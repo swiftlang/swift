@@ -67,10 +67,13 @@ ERROR(cannot_find_appropriate_overload,sema,none,
       "arguments", (StringRef))
 
 ERROR(could_not_find_member,sema,none,
-      "could not find member %0", (Identifier))
+      "could not find member %0", (DeclName))
 
 ERROR(could_not_find_member_type,sema,none,
-      "value of type %0 has no member %1", (Type, Identifier))
+      "value of type %0 has no member %1", (Type, DeclName))
+ERROR(does_not_have_non_mutating_member,sema_tcc,none,
+      "immutable value of type %0 only has mutating members named %1",
+      (Type, DeclName))
 
 ERROR(could_not_convert_argument,sema,none,
       "cannot invoke function with an argument list of type %0", (Type))
@@ -361,12 +364,6 @@ ERROR(did_not_call_method,sema_tcc,none,
       "method %0 was used as a property; add () to call it",
       (Identifier))
 
-ERROR(does_not_have_member,sema_tcc,none,
-      "%0 does not have a member named %1",
-      (Type, DeclName))
-ERROR(does_not_have_non_mutating_member,sema_tcc,none,
-      "immutable value of type %0 only has mutating members named %1",
-      (Type, DeclName))
 ERROR(init_not_instance_member,sema_tcc,none,
       "'init' is a member of the type; insert '.dynamicType' to initialize "
       "a new object of the same dynamic type", ())

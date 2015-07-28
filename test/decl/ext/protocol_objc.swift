@@ -19,5 +19,5 @@ func testOP1(oc1: OC1, ao: AnyObject) {
   ao.reqOP1a!() // okay
 
   // Extension of @objc protocol does not have @objc members.
-  ao.extOP1a!() // expected-error{{'AnyObject' does not have a member named 'extOP1a()'}}
+  ao.extOP1a!() // expected-error{{value of type 'AnyObject' has no member 'extOP1a()'}}
 }

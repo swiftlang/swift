@@ -35,7 +35,7 @@ func badImplicitProperties(obj: BadImplicitProperties) {
   acceptsInt(obj.getterOnly) // expected-error {{cannot invoke 'acceptsInt' with an argument list of type '(() -> Int32)'}}
   // expected-note @-1 {{overloads for 'acceptsInt' exist with these partially matching parameter lists: (Int), (UInt)}}
 
-  acceptsInt(obj.setterOnly) // expected-error {{'BadImplicitProperties' does not have a member named 'setterOnly'}}
+  acceptsInt(obj.setterOnly) // expected-error {{value of type 'BadImplicitProperties' has no member 'setterOnly'}}
 
   // But we should still import all of the methods as methods.
   let x: CInt = obj.setNonVoidReturn(obj.nonVoidReturn())
@@ -65,8 +65,8 @@ func overriding(obj: Sub) {
   // FIXME: These are incorrectly accepted or incorrectly rejected.
   obj.setMethodPairInBase(c)
 
-  obj.setPropertyInProto(g) // expected-error {{does not have a member}}
-  obj.setMethodInBaseButPropertyInProto(h) // expected-error {{does not have a member}}
+  obj.setPropertyInProto(g) // expected-error {{value of type 'Sub' has no member 'setPropertyInProto'}}
+  obj.setMethodInBaseButPropertyInProto(h) // expected-error {{value of type 'Sub' has no member 'setMethodInBaseButPropertyInProto'}}
 }
 
 func doSomethingBase<T: PropertiesProto>(obj: T) {}

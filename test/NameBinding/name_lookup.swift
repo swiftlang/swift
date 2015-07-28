@@ -97,70 +97,70 @@ class ThisDerived1 : ThisBase1 {
     self.baseFunc0()
     self.baseFunc1(42)
     self[0] = 42.0
-    self.baseStaticVar = 42 // expected-error {{'ThisDerived1' does not have a member named 'baseStaticVar'}}
-    self.baseStaticProp = 42 // expected-error {{'ThisDerived1' does not have a member named 'baseStaticProp'}}
-    self.baseStaticFunc0() // expected-error {{'ThisDerived1' does not have a member named 'baseStaticFunc0'}}
+    self.baseStaticVar = 42 // expected-error {{value of type 'ThisDerived1' has no member 'baseStaticVar'}}
+    self.baseStaticProp = 42 // expected-error {{value of type 'ThisDerived1' has no member 'baseStaticProp'}}
+    self.baseStaticFunc0() // expected-error {{value of type 'ThisDerived1' has no member 'baseStaticFunc0'}}
 
     self.baseExtProp = 42
     self.baseExtFunc0()
-    self.baseExtStaticVar = 42 // expected-error {{'ThisDerived1' does not have a member named 'baseExtStaticVar'}}
+    self.baseExtStaticVar = 42 // expected-error {{value of type 'ThisDerived1' has no member 'baseExtStaticVar'}}
     self.baseExtStaticProp = 42
-    self.baseExtStaticFunc0() // expected-error {{'ThisDerived1' does not have a member named 'baseExtStaticFunc0'}}
+    self.baseExtStaticFunc0() // expected-error {{value of type 'ThisDerived1' has no member 'baseExtStaticFunc0'}}
 
     var bs1 : BaseNestedStruct
     var bc1 : BaseNestedClass
     var bo1 : BaseNestedUnion = .BaseUnionX(42)
     var bt1 : BaseNestedTypealias
-    var bs2 = self.BaseNestedStruct() // expected-error{{'ThisDerived1' does not have a member named 'BaseNestedStruct'}}
-    var bc2 = self.BaseNestedClass() // expected-error{{'ThisDerived1' does not have a member named 'BaseNestedClass'}}
-    var bo2 = self.BaseUnionX(24) // expected-error {{'ThisDerived1' does not have a member named 'BaseUnionX'}}
-    var bo3 = self.BaseNestedUnion.BaseUnionX(24) // expected-error{{'ThisDerived1' does not have a member named 'BaseNestedUnion'}}
-    var bt2 = self.BaseNestedTypealias(42) // expected-error{{'ThisDerived1' does not have a member named 'BaseNestedTypealias'}}
+    var bs2 = self.BaseNestedStruct() // expected-error{{value of type 'ThisDerived1' has no member 'BaseNestedStruct'}}
+    var bc2 = self.BaseNestedClass() // expected-error{{value of type 'ThisDerived1' has no member 'BaseNestedClass'}}
+    var bo2 = self.BaseUnionX(24) // expected-error {{value of type 'ThisDerived1' has no member 'BaseUnionX'}}
+    var bo3 = self.BaseNestedUnion.BaseUnionX(24) // expected-error{{value of type 'ThisDerived1' has no member 'BaseNestedUnion'}}
+    var bt2 = self.BaseNestedTypealias(42) // expected-error{{value of type 'ThisDerived1' has no member 'BaseNestedTypealias'}}
 
     var bes1 : BaseExtNestedStruct
     var bec1 : BaseExtNestedClass
     var beo1 : BaseExtNestedUnion = .BaseExtUnionX(42)
     var bet1 : BaseExtNestedTypealias
-    var bes2 = self.BaseExtNestedStruct() // expected-error{{ThisDerived1' does not have a member named 'BaseExtNestedStruct'}}
-    var bec2 = self.BaseExtNestedClass() // expected-error{{ThisDerived1' does not have a member named 'BaseExtNestedClass'}}
-    var beo2 = self.BaseExtUnionX(24) // expected-error {{'ThisDerived1' does not have a member named 'BaseExtUnionX'}}
-    var beo3 = self.BaseExtNestedUnion.BaseExtUnionX(24) // expected-error{{ThisDerived1' does not have a member named 'BaseExtNestedUnion'}}
-    var bet2 = self.BaseExtNestedTypealias(42) // expected-error{{ThisDerived1' does not have a member named 'BaseExtNestedTypealias'}}
+    var bes2 = self.BaseExtNestedStruct() // expected-error{{value of type 'ThisDerived1' has no member 'BaseExtNestedStruct'}}
+    var bec2 = self.BaseExtNestedClass() // expected-error{{value of type 'ThisDerived1' has no member 'BaseExtNestedClass'}}
+    var beo2 = self.BaseExtUnionX(24) // expected-error {{value of type 'ThisDerived1' has no member 'BaseExtUnionX'}}
+    var beo3 = self.BaseExtNestedUnion.BaseExtUnionX(24) // expected-error{{value of type 'ThisDerived1' has no member 'BaseExtNestedUnion'}}
+    var bet2 = self.BaseExtNestedTypealias(42) // expected-error{{value of type 'ThisDerived1' has no member 'BaseExtNestedTypealias'}}
 
     self.derivedInstanceVar = 42
     self.derivedProp = 42
     self.derivedFunc0()
-    self.derivedStaticVar = 42 // expected-error {{'ThisDerived1' does not have a member named 'derivedStaticVar'}}
-    self.derivedStaticProp = 42 // expected-error {{'ThisDerived1' does not have a member named 'derivedStaticProp'}}
-    self.derivedStaticFunc0() // expected-error {{'ThisDerived1' does not have a member named 'derivedStaticFunc0'}}
+    self.derivedStaticVar = 42 // expected-error {{value of type 'ThisDerived1' has no member 'derivedStaticVar'}}
+    self.derivedStaticProp = 42 // expected-error {{value of type 'ThisDerived1' has no member 'derivedStaticProp'}}
+    self.derivedStaticFunc0() // expected-error {{value of type 'ThisDerived1' has no member 'derivedStaticFunc0'}}
 
     self.derivedExtProp = 42
     self.derivedExtFunc0()
-    self.derivedExtStaticVar = 42 // expected-error {{'ThisDerived1' does not have a member named 'derivedExtStaticVar'}}
+    self.derivedExtStaticVar = 42 // expected-error {{value of type 'ThisDerived1' has no member 'derivedExtStaticVar'}}
     self.derivedExtStaticProp = 42
-    self.derivedExtStaticFunc0() // expected-error {{'ThisDerived1' does not have a member named 'derivedExtStaticFunc0'}}
+    self.derivedExtStaticFunc0() // expected-error {{value of type 'ThisDerived1' has no member 'derivedExtStaticFunc0'}}
 
     var ds1 : DerivedNestedStruct
     var dc1 : DerivedNestedClass
     var do1 : DerivedNestedUnion = .DerivedUnionX(42)
     var dt1 : DerivedNestedTypealias
-    var ds2 = self.DerivedNestedStruct() // expected-error{{ThisDerived1' does not have a member named 'DerivedNestedStruct'}}
-    var dc2 = self.DerivedNestedClass() // expected-error{{ThisDerived1' does not have a member named 'DerivedNestedClass'}}
-    var do2 = self.DerivedUnionX(24) // expected-error {{'ThisDerived1' does not have a member named 'DerivedUnionX'}}
-    var do3 = self.DerivedNestedUnion.DerivedUnionX(24) // expected-error{{ThisDerived1' does not have a member named 'DerivedNestedUnion'}}
-    var dt2 = self.DerivedNestedTypealias(42) // expected-error{{ThisDerived1' does not have a member named 'DerivedNestedTypealias'}}
+    var ds2 = self.DerivedNestedStruct() // expected-error{{value of type 'ThisDerived1' has no member 'DerivedNestedStruct'}}
+    var dc2 = self.DerivedNestedClass() // expected-error{{value of type 'ThisDerived1' has no member 'DerivedNestedClass'}}
+    var do2 = self.DerivedUnionX(24) // expected-error {{value of type 'ThisDerived1' has no member 'DerivedUnionX'}}
+    var do3 = self.DerivedNestedUnion.DerivedUnionX(24) // expected-error{{value of type 'ThisDerived1' has no member 'DerivedNestedUnion'}}
+    var dt2 = self.DerivedNestedTypealias(42) // expected-error{{value of type 'ThisDerived1' has no member 'DerivedNestedTypealias'}}
 
     var des1 : DerivedExtNestedStruct
     var dec1 : DerivedExtNestedClass
     var deo1 : DerivedExtNestedUnion = .DerivedExtUnionX(42)
     var det1 : DerivedExtNestedTypealias
-    var des2 = self.DerivedExtNestedStruct() // expected-error{{ThisDerived1' does not have a member named 'DerivedExtNestedStruct'}}
-    var dec2 = self.DerivedExtNestedClass() // expected-error{{ThisDerived1' does not have a member named 'DerivedExtNestedClass'}}
-    var deo2 = self.DerivedExtUnionX(24) // expected-error {{'ThisDerived1' does not have a member named 'DerivedExtUnionX'}}
-    var deo3 = self.DerivedExtNestedUnion.DerivedExtUnionX(24) // expected-error{{ThisDerived1' does not have a member named 'DerivedExtNestedUnion'}}
-    var det2 = self.DerivedExtNestedTypealias(42) // expected-error{{ThisDerived1' does not have a member named 'DerivedExtNestedTypealias'}}
+    var des2 = self.DerivedExtNestedStruct() // expected-error{{value of type 'ThisDerived1' has no member 'DerivedExtNestedStruct'}}
+    var dec2 = self.DerivedExtNestedClass() // expected-error{{value of type 'ThisDerived1' has no member 'DerivedExtNestedClass'}}
+    var deo2 = self.DerivedExtUnionX(24) // expected-error {{value of type 'ThisDerived1' has no member 'DerivedExtUnionX'}}
+    var deo3 = self.DerivedExtNestedUnion.DerivedExtUnionX(24) // expected-error{{value of type 'ThisDerived1' has no member 'DerivedExtNestedUnion'}}
+    var det2 = self.DerivedExtNestedTypealias(42) // expected-error{{value of type 'ThisDerived1' has no member 'DerivedExtNestedTypealias'}}
 
-    self.Type // expected-error {{does not have a member named 'Type'}}
+    self.Type // expected-error {{value of type 'ThisDerived1' has no member 'Type'}}
   }
 
   func testSuper1() {
@@ -169,59 +169,59 @@ class ThisDerived1 : ThisBase1 {
     super.baseFunc0()
     super.baseFunc1(42)
     super[0] = 42.0
-    super.baseStaticVar = 42 // expected-error {{'ThisBase1' does not have a member named 'baseStaticVar'}}
-    super.baseStaticProp = 42 // expected-error {{'ThisBase1' does not have a member named 'baseStaticProp'}}
-    super.baseStaticFunc0() // expected-error {{'ThisBase1' does not have a member named 'baseStaticFunc0'}}
+    super.baseStaticVar = 42 // expected-error {{value of type 'ThisBase1' has no member 'baseStaticVar'}}
+    super.baseStaticProp = 42 // expected-error {{value of type 'ThisBase1' has no member 'baseStaticProp'}}
+    super.baseStaticFunc0() // expected-error {{value of type 'ThisBase1' has no member 'baseStaticFunc0'}}
 
     super.baseExtProp = 42
     super.baseExtFunc0()
-    super.baseExtStaticVar = 42 // expected-error {{'ThisBase1' does not have a member named 'baseExtStaticVar'}}
+    super.baseExtStaticVar = 42 // expected-error {{value of type 'ThisBase1' has no member 'baseExtStaticVar'}}
     super.baseExtStaticProp = 42
-    super.baseExtStaticFunc0() // expected-error {{'ThisBase1' does not have a member named 'baseExtStaticFunc0'}}
+    super.baseExtStaticFunc0() // expected-error {{value of type 'ThisBase1' has no member 'baseExtStaticFunc0'}}
 
-    var bs2 = super.BaseNestedStruct() // expected-error{{'ThisBase1' does not have a member named 'BaseNestedStruct'}}
-    var bc2 = super.BaseNestedClass() // expected-error{{'ThisBase1' does not have a member named 'BaseNestedClass'}}
-    var bo2 = super.BaseUnionX(24) // expected-error {{'ThisBase1' does not have a member named 'BaseUnionX'}}
-    var bo3 = super.BaseNestedUnion.BaseUnionX(24) // expected-error{{'ThisBase1' does not have a member named 'BaseNestedUnion'}}
-    var bt2 = super.BaseNestedTypealias(42) // expected-error{{'ThisBase1' does not have a member named 'BaseNestedTypealias'}}
+    var bs2 = super.BaseNestedStruct() // expected-error{{value of type 'ThisBase1' has no member 'BaseNestedStruct'}}
+    var bc2 = super.BaseNestedClass() // expected-error{{value of type 'ThisBase1' has no member 'BaseNestedClass'}}
+    var bo2 = super.BaseUnionX(24) // expected-error {{value of type 'ThisBase1' has no member 'BaseUnionX'}}
+    var bo3 = super.BaseNestedUnion.BaseUnionX(24) // expected-error{{value of type 'ThisBase1' has no member 'BaseNestedUnion'}}
+    var bt2 = super.BaseNestedTypealias(42) // expected-error{{value of type 'ThisBase1' has no member 'BaseNestedTypealias'}}
 
-    var bes2 = super.BaseExtNestedStruct() // expected-error{{'ThisBase1' does not have a member named 'BaseExtNestedStruct'}}
-    var bec2 = super.BaseExtNestedClass() // expected-error{{'ThisBase1' does not have a member named 'BaseExtNestedClass'}}
-    var beo2 = super.BaseExtUnionX(24) // expected-error {{'ThisBase1' does not have a member named 'BaseExtUnionX'}}
-    var beo3 = super.BaseExtNestedUnion.BaseExtUnionX(24) // expected-error{{'ThisBase1' does not have a member named 'BaseExtNestedUnion'}}
-    var bet2 = super.BaseExtNestedTypealias(42) // expected-error{{'ThisBase1' does not have a member named 'BaseExtNestedTypealias'}}
+    var bes2 = super.BaseExtNestedStruct() // expected-error{{value of type 'ThisBase1' has no member 'BaseExtNestedStruct'}}
+    var bec2 = super.BaseExtNestedClass() // expected-error{{value of type 'ThisBase1' has no member 'BaseExtNestedClass'}}
+    var beo2 = super.BaseExtUnionX(24) // expected-error {{value of type 'ThisBase1' has no member 'BaseExtUnionX'}}
+    var beo3 = super.BaseExtNestedUnion.BaseExtUnionX(24) // expected-error{{value of type 'ThisBase1' has no member 'BaseExtNestedUnion'}}
+    var bet2 = super.BaseExtNestedTypealias(42) // expected-error{{value of type 'ThisBase1' has no member 'BaseExtNestedTypealias'}}
 
-    super.derivedInstanceVar = 42 // expected-error {{'ThisBase1' does not have a member named 'derivedInstanceVar'}}
-    super.derivedProp = 42 // expected-error {{'ThisBase1' does not have a member named 'derivedProp'}}
-    super.derivedFunc0() // expected-error {{'ThisBase1' does not have a member named 'derivedFunc0'}}
-    super.derivedStaticVar = 42 // expected-error {{'ThisBase1' does not have a member named 'derivedStaticVar'}}
-    super.derivedStaticProp = 42 // expected-error {{'ThisBase1' does not have a member named 'derivedStaticProp'}}
-    super.derivedStaticFunc0() // expected-error {{'ThisBase1' does not have a member named 'derivedStaticFunc0'}}
+    super.derivedInstanceVar = 42 // expected-error {{value of type 'ThisBase1' has no member 'derivedInstanceVar'}}
+    super.derivedProp = 42 // expected-error {{value of type 'ThisBase1' has no member 'derivedProp'}}
+    super.derivedFunc0() // expected-error {{value of type 'ThisBase1' has no member 'derivedFunc0'}}
+    super.derivedStaticVar = 42 // expected-error {{value of type 'ThisBase1' has no member 'derivedStaticVar'}}
+    super.derivedStaticProp = 42 // expected-error {{value of type 'ThisBase1' has no member 'derivedStaticProp'}}
+    super.derivedStaticFunc0() // expected-error {{value of type 'ThisBase1' has no member 'derivedStaticFunc0'}}
 
-    super.derivedExtProp = 42 // expected-error {{'ThisBase1' does not have a member named 'derivedExtProp'}}
-    super.derivedExtFunc0() // expected-error {{'ThisBase1' does not have a member named 'derivedExtFunc0'}}
-    super.derivedExtStaticVar = 42 // expected-error {{'ThisBase1' does not have a member named 'derivedExtStaticVar'}}
-    super.derivedExtStaticProp = 42 // expected-error {{'ThisBase1' does not have a member named 'derivedExtStaticProp'}}
-    super.derivedExtStaticFunc0() // expected-error {{'ThisBase1' does not have a member named 'derivedExtStaticFunc0'}}
+    super.derivedExtProp = 42 // expected-error {{value of type 'ThisBase1' has no member 'derivedExtProp'}}
+    super.derivedExtFunc0() // expected-error {{value of type 'ThisBase1' has no member 'derivedExtFunc0'}}
+    super.derivedExtStaticVar = 42 // expected-error {{value of type 'ThisBase1' has no member 'derivedExtStaticVar'}}
+    super.derivedExtStaticProp = 42 // expected-error {{value of type 'ThisBase1' has no member 'derivedExtStaticProp'}}
+    super.derivedExtStaticFunc0() // expected-error {{value of type 'ThisBase1' has no member 'derivedExtStaticFunc0'}}
 
-    var ds2 = super.DerivedNestedStruct() // expected-error {{'ThisBase1' does not have a member named 'DerivedNestedStruct'}}
-    var dc2 = super.DerivedNestedClass() // expected-error {{'ThisBase1' does not have a member named 'DerivedNestedClass'}}
-    var do2 = super.DerivedUnionX(24) // expected-error {{'ThisBase1' does not have a member named 'DerivedUnionX'}}
-    var do3 = super.DerivedNestedUnion.DerivedUnionX(24) // expected-error {{'ThisBase1' does not have a member named 'DerivedNestedUnion'}}
-    var dt2 = super.DerivedNestedTypealias(42) // expected-error {{'ThisBase1' does not have a member named 'DerivedNestedTypealias'}}
+    var ds2 = super.DerivedNestedStruct() // expected-error {{value of type 'ThisBase1' has no member 'DerivedNestedStruct'}}
+    var dc2 = super.DerivedNestedClass() // expected-error {{value of type 'ThisBase1' has no member 'DerivedNestedClass'}}
+    var do2 = super.DerivedUnionX(24) // expected-error {{value of type 'ThisBase1' has no member 'DerivedUnionX'}}
+    var do3 = super.DerivedNestedUnion.DerivedUnionX(24) // expected-error {{value of type 'ThisBase1' has no member 'DerivedNestedUnion'}}
+    var dt2 = super.DerivedNestedTypealias(42) // expected-error {{value of type 'ThisBase1' has no member 'DerivedNestedTypealias'}}
 
-    var des2 = super.DerivedExtNestedStruct() // expected-error {{'ThisBase1' does not have a member named 'DerivedExtNestedStruct'}}
-    var dec2 = super.DerivedExtNestedClass() // expected-error {{'ThisBase1' does not have a member named 'DerivedExtNestedClass'}}
-    var deo2 = super.DerivedExtUnionX(24) // expected-error {{'ThisBase1' does not have a member named 'DerivedExtUnionX'}}
-    var deo3 = super.DerivedExtNestedUnion.DerivedExtUnionX(24) // expected-error {{'ThisBase1' does not have a member named 'DerivedExtNestedUnion'}}
-    var det2 = super.DerivedExtNestedTypealias(42) // expected-error {{'ThisBase1' does not have a member named 'DerivedExtNestedTypealias'}}
+    var des2 = super.DerivedExtNestedStruct() // expected-error {{value of type 'ThisBase1' has no member 'DerivedExtNestedStruct'}}
+    var dec2 = super.DerivedExtNestedClass() // expected-error {{value of type 'ThisBase1' has no member 'DerivedExtNestedClass'}}
+    var deo2 = super.DerivedExtUnionX(24) // expected-error {{value of type 'ThisBase1' has no member 'DerivedExtUnionX'}}
+    var deo3 = super.DerivedExtNestedUnion.DerivedExtUnionX(24) // expected-error {{value of type 'ThisBase1' has no member 'DerivedExtNestedUnion'}}
+    var det2 = super.DerivedExtNestedTypealias(42) // expected-error {{value of type 'ThisBase1' has no member 'DerivedExtNestedTypealias'}}
 
-    super.Type // expected-error {{does not have a member named 'Type'}}
+    super.Type // expected-error {{value of type 'ThisBase1' has no member 'Type'}}
   }
 
   class func staticTestSelf1() {
-    self.baseInstanceVar = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'baseInstanceVar'}}
-    self.baseProp = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'baseProp'}}
+    self.baseInstanceVar = 42 // expected-error {{value of type 'ThisDerived1.Type' has no member 'baseInstanceVar'}}
+    self.baseProp = 42 // expected-error {{value of type 'ThisDerived1.Type' has no member 'baseProp'}}
     self.baseFunc0() // expected-error {{missing argument}}
     self.baseFunc0(ThisBase1())() // expected-error {{'ThisBase1 -> () -> ()' is not convertible to 'ThisDerived1 -> () -> ()'}}
     
@@ -230,15 +230,15 @@ class ThisDerived1 : ThisBase1 {
     // expected-note @-1 {{expected an argument list of type '(ThisBase1)'}}
     self.baseFunc1(ThisBase1())(42) // expected-error {{'ThisBase1 -> (Int) -> ()' is not convertible to 'ThisDerived1 -> (Int) -> ()'}}
     self.baseFunc1(ThisDerived1())(42)
-    self[0] = 42.0 // expected-error {{'ThisDerived1.Type' does not have a member named 'subscript'}}
+    self[0] = 42.0 // expected-error {{value of type 'ThisDerived1.Type' has no member 'subscript'}}
     self.baseStaticVar = 42
     self.baseStaticProp = 42
     self.baseStaticFunc0()
 
-    self.baseExtProp = 42 // expected-error {{ThisDerived1.Type' does not have a member named 'baseExtProp'}}
+    self.baseExtProp = 42 // expected-error {{value of type 'ThisDerived1.Type' has no member 'baseExtProp'}}
     self.baseExtFunc0() // expected-error {{missing argument}}
-    self.baseExtStaticVar = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'baseExtStaticVar'}}
-    self.baseExtStaticProp = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'baseExtStaticProp'}}
+    self.baseExtStaticVar = 42 // expected-error {{value of type 'ThisDerived1.Type' has no member 'baseExtStaticVar'}}
+    self.baseExtStaticProp = 42 // expected-error {{value of type 'ThisDerived1.Type' has no member 'baseExtStaticProp'}}
     self.baseExtStaticFunc0()
 
     var bs1 : BaseNestedStruct
@@ -247,12 +247,12 @@ class ThisDerived1 : ThisBase1 {
     var bt1 : BaseNestedTypealias
     var bs2 = self.BaseNestedStruct()
     var bc2 = self.BaseNestedClass()
-    var bo2 = self.BaseUnionX(24) // expected-error {{'ThisDerived1.Type' does not have a member named 'BaseUnionX'}}
+    var bo2 = self.BaseUnionX(24) // expected-error {{value of type 'ThisDerived1.Type' has no member 'BaseUnionX'}}
     var bo3 = self.BaseNestedUnion.BaseUnionX(24)
     var bt2 = self.BaseNestedTypealias()
 
-    self.derivedInstanceVar = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'derivedInstanceVar'}}
-    self.derivedProp = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'derivedProp'}}
+    self.derivedInstanceVar = 42 // expected-error {{value of type 'ThisDerived1.Type' has no member 'derivedInstanceVar'}}
+    self.derivedProp = 42 // expected-error {{value of type 'ThisDerived1.Type' has no member 'derivedProp'}}
     self.derivedFunc0() // expected-error {{missing argument}}
     self.derivedFunc0(ThisBase1())() // expected-error {{cannot invoke 'derivedFunc0' with an argument list of type '(ThisBase1)'}}
     // expected-note @-1 {{expected an argument list of type '(ThisDerived1)'}}
@@ -261,10 +261,10 @@ class ThisDerived1 : ThisBase1 {
     self.derivedStaticProp = 42
     self.derivedStaticFunc0()
 
-    self.derivedExtProp = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'derivedExtProp'}}
+    self.derivedExtProp = 42 // expected-error {{value of type 'ThisDerived1.Type' has no member 'derivedExtProp'}}
     self.derivedExtFunc0() // expected-error {{missing argument}}
-    self.derivedExtStaticVar = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'derivedExtStaticVar'}}
-    self.derivedExtStaticProp = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'derivedExtStaticProp'}}
+    self.derivedExtStaticVar = 42 // expected-error {{value of type 'ThisDerived1.Type' has no member 'derivedExtStaticVar'}}
+    self.derivedExtStaticProp = 42 // expected-error {{value of type 'ThisDerived1.Type' has no member 'derivedExtStaticProp'}}
     self.derivedExtStaticFunc0()
 
     var ds1 : DerivedNestedStruct
@@ -273,7 +273,7 @@ class ThisDerived1 : ThisBase1 {
     var dt1 : DerivedNestedTypealias
     var ds2 = self.DerivedNestedStruct()
     var dc2 = self.DerivedNestedClass()
-    var do2 = self.DerivedUnionX(24) // expected-error {{'ThisDerived1.Type' does not have a member named 'DerivedUnionX'}}
+    var do2 = self.DerivedUnionX(24) // expected-error {{value of type 'ThisDerived1.Type' has no member 'DerivedUnionX'}}
     var do3 = self.DerivedNestedUnion.DerivedUnionX(24)
     var dt2 = self.DerivedNestedTypealias()
 
@@ -283,64 +283,64 @@ class ThisDerived1 : ThisBase1 {
     var det1 : DerivedExtNestedTypealias
     var des2 = self.DerivedExtNestedStruct()
     var dec2 = self.DerivedExtNestedClass()
-    var deo2 = self.DerivedExtUnionX(24) // expected-error {{'ThisDerived1.Type' does not have a member named 'DerivedExtUnionX'}}
+    var deo2 = self.DerivedExtUnionX(24) // expected-error {{value of type 'ThisDerived1.Type' has no member 'DerivedExtUnionX'}}
     var deo3 = self.DerivedExtNestedUnion.DerivedExtUnionX(24)
     var det2 = self.DerivedExtNestedTypealias()
 
-    self.Type // expected-error {{does not have a member named 'Type'}}
+    self.Type // expected-error {{value of type 'ThisDerived1.Type' has no member 'Type'}}
   }
 
   class func staticTestSuper1() {
-    super.baseInstanceVar = 42 // expected-error {{'ThisBase1.Type' does not have a member named 'baseInstanceVar'}}
-    super.baseProp = 42 // expected-error {{'ThisBase1.Type' does not have a member named 'baseProp'}}
+    super.baseInstanceVar = 42 // expected-error {{value of type 'ThisBase1.Type' has no member 'baseInstanceVar'}}
+    super.baseProp = 42 // expected-error {{value of type 'ThisBase1.Type' has no member 'baseProp'}}
     super.baseFunc0() // expected-error {{missing argument}}
     super.baseFunc0(ThisBase1())()
     super.baseFunc1(42) // expected-error {{cannot invoke 'baseFunc1' with an argument list of type '(Int)'}}
     // expected-note @-1 {{expected an argument list of type '(ThisBase1)'}}
     super.baseFunc1(ThisBase1())(42)
-    super[0] = 42.0 // expected-error {{'ThisBase1.Type' does not have a member named 'subscript'}}
+    super[0] = 42.0 // expected-error {{value of type 'ThisBase1.Type' has no member 'subscript'}}
     super.baseStaticVar = 42
     super.baseStaticProp = 42
     super.baseStaticFunc0()
 
-    super.baseExtProp = 42 // expected-error {{ThisBase1.Type' does not have a member named 'baseExtProp'}}
+    super.baseExtProp = 42 // expected-error {{value of type 'ThisBase1.Type' has no member 'baseExtProp'}}
     super.baseExtFunc0() // expected-error {{missing argument}}
-    super.baseExtStaticVar = 42 // expected-error {{'ThisBase1.Type' does not have a member named 'baseExtStaticVar'}}
-    super.baseExtStaticProp = 42 // expected-error {{'ThisBase1.Type' does not have a member named 'baseExtStaticProp'}}
+    super.baseExtStaticVar = 42 // expected-error {{value of type 'ThisBase1.Type' has no member 'baseExtStaticVar'}}
+    super.baseExtStaticProp = 42 // expected-error {{value of type 'ThisBase1.Type' has no member 'baseExtStaticProp'}}
     super.baseExtStaticFunc0()
 
     var bs2 = super.BaseNestedStruct()
     var bc2 = super.BaseNestedClass()
-    var bo2 = super.BaseUnionX(24) // expected-error {{'ThisBase1.Type' does not have a member named 'BaseUnionX'}}
+    var bo2 = super.BaseUnionX(24) // expected-error {{value of type 'ThisBase1.Type' has no member 'BaseUnionX'}}
     var bo3 = super.BaseNestedUnion.BaseUnionX(24)
     var bt2 = super.BaseNestedTypealias()
 
-    super.derivedInstanceVar = 42 // expected-error {{'ThisBase1.Type' does not have a member named 'derivedInstanceVar'}}
-    super.derivedProp = 42 // expected-error {{'ThisBase1.Type' does not have a member named 'derivedProp'}}
-    super.derivedFunc0() // expected-error {{'ThisBase1.Type' does not have a member named 'derivedFunc0'}}
-    super.derivedStaticVar = 42 // expected-error {{'ThisBase1.Type' does not have a member named 'derivedStaticVar'}}
-    super.derivedStaticProp = 42 // expected-error {{'ThisBase1.Type' does not have a member named 'derivedStaticProp'}}
-    super.derivedStaticFunc0() // expected-error {{'ThisBase1.Type' does not have a member named 'derivedStaticFunc0'}}
+    super.derivedInstanceVar = 42 // expected-error {{value of type 'ThisBase1.Type' has no member 'derivedInstanceVar'}}
+    super.derivedProp = 42 // expected-error {{value of type 'ThisBase1.Type' has no member 'derivedProp'}}
+    super.derivedFunc0() // expected-error {{value of type 'ThisBase1.Type' has no member 'derivedFunc0'}}
+    super.derivedStaticVar = 42 // expected-error {{value of type 'ThisBase1.Type' has no member 'derivedStaticVar'}}
+    super.derivedStaticProp = 42 // expected-error {{value of type 'ThisBase1.Type' has no member 'derivedStaticProp'}}
+    super.derivedStaticFunc0() // expected-error {{value of type 'ThisBase1.Type' has no member 'derivedStaticFunc0'}}
 
-    super.derivedExtProp = 42 // expected-error {{'ThisBase1.Type' does not have a member named 'derivedExtProp'}}
-    super.derivedExtFunc0() // expected-error {{'ThisBase1.Type' does not have a member named 'derivedExtFunc0'}}
-    super.derivedExtStaticVar = 42 // expected-error {{'ThisBase1.Type' does not have a member named 'derivedExtStaticVar'}}
-    super.derivedExtStaticProp = 42 // expected-error {{'ThisBase1.Type' does not have a member named 'derivedExtStaticProp'}}
-    super.derivedExtStaticFunc0() // expected-error {{'ThisBase1.Type' does not have a member named 'derivedExtStaticFunc0'}}
+    super.derivedExtProp = 42 // expected-error {{value of type 'ThisBase1.Type' has no member 'derivedExtProp'}}
+    super.derivedExtFunc0() // expected-error {{value of type 'ThisBase1.Type' has no member 'derivedExtFunc0'}}
+    super.derivedExtStaticVar = 42 // expected-error {{value of type 'ThisBase1.Type' has no member 'derivedExtStaticVar'}}
+    super.derivedExtStaticProp = 42 // expected-error {{value of type 'ThisBase1.Type' has no member 'derivedExtStaticProp'}}
+    super.derivedExtStaticFunc0() // expected-error {{value of type 'ThisBase1.Type' has no member 'derivedExtStaticFunc0'}}
 
-    var ds2 = super.DerivedNestedStruct() // expected-error {{'ThisBase1.Type' does not have a member named 'DerivedNestedStruct'}}
-    var dc2 = super.DerivedNestedClass() // expected-error {{'ThisBase1.Type' does not have a member named 'DerivedNestedClass'}}
-    var do2 = super.DerivedUnionX(24) // expected-error {{'ThisBase1.Type' does not have a member named 'DerivedUnionX'}}
-    var do3 = super.DerivedNestedUnion.DerivedUnionX(24) // expected-error {{'ThisBase1.Type' does not have a member named 'DerivedNestedUnion'}}
-    var dt2 = super.DerivedNestedTypealias(42) // expected-error {{'ThisBase1.Type' does not have a member named 'DerivedNestedTypealias'}}
+    var ds2 = super.DerivedNestedStruct() // expected-error {{value of type 'ThisBase1.Type' has no member 'DerivedNestedStruct'}}
+    var dc2 = super.DerivedNestedClass() // expected-error {{value of type 'ThisBase1.Type' has no member 'DerivedNestedClass'}}
+    var do2 = super.DerivedUnionX(24) // expected-error {{value of type 'ThisBase1.Type' has no member 'DerivedUnionX'}}
+    var do3 = super.DerivedNestedUnion.DerivedUnionX(24) // expected-error {{value of type 'ThisBase1.Type' has no member 'DerivedNestedUnion'}}
+    var dt2 = super.DerivedNestedTypealias(42) // expected-error {{value of type 'ThisBase1.Type' has no member 'DerivedNestedTypealias'}}
 
-    var des2 = super.DerivedExtNestedStruct() // expected-error {{'ThisBase1.Type' does not have a member named 'DerivedExtNestedStruct'}}
-    var dec2 = super.DerivedExtNestedClass() // expected-error {{'ThisBase1.Type' does not have a member named 'DerivedExtNestedClass'}}
-    var deo2 = super.DerivedExtUnionX(24) // expected-error {{'ThisBase1.Type' does not have a member named 'DerivedExtUnionX'}}
-    var deo3 = super.DerivedExtNestedUnion.DerivedExtUnionX(24) // expected-error {{'ThisBase1.Type' does not have a member named 'DerivedExtNestedUnion'}}
-    var det2 = super.DerivedExtNestedTypealias(42) // expected-error {{'ThisBase1.Type' does not have a member named 'DerivedExtNestedTypealias'}}
+    var des2 = super.DerivedExtNestedStruct() // expected-error {{value of type 'ThisBase1.Type' has no member 'DerivedExtNestedStruct'}}
+    var dec2 = super.DerivedExtNestedClass() // expected-error {{value of type 'ThisBase1.Type' has no member 'DerivedExtNestedClass'}}
+    var deo2 = super.DerivedExtUnionX(24) // expected-error {{value of type 'ThisBase1.Type' has no member 'DerivedExtUnionX'}}
+    var deo3 = super.DerivedExtNestedUnion.DerivedExtUnionX(24) // expected-error {{value of type 'ThisBase1.Type' has no member 'DerivedExtNestedUnion'}}
+    var det2 = super.DerivedExtNestedTypealias(42) // expected-error {{value of type 'ThisBase1.Type' has no member 'DerivedExtNestedTypealias'}}
 
-    super.Type // expected-error {{does not have a member named 'Type'}}
+    super.Type // expected-error {{value of type 'ThisBase1.Type' has no member 'Type'}}
   }
 }
 

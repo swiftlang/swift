@@ -67,7 +67,7 @@ struct GZ<T> {
     var t = f1(i, b: f)
     f = t.1
 
-    var zi = Z.i; // expected-error{{'Z.Type' does not have a member named 'i'}}
+    var zi = Z.i; // expected-error{{value of type 'Z.Type' has no member 'i'}}
   }
 }
 
@@ -98,7 +98,7 @@ format._splitFirstIf({ $0.isASCII() })
 ////
 
 // FIXME: Crappy diagnostic
-"foo".lower() // expected-error{{'String' does not have a member named 'lower'}}
+"foo".lower() // expected-error{{value of type 'String' has no member 'lower'}}
 var tmp = "foo".debugDescription
 
 ////
@@ -121,7 +121,7 @@ var wcurriedFull : () = w.curried(0)(y: 1)
 
 // Member of enum Type
 func enumMetatypeMember(opt: Int?) {
-  opt.None // expected-error{{'Int?' does not have a member named 'None'}}
+  opt.None // expected-error{{value of type 'Int?' has no member 'None'}}
 }
 
 ////
@@ -199,7 +199,7 @@ func generic<T: P>(var t: T) {
   let _: Int -> () = id(T.bar(t))
 
   _ = t.mut // expected-error{{partial application of 'mutating' method is not allowed}}
-  _ = t.tum // expected-error{{'T' does not have a member named 'tum'}}
+  _ = t.tum // expected-error{{value of type 'T' has no member 'tum'}}
 
   // Instance member of extension returning Self)
   let _: T -> () -> T = id(T.returnSelfInstance)
@@ -287,12 +287,12 @@ func staticExistential(p: P.Type, pp: P.Protocol) {
   let _: () -> () = p.tum
 
   // Instance member of existential metatype -- not allowed
-  _ = p.bar // expected-error{{'P.Type' does not have a member named 'bar'}}
-  _ = p.mut // expected-error{{'P.Type' does not have a member named 'mut'}}
+  _ = p.bar // expected-error{{value of type 'P.Type' has no member 'bar'}}
+  _ = p.mut // expected-error{{value of type 'P.Type' has no member 'mut'}}
 
   // Static member of metatype -- not allowed
-  _ = pp.tum // expected-error{{'P.Protocol' does not have a member named 'tum'}}
-  _ = P.tum // expected-error{{'P.Protocol' does not have a member named 'tum'}}
+  _ = pp.tum // expected-error{{value of type 'P.Protocol' has no member 'tum'}}
+  _ = P.tum // expected-error{{value of type 'P.Protocol' has no member 'tum'}}
 
   // Static member of extension returning Self)
   let _: () -> P = id(p.returnSelfStatic)

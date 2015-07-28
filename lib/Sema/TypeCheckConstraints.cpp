@@ -222,9 +222,9 @@ Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
 
   Expr *targetAnchor;
   SmallVector<LocatorPathElt, 4> targetPathBuffer;
-  SourceRange range1, range2;
+  SourceRange range;
 
-  simplifyLocator(anchor, path, targetAnchor, targetPathBuffer, range1, range2);
+  simplifyLocator(anchor, path, targetAnchor, targetPathBuffer, range);
   return (path.empty() ? anchor : nullptr);
 }
 

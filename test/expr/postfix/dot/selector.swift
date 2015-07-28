@@ -40,7 +40,7 @@ let instM6 = x.instMethod:overloaded: // expected-error{{could not find an overl
 x.instMethod:overloaded:(1, overloaded: 1)
 x.instMethod:overloaded:(1, overloaded: "two")
 
-let instM7 = x.instMethod:nonexistent: // expected-error{{'C' does not have a member named 'instMethod(_:nonexistent:)'}}
+let instM7 = x.instMethod:nonexistent: // expected-error{{value of type 'C' has no member 'instMethod(_:nonexistent:)'}}
 
 // TODO: recovery
 let instMX = x.instMethod: // expected-error{{expected expression}} // expected-error{{could not find an overload for 'instMethod' that accepts the supplied arguments}} // expected-error{{consecutive statements}}

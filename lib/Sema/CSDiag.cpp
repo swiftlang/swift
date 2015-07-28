@@ -176,10 +176,8 @@ static unsigned recomputeSummaryFlags(ConstraintLocator *oldLocator,
 }
 
 ConstraintLocator *
-constraints::simplifyLocator(ConstraintSystem &cs,
-                             ConstraintLocator *locator,
-                             SourceRange &range1,
-                             SourceRange &range2,
+constraints::simplifyLocator(ConstraintSystem &cs, ConstraintLocator *locator,
+                             SourceRange &range,
                              ConstraintLocator **targetLocator) {
   // Clear out the target locator result.
   if (targetLocator)
@@ -192,18 +190,15 @@ constraints::simplifyLocator(ConstraintSystem &cs,
 
   auto path = locator->getPath();
   auto anchor = locator->getAnchor();
-  simplifyLocator(anchor, path, targetAnchor, targetPath, range1, range2);
+  simplifyLocator(anchor, path, targetAnchor, targetPath, range);
 
 
   // If we have a target anchor, build and simplify the target locator.
   if (targetLocator && targetAnchor) {
-    SourceRange targetRange1, targetRange2;
+    SourceRange targetRange;
     unsigned targetFlags = recomputeSummaryFlags(locator, targetPath);
-    *targetLocator = simplifyLocator(cs,
-                                     cs.getConstraintLocator(targetAnchor,
-                                                             targetPath,
-                                                             targetFlags),
-                                     targetRange1, targetRange2);
+    auto loc = cs.getConstraintLocator(targetAnchor, targetPath, targetFlags);
+    *targetLocator = simplifyLocator(cs, loc, targetRange);
   }
 
   // If we didn't simplify anything, just return the input.
@@ -222,9 +217,8 @@ void constraints::simplifyLocator(Expr *&anchor,
                                   ArrayRef<LocatorPathElt> &path,
                                   Expr *&targetAnchor,
                                   SmallVectorImpl<LocatorPathElt> &targetPath,
-                                  SourceRange &range1, SourceRange &range2) {
-  range1 = SourceRange();
-  range2 = SourceRange();
+                                  SourceRange &range) {
+  range = SourceRange();
   targetAnchor = nullptr;
 
   while (!path.empty()) {
@@ -334,7 +328,7 @@ void constraints::simplifyLocator(Expr *&anchor,
         targetAnchor = nullptr;
         targetPath.clear();
 
-        range1 = dotExpr->getNameLoc();
+        range = dotExpr->getNameLoc();
         anchor = dotExpr->getBase();
         path = path.slice(1);
         continue;
@@ -437,8 +431,8 @@ static Expr *simplifyLocatorToAnchor(ConstraintSystem &cs,
   if (!locator || !locator->getAnchor())
     return nullptr;
 
-  SourceRange range1, range2;
-  locator = simplifyLocator(cs, locator, range1, range2);
+  SourceRange range;
+  locator = simplifyLocator(cs, locator, range);
   if (!locator->getAnchor() || !locator->getPath().empty())
     return nullptr;
 
@@ -722,11 +716,10 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     cloc = failure.getLocator();
   }
   
-  SourceRange range1, range2;
+  SourceRange range;
 
   ConstraintLocator *targetLocator;
-  auto locator = simplifyLocator(cs, cloc, range1, range2,
-                                 &targetLocator);
+  auto locator = simplifyLocator(cs, cloc, range, &targetLocator);
   auto &tc = cs.getTypeChecker();
 
   auto anchor = locator->getAnchor();
@@ -737,15 +730,14 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     auto tuple2 = failure.getSecondType()->castTo<TupleType>();
     tc.diagnose(loc, diag::invalid_tuple_size, tuple1, tuple2,
                 tuple1->getNumElements(), tuple2->getNumElements())
-      .highlight(range1).highlight(range2);
+      .highlight(range);
     return true;
   }
 
   case Failure::TupleUnused:
     tc.diagnose(loc, diag::invalid_tuple_element_unused,
-                failure.getFirstType(),
-                failure.getSecondType())
-      .highlight(range1).highlight(range2);
+                failure.getFirstType(), failure.getSecondType())
+      .highlight(range);
     return true;
 
   case Failure::TypesNotConvertible:
@@ -761,7 +753,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
       tc.diagnose(loc, diag::no_member_of_module,
                   moduleTy->getModule()->getName(),
                   failure.getName())
-        .highlight(range1).highlight(range2);
+        .highlight(range);
       break;
     }
 
@@ -785,11 +777,10 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     }
     
     bool IsNoMember = failure.getKind() == Failure::DoesNotHaveMember;
-    tc.diagnose(loc, IsNoMember ? diag::does_not_have_member :
+    tc.diagnose(loc, IsNoMember ? diag::could_not_find_member_type :
                                   diag::does_not_have_non_mutating_member,
-                failure.getFirstType(),
-                failure.getName())
-      .highlight(range1).highlight(range2);
+                failure.getFirstType(), failure.getName())
+      .highlight(range);
     break;
   }
   case Failure::DoesNotHaveInitOnInstance: {
@@ -848,7 +839,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   case Failure::IsForbiddenLValue:
     if (auto iotTy = failure.getSecondType()->getAs<InOutType>()) {
       tc.diagnose(loc, diag::reference_non_inout, iotTy->getObjectType())
-        .highlight(range1).highlight(range2);
+        .highlight(range);
       return true;
     }
     // FIXME: diagnose other cases
@@ -937,7 +928,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
 
   case Failure::NoPublicInitializers: {
     tc.diagnose(loc, diag::no_accessible_initializers, failure.getFirstType())
-      .highlight(range1);
+      .highlight(range);
     if (targetLocator && !useExprLoc)
       noteTargetOfDiagnostic(cs, failure, targetLocator);
     break;
@@ -945,7 +936,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
 
   case Failure::UnboundGenericParameter: {
     tc.diagnose(loc, diag::unbound_generic_parameter, failure.getFirstType())
-      .highlight(range1);
+      .highlight(range);
     if (!useExprLoc)
       noteTargetOfDiagnostic(cs, failure, locator);
     break;
@@ -954,7 +945,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   case Failure::IsNotMaterializable: {
     tc.diagnose(loc, diag::cannot_bind_generic_parameter_to_type,
                 failure.getFirstType())
-      .highlight(range1);
+      .highlight(range);
     if (!useExprLoc)
       noteTargetOfDiagnostic(cs, failure, locator);
     break;
@@ -962,7 +953,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
 
   case Failure::FunctionNoEscapeMismatch: {
     tc.diagnose(loc, diag::noescape_functiontype_mismatch,
-                failure.getSecondType()).highlight(range2);
+                failure.getSecondType()).highlight(range);
     if (!useExprLoc)
       noteTargetOfDiagnostic(cs, failure, locator);
     break;
@@ -974,7 +965,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
                 failure.getFirstType(),
                 failure.getSecondType()->getAs<AnyFunctionType>()->throws(),
                 failure.getSecondType())
-      .highlight(range2);
+      .highlight(range);
     if (!useExprLoc)
       noteTargetOfDiagnostic(cs, failure, locator);
     break;
@@ -2195,13 +2186,14 @@ bool FailureDiagnosis::diagnoseGeneralValueMemberFailure() {
          valueMemberConstraint->getKind() ==
           ConstraintKind::UnresolvedValueMember);
   
-  auto memberName = valueMemberConstraint->getMember().getBaseName();
+  auto memberName = valueMemberConstraint->getMember();
   
   // Get the referenced expression from the failed constraint.
   auto anchor = expr;
+  SourceRange range = anchor->getSourceRange();
   if (auto locator = valueMemberConstraint->getLocator()) {
-    anchor = simplifyLocatorToAnchor(*CS, locator);
-    if (!anchor)
+    locator = simplifyLocator(*CS, locator, range);
+    if (locator->getAnchor())
       anchor = locator->getAnchor();
   }
 
@@ -2209,16 +2201,19 @@ bool FailureDiagnosis::diagnoseGeneralValueMemberFailure() {
   anchor = typeCheckArbitrarySubExprIndependently(anchor);
   if (!anchor) return true;
   
+  // If we couldn't resolve a specific type for the base expression, then we
+  // cannot produce a specific diagnostic.
   auto type = anchor->getType();
-
   if (typeIsNotSpecialized(type)) {
     diagnose(anchor->getLoc(), diag::could_not_find_member, memberName)
-      .highlight(anchor->getSourceRange());
-  } else {
-    diagnose(anchor->getLoc(), diag::could_not_find_member_type,
-             type, memberName)
-      .highlight(anchor->getSourceRange());
+      .highlight(anchor->getSourceRange()).highlight(range);
+    return true;
   }
+  
+  // Otherwise, try to figure out more about why this failed.
+  diagnose(anchor->getLoc(), diag::could_not_find_member_type,
+           type, memberName)
+    .highlight(anchor->getSourceRange()).highlight(range);
   
   return true;
 }

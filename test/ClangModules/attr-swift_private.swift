@@ -23,7 +23,7 @@ public func testProperty(foo: Foo) {
   foo.__privValue = foo
   
 #if !IRGEN
-  _ = foo.privValue // expected-error {{'Foo' does not have a member named 'privValue'}}
+  _ = foo.privValue // expected-error {{value of type 'Foo' has no member 'privValue'}}
 #endif
 }
 
@@ -58,8 +58,8 @@ public func testFactoryMethods() {
 
 #if !IRGEN
 public func testSubscript(foo: Foo) {
-  _ = foo[foo] // expected-error {{'Foo' does not have a member named 'subscript'}}
-  _ = foo[1] // expected-error {{'Foo' does not have a member named 'subscript'}}
+  _ = foo[foo] // expected-error {{value of type 'Foo' has no member 'subscript'}}
+  _ = foo[1] // expected-error {{value of type 'Foo' has no member 'subscript'}}
 }
 #endif
 

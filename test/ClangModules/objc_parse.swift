@@ -66,7 +66,7 @@ func classMethods(b: B, other: NSObject) {
   i += B.classMethod(1)
   i += B.classMethod(1, withInt:2)
 
-  i += b.classMethod() // expected-error{{'B' does not have a member named 'classMethod'}}
+  i += b.classMethod() // expected-error{{value of type 'B' has no member 'classMethod'}}
 
   // Both class and instance methods exist.
   B.description()
@@ -113,7 +113,7 @@ func properties(b: B) {  // expected-note {{mark parameter with 'var' to make it
   i = i + b.readCounter
   b.readCounter = i + 1 // expected-error{{cannot assign to property: 'readCounter' is a get-only property}}
 
-  b.setCounter(5) // expected-error{{'B' does not have a member named 'setCounter'}}
+  b.setCounter(5) // expected-error{{value of type 'B' has no member 'setCounter'}}
 
   // Informal properties in Objective-C map to methods, not variables.
   b.informalProp()
@@ -151,7 +151,7 @@ func newConstruction(a: A, aproxy: AProxy) {
   b.notAnInit()
 
   // init methods are not imported by themselves.
-  b.initWithInt(17) // expected-error{{'B' does not have a member named 'initWithInt'}}
+  b.initWithInt(17) // expected-error{{value of type 'B' has no member 'initWithInt'}}
 
   // init methods on non-NSObject-rooted classes
   AProxy(int: 5) // expected-warning{{unused}}
@@ -201,7 +201,7 @@ func testProtocols(b: B, bp: BProto) {
 func testProtocolMethods(b: B, p2m: P2.Type) {
   b.otherMethod(1, withFloat:3.14159)
   b.p2Method()
-  b.initViaP2(3.14159, second:3.14159) // expected-error{{'B' does not have a member named 'initViaP2'}}
+  b.initViaP2(3.14159, second:3.14159) // expected-error{{value of type 'B' has no member 'initViaP2'}}
 
   // Imported constructor.
   var b2 = B(viaP2: 3.14159, second:3.14159)
@@ -237,7 +237,7 @@ func overridingTest(srs: SuperRefsSub) {
 
 func almostSubscriptableValueMismatch(as1: AlmostSubscriptable, a: A) {
   // FIXME: Crummy diagnostic.
-  as1[a] // expected-error{{'AlmostSubscriptable' does not have a member named 'subscript'}}
+  as1[a] // expected-error{{value of type 'AlmostSubscriptable' has no member 'subscript'}}
 }
 
 func almostSubscriptableKeyMismatch(bc: BadCollection, key: NSString) {
@@ -293,7 +293,7 @@ func protocolInheritance(s: NSString) {
 
 func ivars(hive: Hive) {
   var d = hive.bees.description
-  hive.queen.description() // expected-error{{'Hive' does not have a member named 'queen'}}
+  hive.queen.description() // expected-error{{value of type 'Hive' has no member 'queen'}}
 }
 
 class NSObjectable : NSObjectProtocol {
@@ -305,8 +305,8 @@ class NSObjectable : NSObjectProtocol {
 // Properties with custom accessors
 func customAccessors(hive: Hive, bee: Bee) {
   markUsed(hive.makingHoney)
-  markUsed(hive.isMakingHoney()) // expected-error{{'Hive' does not have a member named 'isMakingHoney'}}
-  hive.setMakingHoney(true) // expected-error{{'Hive' does not have a member named 'setMakingHoney'}}
+  markUsed(hive.isMakingHoney()) // expected-error{{value of type 'Hive' has no member 'isMakingHoney'}}
+  hive.setMakingHoney(true) // expected-error{{value of type 'Hive' has no member 'setMakingHoney'}}
 
   hive.`guard`.description // okay
   hive.`guard`.description! // no-warning
@@ -393,7 +393,7 @@ func testSubscriptAndPropertyRedeclaration(obj: SubscriptAndProperty) {
   _ = obj.x
   obj.x = 5
   obj.objectAtIndexedSubscript(5) // expected-error{{'objectAtIndexedSubscript' is unavailable: use subscripting}}
-  obj.setX(5) // expected-error{{'SubscriptAndProperty' does not have a member named 'setX'}}
+  obj.setX(5) // expected-error{{value of type 'SubscriptAndProperty' has no member 'setX'}}
 
   _ = obj[0]
   obj[1] = obj
@@ -403,7 +403,7 @@ func testSubscriptAndPropertyRedeclaration(obj: SubscriptAndProperty) {
 func testSubscriptAndPropertyWithProtocols(obj: SubscriptAndPropertyWithProto) {
   _ = obj.x
   obj.x = 5
-  obj.setX(5) // expected-error{{'SubscriptAndPropertyWithProto' does not have a member named 'setX'}}
+  obj.setX(5) // expected-error{{value of type 'SubscriptAndPropertyWithProto' has no member 'setX'}}
 
   _ = obj[0]
   obj[1] = obj
@@ -437,7 +437,7 @@ func testProtocolClassShadowing(obj: ClassInHelper, p: ProtoInHelper) {
 func testDealloc(obj: NSObject) {
   // dealloc is subsumed by deinit.
   // FIXME: Special-case diagnostic in the type checker?
-  obj.dealloc() // expected-error{{'NSObject' does not have a member named 'dealloc'}}
+  obj.dealloc() // expected-error{{value of type 'NSObject' has no member 'dealloc'}}
 }
 
 func testConstantGlobals() {
@@ -460,7 +460,7 @@ class IncompleteProtocolAdopter : Incomplete, IncompleteOptional { // expected-e
 
 func testNullarySelectorPieces(obj: AnyObject) {
   obj.foo(1, bar: 2, 3) // no-warning
-  obj.foo(1, 2, bar: 3) // expected-error{{'AnyObject' does not have a member named 'foo(_:_:bar:)'}}
+  obj.foo(1, 2, bar: 3) // expected-error{{value of type 'AnyObject' has no member 'foo(_:_:bar:)'}}
 }
 
 func testFactoryMethodAvailability() {
@@ -491,7 +491,7 @@ func testUnusedResults(ur: UnusedResults) {
 }
 
 func testCStyle() {
-  ExtraSelectors.cStyle(0, 1, 2) // expected-error{{'ExtraSelectors.Type' does not have a member named 'cStyle'}}
+  ExtraSelectors.cStyle(0, 1, 2) // expected-error{{value of type 'ExtraSelectors.Type' has no member 'cStyle'}}
 }
 
 func testProtocolQualified(obj: CopyableNSObject, cell: CopyableSomeCell,

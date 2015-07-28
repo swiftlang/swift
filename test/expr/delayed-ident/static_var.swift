@@ -22,8 +22,8 @@ struct X2<T> {
   static var NotAnX2 = 0 // expected-error {{static stored properties not yet supported in generic types}}
 }
 
-var x2: X2<Int> = .AnX2  // expected-error {{'X2<Int>.Type' does not have a member named 'AnX2'}}
-x2 = .AnX2     // expected-error {{'X2<Int>.Type' does not have a member named 'AnX2'}}
+var x2: X2<Int> = .AnX2  // expected-error {{value of type 'X2<Int>.Type' has no member 'AnX2'}}
+x2 = .AnX2     // expected-error {{value of type 'X2<Int>.Type' has no member 'AnX2'}}
 x2 = .NotAnX2 // expected-error{{could not find member 'NotAnX2'}}
 
 // Static variables through operators.

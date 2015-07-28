@@ -13,7 +13,7 @@ struct BadContainer2 : SequenceType { // expected-error{{type 'BadContainer2' do
 }
 
 func bad_containers_2(bc: BadContainer2) {
-  for e in bc { } // expected-error{{'BadContainer2' does not have a member named 'Generator'}}
+  for e in bc { } // expected-error{{value of type 'BadContainer2' has no member 'Generator'}}
 }
 
 struct BadContainer3 : SequenceType { // expected-error{{type 'BadContainer3' does not conform to protocol 'SequenceType'}}
@@ -21,7 +21,7 @@ struct BadContainer3 : SequenceType { // expected-error{{type 'BadContainer3' do
 }
 
 func bad_containers_3(bc: BadContainer3) {
-  for e in bc { } // expected-error{{'BadContainer3' does not have a member named 'Generator'}}
+  for e in bc { } // expected-error{{value of type 'BadContainer3' has no member 'Generator'}}
 }
 
 struct BadGeneratorType1 {
@@ -34,7 +34,7 @@ struct BadContainer4 : SequenceType { // expected-error{{type 'BadContainer4' do
 }
 
 func bad_containers_4(bc: BadContainer4) {
-  for e in bc { } // expected-error{{'Generator' (aka 'BadGeneratorType1') does not have a member named 'Element'}}
+  for e in bc { } // expected-error{{value of type 'Generator' (aka 'BadGeneratorType1') has no member 'Element'}}
 }
 
 // Pattern type-checking

@@ -83,7 +83,7 @@ func test3(a: ZeroOneTwoThree) {
   
   var _ : ZeroOneTwoThree = .One(4)
   
-  var _ : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{'((Int, Int) -> ZeroOneTwoThree).Type' does not have a member named 'Two'}}
+  var _ : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{value of type '((Int, Int) -> ZeroOneTwoThree).Type' has no member 'Two'}}
 }
 
 func test3a(a: ZeroOneTwoThree) {
@@ -110,11 +110,11 @@ func test4() {
   var a : CGPoint
   // Note: we reject the following because it conflicts with the current
   // "init" hack.
-  var b = CGPoint.CGPoint(1, 2) // expected-error {{'CGPoint.Type' does not have a member named 'CGPoint'}}
+  var b = CGPoint.CGPoint(1, 2) // expected-error {{value of type 'CGPoint.Type' has no member 'CGPoint'}}
   var c = CGPoint(x: 2, y : 1)   // Using injected name.
 
-  var e = CGPoint.x // expected-error {{'CGPoint.Type' does not have a member named 'x'}}
-  var f = OtherPoint.x  // expected-error {{'OtherPoint.Type' (aka '(x: Int, y: Int).Type') does not have a member named 'x'}}
+  var e = CGPoint.x // expected-error {{value of type 'CGPoint.Type' has no member 'x'}}
+  var f = OtherPoint.x  // expected-error {{value of type 'OtherPoint.Type' (aka '(x: Int, y: Int).Type') has no member 'x'}}
 }
 
 
@@ -218,8 +218,8 @@ func f() {
 func union_error(a: ZeroOneTwoThree) {
   var _ : ZeroOneTwoThree = .Zero(1) // expected-error {{could not find member 'Zero'}}
   var _ : ZeroOneTwoThree = .One // expected-error {{could not find member 'One'}}
-  var _ : ZeroOneTwoThree = .foo // expected-error {{'ZeroOneTwoThree.Type' does not have a member named 'foo'}}
-  var _ : ZeroOneTwoThree = .foo() // expected-error {{'ZeroOneTwoThree.Type' does not have a member named 'foo'}}
+  var _ : ZeroOneTwoThree = .foo // expected-error {{value of type 'ZeroOneTwoThree.Type' has no member 'foo'}}
+  var _ : ZeroOneTwoThree = .foo() // expected-error {{value of type 'ZeroOneTwoThree.Type' has no member 'foo'}}
 }
 
 func local_struct() {
@@ -249,8 +249,8 @@ var %% : distance -> distance // expected-error {{expected pattern}}
 
 func badTupleElement() {
   typealias X = (x : Int, y : Int)
-  var y = X.y // expected-error{{'X.Type' (aka '(x: Int, y: Int).Type') does not have a member named 'y'}}
-  var z = X.z // expected-error{{'X.Type' (aka '(x: Int, y: Int).Type') does not have a member named 'z'}}
+  var y = X.y // expected-error{{value of type 'X.Type' (aka '(x: Int, y: Int).Type') has no member 'y'}}
+  var z = X.z // expected-error{{value of type 'X.Type' (aka '(x: Int, y: Int).Type') has no member 'z'}}
 }
 
 enum Direction {

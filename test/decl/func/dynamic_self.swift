@@ -274,6 +274,6 @@ func testOptionalSelf(y : Y) {
   // Sanity-checking to make sure that the above succeeding
   // isn't coincidental.
   if let clone = y.cloneAsObjectSlice() {
-    clone.operationThatOnlyExistsOnY() // expected-error {{'X' does not have a member named 'operationThatOnlyExistsOnY'}}
+    clone.operationThatOnlyExistsOnY() // expected-error {{value of type 'X' has no member 'operationThatOnlyExistsOnY'}}
   }
 }

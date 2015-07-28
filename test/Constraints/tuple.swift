@@ -59,8 +59,8 @@ any = (1, 2)
 any = (label: 4)
 
 // Scalars don't have .0/.1/etc
-i = j.0 // expected-error{{'Int' does not have a member named '0'}}
-any.1 // expected-error{{'Any' (aka 'protocol<>') does not have a member named '1'}}
+i = j.0 // expected-error{{value of type 'Int' has no member '0'}}
+any.1 // expected-error{{value of type 'Any' (aka 'protocol<>') has no member '1'}}
 
 // Fun with tuples
 protocol PosixErrorReturn {

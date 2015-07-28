@@ -120,7 +120,7 @@ var zi = ZI(x: 1, f: 3.0)
 var i : Int = XI.f()
 i = XI.f()
 i = xi.g()
-i = yi.f() // expected-error{{does not have a member named 'f'}}
+i = yi.f() // expected-error{{value of type 'YI' (aka 'YT<Int>') has no member 'f'}}
 i = yi.g()
 
 var xif : (XI) -> () -> Int = XI.g

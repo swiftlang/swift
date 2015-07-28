@@ -12,4 +12,4 @@ let not = Predicate.not()
 let and = Predicate.and([])
 let or = Predicate.or([not, and])
 
-_ = Predicate.foobar() // expected-error{{'Predicate.Type' does not have a member named 'foobar'}}
+_ = Predicate.foobar() // expected-error{{value of type 'Predicate.Type' has no member 'foobar'}}

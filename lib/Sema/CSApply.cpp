@@ -3401,8 +3401,8 @@ findDefaultArgsOwner(ConstraintSystem &cs, const Solution &solution,
   }
 
   // Simplify the locator.
-  SourceRange range1, range2;
-  locator = simplifyLocator(cs, locator, range1, range2);
+  SourceRange range;
+  locator = simplifyLocator(cs, locator, range);
 
   // If we didn't map down to a specific expression, we can't handle a default
   // argument.
@@ -5835,9 +5835,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
       }
 
       // Resolve the locator to a specific expression.
-      SourceRange range1, range2;
-      ConstraintLocator *resolved
-        = simplifyLocator(*this, locator, range1, range2);
+      SourceRange range;
+      ConstraintLocator *resolved = simplifyLocator(*this, locator, range);
 
       // If we didn't manage to resolve directly to an expression, we don't
       // have a great diagnostic to give, so continue.

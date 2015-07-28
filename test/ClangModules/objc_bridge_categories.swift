@@ -22,13 +22,13 @@ func testStringBridge(str: String) {
   int = int2
 
   // Not bridged because it's in the Foundation module.
-  str.notBridgedMethod() // expected-error{{'String' does not have a member named 'notBridgedMethod'}}
+  str.notBridgedMethod() // expected-error{{value of type 'String' has no member 'notBridgedMethod'}}
 }
 
 func testDictionaryBridge(dict: Dictionary<String, String>) {
-  var d2 = dict.nsDictionaryMethod() // expected-error{{'Dictionary<String, String>' does not have a member named 'nsDictionaryMethod'}}
-  var int = Dictionary<String, String>.nsDictionaryClassMethod() // expected-error{{'Dictionary<String, String>.Type' does not have a member named 'nsDictionaryClassMethod'}}
-  var d3 = dict.nsDictionaryProperty  // expected-error{{'Dictionary<String, String>' does not have a member named 'nsDictionaryProperty'}}
+  var d2 = dict.nsDictionaryMethod() // expected-error{{value of type 'Dictionary<String, String>' has no member 'nsDictionaryMethod'}}
+  var int = Dictionary<String, String>.nsDictionaryClassMethod() // expected-error{{value of type 'Dictionary<String, String>.Type' has no member 'nsDictionaryClassMethod'}}
+  var d3 = dict.nsDictionaryProperty  // expected-error{{value of type 'Dictionary<String, String>' has no member 'nsDictionaryProperty'}}
 }
 
 func testStringBridge() {

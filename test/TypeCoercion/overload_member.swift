@@ -190,8 +190,8 @@ struct WeirdIvarLookupBehavior {
 
   static func static_f() {
     // FIXME: These diagnostics still suck.
-    var a : X = clams // expected-error{{'WeirdIvarLookupBehavior.Type' does not have a member named 'clams'}}
-    var b : Y = clams // expected-error{{'WeirdIvarLookupBehavior.Type' does not have a member named 'clams'}}
+    var a : X = clams // expected-error{{value of type 'WeirdIvarLookupBehavior.Type' has no member 'clams'}}
+    var b : Y = clams // expected-error{{value of type 'WeirdIvarLookupBehavior.Type' has no member 'clams'}}
   }
 }
 

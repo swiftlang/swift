@@ -168,7 +168,7 @@ struct MissingGetterSubscript2 {
 
 func test_subscript(inout x2: X2, i: Int, j: Int, inout value: Int, no: NoSubscript,
                     inout ovl: OverloadedSubscript, inout ret: RetOverloadedSubscript) {
-  no[i] = value // expected-error{{'NoSubscript' does not have a member named 'subscript'}}
+  no[i] = value // expected-error{{value of type 'NoSubscript' has no member 'subscript'}}
 
   value = x2[i]
   x2[i] = value

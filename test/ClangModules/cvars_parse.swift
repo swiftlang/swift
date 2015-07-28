@@ -8,7 +8,7 @@ func getPI() -> Float {
 
 func testPointers() {
   let cp = globalConstPointer
-  cp.abcde() // expected-error {{'UnsafePointer<Void>' (aka 'UnsafePointer<()>') does not have a member named 'abcde'}}
+  cp.abcde() // expected-error {{value of type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>') has no member 'abcde'}}
   let mp = globalPointer
-  mp.abcde() // expected-error {{'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>') does not have a member named 'abcde'}}
+  mp.abcde() // expected-error {{value of type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>') has no member 'abcde'}}
 }

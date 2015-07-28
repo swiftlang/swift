@@ -70,12 +70,12 @@ f3( // expected-error {{cannot invoke 'f3' with an argument list of type '((((In
 // FIXME: Can't test constructible requirement yet.
 
 // Missing member.
-i.wobble() // expected-error{{'Int' does not have a member named 'wobble'}}
+i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
-[1, 2, 3].doesntExist(0)  // expected-error {{'Array<Element>' does not have a member named 'doesntExist'}}
-"awfawf".doesntExist(0)   // expected-error {{'String' does not have a member named 'doesntExist'}}
+[1, 2, 3].doesntExist(0)  // expected-error {{value of type 'Array<Element>' has no member 'doesntExist'}}
+"awfawf".doesntExist(0)   // expected-error {{value of type 'String' has no member 'doesntExist'}}
 
 // Does not conform to protocol.
 // FIXME: f5(i)
@@ -211,7 +211,7 @@ struct Toe {
   let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
 
   func clip() {
-    toenail.inspect { x in // expected-error {{'Toe' does not have a member named 'toenail'}}
+    toenail.inspect { x in // expected-error {{value of type 'Toe' has no member 'toenail'}}
       toenail.inspect { y in }
     }
   }

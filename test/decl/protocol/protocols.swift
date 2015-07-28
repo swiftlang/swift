@@ -256,7 +256,7 @@ protocol HasSequenceAndStream {
 
 func existentialSequenceAndStreamType(h: HasSequenceAndStream) { // expected-error{{has Self or associated type requirements}}
   // FIXME: Crummy diagnostics.
-  var x = h.getR() // expected-error{{'HasSequenceAndStream' does not have a member named 'getR'}}
+  var x = h.getR() // expected-error{{value of type 'HasSequenceAndStream' has no member 'getR'}}
   x.generate()
   x.next()
 
@@ -286,7 +286,7 @@ struct DictionaryIntInt {
 func testSubscripting(iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has Self or associated type requirements}}
   var i: Int = iis[17] 
   // FIXME: Crummy diagnostics.
-  var i2 = i_s[17] // expected-error{{'IntSubscriptable' does not have a member named 'subscript'}}
+  var i2 = i_s[17] // expected-error{{value of type 'IntSubscriptable' has no member 'subscript'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -310,7 +310,7 @@ struct StaticAndInstanceS : InstanceP {
 }
 func StaticProtocolFunc() {
   let a: StaticP = StaticS1()
-  a.f() // expected-error{{'StaticP' does not have a member named 'f'}}
+  a.f() // expected-error{{value of type 'StaticP' has no member 'f'}}
 }
 func StaticProtocolGenericFunc<t : StaticP>(_: t) {
   t.f()

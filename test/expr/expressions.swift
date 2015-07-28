@@ -105,7 +105,7 @@ func funcdecl6(a: Int, b: Int) -> Int { a+b }
 // fields in one.  Cannot dive into functions or through aliases.
 func funcdecl7(a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
   a + b.0 + b.c + third.0 + third.1
-  b.foo // expected-error {{'(c: Int, d: Int)' does not have a member named 'foo'}}
+  b.foo // expected-error {{value of type '(c: Int, d: Int)' has no member 'foo'}}
 }
 
 // Error recovery.
@@ -118,10 +118,10 @@ func errorRecovery() {
     case baz
   }
   var a: Int =
-      .hello // expected-error {{'Int.Type' does not have a member named 'hello'}}
+      .hello // expected-error {{value of type 'Int.Type' has no member 'hello'}}
   var b: union1 = .bar // ok
   var c: union1 =
-      .xyz  // expected-error {{'union1.Type' does not have a member named 'xyz'}}
+      .xyz  // expected-error {{value of type 'union1.Type' has no member 'xyz'}}
   var d: (Int,Int,Int) =
       (1,2) // expected-error {{different number of elements}}
   var e: (Int,Int) =

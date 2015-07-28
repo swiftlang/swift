@@ -2543,9 +2543,7 @@ bool matchCallArguments(ArrayRef<CallArgParam> argTuple,
 ///
 /// \param locator The locator to simplify.
 ///
-/// \param range1 Will be populated with an "interesting" range.
-///
-/// \param range2 Will be populated with a second "interesting" range.
+/// \param range Will be populated with an "interesting" range.
 ///
 /// \param targetLocator If non-null, will be set to a locator that describes
 /// the target of the input locator.
@@ -2553,15 +2551,14 @@ bool matchCallArguments(ArrayRef<CallArgParam> argTuple,
 /// \return the simplified locator.
 ConstraintLocator *simplifyLocator(ConstraintSystem &cs,
                                    ConstraintLocator *locator,
-                                   SourceRange &range1,
-                                   SourceRange &range2,
+                                   SourceRange &range,
                                    ConstraintLocator **targetLocator = nullptr);
 
 void simplifyLocator(Expr *&anchor,
                      ArrayRef<LocatorPathElt> &path,
                      Expr *&targetAnchor,
                      SmallVectorImpl<LocatorPathElt> &targetPath,
-                     SourceRange &range1, SourceRange &range2);
+                     SourceRange &range);
 
 /// Describes the kind of entity to which a locator was resolved.
 enum class ResolvedLocatorKind : uint8_t {

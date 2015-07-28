@@ -28,7 +28,7 @@ class D : B {
 
   func super_calls() {
     super.foo        // expected-error {{expression resolves to an unused l-value}}
-    super.foo.bar    // expected-error {{'Int' does not have a member named 'bar'}}
+    super.foo.bar    // expected-error {{value of type 'Int' has no member 'bar'}}
     super.bar        // expected-error {{expression resolves to an unused function}}
     super.bar()
     super.init // expected-error{{'super.init' cannot be called outside of an initializer}}
