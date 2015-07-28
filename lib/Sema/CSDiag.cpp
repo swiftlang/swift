@@ -3059,7 +3059,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
   Failure::FailureKind failureKind;
   switch (foundConstraint->getKind()) {
   default: assert(0 && "This list out of sync with isConversionConstraint");
-    break;
+    SWIFT_FALLTHROUGH;
   case ConstraintKind::ConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     diagnose(expr->getLoc(), diag::type_does_not_conform,
