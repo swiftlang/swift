@@ -149,6 +149,9 @@ Type DeclContext::getDeclaredTypeInContext() const {
     auto ED = cast<ExtensionDecl>(this);
     auto type = ED->getExtendedType();
 
+    if (type.isNull() || type->is<ErrorType>()) {
+      return ErrorType::get(getASTContext());
+    }
     if (isa<UnboundGenericType>(type.getPointer())) {
       getASTContext().getLazyResolver()->resolveExtension(
         const_cast<ExtensionDecl *>(ED));

@@ -72,3 +72,14 @@ struct CustomGenericCollection<Key> : DictionaryLiteralConvertible {
 extension NilLiteralConvertible {
    var nil: Self { #^RDAR_21796881^#
 }
+
+// rdar://problem/21436558
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21436558
+private protocol RoundRobin : Sendable, Receivable {
+  typealias _NEXT
+}
+#if TESTING
+  extension RoundRobinAS {
+    mutating func appendNextTo(acceptor:#^RDAR_21436558^#
+  }
+#endif

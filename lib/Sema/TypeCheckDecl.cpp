@@ -1592,9 +1592,12 @@ void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
 
   Accessibility maxAccess = Accessibility::Public;
 
-  if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
-    validateDecl(nominal);
-    maxAccess = nominal->getFormalAccess();
+  if (!ED->getExtendedType().isNull() &&
+      !ED->getExtendedType()->is<ErrorType>()) {
+    if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
+      validateDecl(nominal);
+      maxAccess = nominal->getFormalAccess();
+    }
   }
 
   if (const GenericParamList *genericParams = ED->getGenericParams()) {
@@ -6321,6 +6324,10 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   // the innermost extended type might itself be a non-generic type
   // within a generic type.
   auto extendedType = ext->getExtendedType();
+
+  if (extendedType.isNull() || extendedType->is<ErrorType>())
+    return;
+
   if (auto unbound = extendedType->getAs<UnboundGenericType>()) {
     // Validate the nominal type declaration being extended.
     auto nominal = unbound->getDecl();
