@@ -494,20 +494,6 @@ class subject_subscriptInvalid8 {
   }
 }
 
-// rdar://problem/22012606 - test applications of subscript members of class-constrained protocols
-@objc protocol subject_ClassConstrainedSubscript {
-  subscript(index: Int) -> Int { get }
-}
-
-@objc class test_HasSubscript : subject_ClassConstrainedSubscript {
-  subscript(index: Int) -> Int { get { return 0 } }
-}
-
-func test_subject_ClassConstrainedSubscript() {
-  let list: subject_ClassConstrainedSubscript! = test_HasSubscript()
-  list[0]
-}
-
 //===--- Tests for @objc inference.
 
 @objc
