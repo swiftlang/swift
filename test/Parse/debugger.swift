@@ -7,4 +7,4 @@ var z = $x0 + $x1
 
 z // no error.
 
-var x: Double = z // expected-error {{cannot convert initializer of type 'Int' to specified type 'Double'}}
+var x: Double = z // expected-error {{cannot convert initial value of type 'Int' to specified type 'Double'}}

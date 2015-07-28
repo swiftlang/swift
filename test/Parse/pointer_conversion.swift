@@ -69,7 +69,7 @@ func mutableVoidPointerArguments(p: UnsafeMutablePointer<Int>,
   takesMutableVoidPointer(ff) // expected-error{{}} expected-note{{}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafeMutablePointer<Void> = &i // expected-error{{cannot convert initializer of type 'inout Int' to specified type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
+  var x: UnsafeMutablePointer<Void> = &i // expected-error{{cannot convert initial value of type 'inout Int' to specified type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
   x = p // expected-error{{}}
   x = &ii // expected-error{{}}
   _ = x

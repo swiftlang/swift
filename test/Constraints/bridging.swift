@@ -98,7 +98,7 @@ func nsArrayToArray(nsa: NSArray) {
   var _: [BridgedClass] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedClass]'}}
   var _: [OtherClass] = nsa // expected-error{{'NSArray' is not convertible to '[OtherClass]'}}
   var _: [BridgedStruct] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'}}
-  var _: [NotBridgedStruct] = nsa // expected-error{{cannot convert initializer of type 'NSArray' to specified type '[NotBridgedStruct]'}}
+  var _: [NotBridgedStruct] = nsa // expected-error{{cannot convert initial value of type 'NSArray' to specified type '[NotBridgedStruct]'}}
 
   var _: [AnyObject] = nsa as [AnyObject]
   var _: [BridgedClass] = nsa as [BridgedClass] // expected-error{{'NSArray' is not convertible to '[BridgedClass]'; did you mean to use 'as!' to force downcast?}}
@@ -170,7 +170,7 @@ let d2: Double = 3.14159
 inferDouble2 = d2
 
 // rdar://problem/18269449
-var i1: Int = 1.5 * 3.5 // expected-error{{cannot convert initializer of type 'Double' to specified type 'Int'}}
+var i1: Int = 1.5 * 3.5 // expected-error{{cannot convert initial value of type 'Double' to specified type 'Int'}}
 
 // rdar://problem/18330319
 func rdar18330319(s: String, d: [String : AnyObject]) {
@@ -239,15 +239,15 @@ func rdar19831698() {
 
 // <rdar://problem/19836341> Incorrect fixit for NSString? to String? conversions
 func rdar19836341(ns: NSString?, var vns: NSString?) {
-  let _: String? = ns // expected-error{{cannot convert initializer of type 'NSString?' to specified type 'String?'}}
-  var _: String? = ns // expected-error{{cannot convert initializer of type 'NSString?' to specified type 'String?'}}
+  let _: String? = ns // expected-error{{cannot convert initial value of type 'NSString?' to specified type 'String?'}}
+  var _: String? = ns // expected-error{{cannot convert initial value of type 'NSString?' to specified type 'String?'}}
   // FIXME: there should be a fixit appending "as String?" to the line; for now
   // it's sufficient that it doesn't suggest appending "as String"
 
   // Important part about below diagnostic is that from-type is described as
   // 'NSString?' and not '@lvalue NSString?':
-  let _: String? = vns // expected-error{{cannot convert initializer of type 'NSString?' to specified type 'String?'}}
-  var _: String? = vns // expected-error{{cannot convert initializer of type 'NSString?' to specified type 'String?'}}
+  let _: String? = vns // expected-error{{cannot convert initial value of type 'NSString?' to specified type 'String?'}}
+  var _: String? = vns // expected-error{{cannot convert initial value of type 'NSString?' to specified type 'String?'}}
   
   vns = ns
 }

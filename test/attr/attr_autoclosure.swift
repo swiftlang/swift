@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 // Simple case.
-@autoclosure var fn : () -> Int = 4  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} expected-error {{cannot convert initializer of type 'Int' to specified type '() -> Int'}}
+@autoclosure var fn : () -> Int = 4  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} expected-error {{cannot convert initial value of type 'Int' to specified type '() -> Int'}}
 
 @autoclosure func func1() {}  // expected-error {{@autoclosure may only be used on 'parameter' declarations}}
 

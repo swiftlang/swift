@@ -493,7 +493,7 @@ struct SConforms8c : PConforms8 {
 }
 
 func testSConforms8c() {
-  let s: SConforms8c.Assoc = "hello" // expected-error{{cannot convert initializer of type 'String' to specified type 'Assoc' (aka 'Int')}}
+  let s: SConforms8c.Assoc = "hello" // expected-error{{cannot convert initial value of type 'String' to specified type 'Assoc' (aka 'Int')}}
   _ = s
   let i: SConforms8c.Assoc = 5
   _ = i

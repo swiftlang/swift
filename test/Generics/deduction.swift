@@ -278,7 +278,7 @@ class Test<C: Bool_> : MetaFunction {
 } // picks first <*>
 typealias Inty = Test<True>.Result 
 var iy : Inty = 5 // okay, because we picked the first <*>
-var iy2 : Inty = "hello" // expected-error{{cannot convert initializer of type 'String' to specified type 'Inty' (aka 'Int')}}
+var iy2 : Inty = "hello" // expected-error{{cannot convert initial value of type 'String' to specified type 'Inty' (aka 'Int')}}
 
 // rdar://problem/20577950
 class DeducePropertyParams {

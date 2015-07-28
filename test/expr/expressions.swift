@@ -36,7 +36,7 @@ func basictest() {
 
   var x4 : Bool = true
   var x5 : Bool =
-        4 // expected-error {{cannot convert initializer of type 'Int' to specified type 'Bool'}}
+        4 // expected-error {{cannot convert initial value of type 'Int' to specified type 'Bool'}}
 
   //var x6 : Float = 4+5
 
@@ -48,7 +48,7 @@ func basictest() {
   x8 + 1
   0 + x8
   1.0 + x8 // expected-error{{binary operator '+' cannot be applied to operands of type 'Double' and 'Int8'}} expected-note {{overloads for '+' exist with these partially matching parameter lists:}}
-  var x9 : Int16 = x8 + 1 // expected-error{{cannot convert initializer of type 'Int8' to specified type 'Int16'}}
+  var x9 : Int16 = x8 + 1 // expected-error{{cannot convert initial value of type 'Int8' to specified type 'Int16'}}
 
   // Various tuple types.
   var tuple1 : ()
@@ -162,7 +162,7 @@ func test4() -> ((arg1: Int, arg2: Int) -> Int) {
 func test5() {
   let a: (Int, Int) = (1,2)
   var
-     _: ((Int) -> Int, Int) = a  // expected-error {{cannot convert initializer of type '(Int, Int)' to specified type '((Int) -> Int, Int)' (aka '(Int -> Int, Int)')}}
+     _: ((Int) -> Int, Int) = a  // expected-error {{cannot convert initial value of type '(Int, Int)' to specified type '((Int) -> Int, Int)' (aka '(Int -> Int, Int)')}}
 
 
   let c: (a: Int, b: Int) = (1,2)
@@ -265,7 +265,7 @@ func fib(n: Int) -> Int {
 
 // FIXME: Should warn about integer constants being too large <rdar://problem/14070127>
 var
-   il_a: Bool = 4  // expected-error {{cannot convert initializer of type 'Int' to specified type 'Bool'}}
+   il_a: Bool = 4  // expected-error {{cannot convert initial value of type 'Int' to specified type 'Bool'}}
 var il_b: Int8
    = 123123
 var il_c: Int8 = 4  // ok

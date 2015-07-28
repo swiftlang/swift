@@ -25,7 +25,7 @@ class D : B {
   }
 
   init(h:Int) {
-    var _ : B = super.init() // expected-error{{cannot convert initializer of type '()' to specified type 'B'}}
+    var _ : B = super.init() // expected-error{{cannot convert initial value of type '()' to specified type 'B'}}
   }
 
   init(d:Double) {
