@@ -67,3 +67,8 @@ struct CustomGenericCollection<Key> : DictionaryLiteralConvertible {
   var count: Int { #^GENERIC_PARAM_AND_ASSOC_TYPE^# }
 }
 
+// rdar://problem/21796881
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21796881
+extension NilLiteralConvertible {
+   var nil: Self { #^RDAR_21796881^#
+}

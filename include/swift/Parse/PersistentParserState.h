@@ -128,6 +128,8 @@ public:
   std::unique_ptr<FunctionBodyState>
   takeFunctionBodyState(AbstractFunctionDecl *AFD);
 
+  bool hasFunctionBodyState(AbstractFunctionDecl *AFD);
+
   void delayAccessorBodyParsing(AbstractFunctionDecl *AFD,
                                 SourceRange BodyRange,
                                 SourceLoc PreviousLoc,

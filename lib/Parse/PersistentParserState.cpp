@@ -41,6 +41,10 @@ PersistentParserState::takeFunctionBodyState(AbstractFunctionDecl *AFD) {
   return State;
 }
 
+bool PersistentParserState::hasFunctionBodyState(AbstractFunctionDecl *AFD) {
+  return DelayedFunctionBodies.find(AFD) != DelayedFunctionBodies.end();
+}
+
 void PersistentParserState::delayAccessorBodyParsing(AbstractFunctionDecl *AFD,
                                                      SourceRange BodyRange,
                                                      SourceLoc PreviousLoc,

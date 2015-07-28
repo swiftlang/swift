@@ -89,7 +89,7 @@ private:
         Parsed = true;
       }
     }
-    if (!Parsed)
+    if (!Parsed && ParserState.hasFunctionBodyState(AFD))
       TheParser.parseAbstractFunctionBodyDelayed(AFD);
     if (CodeCompletion)
       CodeCompletion->doneParsing();
