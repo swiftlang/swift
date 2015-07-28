@@ -702,3 +702,13 @@ public struct TestPropMethodOverloadGroup {
         return apply(input)
     }
 }
+
+
+// <rdar://problem/18496742> Passing ternary operator expression as inout crashes Swift compiler
+func inoutTests(inout arr: Int) {
+  var x = 1, y = 2
+  (true ? &x : &y)
+  let a = (true ? &x : &y)  // expected-error {{type 'inout Int' of variable is not materializable}}
+
+  inoutTests(true ? &x : &y)
+}

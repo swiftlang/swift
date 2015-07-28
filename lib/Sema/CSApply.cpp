@@ -6186,14 +6186,16 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   } else if (auto *ioTy = result->getType()->getAs<InOutType>()) {
     // We explicitly took a reference to the result, but didn't use it.
     // Complain and emit a Fix-It to zap the '&'.
-    auto addressOf = cast<InOutExpr>(result->getSemanticsProvidingExpr());
-    TC.diagnose(addressOf->getLoc(), diag::reference_non_inout,
-                ioTy->getObjectType())
-      .highlight(addressOf->getSubExpr()->getSourceRange())
-      .fixItRemove(SourceRange(addressOf->getLoc()));
+    if (auto addressOf =
+          dyn_cast<InOutExpr>(result->getSemanticsProvidingExpr())) {
+      TC.diagnose(addressOf->getLoc(), diag::reference_non_inout,
+                  ioTy->getObjectType())
+        .highlight(addressOf->getSubExpr()->getSourceRange())
+        .fixItRemove(SourceRange(addressOf->getLoc()));
 
-    // Strip the address-of expression.
-    result = addressOf->getSubExpr();
+      // Strip the address-of expression.
+      result = addressOf->getSubExpr();
+    }
   } else if (result->getType()->isLValueType() && !discardedExpr) {
     // We referenced an lvalue. Load it.
     result = rewriter.coerceToType(result, result->getType()->getRValueType(),
