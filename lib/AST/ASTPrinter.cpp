@@ -1676,11 +1676,15 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
 }
 
 void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
-  printDocumentationComment(decl);
+  auto elems = decl->getElements();
+  if (!elems.empty()) {
+    // Documentation comments over the case are attached to the enum elements.
+    printDocumentationComment(elems[0]);
+  }
   printAttributes(decl);
   Printer << "case ";
 
-  interleave(decl->getElements().begin(), decl->getElements().end(),
+  interleave(elems.begin(), elems.end(),
     [&](EnumElementDecl *elt) {
       printEnumElement(elt);
     },
