@@ -3492,6 +3492,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 
 bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
   auto subExpr = typeCheckChildIndependently(IOE->getSubExpr(),TCC_AllowLValue);
+  if (!subExpr) return true;
 
   auto subExprType = subExpr->getType();
 

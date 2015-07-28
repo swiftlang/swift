@@ -471,3 +471,8 @@ func testTypeSugar(a : Int) {
 // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Memory>), (Int, UnsafePointer<Memory>)}}
 }
 
+// <rdar://problem/21974772> SegFault in FailureDiagnosis::visitInOutExpr
+func r21974772(y : Int) {
+  let x = &(1.0 + y)  // expected-error {{binary operator '+' cannot be applied to operands of type 'Double' and 'Int'}}
+   //expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (UnsafeMutablePointer<Memory>, Int), (UnsafePointer<Memory>, Int)}}
+}
