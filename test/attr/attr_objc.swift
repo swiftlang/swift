@@ -171,7 +171,13 @@ class subject_genericClass<T> {
 }
 
 extension subject_genericClass where T : Hashable {
-  @objc var prop: Int { return 0 } // expected-error{{variable in a protocol extension cannot be represented in Objective-C}}
+  @objc var prop: Int { return 0 } // expected-error{{members of constrained extensions cannot be declared @objc}}
+}
+
+extension subject_genericClass {
+  @objc var extProp: Int { return 0 } // expected-error{{@objc is not supported within extensions of generic classes}}
+  
+  @objc func extFoo() {} // expected-error{{@objc is not supported within extensions of generic classes}}
 }
 
 @objc
@@ -1821,16 +1827,22 @@ class Load1 {
 // Members of protocol extensions cannot be @objc
 
 extension PlainProtocol {
-  @objc final var property: Int { return 5 } // expected-error{{variable in a protocol extension cannot be represented in Objective-C}}
-  @objc final subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() } // expected-error{{subscript in a protocol extension cannot be represented in Objective-C}}
-  @objc final func fun() { } // expected-error{{method in a protocol extension cannot be represented in Objective-C}}
+  @objc final var property: Int { return 5 } // expected-error{{members of protocol extensions cannot be declared @objc}}
+  @objc final subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() } // expected-error{{members of protocol extensions cannot be declared @objc}}
+  @objc final func fun() { } // expected-error{{members of protocol extensions cannot be declared @objc}}
+}
+
+extension Protocol_ObjC1 {
+  @objc final var property: Int { return 5 } // expected-error{{members of protocol extensions cannot be declared @objc}}
+  @objc final subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() } // expected-error{{members of protocol extensions cannot be declared @objc}}
+  @objc final func fun() { } // expected-error{{members of protocol extensions cannot be declared @objc}}
 }
 
 extension Protocol_ObjC1 {
   // Don't infer @objc for extensions of @objc protocols.
 
-  // CHECK: {{^}} var property: Int
-  final var property: Int { return 5 }
+  // CHECK: {{^}} var propertyOK: Int
+  final var propertyOK: Int { return 5 }
 }
 
 //===---

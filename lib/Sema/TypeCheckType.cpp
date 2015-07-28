@@ -2324,16 +2324,28 @@ static bool checkObjCInExtensionContext(TypeChecker &tc,
   auto DC = value->getDeclContext();
 
   if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
-    if (ED->getGenericParams()) {
-      // Diagnose this problem, if asked to.
+    if (ED->isProtocolExtensionContext()) {
       if (diagnose) {
-        int kind = isa<SubscriptDecl>(value)? 3
-                 : isa<VarDecl>(value)? 2
-                 : isa<ConstructorDecl>(value)? 1
-                 : 0;
-        tc.diagnose(value->getLoc(), diag::objc_in_extension_context, kind);
+        tc.diagnose(value->getLoc(), diag::objc_in_extension_context,
+                    /*is protocol*/true);
       }
+      return true;
+    }
 
+    if (ED->getTrailingWhereClause()) {
+      if (diagnose) {
+        tc.diagnose(value->getLoc(), diag::objc_in_extension_context,
+                    /*is protocol*/false);
+      }
+      return true;
+    }
+
+    // FIXME: This is a current limitation, not inherent. We don't have
+    // a concrete class to attach Objective-C category metadata to.
+    if (ED->getGenericParams()) {
+      if (diagnose) {
+        tc.diagnose(value->getLoc(), diag::objc_in_generic_extension);
+      }
       return true;
     }
   }
