@@ -1347,15 +1347,7 @@ static Module *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
 static int doPrintAST(const CompilerInvocation &InitInvok,
                       StringRef SourceFilename,
                       bool RunTypeChecker,
-                      bool FunctionDefinitions,
-                      bool AbstractAccessors,
-                      bool PreferTypeRepr,
-                      bool ExplodePatternBindingDecls,
-                      bool PrintImplicitAttrs,
-                      bool PrintAccessibility,
-                      bool PrintUnavailableDecls,
-                      bool SkipDeinit,
-                      Accessibility AccessibilityFilter,
+                      const PrintOptions &Options,
                       StringRef MangledNameToFind,
                       StringRef DebugClientDiscriminator) {
   CompilerInvocation Invocation(InitInvok);
@@ -1382,17 +1374,6 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
     CI.performParseOnly();
   else
     CI.performSema();
-
-  PrintOptions Options = PrintOptions::printEverything();
-  Options.AbstractAccessors = AbstractAccessors;
-  Options.FunctionDefinitions = FunctionDefinitions;
-  Options.PreferTypeRepr = PreferTypeRepr;
-  Options.ExplodePatternBindingDecls = ExplodePatternBindingDecls;
-  Options.PrintImplicitAttrs = PrintImplicitAttrs;
-  Options.PrintAccessibility = PrintAccessibility;
-  Options.SkipDeinit = SkipDeinit;
-  Options.AccessibilityFilter = AccessibilityFilter;
-  Options.SkipUnavailable = !PrintUnavailableDecls;
 
   if (MangledNameToFind.empty()) {
     Module *M = CI.getMainModule();
@@ -2448,6 +2429,9 @@ int main(int argc, char *argv[]) {
       options::FullyQualifiedTypesIfAmbiguous;
     PrintOpts.SynthesizeSugarOnTypes = options::SynthesizeSugarOnTypes;
     PrintOpts.AbstractAccessors = options::AbstractAccessors;
+    PrintOpts.FunctionDefinitions = options::FunctionDefinitions;
+    PrintOpts.PreferTypeRepr = options::PreferTypeRepr;
+    PrintOpts.ExplodePatternBindingDecls = options::ExplodePatternBindingDecls;
     PrintOpts.PrintImplicitAttrs = options::PrintImplicitAttrs;
     PrintOpts.PrintAccessibility = options::PrintAccessibility;
     PrintOpts.AccessibilityFilter = options::AccessibilityFilter;
@@ -2515,15 +2499,7 @@ int main(int argc, char *argv[]) {
     ExitCode = doPrintAST(InitInvok,
                           options::SourceFilename,
                           RunTypeChecker,
-                          /*FunctionDefinitions=*/options::FunctionDefinitions,
-                          options::AbstractAccessors,
-                          /*PreferTypeRepr=*/options::PreferTypeRepr,
-                          options::ExplodePatternBindingDecls,
-                          options::PrintImplicitAttrs,
-                          options::PrintAccessibility,
-                          !options::SkipUnavailable,
-                          options::SkipDeinit,
-                          options::AccessibilityFilter,
+                          PrintOpts,
                           options::MangledNameToFind,
                           options::DebugClientDiscriminator);
     break;
