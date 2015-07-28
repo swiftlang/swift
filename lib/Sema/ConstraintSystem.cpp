@@ -1140,6 +1140,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // Open the type of the generic function or member of a generic type.
   Type openedType;
+  auto isClassBoundExistential = false;
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
   if (auto genericFn = value->getInterfaceType()->getAs<GenericFunctionType>()){
     openedType = openType(genericFn, locator, replacements, dc,
@@ -1162,6 +1163,15 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
       // Determine the object type of 'self'.
       auto nominal = value->getDeclContext()->getDeclaredTypeOfContext()
                        ->getAnyNominal();
+      
+      // We want to track if the generic context is represented by a
+      // class-bound existential so we won't inappropriately wrap the
+      // self type in an inout later on.
+      if (auto metatype = nominal->getType()->getAs<AnyMetatypeType>()) {
+        isClassBoundExistential = metatype->getInstanceType()->
+                                            isClassExistentialType();
+      }
+      
       if (dc->isProtocolOrProtocolExtensionContext()) {
         // Retrieve the type variable for 'Self'.
         selfTy = replacements[dc->getProtocolSelf()->getDeclaredType()
@@ -1184,7 +1194,9 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     if (!isa<AbstractFunctionDecl>(value) && !isa<EnumElementDecl>(value)) {
       // If self is a struct, properly qualify it based on our base
       // qualification.  If we have an lvalue coming in, we expect an inout.
-      if (!selfTy->hasReferenceSemantics() && baseTy->is<LValueType>())
+      if (!isClassBoundExistential &&
+          !selfTy->hasReferenceSemantics() &&
+          baseTy->is<LValueType>())
         selfTy = InOutType::get(selfTy);
 
       openedType = FunctionType::get(selfTy, openedType);
