@@ -43,14 +43,14 @@ markUsed(b)
 markUsed(c) // expected-error {{use of unresolved identifier 'c'}}
 
 Foo.x()
-Foo.y() // expected-error {{'Foo.Type' does not have a member named 'y'}}
-Foo.z() // expected-error {{'Foo.Type' does not have a member named 'z'}}
+Foo.y() // expected-error {{value of type 'Foo.Type' has no member 'y'}}
+Foo.z() // expected-error {{value of type 'Foo.Type' has no member 'z'}}
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
-// TESTABLE: :[[@LINE-3]]:{{[^:]+}}: error: 'Foo.Type' does not have a member named 'z'
+// TESTABLE: :[[@LINE-3]]:{{[^:]+}}: error: value of type 'Foo.Type' has no member 'z'
 Foo.a()
 Foo.b()
-Foo.c() // expected-error {{'Foo.Type' does not have a member named 'c'}}
+Foo.c() // expected-error {{value of type 'Foo.Type' has no member 'c'}}
 
 _ = Foo() // expected-error {{'Foo' cannot be constructed because it has no accessible initializers}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
@@ -70,8 +70,8 @@ class Sub : Base {
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 
     method() // expected-error {{use of unresolved identifier 'method'}}
-    self.method() // expected-error {{'Sub' does not have a member named 'method'}}
-    super.method() // expected-error {{'Base' does not have a member named 'method'}}
+    self.method() // expected-error {{value of type 'Sub' has no member 'method'}}
+    super.method() // expected-error {{value of type 'Base' has no member 'method'}}
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:

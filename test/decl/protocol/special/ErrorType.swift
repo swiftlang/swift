@@ -26,8 +26,8 @@ let codeFromOtherFile: Int = AlsoFromOtherFile.A._code
 
 enum NotAnError { case A }
 
-let notAnErrorDomain: String = NotAnError.A._domain // expected-error{{'NotAnError' does not have a member named '_domain'}}
-let notAnErrorCode: Int = NotAnError.A._code // expected-error{{'NotAnError' does not have a member named '_code'}}
+let notAnErrorDomain: String = NotAnError.A._domain // expected-error{{value of type 'NotAnError' has no member '_domain'}}
+let notAnErrorCode: Int = NotAnError.A._code // expected-error{{value of type 'NotAnError' has no member '_code'}}
 
 enum EmptyErrorDomain: ErrorType {}
 
