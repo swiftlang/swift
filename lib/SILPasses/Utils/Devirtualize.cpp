@@ -95,7 +95,7 @@ bool swift::isClassWithUnboundGenericParameters(SILType C, SILModule &M) {
 // to invoke the method.
 static ArrayRef<Substitution>
 getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
-                          SILType ClassInstanceType, ApplyInst *AI) {
+                          SILType ClassInstanceType, FullApplySite AI) {
   // *NOTE*:
   // Apply instruction substitutions are for the Member from a protocol or
   // class B, where this member was first defined, before it got overridden by
@@ -163,12 +163,12 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
   }
 
   if (ClassSubs.empty())
-    return AI->getSubstitutions();
+    return AI.getSubstitutions();
 
-  auto AISubs = AI->getSubstitutions();
+  auto AISubs = AI.getSubstitutions();
 
   CanSILFunctionType AIGenCalleeType =
-      AI->getCallee().getType().castTo<SILFunctionType>();
+      AI.getCallee().getType().castTo<SILFunctionType>();
 
   CanType AISelfClass = AIGenCalleeType->getSelfParameter().getType();
 
@@ -228,11 +228,11 @@ static SILFunction *getTargetClassMethod(SILModule &M,
 /// \p ClassOrMetatypeType is the class type or metatype type we are
 ///    devirtualizing for.
 /// return true if it is possible to devirtualize, false - otherwise.
-bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
+bool swift::canDevirtualizeClassMethod(FullApplySite AI,
                                        SILType ClassOrMetatypeType) {
-  DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
+  DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
 
-  SILModule &Mod = AI->getModule();
+  SILModule &Mod = AI.getModule();
 
   // Bail if any generic types parameters of the class instance type are
   // unbound.
@@ -244,7 +244,7 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
   // either be a metatype or an alloc_ref.
   DEBUG(llvm::dbgs() << "        Origin Type: " << ClassOrMetatypeType);
 
-  auto *CMI = cast<ClassMethodInst>(AI->getCallee());
+  auto *CMI = cast<ClassMethodInst>(AI.getCallee());
 
   // Find the implementation of the member which should be invoked.
   auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, CMI->getMember());
@@ -257,7 +257,7 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
     return false;
   }
 
-  if (AI->getFunction()->isFragile()) {
+  if (AI.getFunction()->isFragile()) {
     // function_ref inside fragile function cannot reference a private or
     // hidden symbol.
     if (!(F->isFragile() || isValidLinkageForFragileRef(F->getLinkage()) ||
@@ -313,15 +313,15 @@ static SILValue conditionallyCastAddr(SILBuilderWithScope<16> &B,
 
 /// Insert instructions to cast the tuple return type into appropiate
 /// tuple type expected by the original apply_inst.
-static SILInstruction *castTupleReturnType(ApplyInst *AI, ApplyInst *NewAI,
+static SILInstruction *castTupleReturnType(FullApplySite AI, SILValue Value,
     CanTypeWrapper<TupleType> ResultTupleTy, SILFunction *F, SILBuilder& B) {
-  auto AITupleTy = cast<TupleType>(AI->getType().getSwiftRValueType());
+  auto AITupleTy = cast<TupleType>(AI.getType().getSwiftRValueType());
   SmallVector<SILValue, 4> TupleElements;
   auto TupleElementTypes = ResultTupleTy.getElementTypes();
   unsigned NumElements = ResultTupleTy->getElements().size();
   for (unsigned i = 0; i < NumElements; ++i) {
     auto EltTy = TupleElementTypes[i];
-    auto ExtractedElt = B.createTupleExtract(AI->getLoc(), NewAI, i);
+    auto ExtractedElt = B.createTupleExtract(AI.getLoc(), Value, i);
     OptionalTypeKind OTK;
     auto OptionalEltTy =
         EltTy.getCanonicalTypeOrNull()->getAnyOptionalObjectType(OTK);
@@ -334,25 +334,25 @@ static SILInstruction *castTupleReturnType(ApplyInst *AI, ApplyInst *NewAI,
 
     // Dereference the optional value
     auto *SomeDecl = B.getASTContext().getOptionalSomeDecl(OTK);
-    auto FuncPtr = B.createUncheckedEnumData(AI->getLoc(), ExtractedElt,
+    auto FuncPtr = B.createUncheckedEnumData(AI.getLoc(), ExtractedElt,
         SomeDecl);
 
     auto AIOptionalEltTy =
         AITupleTy.getElementType(i).getCanonicalTypeOrNull()->getAnyOptionalObjectType();
-    auto SILAIOptionalEltTy = AI->getModule().Types.getLoweredType(
+    auto SILAIOptionalEltTy = AI.getModule().Types.getLoweredType(
         AIOptionalEltTy);
-    auto ConvertedFuncPtr = B.createConvertFunction(AI->getLoc(), FuncPtr,
+    auto ConvertedFuncPtr = B.createConvertFunction(AI.getLoc(), FuncPtr,
         SILAIOptionalEltTy);
 
     TupleElements.push_back(
-        B.createOptionalSome(AI->getLoc(), ConvertedFuncPtr, OTK,
+        B.createOptionalSome(AI.getLoc(), ConvertedFuncPtr, OTK,
             SILType::getPrimitiveObjectType(AITupleTy.getElementType(i))));
   }
 
   // Now create a new tuple
   DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
   NumClassDevirt++;
-  return B.createTuple(AI->getLoc(), AI->getType(), TupleElements);
+  return B.createTuple(AI.getLoc(), AI.getType(), TupleElements);
 }
 
 /// \brief Devirtualize an apply of a class method.
@@ -361,12 +361,12 @@ static SILInstruction *castTupleReturnType(ApplyInst *AI, ApplyInst *NewAI,
 /// \p ClassOrMetatype is a class value or metatype value that is the
 ///    self argument of the apply we will devirtualize.
 /// return the new ApplyInst if created one or null.
-SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
+SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
                                           SILValue ClassOrMetatype) {
-  DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI);
+  DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
 
-  SILModule &Mod = AI->getModule();
-  auto *CMI = cast<ClassMethodInst>(AI->getCallee());
+  SILModule &Mod = AI.getModule();
+  auto *CMI = cast<ClassMethodInst>(AI.getCallee());
   auto ClassOrMetatypeType = ClassOrMetatype.getType();
   auto *F = getTargetClassMethod(Mod, ClassOrMetatypeType, CMI->getMember());
 
@@ -378,18 +378,18 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
   if (GenCalleeType->isPolymorphic())
     SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
 
-  SILBuilderWithScope<16> B(AI);
-  FunctionRefInst *FRI = B.createFunctionRef(AI->getLoc(), F);
+  SILBuilderWithScope<16> B(AI.getInstruction());
+  FunctionRefInst *FRI = B.createFunctionRef(AI.getLoc(), F);
 
   // Create the argument list for the new apply, casting when needed
   // in order to handle covariant indirect return types and
   // contravariant argument types.
   llvm::SmallVector<SILValue, 8> NewArgs;
-  auto Args = AI->getArguments();
+  auto Args = AI.getArguments();
   auto ParamTypes = SubstCalleeType->getParameterSILTypes();
 
   for (unsigned i = 0, e = Args.size() - 1; i != e; ++i)
-    NewArgs.push_back(conditionallyCastAddr(B, AI->getLoc(), Args[i],
+    NewArgs.push_back(conditionallyCastAddr(B, AI.getLoc(), Args[i],
                                             ParamTypes[i]));
 
   // Add the self argument, upcasting if required because we're
@@ -398,31 +398,65 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
   if (ClassOrMetatypeType == SelfParamTy)
     NewArgs.push_back(ClassOrMetatype);
   else
-    NewArgs.push_back(B.createUpcast(AI->getLoc(), ClassOrMetatype,
+    NewArgs.push_back(B.createUpcast(AI.getLoc(), ClassOrMetatype,
                                      SelfParamTy));
 
   // If we have a direct return type, make sure we use the subst callee return
   // type. If we have an indirect return type, AI's return type of the empty
   // tuple should be ok.
-  SILType ReturnType = AI->getType();
+  SILType ReturnType = AI.getType();
   if (!SubstCalleeType->hasIndirectResult()) {
     ReturnType = SubstCalleeType->getSILResult();
   }
 
   SILType SubstCalleeSILType =
     SILType::getPrimitiveObjectType(SubstCalleeType);
-  SILInstruction *NewAI =
-    B.createApply(AI->getLoc(), FRI, SubstCalleeSILType, ReturnType,
-                  Subs, NewArgs);
+  FullApplySite NewAI;
 
-  if (ReturnType == AI->getType()) {
+  SILBasicBlock *ResultBB = nullptr;
+  SILBasicBlock *NormalBB = nullptr;
+  SILValue ResultValue;
+
+  if (!isa<TryApplyInst>(AI)) {
+    NewAI = B.createApply(AI.getLoc(), FRI, SubstCalleeSILType, ReturnType,
+                          Subs, NewArgs);
+    ResultValue = SILValue(NewAI.getInstruction(), 0);
+  } else {
+    auto *TAI = cast<TryApplyInst>(AI);
+    // Always create a new BB for normal and error BBs.
+    // This avoids creation of critical edges.
+    ResultBB = B.getFunction().createBasicBlock();
+    ResultBB->createBBArg(ReturnType);
+    NormalBB = TAI->getNormalBB();
+
+    auto *ErrorBB = B.getFunction().createBasicBlock();
+    ErrorBB->createBBArg(TAI->getErrorBB()->getBBArg(0)->getType());
+
+    NewAI = B.createTryApply(AI.getLoc(), FRI, SubstCalleeSILType,
+                             Subs, NewArgs,
+                             ResultBB, ErrorBB);
+    // The result value is passed as a parameter to the normal block.
+    ResultValue = ResultBB->getBBArg(0);
+    B.setInsertionPoint(ErrorBB);
+    B.createBranch(TAI->getLoc(), TAI->getErrorBB(),
+                   {ErrorBB->getBBArg(0)});
+    B.setInsertionPoint(ResultBB);
+  }
+
+  SILInstruction *CastedReturnValue = NewAI.getInstruction();
+
+  if (ReturnType == AI.getType()) {
     DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
     NumClassDevirt++;
-    return NewAI;
+    if (NormalBB) {
+      B.createBranch(NewAI.getLoc(), NormalBB, { ResultBB->getBBArg(0) });
+    }
+    return CastedReturnValue;
   }
 
   // If our return type differs from AI's return type, then we know that we have
   // a covariant return type. Cast it before we RAUW. This can not happen
+
 
   // Accessors could return a tuple where one of the elements is of a function
   // type, which may refer to a subclass instead of a superclass in its
@@ -432,9 +466,14 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
   // the function types and reconstruct the tuple.
   if (auto *FD = dyn_cast<FuncDecl>(CMI->getMember().getDecl())) {
     if (FD->isAccessor()) {
-      if (auto ResultTupleTy = dyn_cast<TupleType>(ReturnType.getSwiftRValueType()))
-        return castTupleReturnType(AI, dyn_cast<ApplyInst>(NewAI),
-                                   ResultTupleTy, F, B);
+      if (auto ResultTupleTy = dyn_cast<TupleType>(ReturnType.getSwiftRValueType())) {
+        assert(isa<ApplyInst>(NewAI) && "should be an apply_inst");
+        CastedReturnValue = castTupleReturnType(AI, ResultValue, ResultTupleTy, F, B);
+        if (NormalBB) {
+          B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnValue });
+        }
+        return CastedReturnValue;
+      }
     }
   }
 
@@ -449,7 +488,7 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
   auto OptionalReturnType = ReturnType.getSwiftRValueType()
     .getAnyOptionalObjectType(OTK);
 
-  auto OptionalAIType = AI->getType().getSwiftRValueType()
+  auto OptionalAIType = AI.getType().getSwiftRValueType()
     .getAnyOptionalObjectType(AI_OTK);
 
   // Return type if not an optional, but the expected type is an optional
@@ -462,15 +501,19 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
     auto OptType = OptionalType::get(AI_OTK,
                                      ReturnType.getSwiftRValueType()).
                                  getCanonicalTypeOrNull();
-    NewAI = B.createOptionalSome(AI->getLoc(), NewAI,
-                                 AI_OTK,
-                                 SILType::getPrimitiveObjectType(OptType));
+    ResultValue = B.createOptionalSome(AI.getLoc(), ResultValue,
+                                       AI_OTK,
+                                       SILType::getPrimitiveObjectType(OptType));
     OptionalReturnType = ReturnType.getSwiftRValueType();
 
     if (OptionalAIType == OptionalReturnType) {
       DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
       NumClassDevirt++;
-      return NewAI;
+      CastedReturnValue = dyn_cast<SILInstruction>(ResultValue.getDef());
+      if (NormalBB) {
+        B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnValue });
+      }
+      return CastedReturnValue;
     }
   }
 
@@ -481,10 +524,14 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
     // Both types are optional and one of them is the superclass of the other.
     DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
     NumClassDevirt++;
-    return B.createUpcast(AI->getLoc(), SILValue(NewAI, 0), AI->getType());
+    CastedReturnValue = B.createUpcast(AI.getLoc(), ResultValue, AI.getType());
+    if (NormalBB) {
+      B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnValue });
+    }
+    return CastedReturnValue;
   }
 
-  if (OptionalReturnType == AI->getType().getSwiftRValueType()) {
+  if (OptionalReturnType == AI.getType().getSwiftRValueType()) {
     UnwrapOptionalResult = true;
   }
 
@@ -498,28 +545,34 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
          "Only addresses and refs can have their types changed due to "
          "covariant return types or contravariant argument types.");
 
-  SILInstruction *CastedAI = NewAI;
   if (UnwrapOptionalResult) {
     // The devirtualized method returns an optional result.
     // We need to extract the actual result from the optional.
     auto *SomeDecl = B.getASTContext().getOptionalSomeDecl(OTK);
-    CastedAI = B.createUncheckedEnumData(AI->getLoc(), NewAI, SomeDecl);
+    CastedReturnValue = B.createUncheckedEnumData(AI.getLoc(),
+                                                  ResultValue, SomeDecl);
   } else if (WrapOptionalResult) {
     // The devirtualized method returns a non-optional result.
     // We need to wrap it into an optional.
-    CastedAI = B.createOptionalSome(AI->getLoc(), NewAI, AI_OTK, AI->getType());
+    CastedReturnValue = B.createOptionalSome(AI.getLoc(), ResultValue,
+                                             AI_OTK, AI.getType());
   } else if (ReturnType.isAddress()) {
-    CastedAI = B.createUncheckedAddrCast(AI->getLoc(), NewAI, AI->getType());
+    CastedReturnValue = B.createUncheckedAddrCast(AI.getLoc(),
+                                                  ResultValue, AI.getType());
   } else {
-    CastedAI = B.createUncheckedRefCast(AI->getLoc(), NewAI, AI->getType());
+    CastedReturnValue = B.createUncheckedRefCast(AI.getLoc(),
+                                                 ResultValue, AI.getType());
   }
 
   DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
   NumClassDevirt++;
-  return CastedAI;
+  if (NormalBB) {
+    B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnValue });
+  }
+  return CastedReturnValue;
 }
 
-SILInstruction *swift::tryDevirtualizeClassMethod(ApplyInst *AI,
+SILInstruction *swift::tryDevirtualizeClassMethod(FullApplySite AI,
                                              SILValue ClassInstance) {
   if (!canDevirtualizeClassMethod(AI, ClassInstance.getType()))
     return nullptr;
@@ -534,11 +587,11 @@ SILInstruction *swift::tryDevirtualizeClassMethod(ApplyInst *AI,
 /// Generate a new apply of a function_ref to replace an apply of a
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
-static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI, SILFunction *F,
+static ApplyInst *devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
                                             ArrayRef<Substitution> Subs) {
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
-  auto &Module = AI->getModule();
+  auto &Module = AI.getModule();
 
   // Collect all the required substitutions.
   //
@@ -548,7 +601,7 @@ static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI, SILFunction *F,
   SmallVector<Substitution, 16> NewSubstList(Subs.begin(), Subs.end());
 
   // Add the non-self-derived substitutions from the original application.
-  for (auto &origSub : AI->getSubstitutionsWithoutSelfSubstitution())
+  for (auto &origSub : AI.getSubstitutionsWithoutSelfSubstitution())
     if (!origSub.getArchetype()->isSelfDerived())
       NewSubstList.push_back(origSub);
 
@@ -567,10 +620,10 @@ static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI, SILFunction *F,
 
   // Iterate over the non self arguments and add them to the
   // new argument list, upcasting when required.
-  SILBuilderWithScope<8> B(AI);
-  for (SILValue A : AI->getArguments()) {
+  SILBuilderWithScope<8> B(AI.getInstruction());
+  for (SILValue A : AI.getArguments()) {
     if (A.getType() != *ParamType)
-      A = B.createUpcast(AI->getLoc(), A, *ParamType);
+      A = B.createUpcast(AI.getLoc(), A, *ParamType);
 
     Arguments.push_back(A);
     ++ParamType;
@@ -578,8 +631,8 @@ static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI, SILFunction *F,
 
   // Replace old apply instruction by a new apply instruction that invokes
   // the witness thunk.
-  SILBuilderWithScope<2> Builder(AI);
-  SILLocation Loc = AI->getLoc();
+  SILBuilderWithScope<2> Builder(AI.getInstruction());
+  SILLocation Loc = AI.getLoc();
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
 
   auto SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeCanType);
@@ -594,15 +647,15 @@ static ApplyInst *devirtualizeWitnessMethod(ApplyInst *AI, SILFunction *F,
 /// In the cases where we can statically determine the function that
 /// we'll call to, replace an apply of a witness_method with an apply
 /// of a function_ref, returning the new apply.
-static ApplyInst *tryDevirtualizeWitnessMethod(ApplyInst *AI) {
+static ApplyInst *tryDevirtualizeWitnessMethod(FullApplySite AI) {
   SILFunction *F;
   ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;
 
-  auto *WMI = cast<WitnessMethodInst>(AI->getCallee());
+  auto *WMI = cast<WitnessMethodInst>(AI.getCallee());
 
   std::tie(F, WT, Subs) =
-    AI->getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
+    AI.getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
                                                  WMI->getMember());
 
   if (!F)
@@ -652,15 +705,15 @@ static bool isKnownFinal(SILModule &M, SILDeclRef Member) {
 
 /// Attempt to devirtualize the given apply if possible, and return a
 /// new instruction in that case, or nullptr otherwise.
-SILInstruction *swift::tryDevirtualizeApply(ApplyInst *AI) {
-  DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI);
+SILInstruction *swift::tryDevirtualizeApply(FullApplySite AI) {
+  DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI.getInstruction());
 
   // Devirtualize apply instructions that call witness_method instructions:
   //
   //   %8 = witness_method $Optional<UInt16>, #LogicValue.boolValue!getter.1
   //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
   //
-  if (isa<WitnessMethodInst>(AI->getCallee()))
+  if (isa<WitnessMethodInst>(AI.getCallee()))
     return tryDevirtualizeWitnessMethod(AI);
 
   /// Optimize a class_method and alloc_ref pair into a direct function
@@ -679,7 +732,7 @@ SILInstruction *swift::tryDevirtualizeApply(ApplyInst *AI) {
   ///  into
   ///
   /// %YY = function_ref @...
-  if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee())) {
+  if (auto *CMI = dyn_cast<ClassMethodInst>(AI.getCallee())) {
     // Check if the class member is known to be final.
     if (isKnownFinal(CMI->getModule(), CMI->getMember()))
       return tryDevirtualizeClassMethod(AI, CMI->getOperand());

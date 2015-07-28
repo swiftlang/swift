@@ -220,7 +220,8 @@ ApplyInst *swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
 // value, and delete the old apply.
 void swift::replaceDeadApply(FullApplySite Old, SILInstruction *New) {
   auto *OldApply = Old.getInstruction();
-  OldApply->replaceAllUsesWith(New);
+  if (!isa<TryApplyInst>(OldApply))
+    OldApply->replaceAllUsesWith(New);
   recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
 }
 

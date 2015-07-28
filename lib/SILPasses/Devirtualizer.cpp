@@ -71,7 +71,7 @@ public:
               << "\n");
       for (auto &BB : F) {
         for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
-          ApplyInst *AI = dyn_cast<ApplyInst>(&*II);
+          FullApplySite AI = FullApplySite::isa(&*II);
           ++II;
 
           if (!AI)
@@ -109,37 +109,56 @@ SILTransform *swift::createDevirtualizer() {
 }
 
 // A utility function for cloning the apply instruction.
-static ApplyInst *CloneApply(ApplyInst *AI, SILBuilder &Builder) {
+static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
   // Clone the Apply.
-  auto Args = AI->getArguments();
+  auto Args = AI.getArguments();
   SmallVector<SILValue, 8> Ret(Args.size());
   for (unsigned i = 0, e = Args.size(); i != e; ++i)
     Ret[i] = Args[i];
 
-  auto NAI = Builder.createApply(AI->getLoc(), AI->getCallee(),
-                                 AI->getSubstCalleeSILType(),
-                                 AI->getType(),
-                                 AI->getSubstitutions(),
-                                 Ret);
-  NAI->setDebugScope(AI->getDebugScope());
+  FullApplySite NAI;
+
+  switch (AI.getInstruction()->getKind()) {
+  case ValueKind::ApplyInst:
+    NAI = Builder.createApply(AI.getLoc(), AI.getCallee(),
+                                   AI.getSubstCalleeSILType(),
+                                   AI.getType(),
+                                   AI.getSubstitutions(),
+                                   Ret);
+    break;
+  case ValueKind::TryApplyInst: {
+    auto *TryApplyI = cast<TryApplyInst>(AI.getInstruction());
+    NAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
+                                      AI.getSubstCalleeSILType(),
+                                      AI.getSubstitutions(),
+                                      Ret,
+                                      TryApplyI->getNormalBB(),
+                                      TryApplyI->getErrorBB());
+    }
+    break;
+  default:
+    llvm_unreachable("Trying to clone an unsupported apply instruction");
+  }
+
+  NAI.getInstruction()->setDebugScope(AI.getDebugScope());
   return NAI;
 }
 
 /// Insert monomorphic inline caches for a specific class or metatype
 /// type \p SubClassTy.
-static ApplyInst* speculateMonomorphicTarget(ApplyInst *AI,
-                                                SILType SubType) {
+static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
+                                             SILType SubType) {
   // Bail if this class_method cannot be devirtualized.
   if (!canDevirtualizeClassMethod(AI, SubType))
-    return nullptr;
+    return FullApplySite();
 
   // Create a diamond shaped control flow and a checked_cast_branch
   // instruction that checks the exact type of the object.
   // This cast selects between two paths: one that calls the slow dynamic
   // dispatch and one that calls the specific method.
-  SILBasicBlock::iterator It = AI;
-  SILFunction *F = AI->getFunction();
-  SILBasicBlock *Entry = AI->getParent();
+  SILBasicBlock::iterator It = AI.getInstruction();
+  SILFunction *F = AI.getFunction();
+  SILBasicBlock *Entry = AI.getParent();
 
   // Iden is the basic block containing the direct call.
   SILBasicBlock *Iden = F->createBasicBlock();
@@ -149,13 +168,13 @@ static ApplyInst* speculateMonomorphicTarget(ApplyInst *AI,
 
   SILBasicBlock *Continue = Entry->splitBasicBlock(It);
 
-  SILBuilderWithScope<> Builder(Entry, AI->getDebugScope());
+  SILBuilderWithScope<> Builder(Entry, AI.getDebugScope());
   // Create the checked_cast_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
 
-  ClassMethodInst *CMI = cast<ClassMethodInst>(AI->getCallee());
+  ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
 
-  It = Builder.createCheckedCastBranch(AI->getLoc(), /*exact*/ true,
+  It = Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
                                        CMI->getOperand(), SubType, Iden,
                                        Virt);
 
@@ -181,8 +200,8 @@ static ApplyInst* speculateMonomorphicTarget(ApplyInst *AI,
   }
 
   // Copy the two apply instructions into the two blocks.
-  ApplyInst *IdenAI = CloneApply(AI, IdenBuilder);
-  ApplyInst *VirtAI = CloneApply(AI, VirtBuilder);
+  FullApplySite IdenAI = CloneApply(AI, IdenBuilder);
+  FullApplySite VirtAI = CloneApply(AI, VirtBuilder);
 
   // See if Continue has a release on self as the instruction right after the
   // apply. If it exists, move it into position in the diamond.
@@ -200,15 +219,23 @@ static ApplyInst* speculateMonomorphicTarget(ApplyInst *AI,
 
   // Create a PHInode for returning the return value from both apply
   // instructions.
-  SILArgument *Arg = Continue->createBBArg(AI->getType());
-  IdenBuilder.createBranch(AI->getLoc(), Continue, ArrayRef<SILValue>(IdenAI))
-    ->setDebugScope(AI->getDebugScope());
-  VirtBuilder.createBranch(AI->getLoc(), Continue, ArrayRef<SILValue>(VirtAI))
-    ->setDebugScope(AI->getDebugScope());
+  SILArgument *Arg = Continue->createBBArg(AI.getType());
+  if (!isa<TryApplyInst>(AI)) {
+    IdenBuilder.createBranch(AI.getLoc(), Continue,
+        ArrayRef<SILValue>(IdenAI.getInstruction()))->setDebugScope(
+        AI.getDebugScope());
+    VirtBuilder.createBranch(AI.getLoc(), Continue,
+        ArrayRef<SILValue>(VirtAI.getInstruction()))->setDebugScope(
+        AI.getDebugScope());
+  }
 
   // Remove the old Apply instruction.
-  AI->replaceAllUsesWith(Arg);
-  AI->eraseFromParent();
+  if (!isa<TryApplyInst>(AI))
+    AI.getInstruction()->replaceAllUsesWith(Arg);
+  auto *OriginalBB = AI.getParent();
+  AI.getInstruction()->eraseFromParent();
+  if (OriginalBB->empty())
+    OriginalBB->removeFromParent();
 
   // Update the stats.
   NumTargetsPredicted++;
@@ -221,6 +248,32 @@ static ApplyInst* speculateMonomorphicTarget(ApplyInst *AI,
   // Sink class_method instructions down to their single user.
   if (CMI->hasOneUse())
     CMI->moveBefore(CMI->use_begin()->getUser());
+
+  // Split critical edges resulting from VirtAI.
+  if (auto *TAI = dyn_cast<TryApplyInst>(VirtAI)) {
+    auto *ErrorBB = TAI->getFunction()->createBasicBlock();
+    ErrorBB->createBBArg(TAI->getErrorBB()->getBBArg(0)->getType());
+    Builder.setInsertionPoint(ErrorBB);
+    Builder.createBranch(TAI->getLoc(), TAI->getErrorBB(),
+                         {ErrorBB->getBBArg(0)});
+
+    auto *NormalBB = TAI->getFunction()->createBasicBlock();
+    NormalBB->createBBArg(TAI->getNormalBB()->getBBArg(0)->getType());
+    Builder.setInsertionPoint(NormalBB);
+    Builder.createBranch(TAI->getLoc(), TAI->getNormalBB(),
+                        {NormalBB->getBBArg(0) });
+
+    Builder.setInsertionPoint(VirtAI.getInstruction());
+    SmallVector<SILValue, 4> Args;
+    for (auto Arg : VirtAI.getArguments()) {
+      Args.push_back(Arg);
+    }
+    FullApplySite NewVirtAI = Builder.createTryApply(VirtAI.getLoc(), VirtAI.getCallee(),
+        VirtAI.getSubstCalleeSILType(), VirtAI.getSubstitutions(),
+        Args, NormalBB, ErrorBB);
+    VirtAI.getInstruction()->eraseFromParent();
+    VirtAI = NewVirtAI;
+  }
 
   return VirtAI;
 }
@@ -235,12 +288,12 @@ static ApplyInst* speculateMonomorphicTarget(ApplyInst *AI,
 /// \p CD  static class of the instance whose method is being invoked
 /// \p Subs set of direct subclasses of this class
 static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
-                               ApplyInst *AI,
+                               FullApplySite AI,
                                ClassDecl *CD,
                                ClassHierarchyAnalysis::ClassList &Subs) {
-  ClassMethodInst *CMI = cast<ClassMethodInst>(AI->getCallee());
+  ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
   auto *Method = CMI->getMember().getFuncDecl();
-  const DeclContext *DC = AI->getModule().getAssociatedContext();
+  const DeclContext *DC = AI.getModule().getAssociatedContext();
 
   if (CD->isFinal())
     return true;
@@ -262,7 +315,7 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
   case Accessibility::Public:
     return false;
   case Accessibility::Internal:
-    if (!AI->getModule().isWholeModule())
+    if (!AI.getModule().isWholeModule())
       return false;
     break;
   case Accessibility::Private:
@@ -323,9 +376,9 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
 
 /// \brief Try to speculate the call target for the call \p AI. This function
 /// returns true if a change was made.
-static bool tryToSpeculateTarget(ApplyInst *AI,
+static bool tryToSpeculateTarget(FullApplySite AI,
                                  ClassHierarchyAnalysis *CHA) {
-  ClassMethodInst *CMI = cast<ClassMethodInst>(AI->getCallee());
+  ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
 
   // We cannot devirtualize in cases where dynamic calls are
   // semantically required.
@@ -341,7 +394,7 @@ static bool tryToSpeculateTarget(ApplyInst *AI,
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
-  if (isClassWithUnboundGenericParameters(SubType, AI->getModule()))
+  if (isClassWithUnboundGenericParameters(SubType, AI.getModule()))
     return false;
 
   auto &M = CMI->getModule();
@@ -365,7 +418,7 @@ static bool tryToSpeculateTarget(ApplyInst *AI,
 
     DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for class " <<
           CD->getName() << "\n");
-    return speculateMonomorphicTarget(AI, SubType);
+    return !!speculateMonomorphicTarget(AI, SubType);
   }
 
   // Collect the direct subclasses for the class.
@@ -511,11 +564,11 @@ namespace {
       bool Changed = false;
 
       // Collect virtual calls that may be specialized.
-      SmallVector<ApplyInst *, 16> ToSpecialize;
+      SmallVector<FullApplySite, 16> ToSpecialize;
       for (auto &BB : *getFunction()) {
         for (auto II = BB.begin(), IE = BB.end(); II != IE; ++II) {
-          auto *AI = dyn_cast<ApplyInst>(&*II);
-          if (AI && isa<ClassMethodInst>(AI->getCallee()))
+          FullApplySite AI = FullApplySite::isa(&*II);
+          if (AI && isa<ClassMethodInst>(AI.getCallee()))
             ToSpecialize.push_back(AI);
         }
       }

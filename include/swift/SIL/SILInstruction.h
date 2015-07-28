@@ -3902,6 +3902,11 @@ public:
     FOREACH_IMPL_RETURN(getCallee());
   }
 
+  /// Return the type.
+  SILType getType() const {
+    FOREACH_IMPL_RETURN(getSubstCalleeType()->getResult().getSILType());
+  }
+
   /// Get the type of the callee without the applied substitutions.
   CanSILFunctionType getOrigCalleeType() const {
     return getCallee().getType().castTo<SILFunctionType>();
@@ -3937,6 +3942,17 @@ public:
   /// The substitutions used to bind the generic arguments of this function.
   MutableArrayRef<Substitution> getSubstitutions() const {
     FOREACH_IMPL_RETURN(getSubstitutions());
+  }
+
+  ArrayRef<Substitution> getSubstitutionsWithoutSelfSubstitution() const {
+    switch (Inst->getKind()) {
+    case ValueKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getSubstitutionsWithoutSelfSubstitution();
+    case ValueKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getSubstitutionsWithoutSelfSubstitution();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
   }
 
   /// The arguments passed to this instruction.
