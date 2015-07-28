@@ -1737,7 +1737,8 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
     if (!instanceType->getAs<TupleType>()) {
       auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType);
       for (auto ctor : ctors)
-        candidates.push_back({ ctor, 1 });
+        if (ctor->hasType())
+          candidates.push_back({ ctor, 1 });
     }
 
     declName = instanceType->getString();

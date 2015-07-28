@@ -17,7 +17,7 @@ let unqualified = global
 // CHECK-STRING: let qualified: String
 let qualified = HasPrivateAccess.global
 
-// CHECK-ERROR: ambiguous use of 'method'
+// CHECK-ERROR: ambiguous use of 'method()'
 // CHECK-INT: let result: Int?
 // CHECK-STRING: let result: String?
 let result = HasPrivateAccess.MyStruct.method()
