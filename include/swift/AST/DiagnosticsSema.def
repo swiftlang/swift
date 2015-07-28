@@ -187,7 +187,7 @@ NOTE(suggest_partial_overloads,sema,none,
       "lists: %1", (StringRef, StringRef))
 
 ERROR(cannot_convert_initializer_value,sema,none,
-      "cannot convert initial value of type %0 to specified type %1",
+      "cannot convert value of type %0 to specified type %1",
       (Type,Type))
 
 ERROR(cannot_convert_to_return_type,sema,none,
@@ -197,7 +197,7 @@ ERROR(cannot_convert_thrown_type,sema,none,
       "thrown expression type %0 does not conform to 'ErrorType'",
       (Type))
 ERROR(cannot_convert_raw_initializer_value,sema,none,
-      "cannot convert initial value of type %0 to raw type %1",
+      "cannot convert value of type %0 to raw type %1",
       (Type,Type))
 
 ERROR(cannot_convert_default_arg_value,sema,none,

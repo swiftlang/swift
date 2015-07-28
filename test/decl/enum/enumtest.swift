@@ -73,7 +73,7 @@ func test3(a: ZeroOneTwoThree) {
   _ = ZeroOneTwoThree(MaybeInt.None, MaybeInt(4), MaybeInt(32))
 
   var _ : Int =
-     ZeroOneTwoThree.Zero // expected-error {{cannot convert initial value of type 'ZeroOneTwoThree' to specified type 'Int'}}
+     ZeroOneTwoThree.Zero // expected-error {{cannot convert value of type 'ZeroOneTwoThree' to specified type 'Int'}}
 
   test3 ZeroOneTwoThree.Zero // expected-error {{expression resolves to an unused function}} expected-error{{consecutive statements}}
   test3 (ZeroOneTwoThree.Zero)

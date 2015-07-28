@@ -9,7 +9,7 @@ class DefaultInit {
 
 func test2() {
   funcOrVar = 1
-  var _: () -> () = funcOrVar // expected-error{{cannot convert initial value of type 'Int' to specified type '() -> ()'}}
+  var _: () -> () = funcOrVar // expected-error{{cannot convert value of type 'Int' to specified type '() -> ()'}}
 
   _ = SomeStruct(value: 42) // use the SomeStruct from multi-file.swift
 

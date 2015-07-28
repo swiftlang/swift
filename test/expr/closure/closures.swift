@@ -14,7 +14,7 @@ var closure3a : ()->()->(Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // expected-error{{tuple types '(Int, Int)' and '()' have a different number of elements (2 vs. 0)}}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int =
-   { // expected-error {{cannot convert initial value of type '(Double) -> Double' to specified type '(Double) -> Int'}}
+   { // expected-error {{cannot convert value of type '(Double) -> Double' to specified type '(Double) -> Int'}}
        $0 + 1.0 }
 
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}
@@ -69,7 +69,7 @@ func funcdecl5(a: Int, _ y: Int) {
   var fn2 = { 4 }
   
   
-  var c : Int = { a,b-> Int in a+b} // expected-error{{cannot convert initial value of type '(Int, Int) -> Int' to specified type 'Int'}}
+  var c : Int = { a,b-> Int in a+b} // expected-error{{cannot convert value of type '(Int, Int) -> Int' to specified type 'Int'}}
   
   
 }

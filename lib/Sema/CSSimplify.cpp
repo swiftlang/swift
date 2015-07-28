@@ -2735,7 +2735,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   Type baseObjTy = baseTy->getRValueType();
 
   // Try to look through ImplicitlyUnwrappedOptional<T>; the result is
-  // always an r-value.
+  // always an l-value if the input was.
   if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(baseObjTy)) {
     increaseScore(SK_ForceUnchecked);
     
