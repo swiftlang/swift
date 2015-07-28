@@ -83,3 +83,12 @@ private protocol RoundRobin : Sendable, Receivable {
     mutating func appendNextTo(acceptor:#^RDAR_21436558^#
   }
 #endif
+
+// rdar://problem/21435993
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21435993
+class C<T> {
+  func test() {
+    do {} catch { #^RDAR_21435993^#
+  }
+  func accidentallyNested<U>(x: U) {}
+}

@@ -465,7 +465,10 @@ void Mangler::mangleDeclName(const ValueDecl *decl) {
 
 static void bindAllGenericParameters(Mangler &mangler,
                                      GenericParamList *generics) {
-  if (!generics) return;
+  if (!generics) {
+    mangler.resetArchetypesDepth();
+    return;
+  }
   bindAllGenericParameters(mangler, generics->getOuterParameters());
   mangler.bindGenericParameters(generics, /*mangle*/ false);
 }

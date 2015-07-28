@@ -156,6 +156,7 @@ public:
   void mangleIdentifier(StringRef ref,
                         OperatorFixity fixity = OperatorFixity::NotOperator,
                         bool isOperator=false);
+  void resetArchetypesDepth() { ArchetypesDepth = 0; }
 private:
   void mangleFunctionType(AnyFunctionType *fn, ResilienceExpansion expansion,
                           unsigned uncurryingLevel);
