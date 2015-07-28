@@ -36,7 +36,7 @@ func test1a() -> unionSearchFlags {
 
 func test1b(b : Bool) {
   _ = 123
-  _ = .description == 1 // expected-error{{could not find member 'description'}} 
+  _ = .description == 1 // expected-error{{type of expression is ambiguous without more context}} 
 }
 
 enum MaybeInt {
@@ -83,22 +83,22 @@ func test3(a: ZeroOneTwoThree) {
   
   var _ : ZeroOneTwoThree = .One(4)
   
-  var _ : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{value of type '((Int, Int) -> ZeroOneTwoThree).Type' has no member 'Two'}}
+  var _ : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{type of expression is ambiguous without more context}}
 }
 
 func test3a(a: ZeroOneTwoThree) {
   var e : ZeroOneTwoThree = (.Three(1, 2, 3))
   var f = ZeroOneTwoThree.Unknown(.None, .Some(4), .Some(32))
 
-  var g = .None  // expected-error {{could not find member 'None'}}
+  var g = .None  // expected-error {{type of expression is ambiguous without more context}}
 
   // Overload resolution can resolve this to the right constructor.
   var h = ZeroOneTwoThree(1)
 
   test3a;  // expected-error {{unused function}}
-  .Zero   // expected-error {{could not find member 'Zero'}}
+  .Zero   // expected-error {{type of expression is ambiguous without more context}}
   test3a   // expected-error {{unused function}}
-  (.Zero) // expected-error {{could not find member 'Zero'}}
+  (.Zero) // expected-error {{type of expression is ambiguous without more context}}
   test3a(.Zero)
 }
 
@@ -110,11 +110,11 @@ func test4() {
   var a : CGPoint
   // Note: we reject the following because it conflicts with the current
   // "init" hack.
-  var b = CGPoint.CGPoint(1, 2) // expected-error {{value of type 'CGPoint.Type' has no member 'CGPoint'}}
+  var b = CGPoint.CGPoint(1, 2) // expected-error {{type 'CGPoint' has no member 'CGPoint'}}
   var c = CGPoint(x: 2, y : 1)   // Using injected name.
 
-  var e = CGPoint.x // expected-error {{value of type 'CGPoint.Type' has no member 'x'}}
-  var f = OtherPoint.x  // expected-error {{value of type 'OtherPoint.Type' (aka '(x: Int, y: Int).Type') has no member 'x'}}
+  var e = CGPoint.x // expected-error {{member 'x' cannot be used on type 'CGPoint'}}
+  var f = OtherPoint.x  // expected-error {{type 'OtherPoint' (aka '(x: Int, y: Int)') has no member 'x'}}
 }
 
 
@@ -216,10 +216,10 @@ func f() {
 }
 
 func union_error(a: ZeroOneTwoThree) {
-  var _ : ZeroOneTwoThree = .Zero(1) // expected-error {{could not find member 'Zero'}}
-  var _ : ZeroOneTwoThree = .One // expected-error {{could not find member 'One'}}
-  var _ : ZeroOneTwoThree = .foo // expected-error {{value of type 'ZeroOneTwoThree.Type' has no member 'foo'}}
-  var _ : ZeroOneTwoThree = .foo() // expected-error {{value of type 'ZeroOneTwoThree.Type' has no member 'foo'}}
+  var _ : ZeroOneTwoThree = .Zero(1) // expected-error {{type 'Int2048' does not conform to protocol 'IntegerLiteralConvertible'}}
+  var _ : ZeroOneTwoThree = .One // expected-error {{type of expression is ambiguous without more context}}
+  var _ : ZeroOneTwoThree = .foo // expected-error {{type of expression is ambiguous without more context}}
+  var _ : ZeroOneTwoThree = .foo() // expected-error {{type of expression is ambiguous without more context}}
 }
 
 func local_struct() {
@@ -249,8 +249,8 @@ var %% : distance -> distance // expected-error {{expected pattern}}
 
 func badTupleElement() {
   typealias X = (x : Int, y : Int)
-  var y = X.y // expected-error{{value of type 'X.Type' (aka '(x: Int, y: Int).Type') has no member 'y'}}
-  var z = X.z // expected-error{{value of type 'X.Type' (aka '(x: Int, y: Int).Type') has no member 'z'}}
+  var y = X.y // expected-error{{type 'X' (aka '(x: Int, y: Int)') has no member 'y'}}
+  var z = X.z // expected-error{{type 'X' (aka '(x: Int, y: Int)') has no member 'z'}}
 }
 
 enum Direction {

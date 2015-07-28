@@ -39,7 +39,7 @@ func existential<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) {
   eqComp = u
   if t1.isEqual(eqComp) {} // expected-error{{cannot invoke 'isEqual' with an argument list of type '(EqualComparable)'}}
   // expected-note @-1 {{expected an argument list of type '(Self)'}}
-  if eqComp.isEqual(t2) {} // expected-error{{value of type 'EqualComparable' has no member 'isEqual'}}
+  if eqComp.isEqual(t2) {} // expected-error{{member 'isEqual' cannot be used on value of type 'EqualComparable'}}
 }
 
 protocol OtherEqualComparable {
@@ -168,7 +168,7 @@ protocol StaticEq {
 }
 
 func staticEqCheck<T : StaticEq, U : StaticEq>(t: T, u: U) {
-  if t.isEqual(t, t) { return } // expected-error{{value of type 'T' has no member 'isEqual'}}
+  if t.isEqual(t, t) { return } // expected-error{{member 'isEqual' cannot be used on value of type 'T'}}
 
   if T.isEqual(t, y: t) { return }
   if U.isEqual(u, y: u) { return }

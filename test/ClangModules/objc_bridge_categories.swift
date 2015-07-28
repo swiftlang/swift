@@ -27,7 +27,7 @@ func testStringBridge(str: String) {
 
 func testDictionaryBridge(dict: Dictionary<String, String>) {
   var d2 = dict.nsDictionaryMethod() // expected-error{{value of type 'Dictionary<String, String>' has no member 'nsDictionaryMethod'}}
-  var int = Dictionary<String, String>.nsDictionaryClassMethod() // expected-error{{value of type 'Dictionary<String, String>.Type' has no member 'nsDictionaryClassMethod'}}
+  var int = Dictionary<String, String>.nsDictionaryClassMethod() // expected-error{{type 'Dictionary<String, String>' has no member 'nsDictionaryClassMethod'}}
   var d3 = dict.nsDictionaryProperty  // expected-error{{value of type 'Dictionary<String, String>' has no member 'nsDictionaryProperty'}}
 }
 

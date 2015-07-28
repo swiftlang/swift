@@ -69,11 +69,25 @@ ERROR(cannot_find_appropriate_overload,sema,none,
 ERROR(could_not_find_member,sema,none,
       "could not find member %0", (DeclName))
 
-ERROR(could_not_find_member_type,sema,none,
+ERROR(could_not_find_tuple_member,sema,none,
+      "value of tuple type %0 has no member %1", (Type, DeclName))
+
+ERROR(could_not_find_value_member,sema,none,
       "value of type %0 has no member %1", (Type, DeclName))
-ERROR(does_not_have_non_mutating_member,sema_tcc,none,
-      "immutable value of type %0 only has mutating members named %1",
-      (Type, DeclName))
+ERROR(could_not_find_type_member,sema,none,
+      "type %0 has no member %1", (Type, DeclName))
+
+ERROR(could_not_use_value_member,sema,none,
+      "member %1 cannot be used on value of type %0", (Type, DeclName))
+ERROR(could_not_use_type_member,sema,none,
+      "member %1 cannot be used on type %0", (Type, DeclName))
+
+ERROR(cannot_pass_rvalue_mutating_subelement,sema_tcs,none,
+      "cannot use mutating member on immutable value: %0",
+      (StringRef))
+ERROR(cannot_pass_rvalue_mutating,sema_tcs,none,
+      "cannot use mutating member on immutable value of type %0",
+      (Type))
 
 ERROR(could_not_convert_argument,sema,none,
       "cannot invoke function with an argument list of type %0", (Type))
@@ -357,9 +371,12 @@ ERROR(invalid_tuple_size,sema_tcc,none,
 ERROR(invalid_tuple_element_unused,sema_tcc,none,
       "tuple element of type %0 unused when converting tuple to %1",
       (Type, Type))
-ERROR(did_not_call_function,sema_tcc,none,
+ERROR(did_not_call_function_value,sema_tcc,none,
       "function value was used as a property; add () to call it",
       ())
+ERROR(did_not_call_function,sema_tcc,none,
+      "function %0 was used as a property; add () to call it",
+      (Identifier))
 ERROR(did_not_call_method,sema_tcc,none,
       "method %0 was used as a property; add () to call it",
       (Identifier))
@@ -1634,9 +1651,9 @@ NOTE(generic_type_declared_here,tce_sema,none,
 
 // Ambiguities
 ERROR(ambiguous_decl_ref,tce_sema,none,
-      "ambiguous use of %0", (Identifier))
+      "ambiguous use of %0", (DeclName))
 ERROR(ambiguous_operator_ref,tce_sema,none,
-      "ambiguous use of operator %0", (Identifier))
+      "ambiguous use of operator %0", (DeclName))
 
 // Cannot capture inout-ness of a parameter
 // Partial application of foreign functions not supported

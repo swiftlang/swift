@@ -86,7 +86,7 @@ enum Complex {
   case B
 }
 
-if Complex.A(1) == .B { } // expected-error{{could not find member 'B'}}
+if Complex.A(1) == .B { } // expected-error{{type of expression is ambiguous without more context}}
 
 
 // rdar://19773050

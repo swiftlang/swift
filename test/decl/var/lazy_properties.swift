@@ -56,8 +56,10 @@ struct StructTest {
   mutating func f1() -> Int {
     return p1
   }
+  
+  // expected-note @+1 {{mark method 'mutating' to make 'self' mutable}}
   func f2() -> Int {
-    return p1  // expected-error {{immutable value of type 'StructTest' only has mutating members named 'p1'}}
+    return p1  // expected-error {{cannot use mutating member on immutable value: 'self' is immutable}}
   }
 
   static func testStructInits() {

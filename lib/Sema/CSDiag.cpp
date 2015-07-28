@@ -43,12 +43,6 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
         << getName() << "'";
     break;
 
-  case DoesNotHaveNonMutatingMember:
-    out << " immutable value of type " << getFirstType().getString()
-        << " only has mutating members named '"
-        << getName() << "'";
-    break;
-
   case DoesNotHaveInitOnInstance:
     out << getFirstType().getString() << " instance does not have initializers";
     break;
@@ -323,13 +317,23 @@ void constraints::simplifyLocator(Expr *&anchor,
 
     case ConstraintLocator::Member:
     case ConstraintLocator::MemberRefBase:
-      if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(anchor)) {
+      if (auto UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
         // No additional target locator information.
         targetAnchor = nullptr;
         targetPath.clear();
-
-        range = dotExpr->getNameLoc();
-        anchor = dotExpr->getBase();
+        
+        range = UDE->getNameLoc();
+        anchor = UDE->getBase();
+        path = path.slice(1);
+        continue;
+      }
+      if (auto USE = dyn_cast<UnresolvedSelectorExpr>(anchor)) {
+        // No additional target locator information.
+        targetAnchor = nullptr;
+        targetPath.clear();
+        
+        range = USE->getNameRange();
+        anchor = USE->getBase();
         path = path.slice(1);
         continue;
       }
@@ -748,41 +752,9 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     return false;
 
   case Failure::DoesNotHaveMember:
-  case Failure::DoesNotHaveNonMutatingMember: {
-    if (auto moduleTy = failure.getFirstType()->getAs<ModuleType>()) {
-      tc.diagnose(loc, diag::no_member_of_module,
-                  moduleTy->getModule()->getName(),
-                  failure.getName())
-        .highlight(range);
-      break;
-    }
-
-    // If the base of this property access is a function that takes an empty
-    // argument list, then the most likely problem is that the user wanted to
-    // call the function, e.g. in "a.b.c" where they had to write "a.b().c".
-    // Produce a specific diagnostic + fixit for this situation.
-    auto baseFTy = failure.getFirstType()->getAs<AnyFunctionType>();
-    if (baseFTy &&baseFTy->getInput()->isEqual(tc.Context.TheEmptyTupleType)){
-      SourceLoc insertLoc = locator->getAnchor()->getEndLoc();
-      
-      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(locator->getAnchor())) {
-        tc.diagnose(loc, diag::did_not_call_method, UDE->getName())
-          .fixItInsertAfter(insertLoc, "()");
-        break;
-      }
-      
-      tc.diagnose(loc, diag::did_not_call_function)
-        .fixItInsertAfter(insertLoc, "()");
-      break;
-    }
-    
-    bool IsNoMember = failure.getKind() == Failure::DoesNotHaveMember;
-    tc.diagnose(loc, IsNoMember ? diag::could_not_find_member_type :
-                                  diag::does_not_have_non_mutating_member,
-                failure.getFirstType(), failure.getName())
-      .highlight(range);
-    break;
-  }
+    // The Expr path handling these constraints does a good job.
+    return false;
+  
   case Failure::DoesNotHaveInitOnInstance: {
     // Diagnose 'super.init', which can only appear inside another initializer,
     // specially.
@@ -1000,13 +972,13 @@ static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
 }
 
 /// \brief Determine the name of the overload in a set of overload choices.
-static Identifier getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
+static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
   for (auto choice : choices) {
     if (choice.isDecl())
-      return choice.getDecl()->getName();
+      return choice.getDecl()->getFullName();
   }
 
-  return Identifier();
+  return DeclName();
 }
 
 static bool diagnoseAmbiguity(ConstraintSystem &cs,
@@ -1027,7 +999,7 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
 
     // If we don't have a name to hang on to, it'll be hard to diagnose this
     // overload.
-    if (getOverloadChoiceName(overload.choices).empty())
+    if (!getOverloadChoiceName(overload.choices))
       continue;
 
     unsigned distinctOverloads = countDistinctOverloads(overload.choices);
@@ -1968,7 +1940,7 @@ class FailureDiagnosis :public ASTVisitor<FailureDiagnosis, /*exprresult*/bool>{
   // to determine the appropriate diagnostic.
   Constraint *conversionConstraint = nullptr;
   Constraint *overloadConstraint = nullptr;
-  Constraint *valueMemberConstraint = nullptr;
+  Constraint *memberConstraint = nullptr;
   Constraint *argumentConstraint = nullptr;
   Constraint *conformanceConstraint = nullptr;
   
@@ -2031,7 +2003,7 @@ private:
   
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
-  bool diagnoseGeneralValueMemberFailure();
+  bool diagnoseGeneralMemberFailure();
   
   /// Produce a diagnostic for a general overload resolution failure
   /// (irrespective of the exact expression kind).
@@ -2093,7 +2065,11 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   // If the constraint system had a failure constraint, it takes precedence over
   // other random constraints in the system.
   if (auto constraint = CS->failedConstraint) {
-    if (constraint->getKind() == ConstraintKind::BindOverload) {
+    if (constraint->getKind() == ConstraintKind::ValueMember ||
+        constraint->getKind() == ConstraintKind::UnresolvedValueMember ||
+        constraint->getKind() == ConstraintKind::TypeMember) {
+      memberConstraint = constraint;
+    } else if (constraint->getKind() == ConstraintKind::BindOverload) {
       overloadConstraint = CS->failedConstraint;
     } else if (isConversionConstraint(constraint))
       conversionConstraint = CS->failedConstraint;
@@ -2120,10 +2096,11 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
     }
     
     // Failed binding constraints point to a missing member.
-    if ((!valueMemberConstraint || constraint->isFavored()) &&
-        ((constraint->getKind() == ConstraintKind::ValueMember) ||
-         (constraint->getKind() == ConstraintKind::UnresolvedValueMember))) {
-          valueMemberConstraint = constraint;
+    if ((!memberConstraint || constraint->isFavored()) &&
+        (constraint->getKind() == ConstraintKind::ValueMember ||
+         constraint->getKind() == ConstraintKind::UnresolvedValueMember ||
+         constraint->getKind() == ConstraintKind::TypeMember)) {
+          memberConstraint = constraint;
         }
     
     // A missed argument conversion can result in better error messages when
@@ -2178,43 +2155,228 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   }
 }
 
-bool FailureDiagnosis::diagnoseGeneralValueMemberFailure() {
+bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
   
-  if (!valueMemberConstraint) return false;
+  if (!memberConstraint) return false;
   
-  assert(valueMemberConstraint->getKind() == ConstraintKind::ValueMember ||
-         valueMemberConstraint->getKind() ==
-          ConstraintKind::UnresolvedValueMember);
+  assert(memberConstraint->getKind() == ConstraintKind::ValueMember ||
+         memberConstraint->getKind() == ConstraintKind::UnresolvedValueMember ||
+         memberConstraint->getKind() == ConstraintKind::TypeMember);
   
-  auto memberName = valueMemberConstraint->getMember();
+  auto memberName = memberConstraint->getMember();
   
   // Get the referenced expression from the failed constraint.
   auto anchor = expr;
   SourceRange range = anchor->getSourceRange();
-  if (auto locator = valueMemberConstraint->getLocator()) {
+  if (auto locator = memberConstraint->getLocator()) {
     locator = simplifyLocator(*CS, locator, range);
     if (locator->getAnchor())
       anchor = locator->getAnchor();
   }
 
   // Retypecheck the anchor type, which is the base of the member expression.
-  anchor = typeCheckArbitrarySubExprIndependently(anchor);
+  anchor = typeCheckArbitrarySubExprIndependently(anchor, TCC_AllowLValue);
   if (!anchor) return true;
   
   // If we couldn't resolve a specific type for the base expression, then we
   // cannot produce a specific diagnostic.
-  auto type = anchor->getType();
-  if (typeIsNotSpecialized(type)) {
+  auto baseTy = anchor->getType();
+  if (typeIsNotSpecialized(baseTy)) {
+    // If we have a conversion constraint, then we may just have an ambiguous
+    // subexpression.  Diagnose it in conversion constraint stuff, instead of
+    // doing saying that we don't have an element of some undefined type.
+    if (conversionConstraint && isConversionConstraint(conversionConstraint))
+      return false;
+    
     diagnose(anchor->getLoc(), diag::could_not_find_member, memberName)
       .highlight(anchor->getSourceRange()).highlight(range);
     return true;
   }
   
-  // Otherwise, try to figure out more about why this failed.
-  diagnose(anchor->getLoc(), diag::could_not_find_member_type,
-           type, memberName)
-    .highlight(anchor->getSourceRange()).highlight(range);
+  auto baseObjTy = baseTy->getRValueType();
+
+  // If the base type is an IUO, look through it.  Odds are, the code is not
+  // trying to find a member of it.
+  if (auto objTy = CS->lookThroughImplicitlyUnwrappedOptionalType(baseObjTy))
+    baseObjTy = objTy;
+
   
+  if (auto moduleTy = baseObjTy->getAs<ModuleType>()) {
+    diagnose(anchor->getLoc(), diag::no_member_of_module,
+             moduleTy->getModule()->getName(), memberName)
+      .highlight(anchor->getSourceRange()).highlight(range);
+    return true;
+  }
+  
+  // If the base of this property access is a function that takes an empty
+  // argument list, then the most likely problem is that the user wanted to
+  // call the function, e.g. in "a.b.c" where they had to write "a.b().c".
+  // Produce a specific diagnostic + fixit for this situation.
+  if (auto baseFTy = baseObjTy->getAs<AnyFunctionType>()) {
+    if (baseFTy->getInput()->isEqual(CS->TC.Context.TheEmptyTupleType)) {
+      SourceLoc insertLoc = anchor->getEndLoc();
+    
+      if (auto *DRE = dyn_cast<DeclRefExpr>(anchor)) {
+        diagnose(anchor->getLoc(), diag::did_not_call_function,
+                 DRE->getDecl()->getName())
+          .fixItInsertAfter(insertLoc, "()");
+        return true;
+      }
+      
+      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(anchor))
+        if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+          diagnose(anchor->getLoc(), diag::did_not_call_method,
+                   DRE->getDecl()->getName())
+            .fixItInsertAfter(insertLoc, "()");
+          return true;
+        }
+      
+      diagnose(anchor->getLoc(), diag::did_not_call_function_value)
+      .fixItInsertAfter(insertLoc, "()");
+      return true;
+    }
+  }
+
+  if (baseObjTy->is<TupleType>()) {
+    diagnose(anchor->getLoc(), diag::could_not_find_tuple_member,
+             baseObjTy, memberName)
+      .highlight(anchor->getSourceRange()).highlight(range);
+    return true;
+  }
+  
+  
+  // Otherwise, try to figure out more about why this failed.  Perform a name
+  // name lookup and sort through the results.
+  LookupResult &lookup = CS->lookupMember(baseObjTy, memberName);
+  
+  // If it really isn't there, then we know what went wrong!
+  if (!lookup) {
+    // TODO: This should handle tuple member lookups, like x.1231 as well.
+    if (auto MTT = baseObjTy->getAs<MetatypeType>())
+      diagnose(anchor->getLoc(), diag::could_not_find_type_member,
+               MTT->getInstanceType(), memberName)
+        .highlight(anchor->getSourceRange()).highlight(range);
+    else
+      diagnose(anchor->getLoc(), diag::could_not_find_value_member,
+               baseObjTy, memberName)
+        .highlight(anchor->getSourceRange()).highlight(range);
+    return true;
+  }
+  
+  // TODO: Handle initializers, which have special lookup rules.
+  
+  // Dig out the instance type and figure out what members of the instance type
+  // we are going to see.
+  bool isMetatype = false;
+  bool hasInstanceMembers = false;
+  bool hasInstanceMethods = false;
+  bool hasStaticMembers = false;
+  Type instanceTy = baseObjTy;
+  if (baseObjTy->is<ModuleType>()) {
+    hasStaticMembers = true;
+  } else if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>()) {
+    instanceTy = baseObjMeta->getInstanceType();
+    isMetatype = true;
+    if (baseObjMeta->is<ExistentialMetatypeType>()) {
+      // An instance of an existential metatype is a concrete type conforming
+      // to the existential, say Self. Instance members of the concrete type
+      // have type Self -> T -> U, but we don't know what Self is at compile
+      // time so we cannot refer to them. Static methods are fine, on the other
+      // hand -- we already know that they do not have Self or associated type
+      // requirements, since otherwise we would not be able to refer to the
+      // existential metatype in the first place.
+      hasStaticMembers = true;
+    } else if (instanceTy->isExistentialType()) {
+      // A protocol metatype has instance methods with type P -> T -> U, but
+      // not instance properties or static members -- the metatype value itself
+      // doesn't give us a witness so there's no static method to bind.
+      hasInstanceMethods = true;
+    } else {
+      // Metatypes of nominal types and archetypes have instance methods and
+      // static members, but not instance properties.
+      // FIXME: partial application of properties
+      hasInstanceMethods = true;
+      hasStaticMembers = true;
+    }
+  } else {
+    // Otherwise, we can access all instance members.
+    hasInstanceMembers = true;
+    hasInstanceMethods = true;
+  }
+  
+  // Keep track of whether we found a mutating candidate and what it is.  If the
+  // base is non-mutating and the only candidates are mutating, then we have an
+  // base-not-mutable issue.
+  ValueDecl *MutatingCandidate = nullptr;
+  bool UnknownCandidate = false;
+  
+  // FIXME: This is duplicating too much logic from
+  // ConstraintSystem::simplifyMemberConstraint.  It should all move here.
+  for (ValueDecl *result : lookup) {
+    if (result->isInvalid())
+      continue;
+    
+    // FIXME: If the argument labels for this result are incompatible with
+    // the call site, skip it.
+    //if (!hasCompatibleArgumentLabels(result)) { labelMismatch = true; }
+    
+    
+    // See if we have an instance method, instance member or static method,
+    // and check if it can be accessed on our base type.
+    // FIXME: Mark this as 'unavailable'.
+    if (result->isInstanceMember()) {
+      if (isa<FuncDecl>(result) && !hasInstanceMethods)
+        continue;
+      
+      if (!isa<FuncDecl>(result) && !hasInstanceMembers)
+        continue;
+    } else {
+      if (!hasStaticMembers)
+        continue;
+    }
+
+
+    // If we have an rvalue base, make sure that the
+    // result isn't mutating (only valid on lvalues).
+    if (!isMetatype &&
+        !baseTy->is<LValueType>() && result->isInstanceMember()) {
+      if (auto *FD = dyn_cast<FuncDecl>(result))
+        if (FD->isMutating()) {
+          MutatingCandidate = result;
+          continue;
+        }
+      
+      // Subscripts and computed properties are ok on rvalues so long
+      // as the getter is nonmutating.
+      if (auto storage = dyn_cast<AbstractStorageDecl>(result)) {
+        if (storage->isGetterMutating()) {
+          MutatingCandidate = result;
+          continue;
+        }
+      }
+    }
+    UnknownCandidate = true;
+  }
+  
+  // If we have an apparently usable 'mutating' member, but the base is an
+  // rvalue, diagnose this as an invalid mutation error.
+  if (MutatingCandidate && !UnknownCandidate) {
+    diagnoseSubElementFailure(anchor, anchor->getLoc(), *CS,
+                              diag::cannot_pass_rvalue_mutating_subelement,
+                              diag::cannot_pass_rvalue_mutating);
+    return true;
+  }
+
+  // Otherwise, we don't have a specific issue to diagnose.  Just say the vague
+  // 'cannot use' diagnostic.
+  if (auto MTT = baseTy->getRValueType()->getAs<MetatypeType>())
+    diagnose(anchor->getLoc(), diag::could_not_use_type_member,
+             MTT->getInstanceType(), memberName)
+    .highlight(anchor->getSourceRange()).highlight(range);
+  else
+    diagnose(anchor->getLoc(), diag::could_not_use_value_member,
+             baseObjTy, memberName)
+    .highlight(anchor->getSourceRange()).highlight(range);
   return true;
 }
 
@@ -2420,7 +2582,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
 
 bool FailureDiagnosis::diagnoseGeneralFailure() {
   
-  return diagnoseGeneralValueMemberFailure() ||
+  return diagnoseGeneralMemberFailure() ||
          diagnoseGeneralOverloadFailure() ||
          diagnoseGeneralConversionFailure();
 }

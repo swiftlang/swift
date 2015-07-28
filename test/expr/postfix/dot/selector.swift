@@ -11,8 +11,8 @@ class C {
   func instMethod(_: Int, withArgument: Int, argument: Int) {}
   func instMethod(_: Int, withArgument: Int, argument: Int, argument _:Int) {}
 
-  func instMethod(_: Int, overloaded: String) {}
-  func instMethod(_: Int, overloaded: Int) {}
+  func instMethod(_: Int, overloaded: String) {} // expected-note {{found this candidate}}
+  func instMethod(_: Int, overloaded: Int) {}    // expected-note {{found this candidate}}
 }
 
 let x = C()
@@ -35,7 +35,7 @@ let instM3 = x.instMethod:withArgument:argument:argument:
 let instM4: (Int, String) -> () = x.instMethod:overloaded:
 let instM5: (Int, Int) -> () = x.instMethod:overloaded:
 // ambiguous
-let instM6 = x.instMethod:overloaded: // expected-error{{could not find an overload for 'instMethod' that accepts the supplied arguments}}
+let instM6 = x.instMethod:overloaded: // expected-error{{ambiguous use of 'instMethod(_:overloaded:)'}}
 
 x.instMethod:overloaded:(1, overloaded: 1)
 x.instMethod:overloaded:(1, overloaded: "two")

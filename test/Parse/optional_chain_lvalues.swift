@@ -11,7 +11,7 @@ struct S {
 
 struct T {
   var mutS: S? = nil
-  let immS: S? = nil  // expected-note 3 {{change 'let' to 'var' to make it mutable}}
+  let immS: S? = nil  // expected-note 4 {{change 'let' to 'var' to make it mutable}}
 
   mutating func mutateT() {}
 
@@ -19,12 +19,12 @@ struct T {
 }
 
 var mutT: T?
-let immT: T? = nil
+let immT: T? = nil  // expected-note {{change 'let' to 'var' to make it mutable}}
 
 mutT?.mutateT()
-immT?.mutateT() // expected-error{{only has mutating members}}
+immT?.mutateT() // expected-error{{cannot use mutating member on immutable value: 'immT' is a 'let' constant}}
 mutT?.mutS?.mutateS()
-mutT?.immS?.mutateS() // expected-error{{only has mutating members}}
+mutT?.immS?.mutateS() // expected-error{{cannot use mutating member on immutable value: 'immS' is a 'let' constant}}
 mutT?.mutS?.x++
 mutT?.mutS?.y++ // expected-error{{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 

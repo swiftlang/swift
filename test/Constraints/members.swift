@@ -67,7 +67,8 @@ struct GZ<T> {
     var t = f1(i, b: f)
     f = t.1
 
-    var zi = Z.i; // expected-error{{value of type 'Z.Type' has no member 'i'}}
+    var zi = Z.i; // expected-error{{member 'i' cannot be used on type 'Z'}}
+    var zj = Z.asdfasdf  // expected-error {{type 'Z' has no member 'asdfasdf'}}
   }
 }
 
@@ -121,7 +122,7 @@ var wcurriedFull : () = w.curried(0)(y: 1)
 
 // Member of enum Type
 func enumMetatypeMember(opt: Int?) {
-  opt.None // expected-error{{value of type 'Int?' has no member 'None'}}
+  opt.None // expected-error{{member 'None' cannot be used on value of type 'Int?'}}
 }
 
 ////
@@ -199,7 +200,7 @@ func generic<T: P>(var t: T) {
   let _: Int -> () = id(T.bar(t))
 
   _ = t.mut // expected-error{{partial application of 'mutating' method is not allowed}}
-  _ = t.tum // expected-error{{value of type 'T' has no member 'tum'}}
+  _ = t.tum // expected-error{{member 'tum' cannot be used on value of type 'T'}}
 
   // Instance member of extension returning Self)
   let _: T -> () -> T = id(T.returnSelfInstance)
@@ -287,12 +288,12 @@ func staticExistential(p: P.Type, pp: P.Protocol) {
   let _: () -> () = p.tum
 
   // Instance member of existential metatype -- not allowed
-  _ = p.bar // expected-error{{value of type 'P.Type' has no member 'bar'}}
-  _ = p.mut // expected-error{{value of type 'P.Type' has no member 'mut'}}
+  _ = p.bar // expected-error{{member 'bar' cannot be used on value of type 'P.Type'}}
+  _ = p.mut // expected-error{{member 'mut' cannot be used on value of type 'P.Type'}}
 
   // Static member of metatype -- not allowed
-  _ = pp.tum // expected-error{{value of type 'P.Protocol' has no member 'tum'}}
-  _ = P.tum // expected-error{{value of type 'P.Protocol' has no member 'tum'}}
+  _ = pp.tum // expected-error{{member 'tum' cannot be used on type 'P'}}
+  _ = P.tum // expected-error{{member 'tum' cannot be used on type 'P'}}
 
   // Static member of extension returning Self)
   let _: () -> P = id(p.returnSelfStatic)
@@ -423,9 +424,9 @@ extension ExtendedWithMutatingMethods {
 class ClassExtendedWithMutatingMethods: ExtendedWithMutatingMethods {}
 class SubclassExtendedWithMutatingMethods: ClassExtendedWithMutatingMethods {}
 
-func testClassExtendedWithMutatingMethods(c: ClassExtendedWithMutatingMethods,
-                                     sub: SubclassExtendedWithMutatingMethods) {
-  c.mutatingMethod() // expected-error{{only has mutating members}}
+func testClassExtendedWithMutatingMethods(c: ClassExtendedWithMutatingMethods,  // expected-note {{mark parameter with 'var' to make it mutable}}
+                                     sub: SubclassExtendedWithMutatingMethods) { // expected-note {{mark parameter with 'var' to make it mutable}}
+  c.mutatingMethod() // expected-error{{cannot use mutating member on immutable value: 'c' is a 'let' constant}}
   c.mutableProperty = Foo(foo: 0) // todo-error{{...}}
   c.mutableProperty.foo = 0 // todo-error{{...}}
   c.nonmutatingProperty = Foo(foo: 0)
@@ -435,7 +436,7 @@ func testClassExtendedWithMutatingMethods(c: ClassExtendedWithMutatingMethods,
   _ = c.nonmutatingProperty
   _ = c.nonmutatingProperty.foo
 
-  sub.mutatingMethod() // expected-error{{only has mutating members}}
+  sub.mutatingMethod() // expected-error{{cannot use mutating member on immutable value: 'sub' is a 'let' constant}}
   sub.mutableProperty = Foo(foo: 0) // todo-error{{...}}
   sub.mutableProperty.foo = 0 // todo-error{{...}}
   sub.nonmutatingProperty = Foo(foo: 0)

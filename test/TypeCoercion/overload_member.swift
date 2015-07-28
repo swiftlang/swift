@@ -35,7 +35,7 @@ func test_method_overload(a: A, x: X, y: Y) {
 }
 
 func test_method_overload_coerce(a: A, inout x: X, inout y: Y, z: Z) {
-  var fail = a.g(z) // expected-error{{ambiguous use of 'g'}}
+  var fail = a.g(z) // expected-error{{ambiguous use of 'g(z:)'}}
   x = a.g(z: z)
   y = a.g(z: z)
 }
@@ -56,7 +56,7 @@ func test_static_method_overload(a: A, x: X, y: Y) {
 }
 
 func test_static_method_overload_coerce(a: A, inout x: X, inout y: Y, z: Z) {
-  var fail = A.sg(z) // expected-error{{ambiguous use of 'sg'}}
+  var fail = A.sg(z) // expected-error{{ambiguous use of 'sg(z:)'}}
   x = A.sg(z: z)
   y = A.sg(z: z)
 }
@@ -114,7 +114,7 @@ extension A {
   }
 
   func test_method_overload_coerce(inout x x: X, inout y: Y, z: Z) {
-    var fail = g(z: z) // expected-error{{ambiguous use of 'g'}}
+    var fail = g(z: z) // expected-error{{ambiguous use of 'g(z:)'}}
     x = g(z: z)
     y = g(z: z)
   }
@@ -148,7 +148,7 @@ extension A {
   }
 
   class func test_method_overload_coerce_static(inout x x: X, inout y: Y, z: Z) {
-    var fail = sg(z: z) // expected-error{{ambiguous use of 'sg'}}
+    var fail = sg(z: z) // expected-error{{ambiguous use of 'sg(z:)'}}
     x = sg(z: z)
     y = sg(z: z)
   }
@@ -190,8 +190,8 @@ struct WeirdIvarLookupBehavior {
 
   static func static_f() {
     // FIXME: These diagnostics still suck.
-    var a : X = clams // expected-error{{value of type 'WeirdIvarLookupBehavior.Type' has no member 'clams'}}
-    var b : Y = clams // expected-error{{value of type 'WeirdIvarLookupBehavior.Type' has no member 'clams'}}
+    var a : X = clams // expected-error{{member 'clams' cannot be used on type 'WeirdIvarLookupBehavior'}}
+    var b : Y = clams // expected-error{{member 'clams' cannot be used on type 'WeirdIvarLookupBehavior'}}
   }
 }
 

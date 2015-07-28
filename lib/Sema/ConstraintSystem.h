@@ -394,9 +394,6 @@ public:
     DoesNotConformToProtocol,
     /// \brief The first type does not have a member with the given name.
     DoesNotHaveMember,
-    /// \brief The first type does not have a non mutating member with the given
-    /// name.
-    DoesNotHaveNonMutatingMember,
     /// \brief The first type has the given initializer, but it's available only
     /// on the metatype, not the instance.
     DoesNotHaveInitOnInstance,
@@ -512,7 +509,6 @@ public:
                      getSecondType());
 
     case DoesNotHaveMember:
-    case DoesNotHaveNonMutatingMember:
     case DoesNotHaveInitOnInstance:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                      getName());

@@ -3080,9 +3080,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                     baseObjTy, name);
 
       return SolutionKind::Error;
-    } else if (shouldAttemptFixes() && name == TC.Context.Id_fromRaw && 
-               (rawValueType = getRawRepresentableValueType(TC, DC,
-                                                            instanceTy))) {
+    }
+    
+    if (shouldAttemptFixes() && name == TC.Context.Id_fromRaw &&
+        (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
       // Replace a reference to ".fromRaw" with a reference to init(rawValue:).
       // FIXME: This is temporary.
 
@@ -3102,9 +3103,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       addConstraint(ConstraintKind::Bind, memberTy, fromRawType, locator);
       
       return SolutionKind::Solved;
-    } else if (shouldAttemptFixes() && name == TC.Context.Id_toRaw && 
-               (rawValueType = getRawRepresentableValueType(TC, DC,
-                                                            instanceTy))) {
+    }
+    
+    if (shouldAttemptFixes() && name == TC.Context.Id_toRaw &&
+        (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
       // Replace a call to "toRaw" with a reference to rawValue.
       // FIXME: This is temporary.
 
@@ -3123,9 +3125,10 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       addConstraint(ConstraintKind::Bind, memberTy, toRawType, locator);
 
       return SolutionKind::Solved;
-    } else if (shouldAttemptFixes() && name.isSimpleName("allZeros") &&
-               (rawValueType = getRawRepresentableValueType(TC, DC,
-                                                            instanceTy))) {
+    }
+    
+    if (shouldAttemptFixes() && name.isSimpleName("allZeros") &&
+        (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
       // Replace a reference to "X.allZeros" with a reference to X().
       // FIXME: This is temporary.
       
@@ -3142,8 +3145,9 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       addConstraint(ConstraintKind::Bind, memberTy, rawValueType, locator);
       return SolutionKind::Solved;
 
-    } else if (shouldAttemptFixes() && 
-               baseObjTy->getOptionalObjectType()) {
+    }
+    
+    if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
       // If the base type was an optional, look through it.
 
       // Note the fix.
@@ -3165,9 +3169,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // The set of directly accessible types, which is only used when
   // we're performing dynamic lookup into an existential type.
   bool isDynamicLookup = instanceTy->isAnyObject();
-
-  // Record the fact that we found a mutating function for diagnostics.
-  bool FoundMutating = false;
 
   // Introduce a new overload set to capture the choices.
   SmallVector<OverloadChoice, 4> choices;
@@ -3214,23 +3215,19 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         return;
     }
 
-    // If we have an rvalue base, make sure that the
-    // result isn't mutating (only valid on lvalues).
+    // If we have an rvalue base, make sure that the result isn't 'mutating'
+    // (only valid on lvalues).
     if (!isMetatype &&
         !baseTy->is<LValueType>() && result->isInstanceMember()) {
       if (auto *FD = dyn_cast<FuncDecl>(result))
-        if (FD->isMutating()) {
-          FoundMutating = true;
+        if (FD->isMutating())
           return;
-        }
 
       // Subscripts and computed properties are ok on rvalues so long
       // as the getter is nonmutating.
       if (auto storage = dyn_cast<AbstractStorageDecl>(result)) {
-        if (storage->isGetterMutating()) {
-          FoundMutating = true;
+        if (storage->isGetterMutating())
           return;
-        }
       }
     }
     
@@ -3348,9 +3345,7 @@ retry_after_fail:
   }
 
   if (choices.empty()) {
-    recordFailure(constraint.getLocator(),
-                  FoundMutating ? Failure::DoesNotHaveNonMutatingMember :
-                                  Failure::DoesNotHaveMember,
+    recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                   baseObjTy, name);
     return SolutionKind::Error;
   }

@@ -112,7 +112,7 @@ obj.bar!()
 obj.foo!(5)
 obj.foo!("hello")
 obj.wibble!()
-obj.wobble!() // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'wobble()'}}
+obj.wobble!() // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'wobble'}}
 obj.ext1!()
 obj.wonka!()
 
@@ -121,7 +121,7 @@ obj.bar()
 obj.foo(5)
 obj.foo("hello")
 obj.wibble()
-obj.wobble() // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'wobble()'}}
+obj.wobble() // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'wobble'}}
 obj.ext1()
 obj.wonka()
 
@@ -144,7 +144,7 @@ obj.ovl1()
 
 // Don't allow overload resolution between declarations from different
 // classes.
-var ovl2ResultA = obj.ovl2!() // expected-error{{ambiguous use of 'ovl2'}}
+var ovl2ResultA = obj.ovl2!() // expected-error{{ambiguous use of 'ovl2()'}}
 
 // ... but it's okay to allow overload resolution between declarations
 // from the same class.
@@ -156,7 +156,7 @@ ovl3Result = B()
 var ovl4Result = obj.ovl4!()
 
 // ... but not when the types are different.
-var ovl5Result = obj.ovl5!() // expected-error{{ambiguous use of 'ovl5'}}
+var ovl5Result = obj.ovl5!() // expected-error{{ambiguous use of 'ovl5()'}}
 
 // Same as above but without the '!'
 obj.ovl4()
@@ -167,8 +167,8 @@ obj.ovl4()
 // that's a member of anything generic), because we wouldn't be able
 // to figure out the generic arguments.
 var generic1Result = obj.generic1!(17) // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'generic1'}}
-obj.generic2!() // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'generic2()'}}
-obj.generic3!() // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'generic3()'}}
+obj.generic2!() // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'generic2'}}
+obj.generic3!() // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'generic3'}}
 
 // Dynamic method lookup can't find non-[objc] members
 obj.generic4!(5) // expected-error{{value of type 'Id' (aka 'AnyObject') has no member 'generic4'}}
@@ -201,7 +201,7 @@ class Z4<T where T : AnyObject> { }
 
 // Don't allow one to call instance methods on the Type via
 // dynamic method lookup.
-obj.dynamicType.foo!(obj)(5) // expected-error{{value of type 'Id.Type' (aka 'AnyObject.Type') has no member 'foo'}}
+obj.dynamicType.foo!(obj)(5) // expected-error{{member 'foo' cannot be used on value of type 'Id.Type' (aka 'AnyObject.Type')}}
 
 // Checked casts to AnyObject
 var p: P = Y()

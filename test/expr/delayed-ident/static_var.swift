@@ -10,7 +10,7 @@ func acceptInOutX1(inout x1: X1) { }
 
 var x1: X1 = .AnX1
 x1 = .AnX1
-x1 = .NotAnX1 // expected-error{{could not find member 'NotAnX1'}}
+x1 = .NotAnX1 // expected-error{{type of expression is ambiguous without more context}}
 
 // Delayed identifier expressions as lvalues
 (.AnX1 = x1)
@@ -22,9 +22,9 @@ struct X2<T> {
   static var NotAnX2 = 0 // expected-error {{static stored properties not yet supported in generic types}}
 }
 
-var x2: X2<Int> = .AnX2  // expected-error {{value of type 'X2<Int>.Type' has no member 'AnX2'}}
-x2 = .AnX2     // expected-error {{value of type 'X2<Int>.Type' has no member 'AnX2'}}
-x2 = .NotAnX2 // expected-error{{could not find member 'NotAnX2'}}
+var x2: X2<Int> = .AnX2  // expected-error {{type of expression is ambiguous without more context}}
+x2 = .AnX2     // expected-error {{type of expression is ambiguous without more context}}
+x2 = .NotAnX2 // expected-error{{type of expression is ambiguous without more context}}
 
 // Static variables through operators.
 struct Foo {

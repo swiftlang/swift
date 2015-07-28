@@ -58,8 +58,8 @@ public func testFactoryMethods() {
 
 #if !IRGEN
 public func testSubscript(foo: Foo) {
-  _ = foo[foo] // expected-error {{value of type 'Foo' has no member 'subscript'}}
-  _ = foo[1] // expected-error {{value of type 'Foo' has no member 'subscript'}}
+  _ = foo[foo] // expected-error {{cannot subscript a value of type 'Foo' with an index of type 'Foo'}}
+  _ = foo[1] // expected-error {{cannot subscript a value of type 'Foo' with an index of type 'Int'}}
 }
 #endif
 

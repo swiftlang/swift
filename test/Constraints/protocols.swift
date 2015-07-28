@@ -106,5 +106,5 @@ func testClonable(v : Clonable) {
 
   // FIXME: this is a terrible diagnostic; the problem is that that
   // method is unavailable on existentials
-  let v3 = v.badMaybeClone() // expected-error {{value of type 'Clonable' has no member 'badMaybeClone'}}
+  let v3 = v.badMaybeClone() // expected-error {{member 'badMaybeClone' cannot be used on value of type 'Clonable'}}
 }

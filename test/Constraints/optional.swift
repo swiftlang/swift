@@ -20,7 +20,7 @@ func test0(a: AnyObject) {
   a.do_b?(1)
   a.do_b?(5.0)
 
-  a.do_c?(1) // expected-error {{value of type 'AnyObject' has no member 'do_c'}}
+  a.do_c?(1) // expected-error {{cannot invoke value of function type with argument list '(Int)'}}
   a.do_c?(x: 1)
 }
 

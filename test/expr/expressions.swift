@@ -105,7 +105,7 @@ func funcdecl6(a: Int, b: Int) -> Int { a+b }
 // fields in one.  Cannot dive into functions or through aliases.
 func funcdecl7(a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
   a + b.0 + b.c + third.0 + third.1
-  b.foo // expected-error {{value of type '(c: Int, d: Int)' has no member 'foo'}}
+  b.foo // expected-error {{value of tuple type '(c: Int, d: Int)' has no member 'foo'}}
 }
 
 // Error recovery.
@@ -118,10 +118,10 @@ func errorRecovery() {
     case baz
   }
   var a: Int =
-      .hello // expected-error {{value of type 'Int.Type' has no member 'hello'}}
+      .hello // expected-error {{type of expression is ambiguous without more context}}
   var b: union1 = .bar // ok
   var c: union1 =
-      .xyz  // expected-error {{value of type 'union1.Type' has no member 'xyz'}}
+      .xyz  // expected-error {{type of expression is ambiguous without more context}}
   var d: (Int,Int,Int) =
       (1,2) // expected-error {{different number of elements}}
   var e: (Int,Int) =
@@ -480,12 +480,12 @@ func conversionTest(inout a: Double, inout b: Int) {
   var pi_s1 = SpecialPi(pi_s) // expected-error {{cannot invoke initializer for type 'SpecialPi' with an argument list of type '(SpecialPi)'}}
   // expected-note @-1 {{expected an argument list of type '()'}}
 
-  var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi'}}
-  var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi'}}
+  var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
+  var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_s2: SpecialPi = getPi() // no-warning
   
   var float = Float.self
-  var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'getPi'}}
+  var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_f4 = float.init(pi_f)
 
   var e = Empty(f)

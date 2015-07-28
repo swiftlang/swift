@@ -66,7 +66,7 @@ func classMethods(b: B, other: NSObject) {
   i += B.classMethod(1)
   i += B.classMethod(1, withInt:2)
 
-  i += b.classMethod() // expected-error{{value of type 'B' has no member 'classMethod'}}
+  i += b.classMethod() // expected-error{{member 'classMethod' cannot be used on value of type 'B'}}
 
   // Both class and instance methods exist.
   B.description()
@@ -237,7 +237,7 @@ func overridingTest(srs: SuperRefsSub) {
 
 func almostSubscriptableValueMismatch(as1: AlmostSubscriptable, a: A) {
   // FIXME: Crummy diagnostic.
-  as1[a] // expected-error{{value of type 'AlmostSubscriptable' has no member 'subscript'}}
+  as1[a] // expected-error{{cannot subscript a value of type 'AlmostSubscriptable' with an index of type 'A'}}
 }
 
 func almostSubscriptableKeyMismatch(bc: BadCollection, key: NSString) {
@@ -460,7 +460,7 @@ class IncompleteProtocolAdopter : Incomplete, IncompleteOptional { // expected-e
 
 func testNullarySelectorPieces(obj: AnyObject) {
   obj.foo(1, bar: 2, 3) // no-warning
-  obj.foo(1, 2, bar: 3) // expected-error{{value of type 'AnyObject' has no member 'foo(_:_:bar:)'}}
+  obj.foo(1, 2, bar: 3) // expected-error{{cannot call value of non-function type 'AnyObject?!'}}
 }
 
 func testFactoryMethodAvailability() {
@@ -491,7 +491,7 @@ func testUnusedResults(ur: UnusedResults) {
 }
 
 func testCStyle() {
-  ExtraSelectors.cStyle(0, 1, 2) // expected-error{{value of type 'ExtraSelectors.Type' has no member 'cStyle'}}
+  ExtraSelectors.cStyle(0, 1, 2) // expected-error{{type 'ExtraSelectors' has no member 'cStyle'}}
 }
 
 func testProtocolQualified(obj: CopyableNSObject, cell: CopyableSomeCell,

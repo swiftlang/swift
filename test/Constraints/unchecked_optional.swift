@@ -16,7 +16,7 @@ func test0(a : A!) {
   a.do_b(1)
   a.do_b(5.0)
 
-  a.do_c(1) // expected-error {{ambiguous use of 'do_c'}}
+  a.do_c(1) // expected-error {{ambiguous use of 'do_c(x:)'}}
   a.do_c(x: 1)
 }
 
@@ -26,7 +26,7 @@ func test1(a : A!) {
   a?.do_b(1)
   a?.do_b(5.0)
 
-  a?.do_c(1) // expected-error {{ambiguous use of 'do_c'}}
+  a?.do_c(1) // expected-error {{ambiguous use of 'do_c(x:)'}}
   a?.do_c(x: 1)
 }
 
