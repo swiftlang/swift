@@ -51,14 +51,33 @@ func test_property(x: ErrorType) -> String {
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials13test_propertyFPSs9ErrorType_SS
 // CHECK:         [[VALUE:%.*]] = open_existential_box %0 : $ErrorType to $*[[VALUE_TYPE:@opened\(.*\) ErrorType]]
 // FIXME: Extraneous copy here
-// CHECK-NEXT: [[COPY:%[0-9]+]] = alloc_stack $[[VALUE_TYPE]]
-// CHECK-NEXT: copy_addr [[VALUE]] to [initialization] [[COPY]]#1 : $*[[VALUE_TYPE]]
+// CHECK-NEXT:    [[COPY:%[0-9]+]] = alloc_stack $[[VALUE_TYPE]]
+// CHECK-NEXT:    copy_addr [[VALUE]] to [initialization] [[COPY]]#1 : $*[[VALUE_TYPE]]
 // CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #ErrorType._domain!getter.1
 // -- self parameter of witness is @in_guaranteed; no need to copy since
 //    value in box is immutable and box is guaranteed
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]]#1)
 // CHECK:         strong_release %0
 // CHECK:         return [[RESULT]]
+
+func test_property_of_lvalue(var x: ErrorType) -> String {
+  return x._domain
+}
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPSs9ErrorType_SS
+// CHECK:         [[VAR:%.*]] = alloc_box $ErrorType
+// CHECK-NEXT:    store %0 to [[VAR]]#1
+// CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[VAR]]#1
+// CHECK-NEXT:    strong_retain [[VALUE_BOX]]
+// CHECK-NEXT:    [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $ErrorType to $*[[VALUE_TYPE:@opened\(.*\) ErrorType]]
+// CHECK-NEXT:    [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
+// CHECK-NEXT:    copy_addr [[VALUE]] to [initialization] [[COPY]]#1
+// CHECK-NEXT:    [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #ErrorType._domain!getter.1
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]]#1)
+// CHECK-NEXT:    destroy_addr [[COPY]]#1
+// CHECK-NEXT:    dealloc_stack [[COPY]]#0
+// CHECK-NEXT:    strong_release [[VALUE_BOX]]
+// CHECK-NEXT:    strong_release [[VAR]]#0
+// CHECK-NEXT:    return [[RESULT]]
 
 extension ErrorType {
   final func extensionMethod() { }

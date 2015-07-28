@@ -3288,6 +3288,14 @@ void SILGenFunction::emitOpenExistentialImpl(
     canConsume = existentialValue.hasCleanup();
     break;
   case ExistentialRepresentation::Boxed:
+    if (E->getExistentialValue()->getType()->is<LValueType>()) {
+      assert(existentialValue.getValue().getType().isAddress());
+      existentialValue = emitLoad(E, existentialValue.getValue(),
+                                  getTypeLowering(existentialValue.getType()),
+                                  SGFContext::AllowGuaranteedPlusZero,
+                                  IsNotTake);
+    }
+
     assert(existentialValue.getValue().getType().isObject());
     // NB: Don't forward the cleanup, because consuming a boxed value won't
     // consume the box reference.

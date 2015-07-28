@@ -114,5 +114,25 @@ ErrorTypeTests.test("try!")
     let _: () = try! { throw SillyError.JazzHands }()
   }
 
+enum LifetimeError : ErrorType {
+  case MistakeOfALifetime(LifetimeTracked, yearsIncarcerated: Int)
+}
+
+ErrorTypeTests.test("existential in lvalue") {
+  expectEqual(0, LifetimeTracked.instances)
+  do {
+    var e: ErrorType? = nil
+    do {
+      throw LifetimeError.MistakeOfALifetime(LifetimeTracked(0),
+                                             yearsIncarcerated: 25)
+    } catch {
+      e = error
+    }
+    expectEqual(1, LifetimeTracked.instances)
+    expectEqual(0, e?._code)
+  }
+  expectEqual(0, LifetimeTracked.instances)
+}
+
 runAllTests()
 
