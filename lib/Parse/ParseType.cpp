@@ -57,27 +57,21 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
 
   switch (Tok.getKind()) {
   case tok::kw_Self:
-  case tok::identifier: {
+  case tok::identifier:
     ty = parseTypeIdentifier();
-    if (InOutLoc.isValid())
-      ty = makeParserResult(new (Context) InOutTypeRepr(ty.get(),
-                                                        InOutLoc));
     break;
-  }
   case tok::kw_protocol:
     ty = parseTypeComposition();
     break;
-  case tok::l_paren: {
+  case tok::l_paren:
     ty = parseTypeTupleBody();
     break;
-  }
-  case tok::code_complete: {
+  case tok::code_complete:
     if (CodeCompletion)
       CodeCompletion->completeTypeSimpleBeginning();
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionResult<TypeRepr>();
-  }
   case tok::kw_super:
   case tok::kw_dynamicType:
   case tok::kw_self:
@@ -128,6 +122,11 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     }
     break;
   }
+
+  // If we parsed an inout modifier, prepend it.
+  if (InOutLoc.isValid())
+    ty = makeParserResult(new (Context) InOutTypeRepr(ty.get(),
+                                                      InOutLoc));
 
   return ty;
 }

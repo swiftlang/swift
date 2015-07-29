@@ -1166,6 +1166,15 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
 
 Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   assert(repr && "Cannot validate null TypeReprs!");
+  
+  // Strip the "is function input" bits unless this is a type that knows about
+  // them.
+  if (!isa<InOutTypeRepr>(repr) && !isa<TupleTypeRepr>(repr)) {
+    options -= TR_ImmediateFunctionInput;
+    options -= TR_FunctionInput;
+  }
+  
+  
   switch (repr->getKind()) {
   case TypeReprKind::Error:
     return ErrorType::get(Context);
@@ -1870,7 +1879,7 @@ Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
   if (!(options & TR_FunctionInput) &&
       !(options & TR_ImmediateFunctionInput)) {
     TC.diagnose(repr->getInOutLoc(), diag::inout_only_parameter);
-    return ty;
+    return ErrorType::get(Context);
   }
   
   return InOutType::get(ty);
