@@ -106,10 +106,10 @@ struct MethodWithNoreturn {
   func neverReturns() { exit(0) }
 }
 
-func print(_: Int) {}
+func printInt(_: Int) {}
 var maybeReturns: (Int) -> () = exit // no-error
 var neverReturns1 = exit
-neverReturns1 = print // expected-error {{cannot assign a value of type '(Int) -> ()' to a value of type '@noreturn (Int) -> ()'}}
+neverReturns1 = printInt // expected-error {{cannot assign a value of type '(Int) -> ()' to a value of type '@noreturn (Int) -> ()'}}
 
 var neverReturns2: MethodWithNoreturn -> @noreturn () -> () = MethodWithNoreturn.neverReturns
 
