@@ -60,7 +60,7 @@ public protocol CustomStringConvertible {
 /// debugging purposes.
 ///
 /// This textual representation is used when values are written to an
-/// *output stream* by `debugPrint` and `debugPrintln`, and is
+/// *output stream* by `debugPrint`, and is
 /// typically more verbose than the text provided by a
 /// `CustomStringConvertible`'s `description` property.
 ///
