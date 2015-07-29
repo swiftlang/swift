@@ -697,29 +697,24 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   SmallVector<StringRef, 3> ParsedKeywords;
 
   void addSuperKeyword(CodeCompletionResultSink &Sink) {
-    auto *D = CurDeclContext;
-    for (;D && !D->isNominalTypeOrNominalTypeExtensionContext();
-         D = D->getParent());
+    auto *D = CurDeclContext->getInnermostTypeContext();
     if (!D)
       return;
-    Type DT = D->isNominalTypeOrNominalTypeExtensionContext()->getDeclaredType();
+    Type DT = D->getDeclaredTypeInContext();
     if (DT.isNull() || DT->is<ErrorType>())
       return;
     OwnedResolver TypeResolver(createLazyResolver(CurDeclContext->getASTContext()));
     Type ST = DT->getSuperclass(TypeResolver.get());
     if (ST.isNull() || ST->is<ErrorType>())
       return;
-    auto Nominal = ST->getNominalOrBoundGenericNominal();
-    if (Nominal) {
+    if (ST->getNominalOrBoundGenericNominal()) {
       CodeCompletionResultBuilder Builder(Sink,
                                           CodeCompletionResult::ResultKind::Keyword,
                                           SemanticContextKind::None);
       Builder.addTextChunk("super");
       ST = ST->getReferenceStorageReferent();
-      if (ST->isVoid())
-        Builder.addTypeAnnotation("Void");
-      else
-        Builder.addTypeAnnotation(ST.getString());
+      assert(!ST->isVoid() && "Cannot get type name.");
+      Builder.addTypeAnnotation(ST.getString());
     }
   }
 
