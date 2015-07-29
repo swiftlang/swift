@@ -437,9 +437,9 @@ func testInOut(inout arg: Int) {
   takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}}
   takesExplicitInt(&x)
   takesInt(&x) // expected-error{{cannot invoke 'takesInt' with an argument list of type '(inout Int)'}} expected-note{{expected an argument list of type '(Int)'}}
-  var y = &x // expected-error{{reference to 'Int' not used to initialize a inout parameter}} \
+  var y = &x // expected-error{{'&' can only appear immediately in a call argument list}} \
              // expected-error {{type 'inout Int' of variable is not materializable}}
-  var z = &arg // expected-error{{reference to 'Int' not used to initialize a inout parameter}} \
+  var z = &arg // expected-error{{'&' can only appear immediately in a call argument list}} \
              // expected-error {{type 'inout Int' of variable is not materializable}}
 
   takesExplicitInt(5) // expected-error {{cannot invoke 'takesExplicitInt' with an argument list of type '(Int)'}} expected-note{{expected an argument list of type '(inout Int)'}}
@@ -585,8 +585,7 @@ func test() {
   var x = Foo()
 
   // rdar://15708430
-  (&x).method()  // expected-error {{'Foo' is not convertible to 'Foo'}}
-  // expected-error @-1 {{reference to 'Foo' not used to initialize a inout parameter}}
+  (&x).method()  // expected-error {{'inout Foo' is not convertible to 'Foo'}}
 }
 
 
@@ -707,11 +706,14 @@ public struct TestPropMethodOverloadGroup {
 // <rdar://problem/18496742> Passing ternary operator expression as inout crashes Swift compiler
 func inoutTests(inout arr: Int) {
   var x = 1, y = 2
-  (true ? &x : &y)
-  let a = (true ? &x : &y)  // expected-error {{type 'inout Int' of variable is not materializable}}
+  (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
+  let a = (true ? &x : &y)  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
+  // expected-error @-1 {{type 'inout Int' of variable is not materializable}}
 
-  inoutTests(true ? &x : &y);
+  inoutTests(true ? &x : &y);  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
 
   &_ // expected-error {{type of expression is ambiguous without more context}}
-  
+
+  inoutTests((&x))   // expected-error {{'&' can only appear immediately in a call argument list}}
+  inoutTests(&x)
 }

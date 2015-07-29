@@ -111,6 +111,8 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
 ///     lookup.
 ///   - Partial application of some decls isn't allowed due to implementation
 ///     limitations.
+///   - "&" (aka InOutExpressions) may only exist directly in function call
+///     argument lists.
 ///
 static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                                          const DeclContext *DC) {
@@ -120,6 +122,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     
     // Keep track of acceptable DiscardAssignmentExpr's.
     SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
+
+    /// Keep track of InOutExprs
+    SmallPtrSet<InOutExpr*, 2> AcceptableInOutExprs;
+
   public:
     TypeChecker &TC;
     const DeclContext *DC;
@@ -307,6 +313,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
+      if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
+        // Implicit InOutExpr's are allowed in the base of a subscript expr.
+        if (auto *IOE = dyn_cast<InOutExpr>(SE->getBase()))
+          if (IOE->isImplicit())
+            AcceptableInOutExprs.insert(IOE);
+      }
+
+
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
       if (auto *Call = dyn_cast<ApplyExpr>(E)) {
@@ -328,11 +342,26 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         ArrayRef<Expr*> arguments;
         if (auto *TE = dyn_cast<TupleExpr>(Arg))
           arguments = TE->getElements();
+        else if (auto *PE = dyn_cast<ParenExpr>(Arg))
+          arguments = PE->getSubExpr();
         else
           arguments = Call->getArg();
 
         // Check each argument.
         for (auto arg : arguments) {
+          // InOutExpr's are allowed in argument lists directly.
+          if (auto *IOE = dyn_cast<InOutExpr>(arg)) {
+            if (isa<CallExpr>(Call))
+              AcceptableInOutExprs.insert(IOE);
+          }
+          // InOutExprs can be wrapped in some implicit casts.
+          if (auto *ICO = dyn_cast<ImplicitConversionExpr>(arg)) {
+            if (isa<InOutToPointerExpr>(ICO) ||
+                isa<ArrayToPointerExpr>(ICO))
+              if (auto *IOE = dyn_cast<InOutExpr>(ICO->getSubExpr()))
+                AcceptableInOutExprs.insert(IOE);
+          }
+
           while (1) {
             if (auto conv = dyn_cast<ImplicitConversionExpr>(arg))
               arg = conv->getSubExpr();
@@ -357,7 +386,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             !DAE->getType()->is<ErrorType>())
           TC.diagnose(DAE->getLoc(), diag::discard_expr_outside_of_assignment);
       }
-      
+
+      // Diagnose an '&' that isn't in an argument lists.
+      if (auto *IOE = dyn_cast<InOutExpr>(E)) {
+        if (!IOE->isImplicit() && !AcceptableInOutExprs.count(IOE) &&
+            !IOE->getType()->is<ErrorType>())
+          TC.diagnose(IOE->getLoc(), diag::inout_expr_outside_of_call)
+            .highlight(IOE->getSubExpr()->getSourceRange());
+      }
 
       return { true, E };
     }

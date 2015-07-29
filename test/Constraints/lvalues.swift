@@ -161,9 +161,9 @@ func testInOut(inout arg: Int) {
 
 // Don't infer inout types.
 var ir = &i // expected-error{{type 'inout Int' of variable is not materializable}} \
-            // expected-error{{reference to 'Int' not used to initialize a inout parameter}}
+            // expected-error{{'&' can only appear immediately in a call argument list}}
 var ir2 = ((&i)) // expected-error{{type 'inout Int' of variable is not materializable}} \
-                 // expected-error{{reference to 'Int' not used to initialize a inout parameter}}
+                 // expected-error{{'&' can only appear immediately in a call argument list}}
 
 // <rdar://problem/17133089>
 func takeArrayRef(inout x:Array<String>) { }

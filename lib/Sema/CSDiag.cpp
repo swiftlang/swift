@@ -809,6 +809,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     break;
 
   case Failure::IsForbiddenLValue:
+    // FIXME: Probably better handled by InOutExpr later.
     if (auto iotTy = failure.getSecondType()->getAs<InOutType>()) {
       tc.diagnose(loc, diag::reference_non_inout, iotTy->getObjectType())
         .highlight(range);
