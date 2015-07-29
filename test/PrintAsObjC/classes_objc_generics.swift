@@ -376,6 +376,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, copy) NSSet<NSString *> * __nonnull stringSet;
 // CHECK-NEXT: @property (nonatomic, copy) NSSet<NSNumber *> * __nonnull intSet;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray<NSNumber *> * __nonnull cgFloatArray;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray<NSValue *> * __nonnull rangeArray;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray<Properties *> * __null_unspecified outletCollection;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(CustomName) NSArray<CustomName *> *  __nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionAnyObject;
@@ -431,6 +432,7 @@ public class NonObjCClass { }
   var stringSet: Set<String> = []
   var intSet: Set<Int> = []
   var cgFloatArray: Array<CGFloat> = []
+  var rangeArray: Array<NSRange> = []
 
   @IBOutlet var outletCollection: [Properties]!
   @IBOutlet var outletCollectionOptional: [ClassWithCustomName]? = []

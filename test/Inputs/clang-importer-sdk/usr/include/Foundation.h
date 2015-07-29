@@ -18,6 +18,12 @@ void *allocate(NSZone *zone);
 
 typedef double NSTimeInterval;
 
+typedef struct _NSRange {
+    NSUInteger location;
+    NSUInteger length;
+} NSRange;
+
+
 extern NSUInteger NSRealMemoryAvailable(void) __attribute__((availability(macosx,introduced=10.0 ,deprecated=10.8,message="" ))) __attribute__((availability(ios,introduced=2.0 ,deprecated=6.0,message="" )));
 extern NSUInteger SomeCrazyAppExtensionForbiddenAPI(void)
   __attribute__((availability(macosx_app_extension,unavailable,message="Not available in App Extensions")))
@@ -156,7 +162,15 @@ __attribute__((availability(ios,introduced=8.0)))
 - (void)removeObject:(KeyType)obj;
 @end
 
-@interface NSNumber : NSObject <NSCopying>
+@interface NSValue : NSObject <NSCopying>
+@end
+
+@interface NSValue (NSRange)
++ (NSValue *)valueWithRange:(NSRange)range;
+@property NSRange rangeValue;
+@end
+
+@interface NSNumber : NSValue
 @end
 
 @interface NSDecimalNumber : NSObject
@@ -649,11 +663,6 @@ typedef NS_OPTIONS(NSUInteger, NSExplicitlyUnavailableOnOSXOptions) {
 + (instancetype)requestWithString:(NSString *)URLString;
 + (instancetype)URLRequestWithURL:(NSURL *)URL;
 @end
-
-typedef struct _NSRange {
-    NSUInteger location;
-    NSUInteger length;
-} NSRange;
 
 NS_SWIFT_UNAVAILABLE("NSInvocation and related APIs not available")
 @interface NSInvocation : NSObject

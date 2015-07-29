@@ -187,6 +187,35 @@ extension CGFloat : _ObjectiveCBridgeable {
   }
 }
 
+extension NSRange : _ObjectiveCBridgeable {
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+  
+  public static func _getObjectiveCType() -> Any.Type {
+    return NSValue.self
+  }
+
+  public func _bridgeToObjectiveC() -> NSValue {
+    return NSValue(range: self)
+  }
+
+  public static func _forceBridgeFromObjectiveC(
+    x: NSValue,
+    inout result: NSRange?
+  ) {
+    result = x.rangeValue
+  }
+  
+  public static func _conditionallyBridgeFromObjectiveC(
+    x: NSValue,
+    inout result: NSRange?
+  ) -> Bool {
+    self._forceBridgeFromObjectiveC(x, result: &result)
+    return true
+  }
+}
+
 extension NSError : ErrorType {
   public var _domain: String { return domain }
   public var _code: Int { return code }
