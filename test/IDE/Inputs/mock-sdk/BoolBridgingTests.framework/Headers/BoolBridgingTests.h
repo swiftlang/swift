@@ -35,6 +35,22 @@ __typeof(bool (^)(bool)) testCBoolFnToBlock(bool (*)(bool));
 __typeof(BOOL (^)(BOOL)) testObjCBoolFnToBlock(BOOL (*)(BOOL));
 __typeof(Boolean (^)(Boolean)) testDarwinBooleanFnToBlock(Boolean (*)(Boolean));
 
+CBoolBlock testCBoolFnToBlockTypedef(CBoolFn);
+ObjCBoolBlock testObjCBoolFnToBlockTypedef(ObjCBoolFn);
+DarwinBooleanBlock testDarwinBooleanFnToBlockTypedef(DarwinBooleanFn);
+
+typedef __typeof(testCBoolFnToBlockTypedef) CBoolFnToBlockType;
+typedef __typeof(testObjCBoolFnToBlockTypedef) ObjCCBoolFnToBlockType;
+typedef __typeof(testDarwinBooleanFnToBlockTypedef) DarwinBooleanFnToBlockType;
+
+extern CBoolFn globalCBoolFn;
+extern ObjCBoolFn globalObjCBoolFn;
+extern DarwinBooleanFn globalDarwinBooleanFn;
+
+extern CBoolBlock globalCBoolBlock;
+extern ObjCBoolBlock globalObjCBoolBlock;
+extern DarwinBooleanBlock globalDarwinBooleanBlock;
+
 @interface Test : NSObject
 @property bool propCBool;
 @property BOOL propObjCBool;
@@ -51,6 +67,10 @@ __typeof(Boolean (^)(Boolean)) testDarwinBooleanFnToBlock(Boolean (*)(Boolean));
 - (bool (^)(bool))testCBoolFnToBlock:(bool (*)(bool))fp;
 - (BOOL (^)(BOOL))testObjCBoolFnToBlock:(BOOL (*)(BOOL))fp;
 - (Boolean (^)(Boolean))testDarwinBooleanFnToBlock:(Boolean (*)(Boolean))fp;
+
+- (void)produceCBoolBlockTypedef:(CBoolBlock __nullable * __nonnull)outBlock;
+- (void)produceObjCBoolBlockTypedef:(ObjCBoolBlock __nullable * __nonnull)outBlock;
+- (void)produceDarwinBooleanBlockTypedef:(DarwinBooleanBlock __nullable * __nonnull)outBlock;
 
 - (instancetype)init;
 @end

@@ -119,15 +119,15 @@ public func testFunctionPointers() {
 // CHECK-LABEL: sil @_TF18objc_bool_bridging10testBlocksFT_T_
 public func testBlocks() {
   // CHECK: = function_ref @_TFF18objc_bool_bridging10testBlocksFT_T_U_FSbSb : $@convention(thin) (Bool) -> Bool
-  let x: CBoolBlock = { $0 }
+  let x: @convention(block) (Bool) -> Bool = { $0 }
   _ = x(true)
   
   // CHECK-OBJCBOOL: = function_ref @_TFF18objc_bool_bridging10testBlocksFT_T_U0_FV10ObjectiveC8ObjCBoolS1_ : $@convention(thin) (ObjCBool) -> ObjCBool
-  let y: ObjCBoolBlock = { $0 }
+  let y: @convention(block) (ObjCBool) -> ObjCBool = { $0 }
   _ = y(true)
   
   // CHECK: = function_ref @_TFF18objc_bool_bridging10testBlocksFT_T_U1_FV6Darwin13DarwinBooleanS1_ : $@convention(thin) (DarwinBoolean) -> DarwinBoolean
-  let z: DarwinBooleanBlock = { $0 }
+  let z: @convention(block) (DarwinBoolean) -> DarwinBoolean = { $0 }
   _ = z(true)
 }
 

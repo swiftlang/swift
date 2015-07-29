@@ -17,7 +17,7 @@ dispatch_async(dispatch_get_current_queue(), /*not a block=*/()) // expected-err
 
 func testNoEscape(@noescape f: @convention(block) () -> Void, nsStr: NSString,
                   @noescape fStr: (String!) -> Void) {
-  dispatch_async(dispatch_get_current_queue(), f) // expected-error{{invalid use of non-escaping function in escaping context '@convention(block) () -> Void'}}
+  dispatch_async(dispatch_get_current_queue(), f) // expected-error{{invalid use of non-escaping function in escaping context '() -> Void'}}
   dispatch_sync(dispatch_get_current_queue(), f) // okay: dispatch_sync is noescape
 
   // rdar://problem/19818617

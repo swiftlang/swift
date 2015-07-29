@@ -84,12 +84,11 @@ enum class ConstantConvertKind {
 
 /// \brief Describes the kind of type import we're performing.
 enum class ImportTypeKind {
-  /// \brief Import an abstract type reference, like the underlying
-  /// type of a typedef.
-  ///
-  /// This provides special treatment for class reference types:
-  /// the typedef itself is left as a non-optional type.
+  /// \brief Import a type in its most abstract form, without any adjustment.
   Abstract,
+
+  /// \brief Import the underlying type of a typedef.
+  Typedef,
 
   /// \brief Import the type of a literal value.
   Value,

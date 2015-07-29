@@ -1213,11 +1213,16 @@ namespace {
       if (!DC)
         return nullptr;
 
-      if (!SwiftType)
-        SwiftType = Impl.importType(Decl->getUnderlyingType(),
-                                    ImportTypeKind::Abstract,
+      if (!SwiftType) {
+        // Import typedefs of blocks as their fully-bridged equivalent Swift
+        // type. That matches how we want to use them in most cases. All other
+        // types should be imported in a non-bridged way.
+        clang::QualType ClangType = Decl->getUnderlyingType();
+        SwiftType = Impl.importType(ClangType,
+                                    ImportTypeKind::Typedef,
                                     isInSystemModule(DC),
-                                    /*isFullyBridgeable*/false);
+                                    ClangType->isBlockPointerType());
+      }
 
       if (!SwiftType)
         return nullptr;

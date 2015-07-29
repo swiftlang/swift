@@ -566,9 +566,11 @@ namespace {
         SwiftTypeConverter innerConverter(Impl, IsUsedInSystemModule,
                                           /*can fully bridge*/false);
         auto underlyingResult = innerConverter.Visit(type->desugar());
-        assert(underlyingResult.AbstractType->isEqual(mappedType) &&
-               "typedef without special typedef kind was mapped "
-               "differently from its underlying type?");
+        if (underlyingResult.Hint != ImportHint::Block) {
+          assert(underlyingResult.AbstractType->isEqual(mappedType) &&
+                 "typedef without special typedef kind was mapped "
+                 "differently from its underlying type?");
+        }
         hint = underlyingResult.Hint;
       }
 
@@ -788,6 +790,7 @@ namespace {
 static bool canBridgeTypes(ImportTypeKind importKind) {
   switch (importKind) {
   case ImportTypeKind::Abstract:
+  case ImportTypeKind::Typedef:
   case ImportTypeKind::Value:
   case ImportTypeKind::Variable:
   case ImportTypeKind::AuditedVariable:
@@ -811,6 +814,7 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
 static bool isCFAudited(ImportTypeKind importKind) {
   switch (importKind) {
   case ImportTypeKind::Abstract:
+  case ImportTypeKind::Typedef:
   case ImportTypeKind::Value:
   case ImportTypeKind::BridgedValue:
   case ImportTypeKind::Variable:
@@ -971,12 +975,32 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
   // Turn block pointer types back into normal function types in any
   // context where bridging is possible, unless the block has a typedef.
-  if (hint == ImportHint::Block && canBridgeTypes(importKind) &&
-      !isa<NameAliasType>(importedType.getPointer())) {
-    auto fTy = importedType->castTo<FunctionType>();
-    FunctionType::ExtInfo einfo =
-      fTy->getExtInfo().withRepresentation(FunctionType::Representation::Swift);
-    importedType = FunctionType::get(fTy->getInput(), fTy->getResult(), einfo);
+  if (hint == ImportHint::Block) {
+    if (!canFullyBridgeTypes) {
+      if (auto typedefType = clangType->getAs<clang::TypedefType>()) {
+        // In non-bridged contexts, drop the typealias sugar for blocks.
+        // FIXME: This will do the wrong thing if there's any adjustment to do
+        // besides optionality.
+        Type underlyingTy = impl.importType(typedefType->desugar(),
+                                            importKind,
+                                            isUsedInSystemModule,
+                                            canFullyBridgeTypes,
+                                            OTK_None);
+        if (Type unwrappedTy = underlyingTy->getAnyOptionalObjectType())
+          underlyingTy = unwrappedTy;
+        if (!underlyingTy->isEqual(importedType))
+          importedType = underlyingTy;
+      }
+    }
+
+    if (canBridgeTypes(importKind) || importKind == ImportTypeKind::Typedef) {
+      auto fTy = importedType->castTo<FunctionType>();
+      FunctionType::ExtInfo einfo = fTy->getExtInfo();
+      if (einfo.getRepresentation() != FunctionTypeRepresentation::Swift) {
+        einfo = einfo.withRepresentation(FunctionTypeRepresentation::Swift);
+        importedType = fTy->withExtInfo(einfo);
+      }
+    }
   }
 
   // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
@@ -988,9 +1012,10 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
   // When NSUInteger is used as an enum's underlying type or if it does not come
   // from a system module, make sure it stays unsigned.
-  if (hint == ImportHint::NSUInteger)
-     if (importKind == ImportTypeKind::Enum || !isUsedInSystemModule) {
-    return impl.getNamedSwiftType(impl.getStdlibModule(), "UInt");
+  if (hint == ImportHint::NSUInteger) {
+    if (importKind == ImportTypeKind::Enum || !isUsedInSystemModule) {
+      return impl.getNamedSwiftType(impl.getStdlibModule(), "UInt");
+    }
   }
 
   // Wrap CF pointers up as unmanaged types, unless this is an audited
@@ -1073,7 +1098,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
   // Wrap class, class protocol, function, and metatype types in an
   // optional type.
-  if (canImportAsOptional(hint)) {
+  if (importKind != ImportTypeKind::Typedef && canImportAsOptional(hint)) {
     importedType = getOptionalType(importedType, importKind, optKind);
   }
 
