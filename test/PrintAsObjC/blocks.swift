@@ -11,6 +11,9 @@
 
 import ObjectiveC
 
+typealias MyTuple = (a: Int, b: AnyObject?)
+typealias MyInt = Int
+
 // CHECK-LABEL: @interface Callbacks
 // CHECK-NEXT: - (void (^ __nonnull)(void))voidBlocks:(void (^ __nonnull)(void))input;
 // CHECK-NEXT: - (void)manyArguments:(void (^ __nonnull)(float, float, double, double))input;
@@ -21,6 +24,8 @@ import ObjectiveC
 // CHECK-NEXT: - (void (^ __nullable)(NSObject * __nonnull))returnsBlockWithInput;
 // CHECK-NEXT: - (void (^ __nullable)(NSObject * __nonnull))returnsBlockWithParenthesizedInput;
 // CHECK-NEXT: - (void (^ __nullable)(NSObject * __nonnull, NSObject * __nonnull))returnsBlockWithTwoInputs;
+// CHECK-NEXT: - (void)blockWithTypealias:(NSInteger (^ __nonnull)(NSInteger, id __nullable))input;
+// CHECK-NEXT: - (void)blockWithSimpleTypealias:(NSInteger (^ __nonnull)(NSInteger))input;
 // CHECK-NEXT: - (NSInteger (* __nonnull)(NSInteger))functionPointers:(NSInteger (* __nonnull)(NSInteger))input;
 // CHECK-NEXT: - (void)functionPointerTakesAndReturnsFunctionPointer:(NSInteger (* __nonnull (^ __nonnull (* __nonnull)(NSInteger))(NSInteger))(NSInteger))input;
 // CHECK-NEXT: @property (nonatomic, copy) NSInteger (^ __nullable savedBlock)(NSInteger);
@@ -53,6 +58,9 @@ import ObjectiveC
   func returnsBlockWithTwoInputs() -> ((NSObject, NSObject) -> ())? {
     return nil
   }
+
+  func blockWithTypealias(input: MyTuple -> MyInt) {}
+  func blockWithSimpleTypealias(input: MyInt -> MyInt) {}
 
   func functionPointers(input: @convention(c) Int -> Int)
       -> @convention(c) Int -> Int {
