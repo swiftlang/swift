@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend %s -parse -verify
+// RUN: not %target-swift-frontend %s -parse
 
 let pq = {
-    return $0 ?? nil // expected-error{{argument for generic parameter 'T' could not be inferred}}
+    return $0 ?? nil
 }
