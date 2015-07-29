@@ -78,11 +78,6 @@ public protocol CustomDebugStringConvertible {
   var debugDescription: String { get }
 }
 
-@available(*, unavailable, renamed="CustomDebugStringConvertible")
-public typealias DebugPrintable = CustomDebugStringConvertible
-@available(*, unavailable, renamed="CustomStringConvertible")
-public typealias Printable = CustomStringConvertible
-
 //===----------------------------------------------------------------------===//
 // Default (ad-hoc) printing
 //===----------------------------------------------------------------------===//
@@ -288,85 +283,44 @@ extension UnicodeScalar : Streamable {
 }
 
 //===----------------------------------------------------------------------===//
-// Compatibility APIs
+// Unavailable APIs
 //===----------------------------------------------------------------------===//
 
-/// Writes the textual representation of `value` and a newline character into
-/// the stream `target`.
-///
-/// The textual representation is obtained from the `value` using its protocol
-/// conformances, in the following order of preference: `Streamable`,
-/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
-///
-/// Do not overload this function for your type.  Instead, adopt one of the
-/// protocols mentioned above.
+@available(*, unavailable, renamed="CustomDebugStringConvertible")
+public typealias DebugPrintable = CustomDebugStringConvertible
+@available(*, unavailable, renamed="CustomStringConvertible")
+public typealias Printable = CustomStringConvertible
+
 @available(*, unavailable, renamed="print")
-@inline(never)
 public func println<T, TargetStream : OutputStreamType>(
     value: T, inout _ target: TargetStream
 ) {
   fatalError("unavailable function can't be called")
 }
 
-/// Writes the textual representation of `value` and a newline character into
-/// the standard output.
-///
-/// The textual representation is obtained from the `value` using its protocol
-/// conformances, in the following order of preference: `Streamable`,
-/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
-///
-/// Do not overload this function for your type.  Instead, adopt one of the
-/// protocols mentioned above.
 @available(*, unavailable, renamed="print")
-@inline(never)
-@_semantics("stdlib_binary_only")
 public func println<T>(value: T) {
   fatalError("unavailable function can't be called")
 }
 
-/// Writes a single newline character into the standard output.
 @available(*, unavailable, message="use print(\"\")")
-@inline(never)
-@_semantics("stdlib_binary_only")
 public func println() {
   fatalError("unavailable function can't be called")
 }
 
-/// Returns the result of `print`'ing `x` into a `String`.
 @available(*, unavailable, renamed="String")
-@inline(never)
 public func toString<T>(x: T) -> String {
   fatalError("unavailable function can't be called")
 }
 
-/// Write to `target` the textual representation of `x` most suitable
-/// for debugging, followed by a newline.
-///
-/// * If `T` conforms to `CustomDebugStringConvertible`, write `x.debugDescription`
-/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write `x.description`
-/// * Otherwise, if `T` conforms to `Streamable`, write `x`
-/// * Otherwise, fall back to a default textual representation.
-///
-/// - SeeAlso: `debugPrint(x, &target)`
 @available(*, unavailable, message="use debugPrint()")
-@inline(never)
 public func debugPrintln<T, TargetStream : OutputStreamType>(
     x: T, inout _ target: TargetStream
 ) {
   fatalError("unavailable function can't be called")
 }
 
-/// Write to the console the textual representation of `x` most suitable
-/// for debugging, followed by a newline.
-///
-/// * If `T` conforms to `CustomDebugStringConvertible`, write `x.debugDescription`
-/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write `x.description`
-/// * Otherwise, if `T` conforms to `Streamable`, write `x`
-/// * Otherwise, fall back to a default textual representation.
-///
-/// - SeeAlso: `debugPrint(x)`
 @available(*, unavailable, renamed="debugPrint")
-@inline(never)
 public func debugPrintln<T>(x: T) {
   fatalError("unavailable function can't be called")
 }
