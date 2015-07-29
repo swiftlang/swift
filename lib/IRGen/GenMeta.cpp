@@ -449,7 +449,7 @@ TypeMetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
     return TypeMetadataAccessStrategy::Direct;
 
   // DynamicSelfType is actually local.
-  if (isa<DynamicSelfType>(type))
+  if (type->hasDynamicSelfType())
     return TypeMetadataAccessStrategy::Direct;
 
   // The zero-element tuple has special metadata in the runtime.
