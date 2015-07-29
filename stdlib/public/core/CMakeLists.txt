@@ -74,6 +74,7 @@ set(SWIFTLIB_ESSENTIAL
   OutputStream.swift
   Pointer.swift
   Policy.swift
+  Print.swift
   REPL.swift
   Range.swift
   RangeMirrors.swift.gyb
