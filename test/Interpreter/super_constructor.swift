@@ -67,6 +67,6 @@ class DerivedWithDummyParameter : BaseWithDummyParameter {
   }
 }
 
-BaseWithDummyParameter(dummy: ()) // CHECK: correct
-DerivedWithDummyParameter() // CHECK: correct
+_ = BaseWithDummyParameter(dummy: ()) // CHECK: correct
+_ = DerivedWithDummyParameter() // CHECK: correct
 

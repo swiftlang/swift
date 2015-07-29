@@ -54,7 +54,7 @@ printNoPayload(.z)
 
 func printSinglePayloadTrivial(v: SinglePayloadTrivial) {
   switch v {
-  case .x(var char, var int):
+  case .x(let char, let int):
     print("SinglePayloadTrivial.x(\(char), \(int))")
   case .y:
     print("SinglePayloadTrivial.y")
@@ -72,9 +72,9 @@ printSinglePayloadTrivial(.z)
 
 func printMultiPayloadTrivial(v: MultiPayloadTrivial) {
   switch v {
-  case .x(var char, var int):
+  case .x(let char, let int):
     print("MultiPayloadTrivial.x(\(char), \(int))")
-  case .y(var int, var double):
+  case .y(let int, let double):
     print("MultiPayloadTrivial.y(\(int), \(double))")
   case .z:
     print("MultiPayloadTrivial.z")
@@ -109,7 +109,7 @@ enum SinglePayloadAddressOnly {
 
 func printSinglePayloadAddressOnly(v: SinglePayloadAddressOnly) {
   switch v {
-  case .x(var runcible):
+  case .x(let runcible):
     runcible.runce()
   case .y:
     print("Why?")
@@ -131,9 +131,9 @@ enum MultiPayloadAddressOnly {
 
 func printMultiPayloadAddressOnly(v: MultiPayloadAddressOnly) {
   switch v {
-  case .x(var runcible):
+  case .x(let runcible):
     runcible.runce()
-  case .y(var s, var runcible):
+  case .y(let s, let runcible):
     print("\(s) ", appendNewline: false)
     runcible.runce()
   case .z:
@@ -154,7 +154,7 @@ enum TrivialGeneric<T, U> {
 
 func unwrapTrivialGeneric<T, U>(tg: TrivialGeneric<T, U>) -> (T, U) {
   switch tg {
-  case .x(var t, var u):
+  case .x(let t, let u):
     return (t, u)
   }
 }
@@ -166,19 +166,19 @@ func wrapTrivialGeneric<T, U>(t: T, _ u: U) -> TrivialGeneric<T, U> {
 var tg : TrivialGeneric<Int, String> = .x(23, "skidoo")
 // CHECK: 23 skidoo
 switch tg {
-case .x(var t, var u):
+case .x(let t, let u):
   print("\(t) \(u)")
 }
 
 // CHECK: 413 dream
 switch unwrapTrivialGeneric(.x(413, "dream")) {
-case (var t, var u):
+case (let t, let u):
   print("\(t) \(u)")
 }
 
 // CHECK: 1 is the loneliest number that you'll ever do
 switch wrapTrivialGeneric(1, "is the loneliest number that you'll ever do") {
-case .x(var t, var u):
+case .x(let t, let u):
   print("\(t) \(u)")
 }
 
@@ -188,7 +188,7 @@ enum Ensemble<S : Runcible, H : Runcible> {
 
 func concreteEnsemble(e: Ensemble<Spoon, Hat>) {
   switch e {
-  case .x(var spoon, var hat):
+  case .x(let spoon, let hat):
     spoon.runce()
     hat.runce()
   }
@@ -196,7 +196,7 @@ func concreteEnsemble(e: Ensemble<Spoon, Hat>) {
 
 func genericEnsemble<T : Runcible, U : Runcible>(e: Ensemble<T, U>) {
   switch e {
-  case .x(var t, var u):
+  case .x(let t, let u):
     t.runce()
     u.runce()
   }
@@ -225,7 +225,7 @@ enum Optionable<T> {
 
 func tryRunce<T : Runcible>(x: Optionable<T>) {
   switch x {
-  case .Mere(var r):
+  case .Mere(let r):
     r.runce()
   case .Nought:
     print("nought")
@@ -246,7 +246,7 @@ tryRunce(Optionable(Spoon()))
 tryRunce(Optionable(Hat()))
 
 func optionableInts() {
-  var optionables: [Optionable<Int>] = [
+  let optionables: [Optionable<Int>] = [
     .Mere(219),
     .Nought,
     .Nought,
@@ -255,7 +255,7 @@ func optionableInts() {
 
   for o in optionables {
     switch o {
-    case .Mere(var x):
+    case .Mere(let x):
       print(x)
     case .Nought:
       print("---")
@@ -310,7 +310,7 @@ func optionableSuits() {
 optionableSuits()
 
 func optionableRuncibles<T : Runcible>(x: T) {
-  var optionables: [Optionable<T>] = [
+  let optionables: [Optionable<T>] = [
     .Mere(x),
     .Nought,
     .Mere(x),
@@ -319,7 +319,7 @@ func optionableRuncibles<T : Runcible>(x: T) {
 
   for o in optionables {
     switch o {
-    case .Mere(var x):
+    case .Mere(let x):
       x.runce()
     case .Nought:
       print("---")
@@ -410,11 +410,11 @@ enum MultiPayloadSpareBitAggregates {
 
 func test_spare_bit_aggregate(x: MultiPayloadSpareBitAggregates) {
   switch x {
-  case .x(var i32, var i64):
+  case .x(let i32, let i64):
     print(".x(\(i32), \(i64))")
-  case .y(var a, var b):
+  case .y(let a, let b):
     print(".y(\(a.id), \(b.id))")
-  case .z(S(a: var a, b: var b)):
+  case .z(S(a: let a, b: let b)):
     print(".z(\(a), \(b))")
   }
 }
@@ -513,7 +513,7 @@ func presentEitherOr<T, U>(e: EitherOr<T, U>) {
 }
 
 @inline(never)
-func presentEitherOrsOf<T, U>(t t: T, u u: U) {
+func presentEitherOrsOf<T, U>(t t: T, u: U) {
   presentEitherOr(EitherOr<T, U>.Left(t))
   presentEitherOr(EitherOr<T, U>.Middle)
   presentEitherOr(EitherOr<T, U>.Center)

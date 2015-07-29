@@ -5,7 +5,7 @@
 extension SequenceType {
   final var myCount: Int {
     var result = 0
-    for x in self {
+    for _ in self {
       ++result
     }
     return result
@@ -277,18 +277,18 @@ protocol Init { init(x: Int) }
 extension Init { init() { self.init(x: 17) } }
 
 // CHECK: 17 Super
-Super()
+_ = Super()
 
 // CHECK: 17 Sub
-Sub()
+_ = Sub()
 
 // CHECK: 17 Super
 var sup: Super.Type = Super.self
-sup.init()
+_ = sup.init()
 
 // CHECK: 17 Sub
 sup = Sub.self
-sup.init()
+_ = sup.init()
 
 // CHECK: DONE
 print("DONE")

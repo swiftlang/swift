@@ -113,8 +113,8 @@ class E : Equatable {}
 func == (_: E, _: E) -> Bool { return true }
 
 func nilComparison() {
-  let x0: X? = nil
-  let x1: X? = X()
+  let _: X? = nil
+  let _: X? = X()
 
   /*
   // FIXME: <rdar://problem/17489239> Optional<T>() == nil where T: !Equatable
@@ -142,8 +142,8 @@ func nilComparison() {
   print(nil == v0) // CHECK-NEXT: true
   print(nil != v0) // CHECK-NEXT: false
 
-  let c0: C? = nil
-  let c1: C? = C()
+  let _: C? = nil
+  let _: C? = C()
   
   /*
   // FIXME: <rdar://problem/17489239> Optional<T>() == nil where T: !Equatable

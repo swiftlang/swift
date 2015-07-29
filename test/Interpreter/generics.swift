@@ -109,7 +109,7 @@ class D1 : Base {
 }
 
 func parse<T:Base>()->T {
-    var inst = T()
+    let inst = T()
     inst.map()
     return inst
 }
