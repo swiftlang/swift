@@ -413,7 +413,8 @@ public func print<T, TargetStream : OutputStreamType>(
 public func print<T, TargetStream : OutputStreamType>(
   value: T, inout _ target: TargetStream
 ) {
-  // FIXME: workaround for rdar://20775669
+  // FIXME: The PlaygroundTransform/print.swift test currently depends
+  // on maintaining this overload in lieu of using a default argument.
   print(value, &target, appendNewline: true)
 }
 
@@ -446,7 +447,8 @@ public func print<T>(value: T, appendNewline: Bool) {
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func print<T>(value: T) {
-  // FIXME: workaround for rdar://20775669
+  // FIXME: the PlaygroundTransform/array_did_set.swift test currently
+  // on maintaining this overload in lieu of using a default argument.
   print(value, appendNewline: true)
 }
 
@@ -487,7 +489,8 @@ public func debugPrint<T, TargetStream : OutputStreamType>(
 public func debugPrint<T, TargetStream : OutputStreamType>(
   value: T, inout _ target: TargetStream
 ) {
-  // FIXME: workaround for rdar://20775669
+  // FIXME: The PlaygroundTransform/print.swift test currently depends
+  // on maintaining this overload in lieu of using a default argument.
   debugPrint(value, &target, appendNewline: true)
 }
 
@@ -521,7 +524,8 @@ public func debugPrint<T>(value: T, appendNewline: Bool) {
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func debugPrint<T>(value: T) {
-  // FIXME: workaround for rdar://20775669
+  // FIXME: The PlaygroundTransform/print.swift test currently depends
+  // on maintaining this overload in lieu of using a default argument.
   debugPrint(value, appendNewline: true)
 }
 
