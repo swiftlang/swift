@@ -424,7 +424,7 @@ public:
   static const unsigned MaxNumBytesToErase = 127;
 
 private:
-  CodeCompletionString *const CompletionString;
+  CodeCompletionString *CompletionString;
   StringRef ModuleName;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
@@ -500,7 +500,7 @@ public:
     return NumBytesToErase;
   }
 
-  const CodeCompletionString *getCompletionString() const {
+  CodeCompletionString *getCompletionString() const {
     return CompletionString;
   }
 
