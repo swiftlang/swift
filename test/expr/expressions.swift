@@ -717,3 +717,11 @@ func inoutTests(inout arr: Int) {
   inoutTests((&x))   // expected-error {{'&' can only appear immediately in a call argument list}}
   inoutTests(&x)
 }
+
+
+// <rdar://problem/20802757> Compiler crash in default argument & inout expr
+var g20802757 = 2
+func r20802757(inout z: Int = &g20802757) { // expected-error {{'&' can only appear immediately in a call argument list}}
+  print(z)
+}
+
