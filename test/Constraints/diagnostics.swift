@@ -443,7 +443,7 @@ func rdar21078316() {
 
 // <rdar://problem/20978044> QoI: Poor diagnostic when using an incorrect tuple element in a closure
 var numbers = [1, 2, 3]
-zip(numbers, numbers).filter { $0.1 > 1 && $0.2 > 1 }  // expected-error {{type of expression is ambiguous without more context}}
+zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{type of expression is ambiguous without more context}}
 
 
 
