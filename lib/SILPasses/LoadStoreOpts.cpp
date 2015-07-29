@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This pass eliminates redundent loads, dead stores, and performs load
+// This pass eliminates redundant loads, dead stores, and performs load
 // forwarding.
 //
 //===----------------------------------------------------------------------===//

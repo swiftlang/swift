@@ -53,7 +53,7 @@ PASS(EarlyCodeMotion, "early-codemotion",
 PASS(LateCodeMotion, "late-codemotion",
      "Code motion with release hoisting")
 PASS(CopyForwarding, "copy-forwarding",
-     "Eliminate redundent copies")
+     "Eliminate redundant copies")
 PASS(DCE, "dce",
      "Eliminate dead code")
 PASS(DeadFunctionElimination, "sil-deadfuncelim",

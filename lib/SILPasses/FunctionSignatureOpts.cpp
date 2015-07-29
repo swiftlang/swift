@@ -841,7 +841,7 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   SILFunction *NewF =
     moveFunctionBodyToNewFunctionWithName(F, NewFName, Analyzer);
 
-  // And remove all Callee releases that we found and made redundent via owned
+  // And remove all Callee releases that we found and made redundant via owned
   // to guaranteed conversion.
   //
   // TODO: If more stuff needs to be placed here, refactor into its own method.
