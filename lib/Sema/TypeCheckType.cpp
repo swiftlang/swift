@@ -2930,6 +2930,11 @@ static bool
 isElementRepresentableInObjC(TypeChecker &TC, const DeclContext *DC, Type T) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
+  // ImplicitlyUnwrappedOptional is marked bridgeable to Objective-C, but
+  // it's not something you can put in API signatures.
+  if (T->getAnyOptionalObjectType())
+    return false;
+
   if (isAnyObjCRepresentableObjectType(T))
     return true;
 
@@ -2954,42 +2959,40 @@ static bool
 isObjCRepresentableCollection(TypeChecker &TC, const DeclContext *DC, Type T) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
+  auto boundGeneric = T->getAs<BoundGenericType>();
+  if (!boundGeneric)
+    return false;
+
   // Array<T> is representable when T is bridged to Objective-C.
   if (auto arrayDecl = TC.Context.getArrayDecl()) {
-    if (auto boundGeneric = T->getAs<BoundGenericType>()) {
-      if (boundGeneric->getDecl() == arrayDecl) {
-        auto elementType = boundGeneric->getGenericArgs()[0];
-        return isElementRepresentableInObjC(TC, DC, elementType);
-      }
+    if (boundGeneric->getDecl() == arrayDecl) {
+      auto elementType = boundGeneric->getGenericArgs()[0];
+      return isElementRepresentableInObjC(TC, DC, elementType);
     }
   }
 
   // Dictionary<K, V> is representable when K and V are bridged to Objective-C.
   if (auto dictDecl = TC.Context.getDictionaryDecl()) {
-    if (auto boundGeneric = T->getAs<BoundGenericType>()) {
-      if (boundGeneric->getDecl() == dictDecl) {
-        // The key type must be bridged to Objective-C.
-        auto keyType = boundGeneric->getGenericArgs()[0];
-        if (!isElementRepresentableInObjC(TC, DC, keyType))
-          return false;
+    if (boundGeneric->getDecl() == dictDecl) {
+      // The key type must be bridged to Objective-C.
+      auto keyType = boundGeneric->getGenericArgs()[0];
+      if (!isElementRepresentableInObjC(TC, DC, keyType))
+        return false;
 
-        // The value type must be bridged to Objective-C.
-        auto valueType = boundGeneric->getGenericArgs()[1];
-        if (!isElementRepresentableInObjC(TC, DC, valueType))
-          return false;
+      // The value type must be bridged to Objective-C.
+      auto valueType = boundGeneric->getGenericArgs()[1];
+      if (!isElementRepresentableInObjC(TC, DC, valueType))
+        return false;
 
-        return true;
-      }
+      return true;
     }
   }
 
   // Set<T> is representable when T is bridged to Objective-C.
   if (auto setDecl = TC.Context.getSetDecl()) {
-    if (auto boundGeneric = T->getAs<BoundGenericType>()) {
-      if (boundGeneric->getDecl() == setDecl) {
-        auto elementType = boundGeneric->getGenericArgs()[0];
-        return isElementRepresentableInObjC(TC, DC, elementType);
-      }
+    if (boundGeneric->getDecl() == setDecl) {
+      auto elementType = boundGeneric->getGenericArgs()[0];
+      return isElementRepresentableInObjC(TC, DC, elementType);
     }
   }
 
