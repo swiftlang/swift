@@ -491,17 +491,35 @@ bb0(%0 : $Base):
    return %1 : $C
 }
 
+sil public_external @receive_closure : $@convention(thin) <C where C : Base> (@owned @callee_owned () -> (@owned C)) -> ()
+
+// CHECK-LABEL: define void @test_partial_apply(%C13partial_apply4Base*)
+// CHECK:  [[CTX:%.*]] = bitcast %C13partial_apply4Base* %0 to %swift.refcounted*
+// CHECK:  [[TYPE:%.*]] = call %swift.type* @_TMaC13partial_apply3Sub()
+// CHECK:  call void @receive_closure(i8* bitcast (%C13partial_apply3Sub* (%swift.refcounted*)* @_TPA_parametric_casting_closure.28 to i8*), %swift.refcounted* [[CTX]], %swift.type* [[TYPE]])
+
 // CHECK-LABEL: define internal %C13partial_apply3Sub* @_TPA_parametric_casting_closure(%C13partial_apply4Base*, %swift.refcounted*)
 // CHECK: [[RES:%.*]] = tail call %C13partial_apply4Base* @parametric_casting_closure
 // CHECK: [[CASTED:%.*]] = bitcast %C13partial_apply4Base* [[RES]] to %C13partial_apply3Sub*
 // CHECK: ret %C13partial_apply3Sub* [[CASTED]]
 
-sil @test_partial_apply : $@convention(thin) () -> () {
-bb0:
- %0 = function_ref @parametric_casting_closure : $@convention(thin) <C where C : Base> (@owned Base) -> @owned C
- %1 = partial_apply %0<Sub>() : $@convention(thin) <C where C : Base> (@owned Base) -> @owned C
- %2 = tuple ()
- return %2 : $()
+
+// CHECK-LABEL: define internal %C13partial_apply3Sub* @_TPA_parametric_casting_closure.28(%swift.refcounted*)
+// CHECK:  [[CTX:%.*]] = bitcast %swift.refcounted* %0 to %C13partial_apply4Base*
+// CHECK:  [[TYPE:%.*]] = call %swift.type* @_TMaC13partial_apply3Sub()
+// CHECK:  [[CALL:%.*]] = tail call %C13partial_apply4Base* @parametric_casting_closure(%C13partial_apply4Base* [[CTX]], %swift.type* [[TYPE]])
+// CHECK:  [[CAST:%.*]] = bitcast %C13partial_apply4Base* [[CALL]] to %C13partial_apply3Sub*
+// CHECK:  ret %C13partial_apply3Sub* [[CAST]]
+
+sil @test_partial_apply : $@convention(thin) (@owned Base) -> () {
+bb0(%0 : $Base):
+ %1 = function_ref @parametric_casting_closure : $@convention(thin) <C where C : Base> (@owned Base) -> @owned C
+ %6 = partial_apply %1<Sub>() : $@convention(thin) <C where C : Base> (@owned Base) -> @owned C
+ %2 = partial_apply %1<Sub>(%0) : $@convention(thin) <C where C : Base> (@owned Base) -> @owned C
+ %3 = function_ref @receive_closure : $@convention(thin) <C where C : Base> (@owned @callee_owned () -> (@owned C)) -> ()
+ %4 = apply %3<Sub>(%2) : $@convention(thin) <C where C : Base> (@owned @callee_owned () -> (@owned C)) -> ()
+ %5 = tuple ()
+ return %5 : $()
 }
 
 sil public_external @partial_empty_box : $@convention(thin) (@owned @box (), @inout ()) -> ()

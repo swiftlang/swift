@@ -3788,7 +3788,8 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // to capture), and the dest ownership semantics match the parameter's,
   // skip building the box and thunk and just take the pointer as
   // context.
-  if (hasSingleSwiftRefcountedContext == Yes
+  if (!origType->isPolymorphic() &&
+      hasSingleSwiftRefcountedContext == Yes
       && outType->getCalleeConvention() == *singleRefcountedConvention) {
     assert(args.size() == 1);
     fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
