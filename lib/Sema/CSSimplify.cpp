@@ -2727,24 +2727,10 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
   return known->second;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
-  // Resolve the base type, if we can. If we can't resolve the base type,
-  // then we can't solve this constraint.
-  Type baseTy = simplifyType(constraint.getFirstType());
+MemberLookupResult ConstraintSystem::
+performMemberLookup(Type baseTy, const Constraint &constraint) {
   Type baseObjTy = baseTy->getRValueType();
-
-  // Try to look through ImplicitlyUnwrappedOptional<T>; the result is
-  // always an l-value if the input was.
-  if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(baseObjTy)) {
-    increaseScore(SK_ForceUnchecked);
-    
-    baseObjTy = objTy;
-    if (baseTy->is<LValueType>())
-      baseTy = LValueType::get(objTy);
-    else
-      baseTy = objTy;
-  }
+  DeclName name = constraint.getMember();
 
   // Dig out the instance type and figure out what members of the instance type
   // we are going to see.
@@ -2786,34 +2772,24 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   }
 
   bool isExistential = instanceTy->isExistentialType();
-
-  bool isUnresolvedMember;
-  switch (constraint.getKind()) {
-  case ConstraintKind::UnresolvedValueMember:
-    isUnresolvedMember = true;
-    break;
-  case ConstraintKind::ValueMember:
-  case ConstraintKind::TypeMember:
-    isUnresolvedMember = false;
-    break;
-  default:
-    llvm_unreachable("not a member constraint");
-  }
   
-  if (instanceTy->is<TypeVariableType>())
-    return SolutionKind::Unsolved;
+  if (instanceTy->is<TypeVariableType>()) {
+    MemberLookupResult result;
+    result.OverallResult = MemberLookupResult::Unsolved;
+    return result;
+  }
 
+  
+  // Okay, start building up the result list.
+  MemberLookupResult result;
+  result.OverallResult = MemberLookupResult::HasResults;
+  
   // If the base type is a tuple type, look for the named or indexed member
   // of the tuple.
-  DeclName name = constraint.getMember();
-  Type memberTy = constraint.getSecondType();
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     // Tuples don't have compound-name members.
-    if (!name.isSimpleName()) {
-      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
-                    baseObjTy, name);
-      return SolutionKind::Error;
-    }
+    if (!name.isSimpleName())
+      return result;  // No result.
     
     StringRef nameStr = name.getBaseName().str();
     int fieldIdx = -1;
@@ -2825,30 +2801,22 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     } else {
       fieldIdx = baseTuple->getNamedElementId(name.getBaseName());
     }
-
-    if (fieldIdx == -1) {
-      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
-                    baseObjTy, name);
-      return SolutionKind::Error;
-    }
-
+    
+    if (fieldIdx == -1)
+      return result;    // No result.
+    
     // Add an overload set that selects this field.
-    OverloadChoice choice(baseTy, fieldIdx);
-    addBindOverloadConstraint(memberTy, choice, constraint.getLocator());
-    return SolutionKind::Solved;
+    result.ViableCandidates.push_back(OverloadChoice(baseTy, fieldIdx));
+    return result;
   }
-
-  // FIXME: If the base type still involves type variables, we want this
-  // constraint to be unsolved. This effectively requires us to solve the
-  // left-hand side of a dot expression before we look for members.
+  
 
   // If we have a simple name, determine whether there are argument
   // labels we can use to restrict the set of lookup results.
   Optional<ArrayRef<Identifier>> argumentLabels;
   if (name.isSimpleName()) {
-    argumentLabels = getArgumentLabels(
-                       *this, 
-                       ConstraintLocatorBuilder(constraint.getLocator()));
+    argumentLabels = getArgumentLabels(*this,
+                             ConstraintLocatorBuilder(constraint.getLocator()));
 
     // If we're referencing AnyObject and we have argument labels, put
     // the argument labels into the name: we don't want to look for
@@ -2884,27 +2852,23 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     return true;
   };
 
+  
+  // Handle initializers, they have their own approach to name lookup.
   if (name.isSimpleName(TC.Context.Id_init)) {
-    // Constructors have their own approach to name lookup.
     NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
     if (isa<AbstractFunctionDecl>(DC))
       lookupOptions |= NameLookupFlags::KnownPrivate;
     LookupResult ctors = TC.lookupConstructors(DC, baseObjTy, lookupOptions);
-    if (!ctors) {
-      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
-                    baseObjTy, name);
-
-      return SolutionKind::Error;
-    }
+    if (!ctors)
+      return result;    // No result.
+    
     // The constructors are only found on the metatype.
     if (!isMetatype) {
-      recordFailure(constraint.getLocator(), Failure::DoesNotHaveInitOnInstance,
-                    baseObjTy, name);
-      return SolutionKind::Error;
+      result.OverallResult = MemberLookupResult::ErrorDoesNotHaveInitOnInstance;
+      return result;
     }
     
     TypeBase *favoredType = nullptr;
-
     if (auto anchor = constraint.getLocator()->getAnchor()) {
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
         auto argExpr = applyExpr->getArg();
@@ -2917,24 +2881,22 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       }
     }
     
-    OverloadChoice favoredChoice;
-
     // Introduce a new overload set.
-    retry_ctors_after_fail:
+  retry_ctors_after_fail:
     bool labelMismatch = false;
-    SmallVector<OverloadChoice, 4> choices;
     for (auto constructor : ctors) {
-      // If the constructor is invalid, skip it.
-      // FIXME: Note this as invalid, in case we don't find a solution,
-      // so we don't let errors cascade further.
+      // If the constructor is invalid, we fail entirely to avoid error cascade.
       TC.validateDecl(constructor, true);
-      if (constructor->isInvalid())
+      if (constructor->isInvalid()) {
         continue;
+        // FIXME: return result.markErrorAlreadyDiagnosed();
+      }
 
       // If the argument labels for this result are incompatible with
       // the call site, skip it.
       if (!hasCompatibleArgumentLabels(constructor)) {
         labelMismatch = true;
+        result.addUnviable(constructor, MemberLookupResult::UR_LabelMismatch);
         continue;
       }
 
@@ -2942,13 +2904,16 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       // constructor whose signature involves associated types.
       // FIXME: Mark this as 'unavailable'.
       if (isExistential &&
-          isUnavailableInExistential(getTypeChecker(), constructor))
+          isUnavailableInExistential(getTypeChecker(), constructor)) {
+        result.addUnviable(constructor,
+                           MemberLookupResult::UR_UnavailableInExistential);
         continue;
+      }
       
       // If the invocation's argument expression has a favored constraint,
       // use that information to determine whether a specific overload for
       // the initializer should be favored.
-      if (favoredType && !favoredChoice.getDecl()) {
+      if (favoredType && result.FavoredChoice == ~0U) {
         // Only try and favor monomorphic initializers.
         if (auto fnTypeWithSelf =
             constructor->getType()->getAs<FunctionType>()) {
@@ -2963,215 +2928,65 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
               argType = parenType->getUnderlyingType();
             }
             
-            if (argType->isEqual(favoredType)) {
-              favoredChoice = OverloadChoice(baseTy, constructor,
-                                           /*isSpecialized=*/false, *this);
-            }
+            if (argType->isEqual(favoredType))
+              result.FavoredChoice = result.ViableCandidates.size();
           }
         }
       }
       
-      choices.push_back(OverloadChoice(baseTy, constructor,
-                                       /*isSpecialized=*/false, *this));
+      result.addViable(OverloadChoice(baseTy, constructor,
+                                      /*isSpecialized=*/false, *this));
     }
 
 
     // If we rejected some possibilities due to an argument-label
     // mismatch and ended up with nothing, try again ignoring the
     // labels. This allows us to perform typo correction on the labels.
-    if (choices.empty() && labelMismatch && shouldAttemptFixes()) {
+    if (result.ViableCandidates.empty() && labelMismatch &&
+        shouldAttemptFixes()) {
       argumentLabels.reset();
       goto retry_ctors_after_fail;
     }
 
     // FIXME: Should we look for constructors in bridged types?
-
-    if (choices.empty()) {
-      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
-                    baseObjTy, name);
-      return SolutionKind::Error;
-    }
-    
-    addOverloadSet(memberTy,
-                   choices,
-                   constraint.getLocator(),
-                   favoredChoice.getDecl() ? &favoredChoice :  nullptr);
-    
-    return SolutionKind::Solved;
+    return result;
   }
 
   // If we want member types only, use member type lookup.
   if (constraint.getKind() == ConstraintKind::TypeMember) {
     // Types don't have compound names.
-    if (!name.isSimpleName()) {
-      // FIXME: Customize diagnostic to mention types and compound names.
-      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
-                    baseObjTy, name);
-
-      return SolutionKind::Error;
-    }
-
+    // FIXME: Customize diagnostic to mention types and compound names.
+    if (!name.isSimpleName())
+      return result;    // No result.
+    
     NameLookupOptions lookupOptions = defaultMemberTypeLookupOptions;
     if (isa<AbstractFunctionDecl>(DC))
       lookupOptions |= NameLookupFlags::KnownPrivate;
     auto lookup = TC.lookupMemberType(DC, baseObjTy, name.getBaseName(),
                                       lookupOptions);
-    if (!lookup) {
-      // If the base type was an optional, try to look through it.
-      if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
-        
-        // Note the fix.
-        increaseScore(SK_Fix);
-        if (worseThanBestSolution())
-          return SolutionKind::Error;
-        
-        Fixes.push_back({FixKind::ForceOptional, constraint.getLocator()});
-        
-        // Look through one level of optional.
-        addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
-                                         baseObjTy->getOptionalObjectType(),
-                                         constraint.getSecondType(),
-                                         constraint.getMember(),
-                                         constraint.getLocator()));
-        return SolutionKind::Solved;
+    // Form the overload set.
+    for (auto candidate : lookup) {
+      // If the result is invalid, don't cascade errors.
+      TC.validateDecl(candidate.first, true);
+      if (candidate.first->isInvalid()) {
+        continue;
+        //FIXME: return result.markErrorAlreadyDiagnosed();
       }
       
-      // FIXME: Customize diagnostic to mention types.
-      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
-                    baseObjTy, name);
-
-      return SolutionKind::Error;
+      result.addViable(OverloadChoice(baseTy, candidate.first,
+                                      /*isSpecialized=*/false));
     }
-
-    // Form the overload set.
-    SmallVector<OverloadChoice, 4> choices;
-    for (auto result : lookup) {
-      // If the result is invalid, skip it.
-      // FIXME: Note this as invalid, in case we don't find a solution,
-      // so we don't let errors cascade further.
-      TC.validateDecl(result.first, true);
-      if (result.first->isInvalid())
-        continue;
-
-      choices.push_back(OverloadChoice(baseTy, result.first,
-                                       /*isSpecialized=*/false));
-    }
-
-    if (choices.empty()) {
-      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
-                    baseObjTy, name);
-      return SolutionKind::Error;
-    }
-
-    auto locator = getConstraintLocator(constraint.getLocator());
-    addOverloadSet(memberTy, choices, locator);
-    return SolutionKind::Solved;
+    
+    return result;
   }
+  
 
   // Look for members within the base.
   LookupResult &lookup = lookupMember(baseObjTy, name);
-  if (!lookup) {
-    // Check whether we actually performed a lookup with an integer value.
-    unsigned index;
-    Type rawValueType;
-    if (name.isSimpleName()
-        && !name.getBaseName().str().getAsInteger(10, index)) {
-      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
-                    baseObjTy, name);
-
-      return SolutionKind::Error;
-    }
-    
-    if (shouldAttemptFixes() && name == TC.Context.Id_fromRaw &&
-        (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
-      // Replace a reference to ".fromRaw" with a reference to init(rawValue:).
-      // FIXME: This is temporary.
-
-      // Record this fix.
-      increaseScore(SK_Fix);
-      if (worseThanBestSolution())
-        return SolutionKind::Error;
-
-      auto locator = constraint.getLocator();
-      Fixes.push_back({FixKind::FromRawToInit,getConstraintLocator(locator)});
-
-      // Form the type that "fromRaw" would have had and bind the
-      // member type to it.
-      Type fromRawType = FunctionType::get(ParenType::get(TC.Context, 
-                                                          rawValueType),
-                                           OptionalType::get(instanceTy));
-      addConstraint(ConstraintKind::Bind, memberTy, fromRawType, locator);
-      
-      return SolutionKind::Solved;
-    }
-    
-    if (shouldAttemptFixes() && name == TC.Context.Id_toRaw &&
-        (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
-      // Replace a call to "toRaw" with a reference to rawValue.
-      // FIXME: This is temporary.
-
-      // Record this fix.
-      increaseScore(SK_Fix);
-      if (worseThanBestSolution())
-        return SolutionKind::Error;
-
-      auto locator = constraint.getLocator();
-      Fixes.push_back({FixKind::ToRawToRawValue,getConstraintLocator(locator)});
-
-      // Form the type that "toRaw" would have had and bind the member
-      // type to it.
-      Type toRawType = FunctionType::get(TupleType::getEmpty(TC.Context),
-                                         rawValueType);
-      addConstraint(ConstraintKind::Bind, memberTy, toRawType, locator);
-
-      return SolutionKind::Solved;
-    }
-    
-    if (shouldAttemptFixes() && name.isSimpleName("allZeros") &&
-        (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
-      // Replace a reference to "X.allZeros" with a reference to X().
-      // FIXME: This is temporary.
-      
-      // Record this fix.
-      increaseScore(SK_Fix);
-      if (worseThanBestSolution())
-        return SolutionKind::Error;
-      
-      auto locator = constraint.getLocator();
-      Fixes.push_back({FixKind::AllZerosToInit,getConstraintLocator(locator)});
-      
-      // Form the type that "allZeros" would have had and bind the
-      // member type to it.
-      addConstraint(ConstraintKind::Bind, memberTy, rawValueType, locator);
-      return SolutionKind::Solved;
-
-    }
-    
-    if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
-      // If the base type was an optional, look through it.
-
-      // Note the fix.
-      increaseScore(SK_Fix);
-      if (worseThanBestSolution())
-        return SolutionKind::Error;
-
-      Fixes.push_back({FixKind::ForceOptional, constraint.getLocator()});
-
-      // Look through one level of optional.
-      addValueMemberConstraint(baseObjTy->getOptionalObjectType(),
-                               constraint.getMember(),
-                               constraint.getSecondType(),
-                               constraint.getLocator());
-      return SolutionKind::Solved;
-    }
-  }
 
   // The set of directly accessible types, which is only used when
   // we're performing dynamic lookup into an existential type.
   bool isDynamicLookup = instanceTy->isAnyObject();
-
-  // Introduce a new overload set to capture the choices.
-  SmallVector<OverloadChoice, 4> choices;
 
   // If the instance type is String bridged to NSString, compute
   // the type we'll look in for bridging.
@@ -3183,56 +2998,75 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       bridgedType = isMetatype ? MetatypeType::get(classType) : classType;
     }
   }
+  bool labelMismatch = false;
 
   // Local function that adds the given declaration if it is a
   // reasonable choice.
-  auto addChoice = [&](ValueDecl *result, bool isBridged,
+  auto addChoice = [&](ValueDecl *cand, bool isBridged,
                        bool isUnwrappedOptional) {
     // If the result is invalid, skip it.
-    // FIXME: Note this as invalid, in case we don't find a solution,
-    // so we don't let errors cascade further.
-    TC.validateDecl(result, true);
-    if (result->isInvalid())
+    TC.validateDecl(cand, true);
+    if (cand->isInvalid()) {
+      //FIXME: result.markErrorAlreadyDiagnosed();
       return;
+    }
 
+    // If the argument labels for this result are incompatible with
+    // the call site, skip it.
+    if (!hasCompatibleArgumentLabels(cand)) {
+      labelMismatch = true;
+      result.addUnviable(cand, MemberLookupResult::UR_LabelMismatch);
+      return;
+    }
+
+    
     // If our base is an existential type, we can't make use of any
     // member whose signature involves associated types.
-    // FIXME: Mark this as 'unavailable'.
-    if (isExistential && isUnavailableInExistential(getTypeChecker(), result))
+    if (isExistential && isUnavailableInExistential(getTypeChecker(), cand)) {
+      result.addUnviable(cand, MemberLookupResult::UR_UnavailableInExistential);
       return;
+    }
 
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
-    // FIXME: Mark this as 'unavailable'.
-    if (result->isInstanceMember()) {
-      if (isa<FuncDecl>(result) && !hasInstanceMethods)
+    if (cand->isInstanceMember()) {
+      if ((isa<FuncDecl>(cand) && !hasInstanceMethods) ||
+          (!isa<FuncDecl>(cand) && !hasInstanceMembers)) {
+        result.addUnviable(cand, MemberLookupResult::UR_InstanceMemberOnType);
         return;
-
-      if (!isa<FuncDecl>(result) && !hasInstanceMembers)
-        return;
+      }
+      
     } else {
-      if (!hasStaticMembers)
+      if (!hasStaticMembers) {
+        result.addUnviable(cand, MemberLookupResult::UR_TypeMemberOnInstance);
         return;
+      }
     }
 
     // If we have an rvalue base, make sure that the result isn't 'mutating'
     // (only valid on lvalues).
     if (!isMetatype &&
-        !baseTy->is<LValueType>() && result->isInstanceMember()) {
-      if (auto *FD = dyn_cast<FuncDecl>(result))
-        if (FD->isMutating())
+        !baseTy->is<LValueType>() && cand->isInstanceMember()) {
+      if (auto *FD = dyn_cast<FuncDecl>(cand))
+        if (FD->isMutating()) {
+          result.addUnviable(cand,
+                             MemberLookupResult::UR_MutatingMemberOnRValue);
           return;
+        }
 
       // Subscripts and computed properties are ok on rvalues so long
       // as the getter is nonmutating.
-      if (auto storage = dyn_cast<AbstractStorageDecl>(result)) {
-        if (storage->isGetterMutating())
+      if (auto storage = dyn_cast<AbstractStorageDecl>(cand)) {
+        if (storage->isGetterMutating()) {
+          result.addUnviable(cand,
+                             MemberLookupResult::UR_MutatingGetterOnRValue);
           return;
+        }
       }
     }
     
     // If the result's type contains delayed members, we need to force them now.
-    if (auto NT = dyn_cast<NominalType>(result->getType().getPointer())) {
+    if (auto NT = dyn_cast<NominalType>(cand->getType().getPointer())) {
       if (auto *NTD = dyn_cast<NominalTypeDecl>(NT->getDecl())) {
         TC.forceExternalDeclMembers(NTD);
       }
@@ -3241,16 +3075,16 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.
     if (isDynamicLookup) {
-      assert(result->getDeclContext()->isTypeContext() && "Dynamic lookup bug");
+      assert(cand->getDeclContext()->isTypeContext() && "Dynamic lookup bug");
 
       // We found this declaration via dynamic lookup, record it as such.
-      choices.push_back(OverloadChoice::getDeclViaDynamic(baseTy, result));
+      result.addViable(OverloadChoice::getDeclViaDynamic(baseTy, cand));
       return;
     }
 
     // If we have a bridged type, we found this declaration via bridging.
     if (isBridged) {
-      choices.push_back(OverloadChoice::getDeclViaBridge(bridgedType, result));
+      result.addViable(OverloadChoice::getDeclViaBridge(bridgedType, cand));
       return;
     }
 
@@ -3261,27 +3095,19 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       ovlBaseTy = MetatypeType::get(baseTy->castTo<MetatypeType>()
         ->getInstanceType()
         ->getAnyOptionalObjectType());
-      choices.push_back(OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy,
-                                                                    result));
+      result.addViable(OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy,
+                                                                   cand));
     } else {
-      choices.push_back(OverloadChoice(ovlBaseTy, result,
-                                       /*isSpecialized=*/false, *this));
+      result.addViable(OverloadChoice(ovlBaseTy, cand,
+                                      /*isSpecialized=*/false, *this));
     }
   };
 
   // Add all results from this lookup.
 retry_after_fail:
-  bool labelMismatch = false;
-  for (auto result : lookup) {
-    // If the argument labels for this result are incompatible with
-    // the call site, skip it.
-    if (!hasCompatibleArgumentLabels(result)) {
-      labelMismatch = true;
-      continue;
-    }
-
+  labelMismatch = false;
+  for (auto result : lookup)
     addChoice(result, /*isBridged=*/false, /*isUnwrappedOptional=*/false);
-  }
 
   // If the instance type is a bridged to an Objective-C type, perform
   // a lookup into that Objective-C type.
@@ -3303,54 +3129,229 @@ retry_after_fail:
         foundationModule = module;
         continue;
       }
-
-      // If the argument labels for this result are incompatible with
-      // the call site, skip it.
-      if (!hasCompatibleArgumentLabels(result)) {
-        labelMismatch = true;
-        continue;
-      }
       
       addChoice(result, /*isBridged=*/true, /*isUnwrappedOptional=*/false);
     }
   }
-  
+
   // If we're looking into a metatype for an unresolved member lookup, look
   // through optional types.
   //
   // FIXME: The short-circuit here is lame.
-  if (choices.empty() && isMetatype && isUnresolvedMember) {
+  if (result.ViableCandidates.empty() && isMetatype &&
+      constraint.getKind() == ConstraintKind::UnresolvedValueMember) {
     if (auto objectType = instanceTy->getAnyOptionalObjectType()) {
       LookupResult &optionalLookup = lookupMember(MetatypeType::get(objectType),
                                                   name);
-      for (auto result : optionalLookup) {
-        // If the argument labels for this result are incompatible with
-        // the call site, skip it.
-        if (!hasCompatibleArgumentLabels(result)) {
-          labelMismatch = true;
-          continue;
-        }
-        
-        addChoice(result, /*bridged*/ false, /*isUnwrappedOptional=*/true);
-      }
+      for (auto result : optionalLookup)
+        addChoice(result, /*bridged*/false, /*isUnwrappedOptional=*/true);
     }
   }
 
   // If we rejected some possibilities due to an argument-label
   // mismatch and ended up with nothing, try again ignoring the
   // labels. This allows us to perform typo correction on the labels.
-  if (choices.empty() && labelMismatch && shouldAttemptFixes()) {
+  if (result.ViableCandidates.empty() && labelMismatch && shouldAttemptFixes()){
     argumentLabels.reset();
     goto retry_after_fail;
   }
 
-  if (choices.empty()) {
+  return result;
+}
+
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
+  // Resolve the base type, if we can. If we can't resolve the base type,
+  // then we can't solve this constraint.
+  Type baseTy = simplifyType(constraint.getFirstType());
+  Type baseObjTy = baseTy->getRValueType();
+
+  // Try to look through ImplicitlyUnwrappedOptional<T>; the result is
+  // always an l-value if the input was.
+  if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(baseObjTy)) {
+    increaseScore(SK_ForceUnchecked);
+    
+    baseObjTy = objTy;
+    if (baseTy->is<LValueType>())
+      baseTy = LValueType::get(objTy);
+    else
+      baseTy = objTy;
+  }
+
+  MemberLookupResult result = performMemberLookup(baseTy, constraint);
+  
+  DeclName name = constraint.getMember();
+  Type memberTy = constraint.getSecondType();
+
+  switch (result.OverallResult) {
+  case MemberLookupResult::Unsolved:
+    return SolutionKind::Unsolved;
+  case MemberLookupResult::ErrorAlreadyDiagnosed:
+    return SolutionKind::Error;
+      
+  case MemberLookupResult::ErrorDoesNotHaveInitOnInstance:
+    recordFailure(constraint.getLocator(), Failure::DoesNotHaveInitOnInstance,
+                  baseObjTy, name);
+    return SolutionKind::Error;
+      
+  case MemberLookupResult::HasResults:
+    // Keep going!
+    break;
+  }
+
+  
+  // If the lookup found no results at all, diagnose it as such.
+  if (result.UnviableCandidates.empty() &&
+      result.ViableCandidates.empty()) {
+    
+    // Various kinds of lookups have recovery attempts.
+    if (constraint.getKind() == ConstraintKind::TypeMember) {
+      // If the base type was an optional, try to look through it.
+      if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
+        // Note the fix.
+        increaseScore(SK_Fix);
+        if (worseThanBestSolution())
+          return SolutionKind::Error;
+        
+        Fixes.push_back({FixKind::ForceOptional, constraint.getLocator()});
+        
+        // Look through one level of optional.
+        addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
+                                         baseObjTy->getOptionalObjectType(),
+                                         constraint.getSecondType(),
+                                         constraint.getMember(),
+                                         constraint.getLocator()));
+        return SolutionKind::Solved;
+      }
+      
+      
+      // FIXME: Customize diagnostic to mention types.
+      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+                    baseObjTy, name);
+      
+      return SolutionKind::Error;
+    }
+    
+    
+    auto instanceTy = baseObjTy;
+    if (auto MTT = instanceTy->getAs<MetatypeType>())
+      instanceTy = MTT->getInstanceType();
+    
+    // Value member lookup has some hacks too.
+    Type rawValueType;
+    if (shouldAttemptFixes() && name == TC.Context.Id_fromRaw &&
+        (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
+      // Replace a reference to ".fromRaw" with a reference to init(rawValue:).
+      // FIXME: This is temporary.
+      
+      // Record this fix.
+      increaseScore(SK_Fix);
+      if (worseThanBestSolution())
+        return SolutionKind::Error;
+      
+      auto locator = constraint.getLocator();
+      Fixes.push_back({FixKind::FromRawToInit,getConstraintLocator(locator)});
+      
+      // Form the type that "fromRaw" would have had and bind the
+      // member type to it.
+      Type fromRawType = FunctionType::get(ParenType::get(TC.Context,
+                                                          rawValueType),
+                                           OptionalType::get(instanceTy));
+      addConstraint(ConstraintKind::Bind, memberTy, fromRawType, locator);
+      
+      return SolutionKind::Solved;
+    }
+    
+    if (shouldAttemptFixes() && name == TC.Context.Id_toRaw &&
+        (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
+      // Replace a call to "toRaw" with a reference to rawValue.
+      // FIXME: This is temporary.
+      
+      // Record this fix.
+      increaseScore(SK_Fix);
+      if (worseThanBestSolution())
+        return SolutionKind::Error;
+      
+      auto locator = constraint.getLocator();
+      Fixes.push_back({FixKind::ToRawToRawValue,getConstraintLocator(locator)});
+      
+      // Form the type that "toRaw" would have had and bind the member
+      // type to it.
+      Type toRawType = FunctionType::get(TupleType::getEmpty(TC.Context),
+                                         rawValueType);
+      addConstraint(ConstraintKind::Bind, memberTy, toRawType, locator);
+      
+      return SolutionKind::Solved;
+    }
+    
+    if (shouldAttemptFixes() && name.isSimpleName("allZeros") &&
+        (rawValueType = getRawRepresentableValueType(TC, DC, instanceTy))) {
+      // Replace a reference to "X.allZeros" with a reference to X().
+      // FIXME: This is temporary.
+      
+      // Record this fix.
+      increaseScore(SK_Fix);
+      if (worseThanBestSolution())
+        return SolutionKind::Error;
+      
+      auto locator = constraint.getLocator();
+      Fixes.push_back({FixKind::AllZerosToInit,getConstraintLocator(locator)});
+      
+      // Form the type that "allZeros" would have had and bind the
+      // member type to it.
+      addConstraint(ConstraintKind::Bind, memberTy, rawValueType, locator);
+      return SolutionKind::Solved;
+    }
+    
+    if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
+      // If the base type was an optional, look through it.
+      
+      // Note the fix.
+      increaseScore(SK_Fix);
+      if (worseThanBestSolution())
+        return SolutionKind::Error;
+      
+      Fixes.push_back({FixKind::ForceOptional, constraint.getLocator()});
+      
+      // Look through one level of optional.
+      addValueMemberConstraint(baseObjTy->getOptionalObjectType(),
+                               constraint.getMember(),
+                               constraint.getSecondType(),
+                               constraint.getLocator());
+      return SolutionKind::Solved;
+    }
+    
     recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                   baseObjTy, name);
     return SolutionKind::Error;
   }
-  auto locator = getConstraintLocator(constraint.getLocator());
-  addOverloadSet(memberTy, choices, locator);
+  
+  
+  // If we found some unviable results, then fail, but without recovery.
+  // If the lookup found no results at all, diagnose it as such.
+  if (result.ViableCandidates.empty()) {
+    recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+                  baseObjTy, name);
+    return SolutionKind::Error;
+  }
+  
+  // If the base type is a tuple type, look for the named or indexed member
+  // of the tuple.
+  // FIXME: This special case can probably be removed now.
+  if (baseObjTy->is<TupleType>()) {
+    // Tuple member lookup can only have a single result.
+    assert(result.ViableCandidates.size() == 1 && "Unknown tuple member");
+    
+    addBindOverloadConstraint(memberTy, result.ViableCandidates[0],
+                              constraint.getLocator());
+    return SolutionKind::Solved;
+  }
+  
+  // We had a viable candidate, add it!
+  addOverloadSet(memberTy, result.ViableCandidates, constraint.getLocator(),
+                 result.getFavoredChoice());
+    
   return SolutionKind::Solved;
 }
 

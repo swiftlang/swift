@@ -1145,6 +1145,89 @@ enum class ConstraintSystemFlags {
 /// Options that affect the constraint system as a whole.
 typedef OptionSet<ConstraintSystemFlags> ConstraintSystemOptions;
 
+/// This struct represents the results of a member lookup of
+struct MemberLookupResult {
+  enum {
+    /// This result indicates that we cannot begin to solve this, because the
+    /// base expression is a type variable.
+    Unsolved,
+    
+    /// This result indicates that the member reference is erroneous, but was
+    /// already dianosed.  Don't emit another error.
+    ErrorAlreadyDiagnosed,
+    
+    
+    /// An initializer exists, but it's available only on the metatype, not the
+    /// instance.
+    ErrorDoesNotHaveInitOnInstance,
+    
+    /// This result indicates that the lookup produced candidate lists,
+    /// potentially of viable results, potentially of error candidates, and
+    /// potentially empty lists, indicating that there were no matches.
+    HasResults
+  } OverallResult;
+  
+  /// This is a list of viable candidates that were matched.
+  ///
+  SmallVector<OverloadChoice, 4> ViableCandidates;
+  
+  /// If there is a favored candidate in the viable list, this indicates its
+  /// index.
+  unsigned FavoredChoice = ~0U;
+  
+  
+  /// This enum tracks reasons why a candidate is not viable.
+  enum UnviableReason {
+    /// Argment labels don't match.
+    UR_LabelMismatch,
+    
+    /// This uses a type like Self it its signature that cannot be used on an
+    /// existential box.
+    UR_UnavailableInExistential,
+    
+    /// This is an instance member being accessed through something of metatype
+    /// type.
+    UR_InstanceMemberOnType,
+    
+    /// This is a static/class member being access through an instance.
+    UR_TypeMemberOnInstance,
+    
+    /// This is a mutating member, being used on an rvalue.
+    UR_MutatingMemberOnRValue,
+    
+    /// The getter for this subscript or computed property is mutating and we
+    /// only have an rvalue base.  This is more specific than the former one.
+    UR_MutatingGetterOnRValue,
+    
+  };
+  
+  /// This is a list of considered, but rejected, candidates, along with a
+  /// reason for their rejection.
+  SmallVector<std::pair<ValueDecl*, UnviableReason>, 4> UnviableCandidates;
+
+
+  /// Mark this as being an already-diagnosed error and return itself.
+  MemberLookupResult &markErrorAlreadyDiagnosed() {
+    OverallResult = ErrorAlreadyDiagnosed;
+    return *this;
+  }
+  
+  void addViable(OverloadChoice candidate) {
+    ViableCandidates.push_back(candidate);
+  }
+  
+  void addUnviable(ValueDecl *VD, UnviableReason reason) {
+    UnviableCandidates.push_back({VD, reason});
+  }
+  
+  OverloadChoice *getFavoredChoice() {
+    if (FavoredChoice == ~0U) return nullptr;
+    return &ViableCandidates[FavoredChoice];
+  }
+  
+};
+  
+  
 /// \brief Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -2224,6 +2307,9 @@ private:
   /// \brief Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(const Constraint &constraint);
 
+  MemberLookupResult performMemberLookup(Type baseTy,
+                                         const Constraint &constraint);
+  
   /// \brief Attempt to simplify the optional object constraint.
   SolutionKind simplifyOptionalObjectConstraint(const Constraint &constraint);
 
