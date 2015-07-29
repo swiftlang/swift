@@ -90,8 +90,13 @@ public:
 
     // Invalidate the analysis of caller functions.
     for (auto AI : DevirtualizedCalls) {
-      invalidateAnalysis(AI->getFunction(),
-                         SILAnalysis::PreserveKind::Branches);
+      if (isa<ApplyInst>(AI))
+        invalidateAnalysis(AI->getFunction(),
+                           SILAnalysis::PreserveKind::Branches);
+      else
+        // try_apply devirtualization introduces new basic blocks.
+        invalidateAnalysis(AI->getFunction(),
+                           SILAnalysis::PreserveKind::Nothing);
     }
 
     if (Changed) {

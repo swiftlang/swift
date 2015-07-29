@@ -847,17 +847,14 @@ FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
                                                             FullApplySite Apply,
                                                                 CallGraph &CG) {
   auto *AI = dyn_cast<ApplyInst>(Apply.getInstruction());
-  if (!AI)
-    return FullApplySite();
-
-  auto *NewInst = tryDevirtualizeApply(AI);
+  auto NewInst = tryDevirtualizeApply(Apply);
   if (!NewInst)
     return FullApplySite();
 
-  if (auto *Edge = CG.getCallGraphEdge(AI))
+  if (auto *Edge = CG.getCallGraphEdge(Apply))
     CG.removeEdge(Edge);
 
-  auto *NewAI = findApplyFromDevirtualizedResult(NewInst);
+  auto NewAI = findApplyFromDevirtualizedResult(NewInst);
   // In cases where devirtualization results in having to
   // insert code to match the result type of the original
   // function, we need to find the original apply. It's

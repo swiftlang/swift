@@ -318,7 +318,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         if (auto *NewInst = tryDevirtualizeApply(App)) {
           replaceDeadApply(InnerAI, NewInst);
           I = SILBasicBlock::iterator(NewInst);
-          auto *NewAI = findApplyFromDevirtualizedResult(NewInst);
+          auto NewAI = findApplyFromDevirtualizedResult(NewInst);
           if (!NewAI)
             continue;
 

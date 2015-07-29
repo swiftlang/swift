@@ -87,7 +87,7 @@ void eraseUsesOfInstruction(SILInstruction *Inst, bool DeleteDebug=false);
 /// value itself)
 void eraseUsesOfValue(SILValue V, bool DeleteDebug=false);
 
-ApplyInst *findApplyFromDevirtualizedResult(SILInstruction *I);
+FullApplySite findApplyFromDevirtualizedResult(SILInstruction *I);
 
 /// Replace an apply with an instruction that produces the same value,
 /// then delete the apply and the instructions that produce its callee

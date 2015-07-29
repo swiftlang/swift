@@ -206,14 +206,21 @@ void swift::eraseUsesOfValue(SILValue V, bool DeleteDebug) {
 // Devirtualization of functions with covariant return types produces
 // a result that is not an apply, but takes an apply as an
 // argument. Attempt to dig the apply out from this result.
-ApplyInst *swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
-  if (auto *Apply = dyn_cast<ApplyInst>(I))
+FullApplySite swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
+  if (!I)
+    return FullApplySite();
+
+  if (auto Apply = FullApplySite::isa(I))
     return Apply;
 
   if (!I->getNumOperands())
-    return nullptr;
+    return FullApplySite();
 
-  return dyn_cast<ApplyInst>(I->getOperand(0));
+  if (isa<UpcastInst>(I) || isa<EnumInst>(I) || isa<UncheckedRefCastInst>(I))
+    return findApplyFromDevirtualizedResult(
+        dyn_cast<SILInstruction>(I->getOperand(0).getDef()));
+
+  return FullApplySite();
 }
 
 // Replace a dead apply with a new instruction that computes the same
