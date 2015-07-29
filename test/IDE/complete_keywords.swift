@@ -17,6 +17,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_9 | FileCheck %s -check-prefix=KW_DECL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_10 | FileCheck %s -check-prefix=KW_DECL
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD0 | FileCheck %s -check-prefix=SUPER_KEYWORD0
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD1 | FileCheck %s -check-prefix=SUPER_KEYWORD1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD2 | FileCheck %s -check-prefix=SUPER_KEYWORD2
+
 // KW_DECL: Begin completions
 // KW_DECL-DAG: Keyword/None: class{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: convenience{{; name=.+$}}
@@ -191,4 +195,25 @@ extension InStruct {
 
 extension InProtocol {
   #^IN_NOMINAL_DECL_10^#
+}
+
+class SuperSuperClass {
+   func f1() {
+    #^SUPER_KEYWORD0^#
+// SUPER_KEYWORD0-NOT: Keyword/None:                       super
+  }
+}
+
+class SuperClass : SuperSuperClass {
+   func f2() {
+    #^SUPER_KEYWORD1^#
+  }
+// SUPER_KEYWORD1: Keyword/None:                       super[#SuperSuperClass#]; name=super{{$}}
+}
+
+class SubClass : SuperClass {
+  func f3() {
+    #^SUPER_KEYWORD2^#
+  }
+// SUPER_KEYWORD2: Keyword/None:                       super[#SuperClass#]; name=super{{$}}
 }

@@ -696,6 +696,33 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
 
   SmallVector<StringRef, 3> ParsedKeywords;
 
+  void addSuperKeyword(CodeCompletionResultSink &Sink) {
+    auto *D = CurDeclContext;
+    for (;D && !D->isNominalTypeOrNominalTypeExtensionContext();
+         D = D->getParent());
+    if (!D)
+      return;
+    Type DT = D->isNominalTypeOrNominalTypeExtensionContext()->getDeclaredType();
+    if (DT.isNull() || DT->is<ErrorType>())
+      return;
+    OwnedResolver TypeResolver(createLazyResolver(CurDeclContext->getASTContext()));
+    Type ST = DT->getSuperclass(TypeResolver.get());
+    if (ST.isNull() || ST->is<ErrorType>())
+      return;
+    auto Nominal = ST->getNominalOrBoundGenericNominal();
+    if (Nominal) {
+      CodeCompletionResultBuilder Builder(Sink,
+                                          CodeCompletionResult::ResultKind::Keyword,
+                                          SemanticContextKind::None);
+      Builder.addTextChunk("super");
+      ST = ST->getReferenceStorageReferent();
+      if (ST->isVoid())
+        Builder.addTypeAnnotation("Void");
+      else
+        Builder.addTypeAnnotation(ST.getString());
+    }
+  }
+
   /// \brief Set to true when we have delivered code completion results
   /// to the \c Consumer.
   bool DeliveredResults = false;
@@ -2494,6 +2521,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
     break;
 
   case CompletionKind::PostfixExprBeginning:
+    addSuperKeyword(Sink);
     addDeclKeywords(Sink);
     addStmtKeywords(Sink);
     break;
