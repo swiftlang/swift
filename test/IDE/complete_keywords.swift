@@ -20,6 +20,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD0 | FileCheck %s -check-prefix=SUPER_KEYWORD0
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD1 | FileCheck %s -check-prefix=SUPER_KEYWORD1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD2 | FileCheck %s -check-prefix=SUPER_KEYWORD2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD3 | FileCheck %s -check-prefix=SUPER_KEYWORD3
 
 // KW_DECL: Begin completions
 // KW_DECL-DAG: Keyword/None: class{{; name=.+$}}
@@ -216,4 +217,11 @@ class SubClass : SuperClass {
     #^SUPER_KEYWORD2^#
   }
 // SUPER_KEYWORD2: Keyword/None:                       super[#SuperClass#]; name=super{{$}}
+}
+
+extension SubClass {
+  func f4() {
+    #^SUPER_KEYWORD3^#
+  }
+// SUPER_KEYWORD3: Keyword/None:                       super[#SuperClass#]; name=super{{$}}
 }
