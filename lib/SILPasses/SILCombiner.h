@@ -210,6 +210,7 @@ public:
   SILInstruction *visitRetainValueInst(RetainValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
+  SILInstruction *visitTryApplyInst(TryApplyInst *AI);
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
@@ -270,7 +271,7 @@ public:
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);
-  SILInstruction *propagateConcreteTypeOfInitExistential(ApplyInst *AI,
+  SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                          WitnessMethodInst *WMI,
                                                          SILValue IE,
                                                          SILType InstanceType);

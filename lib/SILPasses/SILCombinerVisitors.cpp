@@ -1393,7 +1393,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
 /// This helps the devirtualizer to replace witness_method by
 /// class_method instructions and then devirtualize.
 SILInstruction *
-SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
+SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                     WitnessMethodInst *WMI,
                                                     SILValue InitExistential,
                                                     SILType InstanceType) {
@@ -1418,7 +1418,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
     return nullptr;
 
   auto ConcreteTypeSubsts = ConcreteType->gatherAllSubstitutions(
-      AI->getModule().getSwiftModule(), nullptr);
+      AI.getModule().getSwiftModule(), nullptr);
   if (!ConcreteTypeSubsts.empty()) {
     // Bail if any generic types parameters of the concrete type are unbound.
     if (hasUnboundGenericTypes(ConcreteTypeSubsts))
@@ -1447,12 +1447,12 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
   // it is sufficient to compare the return type to the substituted type because
   // types that depend on the Self type are not allowed (for example [Self] is
   // not allowed).
-  if (AI->getType().getSwiftType().getLValueOrInOutObjectType() ==
+  if (AI.getType().getSwiftType().getLValueOrInOutObjectType() ==
       WMI->getLookupType())
     return nullptr;
 
   SmallVector<SILValue, 8> Args;
-  for (auto Arg : AI->getArgumentsWithoutSelf()) {
+  for (auto Arg : AI.getArgumentsWithoutSelf()) {
     Args.push_back(Arg);
 
     // Below we have special handling for the 'LastArg', which is the self
@@ -1478,7 +1478,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
   eraseInstFromFunction(*WMI);
 
   SmallVector<Substitution, 8> Substitutions;
-  for (auto Subst : AI->getSubstitutions()) {
+  for (auto Subst : AI.getSubstitutions()) {
     if (Subst.getArchetype()->isSelfDerived()) {
       Substitution NewSubst(Subst.getArchetype(), ConcreteType,
                             Subst.getConformances());
@@ -1487,35 +1487,44 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
       Substitutions.push_back(Subst);
   }
 
-  SILType SubstCalleeType = AI->getSubstCalleeSILType();
+  SILType SubstCalleeType = AI.getSubstCalleeSILType();
 
   SILType NewSubstCalleeType;
 
-  auto FnTy = AI->getCallee().getType().getAs<SILFunctionType>();
+  auto FnTy = AI.getCallee().getType().getAs<SILFunctionType>();
   if (FnTy && FnTy->isPolymorphic()) {
     // Handle polymorphic functions by properly substituting
     // their parameter types.
     CanSILFunctionType SFT = FnTy->substGenericArgs(
-                                        AI->getModule(),
-                                        AI->getModule().getSwiftModule(),
+                                        AI.getModule(),
+                                        AI.getModule().getSwiftModule(),
                                         Substitutions);
     NewSubstCalleeType = SILType::getPrimitiveObjectType(SFT);
   } else {
     TypeSubstitutionMap TypeSubstitutions;
     TypeSubstitutions[InstanceType.getSwiftType().getPointer()] = ConcreteType;
-    NewSubstCalleeType = SubstCalleeType.subst(AI->getModule(),
-                                               AI->getModule().getSwiftModule(),
+    NewSubstCalleeType = SubstCalleeType.subst(AI.getModule(),
+                                               AI.getModule().getSwiftModule(),
                                                TypeSubstitutions);
   }
 
-  auto NewAI = Builder->createApply(AI->getLoc(), AI->getCallee(),
+  FullApplySite NewAI;
+
+  if (auto *TAI = dyn_cast<TryApplyInst>(AI))
+    NewAI = Builder->createTryApply(AI.getLoc(), AI.getCallee(),
                                     NewSubstCalleeType,
-                                    AI->getType(), Substitutions, Args);
+                                    Substitutions, Args,
+                                    TAI->getNormalBB(), TAI->getErrorBB());
+  else
+    NewAI = Builder->createApply(AI.getLoc(), AI.getCallee(),
+                                 NewSubstCalleeType,
+                                 AI.getType(), Substitutions, Args);
 
-  NewAI->setDebugScope(AI->getDebugScope());
+  NewAI.getInstruction()->setDebugScope(AI.getDebugScope());
 
-  replaceInstUsesWith(*AI, NewAI, 0);
-  eraseInstFromFunction(*AI);
+  if (isa<ApplyInst>(NewAI))
+    replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction(), 0);
+  eraseInstFromFunction(*AI.getInstruction());
 
   if (CG)
     CG->addEdgesForApply(NewAI);
@@ -1924,6 +1933,106 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (optimizeIdentityCastComposition(AI, "convertToObjectiveC",
                                       "convertFromObjectiveC"))
     return nullptr;
+
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
+  // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
+  // from visitPartialApplyInst(), so bail here.
+  if (isa<PartialApplyInst>(AI->getCallee()))
+    return nullptr;
+
+  // Optimize readonly functions with no meaningful users.
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
+  if (FRI &&
+      FRI->getReferencedFunction()->getEffectsKind() < EffectsKind::ReadWrite) {
+    UserListTy Users;
+    if (recursivelyCollectARCUsers(Users, AI)) {
+      // When deleting Apply instructions make sure to release any owned
+      // arguments.
+      auto FT = FRI->getFunctionType();
+      for (int i = 0, e = AI->getNumArguments(); i < e; ++i) {
+        SILParameterInfo PI = FT->getParameters()[i];
+        auto Arg = AI->getArgument(i);
+        if (PI.isConsumed() && !Arg.getType().isAddress())
+          Builder->emitReleaseValueOperation(AI->getLoc(), Arg);
+      }
+
+      // Erase all of the reference counting instructions and the Apply itself.
+      for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
+        eraseInstFromFunction(**rit);
+
+      return nullptr;
+    }
+    // We found a user that we can't handle.
+  }
+
+  // (apply (witness_method)) -> propagate information about
+  // a concrete type from init_existential_addr or init_existential_ref.
+  if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
+    if (WMI->getConformance())
+      return nullptr;
+    auto LastArg = AI->getArguments().back();
+    // Try to derive conformances from the apply_inst
+
+    if (auto *Instance = dyn_cast<AllocStackInst>(LastArg)) {
+      CopyAddrInst *FoundCAI = nullptr;
+      bool isLegal = true;
+      // Check that this alloc_stack is initalized only once
+      // and then used in apply or dealloc/destroy_addr insns.
+      for (auto Use : Instance->getUses()) {
+        auto *User = Use->getUser();
+        if (isa<DeallocStackInst>(User) || isa<DestroyAddrInst>(User) ||
+            isa<ApplyInst>(User))
+          continue;
+        if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
+          if (!FoundCAI) {
+            FoundCAI = CAI;
+            continue;
+          }
+        }
+        isLegal = false;
+        break;
+      }
+
+      if (isLegal && FoundCAI) {
+        // Try to derive the type from the copy_addr that was used to
+        // initialize the alloc_stack.
+        if (auto *OEAI = dyn_cast<OpenExistentialAddrInst>(FoundCAI->getSrc())) {
+          LastArg = OEAI;
+        }
+      }
+    }
+
+    if (auto *Instance = dyn_cast<OpenExistentialAddrInst>(LastArg)) {
+      auto Op = Instance->getOperand();
+      for (auto Use : Op.getUses()) {
+        if (auto *IE = dyn_cast<InitExistentialAddrInst>(Use->getUser())) {
+          // IE should dominate Instance.
+          // Without a DomTree we want to be very defensive
+          // and only allow this optimization when it is used
+          // inside the same BB.
+          if (IE->getParent() != AI->getParent())
+            continue;
+          return propagateConcreteTypeOfInitExistential(AI, WMI, IE,
+                                                        Instance->getType());
+        }
+      }
+    }
+
+    if (auto *Instance = dyn_cast<OpenExistentialRefInst>(LastArg)) {
+      if (auto *IE = dyn_cast<InitExistentialRefInst>(Instance->getOperand())) {
+        // IE should dominate Instance.
+        // Without a DomTree we want to be very defensive
+        // and only allow this optimization when it is used
+        // inside the same BB.
+        if (IE->getParent() == AI->getParent())
+          return propagateConcreteTypeOfInitExistential(AI, WMI, IE,
+                                                        Instance->getType());
+      }
+    }
+  }
 
   return nullptr;
 }

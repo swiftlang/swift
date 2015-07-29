@@ -55,6 +55,54 @@ private class Derived2: Base {
   }
 }
 
+protocol P {
+  func foo() throws -> Int32
+}
+
+
+class CP1: P {
+  func foo() throws -> Int32 {
+     return 1
+  }
+}
+
+class CP2: CP1 {
+  override func foo() throws -> Int32 {
+     return 2
+  }
+}
+
+// Check devirtualization of witness_method instructions.
+// CHECK-LABEL: sil @_TF16devirt_try_apply5test4FT_VSs5Int32
+// CHECK-NEXT: bb0:
+// CHECK-NEXT: integer_literal $Builtin.Int32, 2
+// CHECK-NEXT: struct $Int32
+// CHECK-NEXT: return
+public func test4() -> Int32 {
+  let p = CP2()
+  var result: Int32 = 0
+  do {
+    result = try p.foo()
+  } catch _ {}
+  return result
+}
+
+// Check devirtualization of witness_method instructions.
+// CHECK-LABEL: sil @_TF16devirt_try_apply5test5FT_VSs5Int32
+// CHECK-NEXT: bb0:
+// CHECK-NEXT: integer_literal $Builtin.Int32, 1
+// CHECK-NEXT: struct $Int32
+// CHECK-NEXT: return
+public func test5() -> Int32 {
+  let p: P = CP1()
+  var result: Int32 = 0
+  do {
+    result = try p.foo()
+  } catch _ {}
+  return result
+}
+
+
 // CHECK-LABEL: sil private [noinline] @_TTSf4g___TF16devirt_try_applyP33_E45F5529CC31A51875E58096B25575A219testTryApplyDevirt1
 // CHECK-NOT: class_method
 // CHECK-NOT: }

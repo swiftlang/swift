@@ -360,9 +360,9 @@ static SILInstruction *castTupleReturnType(FullApplySite AI, SILValue Value,
 /// \p AI is the apply to devirtualize.
 /// \p ClassOrMetatype is a class value or metatype value that is the
 ///    self argument of the apply we will devirtualize.
-/// return the new ApplyInst if created one or null.
+/// return the result value of the new ApplyInst if created one or null.
 SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
-                                          SILValue ClassOrMetatype) {
+                                               SILValue ClassOrMetatype) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
 
   SILModule &Mod = AI.getModule();
@@ -512,6 +512,7 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
       CastedReturnValue = dyn_cast<SILInstruction>(ResultValue.getDef());
       if (NormalBB) {
         B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnValue });
+        return NewAI.getInstruction();
       }
       return CastedReturnValue;
     }
@@ -527,6 +528,7 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
     CastedReturnValue = B.createUpcast(AI.getLoc(), ResultValue, AI.getType());
     if (NormalBB) {
       B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnValue });
+      return NewAI.getInstruction();
     }
     return CastedReturnValue;
   }
@@ -568,6 +570,7 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
   NumClassDevirt++;
   if (NormalBB) {
     B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnValue });
+    return NewAI.getInstruction();
   }
   return CastedReturnValue;
 }
@@ -587,7 +590,7 @@ SILInstruction *swift::tryDevirtualizeClassMethod(FullApplySite AI,
 /// Generate a new apply of a function_ref to replace an apply of a
 /// witness_method when we've determined the actual function we'll end
 /// up calling.
-static ApplyInst *devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
+static FullApplySite devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
                                             ArrayRef<Substitution> Subs) {
   // We know the witness thunk and the corresponding set of substitutions
   // required to invoke the protocol method at this point.
@@ -637,8 +640,15 @@ static ApplyInst *devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
 
   auto SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeCanType);
   auto ResultSILType = SubstCalleeCanType->getSILResult();
-  auto *SAI = Builder.createApply(Loc, FRI, SubstCalleeSILType,
+  FullApplySite SAI;
+
+  if (isa<ApplyInst>(AI))
+    SAI = Builder.createApply(Loc, FRI, SubstCalleeSILType,
                                   ResultSILType, NewSubstList, Arguments);
+  if (auto *TAI = dyn_cast<TryApplyInst>(AI))
+    SAI = Builder.createTryApply(Loc, FRI, SubstCalleeSILType,
+                                 NewSubstList, Arguments,
+                                 TAI->getNormalBB(), TAI->getErrorBB());
 
   NumWitnessDevirt++;
   return SAI;
@@ -647,7 +657,7 @@ static ApplyInst *devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
 /// In the cases where we can statically determine the function that
 /// we'll call to, replace an apply of a witness_method with an apply
 /// of a function_ref, returning the new apply.
-static ApplyInst *tryDevirtualizeWitnessMethod(FullApplySite AI) {
+static SILInstruction *tryDevirtualizeWitnessMethod(FullApplySite AI) {
   SILFunction *F;
   ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;
@@ -661,7 +671,7 @@ static ApplyInst *tryDevirtualizeWitnessMethod(FullApplySite AI) {
   if (!F)
     return nullptr;
 
-  return devirtualizeWitnessMethod(AI, F, Subs);
+  return devirtualizeWitnessMethod(AI, F, Subs).getInstruction();
 }
 
 //===----------------------------------------------------------------------===//

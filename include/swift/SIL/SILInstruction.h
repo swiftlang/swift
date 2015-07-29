@@ -3965,6 +3965,18 @@ public:
     FOREACH_IMPL_RETURN(getArguments());
   }
 
+  /// The arguments passed to this instruction, without self.
+  OperandValueArrayRef getArgumentsWithoutSelf() const {
+    switch (Inst->getKind()) {
+    case ValueKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getArgumentsWithoutSelf();
+    case ValueKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getArgumentsWithoutSelf();
+    default:
+      llvm_unreachable("not implemented for this instruction!");
+    }
+  }
+
   /// Returns the number of arguments for this partial apply.
   unsigned getNumArguments() const { return getArguments().size(); }
 
