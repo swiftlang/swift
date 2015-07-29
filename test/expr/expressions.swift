@@ -716,6 +716,9 @@ func inoutTests(inout arr: Int) {
 
   inoutTests((&x))   // expected-error {{'&' can only appear immediately in a call argument list}}
   inoutTests(&x)
+  
+  // <rdar://problem/17489894> inout not rejected as operand to assignment operator
+  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}
 }
 
 
