@@ -2727,6 +2727,10 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
   return known->second;
 }
 
+/// Given a ValueMember, UnresolvedValueMember, or TypeMember constraint,
+/// perform a lookup into the specified base type to find a candidate list.
+/// The list returned includes the viable candidates as well as the unviable
+/// ones (along with reasons why they aren't viable).
 MemberLookupResult ConstraintSystem::
 performMemberLookup(Type baseTy, const Constraint &constraint) {
   Type baseObjTy = baseTy->getRValueType();
@@ -2887,10 +2891,8 @@ performMemberLookup(Type baseTy, const Constraint &constraint) {
     for (auto constructor : ctors) {
       // If the constructor is invalid, we fail entirely to avoid error cascade.
       TC.validateDecl(constructor, true);
-      if (constructor->isInvalid()) {
-        continue;
-        // FIXME: return result.markErrorAlreadyDiagnosed();
-      }
+      if (constructor->isInvalid())
+        return result.markErrorAlreadyDiagnosed();
 
       // If the argument labels for this result are incompatible with
       // the call site, skip it.
@@ -2967,10 +2969,8 @@ performMemberLookup(Type baseTy, const Constraint &constraint) {
     for (auto candidate : lookup) {
       // If the result is invalid, don't cascade errors.
       TC.validateDecl(candidate.first, true);
-      if (candidate.first->isInvalid()) {
-        continue;
-        //FIXME: return result.markErrorAlreadyDiagnosed();
-      }
+      if (candidate.first->isInvalid())
+        return result.markErrorAlreadyDiagnosed();
       
       result.addViable(OverloadChoice(baseTy, candidate.first,
                                       /*isSpecialized=*/false));
@@ -3006,7 +3006,7 @@ performMemberLookup(Type baseTy, const Constraint &constraint) {
     // If the result is invalid, skip it.
     TC.validateDecl(cand, true);
     if (cand->isInvalid()) {
-      //FIXME: result.markErrorAlreadyDiagnosed();
+      result.markErrorAlreadyDiagnosed();
       return;
     }
 
@@ -3178,6 +3178,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       baseTy = objTy;
   }
 
+  // FIXME: The third bool argument should be eliminated here.
   MemberLookupResult result = performMemberLookup(baseTy, constraint);
   
   DeclName name = constraint.getMember();

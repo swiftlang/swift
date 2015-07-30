@@ -211,7 +211,7 @@ struct Toe {
   let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
 
   func clip() {
-    toenail.inspect { x in // expected-error {{member 'toenail' cannot be used on value of type 'Toe'}}
+    toenail.inspect { x in
       toenail.inspect { y in }
     }
   }

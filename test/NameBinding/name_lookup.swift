@@ -103,7 +103,7 @@ class ThisDerived1 : ThisBase1 {
 
     self.baseExtProp = 42
     self.baseExtFunc0()
-    self.baseExtStaticVar = 42 // expected-error {{member 'baseExtStaticVar' cannot be used on value of type 'ThisDerived1'}}
+    self.baseExtStaticVar = 42
     self.baseExtStaticProp = 42
     self.baseExtStaticFunc0() // expected-error {{member 'baseExtStaticFunc0' cannot be used on value of type 'ThisDerived1'}}
 
@@ -136,7 +136,7 @@ class ThisDerived1 : ThisBase1 {
 
     self.derivedExtProp = 42
     self.derivedExtFunc0()
-    self.derivedExtStaticVar = 42 // expected-error {{member 'derivedExtStaticVar' cannot be used on value of type 'ThisDerived1'}}
+    self.derivedExtStaticVar = 42
     self.derivedExtStaticProp = 42
     self.derivedExtStaticFunc0() // expected-error {{member 'derivedExtStaticFunc0' cannot be used on value of type 'ThisDerived1'}}
 
@@ -175,7 +175,7 @@ class ThisDerived1 : ThisBase1 {
 
     super.baseExtProp = 42
     super.baseExtFunc0()
-    super.baseExtStaticVar = 42 // expected-error {{member 'baseExtStaticVar' cannot be used on value of type 'ThisBase1'}}
+    super.baseExtStaticVar = 42
     super.baseExtStaticProp = 42
     super.baseExtStaticFunc0() // expected-error {{member 'baseExtStaticFunc0' cannot be used on value of type 'ThisBase1'}}
 
@@ -237,7 +237,7 @@ class ThisDerived1 : ThisBase1 {
 
     self.baseExtProp = 42 // expected-error {{member 'baseExtProp' cannot be used on type 'ThisDerived1'}}
     self.baseExtFunc0() // expected-error {{missing argument}}
-    self.baseExtStaticVar = 42 // expected-error {{member 'baseExtStaticVar' cannot be used on type 'ThisDerived1'}}
+    self.baseExtStaticVar = 42
     self.baseExtStaticProp = 42 // expected-error {{member 'baseExtStaticProp' cannot be used on type 'ThisDerived1'}}
     self.baseExtStaticFunc0()
 
@@ -263,7 +263,7 @@ class ThisDerived1 : ThisBase1 {
 
     self.derivedExtProp = 42 // expected-error {{member 'derivedExtProp' cannot be used on type 'ThisDerived1'}}
     self.derivedExtFunc0() // expected-error {{missing argument}}
-    self.derivedExtStaticVar = 42 // expected-error {{member 'derivedExtStaticVar' cannot be used on type 'ThisDerived1'}}
+    self.derivedExtStaticVar = 42
     self.derivedExtStaticProp = 42 // expected-error {{member 'derivedExtStaticProp' cannot be used on type 'ThisDerived1'}}
     self.derivedExtStaticFunc0()
 
@@ -305,7 +305,7 @@ class ThisDerived1 : ThisBase1 {
 
     super.baseExtProp = 42 // expected-error {{member 'baseExtProp' cannot be used on type 'ThisBase1'}}
     super.baseExtFunc0() // expected-error {{missing argument}}
-    super.baseExtStaticVar = 42 // expected-error {{member 'baseExtStaticVar' cannot be used on type 'ThisBase1'}}
+    super.baseExtStaticVar = 42 
     super.baseExtStaticProp = 42 // expected-error {{member 'baseExtStaticProp' cannot be used on type 'ThisBase1'}}
     super.baseExtStaticFunc0()
 
