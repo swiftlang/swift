@@ -846,7 +846,6 @@ static bool isProfitableInColdBlock(SILFunction *Callee) {
 FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
                                                             FullApplySite Apply,
                                                                 CallGraph &CG) {
-  auto *AI = dyn_cast<ApplyInst>(Apply.getInstruction());
   auto NewInst = tryDevirtualizeApply(Apply);
   if (!NewInst)
     return FullApplySite();
@@ -865,10 +864,10 @@ FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
   assert(NewAI && "Expected to find an apply!");
 
   assert(!OriginMap.count(NewAI) && "Unexpected apply in map!");
-  if (OriginMap.count(AI))
-    OriginMap[NewAI] = OriginMap[AI];
-  RemovedApplies.insert(AI);
-  replaceDeadApply(AI, NewInst);
+  if (OriginMap.count(Apply))
+    OriginMap[NewAI] = OriginMap[Apply];
+  RemovedApplies.insert(Apply);
+  replaceDeadApply(Apply, NewInst);
 
   auto *F = getReferencedFunction(NewAI);
   assert(F && "Expected direct function referenced!");
@@ -943,9 +942,16 @@ static void collectAllAppliesInFunction(SILFunction *F,
   assert(Applies.empty() && "Expected empty vector to store into!");
 
   for (auto &B : *F)
-    for (auto &I : B)
-      if (auto *AI = dyn_cast<ApplyInst>(&I))
+    for (auto &I : B) {
+      if (auto *AI = dyn_cast<ApplyInst>(&I)) {
         Applies.push_back(FullApplySite(AI));
+        continue;
+      }
+      if (auto *AI = dyn_cast<TryApplyInst>(&I)) {
+        Applies.push_back(FullApplySite(AI));
+        continue;
+      }
+    }
 }
 
 // Devirtualize and specialize a group of applies, updating the call
