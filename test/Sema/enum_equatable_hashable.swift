@@ -55,8 +55,7 @@ func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expec
 if InvalidCustomHashable.A == .B { }
 var s: String = InvalidCustomHashable.A == .B
 s = InvalidCustomHashable.A.hashValue
-var i: Int = InvalidCustomHashable.A.hashValue // expected-error{{cannot convert value of type 'String' to specified type 'Int'}}
-
+var i: Int = InvalidCustomHashable.A.hashValue
 
 // Check use of an enum's synthesized members before the enum is actually declared.
 struct UseEnumBeforeDeclaration {

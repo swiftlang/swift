@@ -74,7 +74,7 @@ i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
-[1, 2, 3].doesntExist(0)  // expected-error {{member 'Element' cannot be used on value of type '[Int]'}}
+[1, 2, 3].doesntExist(0)  // expected-error {{type 'Int2048' does not conform to protocol 'IntegerLiteralConvertible'}}
 "awfawf".doesntExist(0)   // expected-error {{value of type 'String' has no member 'doesntExist'}}
 
 // Does not conform to protocol.
@@ -211,7 +211,7 @@ struct Toe {
   let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
 
   func clip() {
-    toenail.inspect { x in // expected-error {{member 'toenail' cannot be used on value of type 'Toe'}}
+    toenail.inspect { x in
       toenail.inspect { y in }
     }
   }

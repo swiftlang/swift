@@ -2239,6 +2239,13 @@ public:
    return simplifyType(type, substituting);
   }
 
+  /// Given a ValueMember, UnresolvedValueMember, or TypeMember constraint,
+  /// perform a lookup into the specified base type to find a candidate list.
+  /// The list returned includes the viable candidates as well as the unviable
+  /// ones (along with reasons why they aren't viable).
+  MemberLookupResult performMemberLookup(Type baseTy,
+                                         const Constraint &constraint);
+
 private:
 
   /// \brief Simplify a type, by replacing type variables with either their
@@ -2307,8 +2314,6 @@ private:
   /// \brief Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(const Constraint &constraint);
 
-  MemberLookupResult performMemberLookup(Type baseTy,
-                                         const Constraint &constraint);
   
   /// \brief Attempt to simplify the optional object constraint.
   SolutionKind simplifyOptionalObjectConstraint(const Constraint &constraint);
