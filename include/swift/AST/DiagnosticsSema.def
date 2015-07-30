@@ -82,25 +82,11 @@ ERROR(could_not_use_value_member,sema,none,
 ERROR(could_not_use_type_member,sema,none,
       "member %1 cannot be used on type %0", (Type, DeclName))
 
-ERROR(could_not_use_type_member_on_instance,sema,none,
-      "static member %1 cannot be used on instance of type %0",
-      (Type, DeclName))
-ERROR(could_not_use_instance_member_on_type,sema,none,
-      "instance member %1 cannot be used on type %0",
-      (Type, DeclName))
-
-
 ERROR(cannot_pass_rvalue_mutating_subelement,sema_tcs,none,
       "cannot use mutating member on immutable value: %0",
       (StringRef))
 ERROR(cannot_pass_rvalue_mutating,sema_tcs,none,
       "cannot use mutating member on immutable value of type %0",
-      (Type))
-ERROR(cannot_pass_rvalue_mutating_getter_subelement,sema_tcs,none,
-      "cannot use mutating getter on immutable value: %0",
-      (StringRef))
-ERROR(cannot_pass_rvalue_mutating_getter,sema_tcs,none,
-      "cannot use mutating getter on immutable value of type %0",
       (Type))
 
 ERROR(could_not_convert_argument,sema,none,

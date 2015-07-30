@@ -120,7 +120,7 @@ var zi = ZI(x: 1, f: 3.0)
 var i : Int = XI.f()
 i = XI.f()
 i = xi.g()
-i = yi.f() // expected-error{{static member 'f' cannot be used on instance of type 'YI' (aka 'YT<Int>')}}
+i = yi.f() // expected-error{{member 'f' cannot be used on value of type 'YI' (aka 'YT<Int>')}}
 i = yi.g()
 
 var xif : (XI) -> () -> Int = XI.g

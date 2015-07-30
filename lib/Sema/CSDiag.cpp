@@ -749,6 +749,8 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   case Failure::TypesNotSubtypes:
   case Failure::TypesNotConstructible:
   case Failure::FunctionTypesMismatch:
+    return false;
+
   case Failure::DoesNotHaveMember:
     // The Expr path handling these constraints does a good job.
     return false;
@@ -2155,7 +2157,6 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   }
 }
 
-
 bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
   
   if (!memberConstraint) return false;
@@ -2179,7 +2180,21 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
   anchor = typeCheckArbitrarySubExprIndependently(anchor, TCC_AllowLValue);
   if (!anchor) return true;
   
+  // If we couldn't resolve a specific type for the base expression, then we
+  // cannot produce a specific diagnostic.
   auto baseTy = anchor->getType();
+  if (typeIsNotSpecialized(baseTy)) {
+    // If we have a conversion constraint, then we may just have an ambiguous
+    // subexpression.  Diagnose it in conversion constraint stuff, instead of
+    // doing saying that we don't have an element of some undefined type.
+    if (conversionConstraint && isConversionConstraint(conversionConstraint))
+      return false;
+    
+    diagnose(anchor->getLoc(), diag::could_not_find_member, memberName)
+      .highlight(anchor->getSourceRange()).highlight(range);
+    return true;
+  }
+  
   auto baseObjTy = baseTy->getRValueType();
 
   // If the base type is an IUO, look through it.  Odds are, the code is not
@@ -2231,45 +2246,13 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
     return true;
   }
   
-  MemberLookupResult result =
-    CS->performMemberLookup(baseObjTy, *memberConstraint);
-
-  switch (result.OverallResult) {
-  case MemberLookupResult::Unsolved:
-    // If we couldn't resolve a specific type for the base expression, then we
-    // cannot produce a specific diagnostic.
-
-    // If we have a conversion constraint, then we may just have an ambiguous
-    // subexpression.  Diagnose it in conversion constraint stuff, instead of
-    // doing saying that we don't have an element of some undefined type.
-    if (conversionConstraint && isConversionConstraint(conversionConstraint))
-      return false;
-      
-    // FIXME: This is a really useless error for this, it should be more along
-    // the lines of "could not infer base type".
-    diagnose(anchor->getLoc(), diag::could_not_find_member, memberName)
-      .highlight(anchor->getSourceRange()).highlight(range);
-    return true;
-
-  case MemberLookupResult::ErrorAlreadyDiagnosed:
-    // If an error was already emitted, then we're done, don't emit anything
-    // redundant.
-    return true;
-  case MemberLookupResult::ErrorDoesNotHaveInitOnInstance:
-    // FIXME: Turn this into a normal lookup fail.
-    return false;
-      
-  case MemberLookupResult::HasResults:
-    break;
-  }
   
-  // We know that this is a failing lookup, so we should have no viable
-  // candidates here.
-  assert(result.ViableCandidates.empty() &&
-         "Why did name lookup fail before, but it works now?");
+  // Otherwise, try to figure out more about why this failed.  Perform a name
+  // name lookup and sort through the results.
+  LookupResult &lookup = CS->lookupMember(baseObjTy, memberName);
   
-  // If we found no results at all, mention that fact.
-  if (result.UnviableCandidates.empty()) {
+  // If it really isn't there, then we know what went wrong!
+  if (!lookup) {
     // TODO: This should handle tuple member lookups, like x.1231 as well.
     if (auto MTT = baseObjTy->getAs<MetatypeType>())
       diagnose(anchor->getLoc(), diag::could_not_find_type_member,
@@ -2282,53 +2265,115 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
     return true;
   }
   
-  // Otherwise, we have at least one (and potentially many) viable candidates
-  // sort them out.  If all of the candidates have the same problem (commonly
-  // because there is exactly one candidate!) diagnose this.
-  bool sameProblem = true;
-  auto firstProblem = result.UnviableCandidates[0].second;
-  for (auto cand : result.UnviableCandidates)
-    sameProblem &= cand.second == firstProblem;
+  // TODO: Handle initializers, which have special lookup rules.
   
-  auto instanceTy = baseObjTy;
-  if (auto *MTT = instanceTy->getAs<AnyMetatypeType>())
-    instanceTy = MTT->getInstanceType();
-  
-  if (sameProblem) {
-    switch (firstProblem) {
-    case MemberLookupResult::UR_LabelMismatch:
-    case MemberLookupResult::UR_UnavailableInExistential:
-      break;
-    case MemberLookupResult::UR_InstanceMemberOnType:
-      diagnose(anchor->getLoc(), diag::could_not_use_instance_member_on_type,
-               instanceTy, memberName)
-        .highlight(anchor->getSourceRange()).highlight(range);
-      return true;
-    case MemberLookupResult::UR_TypeMemberOnInstance:
-      diagnose(anchor->getLoc(), diag::could_not_use_type_member_on_instance,
-               baseObjTy, memberName)
-        .highlight(anchor->getSourceRange()).highlight(range);
-      return true;
-        
-    case MemberLookupResult::UR_MutatingMemberOnRValue:
-    case MemberLookupResult::UR_MutatingGetterOnRValue:
-      auto diagIDsubelt = diag::cannot_pass_rvalue_mutating_subelement;
-      auto diagIDmember = diag::cannot_pass_rvalue_mutating;
-      if (firstProblem == MemberLookupResult::UR_MutatingGetterOnRValue) {
-        diagIDsubelt = diag::cannot_pass_rvalue_mutating_getter_subelement;
-        diagIDmember = diag::cannot_pass_rvalue_mutating_getter;
-      }
-      diagnoseSubElementFailure(anchor, anchor->getLoc(), *CS,
-                                diagIDsubelt, diagIDmember);
-      return true;
+  // Dig out the instance type and figure out what members of the instance type
+  // we are going to see.
+  bool isMetatype = false;
+  bool hasInstanceMembers = false;
+  bool hasInstanceMethods = false;
+  bool hasStaticMembers = false;
+  Type instanceTy = baseObjTy;
+  if (baseObjTy->is<ModuleType>()) {
+    hasStaticMembers = true;
+  } else if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>()) {
+    instanceTy = baseObjMeta->getInstanceType();
+    isMetatype = true;
+    if (baseObjMeta->is<ExistentialMetatypeType>()) {
+      // An instance of an existential metatype is a concrete type conforming
+      // to the existential, say Self. Instance members of the concrete type
+      // have type Self -> T -> U, but we don't know what Self is at compile
+      // time so we cannot refer to them. Static methods are fine, on the other
+      // hand -- we already know that they do not have Self or associated type
+      // requirements, since otherwise we would not be able to refer to the
+      // existential metatype in the first place.
+      hasStaticMembers = true;
+    } else if (instanceTy->isExistentialType()) {
+      // A protocol metatype has instance methods with type P -> T -> U, but
+      // not instance properties or static members -- the metatype value itself
+      // doesn't give us a witness so there's no static method to bind.
+      hasInstanceMethods = true;
+    } else {
+      // Metatypes of nominal types and archetypes have instance methods and
+      // static members, but not instance properties.
+      // FIXME: partial application of properties
+      hasInstanceMethods = true;
+      hasStaticMembers = true;
     }
+  } else {
+    // Otherwise, we can access all instance members.
+    hasInstanceMembers = true;
+    hasInstanceMethods = true;
+  }
+  
+  // Keep track of whether we found a mutating candidate and what it is.  If the
+  // base is non-mutating and the only candidates are mutating, then we have an
+  // base-not-mutable issue.
+  ValueDecl *MutatingCandidate = nullptr;
+  bool UnknownCandidate = false;
+  
+  // FIXME: This is duplicating too much logic from
+  // ConstraintSystem::simplifyMemberConstraint.  It should all move here.
+  for (ValueDecl *result : lookup) {
+    if (result->isInvalid())
+      continue;
+    
+    // FIXME: If the argument labels for this result are incompatible with
+    // the call site, skip it.
+    //if (!hasCompatibleArgumentLabels(result)) { labelMismatch = true; }
+    
+    
+    // See if we have an instance method, instance member or static method,
+    // and check if it can be accessed on our base type.
+    // FIXME: Mark this as 'unavailable'.
+    if (result->isInstanceMember()) {
+      if (isa<FuncDecl>(result) && !hasInstanceMethods)
+        continue;
+      
+      if (!isa<FuncDecl>(result) && !hasInstanceMembers)
+        continue;
+    } else {
+      if (!hasStaticMembers)
+        continue;
+    }
+
+
+    // If we have an rvalue base, make sure that the
+    // result isn't mutating (only valid on lvalues).
+    if (!isMetatype &&
+        !baseTy->is<LValueType>() && result->isInstanceMember()) {
+      if (auto *FD = dyn_cast<FuncDecl>(result))
+        if (FD->isMutating()) {
+          MutatingCandidate = result;
+          continue;
+        }
+      
+      // Subscripts and computed properties are ok on rvalues so long
+      // as the getter is nonmutating.
+      if (auto storage = dyn_cast<AbstractStorageDecl>(result)) {
+        if (storage->isGetterMutating()) {
+          MutatingCandidate = result;
+          continue;
+        }
+      }
+    }
+    UnknownCandidate = true;
+  }
+  
+  // If we have an apparently usable 'mutating' member, but the base is an
+  // rvalue, diagnose this as an invalid mutation error.
+  if (MutatingCandidate && !UnknownCandidate) {
+    diagnoseSubElementFailure(anchor, anchor->getLoc(), *CS,
+                              diag::cannot_pass_rvalue_mutating_subelement,
+                              diag::cannot_pass_rvalue_mutating);
+    return true;
   }
 
   // Otherwise, we don't have a specific issue to diagnose.  Just say the vague
   // 'cannot use' diagnostic.
-  if (!baseObjTy->isEqual(instanceTy))
+  if (auto MTT = baseTy->getRValueType()->getAs<MetatypeType>())
     diagnose(anchor->getLoc(), diag::could_not_use_type_member,
-             instanceTy, memberName)
+             MTT->getInstanceType(), memberName)
     .highlight(anchor->getSourceRange()).highlight(range);
   else
     diagnose(anchor->getLoc(), diag::could_not_use_value_member,
@@ -2770,12 +2815,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
       // allowing ambiguous solutions for subexprs, and thus the code below is
       // forced to diagnose "discard_expr_outside_of_assignment".  This should
       // really allow ambiguous expressions and diagnose it only in MiscDiags.
-      isa<DiscardAssignmentExpr>(subExpr)) {
-    
-    // If we have a contextual conversion type, then we *can* type check these.
-    if (!convertType)
-      return subExpr;
-  }
+      isa<DiscardAssignmentExpr>(subExpr))
+    return subExpr;
   
   // TupleExpr often contains things that cannot be typechecked without
   // context (usually from a parameter list), but we do it if they already have

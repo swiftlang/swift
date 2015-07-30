@@ -201,7 +201,7 @@ class Z4<T where T : AnyObject> { }
 
 // Don't allow one to call instance methods on the Type via
 // dynamic method lookup.
-obj.dynamicType.foo!(obj)(5) // expected-error{{instance member 'foo' cannot be used on type 'Id' (aka 'AnyObject')}}
+obj.dynamicType.foo!(obj)(5) // expected-error{{member 'foo' cannot be used on value of type 'Id.Type' (aka 'AnyObject.Type')}}
 
 // Checked casts to AnyObject
 var p: P = Y()

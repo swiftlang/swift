@@ -212,11 +212,6 @@ func test_mutability() {
   // Mutable methods on let and rvalue are not ok.
   x.f()                         // expected-error {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
   TestMutableStruct().f()       // expected-error {{cannot use mutating member on immutable value: function call returns immutable value}}
-  
-  _ = TestMutableStruct().weird_property  // expected-error {{cannot use mutating getter on immutable value: function call returns immutable value}}
-
-  let tms = TestMutableStruct() // expected-note {{change 'let' to 'var' to make it mutable}}
-  _ = tms.weird_property        // expected-error {{cannot use mutating getter on immutable value: 'tms' is a 'let' constant}}
 }
 
 
@@ -287,11 +282,11 @@ struct MutatingGet : NonMutatingGet { // expected-error {{type 'MutatingGet' doe
 func test_properties() {
   let rvalue = TestMutableStruct()      // expected-note 4 {{change 'let' to 'var' to make it mutable}}
   markUsed(rvalue.nonmutating_property) // ok
-  markUsed(rvalue.mutating_property)    // expected-error {{cannot use mutating getter on immutable value: 'rvalue' is a 'let' constant}}
-  markUsed(rvalue.weird_property)       // expected-error {{cannot use mutating getter on immutable value: 'rvalue' is a 'let' constant}}
+  markUsed(rvalue.mutating_property)    // expected-error {{cannot use mutating member on immutable value: 'rvalue' is a 'let' constant}}
+  markUsed(rvalue.weird_property)       // expected-error {{cannot use mutating member on immutable value: 'rvalue' is a 'let' constant}}
   rvalue.nonmutating_property = 1    // ok
-  rvalue.mutating_property = 1       // expected-error {{cannot use mutating getter on immutable value: 'rvalue' is a 'let' constant}}
-  rvalue.weird_property = 1          // expected-error {{cannot use mutating getter on immutable value: 'rvalue' is a 'let' constant}}
+  rvalue.mutating_property = 1       // expected-error {{cannot use mutating member on immutable value: 'rvalue' is a 'let' constant}}
+  rvalue.weird_property = 1          // expected-error {{cannot use mutating member on immutable value: 'rvalue' is a 'let' constant}}
 
  var lvalue = TestMutableStruct()
  markUsed(lvalue.mutating_property)    // ok
