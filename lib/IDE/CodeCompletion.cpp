@@ -119,7 +119,8 @@ CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
   NumChunks = Chunks.size();
 }
 
-CodeCompletionString *CodeCompletionString::create(llvm::BumpPtrAllocator &Allocator, ArrayRef<Chunk> Chunks) {
+CodeCompletionString *CodeCompletionString::create(llvm::BumpPtrAllocator &Allocator,
+                                                   ArrayRef<Chunk> Chunks) {
   void *CCSMem = Allocator.Allocate(sizeof(CodeCompletionString) +
                                     Chunks.size() * sizeof(CodeCompletionString::Chunk),
                                     llvm::alignOf<CodeCompletionString>());
@@ -2873,7 +2874,9 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
   Lookup.getVisibleDeclsOfModule(module, accessPath, needLeadingDot);
 }
 
-void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink, CodeCompletionResultSink &sourceSink, bool onlyTypes) {
+void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
+                                           CodeCompletionResultSink &sourceSink,
+                                           bool onlyTypes) {
 
   // We will be adding foreign results (from another sink) into TargetSink.
   // TargetSink should have an owning pointer to the allocator that keeps the
