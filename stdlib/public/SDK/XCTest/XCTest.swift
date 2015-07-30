@@ -79,11 +79,11 @@ public func XCTFail(message: String = "", file: String = __FILE__, line: UInt = 
   _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, "" as NSString), message, file, line)
 }
 
-public func XCTAssertNil(@autoclosure expression: () -> AnyObject?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNil(@autoclosure expression: () -> Any?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Nil
   
   // evaluate the expression exactly once
-  var expressionValueOptional: AnyObject?
+  var expressionValueOptional: Any?
   
   let result = _XCTRunThrowableBlock {
     expressionValueOptional = expression()
@@ -115,11 +115,11 @@ public func XCTAssertNil(@autoclosure expression: () -> AnyObject?, _ message: S
   }
 }
 
-public func XCTAssertNotNil(@autoclosure expression: () -> AnyObject?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotNil(@autoclosure expression: () -> Any?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotNil
   
   // evaluate the expression exactly once
-  var expressionValueOptional: AnyObject?
+  var expressionValueOptional: Any?
   
   let result = _XCTRunThrowableBlock {
     expressionValueOptional = expression()
