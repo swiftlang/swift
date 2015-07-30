@@ -297,10 +297,9 @@ extension SequenceType {
   public func filter(
     @noescape includeElement: (Generator.Element) throws -> Bool
   ) rethrows -> [Generator.Element] {
-    let initialCapacity = underestimateCount()
     var builder =
       _UnsafePartiallyInitializedContiguousArrayBuffer<Generator.Element>(
-        initialCapacity: initialCapacity)
+        initialCapacity: 0)
 
     var generator = generate()
 
@@ -312,14 +311,6 @@ extension SequenceType {
     defer {
       if !finished { builder.finish() }
     }
-    // Add elements up to the initial capacity without checking for regrowth.
-    for _ in 0..<initialCapacity {
-      let element = generator.next()!
-      if try includeElement(element) {
-        builder.addWithExistingCapacity(element)
-      }
-    }
-    // Add remaining elements, if any.
     while let element = generator.next() {
       if try includeElement(element) {
         builder.add(element)

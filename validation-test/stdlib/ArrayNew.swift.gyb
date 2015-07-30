@@ -1615,29 +1615,17 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
   }
 
   ArrayTestSuite.test("\(testPrefix)/FilterAll")
-  .skip(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
     let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
 
-    if step < 0 {
-      expectCrashLater()
-    }
     let a = evil.filter { _ in true }
     _blackHole(a)
   }
 
   ArrayTestSuite.test("\(testPrefix)/FilterNone")
-  .skip(.Custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
     let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
 
-    if step < 0 {
-      expectCrashLater()
-    }
     let a = evil.filter { _ in false }
     _blackHole(a)
   }
