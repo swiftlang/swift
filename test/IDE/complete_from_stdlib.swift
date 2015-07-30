@@ -55,7 +55,7 @@ func protocolExtCollection1b(a: CollectionType) {
 }
 
 // PRIVATE_NOMINAL_MEMBERS_2: Begin completions
-// PRIVATE_NOMINAL_MEMBERS_2-DAG: Decl[InstanceMethod]/Super: map({#({{.*}}): (Self.Generator.Element) -> T##(Self.Generator.Element) -> T#})[#[T]#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_2-DAG: Decl[InstanceMethod]/Super: map({#({{.*}}): (Self.Generator.Element) throws -> T##(Self.Generator.Element) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_2-DAG-NOT: Decl{{.*}}: last
 // PRIVATE_NOMINAL_MEMBERS_2: End completions
 
@@ -64,7 +64,7 @@ func protocolExtCollection2<C : CollectionType where C.Index : BidirectionalInde
 }
 
 // PRIVATE_NOMINAL_MEMBERS_3: Begin completions
-// PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceMethod]/Super: map({#({{.*}}): (Self.Generator.Element) -> T##(Self.Generator.Element) -> T#})[#[T]#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceMethod]/Super: map({#({{.*}}): (Self.Generator.Element) throws -> T##(Self.Generator.Element) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceVar]/Super:            last[#Self.Generator.Element?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3-DAG-NOT: Decl{{.*}}:         indexOf({#({{.*}}): Self.Generator.Element
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceMethod]/Super:         indexOf({#({{.*}}): (Self.Generator.Element) throws -> Bool##(Self.Generator.Element) throws -> Bool#})[' rethrows'][#Self.Index?#]{{; name=.+}}
@@ -74,7 +74,7 @@ func protocolExtArray<T : Equatable>(a: [T]) {
   a.#^PRIVATE_NOMINAL_MEMBERS_4^#
 }
 // PRIVATE_NOMINAL_MEMBERS_4: Begin completions
-// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super: map({#({{.*}}): (Self.Generator.Element) -> T##(Self.Generator.Element) -> T#})[#[T]#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super: map({#({{.*}}): (Self.Generator.Element) throws -> T##(Self.Generator.Element) throws -> T#})[' rethrows'][#[T]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceVar]/Super:            last[#Self.Generator.Element?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         indexOf({#({{.*}}): Self.Generator.Element#})[#Self.Index?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         indexOf({#({{.*}}): (Self.Generator.Element) throws -> Bool##(Self.Generator.Element) throws -> Bool#})[' rethrows'][#Self.Index?#]{{; name=.+}}

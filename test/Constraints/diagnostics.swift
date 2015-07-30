@@ -423,7 +423,7 @@ func f20371273() {
   let x: [Int] = [1, 2, 3, 4]
   let y: UInt = 4
   x.filter { $0 == y }  // expected-error {{cannot invoke 'filter' with an argument list of type '((UInt) -> Bool)'}}
-   // expected-note @-1 {{expected an argument list of type '(@noescape (Self.Generator.Element) -> Bool)'}}
+   // expected-note @-1 {{expected an argument list of type '(@noescape (Self.Generator.Element) throws -> Bool)'}}
 }
 
 

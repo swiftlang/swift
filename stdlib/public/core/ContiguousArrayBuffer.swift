@@ -550,7 +550,7 @@ internal func _copySequenceToNativeArrayBuffer<
 
   // FIXME(performance): use _initializeTo().
 
-  // Add elements up to the initial capacity without checking.
+  // Add elements up to the initial capacity without checking for regrowth.
   for _ in 0..<initialCapacity {
     builder.addWithExistingCapacity(generator.next()!)
   }
@@ -581,7 +581,7 @@ internal func _copyCollectionToNativeArrayBuffer<
 
   var builder =
     _UnsafePartiallyInitializedContiguousArrayBuffer<C.Generator.Element>(
-      initialCapacity: numericCast(source.count))
+      initialCapacity: count)
 
   var i = source.startIndex
   // FIXME(performance): use _initializeTo().
@@ -665,6 +665,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       "_UnsafePartiallyInitializedContiguousArrayBuffer has incorrect count")
     var finalResult = _ContiguousArrayBuffer<Element>()
     swap(&finalResult, &result)
+    remainingCapacity = 0
     return finalResult
   }
 }

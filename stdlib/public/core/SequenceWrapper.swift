@@ -39,15 +39,15 @@ extension SequenceType
   }
 
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) -> T
-  ) -> [T] {
-    return _base.map(transform)
+    @noescape transform: (Base.Generator.Element) throws -> T
+  ) rethrows -> [T] {
+    return try _base.map(transform)
   }
 
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) -> Bool
-  ) -> [Base.Generator.Element] {
-    return _base.filter(includeElement)
+    @noescape includeElement: (Base.Generator.Element) throws -> Bool
+  ) rethrows -> [Base.Generator.Element] {
+    return try _base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(

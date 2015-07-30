@@ -71,14 +71,14 @@ public protocol SequenceType {
   ///
   /// - Complexity: O(N).
   func map<T>(
-    @noescape transform: (Generator.Element) -> T
-  ) -> [T]
+    @noescape transform: (Generator.Element) throws -> T
+  ) rethrows -> [T]
 
   /// Return an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   func filter(
-    @noescape includeElement: (Generator.Element) -> Bool
-  ) -> [Generator.Element]
+    @noescape includeElement: (Generator.Element) throws -> Bool
+  ) rethrows -> [Generator.Element]
 
   /// Call `body` on each element in `self` in the same order as a
   /// *for-in loop.*
@@ -262,24 +262,72 @@ extension SequenceType {
   ///
   /// - Complexity: O(N).
   public func map<T>(
-    @noescape transform: (Generator.Element) -> T
-  ) -> [T] {
-    // Cast away @noescape.
-    typealias Transform = (Generator.Element) -> T
-    let escapableTransform = unsafeBitCast(transform, Transform.self)
-    return Array(self._prext_lazy.map(escapableTransform))
+    @noescape transform: (Generator.Element) throws -> T
+  ) rethrows -> [T] {
+    let initialCapacity = underestimateCount()
+    var builder =
+      _UnsafePartiallyInitializedContiguousArrayBuffer<T>(
+        initialCapacity: initialCapacity)
+
+    var generator = generate()
+
+    // FIXME: Type checker doesn't allow a `rethrows` function to catch and
+    // throw an error. It'd be nice to separate the success and failure cleanup
+    // paths more cleanly than this.
+    // Ensure the buffer is left in a destructible state.
+    var finished = false
+    defer {
+      if !finished { builder.finish() }
+    }
+    // Add elements up to the initial capacity without checking for regrowth.
+    for _ in 0..<initialCapacity {
+      builder.addWithExistingCapacity(try transform(generator.next()!))
+    }
+    // Add remaining elements, if any.
+    while let element = generator.next() {
+      builder.add(try transform(element))
+    }
+    let buffer = builder.finish()
+    finished = true
+    return Array(buffer)
   }
 
   /// Return an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   public func filter(
-    @noescape includeElement: (Generator.Element) -> Bool
-  ) -> [Generator.Element] {
-    // Cast away @noescape.
-    typealias IncludeElement = (Generator.Element) -> Bool
-    let escapableIncludeElement =
-      unsafeBitCast(includeElement, IncludeElement.self)
-    return Array(self._prext_lazy.filter(escapableIncludeElement))
+    @noescape includeElement: (Generator.Element) throws -> Bool
+  ) rethrows -> [Generator.Element] {
+    let initialCapacity = underestimateCount()
+    var builder =
+      _UnsafePartiallyInitializedContiguousArrayBuffer<Generator.Element>(
+        initialCapacity: initialCapacity)
+
+    var generator = generate()
+
+    // FIXME: Type checker doesn't allow a `rethrows` function to catch and
+    // throw an error. It'd be nice to separate the success and failure cleanup
+    // paths more cleanly than this.
+    // Ensure the buffer is left in a destructible state.
+    var finished = false
+    defer {
+      if !finished { builder.finish() }
+    }
+    // Add elements up to the initial capacity without checking for regrowth.
+    for _ in 0..<initialCapacity {
+      let element = generator.next()!
+      if try includeElement(element) {
+        builder.addWithExistingCapacity(element)
+      }
+    }
+    // Add remaining elements, if any.
+    while let element = generator.next() {
+      if try includeElement(element) {
+        builder.add(element)
+      }
+    }
+    let buffer = builder.finish()
+    finished = true
+    return Array(buffer)
   }
 
   /// Returns a subsequence containing all but the first `n` elements.

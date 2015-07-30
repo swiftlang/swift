@@ -155,6 +155,22 @@ ErrorHandlingTests.test("ErrorHandling/Optional flatMap") {
   expectEqual(loopCount, 2)
 }
 
+ErrorHandlingTests.test("ErrorHandling/Array flatMap") {
+  var loopCount = 0
+  do {
+    let _: [Int] = try [1, 2, 3].flatMap {(x) -> [Int] in
+      ++loopCount
+      if x == 2 {
+        throw SillyError.JazzHands
+      }
+      return Array(count: x, repeatedValue: x)
+    }
+    expectUnreachable()
+  } catch {}
+
+  expectEqual(loopCount, 2)
+}
+
 ErrorHandlingTests.test("ErrorHandling/minElement") {
   do {
     let _: Int? = try [1, 2, 3].minElement { _, _ in
@@ -259,6 +275,68 @@ ErrorHandlingTests.test("ErrorHandling/operators") {
     }
     expectUnreachable()
   } catch {}
+}
+
+ErrorHandlingTests.test("ErrorHandling/Sequence map") {
+  let initialCount = NoisyCount
+  let sequence = AnySequence([1, 2, 3])
+  for throwAtCount in 0...3 {
+    var loopCount = 0
+    do {
+      let result: [Noisy] = try sequence.map { _ in
+        if loopCount == throwAtCount {
+          throw SillyError.JazzHands
+        }
+        ++loopCount
+        return Noisy()
+      }
+      expectEqual(NoisyCount, initialCount + 3)
+      expectEqual(result.count, 3)
+    } catch {}
+    expectEqual(NoisyCount, initialCount)
+  }
+}
+
+ErrorHandlingTests.test("ErrorHandling/Sequence filter") {
+  let initialCount = NoisyCount
+  for condition in [true, false] {
+    for throwAtCount in 0...3 {
+      let sequence = [Noisy(), Noisy(), Noisy()]
+      var loopCount = 0
+      do {
+        let result: [Noisy] = try sequence.filter { _ in
+          if loopCount == throwAtCount {
+            throw SillyError.JazzHands
+          }
+          ++loopCount
+          return condition
+        }
+        expectEqual(NoisyCount, initialCount + sequence.count)
+        expectEqual(result.count, condition ? 3 : 0)
+      } catch {}
+    }
+    expectEqual(NoisyCount, initialCount)
+  }
+}
+
+ErrorHandlingTests.test("ErrorHandling/Collection map") {
+  let initialCount = NoisyCount
+  let collection = [1, 2, 3]
+  for throwAtCount in 0...3 {
+    var loopCount = 0
+    do {
+      let result: [Noisy] = try collection.map { _ in
+        if loopCount == throwAtCount {
+          throw SillyError.JazzHands
+        }
+        ++loopCount
+        return Noisy()
+      }
+      expectEqual(NoisyCount, initialCount + 3)
+      expectEqual(result.count, 3)
+    } catch {}
+    expectEqual(NoisyCount, initialCount)
+  }
 }
 
 runAllTests()

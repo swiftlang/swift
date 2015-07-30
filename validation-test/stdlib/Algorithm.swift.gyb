@@ -1285,10 +1285,10 @@ struct MinimalForwardCollectionWith${Implementation}Filter<Element>
   }
 
   func filter(
-    @noescape transform: (Element) -> Bool
-  ) -> [Element] {
+    @noescape transform: (Element) throws -> Bool
+  ) rethrows -> [Element] {
     ++MinimalForwardCollectionWithCustomFilter.timesFilterWasCalled
-    return _data.filter(transform)
+    return try _data.filter(transform)
   }
 
 %   end
@@ -1434,10 +1434,10 @@ struct MinimalSequenceWith${Implementation}Map<Element> : SequenceType {
   }
 
   func map<T>(
-    @noescape transform: (Element) -> T
-  ) -> [T] {
+    @noescape transform: (Element) throws -> T
+  ) rethrows -> [T] {
     ++MinimalSequenceWithCustomMap.timesMapWasCalled
-    return _data.map(transform)
+    return try _data.map(transform)
   }
 
 %   end
@@ -1562,10 +1562,10 @@ struct MinimalForwardCollectionWith${Implementation}Map<Element>
   }
 
   func map<T>(
-    @noescape transform: (Element) -> T
-  ) -> [T] {
+    @noescape transform: (Element) throws -> T
+  ) rethrows -> [T] {
     ++MinimalForwardCollectionWithCustomMap.timesMapWasCalled
-    return _data.map(transform)
+    return try _data.map(transform)
   }
 
 %   end

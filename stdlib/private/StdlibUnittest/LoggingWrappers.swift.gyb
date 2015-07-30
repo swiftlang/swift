@@ -197,15 +197,15 @@ public struct LoggingRangeReplaceableCollection<
   }
 
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) -> T
-  ) -> [T] {
-    return base.map(transform)
+    @noescape transform: (Base.Generator.Element) throws -> T
+  ) rethrows -> [T] {
+    return try base.map(transform)
   }
 
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) -> Bool
-  ) -> [Base.Generator.Element] {
-    return base.filter(includeElement)
+    @noescape includeElement: (Base.Generator.Element) throws -> Bool
+  ) rethrows -> [Base.Generator.Element] {
+    return try base.filter(includeElement)
   }
 
   public func generate() -> Base.Generator {
@@ -360,17 +360,17 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   }
 
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) -> T
-  ) -> [T] {
+    @noescape transform: (Base.Generator.Element) throws -> T
+  ) rethrows -> [T] {
     ++Log.map[selfType]
-    return base.map(transform)
+    return try base.map(transform)
   }
 
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) -> Bool
-  ) -> [Base.Generator.Element] {
+    @noescape includeElement: (Base.Generator.Element) throws -> Bool
+  ) rethrows -> [Base.Generator.Element] {
     ++Log.filter[selfType]
-    return base.filter(includeElement)
+    return try base.filter(includeElement)
   }
 
   public func dropFirst(n: Int) -> Base.SubSequence {

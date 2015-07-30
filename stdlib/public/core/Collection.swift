@@ -285,17 +285,37 @@ extension CollectionType {
   ///
   /// - Complexity: O(N).
   public func map<T>(
-    @noescape transform: (Generator.Element) -> T
-  ) -> [T] {
-    // Cast away @noescape.
-    typealias Transform = (Generator.Element) -> T
-    let escapableTransform = unsafeBitCast(transform, Transform.self)
+    @noescape transform: (Generator.Element) throws -> T
+  ) rethrows -> [T] {
+    let count: Int = numericCast(self.count)
+    if count == 0 {
+      return []
+    }
 
-    // The implementation looks exactly the same as
-    // `SequenceType.map()`, but it is more efficient, since here we
-    // statically know that `self` is a collection, and `lazy(self)`
-    // returns an instance of a different type.
-    return Array(self._prext_lazy.map(escapableTransform))
+    var builder =
+      _UnsafePartiallyInitializedContiguousArrayBuffer<T>(
+        initialCapacity: count)
+
+    var i = self.startIndex
+
+    // FIXME: Type checker doesn't allow a `rethrows` function to catch and
+    // throw an error. It'd be nice to separate the success and failure cleanup
+    // paths more cleanly than this.
+    // Ensure the buffer is left in a destructible state.
+    var finished = false
+    defer {
+      if !finished { builder.finish() }
+    }
+
+    // On the success path, we know we'll have exactly `count` elements
+    // in the buffer, so we can bypass checks.
+    for _ in 0..<count {
+      builder.addWithExistingCapacity(try transform(self[i++]))
+    }
+    _expectEnd(i, self)
+    let buffer = builder.finishWithOriginalCount()
+    finished = true
+    return Array(buffer)
   }
 
   /// Returns a subsequence containing all but the first `n` elements.

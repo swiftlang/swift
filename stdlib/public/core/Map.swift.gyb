@@ -83,6 +83,9 @@ public struct _prext_LazyMapSequence<Base : SequenceType, Element>
 public struct _prext_LazyMapCollection<Base : CollectionType, Element>
   : _prext_LazyCollectionType {
 
+  // FIXME: Should be inferrable.
+  public typealias Index = Base.Index
+
   public var startIndex: Base.Index { return _base.startIndex }
   public var endIndex: Base.Index { return _base.endIndex }
   
