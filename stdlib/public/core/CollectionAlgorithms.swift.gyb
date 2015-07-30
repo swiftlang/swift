@@ -57,10 +57,10 @@ extension CollectionType {
   ///
   /// - Complexity: O(`self.count`).
   public func indexOf(
-    @noescape predicate: (${GElement}) -> Bool
-  ) -> Index? {
+    @noescape predicate: (${GElement}) throws -> Bool
+  ) rethrows -> Index? {
     for i in self.indices {
-      if predicate(self[i]) {
+      if try predicate(self[i]) {
         return i
       }
     }

@@ -76,16 +76,16 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
   func withUnsafeBufferPointer<R>(
-    @noescape body: (UnsafeBufferPointer<Element>) -> R
-  ) -> R
+    @noescape body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
   ///
   /// - Requires: Such contiguous storage exists or the buffer is empty.
   mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: (UnsafeMutableBufferPointer<Element>) -> R
-  ) -> R
+    @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R
 
   /// The number of elements the buffer stores.
   var count: Int {get set}

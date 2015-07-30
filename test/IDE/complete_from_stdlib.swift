@@ -67,7 +67,7 @@ func protocolExtCollection2<C : CollectionType where C.Index : BidirectionalInde
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceMethod]/Super: map({#({{.*}}): (Self.Generator.Element) -> T##(Self.Generator.Element) -> T#})[#[T]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceVar]/Super:            last[#Self.Generator.Element?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3-DAG-NOT: Decl{{.*}}:         indexOf({#({{.*}}): Self.Generator.Element
-// PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceMethod]/Super:         indexOf({#({{.*}}): (Self.Generator.Element) -> Bool##(Self.Generator.Element) -> Bool#})[#Self.Index?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_3-DAG: Decl[InstanceMethod]/Super:         indexOf({#({{.*}}): (Self.Generator.Element) throws -> Bool##(Self.Generator.Element) throws -> Bool#})[' rethrows'][#Self.Index?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_3: End completions
 
 func protocolExtArray<T : Equatable>(a: [T]) {
@@ -77,5 +77,5 @@ func protocolExtArray<T : Equatable>(a: [T]) {
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super: map({#({{.*}}): (Self.Generator.Element) -> T##(Self.Generator.Element) -> T#})[#[T]#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceVar]/Super:            last[#Self.Generator.Element?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         indexOf({#({{.*}}): Self.Generator.Element#})[#Self.Index?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         indexOf({#({{.*}}): (Self.Generator.Element) -> Bool##(Self.Generator.Element) -> Bool#})[#Self.Index?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_4-DAG: Decl[InstanceMethod]/Super:         indexOf({#({{.*}}): (Self.Generator.Element) throws -> Bool##(Self.Generator.Element) throws -> Bool#})[' rethrows'][#Self.Index?#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_4: End completions

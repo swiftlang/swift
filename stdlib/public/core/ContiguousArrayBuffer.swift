@@ -29,9 +29,9 @@ internal final class _EmptyArrayStorage
 
 #if _runtime(_ObjC)
   override func _withVerbatimBridgedUnsafeBuffer<R>(
-    @noescape body: (UnsafeBufferPointer<AnyObject>) -> R
-  ) -> R? {
-    return body(UnsafeBufferPointer(start: nil, count: 0))
+    @noescape body: (UnsafeBufferPointer<AnyObject>) throws -> R
+  ) rethrows -> R? {
+    return try body(UnsafeBufferPointer(start: nil, count: 0))
   }
 
   override func _getNonVerbatimBridgedCount(dummy: Void) -> Int {
@@ -74,11 +74,11 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
   final override func _withVerbatimBridgedUnsafeBuffer<R>(
-    @noescape body: (UnsafeBufferPointer<AnyObject>) -> R
-  ) -> R? {
+    @noescape body: (UnsafeBufferPointer<AnyObject>) throws -> R
+  ) rethrows -> R? {
     var result: R? = nil
-    self._withVerbatimBridgedUnsafeBufferImpl {
-      result = body($0)
+    try self._withVerbatimBridgedUnsafeBufferImpl {
+      result = try body($0)
     }
     return result
   }
@@ -86,8 +86,8 @@ class _ContiguousArrayStorage1 : _ContiguousArrayStorageBase {
   /// If `Element` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements.
   internal func _withVerbatimBridgedUnsafeBufferImpl(
-    @noescape body: (UnsafeBufferPointer<AnyObject>) -> Void
-  ) {
+    @noescape body: (UnsafeBufferPointer<AnyObject>) throws -> Void
+  ) rethrows {
     _sanityCheckFailure(
       "Must override _withVerbatimBridgedUnsafeBufferImpl in derived classes")
   }
@@ -107,13 +107,13 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorage1 {
   /// If `Element` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements.
   internal final override func _withVerbatimBridgedUnsafeBufferImpl(
-    @noescape body: (UnsafeBufferPointer<AnyObject>) -> Void
-  ) {
+    @noescape body: (UnsafeBufferPointer<AnyObject>) throws -> Void
+  ) rethrows {
     if _isBridgedVerbatimToObjectiveC(Element.self) {
       let count = __manager.value.count
       let elements = UnsafePointer<AnyObject>(__manager._elementPointer)
-      body(UnsafeBufferPointer(start: elements, count: count))
-      _fixLifetime(__manager)
+      defer { _fixLifetime(__manager) }
+      try body(UnsafeBufferPointer(start: elements, count: count))
     }
   }
 
@@ -233,22 +233,20 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.
   public func withUnsafeBufferPointer<R>(
-    @noescape body: UnsafeBufferPointer<Element> -> R
-  ) -> R {
-    let ret = body(UnsafeBufferPointer(start: self.baseAddress, count: count))
-    _fixLifetime(self)
-    return ret
+    @noescape body: UnsafeBufferPointer<Element> throws -> R
+  ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try body(UnsafeBufferPointer(start: self.baseAddress, count: count))
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
   public mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: UnsafeMutableBufferPointer<Element> -> R
-  ) -> R {
-    let ret = body(
+    @noescape body: UnsafeMutableBufferPointer<Element> throws -> R
+  ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try body(
       UnsafeMutableBufferPointer(start: baseAddress, count: count))
-    _fixLifetime(self)
-    return ret
   }
 
   internal func _getBaseAddress() -> UnsafeMutablePointer<Element> {

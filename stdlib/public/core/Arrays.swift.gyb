@@ -638,17 +638,17 @@ extension ${Self} : _ArrayType {
   //===--- algorithms -----------------------------------------------------===//
 
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (inout UnsafeMutableBufferPointer<Element>) -> R
-  ) -> R? {
+    @noescape body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
     // FIXME: Can't write simple code because of:
     // <rdar://problem/20735802> Assertion failure while emitting SIL for
     // _withUnsafeMutableBufferPointerIfSupported
 
     //return withUnsafeMutableBufferPointer { body($0) }
 
-    return withUnsafeMutableBufferPointer {
+    return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      let r = body(&bufferPointer)
+      let r = try body(&bufferPointer)
       return r
     }
   }
@@ -739,9 +739,9 @@ extension ${Self} {
   /// same algorithm on `body`'s argument lets you trade safety for
   /// speed.
   public func withUnsafeBufferPointer<R>(
-    @noescape body: (UnsafeBufferPointer<Element>) -> R
-  ) -> R {
-    return _buffer.withUnsafeBufferPointer(body)
+    @noescape body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
+    return try _buffer.withUnsafeBufferPointer(body)
   }
 
   /// Call `body(p)`, where `p` is a pointer to the `${Self}`'s
@@ -757,8 +757,8 @@ extension ${Self} {
   ///   `body`: it may not appear to have its correct value.  Instead,
   ///   use only the `UnsafeMutableBufferPointer` argument to `body`.
   public mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: (inout UnsafeMutableBufferPointer<Element>) -> R
-  ) -> R {
+    @noescape body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
     // Ensure unique storage
     _arrayReserve(&_buffer, 0)
 
@@ -773,17 +773,18 @@ extension ${Self} {
     var inoutBufferPointer = UnsafeMutableBufferPointer(
       start: pointer, count: count)
 
-    // Invoke the body
-    let ret = body(&inoutBufferPointer)
-
-    _precondition(
-      inoutBufferPointer.baseAddress == pointer &&
-      inoutBufferPointer.count == count,
-      "${Self} withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
-
     // Put the working array back before returning.
-    swap(&work, &self)
-    return ret
+    defer {
+      _precondition(
+        inoutBufferPointer.baseAddress == pointer &&
+        inoutBufferPointer.count == count,
+        "${Self} withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
+
+      swap(&work, &self)
+    }
+
+    // Invoke the body.
+    return try body(&inoutBufferPointer)
   }
 }
 %end
