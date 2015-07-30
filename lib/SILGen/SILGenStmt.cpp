@@ -899,23 +899,3 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
   // Branch to the cleanup destination.
   Cleanups.emitBranchAndCleanups(ThrowDest, loc, exn);
 }
-
-void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {
-  // Nothing to do for these kinds of decls - anything active has been added
-  // to the enclosing declaration.
-}
-
-//===--------------------------------------------------------------------===//
-// SILGenModule visitTopLevelCodeDecl implementation
-//===--------------------------------------------------------------------===//
-
-void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
-  // Emit top-level statements and expressions into the toplevel function until
-  // we hit an unreachable point.
-  assert(TopLevelSGF && "top-level code in a non-main source file!");
-// TODO:
-  if (!TopLevelSGF->B.hasValidInsertionPoint())
-    return;
-  
-  TopLevelSGF->emitStmt(td->getBody());
-}

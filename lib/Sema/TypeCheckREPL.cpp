@@ -135,7 +135,7 @@ Identifier TypeChecker::getNextResponseVariableName(DeclContext *DC) {
 }
 
 
-static VarDecl *getObviousDECLFromExpr(Expr *E) {
+static VarDecl *getObviousDeclFromExpr(Expr *E) {
   // Ignore lvalue->rvalue and other implicit conversions.
   while (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
     E = ICE->getSubExpr();
@@ -304,14 +304,14 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   // REPL metavariable (e.g. r4) to hold the result, so it can be referred to
   // in the future.  However, if this is a direct reference to a decl (e.g. "x")
   // then don't create a repl metavariable.
-  if (VarDecl *d = getObviousDECLFromExpr(E)) {
+  if (VarDecl *d = getObviousDeclFromExpr(E)) {
     generatePrintOfExpression(d->getName().str(), E);
     return;
   }
 
   // Remove the expression from being in the list of decls to execute, we're
   // going to reparent it.
-  SF.Decls.pop_back();
+  auto TLCD = cast<TopLevelCodeDecl>(SF.Decls.back());
 
   E = TC.coerceToMaterializable(E);
 
@@ -325,10 +325,17 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   // Create a PatternBindingDecl to bind the expression into the decl.
   Pattern *metavarPat = new (Context) NamedPattern(vd);
   metavarPat->setType(E->getType());
+
   PatternBindingDecl *metavarBinding
     = PatternBindingDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
-                                 E->getStartLoc(), metavarPat, E, &SF);
-  SF.Decls.push_back(metavarBinding);
+                                 E->getStartLoc(), metavarPat, E, TLCD);
+
+  // Overwrite the body of the existing TopLevelCodeDecl.
+  TLCD->setBody(BraceStmt::create(Context,
+                                  metavarBinding->getStartLoc(),
+                                  ASTNode(metavarBinding),
+                                  metavarBinding->getEndLoc(),
+                                  /*implicit*/true));
 
   // Finally, print the variable's value.
   E = TC.buildCheckedRefExpr(vd, &SF, E->getStartLoc(), /*Implicit=*/true);

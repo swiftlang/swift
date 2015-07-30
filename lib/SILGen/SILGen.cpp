@@ -12,7 +12,7 @@
 
 #define DEBUG_TYPE "silgen"
 #include "SILGenFunction.h"
-#include "llvm/ADT/Optional.h"
+#include "Scope.h"
 #include "swift/Strings.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -871,18 +871,7 @@ void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
 }
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
-  // If we're in a script mode context, emit the pattern binding as top-level
-  // code.
-  if (auto sf = dyn_cast<SourceFile>(pd->getDeclContext())) {
-    if (sf->isScriptMode()) {
-      assert(TopLevelSGF && "no top-level code for script mode?!");
-      if (TopLevelSGF->B.hasValidInsertionPoint())
-        TopLevelSGF->visit(pd);
-      return;
-    }
-  }
-
-  // Otherwise, emit the initializer for library global variables.
+  assert(!TopLevelSGF && "script mode PBDs should be in TopLevelCodeDecls");
   for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
     if (pd->getInit(i))
       emitGlobalInitialization(pd, i);
@@ -891,6 +880,42 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->hasStorage())
     addGlobalVariable(vd);
+}
+
+void SILGenModule::visitIfConfigDecl(IfConfigDecl *ICD) {
+  // Nothing to do for these kinds of decls - anything active has been added
+  // to the enclosing declaration.
+}
+
+void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
+  assert(TopLevelSGF && "top-level code in a non-main source file!");
+
+  if (!TopLevelSGF->B.hasValidInsertionPoint())
+    return;
+
+  for (auto &ESD : td->getBody()->getElements()) {
+    if (!TopLevelSGF->B.hasValidInsertionPoint()) {
+      if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
+        if (S->isImplicit())
+          continue;
+      } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
+        if (E->isImplicit())
+          continue;
+      }
+
+      diagnose(ESD.getStartLoc(), diag::unreachable_code);
+      // There's no point in trying to emit anything else.
+      return;
+    }
+
+    if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
+      TopLevelSGF->emitStmt(S);
+    } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
+      TopLevelSGF->emitIgnoredExpr(E);
+    } else {
+      TopLevelSGF->visit(ESD.get<Decl*>());
+    }
+  }
 }
 
 static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
@@ -955,6 +980,7 @@ namespace {
 class SourceFileScope {
   SILGenModule &sgm;
   SourceFile *sf;
+  Optional<Scope> scope;
 public:
   SourceFileScope(SILGenModule &sgm, SourceFile *sf) : sgm(sgm), sf(sf) {
     // If this is the script-mode file for the module, create a toplevel.
@@ -980,11 +1006,16 @@ public:
       auto PrologueLoc = RegularLocation::getModuleLocation();
       PrologueLoc.markAsPrologue();
       emitTopLevelProlog(*sgm.TopLevelSGF, PrologueLoc);
+
+      scope.emplace(sgm.TopLevelSGF->Cleanups,
+                    CleanupLocation::getModuleCleanupLocation());
     }
   }
 
   ~SourceFileScope() {
     if (sgm.TopLevelSGF) {
+      scope.reset();
+
       // Unregister the top-level function emitter.
       auto &gen = *sgm.TopLevelSGF;
       sgm.TopLevelSGF = nullptr;

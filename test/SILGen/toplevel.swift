@@ -2,6 +2,11 @@
 
 func markUsed<T>(t: T) {}
 
+@noreturn func trap() {
+  fatalError()
+}
+
+
 // CHECK-LABEL: sil @main
 // CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>):
 
@@ -62,11 +67,23 @@ func print_y() {
 y = 1
 print_y()
 
+// -- treat 'guard' vars as locals
+// CHECK-LABEL: function_ref toplevel.A.__allocating_init
+// CHECK: switch_enum {{%.+}} : $Optional<A>, case #Optional.Some!enumelt.1: [[SOME_CASE:.+]], default
+// CHECK: [[SOME_CASE]]([[VALUE:%.+]] : $A):
+// CHECK: store [[VALUE]] to [[BOX:%.+]]#1 : $*A
+// CHECK-NOT: release
+// CHECK: [[SINK:%.+]] = function_ref @_TF8toplevel8markUsedurFq_T_
+// CHECK-NOT: release
+// CHECK: apply [[SINK]]<A>({{%.+}})
+class A {}
+guard var a = Optional(A()) else { trap() }
+markUsed(a)
+
 
 // CHECK: [[VARADDR:%[0-9]+]] = global_addr @_Tv8toplevel21NotInitializedIntegerSi
 // CHECK-NEXT: [[VARMUI:%[0-9]+]] = mark_uninitialized [var] [[VARADDR]] : $*Int
 // CHECK-NEXT: mark_function_escape [[VARMUI]] : $*Int
-
 
 
 // <rdar://problem/21753262> Bug in DI when it comes to initialization of global "let" variables
@@ -101,5 +118,3 @@ func testGlobalCSE() -> Int {
   // We should only emit one global_addr in this function.
   return x + x
 }
-
-
