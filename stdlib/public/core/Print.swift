@@ -10,25 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A hook for playgrounds to print through.
-public var _playgroundPrintHook : ((String)->Void)? = {_ in () }
-
-internal struct _TeeStream<
-  L : OutputStreamType, 
-  R : OutputStreamType
-> : OutputStreamType {
-  var left: L
-  var right: R
-  
-  /// Append the given `string` to this stream.
-  mutating func write(string: String)
-  { left.write(string); right.write(string) }
-
-  mutating func _lock() { left._lock(); right._lock() }
-  mutating func _unlock() { left._unlock(); right._unlock() }
-}
-
-
 /// Writes the textual representations of `items`, separated by
 /// `separator` and terminated by `terminator`, into the standard
 /// output.
