@@ -15,6 +15,10 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1 | FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE1 | FileCheck %s -check-prefix=INIT_FROM_METATYPE1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2 | FileCheck %s -check-prefix=INIT_FROM_METATYPE2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE3 | FileCheck %s -check-prefix=INIT_FROM_METATYPE3
+
 func freeFunc() {}
 
 //===---
@@ -160,3 +164,25 @@ func testExplicitConstructorsBaseDerived1() {
 // EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1-DAG: Decl[Constructor]/CurrNominal:  ()[#ExplicitConstructorsDerived1#]{{; name=.+$}}
 // EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1-DAG: Decl[Constructor]/CurrNominal:  ({#a: Int#})[#ExplicitConstructorsDerived1#]{{; name=.+$}}
 // EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1: End completions
+
+func testGetInitFromMetatype1() {
+  ExplicitConstructorsBase1.#^INIT_FROM_METATYPE1^#
+}
+
+// INIT_FROM_METATYPE1: Begin completions
+// INIT_FROM_METATYPE1-NEXT: Decl[Constructor]/CurrNominal:      init()[#ExplicitConstructorsBase1#]{{; name=.+$}}
+// INIT_FROM_METATYPE1-NEXT: Decl[Constructor]/CurrNominal:      init({#a: Int#})[#ExplicitConstructorsBase1#]{{; name=.+$}}
+// INIT_FROM_METATYPE1-NEXT: End completions
+
+func testGetInitFromMetatype2() {
+  String.#^INIT_FROM_METATYPE2^#
+}
+
+// INIT_FROM_METATYPE2: Decl[Constructor]/CurrNominal:      init({#(c): Character#})[#String#]{{; name=.+$}}
+
+func testGetInitFromMetatype3() {
+  var SS = String.self
+  SS.#^INIT_FROM_METATYPE3^#
+}
+
+// INIT_FROM_METATYPE3: Decl[Constructor]/CurrNominal:      init({#(c): Character#})[#String#]{{; name=.+$}}

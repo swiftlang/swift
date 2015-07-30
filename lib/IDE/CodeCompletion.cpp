@@ -1523,6 +1523,12 @@ public:
         Builder.addTextChunk("init");
       } else if (!addName.empty()) {
         Builder.addTextChunk(addName.str());
+      } else if (HaveDot &&
+                 Reason == DeclVisibilityKind::MemberOfCurrentNominal) {
+
+        // This case is querying the init function as member
+        assert(addName.empty());
+        Builder.addTextChunk("init");
       }
 
       if (MemberType->is<ErrorType>()) {
@@ -1726,6 +1732,18 @@ public:
     switch (Kind) {
     case LookupKind::ValueExpr:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
+        if (auto MT = ExprType->getRValueType()->getAs<AnyMetatypeType>()) {
+          if (HaveDot) {
+
+            // Add init() as member of the metatype.
+            if (Reason == DeclVisibilityKind::MemberOfCurrentNominal &&
+                !MT->getInstanceType()->is<EnumType>()) {
+              addConstructorCall(CD, Reason, None);
+            }
+            return;
+          }
+        }
+
         if (auto MT = ExprType->getAs<AnyMetatypeType>()) {
           if (HaveDot)
             return;
