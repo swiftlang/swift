@@ -535,3 +535,11 @@ extension Printing {
     print(self, options: self) // no-warning
   }
 }
+
+// <rdar://problem/21979968> The "with array" initializers for NSCountedSet and NSMutable set should be properly disambiguated.
+func testSetInitializers() {
+  let a: [AnyObject] = [NSObject()]
+
+  let _ = NSCountedSet(array: a)
+  let _ = NSMutableSet(array: a)
+}

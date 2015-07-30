@@ -162,6 +162,11 @@ __attribute__((availability(ios,introduced=8.0)))
 - (void)removeObject:(KeyType)obj;
 @end
 
+@interface NSCountedSet<KeyType> : NSMutableSet<KeyType> 
+- (instancetype)initWithCapacity:(NSUInteger)numItems NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithArray:(NSArray<KeyType> *)array;
+@end
+
 @interface NSValue : NSObject <NSCopying>
 @end
 

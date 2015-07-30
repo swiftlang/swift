@@ -758,6 +758,21 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                 ++score1;
               else
                 ++score2;
+            } else if (ctor1->getInitKind() ==
+                       CtorInitializerKind::Convenience) {
+              
+              // If both are convenience initializers, and the instance type of
+              // one is a subtype of the other's, favor the subtype constructor.
+              auto resType1 = ctor1->getResultType();
+              auto resType2 = ctor2->getResultType();
+              
+              if (!resType1->isEqual(resType2)) {
+                if (tc.isSubtypeOf(resType1, resType2, cs.DC)) {
+                  ++score1;
+                } else if (tc.isSubtypeOf(resType2, resType1, cs.DC)) {
+                  ++score2;
+                }
+              }
             }
           }
         }
