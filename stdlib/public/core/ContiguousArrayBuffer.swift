@@ -542,23 +542,25 @@ internal func _copySequenceToNativeArrayBuffer<
   S : SequenceType
 >(source: S) -> _ContiguousArrayBuffer<S.Generator.Element> {
   let initialCapacity = source.underestimateCount()
-  var result = _ContiguousArrayBuffer<S.Generator.Element>(
-    count: initialCapacity,
-    minimumCapacity: initialCapacity)
+  var builder =
+    _UnsafePartiallyInitializedContiguousArrayBuffer<S.Generator.Element>(
+      initialCapacity: initialCapacity)
 
   var generator = source.generate()
 
-  var p = result.baseAddress
+  // FIXME(performance): use _initializeTo().
+
+  // Add elements up to the initial capacity without checking.
   for _ in 0..<initialCapacity {
-    // FIXME(performance): use _initializeTo().
-    (p++).initialize(generator.next()!)
+    builder.addWithExistingCapacity(generator.next()!)
   }
 
+  // Add remaining elements, if any.
   while let element = generator.next() {
-    result += CollectionOfOne(element)
+    builder.add(element)
   }
 
-  return result
+  return builder.finish()
 }
 
 extension CollectionType {
@@ -577,17 +579,92 @@ internal func _copyCollectionToNativeArrayBuffer<
     return _ContiguousArrayBuffer()
   }
 
-  let result = _ContiguousArrayBuffer<C.Generator.Element>(
-    count: numericCast(count),
-    minimumCapacity: 0
-  )
+  var builder =
+    _UnsafePartiallyInitializedContiguousArrayBuffer<C.Generator.Element>(
+      initialCapacity: numericCast(source.count))
 
-  var p = result.baseAddress
   var i = source.startIndex
+  // FIXME(performance): use _initializeTo().
   for _ in 0..<count {
-    // FIXME(performance): use _initializeTo().
-    (p++).initialize(source[i++])
+    builder.addWithExistingCapacity(source[i++])
   }
   _expectEnd(i, source)
-  return result
+  return builder.finishWithOriginalCount()
+}
+
+/// A "builder" interface for initializing array buffers.
+///
+/// This presents a "builder" interface for initializing an array buffer
+/// element-by-element. The type is unsafe because it cannot be deinitialized
+/// until the buffer has been finalized by a call to `finish`.
+internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
+  /*private*/ var result: _ContiguousArrayBuffer<Element>
+  /*private*/ var p: UnsafeMutablePointer<Element>
+  /*private*/ var remainingCapacity: Int
+
+  /// Initialize the buffer with an initial size of `initialCapacity`
+  /// elements.
+  init(initialCapacity: Int) {
+    if initialCapacity == 0 {
+      result = _ContiguousArrayBuffer()
+    } else {
+      result = _ContiguousArrayBuffer(count: initialCapacity,
+                                      minimumCapacity: 0)
+    }
+
+    p = result.baseAddress
+    remainingCapacity = result.capacity
+  }
+
+  /// Add an element to the buffer, reallocating if necessary.
+  mutating func add(element: Element) {
+    if remainingCapacity == 0 {
+      // Reallocate.
+      let newCapacity = max(_growArrayCapacity(result.capacity), 1)
+      var newResult = _ContiguousArrayBuffer<Element>(count: newCapacity,
+                                                      minimumCapacity: 0)
+      p = newResult.baseAddress + result.capacity
+      remainingCapacity = newResult.capacity - result.capacity
+      newResult.baseAddress.moveInitializeFrom(result.baseAddress,
+                                               count: result.capacity)
+      result.count = 0
+      swap(&result, &newResult)
+    }
+    addWithExistingCapacity(element)
+  }
+
+  /// Add an element to the buffer, which must have remaining capacity.
+  mutating func addWithExistingCapacity(element: Element) {
+    _sanityCheck(remainingCapacity > 0,
+      "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity")
+    remainingCapacity--
+
+    (p++).initialize(element)
+  }
+
+  /// Finish initializing the buffer, adjusting its count to the final
+  /// number of elements.
+  ///
+  /// Returns the fully-initialized buffer. `self` is reset to contain an
+  /// empty buffer and cannot be used afterward.
+  mutating func finish() -> _ContiguousArrayBuffer<Element> {
+    // Adjust the initialized count of the buffer.
+    result.count = result.capacity - remainingCapacity
+
+    return finishWithOriginalCount()
+  }
+
+  /// Finish initializing the buffer, assuming that the number of elements
+  /// exactly matches the `initialCount` for which the initialization was
+  /// started.
+  ///
+  /// Returns the fully-initialized buffer. `self` is reset to contain an
+  /// empty buffer and cannot be used afterward.
+  mutating func finishWithOriginalCount() -> _ContiguousArrayBuffer<Element> {
+    _sanityCheck(remainingCapacity == result.capacity - result.count,
+      "_UnsafePartiallyInitializedContiguousArrayBuffer has incorrect count")
+    var finalResult = _ContiguousArrayBuffer<Element>()
+    swap(&finalResult, &result)
+    return finalResult
+  }
 }
