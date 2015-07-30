@@ -21,18 +21,18 @@ public prefix func !<T : BooleanType>(a: T) -> Bool {
 /// return its `boolValue`.
 @inline(__always)
 public func && <T : BooleanType, U : BooleanType>(
-  lhs: T, @autoclosure rhs: () -> U
-) -> Bool {
-  return lhs.boolValue ? rhs().boolValue : false
+  lhs: T, @autoclosure rhs: () throws -> U
+) rethrows -> Bool {
+  return lhs.boolValue ? try rhs().boolValue : false
 }
 
 /// If `lhs` is `true`, return it.  Otherwise, evaluate `rhs` and
 /// return its `boolValue`.
 @inline(__always)
 public func || <T : BooleanType, U : BooleanType>(
-  lhs: T, @autoclosure rhs: () -> U
-) -> Bool {
-  return lhs.boolValue ? true : rhs().boolValue
+  lhs: T, @autoclosure rhs: () throws -> U
+) rethrows -> Bool {
+  return lhs.boolValue ? true : try rhs().boolValue
 }
 
 // FIXME: We can't make the above @transparent due to
@@ -40,14 +40,14 @@ public func || <T : BooleanType, U : BooleanType>(
 // for Bool.  We've done the same for ObjCBool
 @transparent
 public func && <T : BooleanType>(
-  lhs: T, @autoclosure rhs: () -> Bool
-) -> Bool {
-  return lhs.boolValue ? rhs().boolValue : false
+  lhs: T, @autoclosure rhs: () throws -> Bool
+) rethrows -> Bool {
+  return lhs.boolValue ? try rhs().boolValue : false
 }
 
 @transparent
 public func || <T : BooleanType>(
-  lhs: T, @autoclosure rhs: () -> Bool
-) -> Bool {
-  return lhs.boolValue ? true : rhs().boolValue
+  lhs: T, @autoclosure rhs: () throws -> Bool
+) rethrows -> Bool {
+  return lhs.boolValue ? true : try rhs().boolValue
 }

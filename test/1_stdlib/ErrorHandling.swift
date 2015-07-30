@@ -103,4 +103,34 @@ ErrorHandlingTests.test("ErrorHandling/indexOf") {
   } catch {}
 }
 
+func explosiveBoolean() throws -> Bool {
+  throw SillyError.JazzHands
+}
+func explosiveInt() throws -> Int {
+  throw SillyError.JazzHands
+}
+
+ErrorHandlingTests.test("ErrorHandling/operators") {
+  do {
+    if try true && explosiveBoolean() {
+      expectUnreachable()
+    }
+    expectUnreachable()
+  } catch {}
+
+  do {
+    if try false || explosiveBoolean() {
+      expectUnreachable()
+    }
+    expectUnreachable()
+  } catch {}
+
+  do {
+    if try nil ?? explosiveInt() == 0 {
+      expectUnreachable()
+    }
+    expectUnreachable()
+  } catch {}
+}
+
 runAllTests()

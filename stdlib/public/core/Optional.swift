@@ -275,21 +275,23 @@ public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 }
 
 @transparent
-public func ?? <T> (optional: T?, @autoclosure defaultValue: () -> T) -> T {
+public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
+    rethrows -> T {
   switch optional {
   case .Some(let value):
     return value
   case .None:
-    return defaultValue()
+    return try defaultValue()
   }
 }
 
 @transparent
-public func ?? <T> (optional: T?, @autoclosure defaultValue: () -> T?) -> T? {
+public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T?)
+    rethrows -> T? {
   switch optional {
   case .Some(let value):
     return value
   case .None:
-    return defaultValue()
+    return try defaultValue()
   }
 }
