@@ -4553,7 +4553,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     // Process all of the constraints in the conjunction.
     for (auto con : constraint.getNestedConstraints()) {
       addConstraint(con);
-      if (failedConstraint)
+      if (failedConstraint && !shouldRecordFailures())
         return SolutionKind::Error;
     }
     return SolutionKind::Solved;

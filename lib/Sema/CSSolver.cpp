@@ -357,19 +357,19 @@ bool ConstraintSystem::simplify() {
     // after simplification to avoid re-insertion.
     constraint->setActive(false);
 
-    // Check whether a constraint failed. If so, we're done.
-    if (failedConstraint) {
+    // Check whether a constraint failed. If so, we'll fail to match, so bail
+    // out early.  We don't do this if we're recording failures though, because
+    // we want to solve as many constraints as possible in that case.
+    if (failedConstraint && !shouldRecordFailures())
       return true;
-    }
 
     // If the current score is worse than the best score we've seen so far,
     // there's no point in continuing. So don't.
-    if (worseThanBestSolution()) {
+    if (worseThanBestSolution())
       return true;
-    }
   }
 
-  return false;
+  return failedConstraint != nullptr;
 }
 
 namespace {
@@ -1174,12 +1174,15 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
 bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
                                 FreeTypeVariableBinding allowFreeTypeVariables){
-  // If we already failed, or simplification fails, we're done.
-  if (failedConstraint || simplify()) {
+  // If we already failed and we're not producing diagnostics, bail out early.
+  if (failedConstraint && !shouldRecordFailures())
     return true;
-  } else {
-    assert(ActiveConstraints.empty() && "Active constraints remain?");
-  }
+
+  // If simplification fails, we're done.
+  if (simplify())
+    return true;
+
+  assert(ActiveConstraints.empty() && "Active constraints remain?");
 
   // If there are no constraints remaining, we're done. Save this solution.
   if (InactiveConstraints.empty()) {
