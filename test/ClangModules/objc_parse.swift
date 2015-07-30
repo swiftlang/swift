@@ -66,7 +66,7 @@ func classMethods(b: B, other: NSObject) {
   i += B.classMethod(1)
   i += B.classMethod(1, withInt:2)
 
-  i += b.classMethod() // expected-error{{member 'classMethod' cannot be used on value of type 'B'}}
+  i += b.classMethod() // expected-error{{static member 'classMethod' cannot be used on instance of type 'B'}}
 
   // Both class and instance methods exist.
   B.description()

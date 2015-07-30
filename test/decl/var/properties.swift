@@ -601,7 +601,7 @@ func staticPropRefs() -> (Int, Int, String, UnicodeScalar, UInt8) {
 }
 
 func staticPropRefThroughInstance(foo: MonoStruct) -> Int {
-  return foo.foo //expected-error{{member 'foo' cannot be used on value of type 'MonoStruct'}}
+  return foo.foo //expected-error{{static member 'foo' cannot be used on instance of type 'MonoStruct'}}
 }
 
 func memberwiseInitOnlyTakesInstanceVars() -> MonoStruct {

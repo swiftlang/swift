@@ -67,7 +67,7 @@ struct GZ<T> {
     var t = f1(i, b: f)
     f = t.1
 
-    var zi = Z.i; // expected-error{{member 'i' cannot be used on type 'Z'}}
+    var zi = Z.i; // expected-error{{instance member 'i' cannot be used on type 'Z'}}
     var zj = Z.asdfasdf  // expected-error {{type 'Z' has no member 'asdfasdf'}}
   }
 }
@@ -122,7 +122,7 @@ var wcurriedFull : () = w.curried(0)(y: 1)
 
 // Member of enum Type
 func enumMetatypeMember(opt: Int?) {
-  opt.None // expected-error{{member 'None' cannot be used on value of type 'Int?'}}
+  opt.None // expected-error{{static member 'None' cannot be used on instance of type 'Int?'}}
 }
 
 ////
@@ -200,7 +200,7 @@ func generic<T: P>(var t: T) {
   let _: Int -> () = id(T.bar(t))
 
   _ = t.mut // expected-error{{partial application of 'mutating' method is not allowed}}
-  _ = t.tum // expected-error{{member 'tum' cannot be used on value of type 'T'}}
+  _ = t.tum // expected-error{{static member 'tum' cannot be used on instance of type 'T'}}
 
   // Instance member of extension returning Self)
   let _: T -> () -> T = id(T.returnSelfInstance)
@@ -288,12 +288,12 @@ func staticExistential(p: P.Type, pp: P.Protocol) {
   let _: () -> () = p.tum
 
   // Instance member of existential metatype -- not allowed
-  _ = p.bar // expected-error{{member 'bar' cannot be used on value of type 'P.Type'}}
-  _ = p.mut // expected-error{{member 'mut' cannot be used on value of type 'P.Type'}}
+  _ = p.bar // expected-error{{instance member 'bar' cannot be used on type 'P'}}
+  _ = p.mut // expected-error{{instance member 'mut' cannot be used on type 'P'}}
 
   // Static member of metatype -- not allowed
-  _ = pp.tum // expected-error{{member 'tum' cannot be used on type 'P'}}
-  _ = P.tum // expected-error{{member 'tum' cannot be used on type 'P'}}
+  _ = pp.tum // expected-error{{static member 'tum' cannot be used on instance of type 'P.Protocol'}}
+  _ = P.tum // expected-error{{static member 'tum' cannot be used on instance of type 'P.Protocol'}}
 
   // Static member of extension returning Self)
   let _: () -> P = id(p.returnSelfStatic)

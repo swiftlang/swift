@@ -2257,7 +2257,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
     return true;
   case MemberLookupResult::ErrorDoesNotHaveInitOnInstance:
     // FIXME: Turn this into a normal lookup fail.
-    llvm_unreachable("should be reported as a failure");
+    return false;
       
   case MemberLookupResult::HasResults:
     break;
@@ -2283,26 +2283,52 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
   }
   
   // Otherwise, we have at least one (and potentially many) viable candidates
-  // sort them out.
-  bool mutating = true;
+  // sort them out.  If all of the candidates have the same problem (commonly
+  // because there is exactly one candidate!) diagnose this.
+  bool sameProblem = true;
+  auto firstProblem = result.UnviableCandidates[0].second;
   for (auto cand : result.UnviableCandidates)
-    mutating &= (cand.second == MemberLookupResult::UR_MutatingMemberOnRValue ||
-                 cand.second == MemberLookupResult::UR_MutatingGetterOnRValue);
+    sameProblem &= cand.second == firstProblem;
   
-  // If we have an apparently usable 'mutating' member, but the base is an
-  // rvalue, diagnose this as an invalid mutation error.
-  if (mutating) {
-    diagnoseSubElementFailure(anchor, anchor->getLoc(), *CS,
-                              diag::cannot_pass_rvalue_mutating_subelement,
-                              diag::cannot_pass_rvalue_mutating);
-    return true;
+  auto instanceTy = baseObjTy;
+  if (auto *MTT = instanceTy->getAs<AnyMetatypeType>())
+    instanceTy = MTT->getInstanceType();
+  
+  if (sameProblem) {
+    switch (firstProblem) {
+    case MemberLookupResult::UR_LabelMismatch:
+    case MemberLookupResult::UR_UnavailableInExistential:
+      break;
+    case MemberLookupResult::UR_InstanceMemberOnType:
+      diagnose(anchor->getLoc(), diag::could_not_use_instance_member_on_type,
+               instanceTy, memberName)
+        .highlight(anchor->getSourceRange()).highlight(range);
+      return true;
+    case MemberLookupResult::UR_TypeMemberOnInstance:
+      diagnose(anchor->getLoc(), diag::could_not_use_type_member_on_instance,
+               baseObjTy, memberName)
+        .highlight(anchor->getSourceRange()).highlight(range);
+      return true;
+        
+    case MemberLookupResult::UR_MutatingMemberOnRValue:
+    case MemberLookupResult::UR_MutatingGetterOnRValue:
+      auto diagIDsubelt = diag::cannot_pass_rvalue_mutating_subelement;
+      auto diagIDmember = diag::cannot_pass_rvalue_mutating;
+      if (firstProblem == MemberLookupResult::UR_MutatingGetterOnRValue) {
+        diagIDsubelt = diag::cannot_pass_rvalue_mutating_getter_subelement;
+        diagIDmember = diag::cannot_pass_rvalue_mutating_getter;
+      }
+      diagnoseSubElementFailure(anchor, anchor->getLoc(), *CS,
+                                diagIDsubelt, diagIDmember);
+      return true;
+    }
   }
 
   // Otherwise, we don't have a specific issue to diagnose.  Just say the vague
   // 'cannot use' diagnostic.
-  if (auto MTT = baseTy->getRValueType()->getAs<MetatypeType>())
+  if (!baseObjTy->isEqual(instanceTy))
     diagnose(anchor->getLoc(), diag::could_not_use_type_member,
-             MTT->getInstanceType(), memberName)
+             instanceTy, memberName)
     .highlight(anchor->getSourceRange()).highlight(range);
   else
     diagnose(anchor->getLoc(), diag::could_not_use_value_member,
@@ -2744,8 +2770,12 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
       // allowing ambiguous solutions for subexprs, and thus the code below is
       // forced to diagnose "discard_expr_outside_of_assignment".  This should
       // really allow ambiguous expressions and diagnose it only in MiscDiags.
-      isa<DiscardAssignmentExpr>(subExpr))
-    return subExpr;
+      isa<DiscardAssignmentExpr>(subExpr)) {
+    
+    // If we have a contextual conversion type, then we *can* type check these.
+    if (!convertType)
+      return subExpr;
+  }
   
   // TupleExpr often contains things that cannot be typechecked without
   // context (usually from a parameter list), but we do it if they already have
