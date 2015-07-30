@@ -24,10 +24,11 @@
 public func _prext_print(
   items: Any...,
   separator: String = " ",
-  end terminator: String = "\n"
+  terminator: String = "\n"
 ) {
   var output = _Stdout()
-  _print(items, toStream: &output, separator: separator, end: terminator)
+  _print(
+    items, toStream: &output, separator: separator, terminator: terminator)
 }
 
 /// Writes the textual representations of `items` most suitable for
@@ -44,9 +45,10 @@ public func _prext_print(
 public func _prext_debugPrint(
   items: Any...,
   separator: String = " ",
-  end terminator: String = "\n") {
+  terminator: String = "\n") {
   var output = _Stdout()
-  _debugPrint(items, toStream: &output, separator: separator, end: terminator)
+  _debugPrint(
+    items, toStream: &output, separator: separator, terminator: terminator)
 }
 
 
@@ -63,9 +65,9 @@ public func _prext_print<Target: OutputStreamType>(
   items: Any...,
   inout toStream output: Target,
   separator: String = " ",
-  end terminator: String = "\n"
+  terminator: String = "\n"
 ) {
-  _print(items, toStream: &output, separator: separator, end: terminator)
+  _print(items, toStream: &output, separator: separator, terminator: terminator)
 }
 
 /// Writes the textual representations of `items` most suitable for
@@ -82,9 +84,10 @@ public func _prext_debugPrint<Target: OutputStreamType>(
   items: Any...,
   inout toStream output: Target,
   separator: String = " ",
-  end terminator: String = "\n"
+  terminator: String = "\n"
 ) {
-  _debugPrint(items, toStream: &output, separator: separator, end: terminator)
+  _debugPrint(
+    items, toStream: &output, separator: separator, terminator: terminator)
 }
 
 @inline(never)
@@ -93,7 +96,7 @@ internal func _print<Target: OutputStreamType>(
   items: [Any],
   inout toStream output: Target,
   separator: String = " ",
-  end terminator: String = "\n"
+  terminator: String = "\n"
 ) {
   var prefix = ""
   output._lock()
@@ -112,7 +115,7 @@ internal func _debugPrint<Target: OutputStreamType>(
   items: [Any],
   inout toStream output: Target,
   separator: String = " ",
-  end terminator: String = "\n"
+  terminator: String = "\n"
 ) {
   var prefix = ""
   output._lock()
