@@ -5660,24 +5660,22 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   case clang::APValue::Float:
   case clang::APValue::Int: {
     // Print the value.
-    llvm::SmallString<16> printedValue;
+    llvm::SmallString<16> printedValueBuf;
     if (value.getKind() == clang::APValue::Int) {
-      value.getInt().toString(printedValue);
+      value.getInt().toString(printedValueBuf);
     } else {
       assert(value.getFloat().isFinite() && "can't handle infinities or NaNs");
-      value.getFloat().toString(printedValue);
+      value.getFloat().toString(printedValueBuf);
     }
+    StringRef printedValue = printedValueBuf.str();
 
     // If this was a negative number, record that and strip off the '-'.
-    // FIXME: This is hideous!
-    // FIXME: Actually make the negation work.
-    bool isNegative = printedValue[0] == '-';
+    bool isNegative = printedValue.front() == '-';
     if (isNegative)
-      printedValue.erase(printedValue.begin());
+      printedValue = printedValue.drop_front();
 
     // Create the expression node.
-    StringRef printedValueCopy(context.AllocateCopy(printedValue).data(),
-                               printedValue.size());
+    StringRef printedValueCopy(context.AllocateCopy(printedValue));
     if (value.getKind() == clang::APValue::Int) {
       expr = new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
                                               /*Implicit=*/true);
@@ -5686,14 +5684,9 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                             /*Implicit=*/true);
     }
 
-    if (!isNegative)
-      break;
+    if (isNegative)
+      cast<NumberLiteralExpr>(expr)->setNegative(SourceLoc());
 
-    // If it was a negative number, negate the integer literal.
-    auto minusRef = getOperatorRef(context, context.getIdentifier("-"));
-    if (!minusRef)
-      return nullptr;
-    expr = new (context) PrefixUnaryExpr(minusRef, expr);
     break;
   }
   }

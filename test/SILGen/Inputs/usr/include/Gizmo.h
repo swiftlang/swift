@@ -109,4 +109,5 @@ typedef  NS_ENUM(NSInteger, NSRuncingOptions) {
 typedef NS_OPTIONS(NSInteger, NSFungingMask) {
   NSFungingAsset = 1,
   NSFungingLiability = 2,
+  NSFungingToTheMax = (NSInteger)1U << 31
 };
