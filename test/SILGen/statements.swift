@@ -518,6 +518,15 @@ func defer_in_generic<T>(x: T) {
   generic_callee_3(x)
 }
 
+// CHECK-LABEL: sil hidden @_TF10statements13defer_mutableFSiT_
+func defer_mutable(var x: Int) {
+  // CHECK: [[BOX:%.*]] = alloc_box $Int
+  // CHECK-NOT: [[BOX]]#0
+  // CHECK: function_ref @_TFF10statements13defer_mutableFSiT_L_6$deferfT_T_ : $@convention(thin) (@inout Int) -> ()
+  // CHECK-NOT: [[BOX]]#0
+  // CHECK: strong_release [[BOX]]#0
+  defer { _ = x }
+}
 
 protocol StaticFooProtocol { static func foo() }
 
