@@ -212,6 +212,11 @@ func test_mutability() {
   // Mutable methods on let and rvalue are not ok.
   x.f()                         // expected-error {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
   TestMutableStruct().f()       // expected-error {{cannot use mutating member on immutable value: function call returns immutable value}}
+  
+  _ = TestMutableStruct().weird_property  // expected-error {{cannot use mutating member on immutable value: function call returns immutable value}}
+
+  let tms = TestMutableStruct() // expected-note {{change 'let' to 'var' to make it mutable}}
+  _ = tms.weird_property        // expected-error {{cannot use mutating member on immutable value: 'tms' is a 'let' constant}}
 }
 
 
