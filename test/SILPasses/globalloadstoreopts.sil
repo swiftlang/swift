@@ -1006,3 +1006,37 @@ bb0(%0 : $*AA, %1 : $AA, %2 : $A):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// Make sure that we properly eliminate the stores in bb1, bb2 from StoreMap.
+//
+// CHECK-LABEL: sil @store_map_failed_dead_object_elim_invalidation : $@convention(thin) () -> () {
+// CHECK: bb1:
+// CHECK: store
+// CHECK: bb2:
+// CHECK: store
+// CHECK: bb3:
+// CHECK: store
+sil @store_map_failed_dead_object_elim_invalidation : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 32
+  %1 = integer_literal $Builtin.Int32, 64
+  %2 = function_ref @escaped_a : $@convention(thin) () -> Builtin.RawPointer
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to $*Builtin.Int32  
+  %5 = apply %2() : $@convention(thin) () -> Builtin.RawPointer  
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to $*Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %0 to %4 : $*Builtin.Int32
+  br bb3
+
+bb2:
+  store %1 to %4 : $*Builtin.Int32
+  br bb3
+
+bb3:
+  store %0 to %6 : $*Builtin.Int32
+  %9999 = tuple()
+  return %9999 : $()
+}

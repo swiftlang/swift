@@ -1057,6 +1057,12 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
     NumDeadStores++;
   }
 
+  for (auto &P : StoreMap) {
+    if (!P.second.aliasingWrite(AA, SI))
+      continue;
+    StoresToStopTracking.push_back(P.first);
+  }
+
   for (SILValue SIOp : StoresToDelete)
     deleteStoreMappedToAddress(Ctx, SIOp, StoreMap);
   for (SILValue SIOp : StoresToStopTracking)
