@@ -389,13 +389,15 @@ public func print<T, TargetStream : OutputStreamType>(
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func print<T>(value: T, appendNewline: Bool) {
-  var target = _Stdout()
-  target._lock()
-  _print_unlocked(value, &target)
-  if appendNewline {
-    target.write("\n")
+  if let hook = _playgroundPrintHook {
+    var output = _TeeStream(left: "", right: _Stdout())
+    print(value, &output, appendNewline: appendNewline)
+    hook(output.left)
   }
-  target._unlock()
+  else {
+    var output = _Stdout()
+    print(value, &output, appendNewline: appendNewline)
+  }
 }
 
 @inline(never)
@@ -466,13 +468,15 @@ public func debugPrint<T, TargetStream : OutputStreamType>(
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func debugPrint<T>(value: T, appendNewline: Bool) {
-  var target = _Stdout()
-  target._lock()
-  _debugPrint_unlocked(value, &target)
-  if appendNewline {
-    target.write("\n")
+  if let hook = _playgroundPrintHook {
+    var output = _TeeStream(left: "", right: _Stdout())
+    debugPrint(value, &output, appendNewline: appendNewline)
+    hook(output.left)
   }
-  target._unlock()
+  else {
+    var output = _Stdout()
+    debugPrint(value, &output, appendNewline: appendNewline)
+  }
 }
 
 @inline(never)

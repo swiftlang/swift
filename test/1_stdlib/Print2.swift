@@ -1023,6 +1023,40 @@ func test_playgroundPrintHook() {
 }
 test_playgroundPrintHook()
 
+func test_playgroundLegacyPrintHook() {
+  var printed: String? = nil
+  _playgroundPrintHook = { printed = $0 }
+  
+  print(1234) // CHECK: 1234
+  print("%\(printed!)%") // CHECK-NEXT: %1234
+  // CHECK-NEXT: %
+  
+  printed = nil
+  debugPrint("5678")
+  // CHECK-NEXT: "5678"
+  print("%\(printed!)%") // CHECK-NEXT: %"5678"
+  // CHECK-NEXT: %
+  
+  var explicitStream = ""
+  printed = nil
+  print("1234", &explicitStream)
+  print(printed)               // CHECK-NEXT: nil
+  print("%\(explicitStream)%") // CHECK-NEXT: %1234
+  // CHECK-NEXT: %
+  
+  explicitStream = ""
+  printed = nil
+  debugPrint("5678", &explicitStream)
+  print(printed) // CHECK-NEXT: nil
+  print("%\(explicitStream)%") // CHECK-NEXT: %"5678"
+  // CHECK-NEXT: %
+  
+  _playgroundPrintHook = nil
+  print("test_playgroundLegacyPrintHook done")
+  // CHECK-NEXT: test_playgroundLegacyPrintHook done
+}
+test_playgroundLegacyPrintHook()
+
 if !failed {
   _prext_print("OK")
 }
