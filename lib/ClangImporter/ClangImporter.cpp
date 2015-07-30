@@ -669,7 +669,7 @@ private:
 };
 }
 
-void ClangImporter::Implementation::importHeader(
+bool ClangImporter::Implementation::importHeader(
     Module *adapter, StringRef headerName, SourceLoc diagLoc,
     bool trackParsedSymbols,
     std::unique_ptr<llvm::MemoryBuffer> sourceBuffer) {
@@ -677,7 +677,7 @@ void ClangImporter::Implementation::importHeader(
   // state. It could cause a crash.
   auto &clangDiags = getClangASTContext().getDiagnostics();
   if (clangDiags.hasFatalErrorOccurred())
-    return;
+    return true;
 
   assert(adapter);
   ImportedHeaderOwners.push_back(adapter);
@@ -718,16 +718,19 @@ void ClangImporter::Implementation::importHeader(
     }
   }
   pp.EndSourceFile();
+  bumpGeneration();
 
+  // FIXME: What do we do if there was already an error?
   if (!hadError && clangDiags.hasErrorOccurred()) {
     SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_error,
                                 headerName);
+    return true;
   }
 
-  bumpGeneration();
+  return false;
 }
 
-void ClangImporter::importHeader(StringRef header, Module *adapter,
+bool ClangImporter::importHeader(StringRef header, Module *adapter,
                                  off_t expectedSize, time_t expectedModTime,
                                  StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
@@ -743,11 +746,11 @@ void ClangImporter::importHeader(StringRef header, Module *adapter,
   std::unique_ptr<llvm::MemoryBuffer> sourceBuffer{
     llvm::MemoryBuffer::getMemBuffer(cachedContents, header)
   };
-  Impl.importHeader(adapter, header, diagLoc, /*trackParsedSymbols=*/false,
-                    std::move(sourceBuffer));
+  return Impl.importHeader(adapter, header, diagLoc, /*trackParsedSymbols=*/false,
+                           std::move(sourceBuffer));
 }
 
-void ClangImporter::importBridgingHeader(StringRef header, Module *adapter,
+bool ClangImporter::importBridgingHeader(StringRef header, Module *adapter,
                                          SourceLoc diagLoc,
                                          bool trackParsedSymbols) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
@@ -756,7 +759,7 @@ void ClangImporter::importBridgingHeader(StringRef header, Module *adapter,
   if (!headerFile) {
     Impl.SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_missing,
                                      header);
-    return;
+    return true;
   }
 
   llvm::SmallString<128> importLine{"#import \""};
@@ -768,8 +771,8 @@ void ClangImporter::importBridgingHeader(StringRef header, Module *adapter,
       importLine, Implementation::bridgingHeaderBufferName)
   };
 
-  Impl.importHeader(adapter, header, diagLoc, trackParsedSymbols,
-                    std::move(sourceBuffer));
+  return Impl.importHeader(adapter, header, diagLoc, trackParsedSymbols,
+                           std::move(sourceBuffer));
 }
 
 std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,

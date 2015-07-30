@@ -5,14 +5,9 @@
 // RUN: not %target-swift-frontend -parse %s -import-objc-header %S/Inputs/broken-modules/BrokenClangModule.h -enable-source-import 2> %t/err.bridging-header.txt 
 // RUN: FileCheck -check-prefix CHECK-BRIDGING-HEADER -check-prefix CLANG-CHECK %s < %t/err.bridging-header.txt
 
-// RUN: not %target-swift-frontend -parse %s -import-objc-header %t/fake.h 2>&1 | FileCheck -check-prefix=MISSING-HEADER %s
-
 // RUN: not %target-swift-frontend -parse %s -import-objc-header %S/../../Inputs/empty.swift 2>&1 | FileCheck -check-prefix=EMPTY-HEADER %s
 
 // REQUIRES: objc_interop
-
-// MISSING-HEADER: error: bridging header '{{.*}}/fake.h' does not exist
-// MISSING-HEADER-NOT: error
 
 // EMPTY-HEADER-NOT: header
 

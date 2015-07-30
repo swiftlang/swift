@@ -270,6 +270,12 @@ FileUnit *SerializedModuleLoader::loadAST(
     break;
   }
 
+  case serialization::Status::FailedToLoadBridgingHeader:
+    // We already emitted a diagnostic about the bridging header. Just emit
+    // a generic message here.
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_load_failed, M.getName());
+    break;
+
   case serialization::Status::NameMismatch: {
     // FIXME: This doesn't handle a non-debugger REPL, which should also treat
     // this as a non-fatal error.

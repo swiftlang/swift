@@ -40,6 +40,9 @@ namespace serialization {
     /// The module file is an overlay for a Clang module, which can't be found.
     MissingShadowedModule,
 
+    /// The module file depends on a bridging header that can't be loaded.
+    FailedToLoadBridgingHeader,
+
     /// The module file is malformed in some way.
     Malformed,
 

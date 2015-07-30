@@ -186,8 +186,10 @@ public:
   ///        since the module was compiled.
   /// \param diagLoc A location to attach any diagnostics to if import fails.
   ///
+  /// \returns true if there was an error importing the header.
+  ///
   /// \sa getImportedHeaderModule
-  void importHeader(StringRef header, ModuleDecl *adapter, off_t expectedSize,
+  bool importHeader(StringRef header, ModuleDecl *adapter, off_t expectedSize,
                     time_t expectedModTime, StringRef cachedContents,
                     SourceLoc diagLoc);
 
@@ -200,8 +202,10 @@ public:
   /// \param trackParsedSymbols If true, tracks decls and macros that were
   ///        parsed from the bridging header.
   ///
+  /// \returns true if there was an error importing the header.
+  ///
   /// \sa getImportedHeaderModule
-  void importBridgingHeader(StringRef header, ModuleDecl *adapter,
+  bool importBridgingHeader(StringRef header, ModuleDecl *adapter,
                             SourceLoc diagLoc = {},
                             bool trackParsedSymbols = false);
 

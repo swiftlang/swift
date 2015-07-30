@@ -1026,10 +1026,15 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       // The path may be empty if the file being loaded is a partial AST,
       // and the current compiler invocation is a merge-modules step.
       if (!dependency.RawPath.empty()) {
-        clangImporter->importHeader(dependency.RawPath, file->getParentModule(),
-                                    importedHeaderInfo.fileSize,
-                                    importedHeaderInfo.fileModTime,
-                                    importedHeaderInfo.contents, diagLoc);
+        bool hadError =
+            clangImporter->importHeader(dependency.RawPath,
+                                        file->getParentModule(),
+                                        importedHeaderInfo.fileSize,
+                                        importedHeaderInfo.fileModTime,
+                                        importedHeaderInfo.contents,
+                                        diagLoc);
+        if (hadError)
+          return error(Status::FailedToLoadBridgingHeader);
       }
       Module *importedHeaderModule = clangImporter->getImportedHeaderModule();
       dependency.Import = { {}, importedHeaderModule };

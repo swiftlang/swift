@@ -640,7 +640,7 @@ public:
   }
 
   /// Imports the given header contents into the Clang context.
-  void importHeader(Module *adapter, StringRef headerName, SourceLoc diagLoc,
+  bool importHeader(Module *adapter, StringRef headerName, SourceLoc diagLoc,
                     bool trackParsedSymbols,
                     std::unique_ptr<llvm::MemoryBuffer> contents);
 

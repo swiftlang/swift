@@ -269,9 +269,10 @@ void CompilerInstance::performSema() {
   Module *importedHeaderModule = nullptr;
   StringRef implicitHeaderPath = options.ImplicitObjCHeaderPath;
   if (!implicitHeaderPath.empty()) {
-    clangImporter->importBridgingHeader(implicitHeaderPath, MainModule);
-    importedHeaderModule = clangImporter->getImportedHeaderModule();
-    assert(importedHeaderModule);
+    if (!clangImporter->importBridgingHeader(implicitHeaderPath, MainModule)) {
+      importedHeaderModule = clangImporter->getImportedHeaderModule();
+      assert(importedHeaderModule);
+    }
   }
 
   SmallVector<Module *, 4> importModules;
