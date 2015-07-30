@@ -100,7 +100,7 @@ public protocol SequenceType {
   ///   skip subsequent calls.
   ///
   /// - Complexity: O(`self.count`)
-  func forEach(@noescape body: (Generator.Element) -> ())
+  func forEach(@noescape body: (Generator.Element) throws -> ()) rethrows
 
   /// Returns a subsequence containing all but the first `n` elements.
   ///
@@ -150,8 +150,8 @@ public protocol SequenceType {
   ///
   /// - Requires: `maxSplit >= 0`
   func split(maxSplit: Int, allowEmptySlices: Bool,
-    @noescape isSeparator: (Generator.Element) -> Bool
-  ) -> [SubSequence]
+    @noescape isSeparator: (Generator.Element) throws -> Bool
+  ) rethrows -> [SubSequence]
 
   func _customContainsEquatableElement(
     element: Generator.Element
@@ -405,8 +405,8 @@ extension SequenceType {
   public func split(
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
-    @noescape isSeparator: (Generator.Element) -> Bool
-  ) -> [AnySequence<Generator.Element>] {
+    @noescape isSeparator: (Generator.Element) throws -> Bool
+  ) rethrows -> [AnySequence<Generator.Element>] {
     _precondition(maxSplit >= 0, "Must take zero or more splits")
     var result: [AnySequence<Generator.Element>] = []
     var subSequence: [Generator.Element] = []
@@ -420,7 +420,7 @@ extension SequenceType {
     }
 
     for element in self {
-      if isSeparator(element) {
+      if try isSeparator(element) {
         if !appendSubsequence() {
           continue
         }
@@ -476,9 +476,11 @@ extension SequenceType {
   ///   skip subsequent calls.
   ///
   /// - Complexity: O(`self.count`)
-  public func forEach(@noescape body: (Generator.Element) -> ()) {
+  public func forEach(
+    @noescape body: (Generator.Element) throws -> ()
+  ) rethrows {
     for element in self {
-      body(element)
+      try body(element)
     }
   }
 }

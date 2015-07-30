@@ -54,8 +54,10 @@ if preds:
   /// - Requires: `isOrderedBefore` is a
   ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings).
   ///   over `self`."""
+  rethrows_ = "rethrows "
 else:
   orderingRequirement = ""
+  rethrows_ = ""
 }%
 
 extension SequenceType ${"" if preds else "where Generator.Element : Comparable"} {
@@ -67,14 +69,14 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   /// ${orderingRequirement}
   public func minElement(
 %   if preds:
-    @noescape isOrderedBefore: (${GElement}, ${GElement}) -> Bool
+    @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
 %   end
-  ) -> ${GElement}? {
+  ) ${rethrows_}-> ${GElement}? {
     var g = generate()
     guard var result = g.next() else { return nil }
     for e in GeneratorSequence(g) {
 %   if preds:
-      if isOrderedBefore(e, result) { result = e }
+      if try isOrderedBefore(e, result) { result = e }
 %   else:
       if e < result { result = e }
 %   end
@@ -88,14 +90,14 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   ///   ${orderingRequirement}
   public func maxElement(
 %   if preds:
-    @noescape isOrderedBefore: (${GElement}, ${GElement}) -> Bool
+    @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
 %   end
-  ) -> ${GElement}? {
+  ) ${rethrows_}-> ${GElement}? {
     var g = generate()
     guard var result = g.next() else { return nil }
     for e in GeneratorSequence(g) {
 %   if preds:
-      if isOrderedBefore(result, e) { result = e }
+      if try isOrderedBefore(result, e) { result = e }
 %   else:
       if e > result { result = e }
 %   end
@@ -125,10 +127,13 @@ if preds:
   ///
   /// - Requires: `isEquivalent` is an
   ///   [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)."""
+
+  rethrows_ = "rethrows "
 else:
   comment = """
   /// Return true iff the the initial elements of `self` are equal to `prefix`.
   /// Return true if `other` is empty."""
+  rethrows_ = ""
 }%
   ${comment}
   public func startsWith<
@@ -136,13 +141,13 @@ else:
   >(
     other: OtherSequence${"," if preds else ""}
 %   if preds:
-    @noescape isEquivalent: (${GElement}, ${GElement}) -> Bool
+    @noescape isEquivalent: (${GElement}, ${GElement}) throws -> Bool
 %   end
-  ) -> Bool {
+  ) ${rethrows_}-> Bool {
     var otherGenerator = other.generate()
     for e0 in self {
       if let e1 = otherGenerator.next() {
-        if ${"!isEquivalent(e0, e1)" if preds else "e0 != e1"} {
+        if ${"try !isEquivalent(e0, e1)" if preds else "e0 != e1"} {
           return false
         }
       }
@@ -174,10 +179,12 @@ if preds:
   ///
   /// - Requires: `isEquivalent` is an
   ///   [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)."""
+  rethrows_ = "rethrows "
 else:
   comment = """
   /// Return `true` iff `self` and `other` contain the same elements in the
   /// same order."""
+  rethrows_ = ""
 }%
 
   ${comment}
@@ -186,15 +193,15 @@ else:
   >(
     other: OtherSequence${"," if preds else ""}
 %   if preds:
-    @noescape isEquivalent: (${GElement}, ${GElement}) -> Bool
+    @noescape isEquivalent: (${GElement}, ${GElement}) throws -> Bool
 %   end
-  ) -> Bool {
+  ) ${rethrows_}-> Bool {
     var g1 = self.generate()
     var g2 = other.generate()
     while true {
       switch (g1.next(), g2.next()) {
       case let (e1?, e2?):
-        if ${'!isEquivalent(e1, e2)' if preds else 'e1 != e2'} {
+        if ${'try !isEquivalent(e1, e2)' if preds else 'e1 != e2'} {
           return false
         }
       case (_?, nil),
@@ -233,6 +240,7 @@ if preds:
   /// - Requires: `isOrderedBefore` is a
   ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   ///   over the elements of `self` and `other`."""
+  rethrows_ = "rethrows "
 else:
   comment = """
   /// Return true iff `self` precedes `other` in a lexicographical ("dictionary")
@@ -242,6 +250,7 @@ else:
   ///   ordering, which has no connection to Unicode.  If you are sorting strings
   ///   to present to the end-user, you should use `String` APIs that perform
   /// localized comparison."""
+  rethrows_ = ""
 }%
 
   ${comment}
@@ -250,18 +259,18 @@ else:
   >(
     other: OtherSequence${"," if preds else ""}
 %   if preds:
-    @noescape isOrderedBefore: (${GElement}, ${GElement}) -> Bool
+    @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
 %   end
-  ) -> Bool {
+  ) ${rethrows_}-> Bool {
     var g1 = self.generate()
     var g2 = other.generate()
     while true {
       if let e1 = g1.next() {
         if let e2 = g2.next() {
-          if ${"isOrderedBefore(e1, e2)" if preds else "e1 < e2"} {
+          if ${"try isOrderedBefore(e1, e2)" if preds else "e1 < e2"} {
             return true
           }
-          if ${"isOrderedBefore(e2, e1)" if preds else "e2 < e1"} {
+          if ${"try isOrderedBefore(e2, e1)" if preds else "e2 < e1"} {
             return false
           }
           continue // equivalent
@@ -299,10 +308,10 @@ extension SequenceType where Generator.Element : Equatable {
 extension SequenceType {
   /// Return `true` iff an element in `self` satisfies `predicate`.
   public func contains(
-    @noescape predicate: (${GElement}) -> Bool
-  ) -> Bool {
+    @noescape predicate: (${GElement}) throws -> Bool
+  ) rethrows -> Bool {
     for e in self {
-      if predicate(e) {
+      if try predicate(e) {
         return true
       }
     }
@@ -321,11 +330,11 @@ extension SequenceType {
   /// `combine(combine(...combine(combine(initial, self[0]),
   /// self[1]),...self[count-2]), self[count-1])`.
   public func reduce<T>(
-    initial: T, @noescape combine: (T, ${GElement}) -> T
-  ) -> T {
+    initial: T, @noescape combine: (T, ${GElement}) throws -> T
+  ) rethrows -> T {
     var result = initial
     for element in self {
-      result = combine(result, element)
+      result = try combine(result, element)
     }
     return result
   }
@@ -401,11 +410,11 @@ extension SequenceType {
   /// - Complexity: O(*M* + *N*), where *M* is the length of `self`
   ///   and *N* is the length of the result.
   public func flatMap<T>(
-    @noescape transform: (${GElement}) -> T?
-  ) -> [T] {
+    @noescape transform: (${GElement}) throws -> T?
+  ) rethrows -> [T] {
     var result: [T] = []
     for element in self {
-      if let newElement = transform(element) {
+      if let newElement = try transform(element) {
         result.append(newElement)
       }
     }

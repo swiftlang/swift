@@ -387,8 +387,8 @@ extension CollectionType {
   public func split(
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
-    @noescape isSeparator: (Generator.Element) -> Bool
-  ) -> [SubSequence] {
+    @noescape isSeparator: (Generator.Element) throws -> Bool
+  ) rethrows -> [SubSequence] {
     _precondition(maxSplit >= 0, "Must take zero or more splits")
     var result: [SubSequence] = []
 
@@ -396,7 +396,7 @@ extension CollectionType {
     var splits = 0
 
     for j in indices {
-      if isSeparator(self[j]) {
+      if try isSeparator(self[j]) {
         if let i = start {
           result.append(self[i..<j])
           start = j.successor()

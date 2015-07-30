@@ -352,9 +352,11 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
     return base.underestimateCount()
   }
 
-  public func forEach(@noescape body: (Base.Generator.Element) -> ()) {
+  public func forEach(
+    @noescape body: (Base.Generator.Element) throws -> ()
+  ) rethrows {
     ++Log.forEach[selfType]
-    base.forEach(body)
+    try base.forEach(body)
   }
 
   public func map<T>(
@@ -394,10 +396,10 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   public func split(
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
-    @noescape isSeparator: (Base.Generator.Element) -> Bool
-  ) -> [Base.SubSequence] {
+    @noescape isSeparator: (Base.Generator.Element) throws -> Bool
+  ) rethrows -> [Base.SubSequence] {
     ++Log.split[selfType]
-    return base.split(maxSplit, allowEmptySlices: allowEmptySlices,
+    return try base.split(maxSplit, allowEmptySlices: allowEmptySlices,
         isSeparator: isSeparator)
   }
 
