@@ -944,7 +944,7 @@ static void collectAllAppliesInFunction(SILFunction *F,
   for (auto &B : *F)
     for (auto &I : B) {
       if (auto Apply = FullApplySite::isa(&I)) {
-        Applies.push_back(FullApplySite(Apply));
+        Applies.push_back(Apply);
         continue;
       }
     }
