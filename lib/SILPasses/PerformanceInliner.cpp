@@ -943,12 +943,8 @@ static void collectAllAppliesInFunction(SILFunction *F,
 
   for (auto &B : *F)
     for (auto &I : B) {
-      if (auto *AI = dyn_cast<ApplyInst>(&I)) {
-        Applies.push_back(FullApplySite(AI));
-        continue;
-      }
-      if (auto *AI = dyn_cast<TryApplyInst>(&I)) {
-        Applies.push_back(FullApplySite(AI));
+      if (auto Apply = FullApplySite::isa(&I)) {
+        Applies.push_back(FullApplySite(Apply));
         continue;
       }
     }
