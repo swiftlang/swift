@@ -698,10 +698,10 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   SmallVector<StringRef, 3> ParsedKeywords;
 
   void addSuperKeyword(CodeCompletionResultSink &Sink) {
-    auto *D = CurDeclContext->getInnermostTypeContext();
-    if (!D)
+    auto *DC = CurDeclContext->getInnermostTypeContext();
+    if (!DC)
       return;
-    Type DT = D->getDeclaredTypeInContext();
+    Type DT = DC->getDeclaredTypeInContext();
     if (DT.isNull() || DT->is<ErrorType>())
       return;
     OwnedResolver TypeResolver(createLazyResolver(CurDeclContext->getASTContext()));
