@@ -9,6 +9,53 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// Eliminate local copies of either address-only or reference types.
+//
+// This opportunity frequently results from a calling convention that transfers
+// object ownership from caller to callee. In this convention, the caller
+// creates a local copy before passing it to the callee. If the original object
+// is immediately destroyed after passing off the copy, then the copy was
+// unnecessary. Removing the useless copy can be thought of as forwarding the
+// original object directly to the call argument in place of the copy. Hence
+// "copy forwarding".
+//
+// There are two classifications of types that copy forwarding applies to:
+// address-only types and references.
+//
+// Useless copies of address-only types look like this:
+//
+// %copy = alloc_stack $T
+// copy_addr %arg to [initialization] %copy#1 : $*T
+// %ret = apply %callee<T>(%copy#1) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+// dealloc_stack %copy#0 : $*@local_storage T
+// destroy_addr %arg : $*T
+//
+// Eliminating the address-only copies eliminates a very expensive call to
+// getGenericMetadata.
+//
+// Useless copies of references look like this:
+//
+// strong_retain %arg : $A
+// %ret = apply %callee(%arg) : $@convention(thin) (@owned A) -> ()
+// strong_release %arg : $A
+//
+// Eliminating the reference copies, avoids artificially bumping the refcount
+// which could save a copy of all elements in a COW container.
+//
+// The actual analysis and optimization do not depend on the copy being linked
+// to call arguments. Any obviously useless copy will be eliminated.
+//
+// TODO: Currently we only handle the address-only case, not the retain/release
+// case.
+//
+// TODO: We should run this at -Onone even though it's not diagnostic.
+//
+// TODO: Currently we only handle cases in which one side of the copy is block
+// local. Either:
+// (1) Forward propagate: copy src -> dest; deinit(dest)
+// (2) Backward propagate: init(src); copy src -> dest
+//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "copy-forwarding"
 #include "swift/SIL/SILArgument.h"
