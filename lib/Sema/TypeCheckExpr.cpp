@@ -760,35 +760,37 @@ namespace {
 
       auto TmpDC = CurDC;
 
-      while (TmpDC != nullptr) {
-        if (TmpDC == DC)
-          break;
+      if (!isa<TopLevelCodeDecl>(DC)) {
+        while (TmpDC != nullptr) {
+          if (TmpDC == DC)
+            break;
 
-        // We have an intervening nominal type context that is not the
-        // declaration context, and the declaration context is not global.
-        // This is not supported since nominal types cannot capture values.
-        if (auto NTD = dyn_cast<NominalTypeDecl>(TmpDC)) {
-          if (DC->isLocalContext()) {
-            TC.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
-                        NTD->getDescriptiveKind(),
-                        D->getName());
+          // We have an intervening nominal type context that is not the
+          // declaration context, and the declaration context is not global.
+          // This is not supported since nominal types cannot capture values.
+          if (auto NTD = dyn_cast<NominalTypeDecl>(TmpDC)) {
+            if (DC->isLocalContext()) {
+              TC.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
+                          NTD->getDescriptiveKind(),
+                          D->getName());
 
-            TC.diagnose(NTD->getLoc(), diag::type_declared_here);
+              TC.diagnose(NTD->getLoc(), diag::type_declared_here);
 
-            TC.diagnose(D->getLoc(), diag::decl_declared_here,
-                        D->getName());
+              TC.diagnose(D->getLoc(), diag::decl_declared_here,
+                          D->getName());
 
-            return { false, DRE };
+              return { false, DRE };
+            }
           }
+
+          TmpDC = TmpDC->getParent();
         }
 
-        TmpDC = TmpDC->getParent();
+        // We walked all the way up to the root without finding the declaration,
+        // so this is not a capture.
+        if (TmpDC == nullptr)
+          return { false, DRE };
       }
-
-      // We walked all the way up to the root without finding the declaration,
-      // so this is not a capture.
-      if (TmpDC == nullptr)
-        return { false, DRE };
 
       // Only capture var decls at global scope.  Other things can be captured
       // if they are local.
