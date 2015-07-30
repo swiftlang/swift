@@ -987,6 +987,42 @@ func test_varargs() {
 test_varargs()
 // CHECK: test_varargs done
 
+func test_playgroundPrintHook() {
+  
+  var printed: String? = nil
+  _playgroundPrintHook = { printed = $0 }
+  
+  _prext_print("", 1, 2, 3, 4, "", separator: "|") // CHECK: |1|2|3|4|
+  _prext_print("%\(printed!)%") // CHECK-NEXT: %|1|2|3|4|
+  // CHECK-NEXT: %
+  
+  printed = nil
+  _prext_debugPrint("", 1, 2, 3, 4, "", separator: "|")
+  // CHECK-NEXT: ""|1|2|3|4|""
+  _prext_print("%\(printed!)%") // CHECK-NEXT: %""|1|2|3|4|""
+  // CHECK-NEXT: %
+  
+  var explicitStream = ""
+  printed = nil
+  _prext_print("", 1, 2, 3, 4, "", toStream: &explicitStream, separator: "!")
+  _prext_print(printed)               // CHECK-NEXT: nil
+  _prext_print("%\(explicitStream)%") // CHECK-NEXT: %!1!2!3!4!
+  // CHECK-NEXT: %
+  
+  explicitStream = ""
+  printed = nil
+  _prext_debugPrint(
+    "", 1, 2, 3, 4, "", toStream: &explicitStream, separator: "!")
+  _prext_print(printed) // CHECK-NEXT: nil
+  _prext_print("%\(explicitStream)%") // CHECK-NEXT: %""!1!2!3!4!""
+  // CHECK-NEXT: %
+  
+  _playgroundPrintHook = nil
+  _prext_print("test_playgroundPrintHook done")
+  // CHECK-NEXT: test_playgroundPrintHook done
+}
+test_playgroundPrintHook()
+
 if !failed {
   _prext_print("OK")
 }

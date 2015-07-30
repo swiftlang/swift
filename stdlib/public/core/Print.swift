@@ -10,6 +10,25 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A hook for playgrounds to print through.
+public var _playgroundPrintHook : ((String)->Void)? = {_ in () }
+
+internal struct _TeeStream<
+  L : OutputStreamType, 
+  R : OutputStreamType
+> : OutputStreamType {
+  var left: L
+  var right: R
+  
+  /// Append the given `string` to this stream.
+  mutating func write(string: String)
+  { left.write(string); right.write(string) }
+
+  mutating func _lock() { left._lock(); right._lock() }
+  mutating func _unlock() { left._unlock(); right._unlock() }
+}
+
+
 /// Writes the textual representations of `items`, separated by
 /// `separator` and terminated by `terminator`, into the standard
 /// output.
@@ -26,9 +45,17 @@ public func _prext_print(
   separator: String = " ",
   terminator: String = "\n"
 ) {
-  var output = _Stdout()
-  _print(
-    items, toStream: &output, separator: separator, terminator: terminator)
+  if let hook = _playgroundPrintHook {
+    var output = _TeeStream(left: "", right: _Stdout())
+    _print(
+      items, toStream: &output, separator: separator, terminator: terminator)
+    hook(output.left)
+  }
+  else {
+    var output = _Stdout()
+    _print(
+      items, toStream: &output, separator: separator, terminator: terminator)
+  }
 }
 
 /// Writes the textual representations of `items` most suitable for
@@ -46,9 +73,17 @@ public func _prext_debugPrint(
   items: Any...,
   separator: String = " ",
   terminator: String = "\n") {
-  var output = _Stdout()
-  _debugPrint(
-    items, toStream: &output, separator: separator, terminator: terminator)
+  if let hook = _playgroundPrintHook {
+    var output = _TeeStream(left: "", right: _Stdout())
+    _debugPrint(
+      items, toStream: &output, separator: separator, terminator: terminator)
+    hook(output.left)
+  }
+  else {
+    var output = _Stdout()
+    _debugPrint(
+      items, toStream: &output, separator: separator, terminator: terminator)
+  }
 }
 
 
