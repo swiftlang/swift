@@ -1479,9 +1479,11 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
 
   SmallVector<Substitution, 8> Substitutions;
   for (auto Subst : AI.getSubstitutions()) {
-    if (Subst.getArchetype()->isSelfDerived()) {
-      Substitution NewSubst(Subst.getArchetype(), ConcreteType,
-                            Subst.getConformances());
+    if (Subst.getReplacement().getCanonicalTypeOrNull() ==
+        WMI->getSelfSubstitution().getReplacement().getCanonicalTypeOrNull()) {
+      Substitution NewSubst(Subst.getArchetype(),
+                            NewWMI->getSelfSubstitution().getReplacement(),
+                            NewWMI->getSelfSubstitution().getConformances());
       Substitutions.push_back(NewSubst);
     } else
       Substitutions.push_back(Subst);
