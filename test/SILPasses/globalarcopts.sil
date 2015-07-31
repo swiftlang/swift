@@ -1747,7 +1747,7 @@ bb0(%0 : $@box Builtin.Int32, %1 : $@box Builtin.Int32):
   apply %2(%1) : $@convention(thin) (@box Builtin.Int32) -> ()
   strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
-  return %9999 : $() 
+  return %9999 : $()
 }
 
 // CHECK-LABEL: sil @retains_that_are_removed_do_not_preserve_known_safety : $@convention(thin) (@owned @box Builtin.Int32, @box Builtin.Int32) -> () {
@@ -1769,7 +1769,7 @@ bb0(%0 : $@box Builtin.Int32, %1 : $@box Builtin.Int32):
   apply %2(%1) : $@convention(thin) (@box Builtin.Int32) -> ()
   strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
-  return %9999 : $() 
+  return %9999 : $()
 }
 
 // CHECK-LABEL: sil @alloc_ref_returns_at_p1 : $@convention(thin) () -> () {
@@ -1861,6 +1861,30 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject):
   %3 = integer_literal $Builtin.Word, 1
   strong_retain %1 : $Builtin.NativeObject
   %4 = builtin "copyArray"<Builtin.Int32>(%2 : $@thick Builtin.Int32.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  fix_lifetime %1 : $Builtin.NativeObject
+  strong_release %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @clibraryintrinsicsdonttouchrefcounts : $@convention(thin) (Builtin.RawPointer, Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @clibraryintrinsicsdonttouchrefcounts : $@convention(thin) (Builtin.RawPointer, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject):
+  %3 = integer_literal $Builtin.Int64, 1
+  %4 = integer_literal $Builtin.Int32, 1
+  %5 = integer_literal $Builtin.Int1, 0
+  strong_retain %1 : $Builtin.NativeObject
+  %6 = builtin "int_memcpy_RawPointer_RawPointer_Int64"(%0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %3 : $Builtin.Int64, %4 : $Builtin.Int32, %5 : $Builtin.Int1) : $()
+  fix_lifetime %1 : $Builtin.NativeObject
+  strong_release %1 : $Builtin.NativeObject
+  strong_retain %1 : $Builtin.NativeObject
+  %7 = builtin "int_memset_RawPointer_RawPointer_Int64"(%0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %3 : $Builtin.Int64, %4 : $Builtin.Int32, %5 : $Builtin.Int1) : $()
+  fix_lifetime %1 : $Builtin.NativeObject
+  strong_release %1 : $Builtin.NativeObject
+  strong_retain %1 : $Builtin.NativeObject
+  %8 = builtin "int_memmove_RawPointer_RawPointer_Int64"(%0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %3 : $Builtin.Int64, %4 : $Builtin.Int32, %5 : $Builtin.Int1) : $()
   fix_lifetime %1 : $Builtin.NativeObject
   strong_release %1 : $Builtin.NativeObject
   %9999 = tuple()

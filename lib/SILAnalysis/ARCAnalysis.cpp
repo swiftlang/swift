@@ -98,8 +98,25 @@ static bool canApplyDecrementRefCount(BuiltinInst *BI, SILValue Ptr,
   // effects do not cause reference counts to be decremented, return false.
   //
   // If this is expanded, refactor it into a method with a string switch.
-  if (BI->getName().str().equals("copyArray"))
-    return false;
+  if (auto Kind = BI->getBuiltinKind()) {
+    switch (Kind.getValue()) {
+    case BuiltinValueKind::CopyArray:
+      return false;
+    default:
+      break;
+    }
+  }
+
+  if (auto ID = BI->getIntrinsicID()) {
+    switch (ID.getValue()) {
+    case llvm::Intrinsic::memcpy:
+    case llvm::Intrinsic::memmove:
+    case llvm::Intrinsic::memset:
+      return false;
+    default:
+      break;
+    }
+  }
 
   return canApplyDecrementRefCount(BI->getArguments(), Ptr, AA);
 }
