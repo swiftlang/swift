@@ -15,9 +15,12 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/AST/RawComment.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Markup/XMLUtils.h"
+#include "swift/Parse/Token.h"
+#include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/AST/ASTContext.h"
@@ -365,6 +368,26 @@ static void replaceObjcDeclarationsWithSwiftOnes(const Decl *D,
       Doc.substr(CI + Close.size());
   else
     OS << Doc;
+}
+
+std::string ide::extractPlainTextFromComment(const StringRef Text) {
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  auto Tokens = swift::tokenize(LangOpts, SourceMgr,
+                                SourceMgr.addMemBufferCopy(Text));
+  std::vector<SingleRawComment> Comments;
+  Comments.reserve(Tokens.size());
+  for (auto &Tok : Tokens) {
+    if (Tok.is(tok::comment)) {
+      Comments.push_back(SingleRawComment(Tok.getText(), 0));
+    }
+  }
+  if (Comments.empty())
+    return {};
+
+  RawComment Comment(Comments);
+  llvm::markup::MarkupContext MC;
+  return MC.getLineList(Comment).str();
 }
 
 bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
