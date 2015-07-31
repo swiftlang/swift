@@ -2477,6 +2477,20 @@ namespace {
 
     void visitMetatypeType(MetatypeType *T, StringRef label) {
       printCommon(T, label, "metatype_type");
+      if (T->hasRepresentation()) {
+        OS << " ";
+        switch (T->getRepresentation()) {
+        case MetatypeRepresentation::Thin:
+          OS << "@thin";
+          break;
+        case MetatypeRepresentation::Thick:
+          OS << "@thick";
+          break;
+        case MetatypeRepresentation::ObjC:
+          OS << "@objc";
+          break;
+        }
+      }
       printRec(T->getInstanceType());
       OS << ")";
     }
