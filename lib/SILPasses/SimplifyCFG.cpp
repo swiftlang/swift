@@ -1037,6 +1037,31 @@ static BranchInst *getTrampolineWithoutBBArgsTerminator(SILBasicBlock *SBB) {
   return BI;
 }
 
+#ifndef NDEBUG
+/// Is the block reachable from the entry.
+static bool isReachable(SILBasicBlock *Block) {
+  SmallPtrSet<SILBasicBlock *, 16> Visited;
+  llvm::SmallVector<SILBasicBlock *, 16> Worklist;
+  SILBasicBlock *EntryBB = Block->getParent()->begin();
+  Worklist.push_back(EntryBB);
+  Visited.insert(EntryBB);
+
+  while (!Worklist.empty()) {
+    auto *CurBB = Worklist.back();
+    Worklist.pop_back();
+
+    if (CurBB == Block)
+      return true;
+
+    for (auto &Succ : CurBB->getSuccessors())
+      if (!Visited.insert(Succ).second)
+        Worklist.push_back(Succ);
+  }
+
+  return false;
+}
+#endif
+
 /// simplifyBranchBlock - Simplify a basic block that ends with an unconditional
 /// branch.
 bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
@@ -1051,8 +1076,22 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   if (BB != DestBB && DestBB->getSinglePredecessor()) {
     // If there are any BB arguments in the destination, replace them with the
     // branch operands, since they must dominate the dest block.
-    for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i)
-      SILValue(DestBB->getBBArg(i)).replaceAllUsesWith(BI->getArg(i));
+    for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
+      if (DestBB->getBBArg(i) != BI->getArg(i).getDef())
+        SILValue(DestBB->getBBArg(i)).replaceAllUsesWith(BI->getArg(i));
+      else {
+        // We must be processing an unreachable part of the cfg with a cycle.
+        // bb1(arg1): // preds: bb3
+        //   br bb2
+        //
+        // bb2: // preds: bb1
+        //   br bb3
+        //
+        // bb3: // preds: bb2
+        //   br bb1(arg1)
+        assert(!isReachable(BB) && "Should only occur in unreachable block");
+      }
+    }
 
     // Zap BI and move all of the instructions from DestBB into this one.
     BI->eraseFromParent();
