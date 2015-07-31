@@ -1157,67 +1157,6 @@ getBoundTypesFromConstraint(ConstraintSystem *CS, Expr *expr,
                                type2->getLValueOrInOutObjectType());
 }
 
-/// Determine if a type resulting from a typecheck operation is
-/// fully-specialized, or if it still has type variable type arguments.
-/// (This diverges slightly from hasTypeVariable, in that certain tyvars,
-/// such as for nil literals, will be treated as specialized.)
-static bool typeIsSpecialized(Type type) {
-  if (type.isNull())
-    return false;
-  
-  if (auto tv = type->getAs<TypeVariableType>()) {
-    // If it's a nil-literal conformance, there's no reason to re-specialize.
-    if (tv->getImpl().literalConformanceProto) {
-      auto knownProtoKind =
-        tv->getImpl().literalConformanceProto->getKnownProtocolKind();
-        
-      if (knownProtoKind.hasValue() &&
-          (knownProtoKind.getValue() ==
-           KnownProtocolKind::NilLiteralConvertible)) {
-        return true;
-      }
-    }
-    
-    return false;
-  }
-  
-  // Desugar, if necessary.
-  if (auto sugaredTy = type->getAs<SyntaxSugarType>())
-    type = sugaredTy->getBaseType();
-  
-  // If it's generic, check the type arguments.
-  if (auto bgt = type->getAs<BoundGenericType>()) {
-    for (auto tyarg : bgt->getGenericArgs()) {
-      if (!typeIsSpecialized(tyarg))
-        return false;
-    }
-    
-    return true;
-  }
-  
-  // If it's a tuple, check the members.
-  if (auto tupleTy = type->getAs<TupleType>()) {
-    for (auto elementTy : tupleTy->getElementTypes()) {
-      if (!typeIsSpecialized(elementTy))
-        return false;
-    }
-    
-    return true;
-  }
-  
-  // If it's an inout type, check the inner type.
-  if (auto inoutTy = type->getAs<InOutType>())
-    return typeIsSpecialized(inoutTy->getObjectType());
-  
-  // If it's a function, check the parameter and return types.
-  if (auto functionTy = type->getAs<AnyFunctionType>())
-    return typeIsSpecialized(functionTy->getResult()) &&
-           typeIsSpecialized(functionTy->getInput());
-
-  // Otherwise, broadly check for type variables.
-  return !type->hasTypeVariable();
-}
-
 /// Conveniently unwrap a paren expression, if necessary.
 static Expr *unwrapParenExpr(Expr *e) {
   if (auto parenExpr = dyn_cast<ParenExpr>(e))
@@ -2772,7 +2711,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
        // InOutExpr needs contextual information otherwise we complain about it
        // not being in an argument context.
        isa<InOutExpr>(subExpr)) &&
-      typeIsSpecialized(subExpr->getType()))
+      !subExpr->getType()->hasTypeVariable())
     return subExpr;
   
   
@@ -2942,7 +2881,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
       return;
 
     // Don't take a constraint that won't tell us anything.
-    if (!typeIsSpecialized(C->getSecondType()))
+    if (C->getSecondType()->hasTypeVariable())
       return;
     
     foundConstraint = C;
@@ -3187,7 +3126,7 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
     if (!resultTy)
       return true;
     
-    if (!typeIsSpecialized(resultTy))
+    if (resultTy->hasTypeVariable())
       resultTy = calleeInfo[0].getResultType();
     
     diagnose(applyExpr->getLoc(), diag::result_type_no_match, resultTy)
@@ -3243,7 +3182,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     auto selfConstraint = CC_ExactMatch;
     auto instanceTy =
       SD->getGetter()->getImplicitSelfDecl()->getType()->getInOutObjectType();
-    if (typeIsSpecialized(baseType) &&
+    if (!baseType->hasTypeVariable() &&
         !CS->TC.isConvertibleTo(baseType, instanceTy, CS->DC)) {
       selfConstraint = CC_SelfMismatch;
     }
@@ -3262,7 +3201,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     if (!resultTy)
       return true;
     
-    if (typeIsSpecialized(resultTy)) {
+    if (!resultTy->hasTypeVariable()) {
       // If we got a strong type back, then we know what the subscript produced.
     } else if (calleeInfo.size() == 1) {
       // If we have one candidate, the result must be what that candidate
@@ -3312,7 +3251,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // non-function/non-metatype type, then we cannot call it!
   auto fnType = fnExpr->getType()->getRValueType();
 
-  if (typeIsSpecialized(fnType) &&
+  if (!fnType->hasTypeVariable() &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
     diagnose(callExpr->getArg()->getStartLoc(),
              diag::cannot_call_non_function_value, fnExpr->getType())
@@ -3323,7 +3262,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 #if 0
   Type argType;  // Type of the argument list, if knowable.
   if (auto FTy = fnType->getAs<AnyFunctionType>())
-    if (typeIsSpecialized(FTy->getInput()))
+    if (!FTy->getInput()->hasTypeVariable())
       argType = FTy->getInput();
 #endif
 
@@ -3355,7 +3294,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     // The most common unnamed value of closure type is a ClosureExpr, so
     // special case it.
     if (auto CE = dyn_cast<ClosureExpr>(fnExpr->getSemanticsProvidingExpr())) {
-      if (!typeIsSpecialized(fnType))
+      if (fnType->hasTypeVariable())
         diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure, argString)
           .highlight(fnExpr->getSourceRange());
       else
@@ -3372,7 +3311,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
                  diag::mult_stmt_closures_require_explicit_result);
       }
 
-    } else if (!typeIsSpecialized(fnType)) {
+    } else if (fnType->hasTypeVariable()) {
       diagnose(argExpr->getStartLoc(), diag::cannot_call_function_value,
                argString)
         .highlight(fnExpr->getSourceRange());
