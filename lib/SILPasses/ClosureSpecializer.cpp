@@ -144,7 +144,7 @@ struct ClosureInfo;
 
 class CallSiteDescriptor {
   ClosureInfo *CInfo;
-  ApplyInst *AI;
+  FullApplySite AI;
   unsigned ClosureIndex;
   SILParameterInfo ClosureParamInfo;
 
@@ -153,7 +153,7 @@ class CallSiteDescriptor {
   llvm::TinyPtrVector<SILBasicBlock *> NonFailureExitBBs;
 
 public:
-  CallSiteDescriptor(ClosureInfo *CInfo, ApplyInst *AI,
+  CallSiteDescriptor(ClosureInfo *CInfo, FullApplySite AI,
                      unsigned ClosureIndex, SILParameterInfo ClosureParamInfo,
                      llvm::TinyPtrVector<SILBasicBlock *> &&NonFailureExitBBs)
     : CInfo(CInfo), AI(AI), ClosureIndex(ClosureIndex),
@@ -164,7 +164,7 @@ public:
   CallSiteDescriptor &operator=(CallSiteDescriptor &&) =default;
 
   SILFunction *getApplyCallee() const {
-    return cast<FunctionRefInst>(AI->getCallee())->getReferencedFunction();
+    return cast<FunctionRefInst>(AI.getCallee())->getReferencedFunction();
   }
 
   SILFunction *getClosureCallee() const {
@@ -196,7 +196,7 @@ public:
                                        getClosure()->getType(0));
   }
 
-  ApplyInst *getApplyInst() const { return AI; }
+  FullApplySite getApplyInst() const { return AI; }
 
   void createName(llvm::SmallString<64> &NewName) const;
 
@@ -232,7 +232,7 @@ public:
 
   SILLocation getLoc() const { return getClosure()->getLoc(); }
 
-  SILModule &getModule() const { return AI->getModule(); }
+  SILModule &getModule() const { return AI.getModule(); }
 
   ArrayRef<SILBasicBlock *> getNonFailureExitBBs() const {
     return NonFailureExitBBs;
@@ -264,15 +264,15 @@ SILInstruction *CallSiteDescriptor::getClosure() const {
 static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
                              SILFunction *NewF,
                              CallGraph &CG) {
-  ApplyInst *AI = CSDesc.getApplyInst();
+  FullApplySite AI = CSDesc.getApplyInst();
   SILInstruction *Closure = CSDesc.getClosure();
   SILBuilderWithScope<2> Builder(Closure);
-  FunctionRefInst *FRI = Builder.createFunctionRef(AI->getLoc(), NewF);
+  FunctionRefInst *FRI = Builder.createFunctionRef(AI.getLoc(), NewF);
 
   // Create the args for the new apply by removing the closure argument...
   llvm::SmallVector<SILValue, 8> NewArgs;
   unsigned Index = 0;
-  for (auto Arg : AI->getArguments()) {
+  for (auto Arg : AI.getArguments()) {
     if (Index != CSDesc.getClosureIndex())
       NewArgs.push_back(Arg);
     Index++;
@@ -330,14 +330,14 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
     //    }
     //               release %arg
     //
-    if (AI->getParent() != Closure->getParent()) {
+    if (AI.getParent() != Closure->getParent()) {
       // Emit the retain and release that keeps the argument life across the
       // callee using the closure.
       CSDesc.extendArgumentLifetime(Arg);
 
       // Emit the retain that matches the captured argument by the partial_apply
       // in the callee that is consumed by the partial_apply.
-      Builder.setInsertionPoint(AI);
+      Builder.setInsertionPoint(AI.getInstruction());
       Builder.createRetainValue(Closure->getLoc(), Arg);
     } else {
       Builder.createRetainValue(Closure->getLoc(), Arg);
@@ -346,23 +346,42 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
 
   SILType LoweredType = NewF->getLoweredType();
   SILType ResultType = LoweredType.castTo<SILFunctionType>()->getSILResult();
-  Builder.setInsertionPoint(AI);
-  ApplyInst *NewAI = Builder.createApply(AI->getLoc(), FRI, LoweredType,
-                                         ResultType, ArrayRef<Substitution>(),
-                                         NewArgs);
-
-  // If we passed in the original closure as @owned, then insert a release right
-  // after NewAI. This is to balance the +1 from being an @owned argument to AI.
-  if (CSDesc.isClosureConsumed() && CSDesc.closureHasRefSemanticContext())
-    Builder.createReleaseValue(Closure->getLoc(), Closure);
+  Builder.setInsertionPoint(AI.getInstruction());
+  FullApplySite NewAI;
+  if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
+    NewAI = Builder.createTryApply(AI.getLoc(), FRI, LoweredType,
+                                   ArrayRef<Substitution>(),
+                                   NewArgs,
+                                   TAI->getNormalBB(), TAI->getErrorBB());
+    // If we passed in the original closure as @owned, then insert a release
+    // right after NewAI. This is to balance the +1 from being an @owned
+    // argument to AI.
+    if (CSDesc.isClosureConsumed() && CSDesc.closureHasRefSemanticContext()) {
+      Builder.setInsertionPoint(TAI->getNormalBB()->begin());
+      Builder.createReleaseValue(Closure->getLoc(), Closure);
+      Builder.setInsertionPoint(TAI->getErrorBB()->begin());
+      Builder.createReleaseValue(Closure->getLoc(), Closure);
+      Builder.setInsertionPoint(AI.getInstruction());
+    }
+  } else {
+    NewAI = Builder.createApply(AI.getLoc(), FRI, LoweredType,
+                                ResultType, ArrayRef<Substitution>(),
+                                NewArgs);
+    // If we passed in the original closure as @owned, then insert a release
+    // right after NewAI. This is to balance the +1 from being an @owned
+    // argument to AI.
+    if (CSDesc.isClosureConsumed() && CSDesc.closureHasRefSemanticContext())
+      Builder.createReleaseValue(Closure->getLoc(), Closure);
+  }
 
   CallGraphEditor Editor(CG);
   Editor.replaceApplyWithNew(AI, NewAI);
 
   // Replace all uses of the old apply with the new apply.
-  AI->replaceAllUsesWith(NewAI);
+  if (isa<ApplyInst>(AI))
+    AI.getInstruction()->replaceAllUsesWith(NewAI.getInstruction());
   // Erase the old apply.
-  AI->eraseFromParent();
+  AI.getInstruction()->eraseFromParent();
 
   // TODO: Maybe include invalidation code for CallSiteDescriptor after we erase
   // AI from parent?
@@ -636,13 +655,13 @@ void ClosureSpecCloner::populateCloned() {
       // cast failure in debug builds.
       auto *Unreachable = cast<UnreachableInst>(TI);
       auto PrevIter = std::prev(SILBasicBlock::iterator(Unreachable));
-      auto *NoReturnApply = cast<ApplyInst>(PrevIter);
+      auto NoReturnApply = FullApplySite::isa(PrevIter);
 
       // We insert the release value right before the no return apply so that if
       // the partial apply is passed into the @noreturn function as an @owned
       // value, we will retain the partial apply before we release it and
       // potentially eliminate it.
-      Builder.setInsertionPoint(NoReturnApply);
+      Builder.setInsertionPoint(NoReturnApply.getInstruction());
       Builder.createReleaseValue(Loc, SILValue(NewClosure));
     }
   }
@@ -665,7 +684,7 @@ public:
 
   void gatherCallSites(SILFunction *Caller,
                        llvm::SmallVectorImpl<ClosureInfo*> &ClosureCandidates,
-                       llvm::SmallPtrSet<ApplyInst *, 4> &MultipleClosureAI);
+                       llvm::DenseSet<FullApplySite> &MultipleClosureAI);
   bool specialize(SILFunction *Caller, CallGraph &CG);
 
   ArrayRef<SILInstruction *> getPropagatedClosures() {
@@ -684,11 +703,11 @@ public:
 void ClosureSpecializer::gatherCallSites(
     SILFunction *Caller,
     llvm::SmallVectorImpl<ClosureInfo*> &ClosureCandidates,
-    llvm::SmallPtrSet<ApplyInst *, 4> &MultipleClosureAI) {
+    llvm::DenseSet<FullApplySite> &MultipleClosureAI) {
 
   // A set of apply inst that we have associated with a closure. We use this to
   // make sure that we do not handle call sites with multiple closure arguments.
-  llvm::SmallPtrSet<ApplyInst *, 4> VisitedAI;
+  llvm::DenseSet<FullApplySite> VisitedAI;
 
   // For each basic block BB in Caller...
   for (auto &BB : *Caller) {
@@ -706,8 +725,8 @@ void ClosureSpecializer::gatherCallSites(
         // If this use use is not an apply inst or an apply inst with
         // substitutions, there is nothing interesting for us to do, so
         // continue...
-        auto *AI = dyn_cast<ApplyInst>(Use->getUser());
-        if (!AI || AI->hasSubstitutions())
+        auto AI = FullApplySite::isa(Use->getUser());
+        if (!AI || AI.hasSubstitutions())
           continue;
 
         // Check if we have already associated this apply inst with a closure to
@@ -720,7 +739,7 @@ void ClosureSpecializer::gatherCallSites(
 
         // If AI does not have a function_ref definition as its callee, we can
         // not do anything here... so continue...
-        auto *ApplyCalleeFRI = dyn_cast<FunctionRefInst>(AI->getCallee());
+        auto *ApplyCalleeFRI = dyn_cast<FunctionRefInst>(AI.getCallee());
         if (!ApplyCalleeFRI)
           continue;
         SILFunction *ApplyCallee = ApplyCalleeFRI->getReferencedFunction();
@@ -731,12 +750,12 @@ void ClosureSpecializer::gatherCallSites(
         // not the optimization is profitable. Find the index of the argument
         // corresponding to our partial apply.
         Optional<unsigned> ClosureIndex;
-        for (unsigned i = 0, e = AI->getNumArguments(); i != e; ++i) {
-          if (AI->getArgument(i) != SILValue(&II))
+        for (unsigned i = 0, e = AI.getNumArguments(); i != e; ++i) {
+          if (AI.getArgument(i) != SILValue(&II))
             continue;
           ClosureIndex = i;
           DEBUG(llvm::dbgs() << "    Found callsite with closure argument at "
-                << i << ": " << *AI);
+                << i << ": " << *AI.getInstruction());
           break;
         }
 
@@ -753,14 +772,14 @@ void ClosureSpecializer::gatherCallSites(
         // partial apply?
         SILValue Arg = ApplyCallee->getArgument(ClosureIndex.getValue());
         if (std::none_of(Arg->use_begin(), Arg->use_end(),
-                         [&Arg](const Operand *Op) -> bool {
-                           auto *UserAI = dyn_cast<ApplyInst>(Op->getUser());
-                           return UserAI && UserAI->getCallee() == Arg;
+                         [&Arg](Operand *Op) -> bool {
+                           auto UserAI = FullApplySite::isa(Op->getUser());
+                           return UserAI && UserAI.getCallee() == Arg;
                          })) {
           continue;
         }
 
-        auto ParamInfo = AI->getSubstCalleeType()->getParameters();
+        auto ParamInfo = AI.getSubstCalleeType()->getParameters();
         SILParameterInfo ClosureParamInfo = ParamInfo[ClosureIndex.getValue()];
 
         // Get all non-failure exit BBs in the Apply Callee if our partial apply
@@ -802,7 +821,7 @@ bool ClosureSpecializer::specialize(SILFunction *Caller,
   // Collect all of the PartialApplyInsts that are used as arguments to
   // ApplyInsts. Check the profitability of specializing the closure argument.
   llvm::SmallVector<ClosureInfo*, 8> ClosureCandidates;
-  llvm::SmallPtrSet<ApplyInst *, 4> MultipleClosureAI;
+  llvm::DenseSet<FullApplySite> MultipleClosureAI;
   gatherCallSites(Caller, ClosureCandidates, MultipleClosureAI);
 
   bool Changed = false;
