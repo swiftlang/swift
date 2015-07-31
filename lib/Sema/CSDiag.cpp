@@ -1157,13 +1157,13 @@ getBoundTypesFromConstraint(ConstraintSystem *CS, Expr *expr,
                                type2->getLValueOrInOutObjectType());
 }
 
-/// Determine if a type resulting from a failed typecheck operation is fully-
-/// specialized, or if it still has type variable type arguments.
+/// Determine if a type resulting from a typecheck operation is
+/// fully-specialized, or if it still has type variable type arguments.
 /// (This diverges slightly from hasTypeVariable, in that certain tyvars,
 /// such as for nil literals, will be treated as specialized.)
-static bool typeIsNotSpecialized(Type type) {
+static bool typeIsSpecialized(Type type) {
   if (type.isNull())
-    return true;
+    return false;
   
   if (auto tv = type->getAs<TypeVariableType>()) {
     // If it's a nil-literal conformance, there's no reason to re-specialize.
@@ -1174,11 +1174,11 @@ static bool typeIsNotSpecialized(Type type) {
       if (knownProtoKind.hasValue() &&
           (knownProtoKind.getValue() ==
            KnownProtocolKind::NilLiteralConvertible)) {
-        return false;
+        return true;
       }
     }
     
-    return true;
+    return false;
   }
   
   // Desugar, if necessary.
@@ -1188,39 +1188,34 @@ static bool typeIsNotSpecialized(Type type) {
   // If it's generic, check the type arguments.
   if (auto bgt = type->getAs<BoundGenericType>()) {
     for (auto tyarg : bgt->getGenericArgs()) {
-      if (typeIsNotSpecialized(tyarg))
-        return true;
+      if (!typeIsSpecialized(tyarg))
+        return false;
     }
     
-    return false;
+    return true;
   }
   
   // If it's a tuple, check the members.
   if (auto tupleTy = type->getAs<TupleType>()) {
     for (auto elementTy : tupleTy->getElementTypes()) {
-      if (typeIsNotSpecialized((elementTy)))
-        return true;
+      if (!typeIsSpecialized(elementTy))
+        return false;
     }
     
-    return false;
+    return true;
   }
   
   // If it's an inout type, check the inner type.
-  if (auto inoutTy = type->getAs<InOutType>()) {
-    return typeIsNotSpecialized(inoutTy->getObjectType());
-  }
+  if (auto inoutTy = type->getAs<InOutType>())
+    return typeIsSpecialized(inoutTy->getObjectType());
   
   // If it's a function, check the parameter and return types.
-  if (auto functionTy = type->getAs<AnyFunctionType>()) {
-    if (typeIsNotSpecialized(functionTy->getResult()) ||
-        typeIsNotSpecialized(functionTy->getInput()))
-      return true;
-    
-    return false;
-  }
-  
+  if (auto functionTy = type->getAs<AnyFunctionType>())
+    return typeIsSpecialized(functionTy->getResult()) &&
+           typeIsSpecialized(functionTy->getInput());
+
   // Otherwise, broadly check for type variables.
-  return type->hasTypeVariable();
+  return !type->hasTypeVariable();
 }
 
 /// Conveniently unwrap a paren expression, if necessary.
@@ -2777,7 +2772,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
        // InOutExpr needs contextual information otherwise we complain about it
        // not being in an argument context.
        isa<InOutExpr>(subExpr)) &&
-      !typeIsNotSpecialized(subExpr->getType()))
+      typeIsSpecialized(subExpr->getType()))
     return subExpr;
   
   
@@ -2947,7 +2942,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
       return;
 
     // Don't take a constraint that won't tell us anything.
-    if (typeIsNotSpecialized(C->getSecondType()))
+    if (!typeIsSpecialized(C->getSecondType()))
       return;
     
     foundConstraint = C;
@@ -3192,7 +3187,7 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
     if (!resultTy)
       return true;
     
-    if (typeIsNotSpecialized(resultTy))
+    if (!typeIsSpecialized(resultTy))
       resultTy = calleeInfo[0].getResultType();
     
     diagnose(applyExpr->getLoc(), diag::result_type_no_match, resultTy)
@@ -3248,7 +3243,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     auto selfConstraint = CC_ExactMatch;
     auto instanceTy =
       SD->getGetter()->getImplicitSelfDecl()->getType()->getInOutObjectType();
-    if (!typeIsNotSpecialized(baseType) &&
+    if (typeIsSpecialized(baseType) &&
         !CS->TC.isConvertibleTo(baseType, instanceTy, CS->DC)) {
       selfConstraint = CC_SelfMismatch;
     }
@@ -3267,7 +3262,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     if (!resultTy)
       return true;
     
-    if (!typeIsNotSpecialized(resultTy)) {
+    if (typeIsSpecialized(resultTy)) {
       // If we got a strong type back, then we know what the subscript produced.
     } else if (calleeInfo.size() == 1) {
       // If we have one candidate, the result must be what that candidate
@@ -3317,7 +3312,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // non-function/non-metatype type, then we cannot call it!
   auto fnType = fnExpr->getType()->getRValueType();
 
-  if (!typeIsNotSpecialized(fnType) &&
+  if (typeIsSpecialized(fnType) &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
     diagnose(callExpr->getArg()->getStartLoc(),
              diag::cannot_call_non_function_value, fnExpr->getType())
@@ -3328,7 +3323,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 #if 0
   Type argType;  // Type of the argument list, if knowable.
   if (auto FTy = fnType->getAs<AnyFunctionType>())
-    if (!typeIsNotSpecialized(FTy->getInput()))
+    if (typeIsSpecialized(FTy->getInput()))
       argType = FTy->getInput();
 #endif
 
@@ -3360,7 +3355,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     // The most common unnamed value of closure type is a ClosureExpr, so
     // special case it.
     if (auto CE = dyn_cast<ClosureExpr>(fnExpr->getSemanticsProvidingExpr())) {
-      if (typeIsNotSpecialized(fnType))
+      if (!typeIsSpecialized(fnType))
         diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure, argString)
           .highlight(fnExpr->getSourceRange());
       else
@@ -3377,7 +3372,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
                  diag::mult_stmt_closures_require_explicit_result);
       }
 
-    } else if (typeIsNotSpecialized(fnType)) {
+    } else if (!typeIsSpecialized(fnType)) {
       diagnose(argExpr->getStartLoc(), diag::cannot_call_function_value,
                argString)
         .highlight(fnExpr->getSourceRange());
