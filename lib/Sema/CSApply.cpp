@@ -2782,7 +2782,7 @@ namespace {
                       diag::delegate_chain_nonoptional_to_optional,
                       !isDelegating, ctor->getFullName());
           tc.diagnose(otherCtorRef->getLoc(), diag::init_force_unwrap)
-            .fixItInsertAfter(otherCtorRef->getLoc(), "!");
+            .fixItInsertAfter(expr->getEndLoc(), "!");
           tc.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
             .fixItInsertAfter(inCtor->getLoc(), "?");
         }

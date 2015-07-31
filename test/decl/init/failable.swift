@@ -51,7 +51,7 @@ class Sub : Super {
 
   init(nonfail: Int) { // expected-note{{propagate the failure with 'init?'}}{{7-7=?}}
     super.init(fail: "boom") // expected-error{{a non-failable initializer cannot chain to failable initializer 'init(fail:)' written with 'init?'}}
-    // expected-note@-1{{force potentially-failing result with '!'}}{{15-15=!}}
+    // expected-note@-1{{force potentially-failing result with '!'}}{{29-29=!}}
   }
 
   convenience init(forceNonfail: Int) {
@@ -101,7 +101,7 @@ extension Super {
 
   convenience init(convenienceNonFailFail: String) { // expected-note{{propagate the failure with 'init?'}}{{19-19=?}}
     self.init(fail: convenienceNonFailFail) // expected-error{{a non-failable initializer cannot delegate to failable initializer 'init(fail:)' written with 'init?'}}
-    // expected-note@-1{{force potentially-failing result with '!'}}{{14-14=!}}
+    // expected-note@-1{{force potentially-failing result with '!'}}{{44-44=!}}
   }
 
   convenience init(convenienceNonFailFailForce: String) {
@@ -140,7 +140,7 @@ extension Super {
 struct SomeStruct {
    init(nonFail: Int) { // expected-note{{propagate the failure with 'init?'}}{{8-8=?}}
     self.init(fail: nonFail) // expected-error{{a non-failable initializer cannot delegate to failable initializer 'init(fail:)' written with 'init?'}}
-    // expected-note@-1{{force potentially-failing result with '!'}}{{14-14=!}}
+    // expected-note@-1{{force potentially-failing result with '!'}}{{29-29=!}}
   }
 
    init(nonFail2: Int) {
