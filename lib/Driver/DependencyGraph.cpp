@@ -79,12 +79,17 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
     if (isa<yaml::NullNode>(i->getValue()))
       continue;
 
-    auto *key = cast<yaml::ScalarNode>(i->getKey());
+    auto *key = dyn_cast<yaml::ScalarNode>(i->getKey());
+    if (!key)
+      return LoadResult::HadError;
     StringRef keyString = key->getValue(scratch);
     LoadResult resultUpdate;
 
     if (keyString == "interface-hash") {
-      auto *value = cast<yaml::ScalarNode>(i->getValue());
+      auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
+      if (!value)
+        return LoadResult::HadError;
+
       StringRef valueString = value->getValue(scratch);
       resultUpdate = interfaceHashCallback(valueString);
 
@@ -122,24 +127,40 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
                              DependencyDirection::Provides))
         .Case("provides-dynamic-lookup",
               std::make_pair(DependencyKind::DynamicLookupName,
-                             DependencyDirection::Provides));
+                             DependencyDirection::Provides))
+        .Default(std::make_pair(DependencyKind(),
+                                DependencyDirection::Depends));
+      if (dirAndKind.first == DependencyKind())
+        return LoadResult::HadError;
 
-      auto *entries = cast<yaml::SequenceNode>(i->getValue());
+      auto *entries = dyn_cast<yaml::SequenceNode>(i->getValue());
+      if (!entries)
+        return LoadResult::HadError;
+
       if (dirAndKind.first == DependencyKind::NominalTypeMember) {
         // Handle member dependencies specially. Rather than being a single
         // string, they come in the form ["{MangledBaseName}", "memberName"].
         for (yaml::Node &rawEntry : *entries) {
           bool isCascading = rawEntry.getRawTag() != "!private";
 
-          auto &entry = cast<yaml::SequenceNode>(rawEntry);
-          auto iter = entry.begin();
-          auto &base = cast<yaml::ScalarNode>(*iter);
+          auto *entry = dyn_cast<yaml::SequenceNode>(&rawEntry);
+          if (!entry)
+            return LoadResult::HadError;
+
+          auto iter = entry->begin();
+          auto *base = dyn_cast<yaml::ScalarNode>(&*iter);
+          if (!base)
+            return LoadResult::HadError;
           ++iter;
-          auto &member = cast<yaml::ScalarNode>(*iter);
+
+          auto *member = dyn_cast<yaml::ScalarNode>(&*iter);
+          if (!member)
+            return LoadResult::HadError;
           ++iter;
+
           // FIXME: LLVM's YAML support doesn't implement == correctly for end
           // iterators.
-          assert(!(iter != entry.end()));
+          assert(!(iter != entry->end()));
 
           bool isDepends = dirAndKind.second == DependencyDirection::Depends;
           auto &callback = isDepends ? dependsCallback : providesCallback;
@@ -147,22 +168,24 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
           // Smash the type and member names together so we can continue using
           // StringMap.
           SmallString<64> appended;
-          appended += base.getValue(scratch);
+          appended += base->getValue(scratch);
           appended.push_back('\0');
-          appended += member.getValue(scratch);
+          appended += member->getValue(scratch);
 
           resultUpdate = callback(appended.str(), dirAndKind.first,
                                   isCascading);
         }
       } else {
         for (const yaml::Node &rawEntry : *entries) {
-          auto &entry = cast<yaml::ScalarNode>(rawEntry);
+          auto *entry = dyn_cast<yaml::ScalarNode>(&rawEntry);
+          if (!entry)
+            return LoadResult::HadError;
 
           bool isDepends = dirAndKind.second == DependencyDirection::Depends;
           auto &callback = isDepends ? dependsCallback : providesCallback;
 
-          resultUpdate = callback(entry.getValue(scratch), dirAndKind.first,
-                                  entry.getRawTag() != "!private");
+          resultUpdate = callback(entry->getValue(scratch), dirAndKind.first,
+                                  entry->getRawTag() != "!private");
         }
       }
     }
