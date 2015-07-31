@@ -1940,10 +1940,7 @@ class FailureDiagnosis :public ASTVisitor<FailureDiagnosis, /*exprresult*/bool>{
   // to determine the appropriate diagnostic.
   Constraint *conversionConstraint = nullptr;
   Constraint *overloadConstraint = nullptr;
-  Constraint *memberConstraint = nullptr;
-  Constraint *argumentConstraint = nullptr;
-  Constraint *conformanceConstraint = nullptr;
-  
+
 public:
   
   FailureDiagnosis(Expr *expr, ConstraintSystem *CS);
@@ -2045,6 +2042,7 @@ static bool isConversionConstraint(const Constraint *C) {
   switch (C->getKind()) {
   case ConstraintKind::Conversion:
   case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -2065,11 +2063,7 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   // If the constraint system had a failure constraint, it takes precedence over
   // other random constraints in the system.
   if (auto constraint = CS->failedConstraint) {
-    if (constraint->getKind() == ConstraintKind::ValueMember ||
-        constraint->getKind() == ConstraintKind::UnresolvedValueMember ||
-        constraint->getKind() == ConstraintKind::TypeMember) {
-      memberConstraint = constraint;
-    } else if (constraint->getKind() == ConstraintKind::BindOverload) {
+    if (constraint->getKind() == ConstraintKind::BindOverload) {
       overloadConstraint = CS->failedConstraint;
     } else if (isConversionConstraint(constraint))
       conversionConstraint = CS->failedConstraint;
@@ -2077,6 +2071,8 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
     
   Constraint *fallbackConstraint = nullptr;
   Constraint *disjunctionConversionConstraint = nullptr;
+  Constraint *conformanceConstraint = nullptr;
+
   for (auto & constraintRef : CS->getConstraints()) {
     auto constraint = &constraintRef;
     
@@ -2094,23 +2090,7 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
         constraint->getKind() == ConstraintKind::ConformsTo) {
       conformanceConstraint = constraint;
     }
-    
-    // Failed binding constraints point to a missing member.
-    if ((!memberConstraint || constraint->isFavored()) &&
-        (constraint->getKind() == ConstraintKind::ValueMember ||
-         constraint->getKind() == ConstraintKind::UnresolvedValueMember ||
-         constraint->getKind() == ConstraintKind::TypeMember)) {
-          memberConstraint = constraint;
-        }
-    
-    // A missed argument conversion can result in better error messages when
-    // a user passes the wrong arguments to a function application.
-    if (!argumentConstraint || constraint->isFavored()) {
-      argumentConstraint = getConstraintChoice(constraint,
-                                               ConstraintKind::
-                                               ArgumentTupleConversion);
-    }
-    
+
     // Overload resolution failures are often nicely descriptive, so store
     // off the first one we find.
     if (!overloadConstraint || constraint->isFavored()) {
@@ -2132,24 +2112,22 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
       getConstraintChoice(constraint, ConstraintKind::Conversion, true);
     }
   }
-  
+
   // If no more descriptive constraint was found, use the fallback constraint.
-  if (fallbackConstraint &&
-      !(conversionConstraint || overloadConstraint || argumentConstraint)) {
-        
-        if (fallbackConstraint->getKind() == ConstraintKind::ArgumentConversion)
-          argumentConstraint = fallbackConstraint;
-        else
-          conversionConstraint = fallbackConstraint;
-      }
-  
+  if (fallbackConstraint && !(conversionConstraint || overloadConstraint))
+    conversionConstraint = fallbackConstraint;
+
   // If there's still no conversion to diagnose, use the disjunction conversion.
   if (!conversionConstraint)
     conversionConstraint = disjunctionConversionConstraint;
-  
+
+    if (conversionConstraint && conformanceConstraint &&
+        conformanceConstraint->getTypeVariables().size() <
+          conversionConstraint->getTypeVariables().size())
+      conversionConstraint = conformanceConstraint;
+
   // If there was already a conversion failure, use it.
-  if (!conversionConstraint &&
-      CS->failedConstraint &&
+  if (!conversionConstraint && CS->failedConstraint &&
       CS->failedConstraint->getKind() != ConstraintKind::Disjunction) {
     conversionConstraint = CS->failedConstraint;
   }
@@ -2157,7 +2135,24 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
 
 
 bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
-  
+  // Check to see if we have any member constraints to diagnose.
+  Constraint *memberConstraint = nullptr;
+  auto considerConstraint = [&](Constraint *C) {
+    // If we've already found a good candidate, ignore other options.
+    if (memberConstraint && !C->isFavored()) return;
+
+    if (C->getKind() == ConstraintKind::ValueMember ||
+        C->getKind() == ConstraintKind::UnresolvedValueMember ||
+        C->getKind() == ConstraintKind::TypeMember)
+      memberConstraint = C;
+  };
+
+  // Look at the failed constraint and the general constraint list.
+  if (CS->failedConstraint)
+    considerConstraint(CS->failedConstraint);
+  for (auto &C : CS->getConstraints())
+    considerConstraint(&C);
+
   if (!memberConstraint) return false;
   
   assert(memberConstraint->getKind() == ConstraintKind::ValueMember ||
@@ -2243,7 +2238,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
     // subexpression.  Diagnose it in conversion constraint stuff, instead of
     // doing saying that we don't have an element of some undefined type.
     if (conversionConstraint && isConversionConstraint(conversionConstraint))
-      return false;
+      return diagnoseGeneralConversionFailure();
       
     // FIXME: This is a really useless error for this, it should be more along
     // the lines of "could not infer base type".
@@ -2257,7 +2252,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
     return true;
   case MemberLookupResult::ErrorDoesNotHaveInitOnInstance:
     // FIXME: Turn this into a normal lookup fail.
-    return false;
+    return diagnoseGeneralConversionFailure();
       
   case MemberLookupResult::HasResults:
     break;
@@ -2271,7 +2266,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
     // This leads us to focusing in on constraints that *are* solvable, and
     // producing laughably incorrect diagnostics.  We need a way for the
     // solver to reconsider all solvable constraints in a failed system.
-    return false;
+    return diagnoseGeneralConversionFailure();
   }
 
   // If we found no results at all, mention that fact.
@@ -2440,19 +2435,11 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   
   // Otherwise, if we have a conversion constraint, use that as the basis for
   // the diagnostic.
-  if (!conversionConstraint && !argumentConstraint)
+  if (!conversionConstraint)
     return false;
   
-  auto constraint =
-    argumentConstraint ? argumentConstraint : conversionConstraint;
-  
-  if (conformanceConstraint) {
-    if (conformanceConstraint->getTypeVariables().size() <
-        constraint->getTypeVariables().size()) {
-      constraint = conformanceConstraint;
-    }
-  }
-  
+  auto constraint = conversionConstraint;
+
   auto anchor = expr;
   if (auto locator = constraint->getLocator()) {
     anchor = simplifyLocatorToAnchor(*CS, locator);
@@ -2463,7 +2450,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   std::pair<Type, Type> types = getBoundTypesFromConstraint(CS, anchor,
                                                             constraint);
   
-  if (argumentConstraint) {
+  if (constraint->getKind() == ConstraintKind::ArgumentTupleConversion ||
+      constraint->getKind() == ConstraintKind::ArgumentConversion) {
     diagnose(anchor->getLoc(), diag::could_not_convert_argument, types.first)
       .highlight(anchor->getSourceRange());
     return true;
@@ -3153,7 +3141,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   // have been what we were looking for - diagnose this as a conversion
   // failure.
   if (calleeInfo.closeness == CC_ExactMatch)
-    return diagnoseGeneralConversionFailure();
+    return diagnoseGeneralFailure();
   
   // A common error is to apply an operator that only has an inout LHS (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -3711,7 +3699,7 @@ bool ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
       
       return true;
     }
-    
+
     if (auto dot = dyn_cast<UnresolvedDotExpr>(expr)) {
       TC.diagnose(expr->getLoc(),
                   diag::not_enough_context_for_generic_method_reference,
