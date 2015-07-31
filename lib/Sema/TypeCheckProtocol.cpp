@@ -3813,6 +3813,14 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
     return;
   }
 
+  // As a special case, diagnose conversion to NilLiteralConvertible, since we
+  // know this is something involving 'nil'.
+  if (Proto->isSpecificProtocol(KnownProtocolKind::NilLiteralConvertible)) {
+    TC.diagnose(ComplainLoc, diag::cannot_use_nil_with_this_type, T);
+    return;
+  }
+
+
   TC.diagnose(ComplainLoc, diag::type_does_not_conform,
               T, Proto->getDeclaredType());
 }

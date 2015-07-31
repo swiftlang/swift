@@ -2428,7 +2428,6 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
       }
     }
 
-    
     return true;
   }
   
@@ -2436,6 +2435,14 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   switch (constraint->getKind()) {
   case ConstraintKind::ConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
+    if (auto pt = toType->getAs<ProtocolType>())
+      if (pt->getDecl()->
+          isSpecificProtocol(KnownProtocolKind::NilLiteralConvertible)) {
+        diagnose(expr->getLoc(), diag::cannot_use_nil_with_this_type, toType)
+          .highlight(expr->getSourceRange());
+        return true;
+      }
+
     diagnose(anchor->getLoc(), diag::type_does_not_conform,
              fromType, toType)
       .highlight(expr->getSourceRange());
@@ -2947,6 +2954,15 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
   default: llvm_unreachable("list out of sync with isConversionConstraint");
   case ConstraintKind::ConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
+    if (auto pt = contextualType->getAs<ProtocolType>())
+      if (pt->getDecl()->
+          isSpecificProtocol(KnownProtocolKind::NilLiteralConvertible)) {
+        diagnose(expr->getLoc(), diag::cannot_use_nil_with_this_type,
+                 contextualType)
+          .highlight(expr->getSourceRange());
+        return true;
+      }
+
     diagnose(expr->getLoc(), diag::type_does_not_conform,
              exprType, contextualType)
       .highlight(expr->getSourceRange());
