@@ -86,7 +86,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
         p++.initialize(unsafeBitCast(bridged!, TargetElement.self))
       }
     }
-    return Array(_ArrayBuffer(buf))
+    return Array(_ArrayBuffer(buf, shiftedToStartIndex: 0))
     
   case (.Value, .Explicit):
     _sanityCheckFailure(
@@ -152,7 +152,7 @@ internal func _arrayConditionalBridgeElements<SourceElement, TargetElement>(
   let buf = _ContiguousArrayBuffer<TargetElement>(
     count: source.count, minimumCapacity: 0)
   
-  var p = buf.baseAddress
+  var p = buf.firstElementAddress
   
 ElementwiseBridging:
   repeat {
@@ -164,12 +164,12 @@ ElementwiseBridging:
       }
       p++.initialize(value!)
     }
-    return Array(_ArrayBuffer(buf))
+    return Array(_ArrayBuffer(buf, shiftedToStartIndex: 0))
   }
   while false
   
   // Don't destroy anything we never created.
-  buf.count = p - buf.baseAddress
+  buf.count = p - buf.firstElementAddress
   
   // Report failure
   return nil

@@ -81,7 +81,8 @@ public struct _ArrayBuffer<Element> : _ArrayBufferType {
 
 extension _ArrayBuffer {
   /// Adopt the storage of `source`.
-  public init(_ source: NativeBuffer) {
+  public init(_ source: NativeBuffer, shiftedToStartIndex: Int) {
+    _sanityCheck(shiftedToStartIndex == 0, "shiftedToStartIndex must be 0")
     _storage = _ArrayBridgeStorage(native: source._storage)
   }
 
@@ -157,21 +158,6 @@ extension _ArrayBuffer {
     return _fastPath(_storage.isNative) ? _native : nil
   }
 
-  /// Replace the given `subRange` with the first `newCount` elements of
-  /// the given collection.
-  ///
-  /// - Requires: This buffer is backed by a uniquely-referenced
-  ///   `_ContiguousArrayBuffer`.
-  public mutating func replace<
-      C: CollectionType where C.Generator.Element == Element
-  >(
-    subRange subRange: Range<Int>,
-    with newCount: Int,
-    elementsOf newValues: C
-  ) {
-    _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
-  }
-
   // We have two versions of type check: one that takes a range and the other
   // checks one element. The reason for this is that the ARC optimizer does not
   // handle loops atm. and so can get blocked by the presence of a loop (over
@@ -238,56 +224,58 @@ extension _ArrayBuffer {
     }
     return result
   }
-  
+
   /// Return a `_SliceBuffer` containing the given `subRange` of values
   /// from this buffer.
   public subscript(subRange: Range<Int>) -> _SliceBuffer<Element> {
     _typeCheck(subRange)
-    
+
     if _fastPath(_isNative) {
       return _native[subRange]
     }
 
-    let nonNative = self._nonNative
-
-    let subRangeCount = subRange.count
-    
     // Look for contiguous storage in the NSArray
+    let nonNative = self._nonNative
     let cocoa = _CocoaArrayWrapper(nonNative)
-    let start = cocoa.contiguousStorage(subRange)
-    if start != nil {
-      return _SliceBuffer(owner: nonNative, start: UnsafeMutablePointer(start),
-          count: subRangeCount, hasNativeBuffer: false)
+    let cocoaStorageBaseAddress = cocoa.contiguousStorage(self.indices)
+
+    if cocoaStorageBaseAddress != nil {
+      return _SliceBuffer(
+        owner: nonNative,
+        subscriptBaseAddress: UnsafeMutablePointer(cocoaStorageBaseAddress),
+        indices: subRange,
+        hasNativeBuffer: false)
     }
-    
+
     // No contiguous storage found; we must allocate
+    let subRangeCount = subRange.count
     let result = _ContiguousArrayBuffer<Element>(
         count: subRangeCount, minimumCapacity: 0)
 
     // Tell Cocoa to copy the objects into our storage
     cocoa.buffer.getObjects(
-      UnsafeMutablePointer(result.baseAddress),
+      UnsafeMutablePointer(result.firstElementAddress),
       range: _SwiftNSRange(location: subRange.startIndex, length: subRangeCount)
     )
 
-    return _SliceBuffer(result)
+    return _SliceBuffer(result, shiftedToStartIndex: subRange.startIndex)
   }
 
-  /// - Precondition: `_isNative` is `true`.
-  internal func _getBaseAddress() -> UnsafeMutablePointer<Element> {
+  public var _unconditionalMutableSubscriptBaseAddress:
+    UnsafeMutablePointer<Element> {
     _sanityCheck(_isNative, "must be a native buffer")
-    return _native.baseAddress
+    return _native.firstElementAddress
   }
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
-  public var baseAddress: UnsafeMutablePointer<Element> {
+  public var firstElementAddress: UnsafeMutablePointer<Element> {
     if (_fastPath(_isNative)) {
-      return _native.baseAddress
+      return _native.firstElementAddress
     }
     return nil
   }
-  
+
   /// The number of elements the buffer stores.
   public var count: Int {
     @inline(__always)
@@ -419,7 +407,7 @@ extension _ArrayBuffer {
   ) rethrows -> R {
     if _fastPath(_isNative) {
       defer { _fixLifetime(self) }
-      return try body(UnsafeBufferPointer(start: self.baseAddress,
+      return try body(UnsafeBufferPointer(start: firstElementAddress,
                                           count: count))
     }
     return try ContiguousArray(self).withUnsafeBufferPointer(body)
@@ -433,12 +421,12 @@ extension _ArrayBuffer {
     @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     _sanityCheck(
-      baseAddress != nil || count == 0,
+      firstElementAddress != nil || count == 0,
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
     )
     defer { _fixLifetime(self) }
     return try body(
-      UnsafeMutableBufferPointer(start: baseAddress, count: count))
+      UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
   }
   
   /// An object that keeps the elements stored in this buffer alive.

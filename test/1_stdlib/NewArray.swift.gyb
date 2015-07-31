@@ -284,46 +284,45 @@ extension ArraySlice {
 func testSlice() {
   print("== ArraySlice ==")
   // CHECK: == ArraySlice ==
-  
+
   // do some tests on the shared semantics
-  var b = ContiguousArray(X(0)..<X(7))
+  var b = ContiguousArray(X(0)..<X(10))
 
   // ArraySlice it
-  var bSlice = b[3..<5]
+  var bSlice = b[3..<8]
   print("<\(bSlice.count)>")
-  // CHECK-NEXT: <2>
-  print("bSlice0: \(bSlice)")           // CHECK-NEXT: bSlice0: [3, 4]
+  // CHECK-NEXT: <5>
+  print("bSlice0: \(bSlice)")      // CHECK-NEXT: bSlice0: [3, 4, 5, 6, 7]
 
   // bSlice += X(11)..<X(13)
 
   // Writing into b does not change bSlice
   b[4] = 41        
-  print("bSlice1: \(bSlice)")           // CHECK-NEXT: bSlice1: [3, 4]
+  print("bSlice1: \(bSlice)")      // CHECK-NEXT: bSlice1: [3, 4, 5, 6, 7]
 
   // Writing into bSlice does not change b
-  bSlice[1] = 42
+  bSlice[3] = 32
 
-  
-  print("bSlice2: \(bSlice)")           // CHECK-NEXT: bSlice2: [3, 42]
-  printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6]
+  print("bSlice2: \(bSlice)")     // CHECK-NEXT: bSlice2: [32, 4, 5, 6, 7]
+  printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6, 7, 8, 9]
 
   var c = b
-  b[4..<b.count].qsort(<)
-  printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 41]
-  printSequence(c)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6]
+  b[b.startIndex..<b.endIndex].qsort(<)
+  printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 7, 8, 9, 41]
+  printSequence(c)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6, 7, 8, 9]
 
   // Now a bridged slice
   var a = Array<NSString>(
     _ArrayBuffer(nsArray: nsArrayOfStrings()._buffer._asCocoaArray()))
-  
+
   printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
-  
+
   var aSlice = a[1..<3]           // CHECK-NEXT: [bar, baz]
-  printSequence(aSlice)  
+  printSequence(aSlice)
 
   // Writing into aSlice works
-  aSlice[0] = "buzz"              // CHECK-NEXT: [buzz, baz]
-  printSequence(aSlice)  
+  aSlice[1] = "buzz"              // CHECK-NEXT: [buzz, baz]
+  printSequence(aSlice)
 
   // ...and doesn't affect a
   printSequence(a)                // CHECK-NEXT: [foo, bar, baz]

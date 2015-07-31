@@ -174,13 +174,21 @@ public struct ${Self}<Element>
 
   /// Always zero, which is the index of the first element when non-empty.
   public var startIndex: Int {
+%if Self == 'ArraySlice':
+    return _buffer.startIndex
+%else:
     return 0
+%end
   }
 
   /// A "past-the-end" element index; the successor of the last valid
   /// subscript argument.
   public var endIndex: Int {
+%if Self == 'ArraySlice':
+    return _buffer.endIndex
+%else:
     return _getCount()
+%end
   }
 
 #if _runtime(_ObjC)
@@ -206,13 +214,13 @@ public struct ${Self}<Element>
 %elif Self == 'ArraySlice':
     addressWithOwner {
       _checkSubscript(index, hoistedIsNativeBuffer: true)
-      return (UnsafePointer(_buffer.baseAddress + index),
+      return (UnsafePointer(_buffer.subscriptBaseAddress + index),
               Builtin.castToUnknownObject(_buffer.owner))
     }
 %else:
     addressWithNativeOwner {
       _checkSubscript(index, hoistedIsNativeBuffer: true)
-      return (UnsafePointer(_buffer.baseAddress + index),
+      return (UnsafePointer(_buffer.subscriptBaseAddress + index),
               Builtin.castToNativeObject(_buffer.owner))
     }
 %end
@@ -305,25 +313,25 @@ public struct ${Self}<Element>
   // Don't inline copyBuffer - this would inline the copy loop into the current
   // path preventing retains/releases to be matched accross that region.
   @inline(never)
-  internal func _copyBuffer(inout buffer: _Buffer) {
+  static internal func _copyBuffer(inout buffer: _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       count: buffer.count, minimumCapacity: buffer.count)
     buffer._uninitializedCopy(
-      0..<count, target: newBuffer.baseAddress)
-    buffer = _Buffer(newBuffer)
+      buffer.indices, target: newBuffer.firstElementAddress)
+    buffer = _Buffer(newBuffer, shiftedToStartIndex: buffer.startIndex)
   }
 
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      _copyBuffer(&_buffer)
+      ${Self}._copyBuffer(&_buffer)
     }
   }
 
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUniqueOrPinned() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
-      _copyBuffer(&_buffer)
+      ${Self}._copyBuffer(&_buffer)
     }
   }
 
@@ -355,8 +363,8 @@ public struct ${Self}<Element>
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`.
   @_semantics("array.check_index")
   internal func _checkIndex(index: Int) {
-    _precondition(index <= count, "${Self} index out of range")
-    _precondition(index >= 0, "Negative ${Self} index is out of range")
+    _precondition(index <= endIndex, "${Self} index out of range")
+    _precondition(index >= startIndex, "Negative ${Self} index is out of range")
   }
 
   @_semantics("array.get_element")
@@ -370,7 +378,7 @@ public struct ${Self}<Element>
 
   @_semantics("array.get_element_address")
   internal func _getElementAddress(index: Int) -> UnsafeMutablePointer<Element> {
-    return _buffer._getBaseAddress() + index
+    return _buffer._unconditionalMutableSubscriptBaseAddress + index
   }
 
 %if Self == 'Array':
@@ -439,7 +447,8 @@ extension ${Self} : _ArrayType {
   public init<
     S: SequenceType where S.Generator.Element == _Buffer.Element
   >(_ s: S) {
-    self = ${Self}(_Buffer(s._copyToNativeArrayBuffer()))
+    self = ${Self}(_Buffer(s._copyToNativeArrayBuffer(),
+      shiftedToStartIndex: 0))
   }
 
   /// Construct a ${Self} of `count` elements, each initialized to
@@ -471,7 +480,7 @@ extension ${Self} : _ArrayType {
     count: Int
   ) -> (${Self}, UnsafeMutablePointer<Element>) {
     let result = ${Self}(_uninitializedCount: count)
-    return (result, result._buffer.baseAddress)
+    return (result, result._buffer.firstElementAddress)
   }
 
 %if Self == 'Array':
@@ -503,12 +512,12 @@ extension ${Self} : _ArrayType {
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
   public var _baseAddressIfContiguous: UnsafeMutablePointer<Element> {
-    return _buffer.baseAddress
+    return _buffer.firstElementAddress
   }
 
 %if Self != 'Array': # // Array does not necessarily have contiguous storage
   internal var _baseAddress: UnsafeMutablePointer<Element> {
-    return _buffer.baseAddress
+    return _buffer.firstElementAddress
   }
 %end
   //===--- basic mutations ------------------------------------------------===//
@@ -527,8 +536,9 @@ extension ${Self} : _ArrayType {
       let newBuffer = _ContiguousArrayBuffer<Element>(
         count: count, minimumCapacity: minimumCapacity)
 
-      _buffer._uninitializedCopy(0..<count, target: newBuffer.baseAddress)
-      _buffer = _Buffer(newBuffer)
+      _buffer._uninitializedCopy(
+        _buffer.indices, target: newBuffer.firstElementAddress)
+      _buffer = _Buffer(newBuffer, shiftedToStartIndex: _buffer.startIndex)
     }
     _sanityCheck(capacity >= minimumCapacity)
   }
@@ -545,7 +555,7 @@ extension ${Self} : _ArrayType {
       let oldCount = _buffer.count
       if _buffer.requestUniqueMutableBackingBuffer(oldCount + 1) != nil {
         _buffer.count = oldCount + 1
-        (_buffer.baseAddress + oldCount).initialize(newElement)
+        (_buffer.firstElementAddress + oldCount).initialize(newElement)
         return
       }
     }
@@ -553,7 +563,9 @@ extension ${Self} : _ArrayType {
   }
 
   @inline(never)
-  internal func _arrayAppendSlowPath<_Buffer: _ArrayBufferType>(
+  internal func _arrayAppendSlowPath<
+    _Buffer: _ArrayBufferType where _Buffer.Index == Int
+  >(
     inout buffer: _Buffer, initializePointer: _InitializePointer<_Buffer.Element>
   ) {
     let oldCount = buffer.count
@@ -593,7 +605,7 @@ extension ${Self} : _ArrayType {
   /// - Requires: `count > 0`.
   public mutating func removeLast() -> Element {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
-    let c = count
+    let c = endIndex
     // We don't check for "c - 1"  underflow because C is known to be positive.
     let result = self[c &- 1]
     self.replaceRange((c &- 1)..<c, with: EmptyCollection())
@@ -719,7 +731,7 @@ extension ${Self} {
       return (_owner, p._rawValue)
     }
     let n = _extractOrCopyToNativeArrayBuffer(self._buffer)
-    return (n.owner, n.baseAddress._rawValue)
+    return (n.owner, n.firstElementAddress._rawValue)
   }
 
 }
@@ -762,7 +774,7 @@ extension ${Self} {
     swap(&work, &self)
 
     // Create an UnsafeBufferPointer over work that we can pass to body
-    let pointer = work._buffer.baseAddress
+    let pointer = work._buffer.firstElementAddress
     let count = work.count
     var inoutBufferPointer = UnsafeMutableBufferPointer(
       start: pointer, count: count)
@@ -805,7 +817,8 @@ internal struct _InitializeMemoryFromCollection<
 @inline(never)
 internal func _arrayOutOfPlaceReplace<
   B : _ArrayBufferType, C : CollectionType
-    where C.Generator.Element == B.Element
+    where C.Generator.Element == B.Element,
+    B.Index == Int
 >(
   inout source: B, _ subRange: Range<Int>, _ newValues: C, _ insertCount: Int
 ) {
@@ -816,7 +829,7 @@ internal func _arrayOutOfPlaceReplace<
 
   _arrayOutOfPlaceUpdate(
     &source, &newBuffer,
-    subRange.startIndex, insertCount,
+    subRange.startIndex - source.startIndex, insertCount,
     _InitializeMemoryFromCollection(newValues)
   )
 }
@@ -831,77 +844,6 @@ internal func _expectEnd<C : CollectionType>(
     i == s.endIndex,
       "invalid CollectionType: count differed in successive traversals"
     )
-}
-
-internal func _arrayNonSliceInPlaceReplace<
-  B : _ArrayBufferType, C : CollectionType
-  where C.Generator.Element == B.Element
->(inout target: B, _ subRange: Range<Int>, _ insertCount: Int, _ newValues: C) {
-  let oldCount = target.count
-  let eraseCount = subRange.count
-
-  let growth = insertCount - eraseCount
-  target.count = oldCount + growth
-
-  let elements = target.baseAddress
-  _sanityCheck(elements != nil)
-
-  let oldTailIndex = subRange.endIndex
-  let oldTailStart = elements + oldTailIndex
-  let newTailIndex = oldTailIndex + growth
-  let newTailStart = oldTailStart + growth
-  let tailCount = oldCount - subRange.endIndex
-
-  if growth > 0 {
-    // Slide the tail part of the buffer forwards, in reverse order
-    // so as not to self-clobber.
-    newTailStart.moveInitializeBackwardFrom(oldTailStart, count: tailCount)
-
-    // Assign over the original subRange
-    var i = newValues.startIndex
-    for j in subRange {
-      elements[j] = newValues[i++]
-    }
-    // Initialize the hole left by sliding the tail forward
-    for j in oldTailIndex..<newTailIndex {
-      (elements + j).initialize(newValues[i++])
-    }
-    _expectEnd(i, newValues)
-  }
-  else { // We're not growing the buffer
-    // Assign all the new elements into the start of the subRange
-    var i = subRange.startIndex
-    var j = newValues.startIndex
-    for _ in 0..<insertCount {
-      elements[i++] = newValues[j++]
-    }
-    _expectEnd(j, newValues)
-
-    // If the size didn't change, we're done.
-    if growth == 0 {
-      return
-    }
-
-    // Move the tail backward to cover the shrinkage.
-    let shrinkage = -growth
-    if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
-
-      // Assign over the rest of the replaced range with the first
-      // part of the tail.
-      newTailStart.moveAssignFrom(oldTailStart, count: shrinkage)
-
-      //  slide the rest of the tail back
-      oldTailStart.moveInitializeFrom(
-        oldTailStart + shrinkage, count: tailCount - shrinkage)
-    }
-    else {                      // tail fits within erased elements
-      // Assign over the start of the replaced range with the tail
-      newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
-
-      // destroy elements remaining after the tail in subRange
-      (newTailStart + tailCount).destroy(shrinkage - tailCount)
-    }
-  }
 }
 
 internal func _growArrayCapacity(capacity: Int) -> Int {
@@ -920,7 +862,7 @@ extension ${Self} {
   >(
     subRange: Range<Int>, with newElements: C
   ) {
-    _precondition(subRange.startIndex >= 0,
+    _precondition(subRange.startIndex >= self._buffer.startIndex,
       "${Self} replace: subRange start is negative")
 
     _precondition(subRange.endIndex <= self._buffer.endIndex,
@@ -973,7 +915,7 @@ public func += <
     max(newCount, _growArrayCapacity(capacity))
     : newCount)
 
-  (lhs._buffer.baseAddress + oldCount).initializeFrom(rhs)
+  (lhs._buffer.firstElementAddress + oldCount).initializeFrom(rhs)
   lhs._buffer.count = newCount
 }
 % end
@@ -1010,7 +952,8 @@ internal protocol _PointerFunctionType {
 /// copying when it isUniquelyReferenced.
 internal func _arrayOutOfPlaceUpdate<
   _Buffer : _ArrayBufferType, Initializer : _PointerFunctionType
-  where Initializer.Element == _Buffer.Element
+  where Initializer.Element == _Buffer.Element,
+  _Buffer.Index == Int
 >(
   inout source: _Buffer,
   inout _ dest: _ContiguousArrayBuffer<_Buffer.Element>?,
@@ -1027,18 +970,18 @@ internal func _arrayOutOfPlaceUpdate<
 
   let sourceCount = source.count
   let oldCount = sourceCount - headCount - tailCount
-  let destStart = dest!.baseAddress
+  let destStart = dest!.firstElementAddress
   let newStart = destStart + headCount
   let newEnd = newStart + newCount
 
   // Check to see if we have storage we can move from
   if let backing = source.requestUniqueMutableBackingBuffer(sourceCount) {
-    let sourceStart = source.baseAddress
+    let sourceStart = source.firstElementAddress
     let oldStart = sourceStart + headCount
 
     // Destroy any items that may be lurking in a _SliceBuffer before
     // its real first element
-    let backingStart = backing.baseAddress
+    let backingStart = backing.firstElementAddress
     let sourceOffset = sourceStart - backingStart
     backingStart.destroy(sourceOffset)
 
@@ -1061,12 +1004,16 @@ internal func _arrayOutOfPlaceUpdate<
     backing.count = 0
   }
   else {
-    let newStart = source._uninitializedCopy(0..<headCount, target: destStart)
+    let headStart = source.startIndex
+    let headEnd = headStart + headCount
+    let newStart = source._uninitializedCopy(headStart..<headEnd,
+      target: destStart)
     initializeNewElements.call(newStart, count: newCount)
-    source._uninitializedCopy(headCount + oldCount..<sourceCount,
-                              target: newEnd)
+    let tailStart = headEnd + oldCount
+    let tailEnd = source.endIndex
+    source._uninitializedCopy(tailStart..<tailEnd, target: newEnd)
   }
-  source = _Buffer(dest!)
+  source = _Buffer(dest!, shiftedToStartIndex: source.startIndex)
 }
 
 internal struct _InitializePointer<T> : _PointerFunctionType {
@@ -1090,7 +1037,9 @@ internal struct _IgnorePointer<T> : _PointerFunctionType {
   }
 }
 
-internal func _arrayReserve<_Buffer : _ArrayBufferType>(
+internal func _arrayReserve<
+  _Buffer : _ArrayBufferType where _Buffer.Index == Int
+>(
   inout buffer: _Buffer, _ minimumCapacity: Int
 ) {
   let count = buffer.count
@@ -1123,7 +1072,8 @@ func _extractOrCopyToNativeArrayBuffer<
 /// Append items from `newItems` to `buffer`.
 internal func _arrayAppendSequence<
   Buffer : _ArrayBufferType,
-  S : SequenceType where S.Generator.Element == Buffer.Element
+  S : SequenceType where S.Generator.Element == Buffer.Element,
+  Buffer.Index == Int
 >(
   inout buffer: Buffer, _ newItems: S
 ) {
@@ -1139,7 +1089,7 @@ internal func _arrayAppendSequence<
   _arrayReserve(&buffer, count + 1)
   while true {
     let capacity = buffer.capacity
-    let base = buffer.baseAddress
+    let base = buffer.firstElementAddress
 
     while (nextItem != nil) && count < capacity {
       (base + count++).initialize(nextItem!)

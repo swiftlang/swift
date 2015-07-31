@@ -17,28 +17,32 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   typealias NativeStorage = _ContiguousArrayStorage<T>
   public typealias NativeBuffer = _ContiguousArrayBuffer<T>
 
-  init(owner: AnyObject, start: UnsafeMutablePointer<T>, count: Int, 
-       hasNativeBuffer: Bool) {
+  init(owner: AnyObject, subscriptBaseAddress: UnsafeMutablePointer<T>,
+       indices: Range<Int>, hasNativeBuffer: Bool) {
     self.owner = owner
-    self.start = start
-    self._countAndFlags = (UInt(count) << 1) | (hasNativeBuffer ? 1 : 0)
+    self.subscriptBaseAddress = subscriptBaseAddress
+    self.startIndex = indices.startIndex
+    let bufferFlag = UInt(hasNativeBuffer ? 1 : 0)
+    self.endIndexAndFlags = (UInt(indices.endIndex) << 1) | bufferFlag
+    _invariantCheck()
   }
 
-  public
-  init() {
+  public init() {
     let empty = _ContiguousArrayBuffer<T>()
-    owner = empty.owner
-    start = empty.baseAddress
-    _countAndFlags = 1
+    self.owner = empty.owner
+    self.subscriptBaseAddress = empty.firstElementAddress
+    self.startIndex = empty.startIndex
+    self.endIndexAndFlags = 1
     _invariantCheck()
   }
 
-  public
-  init(_ buffer: NativeBuffer) {
-    owner = buffer.owner
-    start = buffer.baseAddress
-    _countAndFlags = (UInt(buffer.count) << 1) | 1
-    _invariantCheck()
+  public init(_ buffer: NativeBuffer, shiftedToStartIndex: Int) {
+    let shift = buffer.startIndex - shiftedToStartIndex
+    self.init(
+      owner: buffer.owner,
+      subscriptBaseAddress: buffer.subscriptBaseAddress + shift,
+      indices: shiftedToStartIndex..<shiftedToStartIndex + buffer.count,
+      hasNativeBuffer: true)
   }
 
   func _invariantCheck() {
@@ -49,9 +53,9 @@ struct _SliceBuffer<T> : _ArrayBufferType {
       _sanityCheck(count <= nativeBuffer.count)
     }
   }
-  
+
   var _hasNativeBuffer: Bool {
-    return (_countAndFlags & 1) != 0
+    return (endIndexAndFlags & 1) != 0
   }
 
   var nativeBuffer: NativeBuffer {
@@ -79,24 +83,27 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   ) {
     _invariantCheck()
     _sanityCheck(insertCount <= numericCast(newValues.count))
-    
+
     _sanityCheck(_hasNativeBuffer && isUniquelyReferenced())
 
-    var native = nativeBuffer
-    let offset = start - native.baseAddress
     let eraseCount = subRange.count
     let growth = insertCount - eraseCount
-    
     let oldCount = count
-    
+
+    var native = nativeBuffer
+    let hiddenElementCount = firstElementAddress - native.firstElementAddress
+
     _sanityCheck(native.count + growth <= native.capacity)
 
+    let start = subRange.startIndex - startIndex + hiddenElementCount
+    let end = subRange.endIndex - startIndex + hiddenElementCount
     native.replace(
-      subRange: (subRange.startIndex+offset)..<(subRange.endIndex + offset),
+      subRange: start..<end,
       with: insertCount,
       elementsOf: newValues)
-    
-    setLocalCount(oldCount + growth)
+
+    self.endIndex = self.startIndex + oldCount + growth
+
     _invariantCheck()
   }
 
@@ -104,14 +111,19 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   /// buffers address the same elements when they have the same
   /// identity and count.
   public var identity: UnsafePointer<Void> {
-    return UnsafePointer(start)
+    return UnsafePointer(firstElementAddress)
   }
-  
+
   /// An object that keeps the elements stored in this buffer alive.
-  public
-  var owner: AnyObject
-  var start: UnsafeMutablePointer<T>
-  var _countAndFlags: UInt
+  public var owner: AnyObject
+  public let subscriptBaseAddress: UnsafeMutablePointer<T>
+
+  public var firstElementAddress: UnsafeMutablePointer<T> {
+    return subscriptBaseAddress + startIndex
+  }
+
+  /// [63:1: 63-bit index][0: has a native buffer]
+  var endIndexAndFlags: UInt
 
   //===--- Non-essential bits ---------------------------------------------===//
 
@@ -128,7 +140,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
         // function isn't called for subscripting, this won't slow
         // down that case.
         var native = nativeBuffer
-        let offset = self.baseAddress - native.baseAddress
+        let offset = self.firstElementAddress - native.firstElementAddress
         let backingCount = native.count
         let myCount = count
 
@@ -172,21 +184,12 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     subRange: Range<Int>, target: UnsafeMutablePointer<T>
   ) -> UnsafeMutablePointer<T> {
     _invariantCheck()
-    _sanityCheck(subRange.startIndex >= 0)
+    _sanityCheck(subRange.startIndex >= startIndex)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
-    _sanityCheck(subRange.endIndex <= count)
-    let c = subRange.endIndex - subRange.startIndex
-    target.initializeFrom(start + subRange.startIndex, count: c)
+    _sanityCheck(subRange.endIndex <= endIndex)
+    let c = subRange.count
+    target.initializeFrom(subscriptBaseAddress + subRange.startIndex, count: c)
     return target + c
-  }
-
-  internal func _getBaseAddress() -> UnsafeMutablePointer<T> {
-    return baseAddress
-  }
-
-  public
-  var baseAddress: UnsafeMutablePointer<T> {
-    return start
   }
 
   var arrayPropertyIsNative : Bool {
@@ -201,31 +204,23 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   public
   var count: Int {
     get {
-      return Int(_countAndFlags >> 1)
+      return endIndex - startIndex
     }
     set {
       let growth = newValue - count
       if growth != 0 {
         nativeBuffer.count += growth
-        setLocalCount(newValue)
+        self.endIndex += growth
       }
       _invariantCheck()
     }
   }
 
-  /// Return whether the given `index` is valid for subscripting, i.e. `0
-  /// ≤ index < count`
+  /// Return whether the given `index` is valid for subscripting, i.e. `startIndex
+  /// ≤ index < endIndex`
   internal func _isValidSubscript(index : Int,
                                   hoistedIsNativeBuffer: Bool) -> Bool {
-    return index >= 0 && index < count
-  }
-
-  /// Modify the count in this buffer without a corresponding change
-  /// in the underlying nativeBuffer.  The implementation of replace()
-  /// uses this, because it does a wholesale replace in the underlying
-  /// buffer.
-  mutating func setLocalCount(newValue: Int) {
-    _countAndFlags = (UInt(newValue) << 1) | (_countAndFlags & 1)
+    return index >= startIndex && index < endIndex
   }
 
   public
@@ -235,8 +230,8 @@ struct _SliceBuffer<T> : _ArrayBufferType {
       return count
     }
     let n = nativeBuffer
-    let nativeEnd = n.baseAddress + n.count
-    if (start + count) == nativeEnd {
+    let nativeEnd = n.firstElementAddress + n.count
+    if (firstElementAddress + count) == nativeEnd {
       return count + (n.capacity - n.count)
     }
     return count
@@ -251,9 +246,9 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   }
 
   func getElement(i: Int, hoistedIsNativeNoTypeCheckBuffer: Bool) -> T {
-    _sanityCheck(i >= 0, "negative slice index is out of range")
-    _sanityCheck(i < count, "slice index out of range")
-   return start[i]
+    _sanityCheck(i >= startIndex, "negative slice index is out of range")
+    _sanityCheck(i < endIndex, "slice index out of range")
+    return subscriptBaseAddress[i]
   }
 
   /// Access the element at `position`.
@@ -265,20 +260,20 @@ struct _SliceBuffer<T> : _ArrayBufferType {
       return getElement(position, hoistedIsNativeNoTypeCheckBuffer: true)
     }
     nonmutating set {
-      _sanityCheck(position >= 0, "negative slice index is out of range")
-      _sanityCheck(position < count, "slice index out of range")
-      start[position] = newValue
+      _sanityCheck(position >= startIndex, "negative slice index is out of range")
+      _sanityCheck(position < endIndex, "slice index out of range")
+      subscriptBaseAddress[position] = newValue
     }
   }
 
-  public
-  subscript (subRange: Range<Int>) -> _SliceBuffer {
-    _sanityCheck(subRange.startIndex >= 0)
+  public subscript(subRange: Range<Int>) -> _SliceBuffer {
+    _sanityCheck(subRange.startIndex >= startIndex)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
-    _sanityCheck(subRange.endIndex <= count)
+    _sanityCheck(subRange.endIndex <= endIndex)
     return _SliceBuffer(
-      owner: owner, start: start + subRange.startIndex,
-      count: subRange.endIndex - subRange.startIndex, 
+      owner: owner,
+      subscriptBaseAddress: subscriptBaseAddress,
+      indices: subRange,
       hasNativeBuffer: _hasNativeBuffer)
   }
 
@@ -287,9 +282,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   ///
   /// In an empty collection, `startIndex == endIndex`.
   public
-  var startIndex: Int {
-    return 0
-  }
+  var startIndex: Int
 
   /// The collection's "past the end" position.
   ///
@@ -298,7 +291,12 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   /// `successor()`.
   public
   var endIndex: Int {
-    return count
+    get {
+      return Int(endIndexAndFlags >> 1)
+    }
+    set {
+      endIndexAndFlags = (UInt(newValue) << 1) | (_hasNativeBuffer ? 1 : 0)
+    }
   }
 
   //===--- misc -----------------------------------------------------------===//
@@ -309,17 +307,18 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     @noescape body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
-    return try body(UnsafeBufferPointer(start: self.baseAddress, count: count))
+    return try body(UnsafeBufferPointer(start: firstElementAddress,
+      count: count))
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
-  /// over the underlying contiguous storage.  
+  /// over the underlying contiguous storage.
   public
   mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
     return try body(
-      UnsafeMutableBufferPointer(start: baseAddress, count: count))
+      UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
   }
 }

@@ -182,7 +182,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
 
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the count elements at the
-  /// result's .baseAddress or set the result's .count to zero.
+  /// result's .firstElementAddress or set the result's .count to zero.
   public init(count: Int, minimumCapacity: Int)
   {
     let realMinimumCapacity = max(count, minimumCapacity)
@@ -226,7 +226,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  public var baseAddress: UnsafeMutablePointer<Element> {
+  public var firstElementAddress: UnsafeMutablePointer<Element> {
     return __bufferPointer._elementPointer
   }
 
@@ -236,7 +236,8 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
     @noescape body: UnsafeBufferPointer<Element> throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
-    return try body(UnsafeBufferPointer(start: self.baseAddress, count: count))
+    return try body(UnsafeBufferPointer(start: firstElementAddress,
+      count: count))
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
@@ -246,11 +247,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   ) rethrows -> R {
     defer { _fixLifetime(self) }
     return try body(
-      UnsafeMutableBufferPointer(start: baseAddress, count: count))
-  }
-
-  internal func _getBaseAddress() -> UnsafeMutablePointer<Element> {
-    return baseAddress
+      UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
   }
 
   //===--- _ArrayBufferType conformance -----------------------------------===//
@@ -260,8 +257,8 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
       _uncheckedUnsafeBufferObject: _emptyArrayStorage)
   }
 
-  /// Adopt the storage of x.
-  public init(_ buffer: _ContiguousArrayBuffer) {
+  public init(_ buffer: _ContiguousArrayBuffer, shiftedToStartIndex: Int) {
+    _sanityCheck(shiftedToStartIndex == 0, "shiftedToStartIndex must be 0")
     self = buffer
   }
 
@@ -289,26 +286,13 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
     return self
   }
 
-  /// Replace the given subRange with the first newCount elements of
-  /// the given collection.
-  ///
-  /// - Requires: This buffer is backed by a uniquely-referenced
-  ///   `_ContiguousArrayBuffer`.
-  public mutating func replace<
-    C: CollectionType where C.Generator.Element == Element
-  >(
-    subRange subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
-  ) {
-    _arrayNonSliceInPlaceReplace(&self, subRange, newCount, newValues)
-  }
-
   func getElement(i: Int, hoistedIsNativeNoTypeCheckBuffer: Bool) -> Element {
     _sanityCheck(
       _isValidSubscript(i,
           hoistedIsNativeBuffer: hoistedIsNativeNoTypeCheckBuffer),
       "Array index out of range")
     // If the index is in bounds, we can assume we have storage.
-    return baseAddress[i]
+    return firstElementAddress[i]
   }
 
   /// Get or set the value of the ith element.
@@ -322,11 +306,11 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
 
       // FIXME: Manually swap because it makes the ARC optimizer happy.  See
       // <rdar://problem/16831852> check retain/release order
-      // baseAddress[i] = newValue
+      // firstElementAddress[i] = newValue
       var nv = newValue
       let tmp = nv
-      nv = baseAddress[i]
-      baseAddress[i] = tmp
+      nv = firstElementAddress[i]
+      firstElementAddress[i] = tmp
     }
   }
 
@@ -386,7 +370,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
     _sanityCheck(subRange.endIndex <= count)
 
     let c = subRange.endIndex - subRange.startIndex
-    target.initializeFrom(baseAddress + subRange.startIndex, count: c)
+    target.initializeFrom(firstElementAddress + subRange.startIndex, count: c)
     _fixLifetime(owner)
     return target + c
   }
@@ -397,8 +381,8 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   {
     return _SliceBuffer(
       owner: __bufferPointer.buffer,
-      start: baseAddress + subRange.startIndex,
-      count: subRange.endIndex - subRange.startIndex,
+      subscriptBaseAddress: subscriptBaseAddress,
+      indices: subRange,
       hasNativeBuffer: true)
   }
 
@@ -500,17 +484,18 @@ public func += <
 
   if _fastPath(newCount <= lhs.capacity) {
     lhs.count = newCount
-    (lhs.baseAddress + oldCount).initializeFrom(rhs)
+    (lhs.firstElementAddress + oldCount).initializeFrom(rhs)
   }
   else {
     var newLHS = _ContiguousArrayBuffer<Element>(
       count: newCount,
       minimumCapacity: _growArrayCapacity(lhs.capacity))
 
-    newLHS.baseAddress.moveInitializeFrom(lhs.baseAddress, count: oldCount)
+    newLHS.firstElementAddress.moveInitializeFrom(
+      lhs.firstElementAddress, count: oldCount)
     lhs.count = 0
     swap(&lhs, &newLHS)
-    (lhs.baseAddress + oldCount).initializeFrom(rhs)
+    (lhs.firstElementAddress + oldCount).initializeFrom(rhs)
   }
 }
 
@@ -612,7 +597,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
                                       minimumCapacity: 0)
     }
 
-    p = result.baseAddress
+    p = result.firstElementAddress
     remainingCapacity = result.capacity
   }
 
@@ -623,10 +608,11 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       let newCapacity = max(_growArrayCapacity(result.capacity), 1)
       var newResult = _ContiguousArrayBuffer<Element>(count: newCapacity,
                                                       minimumCapacity: 0)
-      p = newResult.baseAddress + result.capacity
+      p = newResult.firstElementAddress + result.capacity
       remainingCapacity = newResult.capacity - result.capacity
-      newResult.baseAddress.moveInitializeFrom(result.baseAddress,
-                                               count: result.capacity)
+      newResult.firstElementAddress.moveInitializeFrom(
+        result.firstElementAddress,
+        count: result.capacity)
       result.count = 0
       swap(&result, &newResult)
     }

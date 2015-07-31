@@ -19,8 +19,8 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// Create an empty buffer.
   init()
 
-  /// Adopt the storage of x.
-  init(_ buffer: _ContiguousArrayBuffer<Element>)
+  /// Adopt the entire buffer, presenting it at the provided `startIndex`.
+  init(_ buffer: _ContiguousArrayBuffer<Element>, shiftedToStartIndex: Int)
 
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
@@ -37,7 +37,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// buffer store `minimumCapacity` elements, returns that buffer.
   /// Otherwise, returns nil.
   ///
-  /// - Note: The result's baseAddress may not match ours, if we are a
+  /// - Note: The result's firstElementAddress may not match ours, if we are a
   ///   _SliceBuffer.
   ///
   /// - Note: This function must remain mutating; otherwise the buffer
@@ -98,10 +98,105 @@ public protocol _ArrayBufferType : MutableCollectionType {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
-  var baseAddress: UnsafeMutablePointer<Element> {get}
+  var firstElementAddress: UnsafeMutablePointer<Element> {get}
+
+  /// Return a base address to which you can add an index `i` to get the address
+  /// of the corresponding element at `i`.
+  var subscriptBaseAddress: UnsafeMutablePointer<Element> {get}
+
+  /// Like `subscriptBaseAddress`, but can assume that `self` is a mutable,
+  /// uniquely referenced native representation.
+  /// - Precondition: `_isNative` is `true`.
+  var _unconditionalMutableSubscriptBaseAddress:
+    UnsafeMutablePointer<Element> {get}
 
   /// A value that identifies the storage used by the buffer.  Two
   /// buffers address the same elements when they have the same
   /// identity and count.
   var identity: UnsafePointer<Void> {get}
+
+  var startIndex: Int {get}
+}
+
+extension _ArrayBufferType {
+  public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
+    return firstElementAddress
+  }
+
+  public var _unconditionalMutableSubscriptBaseAddress:
+    UnsafeMutablePointer<Element> {
+    return subscriptBaseAddress
+  }
+
+  public mutating func replace<
+    C: CollectionType where C.Generator.Element == Element
+  >(subRange subRange: Range<Int>, with newCount: Int,
+    elementsOf newValues: C) {
+    _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
+    let oldCount = self.count
+    let eraseCount = subRange.count
+
+    let growth = newCount - eraseCount
+    self.count = oldCount + growth
+
+    let elements = self.subscriptBaseAddress
+    _sanityCheck(elements != nil)
+
+    let oldTailIndex = subRange.endIndex
+    let oldTailStart = elements + oldTailIndex
+    let newTailIndex = oldTailIndex + growth
+    let newTailStart = oldTailStart + growth
+    let tailCount = oldCount - subRange.endIndex
+
+    if growth > 0 {
+      // Slide the tail part of the buffer forwards, in reverse order
+      // so as not to self-clobber.
+      newTailStart.moveInitializeBackwardFrom(oldTailStart, count: tailCount)
+
+      // Assign over the original subRange
+      var i = newValues.startIndex
+      for j in subRange {
+        elements[j] = newValues[i++]
+      }
+      // Initialize the hole left by sliding the tail forward
+      for j in oldTailIndex..<newTailIndex {
+        (elements + j).initialize(newValues[i++])
+      }
+      _expectEnd(i, newValues)
+    }
+    else { // We're not growing the buffer
+      // Assign all the new elements into the start of the subRange
+      var i = subRange.startIndex
+      var j = newValues.startIndex
+      for _ in 0..<newCount {
+        elements[i++] = newValues[j++]
+      }
+      _expectEnd(j, newValues)
+
+      // If the size didn't change, we're done.
+      if growth == 0 {
+        return
+      }
+
+      // Move the tail backward to cover the shrinkage.
+      let shrinkage = -growth
+      if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
+
+        // Assign over the rest of the replaced range with the first
+        // part of the tail.
+        newTailStart.moveAssignFrom(oldTailStart, count: shrinkage)
+
+        //  slide the rest of the tail back
+        oldTailStart.moveInitializeFrom(
+          oldTailStart + shrinkage, count: tailCount - shrinkage)
+      }
+      else {                      // tail fits within erased elements
+        // Assign over the start of the replaced range with the tail
+        newTailStart.moveAssignFrom(oldTailStart, count: tailCount)
+
+        // destroy elements remaining after the tail in subRange
+        (newTailStart + tailCount).destroy(shrinkage - tailCount)
+      }
+    }
+  }
 }

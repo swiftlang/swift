@@ -410,7 +410,7 @@ extension NSArray : ArrayLiteralConvertible {
     // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     self.init(
-      objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
+      objects: UnsafeMutablePointer(x.firstElementAddress), count: x.count)
     _fixLifetime(x)
   }
 }
@@ -1116,7 +1116,7 @@ extension NSArray {
     // @objc(initWithObjects:count:)
     //    init(withObjects objects: UnsafePointer<AnyObject?>,
     //    count cnt: Int)
-    self.init(objects: UnsafeMutablePointer(x.baseAddress), count: x.count)
+    self.init(objects: UnsafeMutablePointer(x.firstElementAddress), count: x.count)
     _fixLifetime(x)
   }
 }
