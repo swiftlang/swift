@@ -31,7 +31,9 @@ namespace {
   };
 
   struct ExpectedDiagnosticInfo {
-    const char *Loc;
+    // This specifies the full range of the "expected-foo {{}}" specifier.
+    const char *ExpectedStart, *ExpectedEnd = nullptr;
+
     llvm::SourceMgr::DiagKind Classification;
     
     // This is true if a '*' constraint is present to say that the diagnostic
@@ -48,9 +50,9 @@ namespace {
     
     std::vector<ExpectedFixIt> Fixits;
 
-    ExpectedDiagnosticInfo(const char *Loc,
+    ExpectedDiagnosticInfo(const char *ExpectedStart,
                            llvm::SourceMgr::DiagKind Classification)
-      : Loc(Loc), Classification(Classification) {
+      : ExpectedStart(ExpectedStart), Classification(Classification) {
     }
     
   };
@@ -278,7 +280,6 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       continue;
     }
 
- 
     llvm::SmallString<256> Buf;
     Expected.MessageRange = MatchStart.slice(2, End);
     Expected.MessageStr =
@@ -371,6 +372,9 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       
       Expected.Fixits.push_back(FixIt);
     }
+
+    Expected.ExpectedEnd = ExtraChecks.data();
+
 
     // Add the diagnostic the expected number of times.
     for (; Count; --Count)
@@ -475,7 +479,46 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
   for (auto const &expected : ExpectedDiagnostics) {
     std::string message = "expected "+getDiagKindString(expected.Classification)
       + " not produced";
-    addError(expected.Loc, message);
+
+    // Get the range of the expected-foo{{}} diagnostic specifier.
+    auto StartLoc = expected.ExpectedStart;
+    auto EndLoc = expected.ExpectedEnd;
+
+    // A very common case if for the specifier to be the last thing on the line.
+    // In this case, eat any trailing whitespace.
+    while (isspace(*EndLoc) && *EndLoc != '\n' && *EndLoc != '\r')
+      ++EndLoc;
+
+    // If we hit the end of line, then zap whitespace leading up to it.
+    if (*EndLoc == '\n' || *EndLoc == '\r') {
+      auto FileStart = InputFile.data();
+      while (StartLoc-1 != FileStart && isspace(StartLoc[-1]) &&
+             StartLoc[-1] != '\n' && StartLoc[-1] != '\r')
+        --StartLoc;
+
+      // If we got to the end of the line, and the thing before this diagnostic
+      // is a "//" then we can remove it too.
+      if (StartLoc-2 >= FileStart && StartLoc[-1] == '/' && StartLoc[-2] == '/')
+        StartLoc -= 2;
+
+      // Perform another round of general whitespace nuking to cleanup
+      // whitespace before the //.
+      while (StartLoc-1 != FileStart && isspace(StartLoc[-1]) &&
+             StartLoc[-1] != '\n' && StartLoc[-1] != '\r')
+        --StartLoc;
+
+      // If we found a \n, then we can nuke the entire line.
+      if (StartLoc-1 != FileStart &&
+          (StartLoc[-1] == '\n' || StartLoc[-1] == '\r'))
+        --StartLoc;
+    }
+
+    // Remove the expected-foo{{}} as a fixit.
+    llvm::SMFixIt fixIt(llvm::SMRange{
+      llvm::SMLoc::getFromPointer(StartLoc),
+      llvm::SMLoc::getFromPointer(EndLoc)
+    }, "");
+    addError(expected.ExpectedStart, message, fixIt);
   }
   
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
