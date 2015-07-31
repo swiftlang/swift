@@ -532,7 +532,7 @@ Base=1 as Base=1  // expected-error {{cannot assign to immutable expression of t
 // <rdar://problem/18634543> Parser hangs at swift::Parser::parseType
 public enum TestA {
   public static func convertFromExtenndition(
-    // expected-error@+4{{unnamed parameters must be be written}}
+    // expected-error@+4{{unnamed parameters must be written}}
     // expected-error@+3 2{{expected parameter type following ':'}}
     // expected-error@+2 3{{expected ',' separator}}
     // expected-error@+1{{use of undeclared type 's'}}
@@ -541,7 +541,7 @@ public enum TestA {
 
 public enum TestB {
   public static func convertFromExtenndition(
-    // expected-error@+4{{unnamed parameters must be be written}}
+    // expected-error@+4{{unnamed parameters must be written}}
     // expected-error@+3 2{{expected parameter type following ':'}}
     // expected-error@+2 3{{expected ',' separator}}
     // expected-error@+1{{use of undeclared type 's'}}
@@ -553,9 +553,9 @@ public enum TestB {
 // <rdar://problem/18634543> Infinite loop and unbounded memory consumption in parser
 class bar {}
 var baz: bar
-// expected-error@+1{{unnamed parameters must be be written}}
+// expected-error@+1{{unnamed parameters must be written}}
 func foo1(bar!=baz) {}
-// expected-error@+1{{unnamed parameters must be be written}}
+// expected-error@+1{{unnamed parameters must be written}}
 func foo2(bar! = baz) {}
 
 
