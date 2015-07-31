@@ -1993,6 +1993,27 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
     // We found a user that we can't handle.
   }
 
+  // (try_apply (thin_to_thick_function f)) to (try_apply f)
+  if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(AI->getCallee())) {
+    // TODO: Handle substitutions and indirect results
+    if (AI->hasSubstitutions() || AI->hasIndirectResult())
+      return nullptr;
+    SmallVector<SILValue, 4> Arguments;
+    for (auto &Op : AI->getArgumentOperands()) {
+      Arguments.push_back(Op.get());
+    }
+    // The type of the substitution is the source type of the thin to thick
+    // instruction.
+    SILType substTy = TTTFI->getOperand().getType();
+    auto *NewAI = TryApplyInst::create(AI->getLoc(), TTTFI->getOperand(),
+                                       substTy,
+                                       AI->getSubstitutions(), Arguments,
+                                       AI->getNormalBB(), AI->getErrorBB(),
+                                       *AI->getFunction());
+    NewAI->setDebugScope(AI->getDebugScope());
+    return NewAI;
+  }
+
   // (apply (witness_method)) -> propagate information about
   // a concrete type from init_existential_addr or init_existential_ref.
   if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
