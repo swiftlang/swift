@@ -702,10 +702,8 @@ static void noteTargetOfDiagnostic(ConstraintSystem &cs,
 /// with expr.
 ///
 /// \returns true if the diagnostic was emitted successfully.
-static bool diagnoseFailure(ConstraintSystem &cs,
-                            Failure &failure,
-                            Expr *expr,
-                            bool useExprLoc) {
+static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
+                            Expr *expr, bool useExprLoc) {
   ConstraintLocator *cloc;
   if (!failure.getLocator() || !failure.getLocator()->getAnchor()) {
     if (useExprLoc)
@@ -3675,29 +3673,18 @@ bool ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   return false;
 }
 
-bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
-                               Expr *expr,
-                               bool onlyFailures) {
+bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   // If there were any unavoidable failures, emit the first one we can.
   if (!unavoidableFailures.empty()) {
     for (auto failure : unavoidableFailures) {
-      
-      // In the 'onlyFailures' case, we'll want to synthesize a locator if one
-      // does not exist. That allows us to emit decent diagnostics for
-      // constraint application failures where the constraints themselves lack
-      // a valid location.
-      if (diagnoseFailure(*this, *failure, expr, onlyFailures))
+      if (diagnoseFailure(*this, *failure, expr, false))
         return true;
     }
-    
-    if (onlyFailures)
-      return true;
 
     // If we can't make sense of the existing constraints (or none exist), go
     // ahead and try the unavoidable failures again, but with locator
     // substitutions in place.
-    if (!diagnoseFailureForExpr(expr) &&
-        !unavoidableFailures.empty()) {
+    if (!diagnoseFailureForExpr(expr)) {
       for (auto failure : unavoidableFailures) {
         if (diagnoseFailure(*this, *failure, expr, true))
           return true;

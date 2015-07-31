@@ -1735,15 +1735,10 @@ public:
   ///
   /// \param expr the expression we're trying to salvage.
   ///
-  /// \param onlyFailures Whether we only want to salvage a diagnostic based off
-  /// of unavoidable failures in the system.
-  ///
   /// \returns false if we were able to salvage the system, in which case
   /// \c viable[0] contains the resulting solution. Otherwise, emits a
   /// diagnostic and returns true.
-  bool salvage(SmallVectorImpl<Solution> &viable,
-              Expr *expr,
-              bool onlyFailures = false);
+  bool salvage(SmallVectorImpl<Solution> &viable, Expr *expr);
 
   /// When an assignment to an expression is detected and the destination is
   /// invalid, emit a detailed error about the condition.
