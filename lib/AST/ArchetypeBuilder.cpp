@@ -792,13 +792,13 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
                                                  ProtocolDecl *Proto,
                                                  RequirementSource Source) {
   llvm::SmallPtrSet<ProtocolDecl *, 8> Visited;
-  return addConformanceRequirement(PAT, Proto, Source, &Visited);
+  return addConformanceRequirement(PAT, Proto, Source, Visited);
 }
 
 bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
                                                  ProtocolDecl *Proto,
                                                  RequirementSource Source,
-                               llvm::SmallPtrSetImpl<ProtocolDecl *> *Visited) {
+                               llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
   // Add the requirement to the representative.
   auto T = PAT->getRepresentative();
 
@@ -808,13 +808,13 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
 
   RequirementSource InnerSource(RequirementSource::Protocol, Source.getLoc());
   
-  bool inserted = Visited->insert(Proto).second;
+  bool inserted = Visited.insert(Proto).second;
   assert(inserted);
   (void) inserted;
 
   // Add all of the inherited protocol requirements, recursively.
   for (auto InheritedProto : Impl->getInheritedProtocols(Proto)) {
-    if (Visited->count(InheritedProto))
+    if (Visited.count(InheritedProto))
       continue;
     if (addConformanceRequirement(T, InheritedProto, InnerSource, Visited))
       return true;
@@ -836,7 +836,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
         for (auto InheritedProto : superclassAndConformsTo.second) {
           // If it's a recursive requirement, add it directly to the associated
           // archetype.
-          if (Visited->count(InheritedProto)) {
+          if (Visited.count(InheritedProto)) {
             // FIXME: Drop InheritedProto!
             if (!AssocPA->isRecursive() && !AssocType->isRecursive()) {
               Diags.diagnose(AssocType->getLoc(),
@@ -860,7 +860,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
     // FIXME: Requirement declarations.
   }
   
-  Visited->erase(Proto);
+  Visited.erase(Proto);
   return false;
 }
 
