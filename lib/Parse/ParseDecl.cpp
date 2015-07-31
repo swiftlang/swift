@@ -2731,7 +2731,8 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
                              Type(), Params, ReturnType, P->CurDeclContext);
 
   // Non-static set/willSet/didSet/materializeForSet/mutableAddress
-  // default to mutating.  get/address default to non-mutating.
+  // default to mutating.  get/address default to
+  // non-mutating.
   if (!D->isStatic()) {
     switch (Kind) {
     case AccessorKind::IsAddressor:

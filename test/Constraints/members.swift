@@ -419,32 +419,45 @@ extension ExtendedWithMutatingMethods {
     get { }
     nonmutating set { }
   }
+  var mutatingGetProperty: Foo {
+    mutating get { }
+    set { }
+  }
 }
 
 class ClassExtendedWithMutatingMethods: ExtendedWithMutatingMethods {}
 class SubclassExtendedWithMutatingMethods: ClassExtendedWithMutatingMethods {}
 
-func testClassExtendedWithMutatingMethods(c: ClassExtendedWithMutatingMethods,  // expected-note {{mark parameter with 'var' to make it mutable}}
-                                     sub: SubclassExtendedWithMutatingMethods) { // expected-note {{mark parameter with 'var' to make it mutable}}
+func testClassExtendedWithMutatingMethods(c: ClassExtendedWithMutatingMethods, // expected-note* {{}}
+                                     sub: SubclassExtendedWithMutatingMethods) { // expected-note* {{}}
   c.mutatingMethod() // expected-error{{cannot use mutating member on immutable value: 'c' is a 'let' constant}}
-  c.mutableProperty = Foo(foo: 0) // todo-error{{...}}
-  c.mutableProperty.foo = 0 // todo-error{{...}}
+  c.mutableProperty = Foo(foo: 0) // expected-error{{cannot assign to property}}
+  c.mutableProperty.foo = 0 // expected-error{{cannot assign to property}}
   c.nonmutatingProperty = Foo(foo: 0)
-  c.nonmutatingProperty.foo = 0 //
+  c.nonmutatingProperty.foo = 0
+  c.mutatingGetProperty = Foo(foo: 0) // expected-error{{cannot use mutating}}
+  c.mutatingGetProperty.foo = 0 // expected-error{{cannot use mutating}}
   _ = c.mutableProperty
   _ = c.mutableProperty.foo
   _ = c.nonmutatingProperty
   _ = c.nonmutatingProperty.foo
+  // FIXME: diagnostic nondeterministically says "member" or "getter"
+  _ = c.mutatingGetProperty // expected-error{{cannot use mutating}}
+  _ = c.mutatingGetProperty.foo // expected-error{{cannot use mutating}}
 
   sub.mutatingMethod() // expected-error{{cannot use mutating member on immutable value: 'sub' is a 'let' constant}}
-  sub.mutableProperty = Foo(foo: 0) // todo-error{{...}}
-  sub.mutableProperty.foo = 0 // todo-error{{...}}
+  sub.mutableProperty = Foo(foo: 0) // expected-error{{cannot assign to property}}
+  sub.mutableProperty.foo = 0 // expected-error{{cannot assign to property}}
   sub.nonmutatingProperty = Foo(foo: 0)
   sub.nonmutatingProperty.foo = 0
+  sub.mutatingGetProperty = Foo(foo: 0) // expected-error{{cannot use mutating}}
+  sub.mutatingGetProperty.foo = 0 // expected-error{{cannot use mutating}}
   _ = sub.mutableProperty
   _ = sub.mutableProperty.foo
   _ = sub.nonmutatingProperty
   _ = sub.nonmutatingProperty.foo
+  _ = sub.mutatingGetProperty // expected-error{{cannot use mutating}}
+  _ = sub.mutatingGetProperty.foo // expected-error{{cannot use mutating}}
 
   var mutableC = c
   mutableC.mutatingMethod()
@@ -452,10 +465,14 @@ func testClassExtendedWithMutatingMethods(c: ClassExtendedWithMutatingMethods,  
   mutableC.mutableProperty.foo = 0
   mutableC.nonmutatingProperty = Foo(foo: 0)
   mutableC.nonmutatingProperty.foo = 0
+  mutableC.mutatingGetProperty = Foo(foo: 0)
+  mutableC.mutatingGetProperty.foo = 0
   _ = mutableC.mutableProperty
   _ = mutableC.mutableProperty.foo
   _ = mutableC.nonmutatingProperty
   _ = mutableC.nonmutatingProperty.foo
+  _ = mutableC.mutatingGetProperty
+  _ = mutableC.mutatingGetProperty.foo
 
   var mutableSub = sub
   mutableSub.mutatingMethod()
@@ -467,4 +484,6 @@ func testClassExtendedWithMutatingMethods(c: ClassExtendedWithMutatingMethods,  
   _ = mutableSub.mutableProperty.foo
   _ = mutableSub.nonmutatingProperty
   _ = mutableSub.nonmutatingProperty.foo
+  _ = mutableSub.mutatingGetProperty
+  _ = mutableSub.mutatingGetProperty.foo
 }

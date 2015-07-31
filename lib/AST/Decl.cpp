@@ -2621,6 +2621,12 @@ bool AbstractStorageDecl::isGetterMutating() const {
 /// \brief Return true if the 'setter' is nonmutating, i.e. that it can be
 /// called even on an immutable base value.
 bool AbstractStorageDecl::isSetterNonMutating() const {
+  // Setters declared in reference type contexts are never mutating.
+  if (auto contextType = getDeclContext()->getDeclaredTypeInContext()) {
+    if (contextType->hasReferenceSemantics())
+      return true;
+  }
+
   switch (getStorageKind()) {
   case AbstractStorageDecl::Stored:
     return false;

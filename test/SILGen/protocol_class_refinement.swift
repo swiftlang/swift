@@ -1,5 +1,12 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
+// FIXME: Not correct in the face of protocol extensions. Mutating
+// requirements of a protocol that gets refined by a class-constrained protocol
+// may still in fact be mutating, because they could be fulfilled by a
+// mutating implementation from a protocol extension. WIP for
+// rdar://problem/21578832.
+// XFAIL: *
+
 protocol UID {
     func uid() -> Int
     var clsid: Int { get set }
@@ -42,7 +49,7 @@ class Base {}
 // -- done
 // CHECK:         strong_release [[X]]
 
-func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int) {
+func getObjectUID<T: ObjectUID>(var x: T) -> (Int, Int) {
   x.clsid = x.uid()
   return (x.iid, x.clsid)
 }
@@ -86,7 +93,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int) {
 // -- done
 // CHECK:         strong_release [[X]]
 
-func getBaseObjectUID<T: UID where T: Base>(x: T) -> (Int, Int) {
+func getBaseObjectUID<T: UID where T: Base>(var x: T) -> (Int, Int) {
   x.clsid = x.uid()
   return (x.iid, x.clsid)
 }
