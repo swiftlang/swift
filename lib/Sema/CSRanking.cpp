@@ -385,6 +385,71 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
   return false;
 }
 
+static TypeBase* getTypeAtIndex(TypeBase* containerType, size_t index) {
+  
+  if (auto parenType = dyn_cast<ParenType>(containerType)) {
+    if (!index) {
+      return parenType->getDesugaredType();
+    }
+  }
+  
+  if (auto tupleType = containerType->getAs<TupleType>()) {
+    auto elements = tupleType->getElements();
+    if (!elements.empty()) {
+      if (index < elements.size()) {
+        return elements[index].getType().getPointer();
+      } else if (elements.back().isVararg()) {
+        return elements.back().getType().getPointer();
+      }
+    }
+  }
+  
+  return nullptr;
+}
+
+/// For two function declarations, determine if a parameter of the second is an
+/// empty existential composition ("Any"), and if it would otherwise be compared
+/// against a non-existential parameter at the same position of the first decl.
+/// This is used to disambiguate function overloads that would otherwise be
+/// identical after opening their parameter types.
+static bool hasEmptyExistenialParameterMismatch(ValueDecl *decl1,
+                                                ValueDecl *decl2) {
+  
+  auto func1 = dyn_cast<FuncDecl>(decl1);
+  auto func2 = dyn_cast<FuncDecl>(decl2);
+  
+  if (func1 && func2) {
+    
+    auto pp1 = func1->getBodyParamPatterns();
+    auto pp2 = func2->getBodyParamPatterns();
+    
+    if (pp1.empty() || pp2.empty())
+      return false;
+    
+    auto pc = std::min(pp1.size(), pp2.size());
+    
+    for (size_t i = 0; i < pc; i++) {
+      
+      auto t1 = getTypeAtIndex(pp1[i]->getType().getPointer(), i);
+      auto t2 = getTypeAtIndex(pp2[i]->getType().getPointer(), i);
+      
+      if (!t1 || !t2)
+        break;
+      
+      if (t2->isAnyExistentialType() && !t1->isAnyExistentialType()) {
+        if (auto emtType = ExistentialMetatypeType::get(t2)) {
+          if (auto pcType = emtType->getInstanceType()->
+                              getAs<ProtocolCompositionType>()) {
+            return pcType->getProtocols().empty();
+          }
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+
 /// Determine whether one protocol extension is at least as specialized as
 /// another.
 static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
@@ -813,6 +878,19 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         }
         
         if (isDeclMoreConstrainedThan(decl2, decl1)) {
+          foundRefinement2 = true;
+        }
+      }
+       
+      // If we still haven't found a refinement, check if there's a parameter-
+      // wise comparison between an empty existential collection and a non-
+      // existential type.
+      if (!(foundRefinement1 && foundRefinement2)) {
+        if (hasEmptyExistenialParameterMismatch(decl1, decl2)) {
+          foundRefinement1 = true;
+        }
+        
+        if (hasEmptyExistenialParameterMismatch(decl2, decl1)) {
           foundRefinement2 = true;
         }
       }

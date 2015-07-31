@@ -27,3 +27,13 @@ print(twice(double, 5))
 print(twice({ $0 + 1 }, 5))
 // CHECK: 3
 print(twice({ x in x - 1 }, 5))
+
+// <rdar://problem/22044607>
+class C {}
+class D : C {}
+
+func foo(a: Any, p2: Bool = true) { print("Wrong") }
+func foo(c: C) { print("Right") }
+
+// CHECK: Right
+foo(D())
