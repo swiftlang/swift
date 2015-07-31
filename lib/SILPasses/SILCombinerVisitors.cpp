@@ -630,7 +630,7 @@ class PartialApplyCombiner {
 
   SILCombiner *SilCombiner;
 
-  void processSingleApply(ApplyInst *AI);
+  void processSingleApply(FullApplySite AI);
   void allocateTemporaries();
   void deallocateTemporaries();
   void releaseTemporaries();
@@ -732,13 +732,13 @@ void PartialApplyCombiner::releaseTemporaries() {
 
 /// Process an apply instruction which uses a partial_apply
 /// as its callee.
-void PartialApplyCombiner::processSingleApply(ApplyInst *AI) {
-  Builder->setInsertionPoint(AI);
+void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
+  Builder->setInsertionPoint(AI.getInstruction());
 
   // Prepare the args.
   SmallVector<SILValue, 8> Args;
   // First the ApplyInst args.
-  for (auto Op : AI->getArguments())
+  for (auto Op : AI.getArguments())
     Args.push_back(Op);
 
   SILInstruction *InsertionPoint = Builder->getInsertionPoint();
@@ -784,26 +784,42 @@ void PartialApplyCombiner::processSingleApply(ApplyInst *AI) {
     ResultTy = FnType.getAs<SILFunctionType>()->getSILResult();
   }
 
-  ApplyInst *NAI =
-      Builder->createApply(AI->getLoc(), FRI, FnType, ResultTy, Subs, Args);
-  NAI->setDebugScope(AI->getDebugScope());
+  FullApplySite NAI;
+  if (auto *TAI = dyn_cast<TryApplyInst>(AI))
+    NAI =
+      Builder->createTryApply(AI.getLoc(), FRI, FnType, Subs, Args,
+                              TAI->getNormalBB(), TAI->getErrorBB());
+  else
+    NAI =
+      Builder->createApply(AI.getLoc(), FRI, FnType, ResultTy, Subs, Args);
+
+  NAI.getInstruction()->setDebugScope(AI.getDebugScope());
 
   if (CG)
     CG->addEdgesForApply(NAI);
 
   // We also need to release the partial_apply instruction itself because it
   // is consumed by the apply_instruction.
-  Builder->createStrongRelease(AI->getLoc(), PAI)
-      ->setDebugScope(AI->getDebugScope());
-
+  if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
+    Builder->setInsertionPoint(TAI->getNormalBB()->begin());
+    Builder->createStrongRelease(AI.getLoc(), PAI)
+      ->setDebugScope(AI.getDebugScope());
+    Builder->setInsertionPoint(TAI->getErrorBB()->begin());
+    Builder->createStrongRelease(AI.getLoc(), PAI)
+      ->setDebugScope(AI.getDebugScope());
+    Builder->setInsertionPoint(AI.getInstruction());
+  } else {
+    Builder->createStrongRelease(AI.getLoc(), PAI)
+      ->setDebugScope(AI.getDebugScope());
+  }
   // Update the set endpoints.
-  if (Lifetime.LastUsers.count(AI)) {
-    Lifetime.LastUsers.remove(AI);
-    Lifetime.LastUsers.insert(NAI);
+  if (Lifetime.LastUsers.count(AI.getInstruction())) {
+    Lifetime.LastUsers.remove(AI.getInstruction());
+    Lifetime.LastUsers.insert(NAI.getInstruction());
   }
 
-  SilCombiner->replaceInstUsesWith(*AI, NAI);
-  SilCombiner->eraseInstFromFunction(*AI);
+  SilCombiner->replaceInstUsesWith(*AI.getInstruction(), NAI.getInstruction());
+  SilCombiner->eraseInstFromFunction(*AI.getInstruction());
 }
 
 /// Perform the apply{partial_apply(x,y)}(z) -> apply(z,x,y) peephole
@@ -822,15 +838,15 @@ SILInstruction *PartialApplyCombiner::combine() {
     auto User = Use->getUser();
     // If this use of a partial_apply is not
     // an apply which uses it as a callee, bail.
-    auto AI = dyn_cast<ApplyInst>(User);
+    auto AI = FullApplySite::isa(User);
     if (!AI)
       continue;
 
-    if (AI->getCallee() != PAI)
+    if (AI.getCallee() != PAI)
       continue;
 
     // We cannot handle generic apply yet. Bail.
-    if (AI->hasSubstitutions())
+    if (AI.hasSubstitutions())
       continue;
 
     processSingleApply(AI);
