@@ -1131,6 +1131,7 @@ MagicMirror::MagicMirror(HeapObject *owner,
 static std::tuple<const _ReflectableWitnessTable *, const Metadata *,
                   const OpaqueValue *>
 getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
+recur:
   // If the value is an existential container, look through it to reflect the
   // contained value.
   switch (T->getKind()) {
@@ -1168,7 +1169,10 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
     // its contained value as usual.
     T = existential->getDynamicType(Value);
     Value = existential->projectValue(Value);
-    break;
+
+    // Existential containers can end up nested in some cases due to generic
+    // abstraction barriers. Recur in case we have a nested existential.
+    goto recur;
   }
   case MetadataKind::ExistentialMetatype:
     // TODO: Should look through existential metatypes too, but it doesn't

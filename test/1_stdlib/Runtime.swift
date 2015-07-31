@@ -1038,6 +1038,19 @@ RuntimeFoundationWrappers.test("bridgedNSArray") {
 
 var Reflection = TestSuite("Reflection")
 
+func wrap1   (x: Any) -> Any { return x }
+func wrap2<T>(x: T)   -> Any { return wrap1(x) }
+func wrap3   (x: Any) -> Any { return wrap2(x) }
+func wrap4<T>(x: T)   -> Any { return wrap3(x) }
+func wrap5   (x: Any) -> Any { return wrap4(x) }
+
+class JustNeedAMetatype {}
+
+Reflection.test("nested existential containers") {
+  let wrapped = wrap5(JustNeedAMetatype.self)
+  expectEqual("\(wrapped)", "JustNeedAMetatype")
+}
+
 Reflection.test("dumpToAStream") {
   var output = ""
   dump([ 42, 4242 ], &output)
