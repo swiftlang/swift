@@ -93,7 +93,14 @@ static bool canApplyDecrementRefCount(BuiltinInst *BI, SILValue Ptr,
   // builtin and the retain.
   if (!BI->mayHaveSideEffects())
     return false;
-  
+
+  // If this is an instruction which might have side effect, but its side
+  // effects do not cause reference counts to be decremented, return false.
+  //
+  // If this is expanded, refactor it into a method with a string switch.
+  if (BI->getName().str().equals("copyArray"))
+    return false;
+
   return canApplyDecrementRefCount(BI->getArguments(), Ptr, AA);
 }
 

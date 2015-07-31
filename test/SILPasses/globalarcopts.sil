@@ -1851,3 +1851,18 @@ bb0:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @copyArrayDoesntDecrementRefCounts : $@convention(thin) (Builtin.RawPointer, Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @copyArrayDoesntDecrementRefCounts : $@convention(thin) (Builtin.RawPointer, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject):
+  %2 = metatype $@thick Builtin.Int32.Type
+  %3 = integer_literal $Builtin.Word, 1
+  strong_retain %1 : $Builtin.NativeObject
+  %4 = builtin "copyArray"<Builtin.Int32>(%2 : $@thick Builtin.Int32.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
+  fix_lifetime %1 : $Builtin.NativeObject
+  strong_release %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
