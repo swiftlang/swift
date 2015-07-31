@@ -2288,8 +2288,12 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
   if (sameProblem) {
     switch (firstProblem) {
     case MemberLookupResult::UR_LabelMismatch:
+        abort();
     case MemberLookupResult::UR_UnavailableInExistential:
-      break;
+      diagnose(anchor->getLoc(), diag::could_not_use_member_on_existential,
+               instanceTy, memberName)
+        .highlight(anchor->getSourceRange()).highlight(range);
+      return true;
     case MemberLookupResult::UR_InstanceMemberOnType:
       diagnose(anchor->getLoc(), diag::could_not_use_instance_member_on_type,
                instanceTy, memberName)
@@ -2315,6 +2319,9 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
     }
   }
 
+  // FIXME: Emit candidate set....
+  
+  
   // Otherwise, we don't have a specific issue to diagnose.  Just say the vague
   // 'cannot use' diagnostic.
   if (!baseObjTy->isEqual(instanceTy))

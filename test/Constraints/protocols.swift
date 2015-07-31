@@ -104,7 +104,5 @@ protocol Clonable {
 func testClonable(v : Clonable) {
   let v2 = v.maybeClone()
 
-  // FIXME: this is a terrible diagnostic; the problem is that that
-  // method is unavailable on existentials
-  let v3 = v.badMaybeClone() // expected-error {{member 'badMaybeClone' cannot be used on value of type 'Clonable'}}
+  let v3 = v.badMaybeClone() // expected-error {{member 'badMaybeClone' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
 }

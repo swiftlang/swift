@@ -476,3 +476,14 @@ func r21974772(y : Int) {
   let x = &(1.0 + y)  // expected-error {{binary operator '+' cannot be applied to operands of type 'Double' and 'Int'}}
    //expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (UnsafeMutablePointer<Memory>, Int), (UnsafePointer<Memory>, Int)}}
 }
+
+// <rdar://problem/22020088> QoI: missing member diagnostic on optional gives worse error message than existential/bound generic/etc
+protocol r22020088P {}
+
+func r22020088Foo<T>(t: T) {}
+
+func r22020088bar(p: r22020088P?) {
+  r22020088Foo(p.fdafs)  // expected-error {{value of type 'r22020088P?' has no member 'fdafs'}}
+}
+
+

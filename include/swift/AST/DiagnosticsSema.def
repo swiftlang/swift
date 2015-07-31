@@ -88,6 +88,10 @@ ERROR(could_not_use_type_member_on_instance,sema,none,
 ERROR(could_not_use_instance_member_on_type,sema,none,
       "instance member %1 cannot be used on type %0",
       (Type, DeclName))
+ERROR(could_not_use_member_on_existential,sema,none,
+      "member %1 cannot be used on value of protocol type %0; use a generic"
+      " constraint instead",
+      (Type, DeclName))
 
 
 ERROR(cannot_pass_rvalue_mutating_subelement,sema_tcs,none,

@@ -256,7 +256,7 @@ protocol HasSequenceAndStream {
 
 func existentialSequenceAndStreamType(h: HasSequenceAndStream) { // expected-error{{has Self or associated type requirements}}
   // FIXME: Crummy diagnostics.
-  var x = h.getR() // expected-error{{member 'getR' cannot be used on value of type 'HasSequenceAndStream'}}
+  var x = h.getR() // expected-error{{member 'getR' cannot be used on value of protocol type 'HasSequenceAndStream'; use a generic constraint instead}}
   x.generate()
   x.next()
 
