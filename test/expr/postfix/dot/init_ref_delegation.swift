@@ -101,7 +101,7 @@ enum Z2 {
 // Ill-formed initialization: wrong context.
 class Z3 {
   func f() {
-    self.init() // expected-error{{'init' is a member of the type}}
+    self.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
   }
 
   init() { }
@@ -112,7 +112,7 @@ class Z4 {
   init() {} // expected-note{{selected non-required initializer}}
 
   convenience init(other: Z4) {
-    other.init() // expected-error{{'init' is a member of the type}}
+    other.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
     other.dynamicType.init() // expected-error{{must use a 'required' initializer}} expected-warning{{unused}}
   }
 }
@@ -121,7 +121,7 @@ class Z5 : Z4 {
   override init() { }
 
   convenience init(other: Z5) {
-    other.init() // expected-error{{'init' is a member of the type}}
+    other.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
   }
 }
 
@@ -150,7 +150,7 @@ struct RDar16603812 {
    var i = 42
    init() {}
    func foo() {
-      self.init() // expected-error {{'init' is a member of the type}}
+      self.init() // expected-error {{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
       self.dynamicType.init() // expected-warning{{result of initializer is unused}}
    }
 }
