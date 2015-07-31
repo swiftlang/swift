@@ -82,7 +82,7 @@ func debugPrintedIs<T>(
     file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   var actual = ""
-  _prext_debugPrint(object, toStream: &actual, terminator: "")
+  _prext_debugPrint(object, terminator: "", toStream: &actual)
   if expected1 != actual && (expected2 != nil && expected2! != actual) {
     _prext_print(
       "check failed at \(file), line \(line)",
@@ -974,13 +974,11 @@ func test_varargs() {
 
   var output = ""
   _prext_print(
-    "", 1, 2, 3, 4, "",
-    toStream: &output, separator: "|")
+    "", 1, 2, 3, 4, "", separator: "|", toStream: &output)
   _prext_print((output == "|1|2|3|4|\n") as Bool) // CHECK-NEXT: true
   output = ""
   _prext_debugPrint(
-    "", 1, 2, 3, 4, "",
-    toStream: &output, separator: "|", terminator: "")
+    "", 1, 2, 3, 4, "", separator: "|", terminator: "", toStream: &output)
   _prext_print((output == "\"\"|1|2|3|4|\"\"") as Bool) // CHECK-NEXT: true
   _prext_print("test_varargs done")
 }
@@ -1004,7 +1002,7 @@ func test_playgroundPrintHook() {
   
   var explicitStream = ""
   printed = nil
-  _prext_print("", 1, 2, 3, 4, "", toStream: &explicitStream, separator: "!")
+  _prext_print("", 1, 2, 3, 4, "", separator: "!", toStream: &explicitStream)
   _prext_print(printed)               // CHECK-NEXT: nil
   _prext_print("%\(explicitStream)%") // CHECK-NEXT: %!1!2!3!4!
   // CHECK-NEXT: %
@@ -1012,7 +1010,7 @@ func test_playgroundPrintHook() {
   explicitStream = ""
   printed = nil
   _prext_debugPrint(
-    "", 1, 2, 3, 4, "", toStream: &explicitStream, separator: "!")
+    "", 1, 2, 3, 4, "", separator: "!", toStream: &explicitStream)
   _prext_print(printed) // CHECK-NEXT: nil
   _prext_print("%\(explicitStream)%") // CHECK-NEXT: %""!1!2!3!4!""
   // CHECK-NEXT: %

@@ -29,13 +29,13 @@ public func _prext_print(
   if let hook = _playgroundPrintHook {
     var output = _TeeStream(left: "", right: _Stdout())
     _print(
-      items, toStream: &output, separator: separator, terminator: terminator)
+      items, separator: separator, terminator: terminator, toStream: &output)
     hook(output.left)
   }
   else {
     var output = _Stdout()
     _print(
-      items, toStream: &output, separator: separator, terminator: terminator)
+      items, separator: separator, terminator: terminator, toStream: &output)
   }
 }
 
@@ -57,13 +57,13 @@ public func _prext_debugPrint(
   if let hook = _playgroundPrintHook {
     var output = _TeeStream(left: "", right: _Stdout())
     _debugPrint(
-      items, toStream: &output, separator: separator, terminator: terminator)
+      items, separator: separator, terminator: terminator, toStream: &output)
     hook(output.left)
   }
   else {
     var output = _Stdout()
     _debugPrint(
-      items, toStream: &output, separator: separator, terminator: terminator)
+      items, separator: separator, terminator: terminator, toStream: &output)
   }
 }
 
@@ -79,11 +79,11 @@ public func _prext_debugPrint(
 @inline(__always)
 public func _prext_print<Target: OutputStreamType>(
   items: Any...,
-  inout toStream output: Target,
   separator: String = " ",
-  terminator: String = "\n"
+  terminator: String = "\n",
+  inout toStream output: Target
 ) {
-  _print(items, toStream: &output, separator: separator, terminator: terminator)
+  _print(items, separator: separator, terminator: terminator, toStream: &output)
 }
 
 /// Writes the textual representations of `items` most suitable for
@@ -98,21 +98,21 @@ public func _prext_print<Target: OutputStreamType>(
 @inline(__always)
 public func _prext_debugPrint<Target: OutputStreamType>(
   items: Any...,
-  inout toStream output: Target,
   separator: String = " ",
-  terminator: String = "\n"
+  terminator: String = "\n",
+  inout toStream output: Target
 ) {
   _debugPrint(
-    items, toStream: &output, separator: separator, terminator: terminator)
+    items, separator: separator, terminator: terminator, toStream: &output)
 }
 
 @inline(never)
 @_semantics("stdlib_binary_only")
 internal func _print<Target: OutputStreamType>(
   items: [Any],
-  inout toStream output: Target,
   separator: String = " ",
-  terminator: String = "\n"
+  terminator: String = "\n",
+  inout toStream output: Target
 ) {
   var prefix = ""
   output._lock()
@@ -129,9 +129,9 @@ internal func _print<Target: OutputStreamType>(
 @_semantics("stdlib_binary_only")
 internal func _debugPrint<Target: OutputStreamType>(
   items: [Any],
-  inout toStream output: Target,
   separator: String = " ",
-  terminator: String = "\n"
+  terminator: String = "\n",
+  inout toStream output: Target
 ) {
   var prefix = ""
   output._lock()
