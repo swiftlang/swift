@@ -202,10 +202,11 @@ endfunction()
 #     [MODULE_NAME]                     # The module name. If not specified, the name
 #                                       # is derived from the output name
 #     [IS_STDLIB]                       # Install produced files.
+#     [EMIT_SIB]                        # Emit the file as a sib file instead of a .o
 #     )
 function(_compile_swift_files dependency_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
-    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY"
+    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMIT_SIB"
     "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT"
     "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;API_NOTES;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
@@ -343,11 +344,17 @@ function(_compile_swift_files dependency_target_out_var_name)
       message(FATAL_ERROR "Don't know where to put the module files")
     endif()
 
-    set(module_file "${module_dir}/${module_name}.swiftmodule")
-    set(module_doc_file "${module_dir}/${module_name}.swiftdoc")
-    list(APPEND swift_flags
-        "-parse-as-library"
-        "-emit-module" "-emit-module-path" "${module_file}")
+    if (NOT SWIFTFILE_EMIT_SIB)
+      # Right now sib files seem to not be output when we emit a module. So
+      # don't emit it.
+      set(module_file "${module_dir}/${module_name}.swiftmodule")
+      set(module_doc_file "${module_dir}/${module_name}.swiftdoc")
+      list(APPEND swift_flags
+          "-parse-as-library"
+          "-emit-module" "-emit-module-path" "${module_file}")
+    else()
+      list(APPEND swift_flags "-parse-as-library")
+    endif()
 
     list(APPEND command_create_dirs
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${module_dir}")
@@ -371,25 +378,29 @@ function(_compile_swift_files dependency_target_out_var_name)
   set(command_create_apinotes)
   set(depends_create_apinotes)
   set(apinote_files)
-  foreach(apinote_module ${SWIFTFILE_API_NOTES})
-    set(apinote_file "${module_dir}/${apinote_module}.apinotesc")
-    set(apinote_input_file
+
+  # If we use sib don't emit api notes for now.
+  if (NOT SWIFTFILE_EMIT_SIB)
+    foreach(apinote_module ${SWIFTFILE_API_NOTES})
+      set(apinote_file "${module_dir}/${apinote_module}.apinotesc")
+      set(apinote_input_file
         "${SWIFT_API_NOTES_PATH}/${apinote_module}.apinotes")
-    set(CLANG_APINOTES "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang")
+      set(CLANG_APINOTES "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang")
 
-    list(APPEND command_create_apinotes
+      list(APPEND command_create_apinotes
         COMMAND
-          "${CLANG_APINOTES}" "-cc1apinotes" "-yaml-to-binary"
-          "-o" "${apinote_file}"
-          "-target" "${SWIFT_SDK_${SWIFTFILE_SDK}_ARCH_${SWIFTFILE_ARCHITECTURE}_TRIPLE}"
-          "${apinote_input_file}")
-    list(APPEND depends_create_apinotes "${apinote_input_file}")
+        "${CLANG_APINOTES}" "-cc1apinotes" "-yaml-to-binary"
+        "-o" "${apinote_file}"
+        "-target" "${SWIFT_SDK_${SWIFTFILE_SDK}_ARCH_${SWIFTFILE_ARCHITECTURE}_TRIPLE}"
+        "${apinote_input_file}")
+      list(APPEND depends_create_apinotes "${apinote_input_file}")
 
-    list(APPEND apinote_files "${apinote_file}")
-    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
+      list(APPEND apinote_files "${apinote_file}")
+      swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
         FILES ${apinote_file}
         DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
-  endforeach()
+    endforeach()
+  endif()
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
   set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
@@ -406,6 +417,12 @@ function(_compile_swift_files dependency_target_out_var_name)
     set(output_option "-o" ${first_output})
   endif()
 
+  set(main_command "-c")
+  if (SWIFTFILE_EMIT_SIB)
+    # Change the command to emit-sib if we are asked to emit sib
+    set(main_command "-emit-sib")
+  endif()
+
   add_custom_command_target(
       dependency_target
       ${command_create_dirs}
@@ -414,7 +431,7 @@ function(_compile_swift_files dependency_target_out_var_name)
       ${command_create_apinotes}
       COMMAND
         "${line_directive_tool}" "${source_files}" --
-        "${swift_compiler_tool}" "-c" ${swift_flags}
+        "${swift_compiler_tool}" "${main_command}" ${swift_flags}
         ${output_option} "${source_files}"
       OUTPUT
         ${SWIFTFILE_OUTPUT} "${module_file}" "${module_doc_file}"
