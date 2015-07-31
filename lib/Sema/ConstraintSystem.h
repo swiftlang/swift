@@ -394,9 +394,6 @@ public:
     DoesNotConformToProtocol,
     /// \brief The first type does not have a member with the given name.
     DoesNotHaveMember,
-    /// \brief The first type has the given initializer, but it's available only
-    /// on the metatype, not the instance.
-    DoesNotHaveInitOnInstance,
     /// \brief The type is not an archetype.
     IsNotArchetype,
     /// \brief The type is not a class.
@@ -509,7 +506,6 @@ public:
                      getSecondType());
 
     case DoesNotHaveMember:
-    case DoesNotHaveInitOnInstance:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                      getName());
 
@@ -1155,11 +1151,6 @@ struct MemberLookupResult {
     /// This result indicates that the member reference is erroneous, but was
     /// already dianosed.  Don't emit another error.
     ErrorAlreadyDiagnosed,
-    
-    
-    /// An initializer exists, but it's available only on the metatype, not the
-    /// instance.
-    ErrorDoesNotHaveInitOnInstance,
     
     /// This result indicates that the lookup produced candidate lists,
     /// potentially of viable results, potentially of error candidates, and

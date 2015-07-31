@@ -2867,10 +2867,8 @@ performMemberLookup(Type baseTy, const Constraint &constraint) {
       return result;    // No result.
     
     // The constructors are only found on the metatype.
-    if (!isMetatype) {
-      result.OverallResult = MemberLookupResult::ErrorDoesNotHaveInitOnInstance;
+    if (!isMetatype)
       return result;
-    }
     
     TypeBase *favoredType = nullptr;
     if (auto anchor = constraint.getLocator()->getAnchor()) {
@@ -3189,12 +3187,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     return SolutionKind::Unsolved;
   case MemberLookupResult::ErrorAlreadyDiagnosed:
     return SolutionKind::Error;
-      
-  case MemberLookupResult::ErrorDoesNotHaveInitOnInstance:
-    recordFailure(constraint.getLocator(), Failure::DoesNotHaveInitOnInstance,
-                  baseObjTy, name);
-    return SolutionKind::Error;
-      
   case MemberLookupResult::HasResults:
     // Keep going!
     break;

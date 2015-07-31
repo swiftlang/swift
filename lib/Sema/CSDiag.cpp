@@ -42,10 +42,6 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
     out << getFirstType().getString() << " does not have a member named '"
         << getName() << "'";
     break;
-
-  case DoesNotHaveInitOnInstance:
-    out << getFirstType().getString() << " instance does not have initializers";
-    break;
     
   case FunctionTypesMismatch:
     out << "function type " << getFirstType().getString() << " is not equal to "
@@ -752,31 +748,6 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   case Failure::DoesNotHaveMember:
     // The Expr path handling these constraints does a good job.
     return false;
-  
-  case Failure::DoesNotHaveInitOnInstance: {
-    // Diagnose 'super.init', which can only appear inside another initializer,
-    // specially.
-    auto ctorRef = dyn_cast<UnresolvedConstructorExpr>(locator->getAnchor());
-    if (isa<SuperRefExpr>(ctorRef->getSubExpr())) {
-      tc.diagnose(loc, diag::super_initializer_not_in_initializer);
-      break;
-    }
-  
-    // Suggest inserting '.dynamicType' to construct another object of the same
-    // dynamic type.
-    SourceLoc fixItLoc;
-    if (ctorRef) {
-      // Place the '.dynamicType' right before the init.
-      fixItLoc = ctorRef->getConstructorLoc().getAdvancedLoc(-1);
-    }
-    
-    auto diag = tc.diagnose(loc, diag::init_not_instance_member);
-    if (fixItLoc.isValid())
-      diag.fixItInsert(fixItLoc, ".dynamicType");
-    diag.flush();
-    
-    break;
-  }
 
   case Failure::DoesNotConformToProtocol:
     // FIXME: Probably want to do this within the actual solver, because at
@@ -2231,6 +2202,28 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
+    // Diagnose 'super.init', which can only appear inside another initializer,
+    // specially.
+    if (memberName.isSimpleName(CS->TC.Context.Id_init) &&
+        !baseObjTy->is<MetatypeType>()) {
+      if (auto ctorRef = dyn_cast<UnresolvedConstructorExpr>(anchor)) {
+        if (isa<SuperRefExpr>(ctorRef->getSubExpr())) {
+          diagnose(anchor->getLoc(),
+                   diag::super_initializer_not_in_initializer);
+          return true;
+        }
+        
+        // Suggest inserting '.dynamicType' to construct another object of the
+        // same dynamic type.
+        SourceLoc fixItLoc = ctorRef->getConstructorLoc().getAdvancedLoc(-1);
+        
+        // Place the '.dynamicType' right before the init.
+        diagnose(anchor->getLoc(), diag::init_not_instance_member)
+        .fixItInsert(fixItLoc, ".dynamicType");
+        return true;
+      }
+    }
+      
     // If we couldn't resolve a specific type for the base expression, then we
     // cannot produce a specific diagnostic.
 
@@ -2250,9 +2243,6 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
     // If an error was already emitted, then we're done, don't emit anything
     // redundant.
     return true;
-  case MemberLookupResult::ErrorDoesNotHaveInitOnInstance:
-    // FIXME: Turn this into a normal lookup fail.
-    return diagnoseGeneralConversionFailure();
       
   case MemberLookupResult::HasResults:
     break;
