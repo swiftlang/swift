@@ -1593,6 +1593,7 @@ namespace {
         }
       }
       if (!MaxIntegerTypeDecl ||
+          !MaxIntegerTypeDecl->hasUnderlyingType() ||
           !MaxIntegerTypeDecl->getUnderlyingType()->is<BuiltinIntegerType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinIntegerType_found);
         return nullptr;
@@ -1685,6 +1686,7 @@ namespace {
           MaxFloatTypeDecl = dyn_cast<TypeAliasDecl>(lookupResults.front());
       }
       if (!MaxFloatTypeDecl ||
+          !MaxFloatTypeDecl->hasUnderlyingType() ||
           !MaxFloatTypeDecl->getUnderlyingType()->is<BuiltinFloatType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
         return nullptr;

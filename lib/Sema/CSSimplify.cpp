@@ -1827,13 +1827,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
       
       // Bridging from an ErrorType to an Objective-C NSError.
-      auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorType);
-      if (TC.containsProtocol(type1, errorType, DC,
-                              ConformanceCheckFlags::InExpression))
-        if (auto NSErrorTy = TC.getNSErrorType(DC))
-          if (type2->isEqual(NSErrorTy))
-            conversionsOrFixes.push_back(
-                                   ConversionRestrictionKind::BridgeToNSError);
+      if (auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorType)) {
+        if (TC.containsProtocol(type1, errorType, DC,
+                                ConformanceCheckFlags::InExpression))
+          if (auto NSErrorTy = TC.getNSErrorType(DC))
+            if (type2->isEqual(NSErrorTy))
+              conversionsOrFixes.push_back(
+                                    ConversionRestrictionKind::BridgeToNSError);
+      }
     }
     
     // Pointer arguments can be converted from pointer-compatible types.
