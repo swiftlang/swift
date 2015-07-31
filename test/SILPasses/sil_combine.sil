@@ -2663,3 +2663,17 @@ bb0(%0 : $@callee_owned (@owned String) -> Bool):
   %7 = tuple ()
   return %7 : $()
 }
+
+// CHECK-LABEL: sil @remove_unused_convert_function
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @remove_unused_convert_function : $@convention(thin) (@inout B, B, Builtin.Int1) -> () {
+bb0(%0 : $*B, %1 : $B, %2 : $Builtin.Int1):
+  %3 = function_ref @weird_function : $@convention(thin) (@inout E, E, Builtin.Int1) -> ()
+  %4 = convert_function %3 : $@convention(thin) (@inout E, E, Builtin.Int1) -> () to $@convention(thin) (@inout B, B, Builtin.Int1) -> ()
+  %5 = retain_value %4: $@convention(thin) (@inout B, B, Builtin.Int1) -> ()
+  %6 = release_value %4: $@convention(thin) (@inout B, B, Builtin.Int1) -> ()
+  %7 = tuple()
+  return %7 : $()
+}

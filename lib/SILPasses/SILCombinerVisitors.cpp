@@ -3051,3 +3051,22 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
 SILInstruction *SILCombiner::visitEnumInst(EnumInst *EI) {
   return nullptr;
 }
+
+SILInstruction *SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *CFI) {
+  // If the only uses of this instruction are retains/releases
+  bool isUsed = false;
+  for (auto Use : CFI->getUses()) {
+    if (!isa<RefCountingInst>(Use->getUser())) {
+      isUsed = true;
+    }
+  }
+  if (!isUsed) {
+    eraseUsesOfInstruction(CFI,
+                           [this](SILInstruction *I){
+                             Worklist.remove(I);
+                           },
+                           true);
+    eraseInstFromFunction(*CFI);
+  }
+  return nullptr;
+}
