@@ -1665,7 +1665,7 @@ public:
   void addExprForDiagnosis(Expr *E1, Expr *Result) {
     DiagnosedExprs[E1] = Result;
   }
-  Expr *exprIsBeingDiagnosed(Expr *E) {
+  Expr *isExprBeingDiagnosed(Expr *E) {
     return DiagnosedExprs[E];
   }
 

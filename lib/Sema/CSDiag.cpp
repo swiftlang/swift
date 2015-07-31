@@ -2682,7 +2682,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
                                        ContextualTypePurpose convertTypePurpose,
                                                     TCCOptions options) {
   // Track if this sub-expression is currently being diagnosed.
-  if (Expr *res = CS->TC.exprIsBeingDiagnosed(subExpr))
+  if (Expr *res = CS->TC.isExprBeingDiagnosed(subExpr))
     return res;
   
   // FIXME: expressions are never removed from this set.
@@ -2718,7 +2718,15 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
        isa<InOutExpr>(subExpr)) &&
       !subExpr->getType()->hasTypeVariable())
     return subExpr;
-  
+
+
+  // If we have a conversion type, but it has type variables (from the current
+  // ConstraintSystem), then we can't use it.
+  if (convertType && convertType->hasTypeVariable()) {
+    convertType = Type();
+    convertTypePurpose = CTP_Unused;
+  }
+
   
   ExprTypeSaver SavedTypeData;
   SavedTypeData.save(subExpr);
@@ -3028,7 +3036,6 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
   Type exampleInputType;
   if (!candidates.empty()) {
     exampleInputType = candidates[0].getArgumentType();
-
 
     // If we found a single candidate, and have no contextually known argument
     // type information, use that one candidate as the type information for
@@ -3626,7 +3633,10 @@ bool FailureDiagnosis::diagnoseFailure() {
   // by itself.  If not, then we'll get a more specific failure in the
   // subexpression.  If so, then we know it must be some conversion constraint
   // binding the result of the expression to a type that fails.
-  if (!CS->TC.exprIsBeingDiagnosed(expr)) {
+  if (!CS->TC.isExprBeingDiagnosed(expr) || CS->getContextualType()) {
+    // Make sure we retypecheck this expression, without context.
+    CS->TC.addExprForDiagnosis(expr, nullptr);
+
     // Type check the expression independently of any contextual constraints.
     auto subExprTy = getTypeOfTypeCheckedChildIndependently(expr);
     
