@@ -1908,12 +1908,14 @@ void NominalTypeDecl::computeType() {
   Type parentTy = getDeclContext()->getDeclaredTypeInContext();
   ASTContext &ctx = getASTContext();
   if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-    if (!DeclaredTy)
-      DeclaredTy = ProtocolType::get(proto, ctx);
+    if (!getDeclaredType()) {
+      ProtocolType::get(proto, ctx);
+      assert(getDeclaredType());
+    }
   } else if (getGenericParams()) {
-    DeclaredTy = UnboundGenericType::get(this, parentTy, ctx);
+    setDeclaredType(UnboundGenericType::get(this, parentTy, ctx));
   } else {
-    DeclaredTy = NominalType::get(this, parentTy, ctx);
+    setDeclaredType(NominalType::get(this, parentTy, ctx));
   }
 
   // Set the type.

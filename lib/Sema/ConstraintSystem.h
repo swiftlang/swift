@@ -1289,6 +1289,9 @@ private:
   bool HandlingFavoredConstraint = false;
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
+
+  /// Maps expressions to types for choosing a favored overload
+  /// type in a disjunction constraint.
   llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
 
   /// There can only be a single contextual type on the root of the expression

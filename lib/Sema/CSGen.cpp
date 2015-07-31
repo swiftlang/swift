@@ -315,7 +315,7 @@ namespace {
     equatableProto->lookupDirect(CS.TC.Context.Id_EqualsOperator);
     assert(requirement.size() == 1 && "broken Equatable protocol");
     ConcreteDeclRef witness =
-    conformance->getWitness(requirement.front(), &CS.TC);
+        conformance->getWitness(requirement.front(), &CS.TC);
     if (!witness)
       return;
     
@@ -328,7 +328,7 @@ namespace {
       Type(), witness.getDecl(), /*specialized=*/false, CS
     };
     auto overload =
-    Constraint::createBindOverload(CS, tyvarType, choice, csLoc);
+        Constraint::createBindOverload(CS, tyvarType, choice, csLoc);
     newConstraints.push_back(overload);
   }
   
@@ -347,8 +347,7 @@ namespace {
                                              SmallVectorImpl<Constraint *>&)>
                           createReplacements = nullptr) {
     // Find the type variable associated with the function, if any.
-    auto fnType = expr->getFn()->getType();
-    auto tyvarType = fnType->getAs<TypeVariableType>();
+    auto tyvarType = expr->getFn()->getType()->getAs<TypeVariableType>();
     if (!tyvarType)
       return;
     
@@ -386,8 +385,8 @@ namespace {
           favoredConstraints.push_back(oldConstraint);
           
           favoredTy = overloadChoice.getDecl()->
-          getType()->getAs<AnyFunctionType>()->
-          getResult().getPointer();
+              getType()->getAs<AnyFunctionType>()->
+              getResult().getPointer();
         }
       }
       
@@ -421,16 +420,16 @@ namespace {
       
       // Create the disjunction of favored constraints.
       auto favoredConstraintsDisjunction =
-      Constraint::createDisjunction(CS,
-                                    favoredConstraints,
-                                    csLoc);
+          Constraint::createDisjunction(CS,
+                                        favoredConstraints,
+                                        csLoc);
       
       // If we didn't actually build a disjunction, clone
       // the underlying constraint so we can mark it as
       // favored.
       if (favoredConstraints.size() == 1) {
         favoredConstraintsDisjunction
-        = favoredConstraintsDisjunction->clone(CS);
+            = favoredConstraintsDisjunction->clone(CS);
       }
       
       favoredConstraintsDisjunction->setFavored();
@@ -440,9 +439,9 @@ namespace {
       Constraint *fallbackConstraintsDisjunction = constraint;
       if (replacementConstraints.size() > oldConstraints.size()) {
         fallbackConstraintsDisjunction =
-        Constraint::createDisjunction(CS,
-                                      replacementConstraints,
-                                      csLoc);
+            Constraint::createDisjunction(CS,
+                                          replacementConstraints,
+                                          csLoc);
       }
       
       // Form the (favored, fallback) disjunction.
@@ -585,7 +584,7 @@ namespace {
       auto contextualTy = CS.getContextualType(expr);
       
       return isFavoredParamAndArg(CS, paramTy, argTy, Type()) &&
-      (!contextualTy || contextualTy->isEqual(resultTy));
+          (!contextualTy || contextualTy->isEqual(resultTy));
     };
     
     favorCallOverloads(expr, CS, isFavoredDecl);
@@ -594,8 +593,7 @@ namespace {
   void favorMatchingOverloadExprs(ApplyExpr *expr,
                                   ConstraintSystem &CS) {
     // Find the argument type.
-    auto argTy = expr->getArg()->getType();
-    size_t nArgs = getOperandCount(argTy);
+    size_t nArgs = getOperandCount(expr->getArg()->getType());
     auto fnExpr = expr->getFn();
     
     // Check to ensure that we have an OverloadedDeclRef, and that we're not
