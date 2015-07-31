@@ -4193,38 +4193,63 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 
 
   struct FindReferenceToInitializer : ASTWalker {
+    const ConstructorDecl *Decl;
     BodyInitKind Kind = BodyInitKind::None;
     ApplyExpr *InitExpr = nullptr;
     DiagnosticEngine *Diags;
 
-    FindReferenceToInitializer(DiagnosticEngine *diags) : Diags(diags) { }
+    FindReferenceToInitializer(const ConstructorDecl *decl,
+                               DiagnosticEngine *diags)
+        : Decl(decl), Diags(diags) { }
+
+    bool isSelfExpr(Expr *E) {
+      E = E->getSemanticsProvidingExpr();
+
+      if (auto ATSE = dyn_cast<ArchetypeToSuperExpr>(E))
+        E = ATSE->getSubExpr();
+      if (auto IOE = dyn_cast<InOutExpr>(E))
+        E = IOE->getSubExpr();
+      if (auto LE = dyn_cast<LoadExpr>(E))
+        E = LE->getSubExpr();
+      if (auto DRE = dyn_cast<DeclRefExpr>(E))
+        return DRE->getDecl() == Decl->getImplicitSelfDecl();
+
+      return false;
+    }
 
     std::pair<bool, Expr*> walkToExprPre(Expr *E) override {
       // Don't walk into closures.
       if (isa<ClosureExpr>(E))
         return { false, E };
 
-      // Look for calls of a constructor.
+      // Look for calls of a constructor on self or super.
       auto apply = dyn_cast<ApplyExpr>(E);
       if (!apply)
         return { true, E };
 
       auto Callee = apply->getFn()->getSemanticsProvidingExpr();
       
-      BodyInitKind myKind;
+      Expr *arg;
 
       if (isa<OtherConstructorDeclRefExpr>(Callee)) {
-        if (apply->getArg()->isSuperExpr())
-          myKind = BodyInitKind::Chained;
-        else
-          myKind = BodyInitKind::Delegating;
+        arg = apply->getArg();
       } else if (auto *UCE = dyn_cast<UnresolvedConstructorExpr>(Callee)) {
-        if (UCE->getSubExpr()->isSuperExpr())
-          myKind = BodyInitKind::Chained;
-        else
-          myKind = BodyInitKind::Delegating;
+        arg = UCE->getSubExpr();
+      } else if (auto *CRE = dyn_cast<ConstructorRefCallExpr>(Callee)) {
+        arg = CRE->getArg();
       } else {
         // Not a constructor call.
+        return { true, E };
+      }
+
+      // Look for a base of 'self' or 'super'.
+      BodyInitKind myKind;
+      if (arg->isSuperExpr())
+        myKind = BodyInitKind::Chained;
+      else if (isSelfExpr(arg))
+        myKind = BodyInitKind::Delegating;
+      else {
+        // We're constructing something else.
         return { true, E };
       }
       
@@ -4251,7 +4276,9 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 
       return { true, E };
     }
-  } finder(diags);
+  };
+  
+  FindReferenceToInitializer finder(this, diags);
   getBody()->walk(finder);
 
   // get the kind out of the finder.
