@@ -339,13 +339,17 @@ namespace {
   /// \param isFavored Determine wheth the given overload is favored.
   /// \param createReplacements If provided, a function that creates a set of
   /// replacement fallback constraints.
+  /// \param mustConsider If provided, a function to detect the presence of
+  /// overloads which inhibit any overload from being favored.
   void favorCallOverloads(ApplyExpr *expr,
                           ConstraintSystem &CS,
                           std::function<bool(ValueDecl *)> isFavored,
                           std::function<void(TypeVariableType *tyvarType,
                                              ArrayRef<Constraint *>,
                                              SmallVectorImpl<Constraint *>&)>
-                          createReplacements = nullptr) {
+                              createReplacements = nullptr,
+                          std::function<bool(ValueDecl *)>
+                              mustConsider = nullptr) {
     // Find the type variable associated with the function, if any.
     auto tyvarType = expr->getFn()->getType()->getAs<TypeVariableType>();
     if (!tyvarType)
@@ -372,7 +376,19 @@ namespace {
       if (oldConstraints[0]->getKind() != ConstraintKind::BindOverload) {
         continue;
       }
-      
+
+      if (mustConsider) {
+        bool hasMustConsider = false;
+        for (auto oldConstraint : oldConstraints) {
+          auto overloadChoice = oldConstraint->getOverloadChoice();
+          if (mustConsider(overloadChoice.getDecl()))
+            hasMustConsider = true;
+        }
+        if (hasMustConsider) {
+          continue;
+        }
+      }
+
       SmallVector<Constraint *, 4> favoredConstraints;
       
       TypeBase *favoredTy = nullptr;
@@ -642,7 +658,7 @@ namespace {
         auto fnTy = valueTy->getAs<AnyFunctionType>();
         if (!fnTy)
           return false;
-        
+
         // Figure out the parameter type, accounting for the implicit 'self' if
         // necessary.
         if (auto *FD = dyn_cast<AbstractFunctionDecl>(value)) {
@@ -656,8 +672,20 @@ namespace {
         
         return favoredTy->isEqual(paramTy);
       };
-      
-      favorCallOverloads(expr, CS, isFavoredDecl);
+
+      // This is a hack to ensure we always consider the protocol requirement
+      // itself when calling something that has a default implementation in an
+      // extension. Otherwise, the extension method might be favored if we're
+      // inside an extension context, since any archetypes in the parameter
+      // list could match exactly.
+      auto mustConsider = [&](ValueDecl *value) -> bool {
+        return isa<ProtocolDecl>(value->getDeclContext());
+      };
+
+      favorCallOverloads(expr, CS,
+                         isFavoredDecl,
+                         /*createReplacements=*/nullptr,
+                         mustConsider);
     }
   }
   

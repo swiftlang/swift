@@ -386,3 +386,45 @@ extension ProtoDelegatesToRequired where Self : RequiredInitClass {
     self.init()
   }
 }
+
+// ----------------------------------------------------------------------------
+// Default implementations via protocol extensions
+// ----------------------------------------------------------------------------
+
+protocol P2 {
+  typealias A
+  func f1(a: A)
+  func f2(a: A)
+  var x: A { get }
+}
+
+extension P2 {
+  // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions2P2_S_S0_2f1uRq_S0__fq_Fqq_S0_1AT_
+  // CHECK: witness_method $Self, #P2.f2!1
+  // CHECK: function_ref @_TFeRq_19protocol_extensions2P2_S_S0_2f3uRq_S0__fq_Fqq_S0_1AT_
+  // CHECK: return
+  func f1(a: A) {
+    f2(a)
+    f3(a)
+  }
+
+  // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions2P2_S_S0_2f2uRq_S0__fq_Fqq_S0_1AT_
+  // CHECK: witness_method $Self, #P2.f1!1
+  // CHECK: function_ref @_TFeRq_19protocol_extensions2P2_S_S0_2f3uRq_S0__fq_Fqq_S0_1AT_
+  // CHECK: return
+  func f2(a: A) {
+    f1(a)
+    f3(a)
+  }
+
+  func f3(a: A) {}
+
+  // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions2P2_S_S0_2f4uRq_S0__fq_FT_T_
+  // CHECK: witness_method $Self, #P2.f1!1
+  // CHECK: witness_method $Self, #P2.f2!1
+  // CHECK: return
+  func f4() {
+    f1(x)
+    f2(x)
+  }
+}
