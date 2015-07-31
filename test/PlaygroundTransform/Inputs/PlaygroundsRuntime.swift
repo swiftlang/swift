@@ -40,52 +40,8 @@ func $builtin_log_scope_exit() -> AnyObject? {
   return LogRecord(api:"$builtin_log_scope_exit")
 }
 
-func $builtin_print<T>(object: T) -> AnyObject? {
-  return LogRecord(api: "$builtin_print<>", object: object)
-}
-
-func $builtin_print<T, TargetStream : OutputStreamType>(object: T, inout _ stream: TargetStream) -> AnyObject? {
-  return LogRecord(api: "$builtin_print<stream>", object: object)
-}
-
-func $builtin_print<T>(object: T, appendNewline: Bool) -> AnyObject? {
-  if (appendNewline) {
-    return LogRecord(api: "$builtin_print<appendNewline=true>", object: object)
-  } else {
-    return LogRecord(api: "$builtin_print<appendNewline=false>", object: object)
-  }
-}
-
-func $builtin_print<T, TargetStream : OutputStreamType>(object: T, inout _ stream: TargetStream, appendNewline: Bool) -> AnyObject? {
-  if (appendNewline) {
-    return LogRecord(api: "$builtin_print<stream, appendNewline=true>", object: object)
-  } else {
-    return LogRecord(api: "$builtin_print<stream, appendNewline=false>", object: object)
-  }
-}
-
-func $builtin_debugPrint<T>(object: T) -> AnyObject? {
-  return LogRecord(api: "$builtin_debugPrint<>", object: object)
-}
-
-func $builtin_debugPrint<T, TargetStream : OutputStreamType>(object: T, inout _ stream: TargetStream) -> AnyObject? {
-  return LogRecord(api: "$builtin_debugPrint<stream>", object: object)
-}
-
-func $builtin_debugPrint<T>(object: T, appendNewline: Bool) -> AnyObject? {
-  if (appendNewline) {
-    return LogRecord(api: "$builtin_debugPrint<appendNewline=true>", object: object)
-  } else {
-    return LogRecord(api: "$builtin_debugPrint<appendNewline=false>", object: object)
-  }
-}
-
-func $builtin_debugPrint<T, TargetStream : OutputStreamType>(object: T, inout _ stream: TargetStream, appendNewline: Bool) -> AnyObject? {
-  if (appendNewline) {
-    return LogRecord(api: "$builtin_debugPrint<stream, appendNewline=true>", object: object)
-  } else {
-    return LogRecord(api: "$builtin_debugPrint<stream, appendNewline=false>", object: object)
-  }
+func $builtin_postPrint() -> AnyObject? {
+  return LogRecord(api:"$builtin_postPrint")
 }
 
 func $builtin_send_data(object:AnyObject?, _ sl: Int, _ el: Int, _ sc: Int, _ ec: Int) {

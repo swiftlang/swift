@@ -566,21 +566,28 @@ public:
             if (FnD && FnD->getModuleContext() == Context.TheStdlibModule) {
               StringRef FnName = FnD->getNameStr();
               if (FnName.equals("print") || FnName.equals("debugPrint")) {
-                const bool isDebugPrint = FnName.equals("debugPrint");
-                PatternBindingDecl *ArgPattern = nullptr;
-                VarDecl *ArgVariable = nullptr;
-                Added<Stmt *> Log = logPrint(isDebugPrint, AE,
-                                             ArgPattern, ArgVariable);
-                if (*Log) {
-                  if (ArgPattern) {
-                    assert(ArgVariable);
-                    Elements[EI] = ArgPattern;
-                    Elements.insert(Elements.begin() + (EI + 1), ArgVariable);
-                    Elements.insert(Elements.begin() + (EI + 2), *Log);
-                    EI += 2;
-                  } else {
-                    Elements[EI] = *Log;
+                const bool isOldStyle = false;
+                if (isOldStyle) {
+                  const bool isDebugPrint = FnName.equals("debugPrint");
+                  PatternBindingDecl *ArgPattern = nullptr;
+                  VarDecl *ArgVariable = nullptr;
+                  Added<Stmt *> Log = logPrint(isDebugPrint, AE,
+                                               ArgPattern, ArgVariable);
+                  if (*Log) {
+                    if (ArgPattern) {
+                      assert(ArgVariable);
+                      Elements[EI] = ArgPattern;
+                      Elements.insert(Elements.begin() + (EI + 1), ArgVariable);
+                      Elements.insert(Elements.begin() + (EI + 2), *Log);
+                      EI += 2;
+                    } else {
+                      Elements[EI] = *Log;
+                    }
                   }
+                } else {
+                  Added<Stmt *> Log = logPostPrint(AE->getSourceRange());
+                  Elements.insert(Elements.begin() + (EI + 1), *Log);
+                  EI += 1;
                 }
                 Handled = true;
               }
@@ -870,6 +877,12 @@ public:
     }
 
     return buildLoggerCallWithApply(AddedApply, AE->getSourceRange());
+  }
+
+  Added<Stmt *> logPostPrint(SourceRange SR) {
+    return buildLoggerCallWithArgs("$builtin_postPrint",
+                                   MutableArrayRef<Expr *>(),
+                                   SR);
   }
 
   std::pair<PatternBindingDecl*, VarDecl*>

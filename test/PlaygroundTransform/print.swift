@@ -7,34 +7,35 @@
 
 var str : String = ""
 
-print("One")
-print("One", 2)
+print(("One", 2))
 print("One", &str)
 print("One", appendNewline:true)
 print("One", appendNewline:false)
 print("One", &str, appendNewline:true)
 print("One", &str, appendNewline:false)
 
-debugPrint("One")
-debugPrint("One", 2)
+debugPrint(("One", 2))
 debugPrint("One", &str)
 debugPrint("One", appendNewline:true)
 debugPrint("One", appendNewline:false)
 debugPrint("One", &str, appendNewline:true)
 debugPrint("One", &str, appendNewline:false)
 
-// CHECK: [{{.*}}] $builtin_print<>['One']
-// CHECK-NEXT: [{{.*}}] $builtin_print<>['("One", 2)']
-// CHECK-NEXT: [{{.*}}] $builtin_print<stream>['One']
-// CHECK-NEXT: [{{.*}}] $builtin_print<appendNewline=true>['One']
-// CHECK-NEXT: [{{.*}}] $builtin_print<appendNewline=false>['One']
-// CHECK-NEXT: [{{.*}}] $builtin_print<stream, appendNewline=true>['One']
-// CHECK-NEXT: [{{.*}}] $builtin_print<stream, appendNewline=false>['One']
-// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<>['One']
-// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<>['("One", 2)']
-// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<stream>['One']
-// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<appendNewline=true>['One']
-// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<appendNewline=false>['One']
-// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<stream, appendNewline=true>['One']
-// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<stream, appendNewline=false>['One']
+// CHECK: [{{.*}}] $builtin_log[str='']
+// CHECK-NEXT: ("One", 2)
+// CHECK-NEXT: [{{.*}}] $builtin_postPrint
+// CHECK-NEXT: [{{.*}}] $builtin_postPrint
+// CHECK-NEXT: One
+// CHECK-NEXT: [{{.*}}] $builtin_postPrint
+// CHECK-NEXT: One[{{.*}}] $builtin_postPrint
+// CHECK-NEXT: [{{.*}}] $builtin_postPrint
+// CHECK-NEXT: [{{.*}}] $builtin_postPrint
+// CHECK-NEXT: ("One", 2)
+// CHECK-NEXT: [{{.*}}] $builtin_postPrint
+// CHECK-NEXT: [{{.*}}] $builtin_postPrint
+// CHECK-NEXT: "One"
+// CHECK-NEXT: [{{.*}}] $builtin_postPrint
+// CHECK-NEXT: "One"[{{.*}}] $builtin_postPrint
+// CHECK-NEXT: [{{.*}}] $builtin_postPrint
+// CHECK-NEXT: [{{.*}}] $builtin_postPrint
 

@@ -17,10 +17,12 @@ s.a.append(300)
 
 // CHECK: [{{.*}}] $builtin_log[s='S(a: [])']
 // CHECK-NEXT: [{{.*}}] $builtin_log_scope_entry
-// CHECK-NEXT: [{{.*}}] $builtin_print<>['Set']
+// CHECK-NEXT: Set
+// CHECK-NEXT: [{{.*}}] $builtin_postPrint
 // CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
 // CHECK-NEXT: [{{.*}}] $builtin_log[s='S(a: [3, 2])']
 // CHECK-NEXT: [{{.*}}] $builtin_log_scope_entry
-// CHECK-NEXT: [{{.*}}] $builtin_print<>['Set']
+// CHECK-NEXT: Set
+// CHECK-NEXT: [{{.*}}] $builtin_postPrint
 // CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
 // CHECK-NEXT: [{{.*}}] $builtin_log[a='[3, 2, 300]']
