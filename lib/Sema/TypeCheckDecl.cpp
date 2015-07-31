@@ -5984,8 +5984,14 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     auto VD = cast<VarDecl>(D);
     if (!VD->hasType()) {
       if (PatternBindingDecl *PBD = VD->getParentPatternBinding()) {
-        for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
-          validatePatternBindingDecl(*this, PBD, i);
+        if (PBD->isBeingTypeChecked()) {
+          diagnose(VD, diag::pattern_used_in_type, VD->getName());
+
+        } else {
+          for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i)
+            validatePatternBindingDecl(*this, PBD, i);
+        }
+
         auto parentPattern = VD->getParentPattern();
         if (PBD->isInvalid() || !parentPattern->hasType()) {
           parentPattern->setType(ErrorType::get(Context));

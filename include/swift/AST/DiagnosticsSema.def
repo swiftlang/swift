@@ -307,6 +307,8 @@ NOTE(note_remapped_type,sema_nb,none,
   "did you mean to use '%0'?", (StringRef))
 ERROR(identifier_init_failure,sema_nb,none,
   "could not infer type for %0", (Identifier))
+ERROR(pattern_used_in_type,sema_nb,none,
+      "%0 used within its own type", (Identifier))
 NOTE(note_module_as_type,sema_nb,none,
      "cannot use module %0 as a type", (Identifier))
 

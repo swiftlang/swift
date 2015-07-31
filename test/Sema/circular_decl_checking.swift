@@ -24,17 +24,17 @@ class HasGenericFunc {
 }
 
 class HasProp {
-  var HasProp: HasProp { // expected-error 2 {{use of undeclared type 'HasProp'}}
+  var HasProp: HasProp { // expected-error {{'HasProp' used within its own type}} expected-error 2 {{use of undeclared type 'HasProp'}}
     return HasProp()
   }
-  var SomethingElse: SomethingElse? { // expected-error 2 {{use of undeclared type 'SomethingElse'}}
+  var SomethingElse: SomethingElse? { // expected-error {{'SomethingElse' used within its own type}} expected-error 2 {{use of undeclared type 'SomethingElse'}}
     return nil
   }
 }
 
 protocol SomeProtocol {}
 protocol ReferenceSomeProtocol {
-  var SomeProtocol: SomeProtocol { get } // expected-error 2 {{use of undeclared type 'SomeProtocol'}}
+  var SomeProtocol: SomeProtocol { get }  // expected-error {{'SomeProtocol' used within its own type}} expected-error 2 {{use of undeclared type 'SomeProtocol'}}
 }
 
 func TopLevelFunc(x: TopLevelFunc) -> TopLevelFunc { return x } // expected-error {{use of undeclared type 'TopLevelFunc'}}'
