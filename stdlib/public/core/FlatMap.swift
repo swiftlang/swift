@@ -18,6 +18,7 @@ Generator.Element == Elements.Generator.Element {
   ///     self.map(transform).flatten
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   public func flatMap<Intermediate: SequenceType>(
     transform: (Generator.Element)->Intermediate
   ) -> _prext_LazySequence<
@@ -34,6 +35,7 @@ where Generator.Element == Elements.Generator.Element{
   ///     self.map(transform).flatten
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   public func flatMap<Intermediate: CollectionType>(
     transform: (Generator.Element)->Intermediate
   ) -> _prext_LazyCollection<
@@ -54,6 +56,7 @@ Elements.Index : BidirectionalIndexType
   ///     self.map(transform).flatten
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   public func flatMap<
     Intermediate: CollectionType
     where Intermediate.Index : BidirectionalIndexType

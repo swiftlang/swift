@@ -45,6 +45,7 @@ public enum ImplicitlyUnwrappedOptional<T>
   }
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
+  @warn_unused_result
   public func map<U>(@noescape f: (T) throws -> U)
       rethrows -> ImplicitlyUnwrappedOptional<U> {
     switch self {
@@ -56,6 +57,7 @@ public enum ImplicitlyUnwrappedOptional<T>
   }
 
   /// Returns `nil` if `self` is nil, `f(self!)` otherwise.
+  @warn_unused_result
   public func flatMap<U>(@noescape f: (T) throws -> ImplicitlyUnwrappedOptional<U>)
       rethrows -> ImplicitlyUnwrappedOptional<U> {
     switch self {

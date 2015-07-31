@@ -38,12 +38,14 @@ extension SequenceType
     return _base.underestimateCount()
   }
 
+  @warn_unused_result
   public func map<T>(
     @noescape transform: (Base.Generator.Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
 
+  @warn_unused_result
   public func filter(
     @noescape includeElement: (Base.Generator.Element) throws -> Bool
   ) rethrows -> [Base.Generator.Element] {
@@ -112,12 +114,14 @@ extension CollectionType
   }
 
   //===--- Restatements From SequenceWrapperType break ambiguity ----------===//
+  @warn_unused_result
   public func map<T>(
     @noescape transform: (Base.Generator.Element) -> T
   ) -> [T] {
     return _base.map(transform)
   }
 
+  @warn_unused_result
   public func filter(
     @noescape includeElement: (Base.Generator.Element) -> Bool
   ) -> [Base.Generator.Element] {

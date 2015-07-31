@@ -261,6 +261,7 @@ extension SequenceType {
   /// over `self`.
   ///
   /// - Complexity: O(N).
+  @warn_unused_result
   public func map<T>(
     @noescape transform: (Generator.Element) throws -> T
   ) rethrows -> [T] {
@@ -294,6 +295,7 @@ extension SequenceType {
 
   /// Return an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
+  @warn_unused_result
   public func filter(
     @noescape includeElement: (Generator.Element) throws -> Bool
   ) rethrows -> [Generator.Element] {

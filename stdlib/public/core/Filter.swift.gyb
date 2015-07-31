@@ -229,6 +229,7 @@ extension _prext_LazySequenceType {
   ///   the result is used. No buffering storage is allocated and each
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
+  @warn_unused_result
   public func filter(
     predicate: (Elements.Generator.Element)->Bool
   ) -> _prext_LazyFilterSequence<Self.Elements> {
@@ -244,6 +245,7 @@ extension _prext_LazyCollectionType {
   ///   the result is used. No buffering storage is allocated and each
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
+  @warn_unused_result
   public func filter(
     predicate: (Elements.Generator.Element)->Bool
   ) -> _prext_LazyFilterCollection<Self.Elements> {
@@ -399,6 +401,7 @@ public func filter<S : SequenceType>(
 extension ${Self} {
   /// Return a lazy SequenceType containing the elements `x` of `source` for
   /// which `includeElement(x)` is `true`.
+  @warn_unused_result
   public func filter(
     includeElement: (Base.Generator.Element)->Bool
   ) -> LazySequence<FilterSequence<Base>> {

@@ -295,6 +295,7 @@ extension CollectionType {
   /// over `self`.
   ///
   /// - Complexity: O(N).
+  @warn_unused_result
   public func map<T>(
     @noescape transform: (Generator.Element) throws -> T
   ) rethrows -> [T] {

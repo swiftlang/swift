@@ -196,12 +196,14 @@ public struct LoggingRangeReplaceableCollection<
     base.insertContentsOf(newElements, at: i)
   }
 
+  @warn_unused_result
   public func map<T>(
     @noescape transform: (Base.Generator.Element) throws -> T
   ) rethrows -> [T] {
     return try base.map(transform)
   }
 
+  @warn_unused_result
   public func filter(
     @noescape includeElement: (Base.Generator.Element) throws -> Bool
   ) rethrows -> [Base.Generator.Element] {
@@ -358,6 +360,7 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
     try base.forEach(body)
   }
 
+  @warn_unused_result
   public func map<T>(
     @noescape transform: (Base.Generator.Element) throws -> T
   ) rethrows -> [T] {
@@ -365,6 +368,7 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
     return try base.map(transform)
   }
 
+  @warn_unused_result
   public func filter(
     @noescape includeElement: (Base.Generator.Element) throws -> Bool
   ) rethrows -> [Base.Generator.Element] {

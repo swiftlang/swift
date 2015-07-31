@@ -25,6 +25,7 @@ public enum Optional<T> : _Reflectable, NilLiteralConvertible {
   public init(_ some: T) { self = .Some(some) }
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
+  @warn_unused_result
   public func map<U>(@noescape f: (T) throws -> U) rethrows -> U? {
     switch self {
     case .Some(let y):
@@ -35,6 +36,7 @@ public enum Optional<T> : _Reflectable, NilLiteralConvertible {
   }
 
   /// Returns `nil` if `self` is nil, `f(self!)` otherwise.
+  @warn_unused_result
   public func flatMap<U>(@noescape f: (T) throws -> U?) rethrows -> U? {
     switch self {
     case .Some(let y):
