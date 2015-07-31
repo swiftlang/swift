@@ -81,7 +81,10 @@ bool isInstructionTriviallyDead(SILInstruction *I, bool DeleteDebug=false);
 /// \brief Recursively erase all of the uses of the instruction (but not the
 /// instruction itself) and delete instructions that will become trivially
 /// dead when this instruction is removed.
-void eraseUsesOfInstruction(SILInstruction *Inst, bool DeleteDebug=false);
+void eraseUsesOfInstruction(
+    SILInstruction *Inst,
+    std::function<void(SILInstruction *)> C = [](SILInstruction *){},
+    bool DeleteDebug=false);
 
 /// \brief Recursively erase all of the uses of the value (but not the
 /// value itself)

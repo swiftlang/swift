@@ -150,13 +150,15 @@ bool swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
                                                     DeleteDebug);
 }
 
-void swift::eraseUsesOfInstruction(SILInstruction *Inst, bool DeleteDebug) {
+void swift::eraseUsesOfInstruction(SILInstruction *Inst,
+                                   CallbackTy Callback,
+                                   bool DeleteDebug) {
   for (auto UI : Inst->getUses()) {
     auto *User = UI->getUser();
 
     // If the instruction itself has any uses, recursively zap them so that
     // nothing uses this instruction.
-    eraseUsesOfInstruction(User, DeleteDebug);
+    eraseUsesOfInstruction(User, Callback, DeleteDebug);
 
     // Walk through the operand list and delete any random instructions that
     // will become trivially dead when this instruction is removed.
@@ -167,12 +169,12 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst, bool DeleteDebug) {
         if (OpI != Inst) {
           Op.drop();
           recursivelyDeleteTriviallyDeadInstructions(OpI, false,
-                                                     [](SILInstruction *){},
+                                                     Callback,
                                                      DeleteDebug);
         }
       }
     }
-
+    Callback(User);
     User->eraseFromParent();
   }
 }
