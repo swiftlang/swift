@@ -160,7 +160,7 @@ extension LazySequence where Base : TestProtocol1 {
 
 LazyTestSuite.test("LazySequence<Sequence>/underestimateCount") {
   let s = MinimalSequence(
-    [ 0, 30, 10, 90 ].map(OpaqueValue.init),
+    elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
     underestimatedCount: .Value(42))
   var lazySeq = lazy(s)
   expectType(LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &lazySeq)
@@ -171,7 +171,7 @@ LazyTestSuite.test("LazySequence<Sequence>/underestimateCount") {
 
 LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimateCount") {
   let s = Minimal${traversal}Collection(
-    [ 0, 30, 10, 90 ].map(OpaqueValue.init),
+    elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
     underestimatedCount: .Value(42))
   var lazySeq = lazy(s)
   expectType(
@@ -190,7 +190,7 @@ LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimateCount") {
 
 LazyTestSuite.test("MapSequence<Sequence>/underestimateCount") {
   let s = MinimalSequence(
-    [ 0, 30, 10, 90 ].map(OpaqueValue.init),
+    elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
     underestimatedCount: .Value(42))
   var lazyMap = lazy(s).map { OpaqueValue(Int32($0.value)) }
   expectType(
@@ -206,7 +206,7 @@ LazyTestSuite.test("MapSequence<Sequence>/underestimateCount") {
 
 struct SequenceWithCustomUnderestimateCount : SequenceType {
   init(_ data: [Int]) {
-    self._data = MinimalSequence(data.map(OpaqueValue.init))
+    self._data = MinimalSequence(elements: data.map(OpaqueValue.init))
   }
 
   func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
@@ -244,7 +244,7 @@ LazyTestSuite.test("LazySequence.array") {
 
 LazyTestSuite.test("MapCollection<${traversal}Collection>/underestimateCount") {
   let s = Minimal${traversal}Collection(
-    [ 0, 30, 10, 90 ].map(OpaqueValue.init),
+    elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
     underestimatedCount: .Value(42))
   var lazyMap = lazy(s).map {
     (input: OpaqueValue<Int>) -> OpaqueValue<Int32> in
@@ -282,7 +282,7 @@ extension Lazy${traversal}Collection where Base : TestProtocol1 {
 
 LazyTestSuite.test("Lazy${traversal}Collection.array") {
   let base = Minimal${traversal}Collection(
-    [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
+    elements: [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
   let lazyCollection = Lazy${traversal}Collection(base)
   let arrayFromLazy = lazyCollection.array
 
@@ -297,7 +297,7 @@ LazyTestSuite.test("Lazy${traversal}Collection.array") {
 %  if ReversedType is not None:
 LazyTestSuite.test("Lazy${traversal}Collection.reverse()") {
   let base = Minimal${traversal}Collection(
-    [ 0, 30, 10, 90 ].map(OpaqueValue.init),
+    elements: [ 0, 30, 10, 90 ].map(OpaqueValue.init),
     underestimatedCount: .Value(42))
   let lazyCollection = Lazy${traversal}Collection(base)
   var reversed = lazyCollection.reverse()
@@ -370,7 +370,7 @@ var tests = TestSuite("NewLazy")
 
 tests.test("LazySequence/SequenceType") {
   let expected = (0..<100).map(OpaqueValue.init)
-  var actual = MinimalSequence(expected)._prext_lazy
+  var actual = MinimalSequence(elements: expected)._prext_lazy
   
   expectType(
     _prext_LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &actual)
@@ -432,7 +432,7 @@ tests.test("LazySequence/Passthrough") {
 % for traversal in 'Forward', 'Bidirectional', 'RandomAccess':
 tests.test("LazyCollection/CollectionType/${traversal}") {
   let expected = (0..<100).map(OpaqueValue.init)
-  let base = Minimal${traversal}Collection(expected)
+  let base = Minimal${traversal}Collection(elements: expected)
   var actual = base._prext_lazy
   
   expectType(
@@ -490,7 +490,7 @@ tests.test("LazyCollection/Passthrough") {
 
 tests.test("LazyMapSequence") {
   let base = MinimalSequence(
-    [2, 3, 5, 7, 11].map(OpaqueValue.init))._prext_lazy
+    elements: [2, 3, 5, 7, 11].map(OpaqueValue.init))._prext_lazy
 
   var calls = 0
   var mapped = base.map {
@@ -532,7 +532,7 @@ tests.test("MapSequence/Passthrough") {
 % for traversal in 'Forward', 'Bidirectional', 'RandomAccess':
 tests.test("LazyMapCollection/${traversal}") {
   let base = Minimal${traversal}Collection(
-    [2, 3, 5, 7, 11].map(OpaqueValue.init))._prext_lazy
+    elements: [2, 3, 5, 7, 11].map(OpaqueValue.init))._prext_lazy
 
   var calls = 0
   var mapped = base.map {
@@ -703,7 +703,7 @@ tests.test("LazyFilterSequence") {
   let base = (0..<100).map(OpaqueValue.init)
 
   var calls = 0
-  var filtered = MinimalSequence(base)._prext_lazy.filter {
+  var filtered = MinimalSequence(elements: base)._prext_lazy.filter {
     x in ++calls;
     return x.value % 2 == 0
   }
@@ -721,14 +721,16 @@ tests.test("LazyFilterSequence") {
 
   // check that it works when the first element doesn't satify the predicate
   let odds = stride(from: 1, to: 100, by: 2).map(OpaqueValue.init)
-  filtered = MinimalSequence(base)._prext_lazy.filter { $0.value % 2 != 0 }
+  filtered =
+    MinimalSequence(elements: base)
+    ._prext_lazy.filter { $0.value % 2 != 0 }
   checkSequence(odds, filtered, resiliencyChecks: .none) {
     $0.value == $1.value
   }
   
   // Try again using explicit construction
   filtered = _prext_LazyFilterSequence(
-    MinimalSequence(base),
+    MinimalSequence(elements: base),
     _prext_whereElementsSatisfy: { x in ++calls; return x.value % 2 == 0})
   
   expectEqual(100, calls)
@@ -741,12 +743,12 @@ tests.test("LazyFilterSequence") {
   expectEqual(200, calls)
 
   checkFilterGeneratorBase(
-    MinimalSequence(base)._prext_lazy.filter { $0.value % 2 == 0 },
-    MinimalSequence(base)._prext_lazy.filter { $0.value % 2 != 0 })
+    MinimalSequence(elements: base)._prext_lazy.filter { $0.value % 2 == 0 },
+    MinimalSequence(elements: base)._prext_lazy.filter { $0.value % 2 != 0 })
 }
 
 tests.test("LazyFilterIndex/base") {
-  let base = MinimalForwardCollection((0..<100).map(OpaqueValue.init))
+  let base = MinimalForwardCollection(elements: (0..<100).map(OpaqueValue.init))
   let evens = base._prext_lazy.filter { $0.value % 2 == 0 }
   let odds = base._prext_lazy.filter { $0.value % 2 != 0 }
   
@@ -763,7 +765,7 @@ tests.test("LazyFilterIndex/base") {
 }
 
 tests.test("LazyFilterCollection") {
-  let base = MinimalForwardCollection((0..<100).map(OpaqueValue.init))
+  let base = MinimalForwardCollection(elements: (0..<100).map(OpaqueValue.init))
 
   var calls = 0
   let filtered = base._prext_lazy.filter {
@@ -818,13 +820,15 @@ do {
     let data = sample.data
     
     tests.test("FlattenSequence/\(data)") {
-      var base = MinimalSequence(data.map { MinimalSequence($0) })
+      var base = MinimalSequence(
+        elements: data.map { MinimalSequence(elements: $0) })
       checkSequence(expected, base._prext_flatten, resiliencyChecks: .none)
 
       // Checking that _prext_flatten doesn't introduce laziness
       
       // checkSequence consumed base, so reassign
-      base = MinimalSequence(data.map { MinimalSequence($0) })
+      base = MinimalSequence(
+        elements: data.map { MinimalSequence(elements: $0) })
       let flattened = base._prext_flatten
       var calls = 0
       _ = flattened.map { _ in ++calls }
@@ -836,7 +840,7 @@ do {
     tests.test("FlattenSequence/Lazy/\(data)") {
       // Checking that _prext_flatten doesn't remove laziness
       let base = MinimalSequence(
-        data.map { MinimalSequence($0) }
+        elements: data.map { MinimalSequence(elements: $0) }
       )._prext_lazy.map { $0 }
 
       let flattened = base._prext_flatten
@@ -849,7 +853,7 @@ do {
   %   t = '' if traversal == 'Forward' else traversal
     tests.test("Flatten${t}Collection/\(data)") {
       let base = Minimal${traversal}Collection(
-        data.map { Minimal${traversal}Collection($0) })
+        elements: data.map { Minimal${traversal}Collection(elements: $0) })
 
       let flattened = base._prext_flatten
       check${traversal}Collection(expected, flattened, resiliencyChecks: .none)
@@ -865,7 +869,7 @@ do {
     tests.test("Flatten${t}Collection/Lazy\(data)") {
       // Checking that _prext_flatten doesn't remove laziness
       let base = Minimal${traversal}Collection(
-        data.map { Minimal${traversal}Collection($0) }
+        elements: data.map { Minimal${traversal}Collection(elements: $0) }
       )._prext_lazy.map { $0 }
 
       let flattened = base._prext_flatten

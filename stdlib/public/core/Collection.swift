@@ -64,6 +64,17 @@ public protocol Indexable {
   subscript(position: Index) -> _Element {get}
 }
 
+public protocol MutableIndexable {
+  typealias Index : ForwardIndexType
+
+  var startIndex: Index {get}
+  var endIndex: Index {get}
+
+  typealias _Element
+
+  subscript(position: Index) -> _Element {get set}
+}
+
 /// A *generator* for an arbitrary *collection*.  Provided `C`
 /// conforms to the other requirements of `Indexable`,
 /// `IndexingGenerator<C>` can be used as the result of `C`'s
@@ -563,7 +574,11 @@ public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
 ///     a[i] = x
 ///     let y = x
 ///
-public protocol MutableCollectionType : CollectionType {
+public protocol MutableCollectionType : MutableIndexable, CollectionType {
+  // FIXME: should be constrained to MutableCollectionType
+  // (<rdar://problem/20715009> Implement recursive protocol
+  // constraints)
+  typealias SubSequence/*: MutableCollectionType*/ = MutableSlice<Self>
 
   /// Access the element at `position`.
   ///
@@ -599,6 +614,10 @@ extension MutableCollectionType {
     @noescape body: (UnsafeMutablePointer<Generator.Element>, Int) throws -> R
   ) rethrows -> R? {
     return nil
+  }
+
+  public subscript(bounds: Range<Index>) -> MutableSlice<Self> {
+    return MutableSlice(base: self, bounds: bounds)
   }
 }
 

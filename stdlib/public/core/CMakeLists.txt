@@ -89,7 +89,7 @@ set(SWIFTLIB_ESSENTIAL
   SetAlgebra.swift
   ShadowProtocols.swift
   Shims.swift
-  Slice.swift
+  Slice.swift.gyb
   Sort.swift.gyb
   StaticString.swift
   Stride.swift

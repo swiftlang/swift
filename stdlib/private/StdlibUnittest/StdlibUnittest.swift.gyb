@@ -2527,11 +2527,11 @@ public protocol StrictSequenceType : SequenceType {
 
 extension StrictSequenceType {
   public init<S : SequenceType where S.Generator.Element == Element>(
-    _ s: S,
+    elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
-    self.init(
-      base: MinimalSequence(s, underestimatedCount: underestimatedCount))
+    self.init(base: MinimalSequence(
+      elements: elements, underestimatedCount: underestimatedCount))
   }
 
   public func underestimateCount() -> Int {
@@ -2551,10 +2551,10 @@ extension StrictSequenceType where Generator : _MinimalGeneratorType {
 /// This sequence is consumed when its generator is advanced.
 public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
   public init<S : SequenceType where S.Generator.Element == T>(
-    _ s: S,
+    elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
-    let data = Array(s)
+    let data = Array(elements)
     self._sharedState = _MinimalGeneratorSharedState(data)
 
     switch underestimatedCount {
@@ -2588,69 +2588,276 @@ public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
 }
 
 //===----------------------------------------------------------------------===//
+// Index invalidation checking
+//===----------------------------------------------------------------------===//
+
+internal enum _CollectionOperation : Equatable {
+  case ReserveCapacity(capacity: Int)
+  case Append
+  case AppendContentsOf(count: Int)
+  case ReplaceRange(subRange: Range<Int>, replacementCount: Int)
+  case Insert(atIndex: Int)
+  case InsertContentsOf(atIndex: Int, count: Int)
+  case RemoveAtIndex(index: Int)
+  case RemoveLast
+  case RemoveRange(subRange: Range<Int>)
+  case RemoveAll(keepCapacity: Bool)
+
+  internal func _applyTo(
+    elementsLastMutatedStateIds: [Int], nextStateId: Int) -> [Int] {
+    var result = elementsLastMutatedStateIds
+    switch self {
+    case ReserveCapacity:
+      let invalidIndices = result.indices
+      result.replaceRange(
+        invalidIndices,
+        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+
+    case Append:
+      result.append(nextStateId)
+
+    case AppendContentsOf(let count):
+      result.appendContentsOf(
+        Repeat(count: count, repeatedValue: nextStateId))
+
+    case ReplaceRange(let subRange, let replacementCount):
+      result.replaceRange(
+        subRange,
+        with: Repeat(count: replacementCount, repeatedValue: nextStateId))
+
+      let invalidIndices = subRange.startIndex..<result.endIndex
+      result.replaceRange(
+        invalidIndices,
+        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+
+    case Insert(let atIndex):
+      result.insert(nextStateId, atIndex: atIndex)
+
+      let invalidIndices = atIndex..<result.endIndex
+      result.replaceRange(
+        invalidIndices,
+        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+
+    case InsertContentsOf(let atIndex, let count):
+      result.insertContentsOf(
+        Repeat(count: count, repeatedValue: nextStateId),
+        at: atIndex)
+
+      let invalidIndices = atIndex..<result.endIndex
+      result.replaceRange(
+        invalidIndices,
+        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+
+    case RemoveAtIndex(let index):
+      result.removeAtIndex(index)
+
+      let invalidIndices = index..<result.endIndex
+      result.replaceRange(
+        invalidIndices,
+        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+
+    case RemoveLast:
+      result.removeLast()
+
+    case RemoveRange(let subRange):
+      result.removeRange(subRange)
+
+      let invalidIndices = subRange.startIndex..<result.endIndex
+      result.replaceRange(
+        invalidIndices,
+        with: Repeat(count: invalidIndices.count, repeatedValue: nextStateId))
+
+    case RemoveAll(let keepCapacity):
+      result.removeAll(keepCapacity: keepCapacity)
+    }
+    return result
+  }
+}
+
+internal func == (
+  lhs: _CollectionOperation,
+  rhs: _CollectionOperation
+) -> Bool {
+  switch (lhs, rhs) {
+  case (.ReserveCapacity(let lhsCapacity), .ReserveCapacity(let rhsCapacity)):
+    return lhsCapacity == rhsCapacity
+
+  case (.Append, .Append):
+    return true
+
+  case (.AppendContentsOf(let lhsCount), .AppendContentsOf(let rhsCount)):
+    return lhsCount == rhsCount
+
+  case (
+    .ReplaceRange(let lhsSubRange, let lhsReplacementCount),
+    .ReplaceRange(let rhsSubRange, let rhsReplacementCount)):
+
+    return lhsSubRange == rhsSubRange &&
+      lhsReplacementCount == rhsReplacementCount
+
+  case (.Insert(let lhsAtIndex), .Insert(let rhsAtIndex)):
+    return lhsAtIndex == rhsAtIndex
+
+  case (
+    .InsertContentsOf(let lhsAtIndex, let lhsCount),
+    .InsertContentsOf(let rhsAtIndex, let rhsCount)):
+
+    return lhsAtIndex == rhsAtIndex && lhsCount == rhsCount
+
+  case (.RemoveAtIndex(let lhsIndex), .RemoveAtIndex(let rhsIndex)):
+    return lhsIndex == rhsIndex
+
+  case (.RemoveLast, .RemoveLast):
+    return true
+
+  case (.RemoveRange(let lhsSubRange), .RemoveRange(let rhsSubRange)):
+    return lhsSubRange == rhsSubRange
+
+  case (.RemoveAll(let lhsKeepCapacity), .RemoveAll(let rhsKeepCapacity)):
+    return lhsKeepCapacity == rhsKeepCapacity
+
+  default:
+    return false
+  }
+}
+
+public struct _CollectionState : Equatable, Hashable {
+  internal static var _nextUnusedState: Int = 0
+  internal static var _namedStates: [String : _CollectionState] = [:]
+
+  internal let _id: Int
+  internal let _elementsLastMutatedStateIds: [Int]
+
+  internal init(id: Int, elementsLastMutatedStateIds: [Int]) {
+    self._id = id
+    self._elementsLastMutatedStateIds = elementsLastMutatedStateIds
+  }
+
+  internal init(newRootStateForElementCount count: Int) {
+    self._id = _CollectionState._nextUnusedState++
+    self._elementsLastMutatedStateIds =
+      Array(Repeat(count: count, repeatedValue: self._id))
+  }
+
+  internal init(name: String, elementCount: Int) {
+    if let result = _CollectionState._namedStates[name] {
+      self = result
+    } else {
+      self = _CollectionState(newRootStateForElementCount: elementCount)
+      _CollectionState._namedStates[name] = self
+    }
+  }
+
+  public var hashValue: Int {
+    return _id.hashValue
+  }
+}
+
+public func == (lhs: _CollectionState, rhs: _CollectionState) -> Bool {
+  return lhs._id == rhs._id
+}
+
+internal struct _CollectionStateTransition {
+  internal let _previousState: _CollectionState
+  internal let _operation: _CollectionOperation
+  internal let _nextState: _CollectionState
+
+  internal static var _allTransitions:
+    [_CollectionState : Box<[_CollectionStateTransition]>] = [:]
+
+  internal init(
+    previousState: _CollectionState,
+    operation: _CollectionOperation,
+    nextState: _CollectionState
+  ) {
+    var transitions =
+      _CollectionStateTransition._allTransitions[previousState]
+    if transitions == nil {
+      transitions = Box<[_CollectionStateTransition]>([])
+      _CollectionStateTransition._allTransitions[previousState] = transitions
+    }
+    if let i = transitions!.value.indexOf({ $0._operation == operation }) {
+      self = transitions!.value[i]
+      return
+    }
+    self._previousState = previousState
+    self._operation = operation
+    self._nextState = nextState
+    transitions!.value.append(self)
+  }
+
+  internal init(
+    previousState: _CollectionState,
+    operation: _CollectionOperation
+  ) {
+    let nextStateId = _CollectionState._nextUnusedState++
+    let newElementStates = operation._applyTo(
+      previousState._elementsLastMutatedStateIds, nextStateId: nextStateId)
+    let nextState = _CollectionState(
+      id: nextStateId, elementsLastMutatedStateIds: newElementStates)
+    self = _CollectionStateTransition(
+      previousState: previousState,
+      operation: operation,
+      nextState: nextState)
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // MinimalForwardIndex
 //===----------------------------------------------------------------------===//
 
-/// A type that imitates a copy-on-write backing buffer for a collection.
-/// Instances of this type facilitate checking extra invariants, for example:
-///
-/// - Most operations that take two indices (e.g., comparison) can only operate
-///   on indices from the same buffer.
-///
-/// - Indexing is only universally allowed into the collection that is backed
-///   by the same buffer.
-public final class MinimalCollectionBufferIndirection {
-  public let buffer: MinimalCollectionBuffer = MinimalCollectionBuffer()
-}
-
-public final class MinimalCollectionBuffer {
-  internal var _id: Int
-  internal var _mutationEpoch: Int = 0
-
-  internal static var _nextID: Int = 0
-
-  internal init() {
-    self._id = MinimalCollectionBuffer._nextID++
-  }
-
-  internal func _willMutate() {
-    ++_mutationEpoch
-  }
-}
-
-public struct MinimalCollectionBufferSnapshot {
-  public init?(_ buffer: MinimalCollectionBuffer?) {
-    guard let theBuffer = buffer else { return nil }
-    self.buffer = theBuffer
-    self.mutationEpoch = theBuffer._mutationEpoch
-  }
-
-  public let buffer: MinimalCollectionBuffer
-  public let mutationEpoch: Int
-}
-
-public func expectSameBuffer(
-  expected: MinimalCollectionBufferSnapshot?,
-  _ actual: MinimalCollectionBufferSnapshot?,
+/// Asserts that the two indices are allowed to participate in a binary
+/// operation.
+internal func _expectCompatibleIndices<Index : _MinimalIndexType>(
+  first: Index,
+  _ second: Index,
   ${TRACE}
 ) {
-  expectEqual(
-    expected?.buffer._id, actual?.buffer._id,
-    "lhs and rhs point to different buffers",
-    stackTrace: ${stackTrace}
-  )
+  if let firstStateId = first._collectionState?._id,
+    let secondStateId = second._collectionState?._id
+    where firstStateId == secondStateId {
 
-  if expected?.buffer._id == actual?.buffer._id {
-    expectEqual(
-      expected?.mutationEpoch, actual?.mutationEpoch,
-      "lhs and rhs are from different mutation epochs",
-      stackTrace: ${stackTrace}
-    )
+    // The indices are derived from the same state.
+    return
+  }
+
+  // The indices are derived from different states.  Check that they point
+  // to elements that persisted from the same state.
+
+  func getLastMutatedStateId(i: Index) -> Int? {
+    guard let state = i._collectionState else { return nil }
+    let offset = i._offset
+    if offset == state._elementsLastMutatedStateIds.endIndex {
+      return state._id
+    }
+    return state._elementsLastMutatedStateIds[offset]
+  }
+
+  let firstElementLastMutatedStateId = getLastMutatedStateId(first)
+  let secondElementLastMutatedStateId = getLastMutatedStateId(second)
+
+  expectEqual(
+    firstElementLastMutatedStateId,
+    secondElementLastMutatedStateId,
+    "Indices are not compatible:\n" +
+    "first: \(first)\n" +
+    "second: \(second)\n" +
+    "first element last mutated in state id: \(firstElementLastMutatedStateId)\n" +
+    "second element last mutated in state id: \(secondElementLastMutatedStateId)\n",
+    stackTrace: ${stackTrace})
+
+  // To make writing assertions easier, perform a trap.
+  if firstElementLastMutatedStateId != secondElementLastMutatedStateId {
+    fatalError("Indices are not compatible")
   }
 }
 
-// A protocol to identify minimal index types.
-public protocol _MinimalIndexType {}
+public protocol _MinimalIndexType {
+  /// Distance from start index.
+  var _offset: Int { get }
+
+  var _collectionState: _CollectionState? { get }
+}
 
 % for Distance in [ '', 'Int32' ]:
 %   Index = 'MinimalForward%sIndex' % Distance
@@ -2660,15 +2867,23 @@ public struct ${Index} : ForwardIndexType {
   public typealias Distance = ${Distance}
 % end
 
-  public init(
-    buffer: MinimalCollectionBuffer? = nil,
+  public init(position: Int, startIndex: Int, endIndex: Int) {
+    self = ${Index}(
+      collectionState: nil,
+      position: position,
+      startIndex: startIndex,
+      endIndex: endIndex)
+  }
+
+  internal init(
+    collectionState: _CollectionState?,
     position: Int,
     startIndex: Int,
     endIndex: Int
   ) {
     expectLE(startIndex, position)
     expectGE(endIndex, position)
-    self.bufferSnapshot = MinimalCollectionBufferSnapshot(buffer)
+    self._collectionState = collectionState
     self.position = position
     self.startIndex = startIndex
     self.endIndex = endIndex
@@ -2677,7 +2892,7 @@ public struct ${Index} : ForwardIndexType {
   public func successor() -> ${Index} {
     expectNotEqual(endIndex, position)
     return ${Index}(
-      buffer: bufferSnapshot?.buffer,
+      collectionState: _collectionState,
       position: position + 1, startIndex: startIndex, endIndex: endIndex)
   }
 
@@ -2686,6 +2901,12 @@ public struct ${Index} : ForwardIndexType {
   ) {
     expectLE(bounds.startIndex.position, index.position)
     expectGT(bounds.endIndex.position, index.position)
+
+    if ${Index}.trapOnRangeCheckFailure.value {
+      Int._failEarlyRangeCheck(
+        index.position,
+        bounds: bounds.startIndex.position..<bounds.endIndex.position)
+    }
   }
 
   public static func _failEarlyRangeCheck2(
@@ -2698,21 +2919,35 @@ public struct ${Index} : ForwardIndexType {
     expectGE(bounds.endIndex.position, range.startIndex.position)
     expectLE(bounds.startIndex.position, range.endIndex.position)
     expectGE(bounds.endIndex.position, range.endIndex.position)
+
+    if ${Index}.trapOnRangeCheckFailure.value {
+      Int._failEarlyRangeCheck2(
+        rangeStart.position,
+        rangeEnd: rangeEnd.position,
+        boundsStart: boundsStart.position,
+        boundsEnd: boundsEnd.position)
+    }
   }
 
-  public let bufferSnapshot: MinimalCollectionBufferSnapshot?
+  public let _collectionState: _CollectionState?
 
   public let position: Int
   public let startIndex: Int
   public let endIndex: Int
+
+  public static var trapOnRangeCheckFailure = ResettableValue(true)
 }
 
 public func == (lhs: ${Index}, rhs: ${Index}) -> Bool {
-  expectSameBuffer(lhs.bufferSnapshot, rhs.bufferSnapshot)
+  _expectCompatibleIndices(lhs, rhs)
   return lhs.position == rhs.position
 }
 
-extension ${Index} : _MinimalIndexType {}
+extension ${Index} : _MinimalIndexType {
+  public var _offset: Int {
+    return position - startIndex
+  }
+}
 
 % end
 
@@ -2721,15 +2956,23 @@ extension ${Index} : _MinimalIndexType {}
 //===----------------------------------------------------------------------===//
 
 public struct MinimalBidirectionalIndex : BidirectionalIndexType {
-  public init(
-    buffer: MinimalCollectionBuffer? = nil,
+  public init(position: Int, startIndex: Int, endIndex: Int) {
+    self = MinimalBidirectionalIndex(
+      collectionState: nil,
+      position: position,
+      startIndex: startIndex,
+      endIndex: endIndex)
+  }
+
+  internal init(
+    collectionState: _CollectionState?,
     position: Int,
     startIndex: Int,
     endIndex: Int
   ) {
     expectLE(startIndex, position)
     expectGE(endIndex, position)
-    self.bufferSnapshot = MinimalCollectionBufferSnapshot(buffer)
+    self._collectionState = collectionState
     self.position = position
     self.startIndex = startIndex
     self.endIndex = endIndex
@@ -2738,14 +2981,14 @@ public struct MinimalBidirectionalIndex : BidirectionalIndexType {
   public func successor() -> MinimalBidirectionalIndex {
     expectNotEqual(endIndex, position)
     return MinimalBidirectionalIndex(
-      buffer: bufferSnapshot?.buffer,
+      collectionState: _collectionState,
       position: position + 1, startIndex: startIndex, endIndex: endIndex)
   }
 
   public func predecessor() -> MinimalBidirectionalIndex {
     expectNotEqual(startIndex, position)
     return MinimalBidirectionalIndex(
-      buffer: bufferSnapshot?.buffer,
+      collectionState: _collectionState,
       position: position - 1, startIndex: startIndex, endIndex: endIndex)
   }
 
@@ -2755,6 +2998,12 @@ public struct MinimalBidirectionalIndex : BidirectionalIndexType {
   ) {
     expectLE(bounds.startIndex.position, index.position)
     expectGT(bounds.endIndex.position, index.position)
+
+    if MinimalBidirectionalIndex.trapOnRangeCheckFailure.value {
+      Int._failEarlyRangeCheck(
+        index.position,
+        bounds: bounds.startIndex.position..<bounds.endIndex.position)
+    }
   }
 
   public static func _failEarlyRangeCheck2(
@@ -2769,32 +3018,55 @@ public struct MinimalBidirectionalIndex : BidirectionalIndexType {
     expectGE(bounds.endIndex.position, range.startIndex.position)
     expectLE(bounds.startIndex.position, range.endIndex.position)
     expectGE(bounds.endIndex.position, range.endIndex.position)
+
+    if MinimalBidirectionalIndex.trapOnRangeCheckFailure.value {
+      Int._failEarlyRangeCheck2(
+        rangeStart.position,
+        rangeEnd: rangeEnd.position,
+        boundsStart: boundsStart.position,
+        boundsEnd: boundsEnd.position)
+    }
   }
 
-  public let bufferSnapshot: MinimalCollectionBufferSnapshot?
+  public let _collectionState: _CollectionState?
 
   public let position: Int
   public let startIndex: Int
   public let endIndex: Int
+
+  public static var trapOnRangeCheckFailure = ResettableValue(true)
 }
 
 public func == (
   lhs: MinimalBidirectionalIndex,
   rhs: MinimalBidirectionalIndex
 ) -> Bool {
-  expectSameBuffer(lhs.bufferSnapshot, rhs.bufferSnapshot)
+  _expectCompatibleIndices(lhs, rhs)
   return lhs.position == rhs.position
 }
 
-extension MinimalBidirectionalIndex : _MinimalIndexType {}
+extension MinimalBidirectionalIndex : _MinimalIndexType {
+  public var _offset: Int {
+    return position - startIndex
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 // MinimalRandomAccessIndex
 //===----------------------------------------------------------------------===//
 
 public struct MinimalRandomAccessIndex : RandomAccessIndexType {
-  public init(
-    buffer: MinimalCollectionBuffer? = nil,
+  public init(position: Int, startIndex: Int, endIndex: Int) {
+    self = MinimalRandomAccessIndex(
+      collectionState: nil,
+      position: position,
+      startIndex: startIndex,
+      endIndex: endIndex)
+  }
+
+  internal init(
+    collectionState: _CollectionState?,
     position: Int,
     startIndex: Int,
     endIndex: Int
@@ -2804,7 +3076,7 @@ public struct MinimalRandomAccessIndex : RandomAccessIndexType {
       "position=\(self.position) startIndex=\(self.startIndex) endIndex=\(self.endIndex)"
     }*/
 
-    self.bufferSnapshot = MinimalCollectionBufferSnapshot(buffer)
+    self._collectionState = collectionState
     self.position = position
     self.startIndex = startIndex
     self.endIndex = endIndex
@@ -2813,19 +3085,19 @@ public struct MinimalRandomAccessIndex : RandomAccessIndexType {
   public func successor() -> MinimalRandomAccessIndex {
     expectNotEqual(endIndex, position)
     return MinimalRandomAccessIndex(
-      buffer: bufferSnapshot?.buffer,
+      collectionState: _collectionState,
       position: position + 1, startIndex: startIndex, endIndex: endIndex)
   }
 
   public func predecessor() -> MinimalRandomAccessIndex {
     expectNotEqual(startIndex, position)
     return MinimalRandomAccessIndex(
-      buffer: bufferSnapshot?.buffer,
+      collectionState: _collectionState,
       position: position - 1, startIndex: startIndex, endIndex: endIndex)
   }
 
   public func distanceTo(other: MinimalRandomAccessIndex) -> Int {
-    expectSameBuffer(self.bufferSnapshot, other.bufferSnapshot)
+    _expectCompatibleIndices(self, other)
     return other.position - position
   }
 
@@ -2836,7 +3108,7 @@ public struct MinimalRandomAccessIndex : RandomAccessIndexType {
       endIndex, newPosition,
       "position=\(self.position) startIndex=\(self.startIndex)")
     return MinimalRandomAccessIndex(
-      buffer: bufferSnapshot?.buffer,
+      collectionState: _collectionState,
       position: newPosition, startIndex: startIndex, endIndex: endIndex)
   }
 
@@ -2846,6 +3118,12 @@ public struct MinimalRandomAccessIndex : RandomAccessIndexType {
   ) {
     expectLE(bounds.startIndex.position, index.position)
     expectGT(bounds.endIndex.position, index.position)
+
+    if MinimalRandomAccessIndex.trapOnRangeCheckFailure.value {
+      Int._failEarlyRangeCheck(
+        index.position,
+        bounds: bounds.startIndex.position..<bounds.endIndex.position)
+    }
   }
 
   public static func _failEarlyRangeCheck2(
@@ -2860,24 +3138,38 @@ public struct MinimalRandomAccessIndex : RandomAccessIndexType {
     expectGE(bounds.endIndex.position, range.startIndex.position)
     expectLE(bounds.startIndex.position, range.endIndex.position)
     expectGE(bounds.endIndex.position, range.endIndex.position)
+
+    if MinimalRandomAccessIndex.trapOnRangeCheckFailure.value {
+      Int._failEarlyRangeCheck2(
+        rangeStart.position,
+        rangeEnd: rangeEnd.position,
+        boundsStart: boundsStart.position,
+        boundsEnd: boundsEnd.position)
+    }
   }
 
-  public let bufferSnapshot: MinimalCollectionBufferSnapshot?
+  public let _collectionState: _CollectionState?
 
   public let position: Int
   public let startIndex: Int
   public let endIndex: Int
+
+  public static var trapOnRangeCheckFailure = ResettableValue(true)
 }
 
 public func == (
   lhs: MinimalRandomAccessIndex,
   rhs: MinimalRandomAccessIndex
 ) -> Bool {
-  expectSameBuffer(lhs.bufferSnapshot, rhs.bufferSnapshot)
+  _expectCompatibleIndices(lhs, rhs)
   return lhs.position == rhs.position
 }
 
-extension MinimalRandomAccessIndex : _MinimalIndexType {}
+extension MinimalRandomAccessIndex : _MinimalIndexType {
+  public var _offset: Int {
+    return position - startIndex
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // Minimal***[Mutable]?Collection
@@ -2902,10 +3194,11 @@ public protocol ${Protocol} : ${'MutableCollectionType' if mutable else 'Collect
 
 extension ${Protocol} {
   public init<S : SequenceType where S.Generator.Element == Element>(
-    _ s: S,
+    elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
-    self.init(base: ${Self}(s, underestimatedCount: underestimatedCount))
+    self.init(base:
+      ${Self}(elements: elements, underestimatedCount: underestimatedCount))
   }
 
   public func underestimateCount() -> Int {
@@ -2930,10 +3223,12 @@ extension ${Protocol} where Index : _MinimalIndexType {
 
   public subscript(i: ${Index}) -> Element {
     get {
+      _expectCompatibleIndices(self.startIndex, i)
       return base[i]
     }
 %     if mutable:
     set {
+      _expectCompatibleIndices(self.startIndex, i)
       base[i] = newValue
     }
 %     end
@@ -2943,10 +3238,13 @@ extension ${Protocol} where Index : _MinimalIndexType {
 /// A minimal implementation of `CollectionType` with extra checks.
 public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'CollectionType'} {
   public init<S : SequenceType where S.Generator.Element == T>(
-    _ s: S,
+    elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
-    self._elements = Array(s)
+    self._elements = Array(elements)
+
+    self._collectionState = _CollectionState(
+      newRootStateForElementCount: self._elements.count)
 
     switch underestimatedCount {
     case .Precise:
@@ -2969,7 +3267,7 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
 
   public var startIndex: ${Index} {
     return ${Index}(
-      buffer: bufferIndirection.buffer,
+      collectionState: _collectionState,
       position: 0,
       startIndex: 0,
       endIndex: _elements.endIndex)
@@ -2977,7 +3275,7 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
 
   public var endIndex: ${Index} {
     return ${Index}(
-      buffer: bufferIndirection.buffer,
+      collectionState: _collectionState,
       position: _elements.endIndex,
       startIndex: 0,
       endIndex: _elements.endIndex)
@@ -2985,10 +3283,12 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
 
   public subscript(i: ${Index}) -> T {
     get {
+      _expectCompatibleIndices(self.startIndex, i)
       return _elements[i.position]
     }
 %     if mutable:
     set {
+      _expectCompatibleIndices(self.startIndex, i)
       _elements[i.position] = newValue
     }
 %     end
@@ -2998,18 +3298,10 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
     return underestimatedCount
   }
 
-  internal mutating func _willMutate() {
-    if !isUniquelyReferencedNonObjC(&bufferIndirection) {
-      bufferIndirection = MinimalCollectionBufferIndirection()
-    }
-    bufferIndirection.buffer._willMutate()
-  }
-
   public var underestimatedCount: Int
 
   internal var _elements: [T]
-  public var bufferIndirection: MinimalCollectionBufferIndirection =
-    MinimalCollectionBufferIndirection()
+  internal let _collectionState: _CollectionState
 }
 
 %   end
@@ -3060,9 +3352,11 @@ extension ${Protocol} where Index : _MinimalIndexType {
 
   public subscript(i: ${Index}) -> Element {
     get {
+      _expectCompatibleIndices(advance(self.startIndex, i.position), i)
       return base[i]
     }
     set {
+      _expectCompatibleIndices(advance(self.startIndex, i.position), i)
       base[i] = newValue
     }
   }
@@ -3071,22 +3365,26 @@ extension ${Protocol} where Index : _MinimalIndexType {
 /// A minimal implementation of `RangeReplaceableCollectionType` with extra
 /// checks.
 public struct ${Self}<T> : RangeReplaceableCollectionType {
-
+  /// Creates a collection with given contents, but a unique modification
+  /// history.  No other instance has the same modification history.
   public init<S : SequenceType where S.Generator.Element == T>(
-    _ s: S,
+    elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
-    self.elements = Array(s)
+    self.elements = Array(elements)
+
+    self._collectionState = _CollectionState(
+      newRootStateForElementCount: self.elements.count)
 
     switch underestimatedCount {
     case .Precise:
-      self.underestimatedCount = elements.count
+      self.underestimatedCount = self.elements.count
 
     case .Half:
-      self.underestimatedCount = elements.count / 2
+      self.underestimatedCount = self.elements.count / 2
 
     case .Overestimate:
-      self.underestimatedCount = elements.count * 3 + 5
+      self.underestimatedCount = self.elements.count * 3 + 5
 
     case .Value(let count):
       self.underestimatedCount = count
@@ -3096,6 +3394,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
   public init() {
     self.underestimatedCount = 0
     self.elements = []
+    self._collectionState = _CollectionState(name: "\(self.dynamicType)", elementCount: 0)
   }
 
   public func generate() -> MinimalGenerator<T> {
@@ -3108,7 +3407,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
 
   public var startIndex: ${Index} {
     return ${Index}(
-      buffer: bufferIndirection.buffer,
+      collectionState: _collectionState,
       position: 0,
       startIndex: 0,
       endIndex: elements.endIndex)
@@ -3116,7 +3415,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
 
   public var endIndex: ${Index} {
     return ${Index}(
-      buffer: bufferIndirection.buffer,
+      collectionState: _collectionState,
       position: elements.endIndex,
       startIndex: 0,
       endIndex: elements.endIndex)
@@ -3124,29 +3423,33 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
 
   public subscript(i: ${Index}) -> T {
     get {
+      _expectCompatibleIndices(advance(self.startIndex, i.position), i)
       return elements[i.position]
     }
     set {
+      _expectCompatibleIndices(advance(self.startIndex, i.position), i)
       elements[i.position] = newValue
     }
   }
 
   public mutating func reserveCapacity(n: Int) {
-    _willMutate()
+    _willMutate(.ReserveCapacity(capacity: n))
     elements.reserveCapacity(n)
     reservedCapacity = max(reservedCapacity, n)
   }
 
   public mutating func append(x: T) {
-    _willMutate()
+    _willMutate(.Append)
     elements.append(x)
   }
 
   public mutating func appendContentsOf<
     S : SequenceType where S.Generator.Element == T
   >(newElements: S) {
-    _willMutate()
+    let oldCount = count
     elements.appendContentsOf(newElements)
+    let newCount = count
+    _willMutate(.AppendContentsOf(count: newCount - oldCount))
   }
 
   public mutating func replaceRange<
@@ -3154,60 +3457,72 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
   >(
     subRange: Range<${Index}>, with newElements: C
   ) {
-    _willMutate()
+    let oldCount = count
     elements.replaceRange(
       subRange.startIndex.position..<subRange.endIndex.position,
       with: newElements)
+    let newCount = count
+    _willMutate(.ReplaceRange(
+      subRange: subRange.startIndex._offset..<subRange.endIndex._offset,
+      replacementCount: subRange.count + newCount - oldCount))
   }
 
   public mutating func insert(newElement: T, atIndex i: ${Index}) {
-    _willMutate()
+    _willMutate(.Insert(atIndex: i._offset))
     elements.insert(newElement, atIndex: i.position)
   }
 
   public mutating func insertContentsOf<
     S : CollectionType where S.Generator.Element == T
   >(newElements: S, at i: ${Index}) {
-    _willMutate()
+    let oldCount = count
     elements.insertContentsOf(newElements, at: i.position)
+    let newCount = count
+
+    if newCount - oldCount != 0 {
+      _willMutate(.InsertContentsOf(
+        atIndex: i._offset,
+        count: newCount - oldCount))
+    }
   }
 
   public mutating func removeAtIndex(i: ${Index}) -> T {
-    _willMutate()
+    _willMutate(.RemoveAtIndex(index: i._offset))
     return elements.removeAtIndex(i.position)
   }
 
   public mutating func removeLast() -> T {
-    _willMutate()
+    _willMutate(.RemoveLast)
     return elements.removeLast()
   }
 
   public mutating func removeRange(subRange: Range<${Index}>) {
-    _willMutate()
+    if !subRange.isEmpty {
+      _willMutate(.RemoveRange(
+        subRange: subRange.startIndex._offset..<subRange.endIndex._offset))
+    }
     elements.removeRange(
       subRange.startIndex.position..<subRange.endIndex.position
     )
   }
 
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
-    _willMutate()
+    _willMutate(.RemoveAll(keepCapacity: keepCapacity))
     // Ignore the value of `keepCapacity`.
     elements.removeAll(keepCapacity: false)
   }
 
-  internal mutating func _willMutate() {
-    if !isUniquelyReferencedNonObjC(&bufferIndirection) {
-      bufferIndirection = MinimalCollectionBufferIndirection()
-    }
-    bufferIndirection.buffer._willMutate()
+  internal mutating func _willMutate(operation: _CollectionOperation) {
+    _collectionState = _CollectionStateTransition(
+      previousState: _collectionState,
+      operation: operation)._nextState
   }
 
   public var underestimatedCount: Int
   public var reservedCapacity: Int = 0
 
   public var elements: [T]
-  public var bufferIndirection: MinimalCollectionBufferIndirection =
-    MinimalCollectionBufferIndirection()
+  internal var _collectionState: _CollectionState
 }
 
 % end
@@ -3370,7 +3685,11 @@ public struct Defaulted${traversal}Collection<Element>
   }
 
   public init(_ array: [Element]) {
-    self.base = Base(array)
+    self.base = Base(elements: array)
+  }
+
+  public init(elements: [Element]) {
+    self.base = Base(elements: elements)
   }
 }
 
@@ -3388,7 +3707,11 @@ public struct Defaulted${traversal}MutableCollection<Element>
   }
 
   public init(_ array: [Element]) {
-    self.base = Base(array)
+    self.base = Base(elements: array)
+  }
+
+  public init(elements: [Element]) {
+    self.base = Base(elements: elements)
   }
 }
 
@@ -3410,7 +3733,11 @@ public struct Defaulted${traversal}RangeReplaceableCollection<Element>
   }
 
   public init(_ array: [Element]) {
-    self.base = Base(array)
+    self.base = Base(elements: array)
+  }
+
+  public init(elements: [Element]) {
+    self.base = Base(elements: elements)
   }
 }
 

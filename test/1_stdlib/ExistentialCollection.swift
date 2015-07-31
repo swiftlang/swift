@@ -131,7 +131,7 @@ struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
 
 tests.test("AnySequence.init(SequenceType)") {
   if true {
-    let base = MinimalSequence<OpaqueValue<Int>>([])
+    let base = MinimalSequence<OpaqueValue<Int>>(elements: [])
     var s = AnySequence(base)
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
     checkSequence([], s, resiliencyChecks: .none) { $0.value == $1.value }
@@ -139,7 +139,7 @@ tests.test("AnySequence.init(SequenceType)") {
   if true {
     let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
     let data = intData.map(OpaqueValue.init)
-    let base = MinimalSequence(data)
+    let base = MinimalSequence(elements: data)
     var s = AnySequence(base)
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
     checkSequence(data, s, resiliencyChecks: .none) { $0.value == $1.value }

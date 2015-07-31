@@ -96,12 +96,12 @@ if true {
 
   RangeReplaceableTestSuite.add${traversal}RangeReplaceableCollectionTests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValue: identity,
     extractValue: identity,
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
@@ -109,13 +109,13 @@ if true {
 
   RangeReplaceableTestSuite.add${traversal}RangeReplaceableCollectionTests(
     makeCollection: { (elements: [LifetimeTracked]) in
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValue: { (element: OpaqueValue<Int>) in LifetimeTracked(element.value) },
     extractValue: { (element: LifetimeTracked) in OpaqueValue(element.value) },
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
       // FIXME: use LifetimeTracked.
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,

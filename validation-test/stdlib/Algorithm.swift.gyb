@@ -455,7 +455,7 @@ SequenceTypeAlgorithms.test("enumerate") {
 
   for test in enumerateTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
-      test.sequence.map(OpaqueValue.init))
+      elements: test.sequence.map(OpaqueValue.init))
     var result = s.enumerate()
     expectType(
       EnumerateSequence<MinimalSequence<OpaqueValue<Int>>>.self,
@@ -526,7 +526,7 @@ let minMaxElementTests = [
 SequenceTypeAlgorithms.test("${algorithmKind}Element/WhereElementIsComparable") {
   for test in minMaxElementTests {
     let s = MinimalSequence<MinimalComparableValue>(
-      test.sequence.enumerate().map {
+      elements: test.sequence.enumerate().map {
         MinimalComparableValue($1, identity: $0)
       })
     var maybeResult = s.${algorithmKind}Element()
@@ -553,7 +553,7 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/WhereElementIsComparable") 
 SequenceTypeAlgorithms.test("${algorithmKind}Element/Predicate") {
   for test in minMaxElementTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
-      test.sequence.enumerate().map {
+      elements: test.sequence.enumerate().map {
         OpaqueValue($1, identity: $0)
       })
     var timesClosureWasCalled = 0
@@ -596,9 +596,9 @@ SequenceTypeAlgorithms.test("startsWith/WhereElementIsEquatable") {
   for test in startsWithTests {
     if true {
       let s = MinimalSequence<MinimalEquatableValue>(
-        test.sequence.map(MinimalEquatableValue.init))
+        elements: test.sequence.map(MinimalEquatableValue.init))
       let prefix = MinimalSequence<MinimalEquatableValue>(
-        test.prefix.map(MinimalEquatableValue.init))
+        elements: test.prefix.map(MinimalEquatableValue.init))
       expectEqual(
         test.expected,
         s.startsWith(prefix),
@@ -614,9 +614,9 @@ SequenceTypeAlgorithms.test("startsWith/WhereElementIsEquatable") {
     // Use different types for the sequence and prefix.
     if true {
       let s = MinimalForwardCollection<MinimalEquatableValue>(
-        test.sequence.map(MinimalEquatableValue.init))
+        elements: test.sequence.map(MinimalEquatableValue.init))
       let prefix = MinimalSequence<MinimalEquatableValue>(
-        test.prefix.map(MinimalEquatableValue.init))
+        elements: test.prefix.map(MinimalEquatableValue.init))
       expectEqual(
         test.expected,
         s.startsWith(prefix),
@@ -635,9 +635,9 @@ SequenceTypeAlgorithms.test("startsWith/Predicate") {
   for test in startsWithTests {
     if true {
       let s = MinimalSequence<OpaqueValue<Int>>(
-        test.sequence.map(OpaqueValue.init))
+        elements: test.sequence.map(OpaqueValue.init))
       let prefix = MinimalSequence<OpaqueValue<Int>>(
-        test.prefix.map(OpaqueValue.init))
+        elements: test.prefix.map(OpaqueValue.init))
       expectEqual(
         test.expected,
         s.startsWith(prefix) { $0.value == $1.value },
@@ -651,9 +651,9 @@ SequenceTypeAlgorithms.test("startsWith/Predicate") {
     }
     if true {
       let s = MinimalSequence<OpaqueValue<Int>>(
-        test.sequence.map { OpaqueValue($0 * 2) })
+        elements: test.sequence.map { OpaqueValue($0 * 2) })
       let prefix = MinimalSequence<OpaqueValue<Int>>(
-        test.prefix.map(OpaqueValue.init))
+        elements: test.prefix.map(OpaqueValue.init))
       expectEqual(
         test.expected,
         s.startsWith(prefix) { $0.value / 2 == $1.value },
@@ -669,9 +669,9 @@ SequenceTypeAlgorithms.test("startsWith/Predicate") {
     // Use different types for the sequence and prefix.
     if true {
       let s = MinimalForwardCollection<OpaqueValue<Int>>(
-        test.sequence.map(OpaqueValue.init))
+        elements: test.sequence.map(OpaqueValue.init))
       let prefix = MinimalSequence<OpaqueValue<Int>>(
-        test.prefix.map(OpaqueValue.init))
+        elements: test.prefix.map(OpaqueValue.init))
       expectEqual(
         test.expected,
         s.startsWith(prefix) { $0.value == $1.value },
@@ -738,9 +738,9 @@ SequenceTypeAlgorithms.test("elementsEqual/WhereElementIsEquatable") {
   for test in elementsEqualTests {
     if true {
       let s = MinimalSequence<MinimalEquatableValue>(
-        test.sequence.map(MinimalEquatableValue.init))
+        elements: test.sequence.map(MinimalEquatableValue.init))
       let other = MinimalSequence<MinimalEquatableValue>(
-        test.other.map(MinimalEquatableValue.init))
+        elements: test.other.map(MinimalEquatableValue.init))
       expectEqual(
         test.expected,
         s.elementsEqual(other),
@@ -756,9 +756,9 @@ SequenceTypeAlgorithms.test("elementsEqual/WhereElementIsEquatable") {
     // Use different types for the sequence and other.
     if true {
       let s = MinimalForwardCollection<MinimalEquatableValue>(
-        test.sequence.map(MinimalEquatableValue.init))
+        elements: test.sequence.map(MinimalEquatableValue.init))
       let other = MinimalSequence<MinimalEquatableValue>(
-        test.other.map(MinimalEquatableValue.init))
+        elements: test.other.map(MinimalEquatableValue.init))
       expectEqual(
         test.expected,
         s.elementsEqual(other),
@@ -777,9 +777,9 @@ SequenceTypeAlgorithms.test("elementsEqual/Predicate") {
   for test in elementsEqualTests {
     if true {
       let s = MinimalSequence<OpaqueValue<Int>>(
-        test.sequence.map(OpaqueValue.init))
+        elements: test.sequence.map(OpaqueValue.init))
       let other = MinimalSequence<OpaqueValue<Int>>(
-        test.other.map(OpaqueValue.init))
+        elements: test.other.map(OpaqueValue.init))
       expectEqual(
         test.expected,
         s.elementsEqual(other) { $0.value == $1.value },
@@ -795,9 +795,9 @@ SequenceTypeAlgorithms.test("elementsEqual/Predicate") {
     // Use different types for the sequence and other.
     if true {
       let s = MinimalForwardCollection<OpaqueValue<Int>>(
-        test.sequence.map(OpaqueValue.init))
+        elements: test.sequence.map(OpaqueValue.init))
       let other = MinimalSequence<OpaqueValue<Int>>(
-        test.other.map(OpaqueValue.init))
+        elements: test.other.map(OpaqueValue.init))
       expectEqual(
         test.expected,
         s.elementsEqual(other) { $0.value == $1.value },
@@ -884,9 +884,9 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/WhereElementIsComparable") {
   for test in lexicographicalCompareTests {
     if true {
       let s = MinimalSequence<MinimalComparableValue>(
-        test.sequence.map(MinimalComparableValue.init))
+        elements: test.sequence.map(MinimalComparableValue.init))
       let other = MinimalSequence<MinimalComparableValue>(
-        test.other.map(MinimalComparableValue.init))
+        elements: test.other.map(MinimalComparableValue.init))
       expectEqual(
         test.expected.isLT(),
         s.lexicographicalCompare(other),
@@ -902,9 +902,9 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/WhereElementIsComparable") {
     // Use different types for the sequence and other.
     if true {
       let s = MinimalForwardCollection<MinimalComparableValue>(
-        test.sequence.map(MinimalComparableValue.init))
+        elements: test.sequence.map(MinimalComparableValue.init))
       let other = MinimalSequence<MinimalComparableValue>(
-        test.other.map(MinimalComparableValue.init))
+        elements: test.other.map(MinimalComparableValue.init))
       expectEqual(
         test.expected.isLT(),
         s.lexicographicalCompare(other),
@@ -923,9 +923,9 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/Predicate") {
   for test in lexicographicalCompareTests {
     if true {
       let s = MinimalSequence<OpaqueValue<Int>>(
-        test.sequence.map(OpaqueValue.init))
+        elements: test.sequence.map(OpaqueValue.init))
       let other = MinimalSequence<OpaqueValue<Int>>(
-        test.other.map(OpaqueValue.init))
+        elements: test.other.map(OpaqueValue.init))
       expectEqual(
         test.expected.isLT(),
         s.lexicographicalCompare(other) { $0.value < $1.value },
@@ -941,9 +941,9 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/Predicate") {
     // Use different types for the sequence and other.
     if true {
       let s = MinimalForwardCollection<OpaqueValue<Int>>(
-        test.sequence.map(OpaqueValue.init))
+        elements: test.sequence.map(OpaqueValue.init))
       let other = MinimalSequence<OpaqueValue<Int>>(
-        test.other.map(OpaqueValue.init))
+        elements: test.other.map(OpaqueValue.init))
       expectEqual(
         test.expected.isLT(),
         s.lexicographicalCompare(other) { $0.value < $1.value },
@@ -1025,7 +1025,7 @@ SequenceTypeAlgorithms.test("Set<T>.contains/CustomImplementation/${dispatch}") 
 SequenceTypeAlgorithms.test("contains/Predicate") {
   for test in findTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
-      test.sequence.map { OpaqueValue($0.value) })
+      elements: test.sequence.map { OpaqueValue($0.value) })
     expectEqual(
       test.expected != nil,
       s.contains { $0.value == test.element.value },
@@ -1064,7 +1064,7 @@ let reduceTests = [
 SequenceTypeAlgorithms.test("reduce") {
   for test in reduceTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
-      test.sequence.map(OpaqueValue.init))
+      elements: test.sequence.map(OpaqueValue.init))
     var timesClosureWasCalled = 0
     let result = s.reduce(OpaqueValue<[Int]>([])) {
       (partialResult: OpaqueValue<[Int]>, element: OpaqueValue<Int>)
@@ -1114,7 +1114,7 @@ let reverseTests: [ReverseTest] = [
 SequenceTypeAlgorithms.test("reverse/SequenceType") {
   for test in reverseTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
-      test.sequence.map(OpaqueValue.init))
+      elements: test.sequence.map(OpaqueValue.init))
     var result = s.reverse()
     expectType([OpaqueValue<Int>].self, &result)
     expectEqual(
@@ -1127,7 +1127,7 @@ SequenceTypeAlgorithms.test("reverse/SequenceType") {
 SequenceTypeAlgorithms.test("reverse/WhereIndexIsBidirectional,BidirectionalReverseView") {
   for test in reverseTests {
     let s = MinimalBidirectionalCollection<OpaqueValue<Int>>(
-      test.sequence.map(OpaqueValue.init))
+      elements: test.sequence.map(OpaqueValue.init))
     var result = s.reverse()
     expectType(
       ReverseCollection<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self,
@@ -1146,7 +1146,7 @@ SequenceTypeAlgorithms.test("reverse/WhereIndexIsBidirectional,BidirectionalReve
 SequenceTypeAlgorithms.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView") {
   for test in reverseTests {
     let s = MinimalRandomAccessCollection<OpaqueValue<Int>>(
-      test.sequence.map(OpaqueValue.init))
+      elements: test.sequence.map(OpaqueValue.init))
     var result = s.reverse()
     expectType(
       ReverseRandomAccessCollection<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
@@ -1214,8 +1214,8 @@ SequenceTypeAlgorithms.test("filter/SequenceType/Semantics") {
       UnderestimateCountBehavior.Value(0)
     ] {
       
-      let s = DefaultedSequence<OpaqueValue<Int>> (
-        test.sequence.map(OpaqueValue.init),
+      let s = DefaultedSequence<OpaqueValue<Int>>(
+        elements: test.sequence.map(OpaqueValue.init),
         underestimatedCount: underestimateCountBehavior)
       
       let closureLifetimeTracker = LifetimeTracked(0)
@@ -1251,7 +1251,7 @@ struct MinimalForwardCollectionWith${Implementation}Filter<Element>
 
   init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
     self._data = MinimalForwardCollection(
-      data, underestimatedCount: underestimatedCount)
+      elements: data, underestimatedCount: underestimatedCount)
   }
 
   func generate() -> MinimalGenerator<Element> {
@@ -1412,7 +1412,7 @@ var MinimalSequenceWithCustomMap_timesMapWasCalled: Int = 0
 struct MinimalSequenceWith${Implementation}Map<Element> : SequenceType {
   init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
     self._data = MinimalSequence(
-      data, underestimatedCount: underestimatedCount)
+      elements: data, underestimatedCount: underestimatedCount)
   }
 
   func generate() -> MinimalGenerator<Element> {
@@ -1528,7 +1528,7 @@ struct MinimalForwardCollectionWith${Implementation}Map<Element>
 
   init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
     self._data = MinimalForwardCollection(
-      data, underestimatedCount: underestimatedCount)
+      elements: data, underestimatedCount: underestimatedCount)
   }
 
   func generate() -> MinimalGenerator<Element> {
@@ -1781,7 +1781,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
       UnderestimateCountBehavior.Value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
-        test.sequence.map(OpaqueValue.init),
+        elements: test.sequence.map(OpaqueValue.init),
         underestimatedCount: underestimateCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       var timesClosureWasCalled = 0
@@ -1790,7 +1790,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
         _blackHole(closureLifetimeTracker)
         ++timesClosureWasCalled
         return MinimalSequence<OpaqueValue<Int32>>(
-          test.transform(element.value).map { OpaqueValue(Int32($0)) })
+          elements: test.transform(element.value).map { OpaqueValue(Int32($0)) })
       }
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(
@@ -1813,7 +1813,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
 SequenceTypeAlgorithms.test("flatMap/${Kind}/Lazy") {
   for test in flatMapTests {
     let s = ${Minimal}<OpaqueValue<Int>>(
-      test.sequence.map(OpaqueValue.init))
+      elements: test.sequence.map(OpaqueValue.init))
     let closureLifetimeTracker = LifetimeTracked(0)
     var timesClosureWasCalled = 0
     var result = s._prext_lazy.flatMap {
@@ -1821,7 +1821,7 @@ SequenceTypeAlgorithms.test("flatMap/${Kind}/Lazy") {
       _blackHole(closureLifetimeTracker)
       ++timesClosureWasCalled
       return ${Minimal}<OpaqueValue<Int32>>(
-        test.transform(element.value).map { OpaqueValue(Int32($0)) })
+        elements: test.transform(element.value).map { OpaqueValue(Int32($0)) })
     }
     expectEqual(0, timesClosureWasCalled, "Unexpected eagerness")
 
@@ -1917,7 +1917,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
       UnderestimateCountBehavior.Value(0)
     ] {
       let s = MinimalSequence<OpaqueValue<Int>>(
-        test.sequence.map(OpaqueValue.init),
+        elements: test.sequence.map(OpaqueValue.init),
         underestimatedCount: underestimateCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
@@ -2104,9 +2104,9 @@ SequenceTypeAlgorithms.test("zip") {
 
   for test in zipTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
-      test.sequence.map(OpaqueValue.init))
+      elements: test.sequence.map(OpaqueValue.init))
     let other = MinimalSequence<OpaqueValue<Int32>>(
-      test.other.map(OpaqueValue.init))
+      elements: test.other.map(OpaqueValue.init))
     var result = zip(s, other)
     expectType(
       Zip2Sequence<MinimalSequence<OpaqueValue<Int>>, MinimalSequence<OpaqueValue<Int32>>>.self,
@@ -2144,7 +2144,7 @@ struct SequenceWithDefaultUnderestimateCount : SequenceType {
   func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
     expectUnreachable()
     return MinimalSequence(
-      [ 1, 2, 3 ].map(OpaqueValue.init)
+      elements: [ 1, 2, 3 ].map(OpaqueValue.init)
     ).generate()
   }
 }
@@ -2162,7 +2162,7 @@ struct SequenceWithCustomUnderestimateCount : SequenceType {
   func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
     expectUnreachable()
     return MinimalSequence(
-      [ 0xffff, 0xffff, 0xffff ].map(OpaqueValue.init)
+      elements: [ 0xffff, 0xffff, 0xffff ].map(OpaqueValue.init)
     ).generate()
   }
 
@@ -2275,7 +2275,7 @@ SequenceTypeAlgorithms.test("_copyToNativeArrayBuffer/OverestimatedCount")
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let s = MinimalSequence<OpaqueValue<Int>>(
-    [ 1, 2, 3 ].map(OpaqueValue.init),
+    elements: [ 1, 2, 3 ].map(OpaqueValue.init),
     underestimatedCount: .Value(4))
   expectCrashLater()
   let array = s._copyToNativeArrayBuffer()
@@ -2436,7 +2436,7 @@ SequenceTypeAlgorithms.test("Slice/AssociatedTypes") {
 
 SequenceTypeAlgorithms.test("Slice/init(base:bounds:)") {
   for test in subscriptRangeTests {
-    let base = MinimalForwardCollection(test.collection)
+    let base = MinimalForwardCollection(elements: test.collection)
     var result = Slice(base: base, bounds: test.boundsIn(base))
     expectType(
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
@@ -2452,7 +2452,7 @@ SequenceTypeAlgorithms.test("Slice/init(base:bounds:)") {
 
 SequenceTypeAlgorithms.test("Slice.{startIndex,endIndex}") {
   for test in subscriptRangeTests {
-    let base = MinimalForwardCollection(test.collection)
+    let base = MinimalForwardCollection(elements: test.collection)
     let bounds = test.boundsIn(base)
     var slice = Slice(base: base, bounds: bounds)
     expectType(
@@ -2466,12 +2466,12 @@ SequenceTypeAlgorithms.test("Slice.{startIndex,endIndex}") {
 
 SequenceTypeAlgorithms.test("Slice.subscript(_: Index)") {
   for test in subscriptRangeTests {
-    let base = MinimalForwardCollection(test.collection)
+    typealias Base = MinimalForwardCollection<OpaqueValue<Int>>
+    Base.Index.trapOnRangeCheckFailure.value = false
+    let base = Base(elements: test.collection)
     let bounds = test.boundsIn(base)
     var slice = Slice(base: base, bounds: bounds)
-    expectType(
-      Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
-      &slice)
+    expectType(Slice<Base>.self, &slice)
 
     for i in bounds {
       var element = slice[i]
@@ -2495,16 +2495,14 @@ SequenceTypeAlgorithms.test("Slice.subscript(_: Index)") {
 
 SequenceTypeAlgorithms.test("Slice.subscript(_: Range<Index>)") {
   for test in subscriptRangeTests {
-    let base = MinimalForwardCollection(test.collection)
+    typealias Base = MinimalForwardCollection<OpaqueValue<Int>>
+    Base.Index.trapOnRangeCheckFailure.value = false
+    let base = Base(elements: test.collection)
     var slice = Slice(base: base, bounds: base.indices)
-    expectType(
-      Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
-      &slice)
+    expectType(Slice<Base>.self, &slice)
 
     var result = slice[test.boundsIn(slice)]
-    expectType(
-      Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
-      &result)
+    expectType(Slice<Base>.self, &result)
 
     checkForwardCollection(test.expected, result) { $0.value == $1.value }
 
@@ -2620,6 +2618,139 @@ SequenceTypeAlgorithms.test("Set<T>.find/CustomImplementation/${dispatch}") {
 % end
 
 //===----------------------------------------------------------------------===//
+// MutableSlice<Base>
+//===----------------------------------------------------------------------===//
+
+SequenceTypeAlgorithms.test("MutableSlice/AssociatedTypes") {
+%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+  if true {
+    typealias Base =
+      Minimal${traversal}MutableCollection<OpaqueValue<Int>>
+    typealias ${traversal}MutableSlice = MutableSlice<Base>
+    expectMutableSliceType(${traversal}MutableSlice.self)
+    expectCollectionAssociatedTypes(
+      collectionType: ${traversal}MutableSlice.self,
+      generatorType: IndexingGenerator<${traversal}MutableSlice>.self,
+      subSequenceType: ${traversal}MutableSlice.self,
+      indexType: Minimal${traversal}Index.self)
+  }
+%end
+
+  func checkStaticTypealiases<
+    Base : MutableCollectionType
+  >(_: Base) {
+    expectEqualType(Base.Index.self, MutableSlice<Base>.Index.self)
+  }
+}
+
+/*
+FIXME: uncomment this test when the following bug is fixed:
+
+<rdar://problem/21935030> Recast Slice and MutableSlice in terms of Collection
+and MutableCollection
+
+extension MutableSlice {
+  func _checkBaseSubSequenceElementIsElement() {
+      Element.self,
+      Generator.Element.self)
+    expectEqualType(
+      Element.self,
+      Generator.Element.self,
+      Base.Generator.Element.self)
+    expectEqualType(
+      Element.self,
+      Generator.Element.self,
+      Base.SubSequence.Generator.Element.self)
+  }
+}
+*/
+
+SequenceTypeAlgorithms.test("MutableSlice/init(base:bounds:)") {
+  for test in subscriptRangeTests {
+    let c = MinimalForwardMutableCollection(elements: test.collection)
+    var result = MutableSlice(base: c, bounds: test.boundsIn(c))
+    expectType(
+      MutableSlice<MinimalForwardMutableCollection<OpaqueValue<Int>>>.self,
+      &result)
+
+    checkForwardCollection(
+      test.expected,
+      result,
+      stackTrace: SourceLocStack().with(test.loc))
+      { $0.value == $1.value }
+  }
+}
+
+SequenceTypeAlgorithms.test("MutableSlice.{startIndex,endIndex}") {
+  for test in subscriptRangeTests {
+    let c = MinimalForwardMutableCollection(elements: test.collection)
+    let bounds = test.boundsIn(c)
+    var slice = MutableSlice(base: c, bounds: bounds)
+    expectType(
+      MutableSlice<MinimalForwardMutableCollection<OpaqueValue<Int>>>.self,
+      &slice)
+
+    expectEqual(bounds.startIndex, slice.startIndex)
+    expectEqual(bounds.endIndex, slice.endIndex)
+  }
+}
+
+SequenceTypeAlgorithms.test("MutableSlice.subscript(_: Index)/{get,set}") {
+  for test in subscriptRangeTests {
+    typealias Base = MinimalForwardMutableCollection<OpaqueValue<Int>>
+    Base.Index.trapOnRangeCheckFailure.value = false
+    let base = Base(elements: test.collection)
+    let bounds = test.boundsIn(base)
+    var slice = MutableSlice(base: base, bounds: bounds)
+    expectType(MutableSlice<Base>.self, &slice)
+
+    for i in bounds {
+      // Test getter.
+      var element = slice[i]
+      expectType(OpaqueValue<Int>.self, &element)
+      expectEqual(base[i].value, element.value)
+    }
+
+    do {
+      var sliceForSetter = slice
+      for i in bounds {
+        // Test setter.
+        sliceForSetter[i].value++
+        expectEqual(base[i].value + 1, sliceForSetter[i].value)
+      }
+    }
+
+    var sliceForSetter = slice
+    for (i, index) in base.indices.enumerate() {
+      if test.bounds.contains(i) {
+        // Test getter.
+        expectEqual(base[index].value, slice[index].value)
+
+        // Test setter.
+        sliceForSetter[index].value++
+        expectEqual(base[index].value + 1, sliceForSetter[index].value)
+      } else {
+        // `MutableSlice` disallows out-of-bounds indices when the underlying
+        // index type can perform a range check.
+
+        // Test getter.
+        expectFailure {
+          _blackHole(slice[index])
+        }
+
+        // Test setter.
+        expectFailure {
+          sliceForSetter[index].value++
+        }
+      }
+    }
+
+    // Check that none of the mutations above affected the original collection.
+    expectEqualSequence(test.collection, base) { $0.value == $1.value }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // CollectionType.split()
 //===----------------------------------------------------------------------===//
 
@@ -2694,12 +2825,12 @@ if true {
 
   SequenceTypeAlgorithms.addSequenceTests(
     makeSequence: { (elements: [OpaqueValue<Int>]) in
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValue: identity,
     extractValue: identity,
     makeSequenceOfEquatable: { (elements: [MinimalEquatableValue]) in
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
@@ -2723,12 +2854,12 @@ if true {
 
   SequenceTypeAlgorithms.add${traversal}CollectionTests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValue: identity,
     extractValue: identity,
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
@@ -2738,17 +2869,17 @@ if true {
 %       if mutable:
   SequenceTypeAlgorithms.add${traversal}MutableCollectionTests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValue: identity,
     extractValue: identity,
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
     makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
@@ -2766,7 +2897,7 @@ if true {
 
   SequenceTypeAlgorithms.add${traversal}CollectionTests(
     makeCollection: { (elements: [LifetimeTracked]) in
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValue: { (element: OpaqueValue<Int>) in
       LifetimeTracked(element.value, identity: element.identity)
@@ -2776,7 +2907,7 @@ if true {
     },
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
       // FIXME: use LifetimeTracked.
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
@@ -2786,7 +2917,7 @@ if true {
 %       if mutable:
   SequenceTypeAlgorithms.add${traversal}MutableCollectionTests(
     makeCollection: { (elements: [LifetimeTracked]) in
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValue: { (element: OpaqueValue<Int>) in
       LifetimeTracked(element.value, identity: element.identity)
@@ -2796,13 +2927,13 @@ if true {
     },
     makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
       // FIXME: use LifetimeTracked.
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
     makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
       // FIXME: use LifetimeTracked.
-      return ${Base}(elements)
+      return ${Base}(elements: elements)
     },
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
@@ -2812,56 +2943,97 @@ if true {
 %       end
 }
 
-// Test Slice<Base> of various collections using value types as elements.
+// Test Slice<Base> and MutableSlice<Base> of various collections using value
+// types as elements.
+%       wrapper_types = [ 'Slice', 'MutableSlice' ] if mutable else [ 'Slice' ]
+%       for WrapperType in wrapper_types:
+%         for name, prefix, suffix in [
+%           ('FullWidth', '[]', '[]'),
+%           ('WithPrefix', '[ -9999, -9998, -9997 ]', '[]'),
+%           ('WithSuffix', '[]', '[ -9999, -9998, -9997 ]'),
+%           ('WithPrefixAndSuffix', '[ -9999, -9998, -9997, -9996, -9995 ]', '[ -9994, -9993, -9992 ]')
+%         ]:
 if true {
+  let prefix: [Int] = ${prefix}
+  let suffix: [Int] = ${suffix}
+
   func makeCollection(elements: [OpaqueValue<Int>])
-    -> Slice<${Base}<OpaqueValue<Int>>> {
-    let baseElements =
-      [ -9999, -9998, -9997 ].map(OpaqueValue.init) + elements
-    let base = ${Base}(baseElements)
-    return Slice(
+    -> ${WrapperType}<${Base}<OpaqueValue<Int>>> {
+    var baseElements = prefix.map(OpaqueValue.init)
+    baseElements.appendContentsOf(elements)
+    baseElements.appendContentsOf(suffix.map(OpaqueValue.init))
+    let base = ${Base}(elements: baseElements)
+    let startIndex = advance(base.startIndex, numericCast(prefix.count))
+    let endIndex =
+      advance(
+        base.startIndex,
+        numericCast(prefix.count + elements.count))
+    return ${WrapperType}(
       base: base,
-      bounds: advance(base.startIndex, numericCast(3))..<base.endIndex)
+      bounds: startIndex..<endIndex)
   }
 
   func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
-    -> Slice<${Base}<MinimalEquatableValue>> {
-    let baseElements =
-      [ -9999, -9998, -9997 ].map(MinimalEquatableValue.init) + elements
-    let base = ${Base}(baseElements)
-    return Slice(
+    -> ${WrapperType}<${Base}<MinimalEquatableValue>> {
+    var baseElements = prefix.map(MinimalEquatableValue.init)
+    baseElements.appendContentsOf(elements)
+    baseElements.appendContentsOf(suffix.map(MinimalEquatableValue.init))
+    let base = ${Base}(elements: baseElements)
+    let startIndex = advance(base.startIndex, numericCast(prefix.count))
+    let endIndex =
+      advance(
+        base.startIndex,
+        numericCast(prefix.count + elements.count))
+    return ${WrapperType}(
       base: base,
-      bounds: advance(base.startIndex, numericCast(3))..<base.endIndex)
+      bounds: startIndex..<endIndex)
   }
 
   func makeCollectionOfComparable(elements: [MinimalComparableValue])
-    -> Slice<${Base}<MinimalComparableValue>> {
-    let baseElements =
-      [ -9999, -9998, -9997 ].map(MinimalComparableValue.init) + elements
-    let base = ${Base}(baseElements)
-    return Slice(
+    -> ${WrapperType}<${Base}<MinimalComparableValue>> {
+    var baseElements = prefix.map(MinimalComparableValue.init)
+    baseElements.appendContentsOf(elements)
+    baseElements.appendContentsOf(suffix.map(MinimalComparableValue.init))
+    let base = ${Base}(elements: baseElements)
+    let startIndex = advance(base.startIndex, numericCast(prefix.count))
+    let endIndex =
+      advance(
+        base.startIndex,
+        numericCast(prefix.count + elements.count))
+    return ${WrapperType}(
       base: base,
-      bounds: advance(base.startIndex, numericCast(3))..<base.endIndex)
+      bounds: startIndex..<endIndex)
   }
 
   var checksAdded: Box<Set<String>> = Box([])
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
   resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior = .Trap
-  resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior
-    = .ExpectationFailure
+  resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior = .Trap
 
-  SequenceTypeAlgorithms.add${traversal}CollectionTests(
+  SequenceTypeAlgorithms.add${traversal}${'Mutable' if WrapperType == 'MutableSlice' else ''}CollectionTests(
+    "${name}.",
     makeCollection: makeCollection,
     wrapValue: identity,
     extractValue: identity,
     makeCollectionOfEquatable: makeCollectionOfEquatable,
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
+%           if WrapperType == 'MutableSlice':
+    makeCollectionOfComparable: makeCollectionOfComparable,
+    wrapValueIntoComparable: identityComp,
+    extractValueFromComparable: identityComp,
+%           end
     checksAdded: checksAdded,
     resiliencyChecks: resiliencyChecks,
-    outOfBoundsIndexOffset: 4)
+    outOfBoundsIndexOffset: 6
+%           if WrapperType == 'MutableSlice':
+    , withUnsafeMutableBufferPointerIsSupported: false
+%           end
+    )
 }
+%         end
+%       end
 
 %     end
 %   end

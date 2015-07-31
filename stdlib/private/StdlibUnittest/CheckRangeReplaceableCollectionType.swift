@@ -353,7 +353,7 @@ self.test("\(testNamePrefix).replaceRange()/semantics") {
     var c = makeWrappedCollection(test.collection)
     let rangeToReplace = test.rangeSelection.rangeOf(c)
     let newElements =
-      MinimalForwardCollection(test.newElements.map(wrapValue))
+      MinimalForwardCollection(elements: test.newElements.map(wrapValue))
     c.replaceRange(rangeToReplace, with: newElements)
     expectEqualSequence(
       test.expected,
@@ -440,7 +440,7 @@ self.test("\(testNamePrefix).appendContentsOf()/semantics") {
   for test in tests {
     var c = makeWrappedCollection(test.collection)
     let newElements =
-      MinimalForwardCollection(test.newElements.map(wrapValue))
+      MinimalForwardCollection(elements: test.newElements.map(wrapValue))
     c.appendContentsOf(newElements)
     expectEqualSequence(
       test.expected,
@@ -579,7 +579,7 @@ self.test("\(testNamePrefix).insertContentsOf()/semantics") {
   for test in tests {
     var c = makeWrappedCollection(test.collection)
     let newElements =
-      MinimalForwardCollection(test.newElements.map(wrapValue))
+      MinimalForwardCollection(elements: test.newElements.map(wrapValue))
     c.insertContentsOf(newElements, at: test.indexSelection.indexIn(c))
     expectEqualSequence(
       test.expected,
@@ -901,7 +901,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
   // RangeReplaceableCollectionType + SequenceType
   for test in tests {
     let lhs = makeWrappedCollection(test.lhs)
-    let rhs = MinimalSequence(test.rhs.map(wrapValue))
+    let rhs = MinimalSequence(elements: test.rhs.map(wrapValue))
 
     let result = lhs + rhs
     expectEqualSequence(
@@ -917,7 +917,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
 
   // SequenceType + RangeReplaceableCollectionType
   for test in tests {
-    let lhs = MinimalSequence(test.lhs.map(wrapValue))
+    let lhs = MinimalSequence(elements: test.lhs.map(wrapValue))
     let rhs = makeWrappedCollection(test.rhs)
 
     let result = lhs + rhs
@@ -935,7 +935,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
   // RangeReplaceableCollectionType + CollectionType
   for test in tests {
     let lhs = makeWrappedCollection(test.lhs)
-    let rhs = MinimalForwardCollection(test.rhs.map(wrapValue))
+    let rhs = MinimalForwardCollection(elements: test.rhs.map(wrapValue))
 
     let result = lhs + rhs
     expectEqualSequence(
@@ -977,8 +977,8 @@ self.test("\(testNamePrefix).OperatorPlus") {
   // RangeReplaceableCollectionType + MinimalForwardRangeReplaceableCollection
   for test in tests {
     let lhs = makeWrappedCollection(test.lhs)
-    let rhs =
-      MinimalForwardRangeReplaceableCollection(test.rhs.map(wrapValue))
+    let rhs = MinimalForwardRangeReplaceableCollection(
+      elements: test.rhs.map(wrapValue))
 
     let result = lhs + rhs
     expectEqualSequence(
@@ -998,8 +998,8 @@ self.test("\(testNamePrefix).OperatorPlus") {
 
   // MinimalForwardRangeReplaceableCollection + RangeReplaceableCollectionType
   for test in tests {
-    let lhs =
-      MinimalForwardRangeReplaceableCollection(test.lhs.map(wrapValue))
+    let lhs = MinimalForwardRangeReplaceableCollection(
+      elements: test.lhs.map(wrapValue))
     let rhs = makeWrappedCollection(test.rhs)
 
     let result = lhs + rhs

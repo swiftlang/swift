@@ -279,7 +279,8 @@ extension TestSuite {
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-    outOfBoundsIndexOffset: Int = 1
+    outOfBoundsIndexOffset: Int = 1,
+    outOfBoundsSubscriptOffset: Int = 1
   ) {
 
     if checksAdded.value.contains(__FUNCTION__) {
@@ -385,11 +386,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = advance(index, numericCast(outOfBoundsIndexOffset))
+      index = advance(index, numericCast(outOfBoundsSubscriptOffset))
       _blackHole(c[index])
     } else {
       expectFailure {
-        index = advance(index, numericCast(outOfBoundsIndexOffset))
+        index = advance(index, numericCast(outOfBoundsSubscriptOffset))
         _blackHole(c[index])
       }
     }
@@ -398,13 +399,13 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/Empty/Get") {
     var c = makeWrappedCollection([])
     var index = c.endIndex
-    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
+    if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = advance(index, numericCast(outOfBoundsIndexOffset))
+      index = advance(index, numericCast(outOfBoundsSubscriptOffset))
       _blackHole(c[index])
     } else {
       expectFailure {
-        index = advance(index, numericCast(outOfBoundsIndexOffset))
+        index = advance(index, numericCast(outOfBoundsSubscriptOffset))
         _blackHole(c[index])
       }
     }
@@ -648,7 +649,8 @@ self.test("\(testNamePrefix).suffixFrom/semantics") {
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-    outOfBoundsIndexOffset: Int = 1
+    outOfBoundsIndexOffset: Int = 1,
+    outOfBoundsSubscriptOffset: Int = 1
   ) {
     if checksAdded.value.contains(__FUNCTION__) {
       return
@@ -665,7 +667,8 @@ self.test("\(testNamePrefix).suffixFrom/semantics") {
       extractValueFromEquatable: extractValueFromEquatable,
       checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
-      outOfBoundsIndexOffset: outOfBoundsIndexOffset)
+      outOfBoundsIndexOffset: outOfBoundsIndexOffset,
+      outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
 
     func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> Collection {
       return makeCollection(elements.map(wrapValue))
@@ -734,11 +737,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = advance(index, numericCast(-outOfBoundsIndexOffset))
+      index = advance(index, numericCast(-outOfBoundsSubscriptOffset))
       _blackHole(c[index])
     } else {
       expectFailure {
-        index = advance(index, numericCast(-outOfBoundsIndexOffset))
+        index = advance(index, numericCast(-outOfBoundsSubscriptOffset))
         _blackHole(c[index])
       }
     }
@@ -749,11 +752,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = advance(index, numericCast(-outOfBoundsIndexOffset))
+      index = advance(index, numericCast(-outOfBoundsSubscriptOffset))
       _blackHole(c[index])
     } else {
       expectFailure {
-        index = advance(index, numericCast(-outOfBoundsIndexOffset))
+        index = advance(index, numericCast(-outOfBoundsSubscriptOffset))
         _blackHole(c[index])
       }
     }
@@ -813,7 +816,8 @@ self.test("\(testNamePrefix).suffix/semantics") {
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-    outOfBoundsIndexOffset: Int = 1
+    outOfBoundsIndexOffset: Int = 1,
+    outOfBoundsSubscriptOffset: Int = 1
   ) {
 
     if checksAdded.value.contains(__FUNCTION__) {
@@ -831,7 +835,8 @@ self.test("\(testNamePrefix).suffix/semantics") {
       extractValueFromEquatable: extractValueFromEquatable,
       checksAdded: checksAdded,
       resiliencyChecks: resiliencyChecks,
-      outOfBoundsIndexOffset: outOfBoundsIndexOffset)
+      outOfBoundsIndexOffset: outOfBoundsIndexOffset,
+      outOfBoundsSubscriptOffset: outOfBoundsSubscriptOffset)
 
     testNamePrefix += String(Collection.Type)
 

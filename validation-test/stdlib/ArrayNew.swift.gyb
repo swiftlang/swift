@@ -119,7 +119,7 @@ func == (lhs: EnumWithoutPayloads, rhs: EnumWithoutPayloads) -> Bool {
 
 struct SequenceWithCustomUnderestimateCount : SequenceType {
   init(_ data: [Int]) {
-    self._data = MinimalSequence(data.map(OpaqueValue.init))
+    self._data = MinimalSequence(elements: data.map(OpaqueValue.init))
   }
 
   func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {

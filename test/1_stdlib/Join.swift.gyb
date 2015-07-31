@@ -178,28 +178,28 @@ JoinTestSuite.test("${ArrayType}") {
 
 JoinTestSuite.test("ReservesCapacity") {
   if true {
-    let r = join(MinimalForwardRangeReplaceableCollection<Int>([]), [])
+    let r = join(MinimalForwardRangeReplaceableCollection<Int>(elements: []), [])
     expectEqual(0, r.reservedCapacity)
   }
   if true {
-    let r = join(MinimalForwardRangeReplaceableCollection([ 42 ]),
-        [ MinimalForwardRangeReplaceableCollection([]) ])
+    let r = join(MinimalForwardRangeReplaceableCollection(elements: [ 42 ]),
+        [ MinimalForwardRangeReplaceableCollection(elements: []) ])
     expectEqual(0, r.reservedCapacity)
   }
 
   if true {
-    let r = join(MinimalForwardRangeReplaceableCollection([ 42 ]),
-        [ MinimalForwardRangeReplaceableCollection([ 1 ]),
-          MinimalForwardRangeReplaceableCollection([ 2, 3, 4 ]),
-          MinimalForwardRangeReplaceableCollection([ 5, 6, 7 ]) ])
+    let r = join(MinimalForwardRangeReplaceableCollection(elements: [ 42 ]),
+        [ MinimalForwardRangeReplaceableCollection(elements: [ 1 ]),
+          MinimalForwardRangeReplaceableCollection(elements: [ 2, 3, 4 ]),
+          MinimalForwardRangeReplaceableCollection(elements: [ 5, 6, 7 ]) ])
     expectEqual(9, r.reservedCapacity)
     expectEqual([ 1, 42, 2, 3, 4, 42, 5, 6, 7 ], r.elements)
   }
   if true {
-    let r = join(MinimalForwardRangeReplaceableCollection([ 42, 4242 ]),
-        [ MinimalForwardRangeReplaceableCollection([ 1 ]),
-          MinimalForwardRangeReplaceableCollection([ 2, 3, 4 ]),
-          MinimalForwardRangeReplaceableCollection([ 5, 6, 7 ]) ])
+    let r = join(MinimalForwardRangeReplaceableCollection(elements: [ 42, 4242 ]),
+        [ MinimalForwardRangeReplaceableCollection(elements: [ 1 ]),
+          MinimalForwardRangeReplaceableCollection(elements: [ 2, 3, 4 ]),
+          MinimalForwardRangeReplaceableCollection(elements: [ 5, 6, 7 ]) ])
     expectEqual(11, r.reservedCapacity)
     expectEqual([ 1, 42, 4242, 2, 3, 4, 42, 4242, 5, 6, 7 ], r.elements)
   }
