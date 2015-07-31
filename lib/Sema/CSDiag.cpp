@@ -2288,7 +2288,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
   if (sameProblem) {
     switch (firstProblem) {
     case MemberLookupResult::UR_LabelMismatch:
-        abort();
+      break;
     case MemberLookupResult::UR_UnavailableInExistential:
       diagnose(anchor->getLoc(), diag::could_not_use_member_on_existential,
                instanceTy, memberName)
