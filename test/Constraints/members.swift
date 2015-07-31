@@ -487,3 +487,24 @@ func testClassExtendedWithMutatingMethods(c: ClassExtendedWithMutatingMethods, /
   _ = mutableSub.mutatingGetProperty
   _ = mutableSub.mutatingGetProperty.foo
 }
+
+// <rdar://problem/18879585> QoI: error message for attempted access to instance properties in static methods are bad.
+enum LedModules: Int {
+  case WS2811_1x_5V
+}
+
+extension LedModules {
+  static var watts: Double {
+    return [0.30][self.rawValue] // expected-error {{instance member 'rawValue' cannot be used on type 'LedModules'}}
+  }
+}
+
+
+// <rdar://problem/15117741> QoI: calling a static function on an instance produces a non-helpful diagnostic
+class r15117741S {
+  static func g() {}
+}
+func test15117741(s: r15117741S) {
+  s.g() // expected-error {{static member 'g' cannot be used on instance of type 'r15117741S'}}
+}
+
