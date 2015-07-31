@@ -487,3 +487,26 @@ func r22020088bar(p: r22020088P?) {
 }
 
 
+
+struct AOpts : OptionSetType {
+  let rawValue : Int
+}
+
+class B {
+  func function(x : Int8, a : AOpts) {}
+  func f2(a : AOpts) {}
+  static func f1(a : AOpts) {}
+}
+
+
+func test(a : B) {
+  B.f1(nil)    // expected-error {{cannot invoke 'f1' with an argument list of type '(NilLiteralConvertible)'}}
+  // expected-note @-1 {{expected an argument list of type '(AOpts)'}}
+  a.function(42, nil) //expected-error {{cannot invoke 'function' with an argument list of type '(Int, NilLiteralConvertible)'}}
+  // expected-note @-1 {{expected an argument list of type '(Int8, a: AOpts)'}}
+  a.f2(nil)  // expected-error {{cannot invoke 'f2' with an argument list of type '(NilLiteralConvertible)'}}
+  // expected-note @-1 {{expected an argument list of type '(AOpts)'}}
+}
+
+
+
