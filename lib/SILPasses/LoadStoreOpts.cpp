@@ -51,9 +51,13 @@ STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 static bool isLSForwardingInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   case ValueKind::StrongRetainInst:
+  case ValueKind::StrongRetainUnownedInst:
+  case ValueKind::UnownedRetainInst:
   case ValueKind::RetainValueInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::CondFailInst:
+  case ValueKind::IsUniqueInst:
+  case ValueKind::IsUniqueOrPinnedInst:
     return true;
   default:
     return false;
