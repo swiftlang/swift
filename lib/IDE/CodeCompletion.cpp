@@ -877,6 +877,9 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   /// completions.
   Type ExprType;
 
+  /// Whether the expr is of statically inferred metatype.
+  bool IsStaticMetatype;
+
   /// User-provided base type for LookupKind::Type completions.
   Type BaseType;
 
@@ -989,6 +992,10 @@ public:
   void setHaveDot(SourceLoc DotLoc) {
     HaveDot = true;
     this->DotLoc = DotLoc;
+  }
+
+  void setIsStaticMetatype(bool value) {
+    IsStaticMetatype = value;
   }
 
   bool needDot() const {
@@ -1738,7 +1745,8 @@ public:
             // Add init() as member of the metatype.
             if (Reason == DeclVisibilityKind::MemberOfCurrentNominal &&
                 !MT->getInstanceType()->is<EnumType>()) {
-              addConstructorCall(CD, Reason, None);
+              if (IsStaticMetatype || CD->isRequired())
+                addConstructorCall(CD, Reason, None);
             }
             return;
           }
@@ -2616,6 +2624,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   CompletionLookup Lookup(CompletionContext.getResultSink(), P.Context,
                           CurDeclContext);
+  if (ExprType) {
+    Lookup.setIsStaticMetatype(ParsedExpr->isStaticallyDerivedMetatype());
+  }
 
   auto DoPostfixExprBeginning = [&] {
     if (CStyleForLoopIterationVariable)

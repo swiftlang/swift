@@ -214,8 +214,6 @@ class ThisDerived1 : ThisBase1 {
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   derivedFunc0({#self: ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticVar]/CurrNominal:        derivedStaticVar[#Int#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     derivedStaticFunc0()[#Void#]
-// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      init()[#ThisDerived1#]; name=init()
-// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      init({#a: Int#})[#ThisDerived1#]; name=init(a: Int)
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   test1({#self: ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   test2({#self: ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     staticTest1()[#Void#]

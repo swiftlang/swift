@@ -18,6 +18,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE1 | FileCheck %s -check-prefix=INIT_FROM_METATYPE1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2 | FileCheck %s -check-prefix=INIT_FROM_METATYPE2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE3 | FileCheck %s -check-prefix=INIT_FROM_METATYPE3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE4 | FileCheck %s -check-prefix=INIT_FROM_METATYPE4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE5 | FileCheck %s -check-prefix=INIT_FROM_METATYPE4
 
 func freeFunc() {}
 
@@ -157,6 +159,14 @@ class ExplicitConstructorsDerived1 : ExplicitConstructorsBase1 {
   init(a : Int) {}
 }
 
+class ExplicitConstructorsDerived2 : ExplicitConstructorsBase1 {
+  init() {}
+  required init(a : Int) {}
+  class func foo() {
+    self.#^INIT_FROM_METATYPE5^#
+  }
+}
+
 func testExplicitConstructorsBaseDerived1() {
   ExplicitConstructorsDerived1#^EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1^#
 }
@@ -179,11 +189,19 @@ func testGetInitFromMetatype2() {
   SS.#^INIT_FROM_METATYPE2^#
 }
 
-// INIT_FROM_METATYPE2: Decl[Constructor]/CurrNominal:      init()[#ExplicitConstructorsBase1#]{{; name=.+$}}
+// INIT_FROM_METATYPE2-NOT: Decl[Constructor]/CurrNominal:      init()[#ExplicitConstructorsBase1#]{{; name=.+$}}
 
 func testGetInitFromMetatype3() {
   var SS = ExplicitConstructorsBase1.self
   SS.dynamicType.#^INIT_FROM_METATYPE3^#
 }
 
-// INIT_FROM_METATYPE3: Decl[Constructor]/CurrNominal:      init()[#ExplicitConstructorsBase1#]{{; name=.+$}}
+// INIT_FROM_METATYPE3-NOT: Decl[Constructor]/CurrNominal:      init()[#ExplicitConstructorsBase1#]{{; name=.+$}}
+
+func testGetInitFromMetatype4() {
+  var a = ExplicitConstructorsDerived2()
+  a.dynamicType.#^INIT_FROM_METATYPE4^#
+}
+
+// INIT_FROM_METATYPE4: Decl[Constructor]/CurrNominal: init({#a: Int#})[#ExplicitConstructorsDerived2#]; name=init(a: Int)
+// INIT_FROM_METATYPE4-NOT: Decl[Constructor]/CurrNominal:      init()[#ExplicitConstructorsDerived2#]{{; name=.+$}}
