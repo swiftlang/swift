@@ -143,7 +143,9 @@ ${orderingRequirementForComparable}
 %   end
 
     let maybeResult = _withUnsafeMutableBufferPointerIfSupported {
-      (bufferPointer) -> Index in
+      (baseAddress, count) -> Index in
+      var bufferPointer =
+        UnsafeMutableBufferPointer(start: baseAddress, count: count)
       let startOffset = distance(self.startIndex, range.startIndex)
       let unsafeBufferStartIndex =
         bufferPointer.startIndex + numericCast(startOffset)
@@ -257,7 +259,9 @@ ${orderingRequirementForComparable}
   public mutating func sortInPlace() {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
-      (bufferPointer) -> () in
+      (baseAddress, count) -> () in
+      var bufferPointer =
+        UnsafeMutableBufferPointer(start: baseAddress, count: count)
       bufferPointer.sortInPlace()
       return ()
     }
@@ -278,19 +282,18 @@ ${orderingRequirementForPredicate}
   ) {
     typealias EscapingBinaryPredicate =
       (Generator.Element, Generator.Element) -> Bool
+    let escapableIsOrderedBefore =
+      unsafeBitCast(isOrderedBefore, EscapingBinaryPredicate.self)
+
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
-      (bufferPointer) -> () in
-      let escapableIsOrderedBefore =
-        unsafeBitCast(isOrderedBefore, EscapingBinaryPredicate.self)
-
+      (baseAddress, count) -> () in
+      var bufferPointer =
+        UnsafeMutableBufferPointer(start: baseAddress, count: count)
       bufferPointer.sortInPlace(escapableIsOrderedBefore)
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      let escapableIsOrderedBefore =
-        unsafeBitCast(isOrderedBefore, EscapingBinaryPredicate.self)
-
       _introSort(&self, self.indices, escapableIsOrderedBefore)
     }
   }

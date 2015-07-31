@@ -638,17 +638,11 @@ extension ${Self} : _ArrayType {
   //===--- algorithms -----------------------------------------------------===//
 
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    @noescape body: (UnsafeMutablePointer<Element>, Int) throws -> R
   ) rethrows -> R? {
-    // FIXME: Can't write simple code because of:
-    // <rdar://problem/20735802> Assertion failure while emitting SIL for
-    // _withUnsafeMutableBufferPointerIfSupported
-
-    //return withUnsafeMutableBufferPointer { body($0) }
-
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      let r = try body(&bufferPointer)
+      let r = try body(bufferPointer.baseAddress, bufferPointer.count)
       return r
     }
   }
