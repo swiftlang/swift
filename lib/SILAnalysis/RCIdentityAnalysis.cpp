@@ -44,6 +44,7 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
+  case ValueKind::ConvertFunctionInst:
     return true;
   default:
     return false;
