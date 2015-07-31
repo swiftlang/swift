@@ -1792,6 +1792,9 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
   // Never add materializeForSet to readonly declarations.
   if (!storage->getSetter()) return;
 
+  // Don't bother if the declaration is invalid.
+  if (storage->isInvalid()) return;
+
   // We only need materializeForSet in polymorphic contexts:
   auto containerTy =
     storage->getDeclContext()->getDeclaredTypeOfContext();
