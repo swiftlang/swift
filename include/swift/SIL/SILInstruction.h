@@ -884,6 +884,24 @@ public:
   /// \brief Looks up the lazily cached identification for the builtin function.
   const BuiltinInfo &getBuiltinInfo() const;
 
+  /// \brief Looks up the llvm intrinsic ID of this builtin. Returns None if
+  /// this is not an intrinsic.
+  llvm::Optional<llvm::Intrinsic::ID> getIntrinsicID() const {
+    auto I = getIntrinsicInfo();
+    if (I.ID == llvm::Intrinsic::not_intrinsic)
+      return None;
+    return I.ID;
+  }
+
+  /// \brief Looks up the BuiltinKind of this builtin. Returns None if this is
+  /// not a builtin.
+  llvm::Optional<BuiltinValueKind> getBuiltinKind() const {
+    auto I = getBuiltinInfo();
+    if (I.ID == BuiltinValueKind::None)
+      return None;
+    return I.ID;
+  }
+
   /// True if this builtin application has substitutions, which represent type
   /// parameters to the builtin.
   bool hasSubstitutions() const {
