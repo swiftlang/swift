@@ -543,37 +543,6 @@ static FuncDecl *makeRawValueTrivialSetter(ClangImporter::Implementation &Impl,
   return setterDecl;
 }
 
-/// Returns an operator from the standard library that can be used to import
-/// a macro correctly.
-static Expr *
-getOperatorRef(ASTContext &C, Identifier name) {
-  // FIXME: This is hideous!
-  UnqualifiedLookup lookup(name, C.getStdlibModule(), nullptr,
-                           /*non-cascading=*/true);
-  if (!lookup.isSuccess())
-    return nullptr;
-  
-  SmallVector<ValueDecl *, 4> found;
-  for (auto &result : lookup.Results) {
-    if (!isa<FuncDecl>(result.getValueDecl()))
-      continue;
-    
-    found.push_back(result.getValueDecl());
-  }
-  
-  if (found.empty())
-    return nullptr;
-  
-  if (found.size() == 1) {
-    return new (C) DeclRefExpr(found[0], SourceLoc(),
-                               /*Implicit=*/true);
-  } else {
-    auto foundCopy = C.AllocateCopy(found);
-    return new (C) OverloadedDeclRefExpr(
-                                     foundCopy, SourceLoc(), /*Implicit=*/true);
-  }
-}
-
 // Build the init(rawValue:) initializer for an imported NS_ENUM.
 //   enum NSSomeEnum: RawType {
 //     init?(rawValue: RawType) {
