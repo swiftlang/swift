@@ -518,8 +518,6 @@ ClangImporter::create(ASTContext &ctx,
 
   clang::Preprocessor &clangPP = instance.getPreprocessor();
   clangPP.enableIncrementalProcessing();
-  auto *CB = new HeaderImportCallbacks(*importer, importer->Impl);
-  clangPP.addPPCallbacks(std::unique_ptr<clang::PPCallbacks>(CB));
 
   instance.createModuleManager();
   instance.getModuleManager()->addListener(
@@ -536,6 +534,9 @@ ClangImporter::create(ASTContext &ctx,
 
   clang::Parser::DeclGroupPtrTy parsed;
   while (!importer->Impl.Parser->ParseTopLevelDecl(parsed)) {}
+
+  auto *CB = new HeaderImportCallbacks(*importer, importer->Impl);
+  clangPP.addPPCallbacks(std::unique_ptr<clang::PPCallbacks>(CB));
 
   // Create the selectors we'll be looking for.
   auto &clangContext = importer->Impl.Instance->getASTContext();
