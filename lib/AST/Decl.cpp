@@ -2631,9 +2631,9 @@ bool AbstractStorageDecl::isSetterNonMutating() const {
 
   switch (getStorageKind()) {
   case AbstractStorageDecl::Stored:
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
     return false;
     
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
   case AbstractStorageDecl::StoredWithObservers:
   case AbstractStorageDecl::InheritedWithObservers:
   case AbstractStorageDecl::Computed:

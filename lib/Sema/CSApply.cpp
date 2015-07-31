@@ -296,29 +296,25 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
   }
 
   // If the base of the access is mutable, then we may be invoking a getter or
-  // setter and the base needs to be mutable.
-  if (auto *VD = dyn_cast<VarDecl>(member)) {
+  // setter that requires the base to be mutable.
+  if (auto *SD = dyn_cast<AbstractStorageDecl>(member)) {
+    bool isSettableFromHere = SD->isSettable(UseDC)
+      && (!UseDC->getASTContext().LangOpts.EnableAccessControl
+          || SD->isSetterAccessibleFrom(UseDC));
+
+    // If neither the property's getter nor its setter are mutating, the base
+    // can be an rvalue.
+    if (!SD->isGetterMutating()
+        && (!isSettableFromHere || SD->isSetterNonMutating()))
+      return baseObjectTy;
+
     // If we're calling an accessor, keep the base as an inout type, because the
     // getter may be mutating.
-    if (VD->hasAccessorFunctions() && baseTy->is<InOutType>() &&
+    if (SD->hasAccessorFunctions() && baseTy->is<InOutType>() &&
         semantics != AccessSemantics::DirectToStorage)
       return InOutType::get(baseObjectTy);
-
-    // If the member is immutable in this context, the base is always an
-    // unqualified baseObjectTy.
-    if (!VD->isSettable(UseDC))
-      return baseObjectTy;
-    if (UseDC->getASTContext().LangOpts.EnableAccessControl &&
-        !VD->isSetterAccessibleFrom(UseDC))
-      return baseObjectTy;
   }
-  
-  // If the base of the subscript is mutable, then we may be invoking a mutable
-  // getter or setter.
-  if (isa<SubscriptDecl>(member) && !baseTy->hasReferenceSemantics() &&
-      baseTy->is<InOutType>())
-    return InOutType::get(baseObjectTy);
-  
+
   // Accesses to non-function members in value types are done through an @lvalue
   // type.
   if (baseTy->is<InOutType>())
@@ -910,7 +906,7 @@ namespace {
         
         // If the base is already an lvalue with the right base type, we can
         // pass it as an inout qualified type.
-        if (selfTy->isEqual(baseTy) && !selfTy->hasReferenceSemantics())
+        if (selfTy->isEqual(baseTy))
           if (base->getType()->is<LValueType>())
             selfTy = InOutType::get(selfTy);
         base = coerceObjectArgumentToType(
