@@ -148,6 +148,9 @@ enum ContextualTypePurpose {
   CTP_EnumCaseRawValue, ///< Raw value specified for "case X = 42" in enum.
   CTP_DefaultParameter, ///< Default value in parameter 'foo(a : Int = 42)'.
 
+  CTP_CallArgument,     ///< Call to function or operator requires type.
+
+
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
 

@@ -208,6 +208,11 @@ ERROR(cannot_convert_initializer_value,sema,none,
       "cannot convert value of type %0 to specified type %1",
       (Type,Type))
 
+ERROR(cannot_convert_argument_value,sema,none,
+      "cannot convert value of type %0 to expected argument type %1",
+      (Type,Type))
+
+
 ERROR(cannot_convert_to_return_type,sema,none,
       "cannot convert return expression of type %0 to return type %1",
       (Type,Type))

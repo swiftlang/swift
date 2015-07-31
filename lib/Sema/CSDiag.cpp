@@ -1890,7 +1890,7 @@ public:
                                              TCCOptions options = TCCOptions());
 
   /// Special magic to handle inout exprs and tuples in argument lists.
-  Expr *typeCheckArgumentChildIndependently(Expr *argExpr,
+  Expr *typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
                                         const CalleeCandidateInfo &candidates);
 
   /// Attempt to diagnose a specific failure from the info we've collected from
@@ -2856,8 +2856,12 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
     case CTP_DefaultParameter:
       diagID = diag::cannot_convert_default_arg_value;
       break;
+
+    case CTP_CallArgument:
+      diagID = diag::cannot_convert_argument_value;
+      break;
     }
-    
+
     diagnose(expr->getLoc(), diagID, exprType, contextualType)
       .highlight(expr->getSourceRange());
     return true;
@@ -3003,52 +3007,72 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
 
 /// Special magic to handle inout exprs and tuples in argument lists.
 Expr *FailureDiagnosis::
-typeCheckArgumentChildIndependently(Expr *argExpr,
+typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
                                     const CalleeCandidateInfo &candidates) {
   // Grab one of the candidates (if present) and get its input list to help
   // identify operators that have implicit inout arguments.
   Type exampleInputType;
-  if (!candidates.empty())
+  if (!candidates.empty()) {
     exampleInputType = candidates[0].getArgumentType();
+
+
+    // If we found a single candidate, and have no contextually known argument
+    // type information, use that one candidate as the type information for
+    // subexpr checking.
+    //
+    // TODO: If all candidates have the same type for some argument, we could pass
+    // down partial information.
+    if (candidates.size() == 1 && !argType)
+      argType = candidates[0].getArgumentType();
+  }
+
+  // TODO: Don't disable all type information.
+  argType = Type();
+
+  auto CTPurpose = argType ? CTP_CallArgument : CTP_Unused;
 
   // FIXME: This should all just be a matter of getting type type of the
   // sub-expression, but this doesn't work well when typeCheckChildIndependently
   // is over-conservative w.r.t. TupleExprs.
-  if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
-    // Get the simplified type of each element and rebuild the aggregate.
-    SmallVector<TupleTypeElt, 4> resultEltTys;
-    SmallVector<Expr*, 4> resultElts;
+  auto *TE = dyn_cast<TupleExpr>(argExpr);
+  if (!TE) {
+    // If the argument isn't a tuple, it is some scalar value for a
+    // single-argument call.
+    TCCOptions options;
+    if (exampleInputType && exampleInputType->is<InOutType>())
+      options |= TCC_AllowLValue;
 
-    TupleType *exampleInputTuple = nullptr;
-    if (exampleInputType)
-      exampleInputTuple = exampleInputType->getAs<TupleType>();
-
-    for (unsigned i = 0, e = TE->getNumElements(); i != e; i++) {
-      TCCOptions options;
-      if (exampleInputTuple && i < exampleInputTuple->getNumElements() &&
-          exampleInputTuple->getElementType(i)->is<InOutType>())
-        options |= TCC_AllowLValue;
-
-      auto elExpr = typeCheckChildIndependently(TE->getElement(i), options);
-      if (!elExpr) return nullptr; // already diagnosed.
-      
-      resultElts.push_back(elExpr);
-      resultEltTys.push_back({elExpr->getType(), TE->getElementName(i)});
-    }
-    
-    auto TT = TupleType::get(resultEltTys, CS->getASTContext());
-    return TupleExpr::create(CS->getASTContext(), TE->getLParenLoc(),
-                             resultElts, TE->getElementNames(),
-                             TE->getElementNameLocs(),
-                             TE->getRParenLoc(), TE->hasTrailingClosure(),
-                             TE->isImplicit(), TT);
+    return typeCheckChildIndependently(unwrapParenExpr(argExpr), argType,
+                                       CTPurpose, options);
   }
 
-  TCCOptions options;
-  if (exampleInputType && exampleInputType->is<InOutType>())
-    options |= TCC_AllowLValue;
+  // Get the simplified type of each element and rebuild the aggregate.
+  SmallVector<TupleTypeElt, 4> resultEltTys;
+  SmallVector<Expr*, 4> resultElts;
 
-  return typeCheckChildIndependently(unwrapParenExpr(argExpr), options);
+  TupleType *exampleInputTuple = nullptr;
+  if (exampleInputType)
+    exampleInputTuple = exampleInputType->getAs<TupleType>();
+
+  for (unsigned i = 0, e = TE->getNumElements(); i != e; i++) {
+    TCCOptions options;
+    if (exampleInputTuple && i < exampleInputTuple->getNumElements() &&
+        exampleInputTuple->getElementType(i)->is<InOutType>())
+      options |= TCC_AllowLValue;
+
+    auto elExpr = typeCheckChildIndependently(TE->getElement(i), options);
+    if (!elExpr) return nullptr; // already diagnosed.
+    
+    resultElts.push_back(elExpr);
+    resultEltTys.push_back({elExpr->getType(), TE->getElementName(i)});
+  }
+  
+  auto TT = TupleType::get(resultEltTys, CS->getASTContext());
+  return TupleExpr::create(CS->getASTContext(), TE->getLParenLoc(),
+                           resultElts, TE->getElementNames(),
+                           TE->getElementNameLocs(),
+                           TE->getRParenLoc(), TE->hasTrailingClosure(),
+                           TE->isImplicit(), TT);
 }
 
 bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
@@ -3056,6 +3080,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   assert(!calleeInfo.candidates.empty() && "unrecognized binop function kind");
 
   auto checkedArgExpr = typeCheckArgumentChildIndependently(binop->getArg(),
+                                                            Type(),
                                                             calleeInfo);
   if (!checkedArgExpr) return true;
 
@@ -3113,10 +3138,10 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   assert(!calleeInfo.candidates.empty() && "unrecognized unop function kind");
 
   auto argExpr = typeCheckArgumentChildIndependently(applyExpr->getArg(),
-                                                     calleeInfo);
+                                                     Type(), calleeInfo);
   if (!argExpr) return true;
 
-  auto argType = argExpr->getType();
+  Type argType = argExpr->getType();
   calleeInfo.filterList(argType);
 
   if (calleeInfo.closeness == CC_ExactMatch) {
@@ -3161,7 +3186,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   CalleeCandidateInfo calleeInfo(locator, CS);
 
   auto indexExpr = typeCheckArgumentChildIndependently(SE->getIndex(),
-                                                       calleeInfo);
+                                                       Type(), calleeInfo);
   if (!indexExpr) return true;
 
   auto baseExpr = typeCheckChildIndependently(SE->getBase());
@@ -3259,18 +3284,18 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     return true;
   }
   
-#if 0
   Type argType;  // Type of the argument list, if knowable.
   if (auto FTy = fnType->getAs<AnyFunctionType>())
     if (!FTy->getInput()->hasTypeVariable())
       argType = FTy->getInput();
-#endif
-
 
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
+  //
+  // TODO: If all candidates have the same type for some argument, we could pass
+  // down partial information.
   auto argExpr = typeCheckArgumentChildIndependently(callExpr->getArg(),
-                                                     calleeInfo);
+                                                     argType, calleeInfo);
   if (!argExpr)
     return true; // already diagnosed.
 
