@@ -534,11 +534,47 @@ struct FoundDeclTy {
   }
 };
 
+/// Similar to swift::conflicting, but lenient about protocol extensions which
+/// don't affect code completion's concept of overloading.
+static bool relaxedConflicting(const OverloadSignature &sig1,
+                               const OverloadSignature &sig2) {
+
+  // If the base names are different, they can't conflict.
+  if (sig1.Name.getBaseName() != sig2.Name.getBaseName())
+    return false;
+
+  // If one is a compound name and the other is not, they do not conflict
+  // if one is a property and the other is a non-nullary function.
+  if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName()) {
+    return !((sig1.IsProperty && sig2.Name.getArgumentNames().size() > 0) ||
+             (sig2.IsProperty && sig1.Name.getArgumentNames().size() > 0));
+  }
+
+  // Allow null property types to match non-null ones, which only happens when
+  // one property is from a generic extension and the other is not.
+  if (sig1.InterfaceType != sig2.InterfaceType) {
+    if (!sig1.IsProperty || !sig2.IsProperty)
+      return false;
+    if (sig1.InterfaceType && sig2.InterfaceType)
+      return false;
+  }
+
+  return sig1.Name == sig2.Name && sig1.UnaryOperator == sig2.UnaryOperator &&
+         sig1.IsInstanceMember == sig2.IsInstanceMember;
+}
+
 class OverrideFilteringConsumer : public VisibleDeclConsumer {
 public:
   std::set<ValueDecl *> AllFoundDecls;
   std::map<Identifier, std::set<ValueDecl *>> FoundDecls;
   llvm::SetVector<FoundDeclTy> DeclsToReport;
+  Type BaseTy;
+  const DeclContext *DC;
+
+  OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC)
+      : BaseTy(BaseTy->getRValueType()), DC(DC) {
+    assert(DC && BaseTy);
+  }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
     if (!AllFoundDecls.insert(VD).second)
@@ -573,7 +609,19 @@ public:
       }
     }
 
+    // Does it make sense to substitute types?
+    bool shouldSubst = !isa<UnboundGenericType>(BaseTy.getPointer()) &&
+                       !isa<AnyMetatypeType>(BaseTy.getPointer()) &&
+                       !BaseTy->isAnyExistentialType();
+    ModuleDecl *M = DC->getParentModule();
+
     auto FoundSignature = VD->getOverloadSignature();
+    if (FoundSignature.InterfaceType && shouldSubst) {
+      auto subs = BaseTy->getMemberSubstitutions(VD->getDeclContext());
+      FoundSignature.InterfaceType =
+          FoundSignature.InterfaceType.subst(M, subs, None)->getCanonicalType();
+    }
+
     for (auto I = PossiblyConflicting.begin(), E = PossiblyConflicting.end();
          I != E; ++I) {
       auto *OtherVD = *I;
@@ -582,7 +630,16 @@ public:
         // signature, for example, if the types could not be resolved.
         continue;
       }
-      if (conflicting(FoundSignature, OtherVD->getOverloadSignature())) {
+
+      auto OtherSignature = OtherVD->getOverloadSignature();
+      if (OtherSignature.InterfaceType && shouldSubst) {
+        auto subs = BaseTy->getMemberSubstitutions(OtherVD->getDeclContext());
+        OtherSignature.InterfaceType =
+            OtherSignature.InterfaceType.subst(M, subs, None)
+                ->getCanonicalType();
+      }
+
+      if (relaxedConflicting(FoundSignature, OtherSignature)) {
         if (VD->getFormalAccess() > OtherVD->getFormalAccess()) {
           PossiblyConflicting.erase(I);
           PossiblyConflicting.insert(VD);
@@ -613,7 +670,7 @@ public:
 static void lookupVisibleMemberDecls(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
     LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver) {
-  OverrideFilteringConsumer ConsumerWrapper;
+  OverrideFilteringConsumer ConsumerWrapper(BaseTy, CurrDC);
   VisitedSet Visited;
   lookupVisibleMemberDeclsImpl(BaseTy, ConsumerWrapper, CurrDC, LS, Reason,
                                TypeResolver, Visited);

@@ -141,6 +141,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_DOT_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_T_DOT_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_T_DOT_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_UNUSABLE_EXISTENTIAL | FileCheck %s -check-prefix=PROTOCOL_EXT_UNUSABLE_EXISTENTIAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_DEDUP_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_DEDUP_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_DEDUP_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_DEDUP_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_DEDUP_3 | FileCheck %s -check-prefix=PROTOCOL_EXT_DEDUP_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=THROWS1 | FileCheck %s -check-prefix=THROWS1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=THROWS2 | FileCheck %s -check-prefix=THROWS2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER_THROWS1 | FileCheck %s -check-prefix=MEMBER_THROWS1
@@ -1689,6 +1692,51 @@ func testUnusableProtExt(x: PWithT) {
 // PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   bar({#(x): Self.T#})[#Self.T#]{{; name=.+}}
 // PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: End completions
 
+protocol dedupP {
+  typealias T
+  func foo() -> T
+  var bar: T {get}
+  subscript(x: T) -> T {get}
+}
+
+extension dedupP {
+  func foo() -> T { return T() }
+  var bar: T { return T() }
+  subscript(x: T) -> T { return T() }
+}
+
+struct dedupS : dedupP {
+  func foo() -> Int { return T() }
+  var bar: Int = 5
+  subscript(x: Int) -> Int { return 10 }
+}
+
+func testDeDuped(x: dedupS) {
+  x#^PROTOCOL_EXT_DEDUP_1^#
+// PROTOCOL_EXT_DEDUP_1: Begin completions, 3 items
+// PROTOCOL_EXT_DEDUP_1: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
+// PROTOCOL_EXT_DEDUP_1: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
+// PROTOCOL_EXT_DEDUP_1: Decl[Subscript]/CurrNominal:        [{#Int#}][#Int#]; name=[Int]
+// PROTOCOL_EXT_DEDUP_1: End completions
+}
+func testDeDuped2(x: dedupP) {
+  x#^PROTOCOL_EXT_DEDUP_2^#
+// PROTOCOL_EXT_DEDUP_2: Begin completions, 4 items
+// PROTOCOL_EXT_DEDUP_2: Decl[InstanceMethod]/CurrNominal:   .foo()[#`Self`.T#]; name=foo()
+// PROTOCOL_EXT_DEDUP_2: Decl[InstanceVar]/CurrNominal:      .bar[#`Self`.T#]; name=bar
+// PROTOCOL_EXT_DEDUP_2: Decl[Subscript]/CurrNominal:        [{#Self.T#}][#Self.T#]; name=[Self.T]
+// FIXME: duplicate subscript on protocol type rdar://problem/22086900
+// PROTOCOL_EXT_DEDUP_2: Decl[Subscript]/CurrNominal:        [{#Self.T#}][#Self.T#]; name=[Self.T]
+// PROTOCOL_EXT_DEDUP_2: End completions
+}
+func testDeDuped3<T : dedupP where T.T == Int>(x: T) {
+  x#^PROTOCOL_EXT_DEDUP_3^#
+// PROTOCOL_EXT_DEDUP_3: Begin completions, 3 items
+// PROTOCOL_EXT_DEDUP_3: Decl[InstanceMethod]/Super:   .foo()[#Self.T#]; name=foo()
+// PROTOCOL_EXT_DEDUP_3: Decl[InstanceVar]/Super:      .bar[#Self.T#]; name=bar
+// PROTOCOL_EXT_DEDUP_3: Decl[Subscript]/Super:        [{#Self.T#}][#Self.T#]; name=[Self.T]
+// PROTOCOL_EXT_DEDUP_3: End completions
+}
 
 //===--- Check calls that may throw
 
