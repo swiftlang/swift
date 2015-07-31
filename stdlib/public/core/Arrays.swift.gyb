@@ -247,7 +247,7 @@ public struct ${Self}<Element>
   public subscript(index: Int) -> Element {
     addressWithNativeOwner {
       _checkSubscript(index, hoistedIsNativeBuffer: true)
-      return (UnsafePointer(_buffer.baseAddress + index),
+      return (UnsafePointer(_buffer.subscriptBaseAddress + index),
               Builtin.castToNativeObject(_buffer.owner))
     }
     mutableAddressWithPinnedNativeOwner {
