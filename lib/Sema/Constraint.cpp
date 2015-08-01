@@ -233,21 +233,25 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   bool skipSecond = false;
 
   switch (Kind) {
-  case ConstraintKind::Bind: Out << " := "; break;
-  case ConstraintKind::Equal: Out << " == "; break;
-  case ConstraintKind::Subtype: Out << " < "; break;
-  case ConstraintKind::Conversion: Out << " <c "; break;
-  case ConstraintKind::ExplicitConversion: Out << " <as "; break;
-  case ConstraintKind::ArgumentConversion: Out << " <a "; break;
-  case ConstraintKind::ArgumentTupleConversion: Out << " <ac "; break;
-  case ConstraintKind::OperatorArgumentTupleConversion: Out << " <oac "; break;
-  case ConstraintKind::OperatorArgumentConversion: Out << " <oc "; break;
+  case ConstraintKind::Bind: Out << " bind "; break;
+  case ConstraintKind::Equal: Out << " equal "; break;
+  case ConstraintKind::Subtype: Out << " subtype "; break;
+  case ConstraintKind::Conversion: Out << " conv "; break;
+  case ConstraintKind::ExplicitConversion: Out << " expl conv "; break;
+  case ConstraintKind::ArgumentConversion: Out << " arg conv "; break;
+  case ConstraintKind::ArgumentTupleConversion:
+      Out << " arg tuple conv "; break;
+  case ConstraintKind::OperatorArgumentTupleConversion:
+      Out << " operator arg tuple conv "; break;
+  case ConstraintKind::OperatorArgumentConversion:
+      Out << " operator arg conv "; break;
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
   case ConstraintKind::CheckedCast: Out << " checked cast to "; break;
   case ConstraintKind::SelfObjectOfProtocol: Out << " Self type of "; break;
-  case ConstraintKind::ApplicableFunction: Out << " ==Fn "; break;
+  case ConstraintKind::ApplicableFunction: Out << " applicable fn "; break;
   case ConstraintKind::DynamicTypeOf: Out << " dynamicType type of "; break;
-  case ConstraintKind::OptionalObject: Out << " optional with object type "; break;
+  case ConstraintKind::OptionalObject:
+      Out << " optional with object type "; break;
   case ConstraintKind::BindOverload: {
     Out << " bound to ";
     auto overload = getOverloadChoice();
