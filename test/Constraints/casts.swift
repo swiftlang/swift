@@ -68,7 +68,7 @@ struct S12 : P1, P2 {
 func protocol_archetype_casts<T : P1>(t: T, p1: P1, p2: P2, p12: protocol<P1, P2>) {
   // Coercions.
   var _ : P1 = t
-  var _ : P2 = t // expected-error{{type 'T' does not conform to protocol 'P2'}}
+  var _ : P2 = t // expected-error{{value of type 'T' does not conform to specified type 'P2'}}
 
   // Checked unconditional casts.
   _ = p1 as! T

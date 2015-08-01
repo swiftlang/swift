@@ -12,7 +12,7 @@ var pp: P.Protocol = qp // expected-error{{cannot convert value of type 'Q.Proto
 var qt: Q.Type
 qt = qp // expected-error{{cannot assign a value of type 'Q.Protocol' to a value of type 'Q.Type'}}
 qp = qt // expected-error{{cannot assign a value of type 'Q.Type' to a value of type 'Q.Protocol'}}
-var pt: P.Type = qt // expected-error{{type 'Q' does not conform to protocol 'P'}}
+var pt: P.Type = qt // expected-error{{cannot convert value of type 'Q.Type' to specified type 'P.Type'}}
 pt = pp // expected-error{{cannot assign a value of type 'P.Protocol' to a value of type 'P.Type'}}
 pp = pt // expected-error{{cannot assign a value of type 'P.Type' to a value of type 'P.Protocol'}}
 
@@ -51,7 +51,7 @@ let c: Any.Type.Protocol = Toaster.Type.self // expected-error {{cannot convert 
 let d: Toaster.Type.Type = WashingMachine.Type.self
 let e: Any.Type.Type = WashingMachine.Type.self
 let f: Toaster.Type.Type = Dryer.Type.self
-let g: Toaster.Type.Type = HairDryer.Type.self // expected-error {{type 'HairDryer' does not conform to protocol 'Toaster'}}
+let g: Toaster.Type.Type = HairDryer.Type.self // expected-error {{cannot convert value of type 'HairDryer.Type.Type' to specified type 'Toaster.Type.Type'}}
 let h: WashingMachine.Type.Type = Dryer.Type.self // expected-error {{cannot convert value of type 'Dryer.Type.Type' to specified type 'WashingMachine.Type.Type'}}
 
 func generic<T : WashingMachine>(t: T.Type) {

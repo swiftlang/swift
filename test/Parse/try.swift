@@ -49,7 +49,7 @@ func test() throws -> Int {
   ; // Reset parser.
 
   try throw foo() // expected-error {{'try' must be placed on the thrown expression}} {{3-7=}} {{13-13=try }}
-  // expected-error@-1 {{does not conform to protocol 'ErrorType'}}
+  // expected-error@-1 {{thrown expression type 'Int' does not conform to 'ErrorType'}}
   try return foo() // expected-error {{'try' must be placed on the returned expression}} {{3-7=}} {{14-14=try }}
 }
 

@@ -170,8 +170,8 @@ func keyedSubscripting(b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()]
 
-  dict[nil] = a // expected-error {{nil cannot be used in context expecting type 'NSCopying'}}
-  let q = dict[nil]  // expected-error {{nil cannot be used in context expecting type 'NSCopying'}}
+  dict[nil] = a // expected-error {{nil is not compatible with expected argument type 'NSCopying'}}
+  let q = dict[nil]  // expected-error {{nil is not compatible with expected argument type 'NSCopying'}}
   _ = q
 }
 

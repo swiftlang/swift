@@ -45,7 +45,7 @@ func testSomeClass(sc: SomeClass, osc: SomeClass?) {
 // Nullability with CF types.
 func testCF(fridge: CCRefrigerator) {
   CCRefrigeratorOpenDoSomething(fridge) // okay
-  CCRefrigeratorOpenDoSomething(nil) // expected-error{{nil cannot be used in context expecting type 'CCRefrigerator'}}
+  CCRefrigeratorOpenDoSomething(nil) // expected-error{{nil is not compatible with expected argument type 'CCRefrigerator'}}
 
   CCRefrigeratorOpenMaybeDoSomething(fridge) // okay
   CCRefrigeratorOpenMaybeDoSomething(nil) // okay

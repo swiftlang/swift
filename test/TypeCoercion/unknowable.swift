@@ -43,6 +43,6 @@ func doWibble(_: CanWibble) {}
 
 func testWibble() {
   doWibble(1)
-  doWibble(3.14) // expected-error{{cannot convert value of type 'Double' to expected argument type 'CanWibble'}}
+  doWibble(3.14) // expected-error{{argument type 'Double' does not conform to expected type 'CanWibble'}}
 }
 

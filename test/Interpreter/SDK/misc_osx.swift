@@ -14,5 +14,5 @@ func testFSEventStreamRef(stream: FSEventStreamRef) {
   FSEventStreamRetain(stream) // no-warning
   FSEventStreamRelease(stream)
 
-  let _: AnyObject = stream // expected-error {{'FSEventStreamRef' (aka 'COpaquePointer') does not conform to protocol 'AnyObject'}}
+  let _: AnyObject = stream // expected-error {{value of type 'FSEventStreamRef' (aka 'COpaquePointer') does not conform to specified type 'AnyObject'}}
 }

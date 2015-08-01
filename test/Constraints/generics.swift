@@ -91,11 +91,11 @@ protocol P1 {}
 protocol P2 {}
 
 func foo<T : P1>(t: T) -> P2 {
-  return t // expected-error{{type 'T' does not conform to protocol 'P2'}}
+  return t // expected-error{{return expression of type 'T' does not conform to 'P2'}}
 }
 
 func foo2(p1: P1) -> P2 {
-  return p1 // expected-error{{type 'P1' does not conform to protocol 'P2'}}
+  return p1 // expected-error{{return expression of type 'P1' does not conform to 'P2'}}
 }
 
 // <rdar://problem/14005696>

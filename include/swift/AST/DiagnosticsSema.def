@@ -205,27 +205,44 @@ NOTE(suggest_partial_overloads,sema,none,
       "lists: %1", (StringRef, StringRef))
 
 ERROR(cannot_convert_initializer_value,sema,none,
-      "cannot convert value of type %0 to specified type %1",
-      (Type,Type))
-
-ERROR(cannot_convert_argument_value,sema,none,
-      "cannot convert value of type %0 to expected argument type %1",
-      (Type,Type))
-
+      "cannot convert value of type %0 to specified type %1", (Type,Type))
+ERROR(cannot_convert_initializer_value_protocol,sema,none,
+      "value of type %0 does not conform to specified type %1", (Type,Type))
+ERROR(cannot_convert_initializer_value_nil,sema_tcd,none,
+      "nil cannot initialize specified type %0", (Type))
 
 ERROR(cannot_convert_to_return_type,sema,none,
       "cannot convert return expression of type %0 to return type %1",
       (Type,Type))
+ERROR(cannot_convert_to_return_type_protocol,sema,none,
+      "return expression of type %0 does not conform to %1", (Type,Type))
+ERROR(cannot_convert_to_return_type_nil,sema,none,
+      "nil is incompatible with return type %0", (Type))
+
 ERROR(cannot_convert_thrown_type,sema,none,
-      "thrown expression type %0 does not conform to 'ErrorType'",
-      (Type))
+      "thrown expression type %0 does not conform to 'ErrorType'", (Type))
 ERROR(cannot_convert_raw_initializer_value,sema,none,
-      "cannot convert value of type %0 to raw type %1",
-      (Type,Type))
+      "cannot convert value of type %0 to raw type %1", (Type,Type))
+ERROR(cannot_convert_raw_initializer_value_nil,sema,none,
+      "cannot convert nil to raw type %1", (Type))
 
 ERROR(cannot_convert_default_arg_value,sema,none,
       "default argument value of type %0 cannot be converted to type %1",
       (Type,Type))
+ERROR(cannot_convert_default_arg_value_protocol,sema,none,
+      "default argument value of type %0 does not conform to %1", (Type,Type))
+ERROR(cannot_convert_default_arg_value_nil,sema,none,
+      "nil default argument value of cannot be converted to type %0", (Type))
+
+ERROR(cannot_convert_argument_value,sema,none,
+      "cannot convert value of type %0 to expected argument type %1",
+      (Type,Type))
+ERROR(cannot_convert_argument_value_protocol,sema_tcd,none,
+      "argument type %0 does not conform to expected type %1", (Type, Type))
+ERROR(cannot_convert_argument_value_nil,sema,none,
+      "nil is not compatible with expected argument type %0", (Type))
+
+
 
 
 ERROR(cannot_return_value_from_void_func,sema,none,

@@ -110,7 +110,7 @@ func testCF(a: __PrivCFTypeRef, b: __PrivCFSubRef, c: __PrivInt) {
   makeSureAnyObject(a)
   makeSureAnyObject(b)
 #if !IRGEN
-  makeSureAnyObject(c) // expected-error {{type '__PrivInt' (aka 'Int32') does not conform to protocol 'AnyObject'}}
+  makeSureAnyObject(c) // expected-error {{argument type '__PrivInt' (aka 'Int32') does not conform to expected type 'AnyObject'}}
 #endif
 }
 

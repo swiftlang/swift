@@ -482,10 +482,10 @@ class B {
 
 
 func test(a : B) {
-  B.f1(nil)    // expected-error {{nil cannot be used in context expecting type 'AOpts'}}
+  B.f1(nil)    // expected-error {{nil is not compatible with expected argument type 'AOpts'}}
   a.function(42, nil) //expected-error {{cannot invoke 'function' with an argument list of type '(Int, NilLiteralConvertible)'}}
   // expected-note @-1 {{expected an argument list of type '(Int8, a: AOpts)'}}
-  a.f2(nil)  // expected-error {{nil cannot be used in context expecting type 'AOpts'}}
+  a.f2(nil)  // expected-error {{nil is not compatible with expected argument type 'AOpts'}}
 }
 
 

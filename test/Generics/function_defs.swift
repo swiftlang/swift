@@ -47,7 +47,7 @@ protocol OtherEqualComparable {
 }
 
 func otherExistential<T : EqualComparable>(t1: T) {
-  var otherEqComp : OtherEqualComparable = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}}
+  var otherEqComp : OtherEqualComparable = t1 // expected-error{{value of type 'T' does not conform to specified type 'OtherEqualComparable'}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}}
   otherEqComp = t1 // expected-error{{cannot assign a value of type 'T' to a value of type 'OtherEqualComparable'}}
   _ = otherEqComp
   

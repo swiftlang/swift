@@ -12,4 +12,4 @@ let test4 : AnyClass = B.self
 struct S {}
 
 let test5 : S.Type = S.self
-let test6 : AnyClass = S.self // expected-error {{'S' does not conform to protocol 'AnyObject'}}
+let test6 : AnyClass = S.self // expected-error {{cannot convert value of type 'S.Type' to specified type 'AnyClass' (aka 'AnyObject.Type')}}
