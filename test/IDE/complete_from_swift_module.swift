@@ -52,6 +52,7 @@ func testCompleteModuleQualified2() {
 }
 // MODULE_QUALIFIED_2: Begin completions
 // MODULE_QUALIFIED_2-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc({#self: FooSwiftStruct#})[#() -> Void#]{{; name=.+$}}
+// MODULE_QUALIFIED_2-NEXT: Decl[Constructor]/CurrNominal: init()[#FooSwiftStruct#]{{; name=.+$}}
 // MODULE_QUALIFIED_2-NEXT: End completions
 
 func testCompleteModuleQualified3() {

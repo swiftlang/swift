@@ -1741,11 +1741,15 @@ public:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
         if (auto MT = ExprType->getRValueType()->getAs<AnyMetatypeType>()) {
           if (HaveDot) {
+            Type Ty;
+            for (Ty = MT; Ty && Ty->is<AnyMetatypeType>();
+                 Ty = Ty->getAs<AnyMetatypeType>()->getInstanceType());
+            assert(Ty && "Cannot find instance type.");
 
             // Add init() as member of the metatype.
-            if (Reason == DeclVisibilityKind::MemberOfCurrentNominal &&
-                !MT->getInstanceType()->is<EnumType>()) {
-              if (IsStaticMetatype || CD->isRequired())
+            if (Reason == DeclVisibilityKind::MemberOfCurrentNominal) {
+              if (IsStaticMetatype || CD->isRequired() ||
+                  !Ty->is<ClassType>())
                 addConstructorCall(CD, Reason, None);
             }
             return;
