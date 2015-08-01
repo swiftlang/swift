@@ -32,3 +32,11 @@ func twoVariadics(a: Int..., b: Int...) { } // expected-error{{only a single var
 // rdar://22056861
 func f5(list: Any..., end: String = "") {}
 f5(String())
+
+// rdar://18083599
+enum E1 {
+  case On, Off
+}
+
+func doEV(state: E1...) {}
+doEV(.On)

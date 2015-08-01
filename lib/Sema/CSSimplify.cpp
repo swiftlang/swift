@@ -1396,13 +1396,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
 
     // We need to be careful about mapping 'raw' argument type variables to
-    // parameter tuples containing default args. If we naively bind the type
-    // variable to the parameter tuple, we'll later end up looking to whatever
-    // expression created the type variable to find the declarations for default
-    // arguments. This can obviously be problematic if the expression in
-    // question is not an application. (For example, We don't want to introspect
-    // an 'if' expression to see if it has default arguments.) Instead, we
-    // should bind the type variable to the first element type of the tuple.
+    // parameter tuples containing default args, or varargs in the first
+    // position. If we naively bind the type variable to the parameter tuple,
+    // we'll later end up looking to whatever expression created the type
+    // variable to find the declarations for default arguments. This can
+    // obviously be problematic if the expression in question is not an
+    // application. (For example, We don't want to introspect an 'if' expression
+    // to see if it has default arguments.) Instead, we should bind the type
+    // variable to the first element type of the tuple.
     case TypeMatchKind::ArgumentTupleConversion:
       if (typeVar1 &&
           !typeVar1->getImpl().literalConformanceProto &&
@@ -1413,9 +1414,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         auto tupleTy = type2->getAs<TupleType>();
         
         if (tupleTy &&
-            tupleTy->getElementTypes().size() > 1 &&
-            tupleTy->hasAnyDefaultValues()) {
-          
+            !tupleTy->getElements().empty() &&
+            (tupleTy->hasAnyDefaultValues() ||
+             tupleTy->getElement(0).isVararg())) {
+              
           // Look through vararg types, if necessary.
           auto tupleElt = tupleTy->getElement(0);
           auto tupleEltTy = tupleElt.isVararg() ?
