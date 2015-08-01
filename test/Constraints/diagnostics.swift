@@ -261,7 +261,7 @@ _ = 4(1)  // expected-error {{cannot call value of non-function type 'Int'}}
 // <rdar://problem/21784170> Incongruous `unexpected trailing closure` error in `init` function which is cast and called without trailing closure.
 func rdar21784170() {
   let initial = (1.0 as Double, 2.0 as Double)
-  (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot invoke value of type '(Double...) -> Array<Double>' with argument list '(Double...)'}}
+  (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type '[Double]'}}
 }
 
 // <rdar://problem/21829141> BOGUS: unexpected trailing closure
@@ -312,12 +312,12 @@ func f7(a: Int)(b : Int) -> Int {
 f7(1)(b: 1)
 f7(1.0)(2)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type '(b: Int)'}}
+f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 let f8 = f7(2)
 f8(b: 1)
 f8(10)          // expected-error {{missing argument label 'b:' in call}}
-f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type '(b: Int)'}}
+f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 class CurriedClass {
   func method1() {}

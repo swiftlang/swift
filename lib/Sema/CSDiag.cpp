@@ -2688,6 +2688,19 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   // FIXME: expressions are never removed from this set.
   CS->TC.addExprForDiagnosis(subExpr, subExpr);
   
+  
+  // If we have a conversion type, but it has type variables (from the current
+  // ConstraintSystem), then we can't use it.
+  if (convertType &&
+      (convertType->hasTypeVariable() ||
+       // If the contextual type has an archetype, we need to open it, but
+       // don't know how yet.
+       // FIXME: implement opening of archetypes.
+       convertType->hasArchetype())) {
+    convertType = Type();
+    convertTypePurpose = CTP_Unused;
+  }
+
   if (isa<ClosureExpr>(subExpr))
     options |= TCC_AllowUnresolved;
   
@@ -2716,21 +2729,9 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
        // InOutExpr needs contextual information otherwise we complain about it
        // not being in an argument context.
        isa<InOutExpr>(subExpr)) &&
-      !subExpr->getType()->hasTypeVariable())
+      !subExpr->getType()->hasTypeVariable() &&
+      !convertType)
     return subExpr;
-
-
-  // If we have a conversion type, but it has type variables (from the current
-  // ConstraintSystem), then we can't use it.
-  if (convertType &&
-      (convertType->hasTypeVariable() ||
-       // If the contextual type has an archetype, we need to open it, but
-       // don't know how yet.
-       // FIXME: implement opening of archetypes.
-       convertType->hasArchetype())) {
-    convertType = Type();
-    convertTypePurpose = CTP_Unused;
-  }
 
   
   ExprTypeSaver SavedTypeData;
@@ -2879,7 +2880,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
       diagID = diag::cannot_convert_argument_value;
       break;
     }
-
+    
     diagnose(expr->getLoc(), diagID, exprType, contextualType)
       .highlight(expr->getSourceRange());
     return true;
@@ -3065,18 +3066,19 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     if (exampleInputType && exampleInputType->is<InOutType>())
       options |= TCC_AllowLValue;
 
-    // If the argtype is a tuple type with default arguments, we need to get
-    // the scalar element or punt it, since type checking the subexpression
-    // won't be able to find the default argument provider.
+    // If the argtype is a tuple type with default arguments, or a labeled tuple
+    // with a single element, pull the scalar element type for the subexpression
+    // out.  If we can't do that and the tuple has default arguments, we have to
+    // punt on passing down the type information, since type checking the
+    // subexpression won't be able to find the default argument provider.
     if (argType)
-      if (auto argTT = argType->getAs<TupleType>())
-        if (argTT->hasAnyDefaultValues()) {
-          int scalarElt = argTT->getElementForScalarInit();
-          if (scalarElt == -1)
-            argType = Type();
-          else
-            argType = argTT->getElementType(scalarElt);
-        }
+      if (auto argTT = argType->getAs<TupleType>()) {
+        int scalarElt = argTT->getElementForScalarInit();
+        if (scalarElt != -1)
+          argType = argTT->getElementType(scalarElt);
+        else if (argTT->hasAnyDefaultValues())
+          argType = Type();
+      }
     
     return typeCheckChildIndependently(unwrapParenExpr(argExpr), argType,
                                        CTPurpose, options);

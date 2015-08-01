@@ -156,7 +156,7 @@ func testFooStruct() {
 func takesInt(x: Int) {}
 func testInOut(inout arg: Int) {
   var x : Int
-  takesInt(&x) // expected-error{{cannot invoke 'takesInt' with an argument list of type '(inout Int)'}} expected-note{{expected an argument list of type '(Int)'}}
+  takesInt(&x) // expected-error{{cannot convert value of type 'inout Int' to expected argument type 'Int'}}
 }
 
 // Don't infer inout types.

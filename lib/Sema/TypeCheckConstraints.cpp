@@ -990,9 +990,14 @@ solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  if (convertType)
-    cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType,
+  if (convertType) {
+    auto constraintKind = ConstraintKind::Conversion;
+    if (cs.getContextualTypePurpose() == CTP_CallArgument)
+      constraintKind = ConstraintKind::ArgumentConversion;
+    
+    cs.addConstraint(constraintKind, expr->getType(), convertType,
                      cs.getConstraintLocator(expr), /*isFavored*/ true);
+  }
 
   // Notify the listener that we've built the constraint system.
   if (listener && listener->builtConstraints(cs, expr)) {

@@ -436,7 +436,7 @@ func testInOut(inout arg: Int) {
   var x: Int
   takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}}
   takesExplicitInt(&x)
-  takesInt(&x) // expected-error{{cannot invoke 'takesInt' with an argument list of type '(inout Int)'}} expected-note{{expected an argument list of type '(Int)'}}
+  takesInt(&x) // expected-error{{cannot convert value of type 'inout Int' to expected argument type 'Int'}}
   var y = &x // expected-error{{'&' can only appear immediately in a call argument list}} \
              // expected-error {{type 'inout Int' of variable is not materializable}}
   var z = &arg // expected-error{{'&' can only appear immediately in a call argument list}} \
@@ -508,7 +508,7 @@ class C {
   func method() {}
 }
 
-var c = C(3) // expected-error {{cannot convert value of type 'Int' to expected argument type '(other: C?)' (aka '(other: Optional<C>)')}}
+var c = C(3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C?'}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators
