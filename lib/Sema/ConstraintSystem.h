@@ -1751,9 +1751,9 @@ public:
   /// \param expr The expression whose constraints we're investigating for a
   /// better diagnostic.
   ///
-  /// \return true if we were able to create a diagnostic from expr's
-  /// constraints.
-  bool diagnoseFailureForExpr(Expr *expr);
+  /// Assuming that this constraint system is actually erroneous, this *always*
+  /// emits an error message.
+  void diagnoseFailureForExpr(Expr *expr);
 
   /// \brief Add a newly-allocated constraint after attempting to simplify
   /// it.

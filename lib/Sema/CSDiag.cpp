@@ -3710,16 +3710,30 @@ bool FailureDiagnosis::diagnoseFailure() {
 
 /// Given a specific expression and the remnants of the failed constraint
 /// system, produce a specific diagnostic.
-bool ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
+///
+/// This is guaranteed to always emit an error message.
+///
+void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
     expr = RB->getSubExpr();
-  
   
   FailureDiagnosis diagnosis(expr, this);
   
   // Now, attempt to diagnose the failure from the info we've collected.
   if (diagnosis.diagnoseFailure())
-    return true;
+    return;
+
+  // If the expression-order diagnostics didn't find any diagnosable problems,
+  // try the unavoidable failures list again, with locator substitutions in
+  // place.  To make sure we emit the error if we have a failure recorded.
+  for (auto failure : unavoidableFailures) {
+    if (diagnoseFailure(*this, *failure, expr, true))
+      return;
+  }
+
+  // If noone could find a problem with this expression or constraint system,
+  // then it must be well-formed... but is ambiguous.  Handle this by diagnosic
+  // various cases that come up.
   
   // A DiscardAssignmentExpr is special in that it introduces a new type
   // variable but places no constraints upon it. Instead, it relies on the rhs
@@ -3727,32 +3741,25 @@ bool ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   // case of error recovery, the "_" expression may be left alone with no
   // constraints for us to derive an error from. In that case, we'll fall back
   // to the "outside assignment" error.
-  if (ActiveConstraints.empty() && InactiveConstraints.empty() &&
-      !failedConstraint) {
-    if (isa<DiscardAssignmentExpr>(expr)) {
-      TC.diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment)
-        .highlight(expr->getSourceRange());
-      
-      return true;
-    }
-
-    if (auto dot = dyn_cast<UnresolvedDotExpr>(expr)) {
-      TC.diagnose(expr->getLoc(),
-                  diag::not_enough_context_for_generic_method_reference,
-                  dot->getName());
-      
-      return true;
-    }
+  if (isa<DiscardAssignmentExpr>(expr)) {
+    TC.diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment)
+      .highlight(expr->getSourceRange());
     
-    // If there are no posted constraints or failures, then there was
-    // not enough contextual information available to infer a type for the
-    // expression.
-    TC.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous);
-  
-    return true;
+    return;
+  }
+
+  if (auto dot = dyn_cast<UnresolvedDotExpr>(expr)) {
+    TC.diagnose(expr->getLoc(),
+                diag::not_enough_context_for_generic_method_reference,
+                dot->getName());
+    
+    return;
   }
   
-  return false;
+  // If there are no posted constraints or failures, then there was
+  // not enough contextual information available to infer a type for the
+  // expression.
+  TC.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous);
 }
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
@@ -3763,16 +3770,9 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
         return true;
     }
 
-    // If we can't make sense of the existing constraints (or none exist), go
-    // ahead and try the unavoidable failures again, but with locator
-    // substitutions in place.
-    if (!diagnoseFailureForExpr(expr)) {
-      for (auto failure : unavoidableFailures) {
-        if (diagnoseFailure(*this, *failure, expr, true))
-          return true;
-      }
-    }
-    
+    // If none of the failures wanted to print themselves, emit them in
+    // expression order.
+    diagnoseFailureForExpr(expr);
     return true;
   }
 
@@ -3841,10 +3841,8 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     return true;
   }
   
-  // If all else fails, attempt to diagnose the failure by looking through the
-  // system's constraints.
-  bool result = diagnoseFailureForExpr(expr);
-  assert(result && "didn't diagnose any failure?"); (void)result;
-    
+  // If all else fails, diagnose the failure by looking through the system's
+  // constraints.
+  diagnoseFailureForExpr(expr);
   return true;
 }
