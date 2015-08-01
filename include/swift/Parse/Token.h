@@ -235,7 +235,15 @@ public:
   }
   
 
-  StringRef getText() const { return Text; }
+  StringRef getText() const {
+    if (EscapedIdentifier) {
+      // Strip off the backticks on either side.
+      assert(Text.front() == '`' && Text.back() == '`');
+      return Text.slice(1, Text.size() - 1);
+    }
+    return Text;
+  }
+
   void setText(StringRef T) { Text = T; }
 
   /// \brief Set the token to the specified kind and source range.

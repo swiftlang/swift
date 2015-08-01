@@ -1165,22 +1165,22 @@ void Lexer::lexEscapedIdentifier() {
 
   // Check whether we have an identifier followed by another backtick, in which
   // case this is an escaped identifier.
-  const char *TokStart = CurPtr;
+  const char *IdentifierStart = CurPtr;
   if (advanceIfValidStartOfIdentifier(CurPtr, BufferEnd)) {
     // Keep continuing the identifier.
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
 
     // If we have the terminating "`", it's an escaped identifier.
     if (*CurPtr == '`') {
-      formToken(tok::identifier, TokStart);
-      NextToken.setEscapedIdentifier(true);
       ++CurPtr;
+      formToken(tok::identifier, Quote);
+      NextToken.setEscapedIdentifier(true);
       return;
     }
   }
 
   // The backtick is punctuation.
-  CurPtr = TokStart;
+  CurPtr = IdentifierStart;
   formToken(tok::backtick, Quote);
 }
 

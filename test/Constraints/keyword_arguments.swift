@@ -53,6 +53,12 @@ allkeywords1(1, y: 2) // expected-error{{missing argument label 'x:' in call}}
 func reservedLabel(x: Int, `repeat`: Bool) {}
 reservedLabel(1, true) // expected-error{{missing argument label 'repeat:' in call}}{{18-18=`repeat`: }}
 
+// Insert missing keyword before initial backtick. rdar://problem/21392294 part 2
+func reservedExpr(x: Int, y: Int) {}
+let `do` = 2
+reservedExpr(1, `do`) // expected-error{{missing argument label 'y:' in call}}{{17-17=y: }}
+reservedExpr(1, y: `do`)
+
 class GenericCtor<U> {
   init<T>(t : T) {}
 }
