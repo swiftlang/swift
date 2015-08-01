@@ -1,4 +1,4 @@
-//===--- SliceBuffer.swift - Backing storage for ArraySlice<T> ------------===//
+//===--- SliceBuffer.swift - Backing storage for ArraySlice<Element> ------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,15 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Buffer type for ArraySlice<T>
+/// Buffer type for ArraySlice<Element>
 public
-struct _SliceBuffer<T> : _ArrayBufferType {
-  public typealias Element = T
-  typealias NativeStorage = _ContiguousArrayStorage<T>
-  public typealias NativeBuffer = _ContiguousArrayBuffer<T>
+struct _SliceBuffer<Element> : _ArrayBufferType {
+  typealias NativeStorage = _ContiguousArrayStorage<Element>
+  public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
-  init(owner: AnyObject, subscriptBaseAddress: UnsafeMutablePointer<T>,
-       indices: Range<Int>, hasNativeBuffer: Bool) {
+  init(
+    owner: AnyObject, subscriptBaseAddress: UnsafeMutablePointer<Element>,
+    indices: Range<Int>, hasNativeBuffer: Bool
+  ) {
     self.owner = owner
     self.subscriptBaseAddress = subscriptBaseAddress
     self.startIndex = indices.startIndex
@@ -28,7 +29,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   }
 
   public init() {
-    let empty = _ContiguousArrayBuffer<T>()
+    let empty = _ContiguousArrayBuffer<Element>()
     self.owner = empty.owner
     self.subscriptBaseAddress = empty.firstElementAddress
     self.startIndex = empty.startIndex
@@ -75,8 +76,9 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   /// - Requires: This buffer is backed by a uniquely-referenced
   ///   `_ContiguousArrayBuffer` and
   ///   `insertCount <= numericCast(newValues.count)`.
-  public
-  mutating func replace<C: CollectionType where C.Generator.Element == T>(
+  public mutating func replace<
+    C : CollectionType where C.Generator.Element == Element
+  >(
     subRange subRange: Range<Int>,
     with insertCount: Int,
     elementsOf newValues: C
@@ -116,9 +118,9 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   /// An object that keeps the elements stored in this buffer alive.
   public var owner: AnyObject
-  public let subscriptBaseAddress: UnsafeMutablePointer<T>
+  public let subscriptBaseAddress: UnsafeMutablePointer<Element>
 
-  public var firstElementAddress: UnsafeMutablePointer<T> {
+  public var firstElementAddress: UnsafeMutablePointer<Element> {
     return subscriptBaseAddress + startIndex
   }
 
@@ -181,8 +183,8 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   public
   func _uninitializedCopy(
-    subRange: Range<Int>, target: UnsafeMutablePointer<T>
-  ) -> UnsafeMutablePointer<T> {
+    subRange: Range<Int>, target: UnsafeMutablePointer<Element>
+  ) -> UnsafeMutablePointer<Element> {
     _invariantCheck()
     _sanityCheck(subRange.startIndex >= startIndex)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
@@ -216,10 +218,11 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     }
   }
 
-  /// Return whether the given `index` is valid for subscripting, i.e. `startIndex
-  /// ≤ index < endIndex`
-  internal func _isValidSubscript(index : Int,
-                                  hoistedIsNativeBuffer: Bool) -> Bool {
+  /// Return whether the given `index` is valid for subscripting, i.e.
+  /// `startIndex ≤ index < endIndex`
+  internal func _isValidSubscript(
+    index : Int, hoistedIsNativeBuffer: Bool
+  ) -> Bool {
     return index >= startIndex && index < endIndex
   }
 
@@ -245,7 +248,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     return isUniquelyReferencedOrPinnedNonObjC(&owner)
   }
 
-  func getElement(i: Int, hoistedIsNativeNoTypeCheckBuffer: Bool) -> T {
+  func getElement(i: Int, hoistedIsNativeNoTypeCheckBuffer: Bool) -> Element {
     _sanityCheck(i >= startIndex, "negative slice index is out of range")
     _sanityCheck(i < endIndex, "slice index out of range")
     return subscriptBaseAddress[i]
@@ -255,7 +258,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   ///
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
-  public subscript(position: Int) -> T {
+  public subscript(position: Int) -> Element {
     get {
       return getElement(position, hoistedIsNativeNoTypeCheckBuffer: true)
     }
