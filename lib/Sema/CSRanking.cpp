@@ -395,19 +395,15 @@ static TypeBase* getTypeAtIndex(TypeBase* containerType, size_t index) {
   
   if (auto tupleType = containerType->getAs<TupleType>()) {
     auto elements = tupleType->getElements();
-    auto retrieveVarargType = [&](size_t index) {
-      return elements[index].getType()->getAs<BoundGenericType>()->
-      getGenericArgs()[0].getPointer();
-    };
     
     if (!elements.empty()) {
       if (index < elements.size()) {
         if (elements[index].isVararg()) {
-          return retrieveVarargType(index);
+          return elements[index].getVarargBaseTy().getPointer();
         }
         return elements[index].getType().getPointer();
       } else if (elements.back().isVararg()) {
-        return retrieveVarargType(0);
+        return elements.back().getVarargBaseTy().getPointer();
       }
     }
   }
