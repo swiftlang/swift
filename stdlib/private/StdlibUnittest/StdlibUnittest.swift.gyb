@@ -133,6 +133,19 @@ public func expectFailure(${TRACE1}, body: () -> ()) {
   _anyExpectFailed = _anyExpectFailed || startAnyExpectFailed
 }
 
+public func identity(element: OpaqueValue<Int>) -> OpaqueValue<Int> {
+  return element
+}
+
+public func identityEq(element: MinimalEquatableValue) -> MinimalEquatableValue {
+  return element
+}
+
+public func identityComp(element: MinimalComparableValue)
+  -> MinimalComparableValue {
+  return element
+}
+
 public func expectEqual<T : Equatable>(expected: T, _ actual: T, ${TRACE}) {
   expectEqual(expected, actual, ${trace}, showFrame: false) {$0 == $1}
 }

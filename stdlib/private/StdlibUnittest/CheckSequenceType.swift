@@ -10,27 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct FindTest {
-  public let expected: Int?
-  public let element: MinimalEquatableValue
-  public let sequence: [MinimalEquatableValue]
-  public let expectedLeftoverSequence: [MinimalEquatableValue]
-  public let loc: SourceLoc
-
-  public init(
-    expected: Int?, element: Int, sequence: [Int],
-    expectedLeftoverSequence: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
-  ) {
-    self.expected = expected
-    self.element = MinimalEquatableValue(element)
-    self.sequence = sequence.map(MinimalEquatableValue.init)
-    self.expectedLeftoverSequence = expectedLeftoverSequence.map(
-      MinimalEquatableValue.init)
-    self.loc = SourceLoc(file, line, comment: "test data")
-  }
-}
-
 public struct DropFirstTest {
   public var sequence: [Int]
   public let dropElements: Int
@@ -61,6 +40,223 @@ public struct DropLastTest {
   }
 }
 
+public struct ElementsEqualTest {
+  public let expected: Bool
+  public let sequence: [Int]
+  public let other: [Int]
+  public let expectedLeftoverSequence: [Int]
+  public let expectedLeftoverOther: [Int]
+  public let loc: SourceLoc
+
+  public init(
+    _ expected: Bool, _ sequence: [Int], _ other: [Int],
+    _ expectedLeftoverSequence: [Int],
+    _ expectedLeftoverOther: [Int],
+    file: String = __FILE__, line: UInt = __LINE__,
+    comment: String = ""
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.other = other
+    self.expectedLeftoverSequence = expectedLeftoverSequence
+    self.expectedLeftoverOther = expectedLeftoverOther
+    self.loc = SourceLoc(file, line, comment: "test data" + comment)
+  }
+
+  func flip() -> ElementsEqualTest {
+    return ElementsEqualTest(
+      expected, other, sequence,
+      expectedLeftoverOther, expectedLeftoverSequence,
+      file: loc.file, line: loc.line, comment: " (flipped)")
+  }
+}
+
+public struct EnumerateTest {
+  public let expected: [(Int, Int)]
+  public let sequence: [Int]
+  public let loc: SourceLoc
+
+  public init(
+    _ expected: [(Int, Int)], _ sequence: [Int],
+    file: String = __FILE__, line: UInt = __LINE__,
+    comment: String = ""
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data" + comment)
+  }
+}
+
+public struct FilterTest {
+  public let expected: [Int]
+  public let sequence: [Int]
+  public let includeElement: (Int) -> Bool
+  public let loc: SourceLoc
+
+  public init(
+    _ expected: [Int],
+    _ sequence: [Int],
+    _ includeElement: (Int) -> Bool,
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.includeElement = includeElement
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+public struct FindTest {
+  public let expected: Int?
+  public let element: MinimalEquatableValue
+  public let sequence: [MinimalEquatableValue]
+  public let expectedLeftoverSequence: [MinimalEquatableValue]
+  public let loc: SourceLoc
+
+  public init(
+    expected: Int?, element: Int, sequence: [Int],
+    expectedLeftoverSequence: [Int],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
+    self.expected = expected
+    self.element = MinimalEquatableValue(element)
+    self.sequence = sequence.map(MinimalEquatableValue.init)
+    self.expectedLeftoverSequence = expectedLeftoverSequence.map(
+      MinimalEquatableValue.init)
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+public struct FlatMapTest {
+  public let expected: [Int32]
+  public let sequence: [Int]
+  public let transform: (Int) -> [Int32]
+  public let loc: SourceLoc
+
+  public init(
+    expected: [Int32],
+    sequence: [Int],
+    transform: (Int) -> [Int32],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.transform = transform
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+public struct FlatMapToOptionalTest {
+  public let expected: [Int32]
+  public let sequence: [Int]
+  public let transform: (Int) -> Int32?
+  public let loc: SourceLoc
+
+  public init(
+    _ expected: [Int32],
+    _ sequence: [Int],
+    _ transform: (Int) -> Int32?,
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.transform = transform
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+/// This test performs a side effect on each element of `sequence`. The expected
+/// side effect for the purposes of testing is to append each element to an
+/// external array, which can be compared to `sequence`.
+internal struct ForEachTest {
+  let sequence: [Int]
+  let loc: SourceLoc
+
+  init(
+    _ sequence: [Int],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+public struct LexicographicalCompareTest {
+  public let expected: ExpectedComparisonResult
+  public let sequence: [Int]
+  public let other: [Int]
+  public let expectedLeftoverSequence: [Int]
+  public let expectedLeftoverOther: [Int]
+  public let loc: SourceLoc
+
+  public init(
+    _ expected: ExpectedComparisonResult, _ sequence: [Int], _ other: [Int],
+    _ expectedLeftoverSequence: [Int],
+    _ expectedLeftoverOther: [Int],
+    file: String = __FILE__, line: UInt = __LINE__,
+    comment: String = ""
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.other = other
+    self.expectedLeftoverSequence = expectedLeftoverSequence
+    self.expectedLeftoverOther = expectedLeftoverOther
+    self.loc = SourceLoc(file, line, comment: "test data" + comment)
+  }
+
+  func flip() -> LexicographicalCompareTest {
+    return LexicographicalCompareTest(
+      expected.flip(), other, sequence,
+      expectedLeftoverOther, expectedLeftoverSequence,
+      file: loc.file, line: loc.line, comment: " (flipped)")
+  }
+}
+
+public struct MapTest {
+  public let expected: [Int32]
+  public let sequence: [Int]
+  public let transform: (Int) -> Int32
+  public let loc: SourceLoc
+
+  public init(
+    _ expected: [Int32],
+    _ sequence: [Int],
+    _ transform: (Int) -> Int32,
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.transform = transform
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+public struct MinMaxElementTest {
+  public let expectedMinValue: Int?
+  public let expectedMinIndex: Int?
+  public let expectedMaxValue: Int?
+  public let expectedMaxIndex: Int?
+  public let sequence: [Int]
+  public let loc: SourceLoc
+
+  public init(
+    minValue expectedMinValue: Int?,
+    index expectedMinIndex: Int?,
+    maxValue expectedMaxValue: Int?,
+    index expectedMaxIndex: Int?,
+    _ sequence: [Int],
+    file: String = __FILE__, line: UInt = __LINE__,
+    comment: String = ""
+  ) {
+    self.expectedMinValue = expectedMinValue
+    self.expectedMinIndex = expectedMinIndex
+    self.expectedMaxValue = expectedMaxValue
+    self.expectedMaxIndex = expectedMaxIndex
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data" + comment)
+  }
+}
+
 public struct PrefixTest {
   public var sequence: [Int]
   public let maxLength: Int
@@ -73,6 +269,34 @@ public struct PrefixTest {
     self.maxLength = maxLength
     self.expected = expected
     self.loc = SourceLoc(file, line, comment: "prefix() test data")
+  }
+}
+
+public struct ReduceTest {
+  public let sequence: [Int]
+  public let loc: SourceLoc
+
+  public init(
+    _ sequence: [Int],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+public struct ReverseTest {
+  public let expected: [Int]
+  public let sequence: [Int]
+  public let loc: SourceLoc
+
+  public init(
+    _ expected: [Int], _ sequence: [Int],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data")
   }
 }
 
@@ -109,6 +333,88 @@ public struct SplitTest {
     self.loc = SourceLoc(file, line, comment: "suffix() test data")
   }
 }
+
+public struct StartsWithTest {
+  public let expected: Bool
+  public let sequence: [Int]
+  public let prefix: [Int]
+  public let expectedLeftoverSequence: [Int]
+  public let expectedLeftoverPrefix: [Int]
+  public let loc: SourceLoc
+
+  public init(
+    _ expected: Bool, _ sequence: [Int], _ prefix: [Int],
+    _ expectedLeftoverSequence: [Int],
+    _ expectedLeftoverPrefix: [Int],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.prefix = prefix
+    self.expectedLeftoverSequence = expectedLeftoverSequence
+    self.expectedLeftoverPrefix = expectedLeftoverPrefix
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+public struct ZipTest {
+  public let expected: [(Int, Int32)]
+  public let sequence: [Int]
+  public let other: [Int32]
+  public let expectedLeftoverSequence: [Int]
+  public let expectedLeftoverOther: [Int32]
+  public let loc: SourceLoc
+
+  public init(
+    _ expected: [(Int, Int32)],
+    sequences sequence: [Int],
+    _ other: [Int32],
+    leftovers expectedLeftoverSequence: [Int],
+    _ expectedLeftoverOther: [Int32],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
+    self.expected = expected
+    self.sequence = sequence
+    self.other = other
+    self.expectedLeftoverSequence = expectedLeftoverSequence
+    self.expectedLeftoverOther = expectedLeftoverOther
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+
+public let elementsEqualTests: [ElementsEqualTest] = [
+  ElementsEqualTest(true, [], [], [], []),
+
+  ElementsEqualTest(false, [ 1 ], [], [], []),
+  ElementsEqualTest(false, [], [ 1 ], [], []),
+
+  ElementsEqualTest(false, [ 1, 2 ], [], [ 2 ], []),
+  ElementsEqualTest(false, [], [ 1, 2 ], [], [ 2 ]),
+
+  ElementsEqualTest(false, [ 1, 2, 3, 4 ], [ 1, 2 ], [ 4 ], []),
+  ElementsEqualTest(false, [ 1, 2 ], [ 1, 2, 3, 4 ], [], [ 4 ]),
+].flatMap { [ $0, $0.flip() ] }
+
+public let enumerateTests = [
+  EnumerateTest([], []),
+  EnumerateTest([ (0, 10) ], [ 10 ]),
+  EnumerateTest([ (0, 10), (1, 20) ], [ 10, 20 ]),
+  EnumerateTest([ (0, 10), (1, 20), (2, 30) ], [ 10, 20, 30 ]),
+]
+
+public let filterTests = [
+  FilterTest(
+    [], [],
+    { (x: Int) -> Bool in expectUnreachable(); return true }),
+
+  FilterTest([], [ 0, 30, 10, 90 ], { (x: Int) -> Bool in false }),
+  FilterTest(
+    [ 0, 30, 10, 90 ], [ 0, 30, 10, 90 ], { (x: Int) -> Bool in true }
+  ),
+  FilterTest(
+    [ 0, 30, 90 ], [ 0, 30, 10, 90 ], { (x: Int) -> Bool in x % 3 == 0 }
+  ),
+]
 
 public let findTests = [
   FindTest(
@@ -171,6 +477,127 @@ public let findTests = [
     sequence: [ 1010, 2020, 3030, 2020, 4040 ],
     expectedLeftoverSequence: [ 3030, 2020, 4040 ]),
 ]
+
+/// For a number of form `NNN_MMM`, returns an array of `NNN` numbers that all
+/// have `MMM` as their last three digits.
+func flatMapTransformation(x: Int) -> [Int32] {
+  let repetitions = x / 1000
+  let identity = x % 1000
+  let range = (1..<(repetitions+1))
+  return range.map { Int32($0 * 1000 + identity) }
+}
+
+public let flatMapTests = [
+  FlatMapTest(
+    expected: [],
+    sequence: [],
+    transform: { (x: Int) -> [Int32] in
+      expectUnreachable()
+      return [ 0xffff ]
+    }),
+
+  FlatMapTest(
+    expected: [],
+    sequence: [ 1 ],
+    transform: { (x: Int) -> [Int32] in [] }),
+  FlatMapTest(
+    expected: [],
+    sequence: [ 1, 2 ],
+    transform: { (x: Int) -> [Int32] in [] }),
+  FlatMapTest(
+    expected: [],
+    sequence: [ 1, 2, 3 ],
+    transform: { (x: Int) -> [Int32] in [] }),
+
+  FlatMapTest(
+    expected: [ 101 ],
+    sequence: [ 1 ],
+    transform: { (x: Int) -> [Int32] in [ x + 100 ] }),
+  FlatMapTest(
+    expected: [ 101, 102 ],
+    sequence: [ 1, 2 ],
+    transform: { (x: Int) -> [Int32] in [ x + 100 ] }),
+  FlatMapTest(
+    expected: [ 101, 102, 103 ],
+    sequence: [ 1, 2, 3 ],
+    transform: { (x: Int) -> [Int32] in [ x + 100 ] }),
+
+  FlatMapTest(
+    expected: [ 101, 201 ],
+    sequence: [ 1 ],
+    transform: { (x: Int) -> [Int32] in [ x + 100, x + 200 ] }),
+  FlatMapTest(
+    expected: [ 101, 201, 102, 202 ],
+    sequence: [ 1, 2 ],
+    transform: { (x: Int) -> [Int32] in [ x + 100, x + 200 ] }),
+  FlatMapTest(
+    expected: [ 101, 201, 102, 202, 103, 203 ],
+    sequence: [ 1, 2, 3 ],
+    transform: { (x: Int) -> [Int32] in [ x + 100, x + 200 ] }),
+
+  FlatMapTest(
+    expected: [ 1_071, 1_075 ],
+    sequence: [ 1_071, 72, 73, 74, 1_075 ],
+    transform: flatMapTransformation),
+  FlatMapTest(
+    expected: [ 1_072, 1_073, 2_073 ],
+    sequence: [ 1, 1_072, 2_073 ],
+    transform: flatMapTransformation),
+  FlatMapTest(
+    expected: [ 1_071, 2_071, 1_073, 2_073, 3_073, 1_074 ],
+    sequence: [ 2_071, 2, 3_073, 1_074 ],
+    transform: flatMapTransformation),
+
+  FlatMapTest(
+    expected: [ 1_073, 1_076, 2_076, 1_079, 2_079, 3_079 ],
+    sequence: [ 1, 2, 1_073, 4, 5, 2_076, 7, 8, 3_079, 10, 11 ],
+    transform: flatMapTransformation),
+  FlatMapTest(
+    expected: [ 1_073, 1_076, 2_076, 1_079, 2_079, 3_079 ],
+    sequence: [ 1_073, 4, 5, 2_076, 7, 8, 3_079, 10, 11 ],
+    transform: flatMapTransformation),
+  FlatMapTest(
+    expected: [ 1_073, 1_076, 2_076, 1_079, 2_079, 3_079 ],
+    sequence: [ 1, 2, 1_073, 4, 5, 2_076, 7, 8, 3_079 ],
+    transform: flatMapTransformation),
+
+  FlatMapTest(
+    expected: [ 1_073, 1_076, 2_076, 1_079, 2_079, 3_079 ],
+    sequence: [ 1, 1_073, 4, 2_076, 7, 3_079, 10 ],
+    transform: flatMapTransformation),
+  FlatMapTest(
+    expected: [ 1_073, 1_076, 2_076, 1_079, 2_079, 3_079 ],
+    sequence: [ 1_073, 4, 2_076, 7, 3_079, 10 ],
+    transform: flatMapTransformation),
+  FlatMapTest(
+    expected: [ 1_073, 1_076, 2_076, 1_079, 2_079, 3_079 ],
+    sequence: [ 1, 1_073, 4, 2_076, 7, 3_079 ],
+    transform: flatMapTransformation),
+]
+
+public let flatMapToOptionalTests = [
+  FlatMapToOptionalTest(
+    [], [],
+    { (x: Int) -> Int32? in expectUnreachable(); return 0xffff }),
+
+  FlatMapToOptionalTest([], [ 1 ], { (x: Int) -> Int32? in nil }),
+  FlatMapToOptionalTest([], [ 1, 2 ], { (x: Int) -> Int32? in nil }),
+  FlatMapToOptionalTest([], [ 1, 2, 3 ], { (x: Int) -> Int32? in nil }),
+
+  FlatMapToOptionalTest(
+    [ 1 ], [ 1 ],
+    { (x: Int) -> Int32? in x > 10 ? nil : Int32(x) }),
+  FlatMapToOptionalTest(
+    [ 2 ], [ 11, 2, 13, 14 ],
+    { (x: Int) -> Int32? in x > 10 ? nil : Int32(x) }),
+  FlatMapToOptionalTest(
+    [ 1, 4 ], [ 1, 12, 13, 4 ],
+    { (x: Int) -> Int32? in x > 10 ? nil : Int32(x) }),
+  FlatMapToOptionalTest(
+    [ 1, 2, 3 ], [ 1, 2, 3 ],
+    { (x: Int) -> Int32? in x > 10 ? nil : Int32(x) }),
+]
+
 
 public let dropFirstTests = [
   DropFirstTest(
@@ -238,7 +665,89 @@ public let dropLastTests = [
   ),
 ]
 
-let splitTests: [SplitTest] = [
+public let lexicographicalCompareTests = [
+  LexicographicalCompareTest(.EQ, [], [], [], []),
+  LexicographicalCompareTest(.EQ, [ 1 ], [ 1 ], [], []),
+
+  LexicographicalCompareTest(.GT, [ 1 ], [], [], []),
+
+  LexicographicalCompareTest(.GT, [ 1 ], [ 0 ], [], []),
+  LexicographicalCompareTest(.EQ, [ 1 ], [ 1 ], [], []),
+  LexicographicalCompareTest(.LT, [ 1 ], [ 2 ], [], []),
+
+  LexicographicalCompareTest(.GT, [ 1, 2 ], [], [ 2 ], []),
+
+  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 0 ], [ 2 ], []),
+  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 1 ], [], []),
+  LexicographicalCompareTest(.LT, [ 1, 2 ], [ 2 ], [ 2 ], []),
+
+  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 0, 0 ], [ 2 ], [ 0 ]),
+  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 1, 0 ], [], []),
+  LexicographicalCompareTest(.LT, [ 1, 2 ], [ 2, 0 ], [ 2 ], [ 0 ]),
+
+  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 0, 1 ], [ 2 ], [ 1 ]),
+  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 1, 1 ], [], []),
+  LexicographicalCompareTest(.LT, [ 1, 2 ], [ 2, 1 ], [ 2 ], [ 1 ]),
+
+  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 0, 2 ], [ 2 ], [ 2 ]),
+  LexicographicalCompareTest(.EQ, [ 1, 2 ], [ 1, 2 ], [], []),
+  LexicographicalCompareTest(.LT, [ 1, 2 ], [ 2, 2 ], [ 2 ], [ 2 ]),
+
+  LexicographicalCompareTest(.GT, [ 1, 2 ], [ 0, 3 ], [ 2 ], [ 3 ]),
+  LexicographicalCompareTest(.LT, [ 1, 2 ], [ 1, 3 ], [], []),
+  LexicographicalCompareTest(.LT, [ 1, 2 ], [ 2, 3 ], [ 2 ], [ 3 ]),
+].flatMap { [ $0, $0.flip() ] }
+
+public let mapTests = [
+  MapTest(
+    [], [],
+    { (x: Int) -> Int32 in expectUnreachable(); return 0xffff }),
+
+  MapTest([ 101 ], [ 1 ], { (x: Int) -> Int32 in x + 100 }),
+  MapTest([ 101, 102 ], [ 1, 2 ], { (x: Int) -> Int32 in x + 100 }),
+  MapTest([ 101, 102, 103 ], [ 1, 2, 3 ], { (x: Int) -> Int32 in x + 100 }),
+  MapTest(Array(101..<200), Array(1..<100), { (x: Int) -> Int32 in x + 100 }),
+]
+
+public let minMaxElementTests = [
+  MinMaxElementTest(
+    minValue: nil, index: nil,
+    maxValue: nil, index: nil,
+    []),
+  MinMaxElementTest(
+    minValue: 42, index: 0,
+    maxValue: 42, index: 0,
+    [ 42 ]),
+  MinMaxElementTest(
+    minValue: -1, index: 1,
+    maxValue: 30, index: 2,
+    [ 10, -1, 30, -1, 30 ]),
+  MinMaxElementTest(
+    minValue: -2, index: 5,
+    maxValue: 31, index: 6,
+    [ 10, -1, 30, -1, 30, -2, 31 ]),
+]
+
+public let reduceTests = [
+  ReduceTest([]),
+  ReduceTest([ 1 ]),
+  ReduceTest([ 1, 2 ]),
+  ReduceTest([ 1, 2, 3 ]),
+  ReduceTest([ 1, 2, 3, 4, 5, 6, 7 ]),
+]
+
+public let reverseTests: [ReverseTest] = [
+  ReverseTest([], []),
+  ReverseTest([ 1 ], [ 1 ]),
+  ReverseTest([ 2, 1 ], [ 1, 2 ]),
+  ReverseTest([ 3, 2, 1 ], [ 1, 2, 3 ]),
+  ReverseTest([ 4, 3, 2, 1 ], [ 1, 2, 3, 4]),
+  ReverseTest(
+    [ 7, 6, 5, 4, 3, 2, 1 ],
+    [ 1, 2, 3, 4, 5, 6, 7 ]),
+]
+
+public let splitTests: [SplitTest] = [
   SplitTest(
     sequence: [],
     maxSplit: Int.max,
@@ -354,6 +863,33 @@ public let prefixTests = [
   ),
 ]
 
+public let startsWithTests = [
+  // Corner cases.
+  StartsWithTest(true, [], [], [], []),
+
+  StartsWithTest(false, [], [ 1 ], [], []),
+  StartsWithTest(true, [ 1 ], [], [], []),
+
+  // Equal sequences.
+  StartsWithTest(true, [ 1 ], [ 1 ], [], []),
+  StartsWithTest(true, [ 1, 2 ], [ 1, 2 ], [], []),
+
+  // Proper prefix.
+  StartsWithTest(true, [ 0, 1, 2 ], [ 0, 1 ], [], []),
+  StartsWithTest(false, [ 0, 1 ], [ 0, 1, 2 ], [], []),
+
+  StartsWithTest(true, [ 1, 2, 3, 4 ], [ 1, 2 ], [ 4 ], []),
+  StartsWithTest(false, [ 1, 2 ], [ 1, 2, 3, 4 ], [], [ 4 ]),
+
+  // Not a prefix.
+  StartsWithTest(false, [ 1, 2, 3, 4 ], [ 1, 2, 10 ], [ 4 ], []),
+  StartsWithTest(false, [ 1, 2, 10 ], [ 1, 2, 3, 4 ], [], [ 4 ]),
+
+  StartsWithTest(false, [ 1, 2, 3, 4, 10 ], [ 1, 2, 10 ], [ 4, 10 ], []),
+  StartsWithTest(false, [ 1, 2, 10 ], [ 1, 2, 3, 4, 10 ], [], [ 4, 10 ]),
+]
+
+
 public let suffixTests = [
   SuffixTest(
     sequence: [],
@@ -387,20 +923,54 @@ public let suffixTests = [
   ),
 ]
 
-/// This test performs a side effect on each element of `sequence`. The expected
-/// side effect for the purposes of testing is to append each element to an
-/// external array, which can be compared to `sequence`.
-internal struct ForEachTest {
-  let sequence: [Int]
-  let loc: SourceLoc
+public let zipTests = [
+  ZipTest([], sequences: [], [], leftovers: [], []),
+  ZipTest([], sequences: [], [ 1 ], leftovers: [], [ 1 ]),
+  ZipTest([], sequences: [], [ 1, 2 ], leftovers: [], [ 1, 2 ]),
+  ZipTest([], sequences: [], [ 1, 2, 3 ], leftovers: [], [ 1, 2, 3 ]),
 
-  init(
-    _ sequence: [Int],
-    file: String = __FILE__, line: UInt = __LINE__
-  ) {
-    self.sequence = sequence
-    self.loc = SourceLoc(file, line, comment: "test data")
-  }
+  ZipTest([], sequences: [ 10 ], [], leftovers: [], []),
+  ZipTest([ (10, 1) ], sequences: [ 10 ], [ 1 ], leftovers: [], []),
+  ZipTest([ (10, 1) ], sequences: [ 10 ], [ 1, 2 ], leftovers: [], [ 2 ]),
+  ZipTest([ (10, 1) ], sequences: [ 10 ], [ 1, 2, 3 ], leftovers: [], [ 2, 3 ]),
+
+  ZipTest(
+    [],
+    sequences: [ 10, 20 ], [],
+    leftovers: [ 20 ], []),
+  ZipTest(
+    [ (10, 1) ],
+    sequences: [ 10, 20 ], [ 1 ],
+    leftovers: [], []),
+  ZipTest(
+    [ (10, 1), (20, 2) ],
+    sequences: [ 10, 20 ], [ 1, 2 ],
+    leftovers: [], []),
+  ZipTest(
+    [ (10, 1), (20, 2) ],
+    sequences: [ 10, 20 ], [ 1, 2, 3 ],
+    leftovers: [], [ 3 ]),
+
+  ZipTest(
+    [],
+    sequences: [ 10, 20, 30 ], [],
+    leftovers: [ 20, 30 ], []),
+  ZipTest(
+    [ (10, 1) ],
+    sequences: [ 10, 20, 30 ], [ 1 ],
+    leftovers: [ 30 ], []),
+  ZipTest(
+    [ (10, 1), (20, 2) ],
+    sequences: [ 10, 20, 30 ], [ 1, 2 ],
+    leftovers: [], []),
+  ZipTest(
+    [ (10, 1), (20, 2), (30, 3) ],
+    sequences: [ 10, 20, 30 ], [ 1, 2, 3 ],
+    leftovers: [], []),
+]
+
+public func callGenericUnderestimatedCount<S : SequenceType>(s: S) -> Int {
+  return s.underestimateCount()
 }
 
 extension TestSuite {
