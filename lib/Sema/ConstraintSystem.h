@@ -416,8 +416,6 @@ public:
     ExtraArgument,
     /// Type has no public initializers.
     NoPublicInitializers,
-    /// A generic parameter that cannot be bound to a specific type.
-    UnboundGenericParameter,
     /// The type is not materializable.
     IsNotMaterializable,
   };
@@ -516,7 +514,6 @@ public:
     case IsNotOptional:
     case MissingArgument:
     case NoPublicInitializers:
-    case UnboundGenericParameter:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                     value);
 

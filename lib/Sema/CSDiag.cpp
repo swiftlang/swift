@@ -144,11 +144,6 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
         << " does not have any public initializers";
     break;
 
-  case UnboundGenericParameter:
-    out << getFirstType().getString()
-        << " is an unbound generic parameter";
-    break;
-
   case IsNotMaterializable:
     out << getFirstType().getString() << " is not materializable";
     break;
@@ -851,14 +846,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
       .highlight(range);
     if (targetLocator && !useExprLoc)
       noteTargetOfDiagnostic(cs, &failure, targetLocator);
-    break;
-  }
-
-  case Failure::UnboundGenericParameter: {
-    tc.diagnose(loc, diag::unbound_generic_parameter, failure.getFirstType())
-      .highlight(range);
-    if (!useExprLoc)
-      noteTargetOfDiagnostic(cs, &failure, locator);
     break;
   }
 
@@ -2389,28 +2376,15 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
     toType = types.second.getPointer();
   
   // If the second type is a type variable, the expression itself is
-  // ambiguous.  Handle various cases.
-  if (auto *fromTV = fromType->getAs<TypeVariableType>()) {
-    // If this is a conversion to a type variable used to form an archetype,
-    // Then diagnose this as a generic parameter that could not be resolved.
-    auto ATy = fromTV->getBaseBeingSubstituted()->getAs<ArchetypeType>();
-    // Only diagnose archetypes that don't have a parent, i.e., ones
-    // that correspond to generic parameters.
-    if (ATy && !ATy->getParent() && toType->is<TypeVariableType>()) {
-      diagnose(anchor->getLoc(), diag::unbound_generic_parameter, ATy)
-        .highlight(anchor->getSourceRange());
-
-      // Emit a "note, archetype declared here" sort of thing.
-      noteTargetOfDiagnostic(*CS, nullptr, fromTV->getImpl().getLocator());
-      return true;
-    }
-  }
-
+  // ambiguous.  Bail out so the general ambiguity diagnosing logic can handle
+  // it.
+  if (fromType->is<TypeVariableType>())
+    return false;
   
-  
-  if (fromType->is<UnboundGenericType>() || toType->is<TypeVariableType>() ||
-      (fromType->is<TypeVariableType>() && toType->is<ProtocolType>())) {
+  if (fromType->is<UnboundGenericType>() || toType->is<TypeVariableType>()) {
     
+    // FIXME: mult_stmt_closures_require_explicit_result should be handled by
+    // the parser.
     // Handle closure exprs specifically.
     if (auto *CE = dyn_cast<ClosureExpr>(anchor)) {
       diagnose(anchor->getLoc(), diag::cannot_infer_closure_type)
@@ -2424,11 +2398,9 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
       }
       return true;
     }
-
-    // Otherwise, produce a generic ambiguity error.
-    diagnose(anchor->getLoc(), diag::type_of_expression_is_ambiguous)
-      .highlight(anchor->getSourceRange());
-    return true;
+    
+    // This is an ambiguity allow the outer driver to handle diagnosing this.
+    return false;
   }
   
   auto failureKind = Failure::FailureKind::TypesNotConvertible;
@@ -3761,28 +3733,39 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
       return;
   }
 
-  // If noone could find a problem with this expression or constraint system,
+  // If no one could find a problem with this expression or constraint system,
   // then it must be well-formed... but is ambiguous.  Handle this by diagnosic
   // various cases that come up.
   
-  // A DiscardAssignmentExpr is special in that it introduces a new type
-  // variable but places no constraints upon it. Instead, it relies on the rhs
-  // of its assignment expression to determine its type. Unfortunately, in the
-  // case of error recovery, the "_" expression may be left alone with no
-  // constraints for us to derive an error from. In that case, we'll fall back
-  // to the "outside assignment" error.
+  // Check out all of the type variables lurking in the system.  If any are
+  // unbound archetypes, then the problem is that it couldn't be resolved.
+  for (auto tv : TypeVariables) {
+    if (tv->getImpl().hasRepresentativeOrFixed())
+      continue;
+    
+    
+    // If this is a conversion to a type variable used to form an archetype,
+    // Then diagnose this as a generic parameter that could not be resolved.
+    auto archetype = tv->getImpl().getArchetype();
+    
+    // Only diagnose archetypes that don't have a parent, i.e., ones
+    // that correspond to generic parameters.
+    if (archetype && !archetype->getParent()) {
+      TC.diagnose(expr->getLoc(), diag::unbound_generic_parameter, archetype);
+      
+      // Emit a "note, archetype declared here" sort of thing.
+      noteTargetOfDiagnostic(*this, nullptr, tv->getImpl().getLocator());
+      return;
+    }
+    continue;
+  }
+
+  // A DiscardAssignmentExpr (spelled "_") needs contextual type information to
+  // infer its type. If we see one at top level, diagnose that it must be part
+  // of an assignment so we don't get a generic "expression is ambiguous" error.
   if (isa<DiscardAssignmentExpr>(expr)) {
     TC.diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment)
       .highlight(expr->getSourceRange());
-    
-    return;
-  }
-
-  if (auto dot = dyn_cast<UnresolvedDotExpr>(expr)) {
-    TC.diagnose(expr->getLoc(),
-                diag::not_enough_context_for_generic_method_reference,
-                dot->getName());
-    
     return;
   }
   

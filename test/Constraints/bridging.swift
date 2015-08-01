@@ -265,7 +265,7 @@ func rdar20029786(ns: NSString?) {
 
 // <rdar://problem/19813772> QoI: Using as! instead of as in this case produces really bad diagnostic
 func rdar19813772(nsma: NSMutableArray) {
-  var a1 = nsma as! Array // expected-error{{argument for generic parameter 'Element' could not be inferred}}
+  var a1 = nsma as! Array // expected-error{{'NSMutableArray' is not convertible to 'Array<Element>'}}
   var a2 = nsma as! Array<AnyObject> // expected-warning{{forced cast from 'NSMutableArray' to 'Array<AnyObject>' always succeeds; did you mean to use 'as'?}}
   var a3 = nsma as Array<AnyObject>
 }

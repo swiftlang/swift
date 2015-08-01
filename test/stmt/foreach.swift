@@ -125,7 +125,7 @@ func testForEachInference() {
 
   // Overloaded sequence not resolved contextually
   // FIXME: Incorrect diagnostic + note.
-  for v in getOvlSeq() { } // expected-error{{type of expression is ambiguous without more context}}
+  for v in getOvlSeq() { } // expected-error{{cannot invoke 'getOvlSeq' with no arguments}}
 
   // Generic sequence resolved contextually
   for i: Int in getGenericSeq() { }
