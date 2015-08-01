@@ -982,6 +982,8 @@ static void filterValues(Type expectedTy, Module *expectedModule,
                                [=](ValueDecl *value) {
     if (isType != isa<TypeDecl>(value))
       return true;
+    if (!value->hasType())
+      return true;
     if (canTy && value->getInterfaceType()->getCanonicalType() != canTy)
       return true;
     // FIXME: Should be able to move a value from an extension in a derived

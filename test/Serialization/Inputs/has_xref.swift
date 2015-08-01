@@ -13,3 +13,9 @@ public protocol ExtraIncrementable {
 }
 
 extension SpecialInt : ExtraIncrementable {}
+
+public protocol DefaultInitializable {
+  init()
+}
+
+extension SpecialInt : DefaultInitializable {}
