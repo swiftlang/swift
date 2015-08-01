@@ -148,7 +148,7 @@ extension String {
   /// Produce a substring of the given string from the given character
   /// index to the end of the string.
   func _substr(start: Int) -> String {
-    var rng = unicodeScalars
+    let rng = unicodeScalars
     var startIndex = rng.startIndex
     for _ in 0..<start {
       ++startIndex
@@ -162,7 +162,7 @@ extension String {
   public func _splitFirst(delim: UnicodeScalar)
     -> (before: String, after: String, wasFound : Bool)
   {
-    var rng = unicodeScalars
+    let rng = unicodeScalars
     for i in rng.indices {
       if rng[i] == delim {
         return (String(rng[rng.startIndex..<i]), 
@@ -180,7 +180,7 @@ extension String {
   public func _splitFirstIf(@noescape predicate: (UnicodeScalar) -> Bool)
     -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
   {
-    var rng = unicodeScalars
+    let rng = unicodeScalars
     for i in rng.indices {
       if predicate(rng[i]) {
         return (String(rng[rng.startIndex..<i]),

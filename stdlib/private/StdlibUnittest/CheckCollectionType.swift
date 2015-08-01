@@ -382,7 +382,7 @@ self.test("\(testNamePrefix).subscript(_: Index)/semantics") {
 
 if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/NonEmpty/Get") {
-    var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
+    let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
@@ -397,7 +397,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   }
 
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/Empty/Get") {
-    var c = makeWrappedCollection([])
+    let c = makeWrappedCollection([])
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
@@ -733,7 +733,7 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
 
 if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Left/NonEmpty/Get") {
-    var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
+    let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
@@ -748,7 +748,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   }
 
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Left/Empty/Get") {
-    var c = makeWrappedCollection([])
+    let c = makeWrappedCollection([])
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
@@ -875,7 +875,7 @@ self.test("\(testNamePrefix).suffix/semantics") {
 //===----------------------------------------------------------------------===//
 self.test("\(testNamePrefix).removeFirst/slice/semantics") {
   for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
-    var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
+    let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
     var slice = c[c.startIndex..<c.endIndex]
     let removedElement = slice.removeFirst()
     expectEqual(test.collection.first, extractValue(removedElement).value)
@@ -892,7 +892,7 @@ self.test("\(testNamePrefix).removeFirst/slice/semantics") {
 }
 
 self.test("\(testNamePrefix).removeFirst/slice/empty/semantics") {
-  var c = makeWrappedCollection(Array<OpaqueValue<Int>>())
+  let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
   var slice = c[c.startIndex..<c.startIndex]
   expectCrashLater()
   _ = slice.removeFirst() // Should trap.
