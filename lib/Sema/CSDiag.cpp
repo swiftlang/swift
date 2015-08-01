@@ -2722,7 +2722,12 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
 
   // If we have a conversion type, but it has type variables (from the current
   // ConstraintSystem), then we can't use it.
-  if (convertType && convertType->hasTypeVariable()) {
+  if (convertType &&
+      (convertType->hasTypeVariable() ||
+       // If the contextual type has an archetype, we need to open it, but
+       // don't know how yet.
+       // FIXME: implement opening of archetypes.
+       convertType->hasArchetype())) {
     convertType = Type();
     convertTypePurpose = CTP_Unused;
   }
@@ -3047,9 +3052,6 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
       argType = candidates[0].getArgumentType();
   }
 
-  // TODO: Don't disable all type information.
-  argType = Type();
-
   auto CTPurpose = argType ? CTP_CallArgument : CTP_Unused;
 
   // FIXME: This should all just be a matter of getting type type of the
@@ -3063,6 +3065,19 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     if (exampleInputType && exampleInputType->is<InOutType>())
       options |= TCC_AllowLValue;
 
+    // If the argtype is a tuple type with default arguments, we need to get
+    // the scalar element or punt it, since type checking the subexpression
+    // won't be able to find the default argument provider.
+    if (argType)
+      if (auto argTT = argType->getAs<TupleType>())
+        if (argTT->hasAnyDefaultValues()) {
+          int scalarElt = argTT->getElementForScalarInit();
+          if (scalarElt == -1)
+            argType = Type();
+          else
+            argType = argTT->getElementType(scalarElt);
+        }
+    
     return typeCheckChildIndependently(unwrapParenExpr(argExpr), argType,
                                        CTPurpose, options);
   }

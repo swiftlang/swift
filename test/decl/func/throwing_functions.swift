@@ -118,8 +118,7 @@ func testSubtypeArgument1(x1: (fn: (String -> Int)) -> Int,
 func subtypeArgument2(x: (fn: (String throws -> Int)) -> Int) { }
 func testSubtypeArgument2(x1: (fn: (String -> Int)) -> Int,
                           x2: (fn: (String throws -> Int)) -> Int) {
-  subtypeArgument2(x1) // expected-error{{cannot invoke 'subtypeArgument2' with an argument list of type '((fn: (String -> Int)) -> Int)'}}
-  // expected-note@-1{{expected an argument list of type '((fn: (String throws -> Int)) -> Int)'}}
+  subtypeArgument2(x1) // expected-error{{cannot convert value of type '(fn: (String -> Int)) -> Int' to expected argument type '(fn: (String throws -> Int)) -> Int'}}
   subtypeArgument2(x2)
 }
 

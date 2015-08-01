@@ -37,8 +37,8 @@ var d : Double
 // Check the various forms of diagnostics the type checker can emit.
 
 // Tuple size mismatch.
-f1(  // expected-error {{cannot invoke 'f1' with an argument list of type '((Int) -> Int)'}}
-   f4 // expected-note @-1 {{expected an argument list of type '((Int, Float) -> Int)'}}
+f1(
+   f4 // expected-error {{cannot convert value of type '(Int) -> Int' to expected argument type '(Int, Float) -> Int'}}
    ) 
 
 // Tuple element unused.
@@ -56,12 +56,12 @@ f0(i, // expected-error {{cannot invoke 'f0' with an argument list of type '(Int
    )
 
 // Function result not a subtype.
-f1( // expected-error {{cannot invoke 'f1' with an argument list of type '((Int, Float) -> ())'}}
-   f0 // expected-note @-1 {{expected an argument list of type '((Int, Float) -> Int)'}}
+f1(
+   f0 // expected-error {{cannot convert value of type '(Int, Float) -> ()' to expected argument type '(Int, Float) -> Int'}}
    )
 
-f3( // expected-error {{cannot invoke 'f3' with an argument list of type '((((Int) -> Int)) -> Int)'}}
-   f2 // expected-note @-1 {{expected an argument list of type '(((Int) -> Float) -> Int)'}}
+f3(
+   f2 // expected-error {{cannot convert value of type '(((Int) -> Int)) -> Int' to expected argument type '((Int) -> Float) -> Int'}}
    )
 
 // FIXME: Can't test same-type diagnostic yet.
@@ -83,10 +83,8 @@ i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
 // Make sure we don't leave open existentials when diagnosing.
 // <rdar://problem/20598568>
 func pancakes(p: P2) {
-  f4(p.wonka) // expected-error{{cannot invoke 'f4' with an argument list of type '(() -> ())'}}
-  // expected-note@-1{{expected an argument list of type '(Int)'}}
-  f4(p.wonka()) // expected-error{{cannot invoke 'f4' with an argument list of type '()'}}
-  // expected-note@-1{{expected an argument list of type '(Int)'}}
+  f4(p.wonka) // expected-error{{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
+  f4(p.wonka()) // expected-error{{cannot convert value of type '()' to expected argument type 'Int'}}
 }
 
 protocol Shoes {
@@ -263,7 +261,7 @@ _ = 4(1)  // expected-error {{cannot call value of non-function type 'Int'}}
 // <rdar://problem/21784170> Incongruous `unexpected trailing closure` error in `init` function which is cast and called without trailing closure.
 func rdar21784170() {
   let initial = (1.0 as Double, 2.0 as Double)
-  (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot invoke value of type '(Double...) -> Array<Double>' with argument list '(Double, Double)'}}
+  (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot invoke value of type '(Double...) -> Array<Double>' with argument list '(Double...)'}}
 }
 
 // <rdar://problem/21829141> BOGUS: unexpected trailing closure
@@ -295,9 +293,8 @@ func r20789423() {
   }
 
   let p: C
-  print(p.f(p)())  // expected-error {{cannot invoke 'f' with an argument list of type '(C)'}}
-  // expected-note @-1 {{expected an argument list of type '(Int)'}}
-  
+  print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
+
   let _f = { (v: Int) in  // expected-error {{unable to infer closure type in the current context}}
     // expected-note @-1 {{multi-statement closures require an explicit return type}}
     print("a")
@@ -313,17 +310,14 @@ func f7(a: Int)(b : Int) -> Int {
 }
 
 f7(1)(b: 1)
-f7(1.0)(2)       // expected-error {{cannot invoke 'f7' with an argument list of type '(Double)'}}
-// expected-note @-1 {{expected an argument list of type '(Int)'}}
+f7(1.0)(2)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-f7(1)(1.0)       // expected-error {{cannot invoke 'f7' with an argument list of type '(Double)'}}
-// expected-note @-1 {{expected an argument list of type '(b: Int)'}}
+f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to expected argument type '(b: Int)'}}
 
 let f8 = f7(2)
 f8(b: 1)
 f8(10)          // expected-error {{missing argument label 'b:' in call}}
-f8(1.0)         // expected-error {{cannot invoke 'f8' with an argument list of type '(Double)'}}
-// expected-note @-1 {{expected an argument list of type '(b: Int)'}}
+f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type '(b: Int)'}}
 
 class CurriedClass {
   func method1() {}
@@ -333,35 +327,28 @@ class CurriedClass {
 
 let c = CurriedClass()
 _ = c.method1
-c.method1(1)         // expected-error {{cannot invoke 'method1' with an argument list of type '(Int)'}}
-// expected-note @-1 {{expected an argument list of type '()'}}
+c.method1(1)         // expected-error {{cannot convert value of type 'Int' to expected argument type '()'}}
 _ = c.method2(1)
-_ = c.method2(1.0)   // expected-error {{cannot invoke 'method2' with an argument list of type '(Double)'}}
-// expected-note @-1 {{expected an argument list of type '(Int)'}}
+_ = c.method2(1.0)   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 c.method2(1)(b: 2)
 c.method2(1)(c: 2)   // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
 c.method2(1)(c: 2.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(c: Double)'}}
 // expected-note @-1 {{expected an argument list of type '(b: Int)'}}
 c.method2(1)(b: 2.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(b: Double)'}}
 // expected-note @-1 {{expected an argument list of type '(b: Int)'}}
-c.method2(1.0)(b: 2) // expected-error {{cannot invoke 'method2' with an argument list of type '(Double)'}}
-// expected-note @-1 {{expected an argument list of type '(Int)'}}
-c.method2(1.0)(b: 2.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(Double)'}}
-// expected-note @-1 {{expected an argument list of type '(Int)'}}
+c.method2(1.0)(b: 2) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+c.method2(1.0)(b: 2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
-CurriedClass.method1(c)(1)         // expected-error {{cannot invoke 'method1' with an argument list of type '(Int)'}}
-// expected-note @-1 {{expected an argument list of type '()'}}
-CurriedClass.method1(2.0)(1)       // expected-error {{cannot invoke 'method1' with an argument list of type '(Double)'}}
-// expected-note @-1 {{expected an argument list of type '(CurriedClass)'}}
+CurriedClass.method1(c)(1)         // expected-error {{cannot convert value of type 'Int' to expected argument type '()'}}
+CurriedClass.method1(2.0)(1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'CurriedClass'}}
 
 CurriedClass.method2(c)(32)(b: 1)
 _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
 _ = CurriedClass.method2(1,2)      // expected-error {{extra argument in call}}
-CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot invoke 'method2' with an argument list of type '(Double)'}}
-// expected-note @-1 {{expected an argument list of type '(Int)'}}
+CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(b: Double)'}}
 // expected-note @-1 {{expected an argument list of type '(b: Int)'}}
 CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(c: Double)'}}
@@ -375,8 +362,7 @@ _ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value o
 _ = CurriedClass.method3(1, 2)           // expected-error {{extra argument in call}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot invoke 'method3' with an argument list of type '(Double, b: Int)'}}
 // expected-note @-1 {{expected an argument list of type '(Int, b: Int)'}}
-CurriedClass.method3(c)(1)               // expected-error {{cannot invoke 'method3' with an argument list of type '(Int)'}}
-// expected-note @-1 {{expected an argument list of type '(Int, b: Int)'}}
+CurriedClass.method3(c)(1)               // expected-error {{cannot convert value of type 'Int' to expected argument type '(Int, b: Int)'}}
 
 CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter 'b' in call}}
 
@@ -385,10 +371,7 @@ extension CurriedClass {
   func f() {
     method3(1, b: 2)
     method3()            // expected-error {{missing argument for parameter #1 in call}}
-
-    method3(42)          // expected-error {{cannot invoke 'method3' with an argument list of type '(Int)'}}
-    // expected-note @-1 {{expected an argument list of type '(Int, b: Int)'}}
-
+    method3(42)          // expected-error {{cannot convert value of type 'Int' to expected argument type '(Int, b: Int)'}}
     method3(self)        // expected-error {{missing argument for parameter 'b' in call}}
   }
 }
@@ -422,8 +405,7 @@ func someGeneric19997471<T>(x: T) {
 func f20371273() {
   let x: [Int] = [1, 2, 3, 4]
   let y: UInt = 4
-  x.filter { $0 == y }  // expected-error {{cannot invoke 'filter' with an argument list of type '((UInt) -> Bool)'}}
-   // expected-note @-1 {{expected an argument list of type '(@noescape (Self.Generator.Element) throws -> Bool)'}}
+  x.filter { $0 == y }  // expected-error {{cannot convert value of type '(UInt) -> Bool' to expected argument type '@noescape (Int) throws -> Bool'}}
 }
 
 
@@ -500,12 +482,10 @@ class B {
 
 
 func test(a : B) {
-  B.f1(nil)    // expected-error {{cannot invoke 'f1' with an argument list of type '(NilLiteralConvertible)'}}
-  // expected-note @-1 {{expected an argument list of type '(AOpts)'}}
+  B.f1(nil)    // expected-error {{nil cannot be used in context expecting type 'AOpts'}}
   a.function(42, nil) //expected-error {{cannot invoke 'function' with an argument list of type '(Int, NilLiteralConvertible)'}}
   // expected-note @-1 {{expected an argument list of type '(Int8, a: AOpts)'}}
-  a.f2(nil)  // expected-error {{cannot invoke 'f2' with an argument list of type '(NilLiteralConvertible)'}}
-  // expected-note @-1 {{expected an argument list of type '(AOpts)'}}
+  a.f2(nil)  // expected-error {{nil cannot be used in context expecting type 'AOpts'}}
 }
 
 

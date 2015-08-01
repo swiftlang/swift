@@ -34,8 +34,7 @@ func nsobject_as_class_cast<T>(x: NSObject, _: T) {
 func test(a : CFString!, b : CFString) {
   var dict = NSMutableDictionary()
   let object = NSObject()
-  dict[a] = object // expected-error {{cannot subscript a value of type 'NSMutableDictionary' with an index of type 'CFString!'}}
-  // expected-note @-1 {{expected an argument list of type '(NSCopying)'}}
+  dict[a] = object // expected-error {{cannot convert value of type 'CFString!' to expected argument type 'NSCopying'}}
 
 
   dict[b] = object // expected-error {{type 'CFString' does not conform to protocol 'NSCopying'}}

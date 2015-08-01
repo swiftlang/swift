@@ -13,14 +13,14 @@ func takesAnyObject(x: AnyObject) {}
 func concreteTypes() {
   takesAnyObject(C.self) 
   // TODO: Better error messages
-  takesAnyObject(S.self) // expected-error{{cannot invoke 'takesAnyObject' with an argument list of type '(S.Type)'}} expected-note{{expected an argument list of type '(AnyObject)'}}
-  takesAnyObject(ClassConstrainedProto.self) // expected-error{{cannot invoke 'takesAnyObject' with an argument list of type '(ClassConstrainedProto.Protocol)'}} // expected-note{{expected an argument list of type '(AnyObject)'}}
+  takesAnyObject(S.self) // expected-error{{type 'S.Type' does not conform to protocol 'AnyObject'}}
+  takesAnyObject(ClassConstrainedProto.self) // expected-error{{type 'ClassConstrainedProto.Protocol' does not conform to protocol 'AnyObject'}}
 }
 
 func existentialMetatypes(nonClass: NonClassProto.Type,
                           classConstrained: ClassConstrainedProto.Type,
                           compo: protocol<NonClassProto, ClassConstrainedProto>.Type) {
-  takesAnyObject(nonClass) // expected-error{{cannot invoke 'takesAnyObject' with an argument list of type '(NonClassProto.Type)'}} expected-note{{expected an argument list of type '(AnyObject)'}}
+  takesAnyObject(nonClass) // expected-error{{type 'NonClassProto.Type' does not conform to protocol 'AnyObject'}}
   takesAnyObject(classConstrained)
   takesAnyObject(compo)
 }

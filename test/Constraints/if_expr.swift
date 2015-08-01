@@ -45,21 +45,16 @@ var h = true ? D1() : D1() // should infer D1
 var i = true ? D1() : D2() // should infer B
 
 useB(e)
-useD1(e) // expected-error{{cannot invoke 'useD1' with an argument list of type '(B)'}}
-// expected-note @-1 {{expected an argument list of type '(D1)'}}
+useD1(e) // expected-error{{cannot convert value of type 'B' to expected argument type 'D1'}}
 useB(f)
-useD1(f) // expected-error{{cannot invoke 'useD1' with an argument list of type '(B)'}}
-// expected-note @-1 {{expected an argument list of type '(D1)'}}
+useD1(f) // expected-error{{cannot convert value of type 'B' to expected argument type 'D1'}}
 useB(g)
-useD1(g) // expected-error{{cannot invoke 'useD1' with an argument list of type '(B)'}}
-// expected-note @-1 {{expected an argument list of type '(D1)'}}
+useD1(g) // expected-error{{cannot convert value of type 'B' to expected argument type 'D1'}}
 useB(h)
 useD1(h)
 useB(i)
-useD1(i) // expected-error{{cannot invoke 'useD1' with an argument list of type '(B)'}}
-// expected-note @-1 {{expected an argument list of type '(D1)'}}
-useD2(i) // expected-error{{cannot invoke 'useD2' with an argument list of type '(B)'}}
-// expected-note @-1 {{expected an argument list of type '(D2)'}}
+useD1(i) // expected-error{{cannot convert value of type 'B' to expected argument type 'D1'}}
+useD2(i) // expected-error{{cannot convert value of type 'B' to expected argument type 'D2'}}
 
 var x = MyLogicValue() ? 1 : 0
 var y = 22 ? 1 : 0 // expected-error{{type 'Int' does not conform to protocol 'BooleanType'}}

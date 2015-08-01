@@ -169,7 +169,7 @@ var ir2 = ((&i)) // expected-error{{type 'inout Int' of variable is not material
 func takeArrayRef(inout x:Array<String>) { }
 
 // FIXME: Poor diagnostic.
-takeArrayRef(["asdf", "1234"]) // expected-error{{cannot invoke 'takeArrayRef' with an argument list of type '([String])'}} expected-note{{expected an argument list of type '(inout Array<String>)'}}
+takeArrayRef(["asdf", "1234"]) // expected-error{{cannot convert value of type '[String]' to expected argument type 'inout Array<String>'}}
 
 // <rdar://problem/19835413> Reference to value from array changed
 func rdar19835413() {

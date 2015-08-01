@@ -153,8 +153,7 @@ func derivedType() {
 // Referencing a nonexistent member or constructor should not trigger errors
 // about the type expression.
 func nonexistentMember() {
-  let cons = Foo("this constructor does not exist") // expected-error{{cannot invoke initializer for type 'Foo' with an argument list of type '(String)'}}
-  // expected-note @-1 {{expected an argument list of type '()'}}
+  let cons = Foo("this constructor does not exist") // expected-error{{cannot convert value of type 'String' to expected argument type '()'}}
   let prop = Foo.nonexistent // expected-error{{type 'Foo' has no member 'nonexistent'}}
   let meth = Foo.nonexistent() // expected-error{{type 'Foo' has no member 'nonexistent'}}
 }

@@ -111,7 +111,7 @@ func funcdecl7(a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func errorRecovery() {
-  testfunc2({ $0 + 1 }) // expected-error{{cannot invoke 'testfunc2' with an argument list of type '((Int) -> Int)'}} expected-note{{expected an argument list of type '(((), Int) -> Int)'}}
+  testfunc2({ $0 + 1 }) // expected-error{{cannot convert value of type '(Int) -> Int' to expected argument type '((), Int) -> Int'}}
 
   enum union1 {
     case bar
@@ -442,7 +442,7 @@ func testInOut(inout arg: Int) {
   var z = &arg // expected-error{{'&' can only appear immediately in a call argument list}} \
              // expected-error {{type 'inout Int' of variable is not materializable}}
 
-  takesExplicitInt(5) // expected-error {{cannot invoke 'takesExplicitInt' with an argument list of type '(Int)'}} expected-note{{expected an argument list of type '(inout Int)'}}
+  takesExplicitInt(5) // expected-error {{cannot convert value of type 'Int' to expected argument type 'inout Int'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -477,8 +477,7 @@ func conversionTest(inout a: Double, inout b: Int) {
 
   var pi_f1 = Float(pi_f)
   var pi_d1 = Double(pi_d)
-  var pi_s1 = SpecialPi(pi_s) // expected-error {{cannot invoke initializer for type 'SpecialPi' with an argument list of type '(SpecialPi)'}}
-  // expected-note @-1 {{expected an argument list of type '()'}}
+  var pi_s1 = SpecialPi(pi_s) // expected-error {{cannot convert value of type 'SpecialPi' to expected argument type '()'}}
 
   var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
@@ -489,7 +488,7 @@ func conversionTest(inout a: Double, inout b: Int) {
   var pi_f4 = float.init(pi_f)
 
   var e = Empty(f)
-  var e2 = Empty(d) // expected-error{{cannot invoke initializer for type 'Empty' with an argument list of type '(Double)'}} expected-note{{expected an argument list of type '(Float)'}}
+  var e2 = Empty(d) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Float'}}
   var e3 = Empty(Float(d))
 }
 
@@ -499,7 +498,7 @@ struct Rule {
 }
 
 var ruleVar: Rule
-ruleVar = Rule("a") // expected-error {{cannot invoke initializer for type 'Rule' with an argument list of type '(String)'}} expected-note{{expected an argument list of type '(target: String, dependencies: String)'}}
+ruleVar = Rule("a") // expected-error {{cannot convert value of type 'String' to expected argument type '(target: String, dependencies: String)'}}
 
 
 class C {
@@ -509,7 +508,7 @@ class C {
   func method() {}
 }
 
-var c = C(3) // expected-error {{cannot invoke initializer for type 'C' with an argument list of type '(Int)'}} expected-note{{expected an argument list of type '(other: C?)'}}
+var c = C(3) // expected-error {{cannot convert value of type 'Int' to expected argument type '(other: C?)' (aka '(other: Optional<C>)')}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators

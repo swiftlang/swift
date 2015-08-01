@@ -41,8 +41,8 @@ f0(f)
 f0(b)
 f1(i)
 
-f1(f) // expected-error{{cannot invoke 'f1' with an argument list of type '(Float)'}} expected-note{{expected an argument list of type '(protocol<Barable, Fooable>)'}}
-f1(b) // expected-error{{cannot invoke 'f1' with an argument list of type '(Barable)'}} expected-note{{expected an argument list of type '(protocol<Barable, Fooable>)'}}
+f1(f) // expected-error{{type 'Float' does not conform to protocol 'Fooable'}}
+f1(b) // expected-error{{type 'Barable' does not conform to protocol 'Fooable'}}
 
 //===--------------------------------------------------------------------===//
 // Subtyping
@@ -50,7 +50,7 @@ f1(b) // expected-error{{cannot invoke 'f1' with an argument list of type '(Bara
 g(f0) // expected-error{{function signature '(Barable) -> ()' is not compatible with expected type '(protocol<Barable, Fooable>) -> ()'}} expected-note{{use a closure to safely wrap calls to the function}} {{3-3={ }} {{5-5=($0) }}}
 g(f1) // okay (exact match)
 
-g(f2) // expected-error{{cannot invoke 'g' with an argument list of type '((Float) -> ())'}} expected-note{{expected an argument list of type '((protocol<Barable, Fooable>) -> ())'}}
+g(f2) // expected-error{{cannot convert value of type '(Float) -> ()' to expected argument type '(protocol<Barable, Fooable>) -> ()'}}
 
 // FIXME: Workaround for ?? not playing nice with function types.
 infix operator ??* {}
@@ -60,7 +60,7 @@ g(nilFunc ??* f0) // expected-error {{function signature '(Barable) -> ()' is no
 gc(fc0) // okay
 gc(fc1) // okay
 gc(fc2) // okay
-gc(fc3) // expected-error{{cannot invoke 'gc' with an argument list of type '((SomeArbitraryClass) -> ())'}} expected-note{{expected an argument list of type '((protocol<Classable, Fooable>) -> ())'}}
+gc(fc3) // expected-error{{cannot convert value of type '(SomeArbitraryClass) -> ()' to expected argument type '(protocol<Classable, Fooable>) -> ()'}}
 
 // rdar://problem/19600325
 func getAnyObject() -> AnyObject? {

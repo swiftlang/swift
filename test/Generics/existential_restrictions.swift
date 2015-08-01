@@ -19,7 +19,7 @@ func fT<T>(t: T) { }
 func testPassExistential(p: P, op: OP, opp: protocol<OP, P>, cp: CP, sp: SP, any: Any, ao: AnyObject) {
   fP(p) // expected-error{{cannot invoke 'fP' with an argument list of type '(P)'}} // expected-note{{expected an argument list of type '(T)'}}
   fAO(p) // expected-error{{cannot invoke 'fAO' with an argument list of type '(P)'}} // expected-note{{expected an argument list of type '(T)'}}
-  fAOE(p) // expected-error{{cannot invoke 'fAOE' with an argument list of type '(P)'}} // expected-note{{expected an argument list of type '(AnyObject)'}}
+  fAOE(p) // expected-error{{type 'P' does not conform to protocol 'AnyObject'}}
   fT(p)
 
   fOP(op)

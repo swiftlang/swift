@@ -41,10 +41,9 @@ func takesInt(i: Int) {}
 func noParams() -> Int { return 0 }
 func takesAndReturnsInt(i: Int) -> Int { return 0 }
 
-takesInt(noParams(1)) // expected-error{{cannot invoke 'noParams' with an argument list of type '(Int)'}}
-// expected-note @-1 {{expected an argument list of type '()'}}
+takesInt(noParams(1)) // expected-error{{cannot convert value of type 'Int' to expected argument type '()'}}
 
-takesInt(takesAndReturnsInt("")) // expected-error{{cannot invoke 'takesAndReturnsInt' with an argument list of type '(String)'}} expected-note{{expected an argument list of type '(Int)'}}
+takesInt(takesAndReturnsInt("")) // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
 
 // Test error recovery for type expressions.
 struct MyArray<Element> {}

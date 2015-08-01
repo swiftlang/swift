@@ -247,8 +247,8 @@ var f1: ()->() = {i}
 var x = {return $0}(1)
 
 func returnsInt() -> Int { return 0 }
-takesVoidFunc(returnsInt) // expected-error {{cannot invoke 'takesVoidFunc' with an argument list of type '(() -> Int)'}} expected-note{{expected an argument list of type '(() -> ())'}}
-takesVoidFunc({()->Int in 0}) // expected-error {{cannot invoke 'takesVoidFunc' with an argument list of type '(() -> Int)'}} expected-note{{expected an argument list of type '(() -> ())'}}
+takesVoidFunc(returnsInt) // expected-error {{cannot convert value of type '() -> Int' to expected argument type '() -> ()'}}
+takesVoidFunc({()->Int in 0}) // expected-error {{cannot convert value of type '() -> Int' to expected argument type '() -> ()'}}
 
 // These used to crash the compiler, but were fixed to support the implemenation of rdar://problem/17228969
 Void(0) // expected-error{{cannot invoke initializer for type 'Void' with an argument list of type '(Int)'}}

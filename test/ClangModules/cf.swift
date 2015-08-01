@@ -13,7 +13,7 @@ func test0(fridge: CCRefrigeratorRef) {
 
 func test1(power: Unmanaged<CCPowerSupplyRef>) {
   assertUnmanaged(power)
-  let fridge = CCRefrigeratorCreate(power) // expected-error {{cannot invoke 'CCRefrigeratorCreate' with an argument list of type '(Unmanaged<CCPowerSupplyRef>)'}} expected-note{{expected an argument list of type '(CCPowerSupply!)'}}
+  let fridge = CCRefrigeratorCreate(power) // expected-error {{cannot convert value of type 'Unmanaged<CCPowerSupplyRef>' (aka 'Unmanaged<CCPowerSupply>') to expected argument type 'CCPowerSupply!'}}
   assertUnmanaged(fridge)
 }
 
@@ -111,8 +111,7 @@ func testOutParametersGood() {
 
 func testOutParametersBad() {
   let fridge: CCRefrigerator?
-  CCRefrigeratorCreateIndirect(fridge) // expected-error {{cannot invoke 'CCRefrigeratorCreateIndirect' with an argument list of type '(CCRefrigerator?)'}} 
-  // expected-note @-1 {{expected an argument list of type '(UnsafeMutablePointer<CCRefrigerator?>)'}}
+  CCRefrigeratorCreateIndirect(fridge) // expected-error {{cannot convert value of type 'CCRefrigerator?' to expected argument type 'UnsafeMutablePointer<CCRefrigerator?>' (aka 'UnsafeMutablePointer<Optional<CCRefrigerator>>')}} 
 
   let power: CCPowerSupply?
   CCRefrigeratorGetPowerSupplyIndirect(0, power) // expected-error {{cannot invoke 'CCRefrigeratorGetPowerSupplyIndirect' with an argument list of type '(Int, CCPowerSupply?)'}}

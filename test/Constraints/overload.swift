@@ -84,8 +84,7 @@ struct X2d {
 func f3(x: Intthingy) -> Int { } // expected-error{{use of undeclared type 'Intthingy'}}
 
 func f3(x: Float) -> Float { }
-f3(i) // expected-error{{cannot invoke 'f3' with an argument list of type '(Int)'}}
-// expected-note @-1 {{expected an argument list of type '(Float)'}}
+f3(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Float'}}
 
 func f4(i: Wonka) { } // expected-error{{use of undeclared type 'Wonka'}}
 func f4(j: Wibble) { } // expected-error{{use of undeclared type 'Wibble'}}

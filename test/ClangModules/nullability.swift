@@ -45,12 +45,10 @@ func testSomeClass(sc: SomeClass, osc: SomeClass?) {
 // Nullability with CF types.
 func testCF(fridge: CCRefrigerator) {
   CCRefrigeratorOpenDoSomething(fridge) // okay
-  CCRefrigeratorOpenDoSomething(nil) // expected-error{{cannot invoke 'CCRefrigeratorOpenDoSomething' with an argument list of type '(NilLiteralConvertible)'}}
-  // expected-note@-1{{expected an argument list of type '(CCRefrigerator)'}}
+  CCRefrigeratorOpenDoSomething(nil) // expected-error{{nil cannot be used in context expecting type 'CCRefrigerator'}}
 
   CCRefrigeratorOpenMaybeDoSomething(fridge) // okay
   CCRefrigeratorOpenMaybeDoSomething(nil) // okay
 
-  CCRefrigeratorOpenMaybeDoSomething(5) // expected-error{{cannot invoke}}
-  // expected-note@-1{{argument list of type '(CCRefrigerator?)'}}
+  CCRefrigeratorOpenMaybeDoSomething(5) // expected-error{{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator?'}}
 }

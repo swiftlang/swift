@@ -36,9 +36,9 @@ func protocolConformance(@autoclosure ac1: () -> CustomStringConvertible,
   accept_creates_Printable(ac1)
   accept_creates_Printable({ ac2($0) })
   accept_creates_Printable({ ip1($0) })
-  accept_creates_FormattedPrintable(ac1) // expected-error{{cannot invoke 'accept_creates_FormattedPrintable' with an argument list of type '(@autoclosure () -> CustomStringConvertible)'}} expected-note{{expected an argument list of type '(@noescape () -> FormattedPrintable)'}}
+  accept_creates_FormattedPrintable(ac1) // expected-error{{type 'CustomStringConvertible' does not conform to protocol 'FormattedPrintable'}}
   accept_creates_FormattedPrintable(ac2)
-  accept_creates_FormattedPrintable(ip1) // expected-error{{cannot invoke 'accept_creates_FormattedPrintable' with an argument list of type '(@autoclosure () -> IsPrintable1)'}} expected-note{{expected an argument list of type '(@noescape () -> FormattedPrintable)'}}
+  accept_creates_FormattedPrintable(ip1) // expected-error{{type 'IsPrintable1' does not conform to protocol 'FormattedPrintable'}}
 }
 
 func p_gen_to_fp(_: () -> CustomStringConvertible) -> FormattedPrintable {}
