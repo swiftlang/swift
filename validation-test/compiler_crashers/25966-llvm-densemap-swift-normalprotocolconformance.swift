@@ -1,0 +1,110 @@
+// RUN: not --crash %target-swift-frontend %s -parse
+// Distributed under the terms of the MIT license
+// Test case submitted to project by https://github.com/practicalswift (practicalswift)
+// Test case found by fuzzing
+
+}
+( ")enum S<a
+struct B
+Void{
+var a: A : A
+protocol c : A
+}
+class var e : a {
+protocol a : a {
+struct B<String
+in
+}struct B<T where k : A
+func a
+func a=e
+protocol P {
+func f<h = object {
+protocol c B
+a Foundation
+}
+protocol a {
+class A? = compose("
+}
+{
+class A : a
+class d
+class B<String, C>("
+class d>()
+typealias e : a: a :d
+protocol P {
+struct A
+class A {
+struct B
+func a {
+class A<T.e
+func a {
+}
+struct b<d
+}
+}
+class B
+protocol a {
+var "
+case c,
+let end = compose("
+}
+in
+}
+case c
+typealias e : A
+extension g:BooleanType{
+class A {}
+extension NSFileManager {
+return E.c{ enum b {
+}
+typealias e = compose()enum C {
+{struct A
+var d {
+{
+func a :BooleanType{
+let b{struct B<T:C>()
+let h : A {
+case c
+}
+protocol P {
+}
+struct c {
+}
+{
+protocol A {
+}
+}
+return E.e
+func a {
+}
+atic var d {
+class B<T where T? {{
+protocol a {
+class B< {
+}
+class A {
+enum S<b{
+class A {
+}
+}}
+}
+Void{{
+if
+struct c,
+func c{ enum S<h : a
+typealias e : A {
+class d}
+struct b: a {enum b = F>() {
+}
+}
+( "
+func a {
+class A : A
+func a:BooleanType{
+var f = compose(n: Dictionary<String, C>())
+struct b: A
+protocol A {
+class A {
+static let f = e
+}
+let end = [
