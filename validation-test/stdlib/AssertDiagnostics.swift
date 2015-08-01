@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 func rejectsStringLiteral() {
-  assert("foo") // expected-error {{cannot invoke 'assert' with an argument list of type '(String)'}} expected-note {{expected an argument list of type '(@autoclosure () -> Bool, @autoclosure () -> String, file: StaticString, line: UInt)'}}
-  precondition("foo") // expected-error {{cannot invoke 'precondition' with an argument list of type '(String)'}} expected-note {{expected an argument list of type '(@autoclosure () -> Bool, @autoclosure () -> String, file: StaticString, line: UInt)'}}
+  assert("foo") // expected-error {{cannot convert value of type 'String' to expected argument type '@autoclosure () -> Bool'}}
+  precondition("foo") // expected-error {{cannot convert value of type 'String' to expected argument type '@autoclosure () -> Bool'}}
 }
 
