@@ -1416,9 +1416,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             tupleTy->getElementTypes().size() > 1 &&
             tupleTy->hasAnyDefaultValues()) {
           
+          // Look through vararg types, if necessary.
+          auto tupleElt = tupleTy->getElement(0);
+          auto tupleEltTy = tupleElt.isVararg() ?
+                              tupleElt.getVarargBaseTy() : tupleElt.getType();;
+          
           addConstraint(getConstraintKind(kind),
                         typeVar1,
-                        tupleTy->getElementType(0),
+                        tupleEltTy,
                         getConstraintLocator(locator));
           return SolutionKind::Solved;
         }

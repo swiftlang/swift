@@ -29,3 +29,6 @@ func invalidVariadic(e: NonExistentType) { // expected-error {{use of undeclared
 
 func twoVariadics(a: Int..., b: Int...) { } // expected-error{{only a single variadic parameter '...' is permitted}}
 
+// rdar://22056861
+func f5(list: Any..., end: String = "") {}
+f5(String())
