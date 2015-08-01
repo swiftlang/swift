@@ -5126,6 +5126,13 @@ public:
                     isa<ConstructorDecl>(override));
         TC.diagnose(base, diag::overridden_here);
       }
+
+      if (!overrideFn->isBodyThrowing() && base->isObjC() &&
+          cast<AbstractFunctionDecl>(base)->isBodyThrowing()) {
+        TC.diagnose(override, diag::override_throws_objc,
+                    isa<ConstructorDecl>(override));
+        TC.diagnose(base, diag::overridden_here);
+      }
     }
 
     // FIXME: Possibly should extend to more availability checking.

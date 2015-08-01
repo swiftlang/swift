@@ -1168,6 +1168,9 @@ ERROR(override_ownership_mismatch,sema_tcd,none,
 ERROR(override_throws,sema_tcd,none,
       "cannot override non-throwing %select{method|initializer}0 with "
       "throwing %select{method|initializer}0", (bool))
+ERROR(override_throws_objc,sema_tcd,none,
+      "overriding a throwing @objc %select{method|initializer}0 with "
+      "a non-throwing %select{method|initializer}0 is not supported", (bool))
 
 WARNING(override_unnecessary_IUO,sema_tcd,none,
       "overriding %0 parameter of type %1 with implicitly unwrapped optional "

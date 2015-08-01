@@ -83,3 +83,8 @@ class SomeCellSub5 : SomeCell {
   func otherIsEnabled() { } // should not conflict
 }
 
+class FailSub : FailBase {
+  override init(value: Int) { try! super.init(value: value) } // expected-error {{overriding a throwing @objc initializer with a non-throwing initializer is not supported}}
+  override class func processValue() {} // expected-error {{overriding a throwing @objc method with a non-throwing method is not supported}}
+}
+

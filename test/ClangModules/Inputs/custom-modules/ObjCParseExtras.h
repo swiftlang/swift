@@ -154,3 +154,9 @@ typedef SomeCell <NSCopying> *CopyableSomeCell;
 + (void)print:(id)thing;
 + (void)print:(id)thing options:(id)options;
 @end
+
+
+@interface FailBase : NSObject
+- (nullable instancetype)initWithValue:(NSInteger)val error:(NSError **)error;
++ (BOOL)processValueAndReturnError:(NSError **)error;
+@end
