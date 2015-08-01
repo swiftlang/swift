@@ -944,7 +944,9 @@ public:
                                  SGFContext C = SGFContext());
 
   /// Produce a singular RValue for a load from the specified property.
-  ManagedValue emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
+  ManagedValue emitRValueForPropertyLoad(SILLocation loc,
+                                         ManagedValue base,
+                                         CanType baseFormalType,
                                          bool isSuper, VarDecl *property,
                                          ArrayRef<Substitution> substitutions,
                                          AccessSemantics semantics, Type propTy,
@@ -961,6 +963,7 @@ public:
                                 AnyFunctionRef TheClosure);
   
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
+                                        CanType baseFormalType,
                                         SILDeclRef accessor);
 
   SILDeclRef getGetterDeclRef(AbstractStorageDecl *decl,
@@ -1460,7 +1463,8 @@ public:
 
   /// Emit an lvalue that directly refers to the given instance variable
   /// (without going through getters or setters).
-  LValue emitPropertyLValue(SILLocation loc, ManagedValue base, VarDecl *var,
+  LValue emitPropertyLValue(SILLocation loc, ManagedValue base,
+                            CanType baseFormalType, VarDecl *var,
                             AccessKind accessKind, AccessSemantics semantics);
 
   ManagedValue emitLValueToPointer(SILLocation loc, LValue &&lvalue,

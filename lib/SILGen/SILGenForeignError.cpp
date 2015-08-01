@@ -76,6 +76,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
   }
 
   // Okay, break down the components of SomePointer<SomeErrorType?>.
+  // TODO: this should really be an unlowered AST type?
   CanType bridgedErrorPtrType =
     foreignErrorSlot.getType().getSwiftRValueType();
 
@@ -101,7 +102,8 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &gen,
   // Otherwise, do a normal assignment.
   LValue lvalue =
     gen.emitPropertyLValue(loc, ManagedValue::forUnmanaged(foreignErrorSlot),
-                           memoryProperty, AccessKind::Write,
+                           bridgedErrorPtrType, memoryProperty,
+                           AccessKind::Write,
                            AccessSemantics::Ordinary);
   RValue rvalue(gen, loc, bridgedErrorType,
                 gen.emitManagedRValueWithCleanup(bridgedError));

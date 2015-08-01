@@ -362,17 +362,24 @@ void PathComponent::dump() const {
   print(llvm::errs());
 }
 
-/// Return the LValueTypeData for a value whose type is its own
-/// lowering.
-static LValueTypeData getValueTypeData(SILType type, SILModule &M) {
+/// Return the LValueTypeData for a SIL value with the given AST formal type.
+static LValueTypeData getValueTypeData(CanType formalType,
+                                       SILValue value) {
   return {
-    AbstractionPattern(type.getSwiftRValueType()),
-    type.getSwiftRValueType(),
-    type.getObjectType()
+    AbstractionPattern(formalType),
+    formalType,
+    value.getType().getObjectType()
   };
 }
-static LValueTypeData getValueTypeData(SILValue value, SILModule &M) {
-  return getValueTypeData(value.getType(), M);
+static LValueTypeData getValueTypeData(SILGenFunction &gen, Expr *e) {
+  CanType formalType = getSubstFormalRValueType(e);
+  SILType loweredType = gen.getLoweredType(formalType).getObjectType();
+
+  return {
+    AbstractionPattern(formalType),
+    formalType,
+    loweredType
+  };
 }
 
 /// Given the address of an optional value, unsafely project out the
@@ -670,6 +677,10 @@ namespace {
     Expr *subscriptIndexExpr;
     RValue subscripts;
 
+    /// AST type of the base expression, in case the accessor call
+    /// requires re-abstraction.
+    CanType baseFormalType;
+
     struct AccessorArgs {
       ArgumentSource base;
       RValue subscripts;
@@ -683,7 +694,8 @@ namespace {
     {
       AccessorArgs result;
       if (base)
-        result.base = gen.prepareAccessorBaseArg(loc, base, accessor);
+        result.base = gen.prepareAccessorBaseArg(loc, base, baseFormalType,
+                                                 accessor);
 
       if (subscripts)
         result.subscripts = std::move(subscripts);
@@ -695,13 +707,15 @@ namespace {
                            AbstractStorageDecl *decl,
                            bool isSuper, bool isDirectAccessorUse,
                            ArrayRef<Substitution> substitutions,
+                           CanType baseFormalType,
                            LValueTypeData typeData,
                            Expr *subscriptIndexExpr,
                            RValue *optSubscripts)
       : Base(typeData, kind), decl(decl),
         IsSuper(isSuper), IsDirectAccessorUse(isDirectAccessorUse),
         substitutions(substitutions.begin(), substitutions.end()),
-        subscriptIndexExpr(subscriptIndexExpr)
+        subscriptIndexExpr(subscriptIndexExpr),
+        baseFormalType(baseFormalType)
     {
       assert((optSubscripts != nullptr) == (subscriptIndexExpr != nullptr));
       if (optSubscripts)
@@ -717,7 +731,8 @@ namespace {
         IsDirectAccessorUse(copied.IsDirectAccessorUse),
         substitutions(copied.substitutions),
         subscriptIndexExpr(copied.subscriptIndexExpr),
-        subscripts(copied.subscripts.copy(gen, loc)) {}
+        subscripts(copied.subscripts.copy(gen, loc)) ,
+        baseFormalType(copied.baseFormalType) {}
 
     virtual SILDeclRef getAccessor(SILGenFunction &gen,
                                    AccessKind kind) const  = 0;
@@ -752,12 +767,14 @@ namespace {
      GetterSetterComponent(AbstractStorageDecl *decl,
                            bool isSuper, bool isDirectAccessorUse,
                            ArrayRef<Substitution> substitutions,
+                           CanType baseFormalType,
                            LValueTypeData typeData,
                            Expr *subscriptIndexExpr = nullptr,
                            RValue *subscriptIndex = nullptr)
       : AccessorBasedComponent(GetterSetterKind, decl, isSuper,
                                isDirectAccessorUse, substitutions,
-                               typeData, subscriptIndexExpr, subscriptIndex)
+                               baseFormalType, typeData, subscriptIndexExpr,
+                               subscriptIndex)
     {
     }
     
@@ -841,8 +858,9 @@ namespace {
           optSubscripts = &borrowedSubscripts;
         }
         return new GetterSetterComponent(decl, IsSuper, IsDirectAccessorUse,
-                                         substitutions, getTypeData(),
-                                         subscriptIndexExpr, optSubscripts);
+                                         substitutions, baseFormalType,
+                                         getTypeData(), subscriptIndexExpr,
+                                         optSubscripts);
       }());
 
       SILDeclRef materializeForSet =
@@ -1132,12 +1150,14 @@ namespace {
      AddressorComponent(AbstractStorageDecl *decl,
                         bool isSuper, bool isDirectAccessorUse,
                         ArrayRef<Substitution> substitutions,
-                        LValueTypeData typeData, SILType substFieldType,
+                        CanType baseFormalType, LValueTypeData typeData,
+                        SILType substFieldType,
                         Expr *subscriptIndexExpr = nullptr,
                         RValue *subscriptIndex = nullptr)
       : AccessorBasedComponent(AddressorKind, decl, isSuper,
                                isDirectAccessorUse, substitutions,
-                               typeData, subscriptIndexExpr, subscriptIndex),
+                               baseFormalType, typeData, subscriptIndexExpr,
+                               subscriptIndex),
         SubstFieldType(substFieldType)
     {
     }
@@ -1469,7 +1489,8 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
     }
     
     ManagedValue rv = gen.emitRValueAsSingleValue(e, Ctx);
-    auto typeData = getValueTypeData(rv.getValue(), gen.SGM.M);
+    CanType formalType = getSubstFormalRValueType(e);
+    auto typeData = getValueTypeData(formalType, rv.getValue());
     LValue lv;
     lv.add<ValueComponent>(rv, typeData);
     return lv;
@@ -1501,10 +1522,11 @@ static void
 addNonMemberVarDeclAddressorComponent(SILGenFunction &gen, VarDecl *var,
                                       const LValueTypeData &typeData,
                                       LValue &lvalue) {
+  assert(!lvalue.isValid());
   SILType storageType = gen.getLoweredType(var->getType()).getAddressType();
   lvalue.add<AddressorComponent>(var, /*isSuper=*/ false, /*direct*/ true,
                                  getNonMemberVarDeclSubstitutions(gen, var),
-                                 typeData, storageType);
+                                 CanType(), typeData, storageType);
 }
 
 LValue
@@ -1536,7 +1558,7 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
   case AccessStrategy::DirectToAccessor:
     lv.add<GetterSetterComponent>(var, /*isSuper=*/false, /*direct*/ true,
                                   getNonMemberVarDeclSubstitutions(gen, var),
-                                  typeData);
+                                  CanType(), typeData);
     break;
 
   case AccessStrategy::Addressor:
@@ -1564,15 +1586,14 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
 
 LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
                                                 AccessKind accessKind) {
-  SILType tempType = gen.getLoweredType(getSubstFormalRValueType(e));
+  LValueTypeData typeData = getValueTypeData(gen, e);
 
-  SILValue address = gen.emitTemporaryAllocation(e, tempType.getObjectType());
+  SILValue address = gen.emitTemporaryAllocation(e, typeData.TypeOfRValue);
   address = gen.B.createMarkUninitialized(e, address,
                                           MarkUninitializedInst::Var);
   gen.enterDestroyCleanup(address);
   LValue lv;
-  lv.add<ValueComponent>(ManagedValue::forUnmanaged(address),
-                         getValueTypeData(tempType, gen.SGM.M));
+  lv.add<ValueComponent>(ManagedValue::forUnmanaged(address), typeData);
   return std::move(lv);
 }
 
@@ -1615,10 +1636,9 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
          "consumable opaque value already consumed");
   entry.hasBeenConsumed = true;
 
-  SILType type = gen.getLoweredType(getSubstFormalRValueType(e));
   LValue lv;
   lv.add<ValueComponent>(ManagedValue::forUnmanaged(entry.value),
-                         getValueTypeData(type, gen.SGM.M));
+                         getValueTypeData(gen, e));
   return std::move(lv);
 }
 
@@ -1672,6 +1692,8 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
 
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(var, accessKind, strategy));
+  assert(lv.isValid());
+
   LValueTypeData typeData = getStorageTypeData(gen, var, e);
 
   // Use the property accessors if the variable has accessors and this isn't a
@@ -1681,6 +1703,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
     lv.add<GetterSetterComponent>(var, e->isSuper(),
                                   strategy == AccessStrategy::DirectToAccessor,
                                   e->getMember().getSubstitutions(),
+                                  lv.getSubstFormalType(),
                                   typeData);
     return std::move(lv);
   }
@@ -1714,6 +1737,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   if (strategy == AccessStrategy::Addressor) {
     lv.add<AddressorComponent>(var, e->isSuper(), /*direct*/ true,
                                e->getMember().getSubstitutions(),
+                               lv.getSubstFormalType(),
                                typeData, varStorageType);
   } else if (e->getBase()->getType()->mayHaveSuperclass()) {
     lv.add<RefElementComponent>(var, varStorageType, typeData);
@@ -1741,6 +1765,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(decl, accessKind, strategy));
+  assert(lv.isValid());
 
   Expr *indexExpr = e->getIndex();
   // FIXME: This admits varargs tuples, which should only be handled as part of
@@ -1752,6 +1777,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
     lv.add<GetterSetterComponent>(decl, e->isSuper(),
                                   strategy == AccessStrategy::DirectToAccessor,
                                   e->getDecl().getSubstitutions(),
+                                  lv.getSubstFormalType(),
                                   typeData, indexExpr, &index);
   } else {
     assert(strategy == AccessStrategy::Addressor);
@@ -1759,6 +1785,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
       gen.SGM.Types.getSubstitutedStorageType(decl, e->getType());
     lv.add<AddressorComponent>(decl, e->isSuper(), /*direct*/ true,
                                e->getDecl().getSubstitutions(),
+                               lv.getSubstFormalType(),
                                typeData, storageType, indexExpr, &index);
   }
 
@@ -1866,6 +1893,7 @@ LValue SILGenLValue::visitInOutExpr(InOutExpr *e, AccessKind accessKind) {
 /// Emit an lvalue that refers to the given property.  This is
 /// designed to work with ManagedValue 'base's that are either +0 or +1.
 LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
+                                          CanType baseFormalType,
                                           VarDecl *ivar, AccessKind accessKind,
                                           AccessSemantics semantics) {
   SILGenLValue sgl(*this);
@@ -1876,8 +1904,8 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
     subs = genericType->getSubstitutions(SGM.SwiftModule, nullptr);
   }
 
-  auto baseType = base.getType().getSwiftRValueType();
-  LValueTypeData baseTypeData = getValueTypeData(base.getValue(), SGM.M);
+  LValueTypeData baseTypeData = getValueTypeData(baseFormalType,
+                                                 base.getValue());
 
   // Refer to 'self' as the base of the lvalue.
   lv.add<ValueComponent>(base, baseTypeData);
@@ -1897,7 +1925,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
       strategy == AccessStrategy::DispatchToAccessor) {
     lv.add<GetterSetterComponent>(ivar, /*super*/ false,
                                   strategy == AccessStrategy::DirectToAccessor,
-                                  subs, typeData);
+                                  subs, baseFormalType, typeData);
     return lv;
   }
 
@@ -1910,8 +1938,8 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
 
   if (strategy == AccessStrategy::Addressor) {
     lv.add<AddressorComponent>(ivar, /*super*/ false, /*direct*/ true,
-                               subs, typeData, varStorageType);
-  } else if (baseType->hasReferenceSemantics()) {
+                               subs, baseFormalType, typeData, varStorageType);
+  } else if (baseFormalType->hasReferenceSemantics()) {
     lv.add<RefElementComponent>(ivar, varStorageType, typeData);
   } else {
     lv.add<StructElementComponent>(ivar, varStorageType, typeData);

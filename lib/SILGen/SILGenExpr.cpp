@@ -584,16 +584,19 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
 /// Produce a singular RValue for a load from the specified property.  This
 /// is designed to work with RValue ManagedValue bases that are either +0 or +1.
 ManagedValue SILGenFunction::emitRValueForPropertyLoad(
-    SILLocation loc, ManagedValue base, bool isSuper, VarDecl *field,
-    ArrayRef<Substitution> substitutions, AccessSemantics semantics,
-    Type propTy, SGFContext C, bool isGuaranteedValid) {
+    SILLocation loc, ManagedValue base, CanType baseFormalType,
+    bool isSuper, VarDecl *field, ArrayRef<Substitution> substitutions,
+    AccessSemantics semantics, Type propTy, SGFContext C,
+    bool isGuaranteedValid) {
   AccessStrategy strategy =
     field->getAccessStrategy(semantics, AccessKind::Read);
 
   // If we should call an accessor of some kind, do so.
   if (strategy != AccessStrategy::Storage) {
     auto accessor = getRValueAccessorDeclRef(*this, field, strategy);
-    ArgumentSource baseRV = prepareAccessorBaseArg(loc, base, accessor);
+    ArgumentSource baseRV = prepareAccessorBaseArg(loc, base,
+                                                   baseFormalType,
+                                                   accessor);
 
     AbstractionPattern origFormalType =
       getOrigFormalRValueType(*this, field);
@@ -628,7 +631,8 @@ ManagedValue SILGenFunction::emitRValueForPropertyLoad(
 
   // rvalue MemberRefExprs are produced in two cases: when accessing a 'let'
   // decl member, and when the base is a (non-lvalue) struct.
-  assert(base.getType().getSwiftRValueType()->getAnyNominal() &&
+  assert(baseFormalType->getAnyNominal() &&
+         base.getType().getSwiftRValueType()->getAnyNominal() &&
          "The base of an rvalue MemberRefExpr should be an rvalue value");
 
   // If the accessed field is stored, emit a StructExtract on the base.
@@ -646,8 +650,9 @@ ManagedValue SILGenFunction::emitRValueForPropertyLoad(
   }
 
   // If the base is a reference type, just handle this as loading the lvalue.
-  if (base.getType().getSwiftRValueType()->hasReferenceSemantics()) {
-    LValue LV = emitPropertyLValue(loc, base, field, AccessKind::Read,
+  if (baseFormalType->hasReferenceSemantics()) {
+    LValue LV = emitPropertyLValue(loc, base, baseFormalType, field,
+                                   AccessKind::Read,
                                    AccessSemantics::DirectToStorage);
     auto Result = emitLoadOfLValue(loc, std::move(LV), C, isGuaranteedValid);
     if (hasAbstractionChange)
@@ -1766,8 +1771,14 @@ private:
     ManagedValue base =
       SGF.emitRValueAsSingleValue(Expr->getBase(),
                                   SGFContext::AllowImmediatePlusZero);
+    CanType baseFormalType =
+      Expr->getBase()->getType()->getCanonicalType();
+    assert(baseFormalType->isMaterializable());
+
     ManagedValue result =
-      SGF.emitRValueForPropertyLoad(Expr, base, Expr->isSuper(), Field,
+      SGF.emitRValueForPropertyLoad(Expr, base, baseFormalType,
+                                    Expr->isSuper(),
+                                    Field,
                                     Expr->getMember().getSubstitutions(),
                                     Expr->getAccessSemantics(),
                                     Expr->getType(), Context);
@@ -1787,11 +1798,17 @@ private:
     // emit base.
     ManagedValue base =
       SGF.emitRValueAsSingleValue(Expr->getBase(), Context);
+    
+    CanType baseFormalType =
+      Expr->getBase()->getType()->getCanonicalType();
+    assert(baseFormalType->isMaterializable());
 
     // And then emit our property using whether or not base is at +0 to
     // discriminate whether or not the base was guaranteed.
     ManagedValue result =
-        SGF.emitRValueForPropertyLoad(Expr, base, Expr->isSuper(), Field,
+        SGF.emitRValueForPropertyLoad(Expr, base, baseFormalType,
+                                      Expr->isSuper(),
+                                      Field,
                                       Expr->getMember().getSubstitutions(),
                                       Expr->getAccessSemantics(),
                                       Expr->getType(), Context,

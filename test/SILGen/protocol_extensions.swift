@@ -5,6 +5,10 @@ public protocol P1 {
   subscript(i: Int) -> Int { get set }
 }
 
+struct Box {
+  var number: Int
+}
+
 extension P1 {
   // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions2P1_S_S0_6extP1auRq_S0__fq_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $*Self):
@@ -47,6 +51,20 @@ extension P1 {
     // CHECK: return
     return self[0]
   }
+
+  static var staticReadOnlyProperty: Int {
+    return 0
+  }
+
+  static var staticReadWrite1: Int {
+    get { return 0 }
+    set { }
+  }
+
+  static var staticReadWrite2: Box {
+    get { return Box(number: 0) }
+    set { }
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -58,9 +76,28 @@ class C : P1 {
 
 class D : C { }
 
-// CHECK-LABEL: sil hidden @_TF19protocol_extensions5testDFCS_1DT_ : $@convention(thin) (@owned D) -> () {
-// CHECK-NEXT: bb0([[D:%[0-9]+]] : $D):
-func testD(d: D) {
+struct S : P1 {
+  func reqP1a() { }
+}
+
+struct G<T> : P1 {
+  func reqP1a() { }
+}
+
+struct MetaHolder {
+  var d: D.Type = D.self
+  var s: S.Type = S.self
+}
+
+struct GenericMetaHolder<T> {
+  var g: G<T>.Type = G<T>.self
+}
+
+func inout_func(inout n: Int) {}
+
+// CHECK-LABEL: sil hidden @_TF19protocol_extensions5testDFTVS_10MetaHolder2ddMCS_1D1dS1__T_ : $@convention(thin) (MetaHolder, @thick D.Type, @owned D) -> ()
+// CHECK-NEXT: bb0([[M:%[0-9]+]] : $MetaHolder, [[DD:%[0-9]+]] : $@thick D.Type, [[D:%[0-9]+]] : $D):
+func testD(m: MetaHolder, dd: D.Type, d: D) {
   // CHECK: [[D2:%[0-9]+]] = alloc_box $D
   // CHECK: [[FN:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_11returnsSelfuRq_S0__fq_FT_q_
   // CHECK: [[DCOPY:%[0-9]+]] = alloc_stack $D
@@ -68,6 +105,366 @@ func testD(d: D) {
   // CHECK: [[RESULT:%[0-9]+]] = alloc_stack $D
   // CHECK: apply [[FN]]<D>([[RESULT]]#1, [[DCOPY]]#1) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
   var d2: D = d.returnsSelf()
+
+  // CHECK: metatype $@thick D.Type
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  let _ = D.staticReadOnlyProperty
+
+  // CHECK: metatype $@thick D.Type
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  D.staticReadWrite1 = 1
+
+  // CHECK: metatype $@thick D.Type
+  // CHECK: alloc_stack $Int
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: dealloc_stack
+  D.staticReadWrite1 += 1
+
+  // CHECK: metatype $@thick D.Type
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  D.staticReadWrite2 = Box(number: 2)
+
+  // CHECK: metatype $@thick D.Type
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  D.staticReadWrite2.number += 5
+
+  // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
+  // CHECK: metatype $@thick D.Type
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  inout_func(&D.staticReadWrite2.number)
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  let _ = dd.staticReadOnlyProperty
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  dd.staticReadWrite1 = 1
+
+  // CHECK: alloc_stack $Int
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: dealloc_stack
+  dd.staticReadWrite1 += 1
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  dd.staticReadWrite2 = Box(number: 2)
+
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  dd.staticReadWrite2.number += 5
+
+  // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  inout_func(&dd.staticReadWrite2.number)
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  let _ = m.d.staticReadOnlyProperty
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  m.d.staticReadWrite1 = 1
+
+  // CHECK: alloc_stack $Int
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: dealloc_stack
+  m.d.staticReadWrite1 += 1
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  m.d.staticReadWrite2 = Box(number: 2)
+
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  m.d.staticReadWrite2.number += 5
+
+  // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  inout_func(&m.d.staticReadWrite2.number)
+
+  // CHECK: return
+}
+
+// CHECK-LABEL: sil hidden @_TF19protocol_extensions5testSFTVS_10MetaHolder2ssMVS_1S_T_
+func testS(m: MetaHolder, ss: S.Type) {
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: metatype $@thick S.Type
+  let _ = S.staticReadOnlyProperty
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: metatype $@thick S.Type
+  S.staticReadWrite1 = 1
+
+  // CHECK: alloc_stack $Int
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: metatype $@thick S.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: dealloc_stack
+  S.staticReadWrite1 += 1
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick S.Type
+  S.staticReadWrite2 = Box(number: 2)
+
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick S.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  S.staticReadWrite2.number += 5
+
+  // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick S.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  inout_func(&S.staticReadWrite2.number)
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: metatype $@thick S.Type
+  let _ = ss.staticReadOnlyProperty
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: metatype $@thick S.Type
+  ss.staticReadWrite1 = 1
+
+  // CHECK: alloc_stack $Int
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: metatype $@thick S.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: dealloc_stack
+  ss.staticReadWrite1 += 1
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick S.Type
+  ss.staticReadWrite2 = Box(number: 2)
+
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick S.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  ss.staticReadWrite2.number += 5
+
+  // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick S.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  inout_func(&ss.staticReadWrite2.number)
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: metatype $@thick S.Type
+  let _ = m.s.staticReadOnlyProperty
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: metatype $@thick S.Type
+  m.s.staticReadWrite1 = 1
+
+  // CHECK: alloc_stack $Int
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: metatype $@thick S.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: dealloc_stack
+  m.s.staticReadWrite1 += 1
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick S.Type
+  m.s.staticReadWrite2 = Box(number: 2)
+
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick S.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  m.s.staticReadWrite2.number += 5
+
+  // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick S.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  inout_func(&m.s.staticReadWrite2.number)
+
+  // CHECK: return
+}
+
+// CHECK-LABEL: sil hidden @_TF19protocol_extensions5testGurFTGVS_17GenericMetaHolderq__2ggMGVS_1Gq___T_
+func testG<T>(m: GenericMetaHolder<T>, gg: G<T>.Type) {
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: metatype $@thick G<T>.Type
+  let _ = G<T>.staticReadOnlyProperty
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: metatype $@thick G<T>.Type
+  G<T>.staticReadWrite1 = 1
+
+  // CHECK: alloc_stack $Int
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: metatype $@thick G<T>.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: dealloc_stack
+  G<T>.staticReadWrite1 += 1
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick G<T>.Type
+  G<T>.staticReadWrite2 = Box(number: 2)
+
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick G<T>.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  G<T>.staticReadWrite2.number += 5
+
+  // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick G<T>.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  inout_func(&G<T>.staticReadWrite2.number)
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: metatype $@thick G<T>.Type
+  let _ = gg.staticReadOnlyProperty
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: metatype $@thick G<T>.Type
+  gg.staticReadWrite1 = 1
+
+  // CHECK: alloc_stack $Int
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: metatype $@thick G<T>.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: dealloc_stack
+  gg.staticReadWrite1 += 1
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick G<T>.Type
+  gg.staticReadWrite2 = Box(number: 2)
+
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick G<T>.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  gg.staticReadWrite2.number += 5
+
+  // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick G<T>.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  inout_func(&gg.staticReadWrite2.number)
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: metatype $@thick G<T>.Type
+  let _ = m.g.staticReadOnlyProperty
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: metatype $@thick G<T>.Type
+  m.g.staticReadWrite1 = 1
+
+  // CHECK: alloc_stack $Int
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: metatype $@thick G<T>.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: dealloc_stack
+  m.g.staticReadWrite1 += 1
+
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick G<T>.Type
+  m.g.staticReadWrite2 = Box(number: 2)
+
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick G<T>.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  m.g.staticReadWrite2.number += 5
+
+  // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
+  // CHECK: alloc_stack $Box
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: metatype $@thick G<T>.Type
+  // CHECK: store
+  // CHECK: load
+  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: dealloc_stack
+  inout_func(&m.g.staticReadWrite2.number)
+
+  // CHECK: return
 }
 
 // ----------------------------------------------------------------------------

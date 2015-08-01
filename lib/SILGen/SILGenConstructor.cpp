@@ -764,7 +764,9 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
     WritebackScope scope(SGF);
     SILLocation loc = pattern;
     ManagedValue self;
-    if (selfDecl->getType()->hasReferenceSemantics())
+    CanType selfFormalType = selfDecl->getType()
+        ->getInOutObjectType()->getCanonicalType();
+    if (selfFormalType->hasReferenceSemantics())
       self = SGF.emitRValueForDecl(loc, selfDecl, selfDecl->getType(),
                                    AccessSemantics::DirectToStorage,
                                    SGFContext::AllowImmediatePlusZero);
@@ -774,7 +776,8 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
                                    AccessSemantics::DirectToStorage);
 
     LValue memberRef =
-      SGF.emitPropertyLValue(loc, self, named->getDecl(), AccessKind::Write,
+      SGF.emitPropertyLValue(loc, self, selfFormalType, named->getDecl(),
+                             AccessKind::Write,
                              AccessSemantics::DirectToStorage);
 
     // Assign to it.

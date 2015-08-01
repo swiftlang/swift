@@ -3597,20 +3597,21 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
 
 ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                                       ManagedValue base,
+                                                      CanType baseFormalType,
                                                       SILDeclRef accessor) {
   auto accessorType = SGM.Types.getConstantFunctionType(accessor);
   SILParameterInfo selfParam = accessorType->getParameters().back();
 
   assert(!base.isInContext());
   assert(!base.isLValue() || !base.hasCleanup());
-  SILType baseType = base.getType();
+  SILType baseLoweredType = base.getType();
 
   // If the base is a boxed existential, we will open it later.
-  if (baseType.getPreferredExistentialRepresentation(SGM.M)
+  if (baseLoweredType.getPreferredExistentialRepresentation(SGM.M)
         == ExistentialRepresentation::Boxed) {
-    assert(!baseType.isAddress()
+    assert(!baseLoweredType.isAddress()
            && "boxed existential should not be an address");
-  } else if (baseType.isAddress()) {
+  } else if (baseLoweredType.isAddress()) {
     // If the base is currently an address, we may have to copy it.
     auto needsLoad = [&] {
       switch (selfParam.getConvention()) {
@@ -3647,7 +3648,7 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
 
-      base = emitLoad(loc, base.forward(*this), getTypeLowering(baseType),
+      base = emitLoad(loc, base.forward(*this), getTypeLowering(baseLoweredType),
                       SGFContext(), shouldTake);
 
     // Handle inout bases specially here.
@@ -3661,10 +3662,9 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
 
       // FIXME: this assumes that there's never meaningful
       // reabstraction of self arguments.
-      CanType selfFormalType = baseType.getSwiftRValueType();
       return ArgumentSource(loc,
-                 LValue::forAddress(base, AbstractionPattern(selfFormalType),
-                                    selfFormalType));
+                 LValue::forAddress(base, AbstractionPattern(baseFormalType),
+                                    baseFormalType));
     }
 
   // If the base is currently scalar, we may have to drop it in
@@ -3690,7 +3690,7 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
       // However, when the base is a reference type and the target is
       // a non-class protocol, this is innocuous.
       assert((!selfParam.isIndirectInOut() ||
-              (baseType.getSwiftRValueType()->isAnyClassReferenceType() &&
+              (baseFormalType->isAnyClassReferenceType() &&
                isa<ProtocolDecl>(accessor.getDecl()->getDeclContext()) &&
                !cast<ProtocolDecl>(accessor.getDecl()->getDeclContext())
                  ->requiresClass())) &&
@@ -3701,16 +3701,15 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
       if (selfParam.isIndirectInOut()) {
         // Drop the cleanup if we have one.
         auto baseLV = ManagedValue::forLValue(base.getValue());
-        auto baseType = base.getType().getSwiftRValueType();
         return ArgumentSource(loc, LValue::forAddress(baseLV,
-                                               AbstractionPattern(baseType),
-                                                      baseType));
+                                               AbstractionPattern(baseFormalType),
+                                                      baseFormalType));
       }
     }
   }
 
   return ArgumentSource(loc, RValue(*this, loc,
-                               base.getType().getSwiftRValueType(), base));
+                               baseFormalType, base));
 }
 
 SILDeclRef SILGenFunction::getGetterDeclRef(AbstractStorageDecl *storage,

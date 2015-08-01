@@ -1462,7 +1462,9 @@ emitNominalTypeDispatch(ArrayRef<RowToSpecialize> rows,
     SILLocation loc = firstMatcher;
 
     // TODO: project stored properties directly
-    auto val = SGF.emitRValueForPropertyLoad(loc, aggMV, false,
+    // TODO: need to get baseFormalType from AST
+    CanType baseFormalType = aggMV.getType().getSwiftRValueType();
+    auto val = SGF.emitRValueForPropertyLoad(loc, aggMV, baseFormalType, false,
                                              property,
                                              // FIXME: No generic substitions.
                                              {}, AccessSemantics::Ordinary,
