@@ -635,7 +635,7 @@ ResolvedLocator constraints::resolveLocatorToDecl(
 /// Emit a note referring to the target of a diagnostic, e.g., the function
 /// or parameter being used.
 static void noteTargetOfDiagnostic(ConstraintSystem &cs,
-                                   const Failure &failure,
+                                   const Failure *failure,
                                    ConstraintLocator *targetLocator) {
   // If there's no anchor, there's nothing we can do.
   if (!targetLocator->getAnchor())
@@ -645,7 +645,8 @@ static void noteTargetOfDiagnostic(ConstraintSystem &cs,
   auto resolved
     = resolveLocatorToDecl(cs, targetLocator,
         [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
-          for (auto resolved = failure.getResolvedOverloadSets();
+          if (!failure) return None;
+          for (auto resolved = failure->getResolvedOverloadSets();
                resolved; resolved = resolved->Previous) {
             if (resolved->Locator == locator)
               return SelectedOverload{resolved->Choice,
@@ -766,13 +767,13 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
                           nullptr,
                           loc);
     if (targetLocator)
-      noteTargetOfDiagnostic(cs, failure, targetLocator);
+      noteTargetOfDiagnostic(cs, &failure, targetLocator);
     break;
 
   case Failure::IsNotBridgedToObjectiveC:
     tc.diagnose(loc, diag::type_not_bridged, failure.getFirstType());
     if (targetLocator)
-      noteTargetOfDiagnostic(cs, failure, targetLocator);
+      noteTargetOfDiagnostic(cs, &failure, targetLocator);
     break;
 
   case Failure::IsForbiddenLValue:
@@ -870,7 +871,7 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
     tc.diagnose(loc, diag::no_accessible_initializers, failure.getFirstType())
       .highlight(range);
     if (targetLocator && !useExprLoc)
-      noteTargetOfDiagnostic(cs, failure, targetLocator);
+      noteTargetOfDiagnostic(cs, &failure, targetLocator);
     break;
   }
 
@@ -878,7 +879,7 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
     tc.diagnose(loc, diag::unbound_generic_parameter, failure.getFirstType())
       .highlight(range);
     if (!useExprLoc)
-      noteTargetOfDiagnostic(cs, failure, locator);
+      noteTargetOfDiagnostic(cs, &failure, locator);
     break;
   }
 
@@ -887,7 +888,7 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
                 failure.getFirstType())
       .highlight(range);
     if (!useExprLoc)
-      noteTargetOfDiagnostic(cs, failure, locator);
+      noteTargetOfDiagnostic(cs, &failure, locator);
     break;
   }
 
@@ -895,7 +896,7 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
     tc.diagnose(loc, diag::noescape_functiontype_mismatch,
                 failure.getSecondType()).highlight(range);
     if (!useExprLoc)
-      noteTargetOfDiagnostic(cs, failure, locator);
+      noteTargetOfDiagnostic(cs, &failure, locator);
     break;
   }
 
@@ -907,7 +908,7 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
                 failure.getSecondType())
       .highlight(range);
     if (!useExprLoc)
-      noteTargetOfDiagnostic(cs, failure, locator);
+      noteTargetOfDiagnostic(cs, &failure, locator);
     break;
   }
 
@@ -2409,25 +2410,45 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
     toType = types.second.getPointer();
   
   // If the second type is a type variable, the expression itself is
-  // ambiguous.
+  // ambiguous.  Handle various cases.
+  if (auto *fromTV = fromType->getAs<TypeVariableType>()) {
+    // If this is a conversion to a type variable used to form an archetype,
+    // Then diagnose this as a generic parameter that could not be resolved.
+    auto ATy = fromTV->getBaseBeingSubstituted()->getAs<ArchetypeType>();
+    // Only diagnose archetypes that don't have a parent, i.e., ones
+    // that correspond to generic parameters.
+    if (ATy && !ATy->getParent() && toType->is<TypeVariableType>()) {
+      diagnose(anchor->getLoc(), diag::unbound_generic_parameter, ATy)
+        .highlight(anchor->getSourceRange());
+
+      // Emit a "note, archetype declared here" sort of thing.
+      noteTargetOfDiagnostic(*CS, nullptr, fromTV->getImpl().getLocator());
+      return true;
+    }
+  }
+
+  
+  
   if (fromType->is<UnboundGenericType>() || toType->is<TypeVariableType>() ||
       (fromType->is<TypeVariableType>() && toType->is<ProtocolType>())) {
-    auto diagID = diag::type_of_expression_is_ambiguous;
-    if (isa<ClosureExpr>(anchor))
-      diagID = diag::cannot_infer_closure_type;
     
-    diagnose(anchor->getLoc(), diagID)
-      .highlight(anchor->getSourceRange());
-
+    // Handle closure exprs specifically.
     if (auto *CE = dyn_cast<ClosureExpr>(anchor)) {
+      diagnose(anchor->getLoc(), diag::cannot_infer_closure_type)
+        .highlight(anchor->getSourceRange());
+
       if (!CE->hasSingleExpressionBody() &&
           !CE->hasExplicitResultType() &&
           !CE->getBody()->getElements().empty()) {
         diagnose(CE->getLoc(),
                  diag::mult_stmt_closures_require_explicit_result);
       }
+      return true;
     }
 
+    // Otherwise, produce a generic ambiguity error.
+    diagnose(anchor->getLoc(), diag::type_of_expression_is_ambiguous)
+      .highlight(anchor->getSourceRange());
     return true;
   }
   
@@ -3672,7 +3693,8 @@ bool FailureDiagnosis::diagnoseFailure() {
     CS->TC.addExprForDiagnosis(expr, nullptr);
 
     // Type check the expression independently of any contextual constraints.
-    auto subExprTy = getTypeOfTypeCheckedChildIndependently(expr);
+    auto subExprTy = getTypeOfTypeCheckedChildIndependently(expr,
+                                                 TCCFlags::TCC_AllowUnresolved);
     
     // If it failed an diagnosed something, then we're done.
     if (!subExprTy) return true;

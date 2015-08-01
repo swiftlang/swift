@@ -24,7 +24,7 @@ let classM2 = C.classMethod:withArgument:argument:
 let classM3 = C.classMethod:withArgument:argument:argument:
 
 // TODO: recovery
-let classMX = C.classMethod: // expected-error{{expected expression}} // expected-error{{could not find an overload for 'classMethod' that accepts the supplied arguments}} // expected-error{{consecutive statements}}
+let classMX = C.classMethod: // expected-error{{expected expression}} // expected-error{{type of expression is ambiguous without more context}} // expected-error{{consecutive statements}}
 
 // TODO: Normal method lookup should not find keyword methods
 let instM0: (Int) -> () = x.instMethod
@@ -43,4 +43,4 @@ x.instMethod:overloaded:(1, overloaded: "two")
 let instM7 = x.instMethod:nonexistent: // expected-error{{value of type 'C' has no member 'instMethod(_:nonexistent:)'}}
 
 // TODO: recovery
-let instMX = x.instMethod: // expected-error{{expected expression}} // expected-error{{could not find an overload for 'instMethod' that accepts the supplied arguments}} // expected-error{{consecutive statements}}
+let instMX = x.instMethod: // expected-error{{expected expression}} // expected-error{{type of expression is ambiguous without more context}} // expected-error{{consecutive statements}}

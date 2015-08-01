@@ -15,10 +15,10 @@ func test20807269() {
 func test15921530() {
     struct X {}
 
-    func makef<T>() -> (T)->() { // expected-note{{in call to function 'makef'}}
+    func makef<T>() -> (T)->() {
       return {
         x in ()
       }
     }
-    var f: (inout X)->() = makef() // expected-error{{argument for generic parameter 'T' could not be inferred}}
+    var f: (inout X)->() = makef() // expected-error{{cannot convert value of type '(T) -> ()' to specified type '(inout X) -> ()'}}
 }
