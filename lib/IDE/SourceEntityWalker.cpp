@@ -210,9 +210,31 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return { false, nullptr };
 
   } else if (SubscriptExpr *SE = dyn_cast<SubscriptExpr>(E)) {
+    // Visit in source order.
+    if (!SE->getBase()->walk(*this))
+      return { false, nullptr };
+
+    ValueDecl *SubscrD = nullptr;
     if (SE->hasDecl())
-      if (!passReference(SE->getDecl().getDecl(), E->getLoc()))
+      SubscrD = SE->getDecl().getDecl();
+
+    if (SubscrD) {
+      if (!passReference(SubscrD, E->getLoc()))
         return { false, nullptr };
+    }
+
+    if (!SE->getIndex()->walk(*this))
+      return { false, nullptr };
+
+    if (SubscrD) {
+      if (!passReference(SubscrD, E->getEndLoc()))
+        return { false, nullptr };
+    }
+
+    // We already visited the children.
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
 
   } else if (BinaryExpr *BinE = dyn_cast<BinaryExpr>(E)) {
     // Visit in source order.
@@ -323,6 +345,8 @@ bool SemaAnnotator::passModulePathElements(
 
 bool SemaAnnotator::passReference(ValueDecl *D, SourceLoc Loc) {
   unsigned NameLen = D->getName().getLength();
+  if (isa<SubscriptDecl>(D))
+    NameLen = 1;
   TypeDecl *CtorTyRef = nullptr;
 
   if (TypeDecl *TD = dyn_cast<TypeDecl>(D)) {

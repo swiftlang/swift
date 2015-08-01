@@ -301,3 +301,22 @@ func testMod(x: Swift.String) {
 // CHECK: let <Var>x</Var> = <iMod>Swift</iMod>
   let x = Swift
 }
+
+func +(a: C12, b: C12) {}
+func test9(a: C12, b: C12) {
+  // CHECK: <Param@[[@LINE-1]]:12>a</Param><Func@[[@LINE-2]]:6>+</Func><Param@[[@LINE-1]]:20>b</Param>
+  a+b
+}
+
+func test10(a: [Int], i: Int) {
+  // CHECK: <Param@[[@LINE-1]]:13>a</Param><iSubscript@>[</iSubscript><Param@[[@LINE-1]]:23>i</Param><iSubscript@>]</iSubscript>
+  a[i]
+}
+
+class CWS {
+  subscript (i : Int, j : Int) -> Int { return 0 }
+}
+func test11(a: CWS, i: Int) {
+  // CHECK: <Param@[[@LINE-1]]:13>a</Param><Subscript@[[@LINE-3]]:3>[</Subscript><Param@[[@LINE-1]]:21>i</Param>,<Param@[[@LINE-1]]:21>i</Param><Subscript@[[@LINE-3]]:3>]</Subscript>
+  a[i,i]
+}
