@@ -2881,6 +2881,23 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
       break;
     }
     
+    // Try to simplify irrelevant details of function types.  For example, if
+    // someone passes a "() -> Float" function to a "() throws -> Int"
+    // parameter, then uttering the "throws" may confuse them into thinking that
+    // that is the problem, even though there is a clear subtype relation.
+    if (auto srcFT = exprType->getAs<FunctionType>())
+      if (auto destFT = contextualType->getAs<FunctionType>()) {
+        auto destExtInfo = destFT->getExtInfo();
+        
+        if (!srcFT->isNoEscape()) destExtInfo = destExtInfo.withNoEscape(false);
+        if (!srcFT->throws()) destExtInfo = destExtInfo.withThrows(false);
+        if (destExtInfo != destFT->getExtInfo())
+          contextualType = FunctionType::get(destFT->getInput(),
+                                             destFT->getResult(), destExtInfo);
+      }
+    
+    
+
     diagnose(expr->getLoc(), diagID, exprType, contextualType)
       .highlight(expr->getSourceRange());
     return true;

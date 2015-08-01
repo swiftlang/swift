@@ -405,7 +405,7 @@ func someGeneric19997471<T>(x: T) {
 func f20371273() {
   let x: [Int] = [1, 2, 3, 4]
   let y: UInt = 4
-  x.filter { $0 == y }  // expected-error {{cannot convert value of type '(UInt) -> Bool' to expected argument type '@noescape (Int) throws -> Bool'}}
+  x.filter { $0 == y }  // expected-error {{cannot convert value of type '(UInt) -> Bool' to expected argument type '(Int) -> Bool'}}
 }
 
 
