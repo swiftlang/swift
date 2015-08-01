@@ -26,7 +26,7 @@ public func _atREPLExit(handler: () -> ()) {
 }
 
 internal func _replExit() {
-  let reversed = lazy(_replExitHandlers).reverse()
+  let reversed = _replExitHandlers.reverse()
   for handler in reversed {
     handler.f()
   }

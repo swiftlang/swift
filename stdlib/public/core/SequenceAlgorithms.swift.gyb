@@ -347,6 +347,8 @@ extension SequenceType {
 extension SequenceType {
   /// Return an `Array` containing the elements of `self` in reverse
   /// order.
+  ///
+  /// Complexity: O(N), where N is the length of `self`.
   public func reverse() -> [${GElement}] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
@@ -357,22 +359,6 @@ extension SequenceType {
       swap(&result[i], &result[count - i - 1])
     }
     return result
-  }
-}
-
-extension CollectionType where Index : BidirectionalIndexType {
-  /// Return a lazy `CollectionType` containing the elements of `self`
-  /// in reverse order.
-  public func reverse() -> ReverseCollection<Self> {
-    return ReverseCollection(self)
-  }
-}
-
-extension CollectionType where Index : RandomAccessIndexType {
-  /// Return a lazy `CollectionType` containing the elements of `self`
-  /// in reverse order.
-  public func reverse() -> ReverseRandomAccessCollection<Self> {
-    return ReverseRandomAccessCollection(self)
   }
 }
 
@@ -388,7 +374,7 @@ extension SequenceType {
   ///
   /// is equivalent to
   ///
-  ///     Array(s.map(transform)._prext_flatten)
+  ///     Array(s.map(transform).flatten())
   ///
   /// - Complexity: O(*M* + *N*), where *M* is the length of `self`
   ///   and *N* is the length of the result.

@@ -39,12 +39,11 @@ set(SWIFTLIB_ESSENTIAL
   Collection.swift
   CollectionAlgorithms.swift.gyb
   CompilerProtocols.swift
-  Concatenate.swift.gyb
   ContiguousArrayBuffer.swift
   EmptyCollection.swift
   ErrorType.swift
   Existential.swift
-  Filter.swift.gyb
+  Filter.swift
   FixedPoint.swift.gyb
   Flatten.swift.gyb
   FlatMap.swift
@@ -61,11 +60,11 @@ set(SWIFTLIB_ESSENTIAL
   IntegerParsing.swift.gyb
   Interval.swift.gyb
   Join.swift
-  LazyCollection.swift.gyb
+  LazyCollection.swift
   LazySequence.swift
   LifetimeManager.swift
   ManagedBuffer.swift
-  Map.swift.gyb
+  Map.swift
   Mirrors.swift.gyb
   Misc.swift
   ObjCMirrors.swift
@@ -81,7 +80,7 @@ set(SWIFTLIB_ESSENTIAL
   RangeReplaceableCollectionType.swift
   Reflection.swift
   Repeat.swift
-  Reverse.swift.gyb
+  Reverse.swift
   Runtime.swift.gyb
   Sequence.swift
   SequenceWrapper.swift

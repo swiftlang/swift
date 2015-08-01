@@ -10,50 +10,46 @@
 //
 //===----------------------------------------------------------------------===//
 
-extension _prext_LazySequenceType where
-Generator.Element == Elements.Generator.Element {
+extension LazySequenceType {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
-  ///     self.map(transform).flatten
+  ///     self.map(transform).flatten()
   ///
   /// - Complexity: O(1)
   @warn_unused_result
   public func flatMap<Intermediate: SequenceType>(
-    transform: (Generator.Element)->Intermediate
-  ) -> _prext_LazySequence<
-    _prext_FlattenSequence<_prext_LazyMapSequence<Elements, Intermediate>>> {
-    return self.map(transform)._prext_flatten
+    transform: (Elements.Generator.Element)->Intermediate
+  ) -> LazySequence<
+    FlattenSequence<LazyMapSequence<Elements, Intermediate>>> {
+    return self.map(transform).flatten()
   }
 }
 
-extension _prext_LazyCollectionType
-where Generator.Element == Elements.Generator.Element{
+extension LazyCollectionType {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
-  ///     self.map(transform).flatten
+  ///     self.map(transform).flatten()
   ///
   /// - Complexity: O(1)
   @warn_unused_result
   public func flatMap<Intermediate: CollectionType>(
-    transform: (Generator.Element)->Intermediate
-  ) -> _prext_LazyCollection<
-    _prext_FlattenCollection<
-      _prext_LazyMapCollection<Elements, Intermediate>>
+    transform: (Elements.Generator.Element)->Intermediate
+  ) -> LazyCollection<
+    FlattenCollection<
+      LazyMapCollection<Elements, Intermediate>>
   > {
-    return self.map(transform)._prext_flatten
+    return self.map(transform).flatten()
   }
 }
 
-extension _prext_LazyCollectionType
-where Generator.Element == Elements.Generator.Element,
-Elements.Index : BidirectionalIndexType
+extension LazyCollectionType where Elements.Index : BidirectionalIndexType
 {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
   ///
-  ///     self.map(transform).flatten
+  ///     self.map(transform).flatten()
   ///
   /// - Complexity: O(1)
   @warn_unused_result
@@ -61,11 +57,11 @@ Elements.Index : BidirectionalIndexType
     Intermediate: CollectionType
     where Intermediate.Index : BidirectionalIndexType
   >(
-    transform: (Generator.Element)->Intermediate
-  ) -> _prext_LazyCollection<
-    _prext_FlattenBidirectionalCollection<
-      _prext_LazyMapCollection<Elements, Intermediate>
+    transform: (Elements.Generator.Element)->Intermediate
+  ) -> LazyCollection<
+    FlattenBidirectionalCollection<
+      LazyMapCollection<Elements, Intermediate>
   >> {
-    return self.map(transform)._prext_flatten
+    return self.map(transform).flatten()
   }
 }

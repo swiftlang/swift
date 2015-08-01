@@ -269,7 +269,7 @@ public struct Mirror {
       subject, ancestorRepresentation)
       
     self.children = Children(
-      lazy(unlabeledChildren).map { Child(label: nil, value: $0) }
+      unlabeledChildren.lazy.map { Child(label: nil, value: $0) }
     )
     self.displayStyle = displayStyle
     self._defaultDescendantRepresentation
@@ -309,7 +309,7 @@ public struct Mirror {
     self._makeSuperclassMirror = Mirror._superclassGenerator(
       subject, ancestorRepresentation)
       
-    let lazyChildren = lazy(children).map { Child(label: $0.0, value: $0.1) }
+    let lazyChildren = children.lazy.map { Child(label: $0.0, value: $0.1) }
     self.children = Children(lazyChildren)
 
     self.displayStyle = displayStyle

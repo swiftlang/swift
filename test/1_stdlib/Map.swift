@@ -15,19 +15,19 @@
 // Check that the generic parameters are called 'Base' and 'Element'.
 protocol TestProtocol1 {}
 
-extension MapGenerator where Base : TestProtocol1, Element : TestProtocol1 {
+extension LazyMapGenerator where Base : TestProtocol1, Element : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-extension MapSequence where Base : TestProtocol1, Element : TestProtocol1 {
+extension LazyMapSequence where Base : TestProtocol1, Element : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-extension MapCollection where Base : TestProtocol1, Element : TestProtocol1 {
+extension LazyMapCollection where Base : TestProtocol1, Element : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -38,11 +38,11 @@ print("testing...")
 
 // Test mapping a collection
 // CHECK-NEXT: [6, 9, 12, 15, 18, 21]
-let a = lazy(2..<8).map { $0 * 3 }.array
+let a = Array((2..<8).lazy.map { $0 * 3 })
 print(a)
 
 // Test mapping a sequence
-let s = lazy(a.generate()).map { $0 / 3 }
+let s = a.generate().lazy.map { $0 / 3 }
 // CHECK-NEXT: <2, 3, 4, 5, 6, 7>
 print("<", appendNewline: false)
 var prefix = ""
@@ -90,7 +90,7 @@ struct IntRange : SequenceType {
 
 // Make sure we can iterate a mapped view of IntRange without
 // consuming it.
-let m1 = lazy(IntRange(start: 1, end: 5)).map { $0 * 2 }
+let m1 = IntRange(start: 1, end: 5).lazy.map { $0 * 2 }
 // CHECK-NEXT: [2, 4, 6, 8]
 print(Array(m1))
 

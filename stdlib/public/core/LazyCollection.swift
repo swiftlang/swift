@@ -21,8 +21,8 @@
 /// `LazyCollectionType`s.
 ///
 /// - See Also: `LazySequenceType`, `LazyCollection`
-public protocol _prext_LazyCollectionType
-  : CollectionType, _prext_LazySequenceType {
+public protocol LazyCollectionType
+  : CollectionType, LazySequenceType {
   /// A `CollectionType` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
@@ -33,7 +33,7 @@ public protocol _prext_LazyCollectionType
 
 /// When there's no special associated `Elements` type, the `elements`
 /// property is provided.
-extension _prext_LazyCollectionType where Elements == Self {
+extension LazyCollectionType where Elements == Self {
   /// Identical to `self`.
   public var elements: Self { return self }
 }
@@ -43,8 +43,8 @@ extension _prext_LazyCollectionType where Elements == Self {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceType`, `LazyCollection`
-public struct _prext_LazyCollection<Base : CollectionType>
-  : _prext_LazyCollectionType {
+public struct LazyCollection<Base : CollectionType>
+  : LazyCollectionType {
 
   /// The type of the underlying collection
   public typealias Elements = Base
@@ -69,7 +69,7 @@ public struct _prext_LazyCollection<Base : CollectionType>
 
 /// Forward implementations to the base collection, to pick up any
 /// optimizations it might implement.
-extension _prext_LazyCollection : SequenceType {
+extension LazyCollection : SequenceType {
   
   /// Return a *generator* over the elements of this *sequence*.
   ///
@@ -100,7 +100,7 @@ extension _prext_LazyCollection : SequenceType {
   }
 }
 
-extension _prext_LazyCollection : CollectionType {
+extension LazyCollection : CollectionType {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
@@ -129,8 +129,8 @@ extension _prext_LazyCollection : CollectionType {
   /// `self`'s elements.
   ///
   /// - Complexity: O(1)
-  public subscript(bounds: Range<Index>) -> _prext_LazyCollection<Slice<Base>> {
-    return Slice(base: _base, bounds: bounds)._prext_lazy
+  public subscript(bounds: Range<Index>) -> LazyCollection<Slice<Base>> {
+    return Slice(base: _base, bounds: bounds).lazy
   }
   
   /// Returns `true` iff `self` is empty.
@@ -163,6 +163,9 @@ extension _prext_LazyCollection : CollectionType {
   public var first: Base.Generator.Element? {
     return _base.first
   }
+
+  @available(*, unavailable, renamed="Base")
+  public typealias S = Void
 }
 
 /// Augment `self` with lazy methods such as `map`, `filter`, etc.
@@ -172,91 +175,29 @@ extension CollectionType {
   /// implemented lazily.
   ///
   /// - See Also: `LazySequenceType`, `LazyCollectionType`.
-  public var _prext_lazy: _prext_LazyCollection<Self> {
-    return _prext_LazyCollection(self)
+  public var lazy: LazyCollection<Self> {
+    return LazyCollection(self)
   }
 }
 
-extension _prext_LazyCollectionType {
+extension LazyCollectionType {
   /// Identical to `self`.
-  public var _prext_lazy: Self { // Don't re-wrap already-lazy collections
+  public var lazy: Self { // Don't re-wrap already-lazy collections
     return self
   }
 }
 
-//===----------------------------------------------------------------------===//
-// Implementations we are replacing
-//===----------------------------------------------------------------------===//
-
-%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-%  whereClause = 'where Base.Index : %sIndexType' % traversal
-%  Self = 'Lazy%sCollection' % traversal
-
-/// A collection that forwards its implementation to an underlying
-/// collection instance while exposing lazy computations as methods.
-public struct ${Self}<Base : CollectionType ${whereClause}> : CollectionType {
-  @available(*, unavailable, renamed="Base")
-  public typealias S = Base
-
-  /// Construct an instance with `base` as its underlying collection
-  /// instance.
-  public init(_ base: Base) {
-    self._base = base
-  }
-
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> Base.Generator {
-    return self._base.generate()
-  }
-
-  /// The position of the first element in a non-empty collection.
-  ///
-  /// In an empty collection, `startIndex == endIndex`.
-  public var startIndex: Base.Index {
-    return _base.startIndex
-  }
-  
-  /// The collection's "past the end" position.
-  ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
-  public var endIndex: Base.Index {
-    return _base.endIndex
-  }
-
-  /// Access the element at `position`.
-  ///
-  /// - Requires: `position` is a valid position in `self` and
-  ///   `position != endIndex`.
-  public
-  subscript(position: Base.Index) -> Base.Generator.Element {
-    return _base[position]
-  }
-  
-  /// an Array, created on-demand, containing the elements of this
-  /// lazy CollectionType.
-  public var array: [Base.Generator.Element] {
-    return Array(_base)
-  }
-
-  public func underestimateCount() -> Int {
-    return _base.underestimateCount()
-  }
-
-  var _base: Base
+@available(*, unavailable, message="Please use the collection's '.lazy' property")
+public func lazy<Base : CollectionType>(s: Base) -> LazyCollection<Base> {
+  fatalError("unavailable")
 }
 
-/// Augment `s` with lazy methods such as `map`, `filter`, etc.
-public func lazy<Base : CollectionType ${whereClause}>(s: Base)
-  -> ${Self}<Base> {
-
-  return ${Self}(s)
-}
-
-%end
+@available(*, unavailable, renamed="LazyCollection")
+public struct LazyForwardCollection<T> {}
+@available(*, unavailable, renamed="LazyCollection")
+public struct LazyBidirectionalCollection<T> {}
+@available(*, unavailable, renamed="LazyCollection")
+public struct LazyRandomAccessCollection<T> {}
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

@@ -27,7 +27,7 @@ extension Mirror {
   public var testDescription: String {
     let nil_ = "nil"
     return "[" + ", ".join(
-      lazy(children).map { "\($0.0 ?? nil_): \(String(reflecting: $0.1))" }
+      children.lazy.map { "\($0.0 ?? nil_): \(String(reflecting: $0.1))" }
     ) + "]"
   }
 }

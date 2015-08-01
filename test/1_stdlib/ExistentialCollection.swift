@@ -51,11 +51,12 @@ var tests = TestSuite("ExistentialCollection")
 
 tests.test("AnyGenerator") {
   func countStrings() -> AnyGenerator<String> {
-    let lazyStrings = lazy(0..<5).map { String($0) }
+    let lazyStrings = (0..<5).lazy.map { String($0) }
     
     // This is a really complicated type of no interest to our
     // clients.
-    let g: MapGenerator<RangeGenerator<Int>, String> = lazyStrings.generate()
+    let g: LazyMapGenerator<
+      RangeGenerator<Int>, String> = lazyStrings.generate()
     return anyGenerator(g)
   }
   expectEqual(["0", "1", "2", "3", "4"], Array(countStrings()))
@@ -214,20 +215,20 @@ tests.test("ForwardCollection") {
 
 tests.test("BidirectionalCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyForwardCollection(lazy(a0).reverse())
+  let fc0 = AnyForwardCollection(a0.lazy.reverse())
   
   let bc0_ = AnyBidirectionalCollection(fc0)         // upgrade!
   expectNotEmpty(bc0_)
   let bc0 = bc0_!
   expectTrue(fc0 === bc0)
 
-  let fc1 = AnyForwardCollection(lazy(a0).reverse()) // new collection
+  let fc1 = AnyForwardCollection(a0.lazy.reverse()) // new collection
   expectFalse(fc1 === fc0)
 
   let fc2 = AnyForwardCollection(bc0)                // downgrade
   expectTrue(fc2 === bc0)
   
-  let a1 = ContiguousArray(lazy(bc0).reverse())
+  let a1 = ContiguousArray(bc0.lazy.reverse())
   expectEqual(a0, a1)
   for e in a0 {
     let i = bc0.indexOf(e)
@@ -250,7 +251,7 @@ tests.test("BidirectionalCollection") {
 
 tests.test("RandomAccessCollection") {
   let a0: ContiguousArray = [1, 2, 3, 5, 8, 13, 21]
-  let fc0 = AnyForwardCollection(lazy(a0).reverse())
+  let fc0 = AnyForwardCollection(a0.lazy.reverse())
   let rc0_ = AnyRandomAccessCollection(fc0)         // upgrade!
   expectNotEmpty(rc0_)
   let rc0 = rc0_!
@@ -262,7 +263,7 @@ tests.test("RandomAccessCollection") {
   let fc1 = AnyBidirectionalCollection(rc0)         // downgrade
   expectTrue(fc1 === rc0)
   
-  let a1 = ContiguousArray(lazy(rc0).reverse())
+  let a1 = ContiguousArray(rc0.lazy.reverse())
   expectEqual(a0, a1)
   for e in a0 {
     let i = rc0.indexOf(e)

@@ -420,10 +420,8 @@ extension SequenceType {
     }
 
     if distance(ringBuffer.startIndex, i) > 0 {
-      return AnySequence(_lazyConcatenate([
-        ringBuffer[i..<ringBuffer.endIndex],
-        ringBuffer[0..<i]
-      ]))
+      return AnySequence(
+        [ringBuffer[i..<ringBuffer.endIndex], ringBuffer[0..<i]].flatten())
     }
     return AnySequence(ringBuffer)
   }

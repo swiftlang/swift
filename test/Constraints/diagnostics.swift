@@ -120,7 +120,7 @@ i ***~ i // expected-error{{binary operator '***~' cannot be applied to two 'Int
 // FIXME: poor diagnostic, to be fixed in 20142462. For now, we just want to
 // make sure that it doesn't crash.
 func rdar20142523() {
-  // expected-note @+1 {{overloads for 'map' exist with these partially matching parameter lists: (S, (S.Generator.Element) -> T), (C, (C.Generator.Element) -> T), (T?, @noescape (T) -> U)}}
+  // expected-note @+1 {{overloads for 'map' exist with these partially matching parameter lists: (C, (C.Generator.Element) -> T), (T?, @noescape (T) -> U)}}
   map(0..<10, { x in // expected-error{{cannot invoke 'map' with an argument list of type '(Range<Int>, (_) -> _)'}}
     ()
     return x

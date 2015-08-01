@@ -17,7 +17,7 @@
 ///
 /// - Note: this is the `GeneratorType` used by `FlattenSequence`,
 ///   `FlattenCollection`, and `BidirectionalFlattenCollection`.
-public struct _prext_FlattenGenerator<
+public struct FlattenGenerator<
   Base : GeneratorType where Base.Element : SequenceType
 > : GeneratorType, SequenceType {
 
@@ -57,7 +57,17 @@ public struct _prext_FlattenGenerator<
 ///
 /// The elements of this view are a concatenation of the elements of
 /// each sequence in the base.
-public struct _prext_FlattenSequence<
+///
+/// The `flatten` property is always lazy, but does not implicitly
+/// confer laziness on algorithms applied to its result.  In other
+/// words, for ordinary sequences `s`:
+///
+/// * `s.flatten()` does not create new storage
+/// * `s.flatten().map(f)` maps eagerly and returns a new array
+/// * `s.lazy.flatten().map(f)` maps lazily and returns a `LazyMapSequence`
+///
+/// - See also: `FlattenCollection`
+public struct FlattenSequence<
   Base : SequenceType where Base.Generator.Element : SequenceType
 > : SequenceType {
 
@@ -71,8 +81,8 @@ public struct _prext_FlattenSequence<
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> _prext_FlattenGenerator<Base.Generator> {
-    return _prext_FlattenGenerator(_base.generate())
+  public func generate() -> FlattenGenerator<Base.Generator> {
+    return FlattenGenerator(_base.generate())
   }
   
   internal var _base: Base
@@ -80,32 +90,33 @@ public struct _prext_FlattenSequence<
 
 extension SequenceType where Generator.Element : SequenceType {
   /// A concatenation of the elements of `self`.
-  public var _prext_flatten: _prext_FlattenSequence<Self> {
-    return _prext_FlattenSequence(self)
+  public func flatten() -> FlattenSequence<Self> {
+    return FlattenSequence(self)
   }
 }
 
-extension _prext_LazySequenceType
+extension LazySequenceType
   where Elements.Generator.Element == Generator.Element, 
     Generator.Element : SequenceType {
   /// A concatenation of the elements of `self`.
-  public var _prext_flatten: _prext_LazySequence<
-    _prext_FlattenSequence<Elements>
+  public func flatten() -> LazySequence<
+    FlattenSequence<Elements>
   > {
-    return _prext_FlattenSequence(elements)._prext_lazy
+    return FlattenSequence(elements).lazy
   }
 }
 
 % for traversal in ('Forward', 'Bidirectional'):
 %   t = '' if traversal == 'Forward' else traversal
-%   Collection = '_prext_Flatten%sCollection' % t
-%   constraints = 'Base.Generator.Element : CollectionType'
+%   Collection = 'Flatten%sCollection' % t
+%   constraints = '%(Base)sGenerator.Element : CollectionType'
 %   if traversal == 'Bidirectional':
-%     constraints += ''' , Base.Index : BidirectionalIndexType, 
-%       Base.Generator.Element.Index : BidirectionalIndexType'''
+%     constraints += ''',
+%   %(Base)sIndex : BidirectionalIndexType, 
+%   %(Base)sGenerator.Element.Index : BidirectionalIndexType'''
 %   Index = Collection + 'Index'
 public struct ${Index}<
-  Base: CollectionType where ${constraints}
+  BaseElements: CollectionType where ${constraints % {'Base': 'BaseElements.'}}
 > : ${traversal}IndexType {
   /// Returns the next consecutive value after `self`.
   ///
@@ -145,7 +156,7 @@ public struct ${Index}<
 % end
 
   /// Construct the `startIndex` for a flattened view of `base`.
-  internal init(_startIndexOfFlattened base: Base) {
+  internal init(_startIndexOfFlattened base: BaseElements) {
     for outer in base.indices {
       let innerCollection = base[outer]
       if !innerCollection.isEmpty {
@@ -160,7 +171,7 @@ public struct ${Index}<
   }
 
   /// Construct the `endIndex` for a flattened view of `base`.
-  internal init(_endIndexOfFlattened _base: Base) {
+  internal init(_endIndexOfFlattened _base: BaseElements) {
     self._base = _base
     self._outer = _base.endIndex
     self._inner = nil
@@ -168,23 +179,26 @@ public struct ${Index}<
   }
 
   internal init(
-    _ _base: Base,
-    _ outer: Base.Index,
-    _ inner: Base.Generator.Element.Index?,
-    _ innerCollection: Base.Generator.Element?) {
+    _ _base: BaseElements,
+    _ outer: BaseElements.Index,
+    _ inner: BaseElements.Generator.Element.Index?,
+    _ innerCollection: BaseElements.Generator.Element?) {
     self._base = _base
     self._outer = outer
     self._inner = inner
     self._innerCollection = innerCollection
   }
   
-  internal let _base: Base
-  internal let _outer: Base.Index
-  internal let _inner: Base.Generator.Element.Index?
-  internal let _innerCollection: Base.Generator.Element?
+  internal let _base: BaseElements
+  internal let _outer: BaseElements.Index
+  internal let _inner: BaseElements.Generator.Element.Index?
+  internal let _innerCollection: BaseElements.Generator.Element?
 }
 
-public func == <Base> (lhs: ${Index}<Base>, rhs: ${Index}<Base>) -> Bool {
+public func == <BaseElements> (
+  lhs: ${Index}<BaseElements>, 
+  rhs: ${Index}<BaseElements>
+) -> Bool {
   return lhs._outer == rhs._outer && lhs._inner == rhs._inner
 }
 
@@ -192,8 +206,18 @@ public func == <Base> (lhs: ${Index}<Base>, rhs: ${Index}<Base>) -> Bool {
 ///
 /// The elements of this view are a concatenation of the elements of
 /// each collection in the base.
+///
+/// The `flatten` property is always lazy, but does not implicitly
+/// confer laziness on algorithms applied to its result.  In other
+/// words, for ordinary collections `c`:
+///
+/// * `c.flatten()` does not create new storage
+/// * `c.flatten().map(f)` maps eagerly and returns a new array
+/// * `c.lazy.flatten().map(f)` maps lazily and returns a `LazyMapCollection`
+///
+/// - See also: `FlattenSequence`
 public struct ${Collection}<
-  Base: CollectionType where ${constraints}
+  Base: CollectionType where ${constraints % {'Base': 'Base.'}}
 > : CollectionType {
   /// A type that represents a valid position in the collection.
   ///
@@ -209,8 +233,8 @@ public struct ${Collection}<
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> _prext_FlattenGenerator<Base.Generator> {
-    return _prext_FlattenGenerator(_base.generate())
+  public func generate() -> FlattenGenerator<Base.Generator> {
+    return FlattenGenerator(_base.generate())
   }
 
   /// The position of the first element in a non-empty collection.
@@ -259,20 +283,20 @@ public struct ${Collection}<
   internal var _base: Base
 }
 
-extension CollectionType where ${constraints.replace('Base.', '')} {
+extension CollectionType where ${constraints % {'Base': ''}} {
   /// A concatenation of the elements of `self`.
-  public var _prext_flatten: ${Collection}<Self> {
+  public func flatten() -> ${Collection}<Self> {
     return ${Collection}(self)
   }
 }
 
-extension _prext_LazyCollectionType
-  where ${constraints.replace('Base.', '')}, 
-  ${constraints.replace('Base.', 'Elements.')},
+extension LazyCollectionType
+  where ${constraints % {'Base': ''}}, 
+  ${constraints % {'Base': 'Elements.'}},
   Generator.Element == Elements.Generator.Element {
   /// A concatenation of the elements of `self`.
-  public var _prext_flatten: _prext_LazyCollection<${Collection}<Elements>> {
-    return ${Collection}(elements)._prext_lazy
+  public func flatten() -> LazyCollection<${Collection}<Elements>> {
+    return ${Collection}(elements).lazy
   }
 }
 

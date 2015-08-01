@@ -24,7 +24,7 @@ public func asHex<
 where
   S.Generator.Element : IntegerType
 >(x: S) -> String {
-  return "[ " + ", ".join(lazy(x).map { asHex($0) }) + " ]"
+  return "[ " + ", ".join(x.lazy.map { asHex($0) }) + " ]"
 }
 
 /// Compute the prefix sum of `seq`.

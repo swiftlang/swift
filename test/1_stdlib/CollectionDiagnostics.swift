@@ -147,32 +147,31 @@ extension FilterSequenceView {} // expected-error {{'FilterSequenceView' has bee
 extension FilterCollectionViewIndex {} // expected-error {{'FilterCollectionViewIndex' has been renamed to 'FilterCollectionIndex'}}
 extension FilterCollectionView {} // expected-error {{'FilterCollectionView' has been renamed to 'FilterCollection'}}
 
-extension MapGenerator {
+extension LazyMapGenerator {
   func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
 }
-extension MapSequence {
+extension LazyMapSequence {
   func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
 }
-extension MapCollection {
+extension LazyMapCollection {
   func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
 }
 
-extension MapSequenceGenerator {} // expected-error {{'MapSequenceGenerator' has been renamed to 'MapGenerator'}}
-extension MapSequenceView {} // expected-error {{'MapSequenceView' has been renamed to 'MapSequence'}}
-extension MapCollectionView {} // expected-error {{'MapCollectionView' has been renamed to 'MapCollection'}}
+extension MapSequenceGenerator {} // expected-error {{'MapSequenceGenerator' has been renamed to 'LazyMapGenerator'}}
+extension MapSequenceView {} // expected-error {{'MapSequenceView' has been renamed to 'LazyMapSequence'}}
+extension MapCollectionView {} // expected-error {{'MapCollectionView' has been renamed to 'LazyMapCollection'}}
 
 extension LazySequence {
   func foo(base: S) {} // expected-error {{'S' has been renamed to 'Base'}}
+  func bar() { _ = self.array } // expected-error {{please construct an Array from your lazy sequence}}
 }
-extension LazyForwardCollection {
+extension LazyCollection {
   func foo(base: S) {} // expected-error {{'S' has been renamed to 'Base'}}
 }
-extension LazyBidirectionalCollection {
-  func foo(base: S) {} // expected-error {{'S' has been renamed to 'Base'}}
-}
-extension LazyRandomAccessCollection {
-  func foo(base: S) {} // expected-error {{'S' has been renamed to 'Base'}}
-}
+
+func foo<T>(_:LazyForwardCollection<T>) // expected-error {{'LazyForwardCollection' has been renamed to 'LazyCollection'}}
+func foo<T>(_:LazyBidirectionalCollection<T>) // expected-error {{'LazyBidirectionalCollection' has been renamed to 'LazyCollection'}}
+func foo<T>(_:LazyRandomAccessCollection<T>) // expected-error {{'LazyRandomAccessCollection' has been renamed to 'LazyCollection'}}
 
 extension ReverseIndex {
   func foo(base: I) {} // expected-error {{'I' has been renamed to 'Base'}}

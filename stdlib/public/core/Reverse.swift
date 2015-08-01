@@ -1,4 +1,4 @@
-//===--- Reverse.swift.gyb - Lazy sequence reversal -----------*- swift -*-===//
+//===--- Reverse.swift - Lazy sequence reversal ---------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol _prext_ReverseIndexType : BidirectionalIndexType {
+public protocol ReverseIndexType : BidirectionalIndexType {
   typealias Base : BidirectionalIndexType
   
   /// A type that can represent the number of steps between pairs of
@@ -29,7 +29,7 @@ public protocol _prext_ReverseIndexType : BidirectionalIndexType {
   init(_ base: Base)
 }
 
-extension _prext_ReverseIndexType where Self : BidirectionalIndexType {
+extension BidirectionalIndexType where Self : ReverseIndexType {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Requires: The next value is representable.
@@ -47,8 +47,8 @@ extension _prext_ReverseIndexType where Self : BidirectionalIndexType {
 
 /// A wrapper for a `BidirectionalIndexType` that reverses its
 /// direction of traversal.
-public struct _prext_ReverseIndex<Base: BidirectionalIndexType>
-: BidirectionalIndexType, _prext_ReverseIndexType {
+public struct ReverseIndex<Base: BidirectionalIndexType>
+: BidirectionalIndexType, ReverseIndexType {
   public typealias Distance = Base.Distance
   
   public init(_ base: Base) { self.base = base }
@@ -61,18 +61,21 @@ public struct _prext_ReverseIndex<Base: BidirectionalIndexType>
   /// - if `n` != `c.count`, then `c.reverse[self]` is 
   ///   equivalent to `[self.base.predecessor()]`.
   public let base: Base
+
+  @available(*, unavailable, renamed="Base")
+  public typealias I = Base
 }
 
-public func == <I> (
-  lhs: _prext_ReverseIndex<I>, rhs: _prext_ReverseIndex<I>
+public func == <Base> (
+  lhs: ReverseIndex<Base>, rhs: ReverseIndex<Base>
 ) -> Bool {
   return lhs.base == rhs.base
 }
 
 /// A wrapper for a `RandomAccessIndexType` that reverses its
 /// direction of traversal.
-public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndexType>
-  : RandomAccessIndexType, _prext_ReverseIndexType {
+public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
+  : RandomAccessIndexType, ReverseIndexType {
 
   public typealias Distance = Base.Distance
   
@@ -91,7 +94,7 @@ public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   /// `predecessor` required to reach `other` from `self`.
   ///
   /// - Complexity: O(1).
-  public func distanceTo(other: _prext_ReverseRandomAccessIndex) -> Distance {
+  public func distanceTo(other: ReverseRandomAccessIndex) -> Distance {
     return other.base.distanceTo(base)
   }
 
@@ -102,22 +105,24 @@ public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
   ///
   /// - Complexity: O(1).
-  public func advancedBy(amount: Distance) -> _prext_ReverseRandomAccessIndex {
-    return _prext_ReverseRandomAccessIndex(base.advancedBy(-amount))
+  public func advancedBy(amount: Distance) -> ReverseRandomAccessIndex {
+    return ReverseRandomAccessIndex(base.advancedBy(-amount))
   }
+
+  @available(*, unavailable, renamed="Base")
+  public typealias I = Base
 }
 
 public protocol _ReverseCollectionType : CollectionType {
-  typealias Index : _prext_ReverseIndexType
+  typealias Index : ReverseIndexType
   typealias Base : CollectionType
   var _base: Base {get}
 }
 
-extension _ReverseCollectionType
-  where Self : CollectionType, Self.Base.Index : RandomAccessIndexType
-{
-  public var startIndex : _prext_ReverseRandomAccessIndex<Self.Base.Index> {
-    return _prext_ReverseRandomAccessIndex(_base.endIndex)
+extension CollectionType
+  where Self : _ReverseCollectionType, Self.Base.Index : RandomAccessIndexType {
+  public var startIndex : ReverseRandomAccessIndex<Self.Base.Index> {
+    return ReverseRandomAccessIndex(_base.endIndex)
   }
 }
 
@@ -136,9 +141,20 @@ extension _ReverseCollectionType
 ///
 /// - Note: This type is the result of `x.reverse()` where `x` is a
 ///   collection having bidirectional indices.
-public struct _prext_ReverseCollection<
+///
+/// The `reverse()` method is always lazy when applied to a collection
+/// with bidirectional indices, but does not implicitly confer
+/// laziness on algorithms applied to its result.  In other words, for
+/// ordinary collections `c` having bidirectional indices:
+///
+/// * `c.reverse()` does not create new storage
+/// * `c.reverse().map(f)` maps eagerly and returns a new array
+/// * `c.lazy.reverse().map(f)` maps lazily and returns a `LazyMapCollection`
+///
+/// - See also: `ReverseRandomAccessCollection`
+public struct ReverseCollection<
   Base : CollectionType where Base.Index : BidirectionalIndexType
-> : _ReverseCollectionType {
+> : CollectionType, _ReverseCollectionType {
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
   ///
@@ -151,13 +167,16 @@ public struct _prext_ReverseCollection<
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = _prext_ReverseIndex<Base.Index>
+  public typealias Index = ReverseIndex<Base.Index>
 
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
-  public typealias Generator = IndexingGenerator<_prext_ReverseCollection>
+  public typealias Generator = IndexingGenerator<ReverseCollection>
   
   public let _base: Base
+
+  @available(*, unavailable, renamed="Base")
+  public typealias T = Base
 }
 
 /// A Collection that presents the elements of its `Base` collection
@@ -165,7 +184,8 @@ public struct _prext_ReverseCollection<
 ///
 /// - Note: This type is the result of `x.reverse()` where `x` is a
 ///   collection having random access indices.
-public struct _prext_ReverseRandomAccessCollection<
+/// - See also: `ReverseCollection`
+public struct ReverseRandomAccessCollection<
   Base : CollectionType where Base.Index : RandomAccessIndexType
 > : _ReverseCollectionType {
   /// Creates an instance that presents the elements of `base` in
@@ -180,23 +200,26 @@ public struct _prext_ReverseRandomAccessCollection<
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = _prext_ReverseRandomAccessIndex<Base.Index>
+  public typealias Index = ReverseRandomAccessIndex<Base.Index>
   
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
   public typealias Generator = IndexingGenerator<
-    _prext_ReverseRandomAccessCollection
+    ReverseRandomAccessCollection
   >
 
   public let _base: Base
+
+  @available(*, unavailable, renamed="Base")
+  public typealias T = Base
 }
 
 extension CollectionType where Index : BidirectionalIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
-  public func _prext_reverse() -> _prext_ReverseCollection<Self> {
-    return _prext_ReverseCollection(self)
+  public func reverse() -> ReverseCollection<Self> {
+    return ReverseCollection(self)
   }
 }
 
@@ -204,38 +227,34 @@ extension CollectionType where Index : RandomAccessIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
-  public func _prext_reverse() -> _prext_ReverseRandomAccessCollection<Self> {
-    return _prext_ReverseRandomAccessCollection(self)
+  public func reverse() -> ReverseRandomAccessCollection<Self> {
+    return ReverseRandomAccessCollection(self)
   }
 }
 
-extension _prext_LazyCollectionType
+extension LazyCollectionType
 where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
-  public func _prext_reverse() -> _prext_LazyCollection<
-    _prext_ReverseCollection<Elements>
+  public func reverse() -> LazyCollection<
+    ReverseCollection<Elements>
   > {
-    return _prext_ReverseCollection(elements)._prext_lazy
+    return ReverseCollection(elements).lazy
   }
 }
 
-extension _prext_LazyCollectionType
+extension LazyCollectionType
 where Index : RandomAccessIndexType, Elements.Index : RandomAccessIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
-  public func _prext_reverse() -> _prext_LazyCollection<
-    _prext_ReverseRandomAccessCollection<Elements>
+  public func reverse() -> LazyCollection<
+    ReverseRandomAccessCollection<Elements>
   > {
-    return _prext_ReverseRandomAccessCollection(elements)._prext_lazy
+    return ReverseRandomAccessCollection(elements).lazy
   }
 }
-
-//===----------------------------------------------------------------------===//
-// Implementations we are replacing
-//===----------------------------------------------------------------------===//
 
 /// Return an `Array` containing the elements of `source` in reverse
 /// order.
@@ -245,132 +264,6 @@ public func reverse<C:CollectionType where C.Index: BidirectionalIndexType>(
 ) -> [C.Generator.Element] {
   fatalError("unavailable function can't be called")
 }
-
-% for traversal in ('Bidirectional', 'RandomAccess'):
-%   Self = 'Lazy%sCollection' % traversal
-%   if traversal == 'Bidirectional':
-%     View = 'ReverseCollection'
-%     Index = 'ReverseIndex'
-%     IndexProtocol = '%sIndexType' % traversal
-%   else:
-%     View = 'Reverse%sCollection' % traversal
-%     Index = 'Reverse%sIndex' % traversal
-%     IndexProtocol = '%sIndexType' % traversal
-%   end
-
-/// A wrapper for a `${IndexProtocol}` that reverses its
-/// direction of traversal.
-public struct ${Index}<Base : ${IndexProtocol}> : ${IndexProtocol} {
-  @available(*, unavailable, renamed="Base")
-  public typealias I = Base
-
-  var _base: Base
-
-  init(_ _base: Base) { self._base = _base }
-
-  /// Returns the next consecutive value after `self`.
-  ///
-  /// - Requires: The next value is representable.
-  public func successor() -> ${Index} {
-    return ${Index}(_base.predecessor())
-  }
-
-  /// Returns the previous consecutive value before `self`.
-  ///
-  /// - Requires: The previous value is representable.
-  public func predecessor() -> ${Index} {
-    return ${Index}(_base.successor())
-  }
-
-  /// A type that can represent the number of steps between pairs of
-  /// `${Index}` values where one value is reachable from the other.
-  public typealias Distance = Base.Distance
-
-%   if traversal == 'RandomAccess':
-  /// Return the minimum number of applications of `successor` or
-  /// `predecessor` required to reach `other` from `self`.
-  ///
-  /// - Complexity: O(1).
-  public func distanceTo(other: ${Index}) -> Distance {
-    return other._base.distanceTo(_base)
-  }
-
-  /// Return `self` offset by `n` steps.
-  ///
-  /// - Returns: If `n > 0`, the result of applying `successor` to
-  ///   `self` `n` times.  If `n < 0`, the result of applying
-  ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
-  ///
-  /// - Complexity: O(1).
-  public func advancedBy(amount: Distance) -> ${Index} {
-    return ${Index}(_base.advancedBy(-amount))
-  }
-%   end
-}
-
-public func == <I> (lhs: ${Index}<I>, rhs: ${Index}<I>) -> Bool {
-  return lhs._base == rhs._base
-}
-
-/// The lazy `CollectionType` returned by `reverse(c)` where `c` is a
-/// `CollectionType` with an `Index` conforming to `${IndexProtocol}`.
-public struct ${View}<
-  Base : CollectionType where Base.Index : ${IndexProtocol}
-> : CollectionType {
-  @available(*, unavailable, renamed="Base")
-  public typealias T = Base
-
-  /// A type that represents a valid position in the collection.
-  ///
-  /// Valid indices consist of the position of every element and a
-  /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = ${Index}<Base.Index>
-
-  /// A type whose instances can produce the elements of this
-  /// sequence, in order.
-  public typealias Generator = IndexingGenerator<${View}>
-
-  init(_ _base: Base) {
-    self._base = _base
-  }
-
-  /// The position of the first element in a non-empty collection.
-  ///
-  /// In an empty collection, `startIndex == endIndex`.
-  public var startIndex: Index {
-    return ${Index}(_base.endIndex)
-  }
-
-  /// The collection's "past the end" position.
-  ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
-  public var endIndex: Index {
-    return ${Index}(_base.startIndex)
-  }
-
-  /// Access the element at `position`.
-  ///
-  /// - Requires: `position` is a valid position in `self` and
-  ///   `position != endIndex`.
-  public subscript(position: Index) -> Base.Generator.Element {
-    return _base[position._base.predecessor()]
-  }
-
-  var _base: Base
-}
-
-extension ${Self} {
-  /// Return a `${View}` over this `${Self}`.  The elements of
-  /// the result are computed lazily, each time they are read, by
-  /// calling `transform` function on a base element.
-  public func reverse() -> ${Self}<${View}<Base>> {
-    return ${Self}<${View}<Base>>(${View}<Base>(self._base))
-  }
-}
-
-% end
 
 @available(*, unavailable, renamed="ReverseCollection")
 public struct BidirectionalReverseView<

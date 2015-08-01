@@ -995,7 +995,7 @@ public enum OSVersion : CustomStringConvertible {
 }
 
 func _parseDottedVersion(s: String) -> [Int] {
-  return Array(lazy(s._split(".")).map { Int($0)! })
+  return Array(s._split(".").lazy.map { Int($0)! })
 }
 
 public func _parseDottedVersionTriple(s: String) -> (Int, Int, Int) {
@@ -2399,7 +2399,7 @@ public func expectEqualMethodsForDomain<
 public func expectEqualUnicodeScalars(
   expected: [UInt32], _ actual: String, ${TRACE}) {
   let actualUnicodeScalars = Array(
-    lazy(actual.unicodeScalars).map { $0.value })
+    actual.unicodeScalars.lazy.map { $0.value })
   
   if !expected.elementsEqual(actualUnicodeScalars) {
     expectationFailure(

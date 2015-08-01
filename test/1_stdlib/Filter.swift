@@ -15,25 +15,25 @@
 // Check that the generic parameter is called 'Base'.
 protocol TestProtocol1 {}
 
-extension FilterGenerator where Base : TestProtocol1 {
+extension LazyFilterGenerator where Base : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-extension FilterSequence where Base : TestProtocol1 {
+extension LazyFilterSequence where Base : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-extension FilterCollectionIndex where Base : TestProtocol1 {
+extension LazyFilterIndex where BaseElements : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-extension FilterCollection where Base : TestProtocol1 {
+extension LazyFilterCollection where Base : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -60,7 +60,7 @@ func printlnByIndexing<C: CollectionType>(c: C) {
 
 // Test filtering Collections
 if true {
-  let f0 = FilterCollection(0..<30) { $0 % 7 == 0 }
+  let f0 = LazyFilterCollection(0..<30) { $0 % 7 == 0 }
   
   // CHECK-NEXT: <0, 7, 14, 21, 28>
   printlnByGenerating(f0)
@@ -69,7 +69,7 @@ if true {
 
   // Also try when the first element of the underlying sequence
   // doesn't pass the filter
-  let f1 = FilterCollection(1..<30) { $0 % 7 == 0 }
+  let f1 = LazyFilterCollection(1..<30) { $0 % 7 == 0 }
   
   // CHECK-NEXT: <7, 14, 21, 28>
   printlnByGenerating(f1)
@@ -80,14 +80,14 @@ if true {
 
 // Test filtering Sequences
 if true {
-  let f0 = lazy((0..<30).generate()).filter { $0 % 7 == 0 }
+  let f0 = (0..<30).generate().lazy.filter { $0 % 7 == 0 }
   
   // CHECK-NEXT: <0, 7, 14, 21, 28>
   printlnByGenerating(f0)
 
   // Also try when the first element of the underlying sequence
   // doesn't pass the filter
-  let f1 = lazy((1..<30).generate()).filter { $0 % 7 == 0 }
+  let f1 = (1..<30).generate().lazy.filter { $0 % 7 == 0 }
   
   // CHECK-NEXT: <7, 14, 21, 28>
   printlnByGenerating(f1)

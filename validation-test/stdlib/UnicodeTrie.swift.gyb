@@ -131,7 +131,7 @@ func checkGraphemeClusterSegmentation(
   }
   expectEqual(
     expectedBoundaries, actualBoundaries,
-    "scalars: \(asHex(lazy(subject.unicodeScalars).map { $0.value }.array))"
+    "scalars: \(asHex(subject.unicodeScalars.lazy.map { $0.value }.array))"
   )
 
   let expectedCharacters: [Character] = Array(subject.characters)

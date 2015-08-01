@@ -600,7 +600,7 @@ extension String {
       S : SequenceType where S.Generator.Element == String
   >(elements: S) -> String {
     return String(
-      characters.join(lazy(elements).map { $0.characters })
+      characters.join(elements.lazy.map { $0.characters })
     )
   }
 }

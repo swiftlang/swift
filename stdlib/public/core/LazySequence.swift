@@ -96,7 +96,7 @@
 ///       /// for each prefix `p` of `self`, in order from shortest to
 ///       /// longest.  For example:
 ///       ///
-///       ///     (1..<6).lazy.scan(0, combine: +).array // [0, 1, 3, 6, 10, 15]
+///       ///     Array((1..<6).lazy.scan(0, combine: +)) // [0, 1, 3, 6, 10, 15]
 ///       ///
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
@@ -127,7 +127,7 @@
 ///   [We don't recommend that you use `map` this way, because it
 ///   creates and discards an array. `sum` would be better implemented
 ///   using `reduce`].
-public protocol _prext_LazySequenceType : SequenceType {
+public protocol LazySequenceType : SequenceType {
   /// A `SequenceType` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
@@ -141,31 +141,24 @@ public protocol _prext_LazySequenceType : SequenceType {
   /// of `self` can prevent result types from growing an extra
   /// `LazySequence` layer.  For example,
   ///
+  /// _prext_ example neeeded
+  ///
   /// Note: this property need not be implemented by conforming types,
   /// it has a default implementation in a protocol extension that
   /// just returns `self`.
   var elements: Elements {get} 
   
-  /// An Array, created on-demand, containing the elements of this
-  /// lazy SequenceType.
-  ///
-  /// Note: this property need not be implemented by conforming types, it has a
-  /// default implementation in a protocol extension.
   var array: [Generator.Element] {get}
 }
 
-extension _prext_LazySequenceType {
-  /// An Array containing the elements of this lazy SequenceType.
-  ///
-  /// - Complexity: O(N)
-  public var array: [Generator.Element] {
-    return Array(self)
-  }
+extension LazySequenceType {
+  @available(*, unavailable, message="please construct an Array from your lazy sequence: Array(...)")
+  public var array: [Generator.Element] { fatalError("unavailable") }
 }
 
 /// When there's no special associated `Elements` type, the `elements`
 /// property is provided.
-extension _prext_LazySequenceType where Elements == Self {
+extension LazySequenceType where Elements == Self {
   /// Identical to `self`.
   public var elements: Self { return self }
 }
@@ -175,10 +168,23 @@ extension _prext_LazySequenceType where Elements == Self {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceType`
-public struct _prext_LazySequence<Base : SequenceType>
-  : _prext_LazySequenceType, _SequenceWrapperType {
+public struct LazySequence<Base : SequenceType>
+  : LazySequenceType, _SequenceWrapperType {
+
+  /// Creates a sequence that has the same elements as `base`, but on
+  /// which some operations such as `map` and `filter` are implemented
+  /// lazily.
+  public init(_ base: Base) {
+    self._base = base
+  }
+  
   public var _base: Base
+
+  /// The `Base` (presumably non-lazy) sequence from which `self` was created.
   public var elements: Base { return _base }
+
+  @available(*, unavailable, renamed="Base")
+  public typealias S = Void
 }
 
 extension SequenceType {
@@ -187,57 +193,22 @@ extension SequenceType {
   /// implemented lazily.
   ///
   /// - See also: `LazySequenceType`, `LazySequence`
-  public var _prext_lazy: _prext_LazySequence<Self> {
-    return _prext_LazySequence(_base: self)
+  public var lazy: LazySequence<Self> {
+    return LazySequence(self)
   }
 }
 
 /// Avoid creating multiple layers of `LazySequence` wrapper.
 /// Anything conforming to `LazySequenceType` is already lazy.
-extension _prext_LazySequenceType {
+extension LazySequenceType {
   /// Identical to `self`.
-  public var _prext_lazy: Self {
+  public var lazy: Self {
     return self
   }
 }
 
-//===----------------------------------------------------------------------===//
-// Implementations we are replacing
-//===----------------------------------------------------------------------===//
-
-/// A sequence that forwards its implementation to an underlying
-/// sequence instance while exposing lazy computations as methods.
-public struct LazySequence<Base : SequenceType> : SequenceType {
-  @available(*, unavailable, renamed="Base")
-  public typealias S = Base
-
-  /// Construct an instance with `base` as its underlying sequence
-  /// instance.
-  public init(_ base: Base) {
-    self._base = base
-  }
-
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> Base.Generator {
-    return self._base.generate()
-  }
-
-  /// an Array, created on-demand, containing the elements of this
-  /// lazy SequenceType.
-  public var array: [Base.Generator.Element] {
-    return Array(_base)
-  }
-
-  public func underestimateCount() -> Int {
-    return _base.underestimateCount()
-  }
-
-  var _base: Base
-}
-
-/// Augment `s` with lazy methods such as `map`, `filter`, etc.
+@available(*, unavailable, message="Please use the sequence's '.lazy' property")
 public func lazy<Base : SequenceType>(s: Base) -> LazySequence<Base> {
-  return LazySequence(s)
+  fatalError("unavailable")
 }
+
