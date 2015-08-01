@@ -35,5 +35,10 @@ class D : C {}
 func foo(a: Any, p2: Bool = true) { print("Wrong") }
 func foo(c: C) { print("Right") }
 
+func bar(a: Any..., p2: Bool = true) { print("Wrong") }
+func bar(c: C) { print("Right") }
+
 // CHECK: Right
 foo(D())
+// CHECK: Right
+bar(D())
