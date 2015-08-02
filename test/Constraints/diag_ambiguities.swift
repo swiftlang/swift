@@ -17,3 +17,14 @@ func +++(d: Double, i: Int) {} // expected-note{{found this candidate}}
 
 1 +++ 2 // expected-error{{ambiguous use of operator '+++'}}
 
+class C {
+  init(_ action: (Int) -> ()) {} // expected-note{{found this candidate}}
+  init(_ action: (Int, Int) -> ()) {} // expected-note{{found this candidate}}
+}
+
+func g(x: Int) -> () {} // expected-note{{found this candidate}}
+func g(x: Int, _ y: Int) -> () {} // expected-note{{found this candidate}}
+C(g) // expected-error{{ambiguous use of 'g'}}
+
+func h<T>(x: T) -> () {}
+C(h) // expected-error{{ambiguous use of 'init'}}

@@ -5339,8 +5339,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
          ty->hasDependentProtocolConformances());
   auto ctorLocator = cs.getConstraintLocator(
-                       locator.withPathElement(
-                         ConstraintLocator::ConstructorMember));
+                 locator.withPathElement(ConstraintLocator::ApplyFunction)
+                        .withPathElement(ConstraintLocator::ConstructorMember));
   auto selected = getOverloadChoiceIfAvailable(ctorLocator);
 
   // We have the constructor.

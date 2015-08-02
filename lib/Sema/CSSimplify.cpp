@@ -2284,6 +2284,8 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
   auto name = context.Id_init;
   auto applyLocator = getConstraintLocator(locator,
                                            ConstraintLocator::ApplyArgument);
+  auto fnLocator = getConstraintLocator(locator,
+                                        ConstraintLocator::ApplyFunction);
   auto tv = createTypeVariable(applyLocator,
                                TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
 
@@ -2293,7 +2295,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
   addValueMemberConstraint(MetatypeType::get(valueType, TC.Context), name,
                            FunctionType::get(tv, resultType),
                            getConstraintLocator(
-                             locator, 
+                             fnLocator, 
                              ConstraintLocator::ConstructorMember));
 
   // The first type must be convertible to the constructor's argument type.
@@ -2707,16 +2709,21 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
       continue;
     }
 
+    if (parts.back().getKind() == ConstraintLocator::ApplyFunction) {
+      if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+        anchor = applyExpr->getFn()->getSemanticsProvidingExpr();
+      }
+      parts.pop_back();
+      continue;
+    }
+
     if (parts.back().getKind() == ConstraintLocator::ConstructorMember) {
       // FIXME: Workaround for strange anchor on ConstructorMember locators.
-      if (auto call = dyn_cast<CallExpr>(anchor)) {
-        anchor = call->getFn()->getSemanticsProvidingExpr();
 
-        if (auto optionalWrapper = dyn_cast<BindOptionalExpr>(anchor))
-          anchor = optionalWrapper->getSubExpr();
-        else if (auto forceWrapper = dyn_cast<ForceValueExpr>(anchor))
-          anchor = forceWrapper->getSubExpr();
-      }
+      if (auto optionalWrapper = dyn_cast<BindOptionalExpr>(anchor))
+        anchor = optionalWrapper->getSubExpr();
+      else if (auto forceWrapper = dyn_cast<ForceValueExpr>(anchor))
+        anchor = forceWrapper->getSubExpr();
 
       parts.pop_back();
       continue;

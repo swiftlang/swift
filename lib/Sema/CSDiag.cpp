@@ -306,6 +306,19 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
+    case ConstraintLocator::ConstructorMember:
+      if (auto typeExpr = dyn_cast<TypeExpr>(anchor)) {
+        // This is really an implicit 'init' MemberRef, so point at the base,
+        // i.e. the TypeExpr.
+        targetAnchor = nullptr;
+        targetPath.clear();
+        range = SourceRange();
+        anchor = typeExpr;
+        path = path.slice(1);
+        continue;
+      }
+      SWIFT_FALLTHROUGH;
+
     case ConstraintLocator::Member:
     case ConstraintLocator::MemberRefBase:
       if (auto UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
