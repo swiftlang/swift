@@ -28,11 +28,10 @@ func funcdecl4(a: ((Int)->Int), _ b: Int) {}
 
 func funcdecl5(a: Int, _ y: Int) {
   // Pass in a closure containing the call to funcdecl3.
-  funcdecl4({ funcdecl3() }, 12) // expected-error{{cannot invoke 'funcdecl4' with an argument list of type '(() -> Int, Int)'}} expected-note{{expected an argument list of type '(((Int) -> Int), Int)'}}
+  funcdecl4({ funcdecl3() }, 12) // expected-error{{cannot convert value of type '() -> Int' to expected argument type '(Int) -> Int'}}
   func6(fn: {$0 + $1})       // Closure with two named anonymous arguments
   func6(fn: {($0) + $1})    // Closure with sequence expr inferred type
-  func6(fn: {($0) + $0})    // expected-error{{cannot invoke 'func6' with an argument list of type '(fn: (_) -> _)'}}
-  // expected-note @-1 {{expected an argument list of type '(fn: (Int, Int) -> Int)'}}
+  func6(fn: {($0) + $0})    // expected-error{{cannot convert value of type '(_) -> Int' to expected argument type '(Int, Int) -> Int'}}
 
 
   var testfunc : ((), Int) -> Int
@@ -59,8 +58,7 @@ func funcdecl5(a: Int, _ y: Int) {
   func6(fn: { a,b in a+b })
   
   // Infer incompatible type.
-  func6(fn: {a,b->Float in 4.0 })    // expected-error {{cannot invoke 'func6' with an argument list of type '(fn: (_, _) -> Float)'}}
-  // expected-note @-1 {{expected an argument list of type '(fn: (Int, Int) -> Int)'}}
+  func6(fn: {a,b->Float in 4.0 })    // expected-error {{cannot convert value of type '(_, _) -> Float' to expected argument type '(Int, Int) -> Int'}}
 
   // Pattern doesn't need to name arguments.
   func6(fn: { _,_ in 4 })

@@ -16,7 +16,7 @@ func f0<T : A>(obji: T, _ ai: A, _ bi: B) {
   var obj = obji, a = ai, b = bi
   // Method access
   obj.foo()
-  obj.bar() // expected-error{{}}
+  obj.bar() // expected-error{{value of type 'T' has no member 'bar'}}
 
   // Calls
   acceptA(obj)
@@ -39,7 +39,7 @@ func f0<T : A>(obji: T, _ ai: A, _ bi: B) {
 func call_f0(a: A, b: B, other: Other) {
   f0(a, a, b)
   f0(b, a, b)
-  f0(other, a, b) // expected-error{{}} expected-note{{}}
+  f0(other, a, b) // expected-error{{cannot convert value of type 'Other' to expected argument type 'A'}}
 }
 
 // Declaration errors

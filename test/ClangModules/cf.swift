@@ -60,8 +60,8 @@ func test9() {
   let constFridge: CCRefrigerator = fridge
   CCRefrigeratorOpen(fridge)
   let item = CCRefrigeratorGet(fridge, 0).takeUnretainedValue()
-  CCRefrigeratorInsert(item, fridge) // expected-error {{cannot invoke 'CCRefrigeratorInsert' with an argument list of type '(CCItem, CCMutableRefrigerator)'}} expected-note {{expected an argument list of type '(CCMutableRefrigerator!, CCItem!)'}}
-  CCRefrigeratorInsert(constFridge, item) // expected-error {{cannot invoke 'CCRefrigeratorInsert' with an argument list of type '(CCRefrigerator, CCItem)'}} expected-note {{expected an argument list of type '(CCMutableRefrigerator!, CCItem!)'}}
+  CCRefrigeratorInsert(item, fridge) // expected-error {{cannot convert value of type 'CCItem' to expected argument type 'CCMutableRefrigerator!'}}
+  CCRefrigeratorInsert(constFridge, item) // expected-error {{cannot convert value of type 'CCRefrigerator' to expected argument type 'CCMutableRefrigerator!'}}
   CCRefrigeratorInsert(fridge, item)
   CCRefrigeratorClose(fridge)
 }
@@ -114,10 +114,8 @@ func testOutParametersBad() {
   CCRefrigeratorCreateIndirect(fridge) // expected-error {{cannot convert value of type 'CCRefrigerator?' to expected argument type 'UnsafeMutablePointer<CCRefrigerator?>' (aka 'UnsafeMutablePointer<Optional<CCRefrigerator>>')}} 
 
   let power: CCPowerSupply?
-  CCRefrigeratorGetPowerSupplyIndirect(0, power) // expected-error {{cannot invoke 'CCRefrigeratorGetPowerSupplyIndirect' with an argument list of type '(Int, CCPowerSupply?)'}}
-    // expected-note @-1 {{expected an argument list of type '(CCRefrigerator!, AutoreleasingUnsafeMutablePointer<CCPowerSupply?>)'}}
+  CCRefrigeratorGetPowerSupplyIndirect(0, power) // expected-error {{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator!'}}
 
   let item: CCItem?
-  CCRefrigeratorGetItemUnaudited(0, 0, item) // expected-error {{cannot invoke 'CCRefrigeratorGetItemUnaudited' with an argument list of type '(Int, Int, CCItem?)'}}
-  // expected-note @-1 {{expected an argument list of type '(CCRefrigerator!, UInt32, UnsafeMutablePointer<Unmanaged<CCItem>?>)'}}
+  CCRefrigeratorGetItemUnaudited(0, 0, item) // expected-error {{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator!'}}
 }

@@ -3124,6 +3124,81 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
                                        CTPurpose, options);
   }
 
+  // If we know the requested argType to use, use computeTupleShuffle to produce
+  // the shuffle of input arguments to destination values.  It requires a
+  // TupleType to compute the mapping from argExpr.  Conveniently, it doesn't
+  // care about the actual types though, so we can just use 'void' for them.
+  if (argType && argType->is<TupleType>()) {
+    auto argTypeTT = argType->castTo<TupleType>();
+    SmallVector<TupleTypeElt, 4> ArgElts;
+    auto voidTy = CS->getASTContext().TheEmptyTupleType;
+    
+    for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i)
+      ArgElts.push_back({ voidTy, TE->getElementName(i) });
+    auto actualArgType = TupleType::get(ArgElts, CS->getASTContext());
+    if (auto *actualArgTypeTT = actualArgType->getAs<TupleType>()) {
+      SmallVector<int, 4> sources;
+      SmallVector<unsigned, 4> variadicArgs;
+      if (!computeTupleShuffle(actualArgTypeTT, argTypeTT,
+                               sources, variadicArgs)) {
+        SmallVector<Expr*, 4> resultElts(TE->getNumElements(), nullptr);
+        SmallVector<TupleTypeElt, 4> resultEltTys(TE->getNumElements(), voidTy);
+
+        // If we got a correct shuffle, we can perform the analysis of all of
+        // the input elements, with their expected types.
+        for (unsigned i = 0, e = sources.size(); i != e; ++i) {
+          // If the value is taken from a default argument, ignore it.
+          if (sources[i] == TupleShuffleExpr::DefaultInitialize ||
+              sources[i] == TupleShuffleExpr::Variadic ||
+              sources[i] == TupleShuffleExpr::CallerDefaultInitialize)
+            continue;
+          
+          assert(sources[i] >= 0 && "Unknown sources index");
+          
+          // Otherwise, it must match the corresponding expected argument type.
+          unsigned inArgNo = sources[i];
+          auto actualType = argTypeTT->getElementType(i);
+
+          TCCOptions options;
+          if (actualType->is<InOutType>())
+            options |= TCC_AllowLValue;
+
+          auto expr =
+            typeCheckChildIndependently(TE->getElement(inArgNo), actualType,
+                                        CTP_CallArgument, options);
+          // If there was an error type checking this argument, then we're done.
+          if (!expr)
+            return nullptr;
+          resultElts[inArgNo] = expr;
+          resultEltTys[inArgNo] = {expr->getType(),TE->getElementName(inArgNo)};
+        }
+        
+        if (!variadicArgs.empty()) {
+          auto varargsTy = argTypeTT->getVarArgsBaseType();
+          for (unsigned i = 0, e = variadicArgs.size(); i != e; ++i) {
+            unsigned inArgNo = variadicArgs[i];
+            
+            auto expr =
+              typeCheckChildIndependently(TE->getElement(inArgNo), varargsTy,
+                                          CTP_CallArgument);
+            // If there was an error type checking this argument, then we're done.
+            if (!expr)
+              return nullptr;
+            resultElts[inArgNo] = expr;
+            resultEltTys[inArgNo] = { expr->getType() };
+          }
+        }
+        
+        auto TT = TupleType::get(resultEltTys, CS->getASTContext());
+        return TupleExpr::create(CS->getASTContext(), TE->getLParenLoc(),
+                                 resultElts, TE->getElementNames(),
+                                 TE->getElementNameLocs(),
+                                 TE->getRParenLoc(), TE->hasTrailingClosure(),
+                                 TE->isImplicit(), TT);
+      }
+    }
+  }
+  
   // Get the simplified type of each element and rebuild the aggregate.
   SmallVector<TupleTypeElt, 4> resultEltTys;
   SmallVector<Expr*, 4> resultElts;

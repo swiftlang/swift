@@ -51,8 +51,8 @@ f0(i, i, // expected-error{{extra argument in call}}
 // f5(f4)
 
 // Tuple element not convertible.
-f0(i, // expected-error {{cannot invoke 'f0' with an argument list of type '(Int, Double)'}} expected-note{{expected an argument list of type '(Int, Float)'}}
-   d
+f0(i,
+   d  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Float'}}
    )
 
 // Function result not a subtype.
@@ -102,8 +102,7 @@ infix operator **** {
 }
 
 func ****(_: Int, _: String) { }
-i **** i // expected-error{{binary operator '****' cannot be applied to two 'Int' operands}}
-// expected-note @-1 {{expected an argument list of type '(Int, String)'}}
+i **** i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 infix operator ***~ {
   associativity left
@@ -111,8 +110,7 @@ infix operator ***~ {
 }
 
 func ***~(_: Int, _: String) { }
-i ***~ i // expected-error{{binary operator '***~' cannot be applied to two 'Int' operands}}
-// expected-note @-1 {{expected an argument list of type '(Int, String)'}}
+i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 // <rdar://problem/20142523>
 // FIXME: poor diagnostic, to be fixed in 20142462. For now, we just want to
@@ -334,8 +332,7 @@ c.method2(1)(b: 2)
 c.method2(1)(c: 2)   // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
 c.method2(1)(c: 2.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(c: Double)'}}
 // expected-note @-1 {{expected an argument list of type '(b: Int)'}}
-c.method2(1)(b: 2.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(b: Double)'}}
-// expected-note @-1 {{expected an argument list of type '(b: Int)'}}
+c.method2(1)(b: 2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 c.method2(1.0)(b: 2) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 c.method2(1.0)(b: 2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
@@ -349,8 +346,7 @@ _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
 _ = CurriedClass.method2(1,2)      // expected-error {{extra argument in call}}
 CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(b: Double)'}}
-// expected-note @-1 {{expected an argument list of type '(b: Int)'}}
+CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(c: Double)'}}
 // expected-note @-1 {{expected an argument list of type '(b: Int)'}}
 
@@ -360,8 +356,7 @@ _ = CurriedClass.method3(c)
 _ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}}
 _ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value of non-function type '()'}}
 _ = CurriedClass.method3(1, 2)           // expected-error {{extra argument in call}}
-CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot invoke 'method3' with an argument list of type '(Double, b: Int)'}}
-// expected-note @-1 {{expected an argument list of type '(Int, b: Int)'}}
+CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method3(c)(1)               // expected-error {{cannot convert value of type 'Int' to expected argument type '(Int, b: Int)'}}
 
 CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter 'b' in call}}
@@ -483,8 +478,7 @@ class B {
 
 func test(a : B) {
   B.f1(nil)    // expected-error {{nil is not compatible with expected argument type 'AOpts'}}
-  a.function(42, nil) //expected-error {{cannot invoke 'function' with an argument list of type '(Int, NilLiteralConvertible)'}}
-  // expected-note @-1 {{expected an argument list of type '(Int8, a: AOpts)'}}
+  a.function(42, nil) //expected-error {{nil is not compatible with expected argument type 'AOpts'}}
   a.f2(nil)  // expected-error {{nil is not compatible with expected argument type 'AOpts'}}
 }
 
