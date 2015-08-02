@@ -325,3 +325,20 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
       UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
   }
 }
+
+extension _SliceBuffer {
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
+    if _hasNativeBuffer {
+      let n = nativeBuffer
+      if count == n.count {
+        return n
+      }
+    }
+
+    let result = _ContiguousArrayBuffer<Element>(
+      count: count,
+      minimumCapacity: 0)
+    result.firstElementAddress.initializeFrom(firstElementAddress, count: count)
+    return result
+  }
+}

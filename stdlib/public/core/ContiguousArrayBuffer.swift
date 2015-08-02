@@ -555,6 +555,20 @@ extension CollectionType {
   }
 }
 
+extension _ContiguousArrayBuffer {
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
+    return self
+  }
+}
+
+/// This is a fast implemention of _copyToNativeArrayBuffer() for collections.
+///
+/// It avoids the extra retain, release overhead from storing the
+/// ContiguousArrayBuffer into
+/// _UnsafePartiallyInitializedContiguousArrayBuffer. Since we do not support
+/// ARC loops, the extra retain, release overhead can not be eliminated which
+/// makes assigning ranges very slow. Once this has been implemented, this code
+/// should be changed to use _UnsafePartiallyInitializedContiguousArrayBuffer.
 internal func _copyCollectionToNativeArrayBuffer<
   C : CollectionType
 >(source: C) -> _ContiguousArrayBuffer<C.Generator.Element>
@@ -564,17 +578,19 @@ internal func _copyCollectionToNativeArrayBuffer<
     return _ContiguousArrayBuffer()
   }
 
-  var builder =
-    _UnsafePartiallyInitializedContiguousArrayBuffer<C.Generator.Element>(
-      initialCapacity: count)
+  let result = _ContiguousArrayBuffer<C.Generator.Element>(
+    count: numericCast(count),
+    minimumCapacity: 0
+  )
 
+  var p = result.firstElementAddress
   var i = source.startIndex
-  // FIXME(performance): use _initializeTo().
   for _ in 0..<count {
-    builder.addWithExistingCapacity(source[i++])
+    // FIXME(performance): use _initializeTo().
+    (p++).initialize(source[i++])
   }
   _expectEnd(i, source)
-  return builder.finishWithOriginalCount()
+  return result;
 }
 
 /// A "builder" interface for initializing array buffers.
