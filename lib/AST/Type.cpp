@@ -2036,6 +2036,19 @@ int TupleType::getElementForScalarInit() const {
   return FieldWithoutDefault == -1 ? 0 : FieldWithoutDefault;
 }
 
+/// If this tuple has a varargs element to it, return the base type of the
+/// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
+/// Otherwise, this returns Type().
+Type TupleType::getVarArgsBaseType() const {
+  for (unsigned i = 0, e = Elements.size(); i != e; ++i) {
+    if (Elements[i].isVararg())
+      return Elements[i].getVarargBaseTy();
+  }
+  
+  return Type();
+}
+
+
 CanArchetypeType ArchetypeType::getNew(const ASTContext &Ctx,
                                        ArchetypeType *Parent,
                                        AssocTypeOrProtocolType AssocTypeOrProto,

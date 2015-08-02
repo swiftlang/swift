@@ -1205,6 +1205,8 @@ public:
 
   static inline Type getVarargBaseTy(Type VarArgT);
 
+  /// Remove the type of this varargs element designator, without the array
+  /// type wrapping it.
   Type getVarargBaseTy() const {
     assert(isVararg());
     return getVarargBaseTy(getType());
@@ -1276,6 +1278,11 @@ public:
   /// a scalar, return the element number that the scalar is assigned to.  If
   /// not, return -1.
   int getElementForScalarInit() const;
+  
+  /// If this tuple has a varargs element to it, return the base type of the
+  /// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
+  /// Otherwise, this returns Type().
+  Type getVarArgsBaseType() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
