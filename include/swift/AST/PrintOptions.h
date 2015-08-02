@@ -138,6 +138,9 @@ struct PrintOptions {
   /// Print all decls that have at least this level of access.
   Accessibility AccessibilityFilter = Accessibility::Private;
 
+  /// Print IfConfigDecls and IfConfigStmts.
+  bool PrintIfConfig = true;
+
   /// Whether we are printing for sil.
   bool PrintForSIL = false;
 
@@ -201,6 +204,7 @@ struct PrintOptions {
     result.ExcludeAttrList.push_back(DAK_Inline);
     result.PrintOverrideKeyword = false;
     result.AccessibilityFilter = Accessibility::Public;
+    result.PrintIfConfig = false;
     return result;
   }
 

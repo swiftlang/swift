@@ -1210,7 +1210,9 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
       Printer.printName(decl->getName());
     });
   bool ShouldPrint = true;
-  Type Ty = decl->getUnderlyingType();
+  Type Ty;
+  if (decl->hasUnderlyingType())
+    Ty = decl->getUnderlyingType();
   // If the underlying type is private, don't print it.
   if (Options.SkipPrivateStdlibDecls && Ty && Ty.isPrivateStdlibType())
     ShouldPrint = false;
@@ -1909,6 +1911,9 @@ void PrintAST::visitGuardStmt(GuardStmt *stmt) {
 }
 
 void PrintAST::visitIfConfigStmt(IfConfigStmt *stmt) {
+  if (!Options.PrintIfConfig)
+    return;
+
   for (auto &Clause : stmt->getClauses()) {
     if (&Clause == &*stmt->getClauses().begin())
       Printer << "#if "; // FIXME: print condition
@@ -2098,6 +2103,9 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
     // Enum elements are printed as part of the EnumCaseDecl, unless they were
     // imported without source info.
     return !EED->getSourceRange().isValid();
+
+  } else if (isa<IfConfigDecl>(this)) {
+    return PO.PrintIfConfig;
   }
 
   // Print everything else.

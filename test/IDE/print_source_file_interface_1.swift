@@ -3,8 +3,27 @@
 
 // More blah blah.
 
+#if FOO
+import Swift
+
+class FooEnabled {}
+
+typealias MyN = Int
+#else
+import Swift
+
+class FooDisabled {}
+
+typealias MyN = Int
+#endif
+
 public class MyClass {
   func doit(x: Int) {}
+#if FOO
+  func doFooEnabled() {}
+#else
+  func doFooDisabled() {}
+#endif
 }
 
 // RUN: %target-swift-ide-test -print-swift-file-interface -source-filename %s > %t.out
