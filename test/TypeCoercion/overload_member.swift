@@ -35,7 +35,7 @@ func test_method_overload(a: A, x: X, y: Y) {
 }
 
 func test_method_overload_coerce(a: A, inout x: X, inout y: Y, z: Z) {
-  var fail = a.g(z) // expected-error{{ambiguous use of 'g(z:)'}}
+  var fail = a.g(z: z) // expected-error{{ambiguous use of 'g(z:)'}}
   x = a.g(z: z)
   y = a.g(z: z)
 }
@@ -56,7 +56,7 @@ func test_static_method_overload(a: A, x: X, y: Y) {
 }
 
 func test_static_method_overload_coerce(a: A, inout x: X, inout y: Y, z: Z) {
-  var fail = A.sg(z) // expected-error{{ambiguous use of 'sg(z:)'}}
+  var fail = A.sg(z: z) // expected-error{{ambiguous use of 'sg(z:)'}}
   x = A.sg(z: z)
   y = A.sg(z: z)
 }

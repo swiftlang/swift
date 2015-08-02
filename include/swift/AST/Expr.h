@@ -444,6 +444,17 @@ public:
   /// the parent map.
   llvm::DenseMap<Expr *, Expr *> getParentMap();
 
+  /// Produce a mapping from each subexpression to its depth in the root
+  /// expression. The root expression has depth 0, its children have depth
+  /// 1, etc.
+  llvm::DenseMap<Expr *, unsigned> getDepthMap();
+
+  /// Produce a mapping from each expression to its index according to a
+  /// preorder traversal of the expressions. The parent has index 0, its first
+  /// child has index 1, its second child has index 2 if the first child is a
+  /// leaf node, etc.
+  llvm::DenseMap<Expr *, unsigned> getPreorderIndexMap();
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");

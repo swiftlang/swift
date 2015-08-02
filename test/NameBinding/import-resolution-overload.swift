@@ -15,15 +15,15 @@ import var overload_vars.scopedVar
 import func overload_boolFunctions.scopedFunction
 
 struct LocalType {}
-func something(obj: LocalType) -> LocalType { return obj }
-func something(a: Int, _ b: Int, _ c: Int) -> () {}
+func something(obj: LocalType) -> LocalType { return obj } // expected-note {{found this candidate}}
+func something(a: Int, _ b: Int, _ c: Int) -> () {} // expected-note {{found this candidate}}
 
 var _ : Bool = something(true)
 var _ : Int = something(1)
 var _ : (Int, Int) = something(1, 2)
 var _ : LocalType = something(LocalType())
 var _ : () = something(1, 2, 3)
-something = 42 // expected-error {{could not find an overload for 'something' that accepts the supplied arguments}}
+something = 42 // expected-error {{ambiguous use of 'something'}}
 
 let ambValue = ambiguousWithVar // no-warning - var preferred
 let ambValueChecked: Int = ambValue

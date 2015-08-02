@@ -459,6 +459,55 @@ llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
   return parentMap;
 }
 
+llvm::DenseMap<Expr *, unsigned> Expr::getDepthMap() {
+  class RecordingTraversal : public ASTWalker {
+  public:
+    llvm::DenseMap<Expr *, unsigned> &DepthMap;
+    unsigned Depth = 0;
+
+    explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &depthMap)
+      : DepthMap(depthMap) { }
+
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+      DepthMap[E] = Depth;
+      Depth++;
+      return { true, E };
+    }
+
+    virtual Expr *walkToExprPost(Expr *E) {
+      Depth--;
+      return E;
+    }
+  };
+
+  llvm::DenseMap<Expr *, unsigned> depthMap;
+  RecordingTraversal traversal(depthMap);
+  walk(traversal);
+  return depthMap;
+}
+
+llvm::DenseMap<Expr *, unsigned> Expr::getPreorderIndexMap() {
+  class RecordingTraversal : public ASTWalker {
+  public:
+    llvm::DenseMap<Expr *, unsigned> &IndexMap;
+    unsigned Index = 0;
+
+    explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &indexMap)
+      : IndexMap(indexMap) { }
+
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+      IndexMap[E] = Index;
+      Index++;
+      return { true, E };
+    }
+  };
+
+  llvm::DenseMap<Expr *, unsigned> indexMap;
+  RecordingTraversal traversal(indexMap);
+  walk(traversal);
+  return indexMap;
+}
+
 //===----------------------------------------------------------------------===//
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//

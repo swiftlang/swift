@@ -917,20 +917,40 @@ static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
 }
 
 static bool diagnoseAmbiguity(ConstraintSystem &cs,
-                              ArrayRef<Solution> solutions) {
+                              ArrayRef<Solution> solutions,
+                              Expr *expr) {
   // Produce a diff of the solutions.
   SolutionDiff diff(solutions);
 
   // Find the locators which have the largest numbers of distinct overloads.
-  SmallVector<unsigned, 2> mostDistinctOverloads;
+  Optional<unsigned> bestOverload;
   unsigned maxDistinctOverloads = 0;
+  unsigned maxDepth = 0;
+  unsigned minIndex = std::numeric_limits<unsigned>::max();
+
+  // Get a map of expressions to their depths and post-order traversal indices.
+  // Heuristically, all other things being equal, we should complain about the
+  // ambiguous expression that (1) has the most overloads, (2) is deepest, or
+  // (3) comes earliest in the expression.
+  auto depthMap = expr->getDepthMap();
+  auto indexMap = expr->getPreorderIndexMap();
+
   for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {
     auto &overload = diff.overloads[i];
 
     // If we can't resolve the locator to an anchor expression with no path,
     // we can't diagnose this well.
-    if (!simplifyLocatorToAnchor(cs, overload.locator))
+    auto *anchor = simplifyLocatorToAnchor(cs, overload.locator);
+    if (!anchor)
       continue;
+    auto it = indexMap.find(anchor);
+    if (it == indexMap.end())
+      continue;
+    unsigned index = it->second;
+    it = depthMap.find(anchor);
+    if (it == depthMap.end())
+      continue;
+    unsigned depth = it->second;
 
     // If we don't have a name to hang on to, it'll be hard to diagnose this
     // overload.
@@ -945,17 +965,27 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
 
     // If we have more distinct overload choices for this locator than for
     // prior locators, just keep this locator.
-    if (distinctOverloads > maxDistinctOverloads) {
-      maxDistinctOverloads = distinctOverloads;
-      mostDistinctOverloads.clear();
-      mostDistinctOverloads.push_back(i);
-      continue;
+    
+    bool better = false;
+    if (bestOverload) {
+      if (distinctOverloads > maxDistinctOverloads) {
+        better = true;
+      } else if (distinctOverloads == maxDistinctOverloads) {
+        if (depth > maxDepth) {
+          better = true;
+        } else if (depth == maxDepth) {
+          if (index < minIndex) {
+            better = true;
+          }
+        }
+      }
     }
 
-    // If we have as many distinct overload choices for this locator as
-    // the best so far, add this locator to the set.
-    if (distinctOverloads == maxDistinctOverloads) {
-      mostDistinctOverloads.push_back(i);
+    if (!bestOverload || better) {
+      bestOverload = i;
+      maxDistinctOverloads = distinctOverloads;
+      maxDepth = depth;
+      minIndex = index;
       continue;
     }
 
@@ -964,8 +994,8 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
 
   // FIXME: Should be able to pick the best locator, e.g., based on some
   // depth-first numbering of expressions.
-  if (mostDistinctOverloads.size() == 1) {
-    auto &overload = diff.overloads[mostDistinctOverloads[0]];
+  if (bestOverload) {
+    auto &overload = diff.overloads[*bestOverload];
     auto name = getOverloadChoiceName(overload.choices);
     auto anchor = simplifyLocatorToAnchor(cs, overload.locator);
 
@@ -3890,6 +3920,12 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     // FIXME: If we were able to actually fix things along the way,
     // we may have to hunt for the best solution. For now, we don't care.
 
+    // Remove solutions that require fixes; the fixes in those systems should
+    // be diagnosed rather than any ambiguity.
+    auto hasFixes = [](const Solution &sol) { return !sol.Fixes.empty(); };
+    auto newEnd = std::remove_if(viable.begin(), viable.end(), hasFixes);
+    viable.erase(newEnd, viable.end());
+
     // If there are multiple solutions, try to diagnose an ambiguity.
     if (viable.size() > 1) {
       if (getASTContext().LangOpts.DebugConstraintSolver) {
@@ -3904,7 +3940,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
         }
       }        
 
-      if (diagnoseAmbiguity(*this, viable)) {
+      if (diagnoseAmbiguity(*this, viable, expr)) {
         return true;
       }
     }

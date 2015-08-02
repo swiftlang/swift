@@ -1,18 +1,18 @@
 // RUN: %target-parse-verify-swift
 
 class C {
-  class func classMethod(_: Int) {}
-  class func classMethod(_: Int, withArgument: Int) {}
-  class func classMethod(_: Int, withArgument: Int, argument: Int) {}
-  class func classMethod(_: Int, withArgument: Int, argument: Int, argument _:Int) {}
+  class func classMethod(_: Int) {} // expected-note {{found this candidate}}
+  class func classMethod(_: Int, withArgument: Int) {} // expected-note {{found this candidate}}
+  class func classMethod(_: Int, withArgument: Int, argument: Int) {} // expected-note {{found this candidate}}
+  class func classMethod(_: Int, withArgument: Int, argument: Int, argument _:Int) {} // expected-note {{found this candidate}}
 
-  func instMethod(_: Int) {}
-  func instMethod(_: Int, withArgument: Int) {}
-  func instMethod(_: Int, withArgument: Int, argument: Int) {}
-  func instMethod(_: Int, withArgument: Int, argument: Int, argument _:Int) {}
+  func instMethod(_: Int) {} // expected-note {{found this candidate}}
+  func instMethod(_: Int, withArgument: Int) {} // expected-note {{found this candidate}}
+  func instMethod(_: Int, withArgument: Int, argument: Int) {} // expected-note {{found this candidate}}
+  func instMethod(_: Int, withArgument: Int, argument: Int, argument _:Int) {} // expected-note {{found this candidate}}
 
-  func instMethod(_: Int, overloaded: String) {} // expected-note {{found this candidate}}
-  func instMethod(_: Int, overloaded: Int) {}    // expected-note {{found this candidate}}
+  func instMethod(_: Int, overloaded: String) {} // expected-note 2 {{found this candidate}}
+  func instMethod(_: Int, overloaded: Int) {}    // expected-note 2 {{found this candidate}}
 }
 
 let x = C()
@@ -24,7 +24,7 @@ let classM2 = C.classMethod:withArgument:argument:
 let classM3 = C.classMethod:withArgument:argument:argument:
 
 // TODO: recovery
-let classMX = C.classMethod: // expected-error{{expected expression}} // expected-error{{type of expression is ambiguous without more context}} // expected-error{{consecutive statements}}
+let classMX = C.classMethod: // expected-error{{expected expression}} // expected-error{{ambiguous use of 'classMethod'}} // expected-error{{consecutive statements}}
 
 // TODO: Normal method lookup should not find keyword methods
 let instM0: (Int) -> () = x.instMethod
@@ -43,4 +43,4 @@ x.instMethod:overloaded:(1, overloaded: "two")
 let instM7 = x.instMethod:nonexistent: // expected-error{{value of type 'C' has no member 'instMethod(_:nonexistent:)'}}
 
 // TODO: recovery
-let instMX = x.instMethod: // expected-error{{expected expression}} // expected-error{{type of expression is ambiguous without more context}} // expected-error{{consecutive statements}}
+let instMX = x.instMethod: // expected-error{{expected expression}} // expected-error{{ambiguous use of 'instMethod'}} // expected-error{{consecutive statements}}

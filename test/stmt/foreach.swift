@@ -106,9 +106,9 @@ struct Seq<T> : SequenceType {
 
 func getIntSeq() -> Seq<Int> { return Seq() }
 
-func getOvlSeq() -> Seq<Int> { return Seq() }
-func getOvlSeq() -> Seq<Double> { return Seq() }
-func getOvlSeq() -> Seq<X<Int>> { return Seq() }
+func getOvlSeq() -> Seq<Int> { return Seq() } // expected-note{{found this candidate}}
+func getOvlSeq() -> Seq<Double> { return Seq() } // expected-note{{found this candidate}}
+func getOvlSeq() -> Seq<X<Int>> { return Seq() } // expected-note{{found this candidate}}
 
 func getGenericSeq<T>() -> Seq<T> { return Seq() }
 
@@ -124,9 +124,7 @@ func testForEachInference() {
   for d: Double in getOvlSeq() { }
 
   // Overloaded sequence not resolved contextually
-  // FIXME: Incorrect diagnostic + note.
-  for v in getOvlSeq() { } // expected-error{{cannot invoke 'getOvlSeq' with no arguments}}
-  // expected-note @-1 {{expected an argument list of type '()'}}
+  for v in getOvlSeq() { } // expected-error{{ambiguous use of 'getOvlSeq()'}}
 
   // Generic sequence resolved contextually
   for i: Int in getGenericSeq() { }

@@ -263,10 +263,9 @@ func rdar21784170() {
 }
 
 // <rdar://problem/21829141> BOGUS: unexpected trailing closure
-func expect<T, U>(_: T)(_: U.Type) {}
-func expect<T, U>(_: T, _: Int = 1)(_: U.Type) {}
-expect(Optional(3))(Optional<Int>.self)  // expected-error {{cannot invoke 'expect' with an argument list of type '(Optional<Int>.Type)'}}
-// expected-note @-1 {{expected an argument list of type '(U.Type)'}}
+func expect<T, U>(_: T)(_: U.Type) {} // expected-note {{found this candidate}}
+func expect<T, U>(_: T, _: Int = 1)(_: U.Type) {} // expected-note {{found this candidate}}
+expect(Optional(3))(Optional<Int>.self)  // expected-error {{ambiguous use of 'expect'}}
 
 // <rdar://problem/19804707> Swift Enum Scoping Oddity
 func rdar19804707() {
