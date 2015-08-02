@@ -374,7 +374,10 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     }
 
     Expected.ExpectedEnd = ExtraChecks.data();
-
+    
+    // Don't include trailing whitespace in the expected-foo{{}} range.
+    while (isspace(Expected.ExpectedEnd[-1]))
+      --Expected.ExpectedEnd;
 
     // Add the diagnostic the expected number of times.
     for (; Count; --Count)
@@ -489,8 +492,12 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     while (isspace(*EndLoc) && *EndLoc != '\n' && *EndLoc != '\r')
       ++EndLoc;
 
-    // If we hit the end of line, then zap whitespace leading up to it.
-    if (*EndLoc == '\n' || *EndLoc == '\r') {
+    // If we found the end of the line, we can do great things.  Otherwise,
+    // avoid nuking whitespace that might be zapped through other means.
+    if (*EndLoc != '\n' && *EndLoc != '\r') {
+      EndLoc = expected.ExpectedEnd;
+    } else {
+      // If we hit the end of line, then zap whitespace leading up to it.
       auto FileStart = InputFile.data();
       while (StartLoc-1 != FileStart && isspace(StartLoc[-1]) &&
              StartLoc[-1] != '\n' && StartLoc[-1] != '\r')
