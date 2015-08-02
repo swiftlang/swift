@@ -703,7 +703,7 @@ void LifetimeChecker::doIt() {
   // based on the control flow path reaching them, then insert dynamic control
   // logic and CFG diamonds to handle this.
   SILValue ControlVariable;
-  if (HasConditionalInitAssignOrDestroys)
+  if (HasConditionalInitAssignOrDestroys && TheMemory.getNumMemoryElements())
     ControlVariable = handleConditionalInitAssign();
   if (!ConditionalDestroys.empty())
     handleConditionalDestroys(ControlVariable);

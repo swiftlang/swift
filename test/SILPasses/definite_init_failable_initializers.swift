@@ -37,12 +37,16 @@ struct Struct {
   }
 }
 
+func unwrap(i: Int) throws -> Int {
+  return i
+}
+
 // For classes, we cannot yet support failure with a partially initialized
 // object.
 // TODO: We ought to be able to for native Swift classes.
 
 class RootClass {
-  let x : Int  // expected-note {{'self.x' not initialized}}
+  let x: Int  // expected-note {{'self.x' not initialized}}
   let y: Int  // expected-note 2 {{'self.y' not initialized}}
 
   init() { x = 0; y = 0 }
@@ -81,6 +85,11 @@ class RootClass {
   convenience init?(failAfterFailableDelegation: ()) {
     self.init(failBeforeInitialization: ())
     return nil // OK
+  }
+
+  init(throwBeforeInitialization: Int) throws {
+    self.x = throwBeforeInitialization
+    self.y = throwBeforeInitialization
   }
 }
 
@@ -143,6 +152,19 @@ class SubClass: RootClass {
   convenience init?(failAfterFailableDelegation: ()) {
     self.init(failBeforeInitialization: ())
     return nil // OK
+  }
+}
+
+class AnotherSubClass: RootClass {
+  override init(throwBeforeInitialization: Int) throws {
+    // FIXME: bogus diagnosics about returning nil here
+    try super.init(throwBeforeInitialization: unwrap(throwBeforeInitialization))
+    // expected-error@-1 {{all stored properties of a class instance must be initialized before throwing from an initializer}}
+    // expected-error@-2 {{all stored properties of a class instance must be initialized before returning nil from an initializer}}
+    // expected-note@-3 {{super.init must be called before throwing}}
+    // expected-note@-4 {{super.init must be called before returning nil}}
+
+    try unwrap(throwBeforeInitialization)
   }
 }
 
