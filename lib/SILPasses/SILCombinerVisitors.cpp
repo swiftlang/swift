@@ -1619,7 +1619,8 @@ static ApplyInst *optimizeCastThroughThinFunctionPointer(
   // The bound generic type will carry the substitutions to apply.
   auto Subs = BoundGenericInstTy->getSubstitutions(
       AI->getModule().getSwiftModule(), nullptr);
-  assert(Subs.size() == 1);
+  if (Subs.size() != 1)
+    return nullptr;
 
   SmallVector<SILValue, 16> Args;
   for (auto Arg : AI->getArguments())
