@@ -187,8 +187,9 @@ ERROR(cannot_invoke_closure_type,sema,none,
 
 ERROR(cannot_infer_closure_type,sema,none,
       "unable to infer closure type in the current context", ())
-NOTE(mult_stmt_closures_require_explicit_result,sema,none,
-      "multi-statement closures require an explicit return type", ())
+ERROR(cannot_infer_closure_result_type,sema,none,
+      "unable to infer closure return type in current context", ())
+
 
 ERROR(cannot_call_function_value,sema,none,
       "cannot invoke value of function type with argument list '%0'",

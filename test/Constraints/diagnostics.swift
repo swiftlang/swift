@@ -292,8 +292,7 @@ func r20789423() {
   let p: C
   print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
 
-  let _f = { (v: Int) in  // expected-error {{unable to infer closure type in the current context}}
-    // expected-note @-1 {{multi-statement closures require an explicit return type}}
+  let _f = { (v: Int) in  // expected-error {{unable to infer closure return type in current context}}
     print("a")
     return "hi"
   }

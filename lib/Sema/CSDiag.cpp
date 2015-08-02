@@ -1905,6 +1905,10 @@ public:
   /// the failed constraint system.
   bool diagnoseFailure();
 
+  /// Emit an ambiguity diagnostic about the specified expression.
+  void diagnoseAmbiguity(Expr *E);
+
+  
 private:
     
   /// Attempt to produce a diagnostic for a mismatch between an expression's
@@ -2421,29 +2425,11 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   // If the second type is a type variable, the expression itself is
   // ambiguous.  Bail out so the general ambiguity diagnosing logic can handle
   // it.
-  if (fromType->is<TypeVariableType>())
-    return false;
-  
-  if (fromType->is<UnboundGenericType>() || toType->is<TypeVariableType>()) {
-    
-    // FIXME: mult_stmt_closures_require_explicit_result should be handled by
-    // the parser.
-    // Handle closure exprs specifically.
-    if (auto *CE = dyn_cast<ClosureExpr>(anchor)) {
-      diagnose(anchor->getLoc(), diag::cannot_infer_closure_type)
-        .highlight(anchor->getSourceRange());
-
-      if (!CE->hasSingleExpressionBody() &&
-          !CE->hasExplicitResultType() &&
-          !CE->getBody()->getElements().empty()) {
-        diagnose(CE->getLoc(),
-                 diag::mult_stmt_closures_require_explicit_result);
-      }
-      return true;
-    }
-    
-    // This is an ambiguity allow the outer driver to handle diagnosing this.
-    return false;
+  if (fromType->is<TypeVariableType>() ||
+      fromType->is<UnboundGenericType>() ||
+      toType->is<TypeVariableType>()) {
+    diagnoseAmbiguity(anchor);
+    return true;
   }
   
   auto failureKind = Failure::FailureKind::TypesNotConvertible;
@@ -3512,9 +3498,17 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // If we couldn't get the name of the callee, then it must be something of a
   // more complex "value of function type".
   if (overloadName.empty()) {
+    // If we couldn't infer the result type of the closure expr, then we have
+    // some sort of ambiguity, let the ambiguity diagnostic stuff handle this.
+    if (auto ffty = fnType->getAs<AnyFunctionType>())
+      if (ffty->getResult()->hasTypeVariable()) {
+        diagnoseAmbiguity(fnExpr);
+        return true;
+      }
+    
     // The most common unnamed value of closure type is a ClosureExpr, so
     // special case it.
-    if (auto CE = dyn_cast<ClosureExpr>(fnExpr->getSemanticsProvidingExpr())) {
+    if (isa<ClosureExpr>(fnExpr->getSemanticsProvidingExpr())) {
       if (fnType->hasTypeVariable())
         diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure, argString)
           .highlight(fnExpr->getSourceRange());
@@ -3523,15 +3517,6 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
                  fnType, argString)
           .highlight(fnExpr->getSourceRange());
       
-      // If this is a multi-statement closure with no explicit result type, emit
-      // a note to clue the developer in.
-      if (!CE->hasSingleExpressionBody() &&
-          !CE->hasExplicitResultType() &&
-          !CE->getBody()->getElements().empty()) {
-        diagnose(fnExpr->getLoc(),
-                 diag::mult_stmt_closures_require_explicit_result);
-      }
-
     } else if (fnType->hasTypeVariable()) {
       diagnose(argExpr->getStartLoc(), diag::cannot_call_function_value,
                argString)
@@ -3828,6 +3813,7 @@ bool FailureDiagnosis::diagnoseFailure() {
   return visit(expr);
 }
 
+
 /// Given a specific expression and the remnants of the failed constraint
 /// system, produce a specific diagnostic.
 ///
@@ -3854,10 +3840,15 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   // If no one could find a problem with this expression or constraint system,
   // then it must be well-formed... but is ambiguous.  Handle this by diagnosic
   // various cases that come up.
-  
+  diagnosis.diagnoseAmbiguity(expr);
+}
+
+/// Emit an ambiguity diagnostic about the specified expression.
+void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
+
   // Check out all of the type variables lurking in the system.  If any are
   // unbound archetypes, then the problem is that it couldn't be resolved.
-  for (auto tv : TypeVariables) {
+  for (auto tv : CS->getTypeVariables()) {
     if (tv->getImpl().hasRepresentativeOrFixed())
       continue;
     
@@ -3869,28 +3860,46 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
     // Only diagnose archetypes that don't have a parent, i.e., ones
     // that correspond to generic parameters.
     if (archetype && !archetype->getParent()) {
-      TC.diagnose(expr->getLoc(), diag::unbound_generic_parameter, archetype);
+      diagnose(expr->getLoc(), diag::unbound_generic_parameter, archetype);
       
       // Emit a "note, archetype declared here" sort of thing.
-      noteTargetOfDiagnostic(*this, nullptr, tv->getImpl().getLocator());
+      noteTargetOfDiagnostic(*CS, nullptr, tv->getImpl().getLocator());
       return;
     }
     continue;
   }
 
+  // Unresolved/Anonymous ClosureExprs are common enough that we should give
+  // them tailored diagnostics.
+  if (auto CE = dyn_cast<ClosureExpr>(E->getSemanticsProvidingExpr())) {
+    auto CFTy = CE->getType()->getAs<AnyFunctionType>();
+    
+    // If this is a multi-statement closure with no explicit result type, emit
+    // a note to clue the developer in.
+    if (!CE->hasExplicitResultType() && CFTy &&
+        CFTy->getResult()->hasTypeVariable()) {
+      diagnose(CE->getLoc(), diag::cannot_infer_closure_result_type);
+      return;
+    }
+    
+    diagnose(E->getLoc(), diag::cannot_infer_closure_type)
+      .highlight(E->getSourceRange());
+    return;
+  }
+
   // A DiscardAssignmentExpr (spelled "_") needs contextual type information to
   // infer its type. If we see one at top level, diagnose that it must be part
   // of an assignment so we don't get a generic "expression is ambiguous" error.
-  if (isa<DiscardAssignmentExpr>(expr)) {
-    TC.diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment)
-      .highlight(expr->getSourceRange());
+  if (isa<DiscardAssignmentExpr>(E)) {
+    diagnose(E->getLoc(), diag::discard_expr_outside_of_assignment)
+      .highlight(E->getSourceRange());
     return;
   }
   
   // If there are no posted constraints or failures, then there was
   // not enough contextual information available to infer a type for the
   // expression.
-  TC.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous);
+  diagnose(E->getLoc(), diag::type_of_expression_is_ambiguous);
 }
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
