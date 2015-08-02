@@ -76,6 +76,7 @@ enum class ActionType {
   PrintASTTypeChecked,
   PrintModule,
   PrintHeader,
+  PrintSwiftFileInterface,
   PrintTypes,
   PrintComments,
   PrintModuleComments,
@@ -159,6 +160,8 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "print-module", "Print visible declarations in a module"),
            clEnumValN(ActionType::PrintHeader,
                       "print-header", "Print visible declarations in a header file"),
+           clEnumValN(ActionType::PrintSwiftFileInterface,
+                      "print-swift-file-interface", "Print interface of a swift file"),
            clEnumValN(ActionType::PrintTypes,
                       "print-types", "Print types of all subexpressions and declarations in the AST"),
            clEnumValN(ActionType::PrintComments,
@@ -1736,6 +1739,33 @@ static int doPrintHeaders(const CompilerInvocation &InitInvok,
   return ExitCode;
 }
 
+static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvok,
+                                     StringRef SourceFilename,
+                                     bool AnnotatePrint) {
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.addInputFilename(SourceFilename);
+  Invocation.getFrontendOptions().PrimaryInput = 0;
+  Invocation.getLangOptions().AttachCommentsToDecls = true;
+  CompilerInstance CI;
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+
+  std::unique_ptr<ASTPrinter> Printer;
+  if (AnnotatePrint)
+    Printer.reset(new AnnotatingPrinter(llvm::outs()));
+  else
+    Printer.reset(new StreamPrinter(llvm::outs()));
+
+  PrintOptions Options = PrintOptions::printSwiftFileInterface();
+  printSwiftSourceInterface(*CI.getPrimarySourceFile(), *Printer, Options);
+
+  return 0;
+}
+
 namespace {
 class ASTTypePrinter : public ASTWalker {
   raw_ostream &OS;
@@ -2530,6 +2560,13 @@ int main(int argc, char *argv[]) {
   case ActionType::PrintHeader: {
     ExitCode = doPrintHeaders(
         InitInvok, options::HeaderToPrint, PrintOpts,
+        options::AnnotatePrint);
+    break;
+  }
+
+  case ActionType::PrintSwiftFileInterface: {
+    ExitCode = doPrintSwiftFileInterface(
+        InitInvok, options::SourceFilename,
         options::AnnotatePrint);
     break;
   }

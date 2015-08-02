@@ -211,6 +211,15 @@ struct PrintOptions {
     return result;
   }
 
+  /// Retrieve the print options that are suitable to print interface for a
+  /// swift file.
+  static PrintOptions printSwiftFileInterface() {
+    PrintOptions result = printInterface();
+    result.AccessibilityFilter = Accessibility::Internal;
+    result.EmptyLineBetweenMembers = true;
+    return result;
+  }
+
   /// Retrieve the set of options suitable for interface generation for
   /// documentation purposes.
   static PrintOptions printDocInterface() {

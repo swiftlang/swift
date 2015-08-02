@@ -418,39 +418,49 @@ void swift::ide::printSubmoduleInterface(
 }
 
 static SourceLoc getDeclStartPosition(SourceFile &File) {
-  llvm::Optional<SourceLoc> Winner;
   SourceManager &SM = File.getASTContext().SourceMgr;
-  for (auto D : File.Decls) {
-    auto Start = !D->getRawComment().isEmpty() &&
-      SM.isBeforeInBuffer(D->getRawComment().Comments[0].Range.getStart(),
-                          D->getSourceRange().Start) ?
-        D->getRawComment().Comments[0].Range.getStart() :
-        D->getSourceRange().Start;
+  SourceLoc Winner;
 
-    if (Winner.hasValue()) {
-      if (SM.isBeforeInBuffer(Start, Winner.getValue())) {
-        Winner = Start;
-      }
-    } else {
-      Winner = Start;
+  auto tryUpdateStart = [&](SourceLoc Loc) -> bool {
+    if (Loc.isInvalid())
+      return false;
+    if (Winner.isInvalid()) {
+      Winner = Loc;
+      return true;
+    }
+    if (SM.isBeforeInBuffer(Loc, Winner)) {
+      Winner = Loc;
+      return true;
+    }
+    return false;
+  };
+
+  for (auto D : File.Decls) {
+    if (tryUpdateStart(D->getStartLoc())) {
+      tryUpdateStart(D->getAttrs().getStartLoc());
+      auto RawComment = D->getRawComment();
+      if (!RawComment.isEmpty())
+        tryUpdateStart(RawComment.Comments.front().Range.getStart());
     }
   }
-  return Winner.hasValue() ? Winner.getValue() : SourceLoc();
+
+  return Winner;
 }
 
 static void printUntilFirstDeclStarts(SourceFile &File, ASTPrinter &Printer) {
   if (!File.getBufferID().hasValue())
     return;
-  auto DeclStartLoc = getDeclStartPosition(File);
-  auto &SM = File.getASTContext().SourceMgr;
-  auto Tokens = swift::tokenize(File.getASTContext().LangOpts, SM,
-                                File.getBufferID().getValue());
+  auto BufferID = *File.getBufferID();
 
-  for (auto It = Tokens.begin(); It < Tokens.end() &&
-       (DeclStartLoc.isInvalid() || SM.isBeforeInBuffer(It->getLoc(),
-                                                        DeclStartLoc)); ++ It) {
-    Printer << It->getText();
+  auto &SM = File.getASTContext().SourceMgr;
+  CharSourceRange TextRange = SM.getRangeForBuffer(BufferID);
+
+  auto DeclStartLoc = getDeclStartPosition(File);
+  if (DeclStartLoc.isValid()) {
+    TextRange = CharSourceRange(SM, TextRange.getStart(), DeclStartLoc);
   }
+
+  Printer << SM.extractText(TextRange, BufferID);
 }
 
 void swift::ide::printSwiftSourceInterface(SourceFile &File,
