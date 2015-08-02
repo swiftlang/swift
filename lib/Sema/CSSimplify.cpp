@@ -1421,7 +1421,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           // Look through vararg types, if necessary.
           auto tupleElt = tupleTy->getElement(0);
           auto tupleEltTy = tupleElt.isVararg() ?
-                              tupleElt.getVarargBaseTy() : tupleElt.getType();;
+                              tupleElt.getVarargBaseTy() : tupleElt.getType();
           
           addConstraint(getConstraintKind(kind),
                         typeVar1,
