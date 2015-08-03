@@ -91,7 +91,7 @@ tests.test("index-mapping/character-to-utf8") {
 
     winter.characters.indices.map {
       i in (0..<3).map {
-        winter.utf8[advance(i.samePositionIn(winter.utf8), $0)]
+        winter.utf8[i.samePositionIn(winter.utf8).advancedBy($0)]
       }
     }, sameValue: ==)
 
@@ -128,7 +128,7 @@ tests.test("index-mapping/unicode-scalar-to-utf8") {
     
     winter.unicodeScalars.indices.map {
       i in (0..<3).map {
-        winter.utf8[advance(i.samePositionIn(winter.utf8), $0)]
+        winter.utf8[i.samePositionIn(winter.utf8).advancedBy($0)]
       }
     }, sameValue: ==)
 
@@ -171,7 +171,7 @@ tests.test("index-mapping/utf16-to-utf8") {
     ] as [[UTF8.CodeUnit]],
     winter.utf16.indices.map {
       i16 in i16.samePositionIn(winter.utf8).map {
-        i8 in (0..<3).map { winter.utf8[advance(i8, $0)] }
+        i8 in (0..<3).map { winter.utf8[i8.advancedBy($0)] }
       } ?? []
     }, sameValue: ==)
 
@@ -611,7 +611,7 @@ tests.test("UTF8 indexes") {
 
   //===--- nested for...in loops ------------------------------------------===//
   // Test all valid subranges si0..<si1 of positions in s.  ds is
-  // always distance(si0, si1)
+  // always si0.distanceTo(si1)
   for si0 in s.indices {
     for (ds, si1) in (si0..<s.endIndex).enumerate() {
       

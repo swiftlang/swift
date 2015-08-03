@@ -298,18 +298,19 @@ internal class _ForwardIndexBox<
   }
 
   func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance {
-    return numericCast(distance(base, unsafeUnbox(other)))
+    return numericCast(base.distanceTo(unsafeUnbox(other)))
   }
 
   func _advancedBy(n: AnyForwardIndex.Distance) -> _ForwardIndexBoxType {
-    return self.dynamicType.init(advance(base, numericCast(n)))
+    return self.dynamicType.init(base.advancedBy(numericCast(n)))
   }
 
   func _advancedBy(
     n: AnyForwardIndex.Distance,
     _ limit: _ForwardIndexBoxType
   ) -> _ForwardIndexBoxType {
-    return self.dynamicType.init(advance(base, numericCast(n), unsafeUnbox(limit)))
+    return self.dynamicType.init(
+      base.advancedBy(numericCast(n), limit: unsafeUnbox(limit)))
   }
 
   func _unbox<T : ForwardIndexType>() -> T? {
@@ -424,21 +425,16 @@ public struct ${Self} : ${Traversal}IndexType {
   % end
 
   % if Traversal == 'RandomAccess':
-  /// Return the minimum number of applications of `successor` or
-  /// `predecessor` required to reach `other` from `self`.
-  ///
-  /// - Requires: `self` and `other` wrap instances of the same type.
   public func distanceTo(other: ${Self}) -> Distance {
     return _box._distanceTo(other._box)
   }
 
-  /// Return `self` offset by `n` steps.
-  ///
-  /// - Returns: If `n > 0`, the result of applying `successor` to
-  ///   `self` `n` times.  If `n < 0`, the result of applying
-  ///   `predecessor` to `self` `n` times. Otherwise, `self`.
   public func advancedBy(amount: Distance) -> ${Self} {
     return ${Self}(_box._advancedBy(amount))
+  }
+
+  public func advancedBy(amount: Distance, limit: ${Self}) -> ${Self} {
+    return ${Self}(_box._advancedBy(amount, limit._box))
   }
   % end
 
@@ -463,21 +459,6 @@ public struct ${Self} : ${Traversal}IndexType {
       "distance: base index types differ.")
     return self._box._distanceTo(other._box)
   }
-}
-
-public func ~> (
-  start: ${Self}, distance : (_Advance, ${Self}.Distance)
-) -> ${Self} {
-  return ${Self}(start._box._advancedBy(distance.1))
-}
-
-public func ~> (
-  start: ${Self},
-  args: (_Advance, (${Self}.Distance, ${Self}))
-) -> ${Self} {
-  precondition(
-    start._typeID == args.1.1._typeID, "advance: base index types differ.")
-  return ${Self}(start._box._advancedBy(args.1.0, args.1.1._box))
 }
 
 /// Return true iff `lhs` and `rhs` wrap equal underlying

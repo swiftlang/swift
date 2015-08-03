@@ -132,11 +132,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = advance(index, numericCast(outOfBoundsSubscriptOffset))
+      index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
     } else {
       expectFailure {
-        index = advance(index, numericCast(outOfBoundsSubscriptOffset))
+        index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
         c[index] = wrapValue(OpaqueValue(9999))
       }
     }
@@ -147,11 +147,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = advance(index, numericCast(outOfBoundsSubscriptOffset))
+      index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
     } else {
       expectFailure {
-        index = advance(index, numericCast(outOfBoundsSubscriptOffset))
+        index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
         c[index] = wrapValue(OpaqueValue(9999))
       }
     }
@@ -402,11 +402,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = advance(index, numericCast(-outOfBoundsSubscriptOffset))
+      index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
     } else {
       expectFailure {
-        index = advance(index, numericCast(-outOfBoundsSubscriptOffset))
+        index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
         c[index] = wrapValue(OpaqueValue(9999))
       }
     }
@@ -417,11 +417,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = advance(index, numericCast(-outOfBoundsSubscriptOffset))
+      index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
       c[index] = wrapValue(OpaqueValue(9999))
     } else {
       expectFailure {
-        index = advance(index, numericCast(-outOfBoundsSubscriptOffset))
+        index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
         c[index] = wrapValue(OpaqueValue(9999))
       }
     }

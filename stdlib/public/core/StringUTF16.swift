@@ -210,29 +210,6 @@ extension String.UTF16View.Index {
   }
 }
 
-/// Do not use this operator directly; call advance(start, n) instead.
-@inline(__always)
-public func ~> (
-  start: String.UTF16View.Index,
-  rest: (_Advance, (String.UTF16View.Index.Distance))
-) -> String.UTF16View.Index {
-  let n = rest.1
-  return String.UTF16View.Index(_offset: start._offset.advancedBy(n))
-}
-
-/// Do not use this operator directly; call advance(start, n, end) instead.
-@inline(__always)
-public func ~> (
-  start: String.UTF16View.Index,
-  rest: (_Advance, (String.UTF16View.Index.Distance, String.UTF16View.Index))
-) -> String.UTF16View.Index {
-  let n = rest.1.0
-  let end = rest.1.1
-
-  return String.UTF16View.Index(
-    _offset: advance(start._offset, n, end._offset))
-}
-
 // Index conversions
 extension String.UTF16View.Index {
   /// Construct the position in `utf16` that corresponds exactly to

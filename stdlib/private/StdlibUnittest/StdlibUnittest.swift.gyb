@@ -1728,12 +1728,12 @@ internal func _checkIncrementalAdvance<
   ${TRACE}
 ) {
   for i in instances {
-    let d = sign > 0 ? distance(i, limit) : -distance(limit, i)
+    let d = sign > 0 ? i.distanceTo(limit) : -limit.distanceTo(i)
 
     var offset: Instances.Generator.Element.Distance = 0
     for _ in 0...(d * sign).toIntMax() {
-      let j = advance(i, offset)
-      let k = advance(i, offset + sign, limit)
+      let j = i.advancedBy(offset)
+      let k = i.advancedBy(offset + sign, limit: limit)
       let jAtLimit = offset == d
       if jAtLimit {
         expectEqual(limit, j, ${trace})
@@ -1959,7 +1959,7 @@ public func check${traversal}Collection<
   }
 
   // advances up to 1 positions without passing endIndex.  Don't use
-  // advance() to do this because it's under test here.
+  // advancedBy(n) to do this because it's under test here.
   let next = { $0 == collection.endIndex ? $0 : $0.successor() }
 
   // advances up to 5 positions without passing endIndex.  Picking a
@@ -2174,7 +2174,7 @@ public func checkSliceableWithBidirectionalIndex<
 % end
 
 public func nthIndex<C: CollectionType>(x: C, _ n: Int) -> C.Index {
-  return advance(x.startIndex, numericCast(n))
+  return x.startIndex.advancedBy(numericCast(n))
 }
 
 public func nth<C: CollectionType>(x: C, _ n: Int) -> C.Generator.Element {
@@ -3070,6 +3070,7 @@ extension MinimalBidirectionalIndex : _MinimalIndexType {
 //===----------------------------------------------------------------------===//
 
 public struct MinimalRandomAccessIndex : RandomAccessIndexType {
+  public typealias Distance = Int
   public init(position: Int, startIndex: Int, endIndex: Int) {
     self = MinimalRandomAccessIndex(
       collectionState: nil,
@@ -3365,11 +3366,11 @@ extension ${Protocol} where Index : _MinimalIndexType {
 
   public subscript(i: ${Index}) -> Element {
     get {
-      _expectCompatibleIndices(advance(self.startIndex, i.position), i)
+      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
       return base[i]
     }
     set {
-      _expectCompatibleIndices(advance(self.startIndex, i.position), i)
+      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
       base[i] = newValue
     }
   }
@@ -3436,11 +3437,11 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
 
   public subscript(i: ${Index}) -> T {
     get {
-      _expectCompatibleIndices(advance(self.startIndex, i.position), i)
+      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
       return elements[i.position]
     }
     set {
-      _expectCompatibleIndices(advance(self.startIndex, i.position), i)
+      _expectCompatibleIndices(self.startIndex.advancedBy(i.position), i)
       elements[i.position] = newValue
     }
   }

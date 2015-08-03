@@ -19,40 +19,19 @@
 // These generic functions are for user consumption; they dispatch to the
 // appropriate implementation for T.
 
-/// Measure the distance between `start` and `end`.
-///
-/// If `T` models `RandomAccessIndexType`, requires that `start` and `end` are
-/// part of the same sequence, and executes in O(1).
-///
-/// Otherwise, requires that `end` is reachable from `start` by
-/// incrementation, and executes in O(N), where N is the function's
-/// result.
+@available(*, unavailable, message="call the 'distanceTo(end)' method on the index")
 public func distance<T : ForwardIndexType>(start: T, _ end: T) -> T.Distance {
-  return start._distanceTo(end)
+  fatalError("unavailable function can't be called")
 }
 
-/// Return the result of advancing `start` by `n` positions.  If `T`
-/// models `RandomAccessIndexType`, executes in O(1).  Otherwise,
-/// executes in O(`abs(n)`).  If `T` does not model
-/// `BidirectionalIndexType`, requires that `n` is non-negative.
+@available(*, unavailable, message="call the 'advancedBy(n)' method on the index")
 public func advance<T : ForwardIndexType>(start: T, _ n: T.Distance) -> T {
-  return start~>_advance(n)
+  fatalError("unavailable function can't be called")
 }
 
-/// Return the result of advancing start by `n` positions, or until it
-/// equals `end`.  If `T` models `RandomAccessIndexType`, executes in
-/// O(1).  Otherwise, executes in O(`abs(n)`).  If `T` does not model
-/// `BidirectionalIndexType`, requires that `n` is non-negative.
+@available(*, unavailable, message="call the 'advancedBy(n, limit:)' method on the index")
 public func advance<T : ForwardIndexType>(start: T, _ n: T.Distance, _ end: T) -> T {
-  return start~>_advance(n, end)
-}
-
-public struct _Advance {}
-public func _advance<D>(n: D) -> (_Advance, (D)) {
-  return (_Advance(), (n: n))
-}
-public func _advance<D, I>(n: D, _ end: I) -> (_Advance, (D, I)) {
-  return (_Advance(), (n, end))
+  fatalError("unavailable function can't be called")
 }
 
 //===----------------------------------------------------------------------===//
@@ -122,18 +101,6 @@ public protocol ForwardIndexType : _Incrementable {
   // associated type
   typealias _DisabledRangeIndex = _DisabledRangeIndex_
 
-  // This requirement allows generic distance() to find default
-  // implementations.  Only the author of F and the author of a
-  // refinement of F having a non-default distance implementation need
-  // to know about it.  These refinements are expected to be rare
-  // (which is why defaulted requirements are a win)
-
-  // Do not use these operators directly; call distance(start, end)
-  // and advance(start, n) instead
-  func _distanceTo(_: Self) -> Distance
-  func ~> (start:Self, _ : (_Advance, Distance)) -> Self
-  func ~> (start:Self, _ : (_Advance, (Distance, Self))) -> Self
-
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
   ///
@@ -179,13 +146,66 @@ public protocol ForwardIndexType : _Incrementable {
   // separately (rather than as a range) are workarounds for a compiler defect.
   // <rdar://problem/21855350> Rejects-valid: rejects code that has two Self
   // types in non-direct-argument-type position
+
+  /// Return the result of advancing `self` by `n` positions.
+  ///
+  /// - Returns:
+  ///   - If `n > 0`, the result of applying `successor` to `self` `n` times.
+  ///   - If `n < 0`, the result of applying `predecessor` to `self` `-n` times.
+  ///   - Otherwise, `self`.
+  ///
+  /// - Requires: `n >= 0` if only conforming to `ForwardIndexType`
+  /// - Complexity:
+  ///   - O(1) if conforming to `RandomAccessIndexType`
+  ///   - O(`abs(n)`) otherwise
+  func advancedBy(n: Distance) -> Self
+
+  /// Return the result of advancing `self` by `n` positions, or until it
+  /// equals `limit`.
+  ///
+  /// - Returns:
+  ///   - If `n > 0`, the result of applying `successor` to `self` `n` times
+  ///     but not past `limit`.
+  ///   - If `n < 0`, the result of applying `predecessor` to `self` `-n` times
+  ///     but not past `limit`.
+  ///   - Otherwise, `self`.
+  ///
+  /// - Requires: `n >= 0` if only conforming to `ForwardIndexType`.
+  ///
+  /// - Complexity:
+  ///   - O(1) if conforming to `RandomAccessIndexType`
+  ///   - O(`abs(n)`) otherwise
+  func advancedBy(n: Distance, limit: Self) -> Self
+
+  /// Measure the distance between `self` and `end`.
+  ///
+  /// - Requires:
+  ///   - `start` and `end` are part of the same sequence when conforming to
+  ///     `RandomAccessSequenceType`.
+  ///   - `end` is reachable from `self` by incrementation otherwise.
+  ///
+  /// - Complexity:
+  ///   - O(1) if conforming to `RandomAccessIndexType`
+  ///   - O(`n`) otherwise, where `n` is the function's result.
+  func distanceTo(end: Self) -> Distance
 }
 
 // advance and distance implementations
 
 extension ForwardIndexType {
-  /// Do not use this operator directly; call distance(start, end) instead.
-  public func _distanceTo(other: Self) -> Distance {
+  public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) {
+    // Can't perform range checks in O(1) on forward indices.
+  }
+
+  public static func _failEarlyRangeCheck2(
+    rangeStart: Self, rangeEnd: Self, boundsStart: Self, boundsEnd: Self
+  ) {
+    // Can't perform range checks in O(1) on forward indices.
+  }
+
+  /// Do not use this method directly; call distanceTo(end) instead.
+  @transparent
+  internal func _distanceTo(other: Self) -> Distance {
     var p = self
     var count: Distance = 0
     let end = other
@@ -196,56 +216,41 @@ extension ForwardIndexType {
     return count
   }
 
-  public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) {
-    // Can't perform range checks in O(1) on forward indices.
+  /// Do not use this method directly; call advancedBy(n) instead.
+  @transparent
+  internal func _advanceForward(n: Distance) -> Self {
+    _precondition(n >= 0,
+        "Only BidirectionalIndexType can be advanced by a negative amount")
+    var p = self
+    for var i: Distance = 0; i != n; ++i {
+      ++p
+    }
+    return p
   }
 
-  public static func _failEarlyRangeCheck2(
-    rangeStart: Self, rangeEnd: Self, boundsStart: Self, boundsEnd: Self
-  ) {
-    // Can't perform range checks in O(1) on forward indices.
+  /// Do not use this method directly; call advancedBy(n, limit) instead.
+  @transparent
+  internal func _advanceForward(n: Distance, _ limit: Self) -> Self {
+    _precondition(n >= 0,
+        "Only BidirectionalIndexType can be advanced by a negative amount")
+    var p = self
+    for var i: Distance = 0; i != n && p != limit; ++i {
+      ++p
+    }
+    return p
   }
-}
 
-/// Do not use this operator directly; call advance(start, n) instead.
-@transparent
-public func ~> <T : ForwardIndexType>(
-  start: T, rest: (_Advance, T.Distance)
-) -> T {
-  let n = rest.1
-  return _advanceForward(start, n)
-}
-
-internal
-func _advanceForward<T : ForwardIndexType>(start: T, _ n: T.Distance) -> T {
-  _precondition(n >= 0,
-      "Only BidirectionalIndexType can be advanced by a negative amount")
-  var p = start
-  for var i: T.Distance = 0; i != n; ++i {
-    ++p
+  public func advancedBy(n: Distance) -> Self {
+    return self._advanceForward(n)
   }
-  return p
-}
 
-/// Do not use this operator directly; call advance(start, n, end) instead.
-@transparent
-public func ~> <T : ForwardIndexType>(
-  start:T, rest: ( _Advance, (T.Distance, T))
-) -> T {
-  return _advanceForward(start, rest.1.0, rest.1.1)
-}
-
-internal
-func _advanceForward<T : ForwardIndexType>(
-  start: T, _ n: T.Distance, _ end: T
-) -> T {
-  _precondition(n >= 0,
-      "Only BidirectionalIndexType can be advanced by a negative amount")
-  var p = start
-  for var i: T.Distance = 0; i != n && p != end; ++i {
-    ++p
+  public func advancedBy(n: Distance, limit: Self) -> Self {
+    return self._advanceForward(n, limit)
   }
-  return p
+
+  public func distanceTo(end: Self) -> Distance {
+    return self._distanceTo(end)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -270,7 +275,43 @@ public protocol BidirectionalIndexType : ForwardIndexType {
 
 extension BidirectionalIndexType {
   @inline(__always)
-  public mutating func _predecessorInPlace() { self = self.predecessor() }
+  public mutating func _predecessorInPlace() {
+    self = self.predecessor()
+  }
+
+  @transparent
+  /// Do not use this operator directly; call advancedBy(n) instead.
+  internal func _advanceForwardOrBackward(n: Distance) -> Self {
+    if n >= 0 {
+      return _advanceForward(n)
+    }
+    var p = self
+    for var i: Distance = n; i != 0; ++i {
+      --p
+    }
+    return p
+  }
+
+  @transparent
+  /// Do not use this operator directly; call advancedBy(n, limit) instead.
+  internal func _advanceForwardOrBackward(n: Distance, _ limit: Self) -> Self {
+    if n >= 0 {
+      return _advanceForward(n, limit)
+    }
+    var p = self
+    for var i: Distance = n; i != 0 && p != limit; ++i {
+      --p
+    }
+    return p
+  }
+
+  public func advancedBy(n: Distance) -> Self {
+    return _advanceForwardOrBackward(n)
+  }
+
+  public func advancedBy(n: Distance, limit: Self) -> Self {
+    return _advanceForwardOrBackward(n, limit)
+  }
 }
 
 /// Replace `i` with its `predecessor()` and return the updated value
@@ -291,87 +332,36 @@ public postfix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   return ret
 }
 
-// advance implementation
-
-/// Do not use this operator directly; call advance(start, n) instead.
-@transparent
-public func ~> <T : BidirectionalIndexType>(
-  start:T , rest: (_Advance, T.Distance)
-) -> T {
-  let n = rest.1
-  if n >= 0 {
-    return _advanceForward(start, n)
-  }
-  var p = start
-  for var i: T.Distance = n; i != 0; ++i {
-    --p
-  }
-  return p
-}
-
-/// Do not use this operator directly; call advance(start, n, end) instead.
-@transparent
-public func ~> <T : BidirectionalIndexType>(
-  start:T, rest: (_Advance, (T.Distance, T))
-) -> T {
-  let n = rest.1.0
-  let end = rest.1.1
-
-  if n >= 0 {
-    return _advanceForward(start, n, end)
-  }
-  var p = start
-  for var i: T.Distance = n; i != 0 && p != end; ++i {
-    --p
-  }
-  return p
-}
-
 //===----------------------------------------------------------------------===//
 //===--- RandomAccessIndexType --------------------------------------------===//
+
+/// Used to force conformers of RandomAccessIndexType to implement
+/// `advancedBy` methods and `distanceTo`.
+public protocol _RandomAccessAmbiguity {
+  typealias Distance
+}
+
+extension _RandomAccessAmbiguity {
+  public func advancedBy(n: Distance) -> Self {
+    fatalError("advancedBy(n) not implememented")
+  }
+
+  public func advancedBy(n: Distance, limit: Self) -> Self {
+    fatalError("advancedBy(n, limit:) not implememented")
+  }
+}
+
+// FIXME: Attach _RandomAccessAmbiguity to RandomAccessIndexType
 
 /// An *index* that can be offset by an arbitrary number of positions,
 /// and can measure the distance to any reachable value, in O(1).
 public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable {
-  /// Return the minimum number of applications of `successor` or
-  /// `predecessor` required to reach `other` from `self`.
-  ///
-  /// - Complexity: O(1).
-  ///
-  /// Axioms:
-  ///
-  ///     x.distanceTo(x.successor())) == 1
-  ///     x.distanceTo(x.predecessor())) == -1
-  ///     x.advancedBy(x.distanceTo(y)) == y
   func distanceTo(other: Self) -> Distance
-
-  /// Return `self` offset by `n` steps.
-  ///
-  /// - Returns: If `n > 0`, the result of applying `successor` to
-  ///   `self` `n` times.  If `n < 0`, the result of applying
-  ///   `predecessor` to `self` `n` times. Otherwise, `self`.
-  ///
-  /// - Complexity: O(1).
-  ///
-  /// Axioms:
-  ///
-  ///     x.advancedBy(0) == x
-  ///     x.advancedBy(1) == x.successor()
-  ///     x.advancedBy(-1) == x.predecessor()
-  ///     x.distanceTo(x.advancedBy(m)) == m
   func advancedBy(n: Distance) -> Self
+  func advancedBy(n: Distance, limit: Self) -> Self
 }
 
-// advance and distance implementations
-
 extension RandomAccessIndexType {
-  /// Do not use this operator directly; call distance(start, end) instead.
-  @transparent
-  public func _distanceTo(other: Self) -> Distance {
-    let end = other
-    return self.distanceTo(end)
-  }
-
   public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) {
     _precondition(
       bounds.startIndex <= index,
@@ -400,28 +390,13 @@ extension RandomAccessIndexType {
       range.endIndex <= bounds.endIndex,
       "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
   }
-}
 
-/// Do not use this operator directly; call advance(start, n) instead.
-@transparent
-public func ~> <T : RandomAccessIndexType>(
-  start:T, rest:(_Advance, (T.Distance))
-) -> T {
-  let n = rest.1
-  return start.advancedBy(n)
-}
-
-/// Do not use this operator directly; call advance(start, n, end) instead.
-@transparent
-public func ~> <T : RandomAccessIndexType>(
-  start:T, rest:(_Advance, (T.Distance, T))
-) -> T {
-  let n = rest.1.0
-  let end = rest.1.1
-  let d = start.distanceTo(end)
-  if d == 0 || (d > 0 ? d <= n : d >= n) {
-    return end
+  @transparent
+  public func advancedBy(n: Distance, _ limit: Self) -> Self {
+    let d = self.distanceTo(limit)
+    if d == 0 || (d > 0 ? d <= n : d >= n) {
+      return limit
+    }
+    return self.advancedBy(n)
   }
-  return start.advancedBy(n)
 }
-

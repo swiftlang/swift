@@ -57,6 +57,6 @@ public func pickRandom<
   C : CollectionType where C.Index : RandomAccessIndexType
 >(c: C) -> C.Generator.Element {
   let i = Int(rand32(exclusiveUpperBound: numericCast(c.count)))
-  return c[advance(c.startIndex, numericCast(i))]
+  return c[c.startIndex.advancedBy(numericCast(i))]
 }
 

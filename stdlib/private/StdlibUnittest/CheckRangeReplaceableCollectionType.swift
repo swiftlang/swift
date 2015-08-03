@@ -26,15 +26,15 @@ internal enum RangeSelection {
       case .LeftEdge: return collection.startIndex..<collection.startIndex
       case .RightEdge: return collection.endIndex..<collection.endIndex
       case .Middle:
-        let start = advance(collection.startIndex, (collection.count / 4))
-        let end = advance(collection.startIndex, (3 * collection.count / 4))
+        let start = collection.startIndex.advancedBy(collection.count / 4)
+        let end = collection.startIndex.advancedBy(3 * collection.count / 4)
         return start...end
       case .LeftHalf:
         let start = collection.startIndex
-        let end = advance(start, collection.count / 2)
+        let end = start.advancedBy(collection.count / 2)
         return start..<end
       case .RightHalf:
-        let start = advance(collection.startIndex, collection.count / 2)
+        let start = collection.startIndex.advancedBy(collection.count / 2)
         let end = collection.endIndex
         return start..<end
     }
@@ -50,9 +50,9 @@ internal enum IndexSelection {
   internal func indexIn<C : CollectionType>(collection: C) -> C.Index {
     switch self {
       case .Start: return collection.startIndex
-      case .Middle: return advance(collection.startIndex, collection.count / 2)
+      case .Middle: return collection.startIndex.advancedBy(collection.count / 2)
       case .End: return collection.endIndex
-      case .Last: return advance(collection.startIndex, collection.count - 1)
+      case .Last: return collection.startIndex.advancedBy(collection.count - 1)
     }
   }
 }

@@ -200,7 +200,7 @@ extension RangeReplaceableCollectionType {
 
   public mutating func removeFirst(n: Int) {
     _precondition(!isEmpty, "can't remove items from an empty collection")
-    let end = advance(startIndex, numericCast(n))
+    let end = startIndex.advancedBy(numericCast(n))
     removeRange(startIndex..<end)
   }
 

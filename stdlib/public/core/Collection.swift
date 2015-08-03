@@ -231,7 +231,7 @@ extension CollectionType where SubSequence == Self {
   /// - Complexity: O(`self.count`)
   public mutating func popLast() -> Generator.Element? {
     guard !isEmpty else { return nil }
-    let lastElementIndex = advance(startIndex, numericCast(count) - 1)
+    let lastElementIndex = startIndex.advancedBy(numericCast(count) - 1)
     let element = self[lastElementIndex]
     self = self[startIndex..<lastElementIndex]
     return element
@@ -267,7 +267,7 @@ extension CollectionType {
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
   public var count: Index.Distance {
-    return distance(startIndex, endIndex)
+    return startIndex.distanceTo(endIndex)
   }
 
   /// Customization point for `SequenceType.indexOf()`.
@@ -336,7 +336,7 @@ extension CollectionType {
   /// - Complexity: O(`n`)
   public func dropFirst(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
-    let start = advance(startIndex, numericCast(n), endIndex)
+    let start = startIndex.advancedBy(numericCast(n), limit: endIndex)
     return self[start..<endIndex]
   }
 
@@ -347,7 +347,7 @@ extension CollectionType {
   public func dropLast(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = max(0, numericCast(count) - n)
-    let end = advance(startIndex, numericCast(amount), endIndex)
+    let end = startIndex.advancedBy(numericCast(amount), limit: endIndex)
     return self[startIndex..<end]
   }
 
@@ -361,7 +361,7 @@ extension CollectionType {
   /// - Complexity: O(`maxLength`)
   public func prefix(maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a prefix of negative length from a collection")
-    let end = advance(startIndex, numericCast(maxLength), endIndex)
+    let end = startIndex.advancedBy(numericCast(maxLength), limit: endIndex)
     return self[startIndex..<end]
   }
 
@@ -376,7 +376,7 @@ extension CollectionType {
   public func suffix(maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a collection")
     let amount = max(0, numericCast(count) - maxLength)
-    let start = advance(startIndex, numericCast(amount), endIndex)
+    let start = startIndex.advancedBy(numericCast(amount), limit: endIndex)
     return self[start..<endIndex]
   }
 
@@ -487,7 +487,7 @@ extension CollectionType where Index : BidirectionalIndexType {
   /// - Complexity: O(`n`)
   public func dropLast(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
-    let end = advance(endIndex, numericCast(-n), startIndex)
+    let end = endIndex.advancedBy(numericCast(-n), limit: startIndex)
     return self[startIndex..<end]
   }
 
@@ -501,7 +501,7 @@ extension CollectionType where Index : BidirectionalIndexType {
   /// - Complexity: O(`maxLength`)
   public func suffix(maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a collection")
-    let start = advance(endIndex, numericCast(-maxLength), startIndex)
+    let start = endIndex.advancedBy(numericCast(-maxLength), limit: startIndex)
     return self[start..<endIndex]
   }
 }

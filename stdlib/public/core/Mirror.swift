@@ -126,7 +126,7 @@ public struct Mirror {
   /// might write:
   ///
   ///     if let b = AnyBidirectionalCollection(someMirror.children) {
-  ///       for i in advance(b.endIndex, -20, b.startIndex)..<b.endIndex {
+  ///       for i in b.endIndex.advancedBy(-20, limit: b.startIndex)..<b.endIndex {
   ///          print(b[i])
   ///       }
   ///     }
@@ -387,15 +387,14 @@ extension Mirror {
   ///
   ///     var d = nil
   ///     let children = Mirror(reflecting: x).children
-  ///     let p0 = advance(children.startIndex, 1, children.endIndex)
+  ///     let p0 = children.startIndex.advancedBy(1, limit: children.endIndex)
   ///     if p0 != children.endIndex {
   ///       let grandChildren = Mirror(reflecting: children[p0].value).children
   ///       SeekTwo: for g in grandChildren {
   ///         if g.label == "two" {
   ///           let greatGrandChildren = Mirror(reflecting: g.value).children
-  ///           let p1 = advance(
-  ///             greatGrandChildren.startIndex, 3, 
-  ///             greatGrandChildren.endIndex)
+  ///           let p1 = greatGrandChildren.startIndex.advancedBy(3,
+  ///             limit: greatGrandChildren.endIndex)
   ///           if p1 != endIndex { d = greatGrandChildren[p1].value }
   ///           break SeekTwo
   ///         }
@@ -419,7 +418,8 @@ extension Mirror {
         position = children.indexOf { $0.label == label } ?? children.endIndex
       }
       else if let offset = (e as? Int).map({ IntMax($0) }) ?? (e as? IntMax) {
-        position = advance(children.startIndex, offset, children.endIndex)
+        position = children.startIndex.advancedBy(
+          offset, limit: children.endIndex)
       }
       else {
         _preconditionFailure(

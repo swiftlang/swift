@@ -22,22 +22,11 @@ extension String.UTF16View.Index : RandomAccessIndexType {
     // self._offset = offset
   }
 
-  /// Return the minimum number of applications of `successor` or
-  /// `predecessor` required to reach `other` from `self`.
-  ///
-  /// - Complexity: O(1).
-  public func distanceTo(x: String.UTF16View.Index) -> Int {
-    return x._offset - _offset
+  public func distanceTo(end: String.UTF16View.Index) -> Int {
+    return end._offset - _offset
   }
 
-  /// Return `self` offset by `n` steps.
-  ///
-  /// - Returns: If `n > 0`, the result of applying `successor` to
-  ///   `self` `n` times.  If `n < 0`, the result of applying
-  ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
-  ///
-  /// - Complexity: O(1).
-  public func advancedBy(x: Int) -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset: _offset + x)
+  public func advancedBy(n: Int) -> String.UTF16View.Index {
+    return String.UTF16View.Index(_offset: _offset + n)
   }
 }

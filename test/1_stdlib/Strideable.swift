@@ -46,6 +46,7 @@ extension StrideThrough where Element : TestProtocol1 {
 var StrideTestSuite = TestSuite("Strideable")
 
 struct R : RandomAccessIndexType {
+  typealias Distance = Int
   var x: Int
 
   init(_ x: Int) {
@@ -63,6 +64,13 @@ struct R : RandomAccessIndexType {
   }
   func advancedBy(n: Int) -> R {
     return R(x + n)
+  }
+  func advancedBy(n: Int, limit: R) -> R {
+    let d = distanceTo(limit)
+    if d == 0 || (d > 0 ? d <= n : d >= n) {
+      return limit
+    }
+    return self.advancedBy(n)
   }
 }
 

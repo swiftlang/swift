@@ -90,23 +90,12 @@ public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   ///   equivalent to `[self.base.predecessor()]`.
   public let base: Base
 
-  /// Return the minimum number of applications of `successor` or
-  /// `predecessor` required to reach `other` from `self`.
-  ///
-  /// - Complexity: O(1).
   public func distanceTo(other: ReverseRandomAccessIndex) -> Distance {
     return other.base.distanceTo(base)
   }
 
-  /// Return `self` offset by `n` steps.
-  ///
-  /// - Returns: If `n > 0`, the result of applying `successor` to
-  ///   `self` `n` times.  If `n < 0`, the result of applying
-  ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
-  ///
-  /// - Complexity: O(1).
-  public func advancedBy(amount: Distance) -> ReverseRandomAccessIndex {
-    return ReverseRandomAccessIndex(base.advancedBy(-amount))
+  public func advancedBy(n: Distance) -> ReverseRandomAccessIndex {
+    return ReverseRandomAccessIndex(base.advancedBy(-n))
   }
 
   @available(*, unavailable, renamed="Base")

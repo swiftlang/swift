@@ -22,8 +22,8 @@ public struct SubscriptRangeTest {
   public func boundsIn<C : CollectionType>(c: C) -> Range<C.Index> {
     let i = c.startIndex
     return Range(
-      start: advance(i, numericCast(bounds.startIndex)),
-      end: advance(i, numericCast(bounds.endIndex)))
+      start: i.advancedBy(numericCast(bounds.startIndex)),
+      end: i.advancedBy(numericCast(bounds.endIndex)))
   }
 
   public init(
@@ -339,10 +339,10 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
     let index = c.endIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      _blackHole(advance(index, numericCast(outOfBoundsIndexOffset)))
+      _blackHole(index.advancedBy(numericCast(outOfBoundsIndexOffset)))
     } else {
       expectFailure {
-        _blackHole(advance(index, numericCast(outOfBoundsIndexOffset)))
+        _blackHole(index.advancedBy(numericCast(outOfBoundsIndexOffset)))
       }
     }
   }
@@ -352,10 +352,10 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
     let index = c.endIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      _blackHole(advance(index, numericCast(outOfBoundsIndexOffset)))
+      _blackHole(index.advancedBy(numericCast(outOfBoundsIndexOffset)))
     } else {
       expectFailure {
-        _blackHole(advance(index, numericCast(outOfBoundsIndexOffset)))
+        _blackHole(index.advancedBy(numericCast(outOfBoundsIndexOffset)))
       }
     }
   }
@@ -386,11 +386,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = advance(index, numericCast(outOfBoundsSubscriptOffset))
+      index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
       _blackHole(c[index])
     } else {
       expectFailure {
-        index = advance(index, numericCast(outOfBoundsSubscriptOffset))
+        index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
         _blackHole(c[index])
       }
     }
@@ -401,11 +401,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = advance(index, numericCast(outOfBoundsSubscriptOffset))
+      index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
       _blackHole(c[index])
     } else {
       expectFailure {
-        index = advance(index, numericCast(outOfBoundsSubscriptOffset))
+        index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
         _blackHole(c[index])
       }
     }
@@ -446,7 +446,7 @@ self.test("\(testNamePrefix).indexOf()/WhereElementIsEquatable/semantics") {
       Optional<CollectionWithEquatableElement.Index>.self,
       &result)
     let zeroBasedIndex = result.map {
-      numericCast(distance(c.startIndex, $0)) as Int
+      numericCast(c.startIndex.distanceTo($0)) as Int
     }
     expectEqual(
       test.expected,
@@ -466,7 +466,7 @@ self.test("\(testNamePrefix).indexOf()/Predicate/semantics") {
       return extractValueFromEquatable(candidate).value == test.element.value
     }
     let zeroBasedIndex = result.map {
-      numericCast(distance(c.startIndex, $0)) as Int
+      numericCast(c.startIndex.distanceTo($0)) as Int
     }
     expectEqual(
       test.expected,
@@ -587,7 +587,7 @@ self.test("\(testNamePrefix).split/semantics") {
 self.test("\(testNamePrefix).prefixThrough/semantics") {
   for test in prefixThroughTests {
     let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-    let index = advance(c.startIndex, numericCast(test.position))
+    let index = c.startIndex.advancedBy(numericCast(test.position))
     let result = c.prefixThrough(index)
     expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
@@ -601,7 +601,7 @@ self.test("\(testNamePrefix).prefixThrough/semantics") {
 self.test("\(testNamePrefix).prefixUpTo/semantics") {
   for test in prefixUpToTests {
     let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-    let index = advance(c.startIndex, numericCast(test.end))
+    let index = c.startIndex.advancedBy(numericCast(test.end))
     let result = c.prefixUpTo(index)
     expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
@@ -615,7 +615,7 @@ self.test("\(testNamePrefix).prefixUpTo/semantics") {
 self.test("\(testNamePrefix).suffixFrom/semantics") {
   for test in suffixFromTests {
     let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-    let index = advance(c.startIndex, numericCast(test.start))
+    let index = c.startIndex.advancedBy(numericCast(test.start))
     let result = c.suffixFrom(index)
     expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
@@ -705,10 +705,10 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
     let index = c.startIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      _blackHole(advance(index, numericCast(-outOfBoundsIndexOffset)))
+      _blackHole(index.advancedBy(numericCast(-outOfBoundsIndexOffset)))
     } else {
       expectFailure {
-        _blackHole(advance(index, numericCast(-outOfBoundsIndexOffset)))
+        _blackHole(index.advancedBy(numericCast(-outOfBoundsIndexOffset)))
       }
     }
   }
@@ -718,10 +718,10 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
     let index = c.startIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      _blackHole(advance(index, numericCast(-outOfBoundsIndexOffset)))
+      _blackHole(index.advancedBy(numericCast(-outOfBoundsIndexOffset)))
     } else {
       expectFailure {
-        _blackHole(advance(index, numericCast(-outOfBoundsIndexOffset)))
+        _blackHole(index.advancedBy(numericCast(-outOfBoundsIndexOffset)))
       }
     }
   }
@@ -737,11 +737,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = advance(index, numericCast(-outOfBoundsSubscriptOffset))
+      index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
       _blackHole(c[index])
     } else {
       expectFailure {
-        index = advance(index, numericCast(-outOfBoundsSubscriptOffset))
+        index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
         _blackHole(c[index])
       }
     }
@@ -752,11 +752,11 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
-      index = advance(index, numericCast(-outOfBoundsSubscriptOffset))
+      index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
       _blackHole(c[index])
     } else {
       expectFailure {
-        index = advance(index, numericCast(-outOfBoundsSubscriptOffset))
+        index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
         _blackHole(c[index])
       }
     }

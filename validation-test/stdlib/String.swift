@@ -99,7 +99,7 @@ StringTests.test("ForeignIndexes/Valid") {
     let acceptor = "uvwxyz"
     expectEqual("u", acceptor[donor.startIndex])
     expectEqual("wxy",
-      acceptor[advance(donor.startIndex, 2)..<advance(donor.startIndex, 5)])
+      acceptor[donor.startIndex.advancedBy(2)..<donor.startIndex.advancedBy(5)])
   }
   if true {
     let donor = "abcdef"
@@ -107,9 +107,9 @@ StringTests.test("ForeignIndexes/Valid") {
     expectEqual("\u{fffd}", acceptor[donor.startIndex])
     expectEqual("\u{fffd}", acceptor[donor.startIndex.successor()])
     expectEqualUnicodeScalars([ 0xfffd, 0x1f602, 0xfffd ],
-      acceptor[advance(donor.startIndex, 1)..<advance(donor.startIndex, 5)])
+      acceptor[donor.startIndex.advancedBy(1)..<donor.startIndex.advancedBy(5)])
     expectEqualUnicodeScalars([ 0x1f602, 0xfffd ],
-      acceptor[advance(donor.startIndex, 2)..<advance(donor.startIndex, 5)])
+      acceptor[donor.startIndex.advancedBy(2)..<donor.startIndex.advancedBy(5)])
   }
 }
 
@@ -130,32 +130,32 @@ StringTests.test("ForeignIndexes/subscript(Index)/OutOfBoundsTrap") {
   let donor = "abcdef"
   let acceptor = "uvw"
 
-  expectEqual("u", acceptor[advance(donor.startIndex, 0)])
-  expectEqual("v", acceptor[advance(donor.startIndex, 1)])
-  expectEqual("w", acceptor[advance(donor.startIndex, 2)])
+  expectEqual("u", acceptor[donor.startIndex.advancedBy(0)])
+  expectEqual("v", acceptor[donor.startIndex.advancedBy(1)])
+  expectEqual("w", acceptor[donor.startIndex.advancedBy(2)])
 
   expectCrashLater()
-  acceptor[advance(donor.startIndex, 3)]
+  acceptor[donor.startIndex.advancedBy(3)]
 }
 
 StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/1") {
   let donor = "abcdef"
   let acceptor = "uvw"
 
-  expectEqual("uvw", acceptor[donor.startIndex..<advance(donor.startIndex, 3)])
+  expectEqual("uvw", acceptor[donor.startIndex..<donor.startIndex.advancedBy(3)])
 
   expectCrashLater()
-  acceptor[donor.startIndex..<advance(donor.startIndex, 4)]
+  acceptor[donor.startIndex..<donor.startIndex.advancedBy(4)]
 }
 
 StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/2") {
   let donor = "abcdef"
   let acceptor = "uvw"
 
-  expectEqual("uvw", acceptor[donor.startIndex..<advance(donor.startIndex, 3)])
+  expectEqual("uvw", acceptor[donor.startIndex..<donor.startIndex.advancedBy(3)])
 
   expectCrashLater()
-  acceptor[advance(donor.startIndex, 4)..<advance(donor.startIndex, 5)]
+  acceptor[donor.startIndex.advancedBy(4)..<donor.startIndex.advancedBy(5)]
 }
 
 StringTests.test("ForeignIndexes/replaceRange/OutOfBoundsTrap/1") {
@@ -168,7 +168,7 @@ StringTests.test("ForeignIndexes/replaceRange/OutOfBoundsTrap/1") {
 
   expectCrashLater()
   acceptor.replaceRange(
-    donor.startIndex..<advance(donor.startIndex, 4), with: "")
+    donor.startIndex..<donor.startIndex.advancedBy(4), with: "")
 }
 
 StringTests.test("ForeignIndexes/replaceRange/OutOfBoundsTrap/2") {
@@ -181,7 +181,7 @@ StringTests.test("ForeignIndexes/replaceRange/OutOfBoundsTrap/2") {
 
   expectCrashLater()
   acceptor.replaceRange(
-    advance(donor.startIndex, 4)..<advance(donor.startIndex, 5), with: "")
+    donor.startIndex.advancedBy(4)..<donor.startIndex.advancedBy(5), with: "")
 }
 
 StringTests.test("ForeignIndexes/removeAtIndex/OutOfBoundsTrap") {
@@ -198,7 +198,7 @@ StringTests.test("ForeignIndexes/removeAtIndex/OutOfBoundsTrap") {
   var acceptor = "uvw"
 
   expectCrashLater()
-  acceptor.removeAtIndex(advance(donor.startIndex, 4))
+  acceptor.removeAtIndex(donor.startIndex.advancedBy(4))
 }
 
 StringTests.test("ForeignIndexes/removeRange/OutOfBoundsTrap/1") {
@@ -216,7 +216,7 @@ StringTests.test("ForeignIndexes/removeRange/OutOfBoundsTrap/1") {
 
   expectCrashLater()
   acceptor.removeRange(
-    donor.startIndex..<advance(donor.startIndex, 4))
+    donor.startIndex..<donor.startIndex.advancedBy(4))
 }
 
 StringTests.test("ForeignIndexes/removeRange/OutOfBoundsTrap/2") {
@@ -225,7 +225,7 @@ StringTests.test("ForeignIndexes/removeRange/OutOfBoundsTrap/2") {
 
   expectCrashLater()
   acceptor.removeRange(
-    advance(donor.startIndex, 4)..<advance(donor.startIndex, 5))
+    donor.startIndex.advancedBy(4)..<donor.startIndex.advancedBy(5))
 }
 
 StringTests.test("_splitFirst") {
@@ -319,7 +319,7 @@ StringTests.test("appendToSubstring") {
         var s0 = String(count: initialSize, repeatedValue: UnicodeScalar("x"))
         let originalIdentity = s0.bufferID
         s0 = s0[
-          advance(s0.startIndex, sliceStart)..<advance(s0.startIndex, sliceEnd)]
+          s0.startIndex.advancedBy(sliceStart)..<s0.startIndex.advancedBy(sliceEnd)]
         expectEqual(originalIdentity, s0.bufferID)
         s0 += "x"
         // For a small string size, the allocator could round up the allocation
@@ -364,7 +364,7 @@ StringTests.test("appendToSubstringBug") {
     let originalIdentity = s0.bufferID
 
     // Turn s0 into a slice that points to the end.
-    s0 = s0[advance(s0.startIndex, prefixSize)..<s0.endIndex]
+    s0 = s0[s0.startIndex.advancedBy(prefixSize)..<s0.endIndex]
 
     // Slicing should not reallocate.
     expectEqual(originalIdentity, s0.bufferID)
@@ -396,7 +396,7 @@ StringTests.test("COW/removeRange/start") {
     expectEqual("12345678", slice)
 
     // This mutation should reallocate the string.
-    str.removeRange(str.startIndex..<advance(str.startIndex, 1))
+    str.removeRange(str.startIndex..<str.startIndex.advancedBy(1))
     expectNotEqual(literalIdentity, str.bufferID)
     expectEqual(literalIdentity, slice.bufferID)
     let heapStrIdentity = str.bufferID
@@ -404,7 +404,7 @@ StringTests.test("COW/removeRange/start") {
     expectEqual("12345678", slice)
 
     // No more reallocations are expected.
-    str.removeRange(str.startIndex..<advance(str.startIndex, 1))
+    str.removeRange(str.startIndex..<str.startIndex.advancedBy(1))
     // FIXME: extra reallocation, should be expectEqual()
     expectNotEqual(heapStrIdentity, str.bufferID)
     // end FIXME
@@ -425,7 +425,7 @@ StringTests.test("COW/removeRange/start") {
     expectEqual("345678", slice)
 
     // This mutation should reallocate the string.
-    str.removeRange(str.startIndex..<advance(str.startIndex, 1))
+    str.removeRange(str.startIndex..<str.startIndex.advancedBy(1))
     expectNotEqual(heapStrIdentity1, str.bufferID)
     expectEqual(heapStrIdentity1, slice.bufferID)
     let heapStrIdentity2 = str.bufferID
@@ -433,7 +433,7 @@ StringTests.test("COW/removeRange/start") {
     expectEqual("345678", slice)
 
     // No more reallocations are expected.
-    str.removeRange(str.startIndex..<advance(str.startIndex, 1))
+    str.removeRange(str.startIndex..<str.startIndex.advancedBy(1))
     // FIXME: extra reallocation, should be expectEqual()
     expectNotEqual(heapStrIdentity2, str.bufferID)
     // end FIXME
@@ -457,7 +457,7 @@ StringTests.test("COW/removeRange/end") {
     expectEqual("12345678", slice)
 
     // This mutation should reallocate the string.
-    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    str.removeRange(str.endIndex.advancedBy(-1)..<str.endIndex)
     expectNotEqual(literalIdentity, str.bufferID)
     expectEqual(literalIdentity, slice.bufferID)
     let heapStrIdentity = str.bufferID
@@ -466,7 +466,7 @@ StringTests.test("COW/removeRange/end") {
 
     // No more reallocations are expected.
     str.append(UnicodeScalar("x"))
-    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    str.removeRange(str.endIndex.advancedBy(-1)..<str.endIndex)
     // FIXME: extra reallocation, should be expectEqual()
     expectNotEqual(heapStrIdentity, str.bufferID)
     // end FIXME
@@ -474,9 +474,9 @@ StringTests.test("COW/removeRange/end") {
     expectEqual("1234567", str)
     expectEqual("12345678", slice)
 
-    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    str.removeRange(str.endIndex.advancedBy(-1)..<str.endIndex)
     str.append(UnicodeScalar("x"))
-    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    str.removeRange(str.endIndex.advancedBy(-1)..<str.endIndex)
     // FIXME: extra reallocation, should be expectEqual()
     //expectNotEqual(heapStrIdentity, str.bufferID)
     // end FIXME
@@ -497,7 +497,7 @@ StringTests.test("COW/removeRange/end") {
     expectEqual("123456", slice)
 
     // This mutation should reallocate the string.
-    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    str.removeRange(str.endIndex.advancedBy(-1)..<str.endIndex)
     expectNotEqual(heapStrIdentity1, str.bufferID)
     expectEqual(heapStrIdentity1, slice.bufferID)
     let heapStrIdentity = str.bufferID
@@ -506,7 +506,7 @@ StringTests.test("COW/removeRange/end") {
 
     // No more reallocations are expected.
     str.append(UnicodeScalar("x"))
-    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    str.removeRange(str.endIndex.advancedBy(-1)..<str.endIndex)
     // FIXME: extra reallocation, should be expectEqual()
     expectNotEqual(heapStrIdentity, str.bufferID)
     // end FIXME
@@ -514,9 +514,9 @@ StringTests.test("COW/removeRange/end") {
     expectEqual("12345", str)
     expectEqual("123456", slice)
 
-    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    str.removeRange(str.endIndex.advancedBy(-1)..<str.endIndex)
     str.append(UnicodeScalar("x"))
-    str.removeRange(advance(str.endIndex, -1)..<str.endIndex)
+    str.removeRange(str.endIndex.advancedBy(-1)..<str.endIndex)
     // FIXME: extra reallocation, should be expectEqual()
     //expectNotEqual(heapStrIdentity, str.bufferID)
     // end FIXME
@@ -532,7 +532,7 @@ StringTests.test("COW/replaceRange/end") {
     var str = "12345678"
     let literalIdentity = str.bufferID
 
-    var slice = str[str.startIndex..<advance(str.startIndex, 7)]
+    var slice = str[str.startIndex..<str.startIndex.advancedBy(7)]
     expectEqual(literalIdentity, str.bufferID)
     expectEqual(literalIdentity, slice.bufferID)
     expectEqual("12345678", str)
@@ -547,7 +547,7 @@ StringTests.test("COW/replaceRange/end") {
     expectEqual("12345678", str)
 
     // No more reallocations are expected.
-    slice.replaceRange(advance(slice.endIndex, -1)..<slice.endIndex, with: "b")
+    slice.replaceRange(slice.endIndex.advancedBy(-1)..<slice.endIndex, with: "b")
     // FIXME: extra reallocation, should be expectEqual()
     expectNotEqual(heapStrIdentity, slice.bufferID)
     // end FIXME
@@ -567,7 +567,7 @@ StringTests.test("COW/replaceRange/end") {
     expectNotEqual(literalIdentity, str.bufferID)
     let heapStrIdentity1 = str.bufferID
 
-    var slice = str[str.startIndex..<advance(str.startIndex, 7)]
+    var slice = str[str.startIndex..<str.startIndex.advancedBy(7)]
     expectEqual(heapStrIdentity1, str.bufferID)
     expectEqual(heapStrIdentity1, slice.bufferID)
 
@@ -580,7 +580,7 @@ StringTests.test("COW/replaceRange/end") {
     expectEqual("12345678", str)
 
     // No more reallocations are expected.
-    slice.replaceRange(advance(slice.endIndex, -1)..<slice.endIndex, with: "b")
+    slice.replaceRange(slice.endIndex.advancedBy(-1)..<slice.endIndex, with: "b")
     // FIXME: extra reallocation, should be expectEqual()
     expectNotEqual(heapStrIdentity2, slice.bufferID)
     // end FIXME
@@ -987,12 +987,12 @@ StringTests.test("unicodeViews") {
   
   expectEqual(
     "\u{1F3C2}", String(
-      winter.utf8[winter.utf8.startIndex..<advance(winter.utf8.startIndex, 4)]))
+      winter.utf8[winter.utf8.startIndex..<winter.utf8.startIndex.advancedBy(4)]))
 
   expectEqual(
     "\u{1F3C2}", String(
       winter.utf16[
-        winter.utf16.startIndex..<advance(winter.utf16.startIndex, 2)
+        winter.utf16.startIndex..<winter.utf16.startIndex.advancedBy(2)
       ]))
   
   expectEqual(
@@ -1006,25 +1006,25 @@ StringTests.test("unicodeViews") {
   expectEqual(
     winter, String(
       winter.utf8[
-        winter.utf8.startIndex..<advance(winter.utf8.startIndex, 7)
+        winter.utf8.startIndex..<winter.utf8.startIndex.advancedBy(7)
       ]))
   
   expectEqual(
     winter, String(
       winter.utf16[
-        winter.utf16.startIndex..<advance(winter.utf16.startIndex, 3)
+        winter.utf16.startIndex..<winter.utf16.startIndex.advancedBy(3)
       ]))
   
   expectEqual(
     winter, String(
       winter.unicodeScalars[
         winter.unicodeScalars.startIndex
-        ..< advance(winter.unicodeScalars.startIndex, 2)
+        ..< winter.unicodeScalars.startIndex.advancedBy(2)
       ]))
 
   let ga = "\u{304b}\u{3099}"
   expectEqual(ga, String(ga.utf8[ga.utf8.startIndex ..<
-    advance(ga.utf8.startIndex, 6)]))
+    ga.utf8.startIndex.advancedBy(6)]))
 }
 
 // Validate that index conversion does something useful for Cocoa

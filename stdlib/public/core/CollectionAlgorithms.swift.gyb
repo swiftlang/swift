@@ -146,11 +146,11 @@ ${orderingRequirementForComparable}
       (baseAddress, count) -> Index in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
-      let startOffset = distance(self.startIndex, range.startIndex)
+      let startOffset = startIndex.distanceTo(range.startIndex)
       let unsafeBufferStartIndex =
         bufferPointer.startIndex + numericCast(startOffset)
 
-      let endOffset = distance(self.startIndex, range.endIndex)
+      let endOffset = startIndex.distanceTo(range.endIndex)
       let unsafeBufferEndIndex =
         bufferPointer.startIndex + numericCast(endOffset)
 
@@ -160,8 +160,7 @@ ${orderingRequirementForComparable}
         , isOrderedBefore: isOrderedBefore
 %   end
         )
-      return advance(
-        self.startIndex,
+      return startIndex.advancedBy(
         numericCast(unsafeBufferPivot - bufferPointer.startIndex))
     }
     if let result = maybeResult {

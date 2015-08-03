@@ -17,6 +17,9 @@
 /// A `RandomAccessIndexType` that has two possible values.  Used as
 /// the `Index` type for `CollectionOfOne<T>`.
 public enum Bit : Int, Comparable, RandomAccessIndexType, _Reflectable {
+
+  public typealias Distance = Int
+
   case Zero = 0, One = 1
 
   /// Returns the next consecutive value after `self`.
@@ -35,23 +38,12 @@ public enum Bit : Int, Comparable, RandomAccessIndexType, _Reflectable {
     return .Zero
   }
 
-  /// Return the minimum number of applications of `successor` or
-  /// `predecessor` required to reach `other` from `self`.
-  ///
-  /// - Complexity: O(1).
   public func distanceTo(other: Bit) -> Int {
     return rawValue.distanceTo(other.rawValue)
   }
 
-  /// Return `self` offset by `n` steps.
-  ///
-  /// - Returns: If `n > 0`, the result of applying `successor` to
-  ///   `self` `n` times.  If `n < 0`, the result of applying
-  ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
-  ///
-  /// - Complexity: O(1).
-  public func advancedBy(distance: Int) -> Bit {
-    return rawValue.advancedBy(distance) > 0 ? One : Zero
+  public func advancedBy(n: Distance) -> Bit {
+    return rawValue.advancedBy(n) > 0 ? One : Zero
   }
 
   /// Returns a mirror that reflects `self`.

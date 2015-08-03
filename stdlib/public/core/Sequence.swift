@@ -419,7 +419,7 @@ extension SequenceType {
       }
     }
 
-    if distance(ringBuffer.startIndex, i) > 0 {
+    if i != ringBuffer.startIndex {
       return AnySequence(
         [ringBuffer[i..<ringBuffer.endIndex], ringBuffer[0..<i]].flatten())
     }

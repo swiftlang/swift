@@ -24,12 +24,12 @@ extension String {
   ${MirrorDecl} {
     ${MirrorBoilerplate}
 
-      var count: Int { return distance(_value.startIndex,_value.endIndex) }
+      var count: Int { return _value.startIndex.distanceTo(_value.endIndex) }
 
       subscript(i: Int) -> (String, _MirrorType) {
         _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
         // FIXME(performance): optimize for sequential access.
-        return ("[\(i)]", _reflect(_value[advance(_value.startIndex, i)]))
+        return ("[\(i)]", _reflect(_value[_value.startIndex.advancedBy(i)]))
       }
 
       var summary: String { return _value.description }
