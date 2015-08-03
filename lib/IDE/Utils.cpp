@@ -19,8 +19,10 @@
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/TextDiagnosticBuffer.h"
+#include "clang/Serialization/ASTReader.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -265,6 +267,25 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
       case clang::frontend::After:
         break;
     }
+  }
+
+  if (!PPOpts.ImplicitPCHInclude.empty()) {
+    clang::FileSystemOptions FileSysOpts;
+    clang::FileManager FileMgr(FileSysOpts);
+    auto PCHContainerOperations =
+      std::make_shared<clang::ObjectFilePCHContainerOperations>();
+    std::string HeaderFile =
+      clang::ASTReader::getOriginalSourceFile(PPOpts.ImplicitPCHInclude,
+                                              FileMgr, *PCHContainerOperations,
+                                              *ClangDiags);
+    if (!HeaderFile.empty()) {
+      CCArgs.push_back("-include");
+      CCArgs.push_back(std::move(HeaderFile));
+    }
+  }
+  for (auto &Header : PPOpts.Includes) {
+    CCArgs.push_back("-include");
+    CCArgs.push_back(Header);
   }
 
   for (auto &Entry : HSOpts.ModulesIgnoreMacros) {

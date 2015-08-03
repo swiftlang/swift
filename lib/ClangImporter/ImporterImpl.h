@@ -278,15 +278,6 @@ private:
   /// \brief Clang parser, which is used to load textual headers.
   std::unique_ptr<clang::Parser> Parser;
 
-  /// Tracks top level decls from the bridging header.
-  std::vector<clang::Decl *> BridgeHeaderTopLevelDecls;
-  std::vector<ImportDecl *> BridgeHeaderTopLevelImports;
-
-  /// Tracks macro definitions from the bridging header.
-  std::vector<clang::IdentifierInfo *> BridgeHeaderMacros;
-  /// Tracks included headers from the bridging header.
-  llvm::DenseSet<const clang::FileEntry *> BridgeHeaderFiles;
-
   /// The active type checker, or null if there is no active type checker.
   ///
   /// The flag is \c true if there has ever been a type resolver assigned, i.e.
@@ -610,6 +601,16 @@ public:
   /// The message to embed for implicitly unavailability if a deprecated
   /// API is now unavailable.
   std::string DeprecatedAsUnavailableMessage;
+
+  /// Tracks top level decls from the bridging header.
+  std::vector<clang::Decl *> BridgeHeaderTopLevelDecls;
+  std::vector<llvm::PointerUnion<clang::ImportDecl *, ImportDecl *>>
+    BridgeHeaderTopLevelImports;
+
+  /// Tracks macro definitions from the bridging header.
+  std::vector<clang::IdentifierInfo *> BridgeHeaderMacros;
+  /// Tracks included headers from the bridging header.
+  llvm::DenseSet<const clang::FileEntry *> BridgeHeaderFiles;
 
 public:
   void registerExternalDecl(Decl *D) {
