@@ -3173,6 +3173,44 @@ SILInstruction *SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *CFI) 
     if (!isa<RefCountingInst>(Use->getUser()))
       return nullptr;
   }
+
+  auto Converted = CFI->getConverted();
+  if (!isa<FunctionRefInst>(Converted)) {
+    // Replace all retain/releases on convert_function by retain/releases on
+    // its argument. This is required to preserve the lifetime of its argument,
+    // which could be e.g. a partial_apply instruction capturing some further
+    // arguments.
+    SILBuilderWithScope<1> B(CFI);
+    for (auto Use : CFI->getUses()) {
+      auto User = Use->getUser();
+      B.setInsertionPoint(User);
+      switch (User->getKind()) {
+      default:
+        llvm_unreachable("Unknown RC instruction");
+        break;
+      case ValueKind::StrongRetainInst:
+        B.createStrongRetain(User->getLoc(), Converted);
+        break;
+      case ValueKind::StrongReleaseInst:
+        B.createStrongRelease(User->getLoc(), Converted);
+        break;
+      case ValueKind::RetainValueInst:
+        B.createRetainValue(User->getLoc(), Converted);
+        break;
+      case ValueKind::ReleaseValueInst:
+        B.createReleaseValue(User->getLoc(), Converted);
+        break;
+      case ValueKind::UnownedRetainInst:
+        B.createUnownedRetain(User->getLoc(), Converted);
+        break;
+      case ValueKind::UnownedReleaseInst:
+        B.createUnownedRelease(User->getLoc(), Converted);
+        break;
+      }
+    }
+  }
+
+  // Now remove the convert_function instruction and its uses.
   eraseUsesOfInstruction(CFI,
                          [this](SILInstruction *I){
                            Worklist.remove(I);
