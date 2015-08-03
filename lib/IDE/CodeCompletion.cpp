@@ -1030,7 +1030,11 @@ public:
                   RHS->getTopLevelModuleName()) < 0;
               });
     for (auto *M : Modules) {
-      if (M->isAvailable() && !M->getTopLevelModuleName().startswith("_")) {
+      if (M->isAvailable() &&
+          !M->getTopLevelModuleName().startswith("_") &&
+          // Name hidden implies not imported yet, exactly what code completion
+          // wants.
+          M->NameVisibility == clang::Module::NameVisibilityKind::Hidden) {
         CodeCompletionResultBuilder Builder(Sink,
                                             CodeCompletionResult::ResultKind::
                                               Keyword,
