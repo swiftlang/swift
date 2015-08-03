@@ -267,7 +267,7 @@ public:
 
   SILInstruction *tryOptimizeApplyOfPartialApply(PartialApplyInst *PAI);
 
-  SILInstruction *optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
+  SILInstruction *optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                      ConvertFunctionInst *CFI);
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.

@@ -932,7 +932,7 @@ SILInstruction *SILCombiner::optimizeBuiltinCompareEq(BuiltinInst *BI,
 }
 
 SILInstruction *
-SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
+SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                 ConvertFunctionInst *CFI) {
   // We only handle simplification of static function references. If we don't
   // have one, bail.
@@ -941,7 +941,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
     return nullptr;
 
   // Grab our relevant callee types...
-  CanSILFunctionType SubstCalleeTy = AI->getSubstCalleeType();
+  CanSILFunctionType SubstCalleeTy = AI.getSubstCalleeType();
   auto ConvertCalleeTy =
       CFI->getOperand().getType().castTo<SILFunctionType>();
 
@@ -951,7 +951,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
 
   // Ok, we can now perform our transformation. Grab AI's operands and the
   // relevant types from the ConvertFunction function type and AI.
-  OperandValueArrayRef Ops = AI->getArgumentsWithoutIndirectResult();
+  OperandValueArrayRef Ops = AI.getArgumentsWithoutIndirectResult();
   auto OldOpTypes = SubstCalleeTy->getParameterSILTypes();
   auto NewOpTypes = ConvertCalleeTy->getParameterSILTypes();
 
@@ -970,14 +970,14 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
     // other types alone.
     if (OldOpType.isAddress()) {
       assert(NewOpType.isAddress() && "Addresses should map to addresses.");
-      auto UAC = Builder->createUncheckedAddrCast(AI->getLoc(), Op, NewOpType);
-      UAC->setDebugScope(AI->getDebugScope());
+      auto UAC = Builder->createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
+      UAC->setDebugScope(AI.getDebugScope());
       Args.push_back(UAC);
     } else if (OldOpType.isHeapObjectReferenceType()) {
       assert(NewOpType.isHeapObjectReferenceType() &&
              "refs should map to refs.");
-      auto URC = Builder->createUncheckedRefCast(AI->getLoc(), Op, NewOpType);
-      URC->setDebugScope(AI->getDebugScope());
+      auto URC = Builder->createUncheckedRefCast(AI.getLoc(), Op, NewOpType);
+      URC->setDebugScope(AI.getDebugScope());
       Args.push_back(URC);
     } else {
       Args.push_back(Op);
@@ -986,11 +986,18 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
 
   SILType CCSILTy = SILType::getPrimitiveObjectType(ConvertCalleeTy);
   // Create the new apply inst.
-  auto NAI = ApplyInst::create(AI->getLoc(), FRI, CCSILTy,
-                               ConvertCalleeTy->getSILResult(),
+  SILInstruction *NAI;
+  if (auto *TAI = dyn_cast<TryApplyInst>(AI))
+    NAI = TryApplyInst::create(AI.getLoc(), FRI, CCSILTy,
                                ArrayRef<Substitution>(), Args,
+                               TAI->getNormalBB(), TAI->getErrorBB(),
                                *FRI->getReferencedFunction());
-  NAI->setDebugScope(AI->getDebugScope());
+  else
+    NAI = ApplyInst::create(AI.getLoc(), FRI, CCSILTy,
+                            ConvertCalleeTy->getSILResult(),
+                            ArrayRef<Substitution>(), Args,
+                            *FRI->getReferencedFunction());
+  NAI->setDebugScope(AI.getDebugScope());
   return NAI;
 }
 
