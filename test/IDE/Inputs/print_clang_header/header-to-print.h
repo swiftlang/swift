@@ -22,5 +22,10 @@ void doSomethingInHead(int arg);
 -(void)doItInCategory;
 @end
 
+@protocol Superproto
+-(void)lala;
+@end
+
 @class Cake;
 struct Arkham;
+@protocol Soul;

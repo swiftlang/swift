@@ -242,6 +242,9 @@ bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
   if (auto *ID = dyn_cast<clang::ObjCInterfaceDecl>(D)) {
     if (!ID->isThisDeclarationADefinition())
       return true;
+  } else if (auto PD = dyn_cast<clang::ObjCProtocolDecl>(D)) {
+    if (!PD->isThisDeclarationADefinition())
+      return true;
   } else if (auto TD = dyn_cast<clang::TagDecl>(D)) {
     if (!TD->isThisDeclarationADefinition())
       return true;

@@ -6,3 +6,6 @@ void other_doSomething(int arg);
 @end
 
 struct Arkham {};
+
+@protocol Soul
+@end

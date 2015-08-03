@@ -20,3 +20,7 @@ extension BaseInHead {
   class func doItInCategory()
   func doItInCategory()
 }
+
+protocol Superproto {
+  func lala()
+}
