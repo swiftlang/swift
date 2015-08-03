@@ -541,6 +541,9 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
 
       if (ArrayUserSet.count(II)) // May be an array mutation.
         break;
+    } else {
+      // Not safe.
+      break;
     }
   }
   DEBUG(llvm::dbgs() << "    Skipping Array: retained in loop!\n    "
