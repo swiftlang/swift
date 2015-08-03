@@ -131,6 +131,23 @@ would return a ``Set<Int>``, and all non-unique counts would disappear.
   are the same in spirit, like the ``flatMap()`` that selects the non-nil
   elements of the result sequence.
 
+The `remove*()` method family on collections
+--------------------------------------------
+
+Protocol extensions for ``RangeReplaceableCollectionType`` define
+``removeFirst(n: Int)`` and ``removeLast(n: Int)``.  These functions remove
+exactly ``n`` elements; they don't clamp ``n`` to ``count`` or they could be
+masking bugs.
+
+Since the standard library tries to preserve information, it also defines
+special overloads that return just one element, ``removeFirst() -> Element``
+and ``removeLast() -> Element``, that return the removed element.  These
+overloads have a precondition that the collection is not empty.  Another
+possible design would be that they don't have preconditions and return
+``Element?``.  Doing so would make the overload set inconsistent: semantics of
+different overloads would be significantly different.  It would be surprising
+that ``myData.removeFirst()`` and ``myData.removeFirst(1)`` are not equivalent.
+
 Lazy functions that operate on sequences and collections
 --------------------------------------------------------
 
