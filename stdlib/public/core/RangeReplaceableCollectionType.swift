@@ -27,7 +27,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`subRange.count`) if
-  ///   `subRange.endIndex == self.endIndex` and `isEmpty(newElements)`,
+  ///   `subRange.endIndex == self.endIndex` and `newElements.isEmpty`,
   ///   O(`self.count` + `newElements.count`) otherwise.
   mutating func replaceRange<
     C : CollectionType where C.Generator.Element == Generator.Element

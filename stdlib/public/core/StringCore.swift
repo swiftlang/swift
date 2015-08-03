@@ -568,7 +568,7 @@ extension _StringCore : RangeReplaceableCollectionType {
   /// Replace the given `subRange` of elements with `newElements`.
   ///
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
-  ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == UTF16.CodeUnit
   >(

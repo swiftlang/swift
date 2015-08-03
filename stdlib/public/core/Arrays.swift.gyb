@@ -855,7 +855,7 @@ extension ${Self} {
   /// Replace the given `subRange` of elements with `newElements`.
   ///
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
-  ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   @_semantics("array.mutate_unknown")
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == _Buffer.Element

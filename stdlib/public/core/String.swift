@@ -611,7 +611,7 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
-  ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == Character
   >(
@@ -627,7 +627,7 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
-  ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange(
     subRange: Range<Index>, with newElements: String
   ) {
