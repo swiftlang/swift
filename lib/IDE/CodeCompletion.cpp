@@ -667,6 +667,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
 
   enum class CompletionKind {
     None,
+    Import,
     DotExpr,
     PostfixExprBeginning,
     PostfixExpr,
@@ -833,6 +834,7 @@ public:
       SmallVectorImpl<StringRef> &Keywords) override;
 
   void completePoundAvailablePlatform() override;
+  void completeImportDecl() override;
 
   void addKeywords(CodeCompletionResultSink &Sink);
 
@@ -1016,6 +1018,27 @@ public:
 
   void addExpressionSpecificDecl(const Decl *D) {
     ExpressionSpecificDecls.insert(D);
+  }
+
+  void addImportModuleNames() {
+    // FIXME: Add user-defined swift modules
+    SmallVector<clang::Module*, 20> Modules;
+    Ctx.getVisibleTopLevelClangeModules(Modules);
+    std::sort(Modules.begin(), Modules.end(),
+              [](clang::Module* LHS , clang::Module* RHS) {
+                return LHS->getTopLevelModuleName().compare_lower(
+                  RHS->getTopLevelModuleName()) < 0;
+              });
+    for (auto *M : Modules) {
+      if (M->isAvailable() && !M->getTopLevelModuleName().startswith("_")) {
+        CodeCompletionResultBuilder Builder(Sink,
+                                            CodeCompletionResult::ResultKind::
+                                              Keyword,
+                                            SemanticContextKind::None);
+        Builder.addTextChunk(M->getTopLevelModuleName());
+        Builder.addTypeAnnotation("Module");
+      }
+    }
   }
 
   SemanticContextKind getSemanticContext(const Decl *D,
@@ -2456,6 +2479,11 @@ void CodeCompletionCallbacksImpl::completeCaseStmtDotPrefix() {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeImportDecl() {
+  Kind = CompletionKind::Import;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
     SmallVectorImpl<StringRef> &Keywords) {
   assert(!InEnumElementRawValue);
@@ -2544,6 +2572,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::AttributeDeclParen:
   case CompletionKind::AttributeBegin:
   case CompletionKind::PoundAvailablePlatform:
+  case CompletionKind::Import:
     break;
 
   case CompletionKind::PostfixExprBeginning:
@@ -2759,6 +2788,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::PoundAvailablePlatform: {
     Lookup.getPoundAvailablePlatformCompletions();
+    break;
+  }
+  case CompletionKind::Import: {
+    Lookup.addImportModuleNames();
     break;
   }
   }
