@@ -568,7 +568,15 @@ namespace {
           // to insert the RebindSelfInConstructorExpr.
           Expr *target = nullptr;
           bool foundApply = false;
+          bool foundRebind = false;
           for (auto ancestor : reversed(ExprStack)) {
+            if (isa<RebindSelfInConstructorExpr>(ancestor)) {
+              // If we already have a rebind, then we're re-typechecking an
+              // expression and are done.
+              foundRebind = true;
+              break;
+            }
+            
             // Recognize applications.
             if (auto apply = dyn_cast<ApplyExpr>(ancestor)) {
               // If we already saw an application, we're done.
@@ -597,7 +605,7 @@ namespace {
           }
 
           // If we found a rebind target, note the insertion point.
-          if (target) {
+          if (target && !foundRebind) {
             UnresolvedCtorRebindTarget = target;
             UnresolvedCtorSelf = self;
           }
