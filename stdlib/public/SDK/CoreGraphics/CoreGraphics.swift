@@ -18,7 +18,7 @@ import Darwin
 //===----------------------------------------------------------------------===//
 
 public extension CGPoint {
-  static var zeroPoint: CGPoint {
+  static var zero: CGPoint {
     @transparent // @fragile
     get { return CGPoint(x: 0, y: 0) }
   }
@@ -40,9 +40,8 @@ public func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
   return lhs.x == rhs.x  &&  lhs.y == rhs.y
 }
 
-
 public extension CGSize {
-  static var zeroSize: CGSize {
+  static var zero: CGSize {
     @transparent // @fragile
     get { return CGSize(width: 0, height: 0) }
   }
@@ -64,9 +63,8 @@ public func == (lhs: CGSize, rhs: CGSize) -> Bool {
   return lhs.width == rhs.width  &&  lhs.height == rhs.height
 }
 
-
 public extension CGVector {
-  static var zeroVector: CGVector {
+  static var zero: CGVector {
     @transparent // @fragile
     get { return CGVector(dx: 0, dy: 0) }
   }
@@ -90,34 +88,34 @@ public func == (lhs: CGVector, rhs: CGVector) -> Bool {
 
 
 public extension CGRect {
-  static var zeroRect:     CGRect {
+  static var zero: CGRect {
     @transparent // @fragile
     get { return CGRect(x: 0, y: 0, width: 0, height: 0) }
   }
-  static var nullRect:     CGRect {
+  static var null: CGRect {
     @transparent // @fragile
     get { return CGRectNull }
   }
-  static var infiniteRect: CGRect {
+  static var infinite: CGRect {
     @transparent // @fragile
     get { return CGRectInfinite }
   }
 
   @transparent // @fragile
   init(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) {
-    self.init(origin: CGPoint(x: x, y: y), 
+    self.init(origin: CGPoint(x: x, y: y),
               size: CGSize(width: width, height: height))
   }
 
   @transparent // @fragile
   init(x: Double, y: Double, width: Double, height: Double) {
-    self.init(origin: CGPoint(x: x, y: y), 
+    self.init(origin: CGPoint(x: x, y: y),
               size: CGSize(width: width, height: height))
   }
 
   @transparent // @fragile
   init(x: Int, y: Int, width: Int, height: Int) {
-    self.init(origin: CGPoint(x: x, y: y), 
+    self.init(origin: CGPoint(x: x, y: y),
               size: CGSize(width: width, height: height))
   }
 
@@ -142,7 +140,6 @@ public extension CGRect {
     @transparent // @fragile
     get { return CGRectGetMaxX(self) }
   }
-
   var minY:   CGFloat {
     @transparent // @fragile
     get { return CGRectGetMinY(self) }
@@ -155,7 +152,6 @@ public extension CGRect {
     @transparent // @fragile
     get { return CGRectGetMaxY(self) }
   }
-
   var isNull:     Bool {
     @transparent // @fragile
     get { return CGRectIsNull(self) }
@@ -168,82 +164,80 @@ public extension CGRect {
     @transparent // @fragile
     get { return CGRectIsInfinite(self) }
   }
-
-  var standardizedRect: CGRect { 
+  var standardized: CGRect {
     @transparent // @fragile
-    get { return CGRectStandardize(self) } 
+    get { return CGRectStandardize(self) }
   }
 
-  @transparent // @fragile
-  mutating func standardize() {
-    self = self.standardizedRect
-  }
-
-  var integerRect: CGRect {
+  var integral: CGRect {
     @transparent // @fragile
     get { return CGRectIntegral(self) }
   }
 
   @transparent // @fragile
-  mutating func integerize() {
-    self = self.integerRect
+  mutating func standardizeInPlace() {
+    self = standardized
   }
 
+  @transparent // @fragile
+  mutating func makeIntegralInPlace() {
+    self = integral
+  }
 
   @transparent // @fragile
-  func rectByInsetting(dx dx: CGFloat, dy: CGFloat) -> CGRect {
+  @warn_unused_result(mutable_variant="insetInPlace")
+  func insetBy(dx dx: CGFloat, dy: CGFloat) -> CGRect {
     return CGRectInset(self, dx, dy)
   }
 
   @transparent // @fragile
-  mutating func inset(dx dx: CGFloat, dy: CGFloat) {
-    self = self.rectByInsetting(dx: dx, dy: dy)
+  mutating func insetInPlace(dx dx: CGFloat, dy: CGFloat) {
+    self = insetBy(dx: dx, dy: dy)
   }
 
-
   @transparent // @fragile
-  func rectByOffsetting(dx dx: CGFloat, dy: CGFloat) -> CGRect {
+  @warn_unused_result(mutable_variant="offsetInPlace")
+  func offsetBy(dx dx: CGFloat, dy: CGFloat) -> CGRect {
     return CGRectOffset(self, dx, dy)
   }
 
   @transparent // @fragile
-  mutating func offset(dx dx: CGFloat, dy: CGFloat) {
-    self = self.rectByOffsetting(dx: dx, dy: dy)
-  }
-
-
-  @transparent // @fragile
-  func rectByUnion(withRect: CGRect) -> CGRect {
-    return CGRectUnion(self, withRect)
-  }
-  
-  @transparent // @fragile
-  mutating func union(withRect: CGRect) {
-    self = self.rectByUnion(withRect)
+  mutating func offsetInPlace(dx dx: CGFloat, dy: CGFloat) {
+    self = offsetBy(dx: dx, dy: dy)
   }
 
   @transparent // @fragile
-  func rectByIntersecting(withRect: CGRect) -> CGRect {
-    return CGRectIntersection(self, withRect)
-  }
-  
-  @transparent // @fragile
-  mutating func intersect(withRect: CGRect) {
-    self = self.rectByIntersecting(withRect)
+  @warn_unused_result(mutable_variant="unionInPlace")
+  func union(rect: CGRect) -> CGRect {
+    return CGRectUnion(self, rect)
   }
 
+  @transparent // @fragile
+  mutating func unionInPlace(rect: CGRect) {
+    self = union(rect)
+  }
 
   @transparent // @fragile
-  func rectsByDividing(atDistance: CGFloat, fromEdge: CGRectEdge) 
-    -> (slice: CGRect, remainder: CGRect) 
+  @warn_unused_result(mutable_variant="intersectInPlace")
+  func intersect(rect: CGRect) -> CGRect {
+    return CGRectIntersection(self, rect)
+  }
+
+  @transparent // @fragile
+  mutating func intersectInPlace(rect: CGRect) {
+    self = intersect(rect)
+  }
+
+  @transparent // @fragile
+  func divide(atDistance: CGFloat, fromEdge: CGRectEdge)
+    -> (slice: CGRect, remainder: CGRect)
   {
-    var slice = CGRect.zeroRect
-    var remainder = CGRect.zeroRect
+    var slice = CGRect.zero
+    var remainder = CGRect.zero
     CGRectDivide(self, &slice, &remainder, atDistance, fromEdge)
     return (slice, remainder)
   }
 
-  
   @transparent // @fragile
   func contains(rect: CGRect) -> Bool {
     return CGRectContainsRect(self, rect)
@@ -271,17 +265,17 @@ public func == (lhs: CGRect, rhs: CGRect) -> Bool {
 
 public var CGPointZero: CGPoint {
   @transparent // @fragile
-  get { return CGPoint.zeroPoint }
+  get { return CGPoint.zero }
 }
 
 public var CGRectZero: CGRect {
   @transparent // @fragile
-  get { return CGRect.zeroRect }
+  get { return CGRect.zero }
 }
 
 public var CGSizeZero: CGSize {
   @transparent // @fragile
-  get { return CGSize.zeroSize }
+  get { return CGSize.zero }
 }
 
 public var CGAffineTransformIdentity: CGAffineTransform {

@@ -57,7 +57,7 @@ print(pt, "named ints")
 // CHECK-NEXT: named doubles 1.0 2.0
 // CHECK-NEXT: named ints 1.0 2.0
 
-assert(pt != CGPoint.zeroPoint)
+assert(pt != CGPoint.zero)
 
 
 var size: CGSize
@@ -78,7 +78,7 @@ print(size, "named ints")
 // CHECK-NEXT: named doubles 1.0 2.0
 // CHECK-NEXT: named ints 1.0 2.0
 
-assert(size != CGSize.zeroSize)
+assert(size != CGSize.zero)
 
 
 var vector: CGVector
@@ -99,7 +99,7 @@ print(vector, "named ints")
 // CHECK-NEXT: named doubles 1.0 2.0
 // CHECK-NEXT: named ints 1.0 2.0
 
-assert(vector != CGVector.zeroVector)
+assert(vector != CGVector.zero)
 
 
 var rect: CGRect
@@ -130,17 +130,17 @@ print(rect, "named ints")
 // CHECK-NEXT: named ints 1.0 2.0 3.0 4.0
 
 assert(rect == rect)
-assert(rect != CGRect.zeroRect)
+assert(rect != CGRect.zero)
 assert(!rect.isNull)
 assert(!rect.isEmpty)
 assert(!rect.isInfinite)
-assert(CGRect.nullRect.isNull)
-assert(CGRect.zeroRect.isEmpty)
-assert(CGRect.infiniteRect.isInfinite)
+assert(CGRect.null.isNull)
+assert(CGRect.zero.isEmpty)
+assert(CGRect.infinite.isInfinite)
 
 
 var unstandard = CGRect(x: 10, y: 20, width: -30, height: -50)
-var standard = unstandard.standardizedRect
+var standard = unstandard.standardized
 print(unstandard, "unstandard")
 print(standard, "standard")
 // CHECK-NEXT: unstandard 10.0 20.0 -30.0 -50.0
@@ -165,33 +165,32 @@ assert(unstandard.midY == -5)
 assert(unstandard.maxY == 20)
 
 assert(unstandard == standard)
-assert(unstandard.standardizedRect == standard)
+assert(unstandard.standardized == standard)
 
-unstandard.standardize()
+unstandard.standardizeInPlace()
 print(unstandard, "standardized unstandard")
 // CHECK-NEXT: standardized unstandard -20.0 -30.0 30.0 50.0
 
+rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
+print(rect.insetBy(dx: 1, dy: -2), "insetBy")
+// CHECK-NEXT: insetBy 12.25 20.25 31.25 48.25
+rect.insetInPlace(dx: 1, dy: -2)
+print(rect, "insetInPlace")
+// CHECK-NEXT: insetInPlace 12.25 20.25 31.25 48.25
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
-print(rect.rectByInsetting(dx: 1, dy: -2), "rectByInsetting")
-// CHECK-NEXT: rectByInsetting 12.25 20.25 31.25 48.25
-rect.inset(dx: 1, dy: -2)
-print(rect, "inset")
-// CHECK-NEXT: inset 12.25 20.25 31.25 48.25
+print(rect.offsetBy(dx: 3, dy: -4), "offsetBy")
+// CHECK-NEXT: offsetBy 14.25 18.25 33.25 44.25
+rect.offsetInPlace(dx: 3, dy: -4)
+print(rect, "offsetInPlace")
+// CHECK-NEXT: offsetInPlace 14.25 18.25 33.25 44.25
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
-print(rect.rectByOffsetting(dx: 3, dy: -4), "rectByOffsetting")
-// CHECK-NEXT: rectByOffsetting 14.25 18.25 33.25 44.25
-rect.offset(dx: 3, dy: -4)
-print(rect, "offset")
-// CHECK-NEXT: offset 14.25 18.25 33.25 44.25
-
-rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
-print(rect.integerRect, "integerRect")
-// CHECK-NEXT: integerRect 11.0 22.0 34.0 45.0
-rect.integerize()
-print(rect, "integerize")
-// CHECK-NEXT: integerize 11.0 22.0 34.0 45.0
+print(rect.integral, "integral")
+// CHECK-NEXT: integral 11.0 22.0 34.0 45.0
+rect.makeIntegralInPlace()
+print(rect, "makeIntegralInPlace")
+// CHECK-NEXT: makeIntegralInPlace 11.0 22.0 34.0 45.0
 
 
 let smallRect = CGRect(x: 10, y: 25, width: 5, height: -5)
@@ -199,33 +198,33 @@ let bigRect = CGRect(x: 1, y: 2, width: 101, height: 102)
 let distantRect = CGRect(x: 1000, y: 2000, width: 1, height: 1)
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
-print(rect.rectByUnion(smallRect), "rectByUnion small")
-print(rect.rectByUnion(bigRect), "rectByUnion big")
-print(rect.rectByUnion(distantRect), "rectByUnion distant")
-// CHECK-NEXT: rectByUnion small 10.0 20.0 34.5 46.5
-// CHECK-NEXT: rectByUnion big 1.0 2.0 101.0 102.0
-// CHECK-NEXT: rectByUnion distant 11.25 22.25 989.75 1978.75
-rect.union(smallRect)
-rect.union(bigRect)
-rect.union(distantRect)
-print(rect, "union")
-// CHECK-NEXT: union 1.0 2.0 1000.0 1999.0
+print(rect.union(smallRect), "union small")
+print(rect.union(bigRect), "union big")
+print(rect.union(distantRect), "union distant")
+// CHECK-NEXT: union small 10.0 20.0 34.5 46.5
+// CHECK-NEXT: union big 1.0 2.0 101.0 102.0
+// CHECK-NEXT: union distant 11.25 22.25 989.75 1978.75
+rect.unionInPlace(smallRect)
+rect.unionInPlace(bigRect)
+rect.unionInPlace(distantRect)
+print(rect, "unionInPlace")
+// CHECK-NEXT: unionInPlace 1.0 2.0 1000.0 1999.0
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
-print(rect.rectByIntersecting(smallRect), "rectByIntersecting small")
-print(rect.rectByIntersecting(bigRect), "rectByIntersecting big")
-print(rect.rectByIntersecting(distantRect), "rectByIntersecting distant")
-// CHECK-NEXT: rectByIntersecting small 11.25 22.25 3.75 2.75
-// CHECK-NEXT: rectByIntersecting big 11.25 22.25 33.25 44.25
-// CHECK-NEXT: rectByIntersecting distant inf inf 0.0 0.0
+print(rect.intersect(smallRect), "intersect small")
+print(rect.intersect(bigRect), "intersect big")
+print(rect.intersect(distantRect), "intersect distant")
+// CHECK-NEXT: intersect small 11.25 22.25 3.75 2.75
+// CHECK-NEXT: intersect big 11.25 22.25 33.25 44.25
+// CHECK-NEXT: intersect distant inf inf 0.0 0.0
 assert(rect.intersects(smallRect))
-rect.intersect(smallRect)
+rect.intersectInPlace(smallRect)
 assert(!rect.isEmpty)
 assert(rect.intersects(bigRect))
-rect.intersect(bigRect)
+rect.intersectInPlace(bigRect)
 assert(!rect.isEmpty)
 assert(!rect.intersects(distantRect))
-rect.intersect(distantRect)
+rect.intersectInPlace(distantRect)
 assert(rect.isEmpty)
 
 
@@ -237,7 +236,7 @@ assert(!rect.contains(bigRect))
 
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
-var (slice, remainder) = rect.rectsByDividing(5, fromEdge:CGRectEdge.MinXEdge)
+var (slice, remainder) = rect.divide(5, fromEdge:CGRectEdge.MinXEdge)
 print(slice, "slice")
 print(remainder, "remainder")
 // CHECK-NEXT: slice 11.25 22.25 5.0 44.25
