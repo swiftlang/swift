@@ -98,6 +98,38 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
   return anyOverridden;
 }
 
+enum class ConstructorComparison {
+  Worse,
+  Same,
+  Better,
+};
+
+/// Determines whether \p ctor1 is a "better" initializer than \p ctor2.
+static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
+                                                 ConstructorDecl *ctor2,
+                                                 const swift::ASTContext &ctx) {
+  bool available1 = !ctor1->getAttrs().isUnavailable(ctx);
+  bool available2 = !ctor2->getAttrs().isUnavailable(ctx);
+
+  // An unavailable initializer is always worse than an available initializer.
+  if (available1 < available2)
+    return ConstructorComparison::Worse;
+
+  if (available1 > available2)
+    return ConstructorComparison::Better;
+
+  CtorInitializerKind kind1 = ctor1->getInitKind();
+  CtorInitializerKind kind2 = ctor2->getInitKind();
+
+  if (kind1 > kind2)
+    return ConstructorComparison::Worse;
+
+  if (kind1 < kind2)
+    return ConstructorComparison::Better;
+
+  return ConstructorComparison::Same;
+}
+
 bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                                 const Module *curModule,
                                 LazyResolver *typeResolver) {
@@ -246,18 +278,18 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     if (colliding.second.size() == 1)
       continue;
 
-    // Find the "best" constructor kind with this signature.
-    CtorInitializerKind bestKind = colliding.second[0]->getInitKind();
+    // Find the "best" constructor with this signature.
+    ConstructorDecl *bestCtor = colliding.second[0];
     for (auto ctor : colliding.second) {
-      auto kind = ctor->getInitKind();
-      if (static_cast<unsigned>(kind) < static_cast<unsigned>(bestKind))
-        bestKind = kind;
+      auto comparison = compareConstructors(ctor, bestCtor, ctx);
+      if (comparison == ConstructorComparison::Better)
+        bestCtor = ctor;
     }
 
-    // Shadow any initializers with a worse kind.
+    // Shadow any initializers that are worse.
     for (auto ctor : colliding.second) {
-      auto kind = ctor->getInitKind();
-      if (static_cast<unsigned>(kind) > static_cast<unsigned>(bestKind))
+      auto comparison = compareConstructors(ctor, bestCtor, ctx);
+      if (comparison == ConstructorComparison::Worse)
         shadowed.insert(ctor);
     }
   }

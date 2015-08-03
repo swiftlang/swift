@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target x86_64-apple-macosx10.10 -parse %s -verify
 
 // REQUIRES: objc_interop
 
@@ -22,6 +22,39 @@ func testInstanceTypeFactoryMethodInherited() {
   let a = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{cannot invoke initializer for type 'NSObjectFactorySub' with an argument list of type '(buildingWidgets: ())'}}
   // expected-note @-1 {{overloads for 'NSObjectFactorySub' exist with these partially matching parameter lists: (integer: Int), (double: Double)}}
   _ = a
+}
+
+func testFactoryWithLaterIntroducedInit() {
+  // Prefer importing more available factory initializer over less
+  // less available convenience initializer
+  _ = NSHavingConvenienceFactoryAndLaterConvenienceInit(flim:5)
+  _ = NSHavingConvenienceFactoryAndLaterConvenienceInit(flam:5)
+
+  // Prefer importing more available convenience initializer over less
+  // less available factory initializer
+  _ = NSHavingConvenienceFactoryAndEarlierConvenienceInit(flim:5)
+  _ = NSHavingConvenienceFactoryAndEarlierConvenienceInit(flam:5)
+
+  // Don't prefer more available convience factory initializer over less
+  // available designated initializer
+  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}} expected-note 2{{}}
+  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.11 or newer}} expected-note 2{{}}
+
+  // Don't prefer more available factory initializer over less
+  // available designated initializer
+  _ = NSHavingFactoryAndLaterConvenienceInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}} expected-note 2{{}}
+  _ = NSHavingFactoryAndLaterConvenienceInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.11 or newer}} expected-note 2{{}}
+
+  // When both a convenience factory and a convenience initializer have the
+  // same availability, choose the convenience initializer.
+  _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flim:5) // expected-warning {{'init(flim:)' was deprecated in OS X 10.10: ConvenienceInit}}
+  _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flam:5) // expected-warning {{'init(flam:)' was deprecated in OS X 10.10: ConvenienceInit}}
+
+  _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flotsam:5) // expected-warning {{'init(flotsam:)' is deprecated: ConvenienceInit}}
+  _ = NSHavingConvenienceFactoryAndSameConvenienceInit(jetsam:5) // expected-warning {{'init(jetsam:)' is deprecated: ConvenienceInit}}
+
+  _ = NSHavingUnavailableFactoryAndUnavailableConvenienceInit(flim:5) // expected-error {{'init(flim:)' is unavailable: ConvenienceInit}}
+  _ = NSHavingUnavailableFactoryAndUnavailableConvenienceInit(flam:5) // expected-error {{'init(flam:)' is unavailable: ConvenienceInit}}
 }
 
 func testNSErrorFactoryMethod(path: String) throws {

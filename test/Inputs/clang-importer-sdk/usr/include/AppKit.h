@@ -116,6 +116,74 @@
 @interface NSObjectFactorySub : NSObjectFactory
 @end
 
+@interface NSHavingConvenienceFactoryAndLaterConvenienceInit : NSObject
+-(instancetype)initWithStuff:(NSObject *)stuff NS_DESIGNATED_INITIALIZER;
+
+// Convenience factory declaration followed by convenience init
++(instancetype)havingConvenienceFactoryAndLaterConvenienceInitWithFlim:(NSInteger)flim;
+-(instancetype)initWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.11)));
+
+// Convenience convenience init declaration followed by convenience factory
+-(instancetype)initWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.11)));
++(instancetype)havingConvenienceFactoryAndLaterConvenienceInitWithFlam:(NSInteger)flam;
+@end
+
+@interface NSHavingConvenienceFactoryAndEarlierConvenienceInit : NSObject
+-(instancetype)init NS_DESIGNATED_INITIALIZER;
+
++(instancetype)havingConvenienceFactoryAndEarlierConvenienceInitWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.11)));
+-(instancetype)initWithFlim:(NSInteger)flim;
+
+-(instancetype)initWithFlam:(NSInteger)flam;
++(instancetype)havingConvenienceFactoryAndEarlierConvenienceInitWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.11)));
+@end
+
+@interface NSHavingConvenienceFactoryAndSameConvenienceInit : NSObject
+-(instancetype)init NS_DESIGNATED_INITIALIZER;
+
+// We distinguish between which of these the importer chose by the deprecation message.
++(instancetype)havingConvenienceFactoryAndSameConvenienceInitWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.8, deprecated=10.10, message="ConvenienceFactory")));
+-(instancetype)initWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.8, deprecated=10.10, message="ConvenienceInit")));
+
+-(instancetype)initWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.8, deprecated=10.10, message="ConvenienceInit")));
++(instancetype)havingConvenienceFactoryAndSameConvenienceInitWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.8, deprecated=10.10, message="ConvenienceFactory")));
+
++(instancetype)havingConvenienceFactoryAndSameConvenienceInitWithFlotsam:(NSInteger)flotsam __attribute__((deprecated("ConvenienceFactory")));
+-(instancetype)initWithFlotsam:(NSInteger)flotsam __attribute__((deprecated("ConvenienceInit")));
+
+-(instancetype)initWithJetsam:(NSInteger)jetsam __attribute__((deprecated("ConvenienceInit")));
++(instancetype)havingConvenienceFactoryAndSameConvenienceInitWithJetsam:(NSInteger)jetsam __attribute__((deprecated("ConvenienceFactory")));
+@end
+
+
+@interface NSHavingConvenienceFactoryAndLaterDesignatedInit : NSObject
++(instancetype)havingConvenienceFactoryAndLaterDesignatedInitWithFlim:(NSInteger)flim;
+-(instancetype)initWithFlim:(NSInteger)flim NS_DESIGNATED_INITIALIZER __attribute__((availability(macosx,introduced=10.11)));
+
+-(instancetype)initWithFlam:(NSInteger)flam NS_DESIGNATED_INITIALIZER __attribute__((availability(macosx,introduced=10.11)));
++(instancetype)havingConvenienceFactoryAndLaterDesignatedInitWithFlam:(NSInteger)flam;
+@end
+
+@interface NSHavingFactoryAndLaterConvenienceInit : NSObject
+-(instancetype)init NS_DESIGNATED_INITIALIZER;
+
++(NSHavingFactoryAndLaterConvenienceInit *)havingFactoryAndLaterConvenienceInitWithFlim:(NSInteger)flim;
+-(instancetype)initWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.11)));
+
+-(instancetype)initWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.11)));
++(NSHavingFactoryAndLaterConvenienceInit *)havingFactoryAndLaterConvenienceInitWithFlam:(NSInteger)flam;
+@end
+
+@interface NSHavingUnavailableFactoryAndUnavailableConvenienceInit : NSObject
+-(instancetype)init NS_DESIGNATED_INITIALIZER;
+
++(NSHavingUnavailableFactoryAndUnavailableConvenienceInit *)havingUnavailableFactoryAndUnavailableConvenienceInitWithFlim:(NSInteger)flim __attribute__((unavailable("Factory")));
+-(instancetype)initWithFlim:(NSInteger)flim __attribute__((unavailable("ConvenienceInit")));
+
+-(instancetype)initWithFlam:(NSInteger)flam __attribute__((unavailable("ConvenienceInit")));
++(NSHavingUnavailableFactoryAndUnavailableConvenienceInit *)havingUnavailableFactoryAndUnavailableConvenienceInit:(NSInteger)flam __attribute__((unavailable("Factory")));
+@end
+
 @interface NSString(Category)
 - (NSString*)nsStringMethod;
 + (NSInteger)nsStringClassMethod;
@@ -175,5 +243,4 @@ extern NSString *NSViewFocusDidChangeNotification;
 
 @protocol NSApplicationDelegate
 @end
-
 

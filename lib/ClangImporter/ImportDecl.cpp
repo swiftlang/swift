@@ -3012,6 +3012,83 @@ namespace {
                                variadic, redundant);
     }
 
+    /// Returns the latest "introduced" version on the current platform for
+    /// \p D.
+    clang::VersionTuple findLatestIntroduction(const clang::Decl *D) {
+      clang::VersionTuple result;
+
+      for (auto *attr : D->specific_attrs<clang::AvailabilityAttr>()) {
+        if (attr->getPlatform()->getName() == "swift") {
+          clang::VersionTuple maxVersion{~0U, ~0U, ~0U};
+          return maxVersion;
+        }
+
+        // Does this availability attribute map to the platform we are
+        // currently targeting?
+        if (!Impl.PlatformAvailabilityFilter ||
+            !Impl.PlatformAvailabilityFilter(attr->getPlatform()->getName()))
+          continue;
+
+        // Take advantage of the empty version being 0.0.0.0.
+        result = std::max(result, attr->getIntroduced());
+      }
+
+      return result;
+    }
+
+    /// Returns true if importing \p objcMethod will produce a "better"
+    /// initializer than \p existingCtor.
+    bool
+    existingConstructorIsWorse(const ConstructorDecl *existingCtor,
+                               const clang::ObjCMethodDecl *objcMethod,
+                               CtorInitializerKind kind) {
+      CtorInitializerKind existingKind = existingCtor->getInitKind();
+
+      // If the new kind is the same as the existing kind, stick with
+      // the existing constructor.
+      if (existingKind == kind)
+        return false;
+
+      // Check for cases that are obviously better or obviously worse.
+      if (kind == CtorInitializerKind::Designated ||
+          existingKind == CtorInitializerKind::Factory)
+        return true;
+
+      if (kind == CtorInitializerKind::Factory ||
+          existingKind == CtorInitializerKind::Designated)
+        return false;
+
+      assert(kind == CtorInitializerKind::Convenience ||
+             kind == CtorInitializerKind::ConvenienceFactory);
+      assert(existingKind == CtorInitializerKind::Convenience ||
+             existingKind == CtorInitializerKind::ConvenienceFactory);
+
+      // Between different kinds of convenience initializers, keep the one that
+      // was introduced first.
+      // FIXME: But if one of them is now deprecated, should we prefer the
+      // other?
+      clang::VersionTuple introduced = findLatestIntroduction(objcMethod);
+      VersionRange existingIntroduced =
+          AvailabilityInference::availableRange(existingCtor,
+                                                Impl.SwiftContext);
+      assert(!existingIntroduced.isEmpty());
+
+      if (existingIntroduced.isAll()) {
+        if (!introduced.empty())
+          return false;
+      } else if (introduced != existingIntroduced.getLowerEndpoint()) {
+        return introduced < existingIntroduced.getLowerEndpoint();
+      }
+
+      // The "introduced" versions are the same. Prefer Convenience over
+      // ConvenienceFactory, but otherwise prefer leaving things as they are.
+      if (kind == CtorInitializerKind::Convenience &&
+          existingKind == CtorInitializerKind::ConvenienceFactory)
+        return true;
+
+      return false;
+    }
+
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
@@ -3161,8 +3238,7 @@ namespace {
 
         // If the existing constructor has a less-desirable kind, mark
         // the existing constructor unavailable.
-        if (static_cast<unsigned>(kind) < 
-              static_cast<unsigned>(ctor->getInitKind())) {
+        if (existingConstructorIsWorse(ctor, objcMethod, kind)) {
           // Show exactly where this constructor came from.
           llvm::SmallString<32> errorStr;
           errorStr += "superseded by import of ";
