@@ -337,7 +337,6 @@ class COWArrayOpt {
   typedef StructUseCollector::UserList UserList;
   typedef StructUseCollector::UserOperList UserOperList;
 
-  AliasAnalysis *AA;
   RCIdentityFunctionInfo *RCIA;
   SILFunction *Function;
   SILLoop *Loop;
@@ -387,9 +386,9 @@ class COWArrayOpt {
   // analysing.
   SILValue CurrentArrayAddr;
 public:
-  COWArrayOpt(AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA, SILLoop *L,
+  COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L,
               DominanceAnalysis *DA, CallGraph *CG)
-      : AA(AA), RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
+      : RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
         Preheader(L->getLoopPreheader()), DomTree(DA->get(Function)),
         CG(CG), ColdBlocks(DA), CachedSafeLoop(false, false) {}
 
@@ -795,27 +794,6 @@ static bool isArrayEltStore(StoreInst *SI) {
   return false;
 }
 
-static bool isGuaranteedCallSequenceRelease(SILInstruction *Release,
-                                            AliasAnalysis *AA,
-                                            RCIdentityFunctionInfo *RCFI) {
-  GuaranteedCallSequence Seq;
-  if (!findGuaranteedCallSequence(Release, AA, RCFI, Seq)) {
-    DEBUG(llvm::dbgs() << "        Failed to find guaranteed call sequence!\n");
-    return false;
-  }
-
-  // Make sure that all of the calls are array semantic calls with guaranteed
-  // self for which self matches our SILValue.
-  bool Result = std::all_of(Seq.ApplyList.begin(), Seq.ApplyList.end(),
-                            [](ApplyInst *AI) -> bool {
-                              ArraySemanticsCall Call(AI);
-                              return Call && Call.hasGuaranteedSelf();
-                            });
-  DEBUG(llvm::dbgs() << "         Found calls with guaranteed self: "
-                     << (Result ? "yes" : "no") << "\n");
-  return Result;
-}
-
 /// Check if a loop has only 'safe' array operations such that we can hoist the
 /// uniqueness check even without having an 'identified' object.
 ///
@@ -1050,7 +1028,6 @@ class COWArrayOptPass : public SILFunctionTransform {
     auto *RCIA =
       PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());
     SILLoopInfo *LI = LA->getLoopInfo(getFunction());
-    auto *AA = PM->getAnalysis<AliasAnalysis>();
     CallGraph *CG = PM->getAnalysis<CallGraphAnalysis>()->getCallGraphOrNull();
     if (LI->empty()) {
       DEBUG(llvm::dbgs() << "  Skipping Function: No loops.\n");
@@ -1076,7 +1053,7 @@ class COWArrayOptPass : public SILFunctionTransform {
 
     bool HasChanged = false;
     for (auto *L : Loops)
-      HasChanged |= COWArrayOpt(AA, RCIA, L, DA, CG).run();
+      HasChanged |= COWArrayOpt(RCIA, L, DA, CG).run();
 
     if (HasChanged)
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
