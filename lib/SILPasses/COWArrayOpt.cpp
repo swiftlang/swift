@@ -38,6 +38,10 @@
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
+llvm::cl::opt<std::string>
+COWViewCFGFunction("view-cfg-before-cow-for", llvm::cl::init(""),
+                   llvm::cl::desc("Only print out the sil for this function"));
+
 /// \return a sequence of integers representing the access path of this element
 /// within a Struct/Ref/Tuple.
 ///
@@ -1038,6 +1042,10 @@ class COWArrayOptPass : public SILFunctionTransform {
     if (LI->empty()) {
       DEBUG(llvm::dbgs() << "  Skipping Function: No loops.\n");
       return;
+    }
+    if (!COWViewCFGFunction.empty() && getFunction()->getName() == COWViewCFGFunction) {
+      getFunction()->dump();
+      getFunction()->viewCFG();
     }
 
     // Create a flat list of loops in loop-tree postorder (bottom-up).
