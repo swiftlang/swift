@@ -837,6 +837,12 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
   // We will compute the state of this loop now.
   CachedSafeLoop.first = true;
 
+  // We need to cleanup the MatchedRelease on return.
+  auto ReturnWithCleanup = [&] (bool LoopHasSafeOperations) {
+    MatchedReleases.clear();
+    return LoopHasSafeOperations;
+  };
+
   DEBUG(llvm::dbgs() << "    checking whether loop only has safe array operations ...\n");
   CanType SameTy;
   for (auto *BB : Loop->getBlocks()) {
@@ -869,7 +875,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
                        .getSwiftRValueType()
                        ->getCanonicalType() != SameTy) {
           DEBUG(llvm::dbgs() << "    (NO) mismatching array types\n");
-          return false;
+          return ReturnWithCleanup(false);
         }
 
         // Safe array semantics operation.
@@ -881,7 +887,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         if (isArrayEltStore(SI))
           continue;
         DEBUG(llvm::dbgs() << "     (NO) unknown store " << *SI);
-        return false;
+        return ReturnWithCleanup(false);
       }
 
       // Instructions without side effects are safe.
@@ -896,10 +902,12 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         if (isRetainReleasedBeforeMutate(Inst, false))
           continue;
 
-      // If inst is a guaranteed call sequence release on a sequence of array
-      // semantic functions, we can ignore it.
-      if (isa<StrongReleaseInst>(Inst) || isa<ReleaseValueInst>(Inst))
-        if (isGuaranteedCallSequenceRelease(Inst, AA, RCIA))
+      // If the instruction is a matched release we can ignore it.
+      if (auto SRI = dyn_cast<StrongReleaseInst>(Inst))
+        if (MatchedReleases.count(&SRI->getOperandRef()))
+          continue;
+      if (auto RVI = dyn_cast<ReleaseValueInst>(Inst))
+        if (MatchedReleases.count(&RVI->getOperandRef()))
           continue;
 
       // Ignore fix_lifetime. It can not increment ref counts.
@@ -907,13 +915,13 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         continue;
 
       DEBUG(llvm::dbgs() << "     (NO) unknown operation " << *Inst);
-      return false;
+      return ReturnWithCleanup(false);
     }
   }
 
   DEBUG(llvm::dbgs() << "     (YES)\n");
   CachedSafeLoop.second = true;
-  return true;
+  return ReturnWithCleanup(true);
 }
 
 /// Hoist the make_mutable call and optionally the projection chain that feeds
@@ -951,18 +959,18 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable) {
   SmallVector<unsigned, 4> AccessPath;
   SILValue ArrayContainer = getAccessPath(CurrentArrayAddr, AccessPath);
 
+  // Check whether we can hoist make_mutable based on the operations that are
+  // in the loop.
+  if (hasLoopOnlyDestructorSafeArrayOperations()) {
+    hoistMakeMutableAndSelfProjection(MakeMutable,
+                                      CurrentArrayAddr != ArrayAddrBase);
+    DEBUG(llvm::dbgs()
+          << "    Can Hoist: loop only has 'safe' array operations!\n");
+    return true;
+  }
+
   // Check that the array is a member of an inout argument or return value.
   if (!checkUniqueArrayContainer(ArrayContainer)) {
-    // Check whether we can hoist make_mutable based on the operations that are
-    // in the loop.
-    if (hasLoopOnlyDestructorSafeArrayOperations()) {
-      hoistMakeMutableAndSelfProjection(MakeMutable,
-                                        CurrentArrayAddr != ArrayAddrBase);
-      DEBUG(llvm::dbgs()
-            << "    Can Hoist: loop only has 'safe' array operations!\n");
-      return true;
-    }
-
     DEBUG(llvm::dbgs() << "    Skipping Array: is not unique!\n");
     return false;
   }
