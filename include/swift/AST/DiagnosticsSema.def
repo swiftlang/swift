@@ -66,8 +66,8 @@ ERROR(cannot_find_appropriate_overload,sema,none,
       "could not find an overload for '%0' that accepts the supplied "
       "arguments", (StringRef))
 
-ERROR(could_not_find_member,sema,none,
-      "could not find member %0", (DeclName))
+ERROR(could_not_find_member_base,sema,none,
+      "could not infer type of base expression for member %0", (DeclName))
 
 ERROR(could_not_find_tuple_member,sema,none,
       "value of tuple type %0 has no member %1", (Type, DeclName))

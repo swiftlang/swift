@@ -727,3 +727,6 @@ func r20802757(inout z: Int = &g20802757) { // expected-error {{'&' can only app
   print(z)
 }
 
+_ = _.foo // expected-error {{could not infer type of base expression for member 'foo'}}
+
+

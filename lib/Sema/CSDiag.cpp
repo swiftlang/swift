@@ -2179,9 +2179,8 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
     if (conversionConstraint && isConversionConstraint(conversionConstraint))
       return diagnoseGeneralConversionFailure();
       
-    // FIXME: This is a really useless error for this, it should be more along
-    // the lines of "could not infer base type".
-    diagnose(anchor->getLoc(), diag::could_not_find_member, memberName)
+    // Could not infer base type for member reference.
+    diagnose(anchor->getLoc(), diag::could_not_find_member_base, memberName)
       .highlight(anchor->getSourceRange()).highlight(range);
     return true;
 
@@ -3780,8 +3779,7 @@ bool FailureDiagnosis::visitExpr(Expr *E) {
 
 bool FailureDiagnosis::diagnoseFailure() {
   assert(CS && expr);
-  
-  
+
   // Our general approach is to do a depth first traversal of the broken
   // expression tree, type checking as we go.  If we find a subtree that cannot
   // be type checked on its own (even to an incomplete type) then that is where
@@ -3793,7 +3791,8 @@ bool FailureDiagnosis::diagnoseFailure() {
   // by itself.  If not, then we'll get a more specific failure in the
   // subexpression.  If so, then we know it must be some conversion constraint
   // binding the result of the expression to a type that fails.
-  if (!CS->TC.isExprBeingDiagnosed(expr) || CS->getContextualType()) {
+  if (!CS->TC.isExprBeingDiagnosed(expr) ||
+      CS->getContextualType()) {
     // Make sure we retypecheck this expression, without context.
     CS->TC.addExprForDiagnosis(expr, nullptr);
 
