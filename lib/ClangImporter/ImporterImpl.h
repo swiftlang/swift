@@ -612,6 +612,9 @@ public:
   /// Tracks included headers from the bridging header.
   llvm::DenseSet<const clang::FileEntry *> BridgeHeaderFiles;
 
+  void addBridgeHeaderTopLevelDecls(clang::Decl *D);
+  bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
+
 public:
   void registerExternalDecl(Decl *D) {
     RegisteredExternalDecls.push_back(D);

@@ -228,6 +228,27 @@ private:
 };
 }
 
+void ClangImporter::Implementation::addBridgeHeaderTopLevelDecls(
+    clang::Decl *D) {
+  if (shouldIgnoreBridgeHeaderTopLevelDecl(D))
+    return;
+
+  BridgeHeaderTopLevelDecls.push_back(D);
+}
+
+bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
+    clang::Decl *D) {
+  // Ignore forward references;
+  if (auto *ID = dyn_cast<clang::ObjCInterfaceDecl>(D)) {
+    if (!ID->isThisDeclarationADefinition())
+      return true;
+  } else if (auto TD = dyn_cast<clang::TagDecl>(D)) {
+    if (!TD->isThisDeclarationADefinition())
+      return true;
+  }
+  return false;
+}
+
 ClangImporter::ClangImporter(ASTContext &ctx,
                              const ClangImporterOptions &clangImporterOpts,
                              DependencyTracker *tracker)
@@ -609,7 +630,7 @@ ClangImporter::create(ASTContext &ctx,
   clang::Parser::DeclGroupPtrTy parsed;
   while (!importer->Impl.Parser->ParseTopLevelDecl(parsed)) {
     for (auto *D : parsed.get()) {
-      importer->Impl.BridgeHeaderTopLevelDecls.push_back(D);
+      importer->Impl.addBridgeHeaderTopLevelDecls(D);
     }
   }
 
@@ -702,7 +723,7 @@ bool ClangImporter::Implementation::importHeader(
   while (!Parser->ParseTopLevelDecl(parsed)) {
     if (trackParsedSymbols && parsed) {
       for (auto *D : parsed.get()) {
-        BridgeHeaderTopLevelDecls.push_back(D);
+        addBridgeHeaderTopLevelDecls(D);
       }
     }
   }
@@ -2490,6 +2511,8 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
     unsigned Length = ClangSM.getFileIDSize(FID);
     ClangCtx.getExternalSource()->FindFileRegionDecls(FID, 0, Length, Decls);
     for (auto *ClangD : Decls) {
+      if (Impl.shouldIgnoreBridgeHeaderTopLevelDecl(ClangD))
+        continue;
       if (filter(ClangD)) {
         if (auto *ND = dyn_cast<clang::NamedDecl>(ClangD)) {
           if (Decl *imported = Impl.importDeclReal(ND))

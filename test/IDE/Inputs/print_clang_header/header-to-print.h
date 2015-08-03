@@ -21,3 +21,6 @@ void doSomethingInHead(int arg);
 @interface BaseInHead(SomeCategory)
 -(void)doItInCategory;
 @end
+
+@class Cake;
+struct Arkham;
