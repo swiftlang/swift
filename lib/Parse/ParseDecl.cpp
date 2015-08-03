@@ -2085,8 +2085,15 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
 
+  if (Tok.is(tok::code_complete)) {
+    if (CodeCompletion) {
+      CodeCompletion->completeImportDecl();
+    }
+    return makeParserCodeCompletionStatus();
+  }
+
   DebuggerContextChange DCC (*this);
-  
+
   if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
     diagnose(ImportLoc, diag::decl_inner_scope);
     return nullptr;

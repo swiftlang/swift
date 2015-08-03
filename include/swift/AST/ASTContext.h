@@ -771,6 +771,10 @@ public:
                             llvm::raw_ostream &os,
                             unsigned indent = 0) const;
 
+  /// Collect visible clang modules from the ClangModuleLoader. These modules are
+  /// not necessarily loaded.
+  void getVisibleTopLevelClangeModules(SmallVectorImpl<clang::Module*> &Modules) const;
+
 private:
   friend class Decl;
   Optional<RawComment> getRawComment(const Decl *D);
