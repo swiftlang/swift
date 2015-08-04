@@ -88,8 +88,8 @@ IntervalTestSuite.test("PatternMatching") {
 IntervalTestSuite.test("Overlaps") {
   
   func expectOverlaps<
-    I: IntervalType
-  >(expectation: Bool, _ lhs: I, _ rhs: I) {
+    I0: IntervalType, I1: IntervalType where I0.Bound == I1.Bound
+  >(expectation: Bool, _ lhs: I0, _ rhs: I1) {
     if expectation {
       expectTrue(lhs.overlaps(rhs))
       expectTrue(rhs.overlaps(lhs))
@@ -102,26 +102,26 @@ IntervalTestSuite.test("Overlaps") {
   
   // 0-4, 5-10
   expectOverlaps(false, 0..<4, 5..<10)
-  // expectOverlaps(false, 0..<4, 5...10)
-  // expectOverlaps(false, 0...4, 5..<10)
+  expectOverlaps(false, 0..<4, 5...10)
+  expectOverlaps(false, 0...4, 5..<10)
   expectOverlaps(false, 0...4, 5...10)
 
   // 0-5, 5-10
   expectOverlaps(false, 0..<5, 5..<10)
-  // expectOverlaps(false, 0..<5, 5...10)
-  // expectOverlaps(true, 0...5, 5..<10)
+  expectOverlaps(false, 0..<5, 5...10)
+  expectOverlaps(true, 0...5, 5..<10)
   expectOverlaps(true, 0...5, 5...10)
 
   // 0-6, 5-10
   expectOverlaps(true, 0..<6, 5..<10)
-  // expectOverlaps(true, 0..<6, 5...10)
-  // expectOverlaps(true, 0...6, 5..<10)
+  expectOverlaps(true, 0..<6, 5...10)
+  expectOverlaps(true, 0...6, 5..<10)
   expectOverlaps(true, 0...6, 5...10)
 
   // 0-20, 5-10
   expectOverlaps(true, 0..<20, 5..<10)
-  // expectOverlaps(true, 0..<20, 5...10)
-  // expectOverlaps(true, 0...20, 5..<10)
+  expectOverlaps(true, 0..<20, 5...10)
+  expectOverlaps(true, 0...20, 5..<10)
   expectOverlaps(true, 0...20, 5...10)
 }
 
