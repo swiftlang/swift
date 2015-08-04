@@ -60,3 +60,21 @@ func test13811882() {
   x = 2
 }
 
+
+// <rdar://problem/21544303> QoI: "Unexpected trailing closure" should have a fixit to insert a 'do' statement
+func r21544303() {
+  var inSubcall = true
+  {   // expected-error {{expected 'do' keyword to designate a block of statements}} {{3-3=do }}
+      print("Hello")
+  }
+  inSubcall = false
+
+  // This is a problem, but isn't clear what was intended.
+  var somethingElse = true { // expected-error {{cannot call value of non-function type 'Bool'}}
+      print("Hello")
+  }
+  inSubcall = false
+
+}
+
+

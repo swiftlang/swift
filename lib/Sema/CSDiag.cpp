@@ -3465,9 +3465,23 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // If we resolved a concrete expression for the callee, and it has
   // non-function/non-metatype type, then we cannot call it!
   auto fnType = fnExpr->getType()->getRValueType();
-
   if (!fnType->hasTypeVariable() &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
+    
+    // If the argument is a trailing ClosureExpr (i.e. {....}) and it is on a
+    // different line than the callee, then the "real" issue is that the user
+    // forgot to write "do" before their brace stmt.
+    if (auto *PE = dyn_cast<ParenExpr>(callExpr->getArg()))
+      if (PE->hasTrailingClosure() && isa<ClosureExpr>(PE->getSubExpr())) {
+        auto &SM = CS->getASTContext().SourceMgr;
+        if (SM.getLineNumber(callExpr->getFn()->getEndLoc()) !=
+            SM.getLineNumber(PE->getStartLoc())) {
+          diagnose(PE->getStartLoc(), diag::expected_do_in_statement)
+            .fixItInsert(PE->getStartLoc(), "do ");
+          return true;
+        }
+      }
+    
     diagnose(callExpr->getArg()->getStartLoc(),
              diag::cannot_call_non_function_value, fnExpr->getType())
     .highlight(fnExpr->getSourceRange());
