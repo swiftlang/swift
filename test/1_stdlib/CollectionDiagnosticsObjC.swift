@@ -3,6 +3,6 @@
 // REQUIRES: objc_interop
 
 extension AutoreleasingUnsafeMutablePointer {
-  func foo(memory: T) {} // expected-error {{'T' has been renamed to 'Memory'}}
+  func foo(memory: T) {} // expected-error {{'T' has been renamed to 'Memory'}} {{20-21=Memory}}
 }
 

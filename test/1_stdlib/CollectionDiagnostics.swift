@@ -44,182 +44,182 @@ func sortResultIgnored<
   S.Generator.Element : Comparable,
   MC.Generator.Element : Comparable
 >(
-  var sequence: S, // expected-warning {{parameter 'sequence' was never mutated; consider changing to 'let' constant}}
-  var mutableCollection: MC, // expected-warning {{parameter 'mutableCollection' was never mutated; consider changing to 'let' constant}}
-  var array: [Int] // expected-warning {{parameter 'array' was never mutated; consider changing to 'let' constant}}
+  var sequence: S, // expected-warning {{parameter 'sequence' was never mutated; consider changing to 'let' constant}} {{3-7=}}
+  var mutableCollection: MC, // expected-warning {{parameter 'mutableCollection' was never mutated; consider changing to 'let' constant}} {{3-7=}}
+  var array: [Int] // expected-warning {{parameter 'array' was never mutated; consider changing to 'let' constant}} {{3-7=}}
 ) {
 
   sequence.sort() // expected-warning {{result of call to 'sort()' is unused}}
   sequence.sort { $0 < $1 } // expected-warning {{result of call to 'sort' is unused}}
 
-  mutableCollection.sort() // expected-warning {{result of call to non-mutating function 'sort()' is unused; use 'sortInPlace()' to mutate in-place}}
-  mutableCollection.sort { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sort' is unused; use 'sortInPlace' to mutate in-place}}
+  mutableCollection.sort() // expected-warning {{result of call to non-mutating function 'sort()' is unused; use 'sortInPlace()' to mutate in-place}} {{21-25=sortInPlace}}
+  mutableCollection.sort { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sort' is unused; use 'sortInPlace' to mutate in-place}} {{21-25=sortInPlace}}
 
-  array.sort() // expected-warning {{result of call to non-mutating function 'sort()' is unused; use 'sortInPlace()' to mutate in-place}}
-  array.sort { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sort' is unused; use 'sortInPlace' to mutate in-place}}
+  array.sort() // expected-warning {{result of call to non-mutating function 'sort()' is unused; use 'sortInPlace()' to mutate in-place}} {{9-13=sortInPlace}}
+  array.sort { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sort' is unused; use 'sortInPlace' to mutate in-place}} {{9-13=sortInPlace}}
 }
 
 extension Array {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension ArraySlice {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension ContiguousArray {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 
 extension Set {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension SetGenerator {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension SetIndex {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 
 extension Repeat {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 
 extension GeneratorOfOne {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension CollectionOfOne {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 
 extension EmptyGenerator {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension EmptyCollection {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 
 extension UnsafeBufferPointerGenerator {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension UnsafeBufferPointer {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension UnsafeMutableBufferPointer {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 
 extension Range {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension RangeGenerator {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 
 extension StrideToGenerator {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension StrideTo {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension StrideThroughGenerator {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension StrideThrough {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 
 extension AnyGenerator {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension AnySequence {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension AnyForwardCollection {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension AnyBidirectionalCollection {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension AnyRandomAccessCollection {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 
-extension FilterSequenceView {} // expected-error {{'FilterSequenceView' has been renamed to 'FilterSequence'}}
-extension FilterCollectionViewIndex {} // expected-error {{'FilterCollectionViewIndex' has been renamed to 'FilterCollectionIndex'}}
-extension FilterCollectionView {} // expected-error {{'FilterCollectionView' has been renamed to 'FilterCollection'}}
+extension FilterSequenceView {} // expected-error {{'FilterSequenceView' has been renamed to 'FilterSequence'}} {{11-29=FilterSequence}}
+extension FilterCollectionViewIndex {} // expected-error {{'FilterCollectionViewIndex' has been renamed to 'FilterCollectionIndex'}} {{11-36=FilterCollectionIndex}}
+extension FilterCollectionView {} // expected-error {{'FilterCollectionView' has been renamed to 'FilterCollection'}} {{11-31=FilterCollection}}
 
 extension LazyMapGenerator {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension LazyMapSequence {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 extension LazyMapCollection {
-  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(element: T) {} // expected-error {{'T' has been renamed to 'Element'}} {{21-22=Element}}
 }
 
-extension MapSequenceGenerator {} // expected-error {{'MapSequenceGenerator' has been renamed to 'LazyMapGenerator'}}
-extension MapSequenceView {} // expected-error {{'MapSequenceView' has been renamed to 'LazyMapSequence'}}
-extension MapCollectionView {} // expected-error {{'MapCollectionView' has been renamed to 'LazyMapCollection'}}
+extension MapSequenceGenerator {} // expected-error {{'MapSequenceGenerator' has been renamed to 'LazyMapGenerator'}} {{11-31=LazyMapGenerator}}
+extension MapSequenceView {} // expected-error {{'MapSequenceView' has been renamed to 'LazyMapSequence'}} {{11-26=LazyMapSequence}}
+extension MapCollectionView {} // expected-error {{'MapCollectionView' has been renamed to 'LazyMapCollection'}} {{11-28=LazyMapCollection}}
 
 extension LazySequence {
-  func foo(base: S) {} // expected-error {{'S' has been renamed to 'Base'}}
+  func foo(base: S) {} // expected-error {{'S' has been renamed to 'Base'}} {{18-19=Base}}
   func bar() { _ = self.array } // expected-error {{please construct an Array from your lazy sequence}}
 }
 extension LazyCollection {
-  func foo(base: S) {} // expected-error {{'S' has been renamed to 'Base'}}
+  func foo(base: S) {} // expected-error {{'S' has been renamed to 'Base'}} {{18-19=Base}}
 }
 
-func foo<T>(_:LazyForwardCollection<T>) // expected-error {{'LazyForwardCollection' has been renamed to 'LazyCollection'}}
-func foo<T>(_:LazyBidirectionalCollection<T>) // expected-error {{'LazyBidirectionalCollection' has been renamed to 'LazyCollection'}}
-func foo<T>(_:LazyRandomAccessCollection<T>) // expected-error {{'LazyRandomAccessCollection' has been renamed to 'LazyCollection'}}
+func foo<T>(_:LazyForwardCollection<T>) // expected-error {{'LazyForwardCollection' has been renamed to 'LazyCollection'}} {{15-36=LazyCollection}}
+func foo<T>(_:LazyBidirectionalCollection<T>) // expected-error {{'LazyBidirectionalCollection' has been renamed to 'LazyCollection'}} {{15-42=LazyCollection}}
+func foo<T>(_:LazyRandomAccessCollection<T>) // expected-error {{'LazyRandomAccessCollection' has been renamed to 'LazyCollection'}} {{15-41=LazyCollection}}
 
 extension ReverseIndex {
-  func foo(base: I) {} // expected-error {{'I' has been renamed to 'Base'}}
+  func foo(base: I) {} // expected-error {{'I' has been renamed to 'Base'}} {{18-19=Base}}
 }
 extension ReverseRandomAccessIndex {
-  func foo(base: I) {} // expected-error {{'I' has been renamed to 'Base'}}
+  func foo(base: I) {} // expected-error {{'I' has been renamed to 'Base'}} {{18-19=Base}}
 }
 extension ReverseCollection {
-  func foo(base: T) {} // expected-error {{'T' has been renamed to 'Base'}}
+  func foo(base: T) {} // expected-error {{'T' has been renamed to 'Base'}} {{18-19=Base}}
 }
 extension ReverseRandomAccessCollection {
-  func foo(base: T) {} // expected-error {{'T' has been renamed to 'Base'}}
+  func foo(base: T) {} // expected-error {{'T' has been renamed to 'Base'}} {{18-19=Base}}
 }
 
-extension BidirectionalReverseView {} // expected-error {{'BidirectionalReverseView' has been renamed to 'ReverseCollection'}}
-extension RandomAccessReverseView {} // expected-error {{'RandomAccessReverseView' has been renamed to 'ReverseRandomAccessCollection'}}
+extension BidirectionalReverseView {} // expected-error {{'BidirectionalReverseView' has been renamed to 'ReverseCollection'}} {{11-35=ReverseCollection}}
+extension RandomAccessReverseView {} // expected-error {{'RandomAccessReverseView' has been renamed to 'ReverseRandomAccessCollection'}} {{11-34=ReverseRandomAccessCollection}}
 
 extension GeneratorSequence {
-  func foo(base: G) {} // expected-error {{'G' has been renamed to 'Base'}}
+  func foo(base: G) {} // expected-error {{'G' has been renamed to 'Base'}} {{18-19=Base}}
 }
 
-extension ZipGenerator2 {} // expected-error {{'ZipGenerator2' has been renamed to 'Zip2Generator'}}
-extension Zip2 {} // expected-error {{'Zip2' has been renamed to 'Zip2Sequence'}}
+extension ZipGenerator2 {} // expected-error {{'ZipGenerator2' has been renamed to 'Zip2Generator'}} {{11-24=Zip2Generator}}
+extension Zip2 {} // expected-error {{'Zip2' has been renamed to 'Zip2Sequence'}} {{11-15=Zip2Sequence}}
 
 extension UnsafePointer {
-  func foo(memory: T) {} // expected-error {{'T' has been renamed to 'Memory'}}
+  func foo(memory: T) {} // expected-error {{'T' has been renamed to 'Memory'}} {{20-21=Memory}}
 }
 extension UnsafeMutablePointer {
-  func foo(memory: T) {} // expected-error {{'T' has been renamed to 'Memory'}}
+  func foo(memory: T) {} // expected-error {{'T' has been renamed to 'Memory'}} {{20-21=Memory}}
 }
 
 extension HalfOpenInterval {
-  func foo(bound: T) {} // expected-error {{'T' has been renamed to 'Bound'}}
+  func foo(bound: T) {} // expected-error {{'T' has been renamed to 'Bound'}} {{19-20=Bound}}
 }
 extension ClosedInterval {
-  func foo(bound: T) {} // expected-error {{'T' has been renamed to 'Bound'}}
+  func foo(bound: T) {} // expected-error {{'T' has been renamed to 'Bound'}} {{19-20=Bound}}
 }
 
 extension Unmanaged {
-  func foo(instance: T) {} // expected-error {{'T' has been renamed to 'Instance'}}
+  func foo(instance: T) {} // expected-error {{'T' has been renamed to 'Instance'}} {{22-23=Instance}}
 }
 
-struct MyCollection : Sliceable {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}}
-protocol MyProtocol : Sliceable {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}}
-func processCollection<E : Sliceable>(e: E) {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}}
+struct MyCollection : Sliceable {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}} {{23-32=CollectionType}}
+protocol MyProtocol : Sliceable {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}} {{23-32=CollectionType}}
+func processCollection<E : Sliceable>(e: E) {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}} {{28-37=CollectionType}}
 
 func renamedRangeReplaceableCollectionTypeMethods(var c: DefaultedForwardRangeReplaceableCollection<Int>) {
-  c.extend([ 10 ]) // expected-error {{'extend' has been renamed to 'appendContentsOf'}}
-  c.splice([ 10 ], atIndex: c.startIndex) // expected-error {{'splice(_:atIndex:)' has been renamed to 'insertContentsOf'}}
+  c.extend([ 10 ]) // expected-error {{'extend' has been renamed to 'appendContentsOf'}} {{5-11=appendContentsOf}}
+  c.splice([ 10 ], atIndex: c.startIndex) // expected-error {{'splice(_:atIndex:)' has been renamed to 'insertContentsOf'}} {{5-11=insertContentsOf}}
 }
 
