@@ -24,7 +24,7 @@ using namespace swift;
 
 namespace {
   struct ExpectedFixIt {
-    const char *FixitLoc;
+    const char *StartLoc, *EndLoc;   // The loc of the {{ and }}'s.
     unsigned StartCol;
     unsigned EndCol;
     std::string Text;
@@ -168,6 +168,8 @@ static bool checkForFixIt(const ExpectedFixIt &Expected,
 /// ones.
 bool DiagnosticVerifier::verifyFile(unsigned BufferID,
                                     bool shouldAutoApplyFixes) {
+  using llvm::SMLoc;
+  
   const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
   CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
   StringRef InputFile = SM.extractText(EntireRange);
@@ -183,7 +185,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
   
   auto addError = [&](const char *Loc, std::string message,
                       ArrayRef<llvm::SMFixIt> FixIts = {}) {
-    auto loc = SourceLoc(llvm::SMLoc::getFromPointer(Loc));
+    auto loc = SourceLoc(SMLoc::getFromPointer(Loc));
     auto diag = SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message,
                               {}, FixIts);
     Errors.push_back(diag);
@@ -346,7 +348,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       StringRef AfterEqual = AfterMinus.substr(EqualLoc+1);
       
       ExpectedFixIt FixIt;
-      FixIt.FixitLoc = StartColStr.data()-2;
+      FixIt.StartLoc = StartColStr.data()-2;
+      FixIt.EndLoc = FixItStr.data()+EndLoc+2;
       if (StartColStr.getAsInteger(10, FixIt.StartCol)) {
         addError(StartColStr.data(),
                  "invalid column number in fix-it verification");
@@ -404,31 +407,49 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     
     auto &FoundDiagnostic = *FoundDiagnosticIter;
 
+    const char *IncorrectFixit = nullptr;
     // Verify that any expected fix-its are present in the diagnostic.
     for (auto fixit : expected.Fixits) {
-      if (!checkForFixIt(fixit, FoundDiagnostic, InputFile)) {
-        std::string Message;
-        {
-          llvm::raw_string_ostream OS(Message);
-          OS << "expected fix-it not seen";
-          
-          if (!FoundDiagnostic.getFixIts().empty()) {
-            OS << "; actual fix-its:";
-            
-            for (auto &ActualFixIt : FoundDiagnostic.getFixIts()) {
-              llvm::SMRange Range = ActualFixIt.getRange();
-              
-              OS << " {{"
-              << getColumnNumber(InputFile, Range.Start) << '-'
-              << getColumnNumber(InputFile, Range.End) << '='
-              << ActualFixIt.getText()
-              << "}}";
-            }
-          }
-        }
-        
-        addError(fixit.FixitLoc, std::move(Message));
+      // If we found it, we're ok.
+      if (!checkForFixIt(fixit, FoundDiagnostic, InputFile))
+        IncorrectFixit = fixit.StartLoc;
+    }
+    
+    // If we have any expected fixits that didn't get matched, then they are
+    // wrong.  Replace the failed fixit with what actually happened.
+    if (IncorrectFixit) {
+      std::string Actual;
+      if (FoundDiagnostic.getFixIts().empty()) {
+        addError(IncorrectFixit, "expected fix-it not seen");
+        continue;
       }
+      
+      // If we had an incorrect expected fixit, render it and produce a fixit
+      // of our own.
+      llvm::raw_string_ostream OS(Actual);
+      bool isFirst = true;
+      for (auto &ActualFixIt : FoundDiagnostic.getFixIts()) {
+        llvm::SMRange Range = ActualFixIt.getRange();
+        
+        if (isFirst)
+          isFirst = false;
+        else
+          OS << ' ';
+        OS << "{{"
+        << getColumnNumber(InputFile, Range.Start) << '-'
+        << getColumnNumber(InputFile, Range.End) << '='
+        << ActualFixIt.getText()
+        << "}}";
+      }
+      Actual = OS.str();
+
+      
+      auto replStartLoc = SMLoc::getFromPointer(expected.Fixits[0].StartLoc);
+      auto replEndLoc = SMLoc::getFromPointer(expected.Fixits.back().EndLoc);
+      
+      llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), Actual);
+      addError(IncorrectFixit,
+               "expected fix-it not seen; actual fix-its: " + Actual, fix);
     }
     
     // Actually remove the diagnostic from the list, so we don't match it
@@ -466,8 +487,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
 
     if (I == CapturedDiagnostics.end()) continue;
     
-    auto StartLoc = llvm::SMLoc::getFromPointer(expected.MessageRange.begin());
-    auto EndLoc = llvm::SMLoc::getFromPointer(expected.MessageRange.end());
+    auto StartLoc = SMLoc::getFromPointer(expected.MessageRange.begin());
+    auto EndLoc = SMLoc::getFromPointer(expected.MessageRange.end());
     
     llvm::SMFixIt fixIt(llvm::SMRange{ StartLoc, EndLoc }, I->getMessage());
     addError(expected.MessageRange.begin(), "incorrect message found", fixIt);
@@ -522,8 +543,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
 
     // Remove the expected-foo{{}} as a fixit.
     llvm::SMFixIt fixIt(llvm::SMRange{
-      llvm::SMLoc::getFromPointer(StartLoc),
-      llvm::SMLoc::getFromPointer(EndLoc)
+      SMLoc::getFromPointer(StartLoc),
+      SMLoc::getFromPointer(EndLoc)
     }, "");
     addError(expected.ExpectedStart, message, fixIt);
   }
