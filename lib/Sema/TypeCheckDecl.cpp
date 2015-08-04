@@ -1016,6 +1016,7 @@ bool TypeChecker::handleSILGenericParams(
   GenericSignature *outerSignature = nullptr;
   for (unsigned i = 0, e = gps.size(); i < e; i++) {
     auto &builder = *builders.rbegin()[i];
+    builder.addGenericSignature(outerSignature, true);
 
     auto genericParams = gps.rbegin()[i];
     bool invalid = false;

@@ -87,3 +87,26 @@ sil @_TF16generic_closures24generic_curried_functionU___FT1xQ__FT1yQ0__T_ : $@co
 
 // reabstraction thunk helper from @callee_owned (@in Builtin.Int32) -> (@unowned ()) to @callee_owned (@unowned Builtin.Int32) -> (@unowned ())
 sil [transparent] @_TTRXFo_iBi32__dT__XFo_dBi32__dT__ : $@convention(thin) (Builtin.Int32, @owned @callee_owned (@in Builtin.Int32) -> ()) -> ()
+
+
+protocol FooProtoHelper {}
+protocol FooProto {
+  typealias Assoc : FooProtoHelper
+  var value: Assoc { get }
+}
+
+// These generic parameters used to crash the compiler.
+sil @protocol_extension_with_constrained_associated_type : $@convention(method) <Self where Self : FooProto, Self.Assoc : FooProtoHelper><I where I : FooProto, I.Assoc == Self.Assoc> (@in I, @in_guaranteed Self) -> () {
+bb0(%0 : $*I, %1 : $*Self):
+  %2 = alloc_stack $I                             // users: %3, %6, %7, %9
+  copy_addr %0 to [initialization] %2#1 : $*I     // id: %3
+  %4 = witness_method $I, #FooProto.value!getter.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@out τ_0_0.Assoc, @in_guaranteed τ_0_0) -> () // user: %6
+  %5 = alloc_stack $Self.Assoc                    // users: %6, %8
+  %6 = apply %4<I, Self.Assoc>(%5#1, %2#1) : $@convention(witness_method) <τ_0_0 where τ_0_0 : FooProto, τ_0_0.Assoc : FooProtoHelper> (@out τ_0_0.Assoc, @in_guaranteed τ_0_0) -> ()
+  destroy_addr %2#1 : $*I                         // id: %7
+  dealloc_stack %5#0 : $*@local_storage Self.Assoc // id: %8
+  dealloc_stack %2#0 : $*@local_storage I         // id: %9
+  destroy_addr %0 : $*I                           // id: %10
+  %11 = tuple ()                                  // user: %12
+  return %11 : $()                                // id: %12
+}

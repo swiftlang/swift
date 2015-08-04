@@ -1018,20 +1018,22 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   
   // Make sure the concrete type fulfills the requirements on the archetype.
   DenseMap<ProtocolDecl *, ProtocolConformance*> conformances;
-  for (auto conforms : T->getConformsTo()) {
-    auto protocol = conforms.first;
-    auto conformance = Mod.lookupConformance(
-                         Concrete, protocol,
-                         Mod.getASTContext().getLazyResolver());
-    if (conformance.getInt() == ConformanceKind::DoesNotConform) {
-      Diags.diagnose(Source.getLoc(),
-                     diag::requires_generic_param_same_type_does_not_conform,
-                     Concrete, protocol->getName());
-      return true;
-    }
+  if (!Concrete->is<ArchetypeType>()) {
+    for (auto conforms : T->getConformsTo()) {
+      auto protocol = conforms.first;
+      auto conformance = Mod.lookupConformance(
+                           Concrete, protocol,
+                           Mod.getASTContext().getLazyResolver());
+      if (conformance.getInt() == ConformanceKind::DoesNotConform) {
+        Diags.diagnose(Source.getLoc(),
+                       diag::requires_generic_param_same_type_does_not_conform,
+                       Concrete, protocol->getName());
+        return true;
+      }
 
-    assert(conformance.getPointer() && "No conformance pointer?");
-    conformances[protocol] = conformance.getPointer();
+      assert(conformance.getPointer() && "No conformance pointer?");
+      conformances[protocol] = conformance.getPointer();
+    }
   }
   
   // Record the requirement.
@@ -1044,19 +1046,27 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   for (auto nested : T->getNestedTypes()) {
     AssociatedTypeDecl *assocType
       = nested.second.front()->getResolvedAssociatedType();
-    assert(conformances.count(assocType->getProtocol()) > 0
-           && "missing conformance?");
-    auto witness = conformances[assocType->getProtocol()]
-          ->getTypeWitness(assocType, getLazyResolver());
-    auto witnessType = witness.getReplacement();
-    if (auto witnessPA = resolveArchetype(witnessType)) {
-      addSameTypeRequirementBetweenArchetypes(nested.second.front(),
-                                              witnessPA,
-                                              Source);
-    } else {
+    if (auto *concreteArchetype = Concrete->getAs<ArchetypeType>()) {
+      ArchetypeType::NestedType witnessType =
+          concreteArchetype->getNestedType(nested.first);
       addSameTypeRequirementToConcrete(nested.second.front(),
-                                       witnessType,
+                                       witnessType.getValue(),
                                        Source);
+    } else {
+      assert(conformances.count(assocType->getProtocol()) > 0
+             && "missing conformance?");
+      auto witness = conformances[assocType->getProtocol()]
+            ->getTypeWitness(assocType, getLazyResolver());
+      auto witnessType = witness.getReplacement();
+      if (auto witnessPA = resolveArchetype(witnessType)) {
+        addSameTypeRequirementBetweenArchetypes(nested.second.front(),
+                                                witnessPA,
+                                                Source);
+      } else {
+        addSameTypeRequirementToConcrete(nested.second.front(),
+                                         witnessType,
+                                         Source);
+      }
     }
   }
   
