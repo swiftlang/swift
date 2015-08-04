@@ -163,6 +163,35 @@ static bool checkForFixIt(const ExpectedFixIt &Expected,
   return false;
 }
 
+static std::string renderFixits(ArrayRef<llvm::SMFixIt> fixits,
+                                StringRef InputFile) {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+  bool isFirst = true;
+  for (auto &ActualFixIt : fixits) {
+    llvm::SMRange Range = ActualFixIt.getRange();
+    
+    if (isFirst)
+      isFirst = false;
+    else
+      OS << ' ';
+    OS << "{{"
+    << getColumnNumber(InputFile, Range.Start) << '-'
+    << getColumnNumber(InputFile, Range.End) << '=';
+    
+    for (auto C : ActualFixIt.getText()) {
+      if (C == '\n')
+        OS << "\\n";
+      else if (C == '}' || C == '\\')
+        OS << '\\' << C;
+      else
+        OS << C;
+    }
+    OS << "}}";
+  }
+  return OS.str();
+}
+
 /// \brief After the file has been processed, check to see if we got all of
 /// the expected diagnostics and check to see if there were any unexpected
 /// ones.
@@ -365,9 +394,15 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       StringRef fixItText = AfterEqual.slice(0, EndLoc);
       for (const char *current = fixItText.begin(), *end = fixItText.end();
            current != end; /* in loop */) {
-        if (*current == '\\' && current + 1 < end && *(current + 1) == 'n') {
-          FixIt.Text += '\n';
-          current += 2;
+        if (*current == '\\' && current + 1 < end) {
+          if (current[1] == 'n') {
+            FixIt.Text += '\n';
+            current += 2;
+          } else {  // Handle \}, \\, etc.
+            FixIt.Text += current[1];
+            current += 2;
+          }
+
         } else {
           FixIt.Text += *current++;
         }
@@ -418,7 +453,6 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     // If we have any expected fixits that didn't get matched, then they are
     // wrong.  Replace the failed fixit with what actually happened.
     if (IncorrectFixit) {
-      std::string Actual;
       if (FoundDiagnostic.getFixIts().empty()) {
         addError(IncorrectFixit, "expected fix-it not seen");
         continue;
@@ -426,30 +460,27 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       
       // If we had an incorrect expected fixit, render it and produce a fixit
       // of our own.
-      llvm::raw_string_ostream OS(Actual);
-      bool isFirst = true;
-      for (auto &ActualFixIt : FoundDiagnostic.getFixIts()) {
-        llvm::SMRange Range = ActualFixIt.getRange();
-        
-        if (isFirst)
-          isFirst = false;
-        else
-          OS << ' ';
-        OS << "{{"
-        << getColumnNumber(InputFile, Range.Start) << '-'
-        << getColumnNumber(InputFile, Range.End) << '='
-        << ActualFixIt.getText()
-        << "}}";
-      }
-      Actual = OS.str();
-
-      
+      auto actual = renderFixits(FoundDiagnostic.getFixIts(), InputFile);
       auto replStartLoc = SMLoc::getFromPointer(expected.Fixits[0].StartLoc);
       auto replEndLoc = SMLoc::getFromPointer(expected.Fixits.back().EndLoc);
       
-      llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), Actual);
+      llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc), actual);
       addError(IncorrectFixit,
-               "expected fix-it not seen; actual fix-its: " + Actual, fix);
+               "expected fix-it not seen; actual fix-its: " + actual, fix);
+#if 0 // TODO: There are still some bugs with this, and we don't have a
+      // policy of requiring a fixit specification on tests.
+    } else if (expected.Fixits.empty() &&
+               !FoundDiagnostic.getFixIts().empty() &&
+               !expected.mayAppear &&
+                              false) {
+      // If there was no fixit specification, but some were produced, add a
+      // fixit to add them in.
+      auto actual = renderFixits(FoundDiagnostic.getFixIts(), InputFile);
+      
+      llvm::SMFixIt fix(SMLoc::getFromPointer(expected.ExpectedEnd),
+                        " " + actual);
+      addError(expected.ExpectedEnd, "expected fix-it not specified", fix);
+#endif
     }
     
     // Actually remove the diagnostic from the list, so we don't match it
