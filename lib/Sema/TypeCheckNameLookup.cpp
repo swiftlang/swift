@@ -185,7 +185,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
   bool searchingFromProtoExt = false;
   for (auto outerDC = dc; outerDC; outerDC = outerDC->getParent()) {
     if (auto ext = dyn_cast<ExtensionDecl>(outerDC)) {
-      if (ext->getExtendedType()->is<ProtocolType>()) {
+      if (ext->getExtendedType() && ext->getExtendedType()->is<ProtocolType>()) {
         searchingFromProtoExt = true;
         break;
       }
