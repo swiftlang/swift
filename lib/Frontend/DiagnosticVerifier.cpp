@@ -349,7 +349,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
       
       ExpectedFixIt FixIt;
       FixIt.StartLoc = StartColStr.data()-2;
-      FixIt.EndLoc = FixItStr.data()+EndLoc+2;
+      FixIt.EndLoc = FixItStr.data()+EndLoc;
       if (StartColStr.getAsInteger(10, FixIt.StartCol)) {
         addError(StartColStr.data(),
                  "invalid column number in fix-it verification");
