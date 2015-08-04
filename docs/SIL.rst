@@ -3602,6 +3602,17 @@ unowned_to_ref
 Strips the ``@unowned`` qualifier off the type of a reference to a
 heap object.  No runtime effect.
 
+ref_to_unmanaged
+````````````````
+
+TODO
+
+unmanaged_to_ref
+````````````````
+
+TODO
+
+
 convert_function
 ````````````````
 ::
@@ -3632,78 +3643,15 @@ caveats:
 - A ``@noreturn`` function may be converted to a non-``@noreturn``
   type and vice-versa.
 
-thick_to_objc_metatype
-``````````````````````
-::
+thin_function_to_pointer
+````````````````````````
 
-  sil-instruction ::= 'thick_to_objc_metatype' sil-operand 'to' sil-type
+TODO
 
-  %1 = thick_to_objc_metatype %0 : $@thick T.metatype to $@objc_metatype T.metatype
-  // %0 must be of a thick metatype type $@thick T.metatype
-  // The destination type must be the corresponding Objective-C metatype type
-  // %1 will be of type $@objc_metatype T.metatype
+pointer_to_thin_function
+````````````````````````
 
-Converts a thick metatype to an Objective-C class metatype. ``T`` must
-be of class, class protocol, or class protocol composition type.
-
-objc_to_thick_metatype
-``````````````````````
-::
-
-  sil-instruction ::= 'objc_to_thick_metatype' sil-operand 'to' sil-type
-
-  %1 = objc_to_thick_metatype %0 : $@objc_metatype T.metatype to $@thick T.metatype
-  // %0 must be of an Objective-C metatype type $@objc_metatype T.metatype
-  // The destination type must be the corresponding thick metatype type
-  // %1 will be of type $@thick T.metatype
-
-Converts an Objective-C class metatype to a thick metatype. ``T`` must
-be of class, class protocol, or class protocol composition type.
-
-thin_to_thick_function
-``````````````````````
-::
-
-  sil-instruction ::= 'thin_to_thick_function' sil-operand 'to' sil-type
-
-  %1 = thin_to_thick_function %0 : $@convention(thin) T -> U to $T -> U
-  // %0 must be of a thin function type $@convention(thin) T -> U
-  // The destination type must be the corresponding thick function type
-  // %1 will be of type $T -> U
-
-Converts a thin function value, that is, a bare function pointer with no
-context information, into a thick function value with ignored context.
-Applying the resulting thick function value is equivalent to applying the
-original thin value. The ``thin_to_thick_function`` conversion may be
-eliminated if the context is proven not to be needed.
-
-is_nonnull
-``````````
-::
-
-  sil-instruction ::= 'is_nonnull' sil-operand
-
-  %1 = is_nonnull %0 : $C
-  // %0 must be of reference or function type $C
-  // %1 will be of type Builtin.Int1
-
-Checks whether a reference type value is null, returning 1 if
-the value is not null, or 0 if it is null.  If the value is a function
-type, it checks the function pointer (not the data pointer) for null.
-
-null_class
-``````````
-::
-
-  sil-instruction ::= 'null_class' sil-type
-
-%1 = null_class $T
-// %1 has type $T
-
-Creates a reference type value of null.  This is not a sensical thing for SIL
-to represent given that reference types are non-nullable, but makes sense at
-the machine level.  This is a horrible hack that should go away someday.
-
+TODO
 
 ref_to_bridge_object
 ````````````````````
@@ -3758,6 +3706,88 @@ bridge_object_to_word
   // %1 will be of type $Builtin.Word
 
 Provides the bit pattern of a ``Builtin.BridgeObject`` as an integer.
+
+thin_to_thick_function
+``````````````````````
+::
+
+  sil-instruction ::= 'thin_to_thick_function' sil-operand 'to' sil-type
+
+  %1 = thin_to_thick_function %0 : $@convention(thin) T -> U to $T -> U
+  // %0 must be of a thin function type $@convention(thin) T -> U
+  // The destination type must be the corresponding thick function type
+  // %1 will be of type $T -> U
+
+Converts a thin function value, that is, a bare function pointer with no
+context information, into a thick function value with ignored context.
+Applying the resulting thick function value is equivalent to applying the
+original thin value. The ``thin_to_thick_function`` conversion may be
+eliminated if the context is proven not to be needed.
+
+thick_to_objc_metatype
+``````````````````````
+::
+
+  sil-instruction ::= 'thick_to_objc_metatype' sil-operand 'to' sil-type
+
+  %1 = thick_to_objc_metatype %0 : $@thick T.metatype to $@objc_metatype T.metatype
+  // %0 must be of a thick metatype type $@thick T.metatype
+  // The destination type must be the corresponding Objective-C metatype type
+  // %1 will be of type $@objc_metatype T.metatype
+
+Converts a thick metatype to an Objective-C class metatype. ``T`` must
+be of class, class protocol, or class protocol composition type.
+
+objc_to_thick_metatype
+``````````````````````
+::
+
+  sil-instruction ::= 'objc_to_thick_metatype' sil-operand 'to' sil-type
+
+  %1 = objc_to_thick_metatype %0 : $@objc_metatype T.metatype to $@thick T.metatype
+  // %0 must be of an Objective-C metatype type $@objc_metatype T.metatype
+  // The destination type must be the corresponding thick metatype type
+  // %1 will be of type $@thick T.metatype
+
+Converts an Objective-C class metatype to a thick metatype. ``T`` must
+be of class, class protocol, or class protocol composition type.
+
+objc_metatype_to_object
+```````````````````````
+
+TODO
+
+objc_existential_metatype_to_object
+```````````````````````````````````
+
+TODO
+
+is_nonnull
+``````````
+::
+
+  sil-instruction ::= 'is_nonnull' sil-operand
+
+  %1 = is_nonnull %0 : $C
+  // %0 must be of reference or function type $C
+  // %1 will be of type Builtin.Int1
+
+Checks whether a reference type value is null, returning 1 if
+the value is not null, or 0 if it is null.  If the value is a function
+type, it checks the function pointer (not the data pointer) for null.
+
+null_class
+``````````
+::
+
+  sil-instruction ::= 'null_class' sil-type
+
+%1 = null_class $T
+// %1 has type $T
+
+Creates a reference type value of null.  This is not a sensical thing for SIL
+to represent given that reference types are non-nullable, but makes sense at
+the machine level.  This is a horrible hack that should go away someday.
 
 Checked Conversions
 ~~~~~~~~~~~~~~~~~~~
