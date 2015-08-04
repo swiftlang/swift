@@ -2,11 +2,11 @@
 
 // XFAIL: linux
 
-@override // expected-error {{'override' can only be specified on class members}} expected-error {{'override' is a declaration modifier, not an attribute}}
+@override // expected-error {{'override' can only be specified on class members}} {{1-11=}} expected-error {{'override' is a declaration modifier, not an attribute}} {{1-2=}}
 func virtualAttributeCanNotBeUsedInSource() {}
 
 class MixedKeywordsAndAttributes {
-  // expected-error@+1 {{expected declaration}} expected-error@+1 {{consecutive declarations on a line must be separated by ';'}}
+  // expected-error@+1 {{expected declaration}} expected-error@+1 {{consecutive declarations on a line must be separated by ';'}} {{11-11=;}}
   override @objc func f1() {}
 }
 
@@ -112,7 +112,7 @@ class B : A {
     }
   }
 
-  subscript (d: Double) -> String { // expected-error{{overriding declaration requires an 'override' keyword}}
+  subscript (d: Double) -> String { // expected-error{{overriding declaration requires an 'override' keyword}} {{3-3=override }}
     get {
       return "hello"
     }
@@ -146,8 +146,8 @@ class B : A {
   }
 
   override init() { }
-  override deinit { } // expected-error{{'override' modifier cannot be applied to this declaration}}
-  override typealias Inner = Int // expected-error{{'override' modifier cannot be applied to this declaration}}
+  override deinit { } // expected-error{{'override' modifier cannot be applied to this declaration}} {{3-12=}}
+  override typealias Inner = Int // expected-error{{'override' modifier cannot be applied to this declaration}} {{3-12=}}
 }
 
 extension B {
@@ -155,25 +155,25 @@ extension B {
 }
 
 struct S {
-  override func f() { } // expected-error{{'override' can only be specified on class members}}
+  override func f() { } // expected-error{{'override' can only be specified on class members}} {{3-12=}}
 }
 extension S {
   override func ef() {} // expected-error{{method does not override any method from its superclass}}
 }
 
 enum E {
-  override func f() { } // expected-error{{'override' can only be specified on class members}}
+  override func f() { } // expected-error{{'override' can only be specified on class members}} {{3-12=}}
 }
 
 protocol P {
-  override func f() // expected-error{{'override' can only be specified on class members}}
+  override func f() // expected-error{{'override' can only be specified on class members}} {{3-12=}}
 }
 
-override func f() { } // expected-error{{'override' can only be specified on class members}}
+override func f() { } // expected-error{{'override' can only be specified on class members}} {{1-10=}}
 
 // Invalid 'override' on declarations inside closures.
 var rdar16654075a = {
-  override func foo() {}  // expected-error{{'override' can only be specified on class members}}
+  override func foo() {}  // expected-error{{'override' can only be specified on class members}} {{3-12=}}
 }
 var rdar16654075b = {
   class A {
@@ -181,7 +181,7 @@ var rdar16654075b = {
   }
 }
 var rdar16654075c = { () -> () in
-  override func foo() {} // expected-error {{'override' can only be specified on class members}}
+  override func foo() {} // expected-error {{'override' can only be specified on class members}} {{3-12=}}
   ()
 }
 var rdar16654075d = { () -> () in
@@ -217,7 +217,7 @@ class D2 : C {
   init(string: String) { super.init(string: string) } // expected-error{{overriding declaration requires an 'override' keyword}}{{3-3=override }}
 
   // FIXME: Would like to remove the space after 'override' as well.
-  required override init(double: Double) { } // expected-warning{{'override' is implied when overriding a required initializer}}
+  required override init(double: Double) { } // expected-warning{{'override' is implied when overriding a required initializer}} {{12-21=}}
   override convenience init() { self.init(string: "hello") } // expected-error{{initializer does not override a designated initializer from its superclass}}
 }
 
@@ -241,7 +241,7 @@ class D5 : C {
 }
 
 class D6 : C {
-  init(double: Double) { } // expected-error{{'required' modifier must be present on all overrides of a required initializer}}
+  init(double: Double) { } // expected-error{{'required' modifier must be present on all overrides of a required initializer}} {{3-3=required }}
 }
 
 // rdar://problem/18232867

@@ -10,5 +10,5 @@
 _ = clangGlobal
 
 #if !IMPORTS_ONLY
-@testable func foo() {} // expected-error {{@testable may only be used on 'import' declarations}}
+@testable func foo() {} // expected-error {{@testable may only be used on 'import' declarations}} {{1-11=}}
 #endif

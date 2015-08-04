@@ -15,6 +15,6 @@ indirect enum Bar<T> {
   indirect case B(T) // expected-error{{enum case in 'indirect' enum cannot also be 'indirect'}}
 }
 
-indirect struct Bas { // expected-error{{cannot be applied}}
-  indirect var x: Int // expected-error{{cannot be applied}}
+indirect struct Bas { // expected-error{{cannot be applied}} {{1-10=}}
+  indirect var x: Int // expected-error{{cannot be applied}} {{3-12=}}
 }

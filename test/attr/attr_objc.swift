@@ -30,24 +30,24 @@ protocol Protocol_Class2 : class {}
 @objc extension PlainClass { } // expected-error{{@objc cannot be applied to this declaration}}{{1-7=}}
 
 @objc  
-var subject_globalVar: Int // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+var subject_globalVar: Int // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{1-7=}}
 
 var subject_getterSetter: Int {
   @objc 
-  get { // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  get { // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-9=}}
     return 0
   }
   @objc
-  set {  // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  set {  // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-8=}}
   }
 }
 
 var subject_global_observingAccesorsVar1: Int = 0 {
   @objc 
-  willSet { // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  willSet { // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-9=}}
   }
   @objc 
-  didSet { // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  didSet { // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-9=}}
   }
 }
 
@@ -80,10 +80,10 @@ class subject_getterSetter1 {
 
   var observingAccessorsVar1: Int = 0 {
     @objc
-    willSet { // expected-error {{observing accessors are not allowed to be marked @objc}}
+    willSet { // expected-error {{observing accessors are not allowed to be marked @objc}} {{5-10=}}
     }
     @objc
-    didSet { // expected-error {{observing accessors are not allowed to be marked @objc}}
+    didSet { // expected-error {{observing accessors are not allowed to be marked @objc}} {{5-10=}}
     }
   }
 }
@@ -97,49 +97,49 @@ class subject_staticVar1 {
 }
 
 @objc
-func subject_freeFunc() { // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+func subject_freeFunc() { // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{1-6=}}
   @objc
-  var subject_localVar: Int // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  var subject_localVar: Int // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-8=}}
 
   @objc
-  func subject_nestedFreeFunc() { // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  func subject_nestedFreeFunc() { // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-8=}}
   }
 }
 
 @objc
-func subject_genericFunc<T>(t: T) { // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+func subject_genericFunc<T>(t: T) { // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{1-6=}}
   @objc
-  var subject_localVar: Int // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  var subject_localVar: Int // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-8=}}
 
   @objc
-  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-8=}}
 }
 
-func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}}
+func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@objc }} {{27-33=}}
 }
 
-@objc // expected-error {{@objc cannot be applied to this declaration}}
+@objc // expected-error {{@objc cannot be applied to this declaration}} {{1-7=}}
 struct subject_struct {
   @objc
-  var subject_instanceVar: Int // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  var subject_instanceVar: Int // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-8=}}
 
   @objc
-  init() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  init() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-8=}}
 
   @objc
-  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-8=}}
 }
 
-@objc   // expected-error {{@objc cannot be applied to this declaration}}
+@objc   // expected-error {{@objc cannot be applied to this declaration}} {{1-7=}}
 struct subject_genericStruct<T> {
   @objc
-  var subject_instanceVar: Int // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  var subject_instanceVar: Int // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-8=}}
 
   @objc
-  init() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  init() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-8=}}
 
   @objc
-  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-8=}}
 }
 
 @objc
@@ -158,7 +158,7 @@ class subject_class1 { // no-error
 class subject_class2 : Protocol_Class1, PlainProtocol { // no-error
 }
 
-@objc // expected-error{{only classes that inherit from NSObject can be declared @objc}}
+@objc // expected-error{{only classes that inherit from NSObject can be declared @objc}} {{1-7=}}
 class subject_genericClass<T> {
   @objc
   var subject_instanceVar: Int // no-error
@@ -170,7 +170,7 @@ class subject_genericClass<T> {
   func subject_instanceFunc() {} // no_error
 }
 
-@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{1-7=}}
 class subject_genericClass2<T> : Class_ObjC1 {
   @objc
   var subject_instanceVar: Int // no-error
@@ -194,14 +194,14 @@ extension subject_genericClass {
 
 @objc
 enum subject_enum: Int {
-  @objc   // expected-error {{@objc cannot be applied to this declaration}}
+  @objc   // expected-error {{@objc cannot be applied to this declaration}} {{3-9=}}
   case subject_enumElement1
 
   @objc   
-  init() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  init() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-9=}}
 
   @objc
-  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
+  func subject_instanceFunc() {} // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}} {{3-8=}}
 }
 
 @objc
@@ -306,10 +306,10 @@ class ConcreteContext3 {
 }
 
 func genericContext1<T>(_: T) {
-  @objc // expected-error{{only classes that inherit from NSObject can be declared @objc}}
+  @objc // expected-error{{only classes that inherit from NSObject can be declared @objc}} {{3-9=}}
   class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
 
-  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{3-9=}}
   class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{type 'subject_inGenericContext2' nested in generic function 'genericContext1' is not allowed}}
 
   class subject_constructor_inGenericContext { // expected-error{{type 'subject_constructor_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
@@ -329,10 +329,10 @@ func genericContext1<T>(_: T) {
 }
 
 class GenericContext2<T> {
-  @objc // expected-error{{only classes that inherit from NSObject can be declared @objc}}
+  @objc // expected-error{{only classes that inherit from NSObject can be declared @objc}} {{3-9=}}
   class subject_inGenericContext {} // expected-error{{nested in generic type}}
 
-  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{3-9=}}
   class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{nested in generic type}}
 
   @objc
@@ -341,10 +341,10 @@ class GenericContext2<T> {
 
 class GenericContext3<T> {
   class MoreNested { // expected-error{{nested in generic type}}
-    @objc // expected-error{{only classes that inherit from NSObject can be declared @objc}}
+    @objc // expected-error{{only classes that inherit from NSObject can be declared @objc}} {{5-11=}}
     class subject_inGenericContext {} // expected-error{{nested in generic type}}
 
-    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{5-11=}}
     class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{nested in generic type}}
 
     @objc
@@ -352,14 +352,14 @@ class GenericContext3<T> {
   }
 }
 
-@objc // expected-error{{only classes that inherit from NSObject can be declared @objc}}
+@objc // expected-error{{only classes that inherit from NSObject can be declared @objc}} {{1-7=}}
 class ConcreteSubclassOfGeneric : GenericContext3<Int> {}
 
 extension ConcreteSubclassOfGeneric {
   @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
 }
 
-@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}} {{1-7=}}
 class ConcreteSubclassOfGeneric2 : subject_genericClass2<Int> {}
 
 extension ConcreteSubclassOfGeneric2 {
@@ -1627,7 +1627,7 @@ class HasIBOutlet {
   // CHECK-LABEL: {{^}} @IBOutlet @objc weak var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
-  // expected-error@-1 {{@IBOutlet property cannot have non-object type 'PlainStruct'}}
+  // expected-error@-1 {{@IBOutlet property cannot have non-object type 'PlainStruct'}} {{3-13=}}
   // CHECK-LABEL: {{^}}  @IBOutlet var badOutlet: PlainStruct
 }
 
@@ -1770,7 +1770,7 @@ class BadClass2 {
   }
 
   var prop3: Int {
-    @objc(setProperty:) didSet { } // expected-error{{observing accessors are not allowed to be marked @objc}}
+    @objc(setProperty:) didSet { } // expected-error{{observing accessors are not allowed to be marked @objc}} {{5-10=}}
   }
 
   @objc
@@ -1814,7 +1814,7 @@ class Sub4 : Super {
 }
 
 class Sub5 : Super {
-  @objc(wrongFoo) // expected-error{{Objective-C property has a different name from the property it overrides ('wrongFoo' vs. 'renamedFoo')}}
+  @objc(wrongFoo) // expected-error{{Objective-C property has a different name from the property it overrides ('wrongFoo' vs. 'renamedFoo')}} {{9-17=renamedFoo}}
   override var foo: Int { get { return 5 } }
 }
 

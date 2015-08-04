@@ -17,7 +17,7 @@ protocol InvalidOnProtocol {}
 
 struct InvalidOnExtension {}
 
-@noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}
+@noreturn // expected-error {{@noreturn may only be used on 'func' declarations}} {{1-11=}}
 extension InvalidOnExtension {}
 
 @noreturn // expected-error {{@noreturn may only be used on 'func' declarations}}{{1-11=}}
@@ -73,18 +73,18 @@ class BaseClass {
   class func doesReturn() {} // expected-note {{overridden declaration is here}}
 }
 class DerivedClassA : BaseClass {
-  // expected-error@+2 {{overriding declaration requires an 'override' keyword}}
+  // expected-error@+2 {{overriding declaration requires an 'override' keyword}} {{3-3=override }}
   // expected-error@+1 {{an override of a @noreturn method should also be @noreturn}}
   func neverReturns() {}
 
-  // expected-error@+1 {{overriding declaration requires an 'override' keyword}}
+  // expected-error@+1 {{overriding declaration requires an 'override' keyword}} {{13-13=override }}
   @noreturn func doesReturn() { exit(0) }
 
-  // expected-error@+2 {{overriding declaration requires an 'override' keyword}}
+  // expected-error@+2 {{overriding declaration requires an 'override' keyword}} {{3-3=override }}
   // expected-error@+1 {{an override of a @noreturn method should also be @noreturn}}
   class func neverReturnsClass() { exit(0) }
 
-  // expected-error@+1 {{overriding declaration requires an 'override' keyword}}
+  // expected-error@+1 {{overriding declaration requires an 'override' keyword}} {{13-13=override }}
   @noreturn class func doesReturn() {}
 }
 class DerivedClassB : BaseClass {

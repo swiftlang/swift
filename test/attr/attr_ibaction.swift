@@ -2,15 +2,15 @@
 
 // REQUIRES: objc_interop
 
-@IBAction // expected-error {{@IBAction may only be used on 'func' declarations}}
+@IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{1-11=}}
 var iboutlet_global: Int
 
-@IBAction // expected-error {{@IBAction may only be used on 'func' declarations}}
+@IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{1-11=}}
 class IBOutletClassTy {}
-@IBAction // expected-error {{@IBAction may only be used on 'func' declarations}}
+@IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{1-11=}}
 struct IBStructTy {}
 
-@IBAction // expected-error {{only instance methods can be declared @IBAction}}
+@IBAction // expected-error {{only instance methods can be declared @IBAction}} {{1-11=}}
 func IBFunction() -> () {}
 
 class IBActionWrapperTy {
@@ -18,10 +18,10 @@ class IBActionWrapperTy {
   func click(_: AnyObject) -> () {} // no-warning
 
   func outer(_: AnyObject) -> () {
-    @IBAction  // expected-error {{only instance methods can be declared @IBAction}}
+    @IBAction  // expected-error {{only instance methods can be declared @IBAction}} {{5-15=}}
     func inner(_: AnyObject) -> () {}
   }
-  @IBAction // expected-error {{@IBAction may only be used on 'func' declarations}}
+  @IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{3-13=}}
   var value : Void = ()
 
   @IBAction

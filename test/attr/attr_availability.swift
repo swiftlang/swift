@@ -37,11 +37,11 @@ struct MyCollection<Element> {
   @available(*, unavailable, renamed="Element")
   typealias T = Element // expected-note 2{{'T' has been explicitly marked unavailable here}}
 
-  func foo(x: T) { } // expected-error {{'T' has been renamed to 'Element'}}
+  func foo(x: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{15-16=Element}}
 }
 
 extension MyCollection {
-  func append(element: T) { } // expected-error {{'T' has been renamed to 'Element'}}
+  func append(element: T) { } // expected-error {{'T' has been renamed to 'Element'}} {{24-25=Element}}
 }
 
 var x : int // expected-error {{'int' is unavailable: oh no you dont}}
@@ -172,7 +172,7 @@ func functionWithShortFormIOSVersionNoPointAvailable() {}
 @available(iOS 8.0, OSX 10.10.3, *)
 func functionWithShortFormIOSOSXAvailable() {}
 
-@available(iOS 8.0 // expected-error {{must handle potential future platforms with '*'}}
+@available(iOS 8.0 // expected-error {{must handle potential future platforms with '*'}} {{19-19=, *}}
 func shortFormMissingParen() { // expected-error {{expected ')' in 'available' attribute}}
 }
 
@@ -190,7 +190,7 @@ func onlyWildcardInAvailable() {}
 @available(iOS 8.0, *, OSX 10.10.3)
 func shortFormWithWildcardInMiddle() {}
 
-@available(iOS 8.0, OSX 10.10.3) // expected-error {{must handle potential future platforms with '*'}}
+@available(iOS 8.0, OSX 10.10.3) // expected-error {{must handle potential future platforms with '*'}} {{32-32=, *}}
 func shortFormMissingWildcard() {}
 
 @availability(OSX, introduced=10.10) // expected-error {{@availability has been renamed to @available}} {{2-14=available}}

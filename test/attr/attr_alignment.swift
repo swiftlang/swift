@@ -31,13 +31,13 @@ struct NonPowerOfTwoAlignment {}
 @_alignment(3.5) // expected-error{{must be a positive integer literal}} expected-error{{expected declaration}}
 struct FractionalAlignment {}
 
-@_alignment(16) // expected-error{{cannot be applied to this declaration}}
+@_alignment(16) // expected-error{{cannot be applied to this declaration}} {{1-17=}}
 class ClassWithAlignment {}
 
-@_alignment(16) // expected-error{{cannot be applied to this declaration}}
+@_alignment(16) // expected-error{{cannot be applied to this declaration}} {{1-17=}}
 protocol ProtocolWithAlignment {}
 
 struct Foo {
-  @_alignment(16) var fieldWithAlignment: Int // expected-error{{cannot be applied to this declaration}}
-  @_alignment(16) func funcWithAlignment() {} // expected-error{{cannot be applied to this declaration}}
+  @_alignment(16) var fieldWithAlignment: Int // expected-error{{cannot be applied to this declaration}} {{3-19=}}
+  @_alignment(16) func funcWithAlignment() {} // expected-error{{cannot be applied to this declaration}} {{3-19=}}
 }

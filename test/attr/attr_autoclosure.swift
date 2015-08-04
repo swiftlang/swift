@@ -1,9 +1,9 @@
 // RUN: %target-parse-verify-swift
 
 // Simple case.
-@autoclosure var fn : () -> Int = 4  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
+@autoclosure var fn : () -> Int = 4  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{1-14=}} expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
 
-@autoclosure func func1() {}  // expected-error {{@autoclosure may only be used on 'parameter' declarations}}
+@autoclosure func func1() {}  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{1-14=}}
 
 func func1a(@autoclosure v1 : Int) {} // expected-error {{@autoclosure may only be applied to values of function type}}
 
@@ -12,7 +12,7 @@ func func2(@autoclosure fp : () -> Int) { func2(4)}
 
 func func3(@autoclosure fp fpx : () -> Int) {func3(fp: 0)}
 func func4(@autoclosure fp fp : () -> Int) {func4(fp: 0)}
-func func5(@autoclosure var fp fp : () -> Int) {func5(fp: 0)} // expected-warning {{parameter 'fp' was never mutated}}
+func func5(@autoclosure var fp fp : () -> Int) {func5(fp: 0)} // expected-warning {{parameter 'fp' was never mutated}} {{25-29=}}
 func func6(@autoclosure _: () -> Int) {func6(0)}
 
 // declattr and typeattr on the argument.
@@ -40,14 +40,14 @@ let migrate4 : @autoclosure() -> ()   // expected-error {{@autoclosure is now an
 
 
 struct SomeStruct {
-  @autoclosure let property : () -> Int  // expected-error {{@autoclosure may only be used on 'parameter' declarations}}
+  @autoclosure let property : () -> Int  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{3-16=}}
 
   init() {
   }
 }
 
 class BaseClass {
-  @autoclosure var property : () -> Int // expected-error {{@autoclosure may only be used on 'parameter' declarations}}
+  @autoclosure var property : () -> Int // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{3-16=}}
   init() {}
 }
 
@@ -78,14 +78,14 @@ struct S : P2 {
 
 
 struct AutoclosureEscapeTest {
-  @autoclosure let delayed: () -> Int  // expected-error {{@autoclosure may only be used on 'parameter' declarations}}
+  @autoclosure let delayed: () -> Int  // expected-error {{@autoclosure may only be used on 'parameter' declarations}} {{3-16=}}
 }
 
 // @autoclosure(escaping)
 func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected ')' in @autoclosure}}
 // expected-note@-1{{to match this opening '('}}
 
-func func11(@autoclosure(escaping) @noescape _: () -> ()) { } // expected-error{{@noescape conflicts with @autoclosure(escaping)}}
+func func11(@autoclosure(escaping) @noescape _: () -> ()) { } // expected-error{{@noescape conflicts with @autoclosure(escaping)}} {{36-46=}}
 
 
 class Super {
@@ -117,8 +117,8 @@ class TestFunc12 {
   func test() {
     func12a(x + foo()) // okay
     func12b(x + foo()) 
-    // expected-error@-1{{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}}
-    // expected-error@-2{{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}}
+    // expected-error@-1{{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{13-13=self.}}
+    // expected-error@-2{{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{17-17=self.}}
   }
 }
 

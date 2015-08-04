@@ -39,10 +39,10 @@ class BlueLightSaber : LightSaber {
   init(x: String) {} // expected-error {{conflicts with previous declaration with the same Objective-C selector}}
 }
 
-@nonobjc class NonObjCClassNotAllowed { } // expected-error {{@nonobjc cannot be applied to this declaration}}
+@nonobjc class NonObjCClassNotAllowed { } // expected-error {{@nonobjc cannot be applied to this declaration}} {{1-10=}}
 
 class NonObjCDeallocNotAllowed {
-  @nonobjc deinit { // expected-error {{@nonobjc cannot be applied to this declaration}}
+  @nonobjc deinit { // expected-error {{@nonobjc cannot be applied to this declaration}} {{3-12=}}
 
   }
 }
@@ -79,10 +79,10 @@ class NSManagedAndNonObjCNotAllowed {
   @nonobjc @NSManaged var rosie : NSObject // expected-error {{declaration is marked @NSManaged, and cannot be marked @nonobjc}}
 }
 
-@nonobjc func nonObjCTopLevelFuncNotAllowed() { } // expected-error {{only methods, initializers, properties and subscript declarations can be declared @nonobjc}}
+@nonobjc func nonObjCTopLevelFuncNotAllowed() { } // expected-error {{only methods, initializers, properties and subscript declarations can be declared @nonobjc}} {{1-10=}}
 
 @objc class NonObjCPropertyObjCProtocolNotAllowed : ObjCProtocol { // expected-error {{does not conform to protocol}}
-  @nonobjc func protocolMethod() { } // expected-note {{candidate is not '@objc', but protocol requires it}}
+  @nonobjc func protocolMethod() { } // expected-note {{candidate is not '@objc', but protocol requires it}} {{3-3=@objc }}
 
   func nonObjCProtocolMethodNotAllowed() { }
 

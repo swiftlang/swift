@@ -7,7 +7,7 @@ struct NotObjCAble {
 
 @objc class ObjCClass {}
 
-dynamic prefix operator +!+ {}  // expected-error{{'dynamic' modifier cannot be applied to this declaration}}
+dynamic prefix operator +!+ {}  // expected-error{{'dynamic' modifier cannot be applied to this declaration}} {{1-9=}}
 
 class Foo {
   dynamic init() {}
@@ -26,21 +26,21 @@ class Foo {
 
   dynamic subscript(x: Int) -> NotObjCAble { get {} } // expected-error{{subscript cannot be marked dynamic because its type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
 
-  dynamic deinit {} // expected-error{{'dynamic' modifier cannot be applied to this declaration}}
+  dynamic deinit {} // expected-error{{'dynamic' modifier cannot be applied to this declaration}} {{3-11=}}
 
   func notDynamic() {}
 
-  final dynamic func indecisive() {} // expected-error{{a declaration cannot be both 'final' and 'dynamic'}}
+  final dynamic func indecisive() {} // expected-error{{a declaration cannot be both 'final' and 'dynamic'}} {{9-17=}}
 }
 
 struct Bar {
-  dynamic init() {} // expected-error{{only members of classes may be dynamic}}
+  dynamic init() {} // expected-error{{only members of classes may be dynamic}} {{3-11=}}
 
-  dynamic var x: Int // expected-error{{only members of classes may be dynamic}}
+  dynamic var x: Int // expected-error{{only members of classes may be dynamic}} {{3-11=}}
 
-  dynamic subscript(x: Int) -> ObjCClass { get {} } // expected-error{{only members of classes may be dynamic}}
+  dynamic subscript(x: Int) -> ObjCClass { get {} } // expected-error{{only members of classes may be dynamic}} {{3-11=}}
 
-  dynamic func foo(x: Int) {} // expected-error{{only members of classes may be dynamic}}
+  dynamic func foo(x: Int) {} // expected-error{{only members of classes may be dynamic}} {{3-11=}}
 }
 
 // CHECK-LABEL: class InheritsDynamic : Foo {

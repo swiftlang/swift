@@ -6,13 +6,13 @@
 import Other1
 import Other2
 
-@warn_unqualified_access // expected-error {{@warn_unqualified_access may only be used on 'func' declarations}}
+@warn_unqualified_access // expected-error {{@warn_unqualified_access may only be used on 'func' declarations}} {{1-26=}}
 var x: Int { return 0 }
 
-@warn_unqualified_access // expected-error {{@warn_unqualified_access may only be used on 'func' declarations}}
+@warn_unqualified_access // expected-error {{@warn_unqualified_access may only be used on 'func' declarations}} {{1-26=}}
 struct X {}
 
-@warn_unqualified_access // expected-error {{only methods can be declared @warn_unqualified_access}}
+@warn_unqualified_access // expected-error {{only methods can be declared @warn_unqualified_access}} {{1-26=}}
 func topLevel() {
 }
 
@@ -58,7 +58,7 @@ func test(sub: Sub) {
   sub.b()
   sub.c()
 
-  @warn_unqualified_access // expected-error {{only methods can be declared @warn_unqualified_access}}
+  @warn_unqualified_access // expected-error {{only methods can be declared @warn_unqualified_access}} {{3-28=}}
   func inner() {
   }
   inner()

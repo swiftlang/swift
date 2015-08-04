@@ -53,8 +53,8 @@ var unterminatedEmptySubject = 0
 duplicateAttr(1) // expected-error{{cannot convert value of type 'Int' to expected argument type '()'}}
 
 // CHECK ALLOWED DECLS
-private import Swift // expected-error {{'private' modifier cannot be applied to this declaration}}
-private(set) infix operator ~~~ {} // expected-error {{'private' modifier cannot be applied to this declaration}}
+private import Swift // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-9=}}
+private(set) infix operator ~~~ {} // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-14=}}
 
 private typealias MyInt = Int
 
@@ -70,45 +70,45 @@ private struct TestStruct {
 
 private class TestClass {
   private init() {}
-  internal deinit {} // expected-error {{'internal' modifier cannot be applied to this declaration}}
+  internal deinit {} // expected-error {{'internal' modifier cannot be applied to this declaration}} {{3-12=}}
 }
 
 private enum TestEnum {
-  private case Foo, Bar // expected-error {{'private' modifier cannot be applied to this declaration}}
+  private case Foo, Bar // expected-error {{'private' modifier cannot be applied to this declaration}} {{3-11=}}
 }
 
 private protocol TestProtocol {
-  private typealias Foo // expected-error {{'private' modifier cannot be applied to this declaration}}
-  internal var Bar: Int { get } // expected-error {{'internal' modifier cannot be used in protocols}}
-  public func baz() // expected-error {{'public' modifier cannot be used in protocols}}
+  private typealias Foo // expected-error {{'private' modifier cannot be applied to this declaration}} {{3-11=}}
+  internal var Bar: Int { get } // expected-error {{'internal' modifier cannot be used in protocols}} {{3-12=}}
+  public func baz() // expected-error {{'public' modifier cannot be used in protocols}} {{3-10=}}
 }
 
-public(set) func publicSetFunc() {} // expected-error {{'public' modifier cannot be applied to this declaration}}
+public(set) func publicSetFunc() {} // expected-error {{'public' modifier cannot be applied to this declaration}} {{1-13=}}
 
 public(set) var defaultVis = 0 // expected-error {{internal variable cannot have a public setter}}
 internal(set) private var privateVis = 0 // expected-error {{private variable cannot have an internal setter}}
 private(set) var defaultVisOK = 0
 private(set) public var publicVis = 0
 
-private(set) var computed: Int { // expected-error {{'private(set)' modifier cannot be applied to read-only variables}}
+private(set) var computed: Int { // expected-error {{'private(set)' modifier cannot be applied to read-only variables}} {{1-14=}}
   return 42
 }
 private(set) var computedRW: Int {
   get { return 42 }
   set { }
 }
-private(set) let constant = 42 // expected-error {{'private(set)' modifier cannot be applied to constants}}
+private(set) let constant = 42 // expected-error {{'private(set)' modifier cannot be applied to constants}} {{1-14=}}
 
 public struct Properties {
   private(set) var stored = 42
-  private(set) var computed: Int { // expected-error {{'private(set)' modifier cannot be applied to read-only properties}}
+  private(set) var computed: Int { // expected-error {{'private(set)' modifier cannot be applied to read-only properties}} {{3-16=}}
     return 42
   }
   private(set) var computedRW: Int {
     get { return 42 }
     set { }
   }
-  private(set) let constant = 42 // expected-error {{'private(set)' modifier cannot be applied to read-only properties}}
+  private(set) let constant = 42 // expected-error {{'private(set)' modifier cannot be applied to read-only properties}} {{3-16=}}
   public(set) var defaultVis = 0 // expected-error {{internal property cannot have a public setter}}
 
   public(set) subscript(a a: Int) -> Int { // expected-error {{internal subscript cannot have a public setter}}
@@ -128,7 +128,7 @@ public struct Properties {
     set {}
   }
 
-  private(set) subscript(e e: Int) -> Int { return 0 } // expected-error {{'private(set)' modifier cannot be applied to read-only subscripts}}
+  private(set) subscript(e e: Int) -> Int { return 0 } // expected-error {{'private(set)' modifier cannot be applied to read-only subscripts}} {{3-16=}}
 }
 
 private extension Properties {
@@ -140,8 +140,8 @@ private extension Properties {
 
 internal protocol EmptyProto {}
 internal protocol EmptyProto2 {}
-private extension Properties : EmptyProto {} // expected-error {{'private' modifier cannot be used with extensions that declare protocol conformances}}
-private(set) extension Properties : EmptyProto2 {} // expected-error {{'private' modifier cannot be applied to this declaration}}
+private extension Properties : EmptyProto {} // expected-error {{'private' modifier cannot be used with extensions that declare protocol conformances}} {{1-9=}}
+private(set) extension Properties : EmptyProto2 {} // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-14=}}
 
 public struct PublicStruct {}
 internal struct InternalStruct {} // expected-note * {{declared here}}
@@ -150,7 +150,7 @@ private struct PrivateStruct {} // expected-note * {{declared here}}
 protocol InternalProto { // expected-note * {{declared here}}
   typealias Assoc
 }
-public extension InternalProto {} // expected-error {{extension of internal protocol cannot be declared public}}
+public extension InternalProto {} // expected-error {{extension of internal protocol cannot be declared public}} {{1-8=}}
 internal extension InternalProto where Assoc == PublicStruct {}
 internal extension InternalProto where Assoc == InternalStruct {}
 internal extension InternalProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared internal because its generic requirement uses a private type}}
@@ -173,19 +173,19 @@ private extension PublicProto where Assoc == InternalStruct {}
 private extension PublicProto where Assoc == PrivateStruct {}
 
 extension PublicProto where Assoc == InternalStruct {
-  public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}}
+  public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}
 }
 extension InternalProto {
-  public func foo() {} // expected-warning {{declaring a public instance method for an internal protocol}}
+  public func foo() {} // expected-warning {{declaring a public instance method for an internal protocol}} {{3-9=internal}}
 }
 extension InternalProto where Assoc == PublicStruct {
-  public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}}
+  public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}
 }
 
 public struct GenericStruct<Param> {}
 public extension GenericStruct where Param: InternalProto {} // expected-error {{extension cannot be declared public because its generic requirement uses an internal type}}
 extension GenericStruct where Param: InternalProto {
-  public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}}
+  public func foo() {} // expected-error {{cannot declare a public instance method in an extension with internal requirements}} {{3-9=internal}}
 }
 
 
@@ -196,19 +196,19 @@ public protocol ProtoWithReqs {
 
 public struct Adopter<T> : ProtoWithReqs {}
 extension Adopter {
-  typealias Assoc = Int // expected-error {{type alias 'Assoc' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}}
-  func foo() {} // expected-error {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}}
+  typealias Assoc = Int // expected-error {{type alias 'Assoc' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{3-3=public }}
+  func foo() {} // expected-error {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{3-3=public }}
 }
 
 public class AnotherAdopterBase {
-  typealias Assoc = Int // expected-error {{type alias 'Assoc' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}}
-  func foo() {} // expected-error {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}}
+  typealias Assoc = Int // expected-error {{type alias 'Assoc' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{3-3=public }}
+  func foo() {} // expected-error {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{3-3=public }}
 }
 public class AnotherAdopterSub : AnotherAdopterBase, ProtoWithReqs {}
 
 public protocol ReqProvider {}
 extension ReqProvider {
-  func foo() {} // expected-error {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}}
+  func foo() {} // expected-error {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{3-3=public }}
 }
 public struct AdoptViaProtocol : ProtoWithReqs, ReqProvider {
   public typealias Assoc = Int
@@ -216,7 +216,7 @@ public struct AdoptViaProtocol : ProtoWithReqs, ReqProvider {
 
 public protocol ReqProvider2 {}
 extension ProtoWithReqs where Self : ReqProvider2 {
-  func foo() {} // expected-error {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}}
+  func foo() {} // expected-error {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{3-3=public }}
 }
 public struct AdoptViaCombinedProtocol : ProtoWithReqs, ReqProvider2 {
   public typealias Assoc = Int
