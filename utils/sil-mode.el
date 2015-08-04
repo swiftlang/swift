@@ -65,8 +65,8 @@
 		  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Reference Counting.
    `(,(regexp-opt '("strong_retain" "strong_retain_autoreleased"
-                    "strong_release" "strong_retain_unowned" "ref_to_unowned"
-                    "unowned_to_ref" "unowned_retain" "unowned_release"
+                    "strong_release" "strong_retain_unowned"
+                    "unowned_retain" "unowned_release"
                     "ref_to_unmanaged" "unmanaged_to_ref"
                     "load_weak" "store_weak" "fix_lifetime" "mark_dependence"
                     "strong_unpin" "strong_pin")
@@ -81,7 +81,7 @@
                     "dynamic_method")
                   'words) . font-lock-keyword-face)
    ;; Function Application
-   `(,(regexp-opt '("apply" "partial_apply" "builtin")
+   `(,(regexp-opt '("apply" "partial_apply" "builtin" "try_apply")
 		  'words) . font-lock-keyword-face)
    ;; Metatypes
    `(,(regexp-opt '("metatype" "value_metatype"
@@ -110,14 +110,22 @@
                     "address_to_pointer" "pointer_to_address"
                     "unchecked_addr_cast"
                     "unchecked_ref_cast"
-                    "ref_to_raw_pointer" "raw_pointer_to_ref"
-                    "convert_function"
-                    "thick_to_objc_metatype" "objc_to_thick_metatype"
-                    "thin_to_thick_function" "is_nonnull"
                     "unchecked_ref_bit_cast" "unchecked_trivial_bit_cast"
-                    "objc_existential_metatype_to_object"
+                    "unchecked_bitwise_cast"
+                    "ref_to_raw_pointer" "raw_pointer_to_ref"
+                    "unowned_to_ref" "ref_to_unowned"
+                    "convert_function"
+                    "ref_to_unmanaged" "unmanaged_to_ref"
+                    "thin_function_to_pointer" "pointer_to_thin_function"
+                    "ref_to_bridge_object"
                     "bridge_object_to_word" "bridge_object_to_ref"
-                    "word_to_bridge_object" "ref_to_bridge_object"
+                    "thin_to_thick_function"
+                    "thick_to_objc_metatype" "objc_to_thick_metatype"
+                    "objc_metatype_to_object"
+                    "objc_existential_metatype_to_object"
+                    "word_to_bridge_object"
+                    "is_nonnull"
+                    "null_class"
                     )
                   'words) . font-lock-keyword-face)
    ;; Value Buffer
@@ -133,7 +141,7 @@
    `(,(regexp-opt '("unreachable" "return" "autorelease_return" "br"
                     "cond_br" "switch_value" "switch_enum"
                     "switch_enum_addr" "dynamic_method_br"
-                    "checked_cast_br")
+                    "checked_cast_br" "throw")
                   'words) . font-lock-keyword-face)
    ;; Blocks
    `(,(regexp-opt '("project_block_storage" "init_block_storage_header"
