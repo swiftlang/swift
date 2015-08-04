@@ -18,7 +18,7 @@ func testInstanceTypeFactoryMethodInherited() {
   _ = NSObjectFactorySub() // okay, prefers init method
   _ = NSObjectFactorySub(integer: 1)
   _ = NSObjectFactorySub(double: 314159)
-  _ = NSObjectFactorySub(float: 314159) // expected-error{{incorrect argument label in call (have 'float:', expected 'integer:')}}
+  _ = NSObjectFactorySub(float: 314159) // expected-error{{incorrect argument label in call (have 'float:', expected 'integer:')}} {{26-31=integer}}
   let a = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{cannot invoke initializer for type 'NSObjectFactorySub' with an argument list of type '(buildingWidgets: ())'}}
   // expected-note @-1 {{overloads for 'NSObjectFactorySub' exist with these partially matching parameter lists: (integer: Int), (double: Double)}}
   _ = a
@@ -37,13 +37,25 @@ func testFactoryWithLaterIntroducedInit() {
 
   // Don't prefer more available convience factory initializer over less
   // available designated initializer
-  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}} expected-note 2{{}}
-  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.11 or newer}} expected-note 2{{}}
+  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}} 
+    // expected-note @-1 {{add 'if #available' version check}}
+    // expected-note @-2 {{add @available attribute to enclosing global function}}
+  
+  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.11 or newer}}
+  // expected-note @-1 {{add 'if #available' version check}}  {{3-63=if #available(OSX 10.11, *) {\n      _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5)\n  \} else {\n      // Fallback on earlier versions\n  \}}}
+  // expected-note @-2 {{add @available attribute to enclosing global function}} {{1-1=@available(OSX 10.11, *)\n}}
 
+  
   // Don't prefer more available factory initializer over less
   // available designated initializer
-  _ = NSHavingFactoryAndLaterConvenienceInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}} expected-note 2{{}}
-  _ = NSHavingFactoryAndLaterConvenienceInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.11 or newer}} expected-note 2{{}}
+  _ = NSHavingFactoryAndLaterConvenienceInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.11 or newer}} 
+  // expected-note @-1 {{add 'if #available' version check}}
+  // expected-note @-2 {{add @available attribute to enclosing global function}}
+
+  _ = NSHavingFactoryAndLaterConvenienceInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.11 or newer}} 
+  // expected-note @-1 {{add 'if #available' version check}}
+  // expected-note @-2 {{add @available attribute to enclosing global function}}
+
 
   // When both a convenience factory and a convenience initializer have the
   // same availability, choose the convenience initializer.
