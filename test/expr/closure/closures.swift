@@ -28,10 +28,10 @@ func funcdecl4(a: ((Int)->Int), _ b: Int) {}
 
 func funcdecl5(a: Int, _ y: Int) {
   // Pass in a closure containing the call to funcdecl3.
-  funcdecl4({ funcdecl3() }, 12) // expected-error{{cannot convert value of type '() -> Int' to expected argument type '(Int) -> Int'}}
+  funcdecl4({ funcdecl3() }, 12)  // expected-error {{tuple pattern cannot match values of the non-tuple type 'Int'}}
   func6(fn: {$0 + $1})       // Closure with two named anonymous arguments
   func6(fn: {($0) + $1})    // Closure with sequence expr inferred type
-  func6(fn: {($0) + $0})    // expected-error{{cannot convert value of type '(_) -> Int' to expected argument type '(Int, Int) -> Int'}}
+  func6(fn: {($0) + $0})    // expected-error{{binary operator '+' cannot be applied to two '(Int, Int)' operands}}
 
 
   var testfunc : ((), Int) -> Int

@@ -111,7 +111,8 @@ func funcdecl7(a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func errorRecovery() {
-  testfunc2({ $0 + 1 }) // expected-error{{cannot convert value of type '(Int) -> Int' to expected argument type '((), Int) -> Int'}}
+  testfunc2({ $0 + 1 }) // expected-error{{binary operator '+' cannot be applied to operands of type '((), Int)' and 'Int'}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (UnsafeMutablePointer<Memory>, Int), (UnsafePointer<Memory>, Int)}}
 
   enum union1 {
     case bar

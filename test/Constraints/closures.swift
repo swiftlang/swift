@@ -9,7 +9,7 @@ myMap(intArray, { x -> String in String(x) } )
 
 // Closures with too few parameters.
 func foo(x: (Int, Int) -> Int) {}
-foo({$0}) // expected-error{{type of expression is ambiguous without more context}}
+foo({$0}) // expected-error{{cannot convert value of type '(_) -> Int' to expected argument type '(Int, Int) -> Int'}}
 
 struct X {}
 func mySort(array: [String], _ predicate: (String, String) -> Bool) -> [String] {}

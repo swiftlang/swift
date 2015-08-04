@@ -3727,22 +3727,35 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   // If this is a complex leaf closure, give up.
   if (!CE->hasSingleExpressionBody())
     return diagnoseGeneralFailure();
-  
-  // ClosureExprs are likely to get some clever handling in the future, but for
-  // now we need to defend against type variables from our constraint system
-  // leaking into recursive constraints systems formed when checking the body
-  // of the closure.  These typevars come into them when the body does name
-  // lookups against the parameter decls.
-  //
-  // Handle this by rewriting the arguments to Type().  CSGen has special
-  // handling for ParamDecls from closure arguments with null types.
-  //
-  // TODO: If there is a partial type available for the closure, we should apply
-  // whatever information we have about it to the paramdecls.
-  CE->getParams()->forEachVariable([&](VarDecl *VD) {
-    if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
-      VD->overwriteType(Type());
-  });
+
+  // If we have a contextual type available for this closure, apply it to the
+  // ParamDecls in our parameter list.  This ensures that any uses of them get
+  // appropriate types.
+  if (CS->getContextualType() &&
+      CS->getContextualType()->is<FunctionType>()) {
+    auto fnType = CS->getContextualType()->castTo<FunctionType>();
+    Pattern *params = CE->getParams();
+    TypeResolutionOptions TROptions;
+    TROptions |= TR_OverrideType;
+    TROptions |= TR_FromNonInferredPattern;
+    TROptions |= TR_InExpression;
+    TROptions |= TR_ImmediateFunctionInput;
+    if (CS->TC.coercePatternToType(params, CE, fnType->getInput(), TROptions))
+      return true;
+    CE->setParams(params);
+  } else {
+    // Defend against type variables from our constraint system leaking into
+    // recursive constraints systems formed when checking the body of the
+    // closure.  These typevars come into them when the body does name
+    // lookups against the parameter decls.
+    //
+    // Handle this by rewriting the arguments to Type().  CSGen has special
+    // handling for ParamDecls from closure arguments with null types.
+    CE->getParams()->forEachVariable([&](VarDecl *VD) {
+      if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
+        VD->overwriteType(Type());
+    });
+  }
   
   // When we're type checking a single-expression closure, we need to reset the
   // DeclContext to this closure for the recursive type checking.  Otherwise,
@@ -3752,7 +3765,14 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     if (!typeCheckChildIndependently(CE->getSingleExpressionBody()))
       return true;
   }
-  
+
+  // Check for a contextual type error.  This is necessary because
+  // FailureDiagnosis::diagnoseFailure doesn't do this for closures.
+  if (CS->getContextualType() &&
+      !CS->getContextualType()->isEqual(CE->getType()))
+    if (diagnoseContextualConversionError(CE->getType()))
+      return true;
+
   // Otherwise, produce a generic error.
   return diagnoseGeneralFailure();
 }
@@ -3794,7 +3814,7 @@ bool FailureDiagnosis::diagnoseFailure() {
   // subexpression.  If so, then we know it must be some conversion constraint
   // binding the result of the expression to a type that fails.
   if (!CS->TC.isExprBeingDiagnosed(expr) ||
-      CS->getContextualType()) {
+      (CS->getContextualType() && !isa<ClosureExpr>(expr))) {
     // Make sure we retypecheck this expression, without context.
     CS->TC.addExprForDiagnosis(expr, nullptr);
 

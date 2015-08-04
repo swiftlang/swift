@@ -398,7 +398,8 @@ func someGeneric19997471<T>(x: T) {
 func f20371273() {
   let x: [Int] = [1, 2, 3, 4]
   let y: UInt = 4
-  x.filter { $0 == y }  // expected-error {{cannot convert value of type '(UInt) -> Bool' to expected argument type '(Int) -> Bool'}}
+  x.filter { $0 == y }  // expected-error {{binary operator '==' cannot be applied to operands of type 'Int' and 'UInt'}}
+  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: (UInt, UInt), (Int, Int)}}
 }
 
 
@@ -418,7 +419,7 @@ func rdar21078316() {
 
 // <rdar://problem/20978044> QoI: Poor diagnostic when using an incorrect tuple element in a closure
 var numbers = [1, 2, 3]
-zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{type of expression is ambiguous without more context}}
+zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{value of tuple type '(Int, Int)' has no member '2'}}
 
 
 

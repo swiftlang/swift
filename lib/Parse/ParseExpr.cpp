@@ -1782,8 +1782,8 @@ ParserResult<Expr> Parser::parseExprClosure() {
     for (auto anonVar : anonVars) {
       elements.push_back(TuplePatternElt(new (Context) NamedPattern(anonVar)));
     }
-    params = TuplePattern::createSimple(Context, SourceLoc(), elements,
-                                        SourceLoc());
+    params = TuplePattern::createSimple(Context, leftBrace, elements,
+                                        leftBrace, /*implicit*/true);
 
     // Pop out of the anonymous closure variables scope.
     AnonClosureVars.pop_back();
