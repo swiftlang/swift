@@ -190,7 +190,7 @@ func testStructWithOptionalArray(foo: StructWithOptionalArray) -> Int {
 
 
 // <rdar://problem/19774755> Incorrect diagnostic for unwrapping non-optional bridged types
-var invalidForceUnwrap = Int()! // expected-error {{cannot force unwrap value of non-optional type 'Int'}}
+var invalidForceUnwrap = Int()! // expected-error {{cannot force unwrap value of non-optional type 'Int'}} {{31-32=}}
 
 
 // <rdar://problem/20905802> Swift using incorrect diagnostic sometimes on String().asdf
@@ -252,7 +252,7 @@ _ = { $0 }  // expected-error {{type of expression is ambiguous without more con
 
 
 
-_ = 4()   // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}}
+_ = 4()   // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}} {{6-8=}}
 _ = 4(1)  // expected-error {{cannot call value of non-function type 'Int'}}
 
 
@@ -312,7 +312,7 @@ f7(1)(1.0)       // expected-error {{cannot convert value of type 'Double' to ex
 
 let f8 = f7(2)
 f8(b: 1)
-f8(10)          // expected-error {{missing argument label 'b:' in call}}
+f8(10)          // expected-error {{missing argument label 'b:' in call}} {{4-4=b: }}
 f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 class CurriedClass {
@@ -327,7 +327,7 @@ c.method1(1)         // expected-error {{cannot convert value of type 'Int' to e
 _ = c.method2(1)
 _ = c.method2(1.0)   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 c.method2(1)(b: 2)
-c.method2(1)(c: 2)   // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
+c.method2(1)(c: 2)   // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}} {{14-15=b}}
 c.method2(1)(c: 2.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(c: Double)'}}
 // expected-note @-1 {{expected an argument list of type '(b: Int)'}}
 c.method2(1)(b: 2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
@@ -351,7 +351,7 @@ CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{cannot invoke 'method2' w
 
 CurriedClass.method3(c)(32, b: 1)
 _ = CurriedClass.method3(c)
-_ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}}
+_ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}} {{32-32=b: }}
 _ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value of non-function type '()'}}
 _ = CurriedClass.method3(1, 2)           // expected-error {{extra argument in call}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}

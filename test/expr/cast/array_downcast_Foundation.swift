@@ -21,11 +21,11 @@ func testDowncastObjectToArray(obj: AnyObject, objImplicit: AnyObject!) {
 }
 
 func testArrayDowncast(arr: [AnyObject], arrImplicit: [AnyObject]!) {
-  var nsstrArr1 = (arr as! [NSString])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type '[NSString]'}}
-  var strArr1 = (arr as! [String])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type '[String]'}}
+  var nsstrArr1 = (arr as! [NSString])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type '[NSString]'}} {{39-40=}}
+  var strArr1 = (arr as! [String])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type '[String]'}} {{35-36=}}
 
-  var nsstrArr2 = (arrImplicit as! [NSString])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type '[NSString]'}}
-  var strArr2 = (arrImplicit as! [String])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type '[String]'}}
+  var nsstrArr2 = (arrImplicit as! [NSString])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type '[NSString]'}} {{47-48=}}
+  var strArr2 = (arrImplicit as! [String])! // expected-error{{extraneous postfix '!'; forced downcast already produces a non-optional value of type '[String]'}} {{43-44=}}
 }
 
 func testDowncastNSArrayToArray(nsarray: NSArray) {

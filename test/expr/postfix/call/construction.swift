@@ -42,7 +42,7 @@ func getMetatype<T>(m : T.Type) -> T.Type { return m }
 // Construction from a struct Type value
 func constructStructMetatypeValue() {
   _ = getMetatype(S.self).init(i: 5)
-  _ = getMetatype(S.self)(i: 5) // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
+  _ = getMetatype(S.self)(i: 5) // expected-error{{initializing from a metatype value must reference 'init' explicitly}} {{26-26=.init}}
   _ = getMetatype(S.self)
 }
 

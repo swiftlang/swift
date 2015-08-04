@@ -64,7 +64,7 @@ func forgotOptionalBang(a: A, obj: AnyObject) {
 class Dinner {}
 
 func microwave() -> Dinner {
-  return (n: Dinner?()) // expected-error{{value of optional type 'Dinner?' not unwrapped; did you mean to use '!' or '?'?}}
+  return (n: Dinner?()) // expected-error{{value of optional type 'Dinner?' not unwrapped; did you mean to use '!' or '?'?}} {{24-24=!}}
 }
 
 func forgotAnyObjectBang(obj: AnyObject) {
@@ -100,7 +100,7 @@ class T {
     func m1() {
         // FIXME: should apply nullary function fixit here. {{function produces expected type 'U'; did you mean to call it with '()'?}}
         // <rdar://problem/17741575>
-        let l = self.m2!.prop1 // expected-error{{cannot force unwrap value of non-optional type '() -> U!'}}
+        let l = self.m2!.prop1 // expected-error{{cannot force unwrap value of non-optional type '() -> U!'}} {{24-25=}}
     }
 
     func m2() -> U! {
@@ -125,4 +125,4 @@ ciuo ? true : false // expected-error{{optional type 'C!' cannot be used as a bo
 !ciuo // expected-error{{optional type 'C!' cannot be used as a boolean; test for '!= nil' instead}}{{2-2=(}} {{6-6= != nil)}}
 
 // Forgotten ! or ?
-var someInt = co.a // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}}
+var someInt = co.a // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}

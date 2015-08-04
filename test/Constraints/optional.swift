@@ -50,7 +50,7 @@ func test4() {
   func foo() -> Int { return 0 }
   func takes_optfn(f : () -> Int?) -> Int? { return f() }
 
-  takes_optfn(foo) // expected-error {{function signature '() -> Int' is not compatible with expected type '() -> Int?'}} expected-note {{use a closure to safely wrap calls to the function}}
+  takes_optfn(foo) // expected-error {{function signature '() -> Int' is not compatible with expected type '() -> Int?'}} expected-note {{use a closure to safely wrap calls to the function}} {{15-15={ }} {{18-18=($0) }}}
 
   func takes_objoptfn(f : () -> AnyObject?) -> AnyObject? { return f() }
   func objFoo() -> AnyObject { return A() }
@@ -114,8 +114,8 @@ var fo: Float? = 3.14159
 func voidOptional(handler: () -> ()?) {}
 func testVoidOptional() {
   let noop: () -> Void = {}
-  voidOptional(noop) // expected-error {{function signature '() -> Void' is not compatible with expected type '() -> ()?'}} expected-note {{use a closure to safely wrap calls to the function}}
+  voidOptional(noop) // expected-error {{function signature '() -> Void' is not compatible with expected type '() -> ()?'}} expected-note {{use a closure to safely wrap calls to the function}} {{16-16={ }} {{20-20=($0) }}}
 
   let optNoop: ()? -> ()? = { return $0 }
-  voidOptional(optNoop) // expected-error {{function signature '()? -> ()?' is not compatible with expected type '() -> ()?'}} expected-note {{use a closure to safely wrap calls to the function}}
+  voidOptional(optNoop) // expected-error {{function signature '()? -> ()?' is not compatible with expected type '() -> ()?'}} expected-note {{use a closure to safely wrap calls to the function}} {{16-16={ }} {{23-23=($0) }}}
 }

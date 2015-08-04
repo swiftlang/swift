@@ -73,7 +73,7 @@ func basictest() {
   var call3 : () = func3()()
 
   // Cannot call an integer.
-  bind_test2() // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}}
+  bind_test2() // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}} {{13-15=}}
 }
 
 // Infix operators and attribute lists.
@@ -145,7 +145,7 @@ var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
 
-func test2(a: Int)(b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}}
+func test2(a: Int)(b: Int) -> (c: Int) { // expected-error{{cannot create a single-element tuple with an element label}} {{32-35=}}
  a+b
  a+b+c // expected-error{{use of unresolved identifier 'c'}}
  return a+b
@@ -361,7 +361,7 @@ var fl_e: Float = 1.0e42
 var fl_f: Float = 1.0e+  // expected-error {{expected a digit in floating point exponent}} 
 var fl_g: Float = 1.0E+42
 var fl_h: Float = 2e-42
-var vl_i: Float = -.45   // expected-error {{'.45' is not a valid floating point literal; it must be written '0.45'}}
+var vl_i: Float = -.45   // expected-error {{'.45' is not a valid floating point literal; it must be written '0.45'}} {{20-20=0}}
 var fl_j: Float = 0x1p0
 var fl_k: Float = 0x1.0p0
 var fl_l: Float = 0x1.0 // expected-error {{hexadecimal floating point literal must end with an exponent}}
@@ -382,7 +382,7 @@ var fl_separator7: Double = 0x1_.0FFF_p1_
 var fl_separator8: Double = 0x1_0000.0FFF_ABCDp10_001
 
 var fl_bad_separator1: Double = 1e_ // expected-error {{expected a digit in floating point exponent}}
-var fl_bad_separator2: Double = 0x1p_ // expected-error {{expected a digit in floating point exponent}} expected-error{{'_' can only appear in a pattern or on the left side of an assignment}} expected-error {{consecutive statements on a line must be separated by ';'}}
+var fl_bad_separator2: Double = 0x1p_ // expected-error {{expected a digit in floating point exponent}} expected-error{{'_' can only appear in a pattern or on the left side of an assignment}} expected-error {{consecutive statements on a line must be separated by ';'}} {{37-37=;}}
 
 //===----------------------------------------------------------------------===//
 // String Literals
@@ -418,7 +418,7 @@ func stringliterals() {
   ;
 
   // FIXME: bad diagnostics.
-  /* expected-error {{unterminated string literal}} expected-error 2{{expected ',' separator}} expected-note {{to match this opening '('}}  */ var x2 : () = ("hello" + "
+  /* expected-error {{unterminated string literal}} expected-error {{expected ',' separator}} expected-error {{expected ',' separator}} expected-note {{to match this opening '('}}  */ var x2 : () = ("hello" + "
   ; // expected-error {{expected expression in list of expressions}}
 } // expected-error {{expected ')' in expression list}}
 
@@ -435,7 +435,7 @@ func takesExplicitInt(inout x: Int) { }
 
 func testInOut(inout arg: Int) {
   var x: Int
-  takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+  takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{20-20=&}}
   takesExplicitInt(&x)
   takesInt(&x) // expected-error{{cannot convert value of type 'inout Int' to expected argument type 'Int'}}
   var y = &x // expected-error{{'&' can only appear immediately in a call argument list}} \
@@ -523,7 +523,7 @@ func unaryOps(inout i8: Int8, inout i64: Int64) {
   ++Int64(5) // expected-error{{cannot pass immutable value to mutating operator: function call returns immutable value}}
   
   // <rdar://problem/17691565> attempt to modify a 'let' variable with ++ results in typecheck error not being able to apply ++ to Float
-  let a = i8 // expected-note {{change 'let' to 'var' to make it mutable}}
+  let a = i8 // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   ++a // expected-error {{cannot pass immutable value to mutating operator: 'a' is a 'let' constant}}
   
   var b : Int { get { }}
@@ -568,13 +568,13 @@ func lvalue_processing() {
   var fn = (+-+=)
 
   var n = 42
-  fn(n, 12)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+  fn(n, 12)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{6-6=&}}
   fn(&n, 12)
 
   n +-+= 12
 
   (+-+=)(&n, 12)  // ok.
-  (+-+=)(n, 12) // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+  (+-+=)(n, 12) // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{10-10=&}}
 }
 
 struct Foo {
@@ -623,13 +623,13 @@ func dictionaryLiterals() {
 func invalidDictionaryLiteral() {
   // FIXME: lots of unnecessary diagnostics.
 
-  var a = [1: ; // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} expected-error {{expected key expression in dictionary literal}} expected-error {{expected ']' in container literal expression}} expected-note {{to match this opening '['}}
-  var b = [1: ;] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} expected-error {{expected key expression in dictionary literal}}
-  var c = [1: "one" ;] // expected-error {{expected key expression in dictionary literal}} expected-error 2{{expected ',' separator}}
-  var d = [1: "one", ;] // expected-error {{expected key expression in dictionary literal}} expected-error {{expected ',' separator}}
+  var a = [1: ; // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{14-14=,}} {{14-14=,}} expected-error {{expected key expression in dictionary literal}} expected-error {{expected ']' in container literal expression}} expected-note {{to match this opening '['}}
+  var b = [1: ;] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{14-14=,}} {{14-14=,}} expected-error {{expected key expression in dictionary literal}}
+  var c = [1: "one" ;] // expected-error {{expected key expression in dictionary literal}} expected-error 2{{expected ',' separator}} {{20-20=,}} {{20-20=,}}
+  var d = [1: "one", ;] // expected-error {{expected key expression in dictionary literal}} expected-error {{expected ',' separator}} {{21-21=,}}
   var e = [1: "one", 2] // expected-error {{expected ':' in dictionary literal}}
-  var f = [1: "one", 2 ;] // expected-error 2{{expected ',' separator}} expected-error 1{{expected key expression in dictionary literal}} expected-error {{expected ':' in dictionary literal}}
-  var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} expected-error {{expected key expression in dictionary literal}}
+  var f = [1: "one", 2 ;] // expected-error 2{{expected ',' separator}} {{23-23=,}} {{23-23=,}} expected-error 1{{expected key expression in dictionary literal}} expected-error {{expected ':' in dictionary literal}}
+  var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{24-24=,}} {{24-24=,}} expected-error {{expected key expression in dictionary literal}}
 }
 
 [1].join([4]) // expected-error {{cannot invoke 'join' with an argument list of type '([Int])'}}
@@ -646,7 +646,7 @@ nil != Int.self // expected-error {{binary operator '!=' cannot be applied to op
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
-  a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}}
+  a?    // expected-error {{optional chain has no effect, expression already produces 'Int?'}} {{4-5=}}
   a?._getMirror()
 
   b?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
@@ -660,8 +660,8 @@ func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
 func testNilCoalescePrecedence(cond: Bool, a: Int?, r: Range<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
-  if (cond || a) ?? 42 > 0 {}  // Not ok: expected-error {{cannot be used as a boolean}}
-  if (cond || a) ?? (42 > 0) {}  // Not ok: expected-error {{cannot be used as a boolean}}
+  if (cond || a) ?? 42 > 0 {}  // Not ok: expected-error {{cannot be used as a boolean}} {{6-6=(}} {{17-17= != nil)}}
+  if (cond || a) ?? (42 > 0) {}  // Not ok: expected-error {{cannot be used as a boolean}} {{6-6=(}} {{29-29= != nil)}}
 
   if cond || a ?? 42 > 0 {}    // Parses as the first one, not the others.
 

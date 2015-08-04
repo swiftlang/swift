@@ -94,16 +94,16 @@ func arrayToNSArray() {
 
 // NSArray -> Array
 func nsArrayToArray(nsa: NSArray) {
-  var arr1: [AnyObject] = nsa // expected-error{{'NSArray' is not implicitly convertible to '[AnyObject]'; did you mean to use 'as' to explicitly convert?}}
-  var _: [BridgedClass] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedClass]'}}
-  var _: [OtherClass] = nsa // expected-error{{'NSArray' is not convertible to '[OtherClass]'}}
-  var _: [BridgedStruct] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'}}
+  var arr1: [AnyObject] = nsa // expected-error{{'NSArray' is not implicitly convertible to '[AnyObject]'; did you mean to use 'as' to explicitly convert?}} {{30-30= as [AnyObject]}}
+  var _: [BridgedClass] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedClass]'}} {{30-30= as! [BridgedClass]}}
+  var _: [OtherClass] = nsa // expected-error{{'NSArray' is not convertible to '[OtherClass]'}} {{28-28= as! [OtherClass]}}
+  var _: [BridgedStruct] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'}} {{31-31= as! [BridgedStruct]}}
   var _: [NotBridgedStruct] = nsa // expected-error{{cannot convert value of type 'NSArray' to specified type '[NotBridgedStruct]'}}
 
   var _: [AnyObject] = nsa as [AnyObject]
-  var _: [BridgedClass] = nsa as [BridgedClass] // expected-error{{'NSArray' is not convertible to '[BridgedClass]'; did you mean to use 'as!' to force downcast?}}
-  var _: [OtherClass] = nsa as [OtherClass] // expected-error{{'NSArray' is not convertible to '[OtherClass]'; did you mean to use 'as!' to force downcast?}}
-  var _: [BridgedStruct] = nsa as [BridgedStruct] // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'; did you mean to use 'as!' to force downcast?}}
+  var _: [BridgedClass] = nsa as [BridgedClass] // expected-error{{'NSArray' is not convertible to '[BridgedClass]'; did you mean to use 'as!' to force downcast?}} {{31-33=as!}}
+  var _: [OtherClass] = nsa as [OtherClass] // expected-error{{'NSArray' is not convertible to '[OtherClass]'; did you mean to use 'as!' to force downcast?}} {{29-31=as!}}
+  var _: [BridgedStruct] = nsa as [BridgedStruct] // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'; did you mean to use 'as!' to force downcast?}} {{32-34=as!}}
   var _: [NotBridgedStruct] = nsa as [NotBridgedStruct] // expected-error{{'NSArray' is not convertible to '[NotBridgedStruct]'}}
 
   var arr6: Array = nsa as Array
@@ -254,7 +254,7 @@ func rdar19836341(ns: NSString?, var vns: NSString?) {
 
 // <rdar://problem/20029786> Swift compiler sometimes suggests changing "as!" to "as?!"
 func rdar20029786(ns: NSString?) {
-  var s: String = ns ?? "str" as String as String // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}
+  var s: String = ns ?? "str" as String as String // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{19-19=(}} {{50-50=) as String}}
   var s2 = ns ?? "str" as String as String
 
   let s3: NSString? = "str" as String?
@@ -266,7 +266,7 @@ func rdar20029786(ns: NSString?) {
 // <rdar://problem/19813772> QoI: Using as! instead of as in this case produces really bad diagnostic
 func rdar19813772(nsma: NSMutableArray) {
   var a1 = nsma as! Array // expected-error{{'NSMutableArray' is not convertible to 'Array<Element>'}}
-  var a2 = nsma as! Array<AnyObject> // expected-warning{{forced cast from 'NSMutableArray' to 'Array<AnyObject>' always succeeds; did you mean to use 'as'?}}
+  var a2 = nsma as! Array<AnyObject> // expected-warning{{forced cast from 'NSMutableArray' to 'Array<AnyObject>' always succeeds; did you mean to use 'as'?}} {{17-20=as}}
   var a3 = nsma as Array<AnyObject>
 }
 

@@ -68,7 +68,7 @@ var c3 = C().map // expected-note{{parsing trailing closure for this call}}
 // <rdar://problem/16835718> Ban multiple trailing closures
 func multiTrailingClosure(a : () -> (), b : () -> ()) {
   multiTrailingClosure({}) {} // ok
-  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter #1 in call}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}}
+  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter #1 in call}} expected-error {{consecutive statements on a line must be separated by ';'}} {{26-26=;}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}}
   
   
 }
@@ -78,7 +78,7 @@ func labeledArgumentAndTrailingClosure() {
   takeFuncWithDefault { $0 + 1 }
   takeFuncWithDefault() { $0 + 1 }
   // ... but not non-trailing closures.
-  takeFuncWithDefault({ $0 + 1 }) // expected-error {{missing argument label 'f:' in call}}
+  takeFuncWithDefault({ $0 + 1 }) // expected-error {{missing argument label 'f:' in call}} {{23-23=f: }}
   takeFuncWithDefault(f: { $0 + 1 })
 
   // Trailing closure binds to last parameter, always.

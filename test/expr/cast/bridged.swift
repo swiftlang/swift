@@ -81,6 +81,6 @@ func testExplicitBridging(var object: BridgedClass, var value: BridgedStruct) {
 }
 
 func testBridgingFromSubclass(obj: SubclassOfBridgedClass) {
-  _ = obj as! BridgedStruct // expected-warning{{forced cast from 'SubclassOfBridgedClass' to 'BridgedStruct' always succeeds; did you mean to use 'as'?}}
+  _ = obj as! BridgedStruct // expected-warning{{forced cast from 'SubclassOfBridgedClass' to 'BridgedStruct' always succeeds; did you mean to use 'as'?}} {{11-14=as}}
   _ = obj as BridgedStruct
 }

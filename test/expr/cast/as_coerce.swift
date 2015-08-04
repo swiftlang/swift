@@ -70,12 +70,12 @@ var c: AnyObject = C3()
 if let castX = c as! C4? {} // expected-error {{cannot downcast from 'AnyObject' to a more optional type 'C4?'}}
 
 // Only suggest replacing 'as' with 'as!' if it would fix the error.
-C3() as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to use 'as!' to force downcast?}}
+C3() as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to use 'as!' to force downcast?}} {{6-8=as!}}
 C3() as C5 // expected-error {{'C3' is not convertible to 'C5'}}
 
 // Diagnostic shouldn't include @lvalue in type of c3.
 var c3 = C3()
-c3 as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to use 'as!' to force downcast?}}
+c3 as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to use 'as!' to force downcast?}} {{4-6=as!}}
 
 // <rdar://problem/19495142> Various incorrect diagnostics for explicit type conversions
 1 as Double as Float // expected-error{{'Double' is not convertible to 'Float'}}
@@ -97,9 +97,9 @@ Double(1) as Double as String // expected-error{{'Double' is not convertible to 
 
 // <rdar://problem/19499340> QoI: Nimble as -> as! changes not covered by Fix-Its
 func f(x : String) {}
-f("what" as Any as String) // expected-error{{'Any' (aka 'protocol<>') is not convertible to 'String'; did you mean to use 'as!' to force downcast?}}
+f("what" as Any as String) // expected-error{{'Any' (aka 'protocol<>') is not convertible to 'String'; did you mean to use 'as!' to force downcast?}} {{17-19=as!}}
 f(1 as String) // expected-error{{'Int' is not convertible to 'String'}}
 
 // <rdar://problem/19650402> Swift compiler segfaults while running the annotation tests
 let s : AnyObject = C3()
-s as C3 // expected-error{{'AnyObject' is not convertible to 'C3'; did you mean to use 'as!' to force downcast?}}
+s as C3 // expected-error{{'AnyObject' is not convertible to 'C3'; did you mean to use 'as!' to force downcast?}} {{3-5=as!}}

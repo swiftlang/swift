@@ -55,7 +55,8 @@ func useSwap(xi: Int, yi: Float) {
   mySwap(&x, &x)
   mySwap(&y, &y)
   
-  mySwap(x, x) // expected-error 2{{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+  mySwap(x, x) // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{10-10=&}}
+    // expected-error @-1 {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{13-13=&}}
   
   mySwap(&x, &y) // expected-error{{cannot invoke 'mySwap' with an argument list of type '(inout Int, inout Float)'}} expected-note{{expected an argument list of type '(inout T, inout T)'}}
 }
@@ -127,7 +128,7 @@ func passOverloadSet() {
   acceptUnaryFnRef(&unaryFnIntIntVar)
   acceptUnaryFnSameRef(&unaryFnIntIntVar)
 
-  acceptUnaryFnRef(unaryFnIntIntVar) // expected-error{{passing value of type '(Int) -> Int' to an inout parameter requires explicit '&'}}
+  acceptUnaryFnRef(unaryFnIntIntVar) // expected-error{{passing value of type '(Int) -> Int' to an inout parameter requires explicit '&'}} {{20-20=&}}
 }
 
 func acceptFnFloatFloat(f: (Float) -> Float) {}

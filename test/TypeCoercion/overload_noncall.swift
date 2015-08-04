@@ -45,7 +45,7 @@ func accept_Z(inout z: Z) -> Z { }
 func test_inout() {
   var x : X;
   accept_X(&x);
-  accept_X(xy); // expected-error{{passing value of type 'X' to an inout parameter requires explicit '&'}}
+  accept_X(xy); // expected-error{{passing value of type 'X' to an inout parameter requires explicit '&'}} {{12-12=&}}
   accept_X(&xy);
 
   accept_XY(&x);

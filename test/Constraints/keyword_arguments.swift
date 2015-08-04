@@ -45,9 +45,9 @@ X2(5).f2(5) // expected-error{{missing argument label 'a:' in call}}{{4-4=a: }}
 func allkeywords1(x x: Int, y: Int) { }
 
 // Missing keywords.
-allkeywords1(1, 2) // expected-error{{missing argument labels}}
-allkeywords1(x: 1, 2) // expected-error{{missing argument label 'y:' in call}}
-allkeywords1(1, y: 2) // expected-error{{missing argument label 'x:' in call}}
+allkeywords1(1, 2) // expected-error{{missing argument labels}} {{14-14=x: }} {{17-17=y: }}
+allkeywords1(x: 1, 2) // expected-error{{missing argument label 'y:' in call}} {{20-20=y: }}
+allkeywords1(1, y: 2) // expected-error{{missing argument label 'x:' in call}} {{14-14=x: }}
 
 // If keyword is reserved, make sure to quote it. rdar://problem/21392294
 func reservedLabel(x: Int, `repeat`: Bool) {}
@@ -176,7 +176,7 @@ variadics3(1)
 variadics3()
 
 // Using variadics (out-of-order)
-variadics3(y: 0, 1, 2, 3) // expected-error{{missing argument label 'z:' in call}}
+variadics3(y: 0, 1, 2, 3) // expected-error{{missing argument label 'z:' in call}} {{18-18=z: }}
 variadics3(z: 1, 1) // FIXME: error here?
 
 func variadics4(x x: Int..., y: Int = 2, z: Int = 3) { }
@@ -231,9 +231,9 @@ extraargs1(x: 1, 2, 3) // expected-error{{extra argument in call}}
 
 func mismatch1(thisFoo thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { }
 
-mismatch1(foo: 5) // expected-error{{incorrect argument label in call (have 'foo:', expected 'thisFoo:')}}
-mismatch1(baz: 1, wobble: 2) // expected-error{{incorrect argument labels in call (have 'baz:wobble:', expected 'bar:wibble:')}}
-mismatch1(food: 1, zap: 2) // expected-error{{incorrect argument labels in call (have 'food:zap:', expected 'thisFoo:bar:')}}
+mismatch1(foo: 5) // expected-error{{incorrect argument label in call (have 'foo:', expected 'thisFoo:')}} {{11-14=thisFoo}}
+mismatch1(baz: 1, wobble: 2) // expected-error{{incorrect argument labels in call (have 'baz:wobble:', expected 'bar:wibble:')}} {{11-14=bar}} {{19-25=wibble}}
+mismatch1(food: 1, zap: 2) // expected-error{{incorrect argument labels in call (have 'food:zap:', expected 'thisFoo:bar:')}} {{11-15=thisFoo}} {{20-23=bar}}
 
 // -------------------------------------------
 // Subscript keyword arguments
@@ -248,7 +248,7 @@ struct Sub1 {
 var sub1 = Sub1()
 var i: Int = 0
 i = sub1[i]
-i = sub1[i: i] // expected-error{{extraneous argument label 'i:' in subscript}}
+i = sub1[i: i] // expected-error{{extraneous argument label 'i:' in subscript}} {{10-13=}}
 
 struct Sub2 {
   subscript (d d: Double) -> Double {
@@ -258,9 +258,9 @@ struct Sub2 {
 
 var sub2 = Sub2()
 var d: Double = 0.0
-d = sub2[d] // expected-error{{missing argument label 'd:' in subscript}}
+d = sub2[d] // expected-error{{missing argument label 'd:' in subscript}} {{10-10=d: }}
 d = sub2[d: d]
-d = sub2[f: d] // expected-error{{incorrect argument label in subscript (have 'f:', expected 'd:')}}
+d = sub2[f: d] // expected-error{{incorrect argument label in subscript (have 'f:', expected 'd:')}} {{10-11=d}}
 
 // -------------------------------------------
 // Closures
@@ -280,7 +280,7 @@ func testClosures() {
 
 func acceptAutoclosure(@autoclosure f f: () -> Int) { }
 func produceInt() -> Int { }
-acceptAutoclosure(f: produceInt) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}
+acceptAutoclosure(f: produceInt) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}} {{32-32=()}}
 
 // -------------------------------------------
 // Trailing closures
@@ -290,7 +290,7 @@ func trailingclosure1(x x: Int, f: () -> Int) {}
 trailingclosure1(x: 1) { return 5 }
 trailingclosure1(1) { return 5 } // expected-error{{missing argument label 'x:' in call}}{{18-18=x: }}
 
-trailingclosure1(x: 1, { return 5 }) // expected-error{{missing argument label 'f:' in call}}
+trailingclosure1(x: 1, { return 5 }) // expected-error{{missing argument label 'f:' in call}} {{24-24=f: }}
 
 func trailingclosure2(x x: Int, f: (() -> Int)!...) {}
 trailingclosure2(x: 5) { return 5 }
@@ -329,8 +329,8 @@ mismatchOverloaded1.method2(5) { $0 }
 // -------------------------------------------
 func testValuesOfFunctionType(f1: (_: Int, arg: Int) -> () ) {
   f1(3, arg: 5)
-  f1(x: 3, 5) // expected-error{{incorrect argument labels in call (have 'x:_:', expected '_:arg:')}}
-  f1(3, 5) // expected-error{{missing argument label 'arg:' in call}}
+  f1(x: 3, 5) // expected-error{{incorrect argument labels in call (have 'x:_:', expected '_:arg:')}} {{6-9=}} {{12-12=arg: }}
+  f1(3, 5) // expected-error{{missing argument label 'arg:' in call}} {{9-9=arg: }}
 }
 
 

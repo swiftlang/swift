@@ -40,7 +40,7 @@ f1(&y[i])
 
 // Missing '&'
 f0(i) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}}{{4-4=&}}
-f1(y[i]) // expected-error{{passing value of type 'Float' to an inout parameter requires explicit '&'}}
+f1(y[i]) // expected-error{{passing value of type 'Float' to an inout parameter requires explicit '&'}} {{4-4=&}}
 
 // Assignment operators
 x += x

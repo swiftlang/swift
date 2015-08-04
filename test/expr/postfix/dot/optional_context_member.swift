@@ -13,14 +13,14 @@ func nonOptContext() -> Foo {
   case ():
     return .someVar
   case ():
-    return .someOptVar // expected-error{{}}
+    return .someOptVar // expected-error{{}} {{23-23=!}}
   // TODO
   //case ():
   //  return .someOptVar!
   case ():
     return .someFunc()
   case ():
-    return .someOptFunc() // expected-error{{}}
+    return .someOptFunc() // expected-error{{}} {{26-26=!}}
   // TODO
   //case ():
   //  return .someOptFunc()!

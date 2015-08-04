@@ -37,7 +37,7 @@ let c: C.Type = D.self
 use(c as! D.Type)
 use(c as! X.Type) // expected-warning{{always fails}}
 use(c is AnyObject.Type) // expected-warning{{always true}}
-use(c as! AnyObject.Type) // expected-warning{{always succeeds}}
+use(c as! AnyObject.Type) // expected-warning{{always succeeds}} {{7-10=as}}
 use(c as! AnyObject.Protocol) // expected-warning{{always fails}}
 use(c as! CP.Type)
 use(c as! CP.Protocol) // expected-warning{{always fails}}
@@ -45,7 +45,7 @@ use(c as! Int.Type) // expected-warning{{always fails}}
 
 use(C.self as AnyObject.Protocol) // expected-error{{'C.Type' is not convertible to 'AnyObject.Protocol'}}
 use(C.self as AnyObject.Type)
-use(C.self as P.Type) // expected-error{{'C.Type' is not convertible to 'P.Type'; did you mean to use 'as!' to force downcast?}}
+use(C.self as P.Type) // expected-error{{'C.Type' is not convertible to 'P.Type'; did you mean to use 'as!' to force downcast?}} {{12-14=as!}}
 
 use(E.self as P.Protocol) // expected-error{{'E.Type' is not convertible to 'P.Protocol'}}
 use(E.self as P.Type)

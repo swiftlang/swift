@@ -205,7 +205,7 @@ obj.dynamicType.foo!(obj)(5) // expected-error{{instance member 'foo' cannot be 
 
 // Checked casts to AnyObject
 var p: P = Y()
-var obj3 : AnyObject = (p as! AnyObject)! // expected-error{{extraneous postfix '!'}}
+var obj3 : AnyObject = (p as! AnyObject)! // expected-error{{extraneous postfix '!'}} {{41-42=}}
 
 // Implicit force of an implicitly unwrapped optional
 let uopt : AnyObject! = nil

@@ -20,7 +20,7 @@ var closure5 : (Double) -> Int =
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}
 
 var closure7 : Int =
-   { 4 }  // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}}
+   { 4 }  // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{9-9=()}}
 
 func funcdecl1(a: Int, _ y: Int) {}
 func funcdecl3() -> Int {}
@@ -52,7 +52,7 @@ func funcdecl5(a: Int, _ y: Int) {
   funcdecl1(123, 444)
   
   // Calls.
-  4()  // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}}
+  4()  // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}} {{4-6=}}
   
   
   // rdar://12017658 - Infer some argument types from func6.
@@ -138,20 +138,20 @@ class ExplicitSelfRequiredTest {
   func method() -> Int {
     // explicit closure requires an explicit "self." base.
     doStuff({ ++self.x })
-    doStuff({ ++x })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}}
+    doStuff({ ++x })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{17-17=self.}}
 
     // Methods follow the same rules as properties, uses of 'self' must be marked with "self."
-    doStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit 'self.' to make capture semantics explicit}}
+    doStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit 'self.' to make capture semantics explicit}} {{15-15=self.}}
     doStuff { self.method() }
 
     // <rdar://problem/18877391> "self." shouldn't be required in the initializer expression in a capture list
     // This should not produce an error, "x" isn't being captured by the closure.
-    // expected-warning @+1 {{initialization of immutable value 'myX' was never used}}
+    // expected-warning @+1 {{initialization of immutable value 'myX' was never used}} {{16-19=_}}
     doStuff({ [myX = x] in 4 })
 
     // This should produce an error, since x is used within the inner closure.
-    // expected-warning @+1 {{initialization of immutable value 'myX' was never used}}
-    doStuff({ [myX = {x}] in 4 })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}}
+    // expected-warning @+1 {{initialization of immutable value 'myX' was never used}} {{16-19=_}}
+    doStuff({ [myX = {x}] in 4 })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{23-23=self.}}
 
     return 42
   }
@@ -193,7 +193,7 @@ func testCaptureBehavior(ptr : SomeClass) {
   doStuff { [weak v1, weak v2] in v1!.foo() + v2!.foo() }
 
   let i = 42
-  // expected-warning @+1 {{variable 'i' was never mutated}}
+  // expected-warning @+1 {{variable 'i' was never mutated}} {{19-20=let}}
   doStuff { [weak i] in i! }   // expected-error {{'weak' cannot be applied to non-class type 'Int'}}
 }
 
@@ -204,7 +204,7 @@ extension SomeClass {
     doStuff { [weak xyz = self.field] in xyz!.foo() }
 
     // rdar://16889886 - Assert when trying to weak capture a property of self in a lazy closure
-    doStuff { [weak self.field] in field!.foo() }   // expected-error {{fields may only be captured by assigning to a specific name}} expected-error {{reference to property 'field' in closure requires explicit 'self.' to make capture semantics explicit}}
+    doStuff { [weak self.field] in field!.foo() }   // expected-error {{fields may only be captured by assigning to a specific name}} expected-error {{reference to property 'field' in closure requires explicit 'self.' to make capture semantics explicit}} {{36-36=self.}}
     // expected-warning @+1 {{variable 'self' was written to, but never read}}
     doStuff { [weak self&field] in 42 }  // expected-error {{expected ']' at end of capture list}}
 
@@ -231,7 +231,7 @@ var closureWithObservedProperty: () -> () = {
 
 ;
 
-{}() // expected-error{{statement cannot begin with a closure expression}} expected-note{{explicitly discard the result of the closure by assigning to '_'}}
+{}() // expected-error{{statement cannot begin with a closure expression}} expected-note{{explicitly discard the result of the closure by assigning to '_'}} {{1-1=_ = }}
 
 
 

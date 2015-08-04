@@ -64,7 +64,7 @@ enum E1 {
 
 // Ill-formed initializer delegation: no matching constructor
 class Z0 {
-  init() { // expected-error {{designated initializer for 'Z0' cannot delegate (with 'self.init'); did you mean this to be a convenience initializer?}}
+  init() { // expected-error {{designated initializer for 'Z0' cannot delegate (with 'self.init'); did you mean this to be a convenience initializer?}} {{3-3=convenience }}
     // expected-note @+2 {{delegation occurs here}}
 
     self.init(5, 5) // expected-error{{cannot invoke 'Z0.init' with an argument list of type '(Int, Int)'}}
@@ -101,7 +101,7 @@ enum Z2 {
 // Ill-formed initialization: wrong context.
 class Z3 {
   func f() {
-    self.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
+    self.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{9-9=.dynamicType}}
   }
 
   init() { }
@@ -112,7 +112,7 @@ class Z4 {
   init() {} // expected-note{{selected non-required initializer}}
 
   convenience init(other: Z4) {
-    other.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
+    other.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{10-10=.dynamicType}}
     other.dynamicType.init() // expected-error{{must use a 'required' initializer}} expected-warning{{unused}}
   }
 }
@@ -121,7 +121,7 @@ class Z5 : Z4 {
   override init() { }
 
   convenience init(other: Z5) {
-    other.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
+    other.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{10-10=.dynamicType}}
   }
 }
 
@@ -150,7 +150,7 @@ struct RDar16603812 {
    var i = 42
    init() {}
    func foo() {
-      self.init() // expected-error {{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
+      self.init() // expected-error {{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{11-11=.dynamicType}}
       self.dynamicType.init() // expected-warning{{result of initializer is unused}}
    }
 }
@@ -203,7 +203,7 @@ class D: C {
   }
 
   func foo() {
-    self.init(x: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
+    self.init(x: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{9-9=.dynamicType}}
   }
   func bar() {
     super.init(x: 0) // expected-error{{'super.init' cannot be called outside of an initializer}}
@@ -274,14 +274,14 @@ func foo<T: C where T: P>(x: T, y: T.Type) {
   var c3a = x.dynamicType.init() // expected-error{{'required' initializer}}
   var c4a = x.dynamicType.init(proto: "")
 
-  var ci1 = x.init(required: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
-  var ci2 = x.init(x: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
-  var ci3 = x.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
-  var ci4 = x.init(proto: "") // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
+  var ci1 = x.init(required: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{14-14=.dynamicType}}
+  var ci2 = x.init(x: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{14-14=.dynamicType}}
+  var ci3 = x.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{14-14=.dynamicType}}
+  var ci4 = x.init(proto: "") // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}} {{14-14=.dynamicType}}
 
   var ci1a = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}
   var ci2a = x(x: 0) // expected-error{{cannot call value of non-function type 'T'}}
-  var ci3a = x() // expected-error{{invalid use of '()' to call a value of non-function type 'T'}}
+  var ci3a = x() // expected-error{{invalid use of '()' to call a value of non-function type 'T'}} {{15-17=}}
   var ci4a = x(proto: "") // expected-error{{cannot call value of non-function type 'T'}}
 
   var cm1 = y.init(required: 0)
@@ -298,7 +298,7 @@ func foo<T: C where T: P>(x: T, y: T.Type) {
   var cs2 = T.init(x: 0) // expected-error{{'required' initializer}}
   var cs3 = T.init() // expected-error{{'required' initializer}}
   var cs4 = T.init(proto: "")
-  var cs5 = T.init(notfound: "") // expected-error{{incorrect argument label}}
+  var cs5 = T.init(notfound: "") // expected-error{{incorrect argument label}} {{20-28=proto}}
 
   var csf1: Double -> T = T.init
   var csf2: Int -> T    = T.init // expected-error{{'required' initializer}}
