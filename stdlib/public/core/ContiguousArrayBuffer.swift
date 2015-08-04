@@ -605,6 +605,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
 
   /// Initialize the buffer with an initial size of `initialCapacity`
   /// elements.
+  @inline(__always) // For performance reasons.
   init(initialCapacity: Int) {
     if initialCapacity == 0 {
       result = _ContiguousArrayBuffer()
@@ -618,6 +619,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   }
 
   /// Add an element to the buffer, reallocating if necessary.
+  @inline(__always) // For performance reasons.
   mutating func add(element: Element) {
     if remainingCapacity == 0 {
       // Reallocate.
@@ -636,6 +638,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   }
 
   /// Add an element to the buffer, which must have remaining capacity.
+  @inline(__always) // For performance reasons.
   mutating func addWithExistingCapacity(element: Element) {
     _sanityCheck(remainingCapacity > 0,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity")
@@ -649,6 +652,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   ///
   /// Returns the fully-initialized buffer. `self` is reset to contain an
   /// empty buffer and cannot be used afterward.
+  @inline(__always) // For performance reasons.
   mutating func finish() -> _ContiguousArrayBuffer<Element> {
     // Adjust the initialized count of the buffer.
     result.count = result.capacity - remainingCapacity
@@ -662,6 +666,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   ///
   /// Returns the fully-initialized buffer. `self` is reset to contain an
   /// empty buffer and cannot be used afterward.
+  @inline(__always) // For performance reasons.
   mutating func finishWithOriginalCount() -> _ContiguousArrayBuffer<Element> {
     _sanityCheck(remainingCapacity == result.capacity - result.count,
       "_UnsafePartiallyInitializedContiguousArrayBuffer has incorrect count")
