@@ -202,7 +202,7 @@ func testImportOSTypesTypes() {
 }
 
 func testImportSEL() {
-  var t1 : SEL // expected-error {{use of undeclared type 'SEL'}}
+  var t1 : SEL // expected-error {{use of undeclared type 'SEL'}} {{12-15=Selector}}
   var t2 : ctypes.SEL // expected-error {{no type named 'SEL' in module 'ctypes'}}
 }
 

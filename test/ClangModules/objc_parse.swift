@@ -45,7 +45,7 @@ func instanceMethods(b: B) {
   b.performAdd(1, withValue:2, withValue2:3, withValue:4) // expected-error{{argument 'withValue' must precede argument 'withValue2'}}
   b.performAdd(1, withValue:2, withValue:4, withValue2: 3)
 
-  b.performAdd(1, 2, 3, 4) // expected-error{{missing argument labels 'withValue:withValue:withValue2:' in call}}
+  b.performAdd(1, 2, 3, 4) // expected-error{{missing argument labels 'withValue:withValue:withValue2:' in call}} {{19-19=withValue: }} {{22-22=withValue: }} {{25-25=withValue2: }}
 
   // Both class and instance methods exist.
   b.description
@@ -105,7 +105,7 @@ func dynamicLookupMethod(b: AnyObject) {
 }
 
 // Properties
-func properties(b: B) {  // expected-note {{mark parameter with 'var' to make it mutable}}
+func properties(b: B) {  // expected-note {{mark parameter with 'var' to make it mutable}} {{17-17=var }}
   var i = b.counter
   b.counter = i + 1
   i = i + b.readCounter
@@ -186,7 +186,7 @@ func testProtocols(b: B, bp: BProto) {
   var bp2 : BProto = b
   var b2 : B = bp // expected-error{{cannot convert value of type 'BProto' to specified type 'B'}}
   bp.method(1, withFloat:2.5)
-  bp.method(1, withDouble:2.5) // expected-error{{incorrect argument label in call (have '_:withDouble:', expected '_:withFloat:')}}
+  bp.method(1, withDouble:2.5) // expected-error{{incorrect argument label in call (have '_:withDouble:', expected '_:withFloat:')}} {{16-26=withFloat}}
   bp2 = b.getAsProto()
 
   var c1 : Cat1Proto = b
@@ -262,10 +262,10 @@ func classAnyObject(obj: NSObject) {
 }
 
 // Protocol conformances
-class Wobbler : NSWobbling { // expected-note{{candidate is not '@objc', but protocol requires it}}
+class Wobbler : NSWobbling { // expected-note{{candidate is not '@objc', but protocol requires it}} {{7-7=@objc }}
   // expected-error@-1{{type 'Wobbler' does not conform to protocol 'NSWobbling'}}
   @objc func wobble() { }
-  func returnMyself() -> Self { return self } // expected-note{{candidate is not '@objc', but protocol requires it}}
+  func returnMyself() -> Self { return self } // expected-note{{candidate is not '@objc', but protocol requires it}} {{3-3=@objc }}
 }
 
 extension Wobbler : NSMaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'NSMaybeInitWobble'}}
@@ -281,8 +281,8 @@ extension Wobbler2 : NSMaybeInitWobble { // expected-error{{type 'Wobbler2' does
 
 func optionalMemberAccess(w: NSWobbling) {
   w.wobble()
-  w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}}
-  var x: AnyObject = w[5] // expected-error{{value of optional type 'AnyObject!?' not unwrapped; did you mean to use '!' or '?'?}}
+  w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}} {{11-11=!}}
+  var x: AnyObject = w[5] // expected-error{{value of optional type 'AnyObject!?' not unwrapped; did you mean to use '!' or '?'?}} {{26-26=!}}
 }
 
 func protocolInheritance(s: NSString) {
@@ -494,41 +494,41 @@ func testCStyle() {
 
 func testProtocolQualified(obj: CopyableNSObject, cell: CopyableSomeCell,
                            plainObj: NSObject, plainCell: SomeCell) {
-  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>') is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}}
+  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>') is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
   _ = obj as NSObjectProtocol
   _ = obj as NSCopying
-  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>') is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}}
+  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>') is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}} {{11-13=as!}}
 
   _ = cell as NSObject
   _ = cell as NSObjectProtocol
-  _ = cell as NSCopying // expected-error {{'CopyableSomeCell' (aka 'SomeCell') is not convertible to 'NSCopying'; did you mean to use 'as!' to force downcast?}}
+  _ = cell as NSCopying // expected-error {{'CopyableSomeCell' (aka 'SomeCell') is not convertible to 'NSCopying'; did you mean to use 'as!' to force downcast?}} {{12-14=as!}}
   _ = cell as SomeCell
   
-  _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>'); did you mean to use 'as!' to force downcast?}}
+  _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>'); did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
   _ = plainCell as CopyableSomeCell // FIXME: This is not really typesafe.
 }
 
 extension Printing {
   func testImplicitWarnUnqualifiedAccess() {
     print() // expected-warning {{use of 'print' treated as a reference to instance method in class 'Printing'}}
-    // expected-note@-1 {{use 'self.' to silence this warning}}
-    // expected-note@-2 {{use 'Swift.' to reference the global function}}
+    // expected-note@-1 {{use 'self.' to silence this warning}} {{5-5=self.}}
+    // expected-note@-2 {{use 'Swift.' to reference the global function}} {{5-5=Swift.}}
 
     print(self) // expected-warning {{use of 'print' treated as a reference to instance method in class 'Printing'}}
-    // expected-note@-1 {{use 'self.' to silence this warning}}
-    // expected-note@-2 {{use 'Swift.' to reference the global function}}
+    // expected-note@-1 {{use 'self.' to silence this warning}} {{5-5=self.}}
+    // expected-note@-2 {{use 'Swift.' to reference the global function}} {{5-5=Swift.}}
 
     print(self, options: self) // no-warning
   }
 
   static func testImplicitWarnUnqualifiedAccess() {
     print() // expected-warning {{use of 'print' treated as a reference to class method in class 'Printing'}}
-    // expected-note@-1 {{use 'self.' to silence this warning}}
-    // expected-note@-2 {{use 'Swift.' to reference the global function}}
+    // expected-note@-1 {{use 'self.' to silence this warning}} {{5-5=self.}}
+    // expected-note@-2 {{use 'Swift.' to reference the global function}} {{5-5=Swift.}}
 
     print(self) // expected-warning {{use of 'print' treated as a reference to class method in class 'Printing'}}
-    // expected-note@-1 {{use 'self.' to silence this warning}}
-    // expected-note@-2 {{use 'Swift.' to reference the global function}}
+    // expected-note@-1 {{use 'self.' to silence this warning}} {{5-5=self.}}
+    // expected-note@-2 {{use 'Swift.' to reference the global function}} {{5-5=Swift.}}
 
     print(self, options: self) // no-warning
   }

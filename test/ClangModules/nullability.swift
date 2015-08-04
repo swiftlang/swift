@@ -11,21 +11,21 @@ func testSomeClass(sc: SomeClass, osc: SomeClass?) {
   var ao2: AnyObject = sc.methodB(nil)
   if sc.methodA(osc) == nil { } // expected-error{{binary operator '==' cannot be applied to operands of type 'AnyObject' and 'NilLiteralConvertible'}}
 
-  var ao3: AnyObject = sc.property // expected-error{{value of optional type 'AnyObject?' not unwrapped; did you mean to use '!' or '?'?}}
+  var ao3: AnyObject = sc.property // expected-error{{value of optional type 'AnyObject?' not unwrapped; did you mean to use '!' or '?'?}} {{35-35=!}}
   var ao3_ok: AnyObject? = sc.property // okay
 
   var ao4: AnyObject = sc.methodD()
   if sc.methodD() == nil { } // expected-error{{binary operator '==' cannot be applied to operands of type 'AnyObject' and 'NilLiteralConvertible'}}
 
   sc.methodE(sc)
-  sc.methodE(osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}}
+  sc.methodE(osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
 
   sc.methodF(sc, second: sc)
-  sc.methodF(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}}
-  sc.methodF(sc, second: osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}}
+  sc.methodF(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
+  sc.methodF(sc, second: osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{29-29=!}}
 
   sc.methodG(sc, second: sc)
-  sc.methodG(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}}
+  sc.methodG(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
   sc.methodG(sc, second: osc) 
 
   let ci: CInt = 1
@@ -35,7 +35,7 @@ func testSomeClass(sc: SomeClass, osc: SomeClass?) {
 
   var sc3 = SomeClass(double: 1.5)
   if sc3 == nil { } // okay
-  var sc3a: SomeClass = sc3 // expected-error{{value of optional type 'SomeClass?' not unwrapped}}
+  var sc3a: SomeClass = sc3 // expected-error{{value of optional type 'SomeClass?' not unwrapped}} {{28-28=!}}
 
   var sc4 = sc.returnMe()
   var sc4a: SomeClass = sc4

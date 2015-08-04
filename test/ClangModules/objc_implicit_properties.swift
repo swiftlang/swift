@@ -52,8 +52,8 @@ func overriding(obj: Sub) {
   let a: AnyObject = obj.methodInBase()
   let b: AnyObject = obj.propertyInBase
   let c: AnyObject = obj.methodPairInBase
-  let d: AnyObject = obj.getterOnlyInBase // expected-error {{}}
-  let e: AnyObject = obj.setterOnlyInBase // expected-error {{}}
+  let d: AnyObject = obj.getterOnlyInBase // expected-error {{}} {{42-42=()}}
+  let e: AnyObject = obj.setterOnlyInBase // expected-error {{}} {{42-42=()}}
   let f: AnyObject = obj.methodInProto
   let g: AnyObject = obj.propertyInProto()
   let h: AnyObject = obj.methodInBaseButPropertyInProto()
