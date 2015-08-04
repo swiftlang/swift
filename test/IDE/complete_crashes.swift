@@ -92,3 +92,15 @@ class C<T> {
   }
   func accidentallyNested<U>(x: U) {}
 }
+
+// rdar://problem/21149908
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21149908
+@objc func handleTap(recognizer: UIGestureRecognizer) {
+  if recognizer.state == .Ended {
+    let _ : () = self.suggestion.cata(#^RDAR_21149908^#{ _ in
+      listView?.backUpOneGroup()
+      }, right: { _ in
+        listView?.handleCompletion(self)
+    }
+  }
+}

@@ -1423,6 +1423,8 @@ public:
   }
 
   void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
+    if (FD->getName().empty())
+      return;
     foundFunction(FD);
     bool IsImplicitlyCurriedInstanceMethod;
     switch (Kind) {
