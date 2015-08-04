@@ -206,13 +206,13 @@ case let .Payload(x):
 case let .Payload(name: x):
   acceptInt(x)
   acceptString("\(x)")
-case let .Payload((name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} expected-note {{remove the label to make this a tuple pattern}}
+case let .Payload((name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} {{19-20=}} {{27-28=}} expected-note {{remove the label to make this a tuple pattern}} {{20-25=}}
   acceptInt(x)
   acceptString("\(x)")
-case .Payload(let (name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} expected-note {{remove the label to make this a tuple pattern}}
+case .Payload(let (name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} {{19-20=}} {{27-28=}} expected-note {{remove the label to make this a tuple pattern}} {{20-25=}}
   acceptInt(x)
   acceptString("\(x)")
-case .Payload(let (name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} expected-note {{remove the label to make this a tuple pattern}}
+case .Payload(let (name: x)): // expected-error {{label is not allowed on single element tuple pattern}} expected-note {{remove the parentheses to make this a type annotation}} {{19-20=}} {{27-28=}} expected-note {{remove the label to make this a tuple pattern}} {{20-25=}}
   acceptInt(x)
   acceptString("\(x)")
 case .Payload(let x):
@@ -354,7 +354,7 @@ case (_?)?: break
 // expected-note @+2 {{remove the parentheses to make this a type annotation}} {{5-6=}} {{26-27=}}
 // expected-note @+1 {{remove the label to make this a tuple pattern}} {{6-21=}}
 let (responseObject: Int?) = op1
-// expected-error @-1 2 {{expected ',' separator}}
+// expected-error @-1 2 {{expected ',' separator}} {{25-25=,}} {{25-25=,}}
 // expected-error @-2 {{expected pattern}}
 
 

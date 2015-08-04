@@ -2,20 +2,20 @@
 
 struct S {
   var x: Int = 0
-  let y: Int = 0 // expected-note 4 {{change 'let' to 'var' to make it mutable}}
+  let y: Int = 0 // expected-note 4 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}} {{3-6=var}} {{3-6=var}}
 
   init() {}
 }
 
 struct T {
   var mutS: S? = nil
-  let immS: S? = nil // expected-note 10 {{change 'let' to 'var' to make it mutable}}
+  let immS: S? = nil // expected-note 10 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}} {{3-6=var}} {{3-6=var}} {{3-6=var}} {{3-6=var}} {{3-6=var}} {{3-6=var}} {{3-6=var}} {{3-6=var}}
 
   init() {}
 }
 
 var mutT: T?
-let immT: T? = nil  // expected-note 4 {{change 'let' to 'var' to make it mutable}}
+let immT: T? = nil  // expected-note 4 {{change 'let' to 'var' to make it mutable}} {{1-4=var}} {{1-4=var}} {{1-4=var}} {{1-4=var}}
 
 let mutTPayload = mutT!
 
@@ -40,7 +40,7 @@ immT!.immS!.x = 0 // expected-error{{cannot assign to property: 'immS' is a 'let
 immT!.immS!.y = 0 // expected-error{{cannot assign to property: 'y' is a 'let' constant}}
 
 var mutIUO: T! = nil
-let immIUO: T! = nil // expected-note 2 {{change 'let' to 'var' to make it mutable}}
+let immIUO: T! = nil // expected-note 2 {{change 'let' to 'var' to make it mutable}} {{1-4=var}} {{1-4=var}}
 
 mutIUO!.mutS = S()
 mutIUO!.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
@@ -55,11 +55,11 @@ immIUO.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let
 func foo(x: Int) {}
 
 var nonOptional: S = S()
-_ = nonOptional! // expected-error{{cannot force unwrap value of non-optional type 'S'}}
-_ = nonOptional!.x // expected-error{{cannot force unwrap value of non-optional type 'S'}}
+_ = nonOptional! // expected-error{{cannot force unwrap value of non-optional type 'S'}} {{16-17=}}
+_ = nonOptional!.x // expected-error{{cannot force unwrap value of non-optional type 'S'}} {{16-17=}}
 
 class C {}
 class D: C {}
 
 let c = C()
-let d = (c as! D)! // expected-error{{forced downcast already produces a non-optional value}}
+let d = (c as! D)! // expected-error{{forced downcast already produces a non-optional value}} {{18-19=}}

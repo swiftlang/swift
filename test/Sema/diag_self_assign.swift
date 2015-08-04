@@ -47,12 +47,12 @@ class SA2 {
 class SA3 {
   var foo: Int {
     get {
-      return foo // expected-warning {{attempting to access 'foo' within its own getter}} expected-note{{access 'self' explicitly to silence this warning}}
+      return foo // expected-warning {{attempting to access 'foo' within its own getter}} expected-note{{access 'self' explicitly to silence this warning}} {{14-14=self.}}
     }
     set {
-      foo = foo // expected-error {{assigning a property to itself}} expected-warning {{attempting to modify 'foo' within its own setter}} expected-note{{access 'self' explicitly to silence this warning}}
+      foo = foo // expected-error {{assigning a property to itself}} expected-warning {{attempting to modify 'foo' within its own setter}} expected-note{{access 'self' explicitly to silence this warning}} {{7-7=self.}}
       self.foo = self.foo // expected-error {{assigning a property to itself}}
-      foo = self.foo // expected-error {{assigning a property to itself}} expected-warning {{attempting to modify 'foo' within its own setter}} expected-note{{access 'self' explicitly to silence this warning}}
+      foo = self.foo // expected-error {{assigning a property to itself}} expected-warning {{attempting to modify 'foo' within its own setter}} expected-note{{access 'self' explicitly to silence this warning}} {{7-7=self.}}
       self.foo = foo // expected-error {{assigning a property to itself}}
     }
   }
@@ -61,7 +61,7 @@ class SA3 {
 class SA4 {
   var foo: Int {
     get {
-      return foo // expected-warning {{attempting to access 'foo' within its own getter}} expected-note{{access 'self' explicitly to silence this warning}}
+      return foo // expected-warning {{attempting to access 'foo' within its own getter}} expected-note{{access 'self' explicitly to silence this warning}} {{14-14=self.}}
     }
     set(value) {
       value = value // expected-error {{cannot assign to value: 'value' is a 'let' constant}}

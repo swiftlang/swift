@@ -28,7 +28,7 @@ func parseError4(x: Int) {
 
 func parseError5(x: Int) {
   switch x {
-  case let z // expected-error {{expected ':' after 'case'}} expected-warning {{immutable value 'z' was never used}}
+  case let z // expected-error {{expected ':' after 'case'}} expected-warning {{immutable value 'z' was never used}} {{12-13=_}}
   }
 }
 
@@ -72,13 +72,13 @@ default:
 
 // Multiple cases per case block
 switch x {
-case 0: // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
+case 0: // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{8-8= break}}
 case 1:
   x = 0
 }
 
 switch x {
-case 0: // expected-error{{'case' label in a 'switch' should have at least one executable statement}}
+case 0: // expected-error{{'case' label in a 'switch' should have at least one executable statement}} {{8-8= break}}
 default:
   x = 0
 }
@@ -86,18 +86,18 @@ default:
 switch x {
 case 0:
   x = 0
-case 1: // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
+case 1: // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{8-8= break}}
 }
 
 switch x {
 case 0:
   x = 0
-default: // expected-error {{'default' label in a 'switch' should have at least one executable statement}}
+default: // expected-error {{'default' label in a 'switch' should have at least one executable statement}} {{9-9= break}}
 }
 
 switch x {
 case 0:
-  ; // expected-error {{';' statements are not allowed}}
+  ; // expected-error {{';' statements are not allowed}} {{3-5=}}
 case 1:
   x = 0
 }
@@ -131,13 +131,13 @@ switch x {
 }
 
 switch x {
-default: // expected-error{{'default' label in a 'switch' should have at least one executable statement}}
+default: // expected-error{{'default' label in a 'switch' should have at least one executable statement}} {{9-9= break}}
 case 0: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
 }
 
 switch x {
-default: // expected-error{{'default' label in a 'switch' should have at least one executable statement}}
+default: // expected-error{{'default' label in a 'switch' should have at least one executable statement}} {{9-9= break}}
 default: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
 }
@@ -148,11 +148,11 @@ default where x == 0: // expected-error{{'default' cannot be used with a 'where'
 }
 
 switch x {
-case 0: // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
+case 0: // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{8-8= break}}
 }
 
 switch x {
-case 0: // expected-error{{'case' label in a 'switch' should have at least one executable statement}}
+case 0: // expected-error{{'case' label in a 'switch' should have at least one executable statement}} {{8-8= break}}
 case 1:
   x = 0
 }
@@ -160,7 +160,7 @@ case 1:
 switch x {
 case 0:
   x = 0
-case 1: // expected-error{{'case' label in a 'switch' should have at least one executable statement}}
+case 1: // expected-error{{'case' label in a 'switch' should have at least one executable statement}} {{8-8= break}}
 }
 
 
@@ -206,15 +206,15 @@ case (_, 2), (var a, _): // expected-error {{'case' labels with multiple pattern
 case (var a, 2), (1, var b): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
   ()
 
-case (var a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
+case (var a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
 case (1, _):
   ()
 
-case (_, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
+case (_, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{13-13= break}}
 case (1, var a):
   ()
 
-case (var a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
+case (var a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
 case (1, var b):
   ()
 
@@ -228,7 +228,7 @@ case (_, 2), (let a, _): // expected-error {{'case' labels with multiple pattern
 case (_, 2), (1, _):
   ()
 
-case (_, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}}
+case (_, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{13-13= break}}
 case (1, _):
   ()
 }

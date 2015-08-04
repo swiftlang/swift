@@ -60,12 +60,12 @@ func braceStmt3() {
 
 //===--- Recovery for misplaced 'static'.
 
-static func toplevelStaticFunc() {} // expected-error {{static methods may only be declared on a type}}
+static func toplevelStaticFunc() {} // expected-error {{static methods may only be declared on a type}} {{1-8=}}
 
-static struct StaticStruct {} // expected-error {{declaration cannot be marked 'static'}}
-static class StaticClass {} // expected-error {{declaration cannot be marked 'static'}}
-static protocol StaticProtocol {} // expected-error {{declaration cannot be marked 'static'}}
-static typealias StaticTypealias = Int // expected-error {{declaration cannot be marked 'static'}}
+static struct StaticStruct {} // expected-error {{declaration cannot be marked 'static'}} {{1-8=}}
+static class StaticClass {} // expected-error {{declaration cannot be marked 'static'}} {{1-8=}}
+static protocol StaticProtocol {} // expected-error {{declaration cannot be marked 'static'}} {{1-8=}}
+static typealias StaticTypealias = Int // expected-error {{declaration cannot be marked 'static'}} {{1-8=}}
 
 class ClassWithStaticDecls {
   class var a = 42 // expected-error {{class stored properties not yet supported}}
@@ -89,10 +89,10 @@ func missingControllingExprInIf() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}}
+  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}}
   }
 
-  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} expected-error{{cannot call value of non-function type '()'}}
+  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-error{{cannot call value of non-function type '()'}}
   }
 
   // <rdar://problem/18940198>
@@ -111,10 +111,10 @@ func missingControllingExprInWhile() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}}
+  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}}
   }
 
-  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} expected-error{{cannot call value of non-function type '()'}}
+  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{17-17=;}} expected-error{{cannot call value of non-function type '()'}}
   }
 
   // <rdar://problem/18940198>
@@ -129,7 +129,7 @@ func missingControllingExprInRepeatWhile() {
   }
 
   repeat {
-  } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}}
+  } while { true }() // expected-error{{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} {{10-10=;}}
 }
 
 func acceptsClosure<T>(t: T) -> Bool { return true }
@@ -228,15 +228,15 @@ func missingControllingExprInSwitch() {
   }
 
   switch { // expected-error {{expected expression in 'switch' statement}}
-    case Int: return // expected-error {{'is' keyword required to pattern match against type name}} expected-warning {{cast from '<<error type>>' to unrelated type 'Int' always fails}}
+    case Int: return // expected-error {{'is' keyword required to pattern match against type name}} {{10-10=is }} expected-warning {{cast from '<<error type>>' to unrelated type 'Int' always fails}}
     case _: return
   }
 
-  switch { 42 } { // expected-error {{expected expression in 'switch' statement}} expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error{{consecutive statements on a line must be separated by ';'}} expected-error{{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}}
+  switch { 42 } { // expected-error {{expected expression in 'switch' statement}} expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error{{consecutive statements on a line must be separated by ';'}} {{16-16=;}} expected-error{{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}}
     case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 
-  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{cannot call value of non-function type '()'}}
+  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error {{consecutive statements on a line must be separated by ';'}} {{16-16=;}} expected-error {{cannot call value of non-function type '()'}}
     case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 }
@@ -354,7 +354,7 @@ struct ErrorTypeInVarDeclArrayType1 {
 }
 
 struct ErrorTypeInVarDeclArrayType2 {
-  var v1 : Int[+ // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{unary operator cannot be separated from its operand}} expected-error {{expected expression for size of array type}}
+  var v1 : Int[+ // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{unary operator cannot be separated from its operand}} {{17-3=}} expected-error {{expected expression for size of array type}}
   var v2 : Int
 }
 
@@ -434,7 +434,7 @@ struct ErrorInFunctionSignatureResultArrayType10 {
 }
 
 struct ErrorInFunctionSignatureResultArrayType11 {
-  func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{use of unresolved identifier 'a'}} expected-error {{expected declaration}}
+  func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{29-29=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{use of unresolved identifier 'a'}} expected-error {{expected declaration}}
               // expected-error @-1{{expected expression for size of array type}}
   }
 }
@@ -532,18 +532,22 @@ Base=1 as Base=1  // expected-error {{cannot assign to immutable expression of t
 // <rdar://problem/18634543> Parser hangs at swift::Parser::parseType
 public enum TestA {
   public static func convertFromExtenndition(
-    // expected-error@+4{{unnamed parameters must be written}}
-    // expected-error@+3 2{{expected parameter type following ':'}}
-    // expected-error@+2 3{{expected ',' separator}}
+    // expected-error@+6{{unnamed parameters must be written}} {{5-5=_: }}
+    // expected-error@+5 2{{expected parameter type following ':'}}
+    // expected-error@+4 {{expected ',' separator}} {{18-18=,}}
+    // expected-error@+3 {{expected ',' separator}} {{18-18=,}}
+    // expected-error@+2 {{expected ',' separator}} {{24-24=,}}
     // expected-error@+1{{use of undeclared type 's'}}
     s._core.count != 0, "Can't form a Character from an empty String")
 }
 
 public enum TestB {
   public static func convertFromExtenndition(
-    // expected-error@+4{{unnamed parameters must be written}}
-    // expected-error@+3 2{{expected parameter type following ':'}}
-    // expected-error@+2 3{{expected ',' separator}}
+    // expected-error@+6{{unnamed parameters must be written}} {{5-5=_: }}
+    // expected-error@+5 2{{expected parameter type following ':'}}
+    // expected-error@+4 {{expected ',' separator}} {{18-18=,}}
+    // expected-error@+3 {{expected ',' separator}} {{18-18=,}}
+    // expected-error@+2 {{expected ',' separator}} {{24-24=,}}
     // expected-error@+1{{use of undeclared type 's'}}
     s._core.count ?= 0, "Can't form a Character from an empty String")
 }
@@ -553,9 +557,9 @@ public enum TestB {
 // <rdar://problem/18634543> Infinite loop and unbounded memory consumption in parser
 class bar {}
 var baz: bar
-// expected-error@+1{{unnamed parameters must be written}}
+// expected-error@+1{{unnamed parameters must be written}} {{11-11=_: }}
 func foo1(bar!=baz) {}
-// expected-error@+1{{unnamed parameters must be written}}
+// expected-error@+1{{unnamed parameters must be written}} {{11-11=_: }}
 func foo2(bar! = baz) {}
 
 
@@ -572,12 +576,12 @@ func f2(a: Bar<Baz /* some comment */!>) {}
 switch esp {
 case let (jeb):
   // expected-error@+5{{operator with postfix spacing cannot start a subexpression}}
-  // expected-error@+4{{consecutive statements on a line must be separated by ';'}}
+  // expected-error@+4{{consecutive statements on a line must be separated by ';'}} {{15-15=;}}
   // expected-error@+3{{'>' is not a prefix unary operator}}
   // expected-error@+2{{expected an identifier to name generic parameter}}
   // expected-error@+1{{expected '{' in class}}
   class Ceac<}> {}
-// expected-error@+1{{extraneous '}' at top level}}
+// expected-error@+1{{extraneous '}' at top level}} {{1-2=}}
 }
 
 // rdar://19605164
@@ -589,8 +593,8 @@ func a(s: S[{{g) -> Int {}
 // expected-error@+5{{expected parameter type following ':'}}
 // expected-error@+4{{expected ']' in array type}}
 // expected-error@+3{{expected ')' in parameter}}
-// expected-error@+2{{expected ',' separator}}
-// expected-error@+1{{expected ',' separator}}
+// expected-error@+2{{expected ',' separator}} {{3-3=,}}
+// expected-error@+1{{expected ',' separator}} {{3-3=,}}
 }}}
 
 
@@ -605,9 +609,9 @@ func F() { init<( } )}
 func f1() {
 
   // expected-error @+5 {{use of unresolved identifier 'C'}}
-  // expected-error @+4 {{unary operator cannot be separated from its operand}}
+  // expected-error @+4 {{unary operator cannot be separated from its operand}} {{11-12=}}
   // expected-error @+3 {{'==' is not a prefix unary operator}}
-  // expected-error @+2 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error @+2 {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
   // expected-error@+1 {{type annotation missing in pattern}}
   let n == C { get {}  // expected-error {{use of unresolved identifier 'get'}}
   }
@@ -628,19 +632,19 @@ func testMultiPatternConditionRecovery(x: Int?) {
   }
 
   // <rdar://problem/20883210> QoI: Following a "let" condition with boolean condition spouts nonsensical errors
-  guard let x: Int? = 1, x == 1 else {  } // expected-error {{boolean condition requires 'where' to separate it from variable binding}}
+  guard let x: Int? = 1, x == 1 else {  } // expected-error {{boolean condition requires 'where' to separate it from variable binding}} {{24-25= where}}
 }
 
 // rdar://20866942
 func testRefutableLet() {
   var e : Int?
-  let x? = e  // expected-error {{consecutive statements on a line must be separated by ';'}}
+  let x? = e  // expected-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
   // expected-error @-1 {{expected expression}}
   // expected-error @-2 {{type annotation missing in pattern}}
 }
 
 // <rdar://problem/19833424> QoI: Bad error message when using Objective-C literals (@"Hello") in Swift files
-let myString = @"foo" // expected-error {{string literals in Swift are not preceded by an '@' sign}}
+let myString = @"foo" // expected-error {{string literals in Swift are not preceded by an '@' sign}} {{16-17=}}
 
 
 // <rdar://problem/16990885> support curly quotes for string literals

@@ -2,7 +2,7 @@
 
 struct S {
   var x: Int = 0
-  let y: Int = 0  // expected-note 3 {{change 'let' to 'var' to make it mutable}}
+  let y: Int = 0  // expected-note 3 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}} {{3-6=var}}
 
   mutating func mutateS() {}
 
@@ -11,7 +11,7 @@ struct S {
 
 struct T {
   var mutS: S? = nil
-  let immS: S? = nil  // expected-note 4 {{change 'let' to 'var' to make it mutable}}
+  let immS: S? = nil  // expected-note 4 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}} {{3-6=var}} {{3-6=var}}
 
   mutating func mutateT() {}
 
@@ -19,7 +19,7 @@ struct T {
 }
 
 var mutT: T?
-let immT: T? = nil  // expected-note {{change 'let' to 'var' to make it mutable}}
+let immT: T? = nil  // expected-note {{change 'let' to 'var' to make it mutable}} {{1-4=var}}
 
 mutT?.mutateT()
 immT?.mutateT() // expected-error{{cannot use mutating member on immutable value: 'immT' is a 'let' constant}}
@@ -36,7 +36,7 @@ mutT? = T()
 mutT?.mutS = S()
 mutT?.mutS? = S()
 mutT?.mutS?.x += 0
-_ = mutT?.mutS?.x + 0 // expected-error{{value of optional type 'Int?' not unwrapped}}
+_ = mutT?.mutS?.x + 0 // expected-error{{value of optional type 'Int?' not unwrapped}} {{5-5=(}} {{18-18=)!}}
 mutT?.mutS?.y -= 0 // expected-error{{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
 mutT?.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
 mutT?.immS? = S() // expected-error{{cannot assign to value: 'immS' is a 'let' constant}}

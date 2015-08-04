@@ -13,4 +13,4 @@ struct I: _ImageLiteralConvertible {
 }
 
 let z: I? = [#Image(imageLiteral: "hello.png")#]
-let z2: I = [#Image(imageLiteral: "hello2.png")#] // expected-error{{value of optional type 'I?' not unwrapped; did you mean to use '!' or '?'?}}
+let z2: I = [#Image(imageLiteral: "hello2.png")#] // expected-error{{value of optional type 'I?' not unwrapped; did you mean to use '!' or '?'?}} {{50-50=!}}

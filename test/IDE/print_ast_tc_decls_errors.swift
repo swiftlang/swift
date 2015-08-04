@@ -83,10 +83,10 @@ class ClassWithInheritance3 : FooClass, FooNonExistentProtocol {} // expected-er
 // NO-TYREPR: {{^}}class ClassWithInheritance3 : FooClass, <<error type>> {{{$}}
 // TYREPR: {{^}}class ClassWithInheritance3 : FooClass, FooNonExistentProtocol {{{$}}
 
-class ClassWithInheritance4 : FooProtocol, FooClass {} // expected-error {{superclass 'FooClass' must appear first in the inheritance clause}}
+class ClassWithInheritance4 : FooProtocol, FooClass {} // expected-error {{superclass 'FooClass' must appear first in the inheritance clause}} {{31-31=FooClass, }} {{42-52=}}
 // CHECK: {{^}}class ClassWithInheritance4 : FooProtocol, FooClass {{{$}}
 
-class ClassWithInheritance5 : FooProtocol, BarProtocol, FooClass {} // expected-error {{superclass 'FooClass' must appear first in the inheritance clause}}
+class ClassWithInheritance5 : FooProtocol, BarProtocol, FooClass {} // expected-error {{superclass 'FooClass' must appear first in the inheritance clause}} {{31-31=FooClass, }} {{55-65=}}
 // CHECK: {{^}}class ClassWithInheritance5 : FooProtocol, BarProtocol, FooClass {{{$}}
 
 class ClassWithInheritance6 : FooClass, BarClass {} // expected-error {{multiple inheritance from classes 'FooClass' and 'BarClass'}}

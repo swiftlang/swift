@@ -62,7 +62,7 @@ func recover_missing_body_2() // expected-error {{expected '{' in body of functi
 // should produce the error about missing right paren.
 //
 // FIXME: The errors are awful.  We should produce just the error about paren.
-func f_recover_missing_tuple_paren(a: Int // expected-error {{expected parameter type following ':'}} expected-note {{to match this opening '('}} expected-error{{expected '{' in body of function declaration}} expected-error {{expected ')' in parameter}} expected-error 2{{expected ',' separator}}
+func f_recover_missing_tuple_paren(a: Int // expected-error {{expected parameter type following ':'}} expected-note {{to match this opening '('}} expected-error{{expected '{' in body of function declaration}} expected-error {{expected ')' in parameter}} expected-error 2{{expected ',' separator}} {{42-42=,}} {{42-42=,}}
 func g_recover_missing_tuple_paren(b: Int) {
 }
 
@@ -79,7 +79,7 @@ func parseError3(a: unknown_type, b: ) {} // expected-error {{use of undeclared 
 
 func parseError4(a: , b: ) {} // expected-error 2{{type annotation missing in pattern}} expected-error 2{{expected parameter type following ':'}}
 
-func parseError5(a: b: ) {} // expected-error {{use of undeclared type 'b'}} expected-error 2{{expected ',' separator}} expected-error {{expected parameter type following ':'}}
+func parseError5(a: b: ) {} // expected-error {{use of undeclared type 'b'}} expected-error 2{{expected ',' separator}} {{22-22=,}} {{22-22=,}} expected-error {{expected parameter type following ':'}}
 
 func parseError6(a: unknown_type, b: ) {} // expected-error {{use of undeclared type 'unknown_type'}} expected-error {{type annotation missing in pattern}} expected-error {{expected parameter type following ':'}}
 
@@ -87,8 +87,8 @@ func parseError7(a: Int, goo b: unknown_type) {} // expected-error {{use of unde
 
 public func foo(a: Bool = true) -> (b: Bar, c: Bar) {} // expected-error {{use of undeclared type 'Bar'}}
 
-// expected-error@+1{{unnamed parameters must be written}}
-func parenPatternInArg((a): Int) -> Int { // expected-error {{use of undeclared type 'a'}} expected-error 2{{expected ',' separator}} expected-error {{expected parameter type following ':'}}
+// expected-error@+1{{unnamed parameters must be written}} {{24-24=_: }}
+func parenPatternInArg((a): Int) -> Int { // expected-error {{use of undeclared type 'a'}} expected-error 2{{expected ',' separator}} {{27-27=,}} {{27-27=,}} expected-error {{expected parameter type following ':'}}
   return a
 }
 parenPatternInArg(0)
@@ -100,7 +100,7 @@ nullaryClosure(0)
 // rdar://16737322 - This argument is an unnamed argument that has a labeled
 // tuple type as the type.  Because the labels are in the type, they are not
 // parameter labels, and they are thus not in scope in the body of the function.
-// expected-error@+1{{unnamed parameters must be written}}
+// expected-error@+1{{unnamed parameters must be written}} {{27-27=_: }}
 func destructureArgument( (result: Int, error: Bool) ) -> Int {
   return result  // expected-error {{use of unresolved identifier 'result'}}
 }
@@ -121,7 +121,7 @@ func testObjCMethodCurry(a : ClassWithObjCMethod) -> (Int) -> () {
 }
 
 // We used to crash on this.
-func rdar16786220(var let c: Int) -> () { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
+func rdar16786220(var let c: Int) -> () { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{23-27=}}
   c = 42
 }
 
@@ -135,8 +135,8 @@ func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false
 
 
 // <rdar://problem/16786168> Functions currently permit 'var inout' parameters
-func var_inout_error(inout var x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
-func var_inout_error(var inout x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} expected-warning {{parameter 'x' was never mutated}}
+func var_inout_error(inout var x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{28-32=}}
+func var_inout_error(var inout x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-32=}} expected-warning {{parameter 'x' was never mutated}} {{22-25=}}
 
 // Unnamed parameters require the name "_":
 func unnamed(Int) { } // expected-error{{unnamed parameters must be written with the empty name '_'}}{{14-14=_: }}

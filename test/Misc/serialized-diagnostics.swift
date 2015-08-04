@@ -10,7 +10,7 @@
 // RUN: c-index-test -read-diagnostics %t.integrated_frontend.dia > %t.integrated_frontend.deserialized_diagnostics.txt 2>&1
 // RUN: FileCheck --input-file=%t.integrated_frontend.deserialized_diagnostics.txt %s
 
-var x = 1 x = 2   // expected-error {{consecutive statements on a line must be separated by ';'}}
+var x = 1 x = 2   // expected-error {{consecutive statements on a line must be separated by ';'}} {{10-10=;}}
 var z : Int       // expected-note {{previously declared here}}
 var z : Int       // expected-error {{invalid redeclaration}}
 

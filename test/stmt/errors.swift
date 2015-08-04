@@ -104,7 +104,7 @@ func nine() throws {
 func ten_helper(x: Int) {}
 func ten_helper(x: Int, y: Int) throws {}
 func ten() throws {
-  try ten_helper(y: 0) // expected-error {{extraneous argument label 'y:' in call}}
+  try ten_helper(y: 0) // expected-error {{extraneous argument label 'y:' in call}} {{18-21=}}
 }
 
 // rdar://21074857
@@ -114,7 +114,7 @@ func eleven_one() {
     do {
       try thrower()
     // FIXME: suppress the double-emission of the 'always true' warning
-    } catch let e as ErrorType { // expected-warning {{immutable value 'e' was never used}} expected-warning 2 {{'as' test is always true}}
+    } catch let e as ErrorType { // expected-warning {{immutable value 'e' was never used}} {{17-18=_}} expected-warning 2 {{'as' test is always true}}
     }
   }
 }

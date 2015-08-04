@@ -1,10 +1,10 @@
 // RUN: %target-parse-verify-swift
 
-#if 0  // expected-error {{'0' is not a valid configuration option, use 'false'}}
+#if 0  // expected-error {{'0' is not a valid configuration option, use 'false'}} {{5-6=false}}
   let x = 1
 #endif
 
-#if 1  // expected-error {{'1' is not a valid configuration option, use 'true'}}
+#if 1  // expected-error {{'1' is not a valid configuration option, use 'true'}} {{5-6=true}}
   let x = 1
 #endif
 

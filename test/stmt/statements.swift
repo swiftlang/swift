@@ -205,7 +205,7 @@ func NonVoidReturn1() -> Int {
 }
 
 func NonVoidReturn2() -> Int {
-  return + // expected-error {{unary operator cannot be separated from its operand}} expected-error {{expected expression in 'return' statement}}
+  return + // expected-error {{unary operator cannot be separated from its operand}} {{11-1=}} expected-error {{expected expression in 'return' statement}}
 }
 
 func VoidReturn1() {
@@ -250,7 +250,7 @@ func DoStmt() {
 }
 
 func DoWhileStmt() {
-  do { // expected-error {{'do-while' statement is not allowed; use 'repeat-while' instead}}
+  do { // expected-error {{'do-while' statement is not allowed; use 'repeat-while' instead}} {{3-5=repeat}}
   } while true
 }
 
@@ -271,7 +271,7 @@ func RepeatWhileStmt2() {
 
 func RepeatWhileStmt4() {
   repeat {
-  } while + // expected-error {{unary operator cannot be separated from its operand}} expected-error {{expected expression in 'repeat-while' condition}}
+  } while + // expected-error {{unary operator cannot be separated from its operand}} {{12-1=}} expected-error {{expected expression in 'repeat-while' condition}}
 }
 
 func brokenSwitch(x: Int) -> Int {
@@ -403,7 +403,7 @@ func test_is_as_patterns() {
 func matching_pattern_recursion() {
   switch 42 {
   // FIXME: this is a terrible diagnostic
-  case {  // expected-error {{function produces expected type 'Range<Int>'; did you mean to call it with '()'?}}
+  case {  // expected-error {{function produces expected type 'Range<Int>'; did you mean to call it with '()'?}} {{4-4=()}}
       for i in zs {
       }
   }: break

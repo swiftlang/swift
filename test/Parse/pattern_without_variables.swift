@@ -28,7 +28,7 @@ func testVarLetPattern(a : SimpleEnum) {
   case let x: _ = x; break         // Ok.
   }
   switch a {
-  case let _: break         // expected-warning {{'let' pattern has no effect; sub-pattern didn't bind any variables}}
+  case let _: break         // expected-warning {{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{8-12=}}
   }
   switch (a, 42) {
   case let (_, x): _ = x; break    // ok

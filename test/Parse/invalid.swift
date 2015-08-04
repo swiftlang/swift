@@ -1,19 +1,24 @@
 // RUN: %target-parse-verify-swift
 
 func foo(a: Int) {
-  foo(<\a\>) // expected-error 2 {{invalid character in source file}} \
-             // expected-error {{'<' is not a prefix unary operator}} \
-             // expected-error {{'>' is not a postfix unary operator}}
+  // expected-error @+1 {{invalid character in source file}} {{8-9= }}
+  foo(<\a\>) // expected-error {{invalid character in source file}} {{10-11= }}
+  // expected-error @-1 {{'<' is not a prefix unary operator}}
+  // expected-error @-2 {{'>' is not a postfix unary operator}}
 }
 
 // rdar://15946844
-func test1(inout var x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
-func test2(inout let x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
+func test1(inout var x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{18-22=}}
+func test2(inout let x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{18-22=}}
 
 // rdar://16601779
 func foo() {
-  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'}}  expected-note {{to match this opening '('}} expected-error {{expected ',' separator}}
-    skview! // expected-error 2{{expected ',' separator}} expected-error {{use of unresolved identifier 'skview'}}
+  runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'}}  expected-note {{to match this opening '('}} expected-error {{expected ',' separator}} {{32-32=,}}
+    
+    // expected-error @+2 {{expected ',' separator}} {{12-12=,}}
+    // expected-error @+1 {{expected ',' separator}} {{12-12=,}}
+    skview!
+    // expected-error @-1 {{use of unresolved identifier 'skview'}}
 } // expected-error {{expected expression in list of expressions}} expected-error {{expected ')' in expression list}}
 
 func test3(a: inout Int) {} // expected-error {{'inout' must appear before the parameter name}}{{12-12=inout }}{{15-21=}}
@@ -28,12 +33,13 @@ switch state { // expected-error {{use of unresolved identifier 'state'}}
 // rdar://18926814
 func test4() {
   let abc = 123
-  _ = " >> \( abc } ) << "   // expected-note {{to match this opening '('}}  expected-error {{expected ')' in expression list}}  expected-error 2 {{expected ',' separator}}  expected-error {{expected expression in list of expressions}}  expected-error {{extra tokens after interpolated string expression}}
+  _ = " >> \( abc } ) << "   // expected-note {{to match this opening '('}}  expected-error {{expected ')' in expression list}}  expected-error {{expected ',' separator}} {{18-18=,}} expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}  expected-error {{extra tokens after interpolated string expression}}
 
 }
 
 // rdar://problem/18507467
-func d(b: String -> <T>() -> T) {} // expected-error {{expected type for function result}} \
-                                   // expected-error 2 {{expected ',' separator}} \
-                                   // expected-error {{expected parameter type following ':'}} \
-                                   // expected-error {{type annotation missing in pattern}}
+func d(b: String -> <T>() -> T) {} // expected-error {{expected type for function result}}
+// expected-error @-1 {{expected ',' separator}} {{20-20=,}}
+// expected-error @-2 {{type annotation missing in pattern}}
+// expected-error @-3 {{expected parameter type following ':'}}
+// expected-error @-4 {{expected ',' separator}}

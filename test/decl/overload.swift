@@ -276,7 +276,7 @@ protocol ProtocolWithMutating {
   mutating func test3() // expected-note {{previously declared}}
   func test3() // expected-error {{invalid redeclaration of 'test3()'}}
 
-  mutating static func classTest1() // expected-error {{static functions may not be declared mutating}} expected-note {{previously declared}}
+  mutating static func classTest1() // expected-error {{static functions may not be declared mutating}} {{3-12=}} expected-note {{previously declared}}
   static func classTest1() // expected-error{{invalid redeclaration of 'classTest1()'}}
 }
 

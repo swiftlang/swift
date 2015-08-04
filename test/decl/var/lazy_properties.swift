@@ -1,16 +1,16 @@
 // RUN: %target-parse-verify-swift -parse-as-library
 
-lazy func lazy_func() {} // expected-error {{'lazy' may only be used on 'var' declarations}}
+lazy func lazy_func() {} // expected-error {{'lazy' may only be used on 'var' declarations}} {{1-6=}}
 
-lazy var b = 42  // expected-error {{'lazy' may not be used on an already-lazy global}}
+lazy var b = 42  // expected-error {{'lazy' may not be used on an already-lazy global}} {{1-6=}}
 
 struct S {
-  lazy static var lazy_global = 42 // expected-error {{'lazy' may not be used on an already-lazy global}}
+  lazy static var lazy_global = 42 // expected-error {{'lazy' may not be used on an already-lazy global}} {{3-8=}}
 }
 
 protocol SomeProtocol {
-  lazy var x : Int  // expected-error {{'lazy' isn't allowed on a protocol requirement}}
-  lazy var y : Int { get } // expected-error {{'lazy' isn't allowed on a protocol requirement}}
+  lazy var x : Int  // expected-error {{'lazy' isn't allowed on a protocol requirement}} {{3-8=}}
+  lazy var y : Int { get } // expected-error {{'lazy' isn't allowed on a protocol requirement}} {{3-8=}}
 }
 
 
@@ -18,19 +18,19 @@ class TestClass {
   lazy var a = 42
   lazy var a1 : Int = 42
 
-  lazy let b = 42  // expected-error {{'lazy' cannot be used on a let}}
+  lazy let b = 42  // expected-error {{'lazy' cannot be used on a let}} {{3-8=}}
 
-  lazy var c : Int { return 42 } // expected-error {{'lazy' may not be used on a computed property}}
+  lazy var c : Int { return 42 } // expected-error {{'lazy' may not be used on a computed property}} {{3-8=}}
 
-  lazy var d : Int  // expected-error {{lazy properties must have an initializer}}
+  lazy var d : Int  // expected-error {{lazy properties must have an initializer}} {{3-8=}}
 
-  lazy var (e, f) = (1,2)  // expected-error {{'lazy' cannot destructure an initializer}}
+  lazy var (e, f) = (1,2)  // expected-error {{'lazy' cannot destructure an initializer}} {{3-8=}}
 
   lazy var g : Int = { 0 }()   // single-expr closure
 
   lazy var h : Int = { return 0 }()+1  // multi-stmt closure
 
-  lazy var i : Int = 42 {  // expected-error {{lazy properties may not have observers}}
+  lazy var i : Int = 42 {  // expected-error {{lazy properties may not have observers}} {{3-8=}}
     didSet {
     }
   }
@@ -43,7 +43,7 @@ class TestClass {
   }*/
 
   init() {
-    lazy var localvar = 42  // expected-error {{lazy is only valid for members of a struct or class}}
+    lazy var localvar = 42  // expected-error {{lazy is only valid for members of a struct or class}} {{5-10=}}
     localvar++
     _ = localvar
   }
@@ -57,7 +57,7 @@ struct StructTest {
     return p1
   }
   
-  // expected-note @+1 {{mark method 'mutating' to make 'self' mutable}}
+  // expected-note @+1 {{mark method 'mutating' to make 'self' mutable}} {{3-3=mutating }}
   func f2() -> Int {
     return p1  // expected-error {{cannot use mutating getter on immutable value: 'self' is immutable}}
   }

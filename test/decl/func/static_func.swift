@@ -13,8 +13,8 @@ static override func gf5() {} // expected-error {{static methods may only be dec
 class override func gf6() {} // expected-error {{class methods may only be declared on a type}}{{1-7=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{7-16=}}
 
-static gf7() {} // expected-error {{expected declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} expected-error{{expression resolves to an unused function}}
-class gf8() {} // expected-error {{expected '{' in class}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} expected-error{{expression resolves to an unused function}}
+static gf7() {} // expected-error {{expected declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} {{14-14=_ = }} expected-error{{expression resolves to an unused function}}
+class gf8() {} // expected-error {{expected '{' in class}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} {{13-13=_ = }} expected-error{{expression resolves to an unused function}}
 
 func inGlobalFunc() {
   static func gf1() {} // expected-error {{static methods may only be declared on a type}}{{3-10=}}
@@ -33,31 +33,31 @@ struct DuplicateStatic {
   static class func f2() {} // expected-error{{'class' specified twice}}{{10-16=}}
   class static func f3() {} // expected-error{{'static' specified twice}}{{9-16=}} expected-error{{class methods are only allowed within classes; use 'static' to declare a static method}}{{3-8=static}}
   class class func f4() {} // expected-error{{'class' specified twice}}{{9-15=}} expected-error{{class methods are only allowed within classes; use 'static' to declare a static method}}{{3-8=static}}
-  override static static func f5() {} // expected-error{{'static' specified twice}}{{19-26=}} expected-error{{'override' can only be specified on class members}}
-  static override static func f6() {} // expected-error{{'static' specified twice}}{{19-26=}} expected-error{{'override' can only be specified on class members}}
-  static static override func f7() {} // expected-error{{'static' specified twice}}{{10-17=}} expected-error{{'override' can only be specified on class members}}
+  override static static func f5() {} // expected-error{{'static' specified twice}}{{19-26=}} expected-error{{'override' can only be specified on class members}} {{3-12=}}
+  static override static func f6() {} // expected-error{{'static' specified twice}}{{19-26=}} expected-error{{'override' can only be specified on class members}} {{10-19=}}
+  static static override func f7() {} // expected-error{{'static' specified twice}}{{10-17=}} expected-error{{'override' can only be specified on class members}} {{17-26=}}
   static final func f8() {} // expected-error {{only classes and class members may be marked with 'final'}}
 }
 
 struct S { // expected-note {{extended type declared here}}
   static func f1() {}
-  class func f2() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}}
+  class func f2() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}} {{3-8=static}}
 }
 
 extension S {
   static func ef1() {}
-  class func ef2() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}}
+  class func ef2() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}} {{3-8=static}}
 }
 
 enum E { // expected-note {{extended type declared here}}
   static func f1() {}
-  class func f2() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}}
+  class func f2() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}} {{3-8=static}}
   static final func f3() {} // expected-error {{only classes and class members may be marked with 'final'}}
 }
 
 extension E {
   static func f4() {}
-  class func f5() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}}
+  class func f5() {} // expected-error {{class methods are only allowed within classes; use 'static' to declare a static method}} {{3-8=static}}
 }
 
 class C {
@@ -66,7 +66,7 @@ class C {
   class func f3() {}
   class func f4() {} // expected-note {{overridden declaration is here}}
   class func f5() {} // expected-note {{overridden declaration is here}}
-  static final func f6() {} // expected-error {{static declarations are already final}}
+  static final func f6() {} // expected-error {{static declarations are already final}} {{10-16=}}
 }
 
 extension C {

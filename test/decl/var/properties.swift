@@ -263,7 +263,7 @@ class CT<T : TrivialInitType> {
 
 var computed_prop_with_init_1: X {
   get {}
-} = X()  // expected-error {{expected expression}} expected-error {{consecutive statements on a line must be separated by ';'}}
+} = X()  // expected-error {{expected expression}} expected-error {{consecutive statements on a line must be separated by ';'}} {{2-2=;}}
 
 // FIXME: Redundant error below
 var x2 { // expected-error{{computed property must have an explicit type}} expected-error{{type annotation missing in pattern}}
@@ -648,7 +648,7 @@ class SelfRefProperties {
     }
     set {
       markUsed(setter) // no-warning
-      var unused = setter + setter // expected-warning {{initialization of variable 'unused' was never used; consider replacing with assignment to '_' or removing it}}
+      var unused = setter + setter // expected-warning {{initialization of variable 'unused' was never used; consider replacing with assignment to '_' or removing it}} {{7-17=_}}
       setter = newValue // expected-warning {{attempting to modify 'setter' within its own setter}}
       // expected-note@-1 {{access 'self' explicitly to silence this warning}} {{7-7=self.}}
     }
@@ -1151,7 +1151,7 @@ struct r19874152S3 {
   let number : Int = 42
   let flavour : Int
 }
-_ = r19874152S3(number:64)  // expected-error {{incorrect argument label in call (have 'number:', expected 'flavour:')}}
+_ = r19874152S3(number:64)  // expected-error {{incorrect argument label in call (have 'number:', expected 'flavour:')}} {{17-23=flavour}}
 _ = r19874152S3(number:64, flavour: 17)  // expected-error {{extra argument 'number' in call}}
 _ = r19874152S3(flavour: 17)  // ok
 _ = r19874152S3()  // expected-error {{missing argument for parameter 'flavour' in call}}

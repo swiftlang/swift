@@ -75,7 +75,7 @@ func test3(a: ZeroOneTwoThree) {
   var _ : Int =
      ZeroOneTwoThree.Zero // expected-error {{cannot convert value of type 'ZeroOneTwoThree' to specified type 'Int'}}
 
-  test3 ZeroOneTwoThree.Zero // expected-error {{expression resolves to an unused function}} expected-error{{consecutive statements}}
+  test3 ZeroOneTwoThree.Zero // expected-error {{expression resolves to an unused function}} expected-error{{consecutive statements}} {{8-8=;}}
   test3 (ZeroOneTwoThree.Zero)
   test3(ZeroOneTwoThree.Zero)
   test3 // expected-error {{expression resolves to an unused function}}
@@ -276,7 +276,7 @@ func testDirection() {
 }
 
 enum NestedSingleElementTuple {
-  case Case(x: (y: Int)) // expected-error{{cannot create a single-element tuple with an element label}}
+  case Case(x: (y: Int)) // expected-error{{cannot create a single-element tuple with an element label}} {{17-20=}}
 }
 
 enum SimpleEnum {

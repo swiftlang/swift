@@ -5,15 +5,15 @@
 // <rdar://problem/18876585> Compiler should warn me if I set a parameter as 'var' but never modify it
 
 func basicTests() -> Int {
-  let x = 42 // expected-warning {{immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
-  var y = 12 // expected-warning {{variable 'y' was never mutated; consider changing to 'let' constant}}
+  let x = 42 // expected-warning {{immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}} {{3-8=_}}
+  var y = 12 // expected-warning {{variable 'y' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   _ = 42 // ok
   _ = 42 // ok
   return y
 }
 
 func mutableParameter(a : Int, h : Int, var i : Int, var j: Int,
-       var g : Int) -> Int { // expected-warning {{parameter 'g' was never mutated; consider changing to 'let' constant}}
+       var g : Int) -> Int { // expected-warning {{parameter 'g' was never mutated; consider changing to 'let' constant}} {{8-12=}}
   swap(&i, &j)
   return i+g
 }
@@ -31,7 +31,7 @@ func testStruct() {
   var b = X()
   b.g()
   
-  var c = X()  // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
+  var c = X()  // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   c.f()
 }
 
@@ -53,7 +53,7 @@ func nestedFunction() -> Int {
   
   func g() {
     x = 97
-    var q = 27  // expected-warning {{variable 'q' was never used}}
+    var q = 27  // expected-warning {{variable 'q' was never used}} {{5-10=_}}
   }
   g()
   
@@ -118,12 +118,12 @@ func test() {
   let v = TestComputedPropertyStruct()
   v.x = 42
   
-  var v2 = TestComputedPropertyStruct()  // expected-warning {{variable 'v2' was never mutated; consider changing to 'let' constant}}
+  var v2 = TestComputedPropertyStruct()  // expected-warning {{variable 'v2' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   v2.x = 42
 }
 
 func test4() {
-  // expected-warning @+1 {{variable 'dest' was never mutated; consider changing to 'let' constant}}
+  // expected-warning @+1 {{variable 'dest' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   var dest = UnsafeMutablePointer<Int>(bitPattern: 0)
 
   dest[0] = 0
@@ -161,7 +161,7 @@ protocol Fooable {
   func immutFoo()
 }
 func testOpenExistential(var x: Fooable,
-                         var y: Fooable) {  // expected-warning {{parameter 'y' was never mutated; consider changing to 'let' constant}}
+                         var y: Fooable) {  // expected-warning {{parameter 'y' was never mutated; consider changing to 'let' constant}} {{26-30=}}
   x.mutFoo()
   y.immutFoo()
 }

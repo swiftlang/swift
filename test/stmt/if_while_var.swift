@@ -73,11 +73,11 @@ if 1 != 2, let x : Int? = opt {}
 if 1 != 2, {  // expected-error {{expected 'let' or 'var' in conditional}}
 }
 if 1 != 2, 4 == 57 {}   // expected-error {{expected 'let' or 'var' in conditional; use '&&' to join boolean conditions}}{{10-11= &&}}
-if 1 != 2, 4 == 57, let x = opt {} // expected-error {{expected 'let' or 'var' in conditional; use '&&' to join boolean conditions}}
+if 1 != 2, 4 == 57, let x = opt {} // expected-error {{expected 'let' or 'var' in conditional; use '&&' to join boolean conditions}} {{10-11= &&}}
 
 // Test that these don't cause the parser to crash.
 if true { if a == 0; {} }   // expected-error {{expected '{' after 'if' condition}} expected-error 2{{}}
-if a == 0, where b == 0 {}  // expected-error {{expected 'let' or 'var' in conditional; use '&&' to join boolean conditions}} expected-error 4{{}} expected-note {{}}
+if a == 0, where b == 0 {}  // expected-error {{expected 'let' or 'var' in conditional; use '&&' to join boolean conditions}} {{10-11= &&}} expected-error 4{{}} expected-note {{}} {{25-25=_ = }}
 
 
 

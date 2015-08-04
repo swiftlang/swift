@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 var t1a: (Int...) = (1) // expected-error{{cannot create a variadic tuple}}
-var t2d: (Double = 0.0) = 1 // expected-error {{default argument not permitted in a tuple type}}
+var t2d: (Double = 0.0) = 1 // expected-error {{default argument not permitted in a tuple type}} {{18-23=}}
 
 func f1(a: Int...) { for _ in a {} }
 f1()
@@ -27,7 +27,7 @@ func invalidVariadic(e: NonExistentType) { // expected-error {{use of undeclared
   { (e: ExtraCrispy...) in }() // expected-error {{use of undeclared type 'ExtraCrispy'}}
 }
 
-func twoVariadics(a: Int..., b: Int...) { } // expected-error{{only a single variadic parameter '...' is permitted}}
+func twoVariadics(a: Int..., b: Int...) { } // expected-error{{only a single variadic parameter '...' is permitted}} {{36-39=}}
 
 // rdar://22056861
 func f5(list: Any..., end: String = "") {}

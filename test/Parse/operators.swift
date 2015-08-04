@@ -108,6 +108,6 @@ infix operator !! {}
 func !!(x: Man, y: Man) {}
 let foo = Man()
 let bar = TheDevil()
-foo!!foo // expected-error{{cannot force unwrap value of non-optional type 'Man'}} expected-error{{consecutive statements}}
-foo??bar // expected-error{{broken standard library}} expected-error{{consecutive statements}}
+foo!!foo // expected-error{{cannot force unwrap value of non-optional type 'Man'}} {{4-5=}} expected-error{{consecutive statements}} {{6-6=;}}
+foo??bar // expected-error{{broken standard library}} expected-error{{consecutive statements}} {{6-6=;}}
 

@@ -61,7 +61,7 @@ prefix func +// this should be a comment, not an operator
 prefix func -/* this also should be a comment, not an operator */
 (arg: Int) -> Int { return arg }
 
-func +*/ () {}   // expected-error {{expected identifier in function declaration}} expected-error {{unexpected end of block comment}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} expected-error{{expression resolves to an unused function}}
+func +*/ () {}   // expected-error {{expected identifier in function declaration}} expected-error {{unexpected end of block comment}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} {{13-13=_ = }} expected-error{{expression resolves to an unused function}}
 func errors() {
   */    // expected-error {{unexpected end of block comment}}
   
@@ -84,13 +84,13 @@ postfix operator -+- {}
 
 infix operator +-+= {}
 
-infix func +-+ (x: Int, y: Int) -> Int {} // expected-error {{'infix' modifier is not required or allowed on func declarations}}
+infix func +-+ (x: Int, y: Int) -> Int {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}}
 prefix func +-+ (x: Int) -> Int {}
 
 prefix func -+- (inout y: Int) -> Int {} // expected-note 2{{found this candidate}}
 postfix func -+- (inout x: Int) -> Int {} // expected-note 2{{found this candidate}}
 
-infix func +-+= (inout x: Int, y: Int) -> Int {} // expected-error {{'infix' modifier is not required or allowed on func declarations}}
+infix func +-+= (inout x: Int, y: Int) -> Int {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}}
 
 var n = 0
 
@@ -104,7 +104,7 @@ var n = 0
 
 // Assignment operator refs become inout functions
 (+-+=)(&n, 12)
-(+-+=)(n, 12)   // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+(+-+=)(n, 12)   // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{8-8=&}}
 
 var f1 : (Int, Int) -> Int = (+-+)
 var f2 : (Int) -> Int = (+-+)
@@ -136,7 +136,7 @@ x☃⃠y
 func test_14705150() {
   let a = 4
   var b! = a  // expected-error {{type annotation missing in pattern}}
-  // expected-error @-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error @-1 {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
   // expected-error @-2 {{expected expression}}
 
 }
@@ -163,7 +163,7 @@ func operator_in_func_bad () {
                                                                     // expected-error {{use of unresolved identifier 'input'}}
 }
 
-infix operator ? {}  // expected-error {{expected operator name in operator declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} expected-error{{expression resolves to an unused function}}
+infix operator ? {}  // expected-error {{expected operator name in operator declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} {{18-18=_ = }} expected-error{{expression resolves to an unused function}}
 
 infix operator ??= {}
 

@@ -30,7 +30,7 @@ protocol P {
 class PX : P {
   func g1(x: Int) { } // okay
   func g2(x: Int, other: Int) { } // okay
-  func g3(x: Int, y: Int, third: Int) { } // expected-error{{method 'g3(_:y:third:)' has different argument names from those required by protocol 'P' ('g3(_:other:third:)')}}
+  func g3(x: Int, y: Int, third: Int) { } // expected-error{{method 'g3(_:y:third:)' has different argument names from those required by protocol 'P' ('g3(_:other:third:)')}} {{19-19=other }}
 
   class func g4(x: Int) { }
 }
@@ -72,8 +72,8 @@ func f5(a: Int)(b: Int) { }
 
 func testFunctions(i: Int, x: X) {
   f4(i)(i)
-  f4(i)(b: i) // expected-error{{extraneous argument label 'b:' in call}}
-  f5(i)(i) // expected-error{{missing argument label 'b:' in call}}
+  f4(i)(b: i) // expected-error{{extraneous argument label 'b:' in call}} {{9-12=}}
+  f5(i)(i) // expected-error{{missing argument label 'b:' in call}} {{9-9=b: }}
   f5(i)(b: i)
 }
 
@@ -95,25 +95,25 @@ struct Y {
 
 func testMethods(i: Int, x: Y) {
   x.m0(i)(i)
-  x.m0(i)(b: i) // expected-error{{extraneous argument label 'b:' in call}}
-  x.m1(i)(i) // expected-error{{missing argument label 'b:' in call}}
+  x.m0(i)(b: i) // expected-error{{extraneous argument label 'b:' in call}} {{11-14=}}
+  x.m1(i)(i) // expected-error{{missing argument label 'b:' in call}} {{11-11=b: }}
   x.m1(i)(b: i) 
-  x.m2(i)(i, c: i) // expected-error{{extraneous argument label 'c:' in call}}
+  x.m2(i)(i, c: i) // expected-error{{extraneous argument label 'c:' in call}} {{14-17=}}
   x.m2(i)(i, i)
-  x.m3(i)(b: i, i) // expected-error{{missing argument label 'c2:' in call}}
+  x.m3(i)(b: i, i) // expected-error{{missing argument label 'c2:' in call}} {{17-17=c2: }}
   x.m3(i)(b: i, c2: i)
 }
 
 func testSubscripts(i: Int, s: String, x: Y) {
   var i2 = x[i]
-  var i3 = x[x: i] // expected-error{{extraneous argument label 'x:' in subscript}}
+  var i3 = x[x: i] // expected-error{{extraneous argument label 'x:' in subscript}} {{14-17=}}
   var s2 = x[y: s]
-  var s3 = x[s]  // expected-error{{missing argument label 'y:' in subscript}}
+  var s3 = x[s]  // expected-error{{missing argument label 'y:' in subscript}} {{14-14=y: }}
 }
 
 // Operators
 func +(_ a: String,  // expected-warning{{extraneous '_' in parameter: 'a' has no keyword argument name}}{{8-10=}}
-       b b: Double) { } // expected-error{{operator cannot have keyword arguments}}
+       b b: Double) { } // expected-error{{operator cannot have keyword arguments}} {{8-10=}}
 
 func +(a: Double, b: String)(_ c: Int)(d e: Int) { } // okay
 

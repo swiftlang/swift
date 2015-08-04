@@ -113,7 +113,7 @@ enum Recovery3 {
   case UE2(): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
 enum Recovery4 {
-  case Self Self // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error {{expected declaration}}
+  case Self Self // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-error {{expected declaration}}
 }
 enum Recovery5 {
   case .UE3 // expected-error {{extraneous '.' in enum 'case' declaration}} {{8-9=}}
@@ -139,7 +139,7 @@ enum MultiRawType : Int64, Int32 { // expected-error {{multiple enum raw types '
 }
 
 protocol RawTypeNotFirstProtocol {}
-enum RawTypeNotFirst : RawTypeNotFirstProtocol, Int { // expected-error {{raw type 'Int' must appear first in the enum inheritance clause}}
+enum RawTypeNotFirst : RawTypeNotFirstProtocol, Int { // expected-error {{raw type 'Int' must appear first in the enum inheritance clause}} {{24-24=Int, }} {{47-52=}}
   case E
 }
 

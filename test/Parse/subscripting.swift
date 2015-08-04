@@ -119,7 +119,7 @@ struct A3 {
 }
 
 struct A4 {
-  subscript(i : Int) { // expected-error {{expected '->' for subscript element type}} expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error {{expected declaration}}
+  subscript(i : Int) { // expected-error {{expected '->' for subscript element type}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{21-21=;}} expected-error {{expected declaration}}
     get {
       return i
     }
@@ -131,7 +131,7 @@ struct A5 {
 }
 
 struct A6 {
-  subscript(i: Int)(j: Int) -> Int { // expected-error {{expected '->' for subscript element type}} expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error {{expected declaration}}
+  subscript(i: Int)(j: Int) -> Int { // expected-error {{expected '->' for subscript element type}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{20-20=;}} expected-error {{expected declaration}}
     get {
       return i + j
     }
@@ -139,7 +139,7 @@ struct A6 {
 }
 
 struct A7 {
-  static subscript(a: Int) -> Int { // expected-error {{subscript cannot be marked 'static'}}
+  static subscript(a: Int) -> Int { // expected-error {{subscript cannot be marked 'static'}} {{3-10=}}
     get {
       return 42
     }
@@ -147,7 +147,7 @@ struct A7 {
 }
 
 struct A7b {
-  class subscript(a: Float) -> Int { // expected-error {{subscript cannot be marked 'class'}}
+  class subscript(a: Float) -> Int { // expected-error {{subscript cannot be marked 'class'}} {{3-9=}}
     get {
       return 42
     }
@@ -163,5 +163,5 @@ struct A8 {
       stored = value
     }
   }
-} // expected-error{{extraneous '}' at top level}}
+} // expected-error{{extraneous '}' at top level}} {{1-3=}}
 

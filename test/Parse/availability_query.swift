@@ -17,11 +17,11 @@ if !#available(OSX 10.11, *) { // expected-error {{#available may only be used a
 if let _ = Optional(5) where !#available(OSX 10.11, *) { // expected-error {{#available may only be used as condition}}
 }
 
-if #available(OSX 10.10, *) && #available(OSX 10.11, *) { // expected-error {{expected '{' after 'if' condition}} expected-error 3 {{}} expected-note {{}}
+if #available(OSX 10.10, *) && #available(OSX 10.11, *) { // expected-error {{expected '{' after 'if' condition}} expected-error 3 {{}} expected-note {{}} {{57-57=_ = }}
 }
 
 
-if #available { // expected-error {{expected availability condition}} expected-error {{braced block of statements is an unused closure}} expected-error {{statement cannot begin with a closure expression}} expected-note {{explicitly discard the result of the closure by assigning to '_'}} expected-error {{expression resolves to an unused function}}
+if #available { // expected-error {{expected availability condition}} expected-error {{braced block of statements is an unused closure}} expected-error {{statement cannot begin with a closure expression}} expected-note {{explicitly discard the result of the closure by assigning to '_'}} {{15-15=_ = }} expected-error {{expression resolves to an unused function}}
 }
 
 if #available( { // expected-error {{expected platform name}} expected-error {{expected ')'}} expected-note {{to match this opening '('}}
@@ -36,7 +36,7 @@ if #available(OSX { // expected-error {{expected version number}} expected-error
 if #available(OSX) { // expected-error {{expected version number}}
 }
 
-if #available(OSX 10.10 { // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-error {{must handle potential future platforms with '*'}}
+if #available(OSX 10.10 { // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-error {{must handle potential future platforms with '*'}} {{24-24=, *}}
 }
 
 if #available(iDishwasherOS 10.10) { // expected-error {{unrecognized platform name 'iDishwasherOS'}}

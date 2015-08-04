@@ -48,26 +48,26 @@ public extension PublicStruct {
   private func extImplPublic() {}
 }
 internal extension PublicStruct {
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
   private func extImplInternal() {}
 }
 private extension PublicStruct {
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=private}}
   private func extImplPrivate() {}
 }
 
 internal extension InternalStruct {
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
   private func extImplInternal() {}
 }
 private extension InternalStruct {
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=private}}
   private func extImplPrivate() {}
 }
 
 
 private extension PrivateStruct {
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=private}}
   private func extImplPrivate() {}
 }
 
@@ -77,7 +77,7 @@ public protocol PublicReadOnlyOperations {
 }
 
 internal struct PrivateSettersForReadOnlyInternal : PublicReadOnlyOperations {
-  public private(set) var size = 0 // expected-warning {{declaring a public var for an internal struct}}
+  public private(set) var size = 0 // expected-warning {{declaring a public var for an internal struct}} {{3-9=internal}}
   internal private(set) subscript (_: Int) -> Int { // no-warning
     get { return 42 }
     set {}

@@ -473,7 +473,7 @@ struct MyStruct {
   var state : Bool
   init() { state = true }
   mutating func mod() {state = false}
-  // expected-note @+1 {{mark method 'mutating' to make 'self' mutable}}
+  // expected-note @+1 {{mark method 'mutating' to make 'self' mutable}} {{3-3=mutating }}
   func foo() { mod() } // expected-error {{cannot use mutating member on immutable value: 'self' is immutable}}
 }
 

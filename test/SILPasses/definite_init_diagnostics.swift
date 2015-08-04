@@ -12,7 +12,7 @@ func markUsed<T>(t: T) {}
 // memory promotion pass.
 
 func test1() -> Int {
-  // expected-warning @+1 {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  // expected-warning @+1 {{variable 'a' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   var a : Int  // expected-note {{variable defined here}}
   return a     // expected-error {{variable 'a' used before being initialized}}
 }
@@ -55,7 +55,7 @@ func test2() {
 
   // Closures.
 
-  // expected-warning @+1 {{variable 'b1' was never mutated}}
+  // expected-warning @+1 {{variable 'b1' was never mutated}} {{3-6=let}}
   var b1 : Int        // expected-note {{variable defined here}}
   takes_closure {     // expected-error {{variable 'b1' used before being initialized}}
     markUsed(b1)
@@ -83,7 +83,7 @@ func test2() {
 
 
   // Classes
-  // expected-warning @+1 {{variable 'c1' was never mutated}}
+  // expected-warning @+1 {{variable 'c1' was never mutated}} {{3-6=let}}
   var c1 : SomeClass   // expected-note {{variable defined here}}
   markUsed(c1.x)          // expected-error {{variable 'c1' used before being initialized}}
 
@@ -102,7 +102,7 @@ func test2() {
   
   // Unowned.  This is immediately crashing code (it causes a retain of a
   // released object) so it should be diagnosed with a warning someday.
-  // expected-warning @+1 {{variable 'u1' was never mutated; consider changing to 'let' constant}}
+  // expected-warning @+1 {{variable 'u1' was never mutated; consider changing to 'let' constant}} {{11-14=let}}
   unowned var u1 : SomeClass // expected-note {{variable defined here}}
   _ = u1                // expected-error {{variable 'u1' used before being initialized}}
 
@@ -114,12 +114,12 @@ func test2() {
 
 // Tuple field sensitivity.
 func test4() {
-  // expected-warning @+1 {{variable 't1' was never mutated; consider changing to 'let' constant}}
+  // expected-warning @+1 {{variable 't1' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   var t1 = (1, 2, 3)
   markUsed(t1.0 + t1.1 + t1.2)  // ok
 
 
-  // expected-warning @+1 {{variable 't2' was never mutated; consider changing to 'let' constant}}
+  // expected-warning @+1 {{variable 't2' was never mutated; consider changing to 'let' constant}} {{3-6=let}}
   var t2 : (Int, Int, Int)   // expected-note 3 {{variable defined here}}
   markUsed(t2.0)   // expected-error {{variable 't2.0' used before being initialized}}
   markUsed(t2.1)   // expected-error {{variable 't2.1' used before being initialized}}
@@ -206,21 +206,21 @@ func existentials(i: Int, dp: DerivedProtocol) {
   var b : Any
   b = ()
 
-  // expected-warning @+1 {{variable 'c' was never used}}
+  // expected-warning @+1 {{variable 'c' was never used}} {{7-8=_}}
   var c : Any   // no uses.
   
-  // expected-warning @+1 {{variable 'd1' was never mutated}}
+  // expected-warning @+1 {{variable 'd1' was never mutated}} {{3-6=let}}
   var d1 : Any  // expected-note {{variable defined here}}
   _ = d1   // expected-error {{variable 'd1' used before being initialized}}
   
 
-  // expected-warning @+1 {{variable 'e' was never mutated}}
+  // expected-warning @+1 {{variable 'e' was never mutated}} {{3-6=let}}
   var e : SomeProtocol  // expected-note {{variable defined here}}
   e.protoMe()           // expected-error {{variable 'e' used before being initialized}}
   
   var f : SomeProtocol = dp  // ok, init'd by existential upcast.
   
-  // expected-warning @+1 {{variable 'g' was never mutated}}
+  // expected-warning @+1 {{variable 'g' was never mutated}} {{3-6=let}}
   var g : DerivedProtocol   // expected-note {{variable defined here}}
   f = g                     // expected-error {{variable 'g' used before being initialized}}
   _ = f
@@ -800,7 +800,7 @@ class r18199087SubClassA: r18199087BaseClass {
 class rdar18414728Base {
   var prop:String? { return "boo" }
 
-  // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
+  // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let aaaaa:String  // expected-note 3 {{'self.aaaaa' not initialized}}
 
   init() {
@@ -832,7 +832,7 @@ class rdar18414728Base {
 class rdar18414728Derived : rdar18414728Base {
   var prop2:String? { return "boo" }
 
-  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}}
+  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let aaaaa2:String
 
   override init() {
@@ -938,14 +938,14 @@ extension Int {
 
 // <rdar://problem/19035287> let properties should only be initializable, not reassignable
 struct LetProperties {
-  // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
+  // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let arr : [Int]
-  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}}
+  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let (u, v) : (Int, Int)
-  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}}
+  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let w : (Int, Int)
   let x = 42
-  // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
+  // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let y : Int
   let z : Int?  // expected-note{{'self.z' not initialized}}
 
@@ -1033,9 +1033,9 @@ struct MyMutabilityImplementation : TestMutabilityProtocol {
 
 // <rdar://problem/16181314> don't require immediate initialization of 'let' values
 func testLocalProperties(b : Int) -> Int {
-  // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
+  // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let x : Int
-  let y : Int // never assigned is ok    expected-warning {{immutable value 'y' was never used}}
+  let y : Int // never assigned is ok    expected-warning {{immutable value 'y' was never used}} {{7-8=_}}
 
   x = b
   x = b    // expected-error {{immutable value 'x' may only be initialized once}}
@@ -1054,10 +1054,10 @@ func testLocalProperties(b : Int) -> Int {
 
 // Should be rejected as multiple assignment.
 func testAddressOnlyProperty<T>(b : T) -> T {
-  // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
+  // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let x : T
   let y : T
-  let z : T   // never assigned is ok.  expected-warning {{immutable value 'z' was never used}}
+  let z : T   // never assigned is ok.  expected-warning {{immutable value 'z' was never used}} {{7-8=_}}
   x = b
   y = b
   x = b   // expected-error {{immutable value 'x' may only be initialized once}}
@@ -1183,7 +1183,7 @@ extension SomeProtocol {
 
 // Lvalue check when the archetypes are not the same.
 struct LValueCheck<T> {
-  // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
+  // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let x = 0  // expected-note {{initial value already provided in 'let' declaration}}
 }
 
@@ -1204,7 +1204,7 @@ struct DontLoadFullStruct {
 
 
 func testReassignment() {
-  let c : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
+  let c : Int  // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   c = 12
   c = 32  // expected-error {{immutable value 'c' may only be initialized once}}
   _ = c

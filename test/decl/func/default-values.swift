@@ -23,7 +23,7 @@ func tupleTypes() {
             d = 4) = (1, 2, 3, 4) // expected-error{{default argument not permitted in a tuple type}}{{15-18=}} expected-error{{use of undeclared type 'd'}}
 }
 
-func returnWithDefault() -> (a: Int, b: Int = 42) { // expected-error{{default argument not permitted in a tuple type}}
+func returnWithDefault() -> (a: Int, b: Int = 42) { // expected-error{{default argument not permitted in a tuple type}} {{45-49=}}
   return 5 // expected-error{{cannot convert return expression of type 'Int' to return type '(a: Int, b: Int)'}}
 }
 

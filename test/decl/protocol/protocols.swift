@@ -94,7 +94,7 @@ struct Circle {
 func testCircular(circle: Circle) {
   // FIXME: It would be nice if this failure were suppressed because the protocols
   // have circular definitions.
-  _ = circle as CircleStart // expected-error{{'Circle' is not convertible to 'CircleStart'; did you mean to use 'as!' to force downcast?}}
+  _ = circle as CircleStart // expected-error{{'Circle' is not convertible to 'CircleStart'; did you mean to use 'as!' to force downcast?}} {{14-16=as!}}
 }
 
 // <rdar://problem/14750346>
@@ -457,7 +457,7 @@ func f<T : C1>(x : T) {
 
 class C2 {}
 func g<T : C2>(x : T) {
-  x as P2 // expected-error{{'T' is not convertible to 'P2'; did you mean to use 'as!' to force downcast?}}
+  x as P2 // expected-error{{'T' is not convertible to 'P2'; did you mean to use 'as!' to force downcast?}} {{5-7=as!}}
 }
 
 class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}}

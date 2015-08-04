@@ -33,7 +33,7 @@ class FooClassDeinitializerB {
   deinit { }
 }
 
-init {} // expected-error {{initializers may only be declared within a type}} expected-error {{expected '('}}
+init {} // expected-error {{initializers may only be declared within a type}} expected-error {{expected '('}} {{6-6=() }}
 init() // expected-error {{initializers may only be declared within a type}}
 init() {} // expected-error {{initializers may only be declared within a type}}
 
