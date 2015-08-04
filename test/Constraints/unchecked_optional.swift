@@ -6,8 +6,8 @@ class A {
   func do_b(x: Int) {}
   func do_b(x: Float) {}
 
-  func do_c(x x: Int) {}
-  func do_c(y y: Int) {}
+  func do_c(x x: Int) {} // expected-note 2 {{found this candidate}}
+  func do_c(y y: Int) {} // expected-note 2 {{found this candidate}}
 }
 
 func test0(a : A!) {
@@ -16,7 +16,7 @@ func test0(a : A!) {
   a.do_b(1)
   a.do_b(5.0)
 
-  a.do_c(1) // expected-error {{could not find an overload for 'do_c' that accepts the supplied arguments}}
+  a.do_c(1) // expected-error {{ambiguous reference to member 'do_c'}}
   a.do_c(x: 1)
 }
 
@@ -26,7 +26,7 @@ func test1(a : A!) {
   a?.do_b(1)
   a?.do_b(5.0)
 
-  a?.do_c(1) // expected-error {{could not find an overload for 'do_c' that accepts the supplied arguments}}
+  a?.do_c(1) // expected-error {{ambiguous reference to member 'do_c'}}
   a?.do_c(x: 1)
 }
 

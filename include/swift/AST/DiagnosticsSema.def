@@ -61,6 +61,8 @@ ERROR(result_type_no_match_ambiguous,sema,none,
       "multiple candidates fail to match based on result type",
       ())
 
+ERROR(ambiguous_member_overload_set,sema,none,
+      "ambiguous reference to member '%0'", (StringRef))
 
 ERROR(cannot_find_appropriate_overload,sema,none,
       "could not find an overload for '%0' that accepts the supplied "

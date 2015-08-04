@@ -1854,7 +1854,6 @@ class FailureDiagnosis :public ASTVisitor<FailureDiagnosis, /*exprresult*/bool>{
   // Specific constraint kinds used, in conjunction with the expression node,
   // to determine the appropriate diagnostic.
   Constraint *conversionConstraint = nullptr;
-  Constraint *overloadConstraint = nullptr;
 
 public:
   
@@ -1978,16 +1977,12 @@ static bool isConversionConstraint(const Constraint *C) {
 FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   : expr(expr), CS(cs) {
   assert(expr && CS);
-  
+
   // If the constraint system had a failure constraint, it takes precedence over
   // other random constraints in the system.
-  if (auto constraint = CS->failedConstraint) {
-    if (constraint->getKind() == ConstraintKind::BindOverload) {
-      overloadConstraint = CS->failedConstraint;
-    } else if (isConversionConstraint(constraint))
-      conversionConstraint = CS->failedConstraint;
-  }
-    
+  if (CS->failedConstraint && isConversionConstraint(CS->failedConstraint))
+    conversionConstraint = CS->failedConstraint;
+
   Constraint *fallbackConstraint = nullptr;
   Constraint *disjunctionConversionConstraint = nullptr;
   Constraint *conformanceConstraint = nullptr;
@@ -2010,13 +2005,6 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
       conformanceConstraint = constraint;
     }
 
-    // Overload resolution failures are often nicely descriptive, so store
-    // off the first one we find.
-    if (!overloadConstraint || constraint->isFavored()) {
-      overloadConstraint = getConstraintChoice(constraint,
-                                               ConstraintKind::BindOverload);
-    }
-    
     // Conversion constraints are also nicely descriptive, so we'll grab the
     // first one of those as well.
     if ((!conversionConstraint || constraint->isFavored()) &&
@@ -2033,7 +2021,7 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   }
 
   // If no more descriptive constraint was found, use the fallback constraint.
-  if (fallbackConstraint && !(conversionConstraint || overloadConstraint))
+  if (fallbackConstraint && !conversionConstraint)
     conversionConstraint = fallbackConstraint;
 
   // If there's still no conversion to diagnose, use the disjunction conversion.
@@ -2282,13 +2270,51 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
   return true;
 }
 
+// In the absense of a better conversion constraint failure, point out the
+// inability to find an appropriate overload.
 bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
-  // In the absense of a better conversion constraint failure, point out the
-  // inability to find an appropriate overload.
-  if (!overloadConstraint)
-    return false;
- 
-  auto overloadChoice = overloadConstraint->getOverloadChoice();
+  Constraint *bindOverload = nullptr, *bindOverloadDisjunction = nullptr;
+
+  // Search the system to see if we have any overload failures.
+  if (CS->failedConstraint &&
+      CS->failedConstraint->getKind() == ConstraintKind::BindOverload)
+    bindOverload = CS->failedConstraint;
+  else {
+    for (auto &constraint : CS->getConstraints()) {
+      // If this is a disjunction constraint, check to see if it contains
+      // BindOverloads.  If so, this is an ambiguous case.
+      if (constraint.getKind() == ConstraintKind::Disjunction &&
+          (!bindOverloadDisjunction || constraint.isFavored()) &&
+          constraint.getNestedConstraints().front()->getKind() ==
+            ConstraintKind::BindOverload) {
+        bindOverloadDisjunction = &constraint;
+        continue;
+      }
+
+      // Otherwise, check for a failed BindOverload itself.
+      if (constraint.getKind() != ConstraintKind::BindOverload)
+        continue;
+
+      if (!bindOverload || constraint.isFavored())
+        bindOverload = &constraint;
+    }
+  }
+
+  // If we found a BindOverload constraint, we'll use it.  Otherwise, we'll use
+  // a disjunction member constraint, otherwise we can't do anything here.
+  if (bindOverload) {
+    // If we have a specific unambiguous member failure, use it.
+    bindOverloadDisjunction = nullptr;
+  } else {
+    if (!bindOverloadDisjunction)
+      return false;
+
+    // If we have a disjunction constraint, pull out the first BindOverload to
+    // serve as an exemplar for some of the logic below.
+    bindOverload = bindOverloadDisjunction->getNestedConstraints().front();
+  }
+
+  auto overloadChoice = bindOverload->getOverloadChoice();
   std::string overloadName = overloadChoice.getDecl()->getNameStr();
 
   if (auto *CD = dyn_cast<ConstructorDecl>(overloadChoice.getDecl()))
@@ -2297,15 +2323,15 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
 
   // Get the referenced expression from the failed constraint.
   auto anchor = expr;
-  if (auto locator = overloadConstraint->getLocator()) {
+  if (auto locator = bindOverload->getLocator()) {
     anchor = simplifyLocatorToAnchor(*CS, locator);
     if (!anchor)
       anchor = locator->getAnchor();
   }
 
-  // The anchor for the constraint is almost always an OverloadedDeclRefExpr.
-  // Look at the parent node in the AST to find the Apply to give a better
-  // diagnostic.
+  // The anchor for the constraint is almost always an OverloadedDeclRefExpr or
+  // UnresolvedDotExpr.  Look at the parent node in the AST to find the Apply to
+  // give a better diagnostic.
   Expr *call = expr->getParentMap()[anchor];
   // Ignore parens around the callee.
   while (call && (isa<IdentityExpr>(call) || isa<AnyTryExpr>(call)))
@@ -2313,27 +2339,46 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   
   // Do some sanity checking based on the call: e.g. make sure we're invoking
   // the overloaded decl, not using it as an argument.
-  Type argType;
+  Expr *argExpr = nullptr;
+  SourceLoc fnLoc;
   if (auto *AE = dyn_cast_or_null<ApplyExpr>(call)) {
     if (AE->getFn()->getSemanticsProvidingExpr() == anchor) {
       // Type check the argument list independently to try to get a concrete
       // type (ignoring context).
-      auto argExpr = typeCheckArbitrarySubExprIndependently(AE->getArg(),
-                                                           TCC_AllowUnresolved);
+      argExpr = typeCheckArbitrarySubExprIndependently(AE->getArg(),
+                                                       TCC_AllowUnresolved);
       if (!argExpr) return true;
-
-      argType = argExpr->getType();
     }
+
+    fnLoc = AE->getFn()->getLoc();
   }
-  
-  if (argType.isNull() || argType->is<TypeVariableType>()) {
-    diagnose(anchor->getLoc(), diag::cannot_find_appropriate_overload,
+
+  // If we couldn't resolve an argument, then produce a generic "ambiguity"
+  // diagnostic.
+  if (!argExpr || argExpr->getType()->is<TypeVariableType>()) {
+    if (!bindOverloadDisjunction) {
+      diagnose(anchor->getLoc(), diag::cannot_find_appropriate_overload,
+               overloadName)
+        .highlight(anchor->getSourceRange());
+      return true;
+    }
+
+    diagnose(anchor->getLoc(), diag::ambiguous_member_overload_set,
              overloadName)
-       .highlight(anchor->getSourceRange());
+      .highlight(anchor->getSourceRange());
+
+    for (auto elt : bindOverloadDisjunction->getNestedConstraints()) {
+      if (elt->getKind() != ConstraintKind::BindOverload) continue;
+      auto candidate = elt->getOverloadChoice().getDecl();
+
+      diagnose(candidate->getLoc(), diag::found_candidate);
+    }
+
     return true;
   }
-  
-  
+
+  Type argType = argExpr->getType();
+
   // Otherwise, we have a good grasp on what is going on: we have a call of an
   // unresolve overload set.  Try to dig out the candidates.
   auto apply = cast<ApplyExpr>(call);
@@ -2345,33 +2390,32 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
   // case.
   if (calleeInfo.closeness == CC_NonLValueInOut) {
-    Expr *firstArg = apply->getArg();
+    Expr *firstArg = argExpr;
     if (auto *tuple = dyn_cast<TupleExpr>(firstArg))
       if (tuple->getNumElements())
         firstArg = tuple->getElement(0);
     
-    diagnoseSubElementFailure(firstArg, apply->getLoc(), *CS,
+    diagnoseSubElementFailure(firstArg, call->getLoc(), *CS,
                               diag::cannot_apply_lvalue_binop_to_subelement,
                               diag::cannot_apply_lvalue_binop_to_rvalue);
     return true;
   }
-  
-  
+
   // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
   // then diagnose with some specificity about the arguments.
-  if (isa<TupleExpr>(apply->getArg()) &&
-      cast<TupleExpr>(apply->getArg())->getNumElements() == 0) {
+  if (isa<TupleExpr>(argExpr) &&
+      cast<TupleExpr>(argExpr)->getNumElements() == 0) {
     // Emit diagnostics that say "no arguments".
-    diagnose(apply->getFn()->getLoc(), diag::cannot_call_with_no_params,
+    diagnose(fnLoc, diag::cannot_call_with_no_params,
              overloadName, /*isInitializer*/false)
-      .highlight(apply->getSourceRange());
+      .highlight(call->getSourceRange());
   } else {
-    diagnose(apply->getFn()->getLoc(), diag::cannot_call_with_params,
+    diagnose(fnLoc, diag::cannot_call_with_params,
              overloadName, getTypeListString(argType), /*isInitializer*/false)
-      .highlight(apply->getSourceRange());
+      .highlight(call->getSourceRange());
   }
 
-  calleeInfo.suggestPotentialOverloads(overloadName, apply->getLoc());
+  calleeInfo.suggestPotentialOverloads(overloadName, call->getLoc());
   return true;
 }
 
