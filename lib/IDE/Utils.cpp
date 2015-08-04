@@ -188,6 +188,28 @@ SourceCompleteResult ide::isSourceInputComplete(StringRef Text) {
   return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text));
 }
 
+// Adjust the cc1 triple string we got from clang, to make sure it will be
+// accepted when it goes throught the swift clang importer.
+static std::string adjustClangTriple(StringRef TripleStr) {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+
+  llvm::Triple Triple(TripleStr);
+  switch (Triple.getSubArch()) {
+  case llvm::Triple::SubArchType::ARMSubArch_v7:
+    OS << "armv7"; break;
+  case llvm::Triple::SubArchType::ARMSubArch_v7s:
+    OS << "armv7s"; break;
+  case llvm::Triple::SubArchType::ARMSubArch_v7k:
+    OS << "armv7k"; break;
+  default:
+    OS << Triple.getArchName(); break;
+  }
+  OS << '-' << Triple.getVendorName() << '-' << Triple.getOSName();
+  OS.flush();
+  return Result;
+}
+
 bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
                                          CompilerInvocation &Invok,
                                          std::string &Error) {
@@ -216,7 +238,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
   auto &PPOpts = ClangInvok->getPreprocessorOpts();
   auto &HSOpts = ClangInvok->getHeaderSearchOpts();
 
-  Invok.setTargetTriple(ClangInvok->getTargetOpts().Triple);
+  Invok.setTargetTriple(adjustClangTriple(ClangInvok->getTargetOpts().Triple));
   if (!HSOpts.Sysroot.empty())
     Invok.setSDKPath(HSOpts.Sysroot);
   if (!HSOpts.ModuleCachePath.empty())
