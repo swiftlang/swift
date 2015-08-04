@@ -34,32 +34,32 @@ internal struct _MsgPackSerializerImpl {
 
 extension _MsgPackSerializerImpl : ScalarSerializerType {
   internal mutating func add(inout value: Int64) {
-    _precondition(_value == nil, "value has been set already")
+    precondition(_value == nil, "value has been set already")
     _value = .Int64(value)
   }
 
   internal mutating func add(inout value: UInt64) {
-    _precondition(_value == nil, "value has been set already")
+    precondition(_value == nil, "value has been set already")
     _value = .UInt64(value)
   }
 
   internal mutating func add(inout value: Float) {
-    _precondition(_value == nil, "value has been set already")
+    precondition(_value == nil, "value has been set already")
     _value = .Float32(value)
   }
 
   internal mutating func add(inout value: Double) {
-    _precondition(_value == nil, "value has been set already")
+    precondition(_value == nil, "value has been set already")
     _value = .Float64(value)
   }
 
   internal mutating func add(inout value: Bool) {
-    _precondition(_value == nil, "value has been set already")
+    precondition(_value == nil, "value has been set already")
     _value = .Bool(value)
   }
 
   internal mutating func add(inout value: String) {
-    _precondition(_value == nil, "value has been set already")
+    precondition(_value == nil, "value has been set already")
     _value = .String(value)
   }
 }
@@ -91,7 +91,7 @@ extension _MsgPackSerializerImpl : ArraySerializerType {
     where
       Value.Generator.Element : Serializable${value_kind}Type
   >(inout value: Value) {
-    _precondition(_value == nil, "value has been set already")
+    precondition(_value == nil, "value has been set already")
     _value = _toMsgPackVariant(&value)
   }
 % end
@@ -117,7 +117,7 @@ extension _MsgPackSerializerImpl : DictionarySerializerType {
   internal mutating func add<
     Value : Serializable${value_kind}Type
   >(inout value: [String : Value]) {
-    _precondition(_value == nil, "value has been set already")
+    precondition(_value == nil, "value has been set already")
     _value = _toMsgPackVariant(&value)
   }
 % end
@@ -154,7 +154,7 @@ extension _MsgPackSerializerImpl : FixedDictionarySerializerType {
         map._append(key: .String(key), value: value)
         _value = .Map(map)
       default:
-        _preconditionFailure("impossible")
+        preconditionFailure("impossible")
       }
     } else {
       _value = .Map(MsgPackVariantMap([key: value]))
@@ -188,7 +188,7 @@ extension _MsgPackDeserializerImpl : ScalarSerializerType {
     case .Int64(let i):
       value = i
     default:
-      _preconditionFailure("bad data")
+      preconditionFailure("bad data")
     }
   }
 
@@ -197,7 +197,7 @@ extension _MsgPackDeserializerImpl : ScalarSerializerType {
     case .UInt64(let i):
       value = i
     default:
-      _preconditionFailure("bad data")
+      preconditionFailure("bad data")
     }
   }
 
@@ -206,7 +206,7 @@ extension _MsgPackDeserializerImpl : ScalarSerializerType {
     case .Float32(let f):
       value = f
     default:
-      _preconditionFailure("bad data")
+      preconditionFailure("bad data")
     }
   }
 
@@ -215,7 +215,7 @@ extension _MsgPackDeserializerImpl : ScalarSerializerType {
     case .Float64(let f):
       value = f
     default:
-      _preconditionFailure("bad data")
+      preconditionFailure("bad data")
     }
   }
 
@@ -224,7 +224,7 @@ extension _MsgPackDeserializerImpl : ScalarSerializerType {
     case .Bool(let b):
       value = b
     default:
-      _preconditionFailure("bad data")
+      preconditionFailure("bad data")
     }
   }
 
@@ -233,7 +233,7 @@ extension _MsgPackDeserializerImpl : ScalarSerializerType {
     case .String(let s):
       value = s
     default:
-      _preconditionFailure("bad data")
+      preconditionFailure("bad data")
     }
   }
 }
@@ -260,7 +260,7 @@ internal func _fromMsgPackVariant<
     }
     value.replaceRange(value.startIndex..<value.endIndex, with: elements)
   default:
-    _preconditionFailure("bad data")
+    preconditionFailure("bad data")
   }
 }
 % end
@@ -292,12 +292,12 @@ internal func _fromMsgPackVariant<
         element.serializeDeserialize(&deserializerImpl)
         value[s] = element
       default:
-        _preconditionFailure("bad data")
+        preconditionFailure("bad data")
       }
     }
 
   default:
-    _preconditionFailure("bad data")
+    preconditionFailure("bad data")
   }
 }
 % end
@@ -347,9 +347,9 @@ extension _MsgPackDeserializerImpl : FixedDictionarySerializerType {
           ()
         }
       }
-      _preconditionFailure("key not found")
+      preconditionFailure("key not found")
     default:
-      _preconditionFailure("bad data")
+      preconditionFailure("bad data")
     }
   }
 }
