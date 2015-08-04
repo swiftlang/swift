@@ -773,7 +773,7 @@ extension String {
   /// - SeeAlso: `String.init<T>(reflecting: T)`
   public init<T>(_ instance: T) {
     self.init()
-    print(instance, terminator: "", toStream: &self)
+    _prext_print(instance, toStream: &self)
   }
 
   /// Initialize `self` with a detailed textual representation of

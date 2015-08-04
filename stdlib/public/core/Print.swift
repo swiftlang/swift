@@ -203,4 +203,16 @@ public func print<T>(item: T) {
 public func debugPrint<T>(item: T) {
   debugPrint(item, separator: "\n")
 }
+
+/// Write the item to the stream without having to create a intermediate array
+/// for variable arguments.
+/// This is a performance optimization for string interpolation.
+internal func _prext_print<T, Target: OutputStreamType>(
+  item: T,
+  inout toStream output: Target
+) {
+    output._lock()
+    _print_unlocked(item, &output)
+    output._unlock()
+}
 //===----------------------------------------------------------------------===//
