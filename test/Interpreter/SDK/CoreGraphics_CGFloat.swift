@@ -105,7 +105,7 @@ CGFloatTestSuite.test("arithmetic") {
 CGFloatTestSuite.test("striding") {
   if true {
     var result = [CGFloat]()
-    for f: CGFloat in stride(from: 1.0, to: 2.0, by: 0.5) {
+    for f in (1.0 as CGFloat).stride(to: 2.0, by: 0.5) {
       result.append(f)
     }
     expectEqual([ 1.0, 1.5 ], result)
@@ -113,7 +113,7 @@ CGFloatTestSuite.test("striding") {
 
   if true {
     var result = [CGFloat]()
-    for f: CGFloat in stride(from: 1.0, through: 2.0, by: 0.5) {
+    for f in (1.0 as CGFloat).stride(through: 2.0, by: 0.5) {
       result.append(f)
     }
     expectEqual([ 1.0, 1.5, 2.0 ], result)

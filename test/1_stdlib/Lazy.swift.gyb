@@ -586,7 +586,7 @@ tests.test("LazyMapCollection/Passthrough") {
 //===--- Reverse ----------------------------------------------------------===//
 tests.test("ReverseCollection") {
 
-  let expected = Array(stride(from: 11, through: 0, by: -1))
+  let expected = Array(11.stride(through: 0, by: -1))
   let r = 0..<12
   checkRandomAccessCollection(
     expected,
@@ -623,8 +623,7 @@ tests.test("ReverseCollection/Lazy") {
   // collection, produces the same lazy reverse collection.
   do {
     
-    let base = Array(
-      stride(from: 11, through: 0, by: -1)).lazy.map { $0 }
+    let base = Array(11.stride(through: 0, by: -1)).lazy.map { $0 }
     
     typealias Base = LazyMapCollection<[Int], Int>
     ExpectType<Base>.test(base)
@@ -705,14 +704,14 @@ tests.test("LazyFilterSequence") {
     LazyFilterSequence<MinimalSequence<OpaqueValue<Int>>>
   >.test(filtered)
 
-  let evens = stride(from: 0, to: 100, by: 2).map(OpaqueValue.init)
+  let evens = 0.stride(to: 100, by: 2).map(OpaqueValue.init)
   checkSequence(evens, filtered, resiliencyChecks: .none) {
     $0.value == $1.value 
   }
   expectEqual(100, calls)
 
   // check that it works when the first element doesn't satify the predicate
-  let odds = stride(from: 1, to: 100, by: 2).map(OpaqueValue.init)
+  let odds = 1.stride(to: 100, by: 2).map(OpaqueValue.init)
   filtered =
     MinimalSequence(elements: base).lazy.filter { $0.value % 2 != 0 }
   checkSequence(odds, filtered, resiliencyChecks: .none) {
@@ -770,7 +769,7 @@ tests.test("LazyFilterCollection") {
   >.test(filtered)
   
   checkForwardCollection(
-    stride(from: 0, to: 100, by: 2).map(OpaqueValue.init), filtered,
+    0.stride(to: 100, by: 2).map(OpaqueValue.init), filtered,
     resiliencyChecks: .none
   ) {
     $0.value == $1.value

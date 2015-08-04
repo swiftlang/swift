@@ -191,13 +191,20 @@ public struct StrideTo<Element : Strideable> : SequenceType {
   let stride: Element.Stride
 }
 
-/// Return the sequence of values (`start`, `start + stride`, `start +
-/// stride + stride`, ... *last*) where *last* is the last value in
-/// the progression that is less than `end`.
+extension Strideable {
+  /// Return the sequence of values (`self`, `self + stride`, `self +
+  /// stride + stride`, ... *last*) where *last* is the last value in
+  /// the progression that is less than `end`.
+  public func stride(to end: Self, by stride: Stride) -> StrideTo<Self> {
+    return StrideTo(start: self, end: end, stride: stride)
+  }
+}
+
+@available(*, unavailable, message="call the 'stride(to:by:)' method instead")
 public func stride<
   T : Strideable
 >(from start: T, to end: T, by stride: T.Stride) -> StrideTo<T> {
-  return StrideTo(start: start, end: end, stride: stride)
+  fatalError("unavailable function can't be called")
 }
 
 /// A GeneratorType for `StrideThrough<Element>`.
@@ -256,13 +263,22 @@ public struct StrideThrough<Element : Strideable> : SequenceType {
   let stride: Element.Stride
 }
 
-/// Return the sequence of values (`start`, `start + stride`, `start +
-/// stride + stride`, ... *last*) where *last* is the last value in
-/// the progression less than or equal to `end`.
-///
-/// - Note: There is no guarantee that `end` is an element of the sequence.
+extension Strideable {
+  /// Return the sequence of values (`start`, `start + stride`, `start +
+  /// stride + stride`, ... *last*) where *last* is the last value in
+  /// the progression less than or equal to `end`.
+  ///
+  /// - Note: There is no guarantee that `end` is an element of the sequence.
+  public func stride(
+    through end: Self, by stride: Stride
+  ) -> StrideThrough<Self> {
+    return StrideThrough(start: self, end: end, stride: stride)
+  }
+}
+
+@available(*, unavailable, message="call the 'stride(through:by:)' method instead")
 public func stride<
   T : Strideable
 >(from start: T, through end: T, by stride: T.Stride) -> StrideThrough<T> {
-  return StrideThrough(start: start, end: end, stride: stride)
+  fatalError("unavailable function can't be called")
 }

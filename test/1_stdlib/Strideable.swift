@@ -84,12 +84,12 @@ StrideTestSuite.test("HalfOpen") {
     // Work on Ints
     expectEqual(
       sum,
-      stride(from: start, to: end, by: stepSize).reduce(0, combine: +))
+      start.stride(to: end, by: stepSize).reduce(0, combine: +))
 
     // Work on an arbitrary RandomAccessIndexType
     expectEqual(
       sum,
-      stride(from: R(start), to: R(end), by: stepSize).reduce(0) { $0 + $1.x })
+      R(start).stride(to: R(end), by: stepSize).reduce(0) { $0 + $1.x })
   }
   
   check(from: 1, to: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
@@ -109,13 +109,12 @@ StrideTestSuite.test("Closed") {
     // Work on Ints
     expectEqual(
       sum,
-      stride(from: start, through: end, by: stepSize).reduce(0, combine: +))
+      start.stride(through: end, by: stepSize).reduce(0, combine: +))
 
     // Work on an arbitrary RandomAccessIndexType
     expectEqual(
       sum,
-      stride(from: R(start), through: R(end), by: stepSize)
-        .reduce(0) { $0 + $1.x })
+      R(start).stride(through: R(end), by: stepSize).reduce(0) { $0 + $1.x })
   }
   
   check(from: 1, through: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
