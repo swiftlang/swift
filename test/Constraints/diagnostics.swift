@@ -481,5 +481,12 @@ func test(a : B) {
   a.f2(nil)  // expected-error {{nil is not compatible with expected argument type 'AOpts'}}
 }
 
-
+// <rdar://problem/21684487> QoI: invalid operator use inside a closure reported as a problem with the closure
+typealias MyClosure = ([Int]) -> Bool
+func r21684487() {
+  var closures = Array<MyClosure>()
+  let testClosure = {(list: [Int]) -> Bool in return true}
+  
+  let closureIndex = closures.indexOf{$0 === testClosure} // expected-error {{binary operator '===' cannot be applied to two 'MyClosure' (aka 'Array<Int> -> Bool') operands}}
+}
 
