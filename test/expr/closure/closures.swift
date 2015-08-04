@@ -62,6 +62,8 @@ func funcdecl5(a: Int, _ y: Int) {
   func6(fn: { _,_ in 4 })
   
   func6(fn: {a,b in 4.0 })  // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}
+  
+  // TODO: This diagnostic can be improved: rdar://22128205
   func6(fn: {(a : Float, b) in 4 }) // expected-error {{cannot convert value of type '(Float, _) -> Int' to expected argument type '(Int, Int) -> Int'}}
 
   
