@@ -2865,6 +2865,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
       case CTP_CallArgument:
         nilDiag = diag::cannot_convert_argument_value_nil;
         break;
+      case CTP_ClosureResult:
+        nilDiag = diag::cannot_convert_closure_result_nil;
+        break;
       }
       
       if (isa<NilLiteralExpr>(expr->getSemanticsProvidingExpr())) {
@@ -2927,6 +2930,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
     case CTP_CallArgument:
       diagID = diag::cannot_convert_argument_value;
       diagIDProtocol = diag::cannot_convert_argument_value_protocol;
+      break;
+    case CTP_ClosureResult:
+      diagID = diag::cannot_convert_closure_result;
+      diagIDProtocol = diag::cannot_convert_closure_result_protocol;
       break;
     }
     
@@ -3728,12 +3735,14 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   if (!CE->hasSingleExpressionBody())
     return diagnoseGeneralFailure();
 
+  Type expectedResultType;
+  
   // If we have a contextual type available for this closure, apply it to the
   // ParamDecls in our parameter list.  This ensures that any uses of them get
   // appropriate types.
   if (CS->getContextualType() &&
-      CS->getContextualType()->is<FunctionType>()) {
-    auto fnType = CS->getContextualType()->castTo<FunctionType>();
+      CS->getContextualType()->is<AnyFunctionType>()) {
+    auto fnType = CS->getContextualType()->castTo<AnyFunctionType>();
     Pattern *params = CE->getParams();
     TypeResolutionOptions TROptions;
     TROptions |= TR_OverrideType;
@@ -3743,7 +3752,10 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     if (CS->TC.coercePatternToType(params, CE, fnType->getInput(), TROptions))
       return true;
     CE->setParams(params);
+
+    expectedResultType = fnType->getResult();
   } else {
+    
     // Defend against type variables from our constraint system leaking into
     // recursive constraints systems formed when checking the body of the
     // closure.  These typevars come into them when the body does name
@@ -3757,22 +3769,52 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     });
   }
   
+  // If the closure had an expected result type, use it.
+  if (CE->hasExplicitResultType())
+    expectedResultType = CE->getExplicitResultTypeLoc().getType();
+
   // When we're type checking a single-expression closure, we need to reset the
   // DeclContext to this closure for the recursive type checking.  Otherwise,
   // if there is a closure in the subexpression, we can violate invariants.
   {
     llvm::SaveAndRestore<DeclContext*> SavedDC(CS->DC, CE);
-    if (!typeCheckChildIndependently(CE->getSingleExpressionBody()))
+    
+    auto CTP = expectedResultType ? CTP_ClosureResult : CTP_Unused;
+    
+    if (!typeCheckChildIndependently(CE->getSingleExpressionBody(),
+                                     expectedResultType, CTP))
       return true;
   }
-
-  // Check for a contextual type error.  This is necessary because
-  // FailureDiagnosis::diagnoseFailure doesn't do this for closures.
+  
+  // If the body of the closure looked ok, then look for a contextual type
+  // error.  This is necessary because FailureDiagnosis::diagnoseFailure doesn't
+  // do this for closures.
   if (CS->getContextualType() &&
-      !CS->getContextualType()->isEqual(CE->getType()))
+      !CS->getContextualType()->isEqual(CE->getType())) {
+
+    auto fnType = CS->getContextualType()->getAs<AnyFunctionType>();
+
+    // If the closure had an explicitly written return type incompatible with
+    // the contextual type, diagnose that.
+    if (CE->hasExplicitResultType() &&
+        CE->getExplicitResultTypeLoc().getTypeRepr()) {
+      auto explicitResultTy = CE->getExplicitResultTypeLoc().getType();
+      if (!explicitResultTy->isEqual(fnType->getResult())) {
+        auto repr = CE->getExplicitResultTypeLoc().getTypeRepr();
+        diagnose(repr->getStartLoc(), diag::incorrect_explicit_closure_result,
+                 explicitResultTy, fnType->getResult())
+          .fixItReplace(repr->getSourceRange(),fnType->getResult().getString());
+        return true;
+      }
+    }
+    
+    // Otherwise, diagnose a general error talking about the type of the closure
+    // in-aggregate.
     if (diagnoseContextualConversionError(CE->getType()))
       return true;
-
+  }
+  
+  
   // Otherwise, produce a generic error.
   return diagnoseGeneralFailure();
 }

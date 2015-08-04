@@ -190,6 +190,9 @@ ERROR(cannot_infer_closure_type,sema,none,
 ERROR(cannot_infer_closure_result_type,sema,none,
       "unable to infer closure return type in current context", ())
 
+ERROR(incorrect_explicit_closure_result,sema,none,
+      "declared closure result %0 is incompatible with contextual type %1",
+      (Type, Type))
 
 ERROR(cannot_call_function_value,sema,none,
       "cannot invoke value of function type with argument list '%0'",
@@ -243,6 +246,13 @@ ERROR(cannot_convert_argument_value_protocol,sema_tcd,none,
 ERROR(cannot_convert_argument_value_nil,sema,none,
       "nil is not compatible with expected argument type %0", (Type))
 
+ERROR(cannot_convert_closure_result,sema,none,
+      "cannot convert value of type %0 to closure result type %1",
+      (Type,Type))
+ERROR(cannot_convert_closure_result_protocol,sema_tcd,none,
+      "argument type %0 does not conform to closure result type %1", (Type, Type))
+ERROR(cannot_convert_closure_result_nil,sema,none,
+      "nil is not compatible with closure result type %0", (Type))
 
 
 

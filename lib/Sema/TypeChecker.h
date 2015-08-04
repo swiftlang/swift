@@ -149,7 +149,7 @@ enum ContextualTypePurpose {
   CTP_DefaultParameter, ///< Default value in parameter 'foo(a : Int = 42)'.
 
   CTP_CallArgument,     ///< Call to function or operator requires type.
-
+  CTP_ClosureResult,    ///< Closure result expects a specific type.
 
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };

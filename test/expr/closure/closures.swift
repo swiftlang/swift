@@ -58,10 +58,13 @@ func funcdecl5(a: Int, _ y: Int) {
   func6(fn: { a,b in a+b })
   
   // Infer incompatible type.
-  func6(fn: {a,b->Float in 4.0 })    // expected-error {{cannot convert value of type '(_, _) -> Float' to expected argument type '(Int, Int) -> Int'}}
-
-  // Pattern doesn't need to name arguments.
+  func6(fn: {a,b->Float in 4.0 })    // expected-error {{declared closure result 'Float' is incompatible with contextual type 'Int'}} {{19-24=Int}}  // Pattern doesn't need to name arguments.
   func6(fn: { _,_ in 4 })
+  
+  func6(fn: {a,b in 4.0 })  // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}
+  func6(fn: {(a : Float, b) in 4 }) // expected-error {{cannot convert value of type '(Float, _) -> Int' to expected argument type '(Int, Int) -> Int'}}
+
+  
   
   var fn = {}
   var fn2 = { 4 }
@@ -246,8 +249,8 @@ var x = {return $0}(1)
 
 func returnsInt() -> Int { return 0 }
 takesVoidFunc(returnsInt) // expected-error {{cannot convert value of type '() -> Int' to expected argument type '() -> ()'}}
-takesVoidFunc({()->Int in 0}) // expected-error {{cannot convert value of type '() -> Int' to expected argument type '() -> ()'}}
-
+takesVoidFunc({()->Int in 0}) // expected-error {{declared closure result 'Int' is incompatible with contextual type '()'}} {{20-23=()}}
+  
 // These used to crash the compiler, but were fixed to support the implemenation of rdar://problem/17228969
 Void(0) // expected-error{{cannot invoke initializer for type 'Void' with an argument list of type '(Int)'}}
 _ = {0}
