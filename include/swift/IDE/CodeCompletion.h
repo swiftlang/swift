@@ -293,7 +293,8 @@ public:
   }
 
   StringRef getFirstTextChunk() const;
-  Optional<unsigned> getFirstTextChunkIndex() const;
+  Optional<unsigned>
+  getFirstTextChunkIndex(bool includeLeadingPunctuation = false) const;
 
   /// Concatenates all text chunks considered part of the name to \p OS.
   void getName(raw_ostream &OS) const;

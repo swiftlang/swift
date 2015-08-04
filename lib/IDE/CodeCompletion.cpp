@@ -539,7 +539,8 @@ MutableArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
   return MutableArrayRef<CodeCompletionResult *>(Results, Count);
 }
 
-Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
+Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
+    bool includeLeadingPunctuation) const {
   for (auto i : indices(getChunks())) {
     auto &C = getChunks()[i];
     switch (C.getKind()) {
@@ -552,15 +553,18 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrKeyword:
       return i;
+    case CodeCompletionString::Chunk::ChunkKind::Dot:
+    case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
+    case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
+      if (includeLeadingPunctuation)
+        return i;
+      continue;
     case CodeCompletionString::Chunk::ChunkKind::RightParen:
     case CodeCompletionString::Chunk::ChunkKind::RightBracket:
     case CodeCompletionString::Chunk::ChunkKind::LeftAngle:
     case CodeCompletionString::Chunk::ChunkKind::RightAngle:
-    case CodeCompletionString::Chunk::ChunkKind::Dot:
     case CodeCompletionString::Chunk::ChunkKind::Ellipsis:
     case CodeCompletionString::Chunk::ChunkKind::Comma:
-    case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
-    case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
     case CodeCompletionString::Chunk::ChunkKind::Ampersand:
     case CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword:
     case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
