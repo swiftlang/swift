@@ -120,8 +120,8 @@ let advancedByTests = [
     limit: 10
   ),
   AdvancedByTest(
-    startIndex: 777,
-    distance: -999,
+    startIndex: 10,
+    distance: -20,
     expectedIndex: 0,
     limit: 0
   ),
@@ -129,98 +129,172 @@ let advancedByTests = [
 
 var Index = TestSuite("Index")
 
-% for Kind in ['Forward', 'Bidirectional', 'RandomAccess']:
+% for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 
-%   if Kind in ['Forward', 'Bidirectional']:
-Index.test("${Kind}IndexType/distanceTo/dispatch") {
-  var start = ${Kind}IndexLog.dispatchTester(0)
-  var end = ${Kind}IndexLog.dispatchTester(10)
+Index.test("${Traversal}IndexType/distanceTo/dispatch") {
+  var start = ${Traversal}IndexLog.dispatchTester(0)
+  var end = ${Traversal}IndexLog.dispatchTester(10)
   _ = start.distanceTo(end)
   expectCustomizable(start, start.log.distanceTo)
 }
-%   end
+
+Index.test("${Traversal}IndexType/advancedBy(n)/dispatch") {
+  var start = ${Traversal}IndexLog.dispatchTester(0)
+  _ = start.advancedBy(10)
+  expectCustomizable(start, start.log.advancedBy)
+}
+
+Index.test("${Traversal}IndexType/advancedBy(n, limit:)/dispatch") {
+  let start = ${Traversal}IndexLog.dispatchTester(0)
+  let limit = ${Traversal}IndexLog.dispatchTester(5)
+  _ = start.advancedBy(10, limit: limit)
+  expectCustomizable(start, start.log.advancedByWithLimit)
+}
+
+%   for Base in ['Minimal', 'Defaulted']:
+%     Kind = '{}{}'.format(Base, Traversal)
 
 Index.test("${Kind}IndexType/distanceTo/semantics") {
   for test in distanceToTests {
-    let start = Minimal${Kind}Index(
+    let start = ${Kind}Index(
       position: test.startIndex,
-      startIndex: -1000,
-      endIndex: 1000)
-    let end = Minimal${Kind}Index(
+      startIndex: -20,
+      endIndex: 20)
+    let end = ${Kind}Index(
       position: test.endIndex,
-      startIndex: -1000,
-      endIndex: 1000)
+      startIndex: -20,
+      endIndex: 20)
     let d = start.distanceTo(end)
     expectEqual(test.expectedDistance, d,
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
-%   if Kind in ['Forward', 'Bidirectional']:
-Index.test("${Kind}IndexType/advancedBy(n)/dispatch") {
-  var start = ${Kind}IndexLog.dispatchTester(0)
-  _ = start.advancedBy(10)
-  expectCustomizable(start, start.log.advancedBy)
-}
-%   end
-
 Index.test("${Kind}IndexType/advancedBy(n)/semantics") {
   for test in advancedByTests.filter({$0.limit == nil}) {
-    let start = Minimal${Kind}Index(
+    let start = ${Kind}Index(
       position: test.startIndex,
-      startIndex: -1000,
-      endIndex: 1000)
-    let expected = Minimal${Kind}Index(
+      startIndex: -20,
+      endIndex: 20)
+    let expected = ${Kind}Index(
       position: test.expectedIndex,
-      startIndex: -1000,
-      endIndex: 1000)
-%   if Kind == 'Forward':
+      startIndex: -20,
+      endIndex: 20)
+
+%     if Traversal == 'Forward':
+
     if test.distance < 0 {
-      expectCrashLater()
+      // Negative distance trap tests are handled in
+      // advancedBy(-n)/semantics
+      continue
     }
-%   end
+
+%     end
+
     let new = start.advancedBy(test.distance)
     expectEqual(expected, new,
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
-%   if Kind in ['Forward', 'Bidirectional']:
-Index.test("${Kind}IndexType/advancedBy(n, limit:)/dispatch") {
-  let start = ${Kind}IndexLog.dispatchTester(0)
-  let limit = ${Kind}IndexLog.dispatchTester(5)
-  _ = start.advancedBy(10, limit: limit)
-  expectCustomizable(start, start.log.advancedByWithLimit)
+%     if Traversal == 'Forward':
+Index.test("${Kind}IndexType/advancedBy(-n)/semantics") {
+  for test in advancedByTests.filter({$0.limit == nil && $0.distance < 0}) {
+    let start = ${Kind}Index(
+      position: test.startIndex,
+      startIndex: -20,
+      endIndex: 20)
+    let expected = ${Kind}Index(
+      position: test.expectedIndex,
+      startIndex: -20,
+      endIndex: 20)
+    expectCrashLater()
+    let new = start.advancedBy(test.distance)
+    expectEqual(expected, new,
+      stackTrace: SourceLocStack().with(test.loc))
+  }
 }
-%   end
+%     end
+
+%     if Traversal == 'Forward':
+Index.test("${Kind}IndexType/advancedBy(-n, limit:)/semantics") {
+  for test in advancedByTests.filter({$0.limit != nil && $0.distance < 0}) {
+    let start = ${Kind}Index(
+      position: test.startIndex,
+      startIndex: -20,
+      endIndex: 20)
+    let expected = ${Kind}Index(
+      position: test.expectedIndex,
+      startIndex: -20,
+      endIndex: 20)
+    expectCrashLater()
+    let new = start.advancedBy(test.distance)
+    expectEqual(expected, new,
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+%     end
 
 Index.test("${Kind}IndexType/advancedBy(n, limit:)/semantics") {
   for test in advancedByTests.filter({$0.limit != nil}) {
     let startIndex = test.startIndex
     let endIndex = test.startIndex + test.distance
-    let start = Minimal${Kind}Index(
+    let start = ${Kind}Index(
       position: test.startIndex,
-      startIndex: -1000,
-      endIndex: 1000)
-    let limit = Minimal${Kind}Index(
+      startIndex: -20,
+      endIndex: 20)
+    let limit = ${Kind}Index(
       position: test.limit!,
-      startIndex: -1000,
-      endIndex: 1000)
-%   if Kind == 'Forward':
+      startIndex: -20,
+      endIndex: 20)
+
+%     if Traversal == 'Forward':
+
     if test.distance < 0 {
       expectCrashLater()
     }
-%   end
+
+%     end
+
     let new = start.advancedBy(test.distance, limit: limit)
-    let expected = Minimal${Kind}Index(
+    let expected = ${Kind}Index(
       position: test.expectedIndex,
-      startIndex: -1000,
-      endIndex: 1000)
+      startIndex: -20,
+      endIndex: 20)
     expectEqual(expected, new,
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
+// Check that a random access index doesn't call into O(n) predecessor calls
+// when it has a more efficient implementation.
+
+%     if Traversal == 'RandomAccess' and Base == 'Defaulted':
+Index.test(
+  "${Kind}IndexType/advancedBy(n)/avoidsSuccessorAndPredecessor/dispatch"
+) {
+  for test in advancedByTests.filter({$0.limit == nil}) {
+    let i = ${Kind}Index(test.startIndex)
+    let result  = i.advancedBy(test.distance)
+    expectEqual(test.expectedIndex, result.base)
+    expectEqual(0, ${Kind}Index.timesSuccessorCalled.value)
+    expectEqual(0, ${Kind}Index.timesPredecessorCalled.value)
+  }
+}
+
+Index.test(
+  "${Kind}IndexType/advancedBy(n, limit:)/avoidsSuccessorAndPredecessor/dispatch"
+) {
+  for test in advancedByTests.filter({$0.limit != nil}) {
+    let i = ${Kind}Index(test.startIndex)
+    let result  = i.advancedBy(test.distance, limit: ${Kind}Index(test.limit!))
+    expectEqual(test.expectedIndex, result.base)
+    expectEqual(0, ${Kind}Index.timesSuccessorCalled.value)
+    expectEqual(0, ${Kind}Index.timesPredecessorCalled.value)
+  }
+}
+%     end
+%   end
 % end
 
 runAllTests()

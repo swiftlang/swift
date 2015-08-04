@@ -3064,6 +3064,87 @@ extension MinimalBidirectionalIndex : _MinimalIndexType {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// Strict Index Types
+//===----------------------------------------------------------------------===//
+
+% for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
+%   StrictIndexType = 'Strict{}IndexType'.format(Traversal)
+
+public protocol ${StrictIndexType} : ${Traversal}IndexType {
+  typealias Base : ${Traversal}IndexType
+  init(_ base: Base)
+  var base: Base { get set }
+
+  func logSuccessor()
+  func logPredecessor()
+}
+
+extension ${StrictIndexType} {
+  public func successor() -> Self {
+    logSuccessor()
+    return Self(base.successor())
+  }
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  public func predecessor() -> Self {
+    logPredecessor()
+    return Self(base.predecessor())
+  }
+%   end
+}
+
+% end
+
+//===----------------------------------------------------------------------===//
+// Defaulted Index Types
+//===----------------------------------------------------------------------===//
+% for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
+%   StrictIndexType = 'Strict{}IndexType'.format(Traversal)
+%   DefaultedIndex = 'Defaulted{}Index'.format(Traversal)
+
+public struct ${DefaultedIndex}: ${StrictIndexType} {
+  public typealias Distance = Int
+  public typealias Base = Int
+  public var base: Base
+  public static var timesSuccessorCalled = ResettableValue(0)
+  public static var timesPredecessorCalled = ResettableValue(0)
+
+  public init(_ base: Base) {
+    self.base = base
+  }
+
+  public init(position: Base, startIndex: Base, endIndex: Base) {
+    expectLE(startIndex, position)
+    expectGE(endIndex, position)
+    self.init(position)
+  }
+
+  public func logSuccessor() {
+    ${DefaultedIndex}.timesSuccessorCalled.value++
+  }
+
+  public func logPredecessor() {
+    ${DefaultedIndex}.timesPredecessorCalled.value++
+  }
+
+% if Traversal == 'RandomAccess':
+  public func distanceTo(n: ${DefaultedIndex}) -> Distance {
+    return n.base - base
+  }
+
+  public func advancedBy(n: Distance) -> ${DefaultedIndex} {
+    return ${DefaultedIndex}(base + n)
+  }
+% end
+}
+
+public func == (lhs: ${DefaultedIndex}, rhs: ${DefaultedIndex}) -> Bool {
+  return rhs.base == lhs.base
+}
+
+% end
+
+
 
 //===----------------------------------------------------------------------===//
 // MinimalRandomAccessIndex

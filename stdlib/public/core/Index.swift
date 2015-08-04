@@ -203,19 +203,6 @@ extension ForwardIndexType {
     // Can't perform range checks in O(1) on forward indices.
   }
 
-  /// Do not use this method directly; call distanceTo(end) instead.
-  @transparent
-  internal func _distanceTo(other: Self) -> Distance {
-    var p = self
-    var count: Distance = 0
-    let end = other
-    while p != end {
-      ++count
-      ++p
-    }
-    return count
-  }
-
   /// Do not use this method directly; call advancedBy(n) instead.
   @transparent
   internal func _advanceForward(n: Distance) -> Self {
@@ -249,7 +236,13 @@ extension ForwardIndexType {
   }
 
   public func distanceTo(end: Self) -> Distance {
-    return self._distanceTo(end)
+    var p = self
+    var count: Distance = 0
+    while p != end {
+      ++count
+      ++p
+    }
+    return count
   }
 }
 
@@ -279,9 +272,7 @@ extension BidirectionalIndexType {
     self = self.predecessor()
   }
 
-  @transparent
-  /// Do not use this operator directly; call advancedBy(n) instead.
-  internal func _advanceForwardOrBackward(n: Distance) -> Self {
+  public func advancedBy(n: Distance) -> Self {
     if n >= 0 {
       return _advanceForward(n)
     }
@@ -292,9 +283,7 @@ extension BidirectionalIndexType {
     return p
   }
 
-  @transparent
-  /// Do not use this operator directly; call advancedBy(n, limit) instead.
-  internal func _advanceForwardOrBackward(n: Distance, _ limit: Self) -> Self {
+  public func advancedBy(n: Distance, limit: Self) -> Self {
     if n >= 0 {
       return _advanceForward(n, limit)
     }
@@ -303,14 +292,6 @@ extension BidirectionalIndexType {
       --p
     }
     return p
-  }
-
-  public func advancedBy(n: Distance) -> Self {
-    return _advanceForwardOrBackward(n)
-  }
-
-  public func advancedBy(n: Distance, limit: Self) -> Self {
-    return _advanceForwardOrBackward(n, limit)
   }
 }
 
@@ -351,11 +332,10 @@ extension _RandomAccessAmbiguity {
   }
 }
 
-// FIXME: Attach _RandomAccessAmbiguity to RandomAccessIndexType
-
 /// An *index* that can be offset by an arbitrary number of positions,
 /// and can measure the distance to any reachable value, in O(1).
-public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable {
+public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable,
+  _RandomAccessAmbiguity {
   func distanceTo(other: Self) -> Distance
   func advancedBy(n: Distance) -> Self
   func advancedBy(n: Distance, limit: Self) -> Self
@@ -392,7 +372,7 @@ extension RandomAccessIndexType {
   }
 
   @transparent
-  public func advancedBy(n: Distance, _ limit: Self) -> Self {
+  public func advancedBy(n: Distance, limit: Self) -> Self {
     let d = self.distanceTo(limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {
       return limit

@@ -1046,8 +1046,8 @@ StringTests.test("indexConversion") {
     result, flags, stop
   in
     let r = result!.rangeAtIndex(1)
-    let start = String.UTF16Index(r.location)
-    let end = String.UTF16Index(r.location + r.length)
+    let start = String.UTF16Index(_offset: r.location)
+    let end = String.UTF16Index(_offset: r.location + r.length)
     matches.append(String(s.utf16[start..<end])!)
   }
 

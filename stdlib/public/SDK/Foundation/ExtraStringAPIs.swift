@@ -14,19 +14,10 @@
 // imported.  Making this API dependent on Foundation decouples the
 // Swift core from a UTF16 representation.
 extension String.UTF16View.Index : RandomAccessIndexType {
-
   /// Construct from an integer offset.
   public init(_ offset: Int) {
     _precondition(offset >= 0, "Negative UTF16 index offset not allowed")
     self.init(_offset: offset)
     // self._offset = offset
-  }
-
-  public func distanceTo(end: String.UTF16View.Index) -> Int {
-    return end._offset - _offset
-  }
-
-  public func advancedBy(n: Int) -> String.UTF16View.Index {
-    return String.UTF16View.Index(_offset: _offset + n)
   }
 }

@@ -201,12 +201,19 @@ public func < (
 
 /// Do not use this operator directly; call distance(start, end) instead.
 extension String.UTF16View.Index {
-  @inline(__always)
-  public func _distanceTo(
-    other: String.UTF16View.Index
-  ) -> String.UTF16View.Index.Distance {
-    let end = other
+  public func distanceTo(end: String.UTF16View.Index)
+    -> String.UTF16View.Index.Distance {
     return self._offset.distanceTo(end._offset)
+  }
+
+  public func advancedBy(n: Distance) -> String.UTF16View.Index {
+    return String.UTF16View.Index(_offset: self._offset.advancedBy(n))
+  }
+
+  public func advancedBy(n: Distance, limit: String.UTF16View.Index)
+    -> String.UTF16View.Index {
+    return String.UTF16View.Index(
+      _offset: self._offset.advancedBy(n, limit: limit._offset))
   }
 }
 
