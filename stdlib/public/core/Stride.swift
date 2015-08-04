@@ -48,8 +48,6 @@ public func == <T : _Strideable>(x: T, y: T) -> Bool {
 
 /// Conforming types are notionally continuous, one-dimensional
 /// values that can be offset and measured.
-///
-/// - SeeAlso: `stride(from: to: by:)` and `stride(from: through: by:)`
 public protocol Strideable : Comparable, _Strideable {
   // FIXME: We'd like to name this type "Distance" but for
   // <rdar://problem/17619038>
