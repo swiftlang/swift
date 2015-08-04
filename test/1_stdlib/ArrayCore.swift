@@ -85,11 +85,11 @@ struct MrMcRange : CollectionType {
 }
 
 func printSequence<T : SequenceType>(x: T) {
-  print("<", appendNewline: false)
+  print("<", terminator: "")
   var prefix = ""
   for a in x {
-    print(prefix, appendNewline: false)
-    print(a, appendNewline: false)
+    print(prefix, terminator: "")
+    print(a, terminator: "")
     prefix = " "
   }
   print(">")

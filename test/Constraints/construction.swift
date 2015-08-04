@@ -70,7 +70,7 @@ class File {
 
   var fd : Int32, body : String
     func replPrint() {
-    print("File{\n  fd=\(fd)\n  body=\"\(body)\"\n}", appendNewline: false)
+    print("File{\n  fd=\(fd)\n  body=\"\(body)\"\n}", terminator: "")
   }
 }
 

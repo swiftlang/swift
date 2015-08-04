@@ -13,7 +13,7 @@ import alias
 var i : MyInt64
 i = 42
 var j : AnotherInt64 = i
-print("\(j)\n", appendNewline: false)
+print("\(j)\n", terminator: "")
 
 // OUTPUT: 42
 
@@ -22,7 +22,7 @@ both = (i, j)
 
 var named : ThreeNamedInts
 named.b = 64
-print("\(named.b)\n", appendNewline: false)
+print("\(named.b)\n", terminator: "")
 
 // OUTPUT: 64
 
@@ -36,7 +36,7 @@ func negate(x: MyInt64) -> AnotherInt64 {
   return -x
 }
 var monadic : IntFunction = negate
-print("\(monadic(i))\n", appendNewline: false)
+print("\(monadic(i))\n", terminator: "")
 
 // OUTPUT: -42
 
@@ -44,7 +44,7 @@ func subtract(x: MyInt64, y: MyInt64) -> MyInt64 {
   return x - y
 }
 var dyadic : TwoIntFunction = subtract
-print("\(dyadic((named.b, i))) \(dyadic(both))\n", appendNewline: false)
+print("\(dyadic((named.b, i))) \(dyadic(both))\n", terminator: "")
 
 // OUTPUT: 22 0
 

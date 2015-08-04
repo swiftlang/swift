@@ -35,7 +35,7 @@ internal func _replExit() {
 /// Print a string as is to stdout.
 public // COMPILER_INTRINSIC
 func _replPrintLiteralString(text: String) {
-  print(text, appendNewline: false)
+  print(text, terminator: "")
 }
 
 /// Print the debug representation of `value`, followed by a newline.

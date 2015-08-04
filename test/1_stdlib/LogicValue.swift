@@ -15,12 +15,12 @@ enum Bewl : BooleanType {
 }
 
 func truthy() -> Bewl {
-  print("truthy ", appendNewline: false)
+  print("truthy ", terminator: "")
   return .True
 }
 
 func falsy() -> Bewl {
-  print("falsy ", appendNewline: false)
+  print("falsy ", terminator: "")
   return .False
 }
 

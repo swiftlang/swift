@@ -21,7 +21,7 @@
 ///   `CustomDebugStringConvertible`
 @inline(never)
 @_semantics("stdlib_binary_only")
-public func _prext_print(
+public func print(
   items: Any...,
   separator: String = " ",
   terminator: String = "\n"
@@ -50,7 +50,7 @@ public func _prext_print(
 ///   `CustomDebugStringConvertible`
 @inline(never)
 @_semantics("stdlib_binary_only")
-public func _prext_debugPrint(
+public func debugPrint(
   items: Any...,
   separator: String = " ",
   terminator: String = "\n") {
@@ -67,7 +67,6 @@ public func _prext_debugPrint(
   }
 }
 
-
 /// Writes the textual representations of `items`, separated by
 /// `separator` and terminated by `terminator`, into `output`.
 ///
@@ -77,7 +76,7 @@ public func _prext_debugPrint(
 /// - SeeAlso: `debugPrint`, Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
 @inline(__always)
-public func _prext_print<Target: OutputStreamType>(
+public func print<Target: OutputStreamType>(
   items: Any...,
   separator: String = " ",
   terminator: String = "\n",
@@ -96,7 +95,7 @@ public func _prext_print<Target: OutputStreamType>(
 /// - SeeAlso: `print`, Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
 @inline(__always)
-public func _prext_debugPrint<Target: OutputStreamType>(
+public func debugPrint<Target: OutputStreamType>(
   items: Any...,
   separator: String = " ",
   terminator: String = "\n",
@@ -144,3 +143,64 @@ internal func _debugPrint<Target: OutputStreamType>(
   output._unlock()
 }
 
+//===----------------------------------------------------------------------===//
+//===--- Migration Aids ---------------------------------------------------===//
+
+/* FIXME: Disabled because we need these signatures for our workarounds below
+@available(*, unavailable, message="Please wrap your tuple argument in parentheses: 'print((...))'")
+public func print<T>(_: T) {}
+@available(*, unavailable, message="Please wrap your tuple argument in parentheses: 'debugPrint((...))'")
+public func debugPrint<T>(_: T) {}
+*/
+
+@available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false': 'print((...), terminator: \"\")'")
+public func print<T>(_: T, appendNewline: Bool) {}
+@available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false': 'debugPrint((...), terminator: \"\")'")
+public func debugPrint<T>(_: T, appendNewline: Bool) {}
+
+
+//===--- FIXME: Not working due to <rdar://22101775> ----------------------===//
+@available(*, unavailable, message="Please use the 'toStream' label for the target stream: 'print((...), toStream: &...)'")
+public func print<T>(_: T, inout _: OutputStreamType) {}
+@available(*, unavailable, message="Please use the 'toStream' label for the target stream: 'debugPrint((...), toStream: &...))'")
+public func debugPrint<T>(_: T, inout _: OutputStreamType) {}
+
+@available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'print((...), terminator: \"\", toStream: &...)'")
+public func print<T>(_: T, inout _: OutputStreamType, appendNewline: Bool) {}
+@available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false' and use the 'toStream' label for the target stream: 'debugPrint((...), terminator: \"\", toStream: &...)'")
+public func debugPrint<T>(
+  _: T, inout _: OutputStreamType, appendNewline: Bool
+) {}
+//===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+//===--- WORKAROUNDS ------------------------------------------------------===//
+//===--- FIXME: <rdar://22056861> Bool failing to match variadic Any ------===//
+/// Writes the textual representations of `item` into the standard
+/// output.
+///
+/// The textual representation is obtained via the expression
+/// `String(item)`.
+///
+/// - SeeAlso: `debugPrint`, Streamable`, `CustomStringConvertible`,
+///   `CustomDebugStringConvertible`
+@inline(never)
+@_semantics("stdlib_binary_only")
+public func print<T>(item: T) {
+  print(item, terminator: "\n")
+}
+
+/// Writes the textual representations of `item` most suitable for
+/// debugging into the standard output.
+///
+/// The textual representation is obtained via the expression
+/// `String(reflecting: item)`.
+///
+/// - SeeAlso: `print`, Streamable`, `CustomStringConvertible`,
+///   `CustomDebugStringConvertible`
+@inline(never)
+@_semantics("stdlib_binary_only")
+public func debugPrint<T>(item: T) {
+  debugPrint(item, separator: "\n")
+}
+//===----------------------------------------------------------------------===//

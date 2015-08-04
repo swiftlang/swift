@@ -6,21 +6,21 @@
 import Foundation
 
 func testAnyObjectIsa(obj: AnyObject) {
-  print("(", appendNewline: false)
+  print("(", terminator: "")
   if obj is String {
-    print("String", appendNewline: false)
+    print("String", terminator: "")
   }
   if obj is Int {
-    print("Int", appendNewline: false)
+    print("Int", terminator: "")
   }
   if obj is [NSString] {
-    print("[NSString]", appendNewline: false)
+    print("[NSString]", terminator: "")
   }
   if obj is [Int] {
-    print("[Int]", appendNewline: false)
+    print("[Int]", terminator: "")
   }
   if obj is Dictionary<String, Int> {
-    print("Dictionary<String, Int>", appendNewline: false)
+    print("Dictionary<String, Int>", terminator: "")
   }
   print(")")
 }
@@ -45,12 +45,12 @@ testAnyObjectIsa([1, 2, 3, 4, 5])
 testAnyObjectIsa(["hello" : 1, "world" : 2])
 
 func testNSArrayIsa(nsArr: NSArray) {
-  print("(", appendNewline: false)
+  print("(", terminator: "")
   if nsArr is [String] {
-    print("[String]", appendNewline: false)
+    print("[String]", terminator: "")
   }
   if nsArr is [Int] {
-    print("[Int]", appendNewline: false)
+    print("[Int]", terminator: "")
   }
   print(")")
 }
@@ -65,12 +65,12 @@ testNSArrayIsa([1, 2, 3])
 testNSArrayIsa([[1, 2], [3, 4], [5, 6]])
 
 func testArrayIsa(arr: Array<AnyObject>) {
-  print("(", appendNewline: false)
+  print("(", terminator: "")
   if arr is [NSString] {
-    print("[NSString]", appendNewline: false)
+    print("[NSString]", terminator: "")
   }
   if arr is [NSNumber] {
-    print("[NSNumber]", appendNewline: false)
+    print("[NSNumber]", terminator: "")
   }
   print(")")
 }
@@ -85,12 +85,12 @@ testArrayIsa([1, 2, 3])
 testArrayIsa([[1, 2], [3, 4], [5, 6]])
 
 func testArrayIsaBridged(arr: Array<AnyObject>) {
-  print("(", appendNewline: false)
+  print("(", terminator: "")
   if arr is [String] {
-    print("[String]", appendNewline: false)
+    print("[String]", terminator: "")
   }
   if arr is [Int] {
-    print("[Int]", appendNewline: false)
+    print("[Int]", terminator: "")
   }
   print(")")
 }

@@ -1372,6 +1372,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         }
 
         assignFixedType(typeVar1, type2);
+        
+        // For symmetry with overload resolution, penalize conversions to empty
+        // existentials.
+        if (type2->isEmptyExistentialComposition())
+          increaseScore(ScoreKind::SK_EmptyExistentialConversion);
+        
         return SolutionKind::Solved;
       }
 

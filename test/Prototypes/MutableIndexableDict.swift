@@ -509,10 +509,10 @@ extension String {
 }
 
 func display(v : Dictionary<Int, X>) {
-  print("[ ", appendNewline: false)
+  print("[ ", terminator: "")
   var separator = ""
   for p in v {
-    print("\(separator) \(p.key) : \(p.value)", appendNewline: false)
+    print("\(separator) \(p.key) : \(p.value)", terminator: "")
     separator = ", "
   }
   print(" ]")

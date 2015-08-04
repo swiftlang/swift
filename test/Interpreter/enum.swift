@@ -134,7 +134,7 @@ func printMultiPayloadAddressOnly(v: MultiPayloadAddressOnly) {
   case .x(let runcible):
     runcible.runce()
   case .y(let s, let runcible):
-    print("\(s) ", appendNewline: false)
+    print("\(s) ", terminator: "")
     runcible.runce()
   case .z:
     print("Zed.")

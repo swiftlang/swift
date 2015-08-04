@@ -773,7 +773,7 @@ extension String {
   /// - SeeAlso: `String.init<T>(reflecting: T)`
   public init<T>(_ instance: T) {
     self.init()
-    print(instance, &self, appendNewline: false)
+    print(instance, terminator: "", toStream: &self)
   }
 
   /// Initialize `self` with a detailed textual representation of
@@ -794,7 +794,7 @@ extension String {
   /// - SeeAlso: `String.init<T>(T)`
   public init<T>(reflecting subject: T) {
     self.init()
-    debugPrint(subject, &self, appendNewline: false)
+    debugPrint(subject, terminator: "", toStream: &self)
   }
 }
 

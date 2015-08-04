@@ -111,9 +111,9 @@ extension MutableCollectionType
 var evenOdd = [5, 3, 6, 2, 4, 9, 8, 1, 7, 6]
 var evenOddSplit = evenOdd.myPartition(evenOdd.myIndices)
 for i in evenOdd.myIndices {
-  if i == evenOddSplit { print(" |", appendNewline: false) }
-  if i > 0 { print(" ", appendNewline: false) }
-  print(evenOdd[i], appendNewline: false)
+  if i == evenOddSplit { print(" |", terminator: "") }
+  if i > 0 { print(" ", terminator: "") }
+  print(evenOdd[i], terminator: "")
 }
 print("")
 

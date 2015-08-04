@@ -63,10 +63,10 @@ func test_switch(u: MaybePair) {
 func test_wrapper() {
   var w = Wrapper(Val: 42)
   
-  print(w.value, appendNewline: false)
-  print(w.getValue(), appendNewline: false)
-  print(w.valueAgain, appendNewline: false)
-  print(w.getValueAgain(), appendNewline: false)
+  print(w.value, terminator: "")
+  print(w.getValue(), terminator: "")
+  print(w.valueAgain, terminator: "")
+  print(w.getValueAgain(), terminator: "")
 }
 
 // SIL-LABEL: sil public_external [transparent] [fragile] @_TF15def_transparent17open_existentialsFT1pPS_1P_2cpPS_2CP__T_

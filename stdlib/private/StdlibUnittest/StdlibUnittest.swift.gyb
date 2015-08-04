@@ -162,8 +162,8 @@ public func expectationFailure(
   stackTrace: SourceLocStack) {
   _anyExpectFailed = true
   stackTrace.print()
-  print(reason, appendNewline: reason != "")
-  print(message, appendNewline: message != "")
+  print(reason, terminator: reason == "" ? "" : "\n")
+  print(message, terminator: message == "" ? "" : "\n")
 }
 
 public func expectEqual<T>(
@@ -378,7 +378,7 @@ public func expectCrashLater() {
   print("\(_stdlibUnittestStreamPrefix);expectCrash;\(_anyExpectFailed)")
 
   var stderr = _Stderr()
-  print("\(_stdlibUnittestStreamPrefix);expectCrash", &stderr)
+  print("\(_stdlibUnittestStreamPrefix);expectCrash", toStream: &stderr)
 
   _seenExpectCrash = true
 }
@@ -449,7 +449,7 @@ func _childProcess() {
     print("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed)")
 
     var stderr = _Stderr()
-    print("\(_stdlibUnittestStreamPrefix);end", &stderr)
+    print("\(_stdlibUnittestStreamPrefix);end", toStream: &stderr)
 
     if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
       return
@@ -501,11 +501,11 @@ struct _ParentProcess {
       _spawnChild()
     }
 
-    print("\(testSuite.name);\(testName)", &_childStdin)
+    print("\(testSuite.name);\(testName)", toStream: &_childStdin)
 
     let currentTest = testSuite._testByName(testName)
     if let stdinText = currentTest.stdinText {
-      print(stdinText, &_childStdin, appendNewline: false)
+      print(stdinText, terminator: "", toStream: &_childStdin)
     }
     if currentTest.stdinEndsWithEOF {
       _childStdin.close()

@@ -57,7 +57,7 @@ print("locations[1]=\(a.value.locations[1])")
 // CHECK-NEXT: locations[1]=San Jose
 
 for x in 0..<10 {
-  print(a.baseAddress[x], appendNewline: false)
+  print(a.baseAddress[x], terminator: "")
 }
 print("")
 // CHECK-NEXT: 0123456789

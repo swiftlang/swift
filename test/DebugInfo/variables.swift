@@ -29,15 +29,15 @@ var glob_s:    String = "😄"
 // CHECK-DAG: !DIGlobalVariable(name: "glob_s",{{.*}} scope: ![[TLC]],{{.*}} line: [[@LINE-1]],{{.*}} type: ![[S:[^,]+]]
 // FIXME: Dreadful type-checker performance prevents this from being this single
 // print expression:
-//   print("\(glob_v), \(glob_i8), \(glob_i16), \(glob_i32), \(glob_i64), \(glob_f), \(glob_d), \(glob_b), \(glob_s)", appendNewline: false)
-print(", \(glob_i8)", appendNewline: false)
-print(", \(glob_i16)", appendNewline: false)
-print(", \(glob_i32)", appendNewline: false)
-print(", \(glob_i64)", appendNewline: false)
-print(", \(glob_f)", appendNewline: false)
-print(", \(glob_d)", appendNewline: false)
-print(", \(glob_b)", appendNewline: false)
-print(", \(glob_s)", appendNewline: false)
+//   print("\(glob_v), \(glob_i8), \(glob_i16), \(glob_i32), \(glob_i64), \(glob_f), \(glob_d), \(glob_b), \(glob_s)", terminator: "")
+print(", \(glob_i8)", terminator: "")
+print(", \(glob_i16)", terminator: "")
+print(", \(glob_i32)", terminator: "")
+print(", \(glob_i64)", terminator: "")
+print(", \(glob_f)", terminator: "")
+print(", \(glob_d)", terminator: "")
+print(", \(glob_b)", terminator: "")
+print(", \(glob_s)", terminator: "")
 var unused: Int32 = -1
 
 // CHECK-DAG: ![[RT:[0-9]+]] ={{.*}}"Swift.swiftmodule"

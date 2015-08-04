@@ -11,15 +11,15 @@ import complex
 
 func printDensity(d: Int) {
   if (d > 40) {
-     print(" ", appendNewline: false)
+     print(" ", terminator: "")
   } else if d > 6 {
-     print(".", appendNewline: false)
+     print(".", terminator: "")
   } else if d > 4 {
-     print("+", appendNewline: false)
+     print("+", terminator: "")
   } else if d > 2 {
-     print("*", appendNewline: false)
+     print("*", terminator: "")
   } else {
-     print("#", appendNewline: false)
+     print("#", terminator: "")
   }
 }
 
@@ -55,7 +55,7 @@ func fractal (densityFunc:(c: Complex, maxIterations: Int) -> Int)
       var c = Complex(real: col, imag: row)
       printDensity(densityFunc(c: c, maxIterations: maxIterations))
     }
-    print("\n", appendNewline: false)
+    print("\n", terminator: "")
   }
 }
 
@@ -116,7 +116,7 @@ func getBurningShipIterations(c: Complex, maxIterations: Int) -> Int {
   return n
 }
 
-print("\n== BURNING SHIP ==\n\n", appendNewline: false)
+print("\n== BURNING SHIP ==\n\n", terminator: "")
 
 var burningShip = fractal(getBurningShipIterations)
 burningShip(xMin: -2.0, xMax: 1.2, yMin: -2.1, yMax: 1.2, rows: 40, cols: 80, 

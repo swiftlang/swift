@@ -183,42 +183,44 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
   if maxItemCounter <= 0 { return }
   --maxItemCounter
 
-  for _ in 0..<indent { print(" ", &targetStream, appendNewline: false) }
+  for _ in 0..<indent { print(" ", terminator: "", toStream: &targetStream) }
 
   let count = mirror.count
   let bullet = count == 0    ? "-"
              : maxDepth <= 0 ? "▹" : "▿"
-  print("\(bullet) ", &targetStream, appendNewline: false)
+  print("\(bullet) ", terminator: "", toStream: &targetStream)
 
   if let nam = name {
-    print("\(nam): ", &targetStream, appendNewline: false)
+    print("\(nam): ", terminator: "", toStream: &targetStream)
   }
-  print(mirror.summary, &targetStream, appendNewline: false)
+  print(mirror.summary, terminator: "", toStream: &targetStream)
 
   if let id = mirror.objectIdentifier {
     if let previous = visitedItems[id] {
-      print(" #\(previous)", &targetStream)
+      print(" #\(previous)", toStream: &targetStream)
       return
     }
     let identifier = visitedItems.count
     visitedItems[id] = identifier
-    print(" #\(identifier)", &targetStream, appendNewline: false)
+    print(" #\(identifier)", terminator: "", toStream: &targetStream)
   }
 
-  print("", &targetStream)
+  print("", toStream: &targetStream)
 
   if maxDepth <= 0 { return }
 
   for i in 0..<count {
     if maxItemCounter <= 0 {
-      for _ in 0..<(indent+4) { print(" ", &targetStream, appendNewline: false) }
+      for _ in 0..<(indent+4) {
+        print(" ", terminator: "", toStream: &targetStream)
+      }
       let remainder = count - i
-      print("(\(remainder)", &targetStream, appendNewline: false)
-      if i > 0 { print(" more", &targetStream, appendNewline: false) }
+      print("(\(remainder)", terminator: "", toStream: &targetStream)
+      if i > 0 { print(" more", terminator: "", toStream: &targetStream) }
       if remainder == 1 {
-        print(" child)", &targetStream)
+        print(" child)", toStream: &targetStream)
       } else {
-        print(" children)", &targetStream)
+        print(" children)", toStream: &targetStream)
       }
       return
     }

@@ -18,13 +18,13 @@ func main () -> Void
             if rhs == random_string
             || rhs.unicodeScalars.count == random_int {
                 var local_var : Int = 10
-                print("I have an int here \(local_var).\n", appendNewline: false)
+                print("I have an int here \(local_var).\n", terminator: "")
                 return false
             }
             else
             {
                 var local_var : String = "g"
-                print("I have another string here \(local_var).\n", appendNewline: false)
+                print("I have another string here \(local_var).\n", terminator: "")
                 return rhs < lhs
             }
         }

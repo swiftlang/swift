@@ -9,14 +9,14 @@ import Foundation
 func printRect(r: NSRect) {
   // FIXME: Constraint checker takes too long to typecheck this as an
   // interpolation expression
-  print("NSRect(", appendNewline: false)
-  print(r.origin.x, appendNewline: false)
-  print(", ", appendNewline: false)
-  print(r.origin.y, appendNewline: false)
-  print(", ", appendNewline: false)
-  print(r.size.width, appendNewline: false)
-  print(", ", appendNewline: false)
-  print(r.size.height, appendNewline: false)
+  print("NSRect(", terminator: "")
+  print(r.origin.x, terminator: "")
+  print(", ", terminator: "")
+  print(r.origin.y, terminator: "")
+  print(", ", terminator: "")
+  print(r.size.width, terminator: "")
+  print(", ", terminator: "")
+  print(r.size.height, terminator: "")
   print(")")
 }
 

@@ -86,7 +86,7 @@ let partition_verifier : ([Int]) -> () = {
     // equal to the pivot value.
     for i in 0..<idx {
       if y[i] > y[idx]  {
-        print("Error!\n", appendNewline: false)
+        print("Error!\n", terminator: "")
         return
       }
     }
@@ -94,7 +94,7 @@ let partition_verifier : ([Int]) -> () = {
     // equal to the pivot value.
     for i in idx..<y.count - 1 {
       if y[i] < y[idx]  {
-        print("Error!\n", appendNewline: false)
+        print("Error!\n", terminator: "")
         return
       }
     }

@@ -174,7 +174,7 @@ protocol Proto {
 }
 extension Double : Proto { 
   func foo() {
-    print("Double: \(self)\n", appendNewline: false) 
+    print("Double: \(self)\n", terminator: "") 
   }
 }
 var pr : Proto = 3.14159
@@ -186,7 +186,7 @@ pr = "foo"
 
 extension String : Proto {
   func foo() {
-    print("String: \(self)\n", appendNewline: false)
+    print("String: \(self)\n", terminator: "")
   }
 }
 pr = "foo"

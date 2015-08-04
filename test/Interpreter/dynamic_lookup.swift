@@ -35,7 +35,7 @@ func test_dynamic_lookup_f(obj: AnyObject) {
   if of != nil {
     of!()
   } else {
-    print("Object does not respond to the selector \"f\".\n", appendNewline: false)
+    print("Object does not respond to the selector \"f\".\n", terminator: "")
   }
 }
 
@@ -44,7 +44,7 @@ func test_dynamic_lookup_g(obj: AnyObject) {
   if og != nil {
     og!()
   } else {
-    print("Class does not respond to the selector \"g\".\n", appendNewline: false)
+    print("Class does not respond to the selector \"g\".\n", terminator: "")
   }
 }
 

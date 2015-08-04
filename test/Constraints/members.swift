@@ -85,7 +85,7 @@ var zcurriedFull = z.curried(0)(y: 1)
 ////
 
 // Module
-Swift.print(3, appendNewline: false)
+Swift.print(3, terminator: "")
 
 var format : String
 format._splitFirstIf({ $0.isASCII() })

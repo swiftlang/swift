@@ -204,9 +204,9 @@ PassThroughStdoutStderr.test("hasNewline") {
   print("stdout third")
 
   var stderr = _Stderr()
-  print("stderr first", &stderr)
-  print("stderr second", &stderr)
-  print("stderr third", &stderr)
+  print("stderr first", toStream: &stderr)
+  print("stderr second", toStream: &stderr)
+  print("stderr third", toStream: &stderr)
 }
 // CHECK: [ RUN      ] PassThroughStdoutStderr.hasNewline
 // CHECK-DAG: out>>> stdout first
@@ -220,12 +220,12 @@ PassThroughStdoutStderr.test("hasNewline") {
 PassThroughStdoutStderr.test("noNewline") {
   print("stdout first")
   print("stdout second")
-  print("stdout third", appendNewline: false)
+  print("stdout third", terminator: "")
 
   var stderr = _Stderr()
-  print("stderr first", &stderr)
-  print("stderr second", &stderr)
-  print("stderr third", &stderr, appendNewline: false)
+  print("stderr first", toStream: &stderr)
+  print("stderr second", toStream: &stderr)
+  print("stderr third", terminator: "", toStream: &stderr)
 }
 // CHECK: [ RUN      ] PassThroughStdoutStderr.noNewline
 // CHECK-DAG: out>>> stdout first

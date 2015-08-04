@@ -61,16 +61,18 @@ func printedIs<T>(
     object: T, _ expected1: String, expected2: String? = nil,
     file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
-  var actual = String(object)
+  let actual = String(object)
   var match = expected1 == actual
   if !match && expected2 != nil {
     match = expected2! == actual
   }
   if !match {
-    print("check failed at \(file), line \(line)")
-    print("expected: \"\(expected1)\" or \"\(expected2)\"")
-    print("actual: \"\(actual)\"")
-    print("")
+    print(
+      "check failed at \(file), line \(line)",
+      "expected: \"\(expected1)\" or \"\(expected2)\"",
+      "actual: \"\(actual)\"",
+      "",
+      separator: "\n")
     failed = true
   }
 }
@@ -80,12 +82,14 @@ func debugPrintedIs<T>(
     file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   var actual = ""
-  debugPrint(object, &actual, appendNewline: false)
+  debugPrint(object, terminator: "", toStream: &actual)
   if expected1 != actual && (expected2 != nil && expected2! != actual) {
-    print("check failed at \(file), line \(line)")
-    print("expected: \"\(expected1)\" or \"\(expected2)\"")
-    print("actual: \"\(actual)\"")
-    print("")
+    print(
+      "check failed at \(file), line \(line)",
+      "expected: \"\(expected1)\" or \"\(expected2)\"",
+      "actual: \"\(actual)\"",
+      "",
+      separator: "\n")
     failed = true
   }
 }
@@ -95,10 +99,12 @@ func assertEquals(
     file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   if expected != actual {
-    print("check failed at \(file), line \(line)")
-    print("expected: \"\(expected)\"")
-    print("actual: \"\(actual)\"")
-    print("")
+    print(
+      "check failed at \(file), line \(line)",
+      "expected: \"\(expected)\"",
+      "actual: \"\(actual)\"",
+      "",
+      separator: "\n")
     failed = true
   }
 }
@@ -137,7 +143,7 @@ func test_StdlibTypesPrinted() {
   s = "\\ \' \" \0 \n \r \t \u{05}"
   debugPrintedIs(s, "\"\\\\ \\\' \\\" \\0 \\n \\r \\t \\u{05}\"")
 
-  var ch: Character = "a"
+  let ch: Character = "a"
   printedIs(ch, "a")
   debugPrintedIs(ch, "\"a\"")
 
@@ -729,14 +735,13 @@ test_gcMetatypePrinting()
 // CHECK: test_gcMetatypePrinting done
 
 func test_ArrayPrinting() {
-  var arrayOfInts: [Int] = []
+  let arrayOfInts: [Int] = []
   printedIs(arrayOfInts, "[]")
 
   printedIs([ 1 ], "[1]")
   printedIs([ 1, 2 ], "[1, 2]")
   printedIs([ 1, 2, 3 ], "[1, 2, 3]")
 
-  var arrayOfStrings = [ "foo", "bar", "bas" ]
   printedIs([ "foo", "bar", "bas" ], "[foo, bar, bas]")
   debugPrintedIs([ "foo", "bar", "bas" ], "[\"foo\", \"bar\", \"bas\"]")
 
@@ -776,7 +781,7 @@ func test_DictionaryPrinting() {
   printedIs(dictSI, "[aaa: 1, bbb: 2]", expected2: "[bbb: 2, aaa: 1]")
   debugPrintedIs(dictSI, "[\"aaa\": 1, \"bbb\": 2]", expected2: "[\"bbb\": 2, \"aaa\": 1]")
 
-  var dictSS = [ "aaa": "bbb" ]
+  let dictSS = [ "aaa": "bbb" ]
   printedIs(dictSS, "[aaa: bbb]")
   debugPrintedIs(dictSS, "[\"aaa\": \"bbb\"]")
 
@@ -804,30 +809,30 @@ test_SetPrinting()
 // CHECK: test_SetPrinting done
 
 func test_TuplePrinting() {
-  var tuple1 = (42, ())
+  let tuple1 = (42, ())
   printedIs(tuple1, "(42, ())")
 
-  var tuple2 = ((), 42)
+  let tuple2 = ((), 42)
   printedIs(tuple2, "((), 42)")
 
-  var tuple3 = (42, StructPrintable(3))
+  let tuple3 = (42, StructPrintable(3))
   printedIs(tuple3, "(42, ►3◀︎)")
 
-  var tuple4 = (42, LargeStructPrintable(10, 20, 30, 40))
+  let tuple4 = (42, LargeStructPrintable(10, 20, 30, 40))
   printedIs(tuple4, "(42, <10 20 30 40>)")
 
-  var tuple5 = (42, ClassPrintable(3))
+  let tuple5 = (42, ClassPrintable(3))
   printedIs(tuple5, "(42, ►3◀︎)")
 
-  var tuple6 = ([123: 123], (1, 2, "3"))
+  let tuple6 = ([123: 123], (1, 2, "3"))
   printedIs(tuple6, "([123: 123], (1, 2, \"3\"))")
 
-  var arrayOfTuples1 =
+  let arrayOfTuples1 =
       [ (1, "two", StructPrintable(3), StructDebugPrintable(4),
          WithoutDescription(5)) ]
   printedIs(arrayOfTuples1, "[(1, \"two\", ►3◀︎, ►4◀︎, a.WithoutDescription(x: 5))]")
 
-  var arrayOfTuples2 =
+  let arrayOfTuples2 =
       [ (1, "two", WithoutDescription(3)),
         (11, "twenty-two", WithoutDescription(33)),
         (111, "two hundred twenty-two", WithoutDescription(333)) ]
@@ -839,7 +844,7 @@ test_TuplePrinting()
 // CHECK: test_TuplePrinting done
 
 func test_ArbitraryStructPrinting() {
-  var arrayOfArbitraryStructs =
+  let arrayOfArbitraryStructs =
     [ WithoutDescription(1), WithoutDescription(2), WithoutDescription(3) ]
   printedIs(
     arrayOfArbitraryStructs,
@@ -946,6 +951,75 @@ func test_StdoutUTF8Printing() {
 }
 test_StdoutUTF8Printing()
 // CHECK: test_StdoutUTF8Printing done
+
+func test_varargs() {
+  print("", 1, 2, 3, 4, "", separator: "|") // CHECK: |1|2|3|4|
+  print(1, 2, 3, separator: "\n", terminator: "===")
+  print(4, 5, 6, separator: "\n")
+  // CHECK-NEXT: 1
+  // CHECK-NEXT: 2
+  // CHECK-NEXT: 3===4
+  // CHECK-NEXT: 5
+  // CHECK-NEXT: 6
+
+  debugPrint("", 1, 2, 3, 4, "", separator: "|")
+   // CHECK-NEXT: ""|1|2|3|4|""
+  debugPrint(1, 2, 3, separator: "\n", terminator: "===")
+  debugPrint(4, 5, 6, separator: "\n")
+  // CHECK-NEXT: 1
+  // CHECK-NEXT: 2
+  // CHECK-NEXT: 3===4
+  // CHECK-NEXT: 5
+  // CHECK-NEXT: 6
+
+  var output = ""
+  print(
+    "", 1, 2, 3, 4, "", separator: "|", toStream: &output)
+  print(output == "|1|2|3|4|\n") // CHECK-NEXT: true
+  output = ""
+  debugPrint(
+    "", 1, 2, 3, 4, "", separator: "|", terminator: "", toStream: &output)
+  print(output == "\"\"|1|2|3|4|\"\"") // CHECK-NEXT: true
+  print("test_varargs done")
+}
+test_varargs()
+// CHECK: test_varargs done
+
+func test_playgroundPrintHook() {
+  
+  var printed: String? = nil
+  _playgroundPrintHook = { printed = $0 }
+  
+  print("", 1, 2, 3, 4, "", separator: "|") // CHECK: |1|2|3|4|
+  print("%\(printed!)%") // CHECK-NEXT: %|1|2|3|4|
+  // CHECK-NEXT: %
+  
+  printed = nil
+  debugPrint("", 1, 2, 3, 4, "", separator: "|")
+  // CHECK-NEXT: ""|1|2|3|4|""
+  print("%\(printed!)%") // CHECK-NEXT: %""|1|2|3|4|""
+  // CHECK-NEXT: %
+  
+  var explicitStream = ""
+  printed = nil
+  print("", 1, 2, 3, 4, "", separator: "!", toStream: &explicitStream)
+  print(printed)               // CHECK-NEXT: nil
+  print("%\(explicitStream)%") // CHECK-NEXT: %!1!2!3!4!
+  // CHECK-NEXT: %
+  
+  explicitStream = ""
+  printed = nil
+  debugPrint(
+    "", 1, 2, 3, 4, "", separator: "!", toStream: &explicitStream)
+  print(printed) // CHECK-NEXT: nil
+  print("%\(explicitStream)%") // CHECK-NEXT: %""!1!2!3!4!""
+  // CHECK-NEXT: %
+  
+  _playgroundPrintHook = nil
+  print("test_playgroundPrintHook done")
+  // CHECK-NEXT: test_playgroundPrintHook done
+}
+test_playgroundPrintHook()
 
 if !failed {
   print("OK")

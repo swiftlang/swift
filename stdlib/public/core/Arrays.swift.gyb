@@ -703,9 +703,9 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
         result += ", "
       }
       if isDebug {
-        debugPrint(item, &result, appendNewline: false)
+        debugPrint(item, terminator: "", toStream: &result)
       } else {
-        print(item, &result, appendNewline: false)
+        print(item, terminator: "", toStream: &result)
       }
     }
     result += "]"

@@ -5,9 +5,9 @@
 import UIKit
 
 func printOrientation(o: UIDeviceOrientation) {
-  print("\(o.isPortrait) \(UIDeviceOrientationIsPortrait(o)), ", appendNewline: false)
-  print("\(o.isLandscape) \(UIDeviceOrientationIsLandscape(o)), ", appendNewline: false)
-  print("\(o.isFlat), ", appendNewline: false)
+  print("\(o.isPortrait) \(UIDeviceOrientationIsPortrait(o)), ", terminator: "")
+  print("\(o.isLandscape) \(UIDeviceOrientationIsLandscape(o)), ", terminator: "")
+  print("\(o.isFlat), ", terminator: "")
   print("\(o.isValidInterfaceOrientation) \(UIDeviceOrientationIsValidInterfaceOrientation(o))")
 }
 
@@ -30,7 +30,7 @@ printOrientation(UIDeviceOrientation.FaceDown)
 
 
 func printOrientation(o: UIInterfaceOrientation) {
-  print("\(o.isPortrait) \(UIInterfaceOrientationIsPortrait(o)), ", appendNewline: false)
+  print("\(o.isPortrait) \(UIInterfaceOrientationIsPortrait(o)), ", terminator: "")
   print("\(o.isLandscape) \(UIInterfaceOrientationIsLandscape(o))")
 }
 

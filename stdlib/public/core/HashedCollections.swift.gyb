@@ -744,7 +744,7 @@ extension Set: CustomStringConvertible, CustomDebugStringConvertible {
       } else {
         result += ", "
       }
-      debugPrint(member, &result, appendNewline: false)
+      debugPrint(member, terminator: "", toStream: &result)
     }
     result += isDebug ? "])" : "]"
     return result
@@ -1281,15 +1281,15 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
         result += ", "
       }
       if isDebug {
-        debugPrint(k, &result, appendNewline: false)
+        debugPrint(k, terminator: "", toStream: &result)
       } else {
-        print(k, &result, appendNewline: false)
+        print(k, terminator: "", toStream: &result)
       }
       result += ": "
       if isDebug {
-        debugPrint(v, &result, appendNewline: false)
+        debugPrint(v, terminator: "", toStream: &result)
       } else {
-        print(v, &result, appendNewline: false)
+        print(v, terminator: "", toStream: &result)
       }
     }
     result += "]"

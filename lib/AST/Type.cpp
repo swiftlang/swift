@@ -670,6 +670,17 @@ bool TypeBase::isAnyObject() {
   return false;
 }
 
+bool TypeBase::isEmptyExistentialComposition() {
+  if (auto emtType = ExistentialMetatypeType::get(this)) {
+    if (auto pcType = emtType->getInstanceType()->
+        getAs<ProtocolCompositionType>()) {
+      return pcType->getProtocols().empty();
+    }
+  }
+  
+  return false;
+}
+
 static Type getStrippedType(const ASTContext &context, Type type,
                             bool stripLabels, bool stripDefaultArgs) {
   return type.transform([&](Type type) -> Type {

@@ -69,11 +69,11 @@ func < (x: X, y: X) -> Bool {
 //===----------------------------------------------------------------------===//
 
 func printSequence<T : SequenceType>(x: T) {
-  print("[", appendNewline: false)
+  print("[", terminator: "")
   var prefix = ""
   for a in x {
-    print(prefix, appendNewline: false)
-    print(a, appendNewline: false)
+    print(prefix, terminator: "")
+    print(a, terminator: "")
     prefix = ", "
   }
   print("]")
@@ -115,7 +115,7 @@ where T.Generator.Element == T._Buffer.Element,
           T.Element == X,
           T.Index == Int
 >(_: T.Type, _ label: String) {
-  print("test: \(label)...", appendNewline: false)
+  print("test: \(label)...", terminator: "")
 
   var x: T = [1, 2, 3, 4, 5]
   

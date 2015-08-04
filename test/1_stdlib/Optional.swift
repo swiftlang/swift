@@ -91,7 +91,7 @@ func testRelation(p: (Int?, Int?) -> Bool) {
 
   var prefix = ""
   for (l,r) in relationships {
-    print("\(prefix)\(p(l, r))", appendNewline: false)
+    print("\(prefix)\(p(l, r))", terminator: "")
     prefix=", "
   }
   print(".")

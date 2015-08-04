@@ -78,6 +78,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind) {
     case SK_ScalarPointerConversion:
       log << "scalar-to-pointer conversion";
       break;
+    case SK_EmptyExistentialConversion:
+      log << "empty-existential conversion";
+      break;
     }
     log << ")\n";
   }
@@ -441,12 +444,7 @@ static bool hasEmptyExistenialParameterMismatch(ValueDecl *decl1,
         break;
       
       if (t2->isAnyExistentialType() && !t1->isAnyExistentialType()) {
-        if (auto emtType = ExistentialMetatypeType::get(t2)) {
-          if (auto pcType = emtType->getInstanceType()->
-                              getAs<ProtocolCompositionType>()) {
-            return pcType->getProtocols().empty();
-          }
-        }
+        return t2->isEmptyExistentialComposition();
       }
     }
   }

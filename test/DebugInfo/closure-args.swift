@@ -30,7 +30,7 @@ func main() -> Void
             // CHECK-DAG: !DILocalVariable(tag: DW_TAG_auto_variable, name: "local_var", scope: ![[THENSCOPE:[0-9]+]],{{.*}} line: [[@LINE+2]],
             // CHECK-DAG: ![[THENSCOPE]] = distinct !DILexicalBlock({{.*}} line: [[@LINE-3]]
                 var local_var : Int = 10
-                print("I have an int here \(local_var).\n", appendNewline: false)
+                print("I have an int here \(local_var).\n", terminator: "")
                 return false
             }
             else
@@ -38,7 +38,7 @@ func main() -> Void
             // CHECK-DAG: !DILocalVariable(tag: DW_TAG_auto_variable, name: "local_var", scope: ![[ELSESCOPE:[0-9]+]],{{.*}} line: [[@LINE+2]]
             // CHECK-DAG: ![[ELSESCOPE]] = distinct !DILexicalBlock({{.*}} line: [[@LINE-2]],
                 var local_var : String = "g"
-                print("I have another string here \(local_var).\n", appendNewline: false)
+                print("I have another string here \(local_var).\n", terminator: "")
                 // Assign to all the captured variables to inhibit capture promotion.
                 random_string = "c"
                 random_int = -1

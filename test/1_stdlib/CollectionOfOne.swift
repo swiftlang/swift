@@ -15,18 +15,18 @@
 print("testing...")
 // CHECK: testing...
 
-print("for loop: ", appendNewline: false)
+print("for loop: ", terminator: "")
 for x in CollectionOfOne(2) {
-  print(x, appendNewline: false)
+  print(x, terminator: "")
 }
 print(".")
 // CHECK-NEXT: for loop: 2.
 
 let twentyOne = CollectionOfOne(21)
 
-print("index loop: ", appendNewline: false)
+print("index loop: ", terminator: "")
 for x in twentyOne.indices {
-  print(twentyOne[x] * 2, appendNewline: false)
+  print(twentyOne[x] * 2, terminator: "")
 }
 print(".")
 // CHECK-NEXT: index loop: 42.

@@ -9,7 +9,7 @@ var s = ["two", "three", "five", "seven", "eleven", "thirteen"]
 var i = 0
 var prefix = ""
 for p in zip(n, s) {
-    print("\(prefix)\(p.0) => \(p.1)", appendNewline: false)
+    print("\(prefix)\(p.0) => \(p.1)", terminator: "")
     ++i
     prefix = ", "
 }
@@ -19,7 +19,7 @@ print(" (\(i) items)")
 i = 0
 prefix = ""
 for p in zip(s, n) {
-    print("\(prefix)\(p.0) => \(p.1)", appendNewline: false)
+    print("\(prefix)\(p.0) => \(p.1)", terminator: "")
     ++i
     prefix = ", "
 }

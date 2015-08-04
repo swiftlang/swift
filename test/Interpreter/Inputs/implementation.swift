@@ -1,7 +1,7 @@
 public func countToFive() {
-  print(1, appendNewline: false)
+  print(1, terminator: "")
   for i in 2...5 {
-    print(" \(i)", appendNewline: false)
+    print(" \(i)", terminator: "")
   }
   print("")
 }

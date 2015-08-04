@@ -2,25 +2,25 @@
 // REQUIRES: executable_test
 
 class A {
-  func printA() { print("A", appendNewline: false) }
+  func printA() { print("A", terminator: "") }
 }
 class B : A {
-  override func printA() { print("B", appendNewline: false) }
+  override func printA() { print("B", terminator: "") }
 }
 
 func printA(v: A) { v.printA() }
 func printOpt<T>(subprint: T->())(x: T?) {
   switch (x) {
-  case .Some(let y): print(".Some(", appendNewline: false); subprint(y); print(")", appendNewline: false)
-  case .None: print(".None", appendNewline: false)
+  case .Some(let y): print(".Some(", terminator: ""); subprint(y); print(")", terminator: "")
+  case .None: print(".None", terminator: "")
   }
 }
 
 func test(v: A????, _ cast: (A????) -> B?) {
   printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
-  print(" as? B: ", appendNewline: false)
+  print(" as? B: ", terminator: "")
   printOpt(printA)(x: cast(v))
-  print("\n", appendNewline: false)
+  print("\n", terminator: "")
 }
 test(.Some(.Some(.Some(.Some(A())))), { $0 as? B })
 test(.Some(.Some(.Some(.Some(B())))), { $0 as? B })
@@ -37,9 +37,9 @@ test(.None, { $0 as? B })
 
 func test(v: A????, _ cast: (A????) -> B??) {
   printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
-  print(" as? B?: ", appendNewline: false)
+  print(" as? B?: ", terminator: "")
   printOpt(printOpt(printA))(x: cast(v))
-  print("\n", appendNewline: false)
+  print("\n", terminator: "")
 }
 test(.Some(.Some(.Some(.Some(A())))), { $0 as? B? })
 test(.Some(.Some(.Some(.Some(B())))), { $0 as? B? })
@@ -56,9 +56,9 @@ test(.None, { $0 as? B? })
 
 func test(v: A????, _ cast: (A????) -> B???) {
   printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
-  print(" as? B??: ", appendNewline: false)
+  print(" as? B??: ", terminator: "")
   printOpt(printOpt(printOpt(printA)))(x: cast(v))
-  print("\n", appendNewline: false)
+  print("\n", terminator: "")
 }
 test(.Some(.Some(.Some(.Some(A())))), { $0 as? B?? })
 test(.Some(.Some(.Some(.Some(B())))), { $0 as? B?? })

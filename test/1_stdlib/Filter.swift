@@ -43,10 +43,10 @@ extension LazyFilterCollection where Base : TestProtocol1 {
 print("testing...")
 
 func printlnByGenerating<S: SequenceType>(s: S) {
-  print("<", appendNewline: false)
+  print("<", terminator: "")
   var prefix = ""
   for x in s {
-    print("\(prefix)\(x)", appendNewline: false)
+    print("\(prefix)\(x)", terminator: "")
     prefix = ", "
   }
   print(">")

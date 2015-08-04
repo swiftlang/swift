@@ -40,11 +40,11 @@ func mutate() {
 mutate()
 
 func printInts(ints: Int...) {
-  print("\(ints.count) ints: ", appendNewline: false)
+  print("\(ints.count) ints: ", terminator: "")
   for int in ints {
-    print("\(int) ", appendNewline: false)
+    print("\(int) ", terminator: "")
   }
-  print("\n", appendNewline: false)
+  print("\n", terminator: "")
 }
 
 // CHECK: 0 ints

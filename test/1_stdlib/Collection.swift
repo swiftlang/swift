@@ -24,7 +24,7 @@ var foobar = X("foobar")
 
 // CHECK: foobar
 for a in foobar {
-  print(a, appendNewline: false)
+  print(a, terminator: "")
 }
 print("")
 
@@ -35,7 +35,7 @@ let i = foobar.indices
 let r = i.lazy.reverse()
 for a in PermutationGenerator(elements: foobar, indices: r) {
   
-  print(a, appendNewline: false)
+  print(a, terminator: "")
 }
 print("")
 

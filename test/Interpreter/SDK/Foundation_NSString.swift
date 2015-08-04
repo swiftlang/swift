@@ -36,9 +36,9 @@ array[1] = "world" as NSString
 // FIXME: NSString string interpolation doesn't work due to lack of
 // overload resolution.
 // CHECK: Hello, world!
-print(array[0] as! NSString, appendNewline: false)
-print(", ", appendNewline: false);
-print(array[1] as! NSString, appendNewline: false)
+print(array[0] as! NSString, terminator: "")
+print(", ", terminator: "");
+print(array[1] as! NSString, terminator: "")
 print("!")
 
 // Selectors
@@ -51,7 +51,7 @@ var array2 : NSArray = [hello, hello]
 // Switch on strings
 switch ("world" as NSString).uppercaseString {
 case "WORLD":
-  print("Found it\n", appendNewline: false)
+  print("Found it\n", terminator: "")
 
 default:
   assert(false, "didn't match")

@@ -761,6 +761,9 @@ public:
 
   /// Whether this is the AnyObject type.
   bool isAnyObject();
+  
+  /// Whether this is an empty existential composition ("{}").
+  bool isEmptyExistentialComposition();
 
   void dump() const LLVM_ATTRIBUTE_USED;
   void dump(raw_ostream &os, unsigned indent = 0) const;

@@ -44,10 +44,10 @@ print(a)
 // Test mapping a sequence
 let s = a.generate().lazy.map { $0 / 3 }
 // CHECK-NEXT: <2, 3, 4, 5, 6, 7>
-print("<", appendNewline: false)
+print("<", terminator: "")
 var prefix = ""
 for x in s {
-  print("\(prefix)\(x)", appendNewline: false)
+  print("\(prefix)\(x)", terminator: "")
   prefix = ", "
 }
 print(">")

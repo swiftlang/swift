@@ -106,7 +106,7 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
       }
       let (_, elementMirror) = mirror[i]
       let elt = elementMirror.value
-      debugPrint(elt, &target, appendNewline: false)
+      debugPrint(elt, terminator: "", toStream: &target)
     }
     target.write(")")
 
@@ -121,9 +121,9 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
         target.write(", ")
       }
       let (label, elementMirror) = mirror[i]
-      print(label, &target, appendNewline: false)
+      print(label, terminator: "", toStream: &target)
       target.write(": ")
-      debugPrint(elementMirror.value, &target, appendNewline: false)
+      debugPrint(elementMirror.value, terminator: "", toStream: &target)
     }
     target.write(")")
 
@@ -145,18 +145,18 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
     }
     let (_, payload) = mirror[0]
     if payload is _TupleMirror {
-      debugPrint(payload.value, &target, appendNewline: false)
+      debugPrint(payload.value, terminator: "", toStream: &target)
       return
     }
     target.write("(")
-    debugPrint(payload.value, &target, appendNewline: false)
+    debugPrint(payload.value, terminator: "", toStream: &target)
     target.write(")")
 
   case is _MetatypeMirror:
     printTypeName(mirror.value as! Any.Type)
 
   default:
-    print(mirror.summary, &target, appendNewline: false)
+    print(mirror.summary, terminator: "", toStream: &target)
   }
 }
 
@@ -329,162 +329,6 @@ public func debugPrintln<T>(x: T) {
 @available(*, unavailable, message="use String(reflecting:)")
 public func toDebugString<T>(x: T) -> String {
   fatalError("unavailable function can't be called")
-}
-
-//===----------------------------------------------------------------------===//
-// print()
-//===----------------------------------------------------------------------===//
-
-/// Writes the textual representation of `value`, and an optional newline,
-/// into the stream `target`.
-///
-/// The textual representation is obtained from the `value` using its protocol
-/// conformances, in the following order of preference: `Streamable`,
-/// `CustomStringConvertible`, `CustomDebugStringConvertible`.  If none of
-/// these conformances are found, a default text representation is constructed
-/// in an implementation-defined way, based on the type kind and structure.
-///
-/// Do not overload this function for your type.  Instead, adopt one of the
-/// protocols mentioned above.
-///
-/// - parameter appendNewline: Iff `true` (the default), write a trailing
-///   newline.
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func print<T, TargetStream : OutputStreamType>(
-  value: T, inout _ target: TargetStream, appendNewline: Bool
-) {
-  target._lock()
-  _print_unlocked(value, &target)
-  if appendNewline {
-    target.write("\n")
-  }
-  target._unlock()
-}
-
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func print<T, TargetStream : OutputStreamType>(
-  value: T, inout _ target: TargetStream
-) {
-  // FIXME: The PlaygroundTransform/print.swift test currently depends
-  // on maintaining this overload in lieu of using a default argument.
-  print(value, &target, appendNewline: true)
-}
-
-/// Writes the textual representation of `value`, and an optional newline,
-/// into the standard output.
-///
-/// The textual representation is obtained from the `value` using its protocol
-/// conformances, in the following order of preference: `Streamable`,
-/// `CustomStringConvertible`, `CustomDebugStringConvertible`.  If none of
-/// these conformances are found, a default text representation is constructed
-/// in an implementation-defined way, based on the type kind and structure.
-///
-/// Do not overload this function for your type.  Instead, adopt one of the
-/// protocols mentioned above.
-///
-/// - parameter appendNewline: Iff `true` (the default), write a trailing
-///   newline.
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func print<T>(value: T, appendNewline: Bool) {
-  if let hook = _playgroundPrintHook {
-    var output = _TeeStream(left: "", right: _Stdout())
-    print(value, &output, appendNewline: appendNewline)
-    hook(output.left)
-  }
-  else {
-    var output = _Stdout()
-    print(value, &output, appendNewline: appendNewline)
-  }
-}
-
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func print<T>(value: T) {
-  // FIXME: the PlaygroundTransform/array_did_set.swift test currently
-  // on maintaining this overload in lieu of using a default argument.
-  print(value, appendNewline: true)
-}
-
-//===----------------------------------------------------------------------===//
-// debugPrint()
-//===----------------------------------------------------------------------===//
-
-/// Writes the textual representation of `value` most suitable for debugging,
-/// and an optional newline, into the stream `target`.
-///
-/// The textual representation is obtained from the `value` using its protocol
-/// conformances, in the following order of preference:
-/// `CustomDebugStringConvertible`, `CustomStringConvertible`, `Streamable`.
-/// If none of these conformances are found, a default text representation is
-/// constructed in an implementation-defined way, based on the type kind and
-/// structure.
-///
-/// Do not overload this function for your type.  Instead, adopt one of the
-/// protocols mentioned above.
-///
-/// - parameter appendNewline: Iff `true` (the default), write a trailing
-///   newline.
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func debugPrint<T, TargetStream : OutputStreamType>(
-  value: T, inout _ target: TargetStream, appendNewline: Bool
-) {
-  target._lock()
-  _debugPrint_unlocked(value, &target)
-  if appendNewline {
-    target.write("\n")
-  }
-  target._unlock()
-}
-
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func debugPrint<T, TargetStream : OutputStreamType>(
-  value: T, inout _ target: TargetStream
-) {
-  // FIXME: The PlaygroundTransform/print.swift test currently depends
-  // on maintaining this overload in lieu of using a default argument.
-  debugPrint(value, &target, appendNewline: true)
-}
-
-/// Writes the textual representation of `value` most suitable for debugging,
-/// and an optional newline, into the standard output.
-///
-/// The textual representation is obtained from the `value` using its protocol
-/// conformances, in the following order of preference:
-/// `CustomDebugStringConvertible`, `CustomStringConvertible`, `Streamable`.
-/// If none of these conformances are found, a default text representation is
-/// constructed in an implementation-defined way, based on the type kind and
-/// structure.
-///
-/// Do not overload this function for your type.  Instead, adopt one of the
-/// protocols mentioned above.
-///
-/// - parameter appendNewline: Iff `true` (the default), write a trailing
-///   newline.
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func debugPrint<T>(value: T, appendNewline: Bool) {
-  if let hook = _playgroundPrintHook {
-    var output = _TeeStream(left: "", right: _Stdout())
-    debugPrint(value, &output, appendNewline: appendNewline)
-    hook(output.left)
-  }
-  else {
-    var output = _Stdout()
-    debugPrint(value, &output, appendNewline: appendNewline)
-  }
-}
-
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func debugPrint<T>(value: T) {
-  // FIXME: The PlaygroundTransform/print.swift test currently depends
-  // on maintaining this overload in lieu of using a default argument.
-  debugPrint(value, appendNewline: true)
 }
 
 /// A hook for playgrounds to print through.
