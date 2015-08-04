@@ -1089,6 +1089,7 @@ namespace {
       }
     }
 
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       auto &tc = CS.getTypeChecker();
       auto protocol = tc.getLiteralProtocol(expr);
@@ -1127,6 +1128,7 @@ namespace {
 
       return result;
     }
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
       // If this is a ParamDecl for an anonymous closure argument that has a

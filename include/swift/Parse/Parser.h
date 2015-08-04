@@ -1136,7 +1136,9 @@ public:
 
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   ParserResult<Expr> parseExprObjectLiteral();
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          Identifier firstSelectorPiece
                                            = Identifier(),

@@ -193,6 +193,7 @@ public protocol StringInterpolationConvertible {
   init<T>(stringInterpolationSegment expr: T)
 }
 
+#if SWIFT_ENABLE_OBJECT_LITERALS
 /// Conforming types can be initialized with color literals (e.g.
 /// `[#Color(colorLiteralRed: 1, blue: 0, green: 0, alpha: 1)#]`).
 public protocol _ColorLiteralConvertible {
@@ -204,6 +205,7 @@ public protocol _ColorLiteralConvertible {
 public protocol _ImageLiteralConvertible {
   init?(imageLiteral: String)
 }
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
 /// A container is destructor safe if whether it may store to memory on
 /// destruction only depends on its type parameters.

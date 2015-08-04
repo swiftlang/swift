@@ -80,6 +80,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       Loc = Tok.getLoc();
       Length = Tok.getLength();
 
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
       if (LiteralStartLoc.hasValue() && Length.hasValue()) {
         // We are still inside an object literal until we hit a r_square_lit.
         if (Tok.getKind() != tok::r_square_lit) {
@@ -91,7 +92,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         LiteralStartLoc = Optional<SourceLoc>();
         continue;
       }
-    
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
+
       switch(Tok.getKind()) {
 #define KEYWORD(X) case tok::kw_##X: Kind = SyntaxNodeKind::Keyword; break;
 #include "swift/Parse/Tokens.def"
@@ -152,10 +154,12 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         break;
       }
 
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
       case tok::l_square_lit: {
         LiteralStartLoc = Loc;
         continue;
       }
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
       default:
         continue;
@@ -435,6 +439,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
                                                 CE->getArg()->getSourceRange());
     pushStructureNode(SN, CE);
 
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   } else if (auto *ObjectE = dyn_cast<ObjectLiteralExpr>(E)) {
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::ObjectLiteralExpression;
@@ -444,6 +449,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     pushStructureNode(SN, E);
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
   } else if (auto *ArrayE = dyn_cast<ArrayExpr>(E)) {
     SyntaxStructureNode SN;
@@ -1212,11 +1218,16 @@ bool ModelASTWalker::isCurrentCallArgExpr(const Expr *E) {
   if (SubStructureStack.empty())
     return false;
   auto Current = SubStructureStack.back();
-  return (Current.StructureNode.Kind == SyntaxStructureKind::CallExpression &&
-          cast<CallExpr>(Current.ASTNode.getAsExpr())->getArg() == E) ||
-         (Current.StructureNode.Kind
-            == SyntaxStructureKind::ObjectLiteralExpression &&
-          cast<ObjectLiteralExpr>(Current.ASTNode.getAsExpr())->getArg() == E);
+
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
+  if (Current.StructureNode.Kind ==
+        SyntaxStructureKind::ObjectLiteralExpression &&
+      cast<ObjectLiteralExpr>(Current.ASTNode.getAsExpr())->getArg() == E)
+    return true;
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
+
+  return Current.StructureNode.Kind == SyntaxStructureKind::CallExpression &&
+         cast<CallExpr>(Current.ASTNode.getAsExpr())->getArg() == E;
 }
 
 bool ModelASTWalker::processComment(CharSourceRange Range) {

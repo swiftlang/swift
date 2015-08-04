@@ -55,11 +55,6 @@ function(_add_variant_c_compile_link_flags
         "-m${SWIFT_SDK_${sdk}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
   endif()
 
-  if(${SWIFT_ENABLE_TARGET_TVOS})
-    list(APPEND result
-        " -DSWIFT_ENABLE_TARGET_TVOS=\"1\"")
-  endif()
-
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -99,6 +94,14 @@ function(_add_variant_c_compile_flags
     list(APPEND result "-DNDEBUG")
   endif()
 
+  if(SWIFT_ENABLE_TARGET_TVOS)
+    list(APPEND result "-DSWIFT_ENABLE_TARGET_TVOS=\"1\"")
+  endif()
+
+  if(SWIFT_ENABLE_OBJECT_LITERALS)
+    list(APPEND result "-DSWIFT_ENABLE_OBJECT_LITERALS=\"1\"")
+  endif()
+
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -130,6 +133,10 @@ function(_add_variant_swift_compile_flags
 
   if(enable_assertions)
     list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
+  endif()
+
+  if(SWIFT_ENABLE_OBJECT_LITERALS)
+    list(APPEND result "-D" "SWIFT_ENABLE_OBJECT_LITERALS")
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)

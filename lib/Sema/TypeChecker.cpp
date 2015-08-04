@@ -153,6 +153,7 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
     }
   }
 
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   if (auto E = dyn_cast<ObjectLiteralExpr>(expr)) {
     Identifier name = E->getName();
     if (name.str().equals("Color")) {
@@ -165,10 +166,12 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
       return nullptr;
     }
   }
-  
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
+
   return nullptr;
 }
 
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
 DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
   Identifier name = expr->getName();
   if (name.str().equals("Color")) {
@@ -184,6 +187,7 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
     return DeclName();
   }
 }
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
 Module *TypeChecker::getStdlibModule(const DeclContext *dc) {
   if (StdlibModule)

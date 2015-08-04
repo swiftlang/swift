@@ -123,8 +123,10 @@ PUNCTUATOR(r_brace,       "}")
 PUNCTUATOR(l_square,      "[")
 PUNCTUATOR(r_square,      "]")
 
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
 PUNCTUATOR(l_square_lit,  "[#")
 PUNCTUATOR(r_square_lit,  "#]")
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
 PUNCTUATOR(period,        ".")
 PUNCTUATOR(period_prefix, ".")

@@ -387,6 +387,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   Expr *visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     HANDLE_SEMANTIC_EXPR(E);
 
@@ -399,7 +400,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
     return E;
   }
-  
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
+
   Expr *visitCollectionExpr(CollectionExpr *E) {
     HANDLE_SEMANTIC_EXPR(E);
 

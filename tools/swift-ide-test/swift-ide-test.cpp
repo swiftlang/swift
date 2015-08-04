@@ -675,7 +675,9 @@ public:
     case SyntaxNodeKind::AttributeId: Id = "attr-id"; break;
     case SyntaxNodeKind::AttributeBuiltin: Id = "attr-builtin"; break;
     case SyntaxNodeKind::EditorPlaceholder: Id = "placeholder"; break;
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
     case SyntaxNodeKind::ObjectLiteral: Id = "object-literal"; break;
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
     }
 
     OS << (Begin ? "<" : "</") << Id << '>';
@@ -705,7 +707,9 @@ public:
     case SyntaxNodeKind::AttributeId: Col = llvm::raw_ostream::CYAN; break;
     case SyntaxNodeKind::AttributeBuiltin: Col = llvm::raw_ostream::MAGENTA; break;
     case SyntaxNodeKind::EditorPlaceholder: Col = llvm::raw_ostream::YELLOW; break;
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
     case SyntaxNodeKind::ObjectLiteral: return;
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
     }
 
     if (Begin) {
@@ -989,8 +993,10 @@ private:
       case SyntaxStructureKind::CallExpression: return "call";
       case SyntaxStructureKind::ArrayExpression: return "array";
       case SyntaxStructureKind::DictionaryExpression: return "dictionary";
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
       case SyntaxStructureKind::ObjectLiteralExpression:
         return "object-literal-expression";
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
     }
     llvm_unreachable("unhandled tag?");
   }

@@ -313,8 +313,12 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::StringLiteral:
   case ExprKind::InterpolatedStringLiteral:
   case ExprKind::MagicIdentifierLiteral:
+    return true;
+
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   case ExprKind::ObjectLiteral:
     return true;
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
   case ExprKind::DiscardAssignment:
     // Legal but pointless.

@@ -4831,8 +4831,10 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::StringLiteralConvertible:
   case KnownProtocolKind::NilLiteralConvertible:
   case KnownProtocolKind::UnicodeScalarLiteralConvertible:
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   case KnownProtocolKind::_ColorLiteralConvertible:
   case KnownProtocolKind::_ImageLiteralConvertible:
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
   case KnownProtocolKind::_BuiltinBooleanLiteralConvertible:
   case KnownProtocolKind::_BuiltinExtendedGraphemeClusterLiteralConvertible:
   case KnownProtocolKind::_BuiltinFloatLiteralConvertible:

@@ -2065,6 +2065,7 @@ namespace {
       }
     }
 
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
     Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       auto &ctx = cs.getASTContext();
       auto &tc = cs.getTypeChecker();
@@ -2101,6 +2102,7 @@ namespace {
       expr->setSemanticExpr(semanticExpr);
       return expr;
     }
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
     /// \brief Retrieve the type of a reference to the given declaration.
     Type getTypeOfDeclReference(ValueDecl *decl, bool isSpecialized) {

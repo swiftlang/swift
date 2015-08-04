@@ -268,8 +268,10 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::NilLiteralConvertible: index = 7; break;
   case KnownProtocolKind::BooleanLiteralConvertible: index = 8; break;
   case KnownProtocolKind::UnicodeScalarLiteralConvertible: index = 9; break;
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   case KnownProtocolKind::_ColorLiteralConvertible: index = 10; break;
   case KnownProtocolKind::_ImageLiteralConvertible: index = 11; break;
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
   }
 
   // If we already looked for alternative literal types, return those results.
@@ -319,9 +321,12 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
 
   case KnownProtocolKind::NilLiteralConvertible:
   case KnownProtocolKind::BooleanLiteralConvertible:
+    break;
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   case KnownProtocolKind::_ColorLiteralConvertible:
   case KnownProtocolKind::_ImageLiteralConvertible:
     break;
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
   }
 
   AlternativeLiteralTypes[index] = allocateCopy(types);

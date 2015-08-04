@@ -206,7 +206,9 @@ namespace {
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
                                            SGFContext C);
     RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
@@ -2100,10 +2102,12 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
   return visit(E->getSemanticExpr(), C);
 }
 
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
 RValue RValueEmitter::
 visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr(), C);
 }
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
 static StringRef
 getMagicFunctionString(SILGenFunction &gen) {

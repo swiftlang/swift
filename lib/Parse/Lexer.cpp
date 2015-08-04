@@ -1429,10 +1429,12 @@ Restart:
   case '@': return formToken(tok::at_sign, TokStart);
   case '{': return formToken(tok::l_brace, TokStart);
   case '[': {
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
     if (*CurPtr == '#') { // [#
       CurPtr++;
       return formToken(tok::l_square_lit, TokStart);
     }
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
     return formToken(tok::l_square, TokStart);
   }
   case '(': return formToken(tok::l_paren, TokStart);
@@ -1446,10 +1448,12 @@ Restart:
   case ':': return formToken(tok::colon,    TokStart);
 
   case '#': {
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
     if (*CurPtr == ']') { // #]
       CurPtr++;
       return formToken(tok::r_square_lit, TokStart);
     }
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
     if (getSubstring(TokStart + 1, 2).equals("if") &&
         isWhitespace(CurPtr[2])) {
