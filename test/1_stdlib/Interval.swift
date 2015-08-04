@@ -91,12 +91,12 @@ IntervalTestSuite.test("Overlaps") {
     I0: IntervalType, I1: IntervalType where I0.Bound == I1.Bound
   >(expectation: Bool, _ lhs: I0, _ rhs: I1) {
     if expectation {
-      expectTrue(overlaps(lhs, rhs))
-      expectTrue(overlaps(rhs, lhs))
+      expectTrue(lhs.overlaps(rhs))
+      expectTrue(rhs.overlaps(lhs))
     }
     else {
-      expectFalse(overlaps(lhs, rhs))
-      expectFalse(overlaps(rhs, lhs))
+      expectFalse(lhs.overlaps(rhs))
+      expectFalse(rhs.overlaps(lhs))
     }
   }
   

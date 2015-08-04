@@ -156,13 +156,20 @@ extension ClosedInterval {
   }
 }
 
-// FIXME: current language limitations don't allow this as a method in
-// the protocol.
-/// Returns `true` if `lhs` and `rhs` have a non-empty intersection.
+extension IntervalType {
+  /// Returns `true` if `lhs` and `rhs` have a non-empty intersection.
+  public func overlaps<
+    I: IntervalType where I.Bound == Bound
+  >(other: I) -> Bool {
+    return contains(other.start) || other.contains(start)
+  }
+}
+
+@available(*, unavailable, message="call the 'overlaps(other)' method on the interval")
 public func overlaps<
   I0: IntervalType, I1: IntervalType where I0.Bound == I1.Bound
 >(lhs: I0, _ rhs: I1) -> Bool {
-  return lhs.contains(rhs.start) || rhs.contains(lhs.start)
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns a half-open interval from `start` to `end`.
