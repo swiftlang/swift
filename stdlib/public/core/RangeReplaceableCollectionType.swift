@@ -135,7 +135,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Remove the first `n` elements.
   ///
   /// - Complexity: O(`self.count`)
-  /// - Requires: `!self.isEmpty`.
+  /// - Requires: `self.count >= n`.
   mutating func removeFirst(n: Int)
 
   /// Remove the indicated `subRange` of elements.
@@ -199,13 +199,15 @@ extension RangeReplaceableCollectionType {
   }
 
   public mutating func removeFirst(n: Int) {
-    _precondition(!isEmpty, "can't remove items from an empty collection")
+    _precondition(count >= numericCast(n),
+      "can't remove more items from a collection than it has")
     let end = startIndex.advancedBy(numericCast(n))
     removeRange(startIndex..<end)
   }
 
   public mutating func removeFirst() -> Generator.Element {
-    _precondition(!isEmpty, "can't remove first element from an empty collection")
+    _precondition(!isEmpty,
+      "can't remove first element from an empty collection")
     let firstElement = first!
     removeFirst(1)
     return firstElement
