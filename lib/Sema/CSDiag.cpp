@@ -1221,8 +1221,8 @@ static std::string getTypeListString(Type type) {
 }
 
 
-/// If an UnresolvedDotExpr has been resolved by the constraint system, return
-/// the decl that it references.
+/// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
+/// constraint system, return the decl that it references.
 static ValueDecl *findResolvedMemberRef(ConstraintLocator *locator,
                                         ConstraintSystem &CS) {
   auto *resolvedOverloadSets = CS.getResolvedOverloadSets();
@@ -1687,6 +1687,14 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
   if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
     declName = UDE->getName().str().str();
     uncurryLevel = 1;
+
+    // If we actually resolved the member to use, return it.
+    auto loc = CS->getConstraintLocator(UDE, ConstraintLocator::Member);
+    if (auto *member = findResolvedMemberRef(loc, *CS)) {
+      candidates.push_back({ member, uncurryLevel });
+      return;
+    }
+    // Otherwise, look for a disjunction constraint explaining what the set is.
   }
   
   // Calls to super.init() are automatically uncurried one level.
@@ -2360,6 +2368,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
       diagnose(anchor->getLoc(), diag::cannot_find_appropriate_overload,
                overloadName)
         .highlight(anchor->getSourceRange());
+      diagnose(overloadChoice.getDecl()->getLoc(), diag::found_candidate);
       return true;
     }
 
@@ -2370,7 +2379,6 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
     for (auto elt : bindOverloadDisjunction->getNestedConstraints()) {
       if (elt->getKind() != ConstraintKind::BindOverload) continue;
       auto candidate = elt->getOverloadChoice().getDecl();
-
       diagnose(candidate->getLoc(), diag::found_candidate);
     }
 
@@ -3503,12 +3511,20 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   auto fnExpr = typeCheckChildIndependently(callExpr->getFn(),
                                             TCC_AllowUnresolved);
   if (!fnExpr) return true;
+  auto fnType = fnExpr->getType()->getRValueType();
 
   CalleeCandidateInfo calleeInfo(fnExpr, CS);
 
+  // If we weren't able to resolve the entire callee function expression, but
+  // we were able to find a single candidate, use it to inform the type of the
+  // argument analysis stuff.
+  // TODO: If all candidates have the same type for some argument, we could pass
+  // down partial information.
+  if (fnType->hasTypeVariable() && calleeInfo.size() == 1)
+    fnType = calleeInfo[0].getUncurriedFunctionType();
+
   // If we resolved a concrete expression for the callee, and it has
   // non-function/non-metatype type, then we cannot call it!
-  auto fnType = fnExpr->getType()->getRValueType();
   if (!fnType->hasTypeVariable() &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
     
@@ -3534,14 +3550,11 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   
   Type argType;  // Type of the argument list, if knowable.
   if (auto FTy = fnType->getAs<AnyFunctionType>())
-    if (!FTy->getInput()->hasTypeVariable())
-      argType = FTy->getInput();
+    argType = FTy->getInput();
 
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
   //
-  // TODO: If all candidates have the same type for some argument, we could pass
-  // down partial information.
   auto argExpr = typeCheckArgumentChildIndependently(callExpr->getArg(),
                                                      argType, calleeInfo);
   if (!argExpr)
