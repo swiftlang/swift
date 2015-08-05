@@ -1061,12 +1061,13 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         break;
 
       // Type check the expression.
-      TypeCheckExprOptions options;
+      TypeCheckExprOptions options = TypeCheckExprFlags::IsExprStmt;
       bool isDiscarded = !(IsREPL && isa<TopLevelCodeDecl>(DC))
         && !TC.Context.LangOpts.Playground
         && !TC.Context.LangOpts.DebuggerSupport;
-      if (isDiscarded) options = TypeCheckExprFlags::IsDiscarded;
-      
+      if (isDiscarded)
+        options |= TypeCheckExprFlags::IsDiscarded;
+
       if (TC.typeCheckExpression(SubExpr, DC, Type(), CTP_Unused, options)) {
         elem = SubExpr;
         continue;

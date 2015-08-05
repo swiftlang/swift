@@ -176,15 +176,12 @@ struct S {
     let _ = S.init()
     self.init()
     let _ = self.init // expected-error{{partial application of 'self.init' initializer delegation is not allowed}}
-
-    let _ : () = self.init()
   }
 }
 
 class C {
   convenience init() { // expected-note 11 {{selected non-required initializer 'init()'}}
     self.init()
-    let _ = self.init()
     let _: C = self.init() // expected-error{{cannot convert value of type '()' to specified type 'C'}}
     let _: () -> C = self.init // expected-error{{partial application of 'self.init' initializer delegation is not allowed}}
   }
@@ -197,7 +194,6 @@ class C {
 class D: C {
   override init(x: Int) {
     super.init(x: x)
-    let _ = super.init()
     let _: C = super.init() // expected-error{{cannot convert value of type '()' to specified type 'C'}}
     let _: () -> C = super.init // expected-error{{partial application of 'super.init' initializer chain is not allowed}}
   }
@@ -330,6 +326,67 @@ class TestOverloadSets {
   init(value: Double) { /* ... */ }
 }
 
+class TestNestedExpr {
+  init() {}
+  init?(fail: Bool) {}
 
+  convenience init(a: Int) {
+    let x: () = self.init() // expected-error {{initializer delegation ('self.init') cannot be nested in another statement}}
+    // expected-warning@-1 {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+
+  convenience init(b: Int) {
+    func use(x: ()) {}
+    use(self.init()) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+  }
+
+  convenience init(c: Int) {
+    ((), self.init()) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+  }
+
+  convenience init(d: Int) {
+    let x: () = self.init(fail: true)! // expected-error {{initializer delegation ('self.init') cannot be nested in another statement}}
+    // expected-warning@-1 {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+
+  convenience init(e: Int) {
+    func use(x: ()) {}
+    use(self.init(fail: true)!) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+  }
+
+  convenience init(f: Int) {
+    ((), self.init(fail: true)!) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+  }
+}
+
+class TestNestedExprSub : TestNestedExpr {
+  init(a: Int) {
+    let x: () = super.init() // expected-error {{initializer chaining ('super.init') cannot be nested in another statement}}
+    // expected-warning@-1 {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+
+  init(b: Int) {
+    func use(x: ()) {}
+    use(super.init()) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+  }
+
+  init(c: Int) {
+    ((), super.init()) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+  }
+
+  init(d: Int) {
+    let x: () = super.init(fail: true)! // expected-error {{initializer chaining ('super.init') cannot be nested in another statement}}
+    // expected-warning@-1 {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+
+  init(e: Int) {
+    func use(x: ()) {}
+    use(super.init(fail: true)!) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+  }
+
+  init(f: Int) {
+    ((), super.init(fail: true)!) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+  }
+}
 
 

@@ -559,8 +559,8 @@ namespace {
       // evaluate to void, with the initializer's result implicitly rebound
       // to 'self'. Recognize the unresolved constructor expression and
       // determine where to place the RebindSelfInConstructorExpr node.
-      // When updating this logic, also update CSApply's
-      // visitRebindSelfInConstructorExpr.
+      // When updating this logic, also update
+      // RebindSelfInConstructorExpr::getCalledConstructor.
       if (auto nestedCtor = dyn_cast<UnresolvedConstructorExpr>(expr)) {
         if (auto self
               = TC.getSelfForInitDelegationInConstructor(DC, nestedCtor)) {
@@ -1205,8 +1205,10 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
   if (!suppressDiagnostics &&
-      !options.contains(TypeCheckExprFlags::DisableStructuralChecks))
-    performSyntacticExprDiagnostics(*this, result, dc);
+      !options.contains(TypeCheckExprFlags::DisableStructuralChecks)) {
+    bool isExprStmt = options.contains(TypeCheckExprFlags::IsExprStmt);
+    performSyntacticExprDiagnostics(*this, result, dc, isExprStmt);
+  }
 
   expr = result;
   cleanup.disable();

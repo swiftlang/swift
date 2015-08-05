@@ -180,7 +180,12 @@ enum class TypeCheckExprFlags {
   /// produce a conversion constraint, but it should be used to guide the
   /// solution in terms of performance optimizations of the solver, and in terms
   /// of guiding diagnostics.
-  ConvertTypeIsOnlyAHint = 0x10
+  ConvertTypeIsOnlyAHint = 0x10,
+
+  /// If set, this expression isn't embedded in a larger expression or
+  /// statement. This should only be used for syntactic restrictions, and should
+  /// not affect type checking itself.
+  IsExprStmt = 0x20,
 };
   
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;

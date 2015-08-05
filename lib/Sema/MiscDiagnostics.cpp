@@ -102,7 +102,8 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
 }
 
 
-/// Diagnose syntactic restrictions of expressions:
+/// Diagnose syntactic restrictions of expressions.
+///
 ///   - Module values may only occur as part of qualification.
 ///   - Metatype names cannot generally be used as values: they need a "T.self"
 ///     qualification unless used in narrow case (e.g. T() for construction).
@@ -113,9 +114,12 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
 ///     limitations.
 ///   - "&" (aka InOutExpressions) may only exist directly in function call
 ///     argument lists.
+///   - 'self.init' and 'super.init' cannot be wrapped in a larger expression
+///     or statement.
 ///
 static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
-                                         const DeclContext *DC) {
+                                         const DeclContext *DC,
+                                         bool isExprStmt) {
   class DiagnoseWalker : public ASTWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedNoEscapes;
@@ -126,11 +130,14 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     /// Keep track of InOutExprs
     SmallPtrSet<InOutExpr*, 2> AcceptableInOutExprs;
 
+    bool IsExprStmt;
+
   public:
     TypeChecker &TC;
     const DeclContext *DC;
 
-    DiagnoseWalker(TypeChecker &TC, const DeclContext *DC) : TC(TC), DC(DC) {}
+    DiagnoseWalker(TypeChecker &TC, const DeclContext *DC, bool isExprStmt)
+      : IsExprStmt(isExprStmt), TC(TC), DC(DC) {}
 
     // Selector for the partial_application_of_function_invalid diagnostic
     // message.
@@ -395,6 +402,19 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             .highlight(IOE->getSubExpr()->getSourceRange());
       }
 
+      // Diagnose 'self.init' or 'super.init' nested in another expression.
+      if (auto *rebindSelfExpr = dyn_cast<RebindSelfInConstructorExpr>(E)) {
+        // FIXME: We shouldn't need to special case 'try'; that should get
+        // pulled inside the Rebind like ForceValueExprs do.
+        if ((!Parent.isNull() && !dyn_cast<AnyTryExpr>(Parent.getAsExpr())) ||
+            !IsExprStmt) {
+          bool isChainToSuper;
+          (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
+          TC.diagnose(E->getLoc(), diag::init_delegation_nested,
+                      isChainToSuper, Parent.isNull());
+        }
+      }
+
       return { true, E };
     }
 
@@ -589,7 +609,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     }
   };
 
-  DiagnoseWalker Walker(TC, DC);
+  DiagnoseWalker Walker(TC, DC, isExprStmt);
   const_cast<Expr *>(E)->walk(Walker);
 }
 
@@ -1110,9 +1130,10 @@ static void diagAvailability(TypeChecker &TC, const Expr *E,
 
 /// \brief Emit diagnostics for syntactic restrictions on a given expression.
 void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
-                                            const DeclContext *DC) {
+                                            const DeclContext *DC,
+                                            bool isExprStmt) {
   diagSelfAssignment(TC, E);
-  diagSyntacticUseRestrictions(TC, E, DC);
+  diagSyntacticUseRestrictions(TC, E, DC, isExprStmt);
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
   diagAvailability(TC, E, DC);

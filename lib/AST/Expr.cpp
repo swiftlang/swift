@@ -764,6 +764,41 @@ RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
     SubExpr(SubExpr), Self(Self)
 {}
 
+OtherConstructorDeclRefExpr *
+RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
+  // Dig out the OtherConstructorRefExpr. Note that this is the reverse
+  // of what we do in in pre-checking.
+  Expr *candidate = getSubExpr();
+  while (true) {
+    // Look through identity expressions.
+    if (auto identity = dyn_cast<IdentityExpr>(candidate)) {
+      candidate = identity->getSubExpr();
+      continue;
+    }
+
+    // Look through force-value expressions.
+    if (auto force = dyn_cast<ForceValueExpr>(candidate)) {
+      candidate = force->getSubExpr();
+      continue;
+    }
+
+    break;
+  }
+
+  // We hit an application, find the constructor reference.
+  OtherConstructorDeclRefExpr *otherCtorRef;
+  const ApplyExpr *apply;
+  do {
+    apply = cast<ApplyExpr>(candidate);
+    candidate = apply->getFn();
+    auto candidateUnwrapped = candidate->getSemanticsProvidingExpr();
+    otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(candidateUnwrapped);
+  } while (!otherCtorRef);
+
+  isChainToSuper = apply->getArg()->isSuperExpr();
+  return otherCtorRef;
+}
+
 void AbstractClosureExpr::setParams(Pattern *P) {
   ParamPattern = P;
   // Change the DeclContext of any parameters to be this closure.

@@ -2744,36 +2744,8 @@ namespace {
         if (isError && SuppressDiagnostics)
           return nullptr;
 
-        // Dig out the OtherConstructorRefExpr. Note that this is the reverse
-        // of what we do in in pre-checking.
-        OtherConstructorDeclRefExpr *otherCtorRef = nullptr;
-        Expr *candidate = expr->getSubExpr();
-        bool isDelegating;
-        while (true) {
-          // Look through identity expressions.
-          if (auto identity = dyn_cast<IdentityExpr>(candidate)) {
-            candidate = identity->getSubExpr();
-            continue;
-          }
-
-          // Look through force-value expressions.
-          if (auto force = dyn_cast<ForceValueExpr>(candidate)) {
-            candidate = force->getSubExpr();
-            continue;
-          }
-
-          // We hit an application, find the constructor reference.
-          auto apply = cast<ApplyExpr>(candidate);
-          otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
-                           apply->getFn()->getSemanticsProvidingExpr());
-          if (otherCtorRef) {
-            isDelegating = !apply->getArg()->isSuperExpr();
-            break;
-          }
-
-          candidate = apply->getFn();
-          continue;
-        }
+        bool isChaining;
+        auto *otherCtorRef = expr->getCalledConstructor(isChaining);
 
         auto &tc = cs.getTypeChecker();
         auto &ctx = tc.Context;
@@ -2784,7 +2756,7 @@ namespace {
           ConstructorDecl *ctor = otherCtorRef->getDecl();
           tc.diagnose(otherCtorRef->getLoc(),
                       diag::delegate_chain_nonoptional_to_optional,
-                      !isDelegating, ctor->getFullName());
+                      isChaining, ctor->getFullName());
           tc.diagnose(otherCtorRef->getLoc(), diag::init_force_unwrap)
             .fixItInsertAfter(expr->getEndLoc(), "!");
           tc.diagnose(inCtor->getLoc(), diag::init_propagate_failure)

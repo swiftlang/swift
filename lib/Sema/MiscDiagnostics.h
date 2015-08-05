@@ -26,7 +26,9 @@ namespace swift {
 
 /// \brief Emit diagnostics for syntactic restrictions on a given expression.
 void performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
-                                     const DeclContext *DC);
+                                     const DeclContext *DC,
+                                     bool isExprStmt);
+
 /// \brief Emit diagnostics for a given statement.
 void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 

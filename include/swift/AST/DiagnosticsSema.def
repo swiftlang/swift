@@ -1540,6 +1540,10 @@ NOTE(init_force_unwrap,sema_tce,none,
      "force potentially-failing result with '!'", ())
 NOTE(init_propagate_failure,sema_tce,none,
      "propagate the failure with 'init?'", ())
+ERROR(init_delegation_nested,sema_tce,none,
+      "%select{initializer delegation ('self.init')|"
+      "initializer chaining ('super.init')}0 cannot be nested in another "
+      "%select{expression|statement}1", (bool, bool))
 
 NOTE(convenience_init_here,sema_tce,none,
      "convenience initializer is declared here", ())
