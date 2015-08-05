@@ -45,7 +45,8 @@ func testNSErrorFactoryMethod(path: String) throws {
 }
 
 func testNonInstanceTypeFactoryMethod(s: String) {
-  _ = NSObjectFactory(string: s) // expected-error{{extra argument 'string' in call}}
+  _ = NSObjectFactory(string: s) // expected-error{{cannot invoke initializer for type 'NSObjectFactory' with an argument list of type '(string: String)'}}
+  // expected-note @-1 {{overloads for 'NSObjectFactory' exist with these partially matching parameter lists: (integer: Int), (double: Double), (float: Float)}}
 }
 
 func testUseOfFactoryMethod(queen: Bee) {

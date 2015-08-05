@@ -315,7 +315,7 @@ enumerateDirectSupertypes(TypeChecker &tc, Type type) {
   return result;
 }
 
-bool ConstraintSystem::simplify() {
+bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
   // While we have a constraint in the worklist, process it.
   while (!ActiveConstraints.empty()) {
     // Grab the next constraint from the worklist.
@@ -336,18 +336,20 @@ bool ConstraintSystem::simplify() {
       break;
 
     case SolutionKind::Solved:
-      ++solverState->NumSimplifiedConstraints;
+      if (solverState) {
+        ++solverState->NumSimplifiedConstraints;
 
-      // This constraint has already been solved; retire it.
-      if (solverState)
+        // This constraint has already been solved; retire it.
         solverState->retiredConstraints.push_front(constraint);
+      }
 
       // Remove the constraint from the constraint graph.
       CG.removeConstraint(constraint);
       break;
 
     case SolutionKind::Unsolved:
-      ++solverState->NumUnsimplifiedConstraints;
+      if (solverState)
+        ++solverState->NumUnsimplifiedConstraints;
 
       InactiveConstraints.push_back(constraint);
       break;
@@ -358,7 +360,7 @@ bool ConstraintSystem::simplify() {
     constraint->setActive(false);
 
     // Check whether a constraint failed. If so, we're done.
-    if (failedConstraint) {
+    if (failedConstraint && !ContinueAfterFailures) {
       return true;
     }
 

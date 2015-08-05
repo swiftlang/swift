@@ -4108,20 +4108,19 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     // Fall through to produce diagnostics.
   }
 
-  if (failures.size() == 1) {
-    auto &failure = unavoidableFailures.empty()? *failures.begin()
-                                               : **unavoidableFailures.begin();
-    
-    if (diagnoseFailure(*this, failure, expr, false))
-      return true;
-  }
-  
   if (getExpressionTooComplex()) {
     TC.diagnose(expr->getLoc(), diag::expression_too_complex).
     highlight(expr->getSourceRange());
     return true;
   }
-  
+
+  // Continue simplifying any active constraints left in the system.  We can end
+  // up with them because the solver bails out as soon as it sees a Failure.  We
+  // don't want to leave them around in the system because later diagnostics
+  // will assume they are unsolvable and may otherwise leave the system in an
+  // inconsistent state.
+  simplify(/*ContinueAfterFailures*/true);
+
   // If all else fails, diagnose the failure by looking through the system's
   // constraints.
   diagnoseFailureForExpr(expr);
