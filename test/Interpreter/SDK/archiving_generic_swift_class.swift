@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=tvos
+// UNSUPPORTED: OS=watchos
 
 import Foundation
 
