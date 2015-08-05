@@ -90,10 +90,10 @@ STMT_KEYWORD(switch)
 STMT_KEYWORD(case)
 STMT_KEYWORD(default)
 STMT_KEYWORD(where)
+STMT_KEYWORD(catch)
 
 // Expression keywords.
 KEYWORD(as)
-KEYWORD(catch)
 KEYWORD(dynamicType)
 KEYWORD(false)
 KEYWORD(is)

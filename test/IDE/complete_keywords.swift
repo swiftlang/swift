@@ -110,12 +110,14 @@
 // KW_DECL_STMT-DAG: Keyword/None: case{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: default{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: where{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None: catch{{; name=.+$}}
 //
 // Misc.
 //
-// KW_DECL_STMT-DAG: Keyword/None: catch{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: throw{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: try{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None: try!{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/None: try?{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: __FUNCTION__[#String#]{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: __FILE__[#String#]{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: __LINE__[#Int#]{{; name=.+$}}
