@@ -39,6 +39,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SaveAndRestore.h"
 
 #include "swift/AST/DiagnosticsSIL.h"
 
@@ -884,40 +885,35 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
 }
 
 RValue RValueEmitter::visitForceTryExpr(ForceTryExpr *E, SGFContext C) {
-  SILGenFunction::ForceTryScope scope(SGF, E);
-  return visit(E->getSubExpr(), C);
+  // Set up a "catch" block for when an error occurs.
+  SILBasicBlock *catchBB = SGF.createBasicBlock(FunctionSection::Postmatter);
+  llvm::SaveAndRestore<JumpDest> throwDest{
+      SGF.ThrowDest,
+      JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(),
+               CleanupLocation::get(E))};
+
+  // Visit the sub-expression.
+  RValue result = visit(E->getSubExpr(), C);
+
+  // If there are no uses of the catch block, just drop it.
+  if (catchBB->pred_empty()) {
+    SGF.eraseBasicBlock(catchBB);
+  } else {
+    // Otherwise, we need to emit it.
+    SavedInsertionPoint scope(SGF, catchBB, FunctionSection::Postmatter);
+
+    ASTContext &ctx = SGF.getASTContext();
+    auto error = catchBB->createBBArg(SILType::getExceptionType(ctx));
+    SGF.B.createBuiltin(E, ctx.getIdentifier("unexpectedError"),
+                        SGF.SGM.Types.getEmptyTupleType(), {}, {error});
+    SGF.B.createUnreachable(E);
+  }
+
+  return result;
 }
 
 RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   llvm_unreachable("not yet implemented");
-}
-
-SILGenFunction::ForceTryScope::ForceTryScope(SILGenFunction &gen,
-                                             SILLocation loc)
-  : SGF(gen), TryBB(gen.createBasicBlock(FunctionSection::Postmatter)),
-    Loc(loc), OldThrowDest(gen.ThrowDest) {
-  gen.ThrowDest = JumpDest(TryBB, gen.Cleanups.getCleanupsDepth(),
-                           CleanupLocation::get(loc));
-}
-
-SILGenFunction::ForceTryScope::~ForceTryScope() {
-  // Restore the old throw dest.
-  SGF.ThrowDest = OldThrowDest;
-
-  // If there are no uses of the try block, just drop it.
-  if (TryBB->pred_empty()) {
-    SGF.eraseBasicBlock(TryBB);
-    return;
-  }
-
-  // Otherwise, we need to emit it.
-  SavedInsertionPoint scope(SGF, TryBB, FunctionSection::Postmatter);
-
-  ASTContext &ctx = SGF.getASTContext();
-  auto error = TryBB->createBBArg(SILType::getExceptionType(ctx));
-  SGF.B.createBuiltin(Loc, ctx.getIdentifier("unexpectedError"),
-                      SGF.SGM.Types.getEmptyTupleType(), {}, {error});
-  SGF.B.createUnreachable(Loc);
 }
 
 RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,

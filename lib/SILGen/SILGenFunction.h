@@ -1184,19 +1184,6 @@ public:
                                 ArrayRef<Substitution> subs,
                                 ArrayRef<SILValue> args);
 
-  class ForceTryScope {
-    SILGenFunction &SGF;
-    SILBasicBlock *TryBB;
-    SILLocation Loc;
-    JumpDest OldThrowDest;
-  public:
-    ForceTryScope(SILGenFunction &SGF, SILLocation loc);
-    ~ForceTryScope();
-
-    ForceTryScope(const ForceTryScope &) = delete;
-    ForceTryScope &operator=(const ForceTryScope &) = delete;
-  };
-
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       SILResultInfo exnResult,
                                       bool isSuppressed);
