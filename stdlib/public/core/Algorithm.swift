@@ -226,7 +226,7 @@ public func enumerate<Seq : SequenceType>(
 
 /// Returns `true` iff `a1` and `a2` contain the same elements in the
 /// same order.
-@available(*, unavailable, message="call the 'equal()' method on the sequence")
+@available(*, unavailable, message="call the 'equalElements()' method on the sequence")
 public func equal<
     S1 : SequenceType, S2 : SequenceType
   where
@@ -240,7 +240,7 @@ public func equal<
 /// `isEquivalent` as the equivalence test.
 ///
 /// - Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation).
-@available(*, unavailable, message="call the 'equal()' method on the sequence")
+@available(*, unavailable, message="call the 'equalElements()' method on the sequence")
 public func equal<
     S1 : SequenceType, S2 : SequenceType
   where
