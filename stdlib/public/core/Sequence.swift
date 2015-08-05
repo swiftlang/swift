@@ -43,6 +43,24 @@ public protocol GeneratorType {
 /// whether they will be destructively "consumed" by iteration.  To
 /// ensure non-destructive iteration, constrain your *sequence* to
 /// `CollectionType`.
+///
+/// As a consequence, it is not possible to run multiple `for` loops
+/// on a sequence to "resume" iteration:
+///
+///   for element in sequence {
+///     if ... some condition { break }
+///   }
+///
+///   for element in sequence {
+///     // Not guaranteed to continue from the next element.
+///   }
+///
+/// `SequenceType` makes no requirement about the behavior in that
+/// case.  It is not correct to assume that a sequence will either be
+/// "consumable" and will resume iteration, or that a sequence is a
+/// collection and will restart iteration from the first element.
+/// A conforming sequence that is not a collection is allowed to
+/// produce an arbitrary sequence of elements from the second generator.
 public protocol SequenceType {
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
