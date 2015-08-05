@@ -3520,7 +3520,8 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // argument analysis stuff.
   // TODO: If all candidates have the same type for some argument, we could pass
   // down partial information.
-  if (fnType->hasTypeVariable() && calleeInfo.size() == 1)
+  if (fnType->hasTypeVariable() && calleeInfo.size() == 1 &&
+      calleeInfo[0].getUncurriedFunctionType())
     fnType = calleeInfo[0].getUncurriedFunctionType();
 
   // If we resolved a concrete expression for the callee, and it has
