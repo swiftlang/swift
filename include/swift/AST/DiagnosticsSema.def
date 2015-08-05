@@ -109,9 +109,6 @@ ERROR(cannot_pass_rvalue_mutating_getter,sema_tcs,none,
       "cannot use mutating getter on immutable value of type %0",
       (Type))
 
-ERROR(could_not_convert_argument,sema,none,
-      "cannot invoke function with an argument list of type %0", (Type))
-
 ERROR(single_expression_conformance_failure,sema,none,
       "expression does not conform to type %0", (Type))
 

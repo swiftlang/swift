@@ -2426,14 +2426,6 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   
   std::pair<Type, Type> types = getBoundTypesFromConstraint(CS, anchor,
                                                             constraint);
-#if 0
-  if (constraint->getKind() == ConstraintKind::ArgumentTupleConversion ||
-      constraint->getKind() == ConstraintKind::ArgumentConversion) {
-    diagnose(anchor->getLoc(), diag::could_not_convert_argument, types.first)
-      .highlight(anchor->getSourceRange());
-    return true;
-  }
-#endif
 
   // If it's a type variable failing a conformance, avoid printing the type
   // variable and just print the conformance.
