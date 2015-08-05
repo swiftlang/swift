@@ -913,7 +913,107 @@ RValue RValueEmitter::visitForceTryExpr(ForceTryExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
-  llvm_unreachable("not yet implemented");
+  // FIXME: Much of this was copied from visitOptionalEvaluationExpr.
+
+  auto &optTL = SGF.getTypeLowering(E->getType());
+
+  Initialization *optInit = C.getEmitInto();
+  bool usingProvidedContext = optInit && optInit->isSingleBuffer();
+
+  // Form the optional using address operations if the type is address-only or
+  // if we already have an address to use.
+  bool isByAddress = usingProvidedContext || optTL.isAddressOnly();
+
+  std::unique_ptr<TemporaryInitialization> optTemp;
+  if (!usingProvidedContext && isByAddress) {
+    // Allocate the temporary for the Optional<T> if we didn't get one from the
+    // context.
+    optTemp = SGF.emitTemporary(E, optTL);
+    optInit = optTemp.get();
+  } else if (!usingProvidedContext) {
+    // If the caller produced a context for us, but we can't use it, then don't.
+    optInit = nullptr;
+  }
+
+  FullExpr localCleanups(SGF.Cleanups, E);
+
+  // Set up a "catch" block for when an error occurs.
+  SILBasicBlock *catchBB = SGF.createBasicBlock(FunctionSection::Postmatter);
+  llvm::SaveAndRestore<JumpDest> throwDest{
+    SGF.ThrowDest,
+    JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(), E)};
+
+  SILValue branchArg;
+  if (isByAddress) {
+    assert(optInit);
+    SILValue optAddr = optInit->getAddress();
+    SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
+  } else {
+    ManagedValue subExprValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
+    ManagedValue wrapped = SGF.getOptionalSomeValue(E, subExprValue, optTL);
+    branchArg = wrapped.forward(SGF);
+  }
+
+  localCleanups.pop();
+
+  // If it turns out there are no uses of the catch block, just drop it.
+  if (catchBB->pred_empty()) {
+    // Remove the dead failureBB.
+    catchBB->eraseFromParent();
+
+    // The value we provide is the one we've already got.
+    if (!isByAddress)
+      return RValue(SGF, E,
+                    SGF.emitManagedRValueWithCleanup(branchArg, optTL));
+
+    optInit->finishInitialization(SGF);
+
+    // If we emitted into the provided context, we're done.
+    if (usingProvidedContext)
+      return RValue();
+
+    return RValue(SGF, E, optTemp->getManagedAddress());
+  }
+
+  SILBasicBlock *contBB = SGF.createBasicBlock();
+
+  // Branch to the continuation block.
+  if (isByAddress)
+    SGF.B.createBranch(E, contBB);
+  else
+    SGF.B.createBranch(E, contBB, branchArg);
+
+  // If control branched to the failure block, inject .None into the
+  // result type.
+  SGF.B.emitBlock(catchBB);
+  (void)catchBB->createBBArg(SILType::getExceptionType(SGF.getASTContext()));
+
+  if (isByAddress) {
+    SGF.emitInjectOptionalNothingInto(E, optInit->getAddress(), optTL);
+    SGF.B.createBranch(E, contBB);
+  } else {
+    auto branchArg = SGF.getOptionalNoneValue(E, optTL);
+    SGF.B.createBranch(E, contBB, branchArg);
+  }
+
+  // Emit the continuation block.
+  SGF.B.emitBlock(contBB);
+
+  // If this was done in SSA registers, then the value is provided as an
+  // argument to the block.
+  if (!isByAddress) {
+    auto arg = contBB->createBBArg(optTL.getLoweredType());
+    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
+  }
+
+  optInit->finishInitialization(SGF);
+
+  // If we emitted into the provided context, we're done.
+  if (usingProvidedContext)
+    return RValue();
+
+  assert(optTemp);
+  return RValue(SGF, E, optTemp->getManagedAddress());
 }
 
 RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,

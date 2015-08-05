@@ -114,6 +114,14 @@ ErrorTypeTests.test("try!")
     let _: () = try! { throw SillyError.JazzHands }()
   }
 
+ErrorTypeTests.test("try?") {
+  var value = try? { () throws -> Int in return 1 }()
+  expectType(Optional<Int>.self, &value)
+  expectEqual(Optional(1), value)
+
+  expectEmpty(try? { () throws -> Int in throw SillyError.JazzHands }())
+}
+
 enum LifetimeError : ErrorType {
   case MistakeOfALifetime(LifetimeTracked, yearsIncarcerated: Int)
 }

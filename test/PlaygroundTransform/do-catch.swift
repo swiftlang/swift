@@ -19,3 +19,27 @@ do {
 // CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
 // CHECK-NEXT: [{{.*}}] $builtin_log[='5']
 // CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
+
+1
+try doSomething()
+// CHECK-LABEL: [{{.*}}] $builtin_log[='1']
+// CHECK-NEXT: [{{.*}}] $builtin_log_scope_entry
+// CHECK-NEXT: [{{.*}}] $builtin_log[='5']
+// CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
+// CHECK-NEXT: [{{.*}}] $builtin_log[='5']
+
+2
+try! doSomething()
+// CHECK-LABEL: [{{.*}}] $builtin_log[='2']
+// CHECK-NEXT: [{{.*}}] $builtin_log_scope_entry
+// CHECK-NEXT: [{{.*}}] $builtin_log[='5']
+// CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
+// CHECK-NEXT: [{{.*}}] $builtin_log[='5']
+
+3
+try? doSomething()
+// CHECK-LABEL: [{{.*}}] $builtin_log[='3']
+// CHECK-NEXT: [{{.*}}] $builtin_log_scope_entry
+// CHECK-NEXT: [{{.*}}] $builtin_log[='5']
+// CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
+// CHECK-NEXT: [{{.*}}] $builtin_log[='Optional(5)']

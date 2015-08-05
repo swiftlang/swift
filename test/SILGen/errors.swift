@@ -293,6 +293,32 @@ func testForceTry(fn: () -> Int) {
 // CHECK: builtin "unexpectedError"
 // CHECK: unreachable
 
+func testForceTryMultiple() {
+  _ = try! (make_a_cat(), make_a_cat())
+}
+
+// CHECK-LABEL: sil hidden @_TF6errors20testForceTryMultipleFT_T_
+// CHECK-NEXT: bb0:
+// CHECK: [[FN_1:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
+// CHECK-NEXT: try_apply [[FN_1]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal [[SUCCESS_1:[^ ]+]], error [[CLEANUPS_1:[^ ]+]]
+// CHECK: [[SUCCESS_1]]([[VALUE_1:%.+]] : $Cat)
+// CHECK: [[FN_2:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
+// CHECK-NEXT: try_apply [[FN_2]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal [[SUCCESS_2:[^ ]+]], error [[CLEANUPS_2:[^ ]+]]
+// CHECK: [[SUCCESS_2]]([[VALUE_2:%.+]] : $Cat)
+// CHECK-NEXT: strong_release [[VALUE_2]] : $Cat
+// CHECK-NEXT: strong_release [[VALUE_1]] : $Cat
+// CHECK-NEXT: [[VOID:%.+]] = tuple ()
+// CHECK-NEXT: return [[VOID]] : $()
+// CHECK: [[FAILURE:.+]]([[ERROR:%.+]] : $ErrorType):
+// CHECK-NEXT: = builtin "unexpectedError"([[ERROR]] : $ErrorType)
+// CHECK-NEXT: unreachable
+// CHECK: [[CLEANUPS_1]]([[ERROR:%.+]] : $ErrorType):
+// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorType)
+// CHECK: [[CLEANUPS_2]]([[ERROR:%.+]] : $ErrorType):
+// CHECK-NEXT: strong_release [[VALUE_1]] : $Cat
+// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorType)
+// CHECK: {{^}$}}
+
 // Make sure we balance scopes correctly inside a switch.
 // <rdar://problem/20923654>
 enum CatFood {
@@ -659,4 +685,189 @@ func supportStructure(inout b: PinnedBridge, name: String) throws {
 func testForcePeephole(f: () throws -> Int?) -> Int {
   let x = (try! f())!
   return x
+}
+
+// CHECK-LABEL: sil hidden @_TF6errors15testOptionalTryFT_T_
+// CHECK-NEXT: bb0:
+// CHECK: [[FN:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
+// CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
+// CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Cat)
+// CHECK-NEXT: [[WRAPPED:%.+]] = enum $Optional<Cat>, #Optional.Some!enumelt.1, [[VALUE]]
+// CHECK-NEXT: br [[DONE:[^ ]+]]([[WRAPPED]] : $Optional<Cat>)
+// CHECK: [[DONE]]([[RESULT:%.+]] : $Optional<Cat>):
+// CHECK-NEXT: release_value [[RESULT]] : $Optional<Cat>
+// CHECK-NEXT: [[VOID:%.+]] = tuple ()
+// CHECK-NEXT: return [[VOID]] : $()
+// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorType):
+// CHECK-NEXT: [[NONE:%.+]] = enum $Optional<Cat>, #Optional.None!enumelt
+// CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<Cat>)
+// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorType):
+// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorType)
+// CHECK: {{^}$}}
+func testOptionalTry() {
+  _ = try? make_a_cat()
+}
+
+// CHECK-LABEL: sil hidden @_TF6errors18testOptionalTryVarFT_T_
+// CHECK-NEXT: bb0:
+// CHECK-NEXT: [[BOX:%.+]] = alloc_box $Optional<Cat>
+// CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]]#1 : $*Optional<Cat>, #Optional.Some!enumelt.1
+// CHECK: [[FN:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
+// CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
+// CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Cat)
+// CHECK-NEXT: store [[VALUE]] to [[BOX_DATA]] : $*Cat
+// CHECK-NEXT: inject_enum_addr [[BOX]]#1 : $*Optional<Cat>, #Optional.Some!enumelt.1
+// CHECK-NEXT: br [[DONE:[^ ]+]]
+// CHECK: [[DONE]]:
+// CHECK-NEXT: strong_release [[BOX]]#0 : $@box Optional<Cat>
+// CHECK-NEXT: [[VOID:%.+]] = tuple ()
+// CHECK-NEXT: return [[VOID]] : $()
+// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorType):
+// CHECK-NEXT: inject_enum_addr [[BOX]]#1 : $*Optional<Cat>, #Optional.None!enumelt
+// CHECK-NEXT: br [[DONE]]
+// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorType):
+// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorType)
+// CHECK: {{^}$}}
+func testOptionalTryVar() {
+  var cat = try? make_a_cat() // expected-warning {{initialization of variable 'cat' was never used; consider replacing with assignment to '_' or removing it}}
+}
+
+// CHECK-LABEL: sil hidden @_TF6errors26testOptionalTryAddressOnlyurFq_T_
+// CHECK-NEXT: bb0(%0 : $*T):
+// CHECK: [[BOX:%.+]] = alloc_stack $Optional<T>
+// CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]]#1 : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK: [[FN:%.+]] = function_ref @_TF6errors11dont_returnurFzq_q_
+// CHECK-NEXT: [[ARG_BOX:%.+]] = alloc_stack $T
+// CHECK-NEXT: copy_addr %0 to [initialization] [[ARG_BOX]]#1 : $*T
+// CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error ErrorType, normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
+// CHECK: [[SUCCESS]]({{%.+}} : $()):
+// CHECK-NEXT: inject_enum_addr [[BOX]]#1 : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT: dealloc_stack [[ARG_BOX]]#0 : $*@local_storage T
+// CHECK-NEXT: br [[DONE:[^ ]+]]
+// CHECK: [[DONE]]:
+// CHECK-NEXT: destroy_addr [[BOX]]#1 : $*Optional<T>
+// CHECK-NEXT: dealloc_stack [[BOX]]#0 : $*@local_storage Optional<T>
+// CHECK-NEXT: destroy_addr %0 : $*T
+// CHECK-NEXT: [[VOID:%.+]] = tuple ()
+// CHECK-NEXT: return [[VOID]] : $()
+// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorType):
+// CHECK-NEXT: inject_enum_addr [[BOX]]#1 : $*Optional<T>, #Optional.None!enumelt
+// CHECK-NEXT: br [[DONE]]
+// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorType):
+// CHECK-NEXT: dealloc_stack [[ARG_BOX]]#0 : $*@local_storage T
+// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorType)
+// CHECK: {{^}$}}
+func testOptionalTryAddressOnly<T>(obj: T) {
+  _ = try? dont_return(obj)
+}
+
+// CHECK-LABEL: sil hidden @_TF6errors29testOptionalTryAddressOnlyVarurFq_T_
+// CHECK-NEXT: bb0(%0 : $*T):
+// CHECK: [[BOX:%.+]] = alloc_box $Optional<T>
+// CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]]#1 : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK: [[FN:%.+]] = function_ref @_TF6errors11dont_returnurFzq_q_
+// CHECK-NEXT: [[ARG_BOX:%.+]] = alloc_stack $T
+// CHECK-NEXT: copy_addr %0 to [initialization] [[ARG_BOX]]#1 : $*T
+// CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in τ_0_0) -> @error ErrorType, normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]]
+// CHECK: [[SUCCESS]]({{%.+}} : $()):
+// CHECK-NEXT: inject_enum_addr [[BOX]]#1 : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT: dealloc_stack [[ARG_BOX]]#0 : $*@local_storage T
+// CHECK-NEXT: br [[DONE:[^ ]+]]
+// CHECK: [[DONE]]:
+// CHECK-NEXT: strong_release [[BOX]]#0 : $@box Optional<T>
+// CHECK-NEXT: destroy_addr %0 : $*T
+// CHECK-NEXT: [[VOID:%.+]] = tuple ()
+// CHECK-NEXT: return [[VOID]] : $()
+// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorType):
+// CHECK-NEXT: inject_enum_addr [[BOX]]#1 : $*Optional<T>, #Optional.None!enumelt
+// CHECK-NEXT: br [[DONE]]
+// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : $ErrorType):
+// CHECK-NEXT: dealloc_stack [[ARG_BOX]]#0 : $*@local_storage T
+// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorType)
+// CHECK: {{^}$}}
+func testOptionalTryAddressOnlyVar<T>(obj: T) {
+  var copy = try? dont_return(obj) // expected-warning {{initialization of variable 'copy' was never used; consider replacing with assignment to '_' or removing it}}
+}
+
+// CHECK-LABEL: sil hidden @_TF6errors23testOptionalTryMultipleFT_T_
+// CHECK-NEXT: bb0:
+// CHECK: [[FN_1:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
+// CHECK-NEXT: try_apply [[FN_1]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal [[SUCCESS_1:[^ ]+]], error [[CLEANUPS_1:[^ ]+]]
+// CHECK: [[SUCCESS_1]]([[VALUE_1:%.+]] : $Cat)
+// CHECK: [[FN_2:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
+// CHECK-NEXT: try_apply [[FN_2]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal [[SUCCESS_2:[^ ]+]], error [[CLEANUPS_2:[^ ]+]]
+// CHECK: [[SUCCESS_2]]([[VALUE_2:%.+]] : $Cat)
+// CHECK-NEXT: [[TUPLE:%.+]] = tuple ([[VALUE_1]] : $Cat, [[VALUE_2]] : $Cat)
+// CHECK-NEXT: [[WRAPPED:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.Some!enumelt.1, [[TUPLE]]
+// CHECK-NEXT: br [[DONE:[^ ]+]]([[WRAPPED]] : $Optional<(Cat, Cat)>)
+// CHECK: [[DONE]]([[RESULT:%.+]] : $Optional<(Cat, Cat)>):
+// CHECK-NEXT: release_value [[RESULT]] : $Optional<(Cat, Cat)>
+// CHECK-NEXT: [[VOID:%.+]] = tuple ()
+// CHECK-NEXT: return [[VOID]] : $()
+// CHECK: [[FAILURE:.+]]({{%.+}} : $ErrorType):
+// CHECK-NEXT: [[NONE:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.None!enumelt
+// CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<(Cat, Cat)>)
+// CHECK: [[CLEANUPS_1]]([[ERROR:%.+]] : $ErrorType):
+// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorType)
+// CHECK: [[CLEANUPS_2]]([[ERROR:%.+]] : $ErrorType):
+// CHECK-NEXT: strong_release [[VALUE_1]] : $Cat
+// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $ErrorType)
+// CHECK: {{^}$}}
+func testOptionalTryMultiple() {
+  _ = try? (make_a_cat(), make_a_cat())
+}
+
+// CHECK-LABEL: sil hidden @_TF6errors25testOptionalTryNeverFailsFT_T_
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   [[VALUE:%.+]] = tuple ()
+// CHECK-NEXT:   = enum $Optional<()>, #Optional.Some!enumelt.1, [[VALUE]]
+// CHECK-NEXT:   [[VOID:%.+]] = tuple ()
+// CHECK-NEXT:   return [[VOID]] : $()
+// CHECK: {{^}$}}
+func testOptionalTryNeverFails() {
+  _ = try? () // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+}
+
+// CHECK-LABEL: sil hidden @_TF6errors28testOptionalTryNeverFailsVarFT_T_
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   [[BOX:%.+]] = alloc_box $Optional<()>
+// CHECK-NEXT:   = init_enum_data_addr [[BOX]]#1 : $*Optional<()>, #Optional.Some!enumelt.1
+// CHECK-NEXT:   inject_enum_addr [[BOX]]#1 : $*Optional<()>, #Optional.Some!enumelt.1
+// CHECK-NEXT:   strong_release [[BOX]]#0 : $@box Optional<()>
+// CHECK-NEXT:   [[VOID:%.+]] = tuple ()
+// CHECK-NEXT:   return [[VOID]] : $()
+// CHECK-NEXT: {{^}$}}
+func testOptionalTryNeverFailsVar() {
+  var unit: ()? = try? () // expected-warning {{no calls to throwing functions occur within 'try' expression}} expected-warning {{initialization of variable 'unit' was never used; consider replacing with assignment to '_' or removing it}}
+}
+
+// CHECK-LABEL: sil hidden @_TF6errors36testOptionalTryNeverFailsAddressOnlyurFq_T_
+// CHECK-NEXT: bb0(%0 : $*T):
+// CHECK:   [[BOX:%.+]] = alloc_stack $Optional<T>
+// CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]]#1 : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT:   copy_addr %0 to [initialization] [[BOX_DATA]] : $*T
+// CHECK-NEXT:   inject_enum_addr [[BOX]]#1 : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT:   destroy_addr [[BOX]]#1 : $*Optional<T>
+// CHECK-NEXT:   dealloc_stack [[BOX]]#0 : $*@local_storage Optional<T>
+// CHECK-NEXT:   destroy_addr %0 : $*T
+// CHECK-NEXT:   [[VOID:%.+]] = tuple ()
+// CHECK-NEXT:   return [[VOID]] : $()
+// CHECK-NEXT: {{^}$}}
+func testOptionalTryNeverFailsAddressOnly<T>(obj: T) {
+  _ = try? obj // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+}
+
+// CHECK-LABEL: sil hidden @_TF6errors39testOptionalTryNeverFailsAddressOnlyVarurFq_T_
+// CHECK-NEXT: bb0(%0 : $*T):
+// CHECK:   [[BOX:%.+]] = alloc_box $Optional<T>
+// CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]]#1 : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT:   copy_addr %0 to [initialization] [[BOX_DATA]] : $*T
+// CHECK-NEXT:   inject_enum_addr [[BOX]]#1 : $*Optional<T>, #Optional.Some!enumelt.1
+// CHECK-NEXT:   strong_release [[BOX]]#0 : $@box Optional<T>
+// CHECK-NEXT:   destroy_addr %0 : $*T
+// CHECK-NEXT:   [[VOID:%.+]] = tuple ()
+// CHECK-NEXT:   return [[VOID]] : $()
+// CHECK-NEXT: {{^}$}}
+func testOptionalTryNeverFailsAddressOnlyVar<T>(obj: T) {
+  var copy = try? obj // expected-warning {{no calls to throwing functions occur within 'try' expression}} expected-warning {{initialization of variable 'copy' was never used; consider replacing with assignment to '_' or removing it}}
 }
