@@ -210,8 +210,6 @@ Index.test("${Kind}IndexType/advancedBy(-n)/semantics") {
       endIndex: 20)
     expectCrashLater()
     let new = start.advancedBy(test.distance)
-    expectEqual(expected, new,
-      stackTrace: SourceLocStack().with(test.loc))
   }
 }
 %     end
@@ -229,8 +227,6 @@ Index.test("${Kind}IndexType/advancedBy(-n, limit:)/semantics") {
       endIndex: 20)
     expectCrashLater()
     let new = start.advancedBy(test.distance)
-    expectEqual(expected, new,
-      stackTrace: SourceLocStack().with(test.loc))
   }
 }
 %     end
