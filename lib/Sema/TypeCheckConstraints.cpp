@@ -2130,6 +2130,10 @@ void ConstraintSystem::dump() {
 
 void ConstraintSystem::print(raw_ostream &out) {
   out << "Score: " << CurrentScore << "\n";
+
+  if (contextualType)
+    out << "Contextual Type: " << contextualType << "\n";
+
   out << "Type Variables:\n";
   for (auto tv : TypeVariables) {
     out.indent(2);
