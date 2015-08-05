@@ -59,7 +59,7 @@ func partialApply4<T: Parallelogram>(t: T) {
 }
 
 // Overload resolution/////////////////////////////////////////////////////////
-func barG<T>(t : T) throws -> T { return t } // expected-note{{}}
+func barG<T>(t : T) throws -> T { return t }
 func fooG<T>(t : T) -> T { return t }
 
 var bGE: (i: Int) -> Int = barG // expected-error{{invalid conversion from throwing function of type '(T) throws -> T' to non-throwing function type '(i: Int) -> Int'}}
@@ -88,8 +88,8 @@ func specializedOnFuncType2(x: X<String -> Int>) { }
 func testSpecializedOnFuncType(xThrows: X<String throws -> Int>,
                                xNonThrows: X<String -> Int>) {
   specializedOnFuncType1(xThrows) // ok
-  specializedOnFuncType1(xNonThrows) // expected-error{{invalid conversion from non-throwing function of type 'String -> Int' to throwing function type 'String throws -> Int'}}
-  specializedOnFuncType2(xThrows)  // expected-error{{invalid conversion from throwing function of type 'String throws -> Int' to non-throwing function type 'String -> Int'}}
+  specializedOnFuncType1(xNonThrows) // expected-error{{cannot convert value of type 'X<String -> Int>' to expected argument type 'X<String throws -> Int>'}}
+  specializedOnFuncType2(xThrows)  // expected-error{{cannot convert value of type 'X<String throws -> Int>' to expected argument type 'X<String -> Int>'}}
   specializedOnFuncType2(xNonThrows) // ok
 }
 
@@ -97,7 +97,7 @@ func testSpecializedOnFuncType(xThrows: X<String throws -> Int>,
 func subtypeResult1(x: String -> (Int -> String)) { }
 func testSubtypeResult1(x1: String -> (Int throws -> String),
                         x2: String -> (Int -> String)) {
-  subtypeResult1(x1) // expected-error{{invalid conversion from throwing function of type 'Int throws -> String' to non-throwing function type 'Int -> String'}}
+  subtypeResult1(x1) // expected-error{{cannot convert value of type 'String -> (Int throws -> String)' to expected argument type 'String -> (Int -> String)'}}
   subtypeResult1(x2)
 }
 
@@ -125,7 +125,7 @@ func testSubtypeArgument2(x1: (fn: (String -> Int)) -> Int,
 // Closures
 var c1 = {() throws -> Int in 0}
 var c2 : () throws -> Int = c1 // ok
-var c3 : () -> Int = c1 // expected-error{{cannot convert value of type '() throws -> Int' to specified type '() -> Int'}}
+var c3 : () -> Int = c1 // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c4 : () -> Int = {() throws -> Int in 0} // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c5 : () -> Int = { try c2() } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c6 : () throws -> Int = { do { try c2() } ; return 0 }

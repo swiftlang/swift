@@ -27,7 +27,7 @@ func takesNoEscapeClosure(@noescape fn : () -> Int) {
 
   takesNoEscapeClosure(fn)  // ok
 
-  doesEscape(fn)                   // expected-error {{invalid use of non-escaping function in escaping context '() -> Int'}}
+  doesEscape(fn)                   // expected-error {{invalid conversion from non-escaping function of type '@noescape () -> Int' to potentially escaping function type '() -> Int'}}
   takesGenericClosure(4, fn)       // ok
   takesGenericClosure(4) { fn() }  // ok.
 }

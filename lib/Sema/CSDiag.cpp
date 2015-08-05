@@ -756,6 +756,8 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
   case Failure::FunctionTypesMismatch:
   case Failure::DoesNotHaveMember:
   case Failure::DoesNotConformToProtocol:
+  case Failure::FunctionNoEscapeMismatch:
+  case Failure::FunctionThrowsMismatch:
     // The Expr path handling these constraints does a good job.
     return false;
 
@@ -873,26 +875,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
     break;
   }
 
-  case Failure::FunctionNoEscapeMismatch: {
-    tc.diagnose(loc, diag::noescape_functiontype_mismatch,
-                failure.getSecondType()).highlight(range);
-    if (!useExprLoc)
-      noteTargetOfDiagnostic(cs, &failure, locator);
-    break;
-  }
-
-  case Failure::FunctionThrowsMismatch: {
-    tc.diagnose(loc, diag::throws_functiontype_mismatch,
-                failure.getFirstType()->getAs<AnyFunctionType>()->throws(),
-                failure.getFirstType(),
-                failure.getSecondType()->getAs<AnyFunctionType>()->throws(),
-                failure.getSecondType())
-      .highlight(range);
-    if (!useExprLoc)
-      noteTargetOfDiagnostic(cs, &failure, locator);
-    break;
-  }
-
   case Failure::FunctionAutoclosureMismatch:
   case Failure::FunctionNoReturnMismatch:
   case Failure::IsNotArchetype:
@@ -902,7 +884,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
   case Failure::TupleNameMismatch:
   case Failure::TupleNamePositionMismatch:
   case Failure::TupleVariadicMismatch:
-    // FIXME: Handle all failure kinds
     return false;
   }
 
@@ -2445,14 +2426,15 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   
   std::pair<Type, Type> types = getBoundTypesFromConstraint(CS, anchor,
                                                             constraint);
-  
+#if 0
   if (constraint->getKind() == ConstraintKind::ArgumentTupleConversion ||
       constraint->getKind() == ConstraintKind::ArgumentConversion) {
     diagnose(anchor->getLoc(), diag::could_not_convert_argument, types.first)
       .highlight(anchor->getSourceRange());
     return true;
   }
-    
+#endif
+
   // If it's a type variable failing a conformance, avoid printing the type
   // variable and just print the conformance.
   if ((constraint->getKind() == ConstraintKind::ConformsTo) &&
@@ -2512,7 +2494,39 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
     case ConstraintKind::ArgumentTupleConversion:
     default: break;
   }
-  
+
+  // Try to simplify irrelevant details of function types.  For example, if
+  // someone passes a "() -> Float" function to a "() throws -> Int"
+  // parameter, then uttering the "throws" may confuse them into thinking that
+  // that is the problem, even though there is a clear subtype relation.
+  if (auto srcFT = fromType->getAs<FunctionType>())
+    if (auto destFT = toType->getAs<FunctionType>()) {
+      auto destExtInfo = destFT->getExtInfo();
+
+      if (!srcFT->isNoEscape()) destExtInfo = destExtInfo.withNoEscape(false);
+      if (!srcFT->throws()) destExtInfo = destExtInfo.withThrows(false);
+      if (destExtInfo != destFT->getExtInfo())
+        toType = FunctionType::get(destFT->getInput(),
+                                           destFT->getResult(), destExtInfo);
+
+      // If this is a function conversion that discards throwability or
+      // noescape, emit a specific diagnostic about that.
+      if (srcFT->throws() && !destFT->throws()) {
+        diagnose(expr->getLoc(), diag::throws_functiontype_mismatch,
+                 fromType, toType)
+        .highlight(expr->getSourceRange());
+        return true;
+      }
+
+      if (srcFT->isNoEscape() && !destFT->isNoEscape()) {
+        diagnose(expr->getLoc(), diag::noescape_functiontype_mismatch,
+                 fromType, toType)
+        .highlight(expr->getSourceRange());
+        return true;
+      }
+    }
+
+
   diagnose(anchor->getLoc(), diag::invalid_relation,
            failureKind - Failure::TypesNotEqual,
            fromType, toType)
@@ -3008,6 +3022,13 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
         if (destExtInfo != destFT->getExtInfo())
           contextualType = FunctionType::get(destFT->getInput(),
                                              destFT->getResult(), destExtInfo);
+
+        // If this is a function conversion that discards throwability or
+        // noescape, emit a specific diagnostic about that.
+        if (srcFT->throws() && !destFT->throws())
+          diagID = diag::throws_functiontype_mismatch;
+        else if (srcFT->isNoEscape() && !destFT->isNoEscape())
+          diagID = diag::noescape_functiontype_mismatch;
       }
     
     diagnose(expr->getLoc(), diagID, exprType, contextualType)
@@ -3122,6 +3143,37 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
     failureKind = Failure::FailureKind::TypesNotConvertible;
     break;
   }
+
+  // Try to simplify irrelevant details of function types.  For example, if
+  // someone passes a "() -> Float" function to a "() throws -> Int"
+  // parameter, then uttering the "throws" may confuse them into thinking that
+  // that is the problem, even though there is a clear subtype relation.
+  if (auto srcFT = exprType->getAs<FunctionType>())
+    if (auto destFT = contextualType->getAs<FunctionType>()) {
+      auto destExtInfo = destFT->getExtInfo();
+
+      if (!srcFT->isNoEscape()) destExtInfo = destExtInfo.withNoEscape(false);
+      if (!srcFT->throws()) destExtInfo = destExtInfo.withThrows(false);
+      if (destExtInfo != destFT->getExtInfo())
+        contextualType = FunctionType::get(destFT->getInput(),
+                                           destFT->getResult(), destExtInfo);
+
+      // If this is a function conversion that discards throwability or
+      // noescape, emit a specific diagnostic about that.
+      if (srcFT->throws() && !destFT->throws()) {
+        diagnose(expr->getLoc(), diag::throws_functiontype_mismatch,
+                 exprType, contextualType)
+          .highlight(expr->getSourceRange());
+        return true;
+      }
+
+      if (srcFT->isNoEscape() && !destFT->isNoEscape()) {
+        diagnose(expr->getLoc(), diag::noescape_functiontype_mismatch,
+                 exprType, contextualType)
+          .highlight(expr->getSourceRange());
+        return true;
+      }
+    }
 
   diagnose(expr->getLoc(), diag::invalid_relation,
            failureKind - Failure::FailureKind::TypesNotEqual,

@@ -103,7 +103,7 @@ class Sub : Super {
 func func12_sink(x: () -> Int) { }
 
 func func12a(@autoclosure x: () -> Int) { 
-  func12_sink(x) // expected-error{{invalid use of non-escaping function in escaping context '() -> Int'}}
+  func12_sink(x) // expected-error{{invalid conversion from non-escaping function of type '@autoclosure () -> Int' to potentially escaping function type '() -> Int'}}
 }
 func func12b(@autoclosure(escaping) x: () -> Int) { 
   func12_sink(x)

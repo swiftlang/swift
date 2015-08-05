@@ -119,7 +119,7 @@ func eleven_one() {
   }
 }
 func eleven_two() {
-  eleven_helper { // expected-error {{invalid conversion from throwing function of type '() throws -> _' to non-throwing function type '() -> ()'}}
+  eleven_helper { // expected-error {{invalid conversion from throwing function of type '() throws -> ()' to non-throwing function type '() -> ()'}}
     do {
       try thrower()
     } catch let e as MSV {
@@ -130,7 +130,7 @@ func eleven_two() {
 enum Twelve { case Payload(Int) }
 func twelve_helper(fn: (Int, Int) -> ()) {}
 func twelve() {
-  twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(_, _) throws -> _' to non-throwing function type '(Int, Int) -> ()'}}
+  twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(_, _) throws -> ()' to non-throwing function type '(Int, Int) -> ()'}}
     do {
       try thrower()
     } catch Twelve.Payload(a...b) {
@@ -143,7 +143,7 @@ func ==(a: Thirteen, b: Thirteen) -> Bool { return true }
 
 func thirteen_helper(fn: (Thirteen) -> ()) {}
 func thirteen() {
-  thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '(_) throws -> _' to non-throwing function type '(Thirteen) -> ()'}}
+  thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '(_) throws -> ()' to non-throwing function type '(Thirteen) -> ()'}}
     do {
       try thrower()
     } catch a {

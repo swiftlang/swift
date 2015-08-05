@@ -260,6 +260,15 @@ ERROR(cannot_convert_closure_result_nil,sema,none,
       "nil is not compatible with closure result type %0", (Type))
 
 
+ERROR(throws_functiontype_mismatch,sema_tcc,none,
+      "invalid conversion from throwing function of type %0 to "
+      "non-throwing function type %1", (Type, Type))
+ERROR(noescape_functiontype_mismatch,sema_tcc,none,
+      "invalid conversion from non-escaping function of type %0 to "
+      "potentially escaping function type %1", (Type, Type))
+
+
+
 
 ERROR(cannot_return_value_from_void_func,sema,none,
       "unexpected non-void return value in void function", ())
@@ -539,13 +548,6 @@ ERROR(unbound_generic_parameter,sema_tcc,none,
       "argument for generic parameter %0 could not be inferred", (Type))
 ERROR(cannot_bind_generic_parameter_to_type,sema_tcc,none,
       "cannot bind generic parameter to type %0",
-      (Type))
-ERROR(throws_functiontype_mismatch,sema_tcc,none,
-      "invalid conversion from %select{non-|}0throwing function of type %1 to "
-      "%select{non-|}2throwing function type %3",
-      (bool, Type, bool, Type))
-ERROR(noescape_functiontype_mismatch,sema_tcc,none,
-      "invalid use of non-escaping function in escaping context %0",
       (Type))
 ERROR(invalid_function_conversion,sema_tcc,none,
       "function signature %0 is not compatible with expected type %1",
