@@ -157,6 +157,7 @@ namespace {
                                             SGFContext C);
 
     RValue visitForceTryExpr(ForceTryExpr *E, SGFContext C);
+    RValue visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C);
 
     RValue visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C);
     RValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);
@@ -885,6 +886,10 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
 RValue RValueEmitter::visitForceTryExpr(ForceTryExpr *E, SGFContext C) {
   SILGenFunction::ForceTryScope scope(SGF, E);
   return visit(E->getSubExpr(), C);
+}
+
+RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
+  llvm_unreachable("not yet implemented");
 }
 
 SILGenFunction::ForceTryScope::ForceTryScope(SILGenFunction &gen,

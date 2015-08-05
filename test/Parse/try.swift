@@ -31,6 +31,25 @@ a = foo() + try! bar() // expected-error {{'try!' cannot appear to the right of 
 var b = true ? try! foo() : try! bar() + 0
 var c = true ? try! foo() : try! bar() %%% 0 // expected-error {{'try!' following conditional operator does not cover everything to its right}}
 
+infix operator ?+= { associativity right precedence 90 assignment }
+func ?+=(inout lhs: Int?, rhs: Int?) {
+  lhs = lhs! + rhs!
+}
+
+var i = try? foo() + bar()
+let _: Double = i // expected-error {{cannot convert value of type 'Int?' to specified type 'Double'}}
+i = try? foo() + bar()
+i ?+= try? foo() + bar()
+i ?+= try? foo() %%%% bar() // expected-error {{'try?' following assignment operator does not cover everything to its right}} // expected-error {{call can throw but is not marked with 'try'}}
+i ?+= try? foo() %%% bar()
+_ = foo() < try? bar() // expected-error {{'try?' cannot appear to the right of a non-assignment operator}} // expected-error {{call can throw but is not marked with 'try'}}
+_ = (try? foo()) < bar() // expected-error {{call can throw but is not marked with 'try'}}
+_ = foo() < (try? bar()) // expected-error {{call can throw but is not marked with 'try'}}
+_ = (try? foo()) < (try? bar())
+
+let j = true ? try? foo() : try? bar() + 0
+let k = true ? try? foo() : try? bar() %%% 0 // expected-error {{'try?' following conditional operator does not cover everything to its right}}
+
 try let singleLet = foo() // expected-error {{'try' must be placed on the initial value expression}} {{1-5=}} {{21-21=try }}
 try var singleVar = foo() // expected-error {{'try' must be placed on the initial value expression}} {{1-5=}} {{21-21=try }}
 try let uninit: Int // expected-error {{'try' must be placed on the initial value expression}}
@@ -59,6 +78,8 @@ let _ = "foo"
         *  // expected-error {{operator can throw but expression is not marked with 'try'}}
         "bar"
 let _ = try! "foo"*"bar"
+let _ = try? "foo"*"bar"
+let _ = (try? "foo"*"bar") ?? 0
 
 
 // <rdar://problem/21414023> Assertion failure when compiling function that takes throwing functions and rethrows

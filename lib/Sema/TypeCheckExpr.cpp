@@ -221,18 +221,40 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   // assuming $#! is some crazy operator with lower precedence
   // than the conditional operator.
   if (isa<AnyTryExpr>(RHS)) {
+    // If you change this, also change TRY_KIND_SELECT in diagnostics.
+    enum class TryKindForDiagnostics : unsigned {
+      Try,
+      ForceTry,
+      OptionalTry
+    };
+    TryKindForDiagnostics tryKind;
+    switch (RHS->getKind()) {
+    case ExprKind::Try:
+      tryKind = TryKindForDiagnostics::Try;
+      break;
+    case ExprKind::ForceTry:
+      tryKind = TryKindForDiagnostics::ForceTry;
+      break;
+    case ExprKind::OptionalTry:
+      tryKind = TryKindForDiagnostics::OptionalTry;
+      break;
+    default:
+      llvm_unreachable("unknown try-like expression");
+    }
+
     if (isa<IfExpr>(Op) || infixData.isAssignment()) {
       if (!isEndOfSequence) {
         if (isa<IfExpr>(Op)) {
           TC.diagnose(RHS->getStartLoc(), diag::try_if_rhs_noncovering,
-                      isa<ForceTryExpr>(RHS));
+                      static_cast<unsigned>(tryKind));
         } else {
           TC.diagnose(RHS->getStartLoc(), diag::try_assign_rhs_noncovering,
-                      isa<ForceTryExpr>(RHS));
+                      static_cast<unsigned>(tryKind));
         }
       }
     } else {
-      TC.diagnose(RHS->getStartLoc(), diag::try_rhs, isa<ForceTryExpr>(RHS));
+      TC.diagnose(RHS->getStartLoc(), diag::try_rhs,
+                  static_cast<unsigned>(tryKind));
     }
   }
 

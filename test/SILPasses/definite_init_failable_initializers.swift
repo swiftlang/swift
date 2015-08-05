@@ -176,6 +176,10 @@ struct ThrowStruct {
   init(a : Int) throws {
     try self.init()
   }
+
+  init(a2 : Int) {
+    try! self.init()
+  }
 }
 
 enum Err : ErrorType { case X }
@@ -186,6 +190,10 @@ struct ThrowAddrOnlyStruct<T> {
   
   init(a : Int) throws {
     try self.init()
+  }
+
+  init(a2 : Int) {
+    try! self.init()
   }
 }
 

@@ -1438,7 +1438,26 @@ public:
     return e->getKind() == ExprKind::ForceTry;
   }
 };
-  
+
+/// A 'try?' surrounding an expression, marking that the expression contains
+/// code which might throw, and that the result should be injected into an
+/// Optional. If the code does throw, \c nil is produced.
+class OptionalTryExpr : public AnyTryExpr {
+  SourceLoc QuestionLoc;
+
+public:
+  OptionalTryExpr(SourceLoc tryLoc, Expr *sub, SourceLoc questionLoc,
+                  Type type = Type(), bool implicit = false)
+    : AnyTryExpr(ExprKind::OptionalTry, tryLoc, sub, type, implicit),
+      QuestionLoc(questionLoc) {}
+
+  SourceLoc getQuestionLoc() const { return QuestionLoc; }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::OptionalTry;
+  }
+};
+
 /// An expression node that does not affect the evaluation of its subexpression.
 class IdentityExpr : public Expr {
   Expr *SubExpr;

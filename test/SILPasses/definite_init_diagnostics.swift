@@ -1219,6 +1219,10 @@ class BaseClassEH {
   convenience init(a : Int) throws {
     try self.init()
   }
+
+  convenience init(a2 : Int) {
+    try! self.init()
+  }
 }
 
 class DerivedClassEH : BaseClassEH {
@@ -1227,6 +1231,10 @@ class DerivedClassEH : BaseClassEH {
   }
   convenience init(a : Int) throws {
     try self.init()
+  }
+
+  convenience init(a2 : Int) {
+    try! self.init()
   }
 }
 

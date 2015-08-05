@@ -376,8 +376,9 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::DynamicType:
     return true;
 
-  case ExprKind::ForceTry:
   case ExprKind::Try:
+  case ExprKind::ForceTry:
+  case ExprKind::OptionalTry:
   case ExprKind::InOut:
     return false;
 

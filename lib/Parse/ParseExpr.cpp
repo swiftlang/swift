@@ -333,6 +333,8 @@ done:
 ///
 ///   expr-sequence-element(Mode):
 ///     'try' expr-unary(Mode)
+///     'try' '?' expr-unary(Mode)
+///     'try' '!' expr-unary(Mode)
 ///     expr-unary(Mode)
 ///
 /// 'try' is not actually allowed at an arbitrary position of a
@@ -341,17 +343,28 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
                                                     bool isExprBasic) {
   SourceLoc tryLoc;
   bool hadTry = consumeIf(tok::kw_try, tryLoc);
-  SourceLoc exclaimLoc;
-  bool hadExclaim = (hadTry && consumeIf(tok::exclaim_postfix, exclaimLoc));
+  Optional<Token> trySuffix;
+  if (hadTry && Tok.isAny(tok::exclaim_postfix, tok::question_postfix)) {
+    trySuffix = Tok;
+    consumeToken();
+  }
 
   ParserResult<Expr> sub = parseExprUnary(message, isExprBasic);
 
   if (hadTry && !sub.hasCodeCompletion() && !sub.isNull()) {
-    if (hadExclaim) {
-      sub = makeParserResult(new (Context) ForceTryExpr(tryLoc, sub.get(),
-                                                        exclaimLoc));
-    } else {
+    switch (trySuffix ? trySuffix->getKind() : tok::NUM_TOKENS) {
+    case tok::exclaim_postfix:
+      sub = makeParserResult(
+          new (Context) ForceTryExpr(tryLoc, sub.get(), trySuffix->getLoc()));
+      break;
+    case tok::question_postfix:
+      sub = makeParserResult(
+          new (Context) OptionalTryExpr(tryLoc, sub.get(),
+                                        trySuffix->getLoc()));
+      break;
+    default:
       sub = makeParserResult(new (Context) TryExpr(tryLoc, sub.get()));
+      break;
     }
   }
 

@@ -117,4 +117,8 @@ public class AlsoHasThrowingInit : HasThrowingInit {
   public convenience init(flag: Bool) throws {
     try self.init()
   }
+
+  public convenience init(flag2: Bool) {
+    try! self.init()
+  }
 }

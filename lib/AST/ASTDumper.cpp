@@ -1811,6 +1811,13 @@ public:
     OS << ')';
   }
 
+  void visitOptionalTryExpr(OptionalTryExpr *E) {
+    printCommon(E, "optional_try_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+
   void visitTryExpr(TryExpr *E) {
     printCommon(E, "try_expr");
     OS << '\n';

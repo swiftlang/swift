@@ -1575,15 +1575,20 @@ ERROR(non_assoc_adjacent,sema_tce,none,
 ERROR(incompatible_assoc,sema_tce,none,
       "operator is adjacent to operator of same precedence"
       " but incompatible associativity", ())
+
+// If you change this, also change enum TryKindForDiagnostics.
+#define TRY_KIND_SELECT(SUB) "%select{try|try!|try?}" #SUB
+
 ERROR(try_rhs,sema_tce,none,
-      "%select{'try'|'try!'}0 cannot appear to the right of a non-assignment "
-      "operator", (bool))
+      "'" TRY_KIND_SELECT(0) "' cannot appear to the right of a "
+      "non-assignment operator", (unsigned))
 ERROR(try_if_rhs_noncovering,sema_tce,none,
-      "%select{'try'|'try!'}0 following conditional operator does not cover "
-      "everything to its right", (bool))
+      "'" TRY_KIND_SELECT(0) "' following conditional operator does not cover "
+      "everything to its right", (unsigned))
 ERROR(try_assign_rhs_noncovering,sema_tce,none,
-      "%select{'try'|'try!'}0 following assignment operator does not cover "
-      "everything to its right", (bool))
+      "'" TRY_KIND_SELECT(0) "' following assignment operator does not cover "
+      "everything to its right", (unsigned))
+
 ERROR(reference_non_inout,sema_tce,none,
       "reference to %0 not used to initialize a inout parameter", (Type))
 NOTE(subscript_decl_here,sema_tca,none,

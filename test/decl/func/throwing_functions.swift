@@ -133,6 +133,8 @@ var c7 : () -> Int = { do { try c2() } ; return 0 } // expected-error{{invalid c
 var c8 : () -> Int = { do { try c2()  } catch _ { var x = 0 } ; return 0 }
 var c9 : () -> Int = { do { try c2()  } catch Exception.A { var x = 0 } ; return 0 }// expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c10 : () -> Int = { throw Exception.A; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
+var c11 : () -> Int = { try! c2() }
+var c12 : () -> Int? = { try? c2() }
 
 // Initializers
 struct A {

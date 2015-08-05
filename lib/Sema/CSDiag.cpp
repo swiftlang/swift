@@ -496,6 +496,9 @@ ResolvedLocator constraints::resolveLocatorToDecl(
     }
 
     if (auto tryExpr = dyn_cast<AnyTryExpr>(anchor)) {
+      if (isa<OptionalTryExpr>(tryExpr))
+        break;
+
       anchor = tryExpr->getSubExpr();
       continue;
     }
@@ -2323,8 +2326,14 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   // give a better diagnostic.
   Expr *call = expr->getParentMap()[anchor];
   // Ignore parens around the callee.
-  while (call && (isa<IdentityExpr>(call) || isa<AnyTryExpr>(call)))
+  while (call) {
+    bool shouldIgnore = isa<IdentityExpr>(call);
+    if (!shouldIgnore)
+      shouldIgnore = isa<AnyTryExpr>(call) && !isa<OptionalTryExpr>(call);
+    if (shouldIgnore)
+      break;
     call = expr->getParentMap()[call];
+  }
   
   // Do some sanity checking based on the call: e.g. make sure we're invoking
   // the overloaded decl, not using it as an argument.

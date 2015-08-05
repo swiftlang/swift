@@ -2505,6 +2505,10 @@ namespace {
       return expr;
     }
 
+    Expr *visitOptionalTryExpr(OptionalTryExpr *expr) {
+      return simplifyExprType(expr);
+    }
+
     Expr *visitParenExpr(ParenExpr *expr) {
       auto &ctx = cs.getASTContext();
       expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
@@ -3495,6 +3499,8 @@ static Expr *lookThroughIdentityExprs(Expr *expr) {
     if (auto ident = dyn_cast<IdentityExpr>(expr)) {
       expr = ident->getSubExpr();
     } else if (auto anyTry = dyn_cast<AnyTryExpr>(expr)) {
+      if (isa<OptionalTryExpr>(anyTry))
+        return expr;
       expr = anyTry->getSubExpr();
     } else {
       return expr;
@@ -3519,6 +3525,9 @@ static Type rebuildIdentityExprs(ASTContext &ctx, Expr *expr, Type type) {
   }
 
   if (auto ident = dyn_cast<AnyTryExpr>(expr)) {
+    if (isa<OptionalTryExpr>(ident))
+      return type;
+
     type = rebuildIdentityExprs(ctx, ident->getSubExpr(), type);
     ident->setType(type);
     return ident->getType();

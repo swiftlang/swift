@@ -199,6 +199,8 @@ public:
       recurse = asImpl().checkTry(tryExpr);
     } else if (auto forceTryExpr = dyn_cast<ForceTryExpr>(E)) {
       recurse = asImpl().checkForceTry(forceTryExpr);
+    } else if (auto optionalTryExpr = dyn_cast<OptionalTryExpr>(E)) {
+      recurse = asImpl().checkOptionalTry(optionalTryExpr);
     } else if (auto apply = dyn_cast<ApplyExpr>(E)) {
       recurse = asImpl().checkApply(apply);
     }
@@ -557,6 +559,9 @@ private:
       return ShouldRecurse;
     }
     ShouldRecurse_t checkForceTry(ForceTryExpr *E) {
+      return ShouldNotRecurse;
+    }
+    ShouldRecurse_t checkOptionalTry(OptionalTryExpr *E) {
       return ShouldNotRecurse;
     }
     ShouldRecurse_t checkApply(ApplyExpr *E) {
@@ -1391,6 +1396,20 @@ private:
 
   ShouldRecurse_t checkForceTry(ForceTryExpr *E) {
     // Walk the operand.  'try!' handles errors.
+    ContextScope scope(*this, Context::getHandled());
+    scope.enterTry();
+
+    E->getSubExpr()->walk(*this);
+
+    // Warn about 'try' expressions that weren't actually needed.
+    if (!Flags.has(ContextFlags::HasTryThrowSite)) {
+      TC.diagnose(E->getLoc(), diag::no_throw_in_try);
+    }
+    return ShouldNotRecurse;
+  }
+
+  ShouldRecurse_t checkOptionalTry(OptionalTryExpr *E) {
+    // Walk the operand.  'try?' handles errors.
     ContextScope scope(*this, Context::getHandled());
     scope.enterTry();
 

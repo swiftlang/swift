@@ -1469,6 +1469,20 @@ namespace {
       return expr->getType();
     }
 
+    Type visitOptionalTryExpr(OptionalTryExpr *expr) {
+      auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                           TVO_PrefersSubtypeBinding);
+
+      Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
+      if (!optTy)
+        return Type();
+
+      CS.addConstraint(ConstraintKind::Conversion,
+                       expr->getSubExpr()->getType(), optTy,
+                       CS.getConstraintLocator(expr));
+      return optTy;
+    }
+
     Type visitParenExpr(ParenExpr *expr) {
       auto &ctx = CS.getASTContext();
       expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
@@ -1835,8 +1849,8 @@ namespace {
             return { false, nullptr };
           }
 
-          // Don't walk into a 'try!'.
-          if (isa<ForceTryExpr>(expr)) {
+          // Don't walk into a 'try!' or 'try?'.
+          if (isa<ForceTryExpr>(expr) || isa<OptionalTryExpr>(expr)) {
             return { false, expr };
           }
           

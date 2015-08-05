@@ -70,15 +70,31 @@ struct seven {
       return 0
     }
   }
+
+  var y: Int {
+    return try! seven_helper()
+  }
+
+  var z: Int {
+    return (try? seven_helper()) ?? 0
+  }
 }
 
 class eight {
-  lazy var bar: Int = {
+  lazy var x: Int = {
     do {
       return try seven_helper()
     } catch {
       return 0
     }
+  }()
+
+  lazy var y: Int = {
+    return try! seven_helper()
+  }()
+
+  lazy var z: Int = {
+    return (try? seven_helper()) ?? 0
   }()
 }
 

@@ -1917,7 +1917,10 @@ Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
   if (auto tryExpr = dyn_cast<AnyTryExpr>(expr)) {
     auto sub = coerceToMaterializable(tryExpr->getSubExpr());
     tryExpr->setSubExpr(sub);
-    tryExpr->setType(sub->getType());
+    if (isa<OptionalTryExpr>(tryExpr) && !sub->getType()->is<ErrorType>())
+      tryExpr->setType(OptionalType::get(sub->getType()));
+    else
+      tryExpr->setType(sub->getType());
     return tryExpr;
   }
 
