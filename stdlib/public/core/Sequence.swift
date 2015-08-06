@@ -307,7 +307,9 @@ extension SequenceType {
     // Ensure the buffer is left in a destructible state.
     var finished = false
     defer {
-      if !finished { builder.finish() }
+      if !finished {
+        _ = builder.finish()
+      }
     }
     // Add elements up to the initial capacity without checking for regrowth.
     for _ in 0..<initialCapacity {
@@ -340,7 +342,9 @@ extension SequenceType {
     // Ensure the buffer is left in a destructible state.
     var finished = false
     defer {
-      if !finished { builder.finish() }
+      if !finished {
+        _ = builder.finish()
+      }
     }
     while let element = generator.next() {
       if try includeElement(element) {

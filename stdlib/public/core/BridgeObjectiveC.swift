@@ -50,7 +50,6 @@ public protocol _ObjectiveCBridgeable {
   ///
   /// - parameter result The location where the result is written. The optional
   ///   will always contain a value.
-  @warn_unused_result
   static func _forceBridgeFromObjectiveC(
     source: _ObjectiveCType,
     inout result: Self?
@@ -70,7 +69,6 @@ public protocol _ObjectiveCBridgeable {
   ///   information is provided for the convenience of the runtime's dynamic_cast
   ///   implementation, so that it need not look into the optional representation
   /// to determine success.
-  @warn_unused_result
   static func _conditionallyBridgeFromObjectiveC(
     source: _ObjectiveCType,
     inout result: Self?
@@ -252,7 +250,6 @@ public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeabl
   return result
 }
 
-@warn_unused_result
 @asmname("swift_bridgeNonVerbatimFromObjectiveC")
 func _bridgeNonVerbatimFromObjectiveC<T>(
   x: AnyObject,
@@ -267,7 +264,6 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
 ///   unchanged otherwise.
 ///
 /// - Returns: `true` to indicate success, `false` to indicate failure.
-@warn_unused_result
 @asmname("swift_bridgeNonVerbatimFromObjectiveCConditional")
 func _bridgeNonVerbatimFromObjectiveCConditional<T>(
   x: AnyObject,

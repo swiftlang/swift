@@ -323,7 +323,9 @@ extension CollectionType {
     // Ensure the buffer is left in a destructible state.
     var finished = false
     defer {
-      if !finished { builder.finish() }
+      if !finished {
+        _ = builder.finish()
+      }
     }
 
     // On the success path, we know we'll have exactly `count` elements

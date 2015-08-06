@@ -68,7 +68,6 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
 }
 
 @transparent
-@warn_unused_result
 public // @testable
 func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
@@ -135,7 +134,6 @@ func _swift_stdlib_atomicLoadInt${bits}(
 
 %   for operation in [ 'Add', 'And', 'Or', 'Xor' ]:
 // Warning: no overflow checking.
-@warn_unused_result
 @asmname("swift_stdlib_atomicFetch${operation}UInt${bits}")
 func _swift_stdlib_atomicFetch${operation}UInt${bits}(
   object target: UnsafeMutablePointer<UInt${bits}>,
@@ -224,7 +222,6 @@ func _stdlib_atomicLoadARCRef(
 
 % for operation in [ 'Add', 'And', 'Or', 'Xor' ]:
 // Warning: no overflow checking.
-@warn_unused_result
 public func _swift_stdlib_atomicFetch${operation}Int(
   object target: UnsafeMutablePointer<Int>,
   operand: Int) -> Int {
@@ -263,14 +260,12 @@ public final class _stdlib_AtomicInt {
   }
 
 % for operation_name, operation in [ ('Add', '+'), ('And', '&'), ('Or', '|'), ('Xor', '^') ]:
-  @warn_unused_result
   public func fetchAnd${operation_name}(operand: Int) -> Int {
     return _swift_stdlib_atomicFetch${operation_name}Int(
       object: _valuePtr,
       operand: operand)
   }
 
-  @warn_unused_result
   public func ${operation_name.lower()}AndFetch(operand: Int) -> Int {
     return fetchAnd${operation_name}(operand) ${operation} operand
   }
