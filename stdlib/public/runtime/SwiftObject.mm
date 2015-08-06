@@ -20,10 +20,7 @@
 #include <objc/NSObject.h>
 #include <objc/runtime.h>
 #include <objc/message.h>
-#if __has_include(<objc/objc-internal.h>)
-#include <objc/objc-abi.h>
-#include <objc/objc-internal.h>
-#endif
+#include <objc/objc.h>
 #endif
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/Demangle.h"
@@ -44,26 +41,12 @@
 # import <CoreFoundation/CFBase.h> // for CFTypeID
 # include <malloc/malloc.h>
 # include <dispatch/dispatch.h>
-# include <objc/runtime.h>
 #endif
 #if SWIFT_RUNTIME_ENABLE_DTRACE
 # include "SwiftRuntimeDTraceProbes.h"
 #else
 #define SWIFT_ISUNIQUELYREFERENCED()
 #define SWIFT_ISUNIQUELYREFERENCEDORPINNED()
-#endif
-
-#if SWIFT_OBJC_INTEROP
-// Redeclare these just we check them.
-extern "C" id objc_retain(id);
-extern "C" void objc_release(id);
-extern "C" id _objc_rootAutorelease(id);
-extern "C" void objc_moveWeak(id*, id*);
-extern "C" void objc_copyWeak(id*, id*);
-extern "C" id objc_initWeak(id*, id);
-extern "C" id objc_storeWeak(id*, id);
-extern "C" void objc_destroyWeak(id*);
-extern "C" id objc_loadWeakRetained(id*);
 #endif
 
 using namespace swift;

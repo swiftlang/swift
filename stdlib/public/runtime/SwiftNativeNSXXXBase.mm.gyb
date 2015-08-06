@@ -34,9 +34,7 @@
 #import <CoreFoundation/CoreFoundation.h>
 #include <objc/NSObject.h>
 #include <objc/runtime.h>
-#if __has_include(<objc/objc-internal.h>)
-#include <objc/objc-internal.h>
-#endif
+#include <objc/objc.h>
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/ObjCBridge.h"
@@ -45,9 +43,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mutex>
-
-// Redeclare these just we check them.
-extern "C" id _objc_rootAutorelease(id);
 
 using namespace swift;
 
