@@ -1804,7 +1804,7 @@ public:
 
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
-  bool diagnoseFailure();
+  bool diagnoseExprFailure();
 
   /// Emit an ambiguity diagnostic about the specified expression.
   void diagnoseAmbiguity(Expr *E);
@@ -3272,7 +3272,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   // have been what we were looking for - diagnose this as a conversion
   // failure.
   if (calleeInfo.closeness == CC_ExactMatch)
-    return diagnoseGeneralFailure();
+    return false;
   
   // A common error is to apply an operator that only has an inout LHS (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -3500,7 +3500,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // the result of the call to the expected type.  Diagnose this as a conversion
   // failure.
   if (calleeInfo.closeness == CC_ExactMatch)
-    return diagnoseGeneralFailure();
+    return false;
 
   
   bool isInitializer = isa<TypeExpr>(fnExpr);
@@ -3606,7 +3606,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
     return true;
   }
   
-  return diagnoseGeneralFailure();
+  return false;
 }
 
 // FIXME: Change this to be visitExplicitCastExpr, which is a superclass of
@@ -3624,7 +3624,7 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
     return true;
   }
 
-  return diagnoseGeneralFailure();
+  return false;
 }
 
 bool FailureDiagnosis::
@@ -3641,7 +3641,7 @@ visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCE) {
     return true;
   }
 
-  return diagnoseGeneralFailure();
+  return false;
 }
 
 bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
@@ -3658,7 +3658,7 @@ bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
     return true;
   }
   
-  return diagnoseGeneralFailure();
+  return false;
 }
 
 bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
@@ -3675,7 +3675,7 @@ bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
     return true;
   }
 
-  return diagnoseGeneralFailure();
+  return false;
 }
 
 bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
@@ -3711,14 +3711,14 @@ bool FailureDiagnosis::
 visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   // Don't walk the children for this node, it leads to multiple diagnostics
   // because of how sema injects this node into the type checker.
-  return diagnoseGeneralFailure();
+  return false;
 }
 
 
 bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   // If this is a complex leaf closure, give up.
   if (!CE->hasSingleExpressionBody())
-    return diagnoseGeneralFailure();
+    return false;
 
   Type expectedResultType;
   
@@ -3772,8 +3772,8 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   }
   
   // If the body of the closure looked ok, then look for a contextual type
-  // error.  This is necessary because FailureDiagnosis::diagnoseFailure doesn't
-  // do this for closures.
+  // error.  This is necessary because FailureDiagnosis::diagnoseExprFailure
+  // doesn't do this for closures.
   if (CS->getContextualType() &&
       !CS->getContextualType()->isEqual(CE->getType())) {
 
@@ -3801,7 +3801,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   
   
   // Otherwise, produce a generic error.
-  return diagnoseGeneralFailure();
+  return false;
 }
 
 bool FailureDiagnosis::visitExpr(Expr *E) {
@@ -3822,11 +3822,11 @@ bool FailureDiagnosis::visitExpr(Expr *E) {
     return true;
   
   // Otherwise, produce a more generic error.
-  return diagnoseGeneralFailure();
+  return false;
 }
 
 
-bool FailureDiagnosis::diagnoseFailure() {
+bool FailureDiagnosis::diagnoseExprFailure() {
   assert(CS && expr);
 
   // Our general approach is to do a depth first traversal of the broken
@@ -3874,7 +3874,12 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   FailureDiagnosis diagnosis(expr, this);
   
   // Now, attempt to diagnose the failure from the info we've collected.
-  if (diagnosis.diagnoseFailure())
+  if (diagnosis.diagnoseExprFailure())
+    return;
+  
+  // If we can diagnose a problem based on the constraints left laying around in
+  // the system, do so now.
+  if (diagnosis.diagnoseGeneralFailure())
     return;
 
   // If the expression-order diagnostics didn't find any diagnosable problems,
