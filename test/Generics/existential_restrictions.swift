@@ -84,6 +84,6 @@ func foo() {
   // conformance is rejected because Mine is not @objc, and we hit the
   // generic no overloads error path. The error should actually talk
   // about the return type, and this can happen in other contexts as well;
-  // <rdar://problem/21248136> tracks improving QoI here.
+  // <rdar://problem/21900971> tracks improving QoI here.
   allMine.takeAll() // expected-error{{type 'Mine' does not conform to protocol 'Mine'}}
 }
