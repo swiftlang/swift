@@ -1755,11 +1755,6 @@ class FailureDiagnosis :public ASTVisitor<FailureDiagnosis, /*exprresult*/bool>{
   
   Expr *expr = nullptr;
   ConstraintSystem *const CS;
-  
-  // Specific constraint kinds used, in conjunction with the expression node,
-  // to determine the appropriate diagnostic.
-  Constraint *conversionConstraint = nullptr;
-
 public:
   
   FailureDiagnosis(Expr *expr, ConstraintSystem *CS);
@@ -1859,90 +1854,11 @@ private:
 };
 } // end anonymous namespace.
 
-/// Return true if this constraint is a conversion or requirement between two
-/// types.
-static bool isConversionConstraint(const Constraint *C) {
-  switch (C->getKind()) {
-  case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
-  case ConstraintKind::ArgumentConversion:
-  case ConstraintKind::ArgumentTupleConversion:
-  case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
-  case ConstraintKind::Subtype:
-    return true;
-    
-  default:
-    return false;
-  }
-}
-
 
 
 FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   : expr(expr), CS(cs) {
   assert(expr && CS);
-
-  // If the constraint system had a failure constraint, it takes precedence over
-  // other random constraints in the system.
-  if (CS->failedConstraint && isConversionConstraint(CS->failedConstraint))
-    conversionConstraint = CS->failedConstraint;
-
-  Constraint *fallbackConstraint = nullptr;
-  Constraint *disjunctionConversionConstraint = nullptr;
-  Constraint *conformanceConstraint = nullptr;
-
-  for (auto & constraintRef : CS->getConstraints()) {
-    auto constraint = &constraintRef;
-    
-    // Capture the first non-disjunction constraint we find. We'll use this
-    // if we can't find a clearer reason for the failure.
-    if ((!fallbackConstraint || constraint->isFavored()) &&
-        (constraint->getKind() != ConstraintKind::Disjunction) &&
-        (constraint->getKind() != ConstraintKind::Conjunction)) {
-      fallbackConstraint = constraint;
-    }
-    
-    // Store off conversion constraints, favoring existing conversion
-    // constraints.
-    if ((!conformanceConstraint || constraint->isFavored()) &&
-        constraint->getKind() == ConstraintKind::ConformsTo) {
-      conformanceConstraint = constraint;
-    }
-
-    // Conversion constraints are also nicely descriptive, so we'll grab the
-    // first one of those as well.
-    if ((!conversionConstraint || constraint->isFavored()) &&
-        isConversionConstraint(constraint)) {
-      conversionConstraint = constraint;
-    }
-    
-    // When all else fails, inspect a potential conjunction or disjunction for a
-    // consituent conversion.
-    if (!disjunctionConversionConstraint || constraint->isFavored()) {
-      disjunctionConversionConstraint =
-      getConstraintChoice(constraint, ConstraintKind::Conversion, true);
-    }
-  }
-
-  // If no more descriptive constraint was found, use the fallback constraint.
-  if (fallbackConstraint && !conversionConstraint)
-    conversionConstraint = fallbackConstraint;
-
-  // If there's still no conversion to diagnose, use the disjunction conversion.
-  if (!conversionConstraint)
-    conversionConstraint = disjunctionConversionConstraint;
-
-    if (conversionConstraint && conformanceConstraint &&
-        conformanceConstraint->getTypeVariables().size() <
-          conversionConstraint->getTypeVariables().size())
-      conversionConstraint = conformanceConstraint;
-
-  // If there was already a conversion failure, use it.
-  if (!conversionConstraint && CS->failedConstraint &&
-      CS->failedConstraint->getKind() != ConstraintKind::Disjunction) {
-    conversionConstraint = CS->failedConstraint;
-  }
 }
 
 
@@ -2080,14 +1996,8 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
   
   // We know that this is a failing lookup, so we should have no viable
   // candidates here.
-  if (!result.ViableCandidates.empty()) {
-    // FIXME: we get here when the constraint solver hits an unsolvable
-    // constraint, gives up, and leaves unsolved constraints in its system.
-    // This leads us to focusing in on constraints that *are* solvable, and
-    // producing laughably incorrect diagnostics.  We need a way for the
-    // solver to reconsider all solvable constraints in a failed system.
-    return diagnoseGeneralConversionFailure();
-  }
+  if (!result.ViableCandidates.empty())
+    return false;
 
   // If we found no results at all, mention that fact.
   if (result.UnviableCandidates.empty()) {
@@ -2320,7 +2230,89 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   return true;
 }
 
+/// Return true if this constraint is a conversion or requirement between two
+/// types.
+static bool isConversionConstraint(const Constraint *C) {
+  switch (C->getKind()) {
+    case ConstraintKind::Conversion:
+    case ConstraintKind::ExplicitConversion:
+    case ConstraintKind::ArgumentConversion:
+    case ConstraintKind::ArgumentTupleConversion:
+    case ConstraintKind::ConformsTo:
+    case ConstraintKind::SelfObjectOfProtocol:
+    case ConstraintKind::Subtype:
+      return true;
+      
+    default:
+      return false;
+  }
+}
+
+
 bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
+  Constraint *conversionConstraint = nullptr;
+
+  // If the constraint system had a failure constraint, it takes precedence over
+  // other random constraints in the system.
+  if (CS->failedConstraint && isConversionConstraint(CS->failedConstraint))
+    conversionConstraint = CS->failedConstraint;
+  
+  Constraint *fallbackConstraint = nullptr;
+  Constraint *disjunctionConversionConstraint = nullptr;
+  Constraint *conformanceConstraint = nullptr;
+  
+  for (auto & constraintRef : CS->getConstraints()) {
+    auto constraint = &constraintRef;
+    
+    // Capture the first non-disjunction constraint we find. We'll use this
+    // if we can't find a clearer reason for the failure.
+    if ((!fallbackConstraint || constraint->isFavored()) &&
+        (constraint->getKind() != ConstraintKind::Disjunction) &&
+        (constraint->getKind() != ConstraintKind::Conjunction)) {
+      fallbackConstraint = constraint;
+    }
+    
+    // Store off conversion constraints, favoring existing conversion
+    // constraints.
+    if ((!conformanceConstraint || constraint->isFavored()) &&
+        constraint->getKind() == ConstraintKind::ConformsTo) {
+      conformanceConstraint = constraint;
+    }
+    
+    // Conversion constraints are also nicely descriptive, so we'll grab the
+    // first one of those as well.
+    if ((!conversionConstraint || constraint->isFavored()) &&
+        isConversionConstraint(constraint)) {
+      conversionConstraint = constraint;
+    }
+    
+    // When all else fails, inspect a potential conjunction or disjunction for a
+    // consituent conversion.
+    if (!disjunctionConversionConstraint || constraint->isFavored()) {
+      disjunctionConversionConstraint =
+      getConstraintChoice(constraint, ConstraintKind::Conversion, true);
+    }
+  }
+  
+  // If no more descriptive constraint was found, use the fallback constraint.
+  if (fallbackConstraint && !conversionConstraint)
+    conversionConstraint = fallbackConstraint;
+  
+  // If there's still no conversion to diagnose, use the disjunction conversion.
+  if (!conversionConstraint)
+    conversionConstraint = disjunctionConversionConstraint;
+  
+  if (conversionConstraint && conformanceConstraint &&
+      conformanceConstraint->getTypeVariables().size() <
+      conversionConstraint->getTypeVariables().size())
+    conversionConstraint = conformanceConstraint;
+  
+  // If there was already a conversion failure, use it.
+  if (!conversionConstraint && CS->failedConstraint &&
+      CS->failedConstraint->getKind() != ConstraintKind::Disjunction) {
+    conversionConstraint = CS->failedConstraint;
+  }
+
   
   // Otherwise, if we have a conversion constraint, use that as the basis for
   // the diagnostic.
