@@ -149,6 +149,61 @@ static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
   return NAI;
 }
 
+/// Check if a given value is used as an operand of a given instruction.
+static bool isOperandOf(SILValue V, SILInstruction *I) {
+  for (auto &Op : I->getAllOperands()) {
+    if (Op.get() == V) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Find a retain of the class instance, which happens before a given
+/// instruction. Return this retain instruction, if it is possible to
+/// sink it, or nullptr otherwise.
+static StrongRetainInst *findClassInstanceRetainForSinking(SILBasicBlock *BB,
+                                                  SILBasicBlock::iterator It,
+                                                      SILValue ClassInstance) {
+  // Scan the basic block backwards starting at the provided iterator.
+  // Look for a retain of the class instance, which could be sinked.
+  while (It != BB->begin()) {
+    // Check if this is a strong_retain.
+    auto *SRI = dyn_cast<StrongRetainInst>(--It);
+    if (SRI) {
+      // Be conservative and don't reorder retain instructions:
+      // Bail if it is not a retain of the class instance.
+      if (SRI->getOperand() != ClassInstance)
+        return nullptr;
+
+      // This is a retain of the class instance and it can be sinked.
+      return SRI;
+    }
+
+    // Be conservative and don't try to reorder RC instructions.
+    if (isa<RefCountingInst>(It))
+      return nullptr;
+
+    // It is OK if the class instance is used by the class_method,
+    // as we are going to remove this instruction during devirtualization
+    // anyways. So, there is no conflict.
+    if (isa<ClassMethodInst>(It))
+      continue;
+
+    // OK, it is not an RC instruction:
+    // check if this instruction uses the class instance as its operand.
+    // If this is the case, then we won't be able to sink a retain of
+    // the class instance even if we find this retain later, because the current
+    // instruction may depend on the class instance being retained before
+    // the current instruction is executed.
+    if (isOperandOf(ClassInstance, It))
+      return nullptr;
+  }
+
+  // Nothing was found.
+  return nullptr;
+}
+
 /// Insert monomorphic inline caches for a specific class or metatype
 /// type \p SubClassTy.
 static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
@@ -190,29 +245,13 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
 
   // Try sinking the retain of the class instance into the diamond. This may
   // allow additional ARC optimizations on the fast path.
-  if (It != Entry->begin()) {
-    auto *SRI = dyn_cast<StrongRetainInst>(--It);
-    // Try to skip another instruction, in case the class_method came first.
-    if (!SRI && It != Entry->begin()) {
-      auto AnotheInst = It;
-      SRI = dyn_cast<StrongRetainInst>(--It);
-      if (SRI && !isa<ClassMethodInst>(AnotheInst)) {
-        // Check that the operand of retain is not used by another instruction.
-        for (auto &Op: AnotheInst->getAllOperands()) {
-          if (Op.get() == CMI->getOperand()){
-            SRI = nullptr;
-            break;
-          }
-        }
-      }
-    }
-    if (SRI && SRI->getOperand() == CMI->getOperand()) {
-      VirtBuilder.createStrongRetain(SRI->getLoc(), CMI->getOperand())
-        ->setDebugScope(SRI->getDebugScope());
-      IdenBuilder.createStrongRetain(SRI->getLoc(), DownCastedClassInstance)
-        ->setDebugScope(SRI->getDebugScope());
-      SRI->eraseFromParent();
-    }
+  auto *SRI = findClassInstanceRetainForSinking(Entry, It, CMI->getOperand());
+  if (SRI) {
+    VirtBuilder.createStrongRetain(SRI->getLoc(), CMI->getOperand())
+            ->setDebugScope(SRI->getDebugScope());
+    IdenBuilder.createStrongRetain(SRI->getLoc(), DownCastedClassInstance)
+            ->setDebugScope(SRI->getDebugScope());
+    SRI->eraseFromParent();
   }
 
   // Copy the two apply instructions into the two blocks.
