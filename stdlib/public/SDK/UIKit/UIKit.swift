@@ -42,7 +42,7 @@ extension UIOffset : Equatable {}
 // UIDeviceOrientation
 //===----------------------------------------------------------------------===//
 
-#if !os(watchOS) && !os(tvOS)
+#if !os(watchOS)
 public extension UIDeviceOrientation {
   var isLandscape: Bool { 
     get { return self == .LandscapeLeft  ||  self == .LandscapeRight } 
@@ -91,7 +91,7 @@ public func UIDeviceOrientationIsValidInterfaceOrientation(
 // UIInterfaceOrientation
 //===----------------------------------------------------------------------===//
 
-#if !os(watchOS) && !os(tvOS)
+#if !os(watchOS)
 public extension UIInterfaceOrientation {
   var isLandscape: Bool { 
     get { return self == .LandscapeLeft  ||  self == .LandscapeRight } 
@@ -116,7 +116,7 @@ public func UIInterfaceOrientationIsLandscape(
 
 // Overlays for variadic initializers.
 
-#if !os(watchOS) && !os(tvOS)
+#if !os(watchOS)
 public extension UIActionSheet {
   convenience init(title: String?,
        delegate: UIActionSheetDelegate?,
@@ -138,7 +138,7 @@ public extension UIActionSheet {
 }
 #endif
 
-#if !os(watchOS) && !os(tvOS)
+#if !os(watchOS)
 public extension UIAlertView {
   convenience init(title: String,
        message: String,

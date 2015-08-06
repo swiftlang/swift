@@ -17,10 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #import <UIKit/UIKit.h>
-#include <TargetConditionals.h>
 
-#if (!defined(TARGET_OS_WATCH) || !TARGET_OS_WATCH) && \
-    (!defined(TARGET_OS_TV) || !TARGET_OS_TV)
 @interface UIActionSheet (_SwiftInterop)
 
 - (instancetype)initWithTitle:(NSString *)title
@@ -44,11 +41,8 @@
 }
 
 @end
-#endif
 
 
-#if (!defined(TARGET_OS_WATCH) || !TARGET_OS_WATCH) && \
-    (!defined(TARGET_OS_TV) || !TARGET_OS_TV)
 @interface UIAlertView (_SwiftInterop)
 
 - (instancetype)initWithTitle:(NSString *)title
@@ -72,5 +66,4 @@
 }
 
 @end
-#endif
 

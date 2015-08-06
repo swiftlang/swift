@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #import <CoreFoundation/CoreFoundation.h>
+#import <objc/objc-internal.h>
 
 extern "C"
 void _swift_stdlib_CFStringGetCharacters(CFStringRef theString,
