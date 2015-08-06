@@ -716,7 +716,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     if (ST->getNominalOrBoundGenericNominal()) {
       CodeCompletionResultBuilder Builder(Sink,
                                           CodeCompletionResult::ResultKind::Keyword,
-                                          SemanticContextKind::None);
+                                          SemanticContextKind::CurrentNominal);
       Builder.addTextChunk("super");
       ST = ST->getReferenceStorageReferent();
       assert(!ST->isVoid() && "Cannot get type name.");
@@ -1715,11 +1715,11 @@ public:
     addTypeAnnotation(Builder, EnumType);
   }
 
-  void addKeyword(StringRef Name, Type TypeAnnotation) {
+  void addKeyword(StringRef Name, Type TypeAnnotation,
+                  SemanticContextKind SK = SemanticContextKind::None) {
     CodeCompletionResultBuilder Builder(
         Sink,
-        CodeCompletionResult::ResultKind::Keyword,
-        SemanticContextKind::None);
+        CodeCompletionResult::ResultKind::Keyword, SK);
     addLeadingDot(Builder);
     Builder.addTextChunk(Name);
     if (!TypeAnnotation.isNull())
@@ -2100,7 +2100,7 @@ public:
     lookupVisibleMemberDecls(*this, MetaBase,
                              CurrDeclContext, TypeResolver.get());
     addKeyword("Type", MetaBase);
-    addKeyword("self", BaseType);
+    addKeyword("self", BaseType, SemanticContextKind::CurrentNominal);
   }
 
   void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK) {
@@ -2573,7 +2573,11 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink) {
 
   AddKeyword("__DSO_HANDLE__", "UnsafeMutablePointer<Void>");
 
-  AddKeyword("nil", StringRef());
+  CodeCompletionResultBuilder Builder(Sink,
+                                      CodeCompletionResult::ResultKind::Keyword,
+                                      SemanticContextKind::CurrentModule);
+  Builder.addTextChunk("nil");
+
 }
 
 void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {

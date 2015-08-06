@@ -124,7 +124,7 @@
 // KW_DECL_STMT-DAG: Keyword/None: __COLUMN__[#Int#]{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: false[#Bool#]{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: true[#Bool#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: nil{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword/CurrModule: nil{{; name=.+$}}
 // KW_DECL_STMT: End completions
 
 #^TOP_LEVEL_1^#
@@ -203,7 +203,7 @@ extension InProtocol {
 class SuperSuperClass {
    func f1() {
     #^SUPER_KEYWORD0^#
-// SUPER_KEYWORD0-NOT: Keyword/None:                       super
+// SUPER_KEYWORD0-NOT: Keyword/CurrNominal:                       super
   }
 }
 
@@ -211,19 +211,19 @@ class SuperClass : SuperSuperClass {
    func f2() {
     #^SUPER_KEYWORD1^#
   }
-// SUPER_KEYWORD1: Keyword/None:                       super[#SuperSuperClass#]; name=super{{$}}
+// SUPER_KEYWORD1: Keyword/CurrNominal:                       super[#SuperSuperClass#]; name=super{{$}}
 }
 
 class SubClass : SuperClass {
   func f3() {
     #^SUPER_KEYWORD2^#
   }
-// SUPER_KEYWORD2: Keyword/None:                       super[#SuperClass#]; name=super{{$}}
+// SUPER_KEYWORD2: Keyword/CurrNominal:                       super[#SuperClass#]; name=super{{$}}
 }
 
 extension SubClass {
   func f4() {
     #^SUPER_KEYWORD3^#
   }
-// SUPER_KEYWORD3: Keyword/None:                       super[#SuperClass#]; name=super{{$}}
+// SUPER_KEYWORD3: Keyword/CurrNominal:                       super[#SuperClass#]; name=super{{$}}
 }

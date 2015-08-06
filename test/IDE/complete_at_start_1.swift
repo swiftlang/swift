@@ -6,7 +6,7 @@
 // A: Begin completions
 // A-DAG: Keyword/None: true[#Bool#]{{; name=.+$}}
 // A-DAG: Keyword/None: false[#Bool#]{{; name=.+$}}
-// A-DAG: Keyword/None: nil{{; name=.+$}}
+// A-DAG: Keyword/CurrModule: nil{{; name=.+$}}
 // A-DAG: Decl[Struct]/OtherModule[Swift]: Int8[#Int8#]{{; name=.+$}}
 // A-DAG: Decl[Struct]/OtherModule[Swift]: Int16[#Int16#]{{; name=.+$}}
 // A-DAG: Decl[Struct]/OtherModule[Swift]: Int32[#Int32#]{{; name=.+$}}
