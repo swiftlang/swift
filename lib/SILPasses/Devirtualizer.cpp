@@ -169,8 +169,7 @@ static StrongRetainInst *findClassInstanceRetainForSinking(SILBasicBlock *BB,
   // Look for a retain of the class instance, which could be sinked.
   while (It != BB->begin()) {
     // Check if this is a strong_retain.
-    auto *SRI = dyn_cast<StrongRetainInst>(--It);
-    if (SRI) {
+    if (auto *SRI = dyn_cast<StrongRetainInst>(--It)) {
       // Be conservative and don't reorder retain instructions:
       // Bail if it is not a retain of the class instance.
       if (SRI->getOperand() != ClassInstance)
