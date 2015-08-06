@@ -672,6 +672,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   enum class CompletionKind {
     None,
     Import,
+    UnresolvedMember,
     DotExpr,
     PostfixExprBeginning,
     PostfixExpr,
@@ -839,6 +840,7 @@ public:
 
   void completePoundAvailablePlatform() override;
   void completeImportDecl() override;
+  void completeUnresolvedMember() override;
 
   void addKeywords(CodeCompletionResultSink &Sink);
 
@@ -1927,6 +1929,13 @@ public:
       if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
         addEnumElementRef(EED, Reason, /*HasTypeContext=*/true);
       }
+      if (auto *ED = dyn_cast<EnumDecl>(D)) {
+        llvm::DenseSet<EnumElementDecl *> Elements;
+        ED->getAllElements(Elements);
+        for (auto *Ele : Elements) {
+          foundDecl(Ele, Reason);
+        }
+      }
       return;
 
     case LookupKind::Type:
@@ -2058,6 +2067,15 @@ public:
                        /*IncludeTopLevel=*/false, Loc);
 
     RequestedCachedResults = RequestedResultsTy::toplevelResults();
+  }
+
+  void getEnumElementCompletions(SourceLoc Loc) {
+    llvm::SaveAndRestore<LookupKind> ChangeLookupKind(Kind,
+                                                      LookupKind::EnumElement);
+    NeedLeadingDot = !HaveDot;
+    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
+                       /*IncludeTopLevel=*/true, Loc);
+
   }
 
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
@@ -2494,6 +2512,11 @@ void CodeCompletionCallbacksImpl::completeImportDecl() {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeUnresolvedMember() {
+  Kind = CompletionKind::UnresolvedMember;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
     SmallVectorImpl<StringRef> &Keywords) {
   assert(!InEnumElementRawValue);
@@ -2588,6 +2611,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::AttributeBegin:
   case CompletionKind::PoundAvailablePlatform:
   case CompletionKind::Import:
+  case CompletionKind::UnresolvedMember:
     break;
 
   case CompletionKind::PostfixExprBeginning:
@@ -2807,6 +2831,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::Import: {
     Lookup.addImportModuleNames();
+    break;
+  }
+  case CompletionKind::UnresolvedMember : {
+    Lookup.setHaveDot(SourceLoc());
+    Lookup.getEnumElementCompletions(P.Context.SourceMgr.getCodeCompletionLoc());
     break;
   }
   }

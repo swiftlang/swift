@@ -846,6 +846,15 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     
     Identifier Name;
     SourceLoc NameLoc;
+
+    if (Tok.is(tok::code_complete)) {
+      consumeToken();
+      if (CodeCompletion) {
+        CodeCompletion->completeUnresolvedMember();
+      }
+      return makeParserCodeCompletionResult<Expr>();
+    }
+
     if (Tok.is(tok::kw_init)) {
       Name = Context.Id_init;
       NameLoc = consumeToken(tok::kw_init);

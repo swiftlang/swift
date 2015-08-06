@@ -148,6 +148,9 @@ public:
   /// Complete the import decl with importable modules.
   virtual void completeImportDecl() = 0;
 
+  /// Complete unresolved members after dot.
+  virtual void completeUnresolvedMember() = 0;
+
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.
   virtual void doneParsing() = 0;
