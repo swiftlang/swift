@@ -40,6 +40,7 @@ struct _HashingDetail {
   }
 
   @transparent
+  @warn_unused_result
   static func getExecutionSeed() -> UInt64 {
     // FIXME: This needs to be a per-execution seed. This is just a placeholder
     // implementation.
@@ -48,6 +49,7 @@ struct _HashingDetail {
   }
 
   @transparent
+  @warn_unused_result
   static func hash16Bytes(low: UInt64, _ high: UInt64) -> UInt64 {
     // Murmur-inspired hashing.
     let mul: UInt64 = 0x9ddfea08eb382d69
@@ -70,6 +72,7 @@ struct _HashingDetail {
 //
 
 @transparent
+@warn_unused_result
 public // @testable
 func _mixUInt32(value: UInt32) -> UInt32 {
   // Zero-extend to 64 bits, hash, select 32 bits from the hash.
@@ -83,12 +86,14 @@ func _mixUInt32(value: UInt32) -> UInt32 {
 }
 
 @transparent
+@warn_unused_result
 public // @testable
 func _mixInt32(value: Int32) -> Int32 {
   return Int32(bitPattern: _mixUInt32(UInt32(bitPattern: value)))
 }
 
 @transparent
+@warn_unused_result
 public // @testable
 func _mixUInt64(value: UInt64) -> UInt64 {
   // Similar to hash_4to8_bytes but using a seed instead of length.
@@ -99,12 +104,14 @@ func _mixUInt64(value: UInt64) -> UInt64 {
 }
 
 @transparent
+@warn_unused_result
 public // @testable
 func _mixInt64(value: Int64) -> Int64 {
   return Int64(bitPattern: _mixUInt64(UInt64(bitPattern: value)))
 }
 
 @transparent
+@warn_unused_result
 public // @testable
 func _mixUInt(value: UInt) -> UInt {
 #if arch(i386) || arch(arm)
@@ -115,6 +122,7 @@ func _mixUInt(value: UInt) -> UInt {
 }
 
 @transparent
+@warn_unused_result
 public // @testable
 func _mixInt(value: Int) -> Int {
 #if arch(i386) || arch(arm)
@@ -141,6 +149,7 @@ func _mixInt(value: Int) -> Int {
 /// hash value does not change anything fundamentally: collisions are still
 /// possible, and it does not prevent malicious users from constructing data
 /// sets that will exhibit pathological collisions.
+@warn_unused_result
 public // @testable
 func _squeezeHashValue(hashValue: Int, _ resultRange: Range<Int>) -> Int {
   // Length of a Range<Int> does not fit into an Int, but fits into an UInt.
@@ -163,6 +172,7 @@ func _squeezeHashValue(hashValue: Int, _ resultRange: Range<Int>) -> Int {
       UInt(bitPattern: resultRange.startIndex) &+ unsignedResult)
 }
 
+@warn_unused_result
 public // @testable
 func _squeezeHashValue(hashValue: Int, _ resultRange: Range<UInt>) -> UInt {
   let mixedHashValue = UInt(bitPattern: _mixInt(hashValue))

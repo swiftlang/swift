@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Return the result of inverting `a`'s logic value.
+@warn_unused_result
 public prefix func !<T : BooleanType>(a: T) -> Bool {
   return !a.boolValue
 }
@@ -20,6 +21,7 @@ public prefix func !<T : BooleanType>(a: T) -> Bool {
 /// If `lhs` is `false`, return it.  Otherwise, evaluate `rhs` and
 /// return its `boolValue`.
 @inline(__always)
+@warn_unused_result
 public func && <T : BooleanType, U : BooleanType>(
   lhs: T, @autoclosure rhs: () throws -> U
 ) rethrows -> Bool {
@@ -29,6 +31,7 @@ public func && <T : BooleanType, U : BooleanType>(
 /// If `lhs` is `true`, return it.  Otherwise, evaluate `rhs` and
 /// return its `boolValue`.
 @inline(__always)
+@warn_unused_result
 public func || <T : BooleanType, U : BooleanType>(
   lhs: T, @autoclosure rhs: () throws -> U
 ) rethrows -> Bool {
@@ -39,6 +42,7 @@ public func || <T : BooleanType, U : BooleanType>(
 // rdar://problem/19418937, so here are some @transparent overloads
 // for Bool.  We've done the same for ObjCBool
 @transparent
+@warn_unused_result
 public func && <T : BooleanType>(
   lhs: T, @autoclosure rhs: () throws -> Bool
 ) rethrows -> Bool {
@@ -46,6 +50,7 @@ public func && <T : BooleanType>(
 }
 
 @transparent
+@warn_unused_result
 public func || <T : BooleanType>(
   lhs: T, @autoclosure rhs: () throws -> Bool
 ) rethrows -> Bool {

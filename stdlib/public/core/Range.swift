@@ -147,7 +147,8 @@ public struct Range<
   }
 }
 
-public func ==<Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
+@warn_unused_result
+public func == <Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
   return lhs.startIndex == rhs.startIndex &&
       lhs.endIndex == rhs.endIndex
 }
@@ -155,6 +156,7 @@ public func ==<Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
 /// Forms a half-open range that contains `minimum`, but not
 /// `maximum`.
 @transparent
+@warn_unused_result
 public func ..< <Pos : ForwardIndexType> (minimum: Pos, maximum: Pos)
   -> Range<Pos> {
   return Range(start: minimum, end: maximum)
@@ -162,6 +164,7 @@ public func ..< <Pos : ForwardIndexType> (minimum: Pos, maximum: Pos)
 
 /// Forms a closed range that contains both `minimum` and `maximum`.
 @transparent
+@warn_unused_result
 public func ... <Pos : ForwardIndexType> (
   minimum: Pos, maximum: Pos
 ) -> Range<Pos> {
@@ -174,6 +177,7 @@ public func ... <Pos : ForwardIndexType> (
 ///
 /// - Requires: `start <= end`.
 @transparent
+@warn_unused_result
 public func ..< <Pos : ForwardIndexType where Pos : Comparable> (
   start: Pos, end: Pos
 ) -> Range<Pos> {
@@ -184,6 +188,7 @@ public func ..< <Pos : ForwardIndexType where Pos : Comparable> (
 /// Forms a closed range that contains both `start` and `end`.
 /// - Requires: `start <= end`.
 @transparent
+@warn_unused_result
 public func ... <Pos : ForwardIndexType where Pos : Comparable> (
   start: Pos, end: Pos
 ) -> Range<Pos> {
@@ -192,6 +197,7 @@ public func ... <Pos : ForwardIndexType where Pos : Comparable> (
   return Range(start: start, end: end.successor())
 }
 
+@warn_unused_result
 public func ~= <I : ForwardIndexType where I : Comparable> (
   pattern: Range<I>, value: I
 ) -> Bool {

@@ -176,31 +176,37 @@ struct _UnicodeGraphemeClusterBreakPropertyTrie {
   }
 
   @transparent
+  @warn_unused_result
   func _getBMPFirstLevelIndex(cp: UInt32) -> Int {
     return Int(cp >> ${BMPFirstLevelIndexBits})
   }
 
   @transparent
+  @warn_unused_result
   func _getBMPDataOffset(cp: UInt32) -> Int {
     return Int(cp & ((1 << ${BMPDataOffsetBits}) - 1))
   }
 
   @transparent
+  @warn_unused_result
   func _getSuppFirstLevelIndex(cp: UInt32) -> Int {
     return Int(cp >> (${SuppSecondLevelIndexBits} + ${SuppDataOffsetBits}))
   }
 
   @transparent
+  @warn_unused_result
   func _getSuppSecondLevelIndex(cp: UInt32) -> Int {
     return Int((cp >> ${SuppDataOffsetBits}) &
         ((1 << ${SuppSecondLevelIndexBits}) - 1))
   }
 
   @transparent
+  @warn_unused_result
   func _getSuppDataOffset(cp: UInt32) -> Int {
     return Int(cp & ((1 << ${SuppDataOffsetBits}) - 1))
   }
 
+  @warn_unused_result
   func getPropertyRawValue(
       codePoint: UInt32
   ) -> _GraphemeClusterBreakPropertyRawValue {
@@ -229,6 +235,7 @@ struct _UnicodeGraphemeClusterBreakPropertyTrie {
     }
   }
 
+  @warn_unused_result
   public // @testable
   func getPropertyValue(
       codePoint: UInt32
@@ -247,6 +254,7 @@ internal struct _UnicodeExtendedGraphemeClusterSegmenter {
 
   /// Returns `true` if there is always a grapheme cluster break after a code
   /// point with a given `Grapheme_Cluster_Break` property value.
+  @warn_unused_result
   func isBoundaryAfter(gcb: _GraphemeClusterBreakPropertyRawValue) -> Bool {
     let ruleRow = _noBoundaryRulesMatrix[Int(gcb.rawValue)]
     return ruleRow == 0
@@ -254,6 +262,7 @@ internal struct _UnicodeExtendedGraphemeClusterSegmenter {
 
   /// Returns `true` if there is a grapheme cluster break between code points
   /// with given `Grapheme_Cluster_Break` property values.
+  @warn_unused_result
   func isBoundary(
       gcb1: _GraphemeClusterBreakPropertyRawValue,
       _ gcb2: _GraphemeClusterBreakPropertyRawValue

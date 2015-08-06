@@ -25,8 +25,8 @@ public enum UnicodeDecodingResult {
 
   /// Return true if `self` indicates no more unicode scalars are
   /// available.
-  public
-  func isEmptyInput() -> Bool {
+  @warn_unused_result
+  public func isEmptyInput() -> Bool {
     switch self {
     case .EmptyInput:
       return true
@@ -81,6 +81,7 @@ public struct UTF8 : UnicodeCodecType {
   /// Returns the number of expected trailing bytes for a given first byte: 0,
   /// 1, 2 or 3.  If the first byte can not start a valid UTF-8 code unit
   /// sequence, returns 4.
+  @warn_unused_result
   public static func _numTrailingBytes(cu0: CodeUnit) -> UInt8 {
     if _fastPath(cu0 & 0x80 == 0) {
       // 0x00 -- 0x7f: 1-byte sequences.
@@ -142,6 +143,7 @@ public struct UTF8 : UnicodeCodecType {
 
   /// Return `true` if the LSB bytes in `buffer` are well-formed UTF-8 code
   /// unit sequence.
+  @warn_unused_result
   static func _isValidUTF8Impl(buffer: UInt32, length: UInt8) -> Bool {
     switch length {
     case 4:
@@ -192,6 +194,7 @@ public struct UTF8 : UnicodeCodecType {
 
   /// Return `true` if the LSB bytes in `buffer` are well-formed UTF-8 code
   /// unit sequence.
+  @warn_unused_result
   static func _isValidUTF8(buffer: UInt32, validBytes: UInt8) -> Bool {
     _sanityCheck(validBytes & 0b0000_1111 != 0,
         "input buffer should not be empty")
@@ -221,6 +224,7 @@ public struct UTF8 : UnicodeCodecType {
 
   /// Given an ill-formed sequence, find the length of its maximal subpart.
   @inline(never)
+  @warn_unused_result
   static func _findMaximalSubpartOfIllFormedUTF8Sequence(
       var buffer: UInt32, var validBytes: UInt8) -> UInt8 {
     // This function is '@inline(never)' because it is used only in the error
@@ -472,6 +476,7 @@ public struct UTF8 : UnicodeCodecType {
 
   /// Return `true` if `byte` is a continuation byte of the form
   /// `0b10xxxxxx`.
+  @warn_unused_result
   public static func isContinuation(byte: CodeUnit) -> Bool {
     return byte & 0b11_00__0000 == 0b10_00__0000
   }
@@ -712,6 +717,7 @@ public func transcode<
 ///
 /// Returns the index of the first unhandled code unit and the UTF-8 data
 /// that was encoded.
+@warn_unused_result
 internal func _transcodeSomeUTF16AsUTF8<
   Input : CollectionType
   where Input.Generator.Element == UInt16>(
@@ -805,7 +811,10 @@ internal func _transcodeSomeUTF16AsUTF8<
 /// representation.
 public // @testable
 protocol _StringElementType {
+  @warn_unused_result
   static func _toUTF16CodeUnit(_: Self) -> UTF16.CodeUnit
+
+  @warn_unused_result
   static func _fromUTF16CodeUnit(utf16: UTF16.CodeUnit) -> Self
 }
 
@@ -839,6 +848,7 @@ extension UTF8.CodeUnit : _StringElementType {
 
 extension UTF16 {
   /// Return the number of code units required to encode `x`.
+  @warn_unused_result
   public static func width(x: UnicodeScalar) -> Int {
     return x.value <= 0xFFFF ? 1 : 2
   }
@@ -847,6 +857,7 @@ extension UTF16 {
   /// `x`.
   ///
   /// - Requires: `width(x) == 2`.
+  @warn_unused_result
   public static func leadSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return UTF16.CodeUnit((x.value - 0x1_0000) >> (10 as UInt32)) + 0xD800
@@ -856,6 +867,7 @@ extension UTF16 {
   /// `x`.
   ///
   /// - Requires: `width(x) == 2`.
+  @warn_unused_result
   public static func trailSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
     _precondition(width(x) == 2)
     return UTF16.CodeUnit(
@@ -863,10 +875,12 @@ extension UTF16 {
     ) + 0xDC00
   }
 
+  @warn_unused_result
   public static func isLeadSurrogate(x: CodeUnit) -> Bool {
     return 0xD800...0xDBFF ~= x
   }
 
+  @warn_unused_result
   public static func isTrailSurrogate(x: CodeUnit) -> Bool {
     return 0xDC00...0xDFFF ~= x
   }
@@ -897,6 +911,7 @@ extension UTF16 {
   /// If `repairIllFormedSequences` is `true`, the function always succeeds.
   /// If it is `false`, `nil` is returned if an ill-formed code unit sequence is
   /// found in `input`.
+  @warn_unused_result
   public static func measure<
       Encoding : UnicodeCodecType, Input : GeneratorType
       where Encoding.CodeUnit == Input.Element

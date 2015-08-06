@@ -92,6 +92,7 @@ extension ImplicitlyUnwrappedOptional : CustomStringConvertible {
 }
 
 @transparent
+@warn_unused_result
 public // COMPILER_INTRINSIC
 func _getImplicitlyUnwrappedOptionalValue<T>(v: T!) -> T {
   switch v {
@@ -104,12 +105,14 @@ func _getImplicitlyUnwrappedOptionalValue<T>(v: T!) -> T {
 }
 
 @transparent
+@warn_unused_result
 public // COMPILER_INTRINSIC
 func _injectValueIntoImplicitlyUnwrappedOptional<T>(v: T) -> T! {
   return .Some(v)
 }
 
 @transparent
+@warn_unused_result
 public // COMPILER_INTRINSIC
 func _injectNothingIntoImplicitlyUnwrappedOptional<T>() -> T! {
   return .None

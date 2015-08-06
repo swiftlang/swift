@@ -90,6 +90,7 @@ public struct UnicodeScalar :
   ///
   /// - parameter forceASCII: If `true`, forces most values into a numeric
   ///   representation.
+  @warn_unused_result
   public func escape(asASCII forceASCII: Bool) -> String {
     func lowNibbleAsHex(v: UInt32) -> String {
       let nibble = v & 15
@@ -151,21 +152,25 @@ public struct UnicodeScalar :
 
   /// Returns true if this is an ASCII character (code point 0 to 127
   /// inclusive).
+  @warn_unused_result
   public func isASCII() -> Bool {
     return value <= 127
   }
 
   // FIXME: Locales make this interesting
+  @warn_unused_result
   func _isAlpha() -> Bool {
     return (self >= "A" && self <= "Z") || (self >= "a" && self <= "z")
   }
 
   // FIXME: Is there an similar term of art in Unicode?
+  @warn_unused_result
   public func _isASCIIDigit() -> Bool {
     return self >= "0" && self <= "9"
   }
 
   // FIXME: Unicode makes this interesting
+  @warn_unused_result
   func _isDigit() -> Bool {
     return _isASCIIDigit()
   }
@@ -191,6 +196,7 @@ public struct UnicodeScalar :
   }
 
   // FIXME: Unicode makes this interesting.
+  @warn_unused_result
   public // @testable
   func _isSpace() -> Bool {
     // FIXME: The constraint-based type checker goes painfully exponential
@@ -202,6 +208,7 @@ public struct UnicodeScalar :
   }
 
   // FIXME: Unicode makes this interesting.
+  @warn_unused_result
   func _isPrintableASCII() -> Bool {
     return (self >= UnicodeScalar(0o040) && self <= UnicodeScalar(0o176))
   }
@@ -270,10 +277,12 @@ extension UInt64 {
 extension UnicodeScalar : Comparable, Equatable {
 }
 
+@warn_unused_result
 public func ==(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
   return lhs.value == rhs.value
 }
 
+@warn_unused_result
 public func <(lhs: UnicodeScalar, rhs: UnicodeScalar) -> Bool {
   return lhs.value < rhs.value
 }
@@ -315,6 +324,7 @@ extension UnicodeScalar.UTF16View : CollectionType {
 }
 
 /// Return c as a UTF8.CodeUnit.  Meant to be used as _ascii8("x").
+@warn_unused_result
 public // SPI(SwiftExperimental)
 func _ascii8(c: UnicodeScalar) -> UTF8.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")
@@ -322,6 +332,7 @@ func _ascii8(c: UnicodeScalar) -> UTF8.CodeUnit {
 }
 
 /// Return c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
+@warn_unused_result
 public // SPI(SwiftExperimental)
 func _ascii16(c: UnicodeScalar) -> UTF16.CodeUnit {
   _sanityCheck(c.value >= 0 && c.value <= 0x7F, "not ASCII")

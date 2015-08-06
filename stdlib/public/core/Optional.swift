@@ -47,6 +47,7 @@ public enum Optional<T> : _Reflectable, NilLiteralConvertible {
   }
 
   /// Returns a mirror that reflects `self`.
+  @warn_unused_result
   public func _getMirror() -> _MirrorType {
     return _OptionalMirror(self)
   }
@@ -132,6 +133,7 @@ func _injectNothingIntoOptional<T>() -> T? {
 }
 
 // Comparisons
+@warn_unused_result
 public func == <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case let (l?, r?):
@@ -143,6 +145,7 @@ public func == <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
   }
 }
 
+@warn_unused_result
 public func != <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
   return !(lhs == rhs)
 }
@@ -156,6 +159,7 @@ public struct _OptionalNilComparisonType : NilLiteralConvertible {
   }
 }
 @transparent
+@warn_unused_result
 public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
   case .Some(_):
@@ -167,6 +171,7 @@ public func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
 
 // Enable equality comparisons against the nil literal, even if the
 // element type isn't equatable
+@warn_unused_result
 public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
   case .Some(_):
@@ -176,6 +181,7 @@ public func == <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   }
 }
 
+@warn_unused_result
 public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   switch lhs {
   case .Some(_):
@@ -185,6 +191,7 @@ public func != <T>(lhs: T?, rhs: _OptionalNilComparisonType) -> Bool {
   }
 }
 
+@warn_unused_result
 public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
   case .Some(_):
@@ -194,6 +201,7 @@ public func == <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
+@warn_unused_result
 public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   switch rhs {
   case .Some(_):
@@ -238,6 +246,7 @@ internal struct _OptionalMirror<T> : _MirrorType {
 }
 
 
+@warn_unused_result
 public func < <T : Comparable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case let (l?, r?):
@@ -249,6 +258,7 @@ public func < <T : Comparable> (lhs: T?, rhs: T?) -> Bool {
   }
 }
 
+@warn_unused_result
 public func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case let (l?, r?):
@@ -258,6 +268,7 @@ public func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   }
 }
 
+@warn_unused_result
 public func <= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case let (l?, r?):
@@ -267,6 +278,7 @@ public func <= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   }
 }
 
+@warn_unused_result
 public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case let (l?, r?):
@@ -277,6 +289,7 @@ public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
 }
 
 @transparent
+@warn_unused_result
 public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
     rethrows -> T {
   switch optional {
@@ -288,6 +301,7 @@ public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T)
 }
 
 @transparent
+@warn_unused_result
 public func ?? <T> (optional: T?, @autoclosure defaultValue: () throws -> T?)
     rethrows -> T? {
   switch optional {

@@ -20,6 +20,7 @@ extension String {
   ///
   /// Returns `nil` if the `CString` is `NULL` or if it contains ill-formed
   /// UTF-8 code unit sequences.
+  @warn_unused_result
   public static func fromCString(cs: UnsafePointer<CChar>) -> String? {
     if cs._isNull {
       return .None
@@ -35,6 +36,7 @@ extension String {
   /// Returns `nil` if the `CString` is `NULL`.  If `CString` contains
   /// ill-formed UTF-8 code unit sequences, replaces them with replacement
   /// characters (U+FFFD).
+  @warn_unused_result
   public static func fromCStringRepairingIllFormedUTF8(
     cs: UnsafePointer<CChar>)
       -> (String?, hadError: Bool) {
@@ -51,6 +53,7 @@ extension String {
 /// From a non-`nil` `UnsafePointer` to a null-terminated string
 /// with possibly-transient lifetime, create a nul-terminated array of 'C' char.
 /// Returns `nil` if passed a null pointer.
+@warn_unused_result
 public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
   if s == nil {
     return .None

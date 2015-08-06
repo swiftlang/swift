@@ -47,6 +47,7 @@ public protocol _Incrementable : Equatable {
   /// `Self` values.
   ///
   /// - Requires: `self` has a well-defined successor.
+  @warn_unused_result
   func successor() -> Self
 
   mutating func _successorInPlace()
@@ -158,6 +159,7 @@ public protocol ForwardIndexType : _Incrementable {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndexType`
   ///   - O(`abs(n)`) otherwise
+  @warn_unused_result
   func advancedBy(n: Distance) -> Self
 
   /// Return the result of advancing `self` by `n` positions, or until it
@@ -175,6 +177,7 @@ public protocol ForwardIndexType : _Incrementable {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndexType`
   ///   - O(`abs(n)`) otherwise
+  @warn_unused_result
   func advancedBy(n: Distance, limit: Self) -> Self
 
   /// Measure the distance between `self` and `end`.
@@ -187,6 +190,7 @@ public protocol ForwardIndexType : _Incrementable {
   /// - Complexity:
   ///   - O(1) if conforming to `RandomAccessIndexType`
   ///   - O(`n`) otherwise, where `n` is the function's result.
+  @warn_unused_result
   func distanceTo(end: Self) -> Distance
 }
 
@@ -205,6 +209,7 @@ extension ForwardIndexType {
 
   /// Do not use this method directly; call advancedBy(n) instead.
   @transparent
+  @warn_unused_result
   internal func _advanceForward(n: Distance) -> Self {
     _precondition(n >= 0,
         "Only BidirectionalIndexType can be advanced by a negative amount")
@@ -217,6 +222,7 @@ extension ForwardIndexType {
 
   /// Do not use this method directly; call advancedBy(n, limit) instead.
   @transparent
+  @warn_unused_result
   internal func _advanceForward(n: Distance, _ limit: Self) -> Self {
     _precondition(n >= 0,
         "Only BidirectionalIndexType can be advanced by a negative amount")
@@ -227,14 +233,17 @@ extension ForwardIndexType {
     return p
   }
 
+  @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
     return self._advanceForward(n)
   }
 
+  @warn_unused_result
   public func advancedBy(n: Distance, limit: Self) -> Self {
     return self._advanceForward(n, limit)
   }
 
+  @warn_unused_result
   public func distanceTo(end: Self) -> Distance {
     var p = self
     var count: Distance = 0
@@ -261,6 +270,7 @@ public protocol BidirectionalIndexType : ForwardIndexType {
   /// self`.
   ///
   /// - Requires: `self` has a well-defined predecessor.
+  @warn_unused_result
   func predecessor() -> Self
 
   mutating func _predecessorInPlace()
@@ -272,6 +282,7 @@ extension BidirectionalIndexType {
     self = self.predecessor()
   }
 
+  @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
     if n >= 0 {
       return _advanceForward(n)
@@ -283,6 +294,7 @@ extension BidirectionalIndexType {
     return p
   }
 
+  @warn_unused_result
   public func advancedBy(n: Distance, limit: Self) -> Self {
     if n >= 0 {
       return _advanceForward(n, limit)
@@ -323,10 +335,12 @@ public protocol _RandomAccessAmbiguity {
 }
 
 extension _RandomAccessAmbiguity {
+  @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
     fatalError("advancedBy(n) not implememented")
   }
 
+  @warn_unused_result
   public func advancedBy(n: Distance, limit: Self) -> Self {
     fatalError("advancedBy(n, limit:) not implememented")
   }
@@ -336,8 +350,14 @@ extension _RandomAccessAmbiguity {
 /// and can measure the distance to any reachable value, in O(1).
 public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable,
   _RandomAccessAmbiguity {
+
+  @warn_unused_result
   func distanceTo(other: Self) -> Distance
+
+  @warn_unused_result
   func advancedBy(n: Distance) -> Self
+
+  @warn_unused_result
   func advancedBy(n: Distance, limit: Self) -> Self
 }
 
@@ -372,6 +392,7 @@ extension RandomAccessIndexType {
   }
 
   @transparent
+  @warn_unused_result
   public func advancedBy(n: Distance, limit: Self) -> Self {
     let d = self.distanceTo(limit)
     if d == 0 || (d > 0 ? d <= n : d >= n) {

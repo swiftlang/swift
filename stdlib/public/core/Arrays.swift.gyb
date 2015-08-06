@@ -281,6 +281,7 @@ public struct ${Self}<Element>
 
   //===--- private --------------------------------------------------------===//
 
+  @warn_unused_result
   @_semantics("array.props.isNative")
   public // @testable
   func _getArrayPropertyIsNative() -> Bool {
@@ -289,22 +290,26 @@ public struct ${Self}<Element>
 
   /// Returns true if the array is native and does not need a deferred type
   /// check.
+  @warn_unused_result
   @_semantics("array.props.isNativeNoTypeCheck")
   public // @testable
   func _getArrayPropertyIsNativeNoTypeCheck() -> Bool {
    return _buffer.arrayPropertyIsNativeNoTypeCheck
   }
 
+  @warn_unused_result
   @_semantics("array.get_count")
   internal func _getCount() -> Int {
     return _buffer.count
   }
+  @warn_unused_result
   @_semantics("array.get_capacity")
   internal func _getCapacity() -> Int {
     return _buffer.capacity
   }
 
   /// - Requires: The array has a native buffer.
+  @warn_unused_result
   @_semantics("array.owner")
   internal func _getOwner() -> Builtin.NativeObject {
     return Builtin.castToNativeObject(_buffer.nativeOwner)
@@ -367,6 +372,7 @@ public struct ${Self}<Element>
     _precondition(index >= startIndex, "Negative ${Self} index is out of range")
   }
 
+  @warn_unused_result
   @_semantics("array.get_element")
   @inline(__always)
   public // @testable
@@ -376,6 +382,7 @@ public struct ${Self}<Element>
       hoistedIsNativeNoTypeCheckBuffer : hoistedIsNativeNoTypeCheckBuffer)
   }
 
+  @warn_unused_result
   @_semantics("array.get_element_address")
   internal func _getElementAddress(index: Int) -> UnsafeMutablePointer<Element> {
     return _buffer._unconditionalMutableSubscriptBaseAddress + index
@@ -418,6 +425,7 @@ extension ${Self} : ArrayLiteralConvertible {
 }
 
 // Referenced by the compiler to allocate array literals.
+@warn_unused_result
 @_semantics("array.uninitialized")
 public func _allocateUninitialized${Self}<Element>(count: Builtin.Word)
     -> (${Self}<Element>, Builtin.RawPointer) {
@@ -428,6 +436,7 @@ public func _allocateUninitialized${Self}<Element>(count: Builtin.Word)
 %if Self == 'Array':
 // Referenced by the compiler to deallocate array literals on the
 // error path.
+@warn_unused_result
 @_semantics("array.dealloc_uninitialized")
 public func _deallocateUninitialized${Self}<Element>(
   var array: ${Self}<Element>
@@ -476,6 +485,7 @@ extension ${Self} : _ArrayType {
 
   /// Entry point for `Array` literal construction; builds and returns
   /// a ${Self} of `count` uninitialized elements.
+  @warn_unused_result
   internal static func _allocateUninitialized(
     count: Int
   ) -> (${Self}, UnsafeMutablePointer<Element>) {
@@ -663,6 +673,7 @@ extension ${Self} : _ArrayType {
   /// and concatenate the elements of the resulting sequence.  For
   /// example, `[-1, -2].join([[1, 2, 3], [4, 5, 6], [7, 8, 9]])`
   /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`.
+  @warn_unused_result
   public func join<
       S : SequenceType where S.Generator.Element == ${Self}<Element>
   >(elements: S) -> ${Self}<Element> {
@@ -680,6 +691,7 @@ extension ${Self} : _ArrayType {
     fatalError("unavailable function can't be called")
   }
   
+  @warn_unused_result
   public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
     return _extractOrCopyToNativeArrayBuffer(self._buffer)
   }
@@ -687,12 +699,14 @@ extension ${Self} : _ArrayType {
 
 extension ${Self} : _Reflectable {
   /// Returns a mirror that reflects `self`.
+  @warn_unused_result
   public func _getMirror() -> _MirrorType {
     return _ArrayTypeMirror(self)
   }
 }
 
 extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
+  @warn_unused_result
   internal func _makeDescription(isDebug isDebug: Bool) -> String {
     var result = "["
     var first = true
@@ -725,6 +739,7 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
 
 extension ${Self} {
   @transparent
+  @warn_unused_result
   internal func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
@@ -837,15 +852,14 @@ internal func _arrayOutOfPlaceReplace<
 /// A _debugPrecondition check that `i` has exactly reached the end of
 /// `s`.  This test is never used to ensure memory safety; that is
 /// always guaranteed by measuring `s` once and re-using that value.
-internal func _expectEnd<C : CollectionType>(
-  i: C.Index, _ s: C
-) {
+internal func _expectEnd<C : CollectionType>(i: C.Index, _ s: C) {
   _debugPrecondition(
     i == s.endIndex,
       "invalid CollectionType: count differed in successive traversals"
     )
 }
 
+@warn_unused_result
 internal func _growArrayCapacity(capacity: Int) -> Int {
   return capacity * 2
 }
@@ -1109,6 +1123,7 @@ internal func _arrayAppendSequence<
 // ArraySlice<Int> and Array<Int>.
 
 /// Returns true if these arrays contain the same elements.
+@warn_unused_result
 public func == <Element : Equatable>(
   lhs: ${Self}<Element>, rhs: ${Self}<Element>
 ) -> Bool {
@@ -1138,6 +1153,7 @@ public func == <Element : Equatable>(
 }
 
 /// Returns true if the arrays do not contain the same elements.
+@warn_unused_result
 public func != <Element : Equatable>(
   lhs: ${Self}<Element>, rhs: ${Self}<Element>
 ) -> Bool {
@@ -1151,6 +1167,7 @@ public func != <Element : Equatable>(
 ///
 /// - Requires: `Base` is a base class or base `@objc` protocol (such
 ///   as `AnyObject`) of `Derived`.
+@warn_unused_result
 public func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
   // FIXME: Dynamic casting is currently not possible without the objc runtime:
   // rdar://problem/18801510
@@ -1165,6 +1182,7 @@ extension Array {
   /// Return `nil` otherwise.
   // Note: this function exists here so that Foundation doesn't have
   // to know Array's implementation details.
+  @warn_unused_result
   public static func _bridgeFromObjectiveCAdoptingNativeStorage(
     source: AnyObject
   ) -> Array? {

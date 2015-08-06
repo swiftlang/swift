@@ -370,7 +370,7 @@ func testPreDecOverflow() {
 
 func testAssumeNonNegative() {
   let input = -3
-  _assumeNonNegative(input); // expected-error {{assumed non-negative value '-3' is negative}}
+  _ = _assumeNonNegative(input) // expected-error {{assumed non-negative value '-3' is negative}}
 }
 
 protocol Num { func Double() -> Self }

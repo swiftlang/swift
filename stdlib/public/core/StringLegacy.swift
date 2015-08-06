@@ -36,6 +36,7 @@ extension String {
     return _split("\n")
   }
   
+  @warn_unused_result
   public func _split(separator: UnicodeScalar) -> [String] {
     let scalarSlices = unicodeScalars.split { $0 == separator }
     return scalarSlices.map { String($0) }
@@ -52,14 +53,20 @@ extension String {
     self = String(count: 1, repeatedValue: _c)
   }
 
+  @warn_unused_result
   func _isAll(@noescape predicate: (UnicodeScalar) -> Bool) -> Bool {
     for c in unicodeScalars { if !predicate(c) { return false } }
 
     return true
   }
 
+  @warn_unused_result
   func _isAlpha() -> Bool { return _isAll({ $0._isAlpha() }) }
+
+  @warn_unused_result
   func _isDigit() -> Bool { return _isAll({ $0._isDigit() }) }
+
+  @warn_unused_result
   func _isSpace() -> Bool { return _isAll({ $0._isSpace() }) }
 }
 

@@ -141,10 +141,12 @@ public struct Mirror {
   case Struct, Class, Enum, Tuple, Optional, Collection, Dictionary, Set
   }
 
+  @warn_unused_result
   static func _noSuperclassMirror() -> Mirror? { return nil }
 
   /// Return the legacy mirror representing the part of `subject`
   /// corresponding to the superclass of `staticSubclass`.
+  @warn_unused_result
   internal static func _legacyMirror(
     subject: AnyObject, asClass targetSuperclass: AnyClass) -> _MirrorType? {
     
@@ -164,6 +166,7 @@ public struct Mirror {
     return nil
   }
   
+  @warn_unused_result
   internal static func _superclassGenerator<T: Any>(
     subject: T, _ ancestorRepresentation: AncestorRepresentation
   ) -> ()->Mirror? {
@@ -330,6 +333,7 @@ public struct Mirror {
   /// Suggests a display style for the reflected subject.
   public let displayStyle: DisplayStyle?
 
+  @warn_unused_result
   public func superclassMirror() -> Mirror? {
     return _makeSuperclassMirror()
   }
@@ -349,6 +353,7 @@ public protocol CustomReflectable {
   ///
   /// - Note: If `Self` has value semantics, the `Mirror` should be
   ///   unaffected by subsequent mutations of `self`.
+  @warn_unused_result
   func customMirror() -> Mirror
 }
 
@@ -372,6 +377,7 @@ extension String : MirrorPathType {}
 extension Mirror {
   internal struct _Dummy : CustomReflectable {
     var mirror: Mirror
+    @warn_unused_result
     func customMirror() -> Mirror { return mirror }
   }
   
@@ -407,6 +413,7 @@ extension Mirror {
   /// this function is suitable for exploring the structure of a
   /// `Mirror` in a REPL or playground, but don't expect it to be
   /// efficient.
+  @warn_unused_result
   public func descendant(
     first: MirrorPathType, _ rest: MirrorPathType...
   ) -> Any? {
@@ -452,6 +459,7 @@ extension Mirror.DisplayStyle {
   }
 }
 
+@warn_unused_result
 internal func _isClassSuperMirror(t: Any.Type) -> Bool {
 #if  _runtime(_ObjC)
   return t == _ClassSuperMirror.self || t == _ObjCSuperMirror.self
@@ -461,6 +469,7 @@ internal func _isClassSuperMirror(t: Any.Type) -> Bool {
 }
 
 extension _MirrorType {
+  @warn_unused_result
   internal func _superMirror() -> _MirrorType? {
     if self.count > 0 {
       let childMirror = self[0].1
@@ -692,6 +701,7 @@ public protocol CustomPlaygroundQuickLookable {
   ///
   /// - Note: If `Self` has value semantics, the `Mirror` should be
   ///   unaffected by subsequent mutations of `self`.
+  @warn_unused_result
   func customPlaygroundQuickLook() -> PlaygroundQuickLook
 }
 
@@ -806,6 +816,7 @@ extension Mirror : CustomStringConvertible {
 }
 
 extension Mirror : CustomReflectable {
+  @warn_unused_result
   public func customMirror() -> Mirror {
     return Mirror(self, children: [:])
   }

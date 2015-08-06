@@ -138,7 +138,8 @@ public struct LazyFilterIndex<
 }
 
 /// Returns `true` iff `lhs` is identical to `rhs`.
-public func == <Base: CollectionType>(
+@warn_unused_result
+public func == <Base : CollectionType>(
   lhs: LazyFilterIndex<Base>,
   rhs: LazyFilterIndex<Base>
 ) -> Bool {

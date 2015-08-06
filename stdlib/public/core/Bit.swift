@@ -83,10 +83,12 @@ internal struct _BitMirror : _MirrorType {
   var disposition: _MirrorDisposition { return .Enum }
 }
 
+@warn_unused_result
 public func == (lhs: Bit, rhs: Bit) -> Bool {
   return lhs.rawValue == rhs.rawValue
 }
 
+@warn_unused_result
 public func < (lhs: Bit, rhs: Bit) -> Bool {
   return lhs.rawValue < rhs.rawValue
 }

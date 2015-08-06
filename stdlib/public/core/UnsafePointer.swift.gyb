@@ -108,6 +108,7 @@ public struct ${Self}<Memory>
   /// Allocate memory for `num` objects of type `Memory`.
   ///
   /// - Postcondition: The memory is allocated, but not initialized.
+  @warn_unused_result
   public static func alloc(num: Int) -> ${Self} {
     let size = strideof(Memory.self) * num
     return ${Self}(
@@ -177,6 +178,7 @@ ${comment}
   ///
   /// - Postcondition: The value has been destroyed and the memory must
   ///   be initialized before being used again.
+  @warn_unused_result
   public func move() -> Memory {
     return Builtin.take(_rawValue)
   }
@@ -446,6 +448,7 @@ ${MirrorDecl} {
 ${MirrorConformance}
 
 @transparent
+@warn_unused_result
 public func == <Memory>(
   lhs: ${Self}<Memory>, rhs: ${Self}<Memory>
 ) -> Bool {
@@ -453,28 +456,33 @@ public func == <Memory>(
 }
 
 @transparent
+@warn_unused_result
 public func < <Memory>(lhs: ${Self}<Memory>, rhs: ${Self}<Memory>) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
 @transparent
+@warn_unused_result
 public func + <Memory>(lhs: ${Self}<Memory>, rhs: Int) -> ${Self}<Memory> {
   return ${Self}(Builtin.gep_Word(
     lhs._rawValue, (rhs &* strideof(Memory.self))._builtinWordValue))
 }
 
 @transparent
+@warn_unused_result
 public func + <Memory>(lhs: Int,
            rhs: ${Self}<Memory>) -> ${Self}<Memory> {
   return rhs + lhs
 }
 
 @transparent
+@warn_unused_result
 public func - <Memory>(lhs: ${Self}<Memory>, rhs: Int) -> ${Self}<Memory> {
   return lhs + -rhs
 }
 
 @transparent
+@warn_unused_result
 public func - <Memory>(lhs: ${Self}<Memory>, rhs: ${Self}<Memory>) -> Int {
   return
     Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),

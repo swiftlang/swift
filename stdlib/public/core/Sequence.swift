@@ -34,6 +34,7 @@ public protocol GeneratorType {
   ///   has returned `nil`.  Specific implementations of this protocol
   ///   are encouraged to respond to violations of this requirement by
   ///   calling `preconditionFailure("...")`.
+  @warn_unused_result
   mutating func next() -> Element?
 }
 
@@ -76,24 +77,28 @@ public protocol SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
+  @warn_unused_result
   func generate() -> Generator
 
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
+  @warn_unused_result
   func underestimateCount() -> Int
 
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
   /// - Complexity: O(N).
+  @warn_unused_result
   func map<T>(
     @noescape transform: (Generator.Element) throws -> T
   ) rethrows -> [T]
 
   /// Return an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
+  @warn_unused_result
   func filter(
     @noescape includeElement: (Generator.Element) throws -> Bool
   ) rethrows -> [Generator.Element]
@@ -124,6 +129,7 @@ public protocol SequenceType {
   ///
   /// - Requires: `n >= 0`
   /// - Complexity: O(`n`)
+  @warn_unused_result
   func dropFirst(n: Int) -> SubSequence
 
   /// Returns a subsequence containing all but the last `n` elements.
@@ -131,6 +137,7 @@ public protocol SequenceType {
   /// - Requires: `self` is a finite sequence.
   /// - Requires: `n >= 0`
   /// - Complexity: O(`self.count`)
+  @warn_unused_result
   func dropLast(n: Int) -> SubSequence
 
   /// Returns a subsequence, up to `maxLength` in length, containing the
@@ -140,6 +147,7 @@ public protocol SequenceType {
   /// the elements of `self`.
   ///
   /// - Requires: `maxLength >= 0`
+  @warn_unused_result
   func prefix(maxLength: Int) -> SubSequence
 
   /// Returns a slice, up to `maxLength` in length, containing the
@@ -150,6 +158,7 @@ public protocol SequenceType {
   ///
   /// - Requires: `self` is a finite sequence.
   /// - Requires: `maxLength >= 0`
+  @warn_unused_result
   func suffix(maxLength: Int) -> SubSequence
 
   /// Returns the maximal `SubSequence`s of `self`, in order, that
@@ -167,10 +176,12 @@ public protocol SequenceType {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
+  @warn_unused_result
   func split(maxSplit: Int, allowEmptySlices: Bool,
     @noescape isSeparator: (Generator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
+  @warn_unused_result
   func _customContainsEquatableElement(
     element: Generator.Element
   ) -> Bool?
@@ -345,6 +356,7 @@ extension SequenceType {
   ///
   /// - Requires: `n >= 0`
   /// - Complexity: O(`n`)
+  @warn_unused_result
   public func dropFirst(n: Int) -> AnySequence<Generator.Element> {
     _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
@@ -371,6 +383,7 @@ extension SequenceType {
   /// - Requires: `self` is a finite collection.
   /// - Requires: `n >= 0`
   /// - Complexity: O(`self.count`)
+  @warn_unused_result
   public func dropLast(n: Int) -> AnySequence<Generator.Element> {
     _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
@@ -396,6 +409,7 @@ extension SequenceType {
     return AnySequence(result)
   }
 
+  @warn_unused_result
   public func prefix(maxLength: Int) -> AnySequence<Generator.Element> {
     _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
     if maxLength == 0 {
@@ -415,6 +429,7 @@ extension SequenceType {
     return AnySequence(_PrefixSequence(generate(), maxLength: maxLength))
   }
 
+  @warn_unused_result
   public func suffix(maxLength: Int) -> AnySequence<Generator.Element> {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
     if maxLength == 0 { return AnySequence([]) }
@@ -459,6 +474,7 @@ extension SequenceType {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
+  @warn_unused_result
   public func split(
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
@@ -497,6 +513,7 @@ extension SequenceType {
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
+  @warn_unused_result
   public func underestimateCount() -> Int {
     return 0
   }
@@ -505,6 +522,7 @@ extension SequenceType {
     return nil
   }
 
+  @warn_unused_result
   public func _customContainsEquatableElement(
     element: Generator.Element
   ) -> Bool? {
@@ -558,6 +576,7 @@ extension SequenceType where Generator.Element : Equatable {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
+  @warn_unused_result
   public func split(
     separator: Generator.Element,
     maxSplit: Int = Int.max,
@@ -573,6 +592,7 @@ extension SequenceType {
   ///
   /// - Requires: `n >= 0`
   /// - Complexity: O(`n`)
+  @warn_unused_result
   public func dropFirst() -> SubSequence { return dropFirst(1) }
 
   /// Returns a subsequence containing all but the last element.
@@ -580,6 +600,7 @@ extension SequenceType {
   /// - Requires: `self` is a finite sequence.
   /// - Requires: `n >= 0`
   /// - Complexity: O(`self.count`)
+  @warn_unused_result
   public func dropLast() -> SubSequence  { return dropLast(1) }
 }
 

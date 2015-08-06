@@ -20,7 +20,7 @@ func find<R : GeneratorType where R.Element : Eq>
     if x == value {
       break
     }
-    result.next()
+    _ = result.next()
   }
   return result
 }
@@ -31,7 +31,7 @@ func findIf<R : GeneratorType>(range: R, predicate: (R.Element) -> Bool) -> R {
     if predicate(x) {
       break
     }
-    result.next()
+    _ = result.next()
   }
   return result
 }
@@ -101,8 +101,8 @@ func mismatch<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
     let e1 = range1.next(), e2 = range2.next()
     
     if (e1 == nil) || (e2 == nil) || e1! != e2! { break }
-    prev1.next()
-    prev2.next()
+    _ = prev1.next()
+    _ = prev2.next()
   }
 
   return (prev1, prev2)
@@ -117,8 +117,8 @@ func mismatchIf<R1 : GeneratorType, R2 : GeneratorType>
     let e1 = range1.next(), e2 = range2.next()
     
     if (e1 == nil) || (e2 == nil) || !predicate(e1!, e2!) { break }
-    prev1.next()
-    prev2.next()
+    _ = prev1.next()
+    _ = prev2.next()
   }
 
   return (prev1, prev2)

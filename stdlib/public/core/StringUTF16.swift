@@ -40,6 +40,7 @@ extension String {
       return Index(_offset: _length)
     }
 
+    @warn_unused_result
     func _toInternalIndex(i: Int) -> Int {
       return _core.startIndex + _offset + i
     }
@@ -122,6 +123,7 @@ extension String {
     }
 
     /// Returns a mirror that reflects `self`.
+    @warn_unused_result
     public func _getMirror() -> _MirrorType {
       return _UTF16ViewMirror(self)
     }
@@ -174,14 +176,18 @@ extension String {
 extension String.UTF16View.Index : BidirectionalIndexType {
   public typealias Distance = Int
 
+  @warn_unused_result
   public func successor() -> String.UTF16View.Index {
     return String.UTF16View.Index(_offset: _offset.successor())
   }
+
+  @warn_unused_result
   public func predecessor() -> String.UTF16View.Index {
     return String.UTF16View.Index(_offset: _offset.predecessor())
   }
 }
 
+@warn_unused_result
 public func == (
   lhs: String.UTF16View.Index, rhs: String.UTF16View.Index
 ) -> Bool {
@@ -190,6 +196,7 @@ public func == (
 
 extension String.UTF16View.Index : Comparable, Equatable {}
 
+@warn_unused_result
 public func < (
   lhs: String.UTF16View.Index, rhs: String.UTF16View.Index
 ) -> Bool {
@@ -201,15 +208,18 @@ public func < (
 
 /// Do not use this operator directly; call distance(start, end) instead.
 extension String.UTF16View.Index {
+  @warn_unused_result
   public func distanceTo(end: String.UTF16View.Index)
     -> String.UTF16View.Index.Distance {
     return self._offset.distanceTo(end._offset)
   }
 
+  @warn_unused_result
   public func advancedBy(n: Distance) -> String.UTF16View.Index {
     return String.UTF16View.Index(_offset: self._offset.advancedBy(n))
   }
 
+  @warn_unused_result
   public func advancedBy(n: Distance, limit: String.UTF16View.Index)
     -> String.UTF16View.Index {
     return String.UTF16View.Index(
@@ -265,6 +275,7 @@ extension String.UTF16View.Index {
   ///
   /// - Requires: `self` is an element of
   ///   `String(utf8)!.utf16.indices`.
+  @warn_unused_result
   public func samePositionIn(
     utf8: String.UTF8View
   ) -> String.UTF8View.Index? {
@@ -276,6 +287,7 @@ extension String.UTF16View.Index {
   ///
   /// - Requires: `self` is an element of
   ///   `String(unicodeScalars).utf16.indices`.
+  @warn_unused_result
   public func samePositionIn(
     unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
@@ -286,6 +298,7 @@ extension String.UTF16View.Index {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of `characters.utf16.indices`.
+  @warn_unused_result
   public func samePositionIn(
     characters: String
   ) -> String.Index? {

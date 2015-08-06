@@ -216,14 +216,17 @@ extension ${Self} : FloatingPointType {
     return _BitsType(Builtin.bitcast_FPIEEE${bits}_Int${bits}(value))
   }
 
+  @warn_unused_result
   func __getSignBit() -> Int {
     return Int(_toBitPattern() >> ${bits - 1}) & 1
   }
 
+  @warn_unused_result
   func __getBiasedExponent() -> _BitsType {
     return (_toBitPattern() >> ${getSignificantBitCount(bits)}) & ${getInfinityExponent(bits)}
   }
 
+  @warn_unused_result
   func __getSignificand() -> _BitsType {
     let mask: _BitsType = (1 << ${getSignificantBitCount(bits)}) - 1
     return _toBitPattern() & mask
@@ -417,31 +420,37 @@ extension ${Self} : FloatLiteralConvertible {
 }
 
 @transparent
+@warn_unused_result
 public func ==(lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.fcmp_oeq_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
 @transparent
+@warn_unused_result
 public func != (lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.fcmp_une_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
 @transparent
+@warn_unused_result
 public func <(lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.fcmp_olt_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
 @transparent
+@warn_unused_result
 public func > (lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.fcmp_ogt_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
 @transparent
+@warn_unused_result
 public func <= (lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.fcmp_ole_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
 @transparent
+@warn_unused_result
 public func >= (lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.fcmp_oge_FPIEEE${bits}(lhs.value, rhs.value))
 }
@@ -490,17 +499,20 @@ extension ${Self} : Hashable {
 extension ${Self} : AbsoluteValuable {
   /// Returns the absolute value of `x`.
   @transparent
+  @warn_unused_result
   public static func abs(x: ${Self}) -> ${Self} {
     return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(x.value))
   }
 }
 
 @transparent
+@warn_unused_result
 public prefix func +(x: ${Self}) -> ${Self} {
   return x
 }
 
 @transparent
+@warn_unused_result
 public prefix func -(x: ${Self}) -> ${Self} {
   return ${Self}(_bits: Builtin.fneg_FPIEEE${bits}(x.value))
 }
@@ -588,6 +600,7 @@ extension ${Self} : Strideable {
 
 % for op, name in ('+','fadd'), ('-','fsub'),('*','fmul'), ('/','fdiv'):
 @transparent
+@warn_unused_result
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(_bits: Builtin.${name}_FPIEEE${bits}(lhs.value, rhs.value))
 }
@@ -598,8 +611,9 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 // 1) This is consistent with '%' in C#, D, Java, and JavaScript
 // 2) C99 requires this behavior for fmod*()
 // 3) C++11 requires this behavior for std::fmod*()
-@asmname("_swift_fmod${cFuncSuffix(bits)}") public
-func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
+@warn_unused_result
+@asmname("_swift_fmod${cFuncSuffix(bits)}")
+public func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 
 // See Bool.swift for && and ||
 // In C, 120 is &&

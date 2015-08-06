@@ -89,6 +89,7 @@ public func withVaList<R>(builder: VaListBuilder,
 ///   `withVaList`, but occasionally (i.e. in a `class` initializer) you
 ///   may find that the language rules don't allow you to use
 /// `withVaList` as intended.
+@warn_unused_result
 public func getVaList(args: [CVarArgType]) -> CVaListPointer {
   let builder = VaListBuilder()
   for a in args {
@@ -100,6 +101,7 @@ public func getVaList(args: [CVarArgType]) -> CVaListPointer {
   return builder.va_list()
 }
 
+@warn_unused_result
 public func _encodeBitsAsWords<T : CVarArgType>(x: T) -> [Int] {
   let result = [Int](
     count: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self),
@@ -300,6 +302,7 @@ final public class VaListBuilder {
     appendWords(arg._cVarArgEncoding)
   }
 
+  @warn_unused_result
   func va_list() -> CVaListPointer {
     return CVaListPointer(_fromUnsafeMutablePointer: storage)
   }
@@ -331,11 +334,13 @@ final public class VaListBuilder {
     }
   }
 
+  @warn_unused_result
   func rawSizeAndAlignment(wordCount: Int) -> (Builtin.Word, Builtin.Word) {
     return ((wordCount * strideof(Int.self))._builtinWordValue, 
       requiredAlignmentInBytes._builtinWordValue)
   }
 
+  @warn_unused_result
   func allocStorage(wordCount wordCount: Int) -> UnsafeMutablePointer<Int> {
     let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
     let rawStorage = Builtin.allocRaw(rawSize, rawAlignment)
@@ -404,6 +409,7 @@ final public class VaListBuilder {
     }
   }
 
+  @warn_unused_result
   func va_list() -> CVaListPointer {
     header.reg_save_area = storage._baseAddressIfContiguous
     header.overflow_arg_area

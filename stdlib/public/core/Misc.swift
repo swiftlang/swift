@@ -15,6 +15,7 @@
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
 @transparent
+@warn_unused_result
 public // @testable
 func _countLeadingZeros(value: Int64) -> Int64 {
     return Int64(Builtin.int_ctlz_Int64(value.value, false.value))
@@ -22,6 +23,7 @@ func _countLeadingZeros(value: Int64) -> Int64 {
 
 /// Returns if `x` is a power of 2.
 @transparent
+@warn_unused_result
 public // @testable
 func _isPowerOf2(x: UInt) -> Bool {
   if x == 0 {
@@ -34,6 +36,7 @@ func _isPowerOf2(x: UInt) -> Bool {
 
 /// Returns if `x` is a power of 2.
 @transparent
+@warn_unused_result
 public // @testable
 func _isPowerOf2(x: Int) -> Bool {
   if x <= 0 {
@@ -45,7 +48,8 @@ func _isPowerOf2(x: Int) -> Bool {
 }
 
 #if _runtime(_ObjC)
-@transparent public func _autorelease(x: AnyObject) {
+@transparent
+public func _autorelease(x: AnyObject) {
   Builtin.retain(x)
   Builtin.autorelease(x)
 }
@@ -76,7 +80,9 @@ public func _stdlib_getDemangledMetatypeNameImpl(type: Any.Type, qualified: Bool
 public func _stdlib_getDemangledUnqualifiedMetatypeNameImpl(type: Any.Type, _ result: UnsafeMutablePointer<String>)
 
 /// Returns the demangled qualified name of a metatype.
-public func _typeName(type: Any.Type, qualified: Bool = true) -> String {
+@warn_unused_result
+public // @testable
+func _typeName(type: Any.Type, qualified: Bool = true) -> String {
   let stringPtr = UnsafeMutablePointer<String>.alloc(1)
   _stdlib_getDemangledMetatypeNameImpl(type, qualified: qualified, stringPtr)
   let result = stringPtr.move()
@@ -85,7 +91,9 @@ public func _typeName(type: Any.Type, qualified: Bool = true) -> String {
 }
 
 /// Returns the human-readable type name for the given value.
-public func _stdlib_getDemangledTypeName<T>(value: T) -> String {
+@warn_unused_result
+public // @testable
+func _stdlib_getDemangledTypeName<T>(value: T) -> String {
   // FIXME: this code should be using _withUninitializedString, but it leaks
   // when called from here.
   // <rdar://problem/17892969> Closures in generic context leak their captures?
@@ -96,13 +104,16 @@ public func _stdlib_getDemangledTypeName<T>(value: T) -> String {
   return stringResult
 }
 
+@warn_unused_result
 @asmname("swift_stdlib_demangleName")
 func _stdlib_demangleNameImpl(
-    mangledName: UnsafePointer<UInt8>,
-    _ mangledNameLength: UInt,
-    _ demangledName: UnsafeMutablePointer<String>)
+  mangledName: UnsafePointer<UInt8>,
+  _ mangledNameLength: UInt,
+  _ demangledName: UnsafeMutablePointer<String>)
 
-public func _stdlib_demangleName(mangledName: String) -> String {
+@warn_unused_result
+public // @testable
+func _stdlib_demangleName(mangledName: String) -> String {
   let mangledNameUTF8 = Array(mangledName.utf8)
   return mangledNameUTF8.withUnsafeBufferPointer {
     (mangledNameUTF8) in
@@ -127,6 +138,7 @@ public func _stdlib_demangleName(mangledName: String) -> String {
 ///      floorLog2(9) == floorLog2(15) == 3
 ///
 /// TODO: Implement version working on Int instead of Int64.
+@warn_unused_result
 @transparent
 public // @testable
 func _floorLog2(x: Int64) -> Int {

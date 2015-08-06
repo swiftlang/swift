@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@warn_unused_result
 public func ==(
   lhs: String.UnicodeScalarView.Index,
   rhs: String.UnicodeScalarView.Index
@@ -17,6 +18,7 @@ public func ==(
   return lhs._position == rhs._position
 }
 
+@warn_unused_result
 public func <(
   lhs: String.UnicodeScalarView.Index,
   rhs: String.UnicodeScalarView.Index
@@ -58,6 +60,7 @@ extension String {
       /// Returns the next consecutive value after `self`.
       ///
       /// - Requires: The next value is representable.
+      @warn_unused_result
       public func successor() -> Index {
         var scratch = _ScratchGenerator(_core, _position)
         var decoder = UTF16()
@@ -68,6 +71,7 @@ extension String {
       /// Returns the previous consecutive value before `self`.
       ///
       /// - Requires: The previous value is representable.
+      @warn_unused_result
       public func predecessor() -> Index {
         var i = _position
         let codeUnit = _core[--i]
@@ -201,11 +205,13 @@ extension String {
     /// this *sequence*.
     ///
     /// - Complexity: O(1).
+    @warn_unused_result
     public func generate() -> Generator {
       return Generator(_core)
     }
 
     /// Returns a mirror that reflects `self`.
+    @warn_unused_result
     public func _getMirror() -> _MirrorType {
       return _UnicodeScalarViewMirror(self)
     }
@@ -357,6 +363,7 @@ extension String.UnicodeScalarIndex {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf8)!.indices`.
+  @warn_unused_result
   public func samePositionIn(utf8: String.UTF8View) -> String.UTF8View.Index {
     return String.UTF8View.Index(self, within: utf8)
   }
@@ -365,6 +372,7 @@ extension String.UnicodeScalarIndex {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf16)!.indices`.
+  @warn_unused_result
   public func samePositionIn(
     utf16: String.UTF16View
   ) -> String.UTF16View.Index {
@@ -375,6 +383,7 @@ extension String.UnicodeScalarIndex {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of `characters.unicodeScalars.indices`.
+  @warn_unused_result
   public func samePositionIn(characters: String) -> String.Index? {
     return String.Index(self, within: characters)
   }

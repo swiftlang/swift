@@ -57,6 +57,7 @@ public protocol OptionSetType : SetAlgebraType, RawRepresentable {
 extension OptionSetType {
   /// Returns the set of elements contained in `self`, in `other`, or in
   /// both `self` and `other`.
+  @warn_unused_result
   public func union(other: Self) -> Self {
     var r: Self = Self(rawValue: self.rawValue)
     r.unionInPlace(other)
@@ -64,6 +65,7 @@ extension OptionSetType {
   }
   
   /// Returns the set of elements contained in both `self` and `other`.
+  @warn_unused_result
   public func intersect(other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
     r.intersectInPlace(other)
@@ -72,6 +74,7 @@ extension OptionSetType {
   
   /// Returns the set of elements contained in `self` or in `other`,
   /// but not in both `self` and `other`.
+  @warn_unused_result
   public func exclusiveOr(other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
     r.exclusiveOrInPlace(other)
@@ -89,6 +92,7 @@ extension OptionSetType where Element == Self {
   /// Returns `true` if `self` contains `member`.
   ///
   /// - Equivalent to `self.intersect([member]) == [member]`
+  @warn_unused_result
   public func contains(member: Self) -> Bool {
     return self.isSupersetOf(member)
   }

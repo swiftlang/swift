@@ -124,6 +124,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// - Complexity: O(`self.count`).
   mutating func removeAtIndex(i: Index) -> Generator.Element
 
+  @warn_unused_result
   mutating func _customRemoveLast() -> Generator.Element?
 
   /// Remove the element at `startIndex` and return it.
@@ -226,6 +227,7 @@ extension RangeReplaceableCollectionType {
 }
 
 extension RangeReplaceableCollectionType {
+  @warn_unused_result
   public mutating func _customRemoveLast() -> Generator.Element? {
     return nil
   }
@@ -348,6 +350,7 @@ public func removeLast<
   fatalError("unavailable function can't be called")
 }
 
+@warn_unused_result
 public func +<
     C : RangeReplaceableCollectionType,
     S : SequenceType
@@ -358,6 +361,7 @@ public func +<
   return lhs
 }
 
+@warn_unused_result
 public func +<
     C : RangeReplaceableCollectionType,
     S : SequenceType
@@ -370,6 +374,7 @@ public func +<
   return result
 }
 
+@warn_unused_result
 public func +<
     C : RangeReplaceableCollectionType,
     S : CollectionType
@@ -381,6 +386,7 @@ public func +<
   return lhs
 }
 
+@warn_unused_result
 public func +<
     RRC1 : RangeReplaceableCollectionType,
     RRC2 : RangeReplaceableCollectionType 

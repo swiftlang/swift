@@ -27,6 +27,7 @@ extension _StringCore {
   /// and the second element contains the encoded UTF-8 starting in its
   /// low byte.  Any unused high bytes in the result will be set to
   /// 0xFF.
+  @warn_unused_result
   func _encodeSomeUTF8(i: Int) -> (Int, UTF8Chunk) {
     _sanityCheck(i <= count)
 
@@ -56,6 +57,7 @@ extension _StringCore {
 
   /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
   /// storage is contiguous UTF-16.
+  @warn_unused_result
   func _encodeSomeContiguousUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
     _sanityCheck(!_baseAddress._isNull)
@@ -67,6 +69,7 @@ extension _StringCore {
 #if _runtime(_ObjC)
   /// Helper for `_encodeSomeUTF8`, above.  Handles the case where the
   /// storage is non-contiguous UTF-16.
+  @warn_unused_result
   func _encodeSomeNonContiguousUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
     _sanityCheck(_baseAddress._isNull)
@@ -122,6 +125,7 @@ extension String {
       /// Returns the next consecutive value after `self`.
       ///
       /// - Requires: The next value is representable.
+      @warn_unused_result
       public func successor() -> Index {
         let currentUnit = UTF8.CodeUnit(truncatingBitPattern: _buffer)
         let hiNibble = currentUnit >> 4
@@ -227,6 +231,7 @@ extension String {
     }
 
     /// Returns a mirror that reflects `self`.
+    @warn_unused_result
     public func _getMirror() -> _MirrorType {
       return _UTF8ViewMirror(self)
     }
@@ -280,8 +285,11 @@ extension String {
   public typealias UTF8Index = UTF8View.Index
 }
 
-public
-func == (lhs: String.UTF8View.Index, rhs: String.UTF8View.Index) -> Bool {
+@warn_unused_result
+public func == (
+  lhs: String.UTF8View.Index,
+  rhs: String.UTF8View.Index
+) -> Bool {
   // If the underlying UTF16 index differs, they're unequal
   if lhs._coreIndex != rhs._coreIndex {
     return false
@@ -373,6 +381,7 @@ extension String.UTF8View.Index {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of `String(utf16)!.utf8.indices`.
+  @warn_unused_result
   public func samePositionIn(
     utf16: String.UTF16View
   ) -> String.UTF16View.Index? {
@@ -384,6 +393,7 @@ extension String.UTF8View.Index {
   ///
   /// - Requires: `self` is an element of
   ///   `String(unicodeScalars).utf8.indices`.
+  @warn_unused_result
   public func samePositionIn(
     unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
@@ -394,6 +404,7 @@ extension String.UTF8View.Index {
   /// to `self`, or if no such position exists, `nil`.
   ///
   /// - Requires: `self` is an element of `characters.utf8.indices`.
+  @warn_unused_result
   public func samePositionIn(
     characters: String
   ) -> String.Index? {

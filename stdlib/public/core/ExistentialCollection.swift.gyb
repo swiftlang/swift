@@ -98,6 +98,7 @@ internal class _FunctionGenerator<Element> : AnyGenerator<Element> {
 ///     var x = 7
 ///     let g = anyGenerator { x < 15 ? x++ : nil }
 ///     let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
+@warn_unused_result
 public func anyGenerator<Element>(body: ()->Element?) -> AnyGenerator<Element> {
   return _FunctionGenerator(body)
 }
@@ -261,13 +262,26 @@ extension Any${Kind} {
 
 internal protocol _ForwardIndexBoxType : class {
   var typeID: ObjectIdentifier {get}
+
+  @warn_unused_result
   func successor() -> _ForwardIndexBoxType
+
   func _successorInPlace()
+
+  @warn_unused_result
   func equals(other: _ForwardIndexBoxType) -> Bool
+
+  @warn_unused_result
   func _unbox<T : ForwardIndexType>() -> T?
+
+  @warn_unused_result
   func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance
+
   // FIXME: Can't return Self from _advancedBy pending <rdar://20181253>
+  @warn_unused_result
   func _advancedBy(distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxType
+
+  @warn_unused_result
   func _advancedBy(
     distance: AnyForwardIndex.Distance,
     _ limit: _ForwardIndexBoxType
@@ -466,6 +480,7 @@ public struct ${Self} : ${Traversal}IndexType {
 ///
 /// - Requires: The types of indices wrapped by `lhs` and `rhs` are
 ///   identical.
+@warn_unused_result
 public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
   precondition(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._box.equals(rhs._box)
@@ -502,6 +517,7 @@ public protocol AnyCollectionType : CollectionType {
 }
 
 /// Return true iff `lhs` and `rhs` store the same underlying collection.
+@warn_unused_result
 public func === <
   L: AnyCollectionType, R: AnyCollectionType
 >(lhs: L, rhs: R) -> Bool {
@@ -509,6 +525,7 @@ public func === <
 }
 
 /// Returns false iff `lhs` and `rhs` store the same underlying collection.
+@warn_unused_result
 public func !== <
   L: AnyCollectionType, R: AnyCollectionType
 >(lhs: L, rhs: R) -> Bool {

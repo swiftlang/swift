@@ -120,6 +120,7 @@ public struct String {
 }
 
 extension String {
+  @warn_unused_result
   public // @testable
   static func _fromWellFormedCodeUnitSequence<
     Encoding: UnicodeCodecType, Input: CollectionType
@@ -130,6 +131,7 @@ extension String {
     return String._fromCodeUnitSequence(encoding, input: input)!
   }
 
+  @warn_unused_result
   public // @testable
   static func _fromCodeUnitSequence<
     Encoding: UnicodeCodecType, Input: CollectionType
@@ -147,6 +149,7 @@ extension String {
     }
   }
 
+  @warn_unused_result
   public // @testable
   static func _fromCodeUnitSequenceWithRepair<
     Encoding: UnicodeCodecType, Input: CollectionType
@@ -180,8 +183,7 @@ extension String : UnicodeScalarLiteralConvertible {
 extension String : _BuiltinExtendedGraphemeClusterLiteralConvertible {
   @effects(readonly)
   @_semantics("string.makeUTF8")
-  public
-  init(
+  public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
     isASCII: Builtin.Int1) {
@@ -203,8 +205,7 @@ extension String : ExtendedGraphemeClusterLiteralConvertible {
 extension String : _BuiltinUTF16StringLiteralConvertible {
   @effects(readonly)
   @_semantics("string.makeUTF16")
-  public
-  init(
+  public init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
     numberOfCodeUnits: Builtin.Word
   )  {
@@ -221,8 +222,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
 extension String : _BuiltinStringLiteralConvertible {
   @effects(readonly)
   @_semantics("string.makeUTF8")
-  public
-  init(
+  public init(
     _builtinStringLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
     isASCII: Builtin.Int1) {
@@ -267,6 +267,7 @@ extension String : CustomDebugStringConvertible {
 extension String {
   /// Return the number of code units occupied by this string
   /// in the given encoding.
+  @warn_unused_result
   func _encodedLength<
     Encoding: UnicodeCodecType
   >(encoding: Encoding.Type) -> Int {
@@ -315,6 +316,7 @@ public func _stdlib_compareNSStringDeterministicUnicodeCollation(
 extension String : Equatable {
 }
 
+@warn_unused_result
 public func ==(lhs: String, rhs: String) -> Bool {
   if lhs._core.isASCII && rhs._core.isASCII {
     if lhs._core.count != rhs._core.count {
@@ -335,12 +337,15 @@ extension String {
   /// This is consistent with Foundation, but incorrect as defined by Unicode.
   /// Unicode weights some ASCII punctuation in a different order than ASCII
   /// value. Such as:
-  /// 0022  ; [*02FF.0020.0002] # QUOTATION MARK
-  /// 0023  ; [*038B.0020.0002] # NUMBER SIGN
-  /// 0025  ; [*038C.0020.0002] # PERCENT SIGN
-  /// 0026  ; [*0389.0020.0002] # AMPERSAND
-  /// 0027  ; [*02F8.0020.0002] # APOSTROPHE
-  /// - Precondition: Both self and rhs are ASCII strings.
+  ///
+  ///   0022  ; [*02FF.0020.0002] # QUOTATION MARK
+  ///   0023  ; [*038B.0020.0002] # NUMBER SIGN
+  ///   0025  ; [*038C.0020.0002] # PERCENT SIGN
+  ///   0026  ; [*0389.0020.0002] # AMPERSAND
+  ///   0027  ; [*02F8.0020.0002] # APOSTROPHE
+  ///
+  /// - Precondition: Both `self` and `rhs` are ASCII strings.
+  @warn_unused_result
   public // @testable
   func _compareASCII(rhs: String) -> Int {
     var compare = Int(memcmp(
@@ -356,7 +361,9 @@ extension String {
 #endif
 
   /// Compares two strings with the Unicode Collation Algorithm.
-  @inline(never) @_semantics("stdlib_binary_only") // Hide the CF/ICU dependency
+  @warn_unused_result
+  @inline(never)
+  @_semantics("stdlib_binary_only") // Hide the CF/ICU dependency
   public  // @testable
   func _compareDeterministicUnicodeCollation(rhs: String) -> Int {
     // Note: this operation should be consistent with equality comparison of
@@ -393,6 +400,7 @@ extension String {
 #endif
   }
 
+  @warn_unused_result
   public  // @testable
   func _compareString(rhs: String) -> Int {
 #if _runtime(_ObjC)
@@ -406,6 +414,7 @@ extension String {
   }
 }
 
+@warn_unused_result
 public func <(lhs: String, rhs: String) -> Bool {
   return lhs._compareString(rhs) < 0
 }
@@ -436,9 +445,11 @@ extension String {
 }
 
 #if _runtime(_ObjC)
+@warn_unused_result
 @asmname("swift_stdlib_NSStringNFDHashValue")
 func _stdlib_NSStringNFDHashValue(str: AnyObject) -> Int
 
+@warn_unused_result
 @asmname("swift_stdlib_NSStringASCIIHashValue")
 func _stdlib_NSStringASCIIHashValue(str: AnyObject) -> Int
 #endif
@@ -485,9 +496,10 @@ extension String : Hashable {
   }
 }
 
+@warn_unused_result
 @effects(readonly)
 @_semantics("string.concat")
-public func +(var lhs: String, rhs: String) -> String {
+public func + (var lhs: String, rhs: String) -> String {
   if (lhs.isEmpty) {
     return rhs
   }
@@ -543,10 +555,12 @@ extension String {
   public subscript(i: Index) -> Character { return characters[i] }
 }
 
+@warn_unused_result
 public func == (lhs: String.Index, rhs: String.Index) -> Bool {
   return lhs._base == rhs._base
 }
 
+@warn_unused_result
 public func < (lhs: String.Index, rhs: String.Index) -> Bool {
   return lhs._base < rhs._base
 }
@@ -596,6 +610,7 @@ extension String {
   /// then concatenate the result.  For example:
   ///
   ///     "-|-".join(["foo", "bar", "baz"]) // "foo-|-bar-|-baz"
+  @warn_unused_result
   public func join<
       S : SequenceType where S.Generator.Element == String
   >(elements: S) -> String {
@@ -694,12 +709,15 @@ extension String {
   }
 }
 #if _runtime(_ObjC)
+@warn_unused_result
 @asmname("swift_stdlib_NSStringLowercaseString")
 func _stdlib_NSStringLowercaseString(str: AnyObject) -> _CocoaStringType
 
+@warn_unused_result
 @asmname("swift_stdlib_NSStringUppercaseString")
 func _stdlib_NSStringUppercaseString(str: AnyObject) -> _CocoaStringType
 #else
+@warn_unused_result
 internal func _nativeUnicodeLowercaseString(str: String) -> String {
   var buffer = _StringBuffer(
     capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
@@ -722,6 +740,7 @@ internal func _nativeUnicodeLowercaseString(str: String) -> String {
   return String(_storage: buffer)
 }
 
+@warn_unused_result
 internal func _nativeUnicodeUppercaseString(str: String) -> String {
   var buffer = _StringBuffer(
     capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
@@ -894,6 +913,7 @@ extension String.Index {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf8).indices`.
+  @warn_unused_result
   public func samePositionIn(
     utf8: String.UTF8View
   ) -> String.UTF8View.Index {
@@ -904,6 +924,7 @@ extension String.Index {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(utf16).indices`.
+  @warn_unused_result
   public func samePositionIn(
     utf16: String.UTF16View
   ) -> String.UTF16View.Index {
@@ -914,6 +935,7 @@ extension String.Index {
   /// to `self`.
   ///
   /// - Requires: `self` is an element of `String(unicodeScalars).indices`.
+  @warn_unused_result
   public func samePositionIn(
     unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarView.Index {

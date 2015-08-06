@@ -700,7 +700,7 @@ SequenceTypeTests.test("reverse/WhereIndexIsRandomAccess,RandomAccessReverseView
 
 SequenceTypeTests.test("filter/SequenceType/Dispatch") {
   let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.filter { _ in false }
+  _ = tester.filter { _ in false }
   expectCustomizable(tester, tester.log.filter)
 }
 

@@ -18,6 +18,7 @@
 // UnsafeMutablePointer
 
 @transparent
+@warn_unused_result
 public // @testable
 func _isDebugAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
@@ -28,6 +29,7 @@ func _isDebugAssertConfiguration() -> Bool {
 }
 
 @transparent
+@warn_unused_result
 internal func _isReleaseAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0: Debug
@@ -37,6 +39,7 @@ internal func _isReleaseAssertConfiguration() -> Bool {
 }
 
 @transparent
+@warn_unused_result
 public // @testable
 func _isFastAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
@@ -47,6 +50,7 @@ func _isFastAssertConfiguration() -> Bool {
 }
 
 @transparent
+@warn_unused_result
 public // @testable
 func _isStdlibInternalChecksEnabled() -> Bool {
 #if INTERNAL_CHECKS_ENABLED

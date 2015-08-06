@@ -125,6 +125,7 @@ extension String.CharacterView : CollectionType {
 
     /// Returns the length of the first extended grapheme cluster in UTF-16
     /// code units.
+    @warn_unused_result
     internal static func _measureExtendedGraphemeClusterForward(
         var start: UnicodeScalarView.Index
     ) -> Int {
@@ -163,6 +164,7 @@ extension String.CharacterView : CollectionType {
 
     /// Returns the length of the previous extended grapheme cluster in UTF-16
     /// code units.
+    @warn_unused_result
     internal static func _measureExtendedGraphemeClusterBackward(
         end: UnicodeScalarView.Index
     ) -> Int {
@@ -327,6 +329,7 @@ extension String.CharacterView {
   /// then concatenate the result.  For example:
   ///
   ///     "-|-".join(["foo", "bar", "baz"]) // "foo-|-bar-|-baz"
+  @warn_unused_result
   public func join<
       S : SequenceType where S.Generator.Element == String.CharacterView
   >(elements: S) -> String.CharacterView {

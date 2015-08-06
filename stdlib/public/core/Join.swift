@@ -18,6 +18,7 @@
 /// output:
 ///
 ///     print(join(" ", [ "here", "be", "dragons" ]))
+@warn_unused_result
 public func join<
   C : RangeReplaceableCollectionType, S : SequenceType
   where S.Generator.Element == C

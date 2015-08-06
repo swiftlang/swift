@@ -129,8 +129,8 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
 
   //===--- Non-essential bits ---------------------------------------------===//
 
-  public
-  mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
+  @warn_unused_result
+  public mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> NativeBuffer?
   {
     _invariantCheck()
@@ -159,21 +159,21 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
     return nil
   }
 
-  public
-  mutating func isMutableAndUniquelyReferenced() -> Bool {
+  @warn_unused_result
+  public mutating func isMutableAndUniquelyReferenced() -> Bool {
     return _hasNativeBuffer && isUniquelyReferenced()
   }
 
-  public
-  mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
+  @warn_unused_result
+  public mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
     return _hasNativeBuffer && isUniquelyReferencedOrPinned()
   }
 
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
-  public
-  func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
+  @warn_unused_result
+  public func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer && nativeBuffer.count == count) {
       return nativeBuffer
@@ -220,6 +220,7 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
 
   /// Return whether the given `index` is valid for subscripting, i.e.
   /// `startIndex ≤ index < endIndex`
+  @warn_unused_result
   internal func _isValidSubscript(
     index : Int, hoistedIsNativeBuffer: Bool
   ) -> Bool {
@@ -240,14 +241,17 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
     return count
   }
 
+  @warn_unused_result
   mutating func isUniquelyReferenced() -> Bool {
     return isUniquelyReferencedNonObjC(&owner)
   }
 
+  @warn_unused_result
   mutating func isUniquelyReferencedOrPinned() -> Bool {
     return isUniquelyReferencedOrPinnedNonObjC(&owner)
   }
 
+  @warn_unused_result
   func getElement(i: Int, hoistedIsNativeNoTypeCheckBuffer: Bool) -> Element {
     _sanityCheck(i >= startIndex, "negative slice index is out of range")
     _sanityCheck(i < endIndex, "slice index out of range")

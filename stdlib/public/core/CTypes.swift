@@ -149,6 +149,7 @@ extension COpaquePointer : CustomDebugStringConvertible {
   }
 }
 
+@warn_unused_result
 public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }

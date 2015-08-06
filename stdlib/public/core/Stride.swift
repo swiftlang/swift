@@ -25,6 +25,7 @@ public protocol _Strideable {
   ///
   /// - SeeAlso: `RandomAccessIndexType`'s `distanceTo`, which provides a
   ///   stronger semantic guarantee.
+  @warn_unused_result
   func distanceTo(other: Self) -> Stride
 
   /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
@@ -34,6 +35,7 @@ public protocol _Strideable {
   ///
   /// - SeeAlso: `RandomAccessIndexType`'s `advancedBy`, which
   ///   provides a stronger semantic guarantee.
+  @warn_unused_result
   func advancedBy(n: Stride) -> Self
 }
 
@@ -61,6 +63,7 @@ public protocol Strideable : Comparable, _Strideable {
   ///
   /// - SeeAlso: `RandomAccessIndexType`'s `distanceTo`, which provides a
   ///   stronger semantic guarantee.
+  @warn_unused_result
   func distanceTo(other: Self) -> Stride
 
   /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
@@ -70,21 +73,26 @@ public protocol Strideable : Comparable, _Strideable {
   ///
   /// - SeeAlso: `RandomAccessIndexType`'s `advancedBy`, which
   ///   provides a stronger semantic guarantee.
+  @warn_unused_result
   func advancedBy(n: Stride) -> Self
 }
 
+@warn_unused_result
 public func + <T : Strideable> (lhs: T, rhs: T.Stride) -> T {
   return lhs.advancedBy(rhs)
 }
 
+@warn_unused_result
 public func + <T : Strideable> (lhs: T.Stride, rhs: T) -> T {
   return rhs.advancedBy(lhs)
 }
 
+@warn_unused_result
 public func - <T : Strideable> (lhs: T, rhs: T.Stride) -> T {
   return lhs.advancedBy(-rhs)
 }
 
+@warn_unused_result
 public func - <T : Strideable> (lhs: T, rhs: T) -> T.Stride {
   return rhs.distanceTo(lhs)
 }
@@ -193,6 +201,7 @@ extension Strideable {
   /// Return the sequence of values (`self`, `self + stride`, `self +
   /// stride + stride`, ... *last*) where *last* is the last value in
   /// the progression that is less than `end`.
+  @warn_unused_result
   public func stride(to end: Self, by stride: Stride) -> StrideTo<Self> {
     return StrideTo(start: self, end: end, stride: stride)
   }
@@ -267,6 +276,7 @@ extension Strideable {
   /// the progression less than or equal to `end`.
   ///
   /// - Note: There is no guarantee that `end` is an element of the sequence.
+  @warn_unused_result
   public func stride(
     through end: Self, by stride: Stride
   ) -> StrideThrough<Self> {

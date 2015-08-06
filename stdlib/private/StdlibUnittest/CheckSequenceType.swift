@@ -1089,7 +1089,7 @@ self.test("\(testNamePrefix).dropFirst/semantics/dropFirst()==dropFirst(1)") {
 self.test("\(testNamePrefix).dropFirst/semantics/negative") {
   let s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
-  s.dropFirst(-1)
+  _ = s.dropFirst(-1)
 }
 
 //===----------------------------------------------------------------------===//
@@ -1126,7 +1126,7 @@ self.test("\(testNamePrefix).dropLast/semantics/equivalence") {
 self.test("\(testNamePrefix).dropLast/semantics/negative") {
   let s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
-  s.dropLast(-1)
+  _ = s.dropLast(-1)
 }
 
 //===----------------------------------------------------------------------===//

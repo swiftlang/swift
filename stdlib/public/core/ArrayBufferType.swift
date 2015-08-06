@@ -43,6 +43,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// - Note: This function must remain mutating; otherwise the buffer
   ///   may acquire spurious extra references, which will cause
   ///   unnecessary reallocation.
+  @warn_unused_result
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> _ContiguousArrayBuffer<Element>?
 
@@ -52,11 +53,13 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// - Note: This function must remain mutating; otherwise the buffer
   ///   may acquire spurious extra references, which will cause
   ///   unnecessary reallocation.
+  @warn_unused_result
   mutating func isMutableAndUniquelyReferenced() -> Bool
 
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
+  @warn_unused_result
   func requestNativeBuffer() -> _ContiguousArrayBuffer<Element>?
 
   /// Replace the given `subRange` with the first `newCount` elements of

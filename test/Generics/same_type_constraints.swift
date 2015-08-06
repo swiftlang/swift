@@ -199,18 +199,18 @@ extension Something {
 // rdar://problem/18120419
 func TTGenWrap<T, G: GeneratorType where G.Element == (T,T)>(var gen: G)
 {
-  gen.next()
+  _ = gen.next()
 }
 
 func IntIntGenWrap<G: GeneratorType where G.Element == (Int,Int)>(var gen: G)
 {
-  gen.next()
+  _ = gen.next()
 }
 
 func GGWrap<G1: GeneratorType, G2: GeneratorType where G1.Element == G2.Element>(var g1: G1, var _ g2: G2)
 {
-  g1.next()
-  g2.next()
+  _ = g1.next()
+  _ = g2.next()
 }
 
 func testSameTypeTuple(a: Array<(Int,Int)>, s: ArraySlice<(Int,Int)>) {

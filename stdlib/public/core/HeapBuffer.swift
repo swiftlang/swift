@@ -13,6 +13,7 @@
 import SwiftShims
 typealias _HeapObject = SwiftShims.HeapObject
 
+@warn_unused_result
 @asmname("swift_bufferAllocate")
 func _swift_bufferAllocate(
   bufferType: AnyClass, _ size: Int, _ alignMask: Int) -> AnyObject
@@ -46,6 +47,8 @@ class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
   deinit {
     Buffer(self)._value.destroy()
   }
+
+  @warn_unused_result
   final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
     return Buffer(self)._allocatedSizeAndAlignMask()
   }
@@ -66,15 +69,18 @@ struct _HeapBuffer<Value, Element> : Equatable {
     return _storage.map { Builtin.castFromNativeObject($0) }
   }
 
+  @warn_unused_result
   static func _valueOffset() -> Int {
     return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
   }
 
+  @warn_unused_result
   static func _elementOffset() -> Int {
     return _roundUpToAlignment(_valueOffset() + sizeof(Value.self),
         alignof(Element.self))
   }
 
+  @warn_unused_result
   static func _requiredAlignMask() -> Int {
     // We can't use max here because it can allocate an array.
     let heapAlign = alignof(_HeapObject.self) &- 1
@@ -100,19 +106,23 @@ struct _HeapBuffer<Value, Element> : Equatable {
     return UnsafeMutablePointer(_HeapBuffer._elementOffset() + _address)
   }
 
+  @warn_unused_result
   func _allocatedSize() -> Int {
     return swift_malloc_size(_address)
   }
 
+  @warn_unused_result
   func _allocatedAlignMask() -> Int {
     return _HeapBuffer._requiredAlignMask()
   }
 
+  @warn_unused_result
   func _allocatedSizeAndAlignMask() -> (Int, Int) {
     return (_allocatedSize(), _allocatedAlignMask())
   }
 
   /// Return the actual number of `Elements` we can possibly store.
+  @warn_unused_result
   func _capacity() -> Int {
     return (_allocatedSize() - _HeapBuffer._elementOffset())
       / strideof(Element.self)
@@ -194,15 +204,18 @@ struct _HeapBuffer<Value, Element> : Equatable {
     return _storage!
   }
 
+  @warn_unused_result
   static func fromNativeObject(x: Builtin.NativeObject) -> _HeapBuffer {
     return _HeapBuffer(nativeStorage: x)
   }
 
+  @warn_unused_result
   public // @testable
   mutating func isUniquelyReferenced() -> Bool {
     return _isUnique(&_storage)
   }
 
+  @warn_unused_result
   public // @testable
   mutating func isUniquelyReferencedOrPinned() -> Bool {
     return _isUniqueOrPinned(&_storage)
@@ -210,6 +223,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
 }
 
 // HeapBuffers are equal when they reference the same buffer
+@warn_unused_result
 public // @testable
 func == <Value, Element> (
   lhs: _HeapBuffer<Value, Element>,

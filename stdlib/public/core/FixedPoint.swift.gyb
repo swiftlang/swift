@@ -68,6 +68,7 @@ public protocol IntegerType : _IntegerType, RandomAccessIndexType {
 public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
   /// Represent this number using Swift's widest native signed integer
   /// type.
+  @warn_unused_result
   func toIntMax() -> IntMax
 
   /// Convert from Swift's widest signed integer type, trapping on
@@ -101,6 +102,7 @@ public protocol UnsignedIntegerType : _DisallowMixedSignArithmetic, IntegerType 
 
   /// Represent this number using Swift's widest native unsigned
   /// integer type.
+  @warn_unused_result
   func toUIntMax() -> UIntMax
 
   /// Convert from Swift's widest unsigned integer type, trapping on
@@ -116,6 +118,7 @@ public protocol UnsignedIntegerType : _DisallowMixedSignArithmetic, IntegerType 
 ///
 ///     func f(x: Int32) {}
 ///     func g(x: Int64) { f(numericCast(x)) }
+@warn_unused_result
 public func numericCast<
   T : _SignedIntegerType, U : _SignedIntegerType
 >(x: T) -> U {
@@ -130,6 +133,7 @@ public func numericCast<
 ///
 ///     func f(x: UInt32) {}
 ///     func g(x: UInt64) { f(numericCast(x)) }
+@warn_unused_result
 public func numericCast<
   T : UnsignedIntegerType, U : UnsignedIntegerType
 >(x: T) -> U {
@@ -144,6 +148,7 @@ public func numericCast<
 ///
 ///     func f(x: UInt32) {}
 ///     func g(x: Int64) { f(numericCast(x)) }
+@warn_unused_result
 public func numericCast<
   T : _SignedIntegerType, U : UnsignedIntegerType
 >(x: T) -> U {
@@ -158,6 +163,7 @@ public func numericCast<
 ///
 ///     func f(x: Int32) {}
 ///     func g(x: UInt64) { f(numericCast(x)) }
+@warn_unused_result
 public func numericCast<
 T : UnsignedIntegerType, U : _SignedIntegerType
 >(x: T) -> U {
@@ -628,6 +634,7 @@ public postfix func -- (inout x: ${Self}) -> ${Self} {
 /// Returns the argument and specifies that the value is not negative.
 /// It has only an effect if the argument is a load or call.
 @transparent
+@warn_unused_result
 public func _assumeNonNegative(x: ${Self}) -> ${Self} {
   _sanityCheck(x >= 0)
   return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x.value))

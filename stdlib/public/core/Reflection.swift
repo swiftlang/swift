@@ -18,6 +18,7 @@ public protocol _Reflectable {
   // corresponding change to Reflection.cpp.
 
   /// Returns a mirror that reflects `self`.
+  @warn_unused_result
   func _getMirror() -> _MirrorType
 }
 
@@ -59,10 +60,12 @@ public struct ObjectIdentifier : Hashable, Comparable {
   }
 }
 
+@warn_unused_result
 public func <(lhs: ObjectIdentifier, rhs: ObjectIdentifier) -> Bool {
   return lhs.uintValue < rhs.uintValue
 }
 
+@warn_unused_result
 public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(x.value, y.value))
 }
@@ -126,6 +129,7 @@ public protocol _MirrorType {
 /// An entry point that can be called from C++ code to get the summary string
 /// for an arbitrary object. The memory pointed to by "out" is initialized with
 /// the summary string.
+@warn_unused_result
 @asmname("swift_getSummary")
 public // COMPILER_INTRINSIC
 func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
@@ -136,6 +140,7 @@ func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
 /// `_Reflectable`, invoke its `_getMirror()` method; otherwise, fall back
 /// to an implementation in the runtime that structurally reflects values
 /// of any type.
+@warn_unused_result
 @asmname("swift_reflectAny")
 public func _reflect<T>(x: T) -> _MirrorType
 
@@ -143,6 +148,7 @@ public func _reflect<T>(x: T) -> _MirrorType
 /// guaranteed by holding a strong reference to a heap object.
 /// This lets containers with heap storage vend mirrors for their elements
 /// without unnecessary copying of the underlying value.
+@warn_unused_result
 @asmname("swift_unsafeReflectAny")
 internal func _unsafeReflect<T>(
   owner: Builtin.NativeObject,
@@ -376,14 +382,20 @@ struct _EnumMirror : _MirrorType {
   var disposition: _MirrorDisposition { return .Enum }
 }
 
+@warn_unused_result
 @asmname("swift_ClassMirror_count")
 func _getClassCount(_: _MagicMirrorData) -> Int
+
+@warn_unused_result
 @asmname("swift_ClassMirror_subscript")
 func _getClassChild(_: Int, _: _MagicMirrorData) -> (String, _MirrorType)
 
 #if _runtime(_ObjC)
-@asmname("swift_ClassMirror_quickLookObject")public
-func _getClassPlaygroundQuickLook(data: _MagicMirrorData) -> PlaygroundQuickLook?
+@warn_unused_result
+@asmname("swift_ClassMirror_quickLookObject")
+public func _getClassPlaygroundQuickLook(
+  data: _MagicMirrorData
+) -> PlaygroundQuickLook?
 #endif
 
 struct _ClassMirror : _MirrorType {

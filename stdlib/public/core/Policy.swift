@@ -142,6 +142,7 @@ public protocol AnyObject : class {}
 /// - SeeAlso: `AnyObject`
 public typealias AnyClass = AnyObject.Type
 
+@warn_unused_result
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -156,6 +157,7 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   }
 }
 
+@warn_unused_result
 public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }
@@ -190,9 +192,11 @@ public protocol Equatable {
   ///
   /// **Inequality is the inverse of equality**, i.e. `!(x == y)` iff
   /// `x != y`.
+  @warn_unused_result
   func == (lhs: Self, rhs: Self) -> Bool
 }
 
+@warn_unused_result
 public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
   return !(lhs == rhs)
 }
@@ -201,12 +205,17 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
 // Comparable
 //
 
+@warn_unused_result
 public func > <T : Comparable>(lhs: T, rhs: T) -> Bool {
   return rhs < lhs
 }
+
+@warn_unused_result
 public func <= <T : Comparable>(lhs: T, rhs: T) -> Bool {
   return !(rhs < lhs)
 }
+
+@warn_unused_result
 public func >= <T : Comparable>(lhs: T, rhs: T) -> Bool {
   return !(lhs < rhs)
 }
@@ -232,10 +241,17 @@ public func >= <T : Comparable>(lhs: T, rhs: T) -> Bool {
 public protocol Comparable : Equatable {
   /// A [strict total order](http://en.wikipedia.org/wiki/Total_order#Strict_total_order)
   /// over instances of `Self`.
-  func <(lhs: Self, rhs: Self) -> Bool
-  func <=(lhs: Self, rhs: Self) -> Bool
-  func >=(lhs: Self, rhs: Self) -> Bool
-  func >(lhs: Self, rhs: Self) -> Bool
+  @warn_unused_result
+  func < (lhs: Self, rhs: Self) -> Bool
+
+  @warn_unused_result
+  func <= (lhs: Self, rhs: Self) -> Bool
+
+  @warn_unused_result
+  func >= (lhs: Self, rhs: Self) -> Bool
+
+  @warn_unused_result
+  func > (lhs: Self, rhs: Self) -> Bool
 }
 
 /// A set type with O(1) standard bitwise operators.
@@ -253,22 +269,26 @@ public protocol BitwiseOperationsType {
   /// Returns the intersection of bits set in `lhs` and `rhs`.
   ///
   /// - Complexity: O(1).
+  @warn_unused_result
   func & (lhs: Self, rhs: Self) -> Self
 
   /// Returns the union of bits set in `lhs` and `rhs`.
   ///
   /// - Complexity: O(1).
-  func |(lhs: Self, rhs: Self) -> Self
+  @warn_unused_result
+  func | (lhs: Self, rhs: Self) -> Self
 
   /// Returns the bits that are set in exactly one of `lhs` and `rhs`.
   ///
   /// - Complexity: O(1).
-  func ^(lhs: Self, rhs: Self) -> Self
+  @warn_unused_result
+  func ^ (lhs: Self, rhs: Self) -> Self
 
   /// Returns `x ^ ~Self.allZeros`.
   ///
   /// - Complexity: O(1).
-  prefix func ~(x: Self) -> Self
+  @warn_unused_result
+  prefix func ~ (x: Self) -> Self
 
   /// The empty bitset.
   ///
@@ -278,14 +298,17 @@ public protocol BitwiseOperationsType {
   static var allZeros: Self { get }
 }
 
+@warn_unused_result
 public func |= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
   lhs = lhs | rhs
 }
 
+@warn_unused_result
 public func &= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
   lhs = lhs & rhs
 }
 
+@warn_unused_result
 public func ^= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
   lhs = lhs ^ rhs
 }
@@ -313,6 +336,7 @@ public typealias SinkType = _SinkType
 
 // Equatable types can be matched in patterns by value equality.
 @transparent
+@warn_unused_result
 public func ~= <T : Equatable> (a: T, b: T) -> Bool {
   return a == b
 }

@@ -66,6 +66,7 @@ public struct ReverseIndex<Base: BidirectionalIndexType>
   public typealias I = Base
 }
 
+@warn_unused_result
 public func == <Base> (
   lhs: ReverseIndex<Base>, rhs: ReverseIndex<Base>
 ) -> Bool {
@@ -207,6 +208,7 @@ extension CollectionType where Index : BidirectionalIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   public func reverse() -> ReverseCollection<Self> {
     return ReverseCollection(self)
   }
@@ -216,6 +218,7 @@ extension CollectionType where Index : RandomAccessIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   public func reverse() -> ReverseRandomAccessCollection<Self> {
     return ReverseRandomAccessCollection(self)
   }
@@ -226,6 +229,7 @@ where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   public func reverse() -> LazyCollection<
     ReverseCollection<Elements>
   > {
@@ -238,6 +242,7 @@ where Index : RandomAccessIndexType, Elements.Index : RandomAccessIndexType {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   public func reverse() -> LazyCollection<
     ReverseRandomAccessCollection<Elements>
   > {

@@ -58,17 +58,21 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// Returns `true` if `self` contains `member`.
   ///
   /// - Equivalent to `self.intersect([member]) == [member]`
+  @warn_unused_result
   func contains(member: Element) -> Bool
 
   /// Returns the set of elements contained in `self`, in `other`, or in
   /// both `self` and `other`.
+  @warn_unused_result
   func union(other: Self) -> Self
   
   /// Returns the set of elements contained in both `self` and `other`.
+  @warn_unused_result
   func intersect(other: Self) -> Self
 
   /// Returns the set of elements contained in `self` or in `other`,
   /// but not in both `self` and `other`.
+  @warn_unused_result
   func exclusiveOr(other: Self) -> Self
 
   /// If `member` is not already contained in `self`, inserts it.
@@ -105,13 +109,21 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
 
   //===--- Requirements with default implementations ----------------------===//
   /// Return true iff `self.intersect(other).isEmpty`.
+  @warn_unused_result
   func subtract(other: Self) -> Self
+
   /// Return true iff every element of `self` is contained in `other`.
+  @warn_unused_result
   func isSubsetOf(other: Self) -> Bool
+
   /// Return true iff `self.intersect(other).isEmpty`.
+  @warn_unused_result
   func isDisjointWith(other: Self) -> Bool
+
   /// Return true iff every element of `other` is contained in `self`.
+  @warn_unused_result
   func isSupersetOf(other: Self) -> Bool
+
   /// Return true iff `self.contains(e)` is `false` for all `e`.
   var isEmpty: Bool { get }
   
@@ -126,6 +138,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// Returns `true` iff `a` subsumes `b`.
   ///
   /// - Equivalent to `([a] as Self).isSupersetOf([b])`
+  @warn_unused_result
   static func element(a: Element, subsumes b: Element) -> Bool
 
   /// Returns `true` iff `a` is disjoint with `b`.
@@ -133,6 +146,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   /// Two elements are disjoint when neither one subsumes the other.
   ///
   /// - SeeAlso: `Self.element(_, subsumes:_)`
+  @warn_unused_result
   static func element(a: Element, isDisjointWith b: Element) -> Bool
   
 }
@@ -169,21 +183,25 @@ extension SetAlgebraType {
   }
 
   /// Returns true iff every element of `self` is contained in `other`.
+  @warn_unused_result
   public func isSubsetOf(other: Self) -> Bool {
     return self.intersect(other) == self
   }
 
   /// Returns true iff every element of `other` is contained in `self`.
+  @warn_unused_result
   public func isSupersetOf(other: Self) -> Bool {
     return other.isSubsetOf(self)
   }
 
   /// Returns true iff `self.intersect(other).isEmpty`.
+  @warn_unused_result
   public func isDisjointWith(other: Self) -> Bool {
     return self.intersect(other).isEmpty
   }
 
   /// Returns true iff `self.intersect(other).isEmpty`.
+  @warn_unused_result
   public func subtract(other: Self) -> Self {
     return self.intersect(self.exclusiveOr(other))
   }
@@ -195,12 +213,14 @@ extension SetAlgebraType {
 
   /// Returns true iff every element of `other` is contained in `self`
   /// and `self` contains an element that is not contained in `other`.
+  @warn_unused_result
   public func isStrictSupersetOf(other: Self) -> Bool {
     return self.isSupersetOf(other) && self != other
   }
 
   /// Return true iff every element of `self` is contained in `other`
   /// and `other` contains an element that is not contained in `self`.
+  @warn_unused_result
   public func isStrictSubsetOf(other: Self) -> Bool {
     return other.isStrictSupersetOf(self)
   }
@@ -208,6 +228,7 @@ extension SetAlgebraType {
   /// Returns `true` iff `a` subsumes `b`.
   ///
   /// - Equivalent to `([a] as Self).isSupersetOf([b])`
+  @warn_unused_result
   public static func element(a: Element, subsumes b: Element) -> Bool {
     return ([a] as Self).isSupersetOf([b])
   }
@@ -217,6 +238,7 @@ extension SetAlgebraType {
   /// Two elements are disjoint when neither one subsumes the other.
   ///
   /// - SeeAlso: `Self.element(_, subsumes:_)`
+  @warn_unused_result
   public static func element(a: Element, isDisjointWith b: Element) -> Bool {
     return ([a] as Self).isDisjointWith([b])
   }

@@ -16,10 +16,12 @@ public protocol IntervalType {
   typealias Bound : Comparable
 
   /// Returns `true` iff the interval contains `value`.
+  @warn_unused_result
   func contains(value: Bound) -> Bool
 
   /// Return `rhs` clamped to `self`.  The bounds of the result, even
   /// if it is empty, are always within the bounds of `self`.
+  @warn_unused_result
   func clamp(intervalToClamp: Self) -> Self
 
   /// `true` iff `self` is empty.
@@ -102,6 +104,7 @@ public struct ${Self}<Bound : Comparable>
   }
 
   /// Returns `true` iff the `Interval` contains `x`.
+  @warn_unused_result
   public func contains(x: Bound) -> Bool {
     return x >= start && x ${upperBoundCompare} end
   }
@@ -110,6 +113,7 @@ public struct ${Self}<Bound : Comparable>
   ///
   /// The bounds of the result, even if it is empty, are always limited to the bounds of
   /// `self`.
+  @warn_unused_result
   public func clamp(intervalToClamp: ${Self}) -> ${Self} {
 
     return ${Self}(
@@ -134,6 +138,7 @@ public struct ${Self}<Bound : Comparable>
 }
 
 /// Two `${Self}`s are equal if their `start` and `end` are equal.
+@warn_unused_result
 public func == <Bound : Comparable> (
   lhs: ${Self}<Bound>, rhs: ${Self}<Bound>
 ) -> Bool {
@@ -158,6 +163,7 @@ extension ClosedInterval {
 
 extension IntervalType {
   /// Returns `true` if `lhs` and `rhs` have a non-empty intersection.
+  @warn_unused_result
   public func overlaps<
     I: IntervalType where I.Bound == Bound
   >(other: I) -> Bool {
@@ -173,6 +179,7 @@ public func overlaps<
 }
 
 /// Returns a half-open interval from `start` to `end`.
+@warn_unused_result
 public func ..< <Bound : Comparable>(
   start: Bound, end: Bound
 ) -> HalfOpenInterval<Bound> {
@@ -180,6 +187,7 @@ public func ..< <Bound : Comparable>(
 }
 
 /// Returns a closed interval from `start` through `end`.
+@warn_unused_result
 public func ... <Bound : Comparable>(
   start: Bound, end: Bound
 ) -> ClosedInterval<Bound> {
@@ -187,6 +195,7 @@ public func ... <Bound : Comparable>(
 }
 
 /// Returns `true` iff `pattern` contains `value`.
+@warn_unused_result
 public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
   return pattern.contains(value)
 }

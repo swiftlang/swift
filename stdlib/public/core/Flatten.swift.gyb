@@ -90,6 +90,7 @@ public struct FlattenSequence<
 
 extension SequenceType where Generator.Element : SequenceType {
   /// A concatenation of the elements of `self`.
+  @warn_unused_result
   public func flatten() -> FlattenSequence<Self> {
     return FlattenSequence(self)
   }
@@ -99,6 +100,7 @@ extension LazySequenceType
   where Elements.Generator.Element == Generator.Element, 
     Generator.Element : SequenceType {
   /// A concatenation of the elements of `self`.
+  @warn_unused_result
   public func flatten() -> LazySequence<
     FlattenSequence<Elements>
   > {
@@ -195,6 +197,7 @@ public struct ${Index}<
   internal let _innerCollection: BaseElements.Generator.Element?
 }
 
+@warn_unused_result
 public func == <BaseElements> (
   lhs: ${Index}<BaseElements>, 
   rhs: ${Index}<BaseElements>
@@ -285,6 +288,7 @@ public struct ${Collection}<
 
 extension CollectionType where ${constraints % {'Base': ''}} {
   /// A concatenation of the elements of `self`.
+  @warn_unused_result
   public func flatten() -> ${Collection}<Self> {
     return ${Collection}(self)
   }
@@ -295,6 +299,7 @@ extension LazyCollectionType
   ${constraints % {'Base': 'Elements.'}},
   Generator.Element == Elements.Generator.Element {
   /// A concatenation of the elements of `self`.
+  @warn_unused_result
   public func flatten() -> LazyCollection<${Collection}<Elements>> {
     return ${Collection}(elements).lazy
   }

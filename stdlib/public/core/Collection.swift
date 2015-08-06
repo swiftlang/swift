@@ -162,16 +162,19 @@ public protocol CollectionType : Indexable, SequenceType {
   /// Returns `self[startIndex..<end]`
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   func prefixUpTo(end: Index) -> SubSequence
 
   /// Returns `self[start..<endIndex]`
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   func suffixFrom(start: Index) -> SubSequence
 
   /// Returns `prefixUpTo(position.successor())`
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   func prefixThrough(position: Index) -> SubSequence
 
   /// Returns `true` iff `self` is empty.
@@ -190,6 +193,7 @@ public protocol CollectionType : Indexable, SequenceType {
   /// `nil` otherwise.
   ///
   /// - Complexity: O(N).
+  @warn_unused_result
   func _customIndexOfEquatableElement(element: Generator.Element) -> Index??
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.
@@ -218,6 +222,7 @@ extension CollectionType where SubSequence == Self {
   /// return `nil`.
   ///
   /// - Complexity: O(`self.count`)
+  @warn_unused_result
   public mutating func popFirst() -> Generator.Element? {
     guard !isEmpty else { return nil }
     let element = first!
@@ -229,6 +234,7 @@ extension CollectionType where SubSequence == Self {
   /// return `nil`.
   ///
   /// - Complexity: O(`self.count`)
+  @warn_unused_result
   public mutating func popLast() -> Generator.Element? {
     guard !isEmpty else { return nil }
     let lastElementIndex = startIndex.advancedBy(numericCast(count) - 1)
@@ -280,6 +286,7 @@ extension CollectionType {
   ///   `Optional(Optional(index))` if an element was found.
   ///
   /// - Complexity: O(N).
+  @warn_unused_result
   public // dispatching
   func _customIndexOfEquatableElement(_: Generator.Element) -> Index?? {
     return nil
@@ -334,6 +341,7 @@ extension CollectionType {
   ///
   /// - Requires: `n >= 0`
   /// - Complexity: O(`n`)
+  @warn_unused_result
   public func dropFirst(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let start = startIndex.advancedBy(numericCast(n), limit: endIndex)
@@ -344,6 +352,7 @@ extension CollectionType {
   ///
   /// - Requires: `n >= 0`
   /// - Complexity: O(`self.count`)
+  @warn_unused_result
   public func dropLast(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let amount = max(0, numericCast(count) - n)
@@ -359,6 +368,7 @@ extension CollectionType {
   ///
   /// - Requires: `maxLength >= 0`
   /// - Complexity: O(`maxLength`)
+  @warn_unused_result
   public func prefix(maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a prefix of negative length from a collection")
     let end = startIndex.advancedBy(numericCast(maxLength), limit: endIndex)
@@ -373,6 +383,7 @@ extension CollectionType {
   ///
   /// - Requires: `maxLength >= 0`
   /// - Complexity: O(`self.count`)
+  @warn_unused_result
   public func suffix(maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a collection")
     let amount = max(0, numericCast(count) - maxLength)
@@ -383,6 +394,7 @@ extension CollectionType {
   /// Returns `self[startIndex..<end]`
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   public func prefixUpTo(end: Index) -> SubSequence {
     return self[startIndex..<end]
   }
@@ -390,6 +402,7 @@ extension CollectionType {
   /// Returns `self[start..<endIndex]`
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   public func suffixFrom(start: Index) -> SubSequence {
     return self[start..<endIndex]
   }
@@ -397,6 +410,7 @@ extension CollectionType {
   /// Returns `prefixUpTo(position.successor())`
   ///
   /// - Complexity: O(1)
+  @warn_unused_result
   public func prefixThrough(position: Index) -> SubSequence {
     return prefixUpTo(position.successor())
   }
@@ -416,6 +430,7 @@ extension CollectionType {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
+  @warn_unused_result
   public func split(
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
@@ -470,6 +485,7 @@ extension CollectionType where Generator.Element : Equatable {
   ///   The default value is `false`.
   ///
   /// - Requires: `maxSplit >= 0`
+  @warn_unused_result
   public func split(
     separator: Generator.Element,
     maxSplit: Int = Int.max,
@@ -485,6 +501,7 @@ extension CollectionType where Index : BidirectionalIndexType {
   ///
   /// - Requires: `n >= 0`
   /// - Complexity: O(`n`)
+  @warn_unused_result
   public func dropLast(n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let end = endIndex.advancedBy(numericCast(-n), limit: startIndex)
@@ -499,6 +516,7 @@ extension CollectionType where Index : BidirectionalIndexType {
   ///
   /// - Requires: `maxLength >= 0`
   /// - Complexity: O(`maxLength`)
+  @warn_unused_result
   public func suffix(maxLength: Int) -> SubSequence {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a collection")
     let start = endIndex.advancedBy(numericCast(-maxLength), limit: startIndex)

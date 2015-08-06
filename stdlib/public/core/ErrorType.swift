@@ -26,12 +26,14 @@ extension ErrorType {
 #if _runtime(_ObjC)
 // Helper functions for the C++ runtime to have easy access to domain and
 // code as Objective-C values.
+@warn_unused_result
 @asmname("swift_stdlib_getErrorDomainNSString")
 public func _stdlib_getErrorDomainNSString<T : ErrorType>(x: UnsafePointer<T>)
 -> AnyObject {
   return x.memory._domain._bridgeToObjectiveCImpl()
 }
 
+@warn_unused_result
 @asmname("swift_stdlib_getErrorCode")
 public func _stdlib_getErrorCode<T : ErrorType>(x: UnsafePointer<T>) -> Int {
   return x.memory._code
@@ -39,6 +41,7 @@ public func _stdlib_getErrorCode<T : ErrorType>(x: UnsafePointer<T>) -> Int {
 
 // Known function for the compiler to use to coerce `ErrorType` instances to
 // `NSError`.
+@warn_unused_result
 @asmname("swift_bridgeErrorTypeToNSError")
 public func _bridgeErrorTypeToNSError(e: ErrorType) -> AnyObject
 #endif

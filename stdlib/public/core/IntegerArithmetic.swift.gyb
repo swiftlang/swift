@@ -41,11 +41,13 @@ public protocol IntegerArithmeticType : _IntegerArithmeticType, Comparable {
 % for name,op,Action,result in integerBinaryOps:
   /// ${Action} `lhs` and `rhs`, returning ${result} and trapping in case of
   /// arithmetic overflow (except in -Ounchecked builds).
+  @warn_unused_result
   func ${op} (lhs: Self, rhs: Self) -> Self
 % end
   
   /// Explicitly convert to `IntMax`, trapping on overflow (except in
   /// -Ounchecked builds).
+  @warn_unused_result
   func toIntMax() -> IntMax
 }
 
@@ -53,6 +55,7 @@ public protocol IntegerArithmeticType : _IntegerArithmeticType, Comparable {
 /// ${Action} `lhs` and `rhs`, returning ${result} and trapping in case of
 /// arithmetic overflow (except in -Ounchecked builds).
 @transparent
+@warn_unused_result
 public func ${op} <T : _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
   return _overflowChecked(T.${name}WithOverflow(lhs, rhs))
 }
@@ -60,6 +63,7 @@ public func ${op} <T : _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
 % if (op != '/') and (op != '%'):
 /// ${name} `lhs` and `rhs`, silently discarding any overflow.
 @transparent
+@warn_unused_result
 public func &${op} <T : _IntegerArithmeticType>(lhs: T, rhs: T) -> T {
   return T.${name}WithOverflow(lhs, rhs).0
 }
@@ -89,9 +93,11 @@ public func ${op}= <T : _IntegerArithmeticType>(inout lhs: T, rhs: T) {
 /// - `-(-x) == x`
 public protocol SignedNumberType : Comparable, IntegerLiteralConvertible {
   /// Return the result of negating `x`.
+  @warn_unused_result
   prefix func - (x: Self) -> Self
 
   /// Return the difference between `lhs` and `rhs`.
+  @warn_unused_result
   func - (lhs: Self, rhs: Self) -> Self
   
   // Do not use this operator directly; call abs(x) instead
@@ -128,6 +134,7 @@ public func ~> <T : SignedNumberType>(x:T,_:(_Abs, ())) -> T {
 /// A type that supports an "absolute value" function.
 public protocol AbsoluteValuable : SignedNumberType {
   /// Returns the absolute value of `x`.
+  @warn_unused_result
   static func abs(x: Self) -> Self
 }
 
