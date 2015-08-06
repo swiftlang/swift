@@ -188,7 +188,7 @@ func getHugeBridgedVerbatimSet() -> Set<NSObject> {
 func getBridgedNonverbatimSet(members: [Int] = [1010, 2020, 3030]) ->
   Set<TestBridgedKeyTy> {
   let nss = getAsNSSet(members)
-  let identity1 = unsafeBitCast(nss, Int.self)
+  let _ = unsafeBitCast(nss, Int.self)
   let result: Set<TestBridgedKeyTy> =
     Swift._forceBridgeFromObjectiveC(nss, Set.self)
   expectTrue(isNativeSet(result))
@@ -198,7 +198,7 @@ func getBridgedNonverbatimSet(members: [Int] = [1010, 2020, 3030]) ->
 /// Get a larger Set<TestBridgedKeyTy> backed by native storage
 func getHugeBridgedNonverbatimSet() -> Set<TestBridgedKeyTy> {
   let nss = getAsNSSet(hugeNumberArray)
-  let identity1 = unsafeBitCast(nss, Int.self)
+  let _ = unsafeBitCast(nss, Int.self)
   let result: Set<TestBridgedKeyTy> =
     Swift._forceBridgeFromObjectiveC(nss, Set.self)
   expectTrue(isNativeSet(result))

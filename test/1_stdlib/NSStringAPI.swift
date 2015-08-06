@@ -135,7 +135,7 @@ NSStringAPIs.test("init(contentsOfFile:usedEncoding:error:)") {
 
   var usedEncoding: NSStringEncoding = 0
   do {
-    try String(contentsOfFile: nonExistentPath)
+    _ = try String(contentsOfFile: nonExistentPath)
     expectUnreachable()
   } catch {
     expectEqual(0, usedEncoding)
@@ -158,7 +158,7 @@ NSStringAPIs.test("init(contentsOfURL:encoding:error:)") {
   }
 
   do {
-    try String(contentsOfURL: nonExistentURL, encoding: NSASCIIStringEncoding)
+    _ = try String(contentsOfURL: nonExistentURL, encoding: NSASCIIStringEncoding)
     expectUnreachable()
   } catch {
   }
@@ -183,7 +183,7 @@ NSStringAPIs.test("init(contentsOfURL:usedEncoding:error:)") {
 
   var usedEncoding: NSStringEncoding = 0
   do {
-    try String(contentsOfURL: nonExistentURL, usedEncoding: &usedEncoding)
+    _ = try String(contentsOfURL: nonExistentURL, usedEncoding: &usedEncoding)
     expectUnreachable()
   } catch {
     expectEqual(0, usedEncoding)
