@@ -74,7 +74,7 @@ i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
-[1, 2, 3].doesntExist(0)  // expected-error {{type 'Int2048' does not conform to protocol 'IntegerLiteralConvertible'}}
+[1, 2, 3].doesntExist(0)  // expected-error {{value of type '[Int]' has no member 'doesntExist'}}
 "awfawf".doesntExist(0)   // expected-error {{value of type 'String' has no member 'doesntExist'}}
 
 // Does not conform to protocol.

@@ -216,7 +216,7 @@ func f() {
 }
 
 func union_error(a: ZeroOneTwoThree) {
-  var _ : ZeroOneTwoThree = .Zero(1) // expected-error {{type 'Int2048' does not conform to protocol 'IntegerLiteralConvertible'}}
+  var _ : ZeroOneTwoThree = .Zero(1) // expected-error {{type of expression is ambiguous without more context}}
   var _ : ZeroOneTwoThree = .One // expected-error {{type of expression is ambiguous without more context}}
   var _ : ZeroOneTwoThree = .foo // expected-error {{type of expression is ambiguous without more context}}
   var _ : ZeroOneTwoThree = .foo() // expected-error {{type of expression is ambiguous without more context}}

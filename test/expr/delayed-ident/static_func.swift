@@ -14,7 +14,7 @@ var x1: X1 = .create(5)
 x1 = .createGeneric(3.14159)
 
 // Non-matching data members
-x1 = .notAFactory(5) // expected-error{{type 'Int2048' does not conform to protocol 'IntegerLiteralConvertible'}}
+x1 = .notAFactory(5) // expected-error{{type of expression is ambiguous without more context}}
 
 // Static methods returning unchecked-optional types
 x1 = .createMaybe(5)

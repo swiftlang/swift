@@ -728,6 +728,6 @@ func r20802757(inout z: Int = &g20802757) { // expected-error {{'&' can only app
   print(z)
 }
 
-_ = _.foo // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
+_ = _.foo // expected-error {{type of expression is ambiguous without more context}}
 
 

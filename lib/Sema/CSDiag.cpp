@@ -1756,8 +1756,9 @@ class FailureDiagnosis :public ASTVisitor<FailureDiagnosis, /*exprresult*/bool>{
   Expr *expr = nullptr;
   ConstraintSystem *const CS;
 public:
-  
-  FailureDiagnosis(Expr *expr, ConstraintSystem *CS);
+  FailureDiagnosis(Expr *expr, ConstraintSystem *cs) : expr(expr), CS(cs) {
+    assert(expr && CS);
+  }
 
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(ArgTypes &&...Args) {
@@ -1766,7 +1767,7 @@ public:
 
   /// Attempt to diagnose a failure without taking into account the specific
   /// kind of expression that could not be type checked.
-  bool diagnoseGeneralFailure();
+  bool diagnoseConstraintFailure();
 
   /// Unless we've already done this, retypecheck the specified child of the
   /// current expression on its own, without including any contextual
@@ -1818,15 +1819,15 @@ private:
   
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
-  bool diagnoseGeneralMemberFailure();
+  bool diagnoseGeneralMemberFailure(Constraint *constraint);
   
   /// Produce a diagnostic for a general overload resolution failure
   /// (irrespective of the exact expression kind).
-  bool diagnoseGeneralOverloadFailure();
+  bool diagnoseGeneralOverloadFailure(Constraint *constraint);
   
   /// Produce a diagnostic for a general conversion failure (irrespective of the
   /// exact expression kind).
-  bool diagnoseGeneralConversionFailure();
+  bool diagnoseGeneralConversionFailure(Constraint *constraint);
      
   bool visitExpr(Expr *E);
 
@@ -1856,43 +1857,140 @@ private:
 
 
 
-FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
-  : expr(expr), CS(cs) {
-  assert(expr && CS);
+static bool isMemberConstraint(Constraint *C) {
+  return C->getKind() == ConstraintKind::ValueMember ||
+         C->getKind() == ConstraintKind::UnresolvedValueMember ||
+         C->getKind() == ConstraintKind::TypeMember;
+}
+
+static bool isOverloadConstraint(Constraint *C) {
+  if (C->getKind() == ConstraintKind::BindOverload)
+    return true;
+
+  if (C->getKind() != ConstraintKind::Disjunction)
+    return false;
+  
+  return C->getNestedConstraints().front()->getKind() ==
+    ConstraintKind::BindOverload;
+}
+
+/// Return true if this constraint is a conversion or requirement between two
+/// types.
+static bool isConversionConstraint(const Constraint *C) {
+  switch (C->getKind()) {
+  case ConstraintKind::Conversion:
+  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::ArgumentConversion:
+  case ConstraintKind::ArgumentTupleConversion:
+  case ConstraintKind::ConformsTo:
+  case ConstraintKind::SelfObjectOfProtocol:
+  case ConstraintKind::Subtype:
+    return true;
+    
+  default:
+    return false;
+  }
+}
+
+/// Attempt to diagnose a failure without taking into account the specific
+/// kind of expression that could not be type checked.
+bool FailureDiagnosis::diagnoseConstraintFailure() {
+  // This is the priority order in which we handle constraints.  Things earlier
+  // in the list are considered to have higher specificity (and thus, higher
+  // priority) than things lower in the list.
+  enum ConstraintRanking {
+    CR_MemberConstraint,
+    CR_OverloadConstraint,
+    CR_ConversionConstraint,
+    CR_OtherConstraint
+  };
+
+  // Start out by classifying all the constraints.
+  typedef std::pair<Constraint*, ConstraintRanking> RCElt;
+  std::vector<RCElt> rankedConstraints;
+
+  // This is a predicate that classifies constraints according to our
+  // priorities.
+  auto classifyConstraint = [&](Constraint *C) -> ConstraintRanking {
+    if (isMemberConstraint(C))
+      return CR_MemberConstraint;
+
+    if (isOverloadConstraint(C))
+      return CR_OverloadConstraint;
+
+    if (isConversionConstraint(C))
+      return CR_ConversionConstraint;
+    
+    return CR_OtherConstraint;
+  };
+  
+  // Look at the failed constraint and the general constraint list.
+  if (CS->failedConstraint) {
+    rankedConstraints.push_back({
+      CS->failedConstraint,
+      classifyConstraint(CS->failedConstraint)
+    });
+  }
+  for (auto &C : CS->getConstraints())
+    rankedConstraints.push_back({ &C, classifyConstraint(&C)} );
+
+  // Okay, now that we've classified all the constraints, sort them by their
+  // priority and priviledge the favored constraints.
+  std::stable_sort(rankedConstraints.begin(), rankedConstraints.end(),
+                   [&] (RCElt LHS, RCElt RHS) {
+    // Rank things by their kind as the highest priority.
+    if (LHS.second < RHS.second)
+      return true;
+    if (LHS.second > RHS.second)
+      return false;
+    // Next priority is favored constraints.
+    if (LHS.first->isFavored())
+      return true;
+    if (RHS.first->isFavored())
+      return false;
+    // Finally, rank disjunction constraints lower than non-disjunction
+    // constraints.
+    bool LHSDisj = LHS.first->getKind() == ConstraintKind::Disjunction;
+    bool RHSDisj = RHS.first->getKind() == ConstraintKind::Disjunction;
+    return LHSDisj < RHSDisj;
+  });
+ 
+  // Now that we have a sorted precedence of constraints to diagnose, charge
+  // through them.
+  for (auto elt : rankedConstraints) {
+    auto C = elt.first;
+    switch (elt.second) {
+    case CR_MemberConstraint:
+      if (diagnoseGeneralMemberFailure(C))
+        return true;
+      continue;
+    case CR_OverloadConstraint:
+      if (diagnoseGeneralOverloadFailure(C))
+        return true;
+      continue;
+    case CR_ConversionConstraint:
+    case CR_OtherConstraint:
+      if (diagnoseGeneralConversionFailure(C))
+        return true;
+      continue;
+    }
+  }
+  
+  // Otherwise, all the constraints look ok, diagnose this as an ambiguous
+  // expression.
+  return false;
 }
 
 
-bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
-  // Check to see if we have any member constraints to diagnose.
-  Constraint *memberConstraint = nullptr;
-  auto considerConstraint = [&](Constraint *C) {
-    // If we've already found a good candidate, ignore other options.
-    if (memberConstraint && !C->isFavored()) return;
-
-    if (C->getKind() == ConstraintKind::ValueMember ||
-        C->getKind() == ConstraintKind::UnresolvedValueMember ||
-        C->getKind() == ConstraintKind::TypeMember)
-      memberConstraint = C;
-  };
-
-  // Look at the failed constraint and the general constraint list.
-  if (CS->failedConstraint)
-    considerConstraint(CS->failedConstraint);
-  for (auto &C : CS->getConstraints())
-    considerConstraint(&C);
-
-  if (!memberConstraint) return false;
+bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
+  assert(isMemberConstraint(constraint));
   
-  assert(memberConstraint->getKind() == ConstraintKind::ValueMember ||
-         memberConstraint->getKind() == ConstraintKind::UnresolvedValueMember ||
-         memberConstraint->getKind() == ConstraintKind::TypeMember);
-  
-  auto memberName = memberConstraint->getMember();
+  auto memberName = constraint->getMember();
   
   // Get the referenced expression from the failed constraint.
   auto anchor = expr;
   SourceRange range = anchor->getSourceRange();
-  if (auto locator = memberConstraint->getLocator()) {
+  if (auto locator = constraint->getLocator()) {
     locator = simplifyLocator(*CS, locator, range);
     if (locator->getAnchor())
       anchor = locator->getAnchor();
@@ -1954,8 +2052,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
     return true;
   }
   
-  MemberLookupResult result =
-    CS->performMemberLookup(baseObjTy, *memberConstraint);
+  MemberLookupResult result = CS->performMemberLookup(baseObjTy, *constraint);
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
@@ -2077,47 +2174,10 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
 
 // In the absense of a better conversion constraint failure, point out the
 // inability to find an appropriate overload.
-bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
-  Constraint *bindOverload = nullptr, *bindOverloadDisjunction = nullptr;
-
-  // Search the system to see if we have any overload failures.
-  if (CS->failedConstraint &&
-      CS->failedConstraint->getKind() == ConstraintKind::BindOverload)
-    bindOverload = CS->failedConstraint;
-  else {
-    for (auto &constraint : CS->getConstraints()) {
-      // If this is a disjunction constraint, check to see if it contains
-      // BindOverloads.  If so, this is an ambiguous case.
-      if (constraint.getKind() == ConstraintKind::Disjunction &&
-          (!bindOverloadDisjunction || constraint.isFavored()) &&
-          constraint.getNestedConstraints().front()->getKind() ==
-            ConstraintKind::BindOverload) {
-        bindOverloadDisjunction = &constraint;
-        continue;
-      }
-
-      // Otherwise, check for a failed BindOverload itself.
-      if (constraint.getKind() != ConstraintKind::BindOverload)
-        continue;
-
-      if (!bindOverload || constraint.isFavored())
-        bindOverload = &constraint;
-    }
-  }
-
-  // If we found a BindOverload constraint, we'll use it.  Otherwise, we'll use
-  // a disjunction member constraint, otherwise we can't do anything here.
-  if (bindOverload) {
-    // If we have a specific unambiguous member failure, use it.
-    bindOverloadDisjunction = nullptr;
-  } else {
-    if (!bindOverloadDisjunction)
-      return false;
-
-    // If we have a disjunction constraint, pull out the first BindOverload to
-    // serve as an exemplar for some of the logic below.
-    bindOverload = bindOverloadDisjunction->getNestedConstraints().front();
-  }
+bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
+  Constraint *bindOverload = constraint;
+  if (constraint->getKind() == ConstraintKind::Disjunction)
+    bindOverload = constraint->getNestedConstraints().front();
 
   auto overloadChoice = bindOverload->getOverloadChoice();
   std::string overloadName = overloadChoice.getDecl()->getNameStr();
@@ -2167,7 +2227,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   // If we couldn't resolve an argument, then produce a generic "ambiguity"
   // diagnostic.
   if (!argExpr || argExpr->getType()->is<TypeVariableType>()) {
-    if (!bindOverloadDisjunction) {
+    if (constraint->getKind() != ConstraintKind::Disjunction) {
       diagnose(anchor->getLoc(), diag::cannot_find_appropriate_overload,
                overloadName)
         .highlight(anchor->getSourceRange());
@@ -2179,7 +2239,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
              overloadName)
       .highlight(anchor->getSourceRange());
 
-    for (auto elt : bindOverloadDisjunction->getNestedConstraints()) {
+    for (auto elt : constraint->getNestedConstraints()) {
       if (elt->getKind() != ConstraintKind::BindOverload) continue;
       auto candidate = elt->getOverloadChoice().getDecl();
       diagnose(candidate->getLoc(), diag::found_candidate);
@@ -2230,97 +2290,9 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   return true;
 }
 
-/// Return true if this constraint is a conversion or requirement between two
-/// types.
-static bool isConversionConstraint(const Constraint *C) {
-  switch (C->getKind()) {
-    case ConstraintKind::Conversion:
-    case ConstraintKind::ExplicitConversion:
-    case ConstraintKind::ArgumentConversion:
-    case ConstraintKind::ArgumentTupleConversion:
-    case ConstraintKind::ConformsTo:
-    case ConstraintKind::SelfObjectOfProtocol:
-    case ConstraintKind::Subtype:
-      return true;
-      
-    default:
-      return false;
-  }
-}
 
 
-bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
-  Constraint *conversionConstraint = nullptr;
-
-  // If the constraint system had a failure constraint, it takes precedence over
-  // other random constraints in the system.
-  if (CS->failedConstraint && isConversionConstraint(CS->failedConstraint))
-    conversionConstraint = CS->failedConstraint;
-  
-  Constraint *fallbackConstraint = nullptr;
-  Constraint *disjunctionConversionConstraint = nullptr;
-  Constraint *conformanceConstraint = nullptr;
-  
-  for (auto & constraintRef : CS->getConstraints()) {
-    auto constraint = &constraintRef;
-    
-    // Capture the first non-disjunction constraint we find. We'll use this
-    // if we can't find a clearer reason for the failure.
-    if ((!fallbackConstraint || constraint->isFavored()) &&
-        (constraint->getKind() != ConstraintKind::Disjunction) &&
-        (constraint->getKind() != ConstraintKind::Conjunction)) {
-      fallbackConstraint = constraint;
-    }
-    
-    // Store off conversion constraints, favoring existing conversion
-    // constraints.
-    if ((!conformanceConstraint || constraint->isFavored()) &&
-        constraint->getKind() == ConstraintKind::ConformsTo) {
-      conformanceConstraint = constraint;
-    }
-    
-    // Conversion constraints are also nicely descriptive, so we'll grab the
-    // first one of those as well.
-    if ((!conversionConstraint || constraint->isFavored()) &&
-        isConversionConstraint(constraint)) {
-      conversionConstraint = constraint;
-    }
-    
-    // When all else fails, inspect a potential conjunction or disjunction for a
-    // consituent conversion.
-    if (!disjunctionConversionConstraint || constraint->isFavored()) {
-      disjunctionConversionConstraint =
-      getConstraintChoice(constraint, ConstraintKind::Conversion, true);
-    }
-  }
-  
-  // If no more descriptive constraint was found, use the fallback constraint.
-  if (fallbackConstraint && !conversionConstraint)
-    conversionConstraint = fallbackConstraint;
-  
-  // If there's still no conversion to diagnose, use the disjunction conversion.
-  if (!conversionConstraint)
-    conversionConstraint = disjunctionConversionConstraint;
-  
-  if (conversionConstraint && conformanceConstraint &&
-      conformanceConstraint->getTypeVariables().size() <
-      conversionConstraint->getTypeVariables().size())
-    conversionConstraint = conformanceConstraint;
-  
-  // If there was already a conversion failure, use it.
-  if (!conversionConstraint && CS->failedConstraint &&
-      CS->failedConstraint->getKind() != ConstraintKind::Disjunction) {
-    conversionConstraint = CS->failedConstraint;
-  }
-
-  
-  // Otherwise, if we have a conversion constraint, use that as the basis for
-  // the diagnostic.
-  if (!conversionConstraint)
-    return false;
-  
-  auto constraint = conversionConstraint;
-
+bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   auto anchor = expr;
   if (auto locator = constraint->getLocator()) {
     anchor = simplifyLocatorToAnchor(*CS, locator);
@@ -2415,14 +2387,6 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   
   return true;
 }
-
-bool FailureDiagnosis::diagnoseGeneralFailure() {
-  
-  return diagnoseGeneralMemberFailure() ||
-         diagnoseGeneralOverloadFailure() ||
-         diagnoseGeneralConversionFailure();
-}
-
 namespace {
   class ExprTypeSaver {
     llvm::DenseMap<Expr*, Type> ExprTypes;
@@ -3879,7 +3843,7 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   
   // If we can diagnose a problem based on the constraints left laying around in
   // the system, do so now.
-  if (diagnosis.diagnoseGeneralFailure())
+  if (diagnosis.diagnoseConstraintFailure())
     return;
 
   // If the expression-order diagnostics didn't find any diagnosable problems,
