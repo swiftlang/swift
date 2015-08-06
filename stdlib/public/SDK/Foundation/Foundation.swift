@@ -1288,6 +1288,7 @@ internal func resolveError(error: NSError?) throws {
 }
 
 extension NSCoder {
+  @warn_unused_result
   @nonobjc
   public func decodeObjectOfClasses(classes: NSSet?, forKey key: String) -> AnyObject? {
     var classesAsNSObjects: Set<NSObject>? = nil
@@ -1300,6 +1301,7 @@ extension NSCoder {
     return self.__decodeObjectOfClasses(classesAsNSObjects, forKey: key)
   }
 
+  @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObject() throws -> AnyObject? {
     var error: NSError?
@@ -1308,6 +1310,7 @@ extension NSCoder {
     return result
   }
 
+  @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObjectForKey(key: String) throws -> AnyObject? {
     var error: NSError?
@@ -1316,6 +1319,7 @@ extension NSCoder {
     return result
   }
 
+  @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObjectOfClass<DecodedObjectType: NSCoding where DecodedObjectType: NSObject>(cls: DecodedObjectType.Type, forKey key: String) throws -> DecodedObjectType? {
     var error: NSError?
@@ -1324,6 +1328,7 @@ extension NSCoder {
     return result as? DecodedObjectType
   }
 
+  @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObjectOfClasses(classes: NSSet?, forKey key: String) throws -> AnyObject? {
     var error: NSError?
@@ -1345,6 +1350,7 @@ internal func NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
   _ error: NSErrorPointer) -> AnyObject?
 
 extension NSKeyedUnarchiver {
+  @warn_unused_result
   @available(OSX 10.11, iOS 9.0, *)
   public class func unarchiveTopLevelObjectWithData(data: NSData) throws -> AnyObject? {
     var error: NSError?
