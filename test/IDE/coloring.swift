@@ -1,6 +1,9 @@
 // RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | FileCheck %s
 // RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | FileCheck %s
 
+#line 17 "abc.swift"
+// CHECK: <#kw>#line</#kw> <int>17</int> <str>"abc.swift"</str>
+
 @available(iOS 8.0, OSX 10.10, *)
 // CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <float>8.0</float>, <kw>OSX</kw> <float>10.10</float>, *)
 func foo() {
