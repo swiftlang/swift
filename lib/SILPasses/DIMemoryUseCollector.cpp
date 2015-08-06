@@ -1019,7 +1019,7 @@ static bool isSelfInitUse(SILInstruction *I) {
   if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(LocExpr)) {
     LocExpr = RB->getSubExpr();
     // Look through TryExpr or ForceValueExpr, but not both.
-    if (auto *TE = dyn_cast<TryExpr>(LocExpr))
+    if (auto *TE = dyn_cast<AnyTryExpr>(LocExpr))
       LocExpr = TE->getSubExpr();
     else if (auto *FVE = dyn_cast<ForceValueExpr>(LocExpr))
       LocExpr = FVE->getSubExpr();
@@ -1077,8 +1077,8 @@ static bool isSelfInitUse(ValueMetatypeInst *Inst) {
       return ctor && ctor->isFactoryInit();
     }
 
-    if (auto *AI = dyn_cast<ApplyInst>(User)) {
-      auto *LocExpr = AI->getLoc().getAsASTNode<ApplyExpr>();
+    if (auto apply = ApplySite::isa(User)) {
+      auto *LocExpr = apply.getLoc().getAsASTNode<ApplyExpr>();
       if (!LocExpr)
         return false;
 

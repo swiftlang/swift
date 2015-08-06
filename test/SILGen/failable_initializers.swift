@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s > /dev/null
 
 protocol P {}
 class C: P {}
@@ -226,6 +227,7 @@ class RootClass {
   }
 
   init?(alwaysFail: Void) {
+    fatalError()
     return nil
   }
 
@@ -357,4 +359,548 @@ struct TrivialFailableInit {
 }
 
 
+extension LoadableStruct {
+  init(error: Bool) throws {
+    x = C()
+  }
 
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FzT9propagateSb_S0_
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFV21failable_initializers14LoadableStructCfMS0_FzT5errorSb_S0_
+  // CHECK:   try_apply [[OTHER_INIT]]({{%.+}}, %1) : $@convention(thin) (Bool, @thin LoadableStruct.Type) -> (@owned LoadableStruct, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $LoadableStruct):
+  // CHECK:   assign [[VALUE]] to [[BOX:%.+]] : $*LoadableStruct
+  // CHECK:   [[RESULT:%.+]] = load [[BOX]] : $*LoadableStruct
+  // CHECK:   retain_value [[RESULT]] : $LoadableStruct
+  // CHECK:   return [[RESULT]] : $LoadableStruct
+  // CHECK: [[FAILURE]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK:   throw [[ERROR]] : $ErrorType
+  // CHECK: {{^}$}}
+  init(propagate: Bool) throws {
+    try self.init(error: true)
+  }
+
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FT5forceSb_S0_
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFV21failable_initializers14LoadableStructCfMS0_FzT5errorSb_S0_
+  // CHECK:   try_apply [[OTHER_INIT]]({{%.+}}, %1) : $@convention(thin) (Bool, @thin LoadableStruct.Type) -> (@owned LoadableStruct, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $LoadableStruct):
+  // CHECK:   assign [[VALUE]] to [[BOX:%.+]] : $*LoadableStruct
+  // CHECK:   [[RESULT:%.+]] = load [[BOX]] : $*LoadableStruct
+  // CHECK:   retain_value [[RESULT]] : $LoadableStruct
+  // CHECK:   return [[RESULT]] : $LoadableStruct
+  // CHECK: [[FAILURE:[^ ]+]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK:   builtin "unexpectedError"
+  // CHECK: [[CLEANUP]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK-NEXT:   br [[FAILURE]]([[ERROR]] : $ErrorType)
+  // CHECK: {{^}$}}
+  init(force: Bool) {
+    try! self.init(error: true)
+  }
+
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FT5maybeSb_GSqS0__
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFV21failable_initializers14LoadableStructCfMS0_FzT5errorSb_S0_
+  // CHECK:   try_apply [[OTHER_INIT]]({{%.+}}, %1) : $@convention(thin) (Bool, @thin LoadableStruct.Type) -> (@owned LoadableStruct, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $LoadableStruct):
+  // CHECK:   [[WRAPPED:%.+]] = enum $Optional<LoadableStruct>, #Optional.Some!enumelt.1, [[VALUE]] : $LoadableStruct
+  // CHECK:   br [[CHECK:[^ ]+]]([[WRAPPED]] : $Optional<LoadableStruct>)
+  // CHECK: [[CHECK]]([[RESULT:%.+]] : $Optional<LoadableStruct>):
+  // CHECK:   [[CASE:%.+]] = select_enum [[RESULT]] : $Optional<LoadableStruct>, case #Optional.Some!enumelt.1: {{%.+}}, default {{%.+}}
+  // CHECK:   cond_br [[CASE]], [[SUCCESS:[^ ]+]], [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]:
+  // CHECK:   = unchecked_enum_data [[RESULT]] : $Optional<LoadableStruct>, #Optional.Some!enumelt.1
+  // CHECK:   [[FINAL_RESULT:%.+]] = enum $Optional<LoadableStruct>, #Optional.Some!enumelt.1, {{%.+}} : $LoadableStruct
+  // CHECK:   br [[RETURN:[^ ]+]]([[FINAL_RESULT]] : $Optional<LoadableStruct>)
+  // CHECK: [[FAILURE]]:
+  // CHECK:   [[FINAL_RESULT:%.+]] = enum $Optional<LoadableStruct>, #Optional.None!enumelt
+  // CHECK:   br [[RETURN]]([[FINAL_RESULT]] : $Optional<LoadableStruct>)
+  // CHECK: [[RETURN]]([[RET_VAL:%.+]] : $Optional<LoadableStruct>):
+  // CHECK:   return [[RET_VAL]] : $Optional<LoadableStruct>
+  // CHECK: [[ERROR:[^ ]+]]({{%.+}} : $ErrorType):
+  // CHECK:   [[FAIL_VALUE:%.+]] = enum $Optional<LoadableStruct>, #Optional.None!enumelt
+  // CHECK:   br [[CHECK]]([[FAIL_VALUE]] : $Optional<LoadableStruct>)
+  // CHECK: [[CLEANUP]]({{%.+}} : $ErrorType):
+  // CHECK-NEXT:   br [[ERROR]]({{%.+}} : $ErrorType)
+  // CHECK: {{^}$}}
+  init?(maybe: Bool) {
+    try? self.init(error: true)
+  }
+
+  init?(complex: Bool) throws {
+    try self.init(error: true)
+  }
+
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FzT10propagate2Sb_S0_
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $LoadableStruct
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*LoadableStruct
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFV21failable_initializers14LoadableStructCfMS0_FzT7complexSb_GSqS0__
+  // CHECK:   try_apply [[OTHER_INIT]]({{%.+}}, %1) : $@convention(thin) (Bool, @thin LoadableStruct.Type) -> (@owned Optional<LoadableStruct>, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Optional<LoadableStruct>):
+  // CHECK:   store [[VALUE]] to [[BOX:%.+]]#1 : $*Optional<LoadableStruct>
+  // CHECK:   [[FORCE_FN:%.+]] = function_ref @_TFSs17_getOptionalValueurFGSqq__q_
+  // CHECK:   [[RESULT_BOX:%.+]] = alloc_stack $LoadableStruct
+  // CHECK:   = apply [[FORCE_FN]]<LoadableStruct>([[RESULT_BOX]]#1, [[BOX]]#1)
+  // CHECK:   [[RESULT:%.+]] = load [[RESULT_BOX]]#1 : $*LoadableStruct
+  // CHECK:   assign [[RESULT]] to [[SELF_BOX_VAL]] : $*LoadableStruct
+  // CHECK:   dealloc_stack [[RESULT_BOX]]#0
+  // CHECK:   dealloc_stack [[BOX]]#0
+  // CHECK:   [[FINAL_RESULT:%.+]] = load [[SELF_BOX_VAL]]
+  // CHECK:   retain_value [[FINAL_RESULT]] : $LoadableStruct
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   return [[FINAL_RESULT]] : $LoadableStruct
+  // CHECK: [[FAILURE]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK:   dealloc_stack [[BOX]]#0
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   throw [[ERROR]] : $ErrorType
+  // CHECK: {{^}$}}
+  init(propagate2: Bool) throws {
+    try self.init(complex: true)!
+  }
+
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FT6force2Sb_GSqS0__
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $LoadableStruct
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*LoadableStruct
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFV21failable_initializers14LoadableStructCfMS0_FzT7complexSb_GSqS0__
+  // CHECK:   try_apply [[OTHER_INIT]]({{%.+}}, %1) : $@convention(thin) (Bool, @thin LoadableStruct.Type) -> (@owned Optional<LoadableStruct>, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Optional<LoadableStruct>):
+  // CHECK:   [[CASE:%.+]] = select_enum [[VALUE]] : $Optional<LoadableStruct>, case #Optional.Some!enumelt.1: {{%.+}}, default {{%.+}}
+  // CHECK:   cond_br [[CASE]], [[SUCCESS:[^ ]+]], [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]:
+  // CHECK:   [[UNWRAPPED:%.+]] = unchecked_enum_data [[VALUE]] : $Optional<LoadableStruct>, #Optional.Some!enumelt.1
+  // CHECK:   assign [[UNWRAPPED]] to [[SELF_BOX_VAL]] : $*LoadableStruct
+  // CHECK:   [[RESULT:%.+]] = load [[SELF_BOX_VAL]] : $*LoadableStruct
+  // CHECK:   retain_value [[RESULT]] : $LoadableStruct
+  // CHECK:   [[WRAPPED:%.+]] = enum $Optional<LoadableStruct>, #Optional.Some!enumelt.1, [[RESULT]] : $LoadableStruct
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   br [[RETURN:[^ ]+]]([[WRAPPED]] : $Optional<LoadableStruct>)
+  // CHECK: [[FAILURE]]:
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   [[NONE_VAL:%.+]] = enum $Optional<LoadableStruct>, #Optional.None!enumelt
+  // CHECK:   br [[RETURN:[^ ]+]]([[NONE_VAL]] : $Optional<LoadableStruct>)
+  // CHECK: [[RETURN]]([[RESULT:%.+]] : $Optional<LoadableStruct>):
+  // CHECK:   return [[RESULT]] : $Optional<LoadableStruct>
+  // CHECK: [[ERROR:[^ ]+]]({{%.+}} : $ErrorType):
+  // CHECK:   builtin "unexpectedError"
+  // CHECK: [[CLEANUP]]({{%.+}} : $ErrorType):
+  // CHECK-NEXT:   br [[ERROR]]({{%.+}} : $ErrorType)
+  // CHECK: {{^}$}}
+  init?(force2: Bool) {
+    try! self.init(complex: true)
+  }
+
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FT6maybe2Sb_GSqS0__
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFV21failable_initializers14LoadableStructCfMS0_FzT7complexSb_GSqS0__
+  // CHECK:   try_apply [[OTHER_INIT]]({{%.+}}, %1) : $@convention(thin) (Bool, @thin LoadableStruct.Type) -> (@owned Optional<LoadableStruct>, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Optional<LoadableStruct>):
+  // CHECK:   [[WRAPPED:%.+]] = enum $Optional<Optional<LoadableStruct>>, #Optional.Some!enumelt.1, [[VALUE]] : $Optional<LoadableStruct>
+  // CHECK:   br [[CHECK:[^ ]+]]([[WRAPPED]] : $Optional<Optional<LoadableStruct>>)
+  // CHECK: [[CHECK]]([[RESULT:%.+]] : $Optional<Optional<LoadableStruct>>):
+  // CHECK:   [[CASE:%.+]] = select_enum [[RESULT]] : $Optional<Optional<LoadableStruct>>, case #Optional.Some!enumelt.1: {{%.+}}, default {{%.+}}
+  // CHECK:   cond_br [[CASE]], [[UNWRAP:[^ ]+]], [[NONE:[^ ]+]]
+  // CHECK: [[UNWRAP]]:
+  // CHECK:   [[UNWRAPPED:%.+]] = unchecked_enum_data [[RESULT]] : $Optional<Optional<LoadableStruct>>, #Optional.Some!enumelt.1
+  // CHECK:   br [[CHECK_MERGED:[^ ]+]]([[UNWRAPPED]] : $Optional<LoadableStruct>)
+  // CHECK: [[NONE]]:
+  // CHECK:   [[NONE_VAL:%.+]] = enum $Optional<LoadableStruct>, #Optional.None!enumelt
+  // CHECK:   br [[CHECK_MERGED]]([[NONE_VAL]] : $Optional<LoadableStruct>)
+  // CHECK: [[CHECK_MERGED]]([[RESULT:%.+]] : $Optional<LoadableStruct>):
+  // CHECK:   [[CASE:%.+]] = select_enum [[RESULT]] : $Optional<LoadableStruct>, case #Optional.Some!enumelt.1: {{%.+}}, default {{%.+}}
+  // CHECK:   cond_br [[CASE]], [[SUCCESS:[^ ]+]], [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]:
+  // CHECK:   = unchecked_enum_data [[RESULT]] : $Optional<LoadableStruct>, #Optional.Some!enumelt.1
+  // CHECK:   [[FINAL_RESULT:%.+]] = enum $Optional<LoadableStruct>, #Optional.Some!enumelt.1, {{%.+}} : $LoadableStruct
+  // CHECK:   br [[RETURN:[^ ]+]]([[FINAL_RESULT]] : $Optional<LoadableStruct>)
+  // CHECK: [[FAILURE]]:
+  // CHECK:   [[FINAL_RESULT:%.+]] = enum $Optional<LoadableStruct>, #Optional.None!enumelt
+  // CHECK:   br [[RETURN]]([[FINAL_RESULT]] : $Optional<LoadableStruct>)
+  // CHECK: [[RETURN]]([[RET_VAL:%.+]] : $Optional<LoadableStruct>):
+  // CHECK:   return [[RET_VAL]] : $Optional<LoadableStruct>
+  // CHECK: [[ERROR:[^ ]+]]({{%.+}} : $ErrorType):
+  // CHECK:   [[FAIL_VALUE:%.+]] = enum $Optional<Optional<LoadableStruct>>, #Optional.None!enumelt
+  // CHECK:   br [[CHECK]]([[FAIL_VALUE]] : $Optional<Optional<LoadableStruct>>)
+  // CHECK: [[CLEANUP]]({{%.+}} : $ErrorType):
+  // CHECK-NEXT:   br [[ERROR]]({{%.+}} : $ErrorType)
+  // CHECK: {{^}$}}
+  init?(maybe2: Bool) {
+    try? self.init(complex: true)
+  }
+}
+
+extension AddressOnlyStruct {
+  init(error: Bool) throws {
+    x = C()
+  }
+
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers17AddressOnlyStructCfMS0_FzT9propagateSb_S0_
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $AddressOnlyStruct
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*AddressOnlyStruct
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFV21failable_initializers17AddressOnlyStructCfMS0_FzT5errorSb_S0_
+  // CHECK:   [[BOX:%.+]] = alloc_stack $AddressOnlyStruct
+  // CHECK:   try_apply [[OTHER_INIT]]([[BOX]]#1, {{%.+}}, %2) : $@convention(thin) (@out AddressOnlyStruct, Bool, @thin AddressOnlyStruct.Type) -> @error ErrorType, normal [[SUCCESS:[^ ]+]], error [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]({{%.+}} : $()):
+  // CHECK:   copy_addr [take] [[BOX]]#1 to [[SELF_BOX_VAL]] : $*AddressOnlyStruct
+  // CHECK:   dealloc_stack [[BOX]]#0
+  // CHECK:   copy_addr [[SELF_BOX_VAL]] to [initialization] %0 : $*AddressOnlyStruct
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   [[VOID:%.+]] = tuple ()
+  // CHECK:   return [[VOID]] : $()
+  // CHECK: [[FAILURE]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK:   dealloc_stack [[BOX]]#0
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   throw [[ERROR]] : $ErrorType
+  // CHECK: {{^}$}}
+  init(propagate: Bool) throws {
+    try self.init(error: true)
+  }
+
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT5forceSb_S0_
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $AddressOnlyStruct
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*AddressOnlyStruct
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFV21failable_initializers17AddressOnlyStructCfMS0_FzT5errorSb_S0_
+  // CHECK:   [[BOX:%.+]] = alloc_stack $AddressOnlyStruct
+  // CHECK:   try_apply [[OTHER_INIT]]([[BOX]]#1, {{%.+}}, %2) : $@convention(thin) (@out AddressOnlyStruct, Bool, @thin AddressOnlyStruct.Type) -> @error ErrorType, normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
+  // CHECK: [[SUCCESS]]({{%.+}} : $()):
+  // CHECK:   copy_addr [take] [[BOX]]#1 to [[SELF_BOX_VAL]] : $*AddressOnlyStruct
+  // CHECK:   dealloc_stack [[BOX]]#0
+  // CHECK:   copy_addr [[SELF_BOX_VAL]] to [initialization] %0 : $*AddressOnlyStruct
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   [[VOID:%.+]] = tuple ()
+  // CHECK:   return [[VOID]] : $()
+  // CHECK: [[FAILURE:[^ ]+]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK:   builtin "unexpectedError"
+  // CHECK: [[CLEANUP]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK:   dealloc_stack [[BOX]]#0
+  // CHECK:   br [[FAILURE]]([[ERROR]] : $ErrorType)
+  // CHECK: {{^}$}}
+  init(force: Bool) {
+    try! self.init(error: true)
+  }
+
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT5maybeSb_GSqS0__
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $AddressOnlyStruct
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*AddressOnlyStruct
+  // CHECK:   [[BOX:%.+]] = alloc_stack $Optional<AddressOnlyStruct>
+  // CHECK:   [[BOX_VAL:%.+]] = init_enum_data_addr [[BOX]]#1 : $*Optional<AddressOnlyStruct>, #Optional.Some!enumelt.1
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFV21failable_initializers17AddressOnlyStructCfMS0_FzT5errorSb_S0_
+  // CHECK:   try_apply [[OTHER_INIT]]([[BOX_VAL]], {{%.+}}, %2) : $@convention(thin) (@out AddressOnlyStruct, Bool, @thin AddressOnlyStruct.Type) -> @error ErrorType, normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
+  // CHECK: [[SUCCESS]]({{%.+}} : $()):
+  // CHECK:   inject_enum_addr [[BOX]]#1 : $*Optional<AddressOnlyStruct>, #Optional.Some!enumelt.1
+  // CHECK:   br [[CHECK:[^ ]+]]
+  // CHECK: [[CHECK]]:
+  // CHECK:   [[CASE:%.+]] = select_enum_addr [[BOX]]#1 : $*Optional<AddressOnlyStruct>, case #Optional.Some!enumelt.1: {{%.+}}, default {{%.+}}
+  // CHECK:   cond_br [[CASE]], [[SUCCESS:[^ ]+]], [[FAILURE_CLEANUP:[^ ]+]]
+  // CHECK: [[FAILURE_CLEANUP]]:
+  // CHECK:   dealloc_stack [[BOX]]#0
+  // CHECK:   br [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]:
+  // CHECK:   [[VALUE:%.+]] = unchecked_take_enum_data_addr [[BOX]]#1 : $*Optional<AddressOnlyStruct>, #Optional.Some!enumelt.1
+  // CHECK:   copy_addr [take] [[VALUE]] to [[SELF_BOX_VAL]] : $*AddressOnlyStruct
+  // CHECK:   dealloc_stack [[BOX]]#0
+  // CHECK:   [[FINAL_VAL:%.+]] = init_enum_data_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.Some!enumelt.1
+  // CHECK:   copy_addr [[SELF_BOX_VAL]] to [initialization] [[FINAL_VAL]] : $*AddressOnlyStruct
+  // CHECK:   inject_enum_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.Some!enumelt.1
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   br [[RETURN:[^ ]+]]
+  // CHECK: [[FAILURE]]:
+  // CHECK:   strong_release [[SELF_BOX]]#0 : $@box AddressOnlyStruct
+  // CHECK:   inject_enum_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.None!enumelt
+  // CHECK:   br [[RETURN]]
+  // CHECK: [[RETURN]]:
+  // CHECK:   [[VOID:%.+]] = tuple ()
+  // CHECK:   return [[VOID]] : $()
+  // CHECK: [[ERROR:[^ ]+]]({{%.+}} : $ErrorType):
+  // CHECK:   inject_enum_addr [[BOX]]#1 : $*Optional<AddressOnlyStruct>, #Optional.None!enumelt
+  // CHECK:   br [[CHECK]]
+  // CHECK: [[CLEANUP]]({{%.+}} : $ErrorType):
+  // CHECK-NEXT:   br [[ERROR]]({{%.+}} : $ErrorType)
+  // CHECK: {{^}$}}
+  init?(maybe: Bool) {
+    try? self.init(error: true)
+  }
+
+  init?(complex: Bool) throws {
+    try self.init(error: true)
+  }
+
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT6maybe2Sb_GSqS0__
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $AddressOnlyStruct
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*AddressOnlyStruct
+  // CHECK:   [[BOX:%.+]] = alloc_stack $Optional<Optional<AddressOnlyStruct>>
+  // CHECK:   [[BOX_VAL:%.+]] = init_enum_data_addr [[BOX]]#1 : $*Optional<Optional<AddressOnlyStruct>>, #Optional.Some!enumelt.1
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFV21failable_initializers17AddressOnlyStructCfMS0_FzT7complexSb_GSqS0__
+  // CHECK:   try_apply [[OTHER_INIT]]([[BOX_VAL]], {{%.+}}, %2) : $@convention(thin) (@out Optional<AddressOnlyStruct>, Bool, @thin AddressOnlyStruct.Type) -> @error ErrorType, normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
+  // CHECK: [[SUCCESS]]({{%.+}} : $()):
+  // CHECK:   inject_enum_addr [[BOX]]#1 : $*Optional<Optional<AddressOnlyStruct>>, #Optional.Some!enumelt.1
+  // CHECK:   br [[CHECK:[^ ]+]]
+  // CHECK: [[CHECK]]:
+  // CHECK:   [[INTERMEDIATE_BOX:%.+]] = alloc_stack $Optional<AddressOnlyStruct>
+  // CHECK:   [[CASE:%.+]] = select_enum_addr [[BOX]]#1 : $*Optional<Optional<AddressOnlyStruct>>, case #Optional.Some!enumelt.1: {{%.+}}, default {{%.+}}
+  // CHECK:   cond_br [[CASE]], [[UNWRAP:[^ ]+]], [[NONE:[^ ]+]]
+  // CHECK: [[UNWRAP]]:
+  // CHECK:   [[UNWRAPPED:%.+]] = unchecked_take_enum_data_addr [[BOX]]#1 : $*Optional<Optional<AddressOnlyStruct>>, #Optional.Some!enumelt.1
+  // CHECK:   copy_addr [take] [[UNWRAPPED]] to [initialization] [[INTERMEDIATE_BOX]]#1
+  // CHECK:   br [[CHECK_MERGED:[^ ]+]]
+  // CHECK: [[NONE]]:
+  // CHECK:   inject_enum_addr [[INTERMEDIATE_BOX]]#1 : $*Optional<AddressOnlyStruct>, #Optional.None!enumelt
+  // CHECK:   br [[CHECK_MERGED]]
+  // CHECK: [[CHECK_MERGED]]:
+  // CHECK:   [[CASE:%.+]] = select_enum_addr [[INTERMEDIATE_BOX]]#1 : $*Optional<AddressOnlyStruct>, case #Optional.Some!enumelt.1: {{%.+}}, default {{%.+}}
+  // CHECK:   cond_br [[CASE]], [[SUCCESS:[^ ]+]], [[FAILURE_CLEANUP:[^ ]+]]
+  // CHECK: [[FAILURE_CLEANUP]]:
+  // CHECK:   dealloc_stack [[INTERMEDIATE_BOX]]#0
+  // CHECK:   dealloc_stack [[BOX]]#0
+  // CHECK:   br [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]:
+  // CHECK:   [[UNWRAPPED:%.+]] = unchecked_take_enum_data_addr [[INTERMEDIATE_BOX]]#1 : $*Optional<AddressOnlyStruct>, #Optional.Some!enumelt.1
+  // CHECK:   copy_addr [take] [[UNWRAPPED]] to [[SELF_BOX_VAL]]
+  // CHECK:   dealloc_stack [[INTERMEDIATE_BOX]]#0
+  // CHECK:   dealloc_stack [[BOX]]#0
+  // CHECK:   [[RESULT_VAL:%.+]] = init_enum_data_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.Some!enumelt.1
+  // CHECK:   copy_addr [[SELF_BOX_VAL]] to [initialization] [[RESULT_VAL]]
+  // CHECK:   inject_enum_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.Some!enumelt.1
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   br [[RETURN:[^ ]+]]
+  // CHECK: [[FAILURE]]:
+  // CHECK:   strong_release [[SELF_BOX]]#0 : $@box AddressOnlyStruct
+  // CHECK:   inject_enum_addr %0 : $*Optional<AddressOnlyStruct>, #Optional.None!enumelt
+  // CHECK:   br [[RETURN]]
+  // CHECK: [[RETURN]]:
+  // CHECK:   [[VOID:%.+]] = tuple ()
+  // CHECK:   return [[VOID]]
+  // CHECK: [[ERROR:[^ ]+]]({{%.+}} : $ErrorType):
+  // CHECK:   inject_enum_addr [[BOX]]#1 : $*Optional<Optional<AddressOnlyStruct>>, #Optional.None!enumelt
+  // CHECK:   br [[CHECK]]
+  // CHECK: [[CLEANUP]]({{%.+}} : $ErrorType):
+  // CHECK-NEXT:   br [[ERROR]]({{%.+}} : $ErrorType)
+  // CHECK: {{^}$}}
+  init?(maybe2: Bool) {
+    try? self.init(complex: true)
+  }
+}
+
+class RootClassThrows {
+  init() throws {}
+
+  // CHECK-LABEL: sil hidden @_TFC21failable_initializers15RootClassThrowscfMS0_FzT9propagateSb_S0_
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $RootClassThrows
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*RootClassThrows
+  // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = class_method %6 : $RootClassThrows, #RootClassThrows.init!initializer.1
+  // CHECK:   [[NULL:%.+]] = null_class $RootClassThrows
+  // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   try_apply [[OTHER_INIT]]([[ORIG_SELF]]) : $@convention(method) (@owned RootClassThrows) -> (@owned RootClassThrows, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $RootClassThrows):
+  // CHECK:   store [[VALUE]] to [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   [[NEW_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   strong_retain [[NEW_SELF]]
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   return [[NEW_SELF]] : $RootClassThrows
+  // CHECK: [[FAILURE]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   throw [[ERROR]] : $ErrorType
+  // CHECK: {{^}$}}
+  convenience init(propagate: Bool) throws {
+    try self.init()
+  }
+
+  // CHECK-LABEL: sil hidden @_TFC21failable_initializers15RootClassThrowscfMS0_FT5forceSb_S0_
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $RootClassThrows
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*RootClassThrows
+  // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = class_method %6 : $RootClassThrows, #RootClassThrows.init!initializer.1
+  // CHECK:   [[NULL:%.+]] = null_class $RootClassThrows
+  // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   try_apply [[OTHER_INIT]]([[ORIG_SELF]]) : $@convention(method) (@owned RootClassThrows) -> (@owned RootClassThrows, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $RootClassThrows):
+  // CHECK:   store [[VALUE]] to [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   [[NEW_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   strong_retain [[NEW_SELF]]
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   return [[NEW_SELF]] : $RootClassThrows
+  // CHECK: [[FAILURE:[^ ]+]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK:   builtin "unexpectedError"
+  // CHECK: [[CLEANUP]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK-NEXT:   br [[FAILURE]]([[ERROR]] : $ErrorType)
+  // CHECK: {{^}$}}
+  convenience init(force: Bool) {
+    try! self.init()
+  }
+
+  // CHECK-LABEL: sil hidden @_TFC21failable_initializers15RootClassThrowscfMS0_FT5maybeSb_GSqS0__
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $RootClassThrows
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*RootClassThrows
+  // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = class_method %6 : $RootClassThrows, #RootClassThrows.init!initializer.1
+  // CHECK:   [[NULL:%.+]] = null_class $RootClassThrows
+  // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   try_apply [[OTHER_INIT]]([[ORIG_SELF]]) : $@convention(method) (@owned RootClassThrows) -> (@owned RootClassThrows, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $RootClassThrows):
+  // CHECK:   [[WRAPPED:%.+]] = enum $Optional<RootClassThrows>, #Optional.Some!enumelt.1, [[VALUE]] : $RootClassThrows
+  // CHECK:   br [[CHECK:[^ ]+]]([[WRAPPED]] : $Optional<RootClassThrows>)
+  // CHECK: [[CHECK]]([[RESULT:%.+]] : $Optional<RootClassThrows>):
+  // CHECK:   [[CASE:%.+]] = select_enum [[RESULT]] : $Optional<RootClassThrows>, case #Optional.Some!enumelt.1: {{%.+}}, default {{%.+}}
+  // CHECK:   cond_br [[CASE]], [[SUCCESS:[^ ]+]], [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]:
+  // CHECK:   [[UNWRAPPED:%.+]] = unchecked_enum_data [[RESULT]] : $Optional<RootClassThrows>, #Optional.Some!enumelt.1
+  // CHECK:   store [[UNWRAPPED]] to [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   [[FINAL_RESULT_UNWRAPPED:%.+]] = load [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   strong_retain [[FINAL_RESULT_UNWRAPPED]]
+  // CHECK:   [[FINAL_RESULT:%.+]] = enum $Optional<RootClassThrows>, #Optional.Some!enumelt.1, [[FINAL_RESULT_UNWRAPPED]] : $RootClassThrows
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   br [[RETURN:[^ ]+]]([[FINAL_RESULT]] : $Optional<RootClassThrows>)
+  // CHECK: [[FAILURE]]:
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   [[FINAL_RESULT:%.+]] = enum $Optional<RootClassThrows>, #Optional.None!enumelt
+  // CHECK:   br [[RETURN]]([[FINAL_RESULT]] : $Optional<RootClassThrows>)
+  // CHECK: [[RETURN]]([[RET_VAL:%.+]] : $Optional<RootClassThrows>):
+  // CHECK:   return [[RET_VAL]] : $Optional<RootClassThrows>
+  // CHECK: [[ERROR:[^ ]+]]({{%.+}} : $ErrorType):
+  // CHECK:   [[FAIL_VALUE:%.+]] = enum $Optional<RootClassThrows>, #Optional.None!enumelt
+  // CHECK:   br [[CHECK]]([[FAIL_VALUE]] : $Optional<RootClassThrows>)
+  // CHECK: [[CLEANUP]]({{%.+}} : $ErrorType):
+  // CHECK-NEXT:   br [[ERROR]]({{%.+}} : $ErrorType)
+  // CHECK: {{^}$}}
+  convenience init?(maybe: Bool) {
+    try? self.init()
+  }
+
+  convenience init?(complex: Bool) throws {
+    try self.init()
+  }
+
+  // CHECK-LABEL: sil hidden @_TFC21failable_initializers15RootClassThrowscfMS0_FT6maybe2Sb_GSqS0__
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $RootClassThrows
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*RootClassThrows
+  // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = class_method %6 : $RootClassThrows, #RootClassThrows.init!initializer.1
+  // CHECK:   [[NULL:%.+]] = null_class $RootClassThrows
+  // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   try_apply [[OTHER_INIT]]({{%.+}}, [[ORIG_SELF]]) : $@convention(method) (Bool, @owned RootClassThrows) -> (@owned Optional<RootClassThrows>, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Optional<RootClassThrows>):
+  // CHECK:   [[WRAPPED:%.+]] = enum $Optional<Optional<RootClassThrows>>, #Optional.Some!enumelt.1, [[VALUE]]
+  // CHECK:   br [[CHECK:[^ ]+]]([[WRAPPED]] : $Optional<Optional<RootClassThrows>>)
+  // CHECK: [[CHECK]]([[RESULT:%.+]] : $Optional<Optional<RootClassThrows>>):
+  // CHECK:   [[CASE:%.+]] = select_enum [[RESULT]] : $Optional<Optional<RootClassThrows>>, case #Optional.Some!enumelt.1: {{%.+}}, default {{%.+}}
+  // CHECK:   cond_br [[CASE]], [[UNWRAP:[^ ]+]], [[NONE:[^ ]+]]
+  // CHECK: [[UNWRAP]]:
+  // CHECK:   [[UNWRAPPED:%.+]] = unchecked_enum_data [[RESULT]] : $Optional<Optional<RootClassThrows>>, #Optional.Some!enumelt.1
+  // CHECK:   br [[CHECK_MERGED:[^ ]+]]([[UNWRAPPED]] : $Optional<RootClassThrows>)
+  // CHECK: [[NONE]]:
+  // CHECK:   [[NONE_VAL:%.+]] = enum $Optional<RootClassThrows>, #Optional.None!enumelt
+  // CHECK:   br [[CHECK_MERGED]]([[NONE_VAL]] : $Optional<RootClassThrows>)
+  // CHECK: [[CHECK_MERGED]]([[RESULT:%.+]] : $Optional<RootClassThrows>):
+  // CHECK:   [[CASE:%.+]] = select_enum [[RESULT]] : $Optional<RootClassThrows>, case #Optional.Some!enumelt.1: {{%.+}}, default {{%.+}}
+  // CHECK:   cond_br [[CASE]], [[SUCCESS:[^ ]+]], [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]:
+  // CHECK:   [[UNWRAPPED:%.+]] = unchecked_enum_data [[RESULT]] : $Optional<RootClassThrows>, #Optional.Some!enumelt.1
+  // CHECK:   store [[UNWRAPPED]] to [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   [[FINAL_RESULT_UNWRAPPED:%.+]] = load [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   strong_retain [[FINAL_RESULT_UNWRAPPED]]
+  // CHECK:   [[FINAL_RESULT:%.+]] = enum $Optional<RootClassThrows>, #Optional.Some!enumelt.1, [[FINAL_RESULT_UNWRAPPED]] : $RootClassThrows
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   br [[RETURN:[^ ]+]]([[FINAL_RESULT]] : $Optional<RootClassThrows>)
+  // CHECK: [[FAILURE]]:
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   [[FINAL_RESULT:%.+]] = enum $Optional<RootClassThrows>, #Optional.None!enumelt
+  // CHECK:   br [[RETURN]]([[FINAL_RESULT]] : $Optional<RootClassThrows>)
+  // CHECK: [[RETURN]]([[RET_VAL:%.+]] : $Optional<RootClassThrows>):
+  // CHECK:   return [[RET_VAL]] : $Optional<RootClassThrows>
+  // CHECK: [[ERROR:[^ ]+]]({{%.+}} : $ErrorType):
+  // CHECK:   [[FAIL_VALUE:%.+]] = enum $Optional<Optional<RootClassThrows>>, #Optional.None!enumelt
+  // CHECK:   br [[CHECK]]([[FAIL_VALUE]] : $Optional<Optional<RootClassThrows>>)
+  // CHECK: [[CLEANUP]]({{%.+}} : $ErrorType):
+  // CHECK-NEXT:   br [[ERROR]]({{%.+}} : $ErrorType)
+  // CHECK: {{^}$}}
+  convenience init?(maybe2: Bool) {
+    try? self.init(complex: true)
+  }
+}
+
+class SubClassThrows : RootClassThrows {
+  // CHECK-LABEL: sil hidden @_TFC21failable_initializers14SubClassThrowscfMS0_FzT9propagateSb_S0_
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $SubClassThrows
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [derivedself] [[SELF_BOX]]#1 : $*SubClassThrows
+  // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   [[BASE_SELF:%.+]] = upcast [[ORIG_SELF]] : $SubClassThrows to $RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFC21failable_initializers15RootClassThrowscfMS0_FzT_S0_
+  // CHECK:   [[NULL:%.+]] = null_class $SubClassThrows
+  // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   try_apply [[OTHER_INIT]]([[BASE_SELF]]) : $@convention(method) (@owned RootClassThrows) -> (@owned RootClassThrows, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $RootClassThrows):
+  // CHECK:   [[DOWNCAST_VALUE:%.+]] = unchecked_ref_cast [[VALUE]] : $RootClassThrows to $SubClassThrows // user: %14
+  // CHECK:   store [[DOWNCAST_VALUE]] to [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   [[NEW_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   strong_retain [[NEW_SELF]]
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   return [[NEW_SELF]] : $SubClassThrows
+  // CHECK: [[FAILURE]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   throw [[ERROR]] : $ErrorType
+  // CHECK: {{^}$}}
+  init(propagate: Bool) throws {
+    try super.init()
+  }
+
+  // CHECK-LABEL: sil hidden @_TFC21failable_initializers14SubClassThrowscfMS0_FT5forceSb_S0_
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $SubClassThrows
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [derivedself] [[SELF_BOX]]#1 : $*SubClassThrows
+  // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   [[BASE_SELF:%.+]] = upcast [[ORIG_SELF]] : $SubClassThrows to $RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFC21failable_initializers15RootClassThrowscfMS0_FzT_S0_
+  // CHECK:   [[NULL:%.+]] = null_class $SubClassThrows
+  // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   try_apply [[OTHER_INIT]]([[BASE_SELF]]) : $@convention(method) (@owned RootClassThrows) -> (@owned RootClassThrows, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $RootClassThrows):
+  // CHECK:   [[DOWNCAST_VALUE:%.+]] = unchecked_ref_cast [[VALUE]] : $RootClassThrows to $SubClassThrows // user: %14
+  // CHECK:   store [[DOWNCAST_VALUE]] to [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   [[NEW_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   strong_retain [[NEW_SELF]]
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   return [[NEW_SELF]] : $SubClassThrows
+  // CHECK: [[FAILURE:[^ ]+]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK:   builtin "unexpectedError"
+  // CHECK: [[CLEANUP]]([[ERROR:%.+]] : $ErrorType):
+  // CHECK-NEXT:   br [[FAILURE]]([[ERROR]] : $ErrorType)
+  // CHECK: {{^}$}}
+  init(force: Bool) {
+    try! super.init()
+  }
+
+  // CHECK-LABEL: sil hidden @_TFC21failable_initializers14SubClassThrowscfMS0_FT5maybeSb_GSqS0__
+  // CHECK:   [[SELF_BOX:%.+]] = alloc_box $SubClassThrows
+  // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [derivedself] [[SELF_BOX]]#1 : $*SubClassThrows
+  // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   [[BASE_SELF:%.+]] = upcast [[ORIG_SELF]] : $SubClassThrows to $RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFC21failable_initializers15RootClassThrowscfMS0_FzT_S0_
+  // CHECK:   [[NULL:%.+]] = null_class $SubClassThrows
+  // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   try_apply [[OTHER_INIT]]([[BASE_SELF]]) : $@convention(method) (@owned RootClassThrows) -> (@owned RootClassThrows, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
+  // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $RootClassThrows):
+  // CHECK:   [[WRAPPED:%.+]] = enum $Optional<RootClassThrows>, #Optional.Some!enumelt.1, [[VALUE]] : $RootClassThrows
+  // CHECK:   br [[CHECK:[^ ]+]]([[WRAPPED]] : $Optional<RootClassThrows>)
+  // CHECK: [[CHECK]]([[RESULT:%.+]] : $Optional<RootClassThrows>):
+  // CHECK:   [[CASE:%.+]] = select_enum [[RESULT]] : $Optional<RootClassThrows>, case #Optional.Some!enumelt.1: {{%.+}}, default {{%.+}}
+  // CHECK:   cond_br [[CASE]], [[SUCCESS:[^ ]+]], [[FAILURE:[^ ]+]]
+  // CHECK: [[SUCCESS]]:
+  // CHECK:   [[UNWRAPPED:%.+]] = unchecked_enum_data [[RESULT]] : $Optional<RootClassThrows>, #Optional.Some!enumelt.1
+  // CHECK:   [[DOWNCAST:%.+]] = unchecked_ref_cast [[UNWRAPPED]] : $RootClassThrows to $SubClassThrows
+  // CHECK:   store [[DOWNCAST]] to [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   [[FINAL_RESULT_UNWRAPPED:%.+]] = load [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   strong_retain [[FINAL_RESULT_UNWRAPPED]]
+  // CHECK:   [[FINAL_RESULT:%.+]] = enum $Optional<SubClassThrows>, #Optional.Some!enumelt.1, [[FINAL_RESULT_UNWRAPPED]] : $SubClassThrows
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   br [[RETURN:[^ ]+]]([[FINAL_RESULT]] : $Optional<SubClassThrows>)
+  // CHECK: [[FAILURE]]:
+  // CHECK:   strong_release [[SELF_BOX]]#0
+  // CHECK:   [[FINAL_RESULT:%.+]] = enum $Optional<SubClassThrows>, #Optional.None!enumelt
+  // CHECK:   br [[RETURN]]([[FINAL_RESULT]] : $Optional<SubClassThrows>)
+  // CHECK: [[RETURN]]([[RET_VAL:%.+]] : $Optional<SubClassThrows>):
+  // CHECK:   return [[RET_VAL]] : $Optional<SubClassThrows>
+  // CHECK: [[ERROR:[^ ]+]]({{%.+}} : $ErrorType):
+  // CHECK:   [[FAIL_VALUE:%.+]] = enum $Optional<RootClassThrows>, #Optional.None!enumelt
+  // CHECK:   br [[CHECK]]([[FAIL_VALUE]] : $Optional<RootClassThrows>)
+  // CHECK: [[CLEANUP]]({{%.+}} : $ErrorType):
+  // CHECK-NEXT:   br [[ERROR]]({{%.+}} : $ErrorType)
+  // CHECK: {{^}$}}
+  init?(maybe: Bool) {
+    try? super.init()
+  }
+}

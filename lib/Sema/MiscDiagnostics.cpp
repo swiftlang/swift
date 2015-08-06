@@ -404,14 +404,11 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       // Diagnose 'self.init' or 'super.init' nested in another expression.
       if (auto *rebindSelfExpr = dyn_cast<RebindSelfInConstructorExpr>(E)) {
-        // FIXME: We shouldn't need to special case 'try'; that should get
-        // pulled inside the Rebind like ForceValueExprs do.
-        if ((!Parent.isNull() && !dyn_cast<AnyTryExpr>(Parent.getAsExpr())) ||
-            !IsExprStmt) {
+        if (!Parent.isNull() || !IsExprStmt) {
           bool isChainToSuper;
           (void)rebindSelfExpr->getCalledConstructor(isChainToSuper);
           TC.diagnose(E->getLoc(), diag::init_delegation_nested,
-                      isChainToSuper, Parent.isNull());
+                      isChainToSuper, !IsExprStmt);
         }
       }
 

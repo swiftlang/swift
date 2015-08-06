@@ -767,7 +767,7 @@ RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
 OtherConstructorDeclRefExpr *
 RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
   // Dig out the OtherConstructorRefExpr. Note that this is the reverse
-  // of what we do in in pre-checking.
+  // of what we do in pre-checking.
   Expr *candidate = getSubExpr();
   while (true) {
     // Look through identity expressions.
@@ -779,6 +779,12 @@ RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
     // Look through force-value expressions.
     if (auto force = dyn_cast<ForceValueExpr>(candidate)) {
       candidate = force->getSubExpr();
+      continue;
+    }
+
+    // Look through all try expressions.
+    if (auto tryExpr = dyn_cast<AnyTryExpr>(candidate)) {
+      candidate = tryExpr->getSubExpr();
       continue;
     }
 

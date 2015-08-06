@@ -593,8 +593,10 @@ namespace {
               continue;
             }
 
-            // Look through identity and force-value expressions.
-            if (isa<IdentityExpr>(ancestor) ||isa<ForceValueExpr>(ancestor)) {
+            // Look through identity, force-value, and 'try' expressions.
+            if (isa<IdentityExpr>(ancestor) ||
+                isa<ForceValueExpr>(ancestor) ||
+                isa<AnyTryExpr>(ancestor)) {
               if (target)
                 target = ancestor;
               continue;

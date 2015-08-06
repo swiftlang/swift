@@ -2734,8 +2734,9 @@ namespace {
       // A non-failable initializer cannot delegate to a failable
       // initializer.
       OptionalTypeKind calledOTK;
+      Expr *unwrappedSubExpr = expr->getSubExpr()->getSemanticsProvidingExpr();
       Type valueTy
-        = expr->getSubExpr()->getType()->getAnyOptionalObjectType(calledOTK);
+        = unwrappedSubExpr->getType()->getAnyOptionalObjectType(calledOTK);
       auto inCtor = cast<ConstructorDecl>(cs.DC->getInnermostMethodContext());
       if (calledOTK != OTK_None && inCtor->getFailability() == OTK_None) {
         bool isError = (calledOTK == OTK_Optional);
@@ -2751,16 +2752,27 @@ namespace {
         auto &ctx = tc.Context;
 
         if (isError) {
-          // Give the user the option of adding '!' or making the enclosing
-          // initializer failable.
-          ConstructorDecl *ctor = otherCtorRef->getDecl();
-          tc.diagnose(otherCtorRef->getLoc(),
-                      diag::delegate_chain_nonoptional_to_optional,
-                      isChaining, ctor->getFullName());
-          tc.diagnose(otherCtorRef->getLoc(), diag::init_force_unwrap)
-            .fixItInsertAfter(expr->getEndLoc(), "!");
-          tc.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
-            .fixItInsertAfter(inCtor->getLoc(), "?");
+          if (auto *optTry = dyn_cast<OptionalTryExpr>(unwrappedSubExpr)) {
+            tc.diagnose(optTry->getTryLoc(),
+                        diag::delegate_chain_nonoptional_to_optional_try,
+                        isChaining);
+            tc.diagnose(optTry->getTryLoc(), diag::init_delegate_force_try)
+              .fixItReplace({optTry->getTryLoc(), optTry->getQuestionLoc()},
+                            "try!");
+            tc.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
+              .fixItInsertAfter(inCtor->getLoc(), "?");
+          } else {
+            // Give the user the option of adding '!' or making the enclosing
+            // initializer failable.
+            ConstructorDecl *ctor = otherCtorRef->getDecl();
+            tc.diagnose(otherCtorRef->getLoc(),
+                        diag::delegate_chain_nonoptional_to_optional,
+                        isChaining, ctor->getFullName());
+            tc.diagnose(otherCtorRef->getLoc(), diag::init_force_unwrap)
+              .fixItInsertAfter(expr->getEndLoc(), "!");
+            tc.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
+              .fixItInsertAfter(inCtor->getLoc(), "?");
+          }
         }
 
         // Recover by injecting the force operation (the first option).

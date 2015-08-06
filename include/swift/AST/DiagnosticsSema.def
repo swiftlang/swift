@@ -1534,6 +1534,11 @@ NOTE(init_force_unwrap,sema_tce,none,
      "force potentially-failing result with '!'", ())
 NOTE(init_propagate_failure,sema_tce,none,
      "propagate the failure with 'init?'", ())
+ERROR(delegate_chain_nonoptional_to_optional_try,sema_tce,none,
+      "a non-failable initializer cannot use 'try?' to "
+      "%select{delegate|chain}0 to another initializer", (bool))
+NOTE(init_delegate_force_try,sema_tce,none,
+     "force potentially-failing result with 'try!'", ())
 ERROR(init_delegation_nested,sema_tce,none,
       "%select{initializer delegation ('self.init')|"
       "initializer chaining ('super.init')}0 cannot be nested in another "

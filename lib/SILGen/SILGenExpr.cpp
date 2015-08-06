@@ -2312,11 +2312,84 @@ static SILInstruction *findDelegatingInitCall(SILValue value) {
     return apply;
   }
 
+  // The call comes from a try_apply. The call might be wrapped in a 'try?',
+  // in which case it could have any number of predecessors, but the first
+  // predecessor should always be the success case.
   auto arg = cast<SILArgument>(value);
-  auto pred = arg->getParent()->getSinglePredecessor();
-  assert(pred && "not a single predecessor!");
-  auto tryApply = cast<TryApplyInst>(pred->getTerminator());
-  return tryApply;
+  auto pred = *arg->getParent()->pred_begin();
+  while (!isa<TryApplyInst>(pred->getTerminator())) {
+    pred = pred->getSinglePredecessor();
+    assert(pred && "went back too far!");
+  }
+  return pred->getTerminator();
+}
+
+/// Flattens one level of optional from a nested optional value.
+static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
+                                    ManagedValue optVal) {
+  // FIXME: Largely copied from SILGenFunction::emitOptionalToOptional.
+  auto contBB = SGF.createBasicBlock();
+  auto isNotPresentBB = SGF.createBasicBlock();
+  auto isPresentBB = SGF.createBasicBlock();
+
+  OptionalTypeKind unused;
+  SILType resultTy = optVal.getType().getAnyOptionalObjectType(SGF.SGM.M,
+                                                               unused);
+  auto &resultTL = SGF.getTypeLowering(resultTy);
+  assert(resultTy.getSwiftRValueType().getAnyOptionalObjectType() &&
+         "input was not a nested optional value");
+
+  // If the result is address-only, we need to return something in memory,
+  // otherwise the result is the BBArgument in the merge point.
+  SILValue result;
+  if (resultTL.isAddressOnly())
+    result = SGF.emitTemporaryAllocation(loc, resultTy);
+  else
+    result = contBB->createBBArg(resultTy);
+
+  // Branch on whether the input is optional, this doesn't consume the value.
+  auto isPresent = SGF.emitDoesOptionalHaveValue(loc, optVal.getValue());
+  SGF.B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
+
+  // If it's present, apply the recursive transformation to the value.
+  SGF.B.emitBlock(isPresentBB);
+  SILValue branchArg;
+  {
+    // Don't allow cleanups to escape the conditional block.
+    FullExpr presentScope(SGF.Cleanups, CleanupLocation::get(loc));
+
+    // Pull the value out.  This will load if the value is not address-only.
+    auto &inputTL = SGF.getTypeLowering(optVal.getType());
+    auto resultValue = SGF.emitUncheckedGetOptionalValueFrom(loc, optVal,
+                                                             inputTL);
+
+    // Inject that into the result type if the result is address-only.
+    if (resultTL.isAddressOnly())
+      resultValue.forwardInto(SGF, loc, result);
+    else
+      branchArg = resultValue.forward(SGF);
+  }
+  if (branchArg)
+    SGF.B.createBranch(loc, contBB, branchArg);
+  else
+    SGF.B.createBranch(loc, contBB);
+
+  // If it's not present, inject 'nothing' into the result.
+  SGF.B.emitBlock(isNotPresentBB);
+  if (resultTL.isAddressOnly()) {
+    SGF.emitInjectOptionalNothingInto(loc, result, resultTL);
+    SGF.B.createBranch(loc, contBB);
+  } else {
+    branchArg = SGF.getOptionalNoneValue(loc, resultTL);
+    SGF.B.createBranch(loc, contBB, branchArg);
+  }
+
+  // Continue.
+  SGF.B.emitBlock(contBB);
+  if (resultTL.isAddressOnly())
+    return SGF.emitManagedBufferWithCleanup(result, resultTL);
+
+  return SGF.emitManagedRValueWithCleanup(result, resultTL);
 }
 
 RValue RValueEmitter::visitRebindSelfInConstructorExpr(
@@ -2329,7 +2402,13 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   OptionalTypeKind failability;
   if (auto objTy = newSelfTy->getAnyOptionalObjectType(failability))
     newSelfTy = objTy;
-  
+
+  // "try? self.init()" can give us two levels of optional if the initializer
+  // we delegate to is failable.
+  OptionalTypeKind extraFailability;
+  if (auto objTy = newSelfTy->getAnyOptionalObjectType(extraFailability))
+    newSelfTy = objTy;
+
   bool requiresDowncast = !newSelfTy->isEqual(selfTy);
 
   // The subexpression consumes the current 'self' binding.
@@ -2359,7 +2438,11 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     auto Zero = SGF.B.createNullClass(E, selfAddr.getType().getObjectType());
     SGF.B.createStore(E, Zero, selfAddr);
   }
-  
+
+  // Handle a nested optional case (see above).
+  if (extraFailability != OTK_None)
+    newSelf = flattenOptional(SGF, E, newSelf);
+
   // If both the delegated-to initializer and our enclosing initializer can
   // fail, deal with the failure.
   if (failability != OTK_None && ctorDecl->getFailability() != OTK_None) {

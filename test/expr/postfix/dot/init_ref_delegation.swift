@@ -329,6 +329,7 @@ class TestOverloadSets {
 class TestNestedExpr {
   init() {}
   init?(fail: Bool) {}
+  init(error: Bool) throws {}
 
   convenience init(a: Int) {
     let x: () = self.init() // expected-error {{initializer delegation ('self.init') cannot be nested in another statement}}
@@ -356,6 +357,20 @@ class TestNestedExpr {
 
   convenience init(f: Int) {
     ((), self.init(fail: true)!) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+  }
+
+  convenience init(g: Int) {
+    let x: () = try! self.init(error: true) // expected-error {{initializer delegation ('self.init') cannot be nested in another statement}}
+    // expected-warning@-1 {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+
+  convenience init(h: Int) {
+    func use(x: ()) {}
+    use(try! self.init(error: true)) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+  }
+
+  convenience init(i: Int) {
+    ((), try! self.init(error: true)) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
   }
 }
 
@@ -387,6 +402,66 @@ class TestNestedExprSub : TestNestedExpr {
   init(f: Int) {
     ((), super.init(fail: true)!) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
   }
+
+  init(g: Int) {
+    let x: () = try! super.init(error: true) // expected-error {{initializer chaining ('super.init') cannot be nested in another statement}}
+    // expected-warning@-1 {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+
+  init(h: Int) {
+    func use(x: ()) {}
+    use(try! super.init(error: true)) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+  }
+
+  init(i: Int) {
+    ((), try! super.init(error: true)) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+  }
 }
 
 
+class TestOptionalTry {
+  init() throws {}
+  convenience init(a: Int) { // expected-note {{propagate the failure with 'init?'}} {{19-19=?}}
+    try? self.init() // expected-error {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
+    // expected-note@-1 {{force potentially-failing result with 'try!'}} {{5-9=try!}}
+  }
+
+  init?(fail: Bool) throws {}
+
+  convenience init(failA: Int) { // expected-note {{propagate the failure with 'init?'}} {{19-19=?}}
+    try? self.init(fail: true)! // expected-error {{a non-failable initializer cannot use 'try?' to delegate to another initializer}}
+    // expected-note@-1 {{force potentially-failing result with 'try!'}} {{5-9=try!}}
+  }
+
+  convenience init(failB: Int) { // expected-note {{propagate the failure with 'init?'}} {{19-19=?}}
+    try! self.init(fail: true) // expected-error {{a non-failable initializer cannot delegate to failable initializer 'init(fail:)' written with 'init?'}}
+    // expected-note@-1 {{force potentially-failing result with '!'}} {{31-31=!}}
+  }
+
+  convenience init(failC: Int) {
+    try! self.init(fail: true)! // okay
+  }
+
+  convenience init?(failD: Int) {
+    try? self.init(fail: true) // okay
+  }
+
+  convenience init?(failE: Int) {
+    try! self.init(fail: true) // okay
+  }
+
+  convenience init?(failF: Int) {
+    try! self.init(fail: true)! // okay
+  }
+
+  convenience init?(failG: Int) {
+    try? self.init(fail: true) // okay
+  }
+}
+
+class TestOptionalTrySub : TestOptionalTry {
+  init(a: Int) { // expected-note {{propagate the failure with 'init?'}} {{7-7=?}}
+    try? super.init() // expected-error {{a non-failable initializer cannot use 'try?' to chain to another initializer}}
+    // expected-note@-1 {{force potentially-failing result with 'try!'}} {{5-9=try!}}
+  }
+}
