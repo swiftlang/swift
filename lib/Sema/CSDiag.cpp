@@ -1037,33 +1037,6 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
   return false;
 }
 
-static Constraint *getConstraintChoice(Constraint *constraint,
-                                       ConstraintKind kind,
-                                       bool takeAny = false) {
-  if (constraint->getKind() != ConstraintKind::Disjunction &&
-      constraint->getKind() != ConstraintKind::Conjunction)
-    return nullptr;
-  
-  auto nestedConstraints = constraint->getNestedConstraints();
-  
-  for (auto nestedConstraint : nestedConstraints) {
-    if (!takeAny && nestedConstraint->getKind() != kind)
-      continue;
-      
-    // If this is a last-chance search, and we have a conjunction or
-    // disjunction, look within.
-    if (takeAny &&
-        ((nestedConstraint->getKind() == ConstraintKind::Disjunction) ||
-         (nestedConstraint->getKind() == ConstraintKind::Conjunction))) {
-          return getConstraintChoice(nestedConstraint, kind, takeAny);
-        }
-    
-    return nestedConstraint;
-  }
-
-  return nullptr;
-}
-
 /// Conveniently unwrap a paren expression, if necessary.
 static Expr *unwrapParenExpr(Expr *e) {
   if (auto parenExpr = dyn_cast<ParenExpr>(e))
