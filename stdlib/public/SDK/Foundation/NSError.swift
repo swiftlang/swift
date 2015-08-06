@@ -28,6 +28,7 @@ public enum _GenericObjCError : ErrorType {
 
 /// An intrinsic used by the runtime to create an error when an
 /// Objective-C API indicates failure but produces a nil error.
+@warn_unused_result
 @asmname("swift_allocNilObjCError")
 public func _allocNilObjCError() -> ErrorType {
   return _GenericObjCError.NilError
@@ -47,6 +48,7 @@ public protocol _ObjectiveCBridgeableErrorType : ErrorType {
 /// If the bridge succeeds, the bridged value is written to the uninitialized
 /// memory pointed to by 'out', and true is returned. Otherwise, 'out' is
 /// left uninitialized, and false is returned.
+@warn_unused_result
 @asmname("swift_stdlib_bridgeNSErrorToErrorType")
 public func _stdlib_bridgeNSErrorToErrorType<
   T : _ObjectiveCBridgeableErrorType
@@ -66,6 +68,7 @@ public protocol __BridgedNSError : RawRepresentable, ErrorType {
 }
 
 // Allow two bridged NSError types to be compared.
+@warn_unused_result
 public func ==<T: __BridgedNSError where T.RawValue: SignedIntegerType>(
   lhs: T,
   rhs: T
@@ -93,6 +96,7 @@ public extension __BridgedNSError where RawValue: SignedIntegerType {
 }
 
 // Allow two bridged NSError types to be compared.
+@warn_unused_result
 public func ==<T: __BridgedNSError where T.RawValue: UnsignedIntegerType>(
   lhs: T,
   rhs: T
@@ -146,6 +150,7 @@ public struct NSCocoaError : RawRepresentable, _BridgedNSError {
   public static var _NSErrorDomain: String { return NSCocoaErrorDomain }
 }
 
+@warn_unused_result
 public func ~=(match: NSCocoaError, error: ErrorType) -> Bool {
   guard let cocoaError = error as? NSCocoaError else { return false }
   return match.rawValue == cocoaError.rawValue

@@ -67,12 +67,14 @@ class NSSimpleCString {}
 @available(*, unavailable, message="Please use String or NSString") public
 class NSConstantString {}
 
+@warn_unused_result
 @asmname("swift_convertStringToNSString")
 public // COMPILER_INTRINSIC
 func _convertStringToNSString(string: String) -> NSString {
   return string._bridgeToObjectiveC()
 }
 
+@warn_unused_result
 @_semantics("convertFromObjectiveC")
 public // COMPILER_INTRINSIC
 func _convertNSStringToString(nsstring: NSString?) -> String {
@@ -422,6 +424,7 @@ extension NSArray : ArrayLiteralConvertible {
 ///
 /// to Objective-C code as a method that accepts an `NSArray`.  This operation
 /// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
+@warn_unused_result
 @_semantics("convertFromObjectiveC")
 public func _convertNSArrayToArray<T>(source: NSArray?) -> [T] {
   if _slowPath(source == nil) { return [] }
@@ -436,6 +439,7 @@ public func _convertNSArrayToArray<T>(source: NSArray?) -> [T] {
 ///     func f() -> [NSView] { return [] }
 ///
 /// to Objective-C code as a method that returns an `NSArray`.
+@warn_unused_result
 public func _convertArrayToNSArray<T>(array: [T]) -> NSArray {
   return array._bridgeToObjectiveC()
 }
@@ -564,6 +568,7 @@ extension Dictionary {
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
+@warn_unused_result
 @_semantics("convertFromObjectiveC")
 public func _convertNSDictionaryToDictionary<
   Key : Hashable, Value
@@ -589,6 +594,7 @@ public func _convertNSDictionaryToDictionary<
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
+@warn_unused_result
 public func _convertDictionaryToNSDictionary<Key, Value>(
   d: [Key : Value]
 ) -> NSDictionary {
@@ -830,6 +836,7 @@ extension NSIndexSet : SequenceType {
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
+@warn_unused_result
 public func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
   return s._bridgeToObjectiveC()
 }
@@ -846,6 +853,7 @@ public func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
 ///
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
+@warn_unused_result
 @_semantics("convertFromObjectiveC")
 public func _convertNSSetToSet<T : Hashable>(s: NSSet?) -> Set<T> {
   if _slowPath(s == nil) { return [] }
@@ -960,6 +968,7 @@ extension NSRange {
     length = x.count
   }
 
+  @warn_unused_result
   public func toRange() -> Range<Int>? {
     if location == NSNotFound { return nil }
     return Range(start: location, end: location + length)
@@ -971,6 +980,7 @@ extension NSRange {
 //===----------------------------------------------------------------------===//
 
 /// Returns a localized string, using the main bundle if one is not specified.
+@warn_unused_result
 public
 func NSLocalizedString(key: String,
                        tableName: String? = nil,
@@ -1036,10 +1046,12 @@ extension CGRectEdge {
 
 public typealias NSErrorPointer = AutoreleasingUnsafeMutablePointer<NSError?>
 
+@warn_unused_result
 @asmname("swift_convertNSErrorToErrorType")
 public // COMPILER_INTRINSIC
 func _convertNSErrorToErrorType(error: NSError?) -> ErrorType
 
+@warn_unused_result
 @asmname("swift_convertErrorTypeToNSError")
 public // COMPILER_INTRINSIC
 func _convertErrorTypeToNSError(error: ErrorType) -> NSError
@@ -1083,6 +1095,7 @@ extension NSString {
     self.init(format: format as String, locale: locale, arguments: va_args)
   }
 
+  @warn_unused_result
   public class func localizedStringWithFormat(
     format: NSString, _ args: CVarArgType...
   ) -> Self {
@@ -1091,6 +1104,7 @@ extension NSString {
     }
   }
 
+  @warn_unused_result
   public func stringByAppendingFormat(format: NSString, _ args: CVarArgType...)
   -> NSString {
     return withVaList(args) {
@@ -1236,17 +1250,20 @@ extension NSUndoManager {
 // NSCoder
 //===----------------------------------------------------------------------===//
 
+@warn_unused_result
 @asmname("NS_Swift_NSCoder_decodeObject")
 internal func NS_Swift_NSCoder_decodeObject(
   self_: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
 
+@warn_unused_result
 @asmname("NS_Swift_NSCoder_decodeObjectForKey")
 internal func NS_Swift_NSCoder_decodeObjectForKey(
   self_: AnyObject,
   _ key: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
 
+@warn_unused_result
 @asmname("NS_Swift_NSCoder_decodeObjectOfClassForKey")
 internal func NS_Swift_NSCoder_decodeObjectOfClassForKey(
   self_: AnyObject,
@@ -1254,6 +1271,7 @@ internal func NS_Swift_NSCoder_decodeObjectOfClassForKey(
   _ key: AnyObject,
   _ error: NSErrorPointer) -> AnyObject?
 
+@warn_unused_result
 @asmname("NS_Swift_NSCoder_decodeObjectOfClassesForKey")
 internal func NS_Swift_NSCoder_decodeObjectOfClassesForKey(
   self_: AnyObject,
@@ -1319,6 +1337,7 @@ extension NSCoder {
 // NSKeyedUnarchiver
 //===----------------------------------------------------------------------===//
 
+@warn_unused_result
 @asmname("NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData")
 internal func NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
   self_: AnyObject,

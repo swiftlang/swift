@@ -76,10 +76,13 @@ extension ObjCBool : CustomStringConvertible {
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
+@warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
   return ObjCBool(x)
 }
+
+@warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
   return Bool(x)
@@ -128,6 +131,7 @@ public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
   }
 }
 
+@warn_unused_result
 public func ==(lhs: Selector, rhs: Selector) -> Bool {
   return sel_isEqual(lhs, rhs)
 }
@@ -189,9 +193,12 @@ public struct NSZone : NilLiteralConvertible {
 //===----------------------------------------------------------------------===//
 // FIXME: @autoreleasepool substitute
 //===----------------------------------------------------------------------===//
-@asmname("objc_autoreleasePoolPush") 
+
+@warn_unused_result
+@asmname("objc_autoreleasePoolPush")
 func __pushAutoreleasePool() -> COpaquePointer
-@asmname("objc_autoreleasePoolPop") 
+
+@asmname("objc_autoreleasePoolPop")
 func __popAutoreleasePool(pool: COpaquePointer)
 
 public func autoreleasepool(@noescape code: () -> ()) {
@@ -213,6 +220,7 @@ let NO = ObjCBool(false)
 // rdar://problem/19418937, so here are some @transparent overloads
 // for ObjCBool
 @transparent
+@warn_unused_result
 public func && <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> ObjCBool
 ) -> Bool {
@@ -220,6 +228,7 @@ public func && <T : BooleanType>(
 }
 
 @transparent
+@warn_unused_result
 public func || <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> ObjCBool
 ) -> Bool {
@@ -247,6 +256,7 @@ extension NSObject : Equatable, Hashable {
   }
 }
 
+@warn_unused_result
 public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }

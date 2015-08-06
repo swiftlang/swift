@@ -12,6 +12,7 @@
 
 @exported import GameplayKit
 
+@warn_unused_result
 @asmname("GK_Swift_GKEntity_componentForClass")
 internal func GK_Swift_GKEntity_componentForClass(
   self_: AnyObject,
@@ -22,6 +23,7 @@ internal func GK_Swift_GKEntity_componentForClass(
 extension GKEntity {
   /// Returns the component instance of the indicated class contained by the
   /// entity. Returns nil if entity does not have this component.
+  @warn_unused_result
   public func componentForClass<ComponentType : GKComponent>(
     componentClass: ComponentType.Type) -> ComponentType? {
     return GK_Swift_GKEntity_componentForClass(
@@ -29,6 +31,7 @@ extension GKEntity {
   }
 }
 
+@warn_unused_result
 @asmname("GK_Swift_GKStateMachine_stateForClass")
 internal func GK_Swift_GKStateMachine_stateForClass(
   self_: AnyObject,
@@ -39,6 +42,7 @@ internal func GK_Swift_GKStateMachine_stateForClass(
 extension GKStateMachine {
   /// Returns the state instance of the indicated class contained by the state
   /// machine. Returns nil if state machine does not have this state.
+  @warn_unused_result
   public func stateForClass<StateType : GKState>(
     stateClass: StateType.Type) -> StateType? {
     return GK_Swift_GKStateMachine_stateForClass(

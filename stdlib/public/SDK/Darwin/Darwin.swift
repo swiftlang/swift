@@ -56,14 +56,17 @@ extension DarwinBoolean : CustomStringConvertible {
 }
 
 extension DarwinBoolean : Equatable {}
+@warn_unused_result
 public func ==(lhs: DarwinBoolean, rhs: DarwinBoolean) -> Bool {
   return lhs.boolValue == rhs.boolValue
 }
 
+@warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertBoolToDarwinBoolean(x: Bool) -> DarwinBoolean {
   return DarwinBoolean(x)
 }
+@warn_unused_result
 public // COMPILER_INTRINSIC
 func _convertDarwinBooleanToBool(x: DarwinBoolean) -> Bool {
   return Bool(x)
@@ -73,6 +76,7 @@ func _convertDarwinBooleanToBool(x: DarwinBoolean) -> Bool {
 // rdar://problem/19418937, so here are some @transparent overloads
 // for DarwinBoolean.
 @transparent
+@warn_unused_result
 public func && <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> DarwinBoolean
 ) -> Bool {
@@ -80,6 +84,7 @@ public func && <T : BooleanType>(
 }
 
 @transparent
+@warn_unused_result
 public func || <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> DarwinBoolean
 ) -> Bool {
@@ -137,28 +142,35 @@ public var stderr : UnsafeMutablePointer<FILE> {
 // fcntl.h
 //===----------------------------------------------------------------------===//
 
+@warn_unused_result
 @asmname("_swift_Darwin_open") 
 func _swift_Darwin_open(path: UnsafePointer<CChar>,
   _ oflag: CInt, _ mode: mode_t) -> CInt
+
+@warn_unused_result
 @asmname("_swift_Darwin_openat")
 func _swift_Darwin_openat(fd: CInt,
   _ path: UnsafePointer<CChar>,
   _ oflag: CInt, _ mode: mode_t) -> CInt
 
+@warn_unused_result
 public func open(path: UnsafePointer<CChar>, _ oflag: CInt) -> CInt {
   return _swift_Darwin_open(path, oflag, 0)
 }
 
+@warn_unused_result
 public func open(path: UnsafePointer<CChar>, _ oflag: CInt,
   _ mode: mode_t) -> CInt {
   return _swift_Darwin_open(path, oflag, mode)
 }
 
+@warn_unused_result
 public func openat(fd: CInt, _ path: UnsafePointer<CChar>,
   _ oflag: CInt) -> CInt {
   return _swift_Darwin_openat(fd, path, oflag, 0)
 }
 
+@warn_unused_result
 public func openat(fd: CInt, _ path: UnsafePointer<CChar>,
   _ oflag: CInt, _ mode: mode_t) -> CInt {
   return _swift_Darwin_openat(fd, path, oflag, mode)

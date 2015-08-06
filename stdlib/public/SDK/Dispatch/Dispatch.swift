@@ -32,6 +32,7 @@ public let DISPATCH_QUEUE_PRIORITY_DEFAULT    = dispatch_queue_priority_t(0)
 public let DISPATCH_QUEUE_PRIORITY_LOW        = dispatch_queue_priority_t(-2)
 public let DISPATCH_QUEUE_PRIORITY_BACKGROUND = dispatch_queue_priority_t(-32768)
 
+@warn_unused_result
 public func dispatch_get_global_queue(identifier: qos_class_t,
                                       _ flags: UInt) -> dispatch_queue_t {
   return dispatch_get_global_queue(Int(identifier.rawValue), flags);
@@ -41,6 +42,7 @@ public var DISPATCH_QUEUE_CONCURRENT : dispatch_queue_attr_t {
   get { return _swift_dispatch_queue_concurrent() } 
 }
 
+@warn_unused_result
 @asmname("_swift_dispatch_queue_concurrent") 
 func _swift_dispatch_queue_concurrent() -> dispatch_queue_attr_t
 
@@ -49,6 +51,7 @@ public var dispatch_data_empty : dispatch_data_t {
 get { return _swift_dispatch_data_empty() }
 }
 
+@warn_unused_result
 @asmname("_swift_dispatch_data_empty")
 func _swift_dispatch_data_empty() -> dispatch_data_t
 
@@ -105,26 +108,47 @@ public var DISPATCH_SOURCE_TYPE_WRITE : dispatch_source_type_t {
   get { return _swift_dispatch_source_type_write() } 
 }
 
+@warn_unused_result
 @asmname("_swift_dispatch_source_type_DATA_ADD") 
 func _swift_dispatch_source_type_data_add() -> dispatch_source_type_t
+
+@warn_unused_result
 @asmname("_swift_dispatch_source_type_DATA_OR") 
 func _swift_dispatch_source_type_data_or() -> dispatch_source_type_t
+
+@warn_unused_result
 @asmname("_swift_dispatch_source_type_MACH_SEND") 
 func _swift_dispatch_source_type_mach_send() -> dispatch_source_type_t
+
+@warn_unused_result
 @asmname("_swift_dispatch_source_type_MACH_RECV") 
 func _swift_dispatch_source_type_mach_recv() -> dispatch_source_type_t
+
+@warn_unused_result
 @asmname("_swift_dispatch_source_type_MEMORYPRESSURE") 
 func _swift_dispatch_source_type_memorypressure() -> dispatch_source_type_t
+
+@warn_unused_result
 @asmname("_swift_dispatch_source_type_PROC") 
 func _swift_dispatch_source_type_proc() -> dispatch_source_type_t
+
+@warn_unused_result
 @asmname("_swift_dispatch_source_type_READ") 
 func _swift_dispatch_source_type_read() -> dispatch_source_type_t
+
+@warn_unused_result
 @asmname("_swift_dispatch_source_type_SIGNAL") 
 func _swift_dispatch_source_type_signal() -> dispatch_source_type_t
+
+@warn_unused_result
 @asmname("_swift_dispatch_source_type_TIMER") 
 func _swift_dispatch_source_type_timer() -> dispatch_source_type_t
+
+@warn_unused_result
 @asmname("_swift_dispatch_source_type_VNODE") 
 func _swift_dispatch_source_type_vnode() -> dispatch_source_type_t
+
+@warn_unused_result
 @asmname("_swift_dispatch_source_type_WRITE") 
 func _swift_dispatch_source_type_write() -> dispatch_source_type_t
 

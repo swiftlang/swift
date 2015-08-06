@@ -43,6 +43,7 @@ public extension CGPoint {
 
 extension CGPoint : Equatable {}
 @transparent // @fragile
+@warn_unused_result
 public func == (lhs: CGPoint, rhs: CGPoint) -> Bool {
   return lhs.x == rhs.x  &&  lhs.y == rhs.y
 }
@@ -69,6 +70,7 @@ public extension CGSize {
 
 extension CGSize : Equatable {}
 @transparent // @fragile
+@warn_unused_result
 public func == (lhs: CGSize, rhs: CGSize) -> Bool {
   return lhs.width == rhs.width  &&  lhs.height == rhs.height
 }
@@ -95,6 +97,7 @@ public extension CGVector {
 
 extension CGVector : Equatable {}
 @transparent // @fragile
+@warn_unused_result
 public func == (lhs: CGVector, rhs: CGVector) -> Bool {
   return lhs.dx == rhs.dx  &&  lhs.dy == rhs.dy
 }
@@ -242,6 +245,7 @@ public extension CGRect {
   }
 
   @transparent // @fragile
+  @warn_unused_result
   func divide(atDistance: CGFloat, fromEdge: CGRectEdge)
     -> (slice: CGRect, remainder: CGRect)
   {
@@ -252,16 +256,19 @@ public extension CGRect {
   }
 
   @transparent // @fragile
+  @warn_unused_result
   func contains(rect: CGRect) -> Bool {
     return CGRectContainsRect(self, rect)
   }
 
   @transparent // @fragile
+  @warn_unused_result
   func contains(point: CGPoint) -> Bool {
     return CGRectContainsPoint(self, point)
   }
 
   @transparent // @fragile
+  @warn_unused_result
   func intersects(rect: CGRect) -> Bool {
     return CGRectIntersectsRect(self, rect)
   }
@@ -344,6 +351,7 @@ public extension CGRect {
 
 extension CGRect : Equatable {}
 @transparent // @fragile
+@warn_unused_result
 public func == (lhs: CGRect, rhs: CGRect) -> Bool {
   return CGRectEqualToRect(lhs, rhs)
 }
