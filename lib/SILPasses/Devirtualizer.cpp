@@ -193,8 +193,19 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   if (It != Entry->begin()) {
     auto *SRI = dyn_cast<StrongRetainInst>(--It);
     // Try to skip another instruction, in case the class_method came first.
-    if (!SRI && It != Entry->begin())
+    if (!SRI && It != Entry->begin()) {
+      auto AnotheInst = It;
       SRI = dyn_cast<StrongRetainInst>(--It);
+      if (SRI && !isa<ClassMethodInst>(AnotheInst)) {
+        // Check that the operand of retain is not used by another instruction.
+        for (auto &Op: AnotheInst->getAllOperands()) {
+          if (Op.get() == CMI->getOperand()){
+            SRI = nullptr;
+            break;
+          }
+        }
+      }
+    }
     if (SRI && SRI->getOperand() == CMI->getOperand()) {
       VirtBuilder.createStrongRetain(SRI->getLoc(), CMI->getOperand())
         ->setDebugScope(SRI->getDebugScope());

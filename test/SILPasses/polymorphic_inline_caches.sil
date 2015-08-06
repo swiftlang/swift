@@ -21,6 +21,8 @@ class D : C {
   override func ping(x: Builtin.Int32) -> Builtin.Int32
 }
 
+sil @external_func : $@convention(thin) (A) -> Builtin.Int32
+
 sil @_TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_ : $@convention(method) (Builtin.Int32, @guaranteed A) -> Builtin.Int32
 sil @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_ : $@convention(method) (Builtin.Int32, @guaranteed B) -> Builtin.Int32
 sil @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_ : $@convention(method) (Builtin.Int32, @guaranteed C) -> Builtin.Int32
@@ -61,6 +63,48 @@ bb0(%0 : $A, %1 : $Builtin.Int32):
   // CHECK: [[APING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_
   // CHECK: apply [[APING]]
   // CHECK: strong_release %23 : $A
+  // CHECK: bb9
+  // CHECK: [[PING:%.*]] = class_method %0 : $A, #A.ping!1
+  // CHECK: apply [[PING]]
+}
+
+// CHECK-LABEL: sil @polymorphic_inline_caches_dont_sink_retain
+sil @polymorphic_inline_caches_dont_sink_retain : $@convention(thin) (@owned A, Builtin.Int32) -> Builtin.Int32 {
+// CHECK: bb0
+bb0(%0 : $A, %1 : $Builtin.Int32):
+// CHECK: strong_retain %0
+  %4 = function_ref @external_func : $@convention(thin) (A) -> Builtin.Int32
+  %5 = class_method %0 : $A, #A.ping!1 : A -> (Builtin.Int32) -> Builtin.Int32 , $@convention(method) (Builtin.Int32, @guaranteed A) -> Builtin.Int32
+
+  // Don't sink this retain, because its argument is used by %6 (apply of @external_func)
+  strong_retain %0 : $A
+// CHECK-NOT: class_method
+  // CHECK: apply
+  // CHECK-NOT: apply
+  %6 = apply %4(%0) : $@convention(thin) (A) -> Builtin.Int32
+  %7 = apply %5(%1, %0) : $@convention(method) (Builtin.Int32, @guaranteed A) -> Builtin.Int32
+  // CHECK: checked_cast_br [exact] %0 : $A to $B, bb2, bb3
+  // CHECK: bb1
+  strong_release %0 : $A
+  // CHECK: return
+  return %6 : $Builtin.Int32
+  // CHECK: bb2
+  // CHECK: [[BPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_
+  // CHECK: apply [[BPING]]
+  // CHECK: bb3
+  // CHECK: checked_cast_br [exact] %0 : $A to $C, bb5, bb6
+  // CHECK: bb4
+  // CHECK: br bb1
+  // CHECK: bb5
+  // CHECK: [[CPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_
+  // CHECK: apply [[CPING]]
+  // CHECK: bb6
+  // CHECK: checked_cast_br [exact] %0 : $A to $A, bb8, bb9
+  // CHECK: bb7
+  // CHECK: br bb4
+  // CHECK: bb8
+  // CHECK: [[APING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_
+  // CHECK: apply [[APING]]
   // CHECK: bb9
   // CHECK: [[PING:%.*]] = class_method %0 : $A, #A.ping!1
   // CHECK: apply [[PING]]
