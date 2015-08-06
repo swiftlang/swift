@@ -244,7 +244,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(e: SequenceType) { // expected-error{{has Self or associated type requirements}}
-  var x = e.generate() // expected-error{{type 'SequenceType' does not conform to protocol 'GeneratorType'}}
+  var x = e.generate() // expected-error{{type '@opened("C7CC3CD8-3BCA-11E5-9733-0C4DE99E8DC1") SequenceType' does not conform to protocol 'GeneratorType'}}
   x.next()
   x.nonexistent()
 }

@@ -1064,93 +1064,6 @@ static Constraint *getConstraintChoice(Constraint *constraint,
   return nullptr;
 }
 
-/// If a type variable was created for an opened literal expression, substitute
-/// in the default literal for the type variable's literal conformance.
-static Type substituteLiteralForTypeVariable(ConstraintSystem *CS,
-                                             TypeVariableType *tv) {
-  if (auto proto = tv->getImpl().literalConformanceProto) {
-    
-    auto kind = proto->getKnownProtocolKind();
-    
-    if (kind.hasValue()) {
-      auto altLits = CS->getAlternativeLiteralTypes(kind.getValue());
-      if (!altLits.empty()) {
-        if (auto altType = altLits[0]) {
-          return altType;
-        }
-      }
-    }
-  }
-  
-  return tv;
-}
-
-static std::pair<Type, Type>
-getBoundTypesFromConstraint(ConstraintSystem *CS, Expr *expr,
-                            Constraint *constraint) {
-  
-  auto anchor = simplifyLocatorToAnchor(*CS, constraint->getLocator());
-  auto type1 = anchor && anchor->getType() ? anchor->getType() :expr->getType();
-  
-  auto type2 = constraint->getSecondType();
-  
-  if (type1->isEqual(type2))
-    if (auto firstType = constraint->getFirstType())
-      type1 = firstType;
-  
-  if (auto typeVariableType =
-      dyn_cast<TypeVariableType>(type2.getPointer())) {
-    
-    if (typeVariableType->getImpl().
-          getRepresentative(nullptr) == typeVariableType) {
-      SmallVector<Type, 4> bindings;
-      CS->getComputedBindings(typeVariableType, bindings);
-      auto binding = bindings.size() ? bindings.front() : Type();
-      
-      if (!binding.isNull()) {
-        if (binding.getPointer() != type1.getPointer())
-          type2 = binding;
-      } else {
-        auto impl = typeVariableType->getImpl();
-        if (auto archetypeType = impl.getArchetype()) {
-          type2 = archetypeType;
-        } else if (impl.getLocator()) {
-          auto implAnchor = impl.getLocator()->getAnchor();
-          auto anchorType = implAnchor->getType();
-          
-          // Don't re-substitute an opened type variable for itself.
-          if (anchorType.getPointer() != type1.getPointer())
-            type2 = anchorType;
-        }
-      }
-    }
-  }
-  
-  if (auto typeVariableType =
-      dyn_cast<TypeVariableType>(type1.getPointer())) {
-    SmallVector<Type, 4> bindings;
-    
-    CS->getComputedBindings(typeVariableType, bindings);
-    
-    for (auto binding : bindings) {
-      if (type2.getPointer() != binding.getPointer()) {
-        type1 = binding;
-        break;
-      }
-    }
-  }
-  
-  // If we still have a literal type variable, substitute in the default type.
-  if (auto tv1 = type1->getAs<TypeVariableType>())
-    type1 = substituteLiteralForTypeVariable(CS, tv1);
-  
-  if (auto tv2 = type2->getAs<TypeVariableType>())
-    type2 = substituteLiteralForTypeVariable(CS, tv2);
-  
-  return std::pair<Type, Type>(type1->getLValueOrInOutObjectType(),
-                               type2->getLValueOrInOutObjectType());
-}
-
 /// Conveniently unwrap a paren expression, if necessary.
 static Expr *unwrapParenExpr(Expr *e) {
   if (auto parenExpr = dyn_cast<ParenExpr>(e))
@@ -2154,17 +2067,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure() {
       
     // If we couldn't resolve a specific type for the base expression, then we
     // cannot produce a specific diagnostic.
-
-    // If we have a conversion constraint, then we may just have an ambiguous
-    // subexpression.  Diagnose it in conversion constraint stuff, instead of
-    // doing saying that we don't have an element of some undefined type.
-    if (conversionConstraint && isConversionConstraint(conversionConstraint))
-      return diagnoseGeneralConversionFailure();
-      
-    // Could not infer base type for member reference.
-    diagnose(anchor->getLoc(), diag::could_not_find_member_base, memberName)
-      .highlight(anchor->getSourceRange()).highlight(range);
-    return true;
+    return false;
 
   case MemberLookupResult::ErrorAlreadyDiagnosed:
     // If an error was already emitted, then we're done, don't emit anything
@@ -2432,32 +2335,17 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
     if (!anchor)
       anchor = locator->getAnchor();
   }
-  
-  std::pair<Type, Type> types = getBoundTypesFromConstraint(CS, anchor,
-                                                            constraint);
 
-  // If it's a type variable failing a conformance, avoid printing the type
-  // variable and just print the conformance.
-  if ((constraint->getKind() == ConstraintKind::ConformsTo) &&
-      types.first->getAs<TypeVariableType>()) {
-    diagnose(anchor->getLoc(), diag::single_expression_conformance_failure,
-             types.first)
-      .highlight(anchor->getSourceRange());
-    return true;
+  Type fromType = CS->simplifyType(constraint->getFirstType());
+  if (fromType->is<TypeVariableType>()) {
+    auto sub = typeCheckArbitrarySubExprIndependently(anchor);
+    if (!sub) return true;
+    fromType = sub->getType();
   }
 
-  Type fromType;
-  if (auto sub = typeCheckArbitrarySubExprIndependently(anchor))
-    fromType = sub->getType();
-  else
-    fromType = types.first.getPointer();
-
   fromType = fromType->getRValueType();
-  
-  auto toType = CS->getContextualType(anchor);
-  if (!toType)
-    toType = types.second.getPointer();
-  
+  auto toType = CS->simplifyType(constraint->getSecondType());
+
   // If the second type is a type variable, the expression itself is
   // ambiguous.  Bail out so the general ambiguity diagnosing logic can handle
   // it.
@@ -3729,25 +3617,17 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
   return diagnoseGeneralFailure();
 }
 
+// FIXME: Change this to be visitExplicitCastExpr, which is a superclass of
+// CoerceExpr & ForcedCheckedCastExpr and other stuff.
 bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   Expr *subExpr = typeCheckChildIndependently(CE->getSubExpr());
   if (!subExpr) return true;
   Type subType = subExpr->getType();
 
-  std::pair<Type, Type> conversionTypes(nullptr, nullptr);
-  if (conversionConstraint &&
-      conversionConstraint->getKind() == ConstraintKind::ExplicitConversion &&
-      conversionConstraint->getLocator()->getAnchor() == expr) {
-    conversionTypes = getBoundTypesFromConstraint(CS, CE, conversionConstraint);
-  } else {
-    conversionTypes.first = subType->getLValueOrInOutObjectType();
-    conversionTypes.second = CE->getType();
-  }
-
-  if (conversionTypes.first && conversionTypes.second) {
+  if (!subType->is<TypeVariableType>()) {
     diagnose(CE->getLoc(), diag::invalid_relation,
              Failure::TypesNotConvertible - Failure::TypesNotEqual,
-             conversionTypes.first, conversionTypes.second)
+             subType, CE->getType())
       .highlight(CE->getSourceRange());
     return true;
   }
@@ -3759,24 +3639,12 @@ bool FailureDiagnosis::
 visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCE) {
   Expr *subExpr = typeCheckChildIndependently(FCE->getSubExpr());
   if (!subExpr) return true;
-
   Type subType = subExpr->getType();
 
-  std::pair<Type, Type> conversionTypes(nullptr, nullptr);
-  if (conversionConstraint &&
-      conversionConstraint->getKind() == ConstraintKind::CheckedCast &&
-      conversionConstraint->getLocator()->getAnchor() == expr) {
-    conversionTypes = getBoundTypesFromConstraint(CS, FCE,
-                                                  conversionConstraint);
-  } else {
-    conversionTypes.first = subType->getLValueOrInOutObjectType();
-    conversionTypes.second = FCE->getType();
-  }
-
-  if (conversionTypes.first && conversionTypes.second) {
+  if (!subType->is<TypeVariableType>()) {
     diagnose(FCE->getLoc(), diag::invalid_relation,
              Failure::TypesNotConvertible - Failure::TypesNotEqual,
-             conversionTypes.first, conversionTypes.second)
+             subType, FCE->getType())
       .highlight(FCE->getSourceRange());
     return true;
   }

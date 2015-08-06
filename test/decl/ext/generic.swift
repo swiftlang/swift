@@ -112,7 +112,7 @@ extension Array where Element : Hashable {
 }
 
 func notHashableArray<T>(x: [T]) {
-  x.worseHashEver // expected-error{{type '[T]' does not conform to protocol 'Hashable'}}
+  x.worseHashEver // expected-error{{type 'T' does not conform to protocol 'Hashable'}}
 }
 
 func hashableArray<T : Hashable>(x: [T]) {
@@ -134,7 +134,7 @@ func genericClassEquatable<T : Equatable>(gc: GenericClass<T>, x: T, y: T) {
 }
 
 func genericClassNotEquatable<T>(gc: GenericClass<T>, x: T, y: T) {
-  gc.foo(x, y: y) // expected-error{{type 'GenericClass<T>' does not conform to protocol 'Equatable'}}
+  gc.foo(x, y: y) // expected-error{{type 'T' does not conform to protocol 'Equatable'}}
 }
 
 

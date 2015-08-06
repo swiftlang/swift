@@ -89,11 +89,11 @@ func testConditionalDowncastBridge() {
 
   if let s = setR as? Set<BridgedToObjC> { }
   if let s = setO as? Set<BridgedToObjC> { }
-  if let s = setD as? Set<BridgedToObjC> { } // expected-error {{'Set<DerivesObjC>' is not a subtype of 'DerivesObjC'}}
+  if let s = setD as? Set<BridgedToObjC> { } // expected-error {{'ObjC' is not a subtype of 'DerivesObjC'}}
 
-  if let s = setB as? Set<Root> { } // expected-error {{'Set<BridgedToObjC>' is not a subtype of 'BridgedToObjC'}}
-  if let s = setB as? Set<ObjC> { } // expected-error {{'Set<BridgedToObjC>' is not a subtype of 'BridgedToObjC'}}
-  if let s = setB as? Set<DerivesObjC> { } // expected-error {{'Set<BridgedToObjC>' is not a subtype of 'BridgedToObjC'}}
+  if let s = setB as? Set<Root> { } // expected-error {{'Root' is not a subtype of 'BridgedToObjC'}}
+  if let s = setB as? Set<ObjC> { } // expected-error {{'ObjC' is not a subtype of 'BridgedToObjC'}}
+  if let s = setB as? Set<DerivesObjC> { } // expected-error {{'DerivesObjC' is not a subtype of 'BridgedToObjC'}}
 }
 
 

@@ -2,7 +2,8 @@
 
 // <rdar://problem/15593704>
 struct X {
-  var _maxLoadFactorInverse = 1.0 // expected-error{{expression does not conform to type 'FloatLiteralConvertible'}}
+  // This is in parse-stdlib mode with no default literal type.
+  var _maxLoadFactorInverse = 1.0 // expected-error{{type of expression is ambiguous without more context}}
 }
 
 typealias MaxBuiltinFloatType = Builtin.FPIEEE64
