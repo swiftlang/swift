@@ -49,61 +49,57 @@ namespace {
 class ExplodeTupleValue
   : public CanTypeVisitor<ExplodeTupleValue,
                           /*RetTy=*/ void,
-                          /*Args...=*/ ManagedValue, SILLocation>
+                          /*Args...=*/ ManagedValue>
 {
 public:
   std::vector<ManagedValue> &values;
   SILGenFunction &gen;
+  SILLocation loc;
 
   ExplodeTupleValue(std::vector<ManagedValue> &values,
-                    SILGenFunction &gen)
-    : values(values), gen(gen)
+                    SILGenFunction &gen, SILLocation loc)
+    : values(values), gen(gen), loc(loc)
   {
   }
 
-  void visitType(CanType t, ManagedValue v, SILLocation l) {
+  void visitType(CanType formalType, ManagedValue v) {
     values.push_back(v);
   }
 
-  void visitTupleType(CanTupleType t, ManagedValue mv, SILLocation l) {
-    bool IsPlusZero = mv.isPlusZeroRValueOrTrivial();
+  void visitTupleType(CanTupleType tupleFormalType, ManagedValue tupleMV) {
+    bool isPlusZero = tupleMV.isPlusZeroRValueOrTrivial();
+    SILValue tuple = tupleMV.forward(gen);
 
-    SILValue v = mv.forward(gen);
-    if (v.getType().isAddressOnly(gen.F.getModule())) {
-      // Destructure address-only types by addressing the individual members.
-      for (unsigned i = 0, size = t->getNumElements(); i < size; ++i) {
-        CanType fieldCanTy = t.getElementType(i);
-        auto &fieldTI = gen.getTypeLowering(fieldCanTy);
-        SILType fieldTy = fieldTI.getLoweredType();
-        SILValue member = gen.B.createTupleElementAddr(l, v, i,
-                                                     fieldTy.getAddressType());
-        assert(fieldTI.getSemanticType() == fieldTy);
-        if (fieldTI.isLoadable() && !isa<InOutType>(fieldCanTy))
-          member = gen.B.createLoad(l, member);
+    for (auto i : indices(tupleFormalType->getElements())) {
+      CanType eltFormalType = tupleFormalType.getElementType(i);
+      assert(eltFormalType->isMaterializable());
 
-        // If we're returning a +1 value, emit a cleanup for the member to cover
-        // for the cleanup we disabled for the tuple aggregate.
-        auto SubValue = IsPlusZero ? ManagedValue::forUnmanaged(member)
-                            : gen.emitManagedRValueWithCleanup(member, fieldTI);
+      auto eltTy = tuple.getType().getTupleElementType(i);
+      assert(eltTy.isAddress() == tuple.getType().isAddress());
+      auto &eltTI = gen.getTypeLowering(eltTy);
 
-        visit(fieldCanTy, SubValue, l);
+      // Project the element.
+      SILValue elt;
+      if (tuple.getType().isObject()) {
+        assert(eltTI.isLoadable());
+        elt = gen.B.createTupleExtract(loc, tuple, i, eltTy);
+      } else {
+        elt = gen.B.createTupleElementAddr(loc, tuple, i, eltTy);
+
+        // RValue has an invariant that loadable values have been
+        // loaded.  Except it's not really an invariant, because
+        // argument emission likes to lie sometimes.
+        if (eltTI.isLoadable()) {
+          elt = gen.B.createLoad(loc, elt);
+        }
       }
-    } else {
-      // Extract the elements from loadable tuples.
-      for (unsigned i = 0, size = t->getNumElements(); i < size; ++i) {
-        CanType fieldCanTy = t.getElementType(i);
-        auto &fieldTI = gen.getTypeLowering(fieldCanTy);
-        assert(fieldTI.isLoadable());
-        SILValue member = gen.B.createTupleExtract(l, v, i,
-                                                   fieldTI.getLoweredType());
 
-        // If we're returning a +1 value, emit a cleanup for the member to cover
-        // for the cleanup we disabled for the tuple aggregate.
-        auto SubValue = IsPlusZero ? ManagedValue::forUnmanaged(member)
-          : gen.emitManagedRValueWithCleanup(member, fieldTI);
+      // If we're returning a +1 value, emit a cleanup for the member
+      // to cover for the cleanup we disabled for the tuple aggregate.
+      auto eltMV = isPlusZero ? ManagedValue::forUnmanaged(elt)
+                              : gen.emitManagedRValueWithCleanup(elt, eltTI);
 
-        visit(fieldCanTy, SubValue, l);
-      }
+      visit(eltFormalType, eltMV);
     }
   }
 };
@@ -375,7 +371,7 @@ RValue::RValue(SILGenFunction &gen, SILLocation l, CanType formalType,
     return;
   }
 
-  ExplodeTupleValue(values, gen).visit(type, v, l);
+  ExplodeTupleValue(values, gen, l).visit(formalType, v);
   assert(values.size() == getRValueSize(type));
 }
 
@@ -389,7 +385,7 @@ RValue::RValue(SILGenFunction &gen, Expr *expr, ManagedValue v)
   }
 
   assert(v && "creating r-value with consumed value");
-  ExplodeTupleValue(values, gen).visit(type, v, expr);
+  ExplodeTupleValue(values, gen, expr).visit(type, v);
   assert(values.size() == getRValueSize(type));
 }
 
@@ -416,7 +412,7 @@ void RValue::addElement(SILGenFunction &gen, ManagedValue element,
   assert(!isUsed() && "rvalue already used");
   --elementsToBeAdded;
 
-  ExplodeTupleValue(values, gen).visit(formalType, element, l);
+  ExplodeTupleValue(values, gen, l).visit(formalType, element);
 
   assert(!isComplete() || values.size() == getRValueSize(type));
 }

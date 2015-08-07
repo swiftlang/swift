@@ -305,6 +305,37 @@ public:
     Path.emplace_back(new T(std::forward<As>(args)...));
   }
 
+  /// Add a member component to the access path of this lvalue.
+  void addMemberComponent(SILGenFunction &gen, SILLocation loc,
+                          AbstractStorageDecl *storage,
+                          ArrayRef<Substitution> subs,
+                          bool isSuper,
+                          AccessKind accessKind,
+                          AccessSemantics accessSemantics,
+                          AccessStrategy accessStrategy,
+                          CanType formalRValueType,
+                          RValue &&indices);
+
+  void addMemberVarComponent(SILGenFunction &gen, SILLocation loc,
+                             VarDecl *var,
+                             ArrayRef<Substitution> subs,
+                             bool isSuper,
+                             AccessKind accessKind,
+                             AccessSemantics accessSemantics,
+                             AccessStrategy accessStrategy,
+                             CanType formalRValueType);
+
+  void addMemberSubscriptComponent(SILGenFunction &gen, SILLocation loc,
+                                   SubscriptDecl *subscript,
+                                   ArrayRef<Substitution> subs,
+                                   bool isSuper,
+                                   AccessKind accessKind,
+                                   AccessSemantics accessSemantics,
+                                   AccessStrategy accessStrategy,
+                                   CanType formalRValueType,
+                                   RValue &&indices,
+                                   Expr *indexExprForDiagnostics = nullptr);
+
   /// Add a subst-to-orig reabstraction component.  That is, given
   /// that this l-value trafficks in values following the substituted
   /// abstraction pattern, make an l-value trafficking in values

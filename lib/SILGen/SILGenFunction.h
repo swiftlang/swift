@@ -991,6 +991,11 @@ public:
                                 bool isSuper, bool isDirectAccessorUse,
                                 RValue &&optionalSubscripts,
                                 SILValue buffer, SILValue callbackStorage);
+  bool maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
+                                       FuncDecl *requirement,
+                                       FuncDecl *witness,
+                                       ArrayRef<Substitution> witnessSubs,
+                                       ArrayRef<ManagedValue> params);
 
   SILDeclRef getAddressorDeclRef(AbstractStorageDecl *decl,
                                  AccessKind accessKind,

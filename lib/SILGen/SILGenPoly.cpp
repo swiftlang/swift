@@ -1718,6 +1718,24 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
 // Protocol witnesses
 //===----------------------------------------------------------------------===//
 
+static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
+                                         ProtocolConformance *conformance,
+                                         SILDeclRef requirement,
+                                         SILDeclRef witness,
+                                         ArrayRef<Substitution> witnessSubs,
+                                         ArrayRef<ManagedValue> origParams) {
+  if (auto witnessFn = dyn_cast<FuncDecl>(witness.getDecl())) {
+    if (witnessFn->getAccessorKind() == AccessorKind::IsMaterializeForSet) {
+      auto reqFn = cast<FuncDecl>(requirement.getDecl());
+      assert(reqFn->getAccessorKind() == AccessorKind::IsMaterializeForSet);
+      return gen.maybeEmitMaterializeForSetThunk(conformance, reqFn, witnessFn,
+                                                 witnessSubs, origParams);
+    }
+  }
+
+  return false;
+}
+
 static SILValue getWitnessFunctionRef(SILGenFunction &gen,
                                       ProtocolConformance *conformance,
                                       SILDeclRef witness,
@@ -1822,6 +1840,11 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   if (isFree) {
     reqtOrigInputTy = reqtOrigInputTy.dropLastTupleElement();
   }
+
+  // Open-code certain protocol witness "thunks".
+  if (maybeOpenCodeProtocolWitness(*this, conformance, requirement,
+                                   witness, witnessSubs, origParams))
+    return;
 
   // Translate the argument values from the requirement abstraction level to
   // the substituted signature of the witness.

@@ -641,6 +641,7 @@ public:
   AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage);
   AbstractionPattern getAbstractionPattern(VarDecl *var);
   AbstractionPattern getAbstractionPattern(SubscriptDecl *subscript);
+  AbstractionPattern getIndicesAbstractionPattern(SubscriptDecl *subscript);
   AbstractionPattern getAbstractionPattern(EnumElementDecl *element);
 
   SILType getLoweredTypeOfGlobal(VarDecl *var);
