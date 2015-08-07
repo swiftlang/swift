@@ -227,7 +227,7 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
 
 // Replace a dead apply with a new instruction that computes the same
 // value, and delete the old apply.
-void swift::replaceDeadApply(FullApplySite Old, SILInstruction *New) {
+void swift::replaceDeadApply(ApplySite Old, SILInstruction *New) {
   auto *OldApply = Old.getInstruction();
   if (!isa<TryApplyInst>(OldApply))
     OldApply->replaceAllUsesWith(New);

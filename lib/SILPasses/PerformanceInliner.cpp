@@ -256,14 +256,14 @@ namespace {
                                                 CallGraph &CG);
 
     bool devirtualizeAndSpecializeApplies(
-      llvm::SmallVectorImpl<FullApplySite> &Applies,
+      llvm::SmallVectorImpl<ApplySite> &Applies,
         CallGraphAnalysis *CGA,
         SILModuleTransform *MT,
         llvm::SmallVectorImpl<SILFunction *> &WorkList);
 
-    FullApplySite specializeGenericUpdatingCallGraph(FullApplySite Apply,
-                                                     CallGraph &CG,
-                              llvm::SmallVectorImpl<FullApplySite> &NewApplies);
+    ApplySite specializeGenericUpdatingCallGraph(ApplySite Apply,
+                                                 CallGraph &CG,
+                                  llvm::SmallVectorImpl<ApplySite> &NewApplies);
 
     bool inlineCallsIntoFunction(SILFunction *F, DominanceAnalysis *DA,
                                  SILLoopAnalysis *LA, CallGraph &CG,
@@ -529,8 +529,8 @@ IntConst ConstantTracker::getIntConst(SILValue val, int depth) {
 //                           Performance Inliner
 //===----------------------------------------------------------------------===//
 
-// Returns the referenced function of an apply_inst if it is a direct call.
-static SILFunction *getReferencedFunction(FullApplySite Apply) {
+// Returns the referenced function an ApplySite.
+static SILFunction *getReferencedFunction(ApplySite Apply) {
   auto *FRI = dyn_cast<FunctionRefInst>(Apply.getCallee());
   if (!FRI)
     return nullptr;
@@ -882,41 +882,49 @@ FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
   return NewAI;
 }
 
-FullApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
-                                                            FullApplySite Apply,
-                                                            CallGraph &CG,
-                             llvm::SmallVectorImpl<FullApplySite> &NewApplies) {
+ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
+                                                                ApplySite Apply,
+                                                                CallGraph &CG,
+                                 llvm::SmallVectorImpl<ApplySite> &NewApplies) {
   assert(NewApplies.empty() && "Expected out parameter for new applies!");
 
   if (!Apply.hasSubstitutions())
-    return FullApplySite();
+    return ApplySite();
 
   auto *Callee = getReferencedFunction(Apply);
 
   if (!Callee || Callee->isExternalDeclaration())
-    return FullApplySite();
+    return ApplySite();
 
-  auto *AI = Apply.getInstruction();
   SILFunction *SpecializedFunction;
   llvm::SmallVector<FullApplyCollector::value_type, 4> NewApplyPairs;
-  auto Specialized = trySpecializeApplyOfGeneric(ApplySite(AI),
+  auto Specialized = trySpecializeApplyOfGeneric(Apply,
                                                  SpecializedFunction,
                                                  NewApplyPairs);
 
   if (!Specialized)
-    return FullApplySite();
+    return ApplySite();
 
-  assert(FullApplySite::isa(Specialized.getInstruction()) &&
-         "Expected full apply site!");
-  auto SpecializedFullApply = FullApplySite(Specialized.getInstruction());
-
-  // Update the call graph based on the specialization.
-
+  // Add the specialization to the call graph.
   CallGraphEditor Editor(CG);
   if (SpecializedFunction)
     Editor.addCallGraphNode(SpecializedFunction);
 
-  Editor.replaceApplyWithNew(Apply, SpecializedFullApply);
+  auto FullApply = FullApplySite::isa(Apply.getInstruction());
+
+  if (!FullApply) {
+    assert(!FullApplySite::isa(Specialized.getInstruction()) &&
+           "Unexpected full apply generated!");
+
+    // Replace the old apply with the new and delete the old.
+    replaceDeadApply(Apply, Specialized.getInstruction());
+
+    return ApplySite(Specialized);
+  }
+
+  // Update call graph edges
+  auto SpecializedFullApply = FullApplySite(Specialized.getInstruction());
+  Editor.replaceApplyWithNew(FullApply, SpecializedFullApply);
 
   for (auto NewApply : NewApplyPairs) {
     NewApplies.push_back(NewApply.first);
@@ -927,27 +935,27 @@ FullApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
     OriginMap[NewApply.first] = NewApply.second;
   }
 
-  assert(!OriginMap.count(SpecializedFullApply) && "Unexpected apply in map!");
-  if (OriginMap.count(Apply))
-    OriginMap[SpecializedFullApply] = OriginMap[Apply];
-  RemovedApplies.insert(Apply);
+  assert(!OriginMap.count(SpecializedFullApply) &&
+         "Unexpected apply in map!");
+  if (OriginMap.count(FullApply))
+    OriginMap[SpecializedFullApply] = OriginMap[FullApply];
+
+  RemovedApplies.insert(FullApply);
+
   // Replace the old apply with the new and delete the old.
-  replaceDeadApply(Apply, SpecializedFullApply.getInstruction());
+  replaceDeadApply(Apply, Specialized.getInstruction());
 
   return SpecializedFullApply;
 }
 
 static void collectAllAppliesInFunction(SILFunction *F,
-                                llvm::SmallVectorImpl<FullApplySite> &Applies) {
+                                llvm::SmallVectorImpl<ApplySite> &Applies) {
   assert(Applies.empty() && "Expected empty vector to store into!");
 
   for (auto &B : *F)
-    for (auto &I : B) {
-      if (auto Apply = FullApplySite::isa(&I)) {
+    for (auto &I : B)
+      if (auto Apply = ApplySite::isa(&I))
         Applies.push_back(Apply);
-        continue;
-      }
-    }
 }
 
 // Devirtualize and specialize a group of applies, updating the call
@@ -960,7 +968,7 @@ static void collectAllAppliesInFunction(SILFunction *F,
 //
 // Returns true if any changes were made.
 bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
-                                  llvm::SmallVectorImpl<FullApplySite> &Applies,
+                                  llvm::SmallVectorImpl<ApplySite> &Applies,
                                   CallGraphAnalysis *CGA,
                                   SILModuleTransform *MT,
                                llvm::SmallVectorImpl<SILFunction *> &WorkList) {
@@ -980,13 +988,15 @@ bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
     Applies.pop_back();
 
     bool ChangedApply = false;
-    if (auto NewApply = devirtualizeUpdatingCallGraph(Apply, CG)) {
-      ChangedApply = true;
+    if (auto FullApply = FullApplySite::isa(Apply.getInstruction())) {
+      if (auto NewApply = devirtualizeUpdatingCallGraph(FullApply, CG)) {
+        ChangedApply = true;
 
-      Apply = NewApply;
+        Apply = ApplySite(NewApply.getInstruction());
+      }
     }
 
-    llvm::SmallVector<FullApplySite, 4> NewApplies;
+    llvm::SmallVector<ApplySite, 4> NewApplies;
     if (auto NewApply = specializeGenericUpdatingCallGraph(Apply, CG,
                                                            NewApplies)) {
       ChangedApply = true;
@@ -1164,7 +1174,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
 
 void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
                                                           SILFunction *Caller,
-                                                         SILModuleTransform *MT,
+                                                        SILModuleTransform *MT,
                                                          CallGraphAnalysis *CGA,
                                                           DominanceAnalysis *DA,
                                                           SILLoopAnalysis *LA) {
@@ -1179,7 +1189,7 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
   RemovedApplies.clear();
 
   while (!WorkList.empty()) {
-    llvm::SmallVector<FullApplySite, 4> WorkItemApplies;
+    llvm::SmallVector<ApplySite, 4> WorkItemApplies;
     collectAllAppliesInFunction(WorkList.back(), WorkItemApplies);
 
     // Devirtualize and specialize any applies we've collected,
@@ -1229,7 +1239,7 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
         // FIXME: Update inlineCallsIntoFunction to collect all
         //        remaining applies after inlining, not just those
         //        resulting from inlining code.
-        llvm::SmallVector<FullApplySite, 4> WorkItemApplies;
+        llvm::SmallVector<ApplySite, 4> WorkItemApplies;
         collectAllAppliesInFunction(WorkItem, WorkItemApplies);
 
         if (devirtualizeAndSpecializeApplies(WorkItemApplies, CGA, MT,
