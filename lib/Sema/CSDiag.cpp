@@ -2282,6 +2282,12 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 
   fromType = fromType->getRValueType();
   auto toType = CS->simplifyType(constraint->getSecondType());
+  
+  // If this constraint doesn't simplify into an error, then
+  if (CS->simplifyConstraint(*constraint) !=
+      ConstraintSystem::SolutionKind::Error)
+    return false;
+  
 
   // If the second type is a type variable, the expression itself is
   // ambiguous.  Bail out so the general ambiguity diagnosing logic can handle

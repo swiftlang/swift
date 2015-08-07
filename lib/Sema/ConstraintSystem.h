@@ -2279,7 +2279,6 @@ private:
                                             ConstraintKind kind,
                                             ConstraintLocatorBuilder locator,
                                             unsigned flags);
-
   /// \brief Attempt to simplify the given conformance constraint.
   ///
   /// \param type The type being testing.
@@ -2325,9 +2324,6 @@ private:
   /// \brief Attempt to simplify the given defaultable constraint.
   SolutionKind simplifyDefaultableConstraint(const Constraint &c);
 
-  /// \brief Simplify the given constaint.
-  SolutionKind simplifyConstraint(const Constraint &constraint);
-
   /// \brief Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.
   SolutionKind simplifyRestrictedConstraint(ConversionRestrictionKind restriction,
@@ -2357,6 +2353,9 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool simplify(bool ContinueAfterFailures = false);
+
+  /// \brief Simplify the given constaint.
+  SolutionKind simplifyConstraint(const Constraint &constraint);
 
 private:
   /// \brief Solve the system of constraints after it has already been

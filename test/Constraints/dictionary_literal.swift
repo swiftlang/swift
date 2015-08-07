@@ -19,7 +19,7 @@ func useDict<K, V>(d: Dictionary<K,V>) {}
 useDictStringInt([ "Hello" : 1 ])
 useDictStringInt([ "Hello" : 1, "World" : 2])
 useDictStringInt([ "Hello" : 1, "World" : 2.5]) // expected-error{{cannot convert value of type 'Dictionary<String, Double>' to expected argument type 'DictStringInt'}}
-useDictStringInt([ 7 : 1, "World" : 2]) // expected-error{{type 'Int2048' does not conform to protocol 'IntegerLiteralConvertible'}}
+useDictStringInt([ 7 : 1, "World" : 2]) // expected-error{{type of expression is ambiguous without more context}}
 
 // Generic dictionary literals.
 useDict(["Hello" : 1])
