@@ -656,10 +656,8 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     if (!Edge->getApply().getFunction()->shouldOptimize())
       continue;
 
-    auto *AI = dyn_cast<ApplyInst>(Edge->getApply().getInstruction());
     // TODO: Update for TryApply
-    if (!AI)
-      continue;
+    auto *AI = cast<ApplyInst>(Edge->getApply().getInstruction());
 
     if (!isSupportedCallee(AI->getCallee()))
       continue;
@@ -800,6 +798,10 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
                           std::vector<SILFunction *> &DeadFunctions) {
   DEBUG(llvm::dbgs() << "Optimizing Function Signature of " << F->getName()
                      << "\n");
+
+  assert(!CallSites.empty() && "Unexpected empty set of call sites!");
+  if (isa<TryApplyInst>((*CallSites.begin())->getApply().getInstruction()))
+    return false;
 
   // An array containing our ArgumentDescriptor objects that contain information
   // from our analysis.
