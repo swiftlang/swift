@@ -26,7 +26,7 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
   @warn_unused_result
-  public func map<U>(@noescape f: (Wrapped)->U) -> U? {
+  public func map<U>(@noescape f: (Wrapped) throws -> U) rethrows -> U?
     switch self {
     case .Some(let y):
       return .Some(try f(y))
