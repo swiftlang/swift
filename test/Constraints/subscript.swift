@@ -53,3 +53,21 @@ func genericSubscript<T>(t: T,
   return s2i["hello"]
 }
 
+
+
+// <rdar://problem/21364448> QoI: Poor error message for ambiguous subscript call
+extension String {
+  func number() -> Int {  }     // expected-note {{found this candidate}}
+  func number() -> Double {  }  // expected-note {{found this candidate}}
+}
+
+let _ = "a".number  // expected-error {{ambiguous use of 'number()'}}
+
+extension Int {
+  subscript(key: String) -> Int { get {} }
+  subscript(key: String) -> Double {  get {} }
+}
+
+let _ = 1["1"]  // expected-error {{cannot subscript a value of type 'Int' with an index of type 'String'}}
+
+
