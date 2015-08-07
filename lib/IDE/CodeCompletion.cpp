@@ -877,6 +877,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
     Type,
     TypeInDeclContext,
     ImportFromModule,
+    EnumElementAndOptionSetType,
   };
 
   LookupKind Kind;
@@ -1451,6 +1452,7 @@ public:
         }
       }
       break;
+    case LookupKind::EnumElementAndOptionSetType:
     case LookupKind::EnumElement:
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
@@ -1926,15 +1928,12 @@ public:
       return;
 
     case LookupKind::EnumElement:
-      if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
-        addEnumElementRef(EED, Reason, /*HasTypeContext=*/true);
-      }
-      if (auto *ED = dyn_cast<EnumDecl>(D)) {
-        llvm::DenseSet<EnumElementDecl *> Elements;
-        ED->getAllElements(Elements);
-        for (auto *Ele : Elements) {
-          foundDecl(Ele, Reason);
-        }
+      handleEnumElement(D, Reason);
+      return;
+
+    case LookupKind::EnumElementAndOptionSetType:
+      if (!handleEnumElement(D, Reason)) {
+        handleOptionSetType(D, Reason);
       }
       return;
 
@@ -1962,6 +1961,45 @@ public:
 
       return;
     }
+  }
+
+  bool handleEnumElement(Decl *D, DeclVisibilityKind Reason) {
+    if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+      addEnumElementRef(EED, Reason, /*HasTypeContext=*/true);
+    } else if (auto *ED = dyn_cast<EnumDecl>(D)) {
+      llvm::DenseSet<EnumElementDecl *> Elements;
+      ED->getAllElements(Elements);
+      for (auto *Ele : Elements) {
+        addEnumElementRef(Ele, Reason, /*HasTypeContext=*/true);
+      }
+    } else
+      return false;
+    return true;
+  }
+
+  void handleOptionSetType(Decl *D, DeclVisibilityKind Reason) {
+    if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
+      if (isOptionSetTypeDecl(NTD)) {
+        for (auto M : NTD->getMembers()) {
+          if (auto *VD = dyn_cast<VarDecl>(M)) {
+            if (isOptionSetType(VD->getType()) && VD->isStatic()) {
+              addVarDeclRef(VD, Reason);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  bool isOptionSetTypeDecl(NominalTypeDecl *D) {
+    return std::find(D->getProtocols().begin(), D->getProtocols().end(),
+                    Ctx.getOptionSetTypeDecl()) != D->getProtocols().end();
+  }
+
+  bool isOptionSetType(Type Ty) {
+    return Ty &&
+           Ty->getNominalOrBoundGenericNominal() &&
+           isOptionSetTypeDecl(Ty->getNominalOrBoundGenericNominal());
   }
 
   void getTupleExprCompletions(TupleType *ExprType) {
@@ -2069,13 +2107,12 @@ public:
     RequestedCachedResults = RequestedResultsTy::toplevelResults();
   }
 
-  void getEnumElementCompletions(SourceLoc Loc) {
+  void getUnresolvedMemberCompletions(SourceLoc Loc) {
     llvm::SaveAndRestore<LookupKind> ChangeLookupKind(Kind,
-                                                      LookupKind::EnumElement);
+                                                      LookupKind::EnumElementAndOptionSetType);
     NeedLeadingDot = !HaveDot;
     lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
                        /*IncludeTopLevel=*/true, Loc);
-
   }
 
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
@@ -2835,7 +2872,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::UnresolvedMember : {
     Lookup.setHaveDot(SourceLoc());
-    Lookup.getEnumElementCompletions(P.Context.SourceMgr.getCodeCompletionLoc());
+    Lookup.getUnresolvedMemberCompletions(P.Context.SourceMgr.getCodeCompletionLoc());
     break;
   }
   }

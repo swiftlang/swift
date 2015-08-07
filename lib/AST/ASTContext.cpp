@@ -117,6 +117,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
 
+  /// The declaration of Swift.OptionSetType.
+  NominalTypeDecl *OptionSetTypeDecl = nullptr;
+
   /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.Some.
   EnumElementDecl *ImplicitlyUnwrappedOptionalSomeDecl = nullptr;
 
@@ -640,6 +643,12 @@ EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalNoneDecl() const {
     Impl.ImplicitlyUnwrappedOptionalNoneDecl =
       findEnumElement(getImplicitlyUnwrappedOptionalDecl(), "None");
   return Impl.ImplicitlyUnwrappedOptionalNoneDecl;
+}
+
+NominalTypeDecl *ASTContext::getOptionSetTypeDecl() const {
+  if (!Impl.OptionSetTypeDecl)
+    Impl.OptionSetTypeDecl = findStdlibType(*this, "OptionSetType", 1);
+  return Impl.OptionSetTypeDecl;
 }
 
 NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
