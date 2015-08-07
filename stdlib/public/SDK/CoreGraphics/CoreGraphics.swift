@@ -288,7 +288,7 @@ public extension CGRect {
   }
 
   @available(*, unavailable, renamed="integral")
-  var integralRect: CGRect {
+  var integerRect: CGRect {
     fatalError("can't retrieve unavailable property")
   }
 
