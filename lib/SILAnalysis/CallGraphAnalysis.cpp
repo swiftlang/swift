@@ -133,6 +133,7 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
     return false;
 
   case ValueKind::ApplyInst:
+  case ValueKind::TryApplyInst:
     // TODO: Probably not worth iterating invocation- then
     //       reverse-invocation order to catch this.
     return false;
@@ -290,9 +291,8 @@ void CallGraph::addEdges(SILFunction *F) {
 
   for (auto &BB : *F) {
     for (auto &I : BB) {
-      if (auto *AI = dyn_cast<ApplyInst>(&I)) {
+      if (auto AI = FullApplySite::isa(&I))
         addEdgesForApply(AI, CallerNode);
-      }
 
       if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
         auto *CalleeFn = FRI->getReferencedFunction();
@@ -304,8 +304,8 @@ void CallGraph::addEdges(SILFunction *F) {
 
         if (!CalleeFn->isPossiblyUsedExternally()) {
           bool hasAllApplyUsers = std::none_of(FRI->use_begin(), FRI->use_end(),
-            [](const Operand *Op) {
-              return !isa<ApplyInst>(Op->getUser());
+            [](Operand *Op) {
+              return !FullApplySite::isa(Op->getUser());
             });
 
           // If we have a non-apply user of this function, mark its caller set
