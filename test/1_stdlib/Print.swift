@@ -707,7 +707,7 @@ func test_ThickMetatypePrintingImpl<T>(
     _ expectedDebug: String
 ) {
   printedIs(thickMetatype, expectedPrint)
-  printedIs([ thickMetatype ], "[" + expectedPrint + "]")
+  printedIs([ thickMetatype ], "[" + expectedDebug + "]")
   debugPrintedIs(thickMetatype, expectedDebug)
   debugPrintedIs([ thickMetatype ], "[" + expectedDebug + "]")
 }
@@ -716,7 +716,7 @@ func test_gcMetatypePrinting() {
   let structMetatype = StructPrintable.self
   printedIs(structMetatype, "StructPrintable")
   debugPrintedIs(structMetatype, "a.StructPrintable")
-  printedIs([ structMetatype ], "[StructPrintable]")
+  printedIs([ structMetatype ], "[a.StructPrintable]")
   debugPrintedIs([ structMetatype ], "[a.StructPrintable]")
   test_ThickMetatypePrintingImpl(structMetatype, "StructPrintable",
     "a.StructPrintable")
@@ -724,7 +724,7 @@ func test_gcMetatypePrinting() {
   let classMetatype = ClassPrintable.self
   printedIs(classMetatype, "ClassPrintable")
   debugPrintedIs(classMetatype, "a.ClassPrintable")
-  printedIs([ classMetatype ], "[ClassPrintable]")
+  printedIs([ classMetatype ], "[a.ClassPrintable]")
   debugPrintedIs([ classMetatype ], "[a.ClassPrintable]")
   test_ThickMetatypePrintingImpl(classMetatype, "ClassPrintable",
     "a.ClassPrintable")
@@ -742,7 +742,7 @@ func test_ArrayPrinting() {
   printedIs([ 1, 2 ], "[1, 2]")
   printedIs([ 1, 2, 3 ], "[1, 2, 3]")
 
-  printedIs([ "foo", "bar", "bas" ], "[foo, bar, bas]")
+  printedIs([ "foo", "bar", "bas" ], "[\"foo\", \"bar\", \"bas\"]")
   debugPrintedIs([ "foo", "bar", "bas" ], "[\"foo\", \"bar\", \"bas\"]")
 
   printedIs([ StructPrintable(1), StructPrintable(2),
@@ -774,15 +774,15 @@ func test_DictionaryPrinting() {
   debugPrintedIs(dictSI, "[:]")
 
   dictSI = [ "aaa": 1 ]
-  printedIs(dictSI, "[aaa: 1]")
+  printedIs(dictSI, "[\"aaa\": 1]")
   debugPrintedIs(dictSI, "[\"aaa\": 1]")
 
   dictSI = [ "aaa": 1, "bbb": 2 ]
-  printedIs(dictSI, "[aaa: 1, bbb: 2]", expected2: "[bbb: 2, aaa: 1]")
+  printedIs(dictSI, "[\"aaa\": 1, \"bbb\": 2]", expected2: "[\"bbb\": 2, \"aaa\": 1]")
   debugPrintedIs(dictSI, "[\"aaa\": 1, \"bbb\": 2]", expected2: "[\"bbb\": 2, \"aaa\": 1]")
 
   let dictSS = [ "aaa": "bbb" ]
-  printedIs(dictSS, "[aaa: bbb]")
+  printedIs(dictSS, "[\"aaa\": \"bbb\"]")
   debugPrintedIs(dictSS, "[\"aaa\": \"bbb\"]")
 
   print("test_DictionaryPrinting done")
@@ -848,7 +848,7 @@ func test_ArbitraryStructPrinting() {
     [ WithoutDescription(1), WithoutDescription(2), WithoutDescription(3) ]
   printedIs(
     arrayOfArbitraryStructs,
-    "[WithoutDescription(x: 1), WithoutDescription(x: 2), WithoutDescription(x: 3)]")
+    "[a.WithoutDescription(x: 1), a.WithoutDescription(x: 2), a.WithoutDescription(x: 3)]")
   debugPrintedIs(
     arrayOfArbitraryStructs,
     "[a.WithoutDescription(x: 1), a.WithoutDescription(x: 2), a.WithoutDescription(x: 3)]")

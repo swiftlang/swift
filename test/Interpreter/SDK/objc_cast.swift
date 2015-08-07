@@ -234,7 +234,7 @@ if objImplicitOpt is String {
 
 let words = ["Hello", "Swift", "World"]
 
-// CHECK-NEXT: Object-to-bridged-array cast produced [Hello, Swift, World]
+// CHECK-NEXT: Object-to-bridged-array cast produced ["Hello", "Swift", "World"]
 obj = words as AnyObject
 if let strArr = obj as? [String] {
   print("Object-to-bridged-array cast produced \(strArr)")
@@ -243,7 +243,7 @@ if let strArr = obj as? [String] {
 }
 
 // Check downcast from the bridged type itself.
-// CHECK-NEXT: NSArray-to-bridged-array cast produced [Hello, Swift, World]
+// CHECK-NEXT: NSArray-to-bridged-array cast produced ["Hello", "Swift", "World"]
 var nsarr = words as NSArray
 if let strArr = nsarr as? [String] {
   print("NSArray-to-bridged-array cast produced \(strArr)")
@@ -251,7 +251,7 @@ if let strArr = nsarr as? [String] {
   print("NSArray-to-bridged-array cast failed")
 }
 
-// CHECK-NEXT: NSArray?-to-bridged-array cast produced [Hello, Swift, World]
+// CHECK-NEXT: NSArray?-to-bridged-array cast produced ["Hello", "Swift", "World"]
 var nsarrOpt = words as NSArray?
 if let strArr = nsarrOpt as? [String] {
   print("NSArray?-to-bridged-array cast produced \(strArr)")
@@ -259,7 +259,7 @@ if let strArr = nsarrOpt as? [String] {
   print("NSArray?-to-bridged-array cast failed")
 }
 
-// CHECK-NEXT: NSArray!-to-bridged-array cast produced [Hello, Swift, World]
+// CHECK-NEXT: NSArray!-to-bridged-array cast produced ["Hello", "Swift", "World"]
 var nsarrImplicitOpt = words as NSArray!
 if let strArr = nsarrImplicitOpt as? [String] {
   print("NSArray!-to-bridged-array cast produced \(strArr)")
@@ -268,7 +268,7 @@ if let strArr = nsarrImplicitOpt as? [String] {
 }
 
 // Check downcast from a superclass of the bridged type.
-// CHECK-NEXT: NSObject-to-bridged-array cast produced [Hello, Swift, World]
+// CHECK-NEXT: NSObject-to-bridged-array cast produced ["Hello", "Swift", "World"]
 var nsobj: NSObject = nsarr
 if let strArr = nsobj as? [String] {
   print("NSObject-to-bridged-array cast produced \(strArr)")
@@ -305,19 +305,19 @@ if nsobj is [String] {
 }
 
 // Forced downcast based on context.
-// CHECK-NEXT: Forced to string array [Hello, Swift, World]
+// CHECK-NEXT: Forced to string array ["Hello", "Swift", "World"]
 var forcedStrArray: [String] = obj as! [String]
 print("Forced to string array \(forcedStrArray)")
 
-// CHECK-NEXT: Forced NSArray to string array [Hello, Swift, World]
+// CHECK-NEXT: Forced NSArray to string array ["Hello", "Swift", "World"]
 forcedStrArray = nsarr as! [String]
 print("Forced NSArray to string array \(forcedStrArray)")
 
-// CHECK-NEXT: Forced NSArray? to string array [Hello, Swift, World]
+// CHECK-NEXT: Forced NSArray? to string array ["Hello", "Swift", "World"]
 forcedStrArray = nsarrOpt as! [String]
 print("Forced NSArray? to string array \(forcedStrArray)")
 
-// CHECK-NEXT: Forced NSArray! to string array [Hello, Swift, World]
+// CHECK-NEXT: Forced NSArray! to string array ["Hello", "Swift", "World"]
 forcedStrArray = nsarrImplicitOpt as! [String]
 print("Forced NSArray! to string array \(forcedStrArray)")
 
@@ -343,7 +343,7 @@ if obj is [Int] {
 }
 
 // Implicitly unwrapped optional of object to array casts.
-// CHECK-NEXT: Object-to-bridged-array cast produced [Hello, Swift, World]
+// CHECK-NEXT: Object-to-bridged-array cast produced ["Hello", "Swift", "World"]
 objOpt = words as AnyObject?
 if let strArr = objOpt as? [String] {
   print("Object-to-bridged-array cast produced \(strArr)")
@@ -352,7 +352,7 @@ if let strArr = objOpt as? [String] {
 }
 
 // Forced downcast based on context.
-// CHECK-NEXT: Forced to string array [Hello, Swift, World]
+// CHECK-NEXT: Forced to string array ["Hello", "Swift", "World"]
 let forcedStrArrayOpt: [String] = objOpt as! [String]
 print("Forced to string array \(forcedStrArrayOpt)")
 
@@ -379,7 +379,7 @@ if let strArr = objOpt as? [String] {
 }
 
 // Optional of object to array casts.
-// CHECK-NEXT: Object-to-bridged-array cast produced [Hello, Swift, World]
+// CHECK-NEXT: Object-to-bridged-array cast produced ["Hello", "Swift", "World"]
 objImplicitOpt = words as AnyObject!
 if let strArr = objImplicitOpt as? [String] {
   print("Object-to-bridged-array cast produced \(strArr)")
@@ -388,7 +388,7 @@ if let strArr = objImplicitOpt as? [String] {
 }
 
 // Forced downcast based on context.
-// CHECK-NEXT: Forced to string array [Hello, Swift, World]
+// CHECK-NEXT: Forced to string array ["Hello", "Swift", "World"]
 let forcedStrArrayImplicitOpt: [String] = objImplicitOpt as! [String]
 print("Forced to string array \(forcedStrArrayImplicitOpt)")
 
@@ -534,7 +534,7 @@ if let array = obj as? [Dictionary<String, String>] {
   print("Not a [Dictionary<String, String>]")
 }
 
-// CHECK: Dictionary<String, [Dictionary<String, Int>]> is [a: [
+// CHECK: Dictionary<String, [Dictionary<String, Int>]> is ["a": [
 obj = ["a" : dictArray]
 if let dict = obj as? Dictionary<String, [Dictionary<String, Int>]> {
   print("Dictionary<String, [Dictionary<String, Int>]> is \(dict)")
@@ -581,7 +581,7 @@ func downcastToStringArrayOptOpt(obj: AnyObject??!!) {
   }
 }
 
-// CHECK: {{^}}some(some(some([a, b, c]))){{$}}
+// CHECK: {{^}}some(some(some(["a", "b", "c"]))){{$}}
 var objOptOpt: AnyObject?? = .Some(.Some(["a", "b", "c"]))
 downcastToStringArrayOptOpt(objOptOpt)
 

@@ -1303,7 +1303,7 @@ public func != <Key : Equatable, Value : Equatable>(
 
 extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
   @warn_unused_result
-  internal func _makeDescription(isDebug isDebug: Bool) -> String {
+  private func makeDescription() -> String {
     if count == 0 {
       return "[:]"
     }
@@ -1316,17 +1316,9 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
       } else {
         result += ", "
       }
-      if isDebug {
-        debugPrint(k, terminator: "", toStream: &result)
-      } else {
-        print(k, terminator: "", toStream: &result)
-      }
+      debugPrint(k, terminator: "", toStream: &result)
       result += ": "
-      if isDebug {
-        debugPrint(v, terminator: "", toStream: &result)
-      } else {
-        print(v, terminator: "", toStream: &result)
-      }
+      debugPrint(v, terminator: "", toStream: &result)
     }
     result += "]"
     return result
@@ -1334,12 +1326,12 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
 
   /// A textual representation of `self`.
   public var description: String {
-    return _makeDescription(isDebug: false)
+    return makeDescription()
   }
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return _makeDescription(isDebug: true)
+    return makeDescription()
   }
 }
 

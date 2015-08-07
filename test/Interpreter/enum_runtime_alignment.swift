@@ -16,5 +16,5 @@ var x: [Enum: (Structure?, Structure?)] = [
     .One: (Structure(a: 1, b: 2, c: 3), nil)
 ]
 
-// CHECK: [One: (Optional(main.Structure(a: 1, b: 2, c: 3)), nil)]
+// CHECK: [main.Enum.One: (Optional(main.Structure(a: 1, b: 2, c: 3)), nil)]
 print(x)

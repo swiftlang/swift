@@ -154,8 +154,8 @@ testAnyObjectDowncast(["hello", "swift", "world"] as NSArray)
 testAnyObjectDowncast([1, 2, 3, 4, 5])
 
 // CHECK: Dictionary<String, Int>: [
-// CHECK-DAG: hello: 1
-// CHECK-DAG: world: 2
+// CHECK-DAG: "hello": 1
+// CHECK-DAG: "world": 2
 // CHECK: ]
 testAnyObjectDowncast(["hello" : 1, "world" : 2])
 
@@ -175,7 +175,7 @@ func testNSArrayDowncast(nsArr: NSArray?) {
   }
 }
 
-// CHECK-NEXT: [String]: [a, b, c]
+// CHECK-NEXT: [String]: ["a", "b", "c"]
 testNSArrayDowncast(["a", "b", "c"])
 
 // CHECK-NEXT: [Int]: [1, 2, 3]

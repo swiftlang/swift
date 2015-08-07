@@ -131,16 +131,16 @@ func testForcedObjectToValueBridging() {
   let nsArray: NSArray = ["Hello", "World"]
 
   // Forced bridging (exact)
-  // CHECK: [Hello, World]
+  // CHECK: ["Hello", "World"]
   print(genericForcedCast(nsArray) as [String])
 
   // Forced bridging (superclass)
-  // CHECK: [Hello, World]
+  // CHECK: ["Hello", "World"]
   let nsObject: NSObject = nsArray
   print(genericForcedCast(nsObject) as [String])
 
   // Forced bridging (AnyObject)
-  // CHECK: [Hello, World]
+  // CHECK: ["Hello", "World"]
   let anyObject: AnyObject = nsArray
   print(genericForcedCast(anyObject) as [String])
 
@@ -164,7 +164,7 @@ func testConditionalObjectToValueBridging() {
   let nsString: NSString = "Hello"
 
   // Conditional bridging (exact)
-  // CHECK: [Hello, World]
+  // CHECK: ["Hello", "World"]
   if let arr = (genericConditionalCast(nsArray) as [String]?) {
     print(arr)
   } else {
@@ -172,7 +172,7 @@ func testConditionalObjectToValueBridging() {
   }
 
   // Conditional bridging (superclass)
-  // CHECK: [Hello, World]
+  // CHECK: ["Hello", "World"]
   if let arr = (genericConditionalCast(nsObject) as [String]?) {
     print(arr)
   } else {
@@ -180,7 +180,7 @@ func testConditionalObjectToValueBridging() {
   }
 
   // Conditional bridging (AnyObject)
-  // CHECK: [Hello, World]
+  // CHECK: ["Hello", "World"]
   if let arr = (genericConditionalCast(anyObject) as [String]?) {
     print(arr)
   } else {
@@ -188,7 +188,7 @@ func testConditionalObjectToValueBridging() {
   }
 
   // Conditional bridging (existential success)
-  // CHECK: [Hello, World]
+  // CHECK: ["Hello", "World"]
   if let arr = (genericConditionalCast(nsCoding) as [String]?) {
     print(arr)
   } else {

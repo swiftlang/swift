@@ -24,7 +24,7 @@ TestSuiteUXPasses.test("uxpasses").xfail(.OSXAny("")).code {
 }
 // CHECK: [   UXPASS ] TestSuiteUXPasses.uxpasses{{$}}
 // CHECK: TestSuiteUXPasses: Some tests failed, aborting
-// CHECK: UXPASS: [uxpasses]
+// CHECK: UXPASS: ["uxpasses"]
 // CHECK: FAIL: []
 // CHECK: SKIP: []
 // CHECK: abort()
@@ -36,7 +36,7 @@ TestSuiteFails.test("fails") {
 // CHECK: [     FAIL ] TestSuiteFails.fails{{$}}
 // CHECK: TestSuiteFails: Some tests failed, aborting
 // CHECK: UXPASS: []
-// CHECK: FAIL: [fails]
+// CHECK: FAIL: ["fails"]
 // CHECK: SKIP: []
 // CHECK: abort()
 
