@@ -10,11 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-// The compiler has special knowledge of Optional<T>, including the fact that
-// it is an enum with cases named 'None' and 'Some'.
-public enum Optional<T> : _Reflectable, NilLiteralConvertible {
+// The compiler has special knowledge of Optional<Wrapped>, including the fact
+// that it is an enum with cases named 'None' and 'Some'.
+public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
   case None
-  case Some(T)
+  case Some(Wrapped)
 
   /// Construct a `nil` instance.
   @transparent
@@ -22,11 +22,11 @@ public enum Optional<T> : _Reflectable, NilLiteralConvertible {
 
   /// Construct a non-`nil` instance that stores `some`.
   @transparent
-  public init(_ some: T) { self = .Some(some) }
+  public init(_ some: Wrapped) { self = .Some(some) }
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
   @warn_unused_result
-  public func map<U>(@noescape f: (T) throws -> U) rethrows -> U? {
+  public func map<U>(@noescape f: (Wrapped)->U) -> U? {
     switch self {
     case .Some(let y):
       return .Some(try f(y))
@@ -37,7 +37,7 @@ public enum Optional<T> : _Reflectable, NilLiteralConvertible {
 
   /// Returns `nil` if `self` is nil, `f(self!)` otherwise.
   @warn_unused_result
-  public func flatMap<U>(@noescape f: (T) throws -> U?) rethrows -> U? {
+  public func flatMap<U>(@noescape f: (Wrapped)->U?) -> U? {
     switch self {
     case .Some(let y):
       return try f(y)
@@ -75,11 +75,11 @@ extension Optional : CustomDebugStringConvertible {
 }
 
 // While this free function may seem obsolete, since an optional is
-// often expressed as (x as T), it can lead to cleaner usage, i.e.
+// often expressed as (x as Wrapped), it can lead to cleaner usage, i.e.
 //
-//   map(x as T) { ... }
+//   map(x as Wrapped) { ... }
 // vs
-//   (x as T).map { ... }
+//   (x as Wrapped).map { ... }
 //
 /// Haskell's fmap for Optionals.
 @available(*, unavailable, message="call the 'map()' method on the optional value")
@@ -97,7 +97,7 @@ public func flatMap<T, U>(x: T?, @noescape _ f: (T)->U?) -> U? {
 // Intrinsics for use by language features.
 @transparent
 public // COMPILER_INTRINSIC
-func _doesOptionalHaveValueAsBool<T>(v: T?) -> Bool {
+func _doesOptionalHaveValueAsBool<Wrapped>(v: Wrapped?) -> Bool {
   return v != nil
 }
 
@@ -110,7 +110,7 @@ func _diagnoseUnexpectedNilOptional() {
 
 @transparent
 public // COMPILER_INTRINSIC
-func _getOptionalValue<T>(v: T?) -> T {
+func _getOptionalValue<Wrapped>(v: Wrapped?) -> Wrapped {
   switch v {
   case let x?:
     return x
@@ -122,19 +122,19 @@ func _getOptionalValue<T>(v: T?) -> T {
 
 @transparent
 public // COMPILER_INTRINSIC
-func _injectValueIntoOptional<T>(v: T) -> T? {
+func _injectValueIntoOptional<Wrapped>(v: Wrapped) -> Wrapped? {
   return .Some(v)
 }
 
 @transparent
 public // COMPILER_INTRINSIC
-func _injectNothingIntoOptional<T>() -> T? {
+func _injectNothingIntoOptional<Wrapped>() -> Wrapped? {
   return .None
 }
 
 // Comparisons
 @warn_unused_result
-public func == <T : Equatable> (lhs: T?, rhs: T?) -> Bool {
+public func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case let (l?, r?):
     return l == r
@@ -211,10 +211,10 @@ public func != <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
   }
 }
 
-internal struct _OptionalMirror<T> : _MirrorType {
-  let _value : Optional<T>
+internal struct _OptionalMirror<Wrapped> : _MirrorType {
+  let _value : Optional<Wrapped>
 
-  init(_ x : Optional<T>) {
+  init(_ x : Optional<Wrapped>) {
     _value = x
   }
 

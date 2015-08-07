@@ -33,7 +33,7 @@ func test1(a: A) {
 
 // <rdar://problem/15508756>
 extension Optional {
-  func bind<U>(f: T -> U?) -> U? {
+  func bind<U>(f: Wrapped -> U?) -> U? {
     switch self {
     case .Some(let x):
       return f(x)
