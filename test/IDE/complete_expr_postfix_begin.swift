@@ -42,6 +42,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIND_DESTRUCTOR_PARAM_2 > %t.param.txt
 // RUN: FileCheck %s -check-prefix=FIND_DESTRUCTOR_PARAM_2 < %t.param.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NO_PLACEHOLDER_NAMES_1 | FileCheck %s -check-prefix=NO_PLACEHOLDER_NAMES_1
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INVALID_1 | FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INVALID_2 | FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_INVALID_3 | FileCheck %s -check-prefix=COMMON
@@ -321,6 +323,15 @@ class TestFindDestructorParam2<T> {
 // FIND_DESTRUCTOR_PARAM_2-DAG: Decl[LocalVar]/Local: self[#TestFindDestructorParam2<T>#]{{; name=.+$}}
 // FIND_DESTRUCTOR_PARAM_2: End completions
   }
+}
+
+struct TestPlaceholdersInNames {
+  var <#placeholder_in_name1#>: FooStruct
+  func test() {
+    var <#placeholder_in_name2#>: FooStruct
+    #^NO_PLACEHOLDER_NAMES_1^#
+  }
+// NO_PLACEHOLDER_NAMES_1-NOT: placeholder_in_name
 }
 
 //===--- Test that we don't crash in constructors and destructors in contexts

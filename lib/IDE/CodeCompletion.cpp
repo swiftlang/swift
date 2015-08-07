@@ -1766,6 +1766,10 @@ public:
     if (AvailableAttr::isUnavailable(D))
       return;
 
+    // Hide editor placeholders.
+    if (D->getName().isEditorPlaceholder())
+      return;
+
     if (!D->hasType())
       TypeResolver->resolveDeclSignature(D);
     else if (isa<TypeAliasDecl>(D)) {
