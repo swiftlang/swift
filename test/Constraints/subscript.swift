@@ -64,10 +64,10 @@ extension String {
 let _ = "a".number  // expected-error {{ambiguous use of 'number()'}}
 
 extension Int {
-  subscript(key: String) -> Int { get {} }
-  subscript(key: String) -> Double {  get {} }
+  subscript(key: String) -> Int { get {} }      // expected-note {{found this candidate}}
+  subscript(key: String) -> Double {  get {} }   // expected-note {{found this candidate}}
 }
 
-let _ = 1["1"]  // expected-error {{cannot subscript a value of type 'Int' with an index of type 'String'}}
+let _ = 1["1"]  // expected-error {{ambiguous use of 'subscript'}}
 
 

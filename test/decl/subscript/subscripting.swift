@@ -159,12 +159,12 @@ struct OverloadedSubscript {
 }
 
 struct RetOverloadedSubscript {
-  subscript(i: Int) -> Int {
+  subscript(i: Int) -> Int {  // expected-note {{found this candidate}}
     get { return i }
     set {}
   }
 
-  subscript(i: Int) -> Float {
+  subscript(i: Int) -> Float {  // expected-note {{found this candidate}}
     get { return Float(i) }
     set {}
   }
@@ -196,8 +196,7 @@ func test_subscript(inout x2: X2, i: Int, j: Int, inout value: Int, no: NoSubscr
   value = ovl[(i, j, i)] // expected-error{{cannot subscript a value of type 'OverloadedSubscript' with an index of type '(Int, Int, Int)'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int), (Int, Int)}}
 
-  ret[i] // expected-error{{multiple candidates fail to match based on result type}}
-  // expected-note @-1 {{expected an argument list of type '(Int)'}}
+  ret[i] // expected-error{{ambiguous use of 'subscript'}}
 
   value = ret[i]
   ret[i] = value
@@ -229,8 +228,8 @@ struct tuple_index {
 
 
 struct SubscriptTest1 {
-  subscript(keyword:String) -> Bool { return true }
-  subscript(keyword:String) -> String? {return nil }
+  subscript(keyword:String) -> Bool { return true }  // expected-note {{found this candidate}}
+  subscript(keyword:String) -> String? {return nil }  // expected-note {{found this candidate}}
 }
 
 func testSubscript1(s1 : SubscriptTest1) {
@@ -243,8 +242,7 @@ func testSubscript1(s1 : SubscriptTest1) {
   // expected-note @-1 {{expected an argument list of type '(String)'}}
   
   
-  let _ = s1["hello"]  // expected-error {{multiple candidates fail to match based on result type}}
-  // expected-note @-1 {{expected an argument list of type '(String)'}}
+  let _ = s1["hello"]  // expected-error {{ambiguous use of 'subscript'}}
 }
 
 struct SubscriptTest2 {

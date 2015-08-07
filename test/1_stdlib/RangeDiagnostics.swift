@@ -27,20 +27,15 @@ let r0: Range = 10..<100
 let r1: Range = UInt(10)..<100
 let r2: Range = 10...100
 let r3: Range = UInt(10)...100
-// expected-note @+1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Element), (Element._DisabledRangeIndex), (Range<Self.Index>)}}
-r0[0]       // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Int'}}
-// expected-note @+1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Element), (Element._DisabledRangeIndex), (Range<Self.Index>)}}
-r1[UInt(0)] // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'UInt'}}
-// expected-note @+1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Element), (Element._DisabledRangeIndex), (Range<Self.Index>)}}
-r1[0]       // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Int'}}
-// expected-note @+1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Element), (Element._DisabledRangeIndex), (Range<Self.Index>)}}
-r2[0]       // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Int'}}
-// expected-note @+1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Element), (Element._DisabledRangeIndex), (Range<Self.Index>)}}
-r3[0]       // expected-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Int'}}
+r0[0]       // expected-error {{ambiguous use of 'subscript'}}
+r1[UInt(0)] // expected-error {{ambiguous use of 'subscript'}}
+r1[0]       // expected-error {{ambiguous use of 'subscript'}}
+r2[0]       // expected-error {{ambiguous use of 'subscript'}}
+r3[0]       // expected-error {{ambiguous use of 'subscript'}}
 r0[0..<4]   // FIXME-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Range<Int>'}}
 r1[0..<4]   // FIXME-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
 r2[0..<4]   // FIXME-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Range<Int>'}}
 r3[0..<4]   // FIXME-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
-(10..<100)[0]           // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Int'}}
+(10..<100)[0]           // expected-error {{ambiguous use of 'subscript'}}
 (UInt(10)...100)[0..<4] // FIXME-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
 

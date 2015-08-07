@@ -185,7 +185,7 @@ struct StructWithOptionalArray {
 }
 
 func testStructWithOptionalArray(foo: StructWithOptionalArray) -> Int {
-  return foo.array[0]  // expected-error {{cannot subscript a value of type '[Int]?'}}
+  return foo.array[0]  // expected-error {{value of optional type '[Int]?' not unwrapped; did you mean to use '!' or '?'?}} {{19-19=!}}
 }
 
 
