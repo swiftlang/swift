@@ -87,20 +87,3 @@ public struct CollectionOfOne<Element> : CollectionType {
   let element: Element
 }
 
-extension CollectionOfOne : CustomStringConvertible,
-  CustomDebugStringConvertible {
-
-  public var description: String {
-    var result = "["
-    debugPrint(element, terminator: "", toStream: &result)
-    result += "]"
-    return result
-  }
-
-  public var debugDescription: String {
-    var result = "CollectionOfOne(["
-    debugPrint(element, terminator: "", toStream: &result)
-    result += "])"
-    return result
-  }
-}

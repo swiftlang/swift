@@ -707,7 +707,7 @@ extension ${Self} : _Reflectable {
 
 extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
   @warn_unused_result
-  private func makeDescription(isDebug isDebug: Bool) -> String {
+  internal func _makeDescription(isDebug isDebug: Bool) -> String {
 %   if Self != 'Array':
     var result = isDebug ? "${Self}([" : "["
 %   else:
@@ -734,12 +734,12 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
 
   /// A textual representation of `self`.
   public var description: String {
-    return makeDescription(isDebug: false)
+    return _makeDescription(isDebug: false)
   }
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return makeDescription(isDebug: true)
+    return _makeDescription(isDebug: true)
   }
 }
 

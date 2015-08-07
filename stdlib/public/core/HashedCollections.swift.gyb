@@ -1303,7 +1303,7 @@ public func != <Key : Equatable, Value : Equatable>(
 
 extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
   @warn_unused_result
-  private func makeDescription() -> String {
+  internal func _makeDescription() -> String {
     if count == 0 {
       return "[:]"
     }
@@ -1326,12 +1326,12 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
 
   /// A textual representation of `self`.
   public var description: String {
-    return makeDescription()
+    return _makeDescription()
   }
 
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return makeDescription()
+    return _makeDescription()
   }
 }
 
