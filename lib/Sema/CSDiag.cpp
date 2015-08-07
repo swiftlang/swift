@@ -2238,7 +2238,12 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   CalleeCandidateInfo calleeInfo(apply->getFn(), CS);
   calleeInfo.filterList(argType);
 
-  
+  // Otherwise, whatever the result type of the call happened to be must not
+  // have been what we were looking for - diagnose this as a conversion
+  // failure.
+  if (calleeInfo.closeness == CC_ExactMatch)
+    return false;
+
   // A common error is to apply an operator that only has an inout LHS (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
   // case.
@@ -3273,17 +3278,9 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
 
   if (calleeInfo.closeness == CC_ExactMatch) {
     // Otherwise, whatever the result type of the call happened to be must not
-    // have been what we were looking for.
-    auto resultTy = getTypeOfTypeCheckedChildIndependently(applyExpr);
-    if (!resultTy)
-      return true;
-    
-    if (resultTy->hasTypeVariable())
-      resultTy = calleeInfo[0].getResultType();
-    
-    diagnose(applyExpr->getLoc(), diag::result_type_no_match, resultTy)
-      .highlight(applyExpr->getSourceRange());
-    return true;
+    // have been what we were looking for.  Lets diagnose it as a conversion
+    // or ambiguity failure.
+    return false;
   }
 
   // A common error is to apply an operator that only has inout forms (e.g. ++)
@@ -3347,29 +3344,10 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   // TODO: Is there any reason to check for CC_NonLValueInOut here?
   
   if (calleeInfo.closeness == CC_ExactMatch) {
-    // Otherwise, the return type of the subscript happened to not have been
-    // what we were looking for.
-    auto resultTy = getTypeOfTypeCheckedChildIndependently(SE);
-    if (!resultTy)
-      return true;
-    
-    if (!resultTy->hasTypeVariable()) {
-      // If we got a strong type back, then we know what the subscript produced.
-    } else if (calleeInfo.size() == 1) {
-      // If we have one candidate, the result must be what that candidate
-      // produced.
-      resultTy = calleeInfo[0].getResultType();
-    } else {
-      diagnose(SE->getLoc(), diag::result_type_no_match_ambiguous)
-        .highlight(SE->getSourceRange());
-      calleeInfo.suggestPotentialOverloads("subscript", SE->getLoc());
-      return true;
-    }
-    
-    // Only one choice.
-    diagnose(SE->getLoc(), diag::result_type_no_match, resultTy)
-      .highlight(SE->getSourceRange());
-    return true;
+    // Otherwise, whatever the result type of the call happened to be must not
+    // have been what we were looking for.  Lets diagnose it as a conversion
+    // or ambiguity failure.
+    return false;
   }
 
   // If the closes matches all mismatch on self, we either have something that

@@ -54,13 +54,6 @@ NOTE(while_converting_subscript_index,sema,none,
 // Constraint solver diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(result_type_no_match,sema,none,
-      "result type %0 does not match expected type",
-      (Type))
-ERROR(result_type_no_match_ambiguous,sema,none,
-      "multiple candidates fail to match based on result type",
-      ())
-
 ERROR(ambiguous_member_overload_set,sema,none,
       "ambiguous reference to member '%0'", (StringRef))
 
