@@ -2780,7 +2780,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::Extension:
     assert((pointer->getNumChildren() == 2 || pointer->getNumChildren() == 3)
            && "Extension expects 2 or 3 children.");
-    if (Options.QualifyEntities) {
+    if (Options.QualifyEntities && Options.DisplayExtensionContexts) {
       Printer << "ext.";
       // Print the module where extension is defined.
       print(pointer->getChild(0), true);

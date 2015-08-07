@@ -32,6 +32,7 @@ struct DemangleOptions {
   bool DisplayTypeOfIVarFieldOffset = true;
   bool DisplayDebuggerGeneratedModule = true;
   bool QualifyEntities = true;
+  bool DisplayExtensionContexts = true;
   bool DisplayUnmangledSuffix = true;
   bool DisplayModuleNames = true;
   bool DisplayGenericSpecializations = true;
@@ -48,7 +49,8 @@ struct DemangleOptions {
   static DemangleOptions SimplifiedUIDemangleOptions() {
     auto Opt = DemangleOptions();
     Opt.SynthesizeSugarOnTypes = true;
-    Opt.QualifyEntities = false;
+    Opt.QualifyEntities = true;
+    Opt.DisplayExtensionContexts = false;
     Opt.DisplayUnmangledSuffix = false;
     Opt.DisplayModuleNames = false;
     Opt.DisplayGenericSpecializations = false;
