@@ -2128,13 +2128,22 @@ namespace {
       auto locator = cs.getConstraintLocator(expr);
 
       // Find the overload choice used for this declaration reference.
-      auto selected = getOverloadChoice(locator);
-      auto choice = selected.choice;
+      auto selected = getOverloadChoiceIfAvailable(locator);
+      if (!selected.hasValue()) {
+        assert(!expr->getDecl()->hasType() &&
+               isa<ParamDecl>(expr->getDecl()) &&
+               isa<ClosureExpr>(expr->getDecl()->getDeclContext()) &&
+       "The only case this should happen is for closure arguments in CSDiags");
+        return nullptr;
+      }
+        
+      
+      auto choice = selected->choice;
       auto decl = choice.getDecl();
 
       // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
       // new one?
-      return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
+      return buildDeclRef(decl, expr->getLoc(), selected->openedFullType,
                                   locator, expr->isSpecialized(),
                                   expr->isImplicit(),
                                   expr->getAccessSemantics());

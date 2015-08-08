@@ -1311,6 +1311,9 @@ namespace {
     unsigned level;
 
     AnyFunctionType *getUncurriedFunctionType() const {
+      if (!decl->hasType())
+        return nullptr;
+      
       auto type = decl->getType();
 
       // If this is an operator func decl in a type context, the 'self' isn't
