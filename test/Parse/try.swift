@@ -106,3 +106,9 @@ func callThrowingClosureWithoutTry(closure: Int throws -> Int) rethrows {
 func producesOptional() throws -> Int? { return nil }
 let doubleOptional = try? producesOptional()
 let _: String = doubleOptional // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
+
+func maybeThrow() throws {}
+try maybeThrow() // okay
+try! maybeThrow() // okay
+try? maybeThrow() // expected-warning {{result of 'try?' is unused}}
+_ = try? maybeThrow() // okay

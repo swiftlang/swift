@@ -987,6 +987,13 @@ static void diagnoseIgnoredExpr(TypeChecker &TC, Expr *E) {
 
   auto valueE = E->getValueProvidingExpr();
 
+  // Always complain about 'try?'.
+  if (auto *OTE = dyn_cast<OptionalTryExpr>(valueE)) {
+    TC.diagnose(OTE->getTryLoc(), diag::expression_unused_optional_try)
+      .highlight(E->getSourceRange());
+    return;
+  }
+
   // If we have an OptionalEvaluationExpr at the top level, then someone is
   // "optional chaining" and ignoring the result.  Produce a diagnostic if it
   // doesn't make sense to ignore it.

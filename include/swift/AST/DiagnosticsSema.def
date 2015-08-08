@@ -1862,9 +1862,11 @@ WARNING(expression_unused_result_message,sema_tcs,none,
 WARNING(expression_unused_result_nonmutating,sema_tcs,none,
         "result of call to non-mutating function %0 is unused; "
         "use %1 to mutate in-place", (DeclName, DeclName))
+WARNING(expression_unused_optional_try,sema_tcs,none,
+        "result of 'try?' is unused", ())
+
 ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to immutable expression of type %0", (Type))
-
 ERROR(assignment_lhs_is_immutable_variable,sema_tcs,none,
       "cannot assign to value: %0", (StringRef))
 ERROR(assignment_lhs_is_immutable_property,sema_tcs,none,
