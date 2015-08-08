@@ -1131,13 +1131,13 @@ namespace {
 #endif // SWIFT_ENABLE_OBJECT_LITERALS
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
-      // If this is a ParamDecl for an anonymous closure argument that has a
-      // null type, then this is a situation where CSDiags is trying to perform
+      // If this is a ParamDecl for a closure argument that has a null type,
+      // then this is a situation where CSDiags is trying to perform
       // error recovery within a ClosureExpr.  Just create a new type variable
-      // for the decl that isn't bound to anything.  It will guarantee that it
-      // is ambiguous.
+      // for the decl that isn't bound to anything.  This will guarantee that it
+      // is considered ambiguous.
       if (!E->getDecl()->hasType() && isa<ParamDecl>(E->getDecl()) &&
-          cast<ParamDecl>(E->getDecl())->isAnonClosureParam()) {
+          isa<ClosureExpr>(E->getDecl()->getDeclContext())) {
         return CS.createTypeVariable(CS.getConstraintLocator(E),
                                      TVO_CanBindToLValue);
       }
