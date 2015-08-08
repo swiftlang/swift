@@ -118,6 +118,7 @@ class SwiftLexer(RegexLexer):
         ],
 
         'generic-type' : [
+            (r'\s', Whitespace),
             (r'>', Punctuation, '#pop'),
             include('class-name'),
             include('isa'),
