@@ -4361,8 +4361,8 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
                                          /*implicit*/true);
   returnStmt->setResult(voidExpr);
 
-  // For l-value types, reset to the object type (as would have happened had
-  // the enclosing assignment expression not been synthesized).
+  // For l-value types, reset to the object type. This might not be strictly
+  // necessary any more, but it's probably still a good idea.
   if (singleExpr->getType()->getAs<LValueType>())
     singleExpr->setType(singleExpr->getType()->getLValueOrInOutObjectType());
 
