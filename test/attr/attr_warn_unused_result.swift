@@ -18,7 +18,7 @@ func testFuncsPositive() {
 
   let _: () -> Void = { f1() } // expected-warning{{result of call to 'f1()' is unused}}
   let _: () -> Void = { _ = f1() } // okay
-  let _: () -> Void = { _ = testFuncsPositive() } // okay
+  let _: () -> Void = { testFuncsPositive() } // okay
 }
 
 class C1 {
