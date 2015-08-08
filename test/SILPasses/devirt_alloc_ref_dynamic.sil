@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -sil-combine -devirtualize -dce -verify | FileCheck %s
+// RUN: %target-sil-opt %s -sil-combine -inline -dce -verify | FileCheck %s
 
 sil_stage canonical
 
@@ -14,7 +14,7 @@ class A {
 }
 
 // test.A.foo (test.A)() -> Swift.Int32
-sil hidden @_TFC4test1A3foofS0_FT_VSs5Int32 : $@convention(method) (@guaranteed A) -> Int32 {
+sil hidden [noinline] @_TFC4test1A3foofS0_FT_VSs5Int32 : $@convention(method) (@guaranteed A) -> Int32 {
 bb0(%0 : $A):
   debug_value %0 : $A
   %2 = integer_literal $Builtin.Int32, 1

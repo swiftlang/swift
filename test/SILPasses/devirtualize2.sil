@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -devirtualize -dce -verify | FileCheck %s
+// RUN: %target-sil-opt %s -inline -dce -verify | FileCheck %s
 
 sil_stage canonical
 

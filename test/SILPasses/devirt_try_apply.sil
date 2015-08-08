@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt %s -sil-combine -devirtualize  | FileCheck %s --check-prefix=CHECK-DEVIRT
-// RUN: %target-sil-opt %s -inline  | FileCheck %s --check-prefix=CHECK-INLINE
+// RUN: %target-sil-opt %s -sil-combine -inline -global-load-store-opts -inline  | FileCheck %s --check-prefix=CHECK-INLINE
 // RUN: %target-sil-opt %s -early-inline  | FileCheck %s --check-prefix=CHECK-EARLY-INLINE
 // RUN: %target-sil-opt %s -specdevirt  | FileCheck %s --check-prefix=CHECK-SPECDEVIRT
 // RUN: %target-sil-opt %s -mandatory-inlining  | FileCheck %s --check-prefix=CHECK-MANDATORY-INLINING
@@ -663,10 +662,10 @@ bb4(%19 : $ErrorType):
   br bb3
 }
 
-// CHECK-DEVIRT-LABEL: sil @_TF16devirt_try_apply5test5FT_VSs5Int32
-// CHECK-DEVIRT-NOT: = witness_method
-// CHECK-DEVIRT-NOT: = class_method
-// CHECK-DEVIRT: }
+// CHECK-INLINE-LABEL: sil @_TF16devirt_try_apply5test5FT_VSs5Int32
+// CHECK-INLINE-NOT: = witness_method
+// CHECK-INLINE-NOT: = class_method
+// CHECK-INLINE: }
 sil @_TF16devirt_try_apply5test5FT_VSs5Int32 : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $Int32

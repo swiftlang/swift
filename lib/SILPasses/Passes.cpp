@@ -192,8 +192,6 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addEarlyCodeMotion();
   PM.addGlobalARCOpts();
 
-  // Devirtualize.
-  PM.addDevirtualizer();
   PM.addGenericSpecializer();
   PM.addSILLinker();
 

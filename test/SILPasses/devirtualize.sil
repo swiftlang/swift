@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -devirtualize -dce -verify | FileCheck %s
+// RUN: %target-sil-opt %s -inline -dce -verify | FileCheck %s
 
 sil_stage canonical
 
@@ -59,8 +59,8 @@ bb0(%0 : $Node):
   return %4 : $Int
 }
 
-// CHECK-LABEL: sil private [transparent] @transparent_target
-sil private [transparent] @transparent_target : $@convention(method) (@guaranteed Node) -> Int {
+// CHECK-LABEL: sil private [transparent] [noinline] @transparent_target
+sil private [transparent] [noinline] @transparent_target : $@convention(method) (@guaranteed Node) -> Int {
 bb0(%0 : $Node):
   %2 = ref_element_addr %0 : $Node, #Node.index
   %3 = load %2 : $*Int
