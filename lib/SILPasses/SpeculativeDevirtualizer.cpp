@@ -1,4 +1,4 @@
-//===-- Devirtualizer.cpp ------ Devirtualize virtual calls ---------------===//
+//===-- SpeculativeDevirtualizer.cpp -- Speculatively devirtualize calls --===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Devirtualizes virtual function calls into direct function calls.
+// Speculatively devirtualizes witness- and class-method calls into direct
+// calls.
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-devirtualizer-pass"
+#define DEBUG_TYPE "sil-speculative-devirtualizer-pass"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
@@ -575,4 +576,3 @@ namespace {
 SILTransform *swift::createSpeculativeDevirtualization() {
   return new SpeculativeDevirtualization();
 }
-

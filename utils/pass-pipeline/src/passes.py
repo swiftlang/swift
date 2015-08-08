@@ -18,7 +18,7 @@ DCE = Pass('DCE')
 DeadFunctionElimination = Pass('DeadFunctionElimination')
 DeadObjectElimination = Pass('DeadObjectElimination')
 DefiniteInitialization = Pass('DefiniteInitialization')
-Devirtualizer = Pass('Devirtualizer')
+Devirtualizer = Pass('SpeculativeDevirtualizer')
 DiagnoseUnreachable = Pass('DiagnoseUnreachable')
 DiagnosticConstantPropagation = Pass('DiagnosticConstantPropagation')
 EarlyInliner = Pass('EarlyInliner')
@@ -30,7 +30,6 @@ GlobalLoadStoreOpts = Pass('GlobalLoadStoreOpts')
 GlobalOpt = Pass('GlobalOpt')
 IVInfoPrinter = Pass('IVInfoPrinter')
 InOutDeshadowing = Pass('InOutDeshadowing')
-InlineCaches = Pass('InlineCaches')
 InstCount = Pass('InstCount')
 LICM = Pass('LICM')
 LateInliner = Pass('LateInliner')
@@ -69,7 +68,7 @@ PASSES = [
     DeadFunctionElimination,
     DeadObjectElimination,
     DefiniteInitialization,
-    Devirtualizer,
+    SpeculativeDevirtualizer,
     DiagnoseUnreachable,
     DiagnosticConstantPropagation,
     EarlyInliner,
@@ -81,7 +80,6 @@ PASSES = [
     GlobalOpt,
     IVInfoPrinter,
     InOutDeshadowing,
-    InlineCaches,
     InstCount,
     LICM,
     LateInliner,

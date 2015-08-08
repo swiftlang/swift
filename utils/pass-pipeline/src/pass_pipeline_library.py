@@ -80,7 +80,7 @@ def ssapass_passlist(optlevel):
         p.GlobalLoadStoreOpts,
         p.CodeMotion, # Need to add proper argument here
         p.GlobalARCOpts,
-        p.Devirtualizer,
+        p.SpeculativeDevirtualizer,
         p.GenericSpecializer,
         p.SILLinker,
         inliner_for_optlevel(optlevel),
@@ -96,8 +96,7 @@ def lower_passlist():
         p.GlobalOpt,
         p.CapturePropagation,
         p.ClosureSpecializer,
-        p.Devirtualizer,
-        p.InlineCaches,
+        p.SpeculativeDevirtualizer,
         p.FunctionSignatureOpts,
     ])
         
