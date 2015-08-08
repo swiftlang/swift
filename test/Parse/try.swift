@@ -112,3 +112,6 @@ try maybeThrow() // okay
 try! maybeThrow() // okay
 try? maybeThrow() // expected-warning {{result of 'try?' is unused}}
 _ = try? maybeThrow() // okay
+
+let _: () -> Void = { try! maybeThrow() } // okay
+let _: () -> Void = { try? maybeThrow() } // expected-warning {{result of 'try?' is unused}}

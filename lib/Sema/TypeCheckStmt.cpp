@@ -967,11 +967,10 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
   return hadTypeError;
 }
   
-/// Check an expression whose result is not being used at all.
-static void diagnoseIgnoredExpr(TypeChecker &TC, Expr *E) {
+void TypeChecker::checkIgnoredExpr(Expr *E) {
   // Complain about l-values that are neither loaded nor stored.
   if (E->getType()->isLValueType()) {
-    TC.diagnose(E->getLoc(), diag::expression_unused_lvalue)
+    diagnose(E->getLoc(), diag::expression_unused_lvalue)
       .highlight(E->getSourceRange());
     return;
   }
@@ -980,7 +979,7 @@ static void diagnoseIgnoredExpr(TypeChecker &TC, Expr *E) {
   // TODO: What about tuples which contain functions by-value that are
   // dead?
   if (E->getType()->is<AnyFunctionType>()) {
-    TC.diagnose(E->getLoc(), diag::expression_unused_function)
+    diagnose(E->getLoc(), diag::expression_unused_function)
       .highlight(E->getSourceRange());
     return;
   }
@@ -989,7 +988,7 @@ static void diagnoseIgnoredExpr(TypeChecker &TC, Expr *E) {
 
   // Always complain about 'try?'.
   if (auto *OTE = dyn_cast<OptionalTryExpr>(valueE)) {
-    TC.diagnose(OTE->getTryLoc(), diag::expression_unused_optional_try)
+    diagnose(OTE->getTryLoc(), diag::expression_unused_optional_try)
       .highlight(E->getSourceRange());
     return;
   }
@@ -999,7 +998,7 @@ static void diagnoseIgnoredExpr(TypeChecker &TC, Expr *E) {
   // doesn't make sense to ignore it.
   if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(valueE))
     if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr()))
-      return diagnoseIgnoredExpr(TC, IIO->getSubExpr());
+      return checkIgnoredExpr(IIO->getSubExpr());
 
   // FIXME: Complain about literals
 
@@ -1031,28 +1030,28 @@ static void diagnoseIgnoredExpr(TypeChecker &TC, Expr *E) {
     if (callee) {
       if (auto attr = callee->getAttrs().getAttribute<WarnUnusedResultAttr>()) {
         if (!attr->getMutableVariant().empty() && baseIsLValue) {
-          DeclName replacementName(TC.Context,
-                                   TC.Context.getIdentifier(
+          DeclName replacementName(Context,
+                                   Context.getIdentifier(
                                      attr->getMutableVariant()),
                                    callee->getFullName().getArgumentNames());
-          TC.diagnose(fn->getLoc(), diag::expression_unused_result_nonmutating,
-                      callee->getFullName(), replacementName)
+          diagnose(fn->getLoc(), diag::expression_unused_result_nonmutating,
+                   callee->getFullName(), replacementName)
             .fixItReplace(fn->getLoc(), attr->getMutableVariant());
           return;
         }
 
         if (!attr->getMessage().empty()) {
-          TC.diagnose(fn->getLoc(), diag::expression_unused_result_message,
-                      callee->getFullName(), attr->getMessage());
+          diagnose(fn->getLoc(), diag::expression_unused_result_message,
+                   callee->getFullName(), attr->getMessage());
           return;
         }
 
-        TC.diagnose(fn->getLoc(), diag::expression_unused_result,
-                    callee->getFullName());
+        diagnose(fn->getLoc(), diag::expression_unused_result,
+                 callee->getFullName());
         return;
       }
       if (isa<ConstructorDecl>(callee) && !call->isImplicit()) {
-        TC.diagnose(fn->getLoc(), diag::expression_unused_init_result);
+        diagnose(fn->getLoc(), diag::expression_unused_init_result);
       }
     }
   }
@@ -1081,7 +1080,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       }
       
       if (isDiscarded)
-        diagnoseIgnoredExpr(TC, SubExpr);
+        TC.checkIgnoredExpr(SubExpr);
       
       elem = SubExpr;
       continue;

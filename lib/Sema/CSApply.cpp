@@ -4361,25 +4361,15 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
                                          /*implicit*/true);
   returnStmt->setResult(voidExpr);
 
-  auto discardExpr =
-      new (tc.Context) DiscardAssignmentExpr(singleExpr->getStartLoc(),
-                                             /*implicit*/true);
-  auto assignExpr =
-      new (tc.Context) AssignExpr(discardExpr, SourceLoc(), singleExpr,
-                                  /*implicit*/true);
-  
   // For l-value types, reset to the object type (as would have happened had
   // the enclosing assignment expression not been synthesized).
   if (singleExpr->getType()->getAs<LValueType>())
     singleExpr->setType(singleExpr->getType()->getLValueOrInOutObjectType());
 
-  discardExpr->setType(LValueType::get(singleExpr->
-                                       getType()->
-                                       getLValueOrInOutObjectType()));
-  assignExpr->setType(voidExpr->getType());
+  tc.checkIgnoredExpr(singleExpr);
 
   SmallVector<ASTNode, 2> elements;
-  elements.push_back(assignExpr);
+  elements.push_back(singleExpr);
   elements.push_back(returnStmt);
   
   auto braceStmt = BraceStmt::create(tc.Context,
