@@ -526,23 +526,23 @@ public:
   //===--------------------------------------------------------------------===//
 
   // Builtin type and simple types that are used frequently.
-  const CanType TheErrorType;       /// TheErrorType - This is the error singleton.
-  const CanType TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
-  const CanType TheNativeObjectType; /// Builtin.NativeObject
-  const CanType TheBridgeObjectType; /// Builtin.BridgeObject
-  const CanType TheUnknownObjectType; /// Builtin.UnknownObject
-  const CanType TheRawPointerType;  /// Builtin.RawPointer
+  const CanType TheErrorType;             /// This is the ErrorType singleton.
+  const CanType TheEmptyTupleType;        /// This is "()", aka Void
+  const CanType TheNativeObjectType;      /// Builtin.NativeObject
+  const CanType TheBridgeObjectType;      /// Builtin.BridgeObject
+  const CanType TheUnknownObjectType;     /// Builtin.UnknownObject
+  const CanType TheRawPointerType;        /// Builtin.RawPointer
   const CanType TheUnsafeValueBufferType; /// Builtin.UnsafeValueBuffer
   
-  const CanType TheIEEE32Type;     /// TheIEEE32Type  - 32-bit IEEE floating point
-  const CanType TheIEEE64Type;     /// TheIEEE64Type  - 64-bit IEEE floating point
+  const CanType TheIEEE32Type;            /// 32-bit IEEE floating point
+  const CanType TheIEEE64Type;            /// 64-bit IEEE floating point
   
   // Target specific types.
-  const CanType TheIEEE16Type;     /// TheIEEE16Type  - 16-bit IEEE floating point
-  const CanType TheIEEE80Type;     /// TheIEEE80Type  - 80-bit IEEE floating point
-  const CanType TheIEEE128Type;    /// TheIEEE128Type - 128-bit IEEE floating point
-  const CanType ThePPC128Type;     /// ThePPC128Type  - 128-bit PowerPC 2xDouble
-
+  const CanType TheIEEE16Type;            /// 16-bit IEEE floating point
+  const CanType TheIEEE80Type;            /// 80-bit IEEE floating point
+  const CanType TheIEEE128Type;           /// 128-bit IEEE floating point
+  const CanType ThePPC128Type;            /// 128-bit PowerPC 2xDouble
+  
   /// Retrieve a type member of the given base type variable.
   ///
   /// Note that this routine is only usable when a constraint system
