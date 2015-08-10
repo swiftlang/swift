@@ -4531,6 +4531,15 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Status.isError())
     return nullptr;
 
+  // Protocols don't support generic parameters, but people often want them and
+  // we want to have good error recovery if they try them out.  Parse them and
+  // produce a specific diagnostic if present.
+  if (startsWithLess(Tok)) {
+    diagnose(Tok, diag::generic_arguments_protocol);
+    Scope S(this, ScopeKind::Generics);
+    maybeParseGenericParams();
+  }
+
   DebuggerContextChange DCC (*this);
   
   // Parse optional inheritance clause.

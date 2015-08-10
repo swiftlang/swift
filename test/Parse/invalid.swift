@@ -43,3 +43,11 @@ func d(b: String -> <T>() -> T) {} // expected-error {{expected type for functio
 // expected-error @-2 {{type annotation missing in pattern}}
 // expected-error @-3 {{expected parameter type following ':'}}
 // expected-error @-4 {{expected ',' separator}}
+
+
+// <rdar://problem/22143680> QoI: terrible diagnostic when trying to form a generic protocol
+protocol Animal<Food> {  // expected-error {{protocols do not allow generic parameters; use associated types instead}}
+  func feed(food: Food) // expected-error {{use of undeclared type 'Food'}}
+}
+
+
