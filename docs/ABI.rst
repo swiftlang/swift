@@ -312,8 +312,8 @@ be used by (TODO: reflection and) debugger tools to discover information about
 types. For non-generic nominal types, these metadata records are generated
 statically by the compiler. For instances of generic types, and for intrinsic
 types such as tuples, functions, protocol compositions, etc., metadata records
-are vended by the runtime as needed. Every type has a unique metadata record;
-two **metadata pointer** values are equal iff the types are equivalent.
+are lazily created by the runtime as required. Every type has a unique metadata
+record; two **metadata pointer** values are equal iff the types are equivalent.
 
 In the layout descriptions below, offsets are given relative to the
 metadata pointer as an index into an array of pointers. On a 32-bit platform,
