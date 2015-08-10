@@ -194,7 +194,7 @@ breakpoint/crash/assert) you can list the current breakpoints:
 
     (lldb) br list
     1: name = 'swift_getGenericMetadata', locations = 1, resolved = 1, hit count = 85 Options: ignore: 1 enabled
-      1.1: where = libswiftCore.dylib`swift_getGenericMetadata + 28 at Metadata.cpp:219, address = 0x00000001002e7bcc, resolved, hit count = 85
+    1.1: where = libswiftCore.dylib`swift_getGenericMetadata + 28 at Metadata.cpp:219, address = 0x00000001002e7bcc, resolved, hit count = 85
 
 which will then show you the number of times that each breakpoint was hit. In
 this case, we know that ``swift_getGenericMetadata`` was hit 85 times. So, now
