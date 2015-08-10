@@ -30,7 +30,7 @@ namespace swift {
 
 ApplySite trySpecializeApplyOfGeneric(ApplySite Apply,
                                       SILFunction *&NewFunction,
-          llvm::SmallVectorImpl<FullApplyCollector::value_type> &NewApplyPairs);
+              llvm::SmallVectorImpl<ApplyCollector::value_type> &NewApplyPairs);
 
 /// Checks if a given mangled name could be a name of a whitelisted specialization.
 bool isWhitelistedSpecialization(StringRef SpecName);

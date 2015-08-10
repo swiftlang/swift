@@ -897,7 +897,7 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
     return ApplySite();
 
   SILFunction *SpecializedFunction;
-  llvm::SmallVector<FullApplyCollector::value_type, 4> NewApplyPairs;
+  llvm::SmallVector<ApplyCollector::value_type, 4> NewApplyPairs;
   auto Specialized = trySpecializeApplyOfGeneric(Apply,
                                                  SpecializedFunction,
                                                  NewApplyPairs);
@@ -909,6 +909,10 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
   CallGraphEditor Editor(CG);
   if (SpecializedFunction)
     Editor.addCallGraphNode(SpecializedFunction);
+
+  // Track the new applies from the specialization.
+  for (auto NewApply : NewApplyPairs)
+    NewApplies.push_back(NewApply.first);
 
   auto FullApply = FullApplySite::isa(Apply.getInstruction());
 
@@ -927,12 +931,12 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
   Editor.replaceApplyWithNew(FullApply, SpecializedFullApply);
 
   for (auto NewApply : NewApplyPairs) {
-    NewApplies.push_back(NewApply.first);
+    if (auto Apply = FullApplySite::isa(NewApply.first.getInstruction())) {
+      Editor.addEdgesForApply(Apply);
 
-    Editor.addEdgesForApply(NewApply.first);
-
-    assert(!OriginMap.count(NewApply.first) && "Unexpected apply in map!");
-    OriginMap[NewApply.first] = NewApply.second;
+      assert(!OriginMap.count(Apply) && "Unexpected apply in map!");
+      OriginMap[Apply] = FullApplySite(NewApply.second.getInstruction());
+    }
   }
 
   assert(!OriginMap.count(SpecializedFullApply) &&
@@ -1130,7 +1134,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     for (const auto &Arg : AI.getArguments())
       Args.push_back(Arg);
     
-    FullApplyCollector Collector;
+    ApplyCollector Collector;
 
     // Notice that we will skip all of the newly inlined ApplyInsts. That's
     // okay because we will visit them in our next invocation of the inliner.
@@ -1146,13 +1150,16 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     assert(Success && "Expected inliner to inline this function!");
     llvm::SmallVector<FullApplySite, 4> AppliesFromInlinee;
     for (auto &P : Collector.getApplyPairs()) {
-      AppliesFromInlinee.push_back(P.first);
+      if (auto FullApply = FullApplySite::isa(P.first.getInstruction())) {
+        AppliesFromInlinee.push_back(FullApply);
 
-      // Maintain a mapping for all new applies back to the apply they
-      // originated from.
-      assert(!OriginMap.count(P.first) && "Did not expect apply to be in map!");
-      assert(P.second && "Expected non-null apply site!");
-      OriginMap[P.first] = P.second;
+        // Maintain a mapping for all new applies back to the apply they
+        // originated from.
+        assert(!OriginMap.count(FullApply) &&
+               "Did not expect apply to be in map!");
+        assert(P.second && "Expected non-null apply site!");
+        OriginMap[FullApply] = FullApplySite(P.second.getInstruction());
+      }
     }
 
     CallGraphEditor Editor(CG);

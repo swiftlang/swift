@@ -86,7 +86,7 @@ GenericSpecializer::specializeApplyInstGroup(
   bool Changed = false;
 
   SILFunction *NewFunction;
-  llvm::SmallVector<FullApplyCollector::value_type, 4> NewApplies;
+  llvm::SmallVector<ApplyCollector::value_type, 4> NewApplies;
   CallGraphEditor Editor(CG);
   for (auto AI : ApplyGroup) {
     auto Specialized = trySpecializeApplyOfGeneric(AI, NewFunction, NewApplies);
@@ -109,7 +109,9 @@ GenericSpecializer::specializeApplyInstGroup(
       // We collect new applies from the cloned function during
       // cloning, and need to reflect them in the call graph.
       while (!NewApplies.empty()) {
-        Editor.addEdgesForApply(NewApplies.back().first);
+        if (auto FullApply =
+            FullApplySite::isa(NewApplies.back().first.getInstruction()))
+          Editor.addEdgesForApply(FullApply);
         NewApplies.pop_back();
       }
 

@@ -468,10 +468,10 @@ public:
 };
 
 // Helper class that provides a callback that can be used in
-// inliners/cloners for collecting FullApplySites.
-class FullApplyCollector {
+// inliners/cloners for collecting ApplySites.
+class ApplyCollector {
 public:
-  typedef std::pair<FullApplySite, FullApplySite> value_type;
+  typedef std::pair<ApplySite, ApplySite> value_type;
   typedef std::function<void(SILInstruction *, SILInstruction *)> CallbackType;
 
 
@@ -479,14 +479,14 @@ private:
   llvm::SmallVector<value_type, 4> ApplyPairs;
 
   void collect(SILInstruction *OldApply, SILInstruction *NewApply) {
-    if (FullApplySite::isa(NewApply))
-      ApplyPairs.push_back(std::make_pair(FullApplySite(NewApply),
-                                          FullApplySite(OldApply)));
+    if (auto NewApplySite = ApplySite::isa(NewApply))
+      ApplyPairs.push_back(std::make_pair(NewApplySite,
+                                          ApplySite(OldApply)));
   }
 
 public:
   CallbackType getCallback() {
-    return std::bind(&FullApplyCollector::collect, this, std::placeholders::_1,
+    return std::bind(&ApplyCollector::collect, this, std::placeholders::_1,
                      std::placeholders::_2);
   }
 

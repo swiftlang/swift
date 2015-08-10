@@ -30,7 +30,7 @@
 namespace swift {
 
 class GenericCloner : public TypeSubstCloner<GenericCloner> {
-  FullApplyCollector::CallbackType Callback;
+  ApplyCollector::CallbackType Callback;
 
 public:
   friend class SILCloner<GenericCloner>;
@@ -40,7 +40,7 @@ public:
                 TypeSubstitutionMap &ContextSubs,
                 StringRef NewName,
                 ArrayRef<Substitution> ApplySubs,
-                FullApplyCollector::CallbackType Callback)
+                ApplyCollector::CallbackType Callback)
   : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, ContextSubs,
                     ApplySubs), Callback(Callback) {
     assert(F->getDebugScope()->SILFn != getCloned()->getDebugScope()->SILFn);
@@ -51,7 +51,7 @@ public:
                                     TypeSubstitutionMap &InterfaceSubs,
                                     TypeSubstitutionMap &ContextSubs,
                                     StringRef NewName, ApplySite Caller,
-                           FullApplyCollector::CallbackType Callback =nullptr) {
+                               ApplyCollector::CallbackType Callback =nullptr) {
     // Clone and specialize the function.
     GenericCloner SC(F, InterfaceSubs, ContextSubs, NewName,
                      Caller.getSubstitutions(), Callback);
