@@ -47,7 +47,6 @@ entry(%0 : $AnyObject):
 
   // CHECK-NEXT: [[RESULT:%.*]] = call %objc_object* @try_apply_helper(%objc_object* %0, %swift.refcounted* undef, %swift.error** nocapture [[ERRORSLOT]])
   // CHECK-NEXT: [[ERR:%.*]] = load %swift.error*, %swift.error** [[ERRORSLOT]], align
-  // CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
   // CHECK-NEXT: [[T0:%.*]] = icmp ne %swift.error* [[ERR]], null
   // CHECK-NEXT: br i1 [[T0]],
   %1 = function_ref @try_apply_helper : $@convention(thin) (@owned AnyObject) -> (@owned AnyObject, @error ErrorType)
@@ -63,6 +62,7 @@ bb1(%2 : $AnyObject):
   br bb3
 
 // CHECK:      [[T0:%.*]] = phi %swift.error* [ [[ERR]],
+// CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
 // CHECK-NEXT: call void @swift_errorRelease(%swift.error* [[T0]])
 // CHECK-NEXT: br label [[CONT]]
 bb2(%3 : $ErrorType):
