@@ -13,6 +13,6 @@ func doSomething<T : P>(t : T) -> Y {
 }
 
 func done() -> Y {
-  var x = X()
+  let x = X()
   return doSomething(x)
 }

@@ -20,7 +20,7 @@ struct A<B> : pingable {
 }
 
 func useFoo<T>(x x: T) {
-  var a = A<T>()
+  let a = A<T>()
   generic_call(x: a)
 }
 
@@ -32,7 +32,7 @@ func useFoo<T>(x x: T) {
 //CHECK-NEXT: apply
 //CHECK: return
 func interesting_code_here() {
-  var x = ABC()
+  let x = ABC()
   // Make sure that we can specialize the function generic_call that has a
   // generic call to x.ping().
   generic_call(x: x)
