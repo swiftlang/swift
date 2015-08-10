@@ -121,14 +121,16 @@ script ``swift/utils/viewcfg``. It also works for LLVM IR files.
 The script reads the SIL (or LLVM IR) code from stdin and displays the dot
 graph file. Note: .dot files should be associated with the Graphviz app.
 
+Advanced LLDB Usage
+~~~~~~~~~~~~~~~~~~~
 
 Using Breakpoints
 `````````````````
 
-LLDB has very powerful breakpoints, which can be utilized in many ways to
-debug the compiler.
-The examples in this section show the LLDB command lines. In Xcode you can set
-the breakpoint properties by clicking 'Edit breakpoint'.
+LLDB has very powerful breakpoints, which can be utilized in many ways to debug
+the compiler and swift executables. The examples in this section show the LLDB
+command lines. In Xcode you can set the breakpoint properties by clicking 'Edit
+breakpoint'.
 
 Let's start with a simple example: sometimes you see a function in the SIL
 output and you want to know where the function was created in the compiler.
