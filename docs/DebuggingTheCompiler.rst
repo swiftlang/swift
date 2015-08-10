@@ -182,3 +182,19 @@ one) and set the ignore count to $n minus one::
 
 Run your program again and the breakpoint hits just before the first breakpoint.
 
+Another method for accomplishing the same task is to set the ignore count of the
+breakpoint to a large number, i.e.:
+
+    (lldb) br set -i 9999999 -n swift_getGenericMetadata
+
+Then when you hit the new breakpoint you can list the current breakpoints:
+
+    (lldb) br list
+    1: name = 'swift_getGenericMetadata', locations = 1, resolved = 1, hit count = 85 Options: ignore: 1 enabled
+      1.1: where = libswiftCore.dylib`swift_getGenericMetadata + 28 at Metadata.cpp:219, address = 0x00000001002e7bcc, resolved, hit count = 85
+
+which will then show you the number of times that each breakpoint was hit. In
+this case, we know that ``swift_getGenericMetadata`` was hit 85 times. So, now
+we know to ignore swift_getGenericMetadata 84 times, i.e.:
+
+    (lldb) br set -i 84 -n swift_getGenericMetadata
