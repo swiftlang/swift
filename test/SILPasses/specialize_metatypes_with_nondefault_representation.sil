@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -specialize -verify | FileCheck %s
+// RUN: %target-sil-opt %s -inline -verify | FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -15,7 +15,7 @@ import Builtin
 
 protocol AnyObject {}
 
-sil @tmp : $@convention(thin) <T> (@out T) -> () {
+sil [noinline] @tmp : $@convention(thin) <T> (@out T) -> () {
 bb0(%0 : $*T):
   %1 = tuple()
   return %1 : $()

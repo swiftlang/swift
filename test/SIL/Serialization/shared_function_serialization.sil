@@ -1,12 +1,12 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %target-swift-frontend -disable-func-sig-opts -sil-inline-threshold 0 %S/Inputs/shared_function_serialization_input.swift -o %t/Swift.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-link-name swiftCore -module-name Swift -sil-serialize-all -O
-// RUN: %target-sil-opt -I %t -linker -verify %s -o - | FileCheck %s
+// RUN: %target-swift-frontend -disable-func-sig-opts %S/Inputs/shared_function_serialization_input.swift -o %t/Swift.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-link-name swiftCore -module-name Swift -sil-serialize-all -O
+// RUN: %target-sil-opt -I %t -linker -inline -verify %s -o - | FileCheck %s
 
 // CHECK: sil private @top_level_code : $@convention(thin) () -> () {
 // CHECK: sil public_external [fragile] @_TFVSs1XCfMS_FT_S_ : $@convention(thin) (@thin X.Type) -> X {
 // CHECK: sil public_external [fragile] @_TFSs17the_thing_it_doesFT1xVSs1X_T_ : $@convention(thin) (X) -> () {
-// CHECK: sil shared_external [fragile] @_TTSg5VSs1X___TFSs9the_thingurFT1tq__T_ : $@convention(thin) (@in X) -> () {
+// CHECK: sil shared_external [fragile] [noinline] @_TTSg5VSs1X___TFSs9the_thingurFT1tq__T_ : $@convention(thin) (@in X) -> () {
 
 sil_stage canonical
 

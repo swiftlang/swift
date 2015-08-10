@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -specialize %s | FileCheck %s
+// RUN: %target-sil-opt -inline %s | FileCheck %s
 
 sil_stage canonical
 
@@ -30,7 +30,7 @@ bb0:
 }
 
 // specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
-sil @_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ : $@convention(thin) <T> (@out XXX<T>, @in T, @thin XXX<T>.Type) -> () {
+sil [noinline] @_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ : $@convention(thin) <T> (@out XXX<T>, @in T, @thin XXX<T>.Type) -> () {
 bb0(%0 : $*XXX<T>, %1 : $*T, %2 : $@thin XXX<T>.Type):
   %3 = alloc_stack $XXX<T>  // var self           // users: %7, %11, %13
   debug_value_addr %1 : $*T  // let t             // id: %4
@@ -47,7 +47,7 @@ bb0(%0 : $*XXX<T>, %1 : $*T, %2 : $@thin XXX<T>.Type):
 }
 
 // specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int32
-sil @_TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si : $@convention(method) <T> (@in T, @inout XXX<T>) -> Int32 {
+sil [noinline] @_TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si : $@convention(method) <T> (@in T, @inout XXX<T>) -> Int32 {
 bb0(%0 : $*T, %1 : $*XXX<T>):
   debug_value_addr %0 : $*T  // let t             // id: %2
   %3 = alloc_stack $T                             // users: %4, %6, %7
@@ -71,7 +71,7 @@ bb0(%0 : $Builtin.Int2048, %1 : $@thin Int32.Type):
 }
 
 // specialize.acceptsInt (Swift.Int32) -> ()
-sil @_TF10specialize10acceptsIntFSiT_ : $@convention(thin) (Int32) -> () {
+sil [noinline] @_TF10specialize10acceptsIntFSiT_ : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
   debug_value %0 : $Int32  // let x                 // id: %1
   %2 = tuple ()                                   // user: %3
@@ -270,7 +270,7 @@ bb0(%0 : $C):
 }
 
 // test4.C.init (test4.C.Type)() -> test4.C
-sil hidden @_TFV5test41CCfMS0_FT_S0_ : $@convention(thin) (@thin C.Type) -> C {
+sil hidden [noinline] @_TFV5test41CCfMS0_FT_S0_ : $@convention(thin) (@thin C.Type) -> C {
 bb0(%0 : $@thin C.Type):
   %1 = alloc_stack $C  // var self                // user: %3
   %2 = struct $C ()                               // user: %4
@@ -302,7 +302,7 @@ bb0(%0 : $*U):
 }
 
 // test4.(boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32).(closure #1)
-sil shared @_TFF5test43booUS_1P___FQ_FTVSs5Int32Q0__S1_U_FTS1_Q0__S1_ : $@convention(thin) <U, T where U : P> (Int32, @in T, @owned @box U, @inout U) -> Int32 {
+sil shared [noinline] @_TFF5test43booUS_1P___FQ_FTVSs5Int32Q0__S1_U_FTS1_Q0__S1_ : $@convention(thin) <U, T where U : P> (Int32, @in T, @owned @box U, @inout U) -> Int32 {
 bb0(%0 : $Int32, %1 : $*T, %2 : $@box U, %3 : $*U):
   debug_value %0 : $Int32  // let x               // id: %4
   debug_value_addr %1 : $*T  // let z             // id: %5
@@ -378,7 +378,7 @@ bb0(%0 : $*T):
 }
 
 // test4.(gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32).(closure #1)
-sil shared @_TFF5test44gen1US_1P__FQ_FVSs5Int32S1_U_FS1_S1_ : $@convention(thin) <T where T : P> (Int32, @owned @box T, @inout T) -> Int32 {
+sil shared [noinline] @_TFF5test44gen1US_1P__FQ_FVSs5Int32S1_U_FS1_S1_ : $@convention(thin) <T where T : P> (Int32, @owned @box T, @inout T) -> Int32 {
 bb0(%0 : $Int32, %1 : $@box T, %2 : $*T):
   debug_value %0 : $Int32  // let $0              // id: %3
   %4 = witness_method $T, #P.get!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32 // user: %5
@@ -401,8 +401,8 @@ bb0(%0 : $Int32, %1 : $@box T, %2 : $*T):
 // CHECK: partial_apply [[CLOSURE_SPECIALIZATION:%[0-9]+]]
 // CHECK: return
 
-// Check that there is a generic specialization of a closure from foo
-// CHECK-LABEL: sil shared @_TTSg5V4main1CS0_S_1PS__Sf___TFF5test43booUS_1P___FQ_FTVSs5Int32Q0__S1_U_FTS1_Q0__S1_
+// Check that there is a generic specialization of a closure from boo
+// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS__Sf___TFF5test43booUS_1P___FQ_FTVSs5Int32Q0__S1_U_FTS1_Q0__S1_
 // CHECK: return
 
 // Check that there is a generic specialization of foo
@@ -426,7 +426,7 @@ bb0(%0 : $Int32, %1 : $@box T, %2 : $*T):
 // CHECK: return
 
 // Check that there is a generic specialization of a closure from gen1
-// CHECK-LABEL: sil shared @_TTSg5V4main1CS0_S_1PS____TFF5test44gen1US_1P__FQ_FVSs5Int32S1_U_FS1_S1_ : $@convention(thin) (Int32, @owned @box C, @inout C) -> Int32
+// CHECK-LABEL: sil shared [noinline] @_TTSg5V4main1CS0_S_1PS____TFF5test44gen1US_1P__FQ_FVSs5Int32S1_U_FS1_S1_ : $@convention(thin) (Int32, @owned @box C, @inout C) -> Int32
 // CHECK: return
 
 

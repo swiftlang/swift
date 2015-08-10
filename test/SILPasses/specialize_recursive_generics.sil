@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -specialize -verify | FileCheck %s
+// RUN: %target-sil-opt %s -inline -verify | FileCheck %s
 
 // Check that SIL cloner can correctly handle specialization of recursive
 // functions with generic arguments.
