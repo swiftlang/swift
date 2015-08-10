@@ -189,7 +189,8 @@ breakpoint to a large number, i.e.:
 
     (lldb) br set -i 9999999 -n swift_getGenericMetadata
 
-Then when you hit the new breakpoint you can list the current breakpoints:
+Then whenever the debugger stops next time (due to hitting another
+breakpoint/crash/assert) you can list the current breakpoints:
 
     (lldb) br list
     1: name = 'swift_getGenericMetadata', locations = 1, resolved = 1, hit count = 85 Options: ignore: 1 enabled
@@ -206,9 +207,11 @@ LLDB Scripts
 
 LLDB has powerful capabilities of scripting in python among other languages. An
 often overlooked, but very useful technique is the -s command to lldb. This
-essentially acts as a set of commands that lldb runs each time lldb hits a
-stopping point. As an example of this consider the following script (which
-without any loss of generality will be called test.lldb):
+essentially acts as a pseudo-stdin of commands that lldb will read commands
+from. Each time lldb hits a stopping point (i.e. a breakpoint or a
+crash/assert), it will run the earliest command that has not been run yet. As an
+example of this consider the following script (which without any loss of
+generality will be called test.lldb):
 
     env DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib
     break set -n swift_getGenericMetadata
