@@ -9,7 +9,7 @@ Abstract
 --------
 
 This document contains some useful information for debugging the
-swift compiler.
+swift compiler and swift compiler output.
 
 Printing the Intermediate Representations
 -----------------------------------------
@@ -121,9 +121,6 @@ script ``swift/utils/viewcfg``. It also works for LLVM IR files.
 The script reads the SIL (or LLVM IR) code from stdin and displays the dot
 graph file. Note: .dot files should be associated with the Graphviz app.
 
-Advanced LLDB Usage
-~~~~~~~~~~~~~~~~~~~
-
 Using Breakpoints
 `````````````````
 
@@ -185,22 +182,21 @@ one) and set the ignore count to $n minus one::
 Run your program again and the breakpoint hits just before the first breakpoint.
 
 Another method for accomplishing the same task is to set the ignore count of the
-breakpoint to a large number, i.e.:
+breakpoint to a large number, i.e.::
 
-    (lldb) br set -i 9999999 -n swift_getGenericMetadata
+    (lldb) br set -i 9999999 -n GlobalARCOpts::run
 
 Then whenever the debugger stops next time (due to hitting another
-breakpoint/crash/assert) you can list the current breakpoints:
+breakpoint/crash/assert) you can list the current breakpoints::
 
     (lldb) br list
-    1: name = 'swift_getGenericMetadata', locations = 1, resolved = 1, hit count = 85 Options: ignore: 1 enabled
-    1.1: where = libswiftCore.dylib`swift_getGenericMetadata + 28 at Metadata.cpp:219, address = 0x00000001002e7bcc, resolved, hit count = 85
+    1: name = 'GlobalARCOpts::run', locations = 1, resolved = 1, hit count = 85 Options: ignore: 1 enabled
 
 which will then show you the number of times that each breakpoint was hit. In
-this case, we know that ``swift_getGenericMetadata`` was hit 85 times. So, now
-we know to ignore swift_getGenericMetadata 84 times, i.e.:
+this case, we know that ``GlobalARCOpts::run`` was hit 85 times. So, now
+we know to ignore swift_getGenericMetadata 84 times, i.e.::
 
-    (lldb) br set -i 84 -n swift_getGenericMetadata
+    (lldb) br set -i 84 -n GlobalARCOpts::run
 
 LLDB Scripts
 ````````````
@@ -211,7 +207,7 @@ essentially acts as a pseudo-stdin of commands that lldb will read commands
 from. Each time lldb hits a stopping point (i.e. a breakpoint or a
 crash/assert), it will run the earliest command that has not been run yet. As an
 example of this consider the following script (which without any loss of
-generality will be called test.lldb):
+generality will be called test.lldb)::
 
     env DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib
     break set -n swift_getGenericMetadata
@@ -223,6 +219,9 @@ generality will be called test.lldb):
     break set -a $0
     c
     dis -f
+
+TODO: Change this example to apply to the swift compiler instead of to the
+stdlib unittests.
 
 Then by running ``lldb test -s test.lldb``, lldb will:
 
@@ -238,14 +237,21 @@ Then by running ``lldb test -s test.lldb``, lldb will:
 Using LLDB scripts can enable one to use complex debugger workflows without
 needing to retype the various commands perfectly everytime.
 
+Debugging Swift Executables
+---------------------------
+
+One can use the previous tips for debugging the swift compiler with swift
+executables as well. Here are some additional useful techniques that one can use
+in Swift executables.
+
 Determining the mangled name of a function in LLDB
-``````````````````````````````````````````````````
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 One problem that often comes up when debugging swift code in LLDB is that LLDB
 shows the demangled name instead of the mangled name. This can lead to mistakes
 where due to the length of the mangled names one will look at the wrong
 function. Using the following command, one can find the mangled name of the
-function in the current frame:
+function in the current frame::
 
     (lldb) image lookup -va $pc
     Address: CollectionType3[0x0000000100004db0] (CollectionType3.__TEXT.__text + 16000)
