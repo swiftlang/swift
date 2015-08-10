@@ -666,7 +666,7 @@ static SILInstruction *tryDevirtualizeWitnessMethod(FullApplySite AI) {
 
   std::tie(F, WT, Subs) =
     AI.getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
-                                                 WMI->getMember());
+                                                WMI->getMember());
 
   if (!F)
     return nullptr;
