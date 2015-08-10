@@ -379,6 +379,7 @@ enum class SemanticContextKind {
 
 /// The declaration kind of a code completion result, if it is a declaration.
 enum class CodeCompletionDeclKind {
+  Module,
   Class,
   Struct,
   Enum,

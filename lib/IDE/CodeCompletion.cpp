@@ -223,9 +223,9 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
-  case DeclKind::Module:
     llvm_unreachable("not expecting such a declaration result");
-
+  case DeclKind::Module:
+    return CodeCompletionDeclKind::Module;
   case DeclKind::TypeAlias:
   case DeclKind::AssociatedType:
     return CodeCompletionDeclKind::TypeAlias;
@@ -336,6 +336,9 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     case CodeCompletionDeclKind::GlobalVar:
       Prefix.append("[GlobalVar]");
       break;
+    case CodeCompletionDeclKind::Module:
+      Prefix.append("[Module]");
+      break;
     }
     break;
   case ResultKind::Keyword:
@@ -434,6 +437,8 @@ bool shouldCopyAssociatedUSRForDecl(const ValueDecl *VD) {
   if (isa<AbstractTypeParamDecl>(VD) && !isa<AssociatedTypeDecl>(VD))
     return false;
   if (isa<ParamDecl>(VD))
+    return false;
+  if (isa<ModuleDecl>(VD))
     return false;
   if (VD->hasClangNode() && !VD->getClangDecl())
     return false;
@@ -1042,11 +1047,14 @@ public:
           // Name hidden implies not imported yet, exactly what code completion
           // wants.
           M->NameVisibility == clang::Module::NameVisibilityKind::Hidden) {
+        auto MD = ModuleDecl::create(Ctx.getIdentifier(M->getTopLevelModuleName()),
+                                     Ctx);
         CodeCompletionResultBuilder Builder(Sink,
                                             CodeCompletionResult::ResultKind::
-                                              Keyword,
-                                            SemanticContextKind::None);
-        Builder.addTextChunk(M->getTopLevelModuleName());
+                                              Declaration,
+                                            SemanticContextKind::OtherModule);
+        Builder.setAssociatedDecl(MD);
+        Builder.addTextChunk(MD->getNameStr());
         Builder.addTypeAnnotation("Module");
       }
     }
@@ -3041,6 +3049,7 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       if (R->getKind() != CodeCompletionResult::Declaration)
         return false;
       switch(R->getAssociatedDeclKind()) {
+      case CodeCompletionDeclKind::Module:
       case CodeCompletionDeclKind::Class:
       case CodeCompletionDeclKind::Struct:
       case CodeCompletionDeclKind::Enum:
