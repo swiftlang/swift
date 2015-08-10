@@ -1167,7 +1167,8 @@ public:
 };
 
 
-inline SourceFile &ModuleDecl::getMainSourceFile(SourceFileKind expectedKind) const{
+inline SourceFile &
+ModuleDecl::getMainSourceFile(SourceFileKind expectedKind) const {
   assert(!Files.empty() && "No files added yet");
   assert(cast<SourceFile>(Files.front())->Kind == expectedKind);
   return *cast<SourceFile>(Files.front());
