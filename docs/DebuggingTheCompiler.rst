@@ -232,3 +232,18 @@ Then by running ``lldb test -s test.lldb``, lldb will:
 
 Using LLDB scripts can enable one to use complex debugger workflows without
 needing to retype the various commands perfectly everytime.
+
+Determining the mangled name of a function in LLDB
+``````````````````````````````````````````````````
+
+One problem that often comes up when debugging swift code in LLDB is that LLDB
+shows the demangled name instead of the mangled name. This can lead to mistakes
+where due to the length of the mangled names one will look at the wrong
+function. Using the following command, one can find the mangled name of the
+function in the current frame:
+
+    (lldb) image lookup -va $pc
+    Address: CollectionType3[0x0000000100004db0] (CollectionType3.__TEXT.__text + 16000)
+    Summary: CollectionType3`ext.CollectionType3.CollectionType3.MutableCollectionType2<A where A: CollectionType3.MutableCollectionType2>.(subscript.materializeForSet : (Swift.Range<A.Index>) -> Swift.MutableSlice<A>).(closure #1)
+    Module: file = "/Volumes/Files/work/solon/build/build-swift/validation-test-macosx-x86_64/stdlib/Output/CollectionType.swift.gyb.tmp/CollectionType3", arch = "x86_64"
+    Symbol: id = {0x0000008c}, range = [0x0000000100004db0-0x00000001000056f0), name="ext.CollectionType3.CollectionType3.MutableCollectionType2<A where A: CollectionType3.MutableCollectionType2>.(subscript.materializeForSet : (Swift.Range<A.Index>) -> Swift.MutableSlice<A>).(closure #1)", mangled="_TFFeRq_15CollectionType322MutableCollectionType2_S_S0_m9subscriptFGVSs5Rangeqq_Ss16MutableIndexable5Index_GVSs12MutableSliceq__U_FTBpRBBRQPS0_MS4__T_"
