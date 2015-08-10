@@ -1805,6 +1805,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // checker.
   case TypeKind::AssociatedType:
   case TypeKind::Error:
+  case TypeKind::Unresolved:
   case TypeKind::LValue:
   case TypeKind::TypeVariable:
   case TypeKind::Module:

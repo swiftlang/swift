@@ -1311,8 +1311,10 @@ namespace {
     unsigned level;
 
     AnyFunctionType *getUncurriedFunctionType() const {
+#if 1  // TODO: Simplify with unresolved types?  Can this be removed?
       if (!decl->hasType())
         return nullptr;
+#endif
       
       auto type = decl->getType();
 
@@ -2310,8 +2312,10 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // ambiguous.  Bail out so the general ambiguity diagnosing logic can handle
   // it.
   if (fromType->is<TypeVariableType>() ||
+      fromType->is<UnresolvedType>() ||
       fromType->is<UnboundGenericType>() ||
-      toType->is<TypeVariableType>()) {
+      toType->is<TypeVariableType>() ||
+      toType->is<UnresolvedType>()) {
     diagnoseAmbiguity(anchor);
     return true;
   }
@@ -2719,10 +2723,10 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
     // If we have a ClosureExpr parent of the specified node, check to make sure
     // none of its arguments are type variables.  If so, these type variables
     // would be accessible to name lookup of the subexpression and may thus leak
-    // in.  Reset them to null types for safe measures.
+    // in.  Reset them to UnresolvedTypes for safe measures.
     CE->getParams()->forEachVariable([&](VarDecl *VD) {
       if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
-        VD->overwriteType(Type());
+        VD->overwriteType(CS->getASTContext().TheUnresolvedType);
     });
   }
 
@@ -2895,7 +2899,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
       return;
 
     // Don't take a constraint that won't tell us anything.
-    if (C->getSecondType()->hasTypeVariable())
+    if (C->getSecondType()->hasTypeVariable() ||
+        C->getSecondType()->hasUnresolvedType())
       return;
     
     foundConstraint = C;
@@ -3335,6 +3340,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     auto instanceTy =
       SD->getGetter()->getImplicitSelfDecl()->getType()->getInOutObjectType();
     if (!baseType->hasTypeVariable() &&
+        !baseType->hasUnresolvedType() &&
         !CS->TC.isConvertibleTo(baseType, instanceTy, CS->DC)) {
       selfConstraint = CC_SelfMismatch;
     }
@@ -3679,11 +3685,10 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     // closure.  These typevars come into them when the body does name
     // lookups against the parameter decls.
     //
-    // Handle this by rewriting the arguments to Type().  CSGen has special
-    // handling for ParamDecls from closure arguments with null types.
+    // Handle this by rewriting the arguments to UnresolvedType().
     CE->getParams()->forEachVariable([&](VarDecl *VD) {
       if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
-        VD->overwriteType(Type());
+        VD->overwriteType(CS->getASTContext().TheUnresolvedType);
     });
   }
   
@@ -3863,7 +3868,8 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     // If this is a multi-statement closure with no explicit result type, emit
     // a note to clue the developer in.
     if (!CE->hasExplicitResultType() && CFTy &&
-        CFTy->getResult()->hasTypeVariable()) {
+        (CFTy->getResult()->hasTypeVariable() ||
+         CFTy->getResult()->is<UnresolvedType>())) {
       diagnose(CE->getLoc(), diag::cannot_infer_closure_result_type);
       return;
     }

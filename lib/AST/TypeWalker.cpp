@@ -33,6 +33,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
   TypeWalker &Walker;
 
   bool visitErrorType(ErrorType *ty) { return false; }
+  bool visitUnresolvedType(UnresolvedType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
   bool visitNameAliasType(NameAliasType *ty) { return false; }
 

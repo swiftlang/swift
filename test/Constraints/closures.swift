@@ -79,7 +79,7 @@ func r21544303() {
 
 // <rdar://problem/22162441> Crash from failing to diagnose nonexistent method access inside closure
 func r22162441(lines: [String]) {
-  _ = lines.map { line in line.fooBar() }  // expected-error {{type of expression is ambiguous without more context}}
-  _ = lines.map { $0.fooBar() }  // expected-error {{type of expression is ambiguous without more context}}
+  _ = lines.map { line in line.fooBar() }  // expected-error {{value of type 'String' has no member 'fooBar'}}
+  _ = lines.map { $0.fooBar() }  // expected-error {{value of type 'String' has no member 'fooBar'}}
 }
 

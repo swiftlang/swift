@@ -1146,6 +1146,13 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   assert(!convertType == (convertTypePurpose == CTP_Unused) &&
          "Purpose for conversion type was not specified");
   
+  // If we're asked to convert to an UnresolvedType, then ignore the request.
+  // This happens when CSDiags nukes a type.
+  if (convertType && convertType->is<UnresolvedType>()) {
+    convertType = Type();
+    convertTypePurpose = CTP_Unused;
+  }
+  
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
   if (!convertType.isNull())
@@ -1163,7 +1170,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // system.
   auto allowFreeTypeVariables = FreeTypeVariableBinding::Disallow;
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
-    allowFreeTypeVariables = FreeTypeVariableBinding::Allow;
+    allowFreeTypeVariables = FreeTypeVariableBinding::UnresolvedType;
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
@@ -1649,6 +1656,12 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
+  // If this expression is already typechecked and has an i1 type, then it has
+  // already got its conversion from BooleanType back to i1.  Just re-typecheck
+  // it.
+  if (expr->getType() && expr->getType()->isBuiltinIntegerType(1))
+    return typeCheckExpression(expr, dc);
+  
   /// Expression type checking listener for conditions.
   class ConditionListener : public ExprTypeCheckListener {
     Expr *OrigExpr = nullptr;
@@ -2139,7 +2152,7 @@ void ConstraintSystem::print(raw_ostream &out) {
   // Print all type variables as $T0 instead of _ here.
   llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
                                true);
-
+  
   out << "Score: " << CurrentScore << "\n";
 
   if (contextualType)

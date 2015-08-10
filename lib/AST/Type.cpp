@@ -117,6 +117,7 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   // Nothing else is statically just a class reference.
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
+  case TypeKind::Unresolved:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
@@ -369,6 +370,7 @@ bool TypeBase::isUnspecializedGeneric() {
     return false;
 
   case TypeKind::Error:
+  case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
     llvm_unreachable("querying invalid type");
 
@@ -1251,6 +1253,7 @@ CanType TypeBase::getCanonicalType() {
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Error:
+  case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
     llvm_unreachable("these types are always canonical");
 
@@ -2527,8 +2530,8 @@ static Type getMemberForBaseType(Module *module,
       // conformances we're supposed to skip this conformance's unsatisfied type
       // witnesses, and we have an unsatisfied type witness, return
       // "missing".
-      if (conformance.getPointer() &&
-          conformance.getPointer()->getRootNormalConformance()->getState()
+      assert(conformance.getPointer());
+      if (conformance.getPointer()->getRootNormalConformance()->getState()
             == ProtocolConformanceState::CheckingTypeWitnesses &&
           !conformance.getPointer()->hasTypeWitness(assocType, nullptr))
         return Type();
@@ -2777,6 +2780,7 @@ case TypeKind::Id:
 #define TYPE(Id, Parent)
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Error:
+  case TypeKind::Unresolved:
   case TypeKind::TypeVariable:
   case TypeKind::AssociatedType:
   case TypeKind::GenericTypeParam:

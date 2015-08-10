@@ -116,10 +116,10 @@ i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argum
 // FIXME: poor diagnostic, to be fixed in 20142462. For now, we just want to
 // make sure that it doesn't crash.
 func rdar20142523() {
-  // expected-note @+1 {{overloads for 'map' exist with these partially matching parameter lists: (C, (C.Generator.Element) -> T), (T?, @noescape (T) -> U)}}
   map(0..<10, { x in // expected-error{{cannot invoke 'map' with an argument list of type '(Range<Int>, (_) -> _)'}}
+    // expected-note @-1 {{expected an argument list of type '(C, (C.Generator.Element) -> T)'}}
     ()
-    return x
+    return x  // expected-error {{type of expression is ambiguous without more context}}
   })
 }
 
@@ -348,7 +348,6 @@ CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot convert value of t
 CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(c: Double)'}}
 // expected-note @-1 {{expected an argument list of type '(b: Int)'}}
 
-
 CurriedClass.method3(c)(32, b: 1)
 _ = CurriedClass.method3(c)
 _ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}} {{32-32=b: }}
@@ -407,13 +406,15 @@ func f20371273() {
 
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
 // FIXME: Should complain about not having a return type annotation in the closure.
-[0].map { _ in let r =  (1,2).0;  return r }  // expected-error {{cannot invoke 'map' with an argument list of type '((_) -> _)'}}
+[0].map { _ in let r =  (1,2).0;  return r }
+// expected-error @-1 {{cannot invoke 'map' with an argument list of type '(@noescape (Int) throws -> _)'}}
+// expected-note @-2 {{expected an argument list of type '(@noescape (Self.Generator.Element) throws -> T)'}}
 
 // <rdar://problem/21078316> Less than useful error message when using map on optional dictionary type
 func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{type of expression is ambiguous without more context}}
+  bar = foo.map { ($0, $1) }  // expected-error {{tuple pattern cannot match values of the non-tuple type '[String : String]'}}
 }
 
 

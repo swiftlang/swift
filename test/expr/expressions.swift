@@ -611,13 +611,13 @@ func unusedExpressionResults() {
 func arrayLiterals() { 
   var a = [1,2,3]
   var b : [Int] = []
-  var c = []  // expected-error {{type of expression is ambiguous without more context}}
+  var c = []  // expected-error {{type '[_]' does not conform to protocol 'ArrayLiteralConvertible'}}
 }
 
 func dictionaryLiterals() {
   var a = [1 : "foo",2 : "bar",3 : "baz"]
   var b : Dictionary<Int, String> = [:]
-  var c = [:]  // expected-error {{type of expression is ambiguous without more context}} 
+  var c = [:]  // expected-error {{type '[_ : _]' does not conform to protocol 'DictionaryLiteralConvertible'}} 
 }
 
 func invalidDictionaryLiteral() {
@@ -633,7 +633,10 @@ func invalidDictionaryLiteral() {
 }
 
 [1].join([4]) // expected-error {{cannot invoke 'join' with an argument list of type '([Int])'}}
+// expected-note @-1 {{expected an argument list of type '(S)'}}
+
 [1].join([[[4]]]) // expected-error {{cannot invoke 'join' with an argument list of type '([Array<Array<Int>>])'}}
+// expected-note @-1 {{expected an argument list of type '(S)'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
