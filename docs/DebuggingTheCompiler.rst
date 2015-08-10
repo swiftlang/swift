@@ -198,3 +198,37 @@ this case, we know that ``swift_getGenericMetadata`` was hit 85 times. So, now
 we know to ignore swift_getGenericMetadata 84 times, i.e.:
 
     (lldb) br set -i 84 -n swift_getGenericMetadata
+
+LLDB Scripts
+````````````
+
+LLDB has powerful capabilities of scripting in python among other languages. An
+often overlooked, but very useful technique is the -s command to lldb. This
+essentially acts as a set of commands that lldb runs each time lldb hits a
+stopping point. As an example of this consider the following script (which
+without any loss of generality will be called test.lldb):
+
+    env DYLD_INSERT_LIBRARIES=/usr/lib/libgmalloc.dylib
+    break set -n swift_getGenericMetadata
+    break mod 1 -i 83
+    process launch -- --stdlib-unittest-in-process --stdlib-unittest-filter "DefaultedForwardMutableCollection<OpaqueValue<Int>>.Type.subscript(_: Range)/Set/semantics"
+    break set -l 224
+    c
+    expr pattern->CreateFunction
+    break set -a $0
+    c
+    dis -f
+
+Then by running ``lldb test -s test.lldb``, lldb will:
+
+1. Enable guard malloc.
+2. Set a break point on swift_getGenericMetadata and set it to be ignored for 83 hits.
+3. Launch the application and stop at swift_getGenericMetadata after 83 hits have been ignored.
+4. In the same file as swift_getGenericMetadata introduce a new breakpoint at line 224 and continue.
+5. When we break at line 224 in that file, evaluate an expression pointer.
+6. Set a breakpoint at the address of the expression pointer and continue.
+7. When we hit the breakpoint set at the function pointer's address, disassemble
+   the function that the function pointer was passed to.
+
+Using LLDB scripts can enable one to use complex debugger workflows without
+needing to retype the various commands perfectly everytime.
