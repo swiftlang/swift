@@ -2136,6 +2136,10 @@ void ConstraintSystem::dump() {
 }
 
 void ConstraintSystem::print(raw_ostream &out) {
+  // Print all type variables as $T0 instead of _ here.
+  llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
+                               true);
+
   out << "Score: " << CurrentScore << "\n";
 
   if (contextualType)
