@@ -723,6 +723,95 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
   return true;
 }
 
+static bool
+isRetainAvailableInSomeButNotAllPredecessors(SILValue Ptr, SILBasicBlock *BB,
+                                             AliasAnalysis *AA,
+                                             RCIdentityFunctionInfo *RCIA) {
+  bool AvailInSome = false;
+  bool NotAvailInSome = false;
+
+  Ptr = RCIA->getRCIdentityRoot(Ptr);
+
+  // Check whether a retain on the pointer is available in the predecessors.
+  for (auto *Pred : BB->getPreds()) {
+
+    // Find the first retain of the pointer.
+    auto Retain = std::find_if(
+        Pred->rbegin(), Pred->rend(), [=](const SILInstruction &I) -> bool {
+          if (!isa<StrongRetainInst>(I) && !isa<RetainValueInst>(I))
+            return false;
+
+          return Ptr == RCIA->getRCIdentityRoot(I.getOperand(0));
+        });
+
+    // Check that there is no decrement or check from the increment to the end
+    // of the basic block.
+    if (Retain == Pred->rend() ||
+        valueHasARCDecrementOrCheckInInstructionRange(
+            Ptr, &*Retain, Pred->getTerminator(), AA)) {
+      NotAvailInSome = true;
+      continue;
+    }
+
+    // Alright, the retain is 'available' for merging with a release from a
+    // successor block.
+    AvailInSome = true;
+  }
+
+  return AvailInSome && NotAvailInSome;
+}
+
+static bool hoistDecrementsToPredecessors(SILBasicBlock *BB, AliasAnalysis *AA,
+                                          RCIdentityFunctionInfo *RCIA) {
+  if (BB->getSinglePredecessor())
+    return false;
+
+  // Make sure we can move potential decrements to the predecessors and collect
+  // retains we could match.
+  for (auto *Pred : BB->getPreds())
+    if (!Pred->getSingleSuccessor())
+      return false;
+
+  bool HoistedDecrement = false;
+  for (auto It = BB->begin(); It != BB->end();) {
+    auto *Inst = &*It;
+    ++It;
+
+    if (!isa<StrongReleaseInst>(Inst) && !isa<ReleaseValueInst>(Inst))
+      continue;
+
+    SILValue Ptr = Inst->getOperand(0);
+
+    // The pointer must be defined outside of this basic block.
+    if (Ptr.getDef()->getParentBB() == BB)
+      continue;
+
+    // No arc use to the beginning of this block.
+    if (valueHasARCUsesInInstructionRange(Ptr, BB->begin(), Inst, AA))
+      continue;
+
+    if (!isRetainAvailableInSomeButNotAllPredecessors(Ptr, BB, AA, RCIA))
+      continue;
+
+    // Hoist decrement to predecessors.
+    DEBUG(llvm::dbgs() << "    Hoisting " << *Inst);
+    SILBuilderWithScope<> Builder(Inst, Inst->getDebugScope());
+    for (auto *PredBB : BB->getPreds()) {
+      Builder.setInsertionPoint(PredBB->getTerminator());
+      if (isa<StrongReleaseInst>(Inst)) {
+        Builder.createStrongRelease(Inst->getLoc(), Ptr);
+      } else {
+        assert(isa<ReleaseValueInst>(Inst) && "This can only be retain_value");
+        Builder.createReleaseValue(Inst->getLoc(), Ptr);
+      }
+    }
+
+    Inst->eraseFromParent();
+    HoistedDecrement = true;
+  }
+
+  return HoistedDecrement;
+}
 /// Try sink a retain as far as possible.  This is either to sucessor BBs,
 /// or as far down the current BB as possible
 static bool sinkRefCountIncrement(SILBasicBlock *BB, AliasAnalysis *AA,
@@ -1465,6 +1554,11 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
 
     // Finally we try to sink retain instructions from this BB to the next BB.
     Changed |= sinkRefCountIncrement(State.getBB(), AA, RCIA);
+
+    // And hoist decrements to predecessors. This is beneficial if we can then
+    // match them up with an increment in some of the predecessors.
+    if (HoistReleases)
+      Changed |= hoistDecrementsToPredecessors(State.getBB(), AA, RCIA);
   }
 
   return Changed;
