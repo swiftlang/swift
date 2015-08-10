@@ -553,23 +553,61 @@ extension ${Self} : _ArrayType {
     _sanityCheck(capacity >= minimumCapacity)
   }
 
+  @_semantics("array.make_mutable")
+  internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
+    if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
+      let oldCount = _buffer.count
+
+      var newBuffer =
+        Optional(_forceCreateUniqueMutableBufferForceGrow(&_buffer,
+                                                          oldCount,
+                                                          oldCount + 1))
+      _arrayOutOfPlaceUpdate(&_buffer, &newBuffer, oldCount, 0,
+                             _IgnorePointer())
+    }
+  }
+
+  @_semantics("array.mutate_unknown")
+  internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount : Int) {
+    _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
+
+    if _slowPath(oldCount + 1 > _buffer.capacity) {
+      var newBuffer =
+        Optional(_forceCreateUniqueMutableBufferForceGrow(&_buffer,
+                                                          oldCount,
+                                                          oldCount + 1))
+      _arrayOutOfPlaceUpdate(&_buffer, &newBuffer, oldCount, 0,
+                             _IgnorePointer())
+
+    }
+  }
+
+  @_semantics("array.mutate_unknown")
+  internal mutating func _appendElementAssumeUniqueAndCapacity(
+    oldCount : Int,
+    newElement : Element
+  ) {
+    _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
+    _sanityCheck(_buffer.capacity >= _buffer.count + 1)
+
+    _buffer.count = oldCount + 1
+    (_buffer.firstElementAddress + oldCount).initialize(newElement)
+  }
+
+  @_semantics("array.mutate_unknown")
+  internal mutating func _appendSlowPath(newElement: Element) {
+    _arrayAppendSlowPath(&_buffer,
+                         initializePointer: _InitializePointer(newElement))
+  }
+
   /// Append `newElement` to the ${Self}.
   ///
   /// - Complexity: Amortized ${O1}.
-  @_semantics("array.mutate_unknown")
   public mutating func append(newElement: Element) {
-    // Checking for the isNative fast-path in the outermost if-statement helps
-    // the optimizer to eliminate subsequent isNative checks, e.g. when
-    // accessing _buffer.count.
-    if _fastPath(_buffer.arrayPropertyIsNative) {
-      let oldCount = _buffer.count
-      if _buffer.requestUniqueMutableBackingBuffer(oldCount + 1) != nil {
-        _buffer.count = oldCount + 1
-        (_buffer.firstElementAddress + oldCount).initialize(newElement)
-        return
-      }
-    }
-    _arrayAppendSlowPath(&_buffer, initializePointer: _InitializePointer(newElement))
+    _makeUniqueAndReserveCapacityIfNotUnique()
+      let oldCount = _getCount()
+      _reserveCapacityAssumingUniqueBuffer(oldCount)
+      _appendElementAssumeUniqueAndCapacity(oldCount, newElement: newElement)
   }
 
   @inline(never)
@@ -946,12 +984,33 @@ public func += <
 internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
   inout source: _Buffer, _ newCount: Int, _ requiredCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
+  return _forceCreateUniqueMutableBufferImpl(&source,
+                                             newCount,
+                                             requiredCapacity,
+                                             false)
+}
+
+@inline(never)
+internal
+func _forceCreateUniqueMutableBufferForceGrow<_Buffer : _ArrayBufferType>(
+  inout source: _Buffer, _ newCount: Int, _ requiredCapacity: Int
+) -> _ContiguousArrayBuffer<_Buffer.Element> {
+  return _forceCreateUniqueMutableBufferImpl(&source,
+                                             newCount,
+                                             requiredCapacity,
+                                             true)
+}
+
+internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferType>(
+  inout source: _Buffer, _ newCount: Int, _ requiredCapacity: Int,
+  _ shouldAlwaysGrow: Bool
+) -> _ContiguousArrayBuffer<_Buffer.Element> {
   _sanityCheck(newCount >= 0)
   _sanityCheck(requiredCapacity >= newCount)
 
   let minimumCapacity = max(
     requiredCapacity,
-    newCount > source.capacity
+    newCount > source.capacity || shouldAlwaysGrow
       ? _growArrayCapacity(source.capacity) : source.capacity)
 
   return _ContiguousArrayBuffer(

@@ -88,10 +88,19 @@ class AClass {}
 
 // CHECK-LABEL: COW Array Opts in Func {{.*}}hoistArrayOfClasses{{.*}}
 // CHECK: Hoisting make_mutable
-// CHECK: COW Array Opts
 
 func hoistArrayOfClasses(inout A : [AClass], x: AClass) {
   for i in 0 ..< A.count {
     A[i] = x
+  }
+}
+
+// CHECK-LABEL: COW Array Opts in Func {{.*}}hoistMutableOfAppend{{.*}}
+// CHECK: Hoisting make_mutable
+// CHECK: COW Array Opts
+
+func hoistMutableOfAppend(inout A : [Int]) {
+  for i in 0 ..< 10 {
+    A.append(i)
   }
 }
