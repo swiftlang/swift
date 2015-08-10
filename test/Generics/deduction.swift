@@ -58,7 +58,7 @@ func useSwap(xi: Int, yi: Float) {
   mySwap(x, x) // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{10-10=&}}
     // expected-error @-1 {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{13-13=&}}
   
-  mySwap(&x, &y) // expected-error{{cannot convert value of type 'inout Int' to expected argument type 'inout _'}}
+  mySwap(&x, &y) // expected-error{{cannot invoke 'mySwap' with an argument list of type '(inout Int, inout Float)'}} expected-note{{expected an argument list of type '(inout T, inout T)'}}
 }
 
 func takeTuples<T, U>(_: (T, U), _: (U, T)) {
@@ -67,7 +67,7 @@ func takeTuples<T, U>(_: (T, U), _: (U, T)) {
 func useTuples(x: Int, y: Float, z: (Float, Int)) {
   takeTuples((x, y), (y, x))
 
-  takeTuples((x, y), (x, y)) // expected-error{{cannot convert value of type '(Int, Float)' to expected argument type '(_, _)'}}
+  takeTuples((x, y), (x, y)) // expected-error{{cannot invoke 'takeTuples' with an argument list of type '((Int, Float), (Int, Float))'}} expected-note {{expected an argument list of type '((T, U), (U, T))'}}
 
   // FIXME: Use 'z', which requires us to fix our tuple-conversion
   // representation.
@@ -77,7 +77,7 @@ func acceptFunction<T, U>(f: (T) -> U, _ t: T, _ u: U) {}
 
 func passFunction(f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, x, y)
-   acceptFunction(f, y, y) // expected-error{{cannot convert value of type '(Int) -> Float' to expected argument type '(_) -> _'}}
+   acceptFunction(f, y, y) // expected-error{{cannot invoke 'acceptFunction' with an argument list of type '((Int) -> Float, Float, Float)'}} expected-note{{expected an argument list of type '((T) -> U, T, U)'}}
 }
 
 func returnTuple<T, U>(_: T) -> (T, U) { }
@@ -85,10 +85,9 @@ func returnTuple<T, U>(_: T) -> (T, U) { }
 func testReturnTuple(x: Int, y: Float) {
   returnTuple(x) // expected-error{{cannot invoke 'returnTuple' with an argument list of type '(Int)'}}
   // expected-note @-1 {{expected an argument list of type '(T)'}}
-  
-  var _ : (Int, Float) = returnTuple(x)
-  var _ : (Float, Float) = returnTuple(y)
-  var _ : (Int, Float) = returnTuple(y) // expected-error{{cannot convert value of type '(Float, _)' to specified type '(Int, Float)'}}
+  var rt1 : (Int, Float) = returnTuple(x)
+  var rt2 : (Float, Float) = returnTuple(y)
+  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{cannot convert value of type '(T, U)' to specified type '(Int, Float)'}} 
 }
 
 
@@ -246,8 +245,8 @@ func testGetVectorSize(vi: MyVector<Int>, vf: MyVector<Float>) {
   var i : Int
   i = getVectorSize(vi)
   i = getVectorSize(vf)
-
-  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<_>'}}
+  // FIXME: $T1 should not show up here!
+  getVectorSize(i) // expected-error{{cannot invoke 'getVectorSize' with an argument list of type '(Int)'}} expected-note {{expected an argument list of type '(MyVector<T>)'}}
 
   var x : X, y : Y
   x = ovlVector(vi)

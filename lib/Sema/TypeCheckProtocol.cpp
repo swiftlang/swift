@@ -1795,23 +1795,14 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       aliasDecl->setInterfaceType(
         TC.getInterfaceTypeFromInternalType(DC, metaType));
     }
-    
-    // Inject the typealias into the nominal decl that conforms to the protocol.
-    if (auto nominal = DC->isNominalTypeOrNominalTypeExtensionContext()) {
-      TC.computeAccessibility(nominal);
-      aliasDecl->setAccessibility(nominal->getFormalAccess());
-      if (nominal == DC) {
-        nominal->addMember(aliasDecl);
-      } else {
-        auto ext = cast<ExtensionDecl>(DC);
-        ext->addMember(aliasDecl);
-      }
+    auto nominal = DC->isNominalTypeOrNominalTypeExtensionContext();
+    TC.computeAccessibility(nominal);
+    aliasDecl->setAccessibility(nominal->getFormalAccess());
+    if (nominal == DC) {
+      nominal->addMember(aliasDecl);
     } else {
-      // If the declcontext is a Module, then we're in a special error recovery
-      // situation.  Mark the typealias as an error and don't inject it into any
-      // DeclContext.
-      assert(isa<ModuleDecl>(DC) && "Not an UnresolvedType conformance?");
-      aliasDecl->setInvalid();
+      auto ext = cast<ExtensionDecl>(DC);
+      ext->addMember(aliasDecl);
     }
 
     typeDecl = aliasDecl;
@@ -3012,10 +3003,6 @@ void ConformanceChecker::resolveTypeWitnesses() {
   auto computeDerivedTypeWitness = [&](AssociatedTypeDecl *assocType) -> Type {
     if (Adoptee->is<ErrorType>())
       return Type();
-
-    // UnresolvedTypes propagated their unresolveness to any witnesses.
-    if (Adoptee->is<UnresolvedType>())
-      return Adoptee;
 
     // Can we derive conformances for this protocol and adoptee?
     NominalTypeDecl *derivingTypeDecl = Adoptee->getAnyNominal();

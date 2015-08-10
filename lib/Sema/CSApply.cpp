@@ -2130,11 +2130,13 @@ namespace {
       // Find the overload choice used for this declaration reference.
       auto selected = getOverloadChoiceIfAvailable(locator);
       if (!selected.hasValue()) {
-        assert(expr->getDecl()->getType()->is<UnresolvedType>() &&
-               "should only happen for closure arguments in CSDiags");
-        expr->setType(expr->getDecl()->getType());
-        return expr;
+        assert(!expr->getDecl()->hasType() &&
+               isa<ParamDecl>(expr->getDecl()) &&
+               isa<ClosureExpr>(expr->getDecl()->getDeclContext()) &&
+       "The only case this should happen is for closure arguments in CSDiags");
+        return nullptr;
       }
+        
       
       auto choice = selected->choice;
       auto decl = choice.getDecl();

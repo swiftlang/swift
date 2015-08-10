@@ -2305,13 +2305,6 @@ public:
     Printer << "<<error type>>";
   }
 
-  void visitUnresolvedType(UnresolvedType *T) {
-    if (T->getASTContext().LangOpts.DebugConstraintSolver)
-      Printer << "<<unresolvedtype>>";
-    else
-      Printer << "_";
-  }
-
   void visitBuiltinRawPointerType(BuiltinRawPointerType *T) {
     Printer << "Builtin.RawPointer";
   }

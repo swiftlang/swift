@@ -21,5 +21,5 @@ func test15921530() {
         x in ()
       }
     }
-    var _: (inout X)->() = makef() // expected-error{{cannot convert value of type '(_) -> ()' to specified type '(inout X) -> ()'}}
+    var f: (inout X)->() = makef() // expected-error{{cannot convert value of type '(T) -> ()' to specified type '(inout X) -> ()'}}
 }

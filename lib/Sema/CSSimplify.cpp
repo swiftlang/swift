@@ -1522,7 +1522,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return SolutionKind::Error;
 
     case TypeKind::Error:
-    case TypeKind::Unresolved:
       return SolutionKind::Error;
 
     case TypeKind::GenericTypeParam:
@@ -2212,7 +2211,6 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
 #include "swift/AST/TypeNodes.def"
       llvm_unreachable("artificial type in constraint");
     
-  case TypeKind::Unresolved:
   case TypeKind::Error:
     return SolutionKind::Error;
 
@@ -2800,8 +2798,7 @@ performMemberLookup(Type baseTy, const Constraint &constraint) {
 
   bool isExistential = instanceTy->isExistentialType();
   
-  if (instanceTy->is<TypeVariableType>() ||
-      instanceTy->is<UnresolvedType>()) {
+  if (instanceTy->is<TypeVariableType>()) {
     MemberLookupResult result;
     result.OverallResult = MemberLookupResult::Unsolved;
     return result;

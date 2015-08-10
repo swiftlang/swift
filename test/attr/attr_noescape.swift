@@ -185,8 +185,9 @@ func overloadedEach<P: P2, T>(source: P, _ transform: P.Element -> (), _: T) {}
 struct S : P2 {
   typealias Element = Int
   func each(@noescape transform: Int -> ()) {
-    overloadedEach(self,
-                   transform, 1)  // expected-error {{invalid conversion from non-escaping function of type '@noescape Int -> ()' to potentially escaping function type '_ -> ()'}}
+    overloadedEach(self,         // expected-error {{cannot invoke 'overloadedEach' with an argument list of type '(S, @noescape Int -> (), Int)'}}
+                   transform, 1) 
+    // expected-note @-2 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, O.Element -> (), T), (P, P.Element -> (), T)}}
   }
 }
 

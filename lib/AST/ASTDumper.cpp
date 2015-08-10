@@ -2343,7 +2343,6 @@ namespace {
     }
 
     TRIVIAL_TYPE_PRINTER(Error, error)
-    TRIVIAL_TYPE_PRINTER(Unresolved, unresolved)
 
     void visitBuiltinIntegerType(BuiltinIntegerType *T, StringRef label) {
       printCommon(T, label, "builtin_integer_type");

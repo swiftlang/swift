@@ -251,9 +251,7 @@ enum class FreeTypeVariableBinding {
   /// Allow the free type variables to persist in the solution.
   Allow,
   /// Bind the type variables to fresh generic parameters.
-  GenericParameters,
-  /// Bind the type variables to UnresolvedType to represent the ambiguity.
-  UnresolvedType
+  GenericParameters
 };
 
 /// An abstract interface that can interact with the type checker during

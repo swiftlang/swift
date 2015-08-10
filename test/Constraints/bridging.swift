@@ -189,12 +189,9 @@ func takesSet<T: Hashable>(p: Set<T>) {}
 func takesDictionary<K: Hashable, V>(p: Dictionary<K, V>) {}
 func takesArray<T>(t: Array<T>) {}
 func rdar19695671() {
-  takesSet(NSSet() as! Set) // expected-error{{cannot invoke 'takesSet' with an argument list of type '(Set<_>)'}}
-  // expected-note @-1 {{expected an argument list of type '(Set<T>)'}}
-  takesDictionary(NSDictionary() as! Dictionary) // expected-error{{cannot invoke 'takesDictionary' with an argument list of type '(Dictionary<_, _>)'}}
-  // expected-note @-1 {{expected an argument list of type '(Dictionary<K, V>)'}}
-  takesArray(NSArray() as! Array) // expected-error{{cannot invoke 'takesArray' with an argument list of type '(Array<_>)'}}
-  // expected-note @-1 {{expected an argument list of type '(Array<T>)'}}
+  takesSet(NSSet() as! Set) // expected-error{{'NSSet' is not convertible to 'Set<Element>'}}
+  takesDictionary(NSDictionary() as! Dictionary) // expected-error{{'NSDictionary' is not convertible to 'Dictionary<Key, Value>'}}
+  takesArray(NSArray() as! Array) // expected-error{{'NSArray' is not convertible to 'Array<Element>'}}
 }
 
 
@@ -268,8 +265,7 @@ func rdar20029786(ns: NSString?) {
 
 // <rdar://problem/19813772> QoI: Using as! instead of as in this case produces really bad diagnostic
 func rdar19813772(nsma: NSMutableArray) {
-  var a1 = nsma as! Array // expected-error{{'NSMutableArray' is not convertible to 'Array<_>'}}
-  // expected-warning @-1 {{cast from 'NSMutableArray' to unrelated type 'Array<_>' always fails}}
+  var a1 = nsma as! Array // expected-error{{'NSMutableArray' is not convertible to 'Array<Element>'}}
   var a2 = nsma as! Array<AnyObject> // expected-warning{{forced cast from 'NSMutableArray' to 'Array<AnyObject>' always succeeds; did you mean to use 'as'?}} {{17-20=as}}
   var a3 = nsma as Array<AnyObject>
 }

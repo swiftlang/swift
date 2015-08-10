@@ -3,7 +3,7 @@
 // <rdar://problem/15593704>
 struct X {
   // This is in parse-stdlib mode with no default literal type.
-  var _maxLoadFactorInverse = 1.0 // expected-error{{standard library error: _MaxBuiltinFloatType is not properly defined}}
+  var _maxLoadFactorInverse = 1.0 // expected-error{{type of expression is ambiguous without more context}}
 }
 
 typealias MaxBuiltinFloatType = Builtin.FPIEEE64

@@ -62,7 +62,7 @@ func partialApply4<T: Parallelogram>(t: T) {
 func barG<T>(t : T) throws -> T { return t }
 func fooG<T>(t : T) -> T { return t }
 
-var bGE: (i: Int) -> Int = barG // expected-error{{invalid conversion from throwing function of type '(_) throws -> _' to non-throwing function type '(i: Int) -> Int'}}
+var bGE: (i: Int) -> Int = barG // expected-error{{invalid conversion from throwing function of type '(T) throws -> T' to non-throwing function type '(i: Int) -> Int'}}
 var bg: (i: Int) throws -> Int = barG
 var fG: (i: Int) throws -> Int = fooG
 
@@ -129,10 +129,10 @@ var c3 : () -> Int = c1 // expected-error{{invalid conversion from throwing func
 var c4 : () -> Int = {() throws -> Int in 0} // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c5 : () -> Int = { try c2() } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c6 : () throws -> Int = { do { try c2() } ; return 0 }
-var c7 : () -> Int = { do { try c2() } ; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> _' to non-throwing function type '() -> Int'}}
+var c7 : () -> Int = { do { try c2() } ; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c8 : () -> Int = { do { try c2()  } catch _ { var x = 0 } ; return 0 }
-var c9 : () -> Int = { do { try c2()  } catch Exception.A { var x = 0 } ; return 0 }// expected-error{{invalid conversion from throwing function of type '() throws -> _' to non-throwing function type '() -> Int'}}
-var c10 : () -> Int = { throw Exception.A; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> _' to non-throwing function type '() -> Int'}}
+var c9 : () -> Int = { do { try c2()  } catch Exception.A { var x = 0 } ; return 0 }// expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
+var c10 : () -> Int = { throw Exception.A; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c11 : () -> Int = { try! c2() }
 var c12 : () -> Int? = { try? c2() }
 
