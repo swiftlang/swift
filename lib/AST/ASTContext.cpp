@@ -2241,9 +2241,9 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   RecursiveTypeProperties properties;
   for (const TupleTypeElt &Elt : Fields) {
     if (Elt.getType())
-      properties += Elt.getType()->getRecursiveProperties();
+      properties |= Elt.getType()->getRecursiveProperties();
     if (Elt.getDefaultArgKind() != DefaultArgumentKind::None)
-      properties += RecursiveTypeProperties::IsNotMaterializable;
+      properties |= RecursiveTypeProperties::IsNotMaterializable;
   }
 
   auto arena = getArena(properties);
@@ -2291,7 +2291,7 @@ UnboundGenericType* UnboundGenericType::get(NominalTypeDecl *TheDecl,
   UnboundGenericType::Profile(ID, TheDecl, Parent);
   void *InsertPos = 0;
   RecursiveTypeProperties properties;
-  if (Parent) properties += Parent->getRecursiveProperties();
+  if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
   if (auto unbound = C.Impl.getArena(arena).UnboundGenericTypes
@@ -2310,11 +2310,11 @@ void BoundGenericType::Profile(llvm::FoldingSetNodeID &ID,
                                RecursiveTypeProperties &properties) {
   ID.AddPointer(TheDecl);
   ID.AddPointer(Parent.getPointer());
-  if (Parent) properties += Parent->getRecursiveProperties();
+  if (Parent) properties |= Parent->getRecursiveProperties();
   ID.AddInteger(GenericArgs.size());
   for (Type Arg : GenericArgs) {
     ID.AddPointer(Arg.getPointer());
-    properties += Arg->getRecursiveProperties();
+    properties |= Arg->getRecursiveProperties();
   }
 }
 
@@ -2402,7 +2402,7 @@ EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
   EnumType::Profile(id, D, Parent);
 
   RecursiveTypeProperties properties;
-  if (Parent) properties += Parent->getRecursiveProperties();
+  if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
   void *insertPos = 0;
@@ -2429,7 +2429,7 @@ StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
   StructType::Profile(id, D, Parent);
 
   RecursiveTypeProperties properties;
-  if (Parent) properties += Parent->getRecursiveProperties();
+  if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
   void *insertPos = 0;
@@ -2456,7 +2456,7 @@ ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
   ClassType::Profile(id, D, Parent);
 
   RecursiveTypeProperties properties;
-  if (Parent) properties += Parent->getRecursiveProperties();
+  if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
   void *insertPos = 0;
@@ -2610,8 +2610,8 @@ ModuleType *ModuleType::get(Module *M) {
 }
 
 DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
-  auto properties = selfType->getRecursiveProperties()
-                    - RecursiveTypeProperties::IsNotMaterializable;
+  auto properties = selfType->getRecursiveProperties();
+  properties &= ~RecursiveTypeProperties::IsNotMaterializable;
   auto arena = getArena(properties);
 
   auto &dynamicSelfTypes = ctx.Impl.getArena(arena).DynamicSelfTypes;
@@ -2639,9 +2639,9 @@ static RecursiveTypeProperties getFunctionRecursiveProperties(Type Input,
   checkFunctionRecursiveProperties(Input, Result);
 
   auto properties = Input->getRecursiveProperties()
-    + Result->getRecursiveProperties()
-    - RecursiveTypeProperties::IsNotMaterializable
-    - RecursiveTypeProperties::IsLValue;
+                  | Result->getRecursiveProperties();
+  properties &= ~RecursiveTypeProperties::IsNotMaterializable;
+  properties &= ~RecursiveTypeProperties::IsLValue;
   return properties;
 }
 
@@ -2656,7 +2656,7 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
   if (Result->getRecursiveProperties().hasDynamicSelf())
-    properties += RecursiveTypeProperties::HasDynamicSelf;
+    properties |= RecursiveTypeProperties::HasDynamicSelf;
   return properties;
 }
 
@@ -2947,19 +2947,18 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   if (genericSig) {
     // See getGenericFunctionRecursiveProperties.
     if (interfaceResult.getType()->getRecursiveProperties().hasDynamicSelf())
-      properties += RecursiveTypeProperties::HasDynamicSelf;
+      properties |= RecursiveTypeProperties::HasDynamicSelf;
   }
   else {
     // Nongeneric SIL functions are dependent if they have dependent argument
     // or return types. They still never contain type variables and are always
     // materializable.
-    properties += interfaceResult.getType()->getRecursiveProperties();
+    properties |= interfaceResult.getType()->getRecursiveProperties();
     if (interfaceErrorResult)
-      properties +=
-        interfaceErrorResult->getType()->getRecursiveProperties();
+      properties |= interfaceErrorResult->getType()->getRecursiveProperties();
 
     for (auto &param : interfaceParams) {
-      properties += param.getType()->getRecursiveProperties();
+      properties |= param.getType()->getRecursiveProperties();
     }
   }
 
@@ -2987,7 +2986,7 @@ ArraySliceType *ArraySliceType::get(Type base) {
 
 DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
   auto properties = keyType->getRecursiveProperties() 
-                  + valueType->getRecursiveProperties();
+                  | valueType->getRecursiveProperties();
   auto arena = getArena(properties);
 
   const ASTContext &C = keyType->getASTContext();
@@ -3055,8 +3054,8 @@ LValueType *LValueType::get(Type objectTy) {
          "can not have 'inout' or @lvalue wrapped inside an @lvalue");
 
   auto properties = objectTy->getRecursiveProperties()
-                    + RecursiveTypeProperties::IsNotMaterializable
-                    + RecursiveTypeProperties::IsLValue;
+                    | RecursiveTypeProperties::IsNotMaterializable
+                    | RecursiveTypeProperties::IsLValue;
   auto arena = getArena(properties);
 
   auto &C = objectTy->getASTContext();
@@ -3075,9 +3074,10 @@ InOutType *InOutType::get(Type objectTy) {
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
          "can not have 'inout' or @lvalue wrapped inside an 'inout'");
 
-  auto properties = objectTy->getRecursiveProperties()
-                    + RecursiveTypeProperties::IsNotMaterializable
-                    - RecursiveTypeProperties::IsLValue;
+  auto properties = objectTy->getRecursiveProperties() |
+                     RecursiveTypeProperties::IsNotMaterializable;
+
+  properties &= ~RecursiveTypeProperties::IsLValue;
   auto arena = getArena(properties);
 
   auto &C = objectTy->getASTContext();
@@ -3108,7 +3108,7 @@ SubstitutedType *SubstitutedType::get(Type Original, Type Replacement,
 DependentMemberType *DependentMemberType::get(Type base, Identifier name,
                                               const ASTContext &ctx) {
   auto properties = base->getRecursiveProperties();
-  properties += RecursiveTypeProperties::HasTypeParameter;
+  properties |= RecursiveTypeProperties::HasTypeParameter;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(name);
@@ -3126,7 +3126,7 @@ DependentMemberType *DependentMemberType::get(Type base,
                                               AssociatedTypeDecl *assocType,
                                               const ASTContext &ctx) {
   auto properties = base->getRecursiveProperties();
-  properties += RecursiveTypeProperties::HasTypeParameter;
+  properties |= RecursiveTypeProperties::HasTypeParameter;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(assocType);

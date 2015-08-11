@@ -159,29 +159,22 @@ public:
   bool hasUnboundGeneric() const { return Bits & HasUnboundGeneric; }
 
   /// Returns the set of properties present in either set.
-  friend RecursiveTypeProperties operator+(Property lhs, Property rhs) {
-    return RecursiveTypeProperties(lhs | rhs);
+  friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
+    return RecursiveTypeProperties(unsigned(lhs) | unsigned(rhs));
   }
-  friend RecursiveTypeProperties operator+(RecursiveTypeProperties lhs,
+  friend RecursiveTypeProperties operator|(RecursiveTypeProperties lhs,
                                            RecursiveTypeProperties rhs) {
     return RecursiveTypeProperties(lhs.Bits | rhs.Bits);
   }
 
   /// Add any properties in the right-hand set to this set.
-  RecursiveTypeProperties &operator+=(RecursiveTypeProperties other) {
+  RecursiveTypeProperties &operator|=(RecursiveTypeProperties other) {
     Bits |= other.Bits;
     return *this;
   }
-
-  /// Returns the set of properties present in the left-hand set but
-  /// missing in the right-hand set.
-  RecursiveTypeProperties operator-(RecursiveTypeProperties other) {
-    return RecursiveTypeProperties(Bits & ~other.Bits);
-  }
-
-  /// Remove any properties in the right-hand set from this set.
-  RecursiveTypeProperties &operator-=(RecursiveTypeProperties other) {
-    Bits &= ~other.Bits;
+  /// Add any properties in the right-hand set to this set.
+  RecursiveTypeProperties &operator&=(RecursiveTypeProperties other) {
+    Bits &= other.Bits;
     return *this;
   }
 
@@ -190,6 +183,10 @@ public:
     return Bits & prop;
   }
 };
+
+inline RecursiveTypeProperties operator~(RecursiveTypeProperties::Property P) {
+  return RecursiveTypeProperties(~unsigned(P));
+}
   
 /// The result of a type trait check.
 enum class TypeTraitResult {
@@ -1359,7 +1356,7 @@ private:
                      RecursiveTypeProperties properties)
     : TypeBase(TypeKind::UnboundGeneric,
                (!Parent || Parent->isCanonical())? &C : nullptr,
-               properties + RecursiveTypeProperties::HasUnboundGeneric),
+               properties | RecursiveTypeProperties::HasUnboundGeneric),
       TheDecl(TheDecl), Parent(Parent) { }
 
 public:
@@ -1930,7 +1927,7 @@ private:
   DynamicSelfType(Type selfType, const ASTContext &ctx,
                   RecursiveTypeProperties properties)
     : TypeBase(TypeKind::DynamicSelf, selfType->isCanonical()? &ctx : 0,
-               properties + RecursiveTypeProperties(
+               properties | RecursiveTypeProperties(
                  RecursiveTypeProperties::HasDynamicSelf)),
       SelfType(selfType) { }
 
