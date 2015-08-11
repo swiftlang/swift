@@ -1520,11 +1520,11 @@ Restart:
     }
     return lexOperatorIdentifier();
   case '%':
-    // Lex %[0-9a-zA-Z]+ as a local SIL value
-    if (InSILBody && isAlphanumeric(CurPtr[0])) {
+    // Lex %[0-9a-zA-Z_]+ as a local SIL value
+    if (InSILBody && isIdentifierBody(CurPtr[0])) {
       do {
         ++CurPtr;
-      } while (isDigit(CurPtr[0]));
+      } while (isIdentifierBody(CurPtr[0]));
       
       return formToken(tok::sil_local_name, TokStart);
     }

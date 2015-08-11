@@ -1371,6 +1371,31 @@ bb0(%0 : $@box Int, %1 : $Int):
   return undef : $()
 }
 
+// CHECK-LABEL: sil @value_names : $@convention(thin) (Builtin.Int1) -> () {
+sil @value_names : $@convention(thin) (Builtin.Int1) -> () {
+// CHECK-NEXT: bb0(%0 : $Builtin.Int1):
+entry(%param : $Builtin.Int1):
+// CHECK-NEXT: %1 = tuple ()
+  %v_o_i_d = tuple ()
+// CHECK-NEXT: cond_br %0, bb1, bb2
+  cond_br %param, then, else
+
+// CHECK: bb1:
+then:
+// CHECK-NEXT: %3 = tuple ()
+  %void2 = tuple ()
+// CHECK-NEXT: br bb2
+  br else
+
+// CHECK: bb2:
+else:
+// CHECK-NEXT: %5 = tuple ()
+  %3void = tuple ()
+// CHECK-NEXT: return %5 : $()
+  return %3void : $()
+} // CHECK: {{^}$}}
+
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_
 // CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_
@@ -1379,4 +1404,3 @@ sil_vtable Foo {
   #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_
   #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_
 }
-
