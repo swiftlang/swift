@@ -25,10 +25,20 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+// FIXME: Figure out if this can be migrated to LLVM.
 #include "clang/Basic/CharInfo.h"
 
 using namespace swift;
-using namespace clang;
+
+// clang::isIdentifierHead and clang::isIdentifierBody are deliberately not in
+// this list as a reminder that they are using C rules for identifiers.
+// (Admittedly these are the same as Swift's right now.)
+using clang::isAlphanumeric;
+using clang::isDigit;
+using clang::isHexDigit;
+using clang::isHorizontalWhitespace;
+using clang::isPrintable;
+using clang::isWhitespace;
 
 //===----------------------------------------------------------------------===//
 // UTF8 Validation/Encoding/Decoding helper functions
@@ -402,7 +412,7 @@ void Lexer::skipSlashStarComment() {
 
 static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
   if (c < 0x80)
-    return isAlphanumeric(c) || c == '_' || c == '$';
+    return clang::isIdentifierBody(c, /*dollar*/true);
   
   // N1518: Recommendations for extended identifier characters for C and C++
   // Proposed Annex X.1: Ranges of characters allowed
@@ -691,7 +701,7 @@ void Lexer::lexDollarIdent() {
   for (;; ++CurPtr) {
     if (isDigit(*CurPtr)) {
       // continue
-    } else if (isLetter(*CurPtr) || *CurPtr == '_' || *CurPtr == '$') {
+    } else if (clang::isIdentifierHead(*CurPtr, /*dollar*/true)) {
       isAllDigits = false;
       // continue
     } else {
@@ -722,13 +732,13 @@ void Lexer::lexHexNumber() {
 
   // 0x[0-9a-fA-F][0-9a-fA-F_]*
   ++CurPtr;
-  if (!isxdigit(*CurPtr)) {
+  if (!isHexDigit(*CurPtr)) {
     diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
     return formToken(tok::unknown, TokStart);
   }
     
-  while (isxdigit(*CurPtr) || *CurPtr == '_')
+  while (isHexDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
   if (CurPtr - TokStart == 2) {
     diagnose(CurPtr, diag::lex_expected_digit_in_int_literal);
@@ -745,12 +755,12 @@ void Lexer::lexHexNumber() {
     
     // If the character after the '.' is not a digit, assume we have an int
     // literal followed by a dot expression.
-    if (!isxdigit(*CurPtr)) {
+    if (!isHexDigit(*CurPtr)) {
       --CurPtr;
       return formToken(tok::integer_literal, TokStart);
     }
     
-    while (isxdigit(*CurPtr) || *CurPtr == '_')
+    while (isHexDigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
     if (*CurPtr != 'p' && *CurPtr != 'P') {
       diagnose(CurPtr, diag::lex_expected_binary_exponent_in_hex_float_literal);
@@ -881,7 +891,7 @@ unsigned Lexer::lexUnicodeEscape(const char *&CurPtr, Lexer *Diags) {
   const char *DigitStart = CurPtr;
 
   unsigned NumDigits = 0;
-  for (; isxdigit(CurPtr[0]); ++NumDigits)
+  for (; isHexDigit(CurPtr[0]); ++NumDigits)
     ++CurPtr;
 
   if (CurPtr[0] != '}') {
@@ -1521,10 +1531,10 @@ Restart:
     return lexOperatorIdentifier();
   case '%':
     // Lex %[0-9a-zA-Z_]+ as a local SIL value
-    if (InSILBody && isIdentifierBody(CurPtr[0])) {
+    if (InSILBody && clang::isIdentifierBody(CurPtr[0])) {
       do {
         ++CurPtr;
-      } while (isIdentifierBody(CurPtr[0]));
+      } while (clang::isIdentifierBody(CurPtr[0]));
       
       return formToken(tok::sil_local_name, TokStart);
     }
