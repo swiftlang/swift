@@ -1335,8 +1335,13 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     }
   }
 
-  // Check the pattern. PBDs can never affect a function's signature, so pass
-  // TR_InExpression.
+  // Check the pattern. We treat type-checking a PatternBindingDecl like
+  // type-checking an expression because that's how the initial binding is
+  // checked, and they have the same effect on the file's dependencies.
+  //
+  // In particular, it's /not/ correct to check the PBD's DeclContext because
+  // top-level variables in a script file are accessible from other files,
+  // even though the PBD is inside a TopLevelCodeDecl.
   TypeResolutionOptions options = TR_InExpression;
   if (binding->getInit(entryNumber)) {
     // If we have an initializer, we can also have unknown types.
