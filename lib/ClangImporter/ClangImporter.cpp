@@ -2400,6 +2400,7 @@ class DarwinBlacklistDeclConsumer : public swift::VisibleDeclConsumer {
         clangModule->Parent->Name == "CarbonCore") {
       return llvm::StringSwitch<bool>(clangModule->Name)
           .Cases("BackupCore", "DiskSpaceRecovery", "MacErrors", false)
+          .Case("UnicodeUtilities", false)
           .Default(true);
     }
 
