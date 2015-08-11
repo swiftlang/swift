@@ -820,18 +820,44 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   return %13 : $()
 }
 
-// CHECK-LABEL: sil @test_delegating_release
+// CHECK-LABEL: sil @test_delegating_box_release
 // CHECK-NEXT: bb0(%0 : $RootClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_box $RootClassWithNontrivialStoredProperties
 // CHECK-NEXT: store %0 to [[SELFBOX]]#1
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
 // CHECK-NEXT: dealloc_ref [[SELF]]
 // CHECK-NEXT: dealloc_box [[SELFBOX]]#0
-sil @test_delegating_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+sil @test_delegating_box_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $RootClassWithNontrivialStoredProperties):
   %2 = alloc_box $RootClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [delegatingself] %2#1 : $*RootClassWithNontrivialStoredProperties
   store %0 to %4 : $*RootClassWithNontrivialStoredProperties
+  strong_release %2#0 : $@box RootClassWithNontrivialStoredProperties
+
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil @test_delegating_rvalue_release
+// CHECK-NEXT: bb0(%0 : $RootClassWithNontrivialStoredProperties):
+// CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_box $RootClassWithNontrivialStoredProperties
+// CHECK-NEXT: store %0 to [[SELFBOX]]#1
+// CHECK-NEXT: [[SELFNULL:%[0-9]+]] = null_class $RootClassWithNontrivialStoredProperties
+// CHECK-NEXT: store [[SELFNULL]] to [[SELFBOX]]#1
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
+// CHECK-NEXT: dealloc_ref [[SELF]]
+// CHECK-NEXT: [[SELF2:%[0-9]+]] = load [[SELFBOX]]#1
+// CHECK-NEXT: dealloc_ref [[SELF2]]
+// CHECK-NEXT: dealloc_box [[SELFBOX]]#0
+sil @test_delegating_rvalue_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
+bb0(%0 : $RootClassWithNontrivialStoredProperties):
+  %2 = alloc_box $RootClassWithNontrivialStoredProperties
+  %4 = mark_uninitialized [delegatingself] %2#1 : $*RootClassWithNontrivialStoredProperties
+  store %0 to %4 : $*RootClassWithNontrivialStoredProperties
+  %5 = null_class $RootClassWithNontrivialStoredProperties
+  store %5 to %4 : $*RootClassWithNontrivialStoredProperties
+  %6 = load %4 : $*RootClassWithNontrivialStoredProperties
+  strong_release %6 : $RootClassWithNontrivialStoredProperties
   strong_release %2#0 : $@box RootClassWithNontrivialStoredProperties
 
   %13 = tuple ()

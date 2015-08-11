@@ -360,15 +360,12 @@ class D: C {
   // CHECK-NEXT:    store [[SELF]] to [[SELF_ADDR]]
   // CHECK-NOT:     [[SELF_ADDR]]
   // CHECK:         [[SELF1:%.*]] = load [[SELF_ADDR]]
-  // CHECK-NOT:     [[SELF_ADDR]]
-  // CHECK-NOT:     [[SELF1]]
-  // CHECK:         [[SUPER1:%.*]] = upcast [[SELF1]]
-  // CHECK-NOT:     [[SELF_ADDR]]
-  // CHECK-NOT:     [[SELF1]]
-  // CHECK-NOT:     [[SUPER1]]
-  // CHECK:         null_class
+  // CHECK-NEXT:    null_class
   // CHECK-NEXT:    store
-  // CHECK-NEXT:    [[SUPER2:%.*]] = apply {{.*}}([[SUPER1]])
+  // CHECK-NEXT:    [[SUPER1:%.*]] = upcast [[SELF1]]
+  // CHECK-NOT:     [[SELF_ADDR]]
+  // CHECK-NOT:     [[SELF1]]
+  // CHECK:         [[SUPER2:%.*]] = apply {{.*}}([[SUPER1]])
   // CHECK-NEXT:    [[SELF2:%.*]] = unchecked_ref_cast [[SUPER2]]
   // CHECK-NEXT:    store [[SELF2]] to [[SELF_ADDR]]
   // CHECK-NOT:     [[SELF_ADDR]]

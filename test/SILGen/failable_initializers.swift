@@ -317,6 +317,86 @@ class RootClass {
   convenience init(delegatesNormIUO: Bool) {
     self.init(iuo: true)
   }
+
+  // CHECK-LABEL: sil hidden @_TFC21failable_initializers9RootClasscfMS0_FT16delegatesOptNormSb3optSb_GSqS0__
+  // CHECK:         [[SELF_BOX:%.*]] = alloc_box $RootClass
+  // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself]
+  // CHECK:         store %2 to [[SELF_MARKED]]
+  // CHECK:         cond_br {{.*}}, [[FAILURE:bb[0-9]+]], [[HAS_VALUE:bb[0-9]+]]
+
+  // CHECK:       [[FAILURE]]:
+  // CHECK:         br [[NO_VALUE:bb[0-9]+]]
+
+  // CHECK:       [[HAS_VALUE]]:
+  // CHECK:         [[SELF_TAKEN:%.*]] = load [[SELF_MARKED]]
+  // CHECK:         [[SELF_NULL:%.*]] = null_class $RootClass
+  // CHECK:         store [[SELF_NULL]] to [[SELF_MARKED]]
+  // CHECK:         [[INIT:%.*]] = class_method [[SELF_TAKEN]] : $RootClass, #RootClass.init
+  // CHECK:         [[NEW_SELF:%.*]] = apply [[INIT]]({{.*}}, [[SELF_TAKEN]])
+  // CHECK:         store [[NEW_SELF]] to [[SELF_MARKED]]
+  // CHECK:         [[SELF_RESULT:%.*]] = load [[SELF_MARKED]]
+  // CHECK:         strong_retain [[SELF_RESULT]]
+  // CHECK:         [[SOME:%.*]] = enum $Optional<RootClass>, #Optional.Some!enumelt.1, [[SELF_RESULT]]
+  // CHECK:         strong_release [[SELF_BOX]]
+  // CHECK:         br [[EXIT:bb[0-9]+]]([[SOME]] : $Optional<RootClass>)
+
+  // CHECK:       [[NO_VALUE]]:
+  // CHECK:         strong_release [[SELF_BOX]]#0 : $@box RootClass
+  // CHECK:         [[NIL:%.*]] = enum $Optional<RootClass>, #Optional.None!enumelt
+  // CHECK:         br [[EXIT]]([[NIL]] : $Optional<RootClass>)
+
+  // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<RootClass>):
+  // CHECK:         return [[RESULT]]
+
+  convenience init?(delegatesOptNorm: Bool, opt: Bool) {
+    if (opt) {
+      return nil
+    }
+    self.init(norm: true)
+  }
+
+  // CHECK-LABEL: sil hidden @_TFC21failable_initializers9RootClasscfMS0_FT15delegatesOptOptSb3optSb_GSqS0__
+  // CHECK:         [[SELF_BOX:%.*]] = alloc_box $RootClass
+  // CHECK:         [[SELF_MARKED:%.*]] = mark_uninitialized [delegatingself]
+  // CHECK:         store %2 to [[SELF_MARKED]]
+  // CHECK:         cond_br {{.*}}, [[FAILURE:bb[0-9]+]], [[SUCCESS:bb[0-9]+]]
+
+  // CHECK:       [[FAILURE]]:
+  // CHECK:         br [[NO_VALUE:bb[0-9]+]]
+
+  // CHECK:       [[SUCCESS]]:
+  // CHECK:         [[SELF_TAKEN:%.*]] = load [[SELF_MARKED]]
+  // CHECK:         [[SELF_NULL:%.*]] = null_class $RootClass
+  // CHECK:         store [[SELF_NULL]] to [[SELF_MARKED]]
+  // CHECK:         [[INIT:%.*]] = class_method [[SELF_TAKEN]] : $RootClass, #RootClass.init
+  // CHECK:         [[NEW_SELF_OPT:%.*]] = apply [[INIT]]({{.*}}, [[SELF_TAKEN]])
+  // CHECK:         [[HAS_VALUE1:%.*]] = select_enum [[NEW_SELF_OPT]]
+  // CHECK:         cond_br [[HAS_VALUE1]], [[HAS_VALUE:bb[0-9]+]], [[NO_VALUE:bb[0-9]+]]
+
+  // CHECK:       [[HAS_VALUE]]:
+  // CHECK:         [[NEW_SELF:%.*]] = unchecked_enum_data [[NEW_SELF_OPT]]
+  // CHECK:         store [[NEW_SELF]] to [[SELF_MARKED]]
+
+  // CHECK:         [[SELF_RESULT:%.*]] = load [[SELF_MARKED]]
+  // CHECK:         strong_retain [[SELF_RESULT]]
+  // CHECK:         [[SOME:%.*]] = enum $Optional<RootClass>, #Optional.Some!enumelt.1, [[SELF_RESULT]]
+  // CHECK:         strong_release [[SELF_BOX]]
+  // CHECK:         br [[EXIT:bb[0-9]+]]([[SOME]] : $Optional<RootClass>)
+
+  // CHECK:       [[NO_VALUE]]:
+  // CHECK:          strong_release [[SELF_BOX]]#0 : $@box RootClass
+  // CHECK:         [[NIL:%.*]] = enum $Optional<RootClass>, #Optional.None!enumelt
+  // CHECK:         br [[EXIT]]([[NIL]] : $Optional<RootClass>)
+
+  // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<RootClass>):
+  // CHECK:         return [[RESULT]]
+
+  convenience init?(delegatesOptOpt: Bool, opt: Bool) {
+    if (opt) {
+      return nil
+    }
+    self.init(opt: true)
+  }
 }
 
 class SubClass: RootClass {
@@ -683,9 +763,9 @@ class RootClassThrows {
   // CHECK:   [[SELF_BOX:%.+]] = alloc_box $RootClassThrows
   // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*RootClassThrows
   // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*RootClassThrows
-  // CHECK:   [[OTHER_INIT:%.+]] = class_method %6 : $RootClassThrows, #RootClassThrows.init!initializer.1
   // CHECK:   [[NULL:%.+]] = null_class $RootClassThrows
   // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = class_method %6 : $RootClassThrows, #RootClassThrows.init!initializer.1
   // CHECK:   try_apply [[OTHER_INIT]]([[ORIG_SELF]]) : $@convention(method) (@owned RootClassThrows) -> (@owned RootClassThrows, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[FAILURE:[^ ]+]]
   // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $RootClassThrows):
   // CHECK:   store [[VALUE]] to [[SELF_BOX_VAL]] : $*RootClassThrows
@@ -705,9 +785,9 @@ class RootClassThrows {
   // CHECK:   [[SELF_BOX:%.+]] = alloc_box $RootClassThrows
   // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*RootClassThrows
   // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*RootClassThrows
-  // CHECK:   [[OTHER_INIT:%.+]] = class_method %6 : $RootClassThrows, #RootClassThrows.init!initializer.1
   // CHECK:   [[NULL:%.+]] = null_class $RootClassThrows
   // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = class_method %6 : $RootClassThrows, #RootClassThrows.init!initializer.1
   // CHECK:   try_apply [[OTHER_INIT]]([[ORIG_SELF]]) : $@convention(method) (@owned RootClassThrows) -> (@owned RootClassThrows, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
   // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $RootClassThrows):
   // CHECK:   store [[VALUE]] to [[SELF_BOX_VAL]] : $*RootClassThrows
@@ -728,9 +808,9 @@ class RootClassThrows {
   // CHECK:   [[SELF_BOX:%.+]] = alloc_box $RootClassThrows
   // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*RootClassThrows
   // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*RootClassThrows
-  // CHECK:   [[OTHER_INIT:%.+]] = class_method %6 : $RootClassThrows, #RootClassThrows.init!initializer.1
   // CHECK:   [[NULL:%.+]] = null_class $RootClassThrows
   // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = class_method %6 : $RootClassThrows, #RootClassThrows.init!initializer.1
   // CHECK:   try_apply [[OTHER_INIT]]([[ORIG_SELF]]) : $@convention(method) (@owned RootClassThrows) -> (@owned RootClassThrows, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
   // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $RootClassThrows):
   // CHECK:   [[WRAPPED:%.+]] = enum $Optional<RootClassThrows>, #Optional.Some!enumelt.1, [[VALUE]] : $RootClassThrows
@@ -770,9 +850,9 @@ class RootClassThrows {
   // CHECK:   [[SELF_BOX:%.+]] = alloc_box $RootClassThrows
   // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*RootClassThrows
   // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*RootClassThrows
-  // CHECK:   [[OTHER_INIT:%.+]] = class_method %6 : $RootClassThrows, #RootClassThrows.init!initializer.1
   // CHECK:   [[NULL:%.+]] = null_class $RootClassThrows
   // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = class_method %6 : $RootClassThrows, #RootClassThrows.init!initializer.1
   // CHECK:   try_apply [[OTHER_INIT]]({{%.+}}, [[ORIG_SELF]]) : $@convention(method) (Bool, @owned RootClassThrows) -> (@owned Optional<RootClassThrows>, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
   // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Optional<RootClassThrows>):
   // CHECK:   [[WRAPPED:%.+]] = enum $Optional<Optional<RootClassThrows>>, #Optional.Some!enumelt.1, [[VALUE]]
@@ -819,10 +899,10 @@ class SubClassThrows : RootClassThrows {
   // CHECK:   [[SELF_BOX:%.+]] = alloc_box $SubClassThrows
   // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [derivedself] [[SELF_BOX]]#1 : $*SubClassThrows
   // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*SubClassThrows
-  // CHECK:   [[BASE_SELF:%.+]] = upcast [[ORIG_SELF]] : $SubClassThrows to $RootClassThrows
-  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFC21failable_initializers15RootClassThrowscfMS0_FzT_S0_
   // CHECK:   [[NULL:%.+]] = null_class $SubClassThrows
   // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   [[BASE_SELF:%.+]] = upcast [[ORIG_SELF]] : $SubClassThrows to $RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFC21failable_initializers15RootClassThrowscfMS0_FzT_S0_
   // CHECK:   try_apply [[OTHER_INIT]]([[BASE_SELF]]) : $@convention(method) (@owned RootClassThrows) -> (@owned RootClassThrows, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[FAILURE:[^ ]+]]
   // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $RootClassThrows):
   // CHECK:   [[DOWNCAST_VALUE:%.+]] = unchecked_ref_cast [[VALUE]] : $RootClassThrows to $SubClassThrows // user: %14
@@ -843,10 +923,10 @@ class SubClassThrows : RootClassThrows {
   // CHECK:   [[SELF_BOX:%.+]] = alloc_box $SubClassThrows
   // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [derivedself] [[SELF_BOX]]#1 : $*SubClassThrows
   // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*SubClassThrows
-  // CHECK:   [[BASE_SELF:%.+]] = upcast [[ORIG_SELF]] : $SubClassThrows to $RootClassThrows
-  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFC21failable_initializers15RootClassThrowscfMS0_FzT_S0_
   // CHECK:   [[NULL:%.+]] = null_class $SubClassThrows
   // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   [[BASE_SELF:%.+]] = upcast [[ORIG_SELF]] : $SubClassThrows to $RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFC21failable_initializers15RootClassThrowscfMS0_FzT_S0_
   // CHECK:   try_apply [[OTHER_INIT]]([[BASE_SELF]]) : $@convention(method) (@owned RootClassThrows) -> (@owned RootClassThrows, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
   // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $RootClassThrows):
   // CHECK:   [[DOWNCAST_VALUE:%.+]] = unchecked_ref_cast [[VALUE]] : $RootClassThrows to $SubClassThrows // user: %14
@@ -868,10 +948,10 @@ class SubClassThrows : RootClassThrows {
   // CHECK:   [[SELF_BOX:%.+]] = alloc_box $SubClassThrows
   // CHECK:   [[SELF_BOX_VAL:%.+]] = mark_uninitialized [derivedself] [[SELF_BOX]]#1 : $*SubClassThrows
   // CHECK:   [[ORIG_SELF:%.+]] = load [[SELF_BOX_VAL]] : $*SubClassThrows
-  // CHECK:   [[BASE_SELF:%.+]] = upcast [[ORIG_SELF]] : $SubClassThrows to $RootClassThrows
-  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFC21failable_initializers15RootClassThrowscfMS0_FzT_S0_
   // CHECK:   [[NULL:%.+]] = null_class $SubClassThrows
   // CHECK:   store [[NULL]] to [[SELF_BOX_VAL]] : $*SubClassThrows
+  // CHECK:   [[BASE_SELF:%.+]] = upcast [[ORIG_SELF]] : $SubClassThrows to $RootClassThrows
+  // CHECK:   [[OTHER_INIT:%.+]] = function_ref @_TFC21failable_initializers15RootClassThrowscfMS0_FzT_S0_
   // CHECK:   try_apply [[OTHER_INIT]]([[BASE_SELF]]) : $@convention(method) (@owned RootClassThrows) -> (@owned RootClassThrows, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[CLEANUP:[^ ]+]]
   // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $RootClassThrows):
   // CHECK:   [[WRAPPED:%.+]] = enum $Optional<RootClassThrows>, #Optional.Some!enumelt.1, [[VALUE]] : $RootClassThrows

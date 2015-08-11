@@ -1221,9 +1221,17 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
       for (auto UI : LI->getUses()) {
         auto *User = UI->getUser();
         
-        // We ignore retains and releases of self.
-        if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User))
+        // We ignore retains of self.
+        if (isa<StrongRetainInst>(User))
           continue;
+
+        // A release of a load from the self box in a class delegating
+        // initializer might be releasing an uninitialized self, which requires
+        // special processing.
+        if (isa<StrongReleaseInst>(User)) {
+          Releases.push_back(User);
+          continue;
+        }
 
         // class_method that refers to an initializing constructor is a method
         // lookup for delegation, which is ignored.

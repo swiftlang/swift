@@ -368,8 +368,21 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
       // i.e. ones whose lifetime is assured for the duration of the evaluation.
       // Therefore, if the variable is a constant, the value is guaranteed
       // valid as well.
-      return emitLoad(loc, Result.getLValueAddress(), getTypeLowering(refType),
-                      C, takes, /*guaranteed*/ var->isLet());
+      auto value = emitLoad(loc, Result.getLValueAddress(),
+                            getTypeLowering(refType), C, takes,
+                            /*guaranteed*/ var->isLet());
+
+      // In a class self.init or super.init situation, the self value will 'take'
+      // the value out of the box, leaving it as an unowned reference in an
+      // otherwise valid box.  We need to null it out so that a release of the box
+      // (e.g. on an error path of a failable init) will not do an extra release of
+      // the bit pattern in the box.
+      if (takes == IsTake) {
+        auto Zero = B.createNullClass(loc, Result.getType().getObjectType());
+        B.createStore(loc, Zero, Result.getValue());
+      }
+
+      return value;
     }
 
     // For local decls, use the address we allocated or the value if we have it.
@@ -2281,49 +2294,6 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr(), C);
 }
 
-static SILValue lookThroughSwitchEnum(SILValue value) {
-  if (auto arg = dyn_cast<SILArgument>(value))
-    if (auto pred = arg->getParent()->getSinglePredecessor())
-      if (auto switchEnum = dyn_cast<SwitchEnumInst>(pred->getTerminator()))
-        return switchEnum->getOperand();
-  return value;
-}
-
-/// Given the result of the delegating init call, find the call instruction.
-static SILInstruction *findDelegatingInitCall(SILValue value) {
-  // Look through switch enums that might destructure an optional
-  // value.  This comes up with foreign error conventions.
-  value = lookThroughSwitchEnum(value);
-
-  // Okay, this should be the actual call.
-
-  if (auto load = dyn_cast<LoadInst>(value)) {
-    SILInstruction *found = nullptr;
-    for (auto use : load->getOperand()->getUses()) {
-      if (auto apply = dyn_cast<ApplyInst>(use->getUser())) {
-        assert(!found);
-        found = apply;
-      }
-    }
-    return found;
-  }
-
-  if (auto apply = dyn_cast<ApplyInst>(value)) {
-    return apply;
-  }
-
-  // The call comes from a try_apply. The call might be wrapped in a 'try?',
-  // in which case it could have any number of predecessors, but the first
-  // predecessor should always be the success case.
-  auto arg = cast<SILArgument>(value);
-  auto pred = *arg->getParent()->pred_begin();
-  while (!isa<TryApplyInst>(pred->getTerminator())) {
-    pred = pred->getSinglePredecessor();
-    assert(pred && "went back too far!");
-  }
-  return pred->getTerminator();
-}
-
 /// Flattens one level of optional from a nested optional value.
 static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
                                     ManagedValue optVal) {
@@ -2423,21 +2393,6 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   SILValue selfAddr =
     SGF.emitLValueForDecl(E, selfDecl, selfTy->getCanonicalType(),
                           AccessKind::Write).getLValueAddress();
-
-  // In a class self.init or super.init situation, the self value will 'take'
-  // the value out of the box, leaving it as an unowned reference in an
-  // otherwise valid box.  We need to null it out so that a release of the box
-  // (e.g. on an error path of a failable init) will not do an extra release of
-  // the bit pattern in the box.
-  if (SGF.SelfInitDelegationState == SILGenFunction::DidConsumeSelf) {
-    // Do this immediately before the delegating init call.
-    SILInstruction *newIP = findDelegatingInitCall(newSelf.getValue());
-    SavedInsertionPoint savedIP(SGF, newIP->getParent());
-    SGF.B.setInsertionPoint(newIP);
-
-    auto Zero = SGF.B.createNullClass(E, selfAddr.getType().getObjectType());
-    SGF.B.createStore(E, Zero, selfAddr);
-  }
 
   // Handle a nested optional case (see above).
   if (extraFailability != OTK_None)
