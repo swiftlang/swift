@@ -931,25 +931,100 @@ sil @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
 sil hidden @test_conditional_destroy_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
 // CHECK:  [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
+// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack $MyStruct3
 
   %2 = alloc_stack $MyStruct3
   %3 = mark_uninitialized [delegatingself] %2#1 : $*MyStruct3
+
+// CHECK:  cond_br %0, [[SUCCESS:bb[0-9]+]], [[EXIT:bb[0-9]+]]
   cond_br %0, bb1, bb2
 
+// CHECK: [[SUCCESS]]:
 bb1:
   %9 = function_ref @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
   %10 = apply %9() : $@convention(thin) () -> @owned MyStruct3
   assign %10 to %3 : $*MyStruct3
 
-// CHECK: apply {{.*}}()  : $@convention(thin) () -> @owned MyStruct3
+// CHECK: [[NEW_SELF:%[0-9]+]] = apply {{.*}}()  : $@convention(thin) () -> @owned MyStruct3
 // CHECK-NEXT:  [[SET:%[0-9]+]] = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:  store [[SET]] to [[CONTROL]]#1 : $*Builtin.Int1
+// CHECK-NEXT:  store [[NEW_SELF]] to [[SELF_BOX]]#1 : $*MyStruct3
 
+// CHECK-NEXT:  br [[CHECK:bb[0-9]+]]
   br bb2
 
+// CHECK: [[CHECK]]:
 bb2:
+
+// CHECK-NEXT:  [[BIT:%[0-9]+]] = load [[CONTROL]]#1 : $*Builtin.Int1
+// CHECK-NEXT:  cond_br [[BIT]], [[INITIALIZED:bb[0-9]+]], [[UNINITIALIZED:bb[0-9]+]]
+
+// CHECK: [[INITIALIZED]]:
+// CHECK-NEXT:  destroy_addr [[SELF_BOX]]#1 : $*MyStruct3
+// CHECK-NEXT:  br [[EXIT:bb[0-9]+]]
+
+// CHECK: [[UNINITIALIZED]]:
+// CHECK-NEXT:  br [[EXIT]]
+
+// CHECK: [[EXIT]]:
+
   destroy_addr %3 : $*MyStruct3
   dealloc_stack %2#0 : $*@local_storage MyStruct3
+  %15 = tuple ()
+  return %15 : $()
+}
+
+
+// <rdar://problem/21991742> DI miscompiles this testcase into a double free
+class MyClass3 {
+}
+sil @selfinit_myclass3 : $@convention(thin) () -> @owned MyClass3
+
+// CHECK-LABEL: sil hidden @test_conditional_destroy_class_delegating_init
+sil hidden @test_conditional_destroy_class_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+// CHECK:  [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
+// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack $MyClass3
+
+  %2 = alloc_stack $MyClass3
+  %3 = mark_uninitialized [delegatingself] %2#1 : $*MyClass3
+
+// CHECK:  cond_br %0, [[SUCCESS:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+  cond_br %0, bb1, bb2
+
+// CHECK: [[SUCCESS]]:
+bb1:
+  %9 = function_ref @selfinit_myclass3 : $@convention(thin) () -> @owned MyClass3
+  %10 = apply %9() : $@convention(thin) () -> @owned MyClass3
+  assign %10 to %3 : $*MyClass3
+
+// CHECK: [[NEW_SELF:%[0-9]+]] = apply {{.*}}()  : $@convention(thin) () -> @owned MyClass3
+// CHECK-NEXT:  [[SET:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:  store [[SET]] to [[CONTROL]]#1 : $*Builtin.Int1
+// CHECK-NEXT:  store [[NEW_SELF]] to [[SELF_BOX]]#1 : $*MyClass3
+
+// CHECK-NEXT:  br [[CHECK:bb[0-9]+]]
+  br bb2
+
+// CHECK: [[CHECK]]:
+bb2:
+
+// CHECK-NEXT:  [[BIT:%[0-9]+]] = load [[CONTROL]]#1 : $*Builtin.Int1
+// CHECK-NEXT:  cond_br [[BIT]], [[INITIALIZED:bb[0-9]+]], [[UNINITIALIZED:bb[0-9]+]]
+
+// CHECK: [[INITIALIZED]]:
+// CHECK-NEXT:  destroy_addr [[SELF_BOX]]#1 : $*MyClass3
+// CHECK-NEXT:  br [[EXIT:bb[0-9]+]]
+
+// CHECK: [[UNINITIALIZED]]:
+// CHECK-NEXT:  [[OLD_SELF:%[0-9]+]] = load [[SELF_BOX]]#1 : $*MyClass3
+// CHECK-NEXT:  dealloc_ref [constructor] [[OLD_SELF]]
+// CHECK-NEXT:  br [[EXIT]]
+
+// CHECK: [[EXIT]]:
+
+  destroy_addr %3 : $*MyClass3
+  dealloc_stack %2#0 : $*@local_storage MyClass3
   %15 = tuple ()
   return %15 : $()
 }

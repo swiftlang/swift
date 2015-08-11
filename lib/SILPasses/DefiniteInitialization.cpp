@@ -81,8 +81,9 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
 ///
 /// The SILBuilder is left at the start of the ContBB block.
 static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
+                             bool createFalseBB,
                              SILBasicBlock *&TrueBB,
-                             SILBasicBlock **FalseBB,
+                             SILBasicBlock *&FalseBB,
                              SILBasicBlock *&ContBB) {
   SILBasicBlock *StartBB = B.getInsertionBB();
   SILModule &Module = StartBB->getModule();
@@ -98,14 +99,15 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
   
   // If the client wanted a false BB, create it too.
   SILBasicBlock *FalseDest;
-  if (!FalseBB) {
+  if (!createFalseBB) {
     FalseDest = ContBB;
+    FalseBB = nullptr;
   } else {
     FalseDest = new (Module) SILBasicBlock(StartBB->getParent());
     B.moveBlockTo(FalseDest, ContBB);
     B.setInsertionPoint(FalseDest);
     B.createBranch(Loc, ContBB);
-    *FalseBB = FalseDest;
+    FalseBB = FalseDest;
   }
   
   // Now that we have our destinations, insert a conditional branch on the
@@ -406,6 +408,9 @@ namespace {
     void handleSelfInitUse(DIMemoryUse &InstInfo);
     void updateInstructionForInitState(DIMemoryUse &InstInfo);
 
+
+    void processUninitializedRelease(unsigned ReleaseID,
+                                     SILBasicBlock::iterator InsertPt);
 
     void processNonTrivialRelease(unsigned ReleaseID);
 
@@ -1349,6 +1354,49 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
   assert(isa<StoreInst>(Inst) && "Unknown store instruction!");
 }
 
+void LifetimeChecker::processUninitializedRelease(unsigned ReleaseID,
+                                             SILBasicBlock::iterator InsertPt) {
+  SILInstruction *Release = Releases[ReleaseID];
+  SILInstruction *Dealloc = nullptr;
+
+  // If this is an early release in a class, we need to emit a dealloc_ref to
+  // free the memory.  If this is a derived class, we may have to do a load of
+  // the 'self' box to get the class reference.
+  if (TheMemory.isClassInitSelf()) {
+    SILBuilderWithScope<4> B(Release);
+    B.setInsertionPoint(InsertPt);
+
+    SILValue Pointer = Release->getOperand(0);
+
+    // If we see an alloc_box as the pointer, then we're deallocating a 'box'
+    // for self.  Make sure we're using its address result, not its refcount
+    // result, and make sure that the box gets deallocated (not released)
+    // since the pointer it contains will be manually cleaned up.
+    if (isa<AllocBoxInst>(Pointer))
+      Pointer = SILValue(Pointer.getDef(), 1);
+
+    if (Pointer.getType().isAddress())
+      Pointer = B.createLoad(Release->getLoc(), Pointer);
+    Dealloc = B.createDeallocRef(Release->getLoc(), Pointer,
+                                 DeallocRefInst::Constructor);
+    
+    // dealloc_box the self box is necessary.
+    if (isa<AllocBoxInst>(Release->getOperand(0))) {
+      auto DB = B.createDeallocBox(Release->getLoc(), Pointer.getType(),
+                                   Release->getOperand(0));
+      Releases.push_back(DB);
+    }
+  }
+
+  Release->eraseFromParent();
+  Releases[ReleaseID] = Dealloc;
+  if (isa<DestroyAddrInst>(Release)) {
+    SILValue Addr = Release->getOperand(0);
+    if (auto *AddrI = dyn_cast<SILInstruction>(Addr))
+      recursivelyDeleteTriviallyDeadInstructions(AddrI);
+  }
+}
+
 /// processNonTrivialRelease - We handle two kinds of release instructions here:
 /// destroy_addr for alloc_stack's and strong_release/dealloc_box for
 /// alloc_box's.  By the  time that DI gets here, we've validated that all uses
@@ -1421,44 +1469,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
 
   // If it is all 'no' then we can handle is specially without conditional code.
   if (Availability.isAllNo()) {
-    // If this is an early release in a class, we need to emit a dealloc_ref to
-    // free the memory.  If this is a derived class, we may have to do a load of
-    // the 'self' box to get the class reference.
-    if (TheMemory.isClassInitSelf()) {
-      SILBuilderWithScope<4> B(Release);
-      SILValue Pointer = Release->getOperand(0);
-
-      // If we see an alloc_box as the pointer, then we're deallocating a 'box'
-      // for self.  Make sure we're using its address result, not its refcount
-      // result, and make sure that the box gets deallocated (not released)
-      // since the pointer it contains will be manually cleaned up.
-      if (isa<AllocBoxInst>(Pointer))
-        Pointer = SILValue(Pointer.getDef(), 1);
-
-      if (Pointer.getType().isAddress())
-        Pointer = B.createLoad(Release->getLoc(), Pointer);
-      auto Dealloc = B.createDeallocRef(Release->getLoc(), Pointer,
-                                        DeallocRefInst::Constructor);
-      
-      // dealloc_box the self box is necessary.
-      if (isa<AllocBoxInst>(Release->getOperand(0))) {
-        auto DB = B.createDeallocBox(Release->getLoc(), Pointer.getType(),
-                                     Release->getOperand(0));
-        Releases.push_back(DB);
-      }
-
-      Releases[ReleaseID] = Dealloc;
-      Release->eraseFromParent();
-      return;
-    }
-    
-    // Otherwise, in the normal case, the destroy_addr can just be zapped.
-    assert(isa<DestroyAddrInst>(Release));
-    SILValue Addr = Release->getOperand(0);
-    Release->eraseFromParent();
-    if (auto *AddrI = dyn_cast<SILInstruction>(Addr))
-      recursivelyDeleteTriviallyDeadInstructions(AddrI);
-    Releases[ReleaseID] = nullptr;
+    processUninitializedRelease(ReleaseID, Release);
     return;
   }
   
@@ -1623,8 +1634,10 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
                                   {}, CondVal);
       }
       
-      SILBasicBlock *TrueBB, *ContBB;
-      InsertCFGDiamond(CondVal, Loc, B, TrueBB, nullptr, ContBB);
+      SILBasicBlock *TrueBB, *FalseBB, *ContBB;
+      InsertCFGDiamond(CondVal, Loc, B,
+                       /*createFalseBB=*/false,
+                       TrueBB, FalseBB, ContBB);
 
       // Emit a destroy_addr in the taken block.
       B.setInsertionPoint(TrueBB->begin());
@@ -1670,10 +1683,6 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     auto Loc = Release->getLoc();
     auto &Availability = CDElt.second;
     
-    // The instruction in a partially live region is a destroy_addr or
-    // strong_release.
-    SILValue Addr = Release->getOperand(0);
-  
     // If the memory is not-fully initialized at the destroy_addr, then there
     // can be multiple issues: we could have some tuple elements initialized and
     // some not, or we could have a control flow sensitive situation where the
@@ -1743,48 +1752,33 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
                                   {}, CondVal);
       }
       
-      SILBasicBlock *CondDestroyBlock, *ContBlock;
-      InsertCFGDiamond(CondVal, Loc, B, CondDestroyBlock, nullptr, ContBlock);
-      
-      // Set up the conditional destroy block.
-      B.setInsertionPoint(CondDestroyBlock->begin());
+      SILBasicBlock *ReleaseBlock, *DeallocBlock, *ContBlock;
+
+      InsertCFGDiamond(CondVal, Loc, B,
+                       /*createFalseBB=*/TheMemory.isDelegatingInit(),
+                       ReleaseBlock, DeallocBlock, ContBlock);
+
+      // Set up the initialized release block.
+      B.setInsertionPoint(ReleaseBlock->begin());
       SILValue EltPtr = TheMemory.emitElementAddress(Elt, Loc, B);
       if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
         Releases.push_back(DA);
-    }
-    
-    // If this is an early release in a class, we need to emit a dealloc_ref to
-    // free the memory.  If this is a derived class, we may have to do a load of
-    // the 'self' box to get the class reference.
-    if (TheMemory.isClassInitSelf()) {
-      B.setInsertionPoint(Release);
-      SILValue Pointer = Release->getOperand(0);
-      
-      // If we see an alloc_box as the pointer, then we're deallocating a 'box'
-      // for self.  Make sure we're using its address result, not its refcount
-      // result, and make sure that the box gets deallocated (not released)
-      // since the pointer it contains will be manually cleaned up.
-      if (isa<AllocBoxInst>(Pointer))
-        Pointer = SILValue(Pointer.getDef(), 1);
 
-      if (Pointer.getType().isAddress())
-        Pointer = B.createLoad(Release->getLoc(), Pointer);
-      B.createDeallocRef(Release->getLoc(), Pointer,
-                         DeallocRefInst::Constructor);
-      
-      // dealloc_box the self box if necessary.
-      if (isa<AllocBoxInst>(Release->getOperand(0))) {
-        auto DB = B.createDeallocBox(Release->getLoc(), Pointer.getType(),
-                                     Release->getOperand(0));
-        Releases.push_back(DB);
+      // Set up the uninitialized release block.
+      if (TheMemory.isDelegatingInit()) {
+        assert(NumMemoryElements == 1);
+        processUninitializedRelease(CDElt.first, DeallocBlock->begin());
       }
     }
-  
-    // Finally, now that the original instruction is handled, remove the
-    // original destroy.
-    Release->eraseFromParent();
-    if (auto *AddrI = dyn_cast<SILInstruction>(Addr))
-      recursivelyDeleteTriviallyDeadInstructions(AddrI);
+
+    // If we're in a designated initializer, the elements of the memory
+    // represent instance variables -- after destroying them, we have to
+    // destroy the class instance itself. In a delegating initializer,
+    // the sole element of the memory represents the self instance itself,
+    // so if the self instance was fully initialized and we destroyed it
+    // above, don't double-free the memory here.
+    if (!TheMemory.isDelegatingInit())
+      processUninitializedRelease(CDElt.first, B.getInsertionPoint());
   }
 }
 
