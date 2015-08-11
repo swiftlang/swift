@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 208; // Last change: tuple elt has ellipsis
+const uint16_t VERSION_MINOR = 209; // Last change: add kind to dealloc_ref
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
