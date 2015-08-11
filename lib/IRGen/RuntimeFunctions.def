@@ -137,12 +137,6 @@ FUNCTION(Unpin, swift_unpin, RuntimeCC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_releaseUninitialized(void *ptr);
-FUNCTION(ReleaseUninitialized, swift_releaseUninitialized, RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind))
-
 // void swift_fixLifetime(void *ptr);
 FUNCTION(FixLifetime, swift_fixLifetime, RuntimeCC,
          RETURNS(VoidTy),
