@@ -266,13 +266,20 @@ extension Use4 : TopLevelProto2 {
   var useTy3: TopLevelTy3? { return nil }
 }
 
+// CHECK-DAG: - "TopLevelStruct"
+// CHECK-DAG: - "TopLevelStruct2"
 let useTy4 = { (_: TopLevelStruct.ValueType) -> TopLevelStruct2.ValueType? in
   return nil
 }
-// CHECK-DAG: - "TopLevelStruct"
+// CHECK-DAG: - "TopLevelStruct3"
+// CHECK-DAG: - "TopLevelStruct4"
 typealias useTy5 = TopLevelStruct3.ValueType
 let useTy6: TopLevelStruct4.ValueType = 0
 
+struct StructForDeclaringProperties {
+  // CHECK-DAG: - "TopLevelStruct5"
+  var prop: TopLevelStruct5.ValueType { return 0 }
+}
 
 // CHECK-DAG: !private "privateTopLevel1"
 func private1(a: Int = privateTopLevel1()) {}
@@ -363,6 +370,7 @@ struct Sentinel2 {}
 // CHECK-DAG: - ["V4main15TopLevelStruct2", "ValueType"]
 // CHECK-DAG: - ["V4main15TopLevelStruct3", "ValueType"]
 // CHECK-DAG: - ["V4main15TopLevelStruct4", "ValueType"]
+// CHECK-DAG: - ["V4main15TopLevelStruct5", "ValueType"]
 // CHECK-DAG: - !private ["V4main21PrivateTopLevelStruct", "ValueType"]
 // CHECK-DAG: - !private ["V4main22PrivateTopLevelStruct2", "ValueType"]
 // CHECK-DAG: - !private ["V4main22PrivateTopLevelStruct3", "ValueType"]
@@ -405,6 +413,7 @@ struct Sentinel2 {}
 // CHECK-DAG: - "V4main15TopLevelStruct2"
 // CHECK-DAG: - "V4main15TopLevelStruct3"
 // CHECK-DAG: - "V4main15TopLevelStruct4"
+// CHECK-DAG: - "V4main15TopLevelStruct5"
 // CHECK-DAG: !private "V4main21PrivateTopLevelStruct"
 // CHECK-DAG: !private "V4main22PrivateTopLevelStruct2"
 // CHECK-DAG: !private "V4main22PrivateTopLevelStruct3"

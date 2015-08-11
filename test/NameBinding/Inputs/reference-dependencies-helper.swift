@@ -89,6 +89,9 @@ struct TopLevelStruct3 {
 struct TopLevelStruct4 {
   typealias ValueType = Int
 }
+struct TopLevelStruct5 {
+  typealias ValueType = Int
+}
 
 protocol TopLevelProto1 {}
 protocol TopLevelProto2 {}
