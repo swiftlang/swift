@@ -1,9 +1,17 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not  %target-swift-frontend %s -parse
+
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol c{func a(a
-func a<a
-func a<T:a
-func a
+class A {
+func c<T : A) {
+struct c {
+var _ = .c {
+var e()) ->) -> Self {
+}
+}
+}
+}
+var b: b {
+let start = c: Se

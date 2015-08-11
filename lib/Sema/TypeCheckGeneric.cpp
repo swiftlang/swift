@@ -820,6 +820,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
             // Produce an error that this generic parameter cannot be bound.
             diagnose(paramDecl->getLoc(), diag::unreferenced_generic_parameter,
                      paramDecl->getNameStr());
+            func->setInvalid();
           }
         }
       }

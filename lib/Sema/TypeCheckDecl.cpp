@@ -941,7 +941,8 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
   for (auto GP : *genericParams) {
     GP->setArchetype(builder.getArchetype(GP));
     TC.checkInheritanceClause(GP);
-    GP->setAccessibility(access);
+    if (!GP->hasAccessibility())
+      GP->setAccessibility(access);
   }
   genericParams->setAllArchetypes(
     TC.Context.AllocateCopy(builder.getAllArchetypes()));

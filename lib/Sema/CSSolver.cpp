@@ -119,6 +119,10 @@ Solution ConstraintSystem::finalize(
     case FreeTypeVariableBinding::GenericParameters:
       assignFixedType(tv, GenericTypeParamType::get(0, index++, TC.Context));
       break;
+        
+    case FreeTypeVariableBinding::UnresolvedType:
+      assignFixedType(tv, TC.Context.TheUnresolvedType);
+      break;
     }
   }
 

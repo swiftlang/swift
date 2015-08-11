@@ -2130,13 +2130,11 @@ namespace {
       // Find the overload choice used for this declaration reference.
       auto selected = getOverloadChoiceIfAvailable(locator);
       if (!selected.hasValue()) {
-        assert(!expr->getDecl()->hasType() &&
-               isa<ParamDecl>(expr->getDecl()) &&
-               isa<ClosureExpr>(expr->getDecl()->getDeclContext()) &&
-       "The only case this should happen is for closure arguments in CSDiags");
-        return nullptr;
+        assert(expr->getDecl()->getType()->is<UnresolvedType>() &&
+               "should only happen for closure arguments in CSDiags");
+        expr->setType(expr->getDecl()->getType());
+        return expr;
       }
-        
       
       auto choice = selected->choice;
       auto decl = choice.getDecl();
@@ -5248,10 +5246,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (!fn)
     return nullptr;
   
-  // Handle applications that implicitly look through ImplicitlyUnwrappedOptional<T>.
-  if (auto fnTy = cs.lookThroughImplicitlyUnwrappedOptionalType(fn->getType())) {
+  // Handle applications that look through ImplicitlyUnwrappedOptional<T>.
+  if (auto fnTy = cs.lookThroughImplicitlyUnwrappedOptionalType(fn->getType()))
     fn = coerceImplicitlyUnwrappedOptionalToValue(fn, fnTy, locator);
-  }
 
   // If we're applying a function that resulted from a covariant
   // function conversion, strip off that conversion.

@@ -88,4 +88,9 @@ extension GC {
 }
 
 
+class SomeClassWithInvalidMethod {
+  func method<T>() { // expected-error {{generic parameter 'T' is not used in function signature}}
+    self.method()
+  }
+}
 

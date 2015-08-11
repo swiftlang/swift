@@ -79,12 +79,13 @@ func r21544303() {
 
 // <rdar://problem/22162441> Crash from failing to diagnose nonexistent method access inside closure
 func r22162441(lines: [String]) {
-  _ = lines.map { line in line.fooBar() }  // expected-error {{type of expression is ambiguous without more context}}
-  _ = lines.map { $0.fooBar() }  // expected-error {{type of expression is ambiguous without more context}}
+  _ = lines.map { line in line.fooBar() }  // expected-error {{value of type 'String' has no member 'fooBar'}}
+  _ = lines.map { $0.fooBar() }  // expected-error {{value of type 'String' has no member 'fooBar'}}
 }
 
 
 func testMap() {
   let a = 42
-  [1,a].map { $0 + 1.0 } // expected-error {{cannot invoke 'map' with an argument list of type '((Double) -> Double)'}}
+  [1,a].map { $0 + 1.0 } // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Memory>), (Int, UnsafePointer<Memory>)}}
 }

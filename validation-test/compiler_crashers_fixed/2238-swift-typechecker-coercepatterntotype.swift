@@ -1,8 +1,12 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol b{func
-a}class B<a>:b{func a<T:b
+func d<T) -> {
+typealias b = f.startIndex)] as [Any)
+return ".c {
+class A {
+func a<T: A
+var b = a

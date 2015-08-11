@@ -761,6 +761,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     llvm_unreachable("Cannot mangle module type yet");
 
   case TypeKind::Error:
+  case TypeKind::Unresolved:
     Buffer << "ERR";
     return;
       

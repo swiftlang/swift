@@ -92,22 +92,26 @@ public:
     /// This type expression contains a GenericTypeParamType.
     HasTypeParameter    = 0x04,
 
+    /// This  type expression contains an UnresolvedType.
+    HasUnresolvedType   = 0x08,
+    
+    
     /// This type expression contains an LValueType or InOutType,
     /// other than as a function input.
-    IsNotMaterializable = 0x08,
+    IsNotMaterializable = 0x10,
     
     /// This type expression contains an LValueType and can be loaded to convert
     /// to an rvalue.
-    IsLValue = 0x10,
+    IsLValue = 0x20,
 
     /// This type expression contains an opened existential ArchetypeType.
-    HasOpenedExistential = 0x20,
+    HasOpenedExistential = 0x40,
 
     /// This type expression contains a DynamicSelf type.
-    HasDynamicSelf = 0x40,
+    HasDynamicSelf = 0x80,
 
     /// Whether this type expression contains an unbound generic type.
-    HasUnboundGeneric = 0x80,
+    HasUnboundGeneric = 0x100,
   };
 
 private:
@@ -131,6 +135,9 @@ public:
 
   /// Does a type with these properties have a type parameter somewhere in it?
   bool hasTypeParameter() const { return Bits & HasTypeParameter; }
+
+  /// Does a type with these properties have an unresolved type somewhere in it?
+  bool hasUnresolvedType() const { return Bits & HasUnresolvedType; }
 
   /// Is a type with these properties materializable: that is, is it a
   /// first-class value type?
@@ -377,6 +384,11 @@ public:
   /// \brief Determine whether this type involves a type variable.
   bool hasTypeVariable() const {
     return getRecursiveProperties().hasTypeVariable();
+  }
+
+  /// \brief Determine whether this type involves a UnresolvedType.
+  bool hasUnresolvedType() const {
+    return getRecursiveProperties().hasUnresolvedType();
   }
 
   /// Determine whether the type involves an archetype.
@@ -818,6 +830,27 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorType, Type)
 
+/// UnresolvedType - This represents a type variable that cannot be resolved to
+/// a concrete type because the expression is ambiguous.  This is produced when
+/// parsing expressions and producing diagnostics.  Any instance of this should
+/// cause the entire expression to be ambiguously typed.
+class UnresolvedType : public TypeBase {
+  friend class ASTContext;
+  // The Unresolved type is always canonical.
+  UnresolvedType(ASTContext &C)
+    : TypeBase(TypeKind::Unresolved, &C,
+       RecursiveTypeProperties(RecursiveTypeProperties::HasUnresolvedType)) { }
+public:
+  static Type get(const ASTContext &C);
+  
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Unresolved;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnresolvedType, Type)
+
+  
 /// BuiltinType - An abstract class for all the builtin types.
 class BuiltinType : public TypeBase {
 protected:

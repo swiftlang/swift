@@ -2619,7 +2619,8 @@ void Serializer::writeType(Type ty) {
 
   switch (ty.getPointer()->getKind()) {
   case TypeKind::Error:
-    llvm_unreachable("should not serialize an error type");
+  case TypeKind::Unresolved:
+    llvm_unreachable("should not serialize an invalid type");
 
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
