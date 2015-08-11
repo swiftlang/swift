@@ -1251,7 +1251,7 @@ void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
   // Otherwise everything is good!
 }
 
-/// handleSuperInitUse - When processing a 'self' argument on a class, this is
+/// handleSelfInitUse - When processing a 'self' argument on a class, this is
 /// a call to self.init.
 void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
   auto *Inst = InstInfo.Inst;
@@ -1571,7 +1571,10 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       B.createStore(Loc, MaskVal, AllocAddr);
       continue;
     }
-    
+
+    assert(!TheMemory.isDelegatingInit() &&
+           "re-assignment of self in delegating init?");
+
     // If this ambiguous store is only of trivial types, then we don't need to
     // do anything special.  We don't even need keep the init bit for the
     // element precise.
@@ -1767,7 +1770,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         Pointer = B.createLoad(Release->getLoc(), Pointer);
       B.createDeallocRef(Release->getLoc(), Pointer);
       
-      // dealloc_box the self box is necessary.
+      // dealloc_box the self box if necessary.
       if (isa<AllocBoxInst>(Release->getOperand(0))) {
         auto DB = B.createDeallocBox(Release->getLoc(), Pointer.getType(),
                                      Release->getOperand(0));

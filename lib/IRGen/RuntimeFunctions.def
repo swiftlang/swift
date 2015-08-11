@@ -108,13 +108,13 @@ FUNCTION(CopyPOD,        swift_copyPOD,       RuntimeCC,
          ATTRS(NoUnwind))
 
 // void swift_retain_noresult(void *ptr);
-FUNCTION(RetainNoResult, swift_retain_noresult,RuntimeCC,
+FUNCTION(RetainNoResult, swift_retain_noresult, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_release(void *ptr);
-FUNCTION(Release,        swift_release,       RuntimeCC,
+FUNCTION(Release, swift_release, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
@@ -131,20 +131,26 @@ FUNCTION(Unpin, swift_unpin, RuntimeCC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// void swift_releaseUninitialized(void *ptr);
+FUNCTION(ReleaseUninitialized, swift_releaseUninitialized, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_fixLifetime(void *ptr);
-FUNCTION(FixLifetime,        swift_fixLifetime,       RuntimeCC,
+FUNCTION(FixLifetime, swift_fixLifetime, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_unknownRetain(void *ptr);
-FUNCTION(UnknownRetain,        swift_unknownRetain,       RuntimeCC,
+FUNCTION(UnknownRetain, swift_unknownRetain, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 // void swift_unknownRelease(void *ptr);
-FUNCTION(UnknownRelease,        swift_unknownRelease,       RuntimeCC,
+FUNCTION(UnknownRelease, swift_unknownRelease, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))

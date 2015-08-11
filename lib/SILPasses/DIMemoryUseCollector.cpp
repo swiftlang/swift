@@ -1004,7 +1004,7 @@ static bool isSelfInitUse(SILInstruction *I) {
     return false;
   }
 
-  // Otherwise, a super.init call must have location info, and must be an expr
+  // Otherwise, a self.init call must have location info, and must be an expr
   // to be considered.
   auto *LocExpr = I->getLoc().getAsASTNode<Expr>();
   if (!LocExpr) return false;

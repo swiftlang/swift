@@ -114,7 +114,7 @@ public:
     return false;
   }
 
-  // True if the memory object is the 'self' argument of a enum initializer.
+  /// True if the memory object is the 'self' argument of a enum initializer.
   bool isEnumInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
       if (MUI->isRootSelf())
@@ -124,7 +124,7 @@ public:
     return false;
   }
   
-  // True if the memory object is the 'self' argument of a struct initializer.
+  /// True if the memory object is the 'self' argument of a struct initializer.
   bool isStructInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
       if (MUI->isRootSelf())
@@ -134,7 +134,7 @@ public:
     return false;
   }
 
-  // True if the memory object is the 'self' argument of a class initializer.
+  /// True if the memory object is the 'self' argument of a class initializer.
   bool isClassInitSelf() const {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
       if (!MUI->isVar())
@@ -196,22 +196,22 @@ public:
 
 
 enum DIUseKind {
-  // The instruction is a Load.
+  /// The instruction is a Load.
   Load,
   
-  // The instruction is either an initialization or an assignment, we don't
-  // know which.  This classification only happens with values of trivial type
-  // where the different isn't significant.
+  /// The instruction is either an initialization or an assignment, we don't
+  /// know which.  This classification only happens with values of trivial type
+  /// where the different isn't significant.
   InitOrAssign,
   
-  // The instruction is an initialization of the tuple element.
+  /// The instruction is an initialization of the tuple element.
   Initialization,
   
-  // The instruction is an assignment, overwriting an already initialized
-  // value.
+  /// The instruction is an assignment, overwriting an already initialized
+  /// value.
   Assign,
   
-  // The instruction is a store to a member of a larger struct value.
+  /// The instruction is a store to a member of a larger struct value.
   PartialStore,
   
   /// An indirect 'inout' parameter of an Apply instruction.

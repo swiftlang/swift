@@ -3017,13 +3017,13 @@ public:
     : UnaryInstructionBase(loc, operand) {}
 };
 
-/// Deallocate memory allocated for a reference type
-/// instance, as might have been created by an AllocRefInst. It is
-/// undefined behavior if the type of the operand does not match the
-/// most derived type of the allocated instance.
+/// Deallocate memory for a reference type instance from a destructor.
 ///
-/// This does not destroy the referenced instance; it must either be
-/// uninitialized or have been manually destroyed.
+/// This does not destroy the referenced instance; it must be destroyed
+/// and the last strong reference must have been released.
+///
+/// It is undefined behavior if the type of the operand does not match the
+/// most derived type of the allocated instance.
 class DeallocRefInst :
   public UnaryInstructionBase<ValueKind::DeallocRefInst, DeallocationInst,
                               /*HAS_RESULT*/ false> {
@@ -3032,8 +3032,7 @@ public:
     : UnaryInstructionBase(Loc, Operand) {}
 };
 
-/// Deallocate memory allocated for a unsafe
-/// value buffer.
+/// Deallocate memory allocated for a unsafe value buffer.
 class DeallocValueBufferInst :
   public UnaryInstructionBase<ValueKind::DeallocValueBufferInst,
                               DeallocationInst, /*HAS_RESULT*/ true> {
@@ -3048,8 +3047,7 @@ public:
 };
 
 /// Deallocate memory allocated for a boxed value created by an AllocBoxInst.
-/// It is undefined
-/// behavior if the type of the boxed type does not match the
+/// It is undefined behavior if the type of the boxed type does not match the
 /// type the box was allocated for.
 ///
 /// This does not destroy the boxed value instance; it must either be
