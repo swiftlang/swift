@@ -706,7 +706,8 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
 }
 
 void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
-                                  llvm::Value *selfValue) {
+                                  llvm::Value *selfValue,
+                                  ClassDeallocationKind kind) {
   auto *theClass = selfType.getClassOrBoundGenericClass();
 
   llvm::Value *size, *alignMask;
@@ -714,7 +715,7 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
                               size, alignMask);
 
   selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.RefCountedPtrTy);
-  emitDeallocateClassInstance(IGF, selfValue, size, alignMask);
+  emitDeallocateClassInstance(IGF, selfValue, size, alignMask, kind);
 }
 
 llvm::Constant *irgen::tryEmitClassConstantFragileInstanceSize(

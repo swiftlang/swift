@@ -135,7 +135,7 @@ bb0(%0 : $Base):
   %2 = function_ref @_TFC16devirt_try_apply4Based : $@convention(method) (@guaranteed Base) -> @owned Builtin.NativeObject
   %3 = apply %2(%0) : $@convention(method) (@guaranteed Base) -> @owned Builtin.NativeObject
   %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $Base
-  dealloc_ref %4 : $Base
+  dealloc_ref [constructor] %4 : $Base
   %6 = tuple ()
   return %6 : $()
 }
@@ -200,7 +200,7 @@ bb0(%0 : $Derived1):
   %2 = function_ref @_TFC16devirt_try_apply8Derived1d : $@convention(method) (@guaranteed Derived1) -> @owned Builtin.NativeObject
   %3 = apply %2(%0) : $@convention(method) (@guaranteed Derived1) -> @owned Builtin.NativeObject
   %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $Derived1
-  dealloc_ref %4 : $Derived1
+  dealloc_ref [constructor] %4 : $Derived1
   %6 = tuple ()
   return %6 : $()
 }
@@ -292,7 +292,7 @@ bb0(%0 : $Derived2):
   %2 = function_ref @_TFC16devirt_try_apply8Derived2d : $@convention(method) (@guaranteed Derived2) -> @owned Builtin.NativeObject
   %3 = apply %2(%0) : $@convention(method) (@guaranteed Derived2) -> @owned Builtin.NativeObject
   %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $Derived2
-  dealloc_ref %4 : $Derived2
+  dealloc_ref [constructor] %4 : $Derived2
   %6 = tuple ()
   return %6 : $()
 }
@@ -342,7 +342,7 @@ bb0(%0 : $CP1):
   %2 = function_ref @_TFC16devirt_try_apply3CP1d : $@convention(method) (@guaranteed CP1) -> @owned Builtin.NativeObject
   %3 = apply %2(%0) : $@convention(method) (@guaranteed CP1) -> @owned Builtin.NativeObject
   %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $CP1
-  dealloc_ref %4 : $CP1
+  dealloc_ref [constructor] %4 : $CP1
   %6 = tuple ()
   return %6 : $()
 }
@@ -407,7 +407,7 @@ bb0(%0 : $CP2):
   %2 = function_ref @_TFC16devirt_try_apply3CP2d : $@convention(method) (@guaranteed CP2) -> @owned Builtin.NativeObject
   %3 = apply %2(%0) : $@convention(method) (@guaranteed CP2) -> @owned Builtin.NativeObject
   %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $CP2
-  dealloc_ref %4 : $CP2
+  dealloc_ref [constructor] %4 : $CP2
   %6 = tuple ()
   return %6 : $()
 }

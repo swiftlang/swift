@@ -546,7 +546,7 @@ namespace {
       e.claimNext();
       IGF.emitUnownedRelease(e.claimNext());
     }
-    
+
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
     }

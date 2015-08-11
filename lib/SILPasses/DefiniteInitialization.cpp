@@ -1437,7 +1437,8 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
 
       if (Pointer.getType().isAddress())
         Pointer = B.createLoad(Release->getLoc(), Pointer);
-      auto Dealloc = B.createDeallocRef(Release->getLoc(), Pointer);
+      auto Dealloc = B.createDeallocRef(Release->getLoc(), Pointer,
+                                        DeallocRefInst::Constructor);
       
       // dealloc_box the self box is necessary.
       if (isa<AllocBoxInst>(Release->getOperand(0))) {
@@ -1768,7 +1769,8 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
       if (Pointer.getType().isAddress())
         Pointer = B.createLoad(Release->getLoc(), Pointer);
-      B.createDeallocRef(Release->getLoc(), Pointer);
+      B.createDeallocRef(Release->getLoc(), Pointer,
+                         DeallocRefInst::Constructor);
       
       // dealloc_box the self box if necessary.
       if (isa<AllocBoxInst>(Release->getOperand(0))) {

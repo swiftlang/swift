@@ -23,7 +23,7 @@ bb0(%0 : $Foo):
   %2 = function_ref @_TFC4main3Food : $@convention(method) (@owned Foo) -> @owned Builtin.NativeObject // user: %3
   %3 = apply %2(%0) : $@convention(method) (@owned Foo) -> @owned Builtin.NativeObject // user: %4
   %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $Foo // user: %5
-  dealloc_ref %4 : $Foo                           // id: %5
+  dealloc_ref [constructor] %4 : $Foo             // id: %5
   %6 = tuple ()                                   // user: %7
   return %6 : $()                                 // id: %7
 }

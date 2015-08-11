@@ -1241,7 +1241,16 @@ public:
     *this << "dealloc_stack " << getIDAndType(DI->getOperand());
   }
   void visitDeallocRefInst(DeallocRefInst *DI) {
-    *this << "dealloc_ref " << getIDAndType(DI->getOperand());
+    *this << "dealloc_ref ";
+    switch (DI->getKind()) {
+    case DeallocRefInst::Constructor:
+      *this << "[constructor] ";
+      break;
+    case DeallocRefInst::Destructor:
+      *this << "[destructor] ";
+      break;
+    }
+    *this << getIDAndType(DI->getOperand());
   }
   void visitDeallocValueBufferInst(DeallocValueBufferInst *DVBI) {
     *this << "dealloc_value_buffer " << DVBI->getValueType()

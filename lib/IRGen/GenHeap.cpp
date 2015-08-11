@@ -162,11 +162,20 @@ void irgen::emitDeallocateHeapObject(IRGenFunction &IGF,
 void irgen::emitDeallocateClassInstance(IRGenFunction &IGF,
                                         llvm::Value *object,
                                         llvm::Value *size,
-                                        llvm::Value *alignMask) {
+                                        llvm::Value *alignMask,
+                                        ClassDeallocationKind kind) {
   // FIXME: We should call a fast deallocator for heap objects with
   // known size.
-  IGF.Builder.CreateCall(IGF.IGM.getDeallocClassInstanceFn(),
-                         {object, size, alignMask});
+  llvm::Constant *fn;
+  switch(kind) {
+  case ClassDeallocationKind::DestructorPlusZero:
+    fn = IGF.IGM.getDeallocClassInstanceFn();
+    break;
+  case ClassDeallocationKind::ConstructorPlusOne:
+    fn = IGF.IGM.getDeallocUninitializedClassInstanceFn();
+    break;
+  }
+  IGF.Builder.CreateCall(fn, {object, size, alignMask});
 }
 
 /// Create the destructor function for a layout.

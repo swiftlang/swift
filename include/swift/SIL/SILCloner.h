@@ -1429,7 +1429,8 @@ void
 SILCloner<ImplClass>::visitDeallocRefInst(DeallocRefInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createDeallocRef(getOpLocation(Inst->getLoc()),
-                                  getOpValue(Inst->getOperand())));
+                                  getOpValue(Inst->getOperand()),
+                                  Inst->getKind()));
 }
 
 template<typename ImplClass>

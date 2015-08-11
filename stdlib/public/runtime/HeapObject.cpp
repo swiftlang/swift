@@ -418,7 +418,8 @@ void swift::_swift_deallocClassInstance(HeapObject *self) {
                              classMetadata->getInstanceAlignMask());
 }
 
-void swift::swift_deallocClassInstance(HeapObject *object, size_t allocatedSize,
+void swift::swift_deallocClassInstance(HeapObject *object,
+                                       size_t allocatedSize,
                                        size_t allocatedAlignMask) {
 #if SWIFT_OBJC_INTEROP
   // We need to let the ObjC runtime clean up any associated objects or weak
@@ -426,6 +427,18 @@ void swift::swift_deallocClassInstance(HeapObject *object, size_t allocatedSize,
   objc_destructInstance((id)object);
 #endif
   swift_deallocObject(object, allocatedSize, allocatedAlignMask);
+}
+
+/// Variant of the above used in constructor failure paths.
+extern "C" void swift_deallocUninitializedClassInstance(HeapObject *object,
+                                                        size_t allocatedSize,
+                                                        size_t allocatedAlignMask) {
+  if (!object)
+    return;
+  bool shouldDeallocate = object->refCount.decrementShouldDeallocate();
+  assert(shouldDeallocate);
+  (void) shouldDeallocate;
+  swift_deallocClassInstance(object, allocatedSize, allocatedAlignMask);
 }
 
 #if !defined(__APPLE__)

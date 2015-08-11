@@ -43,6 +43,7 @@ namespace irgen {
   
   enum class ReferenceCounting : unsigned char;
   enum class IsaEncoding : unsigned char;
+  enum class ClassDeallocationKind : unsigned char;
   
   OwnedAddress projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                  llvm::Value *base,
@@ -78,7 +79,8 @@ namespace irgen {
 
   /// Emit class deallocation.
   void emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
-                             llvm::Value *selfValue);
+                             llvm::Value *selfValue,
+                             ClassDeallocationKind kind);
 
   /// Emit the constant fragile instance size of the class, or null if the class
   /// does not have fixed layout. For resilient classes this does not

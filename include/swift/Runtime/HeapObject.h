@@ -246,8 +246,11 @@ extern "C" bool swift_isUniquelyReferenced_nonNull_native(
 extern "C" bool swift_isUniquelyReferencedOrPinned_nonNull_native(
   const struct HeapObject *);
 
-/// Deallocate the given memory; it was returned by swift_allocObject
-/// but is otherwise in an unknown state.
+/// Deallocate the given memory.
+///
+/// It must have been returned by swift_allocObject and the strong reference
+/// must have the RC_DEALLOCATING_FLAG flag set, but otherwise the object is
+/// in an unknown state.
 ///
 /// \param object - never null
 /// \param allocatedSize - the allocated size of the object from the
@@ -261,9 +264,12 @@ extern "C" bool swift_isUniquelyReferencedOrPinned_nonNull_native(
 extern "C" void swift_deallocObject(HeapObject *object, size_t allocatedSize,
                                     size_t allocatedAlignMask);
 
-/// Deallocate the given class instance; it was returned by swift_allocObject
-/// and possibly used as an Objective-C class instance, but is otherwise in an
-/// unknown state.
+/// Deallocate the given memory.
+///
+/// It must have been returned by swift_allocObject, possibly used as an
+/// Objective-C class instance, and the strong reference must have the
+/// RC_DEALLOCATING_FLAG flag set, but otherwise the object is in an unknown
+/// state.
 ///
 /// \param object - never null
 /// \param allocatedSize - the allocated size of the object from the
@@ -277,6 +283,21 @@ extern "C" void swift_deallocObject(HeapObject *object, size_t allocatedSize,
 extern "C" void swift_deallocClassInstance(HeapObject *object,
                                            size_t allocatedSize,
                                            size_t allocatedAlignMask);
+
+/// Deallocate the given memory.
+///
+/// It must have been returned by swift_allocObject, possibly used as an
+/// Objective-C class instance, and the strong reference must be equal to 1,
+/// but otherwise the object is in an unknown state.
+///
+/// \param object - may be null
+/// \param allocatedSize - the allocated size of the object from the
+///   program's perspective, i.e. the value
+/// \param allocatedAlignMask - the alignment requirement that was passed
+///   to allocObject
+extern "C" void swift_deallocUninitializedClassInstance(HeapObject *object,
+                                                        size_t allocatedSize,
+                                                        size_t allocatedAlignMask);
 
 /// Deallocate the given memory allocated by swift_allocBox; it was returned
 /// by swift_allocBox but is otherwise in an unknown state. The given Metadata

@@ -30,7 +30,7 @@ namespace swift {
 namespace irgen {
   class Address;
   class OwnedAddress;
-  
+
 /// A heap layout is the result of laying out a complete structure for
 /// heap-allocation.
 class HeapLayout : public StructLayout {
@@ -100,12 +100,18 @@ void emitDeallocateHeapObject(IRGenFunction &IGF,
                               llvm::Value *object,
                               llvm::Value *size,
                               llvm::Value *alignMask);
+  
+enum class ClassDeallocationKind : unsigned char {
+  DestructorPlusZero,
+  ConstructorPlusOne
+};
 
 /// Emit a class instance deallocation.
 void emitDeallocateClassInstance(IRGenFunction &IGF,
                                  llvm::Value *object,
                                  llvm::Value *size,
-                                 llvm::Value *alignMask);
+                                 llvm::Value *alignMask,
+                                 ClassDeallocationKind kind);
 
 /// Allocate a boxed value.
 OwnedAddress

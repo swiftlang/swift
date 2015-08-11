@@ -972,8 +972,9 @@ public:
   DeallocStackInst *createDeallocStack(SILLocation loc, SILValue operand) {
     return insert(new (F.getModule()) DeallocStackInst(loc, operand));
   }
-  DeallocRefInst *createDeallocRef(SILLocation loc, SILValue operand) {
-    return insert(new (F.getModule()) DeallocRefInst(loc, operand));
+  DeallocRefInst *createDeallocRef(SILLocation loc, SILValue operand,
+                                   DeallocRefInst::Kind kind) {
+    return insert(new (F.getModule()) DeallocRefInst(loc, operand, kind));
   }
   DeallocBoxInst *createDeallocBox(SILLocation loc, SILType eltType,
                                    SILValue operand) {

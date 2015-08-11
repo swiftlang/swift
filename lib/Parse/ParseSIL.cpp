@@ -2323,16 +2323,40 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
 
   case ValueKind::DeallocStackInst:
-  case ValueKind::DeallocRefInst:
     if (parseTypedValueRef(Val))
       return true;
-    if (Opcode == ValueKind::DeallocStackInst) {
-      ResultVal = B.createDeallocStack(InstLoc, Val);
-    } else {
-      assert(Opcode == ValueKind::DeallocRefInst);
-      ResultVal = B.createDeallocRef(InstLoc, Val);
-    }
+    ResultVal = B.createDeallocStack(InstLoc, Val);
     break;
+  case ValueKind::DeallocRefInst: {
+    if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "["))
+      return true;
+
+    Identifier KindId;
+    SourceLoc KindLoc = P.Tok.getLoc();
+    if (P.parseIdentifier(KindId, KindLoc,
+                          diag::expected_tok_in_sil_instr, "kind"))
+      return true;
+
+    if (P.parseToken(tok::r_square, diag::expected_tok_in_sil_instr, "]"))
+      return true;
+
+    DeallocRefInst::Kind Kind;
+    if (KindId.str() == "constructor")
+      Kind = DeallocRefInst::Constructor;
+    else if (KindId.str() == "destructor")
+      Kind = DeallocRefInst::Destructor;
+    else {
+      P.diagnose(KindLoc, diag::expected_tok_in_sil_instr,
+                 "constructor or destructor");
+      return true;
+    }
+
+    if (parseTypedValueRef(Val))
+      return true;
+
+    ResultVal = B.createDeallocRef(InstLoc, Val, Kind);
+    break;
+  }
   case ValueKind::DeallocBoxInst:
     if (parseTypedValueRef(Val))
       return true;

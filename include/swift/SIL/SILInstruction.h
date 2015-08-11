@@ -3017,10 +3017,11 @@ public:
     : UnaryInstructionBase(loc, operand) {}
 };
 
-/// Deallocate memory for a reference type instance from a destructor.
+/// Deallocate memory for a reference type instance from a destructor or
+/// failure path of a constructor.
 ///
 /// This does not destroy the referenced instance; it must be destroyed
-/// and the last strong reference must have been released.
+/// first.
 ///
 /// It is undefined behavior if the type of the operand does not match the
 /// most derived type of the allocated instance.
@@ -3028,8 +3029,20 @@ class DeallocRefInst :
   public UnaryInstructionBase<ValueKind::DeallocRefInst, DeallocationInst,
                               /*HAS_RESULT*/ false> {
 public:
-  DeallocRefInst(SILLocation Loc, SILValue Operand)
-    : UnaryInstructionBase(Loc, Operand) {}
+  enum Kind {
+    /// The uninitialized object has a strong reference count of 1.
+    Constructor,
+
+    /// The destroyed object has a strong reference count of 0.
+    Destructor
+  };
+private:
+  Kind ThisKind;
+public:
+  DeallocRefInst(SILLocation Loc, SILValue Operand, Kind Kind)
+    : UnaryInstructionBase(Loc, Operand), ThisKind(Kind) {}
+
+  Kind getKind() const { return ThisKind; }
 };
 
 /// Deallocate memory allocated for a unsafe value buffer.

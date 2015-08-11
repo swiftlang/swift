@@ -65,7 +65,7 @@ sil hidden_external @speakFoo : $@convention(thin) () -> ()
 sil private @_TFC4mainP33_9ACC0692747077F216D14C36CD9276713FooD : $@convention(method) (@owned Foo) -> () {
 bb0(%0 : $Foo):
   debug_value %0 : $Foo                           // id: %1
-  dealloc_ref %0 : $Foo                           // id: %2
+  dealloc_ref [destructor] %0 : $Foo              // id: %2
   %3 = tuple ()                                   // user: %4
   return %3 : $()                                 // id: %4
 }
@@ -103,7 +103,7 @@ sil hidden_external @speakFoo2 : $@convention(thin) () -> ()
 sil private @_TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo2D : $@convention(method) (@owned Foo2) -> () {
 bb0(%0 : $Foo2):
   debug_value %0 : $Foo2                          // id: %1
-  dealloc_ref %0 : $Foo2                          // id: %2
+  dealloc_ref [destructor] %0 : $Foo2             // id: %2
   %3 = tuple ()                                   // user: %4
   return %3 : $()                                 // id: %4
 }
