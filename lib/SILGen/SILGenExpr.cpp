@@ -2934,7 +2934,7 @@ namespace {
     // If the destination is a tuple, recursively destructure.
     void visitTupleExpr(TupleExpr *E) {
       assert(E->getType()->is<TupleType>());
-      assert(!E->getType()->isMaterializable());
+      assert(!E->getType()->isMaterializable() || E->getType()->isVoid());
       for (auto &elt : E->getElements()) {
         visit(elt);
       }
@@ -3033,7 +3033,7 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
 
   // Handle tuple destinations by destructuring them if present.
   CanType destType = dest->getType()->getCanonicalType();
-  assert(!destType->isMaterializable());
+  assert(!destType->isMaterializable() || destType->isVoid());
 
   // But avoid this in the common case.
   if (!isa<TupleType>(destType)) {

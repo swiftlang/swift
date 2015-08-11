@@ -557,3 +557,8 @@ func test20596042() {
     return (.thing1, 1)
   }
 }
+
+func test21886435() {
+  () = ()
+}
+
