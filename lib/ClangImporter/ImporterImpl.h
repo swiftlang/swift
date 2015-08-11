@@ -248,7 +248,6 @@ public:
 
   const bool InferImplicitProperties;
   const bool ImportForwardDeclarations;
-  const bool ErrorHandling;
 
   constexpr static const char * const moduleImportBufferName =
     "<swift-imported-modules>";

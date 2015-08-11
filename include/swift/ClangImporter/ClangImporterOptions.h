@@ -58,10 +58,6 @@ public:
   /// If true, forward declarations will be imported using unavailable types
   /// instead of dropped altogether when possible.
   bool ImportForwardDeclarations = false;
-
-  /// If true, function and method declarations with error
-  /// out-parameters should be imported as "throws".
-  bool ErrorHandling = true;
 };
 
 } // end namespace swift

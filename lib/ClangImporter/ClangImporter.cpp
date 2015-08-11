@@ -978,8 +978,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
                                               const ClangImporterOptions &opts)
   : SwiftContext(ctx),
     InferImplicitProperties(opts.InferImplicitProperties),
-    ImportForwardDeclarations(opts.ImportForwardDeclarations),
-    ErrorHandling(opts.ErrorHandling)
+    ImportForwardDeclarations(opts.ImportForwardDeclarations)
 {
   // Add filters to determine if a Clang availability attribute
   // applies in Swift, and if so, what is the cutoff for deprecated

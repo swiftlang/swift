@@ -1636,9 +1636,6 @@ considerErrorImport(ClangImporter::Implementation &importer,
                     Type &importedResultType,
                     SpecialMethodKind methodKind,
                     bool hasCustomName) {
-  // Respect the compiler option.
-  if (!importer.ErrorHandling) return None;
-
   // If the declaration name isn't parallel to the actual parameter
   // list (e.g. if the method has C-style parameter declarations),
   // don't try to apply error conventions.
