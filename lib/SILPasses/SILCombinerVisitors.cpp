@@ -791,7 +791,8 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
                               TAI->getNormalBB(), TAI->getErrorBB());
   else
     NAI =
-      Builder->createApply(AI.getLoc(), FRI, FnType, ResultTy, Subs, Args);
+      Builder->createApply(AI.getLoc(), FRI, FnType, ResultTy, Subs, Args,
+                           cast<ApplyInst>(AI)->isNonThrowing());
 
   NAI.getInstruction()->setDebugScope(AI.getDebugScope());
 
@@ -996,6 +997,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
     NAI = ApplyInst::create(AI.getLoc(), FRI, CCSILTy,
                             ConvertCalleeTy->getSILResult(),
                             ArrayRef<Substitution>(), Args,
+                            cast<ApplyInst>(AI)->isNonThrowing(),
                             *FRI->getReferencedFunction());
   NAI->setDebugScope(AI.getDebugScope());
   return NAI;
@@ -1543,7 +1545,8 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   else
     NewAI = Builder->createApply(AI.getLoc(), AI.getCallee(),
                                  NewSubstCalleeType,
-                                 AI.getType(), Substitutions, Args);
+                                 AI.getType(), Substitutions, Args,
+                                 cast<ApplyInst>(AI)->isNonThrowing());
 
   NewAI.getInstruction()->setDebugScope(AI.getDebugScope());
 
@@ -1638,7 +1641,8 @@ static ApplyInst *optimizeCastThroughThinFunctionPointer(
           AI->getModule(), AI->getModule().getSwiftModule(), Subs));
 
   ApplyInst *NewApply = Builder->createApply(
-      AI->getLoc(), OrigThinFun, NewSubstCalleeType, AI->getType(), Subs, Args);
+      AI->getLoc(), OrigThinFun, NewSubstCalleeType, AI->getType(), Subs, Args,
+                                             AI->isNonThrowing());
   NewApply->setDebugScope(AI->getDebugScope());
 
   return NewApply;
@@ -1881,7 +1885,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     auto *NewAI = ApplyInst::create(AI->getLoc(), TTTFI->getOperand(),
                              substTy, AI->getType(),
                              AI->getSubstitutions(), Arguments,
-                             *AI->getFunction());
+                             AI->isNonThrowing(), *AI->getFunction());
     NewAI->setDebugScope(AI->getDebugScope());
     return NewAI;
   }
@@ -2027,7 +2031,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
 
     auto *NewAI = Builder->createApply(AI->getLoc(), Callee, Callee.getType(),
                                        CalleeFnTy->getSILResult(),
-                                       AI->getSubstitutions(), Args);
+                                       AI->getSubstitutions(), Args, false);
 
     if (CG) {
       CG->addEdgesForApply(NewAI);

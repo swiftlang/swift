@@ -593,7 +593,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
                              SILAbbrCodes[SILInstApplyLayout::Code],
-                             2 /*Builtin*/,
+                             SIL_BUILTIN,
                              BI->getSubstitutions().size(),
                              S.addTypeRef(BI->getType().getSwiftRValueType()),
                              (unsigned)BI->getType().getCategory(),
@@ -616,7 +616,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Args.push_back(Arg.getResultNumber());
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code], 0/*Apply*/,
+        SILAbbrCodes[SILInstApplyLayout::Code],
+        AI->isNonThrowing() ? SIL_NON_THROWING_APPLY : SIL_APPLY,
         AI->getSubstitutions().size(),
         S.addTypeRef(AI->getCallee().getType().getSwiftRValueType()),
         S.addTypeRef(AI->getSubstCalleeType()),
@@ -641,7 +642,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     Args.push_back(BasicBlockMap[AI->getNormalBB()]);
     Args.push_back(BasicBlockMap[AI->getErrorBB()]);
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code], 3/*TryApply*/,
+        SILAbbrCodes[SILInstApplyLayout::Code], SIL_TRY_APPLY,
         AI->getSubstitutions().size(),
         S.addTypeRef(AI->getCallee().getType().getSwiftRValueType()),
         S.addTypeRef(AI->getSubstCalleeType()),
@@ -658,7 +659,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Args.push_back(Arg.getResultNumber());
     }
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code], 1/*PartialApply*/,
+        SILAbbrCodes[SILInstApplyLayout::Code], SIL_PARTIAL_APPLY,
         PAI->getSubstitutions().size(),
         S.addTypeRef(PAI->getCallee().getType().getSwiftRValueType()),
         S.addTypeRef(PAI->getSubstCalleeType()),

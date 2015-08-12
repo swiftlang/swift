@@ -498,6 +498,10 @@ class ApplyInstBase<Impl, Base, false> : public Base {
   /// list's tail allocation.
   unsigned NumSubstitutions;
 
+  /// Used for apply_inst instructions: true if the called function has an
+  /// error result but is not actually throwing.
+  bool NonThrowing;
+
   /// The fixed operand is the callee;  the rest are arguments.
   TailAllocatedOperandList<1> Operands;
 
@@ -517,6 +521,7 @@ protected:
     : Base(kind, loc, baseArgs...),
       SubstCalleeType(substCalleeType),
       NumSubstitutions(substitutions.size()),
+      NonThrowing(false),
       Operands(this, args, callee) {
     static_assert(sizeof(Impl) == sizeof(*this),
         "subclass has extra storage, cannot use TailAllocatedOperandList");
@@ -534,6 +539,10 @@ protected:
                              alignof(Impl));
   }
 
+  void setNonThrowing(bool isNonThrowing) { NonThrowing = isNonThrowing; }
+  
+  bool isNonThrowingApply() const { return NonThrowing; }
+  
 public:
   // The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return 1; }
@@ -733,7 +742,8 @@ class ApplyInst : public ApplyInstBase<ApplyInst, SILInstruction> {
             SILType SubstCalleeType,
             SILType ReturnType,
             ArrayRef<Substitution> Substitutions,
-            ArrayRef<SILValue> Args);
+            ArrayRef<SILValue> Args,
+            bool isNonThrowing);
 
 public:
   static ApplyInst *create(SILLocation Loc, SILValue Callee,
@@ -741,6 +751,7 @@ public:
                            SILType ReturnType,
                            ArrayRef<Substitution> Substitutions,
                            ArrayRef<SILValue> Args,
+                           bool isNonThrowing,
                            SILFunction &F);
 
   /// getType() is ok since this is known to only have one type.
@@ -748,6 +759,12 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::ApplyInst;
+  }
+  
+  /// Returns true if the called function has an error result but is not actully
+  /// throwing an error.
+  bool isNonThrowing() const {
+    return isNonThrowingApply();
   }
 };
 

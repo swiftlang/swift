@@ -514,6 +514,9 @@ should take action to reclaim that autorelease with
 
   A function with an error result cannot be called with ``apply``.
   It must be called with ``try_apply``.
+  There is one exception to this rule: a function with an error result can be
+  called with ``apply [nothrow]`` if the compiler can prove that the function
+  does not actually throw.
 
   ``return`` produces a normal result of the function.  To return
   an error result, use ``throw``.
@@ -2523,7 +2526,7 @@ apply
 `````
 ::
 
-  sil-instruction ::= 'apply' sil-value
+  sil-instruction ::= 'apply' '[nothrow]'? sil-value
                         sil-apply-substitution-list?
                         '(' (sil-value (',' sil-value)*)? ')'
                         ':' sil-type
@@ -2554,7 +2557,10 @@ explicit ``retain`` and ``release`` instructions. The return value will
 likewise not be implicitly retained or released.
 
 The callee value must have function type.  That function type may not
-have an error result; for that, use ``try_apply``.
+have an error result, except the instruction has the ``nothrow`` attribute set.
+The ``nothrow`` attribute specifies that the callee has an error result but
+does not actually throw.
+For the regular case of calling a function with error result, use ``try_apply``.
 
 NB: If the callee value is of a thick function type, ``apply`` currently
 consumes the callee value at +1 strong retain count.

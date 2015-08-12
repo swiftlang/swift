@@ -137,7 +137,7 @@ protected:
         FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
                                         &Builder.getFunction());
         ApplyInst *NAI =
-          Builder.createApply(getOpLocation(Inst->getLoc()), FRI, Args);
+          Builder.createApply(getOpLocation(Inst->getLoc()), FRI, Args, Inst->isNonThrowing());
         doPostProcess(Inst, NAI);
         return;
       }
@@ -151,7 +151,7 @@ protected:
     ApplyInst *N = Builder.createApply(
       getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
         getOpType(Inst->getSubstCalleeSILType()), getOpType(Inst->getType()),
-        TempSubstList, Args);
+        TempSubstList, Args, Inst->isNonThrowing());
     doPostProcess(Inst, N);
   }
 

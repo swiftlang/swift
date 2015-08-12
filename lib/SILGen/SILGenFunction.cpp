@@ -777,7 +777,7 @@ ApplyInst *SILGenBuilder::createApply(SILLocation Loc, SILValue Fn,
                                       ArrayRef<Substitution> Subs,
                                       ArrayRef<SILValue> Args) {
   SGM.useConformancesFromSubstitutions(Subs);
-  return SILBuilder::createApply(Loc, Fn, SubstFnTy, Result, Subs, Args);
+  return SILBuilder::createApply(Loc, Fn, SubstFnTy, Result, Subs, Args, false);
 }
 
 TryApplyInst *SILGenBuilder::createTryApply(SILLocation loc, SILValue Fn,

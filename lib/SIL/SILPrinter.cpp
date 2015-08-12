@@ -705,6 +705,8 @@ public:
   
   void visitApplyInst(ApplyInst *AI) {
     *this << "apply ";
+    if (AI->isNonThrowing())
+      *this << "[nothrow] ";
     *this << getID(AI->getCallee());
     printSubstitutions(AI->getSubstitutions());
     *this << '(';

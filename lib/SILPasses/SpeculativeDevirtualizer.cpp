@@ -61,7 +61,8 @@ static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
                                    AI.getSubstCalleeSILType(),
                                    AI.getType(),
                                    AI.getSubstitutions(),
-                                   Ret);
+                                   Ret,
+                                   cast<ApplyInst>(AI)->isNonThrowing());
     break;
   case ValueKind::TryApplyInst: {
     auto *TryApplyI = cast<TryApplyInst>(AI.getInstruction());

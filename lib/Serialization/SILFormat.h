@@ -300,9 +300,17 @@ namespace sil_block {
     BCArray<ValueIDField>
   >;
 
+  enum ApplyKind : unsigned {
+    SIL_APPLY = 0,
+    SIL_PARTIAL_APPLY,
+    SIL_BUILTIN,
+    SIL_TRY_APPLY,
+    SIL_NON_THROWING_APPLY
+  };
+  
   using SILInstApplyLayout = BCRecordLayout<
     SIL_INST_APPLY,
-    BCFixed<2>,           // is partial apply or builtin?
+    BCFixed<3>,           // ApplyKind
     BCFixed<32>,          // num substitutions
     TypeIDField,          // callee unsubstituted type
     TypeIDField,          // callee substituted type

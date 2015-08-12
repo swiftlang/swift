@@ -215,19 +215,21 @@ public:
                          SILType SubstFnTy,
                          SILType Result,
                          ArrayRef<Substitution> Subs,
-                         ArrayRef<SILValue> Args) {
+                         ArrayRef<SILValue> Args,
+                         bool isNonThrowing) {
     return insert(ApplyInst::create(Loc, Fn, SubstFnTy, Result,
-                                    Subs, Args, F));
+                                    Subs, Args, isNonThrowing, F));
   }
   
   ApplyInst *createApply(SILLocation Loc, SILValue Fn,
-                         ArrayRef<SILValue> Args) {
+                         ArrayRef<SILValue> Args,
+                         bool isNonThrowing) {
     auto FnTy = Fn.getType();
     return createApply(Loc, Fn, FnTy,
                        FnTy.castTo<SILFunctionType>()
                          ->getResult()
                          .getSILType(),
-                       ArrayRef<Substitution>(), Args);
+                       ArrayRef<Substitution>(), Args, isNonThrowing);
   }
 
   TryApplyInst *createTryApply(SILLocation loc, SILValue fn,

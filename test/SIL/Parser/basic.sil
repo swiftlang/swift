@@ -1308,6 +1308,17 @@ bb3:
   return %4 : $()
 }
 
+// CHECK-LABEL: sil @apply_nothrow : $@convention(thin) (@owned Class1) -> ()
+sil @apply_nothrow : $@convention(thin) (@owned Class1) -> () {
+entry(%0 : $Class1):
+  %1 = function_ref @error_result4 : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
+  // CHECK: apply [nothrow] %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
+  %2 = apply [nothrow] %1(%0) : $@convention(thin) (@owned Class1) -> (@owned Class1, @error ErrorType)
+  strong_release %2 : $Class1
+  %3 = tuple ()
+  return %3 : $()
+}
+
 sil @null_class : $@convention(thin) () -> Class1 {
 entry:
   %m = null_class $Class1

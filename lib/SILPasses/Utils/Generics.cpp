@@ -38,8 +38,8 @@ ApplySite swift::replaceWithSpecializedFunction(ApplySite AI,
                                   {}, Arguments, TAI->getNormalBB(),
                                   TAI->getErrorBB());
 
-  if (isa<ApplyInst>(AI))
-    return Builder.createApply(Loc, FRI, Arguments);
+  if (auto *A = dyn_cast<ApplyInst>(AI))
+    return Builder.createApply(Loc, FRI, Arguments, A->isNonThrowing());
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI))
       return Builder.createPartialApply(Loc, FRI,

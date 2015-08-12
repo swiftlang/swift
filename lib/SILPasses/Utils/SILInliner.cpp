@@ -161,6 +161,12 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     // Modify throw terminators to branch to the error-return BB, rather than
     // trying to clone the ThrowInst.
     if (ThrowInst *TI = dyn_cast<ThrowInst>(BI->first->getTerminator())) {
+      if (auto *A = dyn_cast<ApplyInst>(AI)) {
+        assert(A->isNonThrowing() &&
+               "apply of a function with error result must be non-throwing");
+        getBuilder().createUnreachable(Loc.getValue());
+        continue;
+      }
       auto tryAI = cast<TryApplyInst>(AI);
       auto returnedValue = remapValue(TI->getOperand());
       getBuilder().createBranch(Loc.getValue(), tryAI->getErrorBB(),

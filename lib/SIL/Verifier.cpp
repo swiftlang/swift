@@ -730,8 +730,13 @@ public:
     auto substTy = AI->getSubstCalleeType();
     require(AI->getType() == substTy->getResult().getSILType(),
             "type of apply instruction doesn't match function result type");
-    require(!substTy->hasErrorResult(),
-            "apply instruction cannot call function with error result");
+    if (AI->isNonThrowing()) {
+      require(substTy->hasErrorResult(),
+              "nothrow flag used for callee without error result");
+    } else {
+      require(!substTy->hasErrorResult(),
+              "apply instruction cannot call function with error result");
+    }
 
     // Check that if the apply is of a noreturn callee, make sure that an
     // unreachable is the next instruction.

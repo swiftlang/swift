@@ -180,10 +180,12 @@ ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
                      SILType SubstCalleeTy,
                      SILType Result,
                      ArrayRef<Substitution> Subs,
-                     ArrayRef<SILValue> Args)
+                     ArrayRef<SILValue> Args,
+                     bool isNonThrowing)
   : ApplyInstBase(ValueKind::ApplyInst, Loc, Callee, SubstCalleeTy,
                   Subs, Args, Result)
 {
+  setNonThrowing(isNonThrowing);
 }
 
 ApplyInst *ApplyInst::create(SILLocation Loc, SILValue Callee,
@@ -191,10 +193,11 @@ ApplyInst *ApplyInst::create(SILLocation Loc, SILValue Callee,
                              SILType Result,
                              ArrayRef<Substitution> Subs,
                              ArrayRef<SILValue> Args,
+                             bool isNonThrowing,
                              SILFunction &F) {
   void *Buffer = allocate(F, Subs, Args);
   return ::new(Buffer) ApplyInst(Loc, Callee, SubstCalleeTy,
-                                 Result, Subs, Args);
+                                 Result, Subs, Args, isNonThrowing);
 }
 
 bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {

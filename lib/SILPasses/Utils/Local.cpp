@@ -626,6 +626,7 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
                            STResultType,
                            ArrayRef<Substitution>(),
                            Arguments,
+                           false,
                            *FRIConvertFromBuiltin->getReferencedFunction());
 }
 
@@ -1072,7 +1073,8 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   Args.push_back(SrcOp);
   Args.push_back(SILValue(MetaTyVal, 0));
 
-  auto *AI = Builder.createApply(Loc, FuncRef, SubstFnTy, ResultTy, Subs, Args);
+  auto *AI = Builder.createApply(Loc, FuncRef, SubstFnTy, ResultTy, Subs, Args,
+                                 false);
 
   // If the source of a cast should be destroyed, emit a release.
   if (auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(Inst)) {
@@ -1243,7 +1245,8 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     Builder.createRetainValue(Loc, Src);
 
   // Generate a code to invoke the bridging function.
-  auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src);
+  auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src,
+                                    false);
 
   if(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
     Builder.createReleaseValue(Loc, Src);

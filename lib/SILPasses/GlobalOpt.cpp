@@ -721,7 +721,7 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
     auto &Call = Calls[i];
     SILBuilderWithScope<1> B(Call);
     SmallVector<SILValue, 1> Args;
-    auto *NewAI = B.createApply(Call->getLoc(), Call->getCallee(), Args);
+    auto *NewAI = B.createApply(Call->getLoc(), Call->getCallee(), Args, false);
     SILValue(Call, 0).replaceAllUsesWith(SILValue(NewAI, 0));
     removeApply(Call);
     addApply(NewAI);
@@ -753,7 +753,7 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
     SILBuilderWithScope<1> B(Call);
     SmallVector<SILValue, 1> Args;
     auto *GetterRef = B.createFunctionRef(Call->getLoc(), GetterF);
-    auto *NewAI = B.createApply(Call->getLoc(), GetterRef, Args);
+    auto *NewAI = B.createApply(Call->getLoc(), GetterRef, Args, false);
     addApply(NewAI);
 
     for (auto Use : Call->getUses()) {
@@ -963,7 +963,7 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
   for (auto *Load: GlobalLoadMap[SILG]) {
     SILBuilderWithScope<1> B(Load);
     auto *GetterRef = B.createFunctionRef(Load->getLoc(), GetterF);
-    SILInstruction *Value = B.createApply(Load->getLoc(), GetterRef, {});
+    SILInstruction *Value = B.createApply(Load->getLoc(), GetterRef, {}, false);
     addApply(cast<ApplyInst>(Value));
 
     convertLoadSequence(Load, Value, B);

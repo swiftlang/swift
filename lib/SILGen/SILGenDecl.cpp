@@ -945,7 +945,7 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
       loc, silDeclRef, getConstantInfo(silDeclRef));
 
   SILValue args[] = {majorValue, minorValue, subminorValue};
-  return B.createApply(loc, availabilityGTEFn, args);
+  return B.createApply(loc, availabilityGTEFn, args, false);
 }
 
 

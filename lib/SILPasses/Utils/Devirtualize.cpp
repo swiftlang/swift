@@ -419,7 +419,7 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
 
   if (!isa<TryApplyInst>(AI)) {
     NewAI = B.createApply(AI.getLoc(), FRI, SubstCalleeSILType, ReturnType,
-                          Subs, NewArgs);
+                          Subs, NewArgs, cast<ApplyInst>(AI)->isNonThrowing());
     ResultValue = SILValue(NewAI.getInstruction(), 0);
   } else {
     auto *TAI = cast<TryApplyInst>(AI);
@@ -642,9 +642,10 @@ static FullApplySite devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
   auto ResultSILType = SubstCalleeCanType->getSILResult();
   FullApplySite SAI;
 
-  if (isa<ApplyInst>(AI))
+  if (auto *A = dyn_cast<ApplyInst>(AI))
     SAI = Builder.createApply(Loc, FRI, SubstCalleeSILType,
-                                  ResultSILType, NewSubstList, Arguments);
+                              ResultSILType, NewSubstList, Arguments,
+                              A->isNonThrowing());
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     SAI = Builder.createTryApply(Loc, FRI, SubstCalleeSILType,
                                  NewSubstList, Arguments,

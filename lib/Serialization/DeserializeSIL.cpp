@@ -634,7 +634,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   SILBuilder Builder(BB, &InsertedInsn);
   unsigned OpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            ValResNum = 0, ValResNum2 = 0, Attr = 0,
-           NumSubs = 0, NumConformances = 0;
+           NumSubs = 0, NumConformances = 0, IsNonThrowingApply = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
@@ -693,17 +693,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILInstApplyLayout::readRecord(scratch, IsPartial, NumSubs,
                                    TyID, TyID2, ValID, ValResNum, ListOfValues);
     switch (IsPartial) {
-    case 0:
+    case SIL_APPLY:
       OpCode = (unsigned)ValueKind::ApplyInst;
       break;
-    case 1:
+    case SIL_PARTIAL_APPLY:
       OpCode = (unsigned)ValueKind::PartialApplyInst;
       break;
-    case 2:
+    case SIL_BUILTIN:
       OpCode = (unsigned)ValueKind::BuiltinInst;
       break;
-    case 3:
+    case SIL_TRY_APPLY:
       OpCode = (unsigned)ValueKind::TryApplyInst;
+      break;
+    case SIL_NON_THROWING_APPLY:
+      OpCode = (unsigned)ValueKind::ApplyInst;
+      IsNonThrowingApply = true;
       break;
         
     default:
@@ -928,7 +932,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createApply(Loc, getLocalValue(ValID, ValResNum, FnTy),
                                     SubstFnTy,
                                     FTI->getResult().getSILType(),
-                                    Substitutions, Args);
+                                    Substitutions, Args, IsNonThrowingApply != 0);
     break;
   }
   case ValueKind::TryApplyInst: {

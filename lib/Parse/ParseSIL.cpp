@@ -3308,6 +3308,10 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   UnresolvedValueName FnName;
   SmallVector<UnresolvedValueName, 4> ArgNames;
 
+  bool IsNonThrowingApply = false;
+  if (parseSILOptional(IsNonThrowingApply, *this, "nothrow"))
+    return true;
+  
   if (parseValueName(FnName))
     return true;
   SmallVector<ParsedSubstitution, 4> parsedSubs;
@@ -3379,7 +3383,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     
     ResultVal = B.createApply(InstLoc, FnVal, FnTy,
                               substFTI->getResult().getSILType(),
-                              subs, Args);
+                              subs, Args, IsNonThrowingApply);
     break;
   }
   case ValueKind::PartialApplyInst: {
