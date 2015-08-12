@@ -14,6 +14,7 @@
 #define SWIFT_BASIC_PLATFORM_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace llvm {

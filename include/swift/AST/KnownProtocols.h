@@ -13,6 +13,8 @@
 #ifndef SWIFT_AST_KNOWNPROTOCOLS_H
 #define SWIFT_AST_KNOWNPROTOCOLS_H
 
+#include "swift/Config.h"
+
 namespace llvm {
 class StringRef;
 }

@@ -38,6 +38,7 @@
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/Markup.h"
+#include "swift/Config.h"
 #include "clang/APINotes/APINotesReader.h"
 #include "clang/APINotes/APINotesWriter.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"

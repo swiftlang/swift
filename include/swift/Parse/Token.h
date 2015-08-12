@@ -19,6 +19,7 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {

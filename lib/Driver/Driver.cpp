@@ -34,6 +34,7 @@
 #include "swift/Driver/ToolChain.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Config.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"

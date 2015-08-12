@@ -27,12 +27,6 @@ function(add_swift_unittest test_dirname)
     set_property(TARGET "${test_dirname}" APPEND_STRING PROPERTY
       LINK_FLAGS " -Xlinker -rpath -Xlinker ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/macosx")
   endif()
-
-  if(SWIFT_ENABLE_OBJECT_LITERALS)
-    set_property(TARGET "${test_dirname}" APPEND_STRING
-      PROPERTY COMPILE_FLAGS 
-      " -DSWIFT_ENABLE_OBJECT_LITERALS=\"1\"")
-  endif()
 endfunction()
 
 if(SWIFT_BUILD_TOOLS)

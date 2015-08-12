@@ -25,6 +25,7 @@
 #include "swift/Parse/Token.h"
 #include "swift/Parse/ParserResult.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
 
 namespace llvm {

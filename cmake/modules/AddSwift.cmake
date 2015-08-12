@@ -94,14 +94,6 @@ function(_add_variant_c_compile_flags
     list(APPEND result "-DNDEBUG")
   endif()
 
-  if(SWIFT_ENABLE_TARGET_TVOS)
-    list(APPEND result "-DSWIFT_ENABLE_TARGET_TVOS=\"1\"")
-  endif()
-
-  if(SWIFT_ENABLE_OBJECT_LITERALS)
-    list(APPEND result "-DSWIFT_ENABLE_OBJECT_LITERALS=\"1\"")
-  endif()
-
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 

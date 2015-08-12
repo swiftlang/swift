@@ -22,6 +22,7 @@
 #include "swift/Driver/Job.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
+#include "swift/Config.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
 #include "llvm/ADT/StringSwitch.h"

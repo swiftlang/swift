@@ -19,8 +19,9 @@
 #ifndef SWIFT_DIAGNOSTICSCOMMON_H
 #define SWIFT_DIAGNOSTICSCOMMON_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Config.h"
 
 namespace swift {
   template<typename ...ArgTypes>
