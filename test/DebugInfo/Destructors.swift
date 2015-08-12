@@ -6,8 +6,8 @@ class Foo {
   // CHECK: !DISubprogram(name: "deinit", linkageName: "_TFC11Destructors3FooD"
   // CHECK-SAME:          line: [[@LINE-2]]
   // CHECK-SAME:          isDefinition: true
-  var x : Int
-  init(x: Int) { self.x = x }
+  var x : Int64
+  init(x: Int64) { self.x = x }
   func bar() -> (() -> ()) { return { markUsed(self.x) } }
 }
 

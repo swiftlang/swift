@@ -1,8 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 class C {
-  let n : Int
-  required init (number i :Int) {
+  let n : Int64
+  required init (number i :Int64) {
     self.n = i
   }
 }

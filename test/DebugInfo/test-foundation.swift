@@ -43,9 +43,6 @@ class MyObject : NSObject {
 // IMPORT-CHECK-SAME:             scope: ![[FOUNDATION]]
 // IMPORT-CHECK: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]
 
-  // Force the use of Int.
-  var count : Int = 0
-
   func foo(obj: MyObject) {
     return obj.foo(obj)
   }

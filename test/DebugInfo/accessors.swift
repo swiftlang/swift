@@ -5,9 +5,9 @@
 // CHECK: !DISubprogram(name: "x.set"
 
 // Variable getter/setter
-var _x : Int = 0
-var x_modify_count : Int = 0
-var x: Int {
+var _x : Int64 = 0
+var x_modify_count : Int64 = 0
+var x: Int64 {
   get {
     return _x
   }

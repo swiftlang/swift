@@ -6,40 +6,22 @@ func markUsed<T>(t: T) {}
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "IGiveOutInts"
 // CHECK-SAME:             identifier: [[PT:"[^"]+"]]
 protocol IGiveOutInts {
-  func callMe() -> Int
+  func callMe() -> Int64
 }
 
 class SomeImplementor : IGiveOutInts {
-        init() {} 
-  func callMe() -> Int { return 1 }
-}
-
-class AFancierImplementor : IGiveOutInts {
-  var myInt : Int
-  init() {
-    myInt = 1
-  }
-
-  func callMe() -> Int {
-    myInt = myInt + 1
-    return myInt
-  }
+  init() {} 
+  func callMe() -> Int64 { return 1 }
 }
 
 func printSomeNumbers(var gen: IGiveOutInts) {
   // CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "gen",
   // CHECK-SAME:             line: [[@LINE-2]]
   // CHECK-SAME:             type: ![[PT]]
-  var i = 1
-  while i < 3 {
-    markUsed("\(gen.callMe())")
-    i++
-  }
+  markUsed(gen.callMe())
 }
 
 var i1 : IGiveOutInts = SomeImplementor()
-var i2 : IGiveOutInts = AFancierImplementor()
 
 printSomeNumbers(i1)
-printSomeNumbers(i2)
 

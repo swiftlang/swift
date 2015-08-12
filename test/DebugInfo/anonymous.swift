@@ -10,12 +10,12 @@ protocol F_ {
 }
 
 protocol F : F_ {
-  func ~> (_: Self, _: (_Distance, (Self))) -> Int
+  func ~> (_: Self, _: (_Distance, (Self))) -> Int64
 }
 
 struct _Distance {}
 
-func ~> <I: F_>(self_:I, _: (_Distance, (I))) -> Int {
+func ~> <I: F_>(self_:I, _: (_Distance, (I))) -> Int64 {
   self_.successor()
   markUsed("F")
   return 0

@@ -22,7 +22,7 @@
 // A type that should be serialized.
 class Foo {
 init() { }
-func bar() -> Int { return 42 }
+func bar() -> Int64 { return 42 }
 }
 
 // Some toplevel code that should not be serialized.

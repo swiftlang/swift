@@ -2,7 +2,7 @@
 
 func markUsed<T>(t: T) {}
 
-func foo(a : Int, _ b : Int) -> Int {
+func foo(a : Int64, _ b : Int64) -> Int64 {
   return a+b
 }
 

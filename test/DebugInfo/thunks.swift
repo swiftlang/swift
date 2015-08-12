@@ -4,23 +4,23 @@
 import Foundation
 
 class Foo : NSObject {
-  dynamic func foo(f: Int -> Int, x: Int) -> Int {
+  dynamic func foo(f: Int64 -> Int64, x: Int64) -> Int64 {
     return f(x)
   }
 }
 
 let foo = Foo()
-let y = 3
+let y = 3 as Int64
 let i = foo.foo(-, x: y)
 
-// CHECK: define {{.*}}@_TTRXFdCb_dSi_dSi_XFo_dSi_dSi_
+// CHECK: define {{.*}}@_TTRXFdCb_dVSs5Int64_dS__XFo_dS__dS__
 // CHECK-NOT: ret
 // CHECK: call {{.*}}, !dbg ![[LOC:.*]]
-// CHECK: ![[THUNK:.*]] = !DISubprogram(linkageName: "_TTRXFdCb_dSi_dSi_XFo_dSi_dSi_"
+// CHECK: ![[THUNK:.*]] = !DISubprogram(linkageName: "_TTRXFdCb_dVSs5Int64_dS__XFo_dS__dS__"
 // CHECK-NOT:                           line:
 // CHECK-SAME:                          ){{$}}
 // CHECK: ![[LOC]] = !DILocation(line: 0, scope: ![[THUNK]])
 
-// SIL-CHECK: sil shared {{.*}}@_TTRXFo_dSi_dSi_XFdCb_dSi_dSi_
+// SIL-CHECK: sil shared {{.*}}@_TTRXFdCb_dVSs5Int64_dS__XFo_dS__dS__
 // SIL-CHECK-NOT: return
 // SIL-CHECK: apply {{.*}}auto_gen

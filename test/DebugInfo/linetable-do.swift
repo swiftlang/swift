@@ -4,7 +4,7 @@ import StdlibUnittest
 
 class Obj {}
 
-func foo (a : Int) throws -> Void {
+func foo (a : Int64) throws -> Void {
   _blackHole(a)
 }
 

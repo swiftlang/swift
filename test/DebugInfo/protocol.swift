@@ -14,9 +14,7 @@ class Point : PointUtils {
     }
 
     func distanceFromOrigin() -> Float {
-        //var distance = sqrt(x*x + y*y)
-        var distance: Float = 1.0
-        return distance
+        return 1.0
     }
 
 }
@@ -28,7 +26,7 @@ func main() -> Int64 {
 // CHECK: call void @llvm.dbg.declare(metadata {{.*}} [[LOC2D]], metadata ![[LOC:.*]], metadata !{{[0-9]+}})
     var loc2d : protocol<PointUtils> = pt
     var distance = loc2d.distanceFromOrigin()
-    print("hello", terminator: "") // Set breakpoint here
+
     return 0
 }
 

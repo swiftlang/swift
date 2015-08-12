@@ -3,15 +3,15 @@
 func markUsed<T>(t: T) {}
 
 class AClass {
-  func f () -> Int { return 1 }
+  func f () -> Int64 { return 1 }
 }
 
 class AnotherClass : AClass {
-  override func f() -> Int { return 2 }
+  override func f() -> Int64 { return 2 }
 }
 
 struct AStruct {
-  func f() -> Int { return 3 }
+  func f() -> Int64 { return 3 }
 }
 
 // CHECK: define hidden void @_TF9nostorage3appFT_T_()

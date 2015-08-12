@@ -16,7 +16,7 @@ class Class <T> {
 }
 
 func main() {
-  var v = Class<Int>(_x: 1)
+  var v = Class<Int64>(_x: 1)
   var tuple = v.foo("hi")
   markUsed(tuple.0)
   markUsed(tuple.1)

@@ -17,7 +17,7 @@ func main () -> Void
 
             if rhs == random_string
             || rhs.unicodeScalars.count == random_int {
-                var local_var : Int = 10
+                var local_var : Int64 = 10
                 print("I have an int here \(local_var).\n", terminator: "")
                 return false
             }

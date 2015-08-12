@@ -29,7 +29,7 @@ func main() -> Void
             // Ensure the two local_vars are in different lexical scopes.
             // CHECK-DAG: !DILocalVariable(tag: DW_TAG_auto_variable, name: "local_var", scope: ![[THENSCOPE:[0-9]+]],{{.*}} line: [[@LINE+2]],
             // CHECK-DAG: ![[THENSCOPE]] = distinct !DILexicalBlock({{.*}} line: [[@LINE-3]]
-                var local_var : Int = 10
+                var local_var : Int64 = 10
                 print("I have an int here \(local_var).\n", terminator: "")
                 return false
             }

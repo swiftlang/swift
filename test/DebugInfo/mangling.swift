@@ -3,36 +3,40 @@
 // Type:
 // Swift.Dictionary<Swift.Int64, Swift.String>
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "Dictionary",{{.*}} identifier: [[DT:[^,)]+]])
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtT4NameSS2IdSi_",{{.*}} identifier: [[TT1:[^,)]+]])
-// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtTSS2IdSi_",{{.*}} identifier: [[TT2:[^,)]+]])
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtT4NameSS2IdVSs5Int64_",{{.*}} identifier: [[TT1:[^,)]+]])
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtTSS2IdVSs5Int64_",{{.*}} identifier: [[TT2:[^,)]+]])
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtTSSVSs5Int64_",{{.*}} identifier: [[TT3:[^,)]+]])
 
 func markUsed<T>(t: T) {}
 
 // Variable:
 // mangling.myDict : Swift.Dictionary<Swift.Int64, Swift.String>
-// CHECK: !DIGlobalVariable(name: "myDict", linkageName: "_Tv8mangling6myDictGVSs10DictionarySiSS_",
+// CHECK: !DIGlobalVariable(name: "myDict",
+// CHECK-SAME:       linkageName: "_Tv8mangling6myDictGVSs10DictionaryVSs5Int64SS_",
 // CHECK-SAME:              line: [[@LINE+2]]
 // CHECK-SAME:              type: ![[DT]]
-var myDict = Dictionary<Int, String>()
+var myDict = Dictionary<Int64, String>()
 myDict[12] = "Hello!"
 
 // mangling.myTuple1 : (Name : Swift.String, Id : Swift.Int64)
-// CHECK: !DIGlobalVariable(name: "myTuple1", linkageName: "_Tv8mangling8myTuple1T4NameSS2IdSi_",
+// CHECK: !DIGlobalVariable(name: "myTuple1",
+// CHECK-SAME:       linkageName: "_Tv8mangling8myTuple1T4NameSS2IdVSs5Int64_",
 // CHECK-SAME:              line: [[@LINE+2]]
 // CHECK-SAME:              type: ![[TT1]]
-var myTuple1 : (Name: String, Id: Int) = ("A", 1)
+var myTuple1 : (Name: String, Id: Int64) = ("A", 1)
 // mangling.myTuple2 : (Swift.String, Id : Swift.Int64)
-// CHECK: !DIGlobalVariable(name: "myTuple2", linkageName: "_Tv8mangling8myTuple2TSS2IdSi_",
+// CHECK: !DIGlobalVariable(name: "myTuple2",
+// CHECK-SAME:       linkageName: "_Tv8mangling8myTuple2TSS2IdVSs5Int64_",
 // CHECK-SAME:              line: [[@LINE+2]]
 // CHECK-SAME:              type: ![[TT2]]
-var myTuple2 : (      String, Id: Int) = ("B", 2)
+var myTuple2 : (      String, Id: Int64) = ("B", 2)
 // mangling.myTuple3 : (Swift.String, Swift.Int64)
-
-// FIXME: Pending <rdar://problem/16860038>
-// FIXME: \00myTuple3\00_Tv8mangling8myTuple3TSSSi_\00[[@LINE+1]]\000\001"{{, [^,]+, [^,]+}}, metadata ![[TT3]], {{.*}} [ DW_TAG_variable ] [myTuple3]
-// var myTuple3 : (      String,     Int) = ("C", 3)
-// markUsed({ $$0.1 }(myTuple3))
+// CHECK: !DIGlobalVariable(name: "myTuple3",
+// CHECK-SAME:       linkageName: "_Tv8mangling8myTuple3TSSVSs5Int64_",
+// CHECK-SAME:              line: [[@LINE+2]]
+// CHECK-SAME:              type: ![[TT3]]
+var myTuple3 : (      String,     Int64) = ("C", 3)
 
 markUsed(myTuple1.Id)
 markUsed(myTuple2.Id)
-
+markUsed({ $0.1 }(myTuple3))

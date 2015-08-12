@@ -5,9 +5,9 @@
 // CHECK-SAME:             line: [[@LINE+3]]
 // CHECK-SAME:             size: 8, align: 8,
 // CHECK-SAME:             identifier: "_TtO4enum5Color"
-enum Color : UInt {
+enum Color : UInt64 {
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "Red"
-// CHECK-SAME:           baseType: !"_TtSu"
+// CHECK-SAME:           baseType: !"_TtVSs6UInt64"
 // CHECK-SAME:           size: 8, align: 8{{[,)]}}
   case Red, Green, Blue
 }

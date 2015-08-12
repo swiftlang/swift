@@ -5,12 +5,12 @@
 func markUsed<T>(t: T) {}
 
 class Class {
-  var ivar : Int
+  var ivar : Int64
   init() { ivar = 1234 }
 }
 
 class Other : Class {
-  var ovar : Int
+  var ovar : Int64
   override init() {
     ovar = 112233
     super.init()
@@ -19,7 +19,7 @@ class Other : Class {
 }
 
 struct Struct {
-  var ivar : Int
+  var ivar : Int64
   init() { ivar = 4567 }
 }
 

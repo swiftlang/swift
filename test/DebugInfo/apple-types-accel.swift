@@ -6,7 +6,7 @@
 // REQUIRES: OS=macosx
 
 // Verify that the unmangles basenames end up in the accelerator table.
-// CHECK-ACCEL-DAG:	 str[0]{{.*}}"Int"
+// CHECK-ACCEL-DAG:	 str[0]{{.*}}"Int64"
 // CHECK-ACCEL-DAG:	 str[0]{{.*}}"foo"
 
 // Verify that the mangled names end up in the debug info.
@@ -21,10 +21,10 @@
 // CHECK-SAME:             line: [[@LINE+2]]
 // CHECK-SAME:             identifier: "_TtC4main3foo"
 class foo {
-	var x : Int = 1
+	var x : Int64 = 1
 }
 
-func main() -> Int {
+func main() -> Int64 {
 	var thefoo = foo();
 	return thefoo.x
 }

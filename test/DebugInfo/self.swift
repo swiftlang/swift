@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
 public struct stuffStruct {
-    var a: Int = 6
+    var a: Int64 = 6
     var b: String = "Nothing"
 }
 

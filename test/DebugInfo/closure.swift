@@ -11,11 +11,11 @@ func foldl1<T>(list: [T], _ function: (a: T, b: T) -> T) -> T {
      return accumulator
 }
 
-var a = [Int](count: 10, repeatedValue: 0)
-for i in 0..<10 { a[i] = i }
+var a = [Int64](count: 10, repeatedValue: 0)
+for i in 0..<10 { a[i] = Int64(i) }
 // A closure is not an artificial function (the last i32 0).
-// CHECK: !DISubprogram({{.*}}linkageName: "_TF7closureU_FTSiSi_Si",{{.*}} line: 20,{{.*}} scopeLine: 20,
+// CHECK: !DISubprogram({{.*}}linkageName: "_TF7closureU_FTVSs5Int64S0__S0_",{{.*}} line: 20,{{.*}} scopeLine: 20,
 // CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "$0",{{.*}} line: [[@LINE+2]],
 // CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "$1",{{.*}} line: [[@LINE+1]],
-var sum:Int = foldl1(a, { $0 + $1 })
+var sum:Int64 = foldl1(a, { $0 + $1 })
 markUsed(sum)

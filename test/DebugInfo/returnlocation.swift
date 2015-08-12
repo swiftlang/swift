@@ -10,7 +10,7 @@ import Foundation
 
 // RUN: FileCheck %s --check-prefix=CHECK_NONE < %t.ll
 // CHECK_NONE: define void {{.*}}none
-public func none(inout a: Int) {
+public func none(inout a: Int64) {
   // CHECK_NONE: call void @llvm.dbg{{.*}}, !dbg
   // CHECK_NONE: !dbg ![[NONE_INIT:.*]]
   a -= 2;
@@ -21,7 +21,7 @@ public func none(inout a: Int) {
 
 // RUN: FileCheck %s --check-prefix=CHECK_EMPTY < %t.ll
 // CHECK_EMPTY: define {{.*}}empty
-public func empty(inout a: Int) {
+public func empty(inout a: Int64) {
   if a > 24 {
       // CHECK-DAG_EMPTY: br {{.*}}, !dbg ![[EMPTY_RET1:.*]]
       // CHECK-DAG_EMPTY_RET1: ![[EMPTY_RET1]] = !DILocation(line: [[@LINE+1]], column: 6,
@@ -38,7 +38,7 @@ public func empty(inout a: Int) {
 
 // RUN: FileCheck %s --check-prefix=CHECK_EMPTY_NONE < %t.ll
 // CHECK_EMPTY_NONE: define {{.*}}empty_none
-public func empty_none(inout a: Int) {
+public func empty_none(inout a: Int64) {
   if a > 24 {
       return;
   }
@@ -50,7 +50,7 @@ public func empty_none(inout a: Int) {
 
 // RUN: FileCheck %s --check-prefix=CHECK_SIMPLE_RET < %t.ll
 // CHECK_SIMPLE_RET: define {{.*}}simple
-public func simple(a: Int) -> Int {
+public func simple(a: Int64) -> Int64 {
   if a > 24 {
       return 0;
   }
@@ -61,7 +61,7 @@ public func simple(a: Int) -> Int {
 
 // RUN: FileCheck %s --check-prefix=CHECK_COMPLEX_RET < %t.ll
 // CHECK_COMPLEX_RET: define {{.*}}complex
-public func complex(a: Int) -> Int {
+public func complex(a: Int64) -> Int64 {
   if a > 24 {
       return a*a
   }
@@ -72,7 +72,7 @@ public func complex(a: Int) -> Int {
 
 // RUN: FileCheck %s --check-prefix=CHECK_COMPLEX_SIMPLE < %t.ll
 // CHECK_COMPLEX_SIMPLE: define {{.*}}complex_simple
-public func complex_simple(a: Int) -> Int {
+public func complex_simple(a: Int64) -> Int64 {
   if a > 24 {
       return a*a
   }
@@ -83,7 +83,7 @@ public func complex_simple(a: Int) -> Int {
 
 // RUN: FileCheck %s --check-prefix=CHECK_SIMPLE_COMPLEX < %t.ll
 // CHECK_SIMPLE_COMPLEX: define {{.*}}simple_complex
-public func simple_complex(a: Int) -> Int {
+public func simple_complex(a: Int64) -> Int64 {
   if a > 24 {
       return a*a
   }
@@ -131,7 +131,7 @@ public func cleanup_empty_none(inout a: NSString) {
 
 // RUN: FileCheck %s --check-prefix=CHECK_CLEANUP_SIMPLE_RET < %t.ll
 // CHECK_CLEANUP_SIMPLE_RET: define {{.*}}cleanup_simple
-public func cleanup_simple(a: NSString) -> Int {
+public func cleanup_simple(a: NSString) -> Int64 {
   if a.length > 24 {
       return 0
   }
@@ -143,21 +143,21 @@ public func cleanup_simple(a: NSString) -> Int {
 
 // RUN: FileCheck %s --check-prefix=CHECK_CLEANUP_COMPLEX < %t.ll
 // CHECK_CLEANUP_COMPLEX: define {{.*}}cleanup_complex
-public func cleanup_complex(a: NSString) -> Int {
+public func cleanup_complex(a: NSString) -> Int64 {
   if a.length > 24 {
-      return a.length*a.length
+    return Int64(a.length*a.length)
   }
 
-  return a.length/2
+  return Int64(a.length/2)
   // CHECK_CLEANUP_COMPLEX: ret i{{.*}}, !dbg ![[CLEANUP_COMPLEX_RET:.*]]
   // CHECK_CLEANUP_COMPLEX: ![[CLEANUP_COMPLEX_RET]] = !DILocation(line: [[@LINE+1]], column: 1,
 }
 
 // RUN: FileCheck %s --check-prefix=CHECK_CLEANUP_COMPLEX_SIMPLE < %t.ll
 // CHECK_CLEANUP_COMPLEX_SIMPLE: define {{.*}}cleanup_complex_simple
-public func cleanup_complex_simple(a: NSString) -> Int {
+public func cleanup_complex_simple(a: NSString) -> Int64 {
   if a.length > 24 {
-      return a.length*a.length
+    return Int64(a.length*a.length)
   }
 
   return 2
@@ -167,9 +167,9 @@ public func cleanup_complex_simple(a: NSString) -> Int {
 
 // RUN: FileCheck %s --check-prefix=CHECK_CLEANUP_SIMPLE_COMPLEX < %t.ll
 // CHECK_CLEANUP_SIMPLE_COMPLEX: define {{.*}}cleanup_simple_complex
-public func cleanup_simple_complex(a: NSString) -> Int {
+public func cleanup_simple_complex(a: NSString) -> Int64 {
   if a.length > 24 {
-      return a.length*a.length
+    return Int64(a.length*a.length)
   }
   return 2
   // CHECK_CLEANUP_SIMPLE_COMPLEX: ret {{.*}}, !dbg ![[CLEANUP_SIMPLE_COMPLEX_RET:.*]]
