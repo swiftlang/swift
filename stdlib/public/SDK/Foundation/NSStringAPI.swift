@@ -187,9 +187,9 @@ extension String {
     return NSString.pathWithComponents(components)
   }
 
-  //===--- Non-failing factories ------------------------------------------===//
-  // NSString factory functions that can't fail, and have a
-  // corresponding constructor, are omitted.
+  //===--------------------------------------------------------------------===//
+  // NSString factory functions that have a corresponding constructor
+  // are omitted.
   //
   // + (instancetype)string
   //
@@ -197,88 +197,26 @@ extension String {
   //     stringWithCharacters:(const unichar *)chars length:(NSUInteger)length
   //
   // + (instancetype)stringWithFormat:(NSString *)format, ...
-  //===--------------------------------------------------------------------===//
-
+  //
   // + (instancetype)
   //     stringWithContentsOfFile:(NSString *)path
   //     encoding:(NSStringEncoding)enc
   //     error:(NSError **)error
-
-  /// Produces a string created by reading data from the file at a
-  /// given path interpreted using a given encoding.
-  public init(
-    contentsOfFile path: String,
-    encoding enc: NSStringEncoding
-  ) throws {
-    let ns = try NSString(contentsOfFile: path, encoding: enc)
-    self = ns as String
-  }
-
-  // + (instancetype)
-  //     stringWithContentsOfFile:(NSString *)path
-  //     usedEncoding:(NSStringEncoding *)
-  //     enc error:(NSError **)error
-
-  /// Produces a string created by reading data from the file at
-  /// a given path and returns by reference the encoding used to
-  /// interpret the file.
-  public init(
-    contentsOfFile path: String,
-    usedEncoding: UnsafeMutablePointer<NSStringEncoding> = nil
-  ) throws {
-    let ns = try NSString(contentsOfFile: path, usedEncoding: usedEncoding)
-    self = ns as String
-  }
-
+  //
   // + (instancetype)
   //     stringWithContentsOfURL:(NSURL *)url
   //     encoding:(NSStringEncoding)enc
   //     error:(NSError **)error
-
-  /// Produces a string created by reading data from a given URL
-  /// interpreted using a given encoding.  Errors are written into the
-  /// inout `error` argument.
-  public init(
-    contentsOfURL url: NSURL,
-    encoding enc: NSStringEncoding
-  ) throws {
-    let ns = try NSString(contentsOfURL: url, encoding: enc)
-    self = ns as String
-  }
-
+  //
   // + (instancetype)
   //     stringWithContentsOfURL:(NSURL *)url
   //     usedEncoding:(NSStringEncoding *)enc
   //     error:(NSError **)error
-
-  /// Produces a string created by reading data from a given URL
-  /// and returns by reference the encoding used to interpret the
-  /// data.  Errors are written into the inout `error` argument.
-  public init(
-    contentsOfURL url: NSURL,
-    usedEncoding enc: UnsafeMutablePointer<NSStringEncoding> = nil
-  ) throws {
-    let ns = try NSString(contentsOfURL: url, usedEncoding: enc)
-    self = ns as String
-  }
-
+  //
   // + (instancetype)
   //     stringWithCString:(const char *)cString
   //     encoding:(NSStringEncoding)enc
-
-  /// Produces a string containing the bytes in a given C array,
-  /// interpreted according to a given encoding.
-  public init?(
-    CString: UnsafePointer<CChar>,
-    encoding enc: NSStringEncoding
-  ) {
-    if let ns = NSString(CString: CString, encoding: enc) {
-      self = ns as String
-    } else {
-      return nil
-    }
-  }
-
+  //===--------------------------------------------------------------------===//
 
   //===--- Adds nothing for String beyond what String(s) does -------------===//
   // + (instancetype)stringWithString:(NSString *)aString
@@ -762,7 +700,7 @@ extension String {
   //===--- Already provided by String's core ------------------------------===//
   // - (instancetype)init
 
-  //===--- Initializers that can fail presented as factory functions ------===//
+  //===--- Initializers that can fail -------------------------------------===//
   // - (instancetype)
   //     initWithBytes:(const void *)bytes
   //     length:(NSUInteger)length
@@ -842,38 +780,94 @@ extension String {
       freeWhenDone: flag) as String
   }
 
-  //===--- Initializers that can fail dropped for factory functions -------===//
+  //===--- Initializers that can fail -------------------------------------===//
+
   // - (instancetype)
   //     initWithContentsOfFile:(NSString *)path
   //     encoding:(NSStringEncoding)enc
   //     error:(NSError **)error
   //
+
+  /// Produces a string created by reading data from the file at a
+  /// given path interpreted using a given encoding.
+  public init(
+    contentsOfFile path: String,
+    encoding enc: NSStringEncoding
+  ) throws {
+    let ns = try NSString(contentsOfFile: path, encoding: enc)
+    self = ns as String
+  }
+
   // - (instancetype)
   //     initWithContentsOfFile:(NSString *)path
   //     usedEncoding:(NSStringEncoding *)enc
   //     error:(NSError **)error
-  //
+
+  /// Produces a string created by reading data from the file at
+  /// a given path and returns by reference the encoding used to
+  /// interpret the file.
+  public init(
+    contentsOfFile path: String,
+    usedEncoding: UnsafeMutablePointer<NSStringEncoding> = nil
+  ) throws {
+    let ns = try NSString(contentsOfFile: path, usedEncoding: usedEncoding)
+    self = ns as String
+  }
+
   // - (instancetype)
   //     initWithContentsOfURL:(NSURL *)url
   //     encoding:(NSStringEncoding)enc
   //     error:(NSError**)error
-  //
+
+  /// Produces a string created by reading data from a given URL
+  /// interpreted using a given encoding.  Errors are written into the
+  /// inout `error` argument.
+  public init(
+    contentsOfURL url: NSURL,
+    encoding enc: NSStringEncoding
+  ) throws {
+    let ns = try NSString(contentsOfURL: url, encoding: enc)
+    self = ns as String
+  }
+
   // - (instancetype)
   //     initWithContentsOfURL:(NSURL *)url
   //     usedEncoding:(NSStringEncoding *)enc
   //     error:(NSError **)error
-  //
+
+  /// Produces a string created by reading data from a given URL
+  /// and returns by reference the encoding used to interpret the
+  /// data.  Errors are written into the inout `error` argument.
+  public init(
+    contentsOfURL url: NSURL,
+    usedEncoding enc: UnsafeMutablePointer<NSStringEncoding> = nil
+  ) throws {
+    let ns = try NSString(contentsOfURL: url, usedEncoding: enc)
+    self = ns as String
+  }
+
   // - (instancetype)
   //     initWithCString:(const char *)nullTerminatedCString
   //     encoding:(NSStringEncoding)encoding
-  //
+
+  /// Produces a string containing the bytes in a given C array,
+  /// interpreted according to a given encoding.
+  public init?(
+    CString: UnsafePointer<CChar>,
+    encoding enc: NSStringEncoding
+  ) {
+    if let ns = NSString(CString: CString, encoding: enc) {
+      self = ns as String
+    } else {
+      return nil
+    }
+  }
+
   // - (instancetype)
   //     initWithData:(NSData *)data
   //     encoding:(NSStringEncoding)encoding
-  //===--------------------------------------------------------------------===//
-
-  // FIXME: optional locale can't be handled with default
-  // arguments due to <rdar://problem/16983329>
+  
+  // FIXME: handle optional locale with default arguments
 
   // - (instancetype)initWithFormat:(NSString *)format, ...
 
