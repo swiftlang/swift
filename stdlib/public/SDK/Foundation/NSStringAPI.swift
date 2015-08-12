@@ -204,6 +204,11 @@ extension String {
   //     error:(NSError **)error
   //
   // + (instancetype)
+  //     stringWithContentsOfFile:(NSString *)path
+  //     usedEncoding:(NSStringEncoding *)enc
+  //     error:(NSError **)error
+  //
+  // + (instancetype)
   //     stringWithContentsOfURL:(NSURL *)url
   //     encoding:(NSStringEncoding)enc
   //     error:(NSError **)error
