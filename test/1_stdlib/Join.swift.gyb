@@ -32,42 +32,42 @@ JoinTestSuite.test("${ArrayType}") {
   if true {
     let separator: ArrayType = []
     if true {
-      let r = join(separator, [])
+      let r = separator.join([])
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[], []]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[], [], []]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 1 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ], [ 2 ]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 1, 2 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ], [ 2 ], [ 3 ]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 1, 2, 3 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 1, 2, 3, 4, 5, 6 ], r)
     }
   }
@@ -77,42 +77,42 @@ JoinTestSuite.test("${ArrayType}") {
     let separator: ArrayType = [ 42 ]
     if true {
       let seq: [ArrayType] = []
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[], []]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 42 ], r)
     }
     if true {
       let seq: [ArrayType] = [[], [], []]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 42, 42 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 1 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ], [ 2 ]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 1, 42, 2 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ], [ 2 ], [ 3 ]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 1, 42, 2, 42, 3 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 1, 2, 42, 3, 4, 42, 5, 6 ], r)
     }
   }
@@ -122,42 +122,42 @@ JoinTestSuite.test("${ArrayType}") {
     let separator: ArrayType = [ 42, 4242 ]
     if true {
       let seq: [ArrayType] = []
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[], []]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 42, 4242 ], r)
     }
     if true {
       let seq: [ArrayType] = [[], [], []]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 42, 4242, 42, 4242 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 1 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ], [ 2 ]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 1, 42, 4242, 2 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ], [ 2 ], [ 3 ]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 1, 42, 4242, 2, 42, 4242, 3 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
-      let r = join(separator, seq)
+      let r = separator.join(seq)
       expectEqual([ 1, 2, 42, 4242, 3, 4, 42, 4242, 5, 6 ], r)
     }
   }
@@ -178,28 +178,28 @@ JoinTestSuite.test("${ArrayType}") {
 
 JoinTestSuite.test("ReservesCapacity") {
   if true {
-    let r = join(MinimalForwardRangeReplaceableCollection<Int>(elements: []), [])
+    let r = MinimalForwardRangeReplaceableCollection<Int>(elements: []).join([])
     expectEqual(0, r.reservedCapacity)
   }
   if true {
-    let r = join(MinimalForwardRangeReplaceableCollection(elements: [ 42 ]),
-        [ MinimalForwardRangeReplaceableCollection(elements: []) ])
+    let r = MinimalForwardRangeReplaceableCollection(elements: [ 42 ]).join(
+      [ MinimalForwardRangeReplaceableCollection(elements: []) ])
     expectEqual(0, r.reservedCapacity)
   }
 
   if true {
-    let r = join(MinimalForwardRangeReplaceableCollection(elements: [ 42 ]),
-        [ MinimalForwardRangeReplaceableCollection(elements: [ 1 ]),
-          MinimalForwardRangeReplaceableCollection(elements: [ 2, 3, 4 ]),
-          MinimalForwardRangeReplaceableCollection(elements: [ 5, 6, 7 ]) ])
+    let r = MinimalForwardRangeReplaceableCollection(elements: [ 42 ]).join(
+      [ MinimalForwardRangeReplaceableCollection(elements: [ 1 ]),
+        MinimalForwardRangeReplaceableCollection(elements: [ 2, 3, 4 ]),
+        MinimalForwardRangeReplaceableCollection(elements: [ 5, 6, 7 ]) ])
     expectEqual(9, r.reservedCapacity)
     expectEqual([ 1, 42, 2, 3, 4, 42, 5, 6, 7 ], r.elements)
   }
   if true {
-    let r = join(MinimalForwardRangeReplaceableCollection(elements: [ 42, 4242 ]),
-        [ MinimalForwardRangeReplaceableCollection(elements: [ 1 ]),
-          MinimalForwardRangeReplaceableCollection(elements: [ 2, 3, 4 ]),
-          MinimalForwardRangeReplaceableCollection(elements: [ 5, 6, 7 ]) ])
+    let r = MinimalForwardRangeReplaceableCollection(elements: [ 42, 4242 ]).join(
+      [ MinimalForwardRangeReplaceableCollection(elements: [ 1 ]),
+        MinimalForwardRangeReplaceableCollection(elements: [ 2, 3, 4 ]),
+        MinimalForwardRangeReplaceableCollection(elements: [ 5, 6, 7 ]) ])
     expectEqual(11, r.reservedCapacity)
     expectEqual([ 1, 42, 4242, 2, 3, 4, 42, 4242, 5, 6, 7 ], r.elements)
   }
@@ -209,10 +209,8 @@ func join<S: SequenceType where S.Generator.Element == String>(
   separator: String, _ elements: S
 ) -> String {
   return String(
-    join(
-      separator.characters,
-      elements.lazy.map { $0.characters }
-    ))
+    separator.characters.join(
+      elements.lazy.map { $0.characters }))
 }
 
 JoinTestSuite.test("String.CharacterView") {

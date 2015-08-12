@@ -325,17 +325,6 @@ extension String.CharacterView : RangeReplaceableCollectionType {
 
 // Algorithms
 extension String.CharacterView {
-  /// Interpose `self` between every pair of consecutive `elements`,
-  /// then concatenate the result.  For example:
-  ///
-  ///     "-|-".join(["foo", "bar", "baz"]) // "foo-|-bar-|-baz"
-  @warn_unused_result
-  public func join<
-      S : SequenceType where S.Generator.Element == String.CharacterView
-  >(elements: S) -> String.CharacterView {
-    return Swift.join(self, elements)
-  }
-
   /// Access the characters in the given `subRange`.
   ///
   /// - Complexity: O(1) unless bridging from Objective-C requires an

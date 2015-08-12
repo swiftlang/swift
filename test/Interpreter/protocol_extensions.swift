@@ -121,7 +121,7 @@ extension RangeReplaceableCollectionType {
   public final func myJoin<S : SequenceType where S.Generator.Element == Self>(
     elements: S
   ) -> Self {
-    return Swift.join(self, elements)
+    return self.join(elements)
   }
 }
 

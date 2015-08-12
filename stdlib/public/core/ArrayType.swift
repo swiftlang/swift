@@ -71,13 +71,6 @@ protocol _ArrayType
   /// - Requires: `count > index`.
   mutating func removeAtIndex(index: Int) -> Generator.Element
 
-  //===--- algorithms -----------------------------------------------------===//
-
-  @warn_unused_result
-  func join<
-      S : SequenceType where S.Generator.Element == Self
-  >(elements: S) -> Self
-
   //===--- implementation detail  -----------------------------------------===//
 
   typealias _Buffer : _ArrayBufferType

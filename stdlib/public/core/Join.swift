@@ -10,50 +10,56 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Creates and returns a collection of type `C` that is the result of
-/// interposing a given separator between the elements of the sequence
-/// `elements`.
-///
-/// For example, this code excerpt writes "``here be dragons``" to the standard
-/// output:
-///
-///     print(join(" ", [ "here", "be", "dragons" ]))
-@warn_unused_result
+extension RangeReplaceableCollectionType {
+  /// Creates and returns a collection of type `Self` that is the result of
+  /// interposing a given separator `self` between the elements of the sequence
+  /// `elements`.
+  ///
+  /// For example, `[-1, -2].join([[1, 2, 3], [4, 5, 6], [7, 8, 9]])`
+  /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`.
+  @warn_unused_result
+  public func join<
+    S : SequenceType where S.Generator.Element == Self
+  >(elements: S) -> Self {
+    var result = Self()
+    let separatorSize = self.count
+
+    let reservation = elements._preprocessingPass {
+      (s: S) -> Index.Distance in
+      let r: Index.Distance = s.reduce(0) { $0 + separatorSize + $1.count }
+      return r - separatorSize
+    }
+
+    if let n = reservation {
+      result.reserveCapacity(n)
+    }
+
+    if separatorSize != 0 {
+      var gen = elements.generate()
+      if let first = gen.next() {
+        result.appendContentsOf(first)
+        while let next = gen.next() {
+          result.appendContentsOf(self)
+          result.appendContentsOf(next)
+        }
+      }
+    } else {
+      for x in elements {
+        result.appendContentsOf(x)
+      }
+    }
+
+    return result
+  }
+}
+
+@available(*, unavailable, message="call the 'join()' method on the collection")
 public func join<
   C : RangeReplaceableCollectionType, S : SequenceType
   where S.Generator.Element == C
 >(
   separator: C, _ elements: S
 ) -> C {
-  var result = C()
-  let separatorSize = separator.count
-
-  // FIXME: include separator
-  let reservation = elements._preprocessingPass {
-    (s: S) -> C.Index.Distance in
-    let r: C.Index.Distance = s.reduce(0) { $0 + separatorSize + $1.count }
-    return r - separatorSize
-  }
-
-  if let n = reservation {
-    result.reserveCapacity(n)
-  }
-
-  if separatorSize != 0 {
-    var gen = elements.generate()
-    if let first = gen.next() {
-      result.appendContentsOf(first)
-      while let next = gen.next() {
-        result.appendContentsOf(separator)
-        result.appendContentsOf(next)
-      }
-    }
-  } else {
-    for x in elements {
-      result.appendContentsOf(x)
-    }
-  }
-
-  return result
+  fatalError("unavailable function can't be called")
 }
 
