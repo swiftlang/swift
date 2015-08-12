@@ -2125,6 +2125,46 @@ bbO(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2: $*GenContain
   return %8 : $()
 }
 
+protocol AnForwardIndexType {
+}
+
+protocol AnIndexable {
+  typealias Index = AnForwardIndexType
+}
+
+struct GenContainer2<T : AnIndexable> {
+}
+
+struct ConcreteForwardIndexType : AnForwardIndexType {
+}
+
+struct ConcreteIndexable : AnIndexable {
+  typealias Index = ConcreteForwardIndexType
+}
+
+
+sil public_external [fragile] @materializeForSetClosure2 : $@convention(thin) <T: AnIndexable> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<T>, @thick GenContainer2<T>.Type) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenContainer2<T>, %3 : $@thick GenContainer2<T>.Type):
+  unreachable
+}
+
+// CHECK-LABEL: sil @combine_cast_of_materializeForSet_function
+// CHECK: bb0
+// CHECK: [[FUN:%.*]] = function_ref @materializeForSetClosure
+// CHECK: apply [[FUN]]<ConcreteIndexable, ConcreteForwardIndexType>(
+// CHECK: return
+
+sil @combine_cast_of_materializeForSet_function_nested_subsitutions : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<ConcreteIndexable>) -> () {
+bbO(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2: $*GenContainer2<ConcreteIndexable>):
+  %3 = metatype $@thick GenContainer2<ConcreteIndexable>.Type
+  %4 = function_ref @materializeForSetClosure2 : $@convention(thin) <τ_0_0 : AnIndexable> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<τ_0_0>, @thick GenContainer2<τ_0_0>.Type) -> ()
+  %5 = thin_function_to_pointer %4 : $@convention(thin) <τ_0_0 : AnIndexable> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<τ_0_0>, @thick GenContainer2<τ_0_0>.Type) -> () to $Builtin.RawPointer
+  %6 = pointer_to_thin_function %5 : $Builtin.RawPointer to $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<ConcreteIndexable>, @thick GenContainer2<ConcreteIndexable>.Type) -> ()
+  %7 = apply %6(%0, %1, %2, %3) : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout GenContainer2<ConcreteIndexable>, @thick GenContainer2<ConcreteIndexable>.Type) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
 // CHECK-LABEL:   sil @thin_function_to_pointer_identity
 // CHECK:         bb0([[Ref:%.*]]: $Builtin.RawPointer):
 // CHECK-NOT:       pointer_to_thin_function

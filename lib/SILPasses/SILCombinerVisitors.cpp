@@ -1629,8 +1629,42 @@ static ApplyInst *optimizeCastThroughThinFunctionPointer(
   // The bound generic type will carry the substitutions to apply.
   auto Subs = BoundGenericInstTy->getSubstitutions(
       AI->getModule().getSwiftModule(), nullptr);
-  if (Subs.size() != 1)
+
+  if (Subs.size() == 0)
     return nullptr;
+
+  // We expect one type variable to be substituted. The substitution might have
+  // recursive substitutions. Recognize and allow the case of one substitution
+  // with recursive substitutions.
+  // Container<T>
+  //   T = ...
+  //   T.A = ...
+  //   T.A.C = ...
+  if (Subs.size() != 1) {
+    SmallPtrSet<ArchetypeType *, 16> Archetypes;
+    bool SawPrimary = false;
+    // Collect all the archetypes and make sure there is only one primary.
+    for (unsigned i = 0, e = Subs.size(); i != e; ++i) {
+      auto *AT = Subs[i].getArchetype();
+      Archetypes.insert(AT);
+      // Two primary arche types. We can't handle this case.
+      if (SawPrimary && AT->isPrimary())
+        return nullptr;
+      else if (AT->isPrimary())
+        SawPrimary = true;
+    }
+
+    // Make sure all the non primary archetypes have a parent archetype in the
+    // set.
+    for (unsigned i = 0, e = Subs.size(); i != e; ++i) {
+      auto *AT = Subs[i].getArchetype();
+      // Ignore the one primary archetype.
+      if (AT->isPrimary())
+        continue;
+      if (!Archetypes.count(AT))
+          return nullptr;
+    }
+  }
 
   SmallVector<SILValue, 16> Args;
   for (auto Arg : AI->getArguments())
