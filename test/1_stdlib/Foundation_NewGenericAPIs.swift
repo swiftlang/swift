@@ -23,36 +23,6 @@ func test_NSCoder_decodeObjectForKey(coder: NSCoder, key: String) {
   expectType(Optional<AnyObject>.self, &r)
 }
 
-/*
-It is not possible to call this function.
-
-@available(iOS, introduced=9.0)
-@available(OSX, introduced=10.11)
-func test_NSCoder_decodeObjectForKey_error(coder: NSCoder, key: String) throws {
-  var r = try coder.decodeObjectForKey(key)
-  expectType(Optional<AnyObject>.self, &r)
-}
-*/
-
-func test_NSCoder_decodeObjectOfClass_forKey(
-  coder: NSCoder, clazz: AnyClass, key: String
-) {
-  var r = coder.decodeObjectOfClass(clazz, forKey: key)
-  expectType(Optional<AnyObject>.self, &r)
-}
-
-@available(iOS, introduced=9.0)
-@available(OSX, introduced=10.11)
-func test_NSCoder_decodeObjectOfClass_forKey_error(
-  coder: NSCoder, clazz: AnyClass, key: String
-) throws {
-  var r = coder.decodeObjectOfClass(clazz, forKey: key)
-  expectType(Optional<AnyObject>.self, &r)
-}
-
-/*
-It wasn't possible to call these APIs from Swift.
-
 func test_NSCoder_decodeObjectOfClasses_forKey(
   coder: NSCoder, classes: NSSet?, key: String
 ) {
@@ -62,14 +32,13 @@ func test_NSCoder_decodeObjectOfClasses_forKey(
 
 @available(iOS, introduced=9.0)
 @available(OSX, introduced=10.11)
-func test_NSCoder_decodeObjectOfClasses_forKey_error(
+func test_NSCoder_decodeTopLevelObjectOfClasses_forKey_error(
   coder: NSCoder, classes: NSSet?, key: String
-) {
-  var error: NSError?
-  var r = coder.decodeObjectOfClasses(classes, forKey: key, error: &error)
+) throws {
+  var r = try coder.decodeTopLevelObjectOfClasses(classes, forKey: key)
   expectType(Optional<AnyObject>.self, &r)
 }
-*/
+
 
 func test_NSKeyedUnarchiver_unarchiveObjectWithData(data: NSData) {
   var r = NSKeyedUnarchiver.unarchiveObjectWithData(data)

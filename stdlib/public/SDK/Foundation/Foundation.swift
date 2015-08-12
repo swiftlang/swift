@@ -1289,6 +1289,12 @@ internal func resolveError(error: NSError?) throws {
 
 extension NSCoder {
   @warn_unused_result
+  public func decodeObjectOfClass<DecodedObjectType: NSCoding where DecodedObjectType: NSObject>(cls: DecodedObjectType.Type, forKey key: String) -> DecodedObjectType? {
+    let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, nil)
+    return result as! DecodedObjectType?
+  }
+
+  @warn_unused_result
   @nonobjc
   public func decodeObjectOfClasses(classes: NSSet?, forKey key: String) -> AnyObject? {
     var classesAsNSObjects: Set<NSObject>? = nil
@@ -1325,7 +1331,7 @@ extension NSCoder {
     var error: NSError?
     let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, &error)
     try resolveError(error)
-    return result as? DecodedObjectType
+    return result as! DecodedObjectType?
   }
 
   @warn_unused_result
