@@ -782,6 +782,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   Opts.InferImplicitProperties |=
     Args.hasArg(OPT_enable_objc_implicit_properties);
 
+  Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
+
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 
   if (Args.hasArg(OPT_embed_bitcode))

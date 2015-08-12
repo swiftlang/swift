@@ -86,11 +86,13 @@ class ClassWithCustomNameSub : ClassWithCustomName {}
 // CHECK-LABEL: @interface ClassWithNSObjectProtocol <NSObject>
 // CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * __nonnull description;
 // CHECK-NEXT: - (BOOL)conformsToProtocol:(Protocol * __nonnull)_;
+// CHECK-NEXT: - (BOOL)isKindOfClass:(Class __nonnull)aClass;
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class ClassWithNSObjectProtocol : NSObjectProtocol {
   var description: String { return "me" }
   func conformsToProtocol(_: Protocol) -> Bool { return false }
+  func isKindOfClass(aClass: AnyClass) -> Bool { return false }
 }
 
 // CHECK-LABEL: @interface Initializers

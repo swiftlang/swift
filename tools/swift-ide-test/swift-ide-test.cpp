@@ -258,6 +258,11 @@ ImplicitProperties("enable-objc-implicit-properties",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+OmitNeedlessWords("enable-omit-needless-words",
+                   llvm::cl::desc("Omit needless words when importing Objective-C names"),
+                   llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
     "disable-objc-attr-requires-foundation-module",
     llvm::cl::desc("Allow @objc to be used freely"),
@@ -2430,6 +2435,8 @@ int main(int argc, char *argv[]) {
     options::ImplicitProperties;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
+  InitInvok.getClangImporterOptions().OmitNeedlessWords |=
+    options::OmitNeedlessWords;
   if (!options::ResourceDir.empty()) {
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }

@@ -191,6 +191,10 @@ def enable_objc_implicit_properties :
   Flag<["-"], "enable-objc-implicit-properties">,
   HelpText<"Import Objective-C \"implicit properties\" as properties">;
 
+def enable_omit_needless_words :
+  Flag<["-"], "enable-omit-needless-words">,
+  HelpText<"Omit needless words when importing Objective-C names">;
+
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 

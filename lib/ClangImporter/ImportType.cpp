@@ -1759,6 +1759,248 @@ considerErrorImport(ClangImporter::Implementation &importer,
   return None;
 }
 
+/// Retrieve the name of the given Clang type for use when omitting
+/// needless words.
+static StringRef getClangTypeNameForOmission(clang::ASTContext &ctx,
+                                             clang::QualType type) {
+  // Dig through the type, looking for a typedef-name and stripping
+  // references along the way.
+  do {
+    // The name of a typedef-name.
+    auto typePtr = type.getTypePtr();
+    if (auto typedefType = dyn_cast<clang::TypedefType>(typePtr)) {
+      auto name = typedefType->getDecl()->getName();
+
+      // For Objective-C type parameters, drop the "Type" suffix if
+      // present.
+      if (isa<clang::ObjCTypeParamDecl>(typedefType->getDecl())) {
+        if (camel_case::getLastWord(name) == "Type")
+          name = name.drop_back(4);
+      }
+
+      // Objective-C selector type.
+      if (ctx.hasSameUnqualifiedType(type, ctx.getObjCSelType()) &&
+          name == "SEL")
+        return "Selector";
+
+      // Objective-C "id" type.
+      if (type->isObjCIdType() && name == "id")
+        return "Object";
+
+      // Objective-C "Class" type.
+      if (type->isObjCClassType() && name == "Class")
+        return "Class";
+
+      return name;
+    }
+
+    // Look through reference types.
+    if (auto refType = dyn_cast<clang::ReferenceType>(typePtr)) {
+      type = refType->getPointeeTypeAsWritten();
+      continue;
+    }
+
+    // Look through pointer types.
+    if (auto ptrType = dyn_cast<clang::PointerType>(typePtr)) {
+      type = ptrType->getPointeeType();
+      continue;
+    }
+
+    // Try to desugar one level...
+    clang::QualType desugared = type.getSingleStepDesugaredType(ctx);
+    if (desugared.getTypePtr() == type.getTypePtr())
+      break;
+
+    type = desugared;
+  } while (true);
+
+  // Objective-C object pointers.
+  if (auto objcObjectPtr = type->getAs<clang::ObjCObjectPointerType>()) {
+    if (auto objcClass = objcObjectPtr->getInterfaceDecl()) {
+      return objcClass->getName();
+    }
+
+    // Objective-C "id" type.
+    if (objcObjectPtr->isObjCIdType())
+      return "Object";
+
+      // Objective-C "Class" type.
+    if (objcObjectPtr->isObjCClassType())
+      return "Class";
+
+    return StringRef();
+  }
+
+  // Objective-C selector type.
+  if (type->isSpecificBuiltinType(clang::BuiltinType::ObjCSel))
+    return "Selector";
+
+  // Tag types.
+  if (auto tagType = type->getAs<clang::TagType>())
+    return tagType->getDecl()->getName();
+
+  // Block pointers.
+  if (type->getAs<clang::BlockPointerType>())
+    return "Block";
+
+  return StringRef();
+}
+
+namespace {
+  /// Describes the role that a particular name has within a
+  /// signature, which can affect how we omit needless words.
+  enum class NameRole {
+    /// The base name of a function or method.
+    BaseName,
+
+    /// The first parameter of a function or method.
+    FirstParameter,
+
+    // Subsequent parameters in a function or method.
+    SubsequentParameter,
+  };
+}
+
+/// Attempt to omit needless words from the given name.
+static Identifier omitNeedlessWords(ASTContext &ctx, 
+                                    clang::ASTContext &clangCtx,
+                                    Identifier name,
+                                    clang::QualType type,
+                                    NameRole role) {
+  if (name.empty()) return name;
+  StringRef nameStr = name.str();
+
+  // Figure out the name of the type.
+  StringRef typeNameStr = getClangTypeNameForOmission(clangCtx, type);
+  if (typeNameStr.empty()) return name;
+
+  // Get the camel-case words in the name and type name.
+  auto nameWords = camel_case::getWords(nameStr);
+  auto typeWords = camel_case::getWords(typeNameStr);
+
+  // Match the last words in the type name to the last words in the
+  // name.
+  auto nameWordRevIter = nameWords.rbegin(),
+    nameWordRevIterEnd = nameWords.rend();
+  auto typeWordRevIter = typeWords.rbegin(),
+    typeWordRevIterEnd = typeWords.rend();
+  bool anyMatches = false;
+  while (nameWordRevIter != nameWordRevIterEnd &&
+         typeWordRevIter != typeWordRevIterEnd) {
+    // If the names match, continue.
+    if (camel_case::sameWordIgnoreFirstCase(*nameWordRevIter,
+                                            *typeWordRevIter)) {
+      anyMatches = true;
+      ++nameWordRevIter;
+      ++typeWordRevIter;
+      continue;
+    }
+
+    // Special case: "Indexes" and "Indices" in the name match
+    // "IndexSet" in the type.
+    if ((camel_case::sameWordIgnoreFirstCase(*nameWordRevIter, "Indexes") ||
+         camel_case::sameWordIgnoreFirstCase(*nameWordRevIter, "Indices")) &&
+        *typeWordRevIter == "Set") {
+      auto nextTypeWordRevIter = typeWordRevIter;
+      ++nextTypeWordRevIter;
+      if (nextTypeWordRevIter != typeWordRevIterEnd &&
+          camel_case::sameWordIgnoreFirstCase(*nextTypeWordRevIter, "Index")) {
+        anyMatches = true;
+        ++nameWordRevIter;
+        typeWordRevIter = nextTypeWordRevIter;
+        ++typeWordRevIter;
+        continue;
+      }
+    }
+
+    break;
+  }
+
+  // If nothing matched, there is nothing to omit.
+  if (!anyMatches) return name;
+
+  // Handle complete name matches.
+  if (nameWordRevIter == nameWordRevIterEnd) {
+    // If this is the first parameter, it's okay to drop the name
+    // entirely.
+    if (role == NameRole::FirstParameter) return Identifier();
+
+    // Otherwise, leave the name alone.
+    return name;
+  }
+
+  // If the word preceding the match is "With", and it isn't the first
+  // word, we can drop it as well.
+  auto nextNameWordRevIter = nameWordRevIter;
+  ++nextNameWordRevIter;
+  if (*nameWordRevIter == "With") {
+    ++nameWordRevIter;
+
+    // If we hit the beginning of the word, step back to keep the
+    // "with". This will only actually happen if the name isn't
+    // following the camel-casing rules correctly.
+    if (nameWordRevIter == nameWordRevIterEnd) --nameWordRevIter;
+  }
+
+  // Go back to the last matching word and chop off the name at that
+  // point.
+  return ctx.getIdentifier(nameStr.substr(0,
+                                          nameWordRevIter.base().getPosition()));
+}
+
+/// Attempt to omit needless words from the given function name.
+static DeclName omitNeedlessWords(ASTContext &ctx,
+                                  clang::ASTContext &clangCtx,
+                                  DeclName name,
+                                  ArrayRef<const clang::ParmVarDecl *> params) {
+  Identifier baseName = name.getBaseName();
+  ArrayRef<Identifier> argNames = name.getArgumentNames();
+
+  // Omit needless words based on parameter types.
+  SmallVector<Identifier, 4> newArgNames;
+  bool anyChanges = false;
+  for (unsigned i = 0, n = argNames.size(); i != n; ++i) {
+    // If there is no corresponding parameter, there is nothing to
+    // omit.
+    if (i >= params.size()) {
+      if (anyChanges) newArgNames.push_back(argNames[i]);
+      continue;
+    }
+
+    // Omit needless words based on the type of the parameter.
+    NameRole role = i > 0 ? NameRole::SubsequentParameter
+      : argNames[0].empty() ? NameRole::BaseName
+      : NameRole::FirstParameter;
+
+    Identifier name = role == NameRole::BaseName ? baseName : argNames[i];
+    Identifier newName = omitNeedlessWords(ctx, clangCtx, name,
+                                           params[i]->getType(), role);
+
+    if (!anyChanges && name == newName) continue;
+
+    // If this is the first change, copy all of the previous argument names.
+    if (!anyChanges) {
+      newArgNames.append(argNames.begin(), argNames.begin() + i);
+      anyChanges = true;
+    }
+
+    // Record this change.
+    if (role == NameRole::BaseName) {
+      baseName = newName;
+      newArgNames.push_back(argNames[i]);
+    } else {
+      newArgNames.push_back(newName);
+    }
+  }
+  // If nothing changed, return the original name.
+  if (!anyChanges)
+    return name;
+
+  // Form the new name.
+  assert(argNames.size() == newArgNames.size());
+  return DeclName(ctx, baseName, newArgNames);
+}
+
 Type ClangImporter::Implementation::importMethodType(
        const clang::ObjCMethodDecl *clangDecl,
        clang::QualType resultType,
@@ -1852,6 +2094,12 @@ Type ClangImporter::Implementation::importMethodType(
 
   auto errorInfo = considerErrorImport(*this, clangDecl, methodName, params,
                                        swiftResultTy, kind, isCustomName);
+
+  // If we should omit needless words and don't have a custom name, do so.
+  if (OmitNeedlessWords && !isCustomName) {
+    methodName = omitNeedlessWords(SwiftContext, getClangASTContext(),
+                                   methodName, params);
+  }
 
   // Import the parameters.
   SmallVector<TupleTypeElt, 4> swiftArgParams;

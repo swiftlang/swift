@@ -58,6 +58,11 @@ public:
   /// If true, forward declarations will be imported using unavailable types
   /// instead of dropped altogether when possible.
   bool ImportForwardDeclarations = false;
+
+  /// If true, remove words from imported names that are redundant
+  /// with the type information of the corresponding parameter or
+  /// property.
+  bool OmitNeedlessWords = false;
 };
 
 } // end namespace swift

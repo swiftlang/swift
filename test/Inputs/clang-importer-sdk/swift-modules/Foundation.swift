@@ -197,7 +197,7 @@ extension NSRange : _ObjectiveCBridgeable {
   }
 
   public func _bridgeToObjectiveC() -> NSValue {
-    return NSValue(range: self)
+    return NSValue()
   }
 
   public static func _forceBridgeFromObjectiveC(

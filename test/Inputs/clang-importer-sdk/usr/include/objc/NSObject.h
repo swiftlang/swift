@@ -10,6 +10,7 @@
 - (instancetype)retain OBJC_ARC_UNAVAILABLE;
 - (Class)class;
 - (BOOL)conformsToProtocol:(Protocol *)aProtocol;
+- (BOOL)isKindOfClass:(Class)aClass;
 @end
 
 @interface NSObject <NSObject>
