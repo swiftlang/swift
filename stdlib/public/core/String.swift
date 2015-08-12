@@ -606,17 +606,60 @@ extension String {
 }
 
 extension String {
-  /// Interpose `self` between every pair of consecutive `elements`,
-  /// then concatenate the result.  For example:
-  ///
-  ///     "-|-".join(["foo", "bar", "baz"]) // "foo-|-bar-|-baz"
-  @warn_unused_result
+  @available(*, unavailable, message="call the 'joinWithSeparator()' method on the sequence of elements")
   public func join<
-      S : SequenceType where S.Generator.Element == String
+    S : SequenceType where S.Generator.Element == String
   >(elements: S) -> String {
-    return String(
-      characters.join(elements.lazy.map { $0.characters })
-    )
+    fatalError("unavailable function can't be called")
+  }
+}
+
+extension SequenceType where Generator.Element == String {
+
+  /// Interpose the `separator` between elements of `self`, then concatenate
+  /// the result.  For example:
+  ///
+  ///     ["foo", "bar", "baz"].joinWithSeparator("-|-") // "foo-|-bar-|-baz"
+  @warn_unused_result
+  public func joinWithSeparator(separator: String) -> String {
+    var result = ""
+
+    // FIXME(performance): this code assumes UTF-16 in-memory representation.
+    // It should be switched to low-level APIs.
+    let separatorSize = separator.utf16.count
+
+    let reservation = self._preprocessingPass {
+      (s: Self) -> Int in
+      var r = 0
+      for chunk in s {
+        // FIXME(performance): this code assumes UTF-16 in-memory representation.
+        // It should be switched to low-level APIs.
+        r += separatorSize + chunk.utf16.count
+      }
+      return r - separatorSize
+    }
+
+    if let n = reservation {
+      result.reserveCapacity(n)
+    }
+
+    if separatorSize != 0 {
+      var gen = generate()
+      if let first = gen.next() {
+        result.appendContentsOf(first)
+        while let next = gen.next() {
+          result.appendContentsOf(separator)
+          result.appendContentsOf(next)
+        }
+      }
+    }
+    else {
+      for x in self {
+        result.appendContentsOf(x)
+      }
+    }
+
+    return result
   }
 }
 

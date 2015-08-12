@@ -26,9 +26,11 @@ var mirrors = TestSuite("Mirrors")
 extension Mirror {
   public var testDescription: String {
     let nil_ = "nil"
-    return "[" + ", ".join(
-      children.lazy.map { "\($0.0 ?? nil_): \(String(reflecting: $0.1))" }
-    ) + "]"
+    return "[" +
+      children.lazy
+        .map { "\($0.0 ?? nil_): \(String(reflecting: $0.1))" }
+        .joinWithSeparator(", ")
+      + "]"
   }
 }
 

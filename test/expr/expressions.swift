@@ -632,11 +632,8 @@ func invalidDictionaryLiteral() {
   var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} {{24-24=,}} {{24-24=,}} expected-error {{expected key expression in dictionary literal}}
 }
 
-[1].join([4]) // expected-error {{cannot invoke 'join' with an argument list of type '([Int])'}}
-// expected-note @-1 {{expected an argument list of type '(S)'}}
-
-[1].join([[[4]]]) // expected-error {{cannot invoke 'join' with an argument list of type '([Array<Array<Int>>])'}}
-// expected-note @-1 {{expected an argument list of type '(S)'}}
+[4].joinWithSeparator([1]) // expected-error {{type of expression is ambiguous without more context}}
+[4].joinWithSeparator([[[1]]]) // expected-error {{type of expression is ambiguous without more context}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons

@@ -172,7 +172,7 @@ public struct ArrayBuilder<T> : CollectionBuilderType {
     _resultParts.append(_resultTail)
     _resultTail = []
     // FIXME: optimize.  parallelize.
-    return [].join(_resultParts)
+    return Array(_resultParts.flatten())
   }
 }
 

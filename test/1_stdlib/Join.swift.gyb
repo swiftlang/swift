@@ -17,205 +17,286 @@
 
 import StdlibUnittest
 
-var JoinTestSuite = TestSuite("Join")
+public struct JoinWithSeparatorTest {
+  public let elements: [[Int]]
+  public let separator: [Int]
+  public let expected: [Int]
+  public let loc: SourceLoc
 
-%for ArrayType in ['ContiguousArray', 'ArraySlice', 'Array']:
-
-JoinTestSuite.test("${ArrayType}") {
-  typealias ArrayType = ${ArrayType}<Int>
-
-  //
-  // Test the free function.
-  //
-
-  // Empty separator.
-  if true {
-    let separator: ArrayType = []
-    if true {
-      let seq: [ArrayType] = []
-      let r = separator.join(seq)
-      expectEqual([], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[]]
-      let r = separator.join(seq)
-      expectEqual([], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[], []]
-      let r = separator.join(seq)
-      expectEqual([], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[], [], []]
-      let r = separator.join(seq)
-      expectEqual([], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[ 1 ]]
-      let r = separator.join(seq)
-      expectEqual([ 1 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[ 1 ], [ 2 ]]
-      let r = separator.join(seq)
-      expectEqual([ 1, 2 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[ 1 ], [ 2 ], [ 3 ]]
-      let r = separator.join(seq)
-      expectEqual([ 1, 2, 3 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
-      let r = separator.join(seq)
-      expectEqual([ 1, 2, 3, 4, 5, 6 ], r)
-    }
+  init(
+    elements: [[Int]], separator: [Int], expected: [Int],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
+    self.elements = elements
+    self.separator = separator
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "prefix() test data")
   }
+}
+
+public let joinWithSeparatorTests = [
+  // Empty separator.
+  JoinWithSeparatorTest(
+    elements: [],
+    separator: [],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[]],
+    separator: [],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[], []],
+    separator: [],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[], [], []],
+    separator: [],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ]],
+    separator: [],
+    expected: [ 1010 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ]],
+    separator: [],
+    expected: [ 1010, 2020 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ], [ 3030 ]],
+    separator: [],
+    expected: [ 1010, 2020, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [ 2020 ], [ 3030 ]],
+    separator: [],
+    expected: [ 2020, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [], [ 3030 ]],
+    separator: [],
+    expected: [ 1010, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ], []],
+    separator: [],
+    expected: [ 1010, 2020 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [ 2020, 2021 ], [ 3030, 3031 ]],
+    separator: [],
+    expected: [ 1010, 1011, 2020, 2021, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [ 2020, 2021 ], [ 3030, 3031 ]],
+    separator: [],
+    expected: [ 2020, 2021, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [], [ 3030, 3031 ]],
+    separator: [],
+    expected: [ 1010, 1011, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [ 2020, 2021 ], []],
+    separator: [],
+    expected: [ 1010, 1011, 2020, 2021 ]),
 
   // 1-element separator.
-  if true {
-    let separator: ArrayType = [ 42 ]
-    if true {
-      let seq: [ArrayType] = []
-      let r = separator.join(seq)
-      expectEqual([], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[]]
-      let r = separator.join(seq)
-      expectEqual([], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[], []]
-      let r = separator.join(seq)
-      expectEqual([ 42 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[], [], []]
-      let r = separator.join(seq)
-      expectEqual([ 42, 42 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[ 1 ]]
-      let r = separator.join(seq)
-      expectEqual([ 1 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[ 1 ], [ 2 ]]
-      let r = separator.join(seq)
-      expectEqual([ 1, 42, 2 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[ 1 ], [ 2 ], [ 3 ]]
-      let r = separator.join(seq)
-      expectEqual([ 1, 42, 2, 42, 3 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
-      let r = separator.join(seq)
-      expectEqual([ 1, 2, 42, 3, 4, 42, 5, 6 ], r)
-    }
-  }
+  JoinWithSeparatorTest(
+    elements: [],
+    separator: [ 99 ],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[]],
+    separator: [ 99 ],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[], []],
+    separator: [ 99 ],
+    expected: [ 99 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [], []],
+    separator: [ 99 ],
+    expected: [ 99, 99 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ]],
+    separator: [ 99 ],
+    expected: [ 1010 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ]],
+    separator: [ 99 ],
+    expected: [ 1010, 99, 2020 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ], [ 3030 ]],
+    separator: [ 99 ],
+    expected: [ 1010, 99, 2020, 99, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [ 2020 ], [ 3030 ]],
+    separator: [ 99 ],
+    expected: [ 99, 2020, 99, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [], [ 3030 ]],
+    separator: [ 99 ],
+    expected: [ 1010, 99, 99, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ], []],
+    separator: [ 99 ],
+    expected: [ 1010, 99, 2020, 99 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [ 2020, 2021 ], [ 3030, 3031 ]],
+    separator: [ 99 ],
+    expected: [ 1010, 1011, 99, 2020, 2021, 99, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [ 2020, 2021 ], [ 3030, 3031 ]],
+    separator: [ 99 ],
+    expected: [ 99, 2020, 2021, 99, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [], [ 3030, 3031 ]],
+    separator: [ 99 ],
+    expected: [ 1010, 1011, 99, 99, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [ 2020, 2021 ], []],
+    separator: [ 99 ],
+    expected: [ 1010, 1011, 99, 2020, 2021, 99 ]),
 
   // 2-element separator.
-  if true {
-    let separator: ArrayType = [ 42, 4242 ]
-    if true {
-      let seq: [ArrayType] = []
-      let r = separator.join(seq)
-      expectEqual([], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[]]
-      let r = separator.join(seq)
-      expectEqual([], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[], []]
-      let r = separator.join(seq)
-      expectEqual([ 42, 4242 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[], [], []]
-      let r = separator.join(seq)
-      expectEqual([ 42, 4242, 42, 4242 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[ 1 ]]
-      let r = separator.join(seq)
-      expectEqual([ 1 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[ 1 ], [ 2 ]]
-      let r = separator.join(seq)
-      expectEqual([ 1, 42, 4242, 2 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[ 1 ], [ 2 ], [ 3 ]]
-      let r = separator.join(seq)
-      expectEqual([ 1, 42, 4242, 2, 42, 4242, 3 ], r)
-    }
-    if true {
-      let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
-      let r = separator.join(seq)
-      expectEqual([ 1, 2, 42, 4242, 3, 4, 42, 4242, 5, 6 ], r)
-    }
-  }
+  JoinWithSeparatorTest(
+    elements: [],
+    separator: [ 98, 99 ],
+    expected: []),
 
-  //
-  // Test forwarding instance function.
-  //
+  JoinWithSeparatorTest(
+    elements: [[]],
+    separator: [ 98, 99 ],
+    expected: []),
 
-  if true {
-    let separator: ArrayType = [ 42, 4242 ]
-    let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
-    let r = separator.join(seq)
-    expectEqual([ 1, 2, 42, 4242, 3, 4, 42, 4242, 5, 6 ], r)
+  JoinWithSeparatorTest(
+    elements: [[], []],
+    separator: [ 98, 99 ],
+    expected: [ 98, 99 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [], []],
+    separator: [ 98, 99 ],
+    expected: [ 98, 99, 98, 99 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ]],
+    separator: [ 98, 99 ],
+    expected: [ 1010 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ]],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 98, 99, 2020 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ], [ 3030 ]],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 98, 99, 2020, 98, 99, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [ 2020 ], [ 3030 ]],
+    separator: [ 98, 99 ],
+    expected: [ 98, 99, 2020, 98, 99, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [], [ 3030 ]],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 98, 99, 98, 99, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ], []],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 98, 99, 2020, 98, 99 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [ 2020, 2021 ], [ 3030, 3031 ]],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 1011, 98, 99, 2020, 2021, 98, 99, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [ 2020, 2021 ], [ 3030, 3031 ]],
+    separator: [ 98, 99 ],
+    expected: [ 98, 99, 2020, 2021, 98, 99, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [], [ 3030, 3031 ]],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 1011, 98, 99, 98, 99, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [ 2020, 2021 ], []],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 1011, 98, 99, 2020, 2021, 98, 99 ]),
+]
+
+var JoinTestSuite = TestSuite("Join")
+
+% from itertools import product
+% traversals = [ 'Forward', 'Bidirectional', 'RandomAccess' ]
+% base_kinds = [ 'Defaulted', 'Minimal' ]
+% collections = [
+%   ('{}{}RangeReplaceableCollection'.format(base_kind, traversal), traversal)
+%     for base_kind, traversal in product(base_kinds, traversals)
+% ]
+% other_array_types = [ 'Array', 'ArraySlice', 'ContiguousArray' ]
+% collections += [(array, 'RandomAccess') for array in other_array_types]
+
+% for Base, traversal in collections:
+%   if Base not in other_array_types:
+%     label = 'elements:'
+%   else:
+%     label = ''
+%   end
+
+JoinTestSuite.test("${Base}.join()") {
+  for test in joinWithSeparatorTests {
+    let elements = ${Base}(${label} test.elements.map {
+      ${Base}(${label} $0)
+    })
+    let separator = ${Base}(${label} test.separator)
+    let r = Array(elements.joinWithSeparator(separator))
+    checkSequence(test.expected, r)
   }
 }
 
-%end
-
-JoinTestSuite.test("ReservesCapacity") {
-  if true {
-    let seq: [MinimalForwardRangeReplaceableCollection<Int>] = []
-    let r = MinimalForwardRangeReplaceableCollection<Int>(elements: []).join(seq)
-    expectEqual(0, r.reservedCapacity)
-  }
-  if true {
-    let r = MinimalForwardRangeReplaceableCollection(elements: [ 42 ]).join(
-      [ MinimalForwardRangeReplaceableCollection(elements: []) ])
-    expectEqual(0, r.reservedCapacity)
-  }
-
-  if true {
-    let r = MinimalForwardRangeReplaceableCollection(elements: [ 42 ]).join(
-      [ MinimalForwardRangeReplaceableCollection(elements: [ 1 ], underestimatedCount: .Precise),
-        MinimalForwardRangeReplaceableCollection(elements: [ 2, 3, 4 ], underestimatedCount: .Precise),
-        MinimalForwardRangeReplaceableCollection(elements: [ 5, 6, 7 ], underestimatedCount: .Precise) ])
-    expectEqual(9, r.reservedCapacity)
-    expectEqual([ 1, 42, 2, 3, 4, 42, 5, 6, 7 ], r.elements)
-  }
-  if true {
-    let r = MinimalForwardRangeReplaceableCollection(elements: [ 42, 4242 ]).join(
-      [ MinimalForwardRangeReplaceableCollection(elements: [ 1 ], underestimatedCount: .Precise),
-        MinimalForwardRangeReplaceableCollection(elements: [ 2, 3, 4 ], underestimatedCount: .Precise),
-        MinimalForwardRangeReplaceableCollection(elements: [ 5, 6, 7 ], underestimatedCount: .Precise) ])
-    expectEqual(11, r.reservedCapacity)
-    expectEqual([ 1, 42, 4242, 2, 3, 4, 42, 4242, 5, 6, 7 ], r.elements)
+JoinTestSuite.test("${Base}.join()/_copyToNativeArrayBuffer()") {
+  for test in joinWithSeparatorTests {
+    let elements = ${Base}(${label} test.elements.map {
+      ${Base}(${label} $0)
+    })
+    let separator = ${Base}(${label} test.separator)
+    let r = Array(elements.joinWithSeparator(separator))
+    checkSequence(test.expected, r)
   }
 }
 
-func join<S: SequenceType where S.Generator.Element == String>(
-  separator: String, _ elements: S
-) -> String {
-  return String(
-    separator.characters.join(
-      elements.lazy.map { $0.characters }))
+% end
+
+func join(separator: String, _ elements: [String]) -> String {
+  return elements.joinWithSeparator(separator)
 }
 
-JoinTestSuite.test("String.CharacterView") {
+JoinTestSuite.test("String.joinWithSeparator()") {
   //
   // Test the free function.
   //
@@ -252,7 +333,7 @@ JoinTestSuite.test("String.CharacterView") {
   // Test forwarding instance function.
   //
 
-  expectEqual("abxycdxyef", "xy".join(["ab", "cd", "ef"]))
+  expectEqual("abxycdxyef", ["ab", "cd", "ef"].joinWithSeparator("xy"))
 }
 
 runAllTests()
