@@ -239,6 +239,11 @@ SkipDeinit("skip-deinit",
                    llvm::cl::init(true));
 
 static llvm::cl::opt<bool>
+SkipParameterNames("skip-parameter-names",
+                   llvm::cl::desc("Whether to skip parameter names"),
+                   llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 DisableAccessControl("disable-access-control",
     llvm::cl::desc("Disables access control, like a debugger"));
 
@@ -2483,6 +2488,10 @@ int main(int argc, char *argv[]) {
     PrintOpts.SkipPrivateStdlibDecls = options::SkipPrivateStdlibDecls;
     PrintOpts.SkipUnavailable = options::SkipUnavailable;
     PrintOpts.SkipDeinit = options::SkipDeinit;
+    if (options::SkipParameterNames) {
+      PrintOpts.ArgAndParamPrinting
+        = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
+    }
   }
 
   if (PrintOpts.PrintDocumentationComments) {
