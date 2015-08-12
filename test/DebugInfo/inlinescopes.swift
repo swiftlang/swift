@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: echo "public var x = Int64()" | %target-swift-frontend -module-name FooBar -emit-module -o %t -
-// RUN: %target-swift-frontend %s -O -I %t -sil-inline-threshold 100 -emit-ir -g -o %t.ll
+// RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o %t.ll
 // RUN: FileCheck %s < %t.ll
 // RUN: FileCheck %s -check-prefix=TRANSPARENT-CHECK < %t.ll
 
@@ -15,6 +15,7 @@ import FooBar
 
 func markUsed<T>(t: T) {}
 
+@inline(__always)
 func square(x: Int64) -> Int64 {
 // CHECK-DAG: ![[MULSCOPE]] = !DILocation(line: [[@LINE+2]], column: {{.*}}, scope: ![[MUL:.*]], inlinedAt: ![[INLINED:.*]])
 // CHECK-DAG: ![[MUL:.*]] = distinct !DILexicalBlock(
