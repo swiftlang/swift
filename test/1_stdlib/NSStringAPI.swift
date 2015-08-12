@@ -458,6 +458,17 @@ NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
   }
 }
 
+NSStringAPIs.test("initWithData(_:encoding:)") {
+  let bytes: [UInt8] = [0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86]
+  let data = NSData(bytes: bytes, length: bytes.count)
+  
+  expectEmpty(String(data: data, encoding: NSNonLossyASCIIStringEncoding))
+  
+  expectEqualSequence(
+    "あいう".characters, 
+    String(data: data, encoding: NSUTF8StringEncoding)!.characters)
+}
+
 NSStringAPIs.test("decomposedStringWithCanonicalMapping") {
   expectEqual("abc", "abc".decomposedStringWithCanonicalMapping)
   expectEqual("\u{305f}\u{3099}くてん", "だくてん".decomposedStringWithCanonicalMapping)

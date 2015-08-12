@@ -862,13 +862,20 @@ extension String {
       return nil
     }
   }
-
+  
+  // FIXME: handle optional locale with default arguments
+  
   // - (instancetype)
   //     initWithData:(NSData *)data
   //     encoding:(NSStringEncoding)encoding
-  
-  // FIXME: handle optional locale with default arguments
 
+  /// Returns a `String` initialized by converting given `data` into
+  /// Unicode characters using a given `encoding`.
+  public init?(data: NSData, encoding: NSStringEncoding) {
+    guard let s = NSString(data: data, encoding: encoding) else { return nil }
+    self = s as String
+  }
+  
   // - (instancetype)initWithFormat:(NSString *)format, ...
 
   /// Returns a `String` object initialized by using a given
