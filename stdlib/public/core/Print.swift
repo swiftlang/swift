@@ -146,12 +146,10 @@ internal func _debugPrint<Target: OutputStreamType>(
 //===----------------------------------------------------------------------===//
 //===--- Migration Aids ---------------------------------------------------===//
 
-/* FIXME: Disabled because we need these signatures for our workarounds below
 @available(*, unavailable, message="Please wrap your tuple argument in parentheses: 'print((...))'")
 public func print<T>(_: T) {}
 @available(*, unavailable, message="Please wrap your tuple argument in parentheses: 'debugPrint((...))'")
 public func debugPrint<T>(_: T) {}
-*/
 
 @available(*, unavailable, message="Please use 'terminator: \"\"' instead of 'appendNewline: false': 'print((...), terminator: \"\")'")
 public func print<T>(_: T, appendNewline: Bool) {}

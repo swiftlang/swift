@@ -3283,9 +3283,7 @@ namespace {
       
       // Coerce the object type, if necessary.
       auto subExpr = expr->getSubExpr();
-      if (auto opTy = dyn_cast<OptionalType>(subExpr->getType().getPointer())) {
-        auto objectTy = opTy->getAnyOptionalObjectType();
-        
+      if (auto objectTy = subExpr->getType()->getAnyOptionalObjectType()) {        
         if (objectTy && !objectTy->isEqual(valueType)) {
           auto coercedSubExpr = coerceToType(subExpr,
                                              OptionalType::get(valueType),

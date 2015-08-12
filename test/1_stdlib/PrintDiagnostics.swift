@@ -12,4 +12,4 @@ print(3, &stream) // expected-error {{'&' can only appear immediately in a call 
 debugPrint(3, &stream) // expected-error {{'&' can only appear immediately in a call argument list}}
 print(3, &stream, appendNewline: false) // expected-error {{cannot invoke 'print' with an argument list of type}} expected-note {{expected an argument list of type}}
 debugPrint(3, &stream, appendNewline: false) // expected-error {{cannot invoke 'debugPrint' with an argument list of type}} expected-note {{expected an argument list of type}}
-print(4, quack: 5) // expected-error {{cannot invoke 'print' with an argument list of type '(Int, quack: Int)'}} expected-note {{expected an argument list of type '(Any..., separator: String, terminator: String)'}}
+print(4, quack: 5) // expected-error {{'print' is unavailable: Please wrap your tuple argument in parentheses: 'print((...))'}}
