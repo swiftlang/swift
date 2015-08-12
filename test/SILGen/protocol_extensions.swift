@@ -29,13 +29,7 @@ extension P1 {
   }
 
   subscript(i: Int) -> Int {
-    // materializeForSet can do static dispatch to peer accessors:
-
-    // CHECK-LABEL: sil hidden [transparent] @_TFeRq_19protocol_extensions2P1_S_S0_m9subscriptFSiSi
-    // CHECK-NEXT: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*Self):
-    // CHECK: function_ref @_TFeRq_19protocol_extensions2P1_S_S0_g9subscriptFSiSi
-    // CHECK: return
-
+    // materializeForSet can do static dispatch to peer accessors (tested later, in the emission of the concrete conformance)
     get {
       return 0
     }
@@ -73,6 +67,12 @@ extension P1 {
 class C : P1 {
   func reqP1a() { }
 }
+
+//   (materializeForSet test from above)
+// CHECK-LABEL: sil [transparent] [thunk] @_TTWC19protocol_extensions1CS_2P1S_FS1_m9subscriptFSiSi
+// CHECK-NEXT: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*C):
+// CHECK: function_ref @_TFeRq_19protocol_extensions2P1_S_S0_g9subscriptFSiSi
+// CHECK: return
 
 class D : C { }
 

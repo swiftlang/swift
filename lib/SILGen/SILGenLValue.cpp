@@ -3324,9 +3324,6 @@ maybeEmitMaterializeForSetThunk(ProtocolConformance *conformance,
                                 FuncDecl *requirement, FuncDecl *witness,
                                 ArrayRef<Substitution> witnessSubs,
                                 ArrayRef<ManagedValue> origParams) {
-  // FIXME: This is all WIP.
-  if (conformance) return false;
-
   // The formal type of materializeForSet is:
   //
   // (self: Self) -> (temporary: Builtin.RawPointer,
