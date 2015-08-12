@@ -3280,6 +3280,21 @@ namespace {
     Expr *visitForceValueExpr(ForceValueExpr *expr) {
       Type valueType = simplifyType(expr->getType());
       expr->setType(valueType);
+      
+      // Coerce the object type, if necessary.
+      auto subExpr = expr->getSubExpr();
+      if (auto opTy = dyn_cast<OptionalType>(subExpr->getType().getPointer())) {
+        auto objectTy = opTy->getAnyOptionalObjectType();
+        
+        if (objectTy && !objectTy->isEqual(valueType)) {
+          auto coercedSubExpr = coerceToType(subExpr,
+                                             OptionalType::get(valueType),
+                                             cs.getConstraintLocator(subExpr));
+          
+          expr->setSubExpr(coercedSubExpr);
+        }
+      }
+      
       return expr;
     }
 

@@ -197,10 +197,12 @@ infix operator <<< {
 	precedence 170
 }
 
-
-print(view(_1)((1, 2))) // CHECK-NEXT: 1
-print(over(_1)({ $0 * 4 })((1, 2))) // CHECK-NEXT: (4, 2)
-print(set(_1)(3)((1, 2))) // CHECK-NEXT: (3, 2)
-
-print(view(_2)("hello", 5)) // CHECK-NEXT: 5
+let pt1 = view(_1)((1, 2))
+print(pt1) // CHECK-NEXT: 1
+let pt2 = over(_1)({ $0 * 4 })((1, 2))
+print(pt2) // CHECK-NEXT: (4, 2)
+let pt3 = set(_1)(3)((1, 2))
+print(pt3) // CHECK-NEXT: (3, 2)
+let pt4 = view(_2)("hello", 5)
+print(pt4) // CHECK-NEXT: 5
 

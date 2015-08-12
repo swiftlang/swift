@@ -173,35 +173,3 @@ public func debugPrint<T>(
 ) {}
 //===----------------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
-
-//===--- WORKAROUNDS ------------------------------------------------------===//
-//===--- FIXME: <rdar://22056861> Bool failing to match variadic Any ------===//
-/// Writes the textual representations of `item` into the standard
-/// output.
-///
-/// The textual representation is obtained via the expression
-/// `String(item)`.
-///
-/// - SeeAlso: `debugPrint`, Streamable`, `CustomStringConvertible`,
-///   `CustomDebugStringConvertible`
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func print<T>(item: T) {
-  print(item, terminator: "\n")
-}
-
-/// Writes the textual representations of `item` most suitable for
-/// debugging into the standard output.
-///
-/// The textual representation is obtained via the expression
-/// `String(reflecting: item)`.
-///
-/// - SeeAlso: `print`, Streamable`, `CustomStringConvertible`,
-///   `CustomDebugStringConvertible`
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func debugPrint<T>(item: T) {
-  debugPrint(item, separator: "\n")
-}
-
-//===----------------------------------------------------------------------===//

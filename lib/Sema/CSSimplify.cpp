@@ -546,6 +546,12 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
       return result != ConstraintSystem::SolutionKind::Solved;
     }
   };
+  
+  // In the empty existential parameter case, we don't need to decompose the
+  // arguments.
+  if (paramType->isEmptyExistentialComposition()) {
+    return ConstraintSystem::SolutionKind::Solved;
+  }
 
   // Extract the arguments.
   auto args = decomposeArgParamType(argType);
@@ -1976,10 +1982,25 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // we hit commit_to_conversions below, but we have to add a token restriction
   // to ensure we wrap the metatype value in a metatype erasure.
   if (concrete && type2->isExistentialType()) {
-    if (kind == TypeMatchKind::ConformsTo)
-      conversionsOrFixes.push_back(ConversionRestrictionKind::MetatypeToExistentialMetatype);
-    else if (kind >= TypeMatchKind::Subtype)
+    
+    // If we're binding to an empty existential, we need to make sure that the
+    // conversion is valid.
+    if (kind == TypeMatchKind::BindType &&
+        type2->isEmptyExistentialComposition()) {
+      
       conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
+      addConstraint(ConstraintKind::SelfObjectOfProtocol,
+                    type1, type2, getConstraintLocator(locator));
+      
+      return SolutionKind::Solved;
+    }
+    
+    if (kind == TypeMatchKind::ConformsTo) {
+      conversionsOrFixes.push_back(ConversionRestrictionKind::
+                                   MetatypeToExistentialMetatype);
+    } else if (kind >= TypeMatchKind::Subtype) {
+      conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
+    }
   }
 
   // A value of type T can be converted to type U? if T is convertible to U.

@@ -96,4 +96,5 @@ any = {(x: Int) -> Int in x + x}
 // CHECK-NEXT: 24
 print((any as! Int -> Int)(12))
 // CHECK-NEXT: 24
-print(callAny(any, 12))
+let ca = callAny(any, 12)
+print(ca)
