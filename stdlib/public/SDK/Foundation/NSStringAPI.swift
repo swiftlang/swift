@@ -1601,5 +1601,46 @@ extension String {
   ) -> String? {
     return _ns.stringByApplyingTransform(transform, reverse: reverse)
   }
+
+  //===--- From the 10.10 release notes; not in public documentation ------===//
+  // No need to make these unavailable on earlier OSes, since they can
+  // forward trivially to rangeOfString.
+
+  /// Returns `true` iff `other` is non-empty and contained within
+  /// `self` by case-sensitive, non-literal search.
+  ///
+  /// Equivalent to `self.rangeOfString(other) != nil`
+  @warn_unused_result
+  public func containsString(other: String) -> Bool {
+    let r = self.rangeOfString(other) != nil
+    if #available(OSX 10.10, iOS 8.0, *) {
+      _sanityCheck(r == _ns.containsString(other))
+    }
+    return r
+  }
+  
+  /// Returns `true` iff `other` is non-empty and contained within
+  /// `self` by case-insensitive, non-literal search, taking into
+  /// account the current locale.
+  ///
+  /// Locale-independent case-insensitive operation, and other needs,
+  /// can be achieved by calling
+  /// `rangeOfString(_:options:_,range:_locale:_)`.
+  ///
+  /// Equivalent to
+  ///
+  ///     self.rangeOfString(
+  ///       other, options: .CaseInsensitiveSearch,
+  ///       locale: NSLocale.currentLocale()) != nil
+  @warn_unused_result
+  public func localizedCaseInsensitiveContainsString(other: String) -> Bool {
+    let r = self.rangeOfString(
+      other, options: .CaseInsensitiveSearch, locale: NSLocale.currentLocale()
+    ) != nil
+    if #available(OSX 10.10, iOS 8.0, *) {
+      _sanityCheck(r == _ns.localizedCaseInsensitiveContainsString(other))
+    }
+    return r
+  }
 }
 

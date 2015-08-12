@@ -1176,6 +1176,62 @@ NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
   }
 }
 
+NSStringAPIs.test("containsString(_:)") {
+  withOverriddenNSLocaleCurrentLocale("en") { () -> () in
+    expectFalse("".containsString(""))
+    expectFalse("".containsString("a"))
+    expectFalse("a".containsString(""))
+    expectFalse("a".containsString("b"))
+    expectTrue("a".containsString("a"))
+    expectFalse("a".containsString("A"))
+    expectFalse("A".containsString("a"))
+    expectFalse("a".containsString("a\u{0301}"))
+    expectTrue("a\u{0301}".containsString("a\u{0301}"))
+    expectFalse("a\u{0301}".containsString("a"))
+    expectTrue("a\u{0301}".containsString("\u{0301}"))
+    expectFalse("a".containsString("\u{0301}"))
+
+    expectFalse("i".containsString("I"))
+    expectFalse("I".containsString("i"))
+    expectFalse("\u{0130}".containsString("i"))
+    expectFalse("i".containsString("\u{0130}"))
+
+    return ()
+  }
+
+  withOverriddenNSLocaleCurrentLocale("tr") {
+    expectFalse("\u{0130}".containsString("ı"))
+  }
+}
+
+NSStringAPIs.test("localizedCaseInsensitiveContainsString(_:)") {
+  withOverriddenNSLocaleCurrentLocale("en") { () -> () in
+    expectFalse("".localizedCaseInsensitiveContainsString(""))
+    expectFalse("".localizedCaseInsensitiveContainsString("a"))
+    expectFalse("a".localizedCaseInsensitiveContainsString(""))
+    expectFalse("a".localizedCaseInsensitiveContainsString("b"))
+    expectTrue("a".localizedCaseInsensitiveContainsString("a"))
+    expectTrue("a".localizedCaseInsensitiveContainsString("A"))
+    expectTrue("A".localizedCaseInsensitiveContainsString("a"))
+    expectFalse("a".localizedCaseInsensitiveContainsString("a\u{0301}"))
+    expectTrue("a\u{0301}".localizedCaseInsensitiveContainsString("a\u{0301}"))
+    expectFalse("a\u{0301}".localizedCaseInsensitiveContainsString("a"))
+    expectTrue("a\u{0301}".localizedCaseInsensitiveContainsString("\u{0301}"))
+    expectFalse("a".localizedCaseInsensitiveContainsString("\u{0301}"))
+
+    expectTrue("i".localizedCaseInsensitiveContainsString("I"))
+    expectTrue("I".localizedCaseInsensitiveContainsString("i"))
+    expectFalse("\u{0130}".localizedCaseInsensitiveContainsString("i"))
+    expectFalse("i".localizedCaseInsensitiveContainsString("\u{0130}"))
+
+    return ()
+  }
+
+  withOverriddenNSLocaleCurrentLocale("tr") {
+    expectFalse("\u{0130}".localizedCaseInsensitiveContainsString("ı"))
+  }
+}
+
 NSStringAPIs.test("localizedStandardContainsString(_:)") {
   if #available(OSX 10.11, iOS 9.0, *) {
     withOverriddenNSLocaleCurrentLocale("en") { () -> () in
