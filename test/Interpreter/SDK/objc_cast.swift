@@ -21,6 +21,9 @@ var obj : AnyObject
 func genericCast<T>(x: AnyObject, _: T.Type) -> T? {
   return x as? T
 }
+func genericCastObjCBound<T: NSObject>(x: AnyObject, _: T.Type) -> T? {
+  return x as? T
+}
 
 // Test instance of Swift subclass of Objective-C class
 
@@ -73,6 +76,14 @@ if genericCast(obj, NSObject.self) == nil       { abort() }
 if genericCast(obj, NSArray.self) != nil        { abort() }
 if genericCast(obj, SwiftSub.self) != nil       { abort() }
 if genericCast(obj, SwiftSuper.self) != nil     { abort() }
+
+_ = genericCastObjCBound(obj, NSPort.self)!
+_ = genericCastObjCBound(obj, NSObject.self)!
+if genericCastObjCBound(obj, SwiftSubPort.self) != nil   { abort() }
+if genericCastObjCBound(obj, SwiftSuperPort.self) != nil { abort() }
+if genericCastObjCBound(obj, NSPort.self) == nil         { abort() }
+if genericCastObjCBound(obj, NSObject.self) == nil       { abort() }
+if genericCastObjCBound(obj, NSArray.self) != nil        { abort() }
 
 obj = NSObject()
 _ = obj as! NSObject
