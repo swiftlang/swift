@@ -78,7 +78,7 @@ check which pass did introduce the wrong SIL.
 There are several other options available, e.g. to filter the output by
 function names (``-Xllvm -sil-print-only-function``/``s``) or by pass names
 (``-Xllvm -sil-print-before``/``after``/``around``).
-For details see ``SILPassManager.cpp``.
+For details see ``PassManager.cpp``.
 
 Dumping the SIL and other Data in LLDB
 ``````````````````````````````````````
