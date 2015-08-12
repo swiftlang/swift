@@ -613,11 +613,15 @@ static bool ignoreableBuiltinInstInUnreachableBlock(BuiltinInst *BI) {
 
 /// Match a call to a trap BB with no ARC relevant side effects.
 bool swift::isARCInertTrapBB(SILBasicBlock *BB) {
-  auto II = BB->begin(), IE = BB->end();
-  while (II != IE) {
-    if (isa<UnreachableInst>(&*II))
-      return true;
+  // Do a quick check at the beginning to make sure that our terminator is
+  // actually an unreachable. This ensures that in many cases this function will
+  // exit early and quickly.
+  auto II = BB->rbegin();
+  if (!isa<UnreachableInst>(*II))
+    return false;
 
+  auto IE = BB->rend();
+  while (II != IE) {
     // Ignore any instructions without side effects.
     if (!II->mayHaveSideEffects()) {
       ++II;
@@ -625,7 +629,7 @@ bool swift::isARCInertTrapBB(SILBasicBlock *BB) {
     }
 
     // Ignore cond fail.
-    if (isa<CondFailInst>(II)) {
+    if (isa<CondFailInst>(*II)) {
       ++II;
       continue;
     }
@@ -637,7 +641,8 @@ bool swift::isARCInertTrapBB(SILBasicBlock *BB) {
         continue;
       }
     }
-    
+
+    // Check for builtins that we can ignore.
     if (auto *BI = dyn_cast<BuiltinInst>(&*II)) {
       if (ignoreableBuiltinInstInUnreachableBlock(BI)) {
         ++II;
@@ -645,10 +650,13 @@ bool swift::isARCInertTrapBB(SILBasicBlock *BB) {
       }
     }
 
+    // If we can't ignore the instruction, return false.
     return false;
   }
 
-  return false;
+  // Otherwise, we have an unreachable and every instruction is inert from an
+  // ARC perspective in an unreachable BB.
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
