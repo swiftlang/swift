@@ -368,6 +368,25 @@ if #available(OSX 10.11, iOS 9.0, *) {
       expectUnreachableCatch(error)
     }
   }
+
+  FoundationTestSuite.test("NSKeyedUnarchiver/decodeTopLevelObjectOfClass(_:forKey:)/trap") {
+    let obj = NSPredicate(value: true)
+    let data = createTestArchive()
+
+    var KU = NSKeyedUnarchiver(forReadingWithData: data)
+
+    expectCrashLater()
+    // Even though we're doing non-secure coding, this should still be checked
+    // in Swift.
+    do {
+      var wrongType = try KU.decodeTopLevelObjectOfClass(NSDateFormatter.self, forKey: KEY)
+      expectType((NSDateFormatter?).self, &wrongType)
+    } catch {
+      expectUnreachableCatch(error)
+    }
+
+    KU.finishDecoding()
+  }
 }
 
 runAllTests()
