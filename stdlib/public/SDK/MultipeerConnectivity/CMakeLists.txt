@@ -5,4 +5,4 @@ add_swift_library(swiftMultipeerConnectivity IS_SDK_OVERLAY
   SWIFT_MODULE_DEPENDS Foundation
   SWIFT_MODULE_DEPENDS_OSX AppKit
   SWIFT_MODULE_DEPENDS_IOS_TVOS UIKit
-  FRAMEWORK_DEPENDS MultipeerConnectivity)
+  FRAMEWORK_DEPENDS_WEAK MultipeerConnectivity)

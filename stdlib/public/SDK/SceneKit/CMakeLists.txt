@@ -6,5 +6,5 @@ add_swift_library(swiftSceneKit IS_SDK_OVERLAY
   SWIFT_MODULE_DEPENDS Foundation GLKit simd
   SWIFT_MODULE_DEPENDS_OSX CoreImage AppKit
   SWIFT_MODULE_DEPENDS_IOS_TVOS CoreImage UIKit
-  FRAMEWORK_DEPENDS SceneKit)
+  FRAMEWORK_DEPENDS_WEAK SceneKit)
 
