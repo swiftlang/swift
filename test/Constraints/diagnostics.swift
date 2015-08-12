@@ -45,10 +45,10 @@ f1(
 f0(i, i, // expected-error{{extra argument in call}}
    i)
 
-// FIXME: Tuple name mismatch.
 
-// FIXME: Position mismatch
-// f5(f4)
+// Position mismatch
+f5(f4)  // expected-error {{cannot invoke 'f5' with an argument list of type '((Int) -> Int)'}}
+// expected-note @-1 {{expected an argument list of type '(T)'}}
 
 // Tuple element not convertible.
 f0(i,
@@ -64,10 +64,7 @@ f3(
    f2 // expected-error {{cannot convert value of type '(((Int) -> Int)) -> Int' to expected argument type '((Int) -> Float) -> Int'}}
    )
 
-// FIXME: Can't test same-type diagnostic yet.
-// f4(i, d)
-
-// FIXME: Can't test constructible requirement yet.
+f4(i, d) // expected-error {{extra argument in call}}
 
 // Missing member.
 i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
@@ -78,7 +75,8 @@ i.wobble() // expected-error{{value of type 'Int' has no member 'wobble'}}
 "awfawf".doesntExist(0)   // expected-error {{value of type 'String' has no member 'doesntExist'}}
 
 // Does not conform to protocol.
-// FIXME: f5(i)
+f5(i)  // expected-error {{cannot invoke 'f5' with an argument list of type '(Int)'}}
+// expected-note @-1 {{expected an argument list of type '(T)'}}
 
 // Make sure we don't leave open existentials when diagnosing.
 // <rdar://problem/20598568>
