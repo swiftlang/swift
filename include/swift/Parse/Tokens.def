@@ -32,6 +32,12 @@
 #define STMT_KEYWORD(kw) KEYWORD(kw)
 #endif
 
+/// SIL_KEYWORD(kw)
+///   Expands for every SIL keyword. These are only keywords when parsing SIL.
+#ifndef SIL_KEYWORD
+#define SIL_KEYWORD(kw) KEYWORD(kw)
+#endif
+
 /// PUNCTUATOR(name, str)
 ///   Expands for every Swift punctuator.
 ///   \param name  The symbolic name of the punctuator, such as
@@ -64,13 +70,13 @@ DECL_KEYWORD(private)
 DECL_KEYWORD(public)
 DECL_KEYWORD(static)
 
-KEYWORD(undef)      // This is only enabled when parsing .sil files.
-KEYWORD(sil)        // This is only enabled when parsing .sil files.
-KEYWORD(sil_stage)  // This is only enabled when parsing .sil files.
-KEYWORD(sil_vtable) // This is only enabled when parsing .sil files.
-KEYWORD(sil_global) // This is only enabled when parsing .sil files.
-KEYWORD(sil_witness_table) // This is only enabled when parsing .sil files.
-KEYWORD(sil_coverage_map)  // This is only enabled when parsing .sil files.
+SIL_KEYWORD(undef)
+SIL_KEYWORD(sil)
+SIL_KEYWORD(sil_stage)
+SIL_KEYWORD(sil_vtable)
+SIL_KEYWORD(sil_global)
+SIL_KEYWORD(sil_witness_table)
+SIL_KEYWORD(sil_coverage_map)
 
 // Statement keywords.
 STMT_KEYWORD(defer)
@@ -154,4 +160,5 @@ PUNCTUATOR(sil_exclamation, "!")    // Only in SIL mode.
 #undef KEYWORD
 #undef DECL_KEYWORD
 #undef STMT_KEYWORD
+#undef SIL_KEYWORD
 #undef PUNCTUATOR

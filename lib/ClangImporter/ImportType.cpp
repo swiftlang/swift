@@ -26,6 +26,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Parse/Token.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "clang/AST/ASTContext.h"
@@ -1944,8 +1945,14 @@ static Identifier omitNeedlessWords(ASTContext &ctx,
 
   // Go back to the last matching word and chop off the name at that
   // point.
-  return ctx.getIdentifier(nameStr.substr(0,
-                                          nameWordRevIter.base().getPosition()));
+  StringRef newName = nameStr.substr(0, nameWordRevIter.base().getPosition());
+
+  // If we ended up with a keyword or a name like "get" or "set", do nothing.
+  if (isKeyword(newName) || newName == "get" || newName == "set")
+    return name;
+
+  // Form the identifier.
+  return ctx.getIdentifier(newName);
 }
 
 /// Attempt to omit needless words from the given function name.
