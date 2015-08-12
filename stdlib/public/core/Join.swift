@@ -19,19 +19,25 @@ extension RangeReplaceableCollectionType {
   /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`.
   @warn_unused_result
   public func join<
-    S : SequenceType where S.Generator.Element == Self
+    S : SequenceType
+    where
+    S.Generator.Element : SequenceType,
+    S.Generator.Element.Generator.Element == Generator.Element
   >(elements: S) -> Self {
     var result = Self()
-    let separatorSize = self.count
+    let separatorSize: Int = numericCast(self.count)
 
     let reservation = elements._preprocessingPass {
-      (s: S) -> Index.Distance in
-      let r: Index.Distance = s.reduce(0) { $0 + separatorSize + $1.count }
+      (s: S) -> Int in
+      var r = 0
+      for chunk in s {
+        r += separatorSize + chunk.underestimateCount()
+      }
       return r - separatorSize
     }
 
     if let n = reservation {
-      result.reserveCapacity(n)
+      result.reserveCapacity(numericCast(n))
     }
 
     if separatorSize != 0 {
@@ -51,6 +57,14 @@ extension RangeReplaceableCollectionType {
 
     return result
   }
+}
+
+extension SequenceType where Generator.Element : SequenceType {
+  func joinWithSeparator<
+    Separator: SequenceType
+    where
+    Separator.Generator.Element == Generator.Element.Generator.Element
+  >(separator: Separator) {}
 }
 
 @available(*, unavailable, message="call the 'join()' method on the collection")
