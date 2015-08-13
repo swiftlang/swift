@@ -2001,22 +2001,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   return nullptr;
 }
 
-static SILValue getActualCallee(SILValue Callee) {
-  while (!isa<FunctionRefInst>(Callee)) {
-    if (auto *CFI = dyn_cast<ConvertFunctionInst>(Callee)) {
-      Callee = CFI->getConverted();
-      continue;
-    }
-    if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(Callee)) {
-      Callee = TTI->getConverted();
-      continue;
-    }
-    break;
-  }
-
-  return Callee;
-}
-
 SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
