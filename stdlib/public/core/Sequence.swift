@@ -164,7 +164,7 @@ public protocol SequenceType {
   /// Returns the maximal `SubSequence`s of `self`, in order, that
   /// don't contain elements satisfying the predicate `isSeparator`.
   ///
-  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
+  /// - Parameter maxSplit: The maximum number of `SubSequence`s to
   ///   return, minus 1.
   ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
   ///   a suffix of `self` containing the remaining elements.
@@ -466,7 +466,7 @@ extension SequenceType {
   /// Returns the maximal `SubSequence`s of `self`, in order, that
   /// don't contain elements satisfying the predicate `isSeparator`.
   ///
-  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
+  /// - Parameter maxSplit: The maximum number of `SubSequence`s to
   ///   return, minus 1.
   ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
   ///   a suffix of `self` containing the remaining elements.
@@ -568,7 +568,7 @@ extension SequenceType where Generator.Element : Equatable {
   /// Returns the maximal `SubSequence`s of `self`, in order, around elements
   /// equatable to `separator`.
   ///
-  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
+  /// - Parameter maxSplit: The maximum number of `SubSequence`s to
   ///   return, minus 1.
   ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
   ///   a suffix of `self` containing the remaining elements.
