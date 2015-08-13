@@ -3821,6 +3821,11 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   // Scope any further writeback just within this operation.
   WritebackScope writebackScope(*this);
 
+  assert(!materializeForSet.getDecl()
+           ->getDeclContext()->isProtocolExtensionContext() &&
+         "direct use of materializeForSet from a protocol extension is"
+         " probably a miscompile");
+
   Callee callee = emitSpecializedAccessorFunctionRef(*this, loc,
                                                      materializeForSet,
                                                      substitutions, selfValue,

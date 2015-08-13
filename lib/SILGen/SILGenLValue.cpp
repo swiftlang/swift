@@ -809,11 +809,14 @@ namespace {
                                  ManagedValue base,
                                  AccessKind accessKind) && override {
       // If this is just for a read, or the property is dynamic, or if
-      // it doesn't have a materializeForSet, just materialize to a
-      // temporary.
+      // it doesn't have a materializeForSet, or if this is a direct
+      // use of something defined in a protocol extension (see
+      // maybeEmitMaterializeForSetThunk), just materialize to a
+      // temporary directly.
       if (accessKind == AccessKind::Read ||
           decl->getAttrs().hasAttribute<DynamicAttr>() ||
-          !decl->getMaterializeForSetFunc()) {
+          !decl->getMaterializeForSetFunc() ||
+          decl->getDeclContext()->isProtocolExtensionContext()) {
         return std::move(*this).LogicalPathComponent::getMaterialized(gen,
                                                         loc, base, accessKind);
       }

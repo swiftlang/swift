@@ -225,6 +225,40 @@ class HasWeak {
 // CHECK:   return [[T4]] : $(Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout HasWeak, @thick HasWeak.Type) -> ()>)
 // CHECK: }
 
+// rdar://22109071
+// Test that we don't use materializeForSet from a protocol extension.
+protocol Magic {}
+extension Magic {
+  var hocus: Int {
+    get { return 0 }
+    set {}
+  }
+}
+struct Wizard : Magic {}
+func improve(inout x: Int) {}
+func improveWizard(inout wizard: Wizard) {
+  improve(&wizard.hocus)
+}
+// SILGEN-LABEL: sil hidden @_TF17materializeForSet13improveWizardFRVS_6WizardT_
+// SILGEN:       [[IMPROVE:%.*]] = function_ref @_TF17materializeForSet7improveFRSiT_ :
+// SILGEN-NEXT:  [[TEMP:%.*]] = alloc_stack $Int
+//   Call the getter and materialize the result in the temporary.
+// SILGEN-NEXT:  [[T0:%.*]] = load [[WIZARD:.*]] : $*Wizard
+// SILGEN-NEXT:  function_ref
+// SILGEN-NEXT:  [[GETTER:%.*]] = function_ref @_TFeRq_17materializeForSet5Magic_S_S0_g5hocusSi
+// SILGEN-NEXT:  [[WTEMP:%.*]] = alloc_stack $Wizard
+// SILGEN-NEXT:  store [[T0]] to [[WTEMP]]#1
+// SILGEN-NEXT:  [[T0:%.*]] = apply [[GETTER]]<Wizard>([[WTEMP]]#1)
+// SILGEN-NEXT:  store [[T0]] to [[TEMP]]#1
+//   Call improve.
+// SILGEN-NEXT:  apply [[IMPROVE]]([[TEMP]]#1)
+// SILGEN-NEXT:  [[T0:%.*]] = load [[TEMP]]#1
+// SILGEN-NEXT:  function_ref
+// SILGEN-NEXT:  [[SETTER:%.*]] = function_ref @_TFeRq_17materializeForSet5Magic_S_S0_s5hocusSi
+// SILGEN-NEXT:  apply [[SETTER]]<Wizard>([[T0]], [[WIZARD]])
+// SILGEN-NEXT:  dealloc_stack [[WTEMP]]#0
+// SILGEN-NEXT:  dealloc_stack [[TEMP]]#0
+
 protocol Totalled {
   var total: Int { get set }
 }
