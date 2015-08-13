@@ -80,20 +80,19 @@ printTypeName(Tup.self) // CHECK-NEXT: (protocol<>, () -> (), [[THIS]].C)
 typealias IF = inout Int -> ()
 typealias IF2 = inout Int -> inout Int -> ()
 typealias IF3 = (inout Int -> ()) -> ()
+typealias IF3a = (inout (Int -> ())) -> ()
+typealias IF3b = inout (Int -> ()) -> ()
+typealias IF3c = ((inout Int) -> ()) -> ()
 typealias IF4 = inout (() -> ()) -> ()
 typealias IF5 = (inout Int, Any) -> ()
 
 printTypeName(IF.self) // CHECK-NEXT: inout Swift.Int -> ()
 printTypeName(IF2.self) // CHECK-NEXT: inout Swift.Int -> inout Swift.Int -> ()
-
-// FIXME: this is wrong.  Should be: "(inout Swift.Int -> ()) -> ()"
-// <rdar://problem/20133773> Demangling of function types that include 'inout' is wrong
 printTypeName(IF3.self) // CHECK-NEXT: inout (Swift.Int -> ()) -> ()
-
-// FIXME: this is wrong.  Should be: "inout (() -> ()) -> ()"
-// <rdar://problem/20133773> Demangling of function types that include 'inout' is wrong
-printTypeName(IF4.self) // CHECK-NEXT: (() -> ()) -> ()
-
+printTypeName(IF3a.self) // CHECK-NEXT: inout (Swift.Int -> ()) -> ()
+printTypeName(IF3b.self) // CHECK-NEXT: inout (Swift.Int -> ()) -> ()
+printTypeName(IF3c.self) // CHECK-NEXT: (inout Swift.Int -> ()) -> ()
+printTypeName(IF4.self) // CHECK-NEXT: inout (() -> ()) -> ()
 printTypeName(IF5.self) // CHECK-NEXT: (inout Swift.Int, protocol<>) -> ()
 
 func curry1() {
