@@ -375,18 +375,15 @@ deriveHashable_enum_hashValue(TypeChecker &tc, Decl *parentDecl,
   
   // We can't form a Hashable conformance if Int isn't Hashable or
   // IntegerLiteralConvertible.
-  if (!tc.conformsToProtocol(intType,
-                             C.getProtocol(KnownProtocolKind::Hashable),
-                             enumDecl,
-                             None)) {
+  if (!tc.conformsToProtocol(intType,C.getProtocol(KnownProtocolKind::Hashable),
+                             enumDecl, None)) {
     tc.diagnose(enumDecl->getLoc(), diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::IntegerLiteralConvertible);
-  if (!tc.conformsToProtocol(intType, intLiteralProto, enumDecl,
-                             None)) {
+  if (!tc.conformsToProtocol(intType, intLiteralProto, enumDecl, None)) {
     tc.diagnose(enumDecl->getLoc(),
                 diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;

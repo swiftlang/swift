@@ -516,4 +516,8 @@ func reachabilityForInternetConnection() {
   r22255907_2(1, a: &variable, b: 2.1)// expected-error {{'&' used with non-inout argument of type 'Int'}} {{21-22=}}
 }
 
+// <rdar://problem/21601687> QoI: Using "=" instead of "==" in if statement leads to incorrect error message
+if i = 6 { } // expected-error {{use of '=' in a boolean context, did you mean '=='?}} {{6-7===}}
+
+_ = (i = 6) ? 42 : 57 // expected-error {{use of '=' in a boolean context, did you mean '=='?}} {{8-9===}}
 

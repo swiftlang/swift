@@ -2948,6 +2948,16 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
   // If the destination type is a protocol, then use conformsToProtocol to
   // produce a more specific diagnostic.
   if (auto *PT = contextualType->getAs<ProtocolType>()) {
+    // Check for "=" converting to BooleanType.  The user probably meant ==.
+    if (auto *AE = dyn_cast<AssignExpr>(expr->getSemanticsProvidingExpr()))
+      if (PT->getDecl()->getNameStr() == "BooleanType") {
+        diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
+          .fixItReplace(AE->getEqualLoc(), "==")
+          .highlight(AE->getDest()->getLoc())
+          .highlight(AE->getSrc()->getLoc());
+        return true;
+      }
+    
     if (!CS->TC.conformsToProtocol(exprType, PT->getDecl(), CS->DC,
                                    ConformanceCheckFlags::InExpression,
                                    nullptr, expr->getLoc()))
@@ -3661,6 +3671,16 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
   auto booleanType = CS->TC.getProtocol(IE->getQuestionLoc(),
                                         KnownProtocolKind::BooleanType);
   if (!booleanType) return true;
+  
+  
+  // Check for "=" converting to BooleanType.  The user probably meant ==.
+  if (auto *AE = dyn_cast<AssignExpr>(condExpr->getSemanticsProvidingExpr())) {
+    diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
+      .fixItReplace(AE->getEqualLoc(), "==")
+      .highlight(AE->getDest()->getLoc())
+      .highlight(AE->getSrc()->getLoc());
+    return true;
+  }
   
   if (!CS->TC.conformsToProtocol(condExpr->getType(), booleanType, CS->DC,
                                  ConformanceCheckFlags::InExpression,

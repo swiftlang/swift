@@ -859,6 +859,10 @@ ERROR(type_does_not_conform,sema_tcd,none,
 ERROR(cannot_use_nil_with_this_type,sema_tcd,none,
       "nil cannot be used in context expecting type %0", (Type))
 
+ERROR(use_of_equal_instead_of_equality,sema_tcd,none,
+      "use of '=' in a boolean context, did you mean '=='?", ())
+
+
 ERROR(protocol_does_not_conform_objc,sema_tcc,none,
       "using %0 as a concrete type conforming to protocol %1 is not supported",
       (Type, Type))
