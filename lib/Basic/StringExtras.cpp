@@ -16,8 +16,10 @@
 //===----------------------------------------------------------------------===//
 #include "swift/Basic/StringExtras.h"
 #include "clang/Basic/CharInfo.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringSwitch.h"
 #include <algorithm>
 
 using namespace swift;
@@ -239,3 +241,148 @@ size_t camel_case::findWord(StringRef string, StringRef word) {
   }
 }
 
+/// Determine whether the given identifier is a keyword.
+static bool isKeyword(StringRef identifier) {
+  return llvm::StringSwitch<bool>(identifier)
+#define KEYWORD(kw) .Case(#kw, true)
+#define SIL_KEYWORD(kw)
+#include "swift/Parse/Tokens.def"
+    .Default(false);
+}
+
+StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
+                                   NameRole role) {
+  if (name.empty() || typeName.empty()) return name;
+
+  // Get the camel-case words in the name and type name.
+  auto nameWords = camel_case::getWords(name);
+  auto typeWords = camel_case::getWords(typeName);
+
+  // Match the last words in the type name to the last words in the
+  // name.
+  auto nameWordRevIter = nameWords.rbegin(),
+    nameWordRevIterEnd = nameWords.rend();
+  auto typeWordRevIter = typeWords.rbegin(),
+    typeWordRevIterEnd = typeWords.rend();
+  bool anyMatches = false;
+  while (nameWordRevIter != nameWordRevIterEnd &&
+         typeWordRevIter != typeWordRevIterEnd) {
+    // If the names match, continue.
+    if (camel_case::sameWordIgnoreFirstCase(*nameWordRevIter,
+                                            *typeWordRevIter)) {
+      anyMatches = true;
+      ++nameWordRevIter;
+      ++typeWordRevIter;
+      continue;
+    }
+
+    // Special case: "Indexes" and "Indices" in the name match
+    // "IndexSet" in the type.
+    if ((camel_case::sameWordIgnoreFirstCase(*nameWordRevIter, "Indexes") ||
+         camel_case::sameWordIgnoreFirstCase(*nameWordRevIter, "Indices")) &&
+        *typeWordRevIter == "Set") {
+      auto nextTypeWordRevIter = typeWordRevIter;
+      ++nextTypeWordRevIter;
+      if (nextTypeWordRevIter != typeWordRevIterEnd &&
+          camel_case::sameWordIgnoreFirstCase(*nextTypeWordRevIter, "Index")) {
+        anyMatches = true;
+        ++nameWordRevIter;
+        typeWordRevIter = nextTypeWordRevIter;
+        ++typeWordRevIter;
+        continue;
+      }
+    }
+
+    break;
+  }
+
+  // If nothing matched, there is nothing to omit.
+  if (!anyMatches) return name;
+
+  // Handle complete name matches.
+  if (nameWordRevIter == nameWordRevIterEnd) {
+    // If this is the first parameter, it's okay to drop the name
+    // entirely.
+    if (role == NameRole::FirstParameter) return "";
+
+    // Otherwise, leave the name alone.
+    return name;
+  }
+
+  // If the word preceding the match is "With", and it isn't the first
+  // word, we can drop it as well.
+  auto nextNameWordRevIter = nameWordRevIter;
+  ++nextNameWordRevIter;
+  if (*nameWordRevIter == "With") {
+    ++nameWordRevIter;
+
+    // If we hit the beginning of the word, step back to keep the
+    // "with". This will only actually happen if the name isn't
+    // following the camel-casing rules correctly.
+    if (nameWordRevIter == nameWordRevIterEnd) --nameWordRevIter;
+  }
+
+  // Go back to the last matching word and chop off the name at that
+  // point.
+  StringRef newName = name.substr(0, nameWordRevIter.base().getPosition());
+
+  // If we ended up with a keyword or a name like "get" or "set", do nothing.
+  if (isKeyword(newName) || newName == "get" || newName == "set")
+    return name;
+
+  // We're done.
+  return newName;
+}
+
+bool swift::omitNeedlessWords(StringRef &baseName,
+                              MutableArrayRef<StringRef> argNames,
+                              StringRef resultType,
+                              StringRef contextType,
+                              ArrayRef<StringRef> paramTypes,
+                              bool returnsSelf) {
+  // For zero-parameter methods that return 'Self' or a result type
+  // that matches the declaration context, omit needless words from
+  // the base name.
+  if (paramTypes.empty()) {
+    if (returnsSelf || (resultType == contextType)) {
+      StringRef typeName = returnsSelf ? contextType : resultType;
+      if (typeName.empty())
+        return false;
+
+      StringRef oldBaseName = baseName;
+      baseName = omitNeedlessWords(baseName, typeName, NameRole::BaseName);
+      return baseName != oldBaseName;
+    }
+
+    return false;
+  }
+
+  // Omit needless words based on parameter types.
+  bool anyChanges = false;
+  for (unsigned i = 0, n = argNames.size(); i != n; ++i) {
+    // If there is no corresponding parameter, there is nothing to
+    // omit.
+    if (i >= paramTypes.size()) continue;
+
+    // Omit needless words based on the type of the parameter.
+    NameRole role = i > 0 ? NameRole::SubsequentParameter
+      : argNames[0].empty() ? NameRole::BaseName
+      : NameRole::FirstParameter;
+
+    StringRef name = role == NameRole::BaseName ? baseName : argNames[i];
+    StringRef newName = omitNeedlessWords(name, paramTypes[i], role);
+
+    if (name == newName) continue;
+
+    anyChanges = true;
+
+    // Record this change.
+    if (role == NameRole::BaseName) {
+      baseName = newName;
+    } else {
+      argNames[i] = newName;
+    }
+  }
+
+  return anyChanges;
+}

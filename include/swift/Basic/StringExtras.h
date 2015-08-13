@@ -241,6 +241,63 @@ namespace swift {
     ///   it was not found
     size_t findWord(StringRef string, StringRef word);
   } // end namespace camel_case
+
+/// Describes the role that a particular name has within a
+/// signature, which can affect how we omit needless words.
+enum class NameRole {
+  /// The base name of a function or method.
+  BaseName,
+
+  /// The first parameter of a function or method.
+  FirstParameter,
+
+  // Subsequent parameters in a function or method.
+    SubsequentParameter,
+
+  // The name of a property.
+  Property,
+};
+
+/// Attempt to omit needless words from the given name based on the
+/// name of the type associated with the name.
+///
+/// \param name The name from which we will attempt to remove needless
+/// words.
+///
+/// \param typeName The name of the type of the entity being described.
+///
+/// \param role The role of the name, e.g., a parameter name, property
+/// name, base name of a function, etc.
+///
+/// \returns the updated name.
+StringRef omitNeedlessWords(StringRef name, StringRef typeName, NameRole role);
+
+/// Omit needless words for a function, method, or initializer.
+///
+/// \param baseName The base name of the function. This value may be
+/// changed if any words are removed.
+///
+/// \param argNames The names of the arguments to the function. The
+/// values in this array may be changed if any words are removed.
+///
+/// \param resultType The name of the result type of the function.
+///
+/// \param contextType The name of the type of the enclosing context,
+/// e.g., the class name.
+///
+/// \param paramTypes The names of the parameter types for the
+/// function.
+///
+/// \param returnsSelf Whether the result of the function is 'Self'
+/// (in Swift) or 'instancetype' (in Objective-C).
+///
+/// \returns true if any words were omitted, false otherwise.
+bool omitNeedlessWords(StringRef &baseName,
+                       MutableArrayRef<StringRef> argNames,
+                       StringRef resultType,
+                       StringRef contextType,
+                       ArrayRef<StringRef> paramTypes,
+                       bool returnsSelf);
 }
 
 #endif // LLVM_SWIFT_BASIC_STRINGEXTRAS_HPP

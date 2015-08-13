@@ -1302,8 +1302,24 @@ ClangImporter::Implementation::importName(const clang::NamedDecl *D,
     result = SwiftContext.getIdentifier(name.str());
   }
 
-  if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(D)) {
-    result = adjustObjCPropertyName(objcProperty, result);
+  // Omit needless words from properties whose types match that of
+  // their enclosing class.
+  if (OmitNeedlessWords) {
+    if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+      auto contextType = getClangDeclContextType(D->getDeclContext());
+      if (!contextType.isNull()) {
+        auto contextTypeName = getClangTypeNameForOmission(contextType);
+        auto propertyTypeName = getClangTypeNameForOmission(
+                                  objcProperty->getType());
+        if (contextTypeName == propertyTypeName) {
+          StringRef newName = omitNeedlessWords(result.str(),
+                                                propertyTypeName,
+                                                NameRole::Property);
+          if (newName != result.str())
+            result = SwiftContext.getIdentifier(newName);
+        }
+      }
+    }
   }
 
   return result;

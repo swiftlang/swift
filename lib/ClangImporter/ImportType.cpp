@@ -1762,8 +1762,13 @@ considerErrorImport(ClangImporter::Implementation &importer,
 
 /// Retrieve the name of the given Clang type for use when omitting
 /// needless words.
-static StringRef getClangTypeNameForOmission(clang::ASTContext &ctx,
-                                             clang::QualType type) {
+StringRef ClangImporter::Implementation::getClangTypeNameForOmission(
+            clang::QualType type) {
+  if (type.isNull())
+    return "";
+
+  auto &ctx = getClangASTContext();
+
   // Dig through the type, looking for a typedef-name and stripping
   // references along the way.
   do {
@@ -1847,173 +1852,67 @@ static StringRef getClangTypeNameForOmission(clang::ASTContext &ctx,
   return StringRef();
 }
 
-namespace {
-  /// Describes the role that a particular name has within a
-  /// signature, which can affect how we omit needless words.
-  enum class NameRole {
-    /// The base name of a function or method.
-    BaseName,
-
-    /// The first parameter of a function or method.
-    FirstParameter,
-
-    // Subsequent parameters in a function or method.
-      SubsequentParameter,
-
-    // The name of a property.
-    Property,
-  };
-}
-
-/// Attempt to omit needless words from the given name.
-static Identifier omitNeedlessWords(ASTContext &ctx, 
-                                    clang::ASTContext &clangCtx,
-                                    Identifier name,
-                                    clang::QualType type,
-                                    NameRole role) {
-  if (name.empty()) return name;
-  StringRef nameStr = name.str();
-
-  // Figure out the name of the type.
-  StringRef typeNameStr = getClangTypeNameForOmission(clangCtx, type);
-  if (typeNameStr.empty()) return name;
-
-  // Get the camel-case words in the name and type name.
-  auto nameWords = camel_case::getWords(nameStr);
-  auto typeWords = camel_case::getWords(typeNameStr);
-
-  // Match the last words in the type name to the last words in the
-  // name.
-  auto nameWordRevIter = nameWords.rbegin(),
-    nameWordRevIterEnd = nameWords.rend();
-  auto typeWordRevIter = typeWords.rbegin(),
-    typeWordRevIterEnd = typeWords.rend();
-  bool anyMatches = false;
-  while (nameWordRevIter != nameWordRevIterEnd &&
-         typeWordRevIter != typeWordRevIterEnd) {
-    // If the names match, continue.
-    if (camel_case::sameWordIgnoreFirstCase(*nameWordRevIter,
-                                            *typeWordRevIter)) {
-      anyMatches = true;
-      ++nameWordRevIter;
-      ++typeWordRevIter;
-      continue;
-    }
-
-    // Special case: "Indexes" and "Indices" in the name match
-    // "IndexSet" in the type.
-    if ((camel_case::sameWordIgnoreFirstCase(*nameWordRevIter, "Indexes") ||
-         camel_case::sameWordIgnoreFirstCase(*nameWordRevIter, "Indices")) &&
-        *typeWordRevIter == "Set") {
-      auto nextTypeWordRevIter = typeWordRevIter;
-      ++nextTypeWordRevIter;
-      if (nextTypeWordRevIter != typeWordRevIterEnd &&
-          camel_case::sameWordIgnoreFirstCase(*nextTypeWordRevIter, "Index")) {
-        anyMatches = true;
-        ++nameWordRevIter;
-        typeWordRevIter = nextTypeWordRevIter;
-        ++typeWordRevIter;
-        continue;
-      }
-    }
-
-    break;
-  }
-
-  // If nothing matched, there is nothing to omit.
-  if (!anyMatches) return name;
-
-  // Handle complete name matches.
-  if (nameWordRevIter == nameWordRevIterEnd) {
-    // If this is the first parameter, it's okay to drop the name
-    // entirely.
-    if (role == NameRole::FirstParameter) return Identifier();
-
-    // Otherwise, leave the name alone.
-    return name;
-  }
-
-  // If the word preceding the match is "With", and it isn't the first
-  // word, we can drop it as well.
-  auto nextNameWordRevIter = nameWordRevIter;
-  ++nextNameWordRevIter;
-  if (*nameWordRevIter == "With") {
-    ++nameWordRevIter;
-
-    // If we hit the beginning of the word, step back to keep the
-    // "with". This will only actually happen if the name isn't
-    // following the camel-casing rules correctly.
-    if (nameWordRevIter == nameWordRevIterEnd) --nameWordRevIter;
-  }
-
-  // Go back to the last matching word and chop off the name at that
-  // point.
-  StringRef newName = nameStr.substr(0, nameWordRevIter.base().getPosition());
-
-  // If we ended up with a keyword or a name like "get" or "set", do nothing.
-  if (isKeyword(newName) || newName == "get" || newName == "set")
-    return name;
-
-  // Form the identifier.
-  return ctx.getIdentifier(newName);
-}
-
 /// Attempt to omit needless words from the given function name.
-static DeclName omitNeedlessWords(ASTContext &ctx,
-                                  clang::ASTContext &clangCtx,
-                                  DeclName name,
-                                  ArrayRef<const clang::ParmVarDecl *> params) {
-  Identifier baseName = name.getBaseName();
-  ArrayRef<Identifier> argNames = name.getArgumentNames();
+DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
+           DeclName name,
+           ArrayRef<const clang::ParmVarDecl *> params,
+           clang::QualType resultType,
+           const clang::DeclContext *dc,
+           bool returnsSelf) {
+  ASTContext &ctx = SwiftContext;
 
-  // Omit needless words based on parameter types.
-  SmallVector<Identifier, 4> newArgNames;
-  bool anyChanges = false;
-  for (unsigned i = 0, n = argNames.size(); i != n; ++i) {
-    // If there is no corresponding parameter, there is nothing to
-    // omit.
-    if (i >= params.size()) {
-      if (anyChanges) newArgNames.push_back(argNames[i]);
-      continue;
-    }
-
-    // Omit needless words based on the type of the parameter.
-    NameRole role = i > 0 ? NameRole::SubsequentParameter
-      : argNames[0].empty() ? NameRole::BaseName
-      : NameRole::FirstParameter;
-
-    Identifier name = role == NameRole::BaseName ? baseName : argNames[i];
-    Identifier newName = omitNeedlessWords(ctx, clangCtx, name,
-                                           params[i]->getType(), role);
-
-    if (!anyChanges && name == newName) continue;
-
-    // If this is the first change, copy all of the previous argument names.
-    if (!anyChanges) {
-      newArgNames.append(argNames.begin(), argNames.begin() + i);
-      anyChanges = true;
-    }
-
-    // Record this change.
-    if (role == NameRole::BaseName) {
-      baseName = newName;
-      newArgNames.push_back(argNames[i]);
-    } else {
-      newArgNames.push_back(newName);
-    }
+  // Collect the argument names.
+  SmallVector<StringRef, 4> argNames;
+  for (auto arg : name.getArgumentNames()) {
+    if (arg.empty())
+      argNames.push_back("");
+    else
+      argNames.push_back(arg.str());
   }
-  // If nothing changed, return the original name.
-  if (!anyChanges)
+
+  // Collect the parameter type names.
+  SmallVector<StringRef, 4> paramTypes;
+  for (auto param : params) {
+    paramTypes.push_back(getClangTypeNameForOmission(param->getType()));
+  }
+
+  // Omit needless words.
+  StringRef baseName = name.getBaseName().str();
+  if (!omitNeedlessWords(baseName, argNames,
+                         getClangTypeNameForOmission(resultType),
+                         getClangTypeNameForOmission(
+                           getClangDeclContextType(dc)),
+                         paramTypes, returnsSelf))
     return name;
 
-  // Form the new name.
-  assert(argNames.size() == newArgNames.size());
-  return DeclName(ctx, baseName, newArgNames);
+  /// Retrieve a replacement identifier.
+  auto getReplacementIdentifier = [&](StringRef name,
+                                      Identifier old) -> Identifier{
+    if (name.empty())
+      return Identifier();
+
+    if (!old.empty() && name == old.str())
+      return old;
+
+    return ctx.getIdentifier(name);
+  };
+
+  Identifier newBaseName = getReplacementIdentifier(baseName,
+                                                    name.getBaseName());
+  SmallVector<Identifier, 4> newArgNames;
+  auto oldArgNames = name.getArgumentNames();
+  for (unsigned i = 0, n = argNames.size(); i != n; ++i) {
+    newArgNames.push_back(getReplacementIdentifier(argNames[i],
+                                                   oldArgNames[i]));
+  }
+
+  return DeclName(ctx, newBaseName, newArgNames);
 }
 
 /// Retrieve the instance type of the given Clang declaration context.
-static clang::QualType getTypeOfClangDeclContext(clang::ASTContext &ctx,
-                                                 const clang::DeclContext *dc) {
+clang::QualType ClangImporter::Implementation::getClangDeclContextType(
+                  const clang::DeclContext *dc) {
+  auto &ctx = getClangASTContext();
   if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc))
     return ctx.getObjCObjectPointerType(ctx.getObjCInterfaceType(objcClass));
 
@@ -2028,68 +1927,6 @@ static clang::QualType getTypeOfClangDeclContext(clang::ASTContext &ctx,
   }
 
   return clang::QualType();
-}
-
-/// Determine whether the given Clang type matches the current
-/// declaration context.
-static bool clangTypeMatchesTypeOfDeclContext(clang::ASTContext &ctx,
-                                              clang::QualType type,
-                                              const clang::DeclContext *dc) {
-  // Determine the type of the DeclContext.
-  auto dcType = getTypeOfClangDeclContext(ctx, dc);
-  if (dcType.isNull())
-    return false;
-
-  // Remove pointers/references from the incoming type.
-  do {
-    if (auto ptrTy = type->getAs<clang::PointerType>()) {
-      type = ptrTy->getPointeeType();
-      continue;
-    }
-
-    if (auto refTy = type->getAs<clang::ReferenceType>()) {
-      type = refTy->getPointeeType();
-      continue;
-    }
-
-    break;
-  } while (true);
-
-  // If the types match already, we're done.
-  if (ctx.hasSameUnqualifiedType(type, dcType))
-    return true;
-
-  // If both types are Objective-C pointer types, check whether they
-  // have the same interface type.
-  auto objcObjectPtrType = type->getAsObjCInterfacePointerType();
-  if (!objcObjectPtrType)
-    return false;
-  auto objcClass = objcObjectPtrType->getInterfaceDecl();
-
-  auto dcObjcObjectPtrType = dcType->getAsObjCInterfacePointerType();
-  if (!dcObjcObjectPtrType)
-    return false;
-  auto dcObjcClass = dcObjcObjectPtrType->getInterfaceDecl();
-
-  return objcClass->getCanonicalDecl() == dcObjcClass->getCanonicalDecl();
-}
-
-Identifier ClangImporter::Implementation::adjustObjCPropertyName(
-             const clang::ObjCPropertyDecl *property,
-             Identifier name) {
-  // If we aren't omitting needless words, there is nothing to do.
-  if (!OmitNeedlessWords)
-    return name;
-
-  // Only adjust the name if the Clang type matches the type of its 
-  if (!clangTypeMatchesTypeOfDeclContext(getClangASTContext(),
-                                         property->getType(),
-                                         property->getDeclContext()))
-    return name;
-
-  // Try to omit needless words.
-  return omitNeedlessWords(SwiftContext, getClangASTContext(), name,
-                           property->getType(), NameRole::Property);
 }
 
 Type ClangImporter::Implementation::importMethodType(
@@ -2187,35 +2024,11 @@ Type ClangImporter::Implementation::importMethodType(
                                        swiftResultTy, kind, isCustomName);
 
   // If we should omit needless words and don't have a custom name, do so.
-  if (OmitNeedlessWords && !isCustomName) {
-    auto &clangCtx = getClangASTContext();
-    if (params.empty()) {
-      // For zero-parameter methods with a related result type or a
-      // result type that matches the declaration context, omit
-      // needless words from the base name.
-      clang::QualType clangDCType;
-      if (clangDecl)
-        clangDCType = getTypeOfClangDeclContext(
-                        clangCtx,
-                        clangDecl->getDeclContext());
-      if (!clangDCType.isNull() &&
-          (clangDecl->hasRelatedResultType() ||
-           clangTypeMatchesTypeOfDeclContext(clangCtx,
-                                             resultType,
-                                             clangDecl->getDeclContext()))) {
-        Identifier baseName = omitNeedlessWords(SwiftContext, clangCtx,
-                                                methodName.getBaseName(),
-                                                clangDCType,
-                                                NameRole::BaseName);
-        if (baseName != methodName.getBaseName())
-          methodName = DeclName(SwiftContext, baseName,
-                                methodName.getArgumentNames());
-      }
-    } else {
-      // Omit needless words based on the types of parameters.
-      methodName = omitNeedlessWords(SwiftContext, clangCtx, methodName,
-                                     params);
-    }
+  if (OmitNeedlessWords && !isCustomName && clangDecl) {
+    methodName = omitNeedlessWordsInFunctionName(
+                   methodName, params, resultType,
+                   clangDecl->getDeclContext(),
+                   clangDecl->hasRelatedResultType());
   }
 
   // Import the parameters.

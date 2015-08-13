@@ -255,9 +255,6 @@ public:
     EscapedIdentifier = false;
   }
 };
-
-/// Determine whether the given identifier is a keyword.
-bool isKeyword(StringRef identifier);
   
 } // end namespace swift
 

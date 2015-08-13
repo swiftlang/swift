@@ -1775,14 +1775,5 @@ StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc) {
   return StringRef(StartOfLine, EndOfIndentation - StartOfLine);
 }
 
-/// Determine whether the given identifier is a Swift keyword.
-bool swift::isKeyword(StringRef identifier) {
-  return llvm::StringSwitch<bool>(identifier)
-#define KEYWORD(kw) .Case(#kw, true)
-#define SIL_KEYWORD(kw)
-#include "swift/Parse/Tokens.def"
-    .Default(false);
-}
-
 
 

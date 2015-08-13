@@ -681,6 +681,22 @@ public:
 
   ClangModuleUnit *getClangModuleForMacro(const clang::MacroInfo *MI);
 
+  /// Retrieve the type of an instance of the given Clang declaration context,
+  /// or a null type if the DeclContext does not have a correspinding type.
+  clang::QualType getClangDeclContextType(const clang::DeclContext *dc);
+
+  /// Retrieve the type name of a Clang type for the purposes of
+  /// omitting unneeded words.
+  StringRef getClangTypeNameForOmission(clang::QualType type);
+
+  /// Omit needless words in a function name.
+  DeclName omitNeedlessWordsInFunctionName(
+             DeclName name,
+             ArrayRef<const clang::ParmVarDecl *> params,
+             clang::QualType resultType,
+             const clang::DeclContext *dc,
+             bool returnsSelf);
+
   /// \brief Converts the given Swift identifier for Clang.
   clang::DeclarationName exportName(Identifier name);
 
@@ -705,9 +721,6 @@ public:
 
   /// Import an Objective-C selector.
   ObjCSelector importSelector(clang::Selector selector);
-
-  Identifier adjustObjCPropertyName(const clang::ObjCPropertyDecl *property,
-                                    Identifier name);
 
   /// Import a Swift name as a Clang selector.
   clang::Selector exportSelector(DeclName name, bool allowSimpleName = true);
