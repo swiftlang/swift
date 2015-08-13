@@ -5608,7 +5608,7 @@ static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(Expr *expr,
 // function there is meant to return infix data for expressions that have not
 // yet been folded, so currently the correct behavor for this infixData() and
 // that one are mutually exclusive.
-static InfixData getInfixData(DeclContext *DC, Expr *E) {
+static InfixData getInfixDataForFixIt(DeclContext *DC, Expr *E) {
   assert(E);
   if (isa<IfExpr>(E)) {
     return InfixData(IntrinsicPrecedences::IfExpr,
@@ -5639,8 +5639,15 @@ static InfixData getInfixData(DeclContext *DC, Expr *E) {
                                                           E->getLoc()))
         return op->getInfixData();
     }
+  // These cases are /not/ in the version in TypeCheckExpr, since they never
+  // appear in operator position. They are only used for determining whether
+  // it is necessary to add parentheses in a fix-it.
   } else if (isa<PrefixUnaryExpr>(E)) {
     return InfixData(IntrinsicPrecedences::PrefixUnaryExpr,
+                     Associativity::Left,
+                     /*assignment*/ false);
+  } else if (isa<OptionalTryExpr>(E)) {
+    return InfixData(IntrinsicPrecedences::MinPrecedence,
                      Associativity::Left,
                      /*assignment*/ false);
   }
@@ -5661,7 +5668,7 @@ static unsigned char getMinPrecedenceForExpr(DeclContext *DC, Expr *expr,
     return IntrinsicPrecedences::MinPrecedence;
   } else if (isa<BinaryExpr>(parent) || isa<IfExpr>(parent) ||
              isa<AssignExpr>(parent) || isa<ExplicitCastExpr>(parent)) {
-    auto infixData = getInfixData(DC, parent);
+    auto infixData = getInfixDataForFixIt(DC, parent);
     unsigned result = infixData.getPrecedence();
     if (result < IntrinsicPrecedences::MaxPrecedence &&
         ((index == 0 && !infixData.isLeftAssociative()) ||
@@ -5677,7 +5684,7 @@ static unsigned char getMinPrecedenceForExpr(DeclContext *DC, Expr *expr,
 // Return true if, when replacing "<expr>" with "<expr> as T", parentheses need
 // to be added around <expr> first in order to maintain the correct precedence.
 static bool exprNeedsParensBeforeAddingAs(DeclContext *DC, Expr *expr) {
-  return (getInfixData(DC, expr).getPrecedence() <
+  return (getInfixDataForFixIt(DC, expr).getPrecedence() <
           IntrinsicPrecedences::ExplicitCastExpr);
 }
 
@@ -5892,8 +5899,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                       ->getRValueObjectType();
         auto diag = TC.diagnose(affected->getLoc(),
                                 diag::missing_unwrap_optional, type);
-        bool parensNeeded = (getInfixData(DC, affected).getPrecedence() <
-                                IntrinsicPrecedences::PostfixUnaryExpr) ||
+        bool parensNeeded = (getInfixDataForFixIt(DC, affected).getPrecedence()<
+                             IntrinsicPrecedences::PostfixUnaryExpr) ||
                             isa<OptionalEvaluationExpr>(affected);
         if (parensNeeded) {
           diag.fixItInsert(affected->getStartLoc(), "(")

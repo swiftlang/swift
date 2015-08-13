@@ -119,4 +119,10 @@ let _: () -> Void = { try? maybeThrow() } // expected-warning {{result of 'try?'
 
 if try? maybeThrow() { // expected-error {{cannot be used as a boolean}} {{4-4=((}} {{21-21=) != nil)}}
 }
+let _: Int = try? foo() // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}} {{14-14=(}} {{24-24=)!}}
+
+class X {}
+func test(_: X) {}
+func producesObject() throws -> AnyObject { return X() }
+test(try producesObject()) // expected-error {{'AnyObject' is not convertible to 'X'; did you mean to use 'as!' to force downcast?}} {{26-26= as! X}}
 
