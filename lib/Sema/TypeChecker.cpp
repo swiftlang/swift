@@ -162,6 +162,9 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
     } else if (name.str().equals("Image")) {
       return getProtocol(expr->getLoc(),
                          KnownProtocolKind::_ImageLiteralConvertible);
+    } else if (name.str().equals("FileReference")) {
+      return getProtocol(expr->getLoc(),
+                         KnownProtocolKind::_FileReferenceLiteralConvertible);
     } else {
       return nullptr;
     }
@@ -183,6 +186,9 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
   } else if (name.str().equals("Image")) {
     return DeclName(Context, Context.Id_init,
                     { Context.getIdentifier("imageLiteral") });
+  } else if (name.str().equals("FileReference")) {
+    return DeclName(Context, Context.Id_init,
+                    { Context.getIdentifier("fileReferenceLiteral") });
   } else {
     return DeclName();
   }

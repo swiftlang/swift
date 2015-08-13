@@ -208,6 +208,13 @@ public protocol _ColorLiteralConvertible {
 public protocol _ImageLiteralConvertible {
   init(imageLiteral: String)
 }
+
+/// Conforming types can be initialized with strings (e.g.
+/// `[#FileReference(fileReferenceLiteral: "resource.txt")#]`).
+public protocol _FileReferenceLiteralConvertible {
+  init(fileReferenceLiteral: String)
+}
+
 #endif // SWIFT_ENABLE_OBJECT_LITERALS
 
 /// A container is destructor safe if whether it may store to memory on

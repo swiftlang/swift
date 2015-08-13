@@ -671,6 +671,13 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     type = &ImageLiteralType;
     name = "_ImageLiteralType";
   }
+  // _FileReferenceLiteralConvertible -> _FileReferenceLiteralType
+  else if (protocol == getProtocol(
+                         SourceLoc(),
+                         KnownProtocolKind::_FileReferenceLiteralConvertible)) {
+    type = &FileReferenceLiteralType;
+    name = "_FileReferenceLiteralType";
+  }
 #endif // SWIFT_ENABLE_OBJECT_LITERALS
 
   if (!type)

@@ -497,6 +497,7 @@ private:
 #ifdef SWIFT_ENABLE_OBJECT_LITERALS
   Type ColorLiteralType;
   Type ImageLiteralType;
+  Type FileReferenceLiteralType;
 #endif // SWIFT_ENABLE_OBJECT_LITERALS
   Type StringType;
   Type Int8Type;

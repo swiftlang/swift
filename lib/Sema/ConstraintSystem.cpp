@@ -271,6 +271,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
 #ifdef SWIFT_ENABLE_OBJECT_LITERALS
   case KnownProtocolKind::_ColorLiteralConvertible: index = 10; break;
   case KnownProtocolKind::_ImageLiteralConvertible: index = 11; break;
+  case KnownProtocolKind::_FileReferenceLiteralConvertible: index = 12; break;
 #endif // SWIFT_ENABLE_OBJECT_LITERALS
   }
 
@@ -325,6 +326,7 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
 #ifdef SWIFT_ENABLE_OBJECT_LITERALS
   case KnownProtocolKind::_ColorLiteralConvertible:
   case KnownProtocolKind::_ImageLiteralConvertible:
+  case KnownProtocolKind::_FileReferenceLiteralConvertible:
     break;
 #endif // SWIFT_ENABLE_OBJECT_LITERALS
   }

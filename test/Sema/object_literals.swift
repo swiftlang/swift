@@ -13,3 +13,9 @@ struct I: _ImageLiteralConvertible {
 }
 
 let z: I = [#Image(imageLiteral: "hello.png")#]
+
+struct Path: _FileReferenceLiteralConvertible {
+  init(fileReferenceLiteral: String) {}
+}
+
+let p1: Path = [#FileReference(fileReferenceLiteral: "what.txt")#]

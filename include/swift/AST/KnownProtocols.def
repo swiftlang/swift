@@ -65,6 +65,7 @@ LITERAL_CONVERTIBLE_PROTOCOL(UnicodeScalarLiteralConvertible, character)
 #ifdef SWIFT_ENABLE_OBJECT_LITERALS
 LITERAL_CONVERTIBLE_PROTOCOL(_ColorLiteralConvertible, color)
 LITERAL_CONVERTIBLE_PROTOCOL(_ImageLiteralConvertible, image)
+LITERAL_CONVERTIBLE_PROTOCOL(_FileReferenceLiteralConvertible, file-reference)
 #endif // SWIFT_ENABLE_OBJECT_LITERALS
 
 BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinBooleanLiteralConvertible)
