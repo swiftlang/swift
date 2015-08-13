@@ -696,14 +696,7 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
 %   end
 }
 
-self.test("\(testNamePrefix).partition/${'Predicate' if predicate else 'WhereElementIsComparable'}")
-  .xfail(.Custom({
-      return
-        findSubstring("\(testNamePrefix)", "DefaultedRandomAccessMutableCollection") != nil &&
-        findSubstring("\(testNamePrefix)", "Slice<DefaultedRandomAccessMutableCollection") == nil
-    },
-    reason: "<rdar://problem/21780567> Code crashes in materializeForSet"))
-  .code {
+self.test("\(testNamePrefix).partition/${'Predicate' if predicate else 'WhereElementIsComparable'}") {
   for test in partitionExhaustiveTests {
     forAllPermutations(test.sequence) { (sequence) in
       checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
@@ -715,14 +708,7 @@ self.test("\(testNamePrefix).partition/${'Predicate' if predicate else 'WhereEle
   }
 }
 
-self.test("\(testNamePrefix).partition/${'Predicate' if predicate else 'WhereElementIsComparable'}/InvalidOrderings")
-  .xfail(.Custom({
-      return
-        findSubstring("\(testNamePrefix)", "DefaultedRandomAccessMutableCollection") != nil &&
-        findSubstring("\(testNamePrefix)", "Slice<DefaultedRandomAccessMutableCollection") == nil
-    },
-    reason: "<rdar://problem/21780567> Code crashes in materializeForSet"))
-  .code {
+self.test("\(testNamePrefix).partition/${'Predicate' if predicate else 'WhereElementIsComparable'}/InvalidOrderings") {
   withInvalidOrderings { (comparisonPredicate) in
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in
