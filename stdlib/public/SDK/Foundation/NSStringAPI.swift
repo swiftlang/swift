@@ -590,22 +590,49 @@ extension String {
   //     range:(NSRange)range
   //     remainingRange:(NSRangePointer)leftover
 
-  /// Gets a given range of characters as bytes in a specified encoding.
+  /// Writes the given `range` of characters into `buffer` in a given
+  /// `encoding`, without any allocations.  Does not NULL-terminate.
+  ///
+  /// - Parameter buffer: A buffer into which to store the bytes from
+  ///   the receiver. The returned bytes are not NUL-terminated.
+  ///
+  /// - Parameter maxBufferCount: The maximum number of bytes to write
+  ///   to buffer.
+  ///
+  /// - Parameter usedBufferCount: The number of bytes used from
+  ///   buffer. Pass `nil` if you do not need this value.
+  ///
+  /// - Parameter encoding: The encoding to use for the returned bytes.
+  ///
+  /// - Parameter options: A mask to specify options to use for
+  ///   converting the receiver’s contents to `encoding` (if conversion
+  ///   is necessary).
+  ///
+  /// - Parameter range: The range of characters in the receiver to get.
+  ///
+  /// - Parameter leftover: The remaining range. Pass `nil` If you do
+  ///   not need this value.
+  ///
+  /// - Returns: `true` iff some characters were converted.
+  ///
+  /// - Note: Conversion stops when the buffer fills or when the
+  ///   conversion isn't possible due to the chosen encoding.
+  ///
   /// - Note: will get a maximum of `min(buffer.count, maxLength)` bytes.
   public func getBytes(
     inout buffer: [UInt8],
-    maxLength: Int,
-    usedLength: UnsafeMutablePointer<Int>,
+    maxLength maxBufferCount: Int,
+    usedLength usedBufferCount: UnsafeMutablePointer<Int>,
     encoding: NSStringEncoding,
     options: NSStringEncodingConversionOptions,
     range: Range<Index>,
-    remainingRange: UnsafeMutablePointer<Range<Index>>
+    remainingRange leftover: UnsafeMutablePointer<Range<Index>>
   ) -> Bool {
-    return _withOptionalOutParameter(remainingRange) {
+    return _withOptionalOutParameter(leftover) {
       self._ns.getBytes(
         &buffer,
-        maxLength: min(buffer.count, maxLength),
-        usedLength: usedLength,
+        maxLength: min(buffer.count, maxBufferCount),
+        usedLength: usedBufferCount,
         encoding: encoding,
         options: options,
         range: _toNSRange(range),
@@ -1058,7 +1085,7 @@ extension String {
   /// converted to lowercase, taking into account the specified
   /// locale.
   @warn_unused_result
-  public func lowercaseStringWithLocale(locale: NSLocale) -> String {
+  public func lowercaseStringWithLocale(locale: NSLocale?) -> String {
     return _ns.lowercaseStringWithLocale(locale)
   }
 
@@ -1395,7 +1422,7 @@ extension String {
   /// applied.
   @warn_unused_result
   public func stringByFoldingWithOptions(
-    options: NSStringCompareOptions, locale: NSLocale
+    options: NSStringCompareOptions, locale: NSLocale?
   ) -> String {
     return _ns.stringByFoldingWithOptions(options, locale: locale)
   }
@@ -1558,7 +1585,7 @@ extension String {
   /// converted to uppercase, taking into account the specified
   /// locale.
   @warn_unused_result
-  public func uppercaseStringWithLocale(locale: NSLocale) -> String {
+  public func uppercaseStringWithLocale(locale: NSLocale?) -> String {
     return _ns.uppercaseStringWithLocale(locale)
   }
 

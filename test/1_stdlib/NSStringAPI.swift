@@ -249,13 +249,44 @@ NSStringAPIs.test("localizedCapitalizedString") {
   }
 }
 
+/// Checks that executing the operation in the locale with the given
+/// `localeID` (or if `localeID` is `nil`, the current locale) gives
+/// the expected result, and that executing the operation with a nil
+/// locale gives the same result as explicitly passing the system
+/// locale.
+///
+/// - Parameter expected: the expected result when the operation is
+///   executed in the given localeID
+func expectLocalizedEquality(
+  expected: String,
+  _ op: (_: NSLocale?)->String,
+  _ localeID: String? = nil,
+  @autoclosure _ message: ()->String = "",
+  showFrame: Bool = true,
+  stackTrace: SourceLocStack = SourceLocStack(),  
+  file: String = __FILE__, line: UInt = __LINE__
+) {
+  let trace = stackTrace.pushIf(showFrame, file: file, line: line)
+
+  let locale = localeID.map {
+    NSLocale(localeIdentifier: $0)
+  } ?? NSLocale.currentLocale()
+  
+  expectEqual(
+    expected, op(locale),
+    message(), stackTrace: trace)
+  
+  expectEqual(
+    op(NSLocale.systemLocale()), op(nil),
+    message(), stackTrace: trace)
+}
+
 NSStringAPIs.test("capitalizedStringWithLocale(_:)") {
-  expectEqual(
+  expectLocalizedEquality(
     "Foo Foo Foo Foo",
-    "foo Foo fOO FOO".capitalizedStringWithLocale(NSLocale.currentLocale()))
-  expectEqual(
-    "Жжж",
-    "жжж".capitalizedStringWithLocale(NSLocale.currentLocale()))
+    "foo Foo fOO FOO".capitalizedStringWithLocale)
+  
+  expectLocalizedEquality("Жжж","жжж".capitalizedStringWithLocale)
 
   expectEqual(
     "Foo Foo Foo Foo",
@@ -269,18 +300,16 @@ NSStringAPIs.test("capitalizedStringWithLocale(_:)") {
   // U+0069 LATIN SMALL LETTER I
   // to upper case:
   // U+0049 LATIN CAPITAL LETTER I
-  expectEqual(
+  expectLocalizedEquality(
     "Iii Iii",
-    "iii III".capitalizedStringWithLocale(
-      NSLocale(localeIdentifier: "en")))
+    "iii III".capitalizedStringWithLocale, "en")
 
   // U+0069 LATIN SMALL LETTER I
   // to upper case in Turkish locale:
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
-  expectEqual(
+  expectLocalizedEquality(
     "İii Iıı",
-    "iii III".capitalizedStringWithLocale(
-      NSLocale(localeIdentifier: "tr")))
+    "iii III".capitalizedStringWithLocale, "tr")
 }
 
 NSStringAPIs.test("caseInsensitiveCompare(_:)") {
@@ -950,16 +979,12 @@ NSStringAPIs.test("localizedLowercaseString") {
 }
 
 NSStringAPIs.test("lowercaseStringWithLocale(_:)") {
-  expectEqual("abcd", "abCD".lowercaseStringWithLocale(
-      NSLocale(localeIdentifier: "en")))
+  expectLocalizedEquality("abcd", "abCD".lowercaseStringWithLocale, "en")
 
-  expectEqual("абвг", "абВГ".lowercaseStringWithLocale(
-      NSLocale(localeIdentifier: "en")))
-  expectEqual("абвг", "абВГ".lowercaseStringWithLocale(
-      NSLocale(localeIdentifier: "ru")))
+  expectLocalizedEquality("абвг", "абВГ".lowercaseStringWithLocale, "en")
+  expectLocalizedEquality("абвг", "абВГ".lowercaseStringWithLocale, "ru")
 
-  expectEqual("たちつてと", "たちつてと".lowercaseStringWithLocale(
-      NSLocale(localeIdentifier: "ru")))
+  expectLocalizedEquality("たちつてと", "たちつてと".lowercaseStringWithLocale, "ru")
 
   //
   // Special casing.
@@ -969,29 +994,25 @@ NSStringAPIs.test("lowercaseStringWithLocale(_:)") {
   // to lower case:
   // U+0069 LATIN SMALL LETTER I
   // U+0307 COMBINING DOT ABOVE
-  expectEqual("\u{0069}\u{0307}", "\u{0130}".lowercaseStringWithLocale(
-      NSLocale(localeIdentifier: "en")))
+  expectLocalizedEquality("\u{0069}\u{0307}", "\u{0130}".lowercaseStringWithLocale, "en")
 
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
   // to lower case in Turkish locale:
   // U+0069 LATIN SMALL LETTER I
-  expectEqual("\u{0069}", "\u{0130}".lowercaseStringWithLocale(
-      NSLocale(localeIdentifier: "tr")))
+  expectLocalizedEquality("\u{0069}", "\u{0130}".lowercaseStringWithLocale, "tr")
 
   // U+0049 LATIN CAPITAL LETTER I
   // U+0307 COMBINING DOT ABOVE
   // to lower case:
   // U+0069 LATIN SMALL LETTER I
   // U+0307 COMBINING DOT ABOVE
-  expectEqual("\u{0069}\u{0307}", "\u{0049}\u{0307}".lowercaseStringWithLocale(
-      NSLocale(localeIdentifier: "en")))
+  expectLocalizedEquality("\u{0069}\u{0307}", "\u{0049}\u{0307}".lowercaseStringWithLocale, "en")
 
   // U+0049 LATIN CAPITAL LETTER I
   // U+0307 COMBINING DOT ABOVE
   // to lower case in Turkish locale:
   // U+0069 LATIN SMALL LETTER I
-  expectEqual("\u{0069}", "\u{0049}\u{0307}".lowercaseStringWithLocale(
-      NSLocale(localeIdentifier: "tr")))
+  expectLocalizedEquality("\u{0069}", "\u{0049}\u{0307}".lowercaseStringWithLocale, "tr")
 }
 
 NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
@@ -1371,26 +1392,30 @@ NSStringAPIs.test("stringByDeletingLastPathComponent") {
 }
 
 NSStringAPIs.test("stringByFoldingWithOptions(_:locale:)") {
-  expectEqual("abcd", "abCD".stringByFoldingWithOptions(
-    .CaseInsensitiveSearch, locale: NSLocale(localeIdentifier: "en")))
+
+  func fwo(
+    s: String, _ options: NSStringCompareOptions
+  )(loc: NSLocale?) -> String {
+    return s.stringByFoldingWithOptions(options, locale: loc)
+  }
+  
+  expectLocalizedEquality("abcd", fwo("abCD", .CaseInsensitiveSearch), "en")
 
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
   // to lower case:
   // U+0069 LATIN SMALL LETTER I
   // U+0307 COMBINING DOT ABOVE
-  expectEqual("\u{0069}\u{0307}", "\u{0130}".stringByFoldingWithOptions(
-    .CaseInsensitiveSearch, locale: NSLocale(localeIdentifier: "en")))
+  expectLocalizedEquality(
+    "\u{0069}\u{0307}", fwo("\u{0130}", .CaseInsensitiveSearch), "en")
 
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
   // to lower case in Turkish locale:
   // U+0069 LATIN SMALL LETTER I
-  expectEqual("\u{0069}", "\u{0130}".stringByFoldingWithOptions(
-    .CaseInsensitiveSearch, locale: NSLocale(localeIdentifier: "tr")))
+  expectLocalizedEquality(
+    "\u{0069}", fwo("\u{0130}", .CaseInsensitiveSearch), "tr")
 
-  expectEqual(
-    "example123",
-    "ｅｘａｍｐｌｅ１２３".stringByFoldingWithOptions(
-      .WidthInsensitiveSearch, locale: NSLocale(localeIdentifier: "en")))
+  expectLocalizedEquality(
+    "example123", fwo("ｅｘａｍｐｌｅ１２３", .WidthInsensitiveSearch), "en")
 }
 
 NSStringAPIs.test("stringByPaddingToLength(_:withString:startingAtIndex:)") {
@@ -1718,16 +1743,12 @@ NSStringAPIs.test("localizedUppercaseString") {
 }
 
 NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
-  expectEqual("ABCD", "abCD".uppercaseStringWithLocale(
-      NSLocale(localeIdentifier: "en")))
+  expectLocalizedEquality("ABCD", "abCD".uppercaseStringWithLocale, "en")
 
-  expectEqual("АБВГ", "абВГ".uppercaseStringWithLocale(
-      NSLocale(localeIdentifier: "en")))
-  expectEqual("АБВГ", "абВГ".uppercaseStringWithLocale(
-      NSLocale(localeIdentifier: "ru")))
+  expectLocalizedEquality("АБВГ", "абВГ".uppercaseStringWithLocale, "en")
+  expectLocalizedEquality("АБВГ", "абВГ".uppercaseStringWithLocale, "ru")
 
-  expectEqual("たちつてと", "たちつてと".uppercaseStringWithLocale(
-      NSLocale(localeIdentifier: "ru")))
+  expectLocalizedEquality("たちつてと", "たちつてと".uppercaseStringWithLocale, "ru")
 
   //
   // Special casing.
@@ -1736,14 +1757,12 @@ NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
   // U+0069 LATIN SMALL LETTER I
   // to upper case:
   // U+0049 LATIN CAPITAL LETTER I
-  expectEqual("\u{0049}", "\u{0069}".uppercaseStringWithLocale(
-      NSLocale(localeIdentifier: "en")))
+  expectLocalizedEquality("\u{0049}", "\u{0069}".uppercaseStringWithLocale, "en")
 
   // U+0069 LATIN SMALL LETTER I
   // to upper case in Turkish locale:
   // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
-  expectEqual("\u{0130}", "\u{0069}".uppercaseStringWithLocale(
-      NSLocale(localeIdentifier: "tr")))
+  expectLocalizedEquality("\u{0130}", "\u{0069}".uppercaseStringWithLocale, "tr")
 
   // U+00DF LATIN SMALL LETTER SHARP S
   // to upper case:
@@ -1751,8 +1770,7 @@ NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
   // U+0073 LATIN SMALL LETTER S
   // But because the whole string is converted to uppercase, we just get two
   // U+0053.
-  expectEqual("\u{0053}\u{0053}", "\u{00df}".uppercaseStringWithLocale(
-      NSLocale(localeIdentifier: "en")))
+  expectLocalizedEquality("\u{0053}\u{0053}", "\u{00df}".uppercaseStringWithLocale, "en")
 
   // U+FB01 LATIN SMALL LIGATURE FI
   // to upper case:
@@ -1760,8 +1778,7 @@ NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
   // U+0069 LATIN SMALL LETTER I
   // But because the whole string is converted to uppercase, we get U+0049
   // LATIN CAPITAL LETTER I.
-  expectEqual("\u{0046}\u{0049}", "\u{fb01}".uppercaseStringWithLocale(
-      NSLocale(localeIdentifier: "ru")))
+  expectLocalizedEquality("\u{0046}\u{0049}", "\u{fb01}".uppercaseStringWithLocale, "ru")
 }
 
 NSStringAPIs.test("writeToFile(_:atomically:encoding:error:)") {
@@ -2061,7 +2078,7 @@ NSStringAPIs.test("Failures{hasPrefix,hasSuffix}")
   .xfail(.Custom({ true }, reason: "blocked on rdar://problem/19036555")).code {
   let tests =
     [ComparisonTest(.LT, "\r\n", "t"), ComparisonTest(.GT, "\r\n", "\n")]
-  tests.map {
+  tests.forEach {
     checkHasPrefixHasSuffix($0.lhs, $0.rhs, $0.loc.withCurrentLoc())
   }
 }
