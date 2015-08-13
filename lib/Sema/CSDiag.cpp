@@ -3085,8 +3085,6 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
       argType = candidates[0].getArgumentType();
   }
 
-  auto CTPurpose = argType ? CTP_CallArgument : CTP_Unused;
-
   // FIXME: This should all just be a matter of getting type type of the
   // sub-expression, but this doesn't work well when typeCheckChildIndependently
   // is over-conservative w.r.t. TupleExprs.
@@ -3112,6 +3110,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
           argType = Type();
       }
     
+    auto CTPurpose = argType ? CTP_CallArgument : CTP_Unused;
     return typeCheckChildIndependently(unwrapParenExpr(argExpr), argType,
                                        CTPurpose, options);
   }
