@@ -19,6 +19,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/SimplifyInstruction.h"
+#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILPasses/Utils/Local.h"
@@ -62,8 +63,9 @@ namespace {
     SmallPtrSet<SILBasicBlock *, 32> LoopHeaders;
 
     // Dominance and post-dominance info for the current function
-    DominanceInfo *DT;
-    PostDominanceInfo *PDT;
+    DominanceInfo *DT = nullptr;
+    PostDominanceInfo *PDT = nullptr;
+    CallGraph *CG = nullptr;
 
     bool ShouldVerify;
     bool EnableJumpThread;
@@ -159,6 +161,7 @@ namespace {
     bool simplifyCondBrBlock(CondBranchInst *BI);
     bool simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI);
     bool simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI);
+    bool simplifyTryApplyBlock(TryApplyInst *TAI);
     bool simplifySwitchValueBlock(SwitchValueInst *SVI);
     bool simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB);
     bool simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI);
@@ -1769,6 +1772,115 @@ simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
   return MadeChange;
 }
 
+static SILValue getActualCallee(SILValue Callee) {
+  while (!isa<FunctionRefInst>(Callee)) {
+    if (auto *CFI = dyn_cast<ConvertFunctionInst>(Callee)) {
+      Callee = CFI->getConverted();
+      continue;
+    }
+    if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(Callee)) {
+      Callee = TTI->getConverted();
+      continue;
+    }
+    break;
+  }
+  
+  return Callee;
+}
+
+/// Checks if the callee of \p TAI is a convert from a function without
+/// error result.
+static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
+                                              SILValue &Callee,
+                                              SILType &CalleeType) {
+  auto *CFI = dyn_cast<ConvertFunctionInst>(TAI->getCallee());
+  if (!CFI)
+    return false;
+  
+  // Check if it is a conversion of a non-throwing function into
+  // a throwing function. If this is the case, replace by a
+  // simple apply.
+  auto OrigFnTy = dyn_cast<SILFunctionType>(CFI->getConverted().getType().
+                                            getSwiftRValueType());
+  if (!OrigFnTy || OrigFnTy->hasErrorResult())
+    return false;
+  
+  auto TargetFnTy = dyn_cast<SILFunctionType>(CFI->getType().
+                                              getSwiftRValueType());
+  if (!TargetFnTy || !TargetFnTy->hasErrorResult())
+    return false;
+  
+  // Look through the conversions and find the real callee.
+  Callee = getActualCallee(CFI->getConverted());
+  CalleeType = Callee.getType();
+  
+  // If it a call of a throwing callee, bail.
+  auto CalleeFnTy = dyn_cast<SILFunctionType>(CalleeType.getSwiftRValueType());
+  if (!CalleeFnTy || CalleeFnTy->hasErrorResult())
+    return false;
+  
+  return true;
+}
+
+/// Checks if the error block of \p TAI has just an unreachable instruction.
+/// In this case we know that the callee cannot throw.
+static bool isTryApplyWithUnreachableError(TryApplyInst *TAI,
+                                           SILValue &Callee,
+                                           SILType &CalleeType) {
+  SILBasicBlock *ErrorBlock = TAI->getErrorBB();
+  TermInst *Term = ErrorBlock->getTerminator();
+  if (!isa<UnreachableInst>(Term))
+    return false;
+  
+  if (&*ErrorBlock->begin() != Term)
+    return false;
+  
+  Callee = TAI->getCallee();
+  CalleeType = TAI->getSubstCalleeSILType();
+  return true;
+}
+
+bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
+
+  SILValue Callee;
+  SILType CalleeType;
+
+  // Two reasons for converting a try_apply to an apply.
+  if (isTryApplyOfConvertFunction(TAI, Callee, CalleeType) ||
+      isTryApplyWithUnreachableError(TAI, Callee, CalleeType)) {
+
+    SmallVector<SILValue, 8> Args;
+    for (auto Arg : TAI->getArguments()) {
+      Args.push_back(Arg);
+    }
+
+    auto CalleeFnTy = cast<SILFunctionType>(CalleeType.getSwiftRValueType());
+
+    assert (CalleeFnTy->getParameters().size() == Args.size() &&
+            "The number of arguments should match");
+    
+    assert(TAI->getNormalBB()->getBBArg(0)->getType() ==
+           CalleeFnTy->getSILResult() &&
+           "Return types should be the same");
+    
+    SILBuilderWithScope<1> Builder(TAI);
+    ApplyInst *NewAI = Builder.createApply(TAI->getLoc(), Callee,
+                        CalleeType,
+                        TAI->getNormalBB()->getBBArg(0)->getType(),
+                        TAI->getSubstitutions(),
+                        Args, CalleeFnTy->hasErrorResult());
+
+    Builder.createBranch(TAI->getLoc(), TAI->getNormalBB(), { SILValue(NewAI) });
+
+    if (CG) {
+      CG->addEdgesForApply(NewAI);
+    }
+    TAI->eraseFromParent();
+    return true;
+  }
+  return false;
+}
+
 // Replace the terminator of BB with a simple branch if all successors go
 // to trampoline jumps to the same destination block. The successor blocks
 // and the destination blocks may have no arguments.
@@ -1949,6 +2061,9 @@ bool SimplifyCFG::simplifyBlocks() {
     case ValueKind::CheckedCastAddrBranchInst:
       Changed |= simplifyCheckedCastAddrBranchBlock(cast<CheckedCastAddrBranchInst>(TI));
       break;
+    case ValueKind::TryApplyInst:
+      Changed |= simplifyTryApplyBlock(cast<TryApplyInst>(TI));
+      break;
     case ValueKind::SwitchEnumAddrInst:
       Changed |= simplifyTermWithIdenticalDestBlocks(BB);
       break;
@@ -2104,6 +2219,9 @@ bool SimplifyCFG::run() {
 
   DT = nullptr;
   PDT = nullptr;
+  auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
+  CG = CGA->getCallGraphOrNull();
+  
   if (simplifyBlocks()) {
     // Simplifying other blocks might have resulted in unreachable
     // loops.

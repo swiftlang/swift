@@ -2103,3 +2103,25 @@ bb10:
   %21 = tuple ()
   return %21 : $()
 }
+
+sil @rethrow_function : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error ErrorType)) -> (Int, @error ErrorType)
+sil @non_throwing_closure : $@convention(thin) (Int) -> Int
+
+// CHECK-LABEL: sil @replace_try_apply_with_apply
+// CHECK: [[R:%[0-9]+]] = apply [nothrow] %0(%{{[0-9]+}}) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error ErrorType)) -> (Int, @error ErrorType)
+// CHECK-NEXT: return [[R]] : $Int
+sil @replace_try_apply_with_apply : $@convention(thin) () -> Int {
+bb0:
+  %0 = function_ref @rethrow_function : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error ErrorType)) -> (Int, @error ErrorType)
+  %1 = function_ref @non_throwing_closure : $@convention(thin) (Int) -> Int
+  %2 = thin_to_thick_function %1 : $@convention(thin) (Int) -> Int to $@callee_owned (Int) -> Int
+  %3 = convert_function %2 : $@callee_owned (Int) -> Int to $@callee_owned (Int) -> (Int, @error ErrorType)
+  try_apply %0(%3) : $@convention(thin) (@owned @callee_owned (Int) -> (Int, @error ErrorType)) -> (Int, @error ErrorType), normal bb1, error bb2
+
+bb1(%5 : $Int):
+  return %5 : $Int
+
+bb2(%8 : $ErrorType):
+  unreachable
+}
+

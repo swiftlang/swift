@@ -2024,57 +2024,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
     return nullptr;
 
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee())) {
-    auto *I =  optimizeApplyOfConvertFunctionInst(AI, CFI);
-    if (I)
-      return I;
-
-    // Check if it is a conversion of a non-throwing function into
-    // a throwing function. If this is the case, replace by a
-    // simple apply.
-    auto OrigFnTy = dyn_cast<SILFunctionType>(
-        CFI->getConverted().getType().getSwiftRValueType());
-    if (!OrigFnTy || OrigFnTy->hasErrorResult())
-      return nullptr;
-
-    auto TargetFnTy = dyn_cast<SILFunctionType>(
-        CFI->getType().getSwiftRValueType());
-    if (!TargetFnTy || !TargetFnTy->hasErrorResult())
-      return nullptr;
-
-    // Look through the conversions and find the real callee.
-    auto Callee = CFI->getConverted();
-    Callee = getActualCallee(Callee);
-
-    // If it a call of a throwing callee, bail.
-
-    auto CalleeFnTy = dyn_cast<SILFunctionType>(Callee.getType().
-                                                getSwiftRValueType());
-    if (!CalleeFnTy || CalleeFnTy->hasErrorResult())
-      return nullptr;
-
-    SmallVector<SILValue, 8> Args;
-    for (auto Arg : AI->getArguments()) {
-      Args.push_back(Arg);
-    }
-
-    assert (CalleeFnTy->getParameters().size() == Args.size() &&
-            "The number of arguments should match");
-
-    assert(TargetFnTy->getSILResult() == CalleeFnTy->getSILResult() &&
-           "Return types should be the same");
-
-    auto *NewAI = Builder->createApply(AI->getLoc(), Callee, Callee.getType(),
-                                       CalleeFnTy->getSILResult(),
-                                       AI->getSubstitutions(), Args, false);
-
-    if (CG) {
-      CG->addEdgesForApply(NewAI);
-    }
-
-    Builder->createBranch(AI->getLoc(), AI->getNormalBB(),
-                          { SILValue(NewAI, 0) });
-    eraseInstFromFunction(*AI);
-    return nullptr;
+    return optimizeApplyOfConvertFunctionInst(AI, CFI);
   }
 
   // Optimize readonly functions with no meaningful users.
