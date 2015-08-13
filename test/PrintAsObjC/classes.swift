@@ -14,7 +14,7 @@
 
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes_objc_generics.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: FileCheck %s < %t/classes.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang %t/classes.h
@@ -480,7 +480,7 @@ public class NonObjCClass { }
 // CHECK-LABEL: @interface ReversedOrder2{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-// CHECK: SWIFT_CLASS("_TtC21classes_objc_generics14ReversedOrder1")
+// CHECK: SWIFT_CLASS("_TtC7classes14ReversedOrder1")
 // CHECK-NEXT: @interface ReversedOrder1 : ReversedOrder2
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
