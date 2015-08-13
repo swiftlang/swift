@@ -733,7 +733,11 @@ _ = _.foo // expected-error {{type of expression is ambiguous without more conte
 // <rdar://problem/22211854> wrong arg list crashing sourcekit
 func r22211854() {
     func f(x: Int, _ y: Int, _ z: String = "") {}
-    f(1) // expected-error{{cannot invoke 'f' with an argument list of type '(Int)'}} expected-note{{expected an argument list of type '(Int, Int, String)'}}
     func g<T>(x: T, _ y: T, _ z: String = "") {}
+
+    f(1) // expected-error{{cannot invoke 'f' with an argument list of type '(Int)'}} expected-note{{expected an argument list of type '(Int, Int, String)'}}
     g(1) // expected-error{{cannot invoke 'g' with an argument list of type '(Int)'}} expected-note{{expected an argument list of type '(T, T, String)'}}
+    func h() -> Int { return 1 }
+    f(h() == 1) // expected-error{{cannot invoke 'f' with an argument list of type '(Bool)'}} expected-note{{expected an argument list of type '(Int, Int, String)'}}
+    g(h() == 1) // expected-error{{cannot invoke 'g' with an argument list of type '(Bool)'}} expected-note{{expected an argument list of type '(T, T, String)'}}
 }

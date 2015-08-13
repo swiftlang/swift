@@ -1253,6 +1253,19 @@ static bool isArrayDictionarySetOrString(const ASTContext &ctx, Type type) {
   return false;
 }
 
+/// Return the number of elements of parameter tuple type 'tupleTy' that must
+/// be matched to arguments, as opposed to being varargs or having default
+/// values.
+static unsigned tupleTypeRequiredArgCount(TupleType *tupleTy) {
+  auto argIsRequired = [&](const TupleTypeElt &elt) {
+    return !elt.isVararg() &&
+           elt.getDefaultArgKind() == DefaultArgumentKind::None;
+  };
+  return std::count_if(
+    tupleTy->getElements().begin(), tupleTy->getElements().end(),
+    argIsRequired);
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags,
@@ -1428,7 +1441,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         if (tupleTy &&
             !tupleTy->getElements().empty() &&
             (tupleTy->hasAnyDefaultValues() ||
-             tupleTy->getElement(0).isVararg())) {
+             tupleTy->getElement(0).isVararg()) &&
+            tupleTypeRequiredArgCount(tupleTy) <= 1) {
               
           // Look through vararg types, if necessary.
           auto tupleElt = tupleTy->getElement(0);
