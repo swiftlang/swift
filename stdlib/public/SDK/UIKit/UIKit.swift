@@ -252,8 +252,12 @@ extension UIColor : _ColorLiteralConvertible {
 public typealias _ColorLiteralType = UIColor
 
 extension UIImage : _ImageLiteralConvertible {
-  public required convenience init?(imageLiteral name: String) {
+  private convenience init!(failableImageLiteral name: String) {
     self.init(named: name)
+  }
+
+  public required convenience init(imageLiteral name: String) {
+    self.init(failableImageLiteral: name)
   }
 }
 

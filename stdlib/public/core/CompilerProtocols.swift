@@ -203,10 +203,10 @@ public protocol _ColorLiteralConvertible {
   init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)
 }
 
-/// Optionals of conforming types can be initialized with image literals (e.g.
+/// Conforming types can be initialized with image literals (e.g.
 /// `[#Image(imageLiteral: "hi.png")#]`).
 public protocol _ImageLiteralConvertible {
-  init?(imageLiteral: String)
+  init(imageLiteral: String)
 }
 #endif // SWIFT_ENABLE_OBJECT_LITERALS
 
