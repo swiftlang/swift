@@ -79,6 +79,8 @@
 
 @interface NSColor : NSObject
 + (instancetype)colorWithDeviceRed:(double)red green:(double)green blue:(double)blue alpha:(double)alpha;
++ (NSColor*)redColor;
+- (instancetype)sameColor;
 @end
 
 @protocol NSAnimatablePropertyContainer

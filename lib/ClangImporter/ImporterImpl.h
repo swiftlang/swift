@@ -706,6 +706,9 @@ public:
   /// Import an Objective-C selector.
   ObjCSelector importSelector(clang::Selector selector);
 
+  Identifier adjustObjCPropertyName(const clang::ObjCPropertyDecl *property,
+                                    Identifier name);
+
   /// Import a Swift name as a Clang selector.
   clang::Selector exportSelector(DeclName name, bool allowSimpleName = true);
 

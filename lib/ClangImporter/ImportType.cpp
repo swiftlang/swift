@@ -1858,7 +1858,10 @@ namespace {
     FirstParameter,
 
     // Subsequent parameters in a function or method.
-    SubsequentParameter,
+      SubsequentParameter,
+
+    // The name of a property.
+    Property,
   };
 }
 
@@ -2008,6 +2011,87 @@ static DeclName omitNeedlessWords(ASTContext &ctx,
   return DeclName(ctx, baseName, newArgNames);
 }
 
+/// Retrieve the instance type of the given Clang declaration context.
+static clang::QualType getTypeOfClangDeclContext(clang::ASTContext &ctx,
+                                                 const clang::DeclContext *dc) {
+  if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc))
+    return ctx.getObjCObjectPointerType(ctx.getObjCInterfaceType(objcClass));
+
+  if (auto objcCategory = dyn_cast<clang::ObjCCategoryDecl>(dc)) {
+    return ctx.getObjCObjectPointerType(
+             ctx.getObjCInterfaceType(
+               objcCategory->getClassInterface()));
+  }
+
+  if (auto tag = dyn_cast<clang::TagDecl>(dc)) {
+    return ctx.getTagDeclType(tag);
+  }
+
+  return clang::QualType();
+}
+
+/// Determine whether the given Clang type matches the current
+/// declaration context.
+static bool clangTypeMatchesTypeOfDeclContext(clang::ASTContext &ctx,
+                                              clang::QualType type,
+                                              const clang::DeclContext *dc) {
+  // Determine the type of the DeclContext.
+  auto dcType = getTypeOfClangDeclContext(ctx, dc);
+  if (dcType.isNull())
+    return false;
+
+  // Remove pointers/references from the incoming type.
+  do {
+    if (auto ptrTy = type->getAs<clang::PointerType>()) {
+      type = ptrTy->getPointeeType();
+      continue;
+    }
+
+    if (auto refTy = type->getAs<clang::ReferenceType>()) {
+      type = refTy->getPointeeType();
+      continue;
+    }
+
+    break;
+  } while (true);
+
+  // If the types match already, we're done.
+  if (ctx.hasSameUnqualifiedType(type, dcType))
+    return true;
+
+  // If both types are Objective-C pointer types, check whether they
+  // have the same interface type.
+  auto objcObjectPtrType = type->getAsObjCInterfacePointerType();
+  if (!objcObjectPtrType)
+    return false;
+  auto objcClass = objcObjectPtrType->getInterfaceDecl();
+
+  auto dcObjcObjectPtrType = dcType->getAsObjCInterfacePointerType();
+  if (!dcObjcObjectPtrType)
+    return false;
+  auto dcObjcClass = dcObjcObjectPtrType->getInterfaceDecl();
+
+  return objcClass->getCanonicalDecl() == dcObjcClass->getCanonicalDecl();
+}
+
+Identifier ClangImporter::Implementation::adjustObjCPropertyName(
+             const clang::ObjCPropertyDecl *property,
+             Identifier name) {
+  // If we aren't omitting needless words, there is nothing to do.
+  if (!OmitNeedlessWords)
+    return name;
+
+  // Only adjust the name if the Clang type matches the type of its 
+  if (!clangTypeMatchesTypeOfDeclContext(getClangASTContext(),
+                                         property->getType(),
+                                         property->getDeclContext()))
+    return name;
+
+  // Try to omit needless words.
+  return omitNeedlessWords(SwiftContext, getClangASTContext(), name,
+                           property->getType(), NameRole::Property);
+}
+
 Type ClangImporter::Implementation::importMethodType(
        const clang::ObjCMethodDecl *clangDecl,
        clang::QualType resultType,
@@ -2104,8 +2188,34 @@ Type ClangImporter::Implementation::importMethodType(
 
   // If we should omit needless words and don't have a custom name, do so.
   if (OmitNeedlessWords && !isCustomName) {
-    methodName = omitNeedlessWords(SwiftContext, getClangASTContext(),
-                                   methodName, params);
+    auto &clangCtx = getClangASTContext();
+    if (params.empty()) {
+      // For zero-parameter methods with a related result type or a
+      // result type that matches the declaration context, omit
+      // needless words from the base name.
+      clang::QualType clangDCType;
+      if (clangDecl)
+        clangDCType = getTypeOfClangDeclContext(
+                        clangCtx,
+                        clangDecl->getDeclContext());
+      if (!clangDCType.isNull() &&
+          (clangDecl->hasRelatedResultType() ||
+           clangTypeMatchesTypeOfDeclContext(clangCtx,
+                                             resultType,
+                                             clangDecl->getDeclContext()))) {
+        Identifier baseName = omitNeedlessWords(SwiftContext, clangCtx,
+                                                methodName.getBaseName(),
+                                                clangDCType,
+                                                NameRole::BaseName);
+        if (baseName != methodName.getBaseName())
+          methodName = DeclName(SwiftContext, baseName,
+                                methodName.getArgumentNames());
+      }
+    } else {
+      // Omit needless words based on the types of parameters.
+      methodName = omitNeedlessWords(SwiftContext, clangCtx, methodName,
+                                     params);
+    }
   }
 
   // Import the parameters.

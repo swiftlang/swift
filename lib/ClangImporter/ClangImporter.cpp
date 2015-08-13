@@ -1302,6 +1302,10 @@ ClangImporter::Implementation::importName(const clang::NamedDecl *D,
     result = SwiftContext.getIdentifier(name.str());
   }
 
+  if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(D)) {
+    result = adjustObjCPropertyName(objcProperty, result);
+  }
+
   return result;
 }
 

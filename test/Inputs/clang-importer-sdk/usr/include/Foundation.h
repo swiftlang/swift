@@ -702,6 +702,10 @@ NSSet *setToSet(NSSet *dict);
 - (void)notBridgedMethod;
 @end
 
+@interface NSString(FoundationExts)
+@property (nonatomic, copy) NSString *uppercaseString;
+@end
+
 typedef struct {
     unsigned long state;
     id __unsafe_unretained *itemsPtr;
