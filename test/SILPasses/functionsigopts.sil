@@ -2,6 +2,7 @@
 // RUN: %target-sil-opt -function-signature-opts %s | FileCheck -check-prefix=CHECK-NEGATIVE %s
 
 import Builtin
+import Swift
 
 // We do this check separately to ensure that this does not occur anywhere in
 // the output for the file. (Maybe this is an interesting enough feature to add to FileCheck?).
@@ -119,6 +120,37 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   %4 = apply %3(%0, %1) : $@callee_owned (Builtin.NativeObject, Builtin.NativeObject) -> ()
   %5 = tuple()
   return %5 : $()
+}
+
+//==========================================
+// Check an apply with the nothrow attribute
+
+// CHECK-LABEL: sil [fragile] [thunk] @dead_arg_with_error_result : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+// CHECK: bb0
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @_TTSf4d__dead_arg_with_error_result : $@convention(thin) () -> @error ErrorType
+// CHECK-NEXT: apply [nothrow]
+// CHECK-NEXT: return
+sil [fragile] @dead_arg_with_error_result: $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
+bb0(%0 : $Builtin.NativeObject):
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [fragile] @dead_arg_with_error_callsite : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @_TTSf4d__dead_arg_with_error_result : $@convention(thin) () -> @error ErrorType
+// CHECK-NEXT: apply [nothrow] [[OPT_FUN]](
+sil [fragile] @dead_arg_with_error_callsite : $@convention(thin) (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %2 = function_ref @dead_arg_with_error_result: $@convention(thin) (Builtin.NativeObject) -> @error ErrorType
+  %3 = apply [nothrow] %2(%0) : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType
+
+  // This ensures that %0 is not dead in this function. We don't want to specialize this.
+  %4 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %4(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %7 = tuple()
+  return %7 : $()
 }
 
 //======================
