@@ -1703,6 +1703,12 @@ public:
                                               AnyMetatypeType *metaTy,
                                               ConstructorDecl *ctorDecl,
                                               bool SuppressDiagnostics);
+
+  /// Check for needless words in the name of the given function/constructor.
+  void checkOmitNeedlessWords(AbstractFunctionDecl *afd);
+
+  /// Check for needless words in the name of the given variable.
+  void checkOmitNeedlessWords(VarDecl *var);
 };
 
 /// \brief RAII object that cleans up the given expression if not explicitly
@@ -1725,7 +1731,7 @@ public:
   }
 };
 
-/// Temporary on-stack storage and unescaping for for encoded diagnostic
+/// Temporary on-stack storage and unescaping for encoded diagnostic
 /// messages.
 ///
 ///

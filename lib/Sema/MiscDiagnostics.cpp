@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/MapVector.h"
 using namespace swift;
@@ -1639,4 +1640,187 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
   } else {
     diag.fixItInsert(VD->getStartLoc(), fixItString);
   }
+}
+
+/// Retrieve the type name to be used for determining whether we can
+/// omit needless words.
+static StringRef getTypeNameForOmission(Type type) {
+  if (!type)
+    return "";
+
+  do {
+    // If we have a typealias, return that name.
+    if (auto aliasTy = dyn_cast<NameAliasType>(type.getPointer())) {
+      return aliasTy->getDecl()->getName().str();
+    }
+
+    // Strip off lvalue/inout types.
+    Type newType = type->getLValueOrInOutObjectType();
+    if (newType.getPointer() != type.getPointer()) {
+      type = newType;
+      continue;
+    }
+
+    // Look through reference-storage types.
+    newType = type->getReferenceStorageReferent();
+    if (newType.getPointer() != type.getPointer()) {
+      type = newType;
+      continue;
+    }
+
+    // Look through parentheses.
+    if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
+      type = parenTy->getUnderlyingType();
+      continue;
+    }
+
+    // Look through optionals.
+    if (auto optObjectTy = type->getAnyOptionalObjectType()) {
+      type = optObjectTy;
+      continue;
+    }
+
+    break;
+  } while (true);
+
+  // Nominal types.
+  if (auto nominal = type->getAnyNominal())
+    return nominal->getName().str();
+
+  // Generic type parameters.
+  if (auto genericParamTy = type->getAs<GenericTypeParamType>()) {
+    if (auto genericParam = genericParamTy->getDecl())
+      return genericParam->getName().str();
+
+    return "";
+  }
+
+  // Dependent members.
+  if (auto dependentMemberTy = type->getAs<DependentMemberType>()) {
+    return dependentMemberTy->getName().str();
+  }
+
+  // Archetypes.
+  if (auto archetypeTy = type->getAs<ArchetypeType>()) {
+    return archetypeTy->getName().str();
+  }
+
+  return "";
+}
+
+void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {
+  if (!Context.LangOpts.WarnOmitNeedlessWords)
+    return;
+
+  DeclName name = afd->getFullName();
+  if (!name)
+    return;
+
+  // String'ify the arguments.
+  StringRef baseNameStr = name.getBaseName().str();
+  SmallVector<StringRef, 4> argNameStrs;
+  for (auto arg : name.getArgumentNames()) {
+    if (arg.empty())
+      argNameStrs.push_back("");
+    else
+      argNameStrs.push_back(arg.str());
+  }
+
+  // String'ify the parameter types.
+  SmallVector<StringRef, 4> paramTypeStrs;
+  Type functionType = afd->getInterfaceType();
+  Type argumentType;
+  for (unsigned i = 0, n = afd->getNaturalArgumentCount()-1; i != n; ++i)
+    functionType = functionType->getAs<AnyFunctionType>()->getResult();
+  argumentType = functionType->getAs<AnyFunctionType>()->getInput();
+  if (auto tupleTy = argumentType->getAs<TupleType>()) {
+    if (tupleTy->getNumElements() == argNameStrs.size()) {
+      for (auto argType : tupleTy->getElementTypes())
+        paramTypeStrs.push_back(getTypeNameForOmission(argType));
+    }
+  }
+
+  if (argNameStrs.size() == 1 && paramTypeStrs.empty())
+    paramTypeStrs.push_back(getTypeNameForOmission(argumentType));
+
+  // Handle contextual type, result type, and returnsSelf.
+  Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
+  Type resultType;
+  bool returnsSelf = false;
+
+  if (auto func = dyn_cast<FuncDecl>(afd)) {
+    resultType = func->getResultType();
+    returnsSelf = func->hasDynamicSelf();
+  } else if (isa<ConstructorDecl>(afd)) {
+    resultType = contextType;
+    returnsSelf = true;
+  }
+
+  if (!omitNeedlessWords(baseNameStr, argNameStrs,
+                         getTypeNameForOmission(resultType),
+                         getTypeNameForOmission(contextType),
+                         paramTypeStrs,
+                         returnsSelf))
+    return;
+
+  /// Retrieve a replacement identifier.
+  auto getReplacementIdentifier = [&](StringRef name,
+                                      Identifier old) -> Identifier{
+    if (name.empty())
+      return Identifier();
+
+    if (!old.empty() && name == old.str())
+      return old;
+
+    return Context.getIdentifier(name);
+  };
+
+  Identifier newBaseName = getReplacementIdentifier(baseNameStr,
+                                                    name.getBaseName());
+  SmallVector<Identifier, 4> newArgNames;
+  auto oldArgNames = name.getArgumentNames();
+  for (unsigned i = 0, n = argNameStrs.size(); i != n; ++i) {
+    newArgNames.push_back(getReplacementIdentifier(argNameStrs[i],
+                                                   oldArgNames[i]));
+  }
+
+  DeclName newName = DeclName(Context, newBaseName, newArgNames);
+  InFlightDiagnostic diag = diagnose(afd->getLoc(), diag::omit_needless_words,
+                                     name, newName);
+  fixAbstractFunctionNames(diag, afd, newName);
+}
+
+void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
+  if (!Context.LangOpts.WarnOmitNeedlessWords)
+    return;
+
+  auto name = var->getName();
+  if (name.empty())
+    return;
+
+  // Dig out the context type.
+  Type contextType = var->getDeclContext()->getDeclaredInterfaceType();
+  if (!contextType)
+    return;
+
+  // Dig out the type of the variable.
+  Type type = var->getInterfaceType()->getReferenceStorageReferent()
+                ->getLValueOrInOutObjectType();
+  while (auto optObjectTy = type->getAnyOptionalObjectType())
+    type = optObjectTy;
+
+  // If the types refer to different nominal types, we're done.
+  if (contextType->getAnyNominal() != type->getAnyNominal())
+    return;
+
+  // Omit needless words.
+  StringRef newName = omitNeedlessWords(name.str(),
+                                        getTypeNameForOmission(var->getType()),
+                                        NameRole::Property);
+  if (newName == name.str())
+    return;
+
+  diagnose(var->getLoc(), diag::omit_needless_words, name,
+           Context.getIdentifier(newName))
+    .fixItReplace(var->getLoc(), newName);
 }

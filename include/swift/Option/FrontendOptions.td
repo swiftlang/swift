@@ -195,6 +195,10 @@ def enable_omit_needless_words :
   Flag<["-"], "enable-omit-needless-words">,
   HelpText<"Omit needless words when importing Objective-C names">;
 
+def warn_omit_needless_words :
+  Flag<["-"], "Womit-needless-words">,
+  HelpText<"Warn about needless words in names">;
+
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 

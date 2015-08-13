@@ -2963,6 +2963,7 @@ public:
     }
 
     TC.checkDeclAttributes(VD);
+    TC.checkOmitNeedlessWords(VD);
   }
 
 
@@ -3999,6 +4000,7 @@ public:
 
     if (IsSecondPass) {
       checkAccessibility(TC, FD);
+      TC.checkOmitNeedlessWords(FD);
       return;
     }
 
@@ -5397,6 +5399,7 @@ public:
 
     if (IsSecondPass) {
       checkAccessibility(TC, CD);
+      TC.checkOmitNeedlessWords(CD);
       return;
     }
     if (CD->hasType())

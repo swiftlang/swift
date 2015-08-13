@@ -83,6 +83,9 @@ namespace swift {
     // FIXME: This should probably be limited to the particular SourceFile.
     bool Playground = false;
 
+    /// Whether to warn about "needless" words in declarations.
+    bool WarnOmitNeedlessWords = false;
+
     /// Whether to delay adding enum protocol conformances during code
     /// completion. This isn't completely correct with multiple files but is
     /// currently necessary to get reasonable performance.

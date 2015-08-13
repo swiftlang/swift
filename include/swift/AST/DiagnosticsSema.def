@@ -2526,6 +2526,12 @@ WARNING(variable_never_read, sema_varusage, none,
         "%select{variable|parameter}1 %0 was written to, but never read",
         (Identifier, unsigned))
 
+//------------------------------------------------------------------------------
+// Naming convention diagnostics
+//------------------------------------------------------------------------------
+WARNING(omit_needless_words, sema_tcd, none,
+        "%0 could be named %1 [-Womit-needless-words]", (DeclName, DeclName))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
