@@ -119,7 +119,7 @@ let _: () -> Void = { try? maybeThrow() } // expected-warning {{result of 'try?'
 
 if try? maybeThrow() { // expected-error {{cannot be used as a boolean}} {{4-4=((}} {{21-21=) != nil)}}
 }
-let _: Int = try? foo() // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}} {{14-14=(}} {{24-24=)!}}
+let _: Int = try? foo() // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use 'try!' or chain with '?'?}} {{14-18=try!}}
 
 class X {}
 func test(_: X) {}

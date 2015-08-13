@@ -5895,18 +5895,30 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
       }
 
       case FixKind::ForceOptional: {
+        const Expr *unwrapped = affected->getValueProvidingExpr();
         auto type = solution.simplifyType(TC, affected->getType())
                       ->getRValueObjectType();
-        auto diag = TC.diagnose(affected->getLoc(),
-                                diag::missing_unwrap_optional, type);
-        bool parensNeeded = (getInfixDataForFixIt(DC, affected).getPrecedence()<
-                             IntrinsicPrecedences::PostfixUnaryExpr) ||
-                            isa<OptionalEvaluationExpr>(affected);
-        if (parensNeeded) {
-          diag.fixItInsert(affected->getStartLoc(), "(")
-              .fixItInsertAfter(affected->getEndLoc(), ")!");
+
+        if (auto tryExpr = dyn_cast<OptionalTryExpr>(unwrapped)) {
+          TC.diagnose(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try,
+                      type)
+            .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()},
+                          "try!");
+
         } else {
-          diag.fixItInsertAfter(affected->getEndLoc(), "!");
+          auto diag = TC.diagnose(affected->getLoc(),
+                                  diag::missing_unwrap_optional, type);
+          bool parensNeeded =
+              (getInfixDataForFixIt(DC, affected).getPrecedence() <
+               IntrinsicPrecedences::PostfixUnaryExpr) ||
+              isa<OptionalEvaluationExpr>(affected);
+
+          if (parensNeeded) {
+            diag.fixItInsert(affected->getStartLoc(), "(")
+                .fixItInsertAfter(affected->getEndLoc(), ")!");
+          } else {
+            diag.fixItInsertAfter(affected->getEndLoc(), "!");
+          }
         }
         diagnosed = true;
         break;

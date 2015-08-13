@@ -487,6 +487,10 @@ ERROR(missing_unwrap_optional,sema_tcc,none,
       "value of optional type %0 not unwrapped; did you mean to use '!' "
       "or '?'?",
      (Type))
+ERROR(missing_unwrap_optional_try,sema_tcc,none,
+      "value of optional type %0 not unwrapped; did you mean to use 'try!' "
+      "or chain with '?'?",
+     (Type))
 ERROR(missing_forced_downcast,sema_tcc,none,
       "%0 is not convertible to %1; "
       "did you mean to use 'as!' to force downcast?", (Type, Type))
