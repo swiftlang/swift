@@ -1,8 +1,5 @@
 // -*- swift -*-
-// RUN: rm -rf %t ; mkdir -p %t
-// RUN: %S/../../utils/gyb %s -o %t/Algorithm.swift
-// RUN: %S/../../utils/line-directive %t/Algorithm.swift -- %target-build-swift %t/Algorithm.swift -o %t/a.out
-// RUN: %S/../../utils/line-directive %t/Algorithm.swift -- %target-run %t/a.out
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
