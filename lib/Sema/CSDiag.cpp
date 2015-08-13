@@ -3464,6 +3464,14 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   Type argType;  // Type of the argument list, if knowable.
   if (auto FTy = fnType->getAs<AnyFunctionType>())
     argType = FTy->getInput();
+  else if (auto MTT = fnType->getAs<AnyMetatypeType>()) {
+    auto instanceTy = MTT->getInstanceType();
+    if (instanceTy->is<TupleType>()) {
+      argType = instanceTy;
+    }
+    // TODO: if this is a nominal type with one init, or one init that matches
+    // the argument count (more likely) use it.
+  }
 
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.

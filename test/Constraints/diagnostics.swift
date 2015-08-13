@@ -521,3 +521,9 @@ if i = 6 { } // expected-error {{use of '=' in a boolean context, did you mean '
 
 _ = (i = 6) ? 42 : 57 // expected-error {{use of '=' in a boolean context, did you mean '=='?}} {{8-9===}}
 
+
+// <rdar://problem/22263468> QoI: Not producing specific argument conversion diagnostic for tuple init
+func r22263468(a : String?) {
+  typealias MyTuple = (Int, String)
+  _ = MyTuple(42, a) // expected-error {{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{20-20=!}}
+}
