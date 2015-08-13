@@ -439,34 +439,42 @@ extension CollectionType {
     @noescape isSeparator: (Generator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     _precondition(maxSplit >= 0, "Must take zero or more splits")
+
     var result: [SubSequence] = []
+    var subSequenceStart: Index = startIndex
 
-    var start: Optional<Index> = allowEmptySlices ? startIndex : Optional.None
-    var splits = 0
-
-    for j in indices {
-      if try isSeparator(self[j]) {
-        if let i = start {
-          result.append(self[i..<j])
-          start = j.successor()
-          if ++splits >= maxSplit {
-            return result
-          }
-          if !allowEmptySlices {
-            start = .None
-          }
-        }
+    func appendSubsequence(end end: Index) -> Bool {
+      if subSequenceStart == end && !allowEmptySlices {
+        return false
       }
-      else {
-        if start == nil {
-          start = .Some(j)
-        }
-      }
+      result.append(self[subSequenceStart..<end])
+      return true
     }
 
-    if let i = start {
-      result.append(self[i..<endIndex])
+    if maxSplit == 0 || isEmpty {
+      appendSubsequence(end: endIndex)
+      return result
     }
+
+    var subSequenceEnd = subSequenceStart
+    let cachedEndIndex = endIndex
+    while subSequenceEnd != cachedEndIndex {
+      if try isSeparator(self[subSequenceEnd]) {
+        let didAppend = appendSubsequence(end: subSequenceEnd)
+        ++subSequenceEnd
+        subSequenceStart = subSequenceEnd
+        if didAppend && result.count == maxSplit {
+          break
+        }
+        continue
+      }
+      ++subSequenceEnd
+    }
+
+    if subSequenceStart != cachedEndIndex || allowEmptySlices {
+      result.append(self[subSequenceStart..<cachedEndIndex])
+    }
+
     return result
   }
 }

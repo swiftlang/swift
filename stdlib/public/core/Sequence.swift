@@ -493,19 +493,38 @@ extension SequenceType {
         return false
       }
       result.append(AnySequence(subSequence))
+      subSequence = []
       return true
     }
 
-    for element in self {
+    if maxSplit == 0 {
+      // We aren't really splitting the sequence.  Convert `self` into an
+      // `Array` using a fast entry point.
+      subSequence = Array(self)
+      appendSubsequence()
+      return result
+    }
+
+    var hitEnd = false
+    var generator = self.generate()
+    while true {
+      guard let element = generator.next() else {
+        hitEnd = true
+        break
+      }
       if try isSeparator(element) {
         if !appendSubsequence() {
           continue
         }
         if result.count == maxSplit {
-          return result
+          break
         }
-        subSequence = []
       } else {
+        subSequence.append(element)
+      }
+    }
+    if !hitEnd {
+      while let element = generator.next() {
         subSequence.append(element)
       }
     }
