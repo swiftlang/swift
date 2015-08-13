@@ -62,7 +62,7 @@ for opt, arg in opts:
         continue
 
     if opt in ('-d', '--diff_tool'):
-        swift_ide_test = arg
+        diff_tool = arg
         continue
 
     help()
