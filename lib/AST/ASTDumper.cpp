@@ -26,6 +26,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -894,6 +895,9 @@ void Decl::dump() const {
 }
 
 void Decl::dump(raw_ostream &OS, unsigned Indent) const {
+  // Make sure to print type variables.
+  llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
+                               true);
   PrintDecl(OS, Indent).visit(const_cast<Decl *>(this));
   llvm::errs() << '\n';
 }
@@ -1003,6 +1007,8 @@ void SourceFile::dump() const {
 }
 
 void SourceFile::dump(llvm::raw_ostream &OS) const {
+  llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
+                               true);
   PrintDecl(OS).visitSourceFile(*this);
   llvm::errs() << '\n';
 }
@@ -2024,7 +2030,14 @@ public:
 
 
 void Expr::dump(raw_ostream &OS) const {
-  print(OS);
+  if (auto ty = getType()) {
+    llvm::SaveAndRestore<bool> X(ty->getASTContext().LangOpts.
+                                 DebugConstraintSolver, true);
+  
+    print(OS);
+  } else {
+    print(OS);
+  }
   OS << '\n';
 }
 
@@ -2786,18 +2799,27 @@ namespace {
 }
 
 void Type::dump() const {
+  // Make sure to print type variables.
   dump(llvm::errs());
 }
 
 void Type::dump(raw_ostream &os, unsigned indent) const {
+  // Make sure to print type variables.
+  llvm::SaveAndRestore<bool> X(getPointer()->getASTContext().LangOpts.
+                               DebugConstraintSolver, true);
   PrintType(os, indent).visit(*this, "");
   os << "\n";
 }
 
 void TypeBase::dump() const {
+  // Make sure to print type variables.
   Type(const_cast<TypeBase *>(this)).dump();
 }
 
 void TypeBase::dump(raw_ostream &os, unsigned indent) const {
+  auto &ctx = const_cast<TypeBase*>(this)->getASTContext();
+  
+  // Make sure to print type variables.
+  llvm::SaveAndRestore<bool> X(ctx.LangOpts.DebugConstraintSolver, true);
   Type(const_cast<TypeBase *>(this)).dump(os, indent);
 }
