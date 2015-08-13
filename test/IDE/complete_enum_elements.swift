@@ -367,12 +367,13 @@ func testWithInvalid1() {
 // WITH_INVALID_DOT-DAG: Decl[EnumElement]/CurrNominal:      JustFine[#WithInvalid#]; name=JustFine
 // WITH_INVALID_DOT: End completions
 
-  let y = .#^UNRESOLVED_1^#
+  var y : QuxEnum
+  y = .#^UNRESOLVED_1^#
 // FIXME: Only contains resolvable ones.
 // UNRESOLVED_1:  Begin completions
-// UNRESOLVED_1-DAG:  Decl[EnumElement]/ExprSpecific:     Baz2({#T#})[#(T) -> BazEnum<T>#]; name=Baz2(T)
-// UNRESOLVED_1-DAG:  Decl[EnumElement]/ExprSpecific:     Baz1[#BazEnum<T>#]; name=Baz1
-// UNRESOLVED_1-DAG:  Decl[EnumElement]/ExprSpecific:     Bar8({#a: Int#}, b: ({#c: Float#}, {#d: Double#}))[#(a: Int, b: (c: Float, d: Double)) -> BarEnum#]; name=Bar8(a: Int, b: (c: Float, d: Double))
+// UNRESOLVED_1-NOT:  Decl[EnumElement]/ExprSpecific:     Baz2({#T#})[#(T) -> BazEnum<T>#]; name=Baz2(T)
+// UNRESOLVED_1-NOT:  Decl[EnumElement]/ExprSpecific:     Baz1[#BazEnum<T>#]; name=Baz1
+// UNRESOLVED_1-NOT:  Decl[EnumElement]/ExprSpecific:     Bar8({#a: Int#}, b: ({#c: Float#}, {#d: Double#}))[#(a: Int, b: (c: Float, d: Double)) -> BarEnum#]; name=Bar8(a: Int, b: (c: Float, d: Double))
 // UNRESOLVED_1-DAG:  Decl[EnumElement]/ExprSpecific:     Qux2[#QuxEnum#]; name=Qux2
-// UNRESOLVED_1-DAG:  Decl[EnumElement]/ExprSpecific:     Okay[#WithInvalid#]; name=Okay
+// UNRESOLVED_1-NOT:  Decl[EnumElement]/ExprSpecific:     Okay[#WithInvalid#]; name=Okay
 }

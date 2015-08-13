@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
+#include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/APInt.h"
 
@@ -986,6 +987,7 @@ namespace {
 
   public:
     ConstraintGenerator(ConstraintSystem &CS) : CS(CS) { }
+    virtual ~ConstraintGenerator() = default;
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
     
@@ -1329,7 +1331,7 @@ namespace {
                                      expr->getMember().getDecl());
     }
     
-    Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
+    virtual Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) {
       auto baseLocator = CS.getConstraintLocator(
                             expr,
                             ConstraintLocator::MemberRefBase);
@@ -2725,4 +2727,49 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   // Optimize the constraints.
   ConstraintOptimizer optimizer(*this);
   e->walk(optimizer);
+}
+
+class InferUnresolvedMemberConstraintGenerator : public ConstraintGenerator {
+  Expr *Target;
+  TypeVariableType* VT;
+public:
+
+  InferUnresolvedMemberConstraintGenerator(Expr *Target, ConstraintSystem &CS) :
+    ConstraintGenerator(CS), Target(Target) {};
+  virtual ~InferUnresolvedMemberConstraintGenerator() = default;
+
+  Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) override {
+    if (Target != expr) {
+      // If expr is not the target, do the default constraint generation.
+      return ConstraintGenerator::visitUnresolvedMemberExpr(expr);
+    }
+    // Otherwise, create a type variable saying we know nothing about this expr.
+    auto &CS = getConstraintSystem();
+    return VT = CS.createTypeVariable(CS.getConstraintLocator(nullptr),
+                                      TypeVariableOptions::TVO_CanBindToLValue);
+  }
+
+  Type getResolvedType(Solution &S) {
+    return S.typeBindings[VT];
+  }
+};
+
+bool swift::typeCheckUnresolvedMember(DeclContext &DC,
+                                      UnresolvedMemberExpr* E, Expr *Parent,
+                                      SmallVectorImpl<Type> &PossibleTypes) {
+  ConstraintSystemOptions Options;
+  auto *TypeChecker = static_cast<class TypeChecker*>(DC.getASTContext().
+                                                      getLazyResolver());
+  ConstraintSystem CS(*TypeChecker, &DC, Options);
+  InferUnresolvedMemberConstraintGenerator MCG(E, CS);
+  ConstraintWalker cw(MCG);
+  Parent->walk(cw);
+  SmallVector<Solution, 3> solutions;
+  if (CS.solve(solutions)) {
+    return false;
+  }
+  for (auto &S : solutions) {
+    PossibleTypes.push_back(MCG.getResolvedType(S));
+  }
+  return true;
 }

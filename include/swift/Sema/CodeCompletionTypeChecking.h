@@ -33,6 +33,12 @@ namespace swift {
   /// \returns true on success, false on error.
   bool typeCheckCompletionDecl(Decl *D);
 
+  /// \brief Given an unresolved member E and its parent P, this function tries
+  /// to infer the type of E.
+  /// \returns true on success, false on error.
+  bool typeCheckUnresolvedMember(DeclContext &DC, UnresolvedMemberExpr* E,
+                                 Expr *P, SmallVectorImpl<Type> &PossibleTypes);
+
   /// \brief Return the type of an expression parsed during code completion, or
   /// None on error.
   Optional<Type> getTypeOfCompletionContextExpr(ASTContext &Ctx,

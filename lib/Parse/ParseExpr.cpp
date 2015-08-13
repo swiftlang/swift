@@ -849,10 +849,15 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
     if (Tok.is(tok::code_complete)) {
       consumeToken();
+      auto Expr = new (Context) UnresolvedMemberExpr(DotLoc,
+        DotLoc.getAdvancedLoc(1), Context.getIdentifier("_"), nullptr);
+      Result = makeParserResult(Expr);
       if (CodeCompletion) {
-        CodeCompletion->completeUnresolvedMember();
+        CodeCompletion->completeUnresolvedMember(Expr);
+      } else {
+        Result.setHasCodeCompletion();
       }
-      return makeParserCodeCompletionResult<Expr>();
+      return Result;
     }
 
     if (Tok.is(tok::kw_init)) {

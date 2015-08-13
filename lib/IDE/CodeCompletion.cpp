@@ -695,6 +695,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     PoundAvailablePlatform,
   };
 
+  UnresolvedMemberExpr *UnresolvedExpr;
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
   SourceLoc DotLoc;
@@ -845,7 +846,7 @@ public:
 
   void completePoundAvailablePlatform() override;
   void completeImportDecl() override;
-  void completeUnresolvedMember() override;
+  void completeUnresolvedMember(UnresolvedMemberExpr *E) override;
 
   void addKeywords(CodeCompletionResultSink &Sink);
 
@@ -2119,12 +2120,15 @@ public:
     RequestedCachedResults = RequestedResultsTy::toplevelResults();
   }
 
-  void getUnresolvedMemberCompletions(SourceLoc Loc) {
-    llvm::SaveAndRestore<LookupKind> ChangeLookupKind(Kind,
-                                                      LookupKind::EnumElementAndOptionSetType);
+  void getUnresolvedMemberCompletions(SourceLoc Loc, SmallVectorImpl<Type> &Types) {
+    llvm::SaveAndRestore<LookupKind> ChangeLookupKind(Kind, LookupKind::
+                                                      EnumElementAndOptionSetType);
     NeedLeadingDot = !HaveDot;
-    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
-                       /*IncludeTopLevel=*/true, Loc);
+    for (auto T : Types) {
+      if (T && T->getNominalOrBoundGenericNominal())
+        foundDecl(T->getNominalOrBoundGenericNominal(),
+                  DeclVisibilityKind::MemberOfCurrentNominal);
+    }
   }
 
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
@@ -2561,9 +2565,10 @@ void CodeCompletionCallbacksImpl::completeImportDecl() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeUnresolvedMember() {
+void CodeCompletionCallbacksImpl::completeUnresolvedMember(UnresolvedMemberExpr *E) {
   Kind = CompletionKind::UnresolvedMember;
   CurDeclContext = P.CurDeclContext;
+  UnresolvedExpr = E;
 }
 
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
@@ -2687,20 +2692,23 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
 }
 
 namespace  {
-  class NearestExprParentFinder : public ASTWalker {
+  class ExprParentFinder : public ASTWalker {
     Expr *ChildExpr;
     llvm::function_ref<bool(Expr*)> Predicate;
 
   public:
     llvm::SmallVector<Expr*, 5> Ancestors;
-    Expr *ParentExpr = nullptr;
-    NearestExprParentFinder(Expr* ChildExpr, llvm::function_ref<bool(Expr*)>
-                        Predicate) : ChildExpr(ChildExpr), Predicate(Predicate){}
+    Expr *ParentExprClosest = nullptr;
+    Expr *ParentExprFarthest = nullptr;
+    ExprParentFinder(Expr* ChildExpr, llvm::function_ref<bool(Expr*)>
+                     Predicate) : ChildExpr(ChildExpr), Predicate(Predicate){}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (E == ChildExpr) {
-        if (!Ancestors.empty())
-          ParentExpr = Ancestors.back();
+        if (!Ancestors.empty()) {
+          ParentExprClosest = Ancestors.back();
+          ParentExprFarthest = Ancestors.front();
+        }
         return { false, nullptr };
       }
       if (Predicate(E))
@@ -2769,11 +2777,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     // If there is no nominal type in the expr, try to find nominal types
     // in the ancestors of the expr.
     if (!OriginalType->getAnyNominal()) {
-      NearestExprParentFinder Walker(ParsedExpr, [&](Expr* E) {
+      ExprParentFinder Walker(ParsedExpr, [&](Expr* E) {
         return E->getType() && E->getType()->getAnyNominal();
       });
       CurDeclContext->walkContext(Walker);
-      ExprType = Walker.ParentExpr ? Walker.ParentExpr->getType():
+      ExprType = Walker.ParentExprClosest ? Walker.ParentExprClosest->getType():
         OriginalType;
     }
 
@@ -2884,7 +2892,15 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::UnresolvedMember : {
     Lookup.setHaveDot(SourceLoc());
-    Lookup.getUnresolvedMemberCompletions(P.Context.SourceMgr.getCodeCompletionLoc());
+    SmallVector<Type, 1> PossibleTypes;
+    ExprParentFinder Walker(UnresolvedExpr, [&](Expr* E) { return true; });
+    CurDeclContext->walkContext(Walker);
+    if(Walker.ParentExprFarthest) {
+      typeCheckUnresolvedMember(*CurDeclContext, UnresolvedExpr,
+                                Walker.ParentExprFarthest, PossibleTypes);
+      Lookup.getUnresolvedMemberCompletions(
+        P.Context.SourceMgr.getCodeCompletionLoc(), PossibleTypes);
+    }
     break;
   }
   }
