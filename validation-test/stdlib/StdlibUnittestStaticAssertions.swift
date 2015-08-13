@@ -14,5 +14,6 @@ func test_expectType() {
 func test_expectEqualType() {
   expectEqualType(S1.self, S1.self)
   expectEqualType(S1.self, S2.self) // expected-error {{cannot invoke 'expectEqualType' with an argument list of type '(S1.Type, S2.Type)'}}
+  // expected-note @-1 {{expected an argument list of type '(T.Type, T.Type)'}}
 }
 
