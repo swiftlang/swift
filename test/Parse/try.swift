@@ -115,3 +115,8 @@ _ = try? maybeThrow() // okay
 
 let _: () -> Void = { try! maybeThrow() } // okay
 let _: () -> Void = { try? maybeThrow() } // expected-warning {{result of 'try?' is unused}}
+
+
+if try? maybeThrow() { // expected-error {{cannot be used as a boolean}} {{4-4=((}} {{21-21=) != nil)}}
+}
+

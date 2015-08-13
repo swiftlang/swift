@@ -5983,11 +5983,24 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         if (auto prefixUnaryExpr = dyn_cast<PrefixUnaryExpr>(errorExpr)) {
           errorExpr = prefixUnaryExpr->getArg();
         }
-        
+
+        StringRef prefix = "((";
+        StringRef suffix = ") != nil)";
+
+        // Check if we need the inner parentheses.
+        // Technically we only need them if there's something in 'expr' with
+        // lower precedence than '!=', but the code actually comes out nicer
+        // in most cases with parens on anything non-trivial.
+        if (errorExpr->canAppendCallParentheses()) {
+          prefix = prefix.drop_back();
+          suffix = suffix.drop_front();
+        }
+        // FIXME: The outer parentheses may be superfluous too.
+
         TC.diagnose(errorExpr->getLoc(), diag::optional_used_as_boolean,
                     errorExpr->getType()->getRValueType())
-        .fixItInsert(errorExpr->getStartLoc(), "(")
-        .fixItInsertAfter(errorExpr->getEndLoc(), " != nil)");
+          .fixItInsert(errorExpr->getStartLoc(), prefix)
+          .fixItInsertAfter(errorExpr->getEndLoc(), suffix);
         
         diagnosed = true;
         break;

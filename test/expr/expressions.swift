@@ -661,7 +661,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: Range<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
   if (cond || a) ?? 42 > 0 {}  // Not ok: expected-error {{cannot be used as a boolean}} {{6-6=(}} {{17-17= != nil)}}
-  if (cond || a) ?? (42 > 0) {}  // Not ok: expected-error {{cannot be used as a boolean}} {{6-6=(}} {{29-29= != nil)}}
+  if (cond || a) ?? (42 > 0) {}  // Not ok: expected-error {{cannot be used as a boolean}} {{6-6=((}} {{29-29=) != nil)}}
 
   if cond || a ?? 42 > 0 {}    // Parses as the first one, not the others.
 
