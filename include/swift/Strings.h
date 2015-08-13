@@ -31,6 +31,11 @@ namespace swift {
   static const char SWIFT_SHIMS_NAME[] = "SwiftShims";
   /// The prefix of module names used by LLDB to capture Swift expressions
   static const char LLDB_EXPRESSIONS_MODULE_NAME_PREFIX[] = "__lldb_expr_";
+
+  /// The name of the fake module used to hold imported Objective-C things.
+  static const char MANGLING_MODULE_OBJC[] = "__ObjC";
+  /// The name of the fake module used to hold imported C things.
+  static const char MANGLING_MODULE_C[] = "__C";
 } // end namespace swift
 
 #endif

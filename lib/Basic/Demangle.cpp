@@ -994,9 +994,9 @@ private:
     if (!Mangled)
       return nullptr;
     if (Mangled.nextIf('o'))
-      return NodeFactory::create(Node::Kind::Module, "ObjectiveC");
+      return NodeFactory::create(Node::Kind::Module, MANGLING_MODULE_OBJC);
     if (Mangled.nextIf('C'))
-      return NodeFactory::create(Node::Kind::Module, "C");
+      return NodeFactory::create(Node::Kind::Module, MANGLING_MODULE_C);
     if (Mangled.nextIf('s'))
       return NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
     if (Mangled.nextIf('a'))

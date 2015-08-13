@@ -31,6 +31,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/ObjCBridge.h"
+#include "swift/Strings.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "Private.h"
 #include "Lazy.h"
@@ -1078,8 +1079,8 @@ static Demangle::NodePointer _buildDemanglingForMetadata(const Metadata *type) {
     auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
     const char *className = class_getName((Class)objcWrapper->Class);
     
-    // ObjC classes mangle as being in the magic "ObjectiveC" module.
-    auto module = NodeFactory::create(Node::Kind::Module, "ObjectiveC");
+    // ObjC classes mangle as being in the magic "__ObjC" module.
+    auto module = NodeFactory::create(Node::Kind::Module, "__ObjC");
     
     auto node = NodeFactory::create(Node::Kind::Class);
     node->addChild(module);
@@ -1124,7 +1125,8 @@ static Demangle::NodePointer _buildDemanglingForMetadata(const Metadata *type) {
       
       // ObjC protocol names aren't mangled.
       if (!protocolNode) {
-        auto module = NodeFactory::create(Node::Kind::Module, "ObjectiveC");
+        auto module = NodeFactory::create(Node::Kind::Module,
+                                          MANGLING_MODULE_OBJC);
         auto node = NodeFactory::create(Node::Kind::Protocol);
         node->addChild(module);
         node->addChild(NodeFactory::create(Node::Kind::Identifier,

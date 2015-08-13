@@ -21,7 +21,7 @@ _TtGSqSS_ ---> Swift.String?
 _TtGSQSS_ ---> Swift.String!
 _TtGVSs10DictionarySSSi_ ---> [Swift.String : Swift.Int]
 _TtVSs7CString ---> Swift.CString
-_TtCSo8NSObject ---> ObjectiveC.NSObject
+_TtCSo8NSObject ---> __ObjC.NSObject
 _TtO6Monads6Either ---> Monads.Either
 _TtbSiSu ---> @convention(block) (Swift.Int) -> Swift.UInt
 _TtcSiSu ---> @convention(c) (Swift.Int) -> Swift.UInt
@@ -107,7 +107,7 @@ _TWZC3foo3barS_8barrableS_ ---> lazy protocol witness table accessor for foo.bar
 _TWzC3foo3barS_8barrableS_ ---> lazy protocol witness table template for foo.bar : foo.barrable in foo
 _TWDC3foo3barS_8barrableS_ ---> dependent protocol witness table generator for foo.bar : foo.barrable in foo
 _TWdC3foo3barS_8barrableS_ ---> dependent protocol witness table template for foo.bar : foo.barrable in foo
-_TFSCg5greenVSC5Color ---> C.green.getter : C.Color
+_TFSCg5greenVSC5Color ---> __C.green.getter : __C.Color
 _TIF1t1fFT1iSi1sSS_T_A_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 0)
 _TIF1t1fFT1iSi1sSS_T_A0_ ---> t.(f (i : Swift.Int, s : Swift.String) -> ()).(default argument 1)
 _TFSqcU__fMGSqQ__FT_GSqQ__ ---> Swift.Optional.init <A>(A?.Type)() -> A?
@@ -158,8 +158,8 @@ _TFCF5types1gFT1bSb_T_L0_10Collection3zimfS0_FT_T_ ---> types.(g (b : Swift.Bool
 _TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si_promote0 ---> capture_promotion.(test_capture_promotion () -> () -> Swift.Int).(closure #1) with unmangled suffix "_promote0"
 _TFIVSs8_Processi10_argumentsGSaSS_U_FT_GSaSS_ ---> Swift._Process.(variable initialization expression)._arguments : [Swift.String] with unmangled suffix "U_FT_GSaSS_"
 _TFIvVSs8_Process10_argumentsGSaSS_iU_FT_GSaSS_ ---> Swift._Process.(_arguments : [Swift.String]).(variable initialization expression).(closure #1)
-_TFCSo1AE ---> ObjectiveC.A.__ivar_destroyer
-_TFCSo1Ae ---> ObjectiveC.A.__ivar_initializer
+_TFCSo1AE ---> __ObjC.A.__ivar_destroyer
+_TFCSo1Ae ---> __ObjC.A.__ivar_initializer
 _TTWC13call_protocol1CS_1PS_FS1_3fooU_fRQPS1_FT_Si ---> protocol witness for call_protocol.P.foo (inout call_protocol.P.Self)() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol
 _TFC12dynamic_self1X1ffDS0_FT_DS0_ ---> dynamic_self.X.f (Self)() -> Self
 _TTSg5Si___TFSqcU__fMGSqQ__FT_GSqQ__ ---> generic specialization <Swift.Int> of Swift.Optional.init <A>(A?.Type)() -> A?

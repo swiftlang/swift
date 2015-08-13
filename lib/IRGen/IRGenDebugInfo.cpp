@@ -1508,10 +1508,10 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
       L.Filename = ClangSM.getBufferName(ClangSrcLoc);
 
-      // Use "ObjectiveC" as default for implicit decls.
+      // Use "__ObjC" as default for implicit decls.
       // FIXME: Do something more clever based on the decl's mangled name.
       StringRef ModulePath;
-      StringRef ModuleName = "ObjectiveC";
+      StringRef ModuleName = "__ObjC";
       if (auto *OwningModule = ClangDecl->getImportedOwningModule())
         ModuleName = OwningModule->getTopLevelModuleName();
 

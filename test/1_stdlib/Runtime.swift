@@ -2093,8 +2093,8 @@ Reflection.test("Unmanaged/not-nil") {
   dump(optionalURL, &output)
 
   let expected =
-    "▿ Swift.Unmanaged<ObjectiveC.CFURL>\n" +
-    "  ▿ Some: Swift.Unmanaged<ObjectiveC.CFURL>\n" +
+    "▿ Swift.Unmanaged<__ObjC.CFURL>\n" +
+    "  ▿ Some: Swift.Unmanaged<__ObjC.CFURL>\n" +
     "    ▿ _value: http://llvm.org/ #0\n" +
     "      - NSObject: http://llvm.org/\n"
 
