@@ -3689,11 +3689,15 @@ ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
       //
       // However, when the base is a reference type and the target is
       // a non-class protocol, this is innocuous.
+#ifndef NDEBUG
+      auto isNonClassProtocolMember = [](Decl *d) {
+        auto p = d->getDeclContext()->isProtocolOrProtocolExtensionContext();
+        return (p && !p->requiresClass());
+      };
+#endif
       assert((!selfParam.isIndirectInOut() ||
               (baseFormalType->isAnyClassReferenceType() &&
-               isa<ProtocolDecl>(accessor.getDecl()->getDeclContext()) &&
-               !cast<ProtocolDecl>(accessor.getDecl()->getDeclContext())
-                 ->requiresClass())) &&
+               isNonClassProtocolMember(accessor.getDecl()))) &&
              "passing unmaterialized r-value as inout argument");
 
       base = emitMaterializeIntoTemporary(*this, loc, base);

@@ -58,6 +58,121 @@ class Base {
     set(value) {}
   }
 
+  var storedFunction: () -> Int = { 0 }
+  final var finalStoredFunction: () -> Int = { 0 }
+  var computedFunction: () -> Int {
+    get { return {0} }
+    set {}
+  }
+}
+
+class Derived : Base {}
+
+protocol Abstractable {
+  typealias Result
+  var storedFunction: () -> Result { get set }
+  var finalStoredFunction: () -> Result { get set }
+  var computedFunction: () -> Result { get set }
+}
+
+// Validate that we thunk materializeForSet correctly when there's
+// an abstraction pattern present.
+
+extension Derived : Abstractable {}
+// SILGEN: sil hidden [transparent] [thunk] @_TTWC17materializeForSet7DerivedS_12AbstractableS_FS1_m14storedFunctionFT_qq_S1_6Result :
+// SILGEN: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
+// SILGEN-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned (@out Int) -> ()
+// SILGEN-NEXT: [[T0:%.*]] = load %2 : $*Derived
+// SILGEN-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
+// SILGEN-NEXT: [[TEMP:%.*]] = alloc_stack $@callee_owned () -> Int
+// SILGEN-NEXT: [[FN:%.*]] = class_method [[SELF]] : $Base, #Base.storedFunction!getter.1
+// SILGEN-NEXT: [[RESULT:%.*]] = apply [[FN]]([[SELF]])
+// SILGEN-NEXT: store [[RESULT]] to [[TEMP]]
+// SILGEN-NEXT: [[RESULT:%.*]] = load [[TEMP]]
+// SILGEN-NEXT: strong_retain [[RESULT]]
+// SILGEN-NEXT: function_ref
+// SILGEN-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@out Int, @owned @callee_owned () -> Int) -> ()
+// SILGEN-NEXT: [[T1:%.*]] = partial_apply [[REABSTRACTOR]]([[RESULT]])
+// SILGEN-NEXT: store [[T1]] to [[RESULT_ADDR]]
+// SILGEN-NEXT: [[RESULT_PTR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned (@out Int) -> () to $Builtin.RawPointer
+// SILGEN-NEXT: function_ref
+// SILGEN-NEXT: [[T0:%.*]] = function_ref @_TTWC17materializeForSet7DerivedS_12AbstractableS_FFCS_4Basem14storedFunctionFT_SiU_XfTBpRBBRS2_XMTS2__T_
+// SILGEN-NEXT: [[CALLBACK:%.*]] = enum $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Derived, @thick Derived.Type) -> ()>, #Optional.Some!enumelt.1, [[T0]]
+// SILGEN-NEXT: [[T0:%.*]] = tuple ([[RESULT_PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Derived, @thick Derived.Type) -> ()>)
+// SILGEN-NEXT: destroy_addr [[TEMP]]
+// SILGEN-NEXT: dealloc_stack [[TEMP]]
+// SILGEN-NEXT: return [[T0]]
+
+// SILGEN: sil hidden [transparent] @_TTWC17materializeForSet7DerivedS_12AbstractableS_FFCS_4Basem14storedFunctionFT_SiU_XfTBpRBBRS2_XMTS2__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Derived, @thick Derived.Type) -> ()
+// SILGEN: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived, %3 : $@thick Derived.Type):
+// SILGEN-NEXT: [[T0:%.*]] = load %2 : $*Derived
+// SILGEN-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
+// SILGEN-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned (@out Int) -> ()
+// SILGEN-NEXT: [[VALUE:%.*]] = load [[RESULT_ADDR]] : $*@callee_owned (@out Int) -> ()
+// SILGEN-NEXT: function_ref
+// SILGEN-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__iSi_XFo__dSi_ : $@convention(thin) (@owned @callee_owned (@out Int) -> ()) -> Int
+// SILGEN-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
+// SILGEN-NEXT: [[FN:%.*]] = class_method [[SELF]] : $Base, #Base.storedFunction!setter.1 : Base -> (() -> Int) -> ()
+// SILGEN-NEXT: apply [[FN]]([[NEWVALUE]], [[SELF]])
+// SILGEN-NEXT: tuple ()
+// SILGEN-NEXT: return
+
+// SILGEN: sil hidden [transparent] [thunk] @_TTWC17materializeForSet7DerivedS_12AbstractableS_FS1_m19finalStoredFunctionFT_qq_S1_6Result :
+// SILGEN: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
+// SILGEN-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned (@out Int) -> ()
+// SILGEN-NEXT: [[T0:%.*]] = load %2 : $*Derived
+// SILGEN-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
+// SILGEN-NEXT: [[ADDR:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.finalStoredFunction
+// SILGEN-NEXT: [[RESULT:%.*]] = load [[ADDR]]
+// SILGEN-NEXT: strong_retain [[RESULT]]
+// SILGEN-NEXT: function_ref
+// SILGEN-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@out Int, @owned @callee_owned () -> Int) -> ()
+// SILGEN-NEXT: [[T1:%.*]] = partial_apply [[REABSTRACTOR]]([[RESULT]])
+// SILGEN-NEXT: store [[T1]] to [[RESULT_ADDR]]
+// SILGEN-NEXT: [[RESULT_PTR:%.*]] = address_to_pointer [[RESULT_ADDR]] : $*@callee_owned (@out Int) -> () to $Builtin.RawPointer
+// SILGEN-NEXT: function_ref
+// SILGEN-NEXT: [[T0:%.*]] = function_ref @_TTWC17materializeForSet7DerivedS_12AbstractableS_FFCS_4Basem19finalStoredFunctionFT_SiU_XfTBpRBBRS2_XMTS2__T_
+// SILGEN-NEXT: [[CALLBACK:%.*]] = enum $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Derived, @thick Derived.Type) -> ()>, #Optional.Some!enumelt.1, [[T0]]
+// SILGEN-NEXT: [[T0:%.*]] = tuple ([[RESULT_PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Derived, @thick Derived.Type) -> ()>)
+// SILGEN-NEXT: return [[T0]]
+
+// SILGEN: sil hidden [transparent] @_TTWC17materializeForSet7DerivedS_12AbstractableS_FFCS_4Basem19finalStoredFunctionFT_SiU_XfTBpRBBRS2_XMTS2__T_ :
+// SILGEN: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived, %3 : $@thick Derived.Type):
+// SILGEN-NEXT: [[T0:%.*]] = load %2 : $*Derived
+// SILGEN-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
+// SILGEN-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned (@out Int) -> ()
+// SILGEN-NEXT: [[VALUE:%.*]] = load [[RESULT_ADDR]] : $*@callee_owned (@out Int) -> ()
+// SILGEN-NEXT: function_ref
+// SILGEN-NEXT: [[REABSTRACTOR:%.*]] = function_ref @_TTRXFo__iSi_XFo__dSi_ : $@convention(thin) (@owned @callee_owned (@out Int) -> ()) -> Int
+// SILGEN-NEXT: [[NEWVALUE:%.*]] = partial_apply [[REABSTRACTOR]]([[VALUE]])
+// SILGEN-NEXT: [[ADDR:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.finalStoredFunction
+// SILGEN-NEXT: assign [[NEWVALUE]] to [[ADDR]]
+// SILGEN-NEXT: tuple ()
+// SILGEN-NEXT: return
+
+protocol ClassAbstractable : class {
+  typealias Result
+  var storedFunction: () -> Result { get set }
+  var finalStoredFunction: () -> Result { get set }
+  var computedFunction: () -> Result { get set }
+}
+extension Derived : ClassAbstractable {}
+
+protocol Signatures {
+  typealias Result
+  var computedFunction: () -> Result { get set }
+}
+protocol Implementations {}
+extension Implementations {
+  var computedFunction: () -> Int {
+    get { return {0} }
+    set {}
+  }
+}
+
+class ImplementingClass : Implementations, Signatures {}
+struct ImplementingStruct : Implementations, Signatures {
+  var ref: ImplementingClass?
 }
 
 class HasDidSet : Base {

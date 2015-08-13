@@ -1382,6 +1382,21 @@ LValue LValue::forAddress(ManagedValue address,
   return lv;
 }
 
+LValue LValue::forClassReference(ManagedValue ref) {
+  assert(ref.isPlusZeroRValueOrTrivial());
+  assert(ref.getType().isObject());
+  assert(ref.getType().getSwiftRValueType()->mayHaveSuperclass());
+
+  CanType classType = ref.getType().getSwiftRValueType();
+  LValueTypeData typeData = {
+    AbstractionPattern(classType), classType, ref.getType()
+  };
+
+  LValue lv;
+  lv.add<ValueComponent>(ref, typeData);
+  return lv;
+}
+
 void LValue::addMemberComponent(SILGenFunction &gen, SILLocation loc,
                                 AbstractStorageDecl *storage,
                                 ArrayRef<Substitution> subs,
@@ -2739,8 +2754,9 @@ struct MaterializeForSetEmitter {
                .getObjectType();
 
     // In a protocol witness thunk, we always want to use ordinary
-    // access semantics.  But when we're changing this to use For standard implementations, we'll need to
-    // modify this to use direct semantics.
+    // access semantics.  But when we're changing for standard
+    // implementations, we'll need to modify this to use direct
+    // semantics.
     TheAccessSemantics = AccessSemantics::Ordinary;
     IsSuper = false;
   }
@@ -2792,12 +2808,49 @@ struct MaterializeForSetEmitter {
   RValue collectIndicesFromParameters(SILGenFunction &gen, SILLocation loc,
                                       ArrayRef<ManagedValue> sourceIndices);
 
+  LValue buildSelfLValue(SILGenFunction &gen, SILLocation loc,
+                         ManagedValue self) {
+    // All of the complexity here is tied up with class types.  If the
+    // substituted type isn't a reference type, then we can't have a
+    // class-bounded protocol or inheritance, and the simple case just
+    // works.
+    AbstractionPattern selfPattern(SubstSelfType);
+    if (!SubstSelfType->mayHaveSuperclass()) {
+      return LValue::forAddress(self, selfPattern, SubstSelfType);
+    }
+
+    CanType witnessSelfType =
+      Witness->computeInterfaceSelfType(false)->getCanonicalType();
+    witnessSelfType = getSubstWitnessInterfaceType(witnessSelfType);
+    if (auto selfTuple = dyn_cast<TupleType>(witnessSelfType)) {
+      assert(selfTuple->getNumElements() == 1);
+      witnessSelfType = selfTuple.getElementType(0);
+    }
+    witnessSelfType = witnessSelfType.getLValueOrInOutObjectType();
+
+    // Eagerly loading here could cause an unnecessary
+    // load+materialize in some cases, but it's not really important.
+    SILValue selfValue = self.getValue();
+    if (selfValue.getType().isAddress()) {
+      selfValue = gen.B.createLoad(loc, selfValue);
+    }
+
+    // Do a derived-to-base conversion if necessary.
+    if (witnessSelfType != SubstSelfType) {
+      auto selfSILType = SILType::getPrimitiveObjectType(witnessSelfType);
+      selfValue = gen.B.createUpcast(loc, selfValue, selfSILType);
+    }
+
+    // Recreate as a borrowed value.
+    self = ManagedValue::forUnmanaged(selfValue);
+    return LValue::forClassReference(self);
+  }
+
   LValue buildLValue(SILGenFunction &gen, SILLocation loc,
                      ManagedValue self, RValue &&indices,
                      AccessKind accessKind) {
     // Begin with the 'self' value.
-    AbstractionPattern selfPattern(SubstSelfType);
-    LValue lv = LValue::forAddress(self, selfPattern, SubstSelfType);
+    LValue lv = buildSelfLValue(gen, loc, self);
 
     auto strategy =
       WitnessStorage->getAccessStrategy(TheAccessSemantics, accessKind);
@@ -3212,7 +3265,7 @@ MaterializeForSetEmitter::emitUsingGetterSetter(SILGenFunction &gen,
                                                 SILFunction *&callback) {
   // Copy the indices into the callback storage.
   const TypeLowering *indicesTL = nullptr;
-  CleanupHandle indicesCleanup;
+  CleanupHandle indicesCleanup = CleanupHandle::invalid();
   CanType indicesFormalType;
   if (isa<SubscriptDecl>(WitnessStorage)) {
     indicesFormalType = indices.getType();
