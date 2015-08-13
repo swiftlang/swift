@@ -2071,6 +2071,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   unsigned bestIdx = 0;
   bool invalidWitness = false;
   bool didDerive = false;
+  bool anyFromUnconstrainedExtension = false;
   for (auto witness : witnesses) {
     // Don't match anything in a protocol.
     // FIXME: When default implementations come along, we can try to match
@@ -2090,6 +2091,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     } else if (match.Kind == MatchKind::WitnessInvalid) {
       invalidWitness = true;
     }
+
+    if (auto *ext = dyn_cast<ExtensionDecl>(match.Witness->getDeclContext()))
+      if (!ext->isConstrainedExtension() && ext->isProtocolExtensionContext())
+        anyFromUnconstrainedExtension = true;
 
     matches.push_back(std::move(match));
   }
@@ -2371,7 +2376,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   // If there was an invalid witness that might have worked, just
   // suppress the diagnostic entirely. This stops the diagnostic cascade.
   // FIXME: We could do something crazy, like try to fix up the witness.
-  if (invalidWitness) {
+  if (invalidWitness || (numViable == 0 && anyFromUnconstrainedExtension)) {
     return ResolveWitnessResult::ExplicitFailed;
   }
 
