@@ -1148,9 +1148,12 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   
   // If we're asked to convert to an UnresolvedType, then ignore the request.
   // This happens when CSDiags nukes a type.
-  if (convertType && convertType->is<UnresolvedType>()) {
-    convertType = Type();
-    convertTypePurpose = CTP_Unused;
+  if (convertType) {
+    if (convertType->is<UnresolvedType>() ||
+        (convertType->is<MetatypeType>() && convertType->hasUnresolvedType())) {
+      convertType = Type();
+      convertTypePurpose = CTP_Unused;
+    }
   }
   
   // Tell the constraint system what the contextual type is.  This informs

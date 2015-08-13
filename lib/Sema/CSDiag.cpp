@@ -3145,14 +3145,31 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
           if (actualType->is<InOutType>())
             options |= TCC_AllowLValue;
 
-          auto expr =
+          auto exprResult =
             typeCheckChildIndependently(TE->getElement(inArgNo), actualType,
                                         CTP_CallArgument, options);
           // If there was an error type checking this argument, then we're done.
-          if (!expr)
+          if (!exprResult)
             return nullptr;
-          resultElts[inArgNo] = expr;
-          resultEltTys[inArgNo] = {expr->getType(),TE->getElementName(inArgNo)};
+
+          // If the caller expected something inout, but we didn't have
+          // something of inout type, diagnose it.
+          if (auto IOE =
+                dyn_cast<InOutExpr>(exprResult->getSemanticsProvidingExpr())) {
+            if (!actualType->is<InOutType>()) {
+              diagnose(exprResult->getLoc(), diag::extra_address_of,
+                       exprResult->getType()->getInOutObjectType())
+                .highlight(exprResult->getSourceRange())
+                .fixItRemove(IOE->getStartLoc());
+              return nullptr;
+            }
+          }
+          
+          resultElts[inArgNo] = exprResult;
+          resultEltTys[inArgNo] = {
+            exprResult->getType(),
+            TE->getElementName(inArgNo)
+          };
         }
         
         if (!variadicArgs.empty()) {

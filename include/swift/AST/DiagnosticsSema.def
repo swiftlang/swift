@@ -504,6 +504,10 @@ ERROR(missing_explicit_conversion,sema_tcc,none,
 ERROR(missing_address_of,sema_tcc,none,
       "passing value of type %0 to an inout parameter requires explicit '&'",
       (Type))
+ERROR(extra_address_of,sema_tcc,none,
+      "'&' used with non-inout argument of type %0",
+      (Type))
+
 ERROR(missing_init_on_metatype_initialization,sema_tcc,none,
       "initializing from a metatype value must reference 'init' explicitly",
       ())

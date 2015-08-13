@@ -503,5 +503,17 @@ func r18397777(d : r21447318?) {
 
   if !Optional(c) { // expected-error {{optional type '_' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{18-18= == nil)}}
   }
-
 }
+
+
+// <rdar://problem/22255907> QoI: bad diagnostic if spurious & in argument list
+func r22255907_1<T>(a : T, b : Int) {}
+func r22255907_2<T>(x : Int, a : T, b: Int) {}
+
+func reachabilityForInternetConnection() {
+  var variable: Int = 42
+  r22255907_1(&variable, b: 2.1) // expected-error {{'&' used with non-inout argument of type 'Int'}} {{15-16=}}
+  r22255907_2(1, a: &variable, b: 2.1)// expected-error {{'&' used with non-inout argument of type 'Int'}} {{21-22=}}
+}
+
+
