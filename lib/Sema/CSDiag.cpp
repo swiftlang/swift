@@ -1134,7 +1134,7 @@ static ValueDecl *findResolvedMemberRef(ConstraintLocator *locator,
 ///
 static std::pair<Expr*, ValueDecl*>
 resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
-  expr = expr->getSemanticsProvidingExpr();
+  expr = expr->getValueProvidingExpr();
 
   // Provide specific diagnostics for assignment to subscripts whose base expr
   // is known to be an rvalue.
@@ -1273,7 +1273,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
       name = "method call";
 
     if (auto *DRE =
-          dyn_cast<DeclRefExpr>(AE->getFn()->getSemanticsProvidingExpr()))
+          dyn_cast<DeclRefExpr>(AE->getFn()->getValueProvidingExpr()))
       name = std::string("'") + DRE->getDecl()->getName().str().str() + "'";
 
     TC.diagnose(loc, diagID, name + " returns immutable value")
@@ -1486,7 +1486,7 @@ evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
 
 
 void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
-  fn = fn->getSemanticsProvidingExpr();
+  fn = fn->getValueProvidingExpr();
 
   // Treat a call to a load of a variable as a call to that variable, it is just
   // the lvalue'ness being removed.
@@ -2776,7 +2776,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
         break;
       }
       
-      if (isa<NilLiteralExpr>(expr->getSemanticsProvidingExpr())) {
+      if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
         diagnose(expr->getLoc(), nilDiag, contextualType);
         return true;
       }
@@ -2949,8 +2949,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
   // produce a more specific diagnostic.
   if (auto *PT = contextualType->getAs<ProtocolType>()) {
     // Check for "=" converting to BooleanType.  The user probably meant ==.
-    if (auto *AE = dyn_cast<AssignExpr>(expr->getSemanticsProvidingExpr()))
-      if (PT->getDecl()->getNameStr() == "BooleanType") {
+    if (auto *AE = dyn_cast<AssignExpr>(expr->getValueProvidingExpr()))
+      if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::BooleanType)) {
         diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
           .fixItReplace(AE->getEqualLoc(), "==")
           .highlight(AE->getDest()->getLoc())
@@ -3042,7 +3042,7 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
   auto &TC = getTypeChecker();
 
   // Diagnose obvious assignments to literals.
-  if (isa<LiteralExpr>(dest->getSemanticsProvidingExpr())) {
+  if (isa<LiteralExpr>(dest->getValueProvidingExpr())) {
     TC.diagnose(equalLoc, diag::cannot_assign_to_literal);
     return;
   }
@@ -3280,7 +3280,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
 
   // If this is a comparison against nil, then we should produce a specific
   // diagnostic.
-  if (isa<NilLiteralExpr>(rhsExpr->getSemanticsProvidingExpr()) &&
+  if (isa<NilLiteralExpr>(rhsExpr->getValueProvidingExpr()) &&
       !lhsType->hasTypeVariable()) {
     if (overloadName == "=="  || overloadName == "!=" ||
         overloadName == "===" || overloadName == "!==" ||
@@ -3465,12 +3465,12 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   if (auto FTy = fnType->getAs<AnyFunctionType>())
     argType = FTy->getInput();
   else if (auto MTT = fnType->getAs<AnyMetatypeType>()) {
+    // If we are constructing a tuple with initializer syntax, the expected
+    // argument list is the tuple type itself - and there is no initdecl.
     auto instanceTy = MTT->getInstanceType();
     if (instanceTy->is<TupleType>()) {
       argType = instanceTy;
     }
-    // TODO: if this is a nominal type with one init, or one init that matches
-    // the argument count (more likely) use it.
   }
 
   // Get the expression result of type checking the arguments to the call
@@ -3508,7 +3508,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     
     // The most common unnamed value of closure type is a ClosureExpr, so
     // special case it.
-    if (isa<ClosureExpr>(fnExpr->getSemanticsProvidingExpr())) {
+    if (isa<ClosureExpr>(fnExpr->getValueProvidingExpr())) {
       if (fnType->hasTypeVariable())
         diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure, argString)
           .highlight(fnExpr->getSourceRange());
@@ -3551,7 +3551,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 
 bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   // Diagnose obvious assignments to literals.
-  if (isa<LiteralExpr>(assignExpr->getDest()->getSemanticsProvidingExpr())) {
+  if (isa<LiteralExpr>(assignExpr->getDest()->getValueProvidingExpr())) {
     diagnose(assignExpr->getLoc(), diag::cannot_assign_to_literal);
     return true;
   }
@@ -3682,7 +3682,7 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
   
   
   // Check for "=" converting to BooleanType.  The user probably meant ==.
-  if (auto *AE = dyn_cast<AssignExpr>(condExpr->getSemanticsProvidingExpr())) {
+  if (auto *AE = dyn_cast<AssignExpr>(condExpr->getValueProvidingExpr())) {
     diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
       .fixItReplace(AE->getEqualLoc(), "==")
       .highlight(AE->getDest()->getLoc())
@@ -3920,7 +3920,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
 
   // Unresolved/Anonymous ClosureExprs are common enough that we should give
   // them tailored diagnostics.
-  if (auto CE = dyn_cast<ClosureExpr>(E->getSemanticsProvidingExpr())) {
+  if (auto CE = dyn_cast<ClosureExpr>(E->getValueProvidingExpr())) {
     auto CFTy = CE->getType()->getAs<AnyFunctionType>();
     
     // If this is a multi-statement closure with no explicit result type, emit
