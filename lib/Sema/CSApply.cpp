@@ -5991,20 +5991,53 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         // If we're implicitly trying to treat an optional type as a boolean,
         // let the user know that they should be testing for a value manually
         // instead.
-        
         Expr *errorExpr = expr;
+        StringRef prefix = "((";
+        StringRef suffix = ") != nil)";
+        
+        // In the common case of a !x, post the error against the inner
+        // expression as an == comparison.
+        if (auto PUE =
+            dyn_cast<PrefixUnaryExpr>(errorExpr->getSemanticsProvidingExpr())){
+          bool isNot = false;
+          if (auto *D = PUE->getCalledValue())
+            isNot = D->getNameStr() == "!";
+          else if (auto *ODR = dyn_cast<OverloadedDeclRefExpr>(PUE->getFn()))
+            isNot = ODR->getDecls()[0]->getNameStr() == "!";
+          
+          if (isNot) {
+            suffix = ") == nil)";
+            errorExpr = PUE->getArg();
+            
+            // Check if we need the inner parentheses.
+            // Technically we only need them if there's something in 'expr' with
+            // lower precedence than '!=', but the code actually comes out nicer
+            // in most cases with parens on anything non-trivial.
+            if (errorExpr->canAppendCallParentheses()) {
+              prefix = prefix.drop_back();
+              suffix = suffix.drop_front();
+            }
+            // FIXME: The outer parentheses may be superfluous too.
+
+            
+            TC.diagnose(errorExpr->getLoc(),diag::optional_used_as_true_boolean,
+                        simplifyType(errorExpr->getType())->getRValueType())
+              .fixItRemove(PUE->getLoc())
+              .fixItInsert(errorExpr->getStartLoc(), prefix)
+              .fixItInsertAfter(errorExpr->getEndLoc(), suffix);
+            diagnosed = true;
+            break;
+          }
+        }
         
         // If we can, post the fix-it to the sub-expression if it's a better
         // fit.
-        if (auto ifExpr = dyn_cast<IfExpr>(expr)) {
+        if (auto ifExpr = dyn_cast<IfExpr>(errorExpr)) {
           errorExpr = ifExpr->getCondExpr();
         }
         if (auto prefixUnaryExpr = dyn_cast<PrefixUnaryExpr>(errorExpr)) {
           errorExpr = prefixUnaryExpr->getArg();
         }
-
-        StringRef prefix = "((";
-        StringRef suffix = ") != nil)";
 
         // Check if we need the inner parentheses.
         // Technically we only need them if there's something in 'expr' with
@@ -6017,7 +6050,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         // FIXME: The outer parentheses may be superfluous too.
 
         TC.diagnose(errorExpr->getLoc(), diag::optional_used_as_boolean,
-                    errorExpr->getType()->getRValueType())
+                    simplifyType(errorExpr->getType())->getRValueType())
           .fixItInsert(errorExpr->getStartLoc(), prefix)
           .fixItInsertAfter(errorExpr->getEndLoc(), suffix);
         

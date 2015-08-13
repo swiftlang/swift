@@ -172,8 +172,7 @@ class r20201968C {
 
 // <rdar://problem/21459429> QoI: Poor compilation error calling assert
 func r21459429(a : Int) {
-  assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{binary operator '!=' cannot be applied to operands of type 'Int' and 'NilLiteralConvertible'}}
-  // expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
+  assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{value of type 'Int' can never be nil, comparison isn't allowed}}
 }
 
 
@@ -489,3 +488,20 @@ func r21684487() {
   let closureIndex = closures.indexOf{$0 === testClosure} // expected-error {{binary operator '===' cannot be applied to two 'MyClosure' (aka 'Array<Int> -> Bool') operands}}
 }
 
+// <rdar://problem/18397777> QoI: special case comparisons with nil
+func r18397777(d : r21447318?) {
+  let c = r21447318()
+
+  if c != nil { // expected-error {{value of type 'r21447318' can never be nil, comparison isn't allowed}}
+  }
+  
+  if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
+  }
+  
+  if !d { // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{8-8= == nil)}}
+  }
+
+  if !Optional(c) { // expected-error {{optional type '_' cannot be used as a boolean; test for '== nil' instead}} {{6-7=}} {{7-7=(}} {{18-18= == nil)}}
+  }
+
+}

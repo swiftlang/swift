@@ -5,8 +5,8 @@ var f = false
 
 func markUsed<T>(t: T) {}
 
-markUsed(t != nil) // expected-error {{binary operator '!=' cannot be applied to operands of type 'Bool' and 'NilLiteralConvertible'}}
-markUsed(f != nil) // expected-error {{binary operator '!=' cannot be applied to operands of type 'Bool' and 'NilLiteralConvertible'}}
+markUsed(t != nil) // expected-error {{value of type 'Bool' can never be nil, comparison isn't allowed}}
+markUsed(f != nil) // expected-error {{value of type 'Bool' can never be nil, comparison isn't allowed}}
 
 class C : Equatable {}
 
@@ -15,7 +15,7 @@ func == (lhs: C, rhs: C) -> Bool {
 }
 
 func test(c: C) {
-  if c == nil {} // expected-error {{binary operator '==' cannot be applied to operands of type 'C' and 'NilLiteralConvertible'}} expected-note {{expected an argument list of type '(C, C)'}}
+  if c == nil {} // expected-error {{value of type 'C' can never be nil, comparison isn't allowed}}
 }
 
 class D {}
@@ -24,6 +24,6 @@ var d = D()
 var dopt: D? = nil
 var diuopt: D! = nil
 
-d == nil // expected-error{{binary operator '==' cannot be applied to operands of type 'D' and 'NilLiteralConvertible'}}
+d == nil // expected-error{{value of type 'D' can never be nil, comparison isn't allowed}}
 dopt == nil
 diuopt == nil

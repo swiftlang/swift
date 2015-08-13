@@ -1311,11 +1311,6 @@ namespace {
     unsigned level;
 
     AnyFunctionType *getUncurriedFunctionType() const {
-#if 1  // TODO: Simplify with unresolved types?  Can this be removed?
-      if (!decl->hasType())
-        return nullptr;
-#endif
-      
       auto type = decl->getType();
 
       // If this is an operator func decl in a type context, the 'self' isn't
@@ -3249,20 +3244,38 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
     return true;
   }
 
-  auto argType1 = argTupleType->getElementType(0)->getRValueType();
-  auto argType2 = argTupleType->getElementType(1)->getRValueType();
   std::string overloadName = calleeInfo[0].decl->getNameStr();
   assert(!overloadName.empty());
-  if (!argType1->isEqual(argType2)) {
+
+  auto lhsExpr = argExpr->getElement(0), rhsExpr = argExpr->getElement(1);
+  auto lhsType = lhsExpr->getType()->getRValueType();
+  auto rhsType = rhsExpr->getType()->getRValueType();
+
+  // If this is a comparison against nil, then we should produce a specific
+  // diagnostic.
+  if (isa<NilLiteralExpr>(rhsExpr->getSemanticsProvidingExpr()) &&
+      !lhsType->hasTypeVariable()) {
+    if (overloadName == "=="  || overloadName == "!=" ||
+        overloadName == "===" || overloadName == "!==" ||
+        overloadName == "<"   || overloadName == ">" ||
+        overloadName == "<="  || overloadName == ">=") {
+      diagnose(binop->getLoc(), diag::comparison_with_nil_illegal, lhsType)
+        .highlight(lhsExpr->getSourceRange());
+      return true;
+    }
+  }
+  
+  
+  if (!lhsType->isEqual(rhsType)) {
     diagnose(binop->getLoc(), diag::cannot_apply_binop_to_args,
-             overloadName, argType1, argType2)
-      .highlight(argExpr->getElement(0)->getSourceRange())
-      .highlight(argExpr->getElement(1)->getSourceRange());
+             overloadName, lhsType, rhsType)
+      .highlight(lhsExpr->getSourceRange())
+      .highlight(rhsExpr->getSourceRange());
   } else {
     diagnose(binop->getLoc(), diag::cannot_apply_binop_to_same_args,
-             overloadName, argType1)
-      .highlight(argExpr->getElement(0)->getSourceRange())
-      .highlight(argExpr->getElement(1)->getSourceRange());
+             overloadName, lhsType)
+      .highlight(lhsExpr->getSourceRange())
+      .highlight(rhsExpr->getSourceRange());
   }
   
   calleeInfo.suggestPotentialOverloads(overloadName, binop->getLoc());

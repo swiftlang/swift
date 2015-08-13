@@ -103,6 +103,10 @@ ERROR(expression_too_complex,sema,none,
       "expression was too complex to be solved in reasonable time; "
       "consider breaking up the expression into distinct sub-expressions", ())
 
+ERROR(comparison_with_nil_illegal,sema,none,
+      "value of type %0 can never be nil, comparison isn't allowed",
+      (Type))
+
 ERROR(cannot_apply_binop_to_args,sema,none,
       "binary operator '%0' cannot be applied to operands of type "
       "%1 and %2",
@@ -1622,6 +1626,9 @@ ERROR(conditional_downcast_foreign,sema_tce,none,
 ERROR(optional_used_as_boolean,sema_tce,none,
      "optional type %0 cannot be used as a boolean; "
      "test for '!= nil' instead", (Type))
+ERROR(optional_used_as_true_boolean,sema_tce,none,
+      "optional type %0 cannot be used as a boolean; "
+      "test for '== nil' instead", (Type))
 
 ERROR(migrate_from_raw_to_init,sema_tce,none,
       "static method 'fromRaw' has been replaced with a failable initializer "
