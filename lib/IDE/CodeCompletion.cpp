@@ -2693,6 +2693,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
 
 namespace  {
   class ExprParentFinder : public ASTWalker {
+    SourceManager &SM;
     Expr *ChildExpr;
     llvm::function_ref<bool(Expr*)> Predicate;
 
@@ -2700,8 +2701,10 @@ namespace  {
     llvm::SmallVector<Expr*, 5> Ancestors;
     Expr *ParentExprClosest = nullptr;
     Expr *ParentExprFarthest = nullptr;
-    ExprParentFinder(Expr* ChildExpr, llvm::function_ref<bool(Expr*)>
-                     Predicate) : ChildExpr(ChildExpr), Predicate(Predicate){}
+    ExprParentFinder(SourceManager &SM,
+                     Expr* ChildExpr,
+                     llvm::function_ref<bool(Expr*)> Predicate) :
+                       SM(SM), ChildExpr(ChildExpr), Predicate(Predicate){}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (E == ChildExpr) {
@@ -2711,9 +2714,13 @@ namespace  {
         }
         return { false, nullptr };
       }
-      if (Predicate(E))
-        Ancestors.push_back(E);
-      return { true, E };
+      if (SM.rangeContains(E->getSourceRange(), ChildExpr->getSourceRange())) {
+        if (Predicate(E)) {
+          Ancestors.push_back(E);
+        }
+        return { true, E };
+      }
+      return { false, E };
     }
 
     Expr *walkToExprPost(Expr *E) override {
@@ -2777,7 +2784,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     // If there is no nominal type in the expr, try to find nominal types
     // in the ancestors of the expr.
     if (!OriginalType->getAnyNominal()) {
-      ExprParentFinder Walker(ParsedExpr, [&](Expr* E) {
+      ExprParentFinder Walker(CurDeclContext->getASTContext().SourceMgr,
+                              ParsedExpr, [&](Expr* E) {
         return E->getType() && E->getType()->getAnyNominal();
       });
       CurDeclContext->walkContext(Walker);
@@ -2893,7 +2901,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::UnresolvedMember : {
     Lookup.setHaveDot(SourceLoc());
     SmallVector<Type, 1> PossibleTypes;
-    ExprParentFinder Walker(UnresolvedExpr, [&](Expr* E) { return true; });
+    ExprParentFinder Walker(CurDeclContext->getASTContext().SourceMgr,
+                            UnresolvedExpr, [&](Expr* E) { return true; });
     CurDeclContext->walkContext(Walker);
     if(Walker.ParentExprFarthest) {
       typeCheckUnresolvedMember(*CurDeclContext, UnresolvedExpr,
