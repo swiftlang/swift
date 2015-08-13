@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 struct Int {
   mutating func foo() {}
@@ -22,9 +22,9 @@ func getF(x: Foo<Int, Int>) -> Int -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF20property_abstraction4setF
-// CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_dV20property_abstraction3Int_dS0__XFo_iS0__iS0__ : $@convention(thin) (@out Int, @in Int, @owned @callee_owned (Int) -> Int) -> ()
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]({{%.*}})
+// CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
 func setF(inout x: Foo<Int, Int>, f: Int -> Int) {
   x.f = f
@@ -106,3 +106,24 @@ struct T20341012 {
         _ = self.options[].title
     }
 }
+
+class MyClass {}
+
+// When simply assigning to a property, reabstract the r-value and assign
+// to the base instead of materializing and then assigning.
+protocol Factory {
+  typealias Product
+  var builder : () -> Product { get set }
+}
+func setBuilder<F: Factory where F.Product == MyClass>(inout factory: F) {
+  factory.builder = { return MyClass() }
+}
+// CHECK: sil hidden @_TF20property_abstraction10setBuilderuRq_S_7Factoryzqq_S0_7ProductCS_7MyClass_FRq_T_ : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
+// CHECK: bb0(%0 : $*F):
+// CHECK:   [[FACTORY:%.*]] = alloc_box $F
+// CHECK:   [[F0:%.*]] = function_ref @_TFF20property_abstraction10setBuilderuRq_S_7Factoryzqq_S0_7ProductCS_7MyClass_FRq_T_U_FT_S1_ : $@convention(thin) <τ_0_0 where τ_0_0 : Factory, τ_0_0.Product == MyClass> () -> @owned MyClass
+// CHECK:   [[F1:%.*]] = partial_apply [[T0]]<T>()
+// CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
+// CHECK:   [[REABSTRACTOR:%.*]] = function_ref @_TTRGRq_20property_abstraction7Factoryzqq_S0_7ProductCS_7MyClass_XFo__oS1__XFo__iS1__ :
+// CHECK:   [[F2:%.*]] = partial_apply [[REABSTRACTOR]]<F>([[F1]])
+// CHECK:   apply [[SETTER]]<F, MyClass>([[F2]], [[FACTORY]]#1)

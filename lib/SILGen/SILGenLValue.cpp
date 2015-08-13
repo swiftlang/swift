@@ -1211,62 +1211,57 @@ namespace {
   };
 } // end anonymous namespace.
 
+ManagedValue
+TranslationPathComponent::get(SILGenFunction &gen, SILLocation loc,
+                              ManagedValue base, SGFContext c) && {
+  // Load the original value.
+  ManagedValue baseVal = gen.emitLoad(loc, base.getValue(),
+                                      gen.getTypeLowering(base.getType()),
+                                      SGFContext(),
+                                      IsNotTake);
+
+  // Map the base value to its substituted representation.
+  return std::move(*this).translate(gen, loc, baseVal, c);
+}
+
+void TranslationPathComponent::set(SILGenFunction &gen, SILLocation loc,
+                                   RValue &&value, ManagedValue base) && {
+  // Map the value to the original pattern.
+  ManagedValue mv = std::move(value).getAsSingleValue(gen, loc);
+  mv = std::move(*this).untranslate(gen, loc, mv);
+
+  // Store to the base.
+  mv.assignInto(gen, loc, base.getValue());
+}
+
 namespace {
-  /// An abstract class for components which translate values in some way.
-  class TranslationComponent : public LogicalPathComponent {
-  public:
-    TranslationComponent(const LValueTypeData &typeData, KindTy kind)
-      : LogicalPathComponent(typeData, kind) {}
-
-    void diagnoseWritebackConflict(LogicalPathComponent *RHS,
-                                   SILLocation loc1, SILLocation loc2,
-                                   SILGenFunction &gen) override {
-      // no useful writeback diagnostics at this point
-    }
-
-    AccessKind getBaseAccessKind(SILGenFunction &gen,
-                                 AccessKind kind) const override {
-      // Always use the same access kind for the base.
-      return kind;
-    }
-  };
-
   /// Remap an lvalue referencing a generic type to an lvalue of its
   /// substituted type in a concrete context.
-  class OrigToSubstComponent : public TranslationComponent {
+  class OrigToSubstComponent : public TranslationPathComponent {
     AbstractionPattern OrigType;
     
   public:
     OrigToSubstComponent(AbstractionPattern origType,
                          CanType substFormalType,
                          SILType loweredSubstType)
-      : TranslationComponent({ AbstractionPattern(substFormalType),
-                               substFormalType, loweredSubstType },
+      : TranslationPathComponent({ AbstractionPattern(substFormalType),
+                                   substFormalType, loweredSubstType },
                              OrigToSubstKind),
         OrigType(origType)
     {}
-    
-    void set(SILGenFunction &gen, SILLocation loc,
-             RValue &&value, ManagedValue base) && override {
-      // Map the value to the original abstraction level.
-      ManagedValue mv = std::move(value).getAsSingleValue(gen, loc);
-      mv = gen.emitSubstToOrigValue(loc, mv, OrigType, getSubstFormalType());
-      // Store to the base.
-      mv.assignInto(gen, loc, base.getValue());
+
+    ManagedValue untranslate(SILGenFunction &gen, SILLocation loc,
+                             ManagedValue mv, SGFContext c) && override {
+      return gen.emitSubstToOrigValue(loc, mv, OrigType,
+                                      getSubstFormalType(), c);
     }
-    
-    ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue base, SGFContext c) && override {
-      // Load the original value.
-      ManagedValue baseVal = gen.emitLoad(loc, base.getValue(),
-                                          gen.getTypeLowering(base.getType()),
-                                          SGFContext(),
-                                          IsNotTake);
-      // Map the base value to its substituted representation.
-      return gen.emitOrigToSubstValue(loc, baseVal,
-                                      OrigType, getSubstFormalType(), c);
+
+    ManagedValue translate(SILGenFunction &gen, SILLocation loc,
+                           ManagedValue mv, SGFContext c) && override {
+      return gen.emitOrigToSubstValue(loc, mv, OrigType,
+                                      getSubstFormalType(), c);
     }
-    
+
     std::unique_ptr<LogicalPathComponent>
     clone(SILGenFunction &gen, SILLocation loc) const override {
       LogicalPathComponent *clone
@@ -1285,35 +1280,24 @@ namespace {
 
   /// Remap an lvalue referencing a concrete type to an lvalue of a
   /// generically-reabstracted type.
-  class SubstToOrigComponent : public TranslationComponent {
+  class SubstToOrigComponent : public TranslationPathComponent {
   public:
     SubstToOrigComponent(AbstractionPattern origType,
                          CanType substFormalType,
                          SILType loweredSubstType)
-      : TranslationComponent({ origType, substFormalType, loweredSubstType },
+      : TranslationPathComponent({ origType, substFormalType, loweredSubstType },
                              SubstToOrigKind)
     {}
-    
-    void set(SILGenFunction &gen, SILLocation loc,
-             RValue &&value, ManagedValue base) && override {
-      // Map the value to the substituted abstraction level.
-      ManagedValue mv = std::move(value).getAsSingleValue(gen, loc);
-      mv = gen.emitOrigToSubstValue(loc, mv, getOrigFormalType(),
-                                    getSubstFormalType());
-      // Store to the base.
-      mv.assignInto(gen, loc, base.getValue());
+
+    ManagedValue untranslate(SILGenFunction &gen, SILLocation loc,
+                             ManagedValue mv, SGFContext c) && override {
+      return gen.emitOrigToSubstValue(loc, mv, getOrigFormalType(),
+                                      getSubstFormalType(), c);
     }
-    
-    ManagedValue get(SILGenFunction &gen, SILLocation loc,
-                     ManagedValue base, SGFContext c) && override {
-      // Load the original value.
-      ManagedValue baseVal = gen.emitLoad(loc, base.getValue(),
-                                          gen.getTypeLowering(base.getType()),
-                                          SGFContext(),
-                                          IsNotTake);
-      // Map the base value to the original representation.
-      return gen.emitSubstToOrigValue(loc, baseVal,
-                                      getOrigFormalType(),
+
+    ManagedValue translate(SILGenFunction &gen, SILLocation loc,
+                           ManagedValue mv, SGFContext c) && override {
+      return gen.emitSubstToOrigValue(loc, mv, getOrigFormalType(),
                                       getSubstFormalType(), c);
     }
     
@@ -1334,10 +1318,22 @@ namespace {
   };
 
   /// Remap a weak value to Optional<T>*, or unowned pointer to T*.
-  class OwnershipComponent : public TranslationComponent {
+  class OwnershipComponent : public LogicalPathComponent {
   public:
     OwnershipComponent(LValueTypeData typeData)
-      : TranslationComponent(typeData, OwnershipKind) {
+      : LogicalPathComponent(typeData, OwnershipKind) {
+    }
+
+    AccessKind getBaseAccessKind(SILGenFunction &gen,
+                                 AccessKind kind) const override {
+      // Always use the same access kind for the base.
+      return kind;
+    }
+
+    void diagnoseWritebackConflict(LogicalPathComponent *RHS,
+                                   SILLocation loc1, SILLocation loc2,
+                                   SILGenFunction &gen) override {
+      // no useful writeback diagnostics at this point
     }
 
     ManagedValue get(SILGenFunction &gen, SILLocation loc,
@@ -2575,6 +2571,24 @@ ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
 void SILGenFunction::emitAssignToLValue(SILLocation loc, RValue &&src,
                                         LValue &&dest) {
   WritebackScope scope(*this);
+
+  // Peephole: instead of materializing and then assigning into a
+  // translation component, untransform the value first.
+  if (dest.isLastComponentTranslation()) {
+    // Implode to a single value.
+    auto srcFormalType = src.getType();
+    ManagedValue srcValue = std::move(src).getAsSingleValue(*this, loc);
+
+    // Repeatedly reverse translation components.
+    do {
+      srcValue = std::move(dest.getLastTranslationComponent())
+                   .untranslate(*this, loc, srcValue);
+      dest.dropLastTranslationComponent();
+    } while (dest.isLastComponentTranslation());
+
+    // Explode to an r-value.
+    src = RValue(*this, loc, srcFormalType, srcValue);
+  }
   
   // Resolve all components up to the last, keeping track of value-type logical
   // properties we need to write back to.

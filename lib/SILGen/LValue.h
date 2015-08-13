@@ -30,6 +30,7 @@ namespace Lowering {
 
 class PhysicalPathComponent;
 class LogicalPathComponent;
+class TranslationPathComponent;
 
 /// Information about the type of an l-value.
 struct LValueTypeData {
@@ -100,13 +101,15 @@ public:
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter
-    OrigToSubstKind,            // generic type substitution
-    SubstToOrigKind,            // generic type substitution
     OwnershipKind,              // weak pointer remapping
     AutoreleasingWritebackKind, // autorelease pointer on set
     WritebackPseudoKind,        // a fake component to customize writeback
+    // Translation LValue kinds (a subtype of logical)
+    OrigToSubstKind,            // generic type substitution
+    SubstToOrigKind,            // generic type substitution
 
-    FirstLogicalKind = GetterSetterKind
+    FirstLogicalKind = GetterSetterKind,
+    FirstTranslationKind = OrigToSubstKind,
   };
 private:
   const KindTy Kind : 8;
@@ -134,6 +137,7 @@ public:
   /// be a subclass of LogicalPathComponent.
   bool isPhysical() const { return Kind < FirstLogicalKind; }
   bool isLogical() const { return Kind >= FirstLogicalKind; }
+  bool isTranslation() const { return Kind >= FirstTranslationKind; }
 
   // These are implemented inline after the respective class declarations.
 
@@ -142,6 +146,9 @@ public:
 
   LogicalPathComponent &asLogical();
   const LogicalPathComponent &asLogical() const;
+
+  TranslationPathComponent &asTranslation();
+  const TranslationPathComponent &asTranslation() const;
 
   /// Return the appropriate access kind to use when producing the
   /// base value.
@@ -264,6 +271,55 @@ inline const LogicalPathComponent &PathComponent::asLogical() const {
   return static_cast<const LogicalPathComponent&>(*this);
 }
 
+/// An abstract class for components which translate values in some way.
+class TranslationPathComponent : public LogicalPathComponent {
+protected:
+  TranslationPathComponent(LValueTypeData typeData, KindTy kind)
+      : LogicalPathComponent(typeData, kind) {
+    assert(isTranslation() &&
+           "TranslationPathComponent kind isn't value translation");
+  }
+
+public:
+  AccessKind getBaseAccessKind(SILGenFunction &gen,
+                               AccessKind kind) const override {
+    // Always use the same access kind for the base.
+    return kind;
+  }
+
+  void diagnoseWritebackConflict(LogicalPathComponent *RHS,
+                                 SILLocation loc1, SILLocation loc2,
+                                 SILGenFunction &gen) override {
+    // no useful writeback diagnostics at this point
+  }
+
+  ManagedValue get(SILGenFunction &gen, SILLocation loc,
+                   ManagedValue base, SGFContext c) && override;
+
+  void set(SILGenFunction &gen, SILLocation loc,
+           RValue &&value, ManagedValue base) && override;
+
+  /// Transform from the original pattern.
+  virtual ManagedValue translate(SILGenFunction &gen, SILLocation loc,
+                                 ManagedValue value,
+                                 SGFContext ctx = SGFContext()) && = 0;
+
+  /// Transform into the original pattern.
+  virtual ManagedValue untranslate(SILGenFunction &gen, SILLocation loc,
+                                   ManagedValue value,
+                                   SGFContext ctx = SGFContext()) && = 0;
+  
+};
+
+inline TranslationPathComponent &PathComponent::asTranslation() {
+  assert(isTranslation());
+  return static_cast<TranslationPathComponent&>(*this);
+}
+inline const TranslationPathComponent &PathComponent::asTranslation() const {
+  assert(isTranslation());
+  return static_cast<const TranslationPathComponent&>(*this);
+}
+
 /// An lvalue represents a reference to storage holding a value
 /// of a type, as opposed to an rvalue, which is an actual value
 /// of the type.
@@ -297,6 +353,26 @@ public:
   bool isLastComponentPhysical() const {
     assert(isValid());
     return Path.back()->isPhysical();
+  }
+
+  /// Is the lvalue's final component a translation component?
+  bool isLastComponentTranslation() const {
+    assert(isValid());
+    return Path.back()->isTranslation();
+  }
+
+  /// Given that the last component is a translation component,
+  /// return it.
+  TranslationPathComponent &getLastTranslationComponent() & {
+    assert(isLastComponentTranslation());
+    return Path.back()->asTranslation();
+  }
+
+  /// Given that the last component is a translation component,
+  /// peel it off.
+  void dropLastTranslationComponent() & {
+    assert(isLastComponentTranslation());
+    Path.pop_back();
   }
   
   /// Add a new component at the end of the access path of this lvalue.
