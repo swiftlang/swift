@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 // Capture the pointer size from type Int
-// CHECK: %VSs5Int64 = type <{ i[[PTRSIZE:[0-9]+]] }>
+// CHECK: %Si = type <{ i[[PTRSIZE:[0-9]+]] }>
 
 struct A {
   var fn : () -> ()
@@ -15,7 +15,7 @@ func test(var x : A) {}
 // CHECK-SAME:             identifier: [[A_DI:"[^"]+"]]
 
 class C {
-  var lots_of_extra_storage: (Int64, Int64, Int64) = (1, 2, 3)
+  var lots_of_extra_storage: (Int, Int, Int) = (1, 2, 3)
   var member: C = C()
 }
 
