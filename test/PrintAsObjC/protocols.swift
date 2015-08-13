@@ -133,7 +133,7 @@ extension NSString : A, ZZZ {}
 
 // CHECK-LABEL: @protocol Properties
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger a;
-// CHECK-NEXT: @property (nonatomic) id <Properties> __nullable b;
+// CHECK-NEXT: @property (nonatomic, strong) id <Properties> __nullable b;
 // CHECK-NEXT: @optional
 // CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * __nonnull c;
 // CHECK-NEXT: @end

@@ -303,14 +303,14 @@ class MyObject : NSObject {}
 
 // CHECK-LABEL: @class Inner2;
 // CHECK-LABEL: @interface NestedMembers
-// CHECK-NEXT: @property (nonatomic) Inner2 * __nullable ref2;
-// CHECK-NEXT: @property (nonatomic) Inner3 * __nullable ref3;
+// CHECK-NEXT: @property (nonatomic, strong) Inner2 * __nullable ref2;
+// CHECK-NEXT: @property (nonatomic, strong) Inner3 * __nullable ref3;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class NestedMembers {
   // NEGATIVE-NOT: @class NestedMembers;
   // CHECK-LABEL: @interface Inner2
-  // CHECK-NEXT: @property (nonatomic) NestedMembers * __nullable ref;
+  // CHECK-NEXT: @property (nonatomic, strong) NestedMembers * __nullable ref;
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
   @objc class Inner2 {
@@ -321,7 +321,7 @@ class MyObject : NSObject {}
   var ref3: Inner3? = nil
 
   // CHECK-LABEL: @interface Inner3
-  // CHECK-NEXT: @property (nonatomic) NestedMembers * __nullable ref;
+  // CHECK-NEXT: @property (nonatomic, strong) NestedMembers * __nullable ref;
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
   @objc class Inner3 {
@@ -355,7 +355,7 @@ public class NonObjCClass { }
 
 // CHECK-LABEL: @interface Properties
 // CHECK-NEXT: @property (nonatomic) NSInteger i;
-// CHECK-NEXT: @property (nonatomic, readonly) Properties * __nonnull mySelf;
+// CHECK-NEXT: @property (nonatomic, readonly, strong) Properties * __nonnull mySelf;
 // CHECK-NEXT: @property (nonatomic, readonly) double pi;
 // CHECK-NEXT: @property (nonatomic) NSInteger computed;
 // CHECK-NEXT: + (Properties * __nonnull)shared;
@@ -367,8 +367,9 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, weak) id <MyProtocol> __nullable weakProto;
 // CHECK-NEXT: @property (nonatomic) CFTypeRef __nullable weakCF;
 // CHECK-NEXT: @property (nonatomic) CFStringRef __nullable weakCFString;
+// CHECK-NEXT: @property (nonatomic) CFTypeRef __nullable strongCF;
 // CHECK-NEXT: @property (nonatomic, weak) IBOutlet id __null_unspecified outlet;
-// CHECK-NEXT: @property (nonatomic) IBOutlet Properties * __null_unspecified typedOutlet;
+// CHECK-NEXT: @property (nonatomic, strong) IBOutlet Properties * __null_unspecified typedOutlet;
 // CHECK-NEXT: @property (nonatomic, copy) NSString * __nonnull string;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull array;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> * __nonnull arrayOfArrays;
@@ -387,10 +388,10 @@ public class NonObjCClass { }
 // CHECK-NEXT: + (NSString * __nonnull)staticString;
 // CHECK-NEXT: + (void)setStaticString:(NSString * __nonnull)value;
 // CHECK-NEXT: + (double)staticDouble;
-// CHECK-NEXT: @property (nonatomic) Properties * __nullable wobble;
+// CHECK-NEXT: @property (nonatomic, strong) Properties * __nullable wobble;
 // CHECK-NEXT: @property (nonatomic, getter=isEnabled, setter=setIsEnabled:) BOOL enabled;
 // CHECK-NEXT: @property (nonatomic, getter=register, setter=setRegister:) BOOL register_;
-// CHECK-NEXT: @property (nonatomic, readonly, getter=this) Properties * __nonnull this_;
+// CHECK-NEXT: @property (nonatomic, readonly, strong, getter=this) Properties * __nonnull this_;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -421,6 +422,8 @@ public class NonObjCClass { }
   weak var weakProto: MyProtocol?
   weak var weakCF: CFTypeRef?
   weak var weakCFString: CFStringRef?
+
+  var strongCF: CFTypeRef?
 
   @IBOutlet weak var outlet: AnyObject!
   @IBOutlet var typedOutlet: Properties!

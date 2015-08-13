@@ -34,12 +34,10 @@
 
 using namespace swift;
 
-static bool isNSObject(Type type) {
+static bool isNSObject(ASTContext &ctx, Type type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
-    return !classDecl->getName().empty() &&
-           classDecl->getName().str() == "NSObject" &&
-           !classDecl->getModuleContext()->getName().empty() &&
-           classDecl->getModuleContext()->getName().str() == "ObjectiveC";
+    return classDecl->getName() == ctx.Id_NSObject &&
+           classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC;
   }
 
   return false;
@@ -525,7 +523,6 @@ private:
     // We treat "unowned" as "assign" (even though it's more like
     // "safe_unretained") because we want people to think twice about
     // allowing that object to disappear.
-    // FIXME: Handle the "Unmanaged" wrapper struct.
     Type ty = VD->getType();
     if (auto weakTy = ty->getAs<WeakStorageType>()) {
       auto innerTy = weakTy->getReferentType()->getAnyOptionalObjectType();
@@ -543,7 +540,8 @@ private:
       OptionalTypeKind optionalType;
       if (auto unwrappedTy = copyTy->getAnyOptionalObjectType(optionalType))
         copyTy = unwrappedTy;
-      if (auto nominal = copyTy->getStructOrBoundGenericStruct()) {
+      auto nominal = copyTy->getNominalOrBoundGenericNominal();
+      if (dyn_cast_or_null<StructDecl>(nominal)) {
         if (nominal == ctx.getArrayDecl() ||
             nominal == ctx.getDictionaryDecl() ||
             nominal == ctx.getSetDecl() ||
@@ -568,6 +566,10 @@ private:
         case FunctionTypeRepresentation::CFunctionPointer:
           break;
         }
+      } else if ((dyn_cast_or_null<ClassDecl>(nominal) &&
+                  !cast<ClassDecl>(nominal)->isForeign()) ||
+                 (copyTy->isObjCExistentialType() && !isCFTypeRef(copyTy))) {
+        os << ", strong";
       }
     }
 
@@ -898,7 +900,7 @@ private:
     }
 
     if (SD == ctx.getDictionaryDecl()) {
-      if (!isNSObject(BGT->getGenericArgs()[0]) ||
+      if (!isNSObject(ctx, BGT->getGenericArgs()[0]) ||
           !BGT->getGenericArgs()[1]->isAnyObject()) {
         os << "NSDictionary<";
         printCollectionElement(BGT->getGenericArgs()[0]);
@@ -914,7 +916,7 @@ private:
     }
 
     if (SD == ctx.getSetDecl()) {
-      if (!isNSObject(BGT->getGenericArgs()[0])) {
+      if (!isNSObject(ctx, BGT->getGenericArgs()[0])) {
         os << "NSSet<";
         printCollectionElement(BGT->getGenericArgs()[0]);
         os << "> *";

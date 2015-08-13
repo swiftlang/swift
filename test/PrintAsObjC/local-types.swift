@@ -43,7 +43,7 @@ class ANonObjCClass {}
 // CHECK-NEXT: - (void)f:(id <ZForwardProtocol5> __nonnull (^ __nonnull)(id <ZForwardProtocol3> __nonnull, id <ZForwardProtocol4> __nonnull))f;
 // CHECK-NEXT: - (void)g:(id <ZForwardProtocol6, ZForwardProtocol7> __nonnull)g;
 // CHECK-NEXT: - (void)i:(id <ZForwardProtocol8> __nonnull)_;
-// CHECK-NEXT: @property (nonatomic, readonly) ZForwardClass3 * __nonnull j;
+// CHECK-NEXT: @property (nonatomic, readonly, strong) ZForwardClass3 * __nonnull j;
 // CHECK-NEXT: @property (nonatomic, readonly) SWIFT_METATYPE(ZForwardClass4) __nonnull k;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
