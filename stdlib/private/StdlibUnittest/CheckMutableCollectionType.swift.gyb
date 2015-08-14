@@ -58,14 +58,22 @@ public func withInvalidOrderings(body: ((Int,Int) -> Bool) -> ()) {
   body { (_,_) in i++ % 5 == 0 }
 }
 
+internal func _mapInPlace<C : MutableCollectionType>(
+  inout elements: C,
+  @noescape transform: (C.Generator.Element) -> C.Generator.Element
+) {
+  for i in elements.indices {
+    elements[i] = transform(elements[i])
+  }
+}
+
 extension TestSuite {
   public func addForwardMutableCollectionTests<
     Collection : MutableCollectionType,
     CollectionWithEquatableElement : MutableCollectionType,
     CollectionWithComparableElement : MutableCollectionType
     where
-    // FIXME: Collection.SubSequence : MutableCollectionType,
-    Collection.SubSequence : CollectionType,
+    Collection.SubSequence : MutableCollectionType,
     Collection.SubSequence.SubSequence : CollectionType,
     Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
@@ -153,6 +161,53 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
       expectFailure {
         index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
         c[index] = wrapValue(OpaqueValue(9999))
+      }
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// subscript(_: Range)
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).subscript(_: Range)/Set/semantics") {
+  for test in subscriptRangeTests {
+    var expectedCollection = test.collection
+    _mapInPlace(&expectedCollection[test.boundsIn(expectedCollection)]) {
+      OpaqueValue($0.value + 90000)
+    }
+
+    do {
+      // Call setter with new elements coming from a different collection.
+      var c = makeWrappedCollection(test.collection)
+
+      let newElements = makeWrappedCollection(
+        test.expected.map { OpaqueValue($0.value + 90000) })
+      c[test.boundsIn(c)] = newElements[newElements.indices]
+
+      // FIXME: improve checkForwardCollection to check the SubSequence type.
+      checkForwardCollection(
+        expectedCollection.map(wrapValue),
+        c,
+        resiliencyChecks: .none) {
+        extractValue($0).value == extractValue($1).value
+      }
+    }
+
+    do {
+      // Call setter implicitly through an inout mutation.
+      var c = makeWrappedCollection(test.collection)
+
+      _mapInPlace(&c[test.boundsIn(c)]) {
+        wrapValue(OpaqueValue(extractValue($0).value + 90000))
+      }
+
+      // FIXME: improve checkForwardCollection to check the SubSequence type.
+      checkForwardCollection(
+        expectedCollection.map(wrapValue),
+        c,
+        resiliencyChecks: .none) {
+        extractValue($0).value == extractValue($1).value
       }
     }
   }
@@ -322,8 +377,7 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
     Collection.Index : BidirectionalIndexType,
     CollectionWithEquatableElement.Index : BidirectionalIndexType,
     CollectionWithComparableElement.Index : BidirectionalIndexType,
-    // FIXME: Collection.SubSequence : MutableCollectionType,
-    Collection.SubSequence : CollectionType,
+    Collection.SubSequence : MutableCollectionType,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
     Collection.SubSequence.SubSequence : CollectionType,
     Collection.SubSequence == Collection.SubSequence.SubSequence,
@@ -440,8 +494,7 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     Collection.Index : RandomAccessIndexType,
     CollectionWithEquatableElement.Index : RandomAccessIndexType,
     CollectionWithComparableElement.Index : RandomAccessIndexType,
-    // FIXME: Collection.SubSequence : MutableCollectionType,
-    Collection.SubSequence : CollectionType,
+    Collection.SubSequence : MutableCollectionType,
     Collection.SubSequence.SubSequence : CollectionType,
     Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,

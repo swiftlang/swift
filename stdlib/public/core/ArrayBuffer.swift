@@ -237,37 +237,43 @@ extension _ArrayBuffer {
   /// Return a `_SliceBuffer` containing the given `subRange` of values
   /// from this buffer.
   public subscript(subRange: Range<Int>) -> _SliceBuffer<Element> {
-    _typeCheck(subRange)
+    get {
+      _typeCheck(subRange)
 
-    if _fastPath(_isNative) {
-      return _native[subRange]
-    }
+      if _fastPath(_isNative) {
+        return _native[subRange]
+      }
 
-    // Look for contiguous storage in the NSArray
-    let nonNative = self._nonNative
-    let cocoa = _CocoaArrayWrapper(nonNative)
-    let cocoaStorageBaseAddress = cocoa.contiguousStorage(self.indices)
+      // Look for contiguous storage in the NSArray
+      let nonNative = self._nonNative
+      let cocoa = _CocoaArrayWrapper(nonNative)
+      let cocoaStorageBaseAddress = cocoa.contiguousStorage(self.indices)
 
-    if cocoaStorageBaseAddress != nil {
-      return _SliceBuffer(
-        owner: nonNative,
-        subscriptBaseAddress: UnsafeMutablePointer(cocoaStorageBaseAddress),
-        indices: subRange,
-        hasNativeBuffer: false)
-    }
+      if cocoaStorageBaseAddress != nil {
+        return _SliceBuffer(
+          owner: nonNative,
+          subscriptBaseAddress: UnsafeMutablePointer(cocoaStorageBaseAddress),
+          indices: subRange,
+          hasNativeBuffer: false)
+      }
 
-    // No contiguous storage found; we must allocate
-    let subRangeCount = subRange.count
-    let result = _ContiguousArrayBuffer<Element>(
+      // No contiguous storage found; we must allocate
+      let subRangeCount = subRange.count
+      let result = _ContiguousArrayBuffer<Element>(
         count: subRangeCount, minimumCapacity: 0)
 
-    // Tell Cocoa to copy the objects into our storage
-    cocoa.buffer.getObjects(
-      UnsafeMutablePointer(result.firstElementAddress),
-      range: _SwiftNSRange(location: subRange.startIndex, length: subRangeCount)
-    )
+      // Tell Cocoa to copy the objects into our storage
+      cocoa.buffer.getObjects(
+        UnsafeMutablePointer(result.firstElementAddress),
+        range: _SwiftNSRange(
+          location: subRange.startIndex,
+          length: subRangeCount))
 
-    return _SliceBuffer(result, shiftedToStartIndex: subRange.startIndex)
+      return _SliceBuffer(result, shiftedToStartIndex: subRange.startIndex)
+    }
+    set {
+      fatalError("not implemented")
+    }
   }
 
   public var _unconditionalMutableSubscriptBaseAddress:

@@ -294,6 +294,7 @@ public class MutableCollectionLog : CollectionLog {
     return LoggingMutableCollection(LoggingMutableCollection(c))
   }
   public static var subscriptIndexSet = TypeIndexed(0)
+  public static var subscriptRangeSet = TypeIndexed(0)
   public static var _withUnsafeMutableBufferPointerIfSupported = TypeIndexed(0)
   public static var _withUnsafeMutableBufferPointerIfSupportedNonNilReturns =
     TypeIndexed(0)
@@ -382,8 +383,16 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   }
 
   public subscript(bounds: Range<Base.Index>) -> Base.SubSequence {
-    ++Log.subscriptRange[selfType]
-    return base[bounds]
+    get {
+      ++Log.subscriptRange[selfType]
+      return base[bounds]
+    }
+%     if Kind == 'MutableCollection':
+    set {
+      ++Log.subscriptRangeSet[selfType]
+      base[bounds] = newValue
+    }
+%     end
   }
 
   public var isEmpty: Bool {

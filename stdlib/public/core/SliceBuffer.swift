@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Buffer type for ArraySlice<Element>
-public
+/// Buffer type for `ArraySlice<Element>`.
+public // @testable
 struct _SliceBuffer<Element> : _ArrayBufferType {
-  typealias NativeStorage = _ContiguousArrayStorage<Element>
+  internal typealias NativeStorage = _ContiguousArrayStorage<Element>
   public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
   init(
@@ -274,14 +274,19 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
   }
 
   public subscript(subRange: Range<Int>) -> _SliceBuffer {
-    _sanityCheck(subRange.startIndex >= startIndex)
-    _sanityCheck(subRange.endIndex >= subRange.startIndex)
-    _sanityCheck(subRange.endIndex <= endIndex)
-    return _SliceBuffer(
-      owner: owner,
-      subscriptBaseAddress: subscriptBaseAddress,
-      indices: subRange,
-      hasNativeBuffer: _hasNativeBuffer)
+    get {
+      _sanityCheck(subRange.startIndex >= startIndex)
+      _sanityCheck(subRange.endIndex >= subRange.startIndex)
+      _sanityCheck(subRange.endIndex <= endIndex)
+      return _SliceBuffer(
+        owner: owner,
+        subscriptBaseAddress: subscriptBaseAddress,
+        indices: subRange,
+        hasNativeBuffer: _hasNativeBuffer)
+    }
+    set {
+      fatalError("not implemented")
+    }
   }
 
   //===--- CollectionType conformance -------------------------------------===//

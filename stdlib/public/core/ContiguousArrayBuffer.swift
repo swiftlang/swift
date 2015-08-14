@@ -390,11 +390,16 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   /// Returns a `_SliceBuffer` containing the given `subRange` of values
   /// from this buffer.
   public subscript(subRange: Range<Int>) -> _SliceBuffer<Element> {
-    return _SliceBuffer(
-      owner: __bufferPointer.buffer,
-      subscriptBaseAddress: subscriptBaseAddress,
-      indices: subRange,
-      hasNativeBuffer: true)
+    get {
+      return _SliceBuffer(
+        owner: __bufferPointer.buffer,
+        subscriptBaseAddress: subscriptBaseAddress,
+        indices: subRange,
+        hasNativeBuffer: true)
+    }
+    set {
+      fatalError("not implemented")
+    }
   }
 
   /// Returns `true` iff this buffer's storage is uniquely-referenced.

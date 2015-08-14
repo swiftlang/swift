@@ -213,6 +213,9 @@ extension CollectionType where Generator == IndexingGenerator<Self> {
 /// that accept the default associated `SubSequence`, `Slice<Self>`.
 extension CollectionType where SubSequence == Slice<Self> {
   public subscript(bounds: Range<Index>) -> Slice<Self> {
+    Index._failEarlyRangeCheck2(
+      bounds.startIndex, rangeEnd: bounds.endIndex,
+      boundsStart: startIndex, boundsEnd: endIndex)
     return Slice(base: self, bounds: bounds)
   }
 }
@@ -617,6 +620,12 @@ public protocol MutableCollectionType : MutableIndexable, CollectionType {
   /// - Complexity: O(1)
   subscript(position: Index) -> Generator.Element {get set}
 
+  /// Returns a collection representing a contiguous sub-range of
+  /// `self`'s elements.
+  ///
+  /// - Complexity: O(1) for the getter, O(`bounds.count`) for the setter.
+  subscript(bounds: Range<Index>) -> SubSequence {get set}
+
   /// Call `body(p)`, where `p` is a pointer to the collection's
   /// mutable contiguous storage.  If no such storage exists, it is
   /// first created.  If the collection does not support an internal
@@ -646,8 +655,51 @@ extension MutableCollectionType {
   }
 
   public subscript(bounds: Range<Index>) -> MutableSlice<Self> {
-    return MutableSlice(base: self, bounds: bounds)
+    get {
+      Index._failEarlyRangeCheck2(
+        bounds.startIndex, rangeEnd: bounds.endIndex,
+        boundsStart: startIndex, boundsEnd: endIndex)
+      return MutableSlice(base: self, bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
   }
+}
+
+internal func _writeBackMutableSlice<
+  Collection : MutableCollectionType,
+  Slice_ : CollectionType
+  where
+  Collection._Element == Slice_.Generator.Element,
+  Collection.Index == Slice_.Index
+>(inout self_: Collection, bounds: Range<Collection.Index>, slice: Slice_) {
+  Collection.Index._failEarlyRangeCheck2(
+    bounds.startIndex, rangeEnd: bounds.endIndex,
+    boundsStart: self_.startIndex, boundsEnd: self_.endIndex)
+  // FIXME(performance): can we use
+  // _withUnsafeMutableBufferPointerIfSupported?  Would that create inout
+  // aliasing violations if the newValue points to the same buffer?
+
+  var selfElementIndex = bounds.startIndex
+  let selfElementsEndIndex = bounds.endIndex
+  var newElementIndex = slice.startIndex
+  let newElementsEndIndex = slice.endIndex
+
+  while selfElementIndex != selfElementsEndIndex &&
+    newElementIndex != newElementsEndIndex {
+
+    self_[selfElementIndex] = slice[newElementIndex]
+    ++selfElementIndex
+    ++newElementIndex
+  }
+
+  _precondition(
+    selfElementIndex == selfElementsEndIndex,
+    "Can not replace a slice of a MutableCollectionType with a slice of a larger size")
+  _precondition(
+    newElementIndex == newElementsEndIndex,
+    "Can not replace a slice of a MutableCollectionType with a slice of a smaller size")
 }
 
 /// Returns the range of `x`'s valid index values.

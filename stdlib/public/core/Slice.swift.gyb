@@ -104,7 +104,15 @@ public struct MutableSlice<Base : MutableIndexable> : MutableCollectionType {
   }
 
   public subscript(bounds: Range<Index>) -> MutableSlice {
-    return MutableSlice(base: _base, bounds: bounds)
+    get {
+      Index._failEarlyRangeCheck2(
+        bounds.startIndex, rangeEnd: bounds.endIndex,
+        boundsStart: startIndex, boundsEnd: endIndex)
+      return MutableSlice(base: _base, bounds: bounds)
+    }
+    set {
+      _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
   }
 
   public init(base: Base, bounds: Range<Index>) {

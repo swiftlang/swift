@@ -365,21 +365,6 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
 // subscript(_: Index)
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).subscript(_: Index)/semantics") {
-  for test in subscriptRangeTests {
-    let c = makeWrappedCollection(test.collection)
-    let result = c[test.boundsIn(c)]
-
-    // FIXME: improve checkForwardCollection to check the SubSequence type.
-    checkForwardCollection(
-      test.expected.map(wrapValue),
-      result,
-      resiliencyChecks: .none) {
-      extractValue($0).value == extractValue($1).value
-    }
-  }
-}
-
 if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/NonEmpty/Get") {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
@@ -407,6 +392,57 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
       expectFailure {
         index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
         _blackHole(c[index])
+      }
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// subscript(_: Range)
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).subscript(_: Range)/Get/semantics") {
+  for test in subscriptRangeTests {
+    let c = makeWrappedCollection(test.collection)
+    let result = c[test.boundsIn(c)]
+
+    // FIXME: improve checkForwardCollection to check the SubSequence type.
+    checkForwardCollection(
+      test.expected.map(wrapValue),
+      result,
+      resiliencyChecks: .none) {
+      extractValue($0).value == extractValue($1).value
+    }
+  }
+}
+
+if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .None {
+  self.test("\(testNamePrefix).subscript(_: Range)/OutOfBounds/Right/NonEmpty/Get") {
+    let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
+    var index = c.endIndex
+    if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior == .Trap {
+      expectCrashLater()
+      index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
+      _blackHole(c[index..<index])
+    } else {
+      expectFailure {
+        index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
+        _blackHole(c[index..<index])
+      }
+    }
+  }
+
+  self.test("\(testNamePrefix).subscript(_: Range)/OutOfBounds/Right/Empty/Get") {
+    let c = makeWrappedCollection([])
+    var index = c.endIndex
+    if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior == .Trap {
+      expectCrashLater()
+      index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
+      _blackHole(c[index..<index])
+    } else {
+      expectFailure {
+        index = index.advancedBy(numericCast(outOfBoundsSubscriptOffset))
+        _blackHole(c[index..<index])
       }
     }
   }
@@ -758,6 +794,42 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
       expectFailure {
         index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
         _blackHole(c[index])
+      }
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// subscript(_: Range)
+//===----------------------------------------------------------------------===//
+
+if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .None {
+  self.test("\(testNamePrefix).subscript(_: Range)/OutOfBounds/Left/NonEmpty/Get") {
+    let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
+    var index = c.startIndex
+    if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior == .Trap {
+      expectCrashLater()
+      index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
+      _blackHole(c[index..<index])
+    } else {
+      expectFailure {
+        index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
+        _blackHole(c[index..<index])
+      }
+    }
+  }
+
+  self.test("\(testNamePrefix).subscript(_: Range)/OutOfBounds/Left/Empty/Get") {
+    let c = makeWrappedCollection([])
+    var index = c.startIndex
+    if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior == .Trap {
+      expectCrashLater()
+      index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
+      _blackHole(c[index..<index])
+    } else {
+      expectFailure {
+        index = index.advancedBy(numericCast(-outOfBoundsSubscriptOffset))
+        _blackHole(c[index..<index])
       }
     }
   }

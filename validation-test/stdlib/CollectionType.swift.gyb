@@ -507,6 +507,18 @@ CollectionTypeTests.test("subscript(_: Range<Index>)/Dispatch") {
   expectCustomizable(tester, tester.log.subscriptRange)
 }
 
+CollectionTypeTests.test("subscript(_: Range<Index>)/writeback") {
+  // This code used to crash in materializeForSet.  The issue only reproduced
+  // in non-generic code.  rdar://22109071
+  var collection = MinimalRandomAccessMutableCollection(
+    elements: [ 5, 4, 3, 2, 1, 0, -1, -2, -3, -4 ])
+  var i = collection.startIndex
+  var j = i.advancedBy(5)
+  collection[i..<j].sortInPlace()
+  expectEqualSequence(
+    [ 1, 2, 3, 4, 5, 0, -1, -2, -3, -4 ], collection)
+}
+
 //===----------------------------------------------------------------------===//
 // isEmpty
 //===----------------------------------------------------------------------===//
