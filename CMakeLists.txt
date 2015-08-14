@@ -125,7 +125,7 @@ option(SWIFT_EMBED_BITCODE_SECTION
     FALSE)
 
 option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
-    "Whether to enable CrashReporter integration"
+    "Whether CrashReporterClient library should be a required dependency (build will fail if it is not found)"
     FALSE)
 
 #
@@ -394,7 +394,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   if(${SWIFT_ENABLE_TARGET_TVOS})
     is_sdk_requested(TVOS swift_build_tvos)
     if(swift_build_tvos AND ${swift_can_crosscompile_stdlib})
-      configure_sdk_darwin(TVOS "tvOS" "9.0" appletvos tvos tvos "arm64" FALSE)
+      configure_sdk_darwin(TVOS "tvOS" "9.0" appletvos tvos tvos "arm64" TRUE)
       configure_target_variant(TVOS-DA "tvOS Debug+Asserts"   TVOS DA "Debug+Asserts")
       configure_target_variant(TVOS-RA "tvOS Release+Asserts" TVOS RA "Release+Asserts")
       configure_target_variant(TVOS-R  "tvOS Release"         TVOS R "Release")
@@ -414,7 +414,7 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 
   is_sdk_requested(WATCHOS swift_build_watchos)
   if(swift_build_watchos AND ${swift_can_crosscompile_stdlib})
-    configure_sdk_darwin(WATCHOS "watchOS" "2.0" watchos watchos watchos "armv7k" FALSE)
+    configure_sdk_darwin(WATCHOS "watchOS" "2.0" watchos watchos watchos "armv7k" TRUE)
     configure_target_variant(WATCHOS-DA "watchOS Debug+Asserts"   WATCHOS DA "Debug+Asserts")
     configure_target_variant(WATCHOS-RA "watchOS Release+Asserts" WATCHOS RA "Release+Asserts")
     configure_target_variant(WATCHOS-R  "watchOS Release"         WATCHOS R "Release")
@@ -501,6 +501,25 @@ message(STATUS "")
 find_package(LibXml2)
 if(LIBXML2_FOUND)
   set(SWIFT_HAVE_LIBXML 1)
+endif()
+
+# Find CrashReporterClient.
+if(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT)
+  foreach(SDK ${SWIFT_SDKS})
+    foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
+      set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
+      unset(SWIFT_HAVE_CRASH_REPORTER_CLIENT)
+      unset(SWIFT_HAVE_CRASH_REPORTER_CLIENT CACHE)
+      find_library(SWIFT_HAVE_CRASH_REPORTER_CLIENT
+          NAMES CrashReporterClient
+          PATHS "${SWIFT_SDK_${SDK}_PATH}/usr/local/lib"
+          NO_DEFAULT_PATH)
+      if(NOT SWIFT_HAVE_CRASH_REPORTER_CLIENT)
+        message(FATAL_ERROR
+            "CrashReporterClient library is required, but it was not found")
+      endif()
+    endforeach()
+  endforeach()
 endif()
 
 #

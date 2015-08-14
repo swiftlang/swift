@@ -18,45 +18,12 @@
 #define _SWIFT_RUNTIME_DEBUG_HELPERS_
 
 #include <llvm/Support/Compiler.h>
+#include <stdio.h>
 
-#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
-#include <stdint.h>
-
-#define CRASH_REPORTER_CLIENT_HIDDEN __attribute__((visibility("hidden")))
-#define CRASHREPORTER_ANNOTATIONS_VERSION 5
-#define CRASHREPORTER_ANNOTATIONS_SECTION "__crash_info"
-
-struct crashreporter_annotations_t {
-  uint64_t version;          // unsigned long
-  uint64_t message;          // char *
-  uint64_t signature_string; // char *
-  uint64_t backtrace;        // char *
-  uint64_t message2;         // char *
-  uint64_t thread;           // uint64_t
-  uint64_t dialog_mode;      // unsigned int
-  uint64_t abort_cause;      // unsigned int
-};
-
-extern "C" {
-CRASH_REPORTER_CLIENT_HIDDEN
-extern struct crashreporter_annotations_t gCRAnnotations;
-}
-
-LLVM_ATTRIBUTE_ALWAYS_INLINE
-static void CRSetCrashLogMessage(const char *message) {
-  gCRAnnotations.message = reinterpret_cast<uint64_t>(message);
-}
-
-LLVM_ATTRIBUTE_ALWAYS_INLINE
-static const char *CRGetCrashLogMessage() {
-  return reinterpret_cast<const char *>(gCRAnnotations.message);
-}
-
+#if SWIFT_HAVE_CRASHREPORTERCLIENT
+#include <CrashReporterClient.h>
 #else
-
-LLVM_ATTRIBUTE_ALWAYS_INLINE
-static void CRSetCrashLogMessage(const char *) {}
-
+#define CRSetCrashLogMessage(_m_) fprintf(stderr, "%s\n", (_m_))
 #endif
 
 namespace swift {
