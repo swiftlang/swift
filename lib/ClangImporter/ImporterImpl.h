@@ -41,6 +41,7 @@ class Decl;
 class DeclarationName;
 class EnumDecl;
 class MacroInfo;
+class MangleContext;
 class NamedDecl;
 class ObjCInterfaceDecl;
 class ObjCMethodDecl;
@@ -277,6 +278,9 @@ private:
 
   /// \brief Clang parser, which is used to load textual headers.
   std::unique_ptr<clang::Parser> Parser;
+
+  /// \brief Clang parser, which is used to load textual headers.
+  std::unique_ptr<clang::MangleContext> Mangler;
 
   /// The active type checker, or null if there is no active type checker.
   ///

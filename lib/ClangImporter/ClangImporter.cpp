@@ -34,6 +34,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Mangle.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Module.h"
@@ -3307,3 +3308,10 @@ void ClangModuleUnit::getImportedModulesForLookup(
   importedModulesForLookup = getASTContext().AllocateCopy(importsToCache);
 }
 
+void ClangImporter::getMangledName(raw_ostream &os,
+                                   const clang::NamedDecl *clangDecl) const {
+  if (!Impl.Mangler)
+    Impl.Mangler.reset(Impl.getClangASTContext().createMangleContext());
+
+  Impl.Mangler->mangleName(clangDecl, os);
+}

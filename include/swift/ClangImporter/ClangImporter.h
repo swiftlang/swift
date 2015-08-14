@@ -251,6 +251,9 @@ public:
   /// used by the debugger.
   Identifier getEnumConstantName(const clang::EnumConstantDecl *enumConstant);
 
+  /// Writes the mangled name of \p clangDecl to \p os.
+  void getMangledName(raw_ostream &os, const clang::NamedDecl *clangDecl) const;
+
   using ClangModuleLoader::addDependency;
   
   // Print statistics from the Clang AST reader.

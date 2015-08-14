@@ -17,6 +17,7 @@
 #include "Linking.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/AST/Mangle.h"
 #include "clang/AST/Attr.h"
@@ -68,6 +69,14 @@ static StringRef mangleValueWitness(ValueWitness witness) {
 void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
   llvm::raw_svector_ostream stream(buffer);
   mangle(stream);
+}
+
+/// Use the Clang importer to mangle a Clang declaration.
+static void mangleClangDecl(raw_ostream &buffer,
+                            const clang::NamedDecl *clangDecl,
+                            ASTContext &ctx) {
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  importer->getMangledName(buffer, clangDecl);
 }
 
 /// Mangle this entity into the given stream.
@@ -208,11 +217,13 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
 
   case Kind::Other:
     // As a special case, Clang functions and globals don't get mangled at all.
-    // FIXME: When we can import C++, use Clang's mangler.
     if (auto clangDecl = getDecl()->getClangDecl()) {
       if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
         if (auto asmLabel = namedClangDecl->getAttr<clang::AsmLabelAttr>()) {
           buffer << '\01' << asmLabel->getLabel();
+        } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>()) {
+          // FIXME: When we can import C++, use Clang's mangler all the time.
+          mangleClangDecl(buffer, namedClangDecl, getDecl()->getASTContext());
         } else {
           buffer << namedClangDecl->getName();
         }
