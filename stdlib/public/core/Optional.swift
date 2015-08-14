@@ -16,6 +16,9 @@ public enum Optional<Wrapped> : _Reflectable, NilLiteralConvertible {
   case None
   case Some(Wrapped)
 
+  @available(*, unavailable, renamed="Wrapped")
+  public typealias T = Wrapped
+
   /// Construct a `nil` instance.
   @transparent
   public init() { self = .None }
