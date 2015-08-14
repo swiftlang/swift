@@ -25,8 +25,10 @@
 #include "ErrorObject.h"
 #include "Private.h"
 #include <dlfcn.h>
-#include <objc/objc-internal.h>
+#include <objc/NSObject.h>
 #include <objc/runtime.h>
+#include <objc/message.h>
+#include <objc/objc.h>
 #include <Foundation/Foundation.h>
 
 using namespace swift;

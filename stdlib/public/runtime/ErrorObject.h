@@ -29,13 +29,18 @@
 #include <atomic>
 #if SWIFT_OBJC_INTEROP
 # include <CoreFoundation/CoreFoundation.h>
-# include <CoreFoundation/CFRuntime.h>
 # include <objc/objc.h>
 #endif
 
 namespace swift {
 
 #if SWIFT_OBJC_INTEROP
+
+// Copied from CoreFoundation/CFRuntime.h.
+struct CFRuntimeBase {
+  void *opaque1;
+  void *opaque2;
+};
 
 /// When ObjC interop is enabled, SwiftError uses an NSError-layout-compatible
 /// header.
@@ -49,9 +54,6 @@ struct SwiftErrorHeader {
   std::atomic<CFStringRef> domain;
   std::atomic<CFDictionaryRef> userInfo;
 };
-
-static_assert(sizeof(CFRuntimeBase) == sizeof(void*) * 2,
-              "size of CFRuntimeBase changed");
 
 #else
 
