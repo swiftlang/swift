@@ -2325,35 +2325,6 @@ llvm::CallSite CallEmission::emitCallSite(bool hasIndirectResult) {
   return call;
 }
 
-enum class ResultDifference {
-  /// The substituted result type is the same as the original result type.
-  Identical,
-
-  /// The substituted result type is a different formal type from, but
-  /// has the same layout and interpretation as, the original result type.
-  Aliasable,
-
-  /// The substitued result type has the same layout as the original
-  /// result type, but may differ in interpretation.
-  // Reinterpretable,
-
-  /// The substituted result type differs not just in interpretation,
-  /// but in layout, from the original result type.
-  Divergent
-};
-
-static ResultDifference computeResultDifference(IRGenModule &IGM,
-                                                CanType origResultType,
-                                                CanType substResultType) {
-  if (origResultType == substResultType)
-    return ResultDifference::Identical;
-
-  if (differsByAbstractionInMemory(IGM, origResultType, substResultType))
-    return ResultDifference::Divergent;
-
-  return ResultDifference::Aliasable;
-}
-
 /// Emit the result of this call to memory.
 void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
   assert(LastArgWritten <= 1);
@@ -2383,28 +2354,17 @@ void CallEmission::emitToMemory(Address addr, const TypeInfo &substResultTI) {
     substResultType = substFnType->getResult().getType();
   }
 
-  // Figure out how the substituted result differs from the original.
-  auto resultDiff =
-    computeResultDifference(IGF.IGM, origResultType, substResultType);
-  switch (resultDiff) {
+  if (origResultType->hasTypeParameter())
+    origResultType = IGF.IGM.getContextArchetypes()
+      .substDependentType(origResultType)
+      ->getCanonicalType();
 
-  // For aliasable types, just bitcast the output address.
-  case ResultDifference::Aliasable: {
+  if (origResultType != substResultType) {
     auto origTy = IGF.IGM.getStoragePointerTypeForLowered(origResultType);
     origAddr = IGF.Builder.CreateBitCast(origAddr, origTy);
-    SWIFT_FALLTHROUGH;
   }
 
-  case ResultDifference::Identical:
-    emitToUnmappedMemory(origAddr);
-    return;
-
-  case ResultDifference::Divergent:
-    // We need to do layout+allocation under substitution rules.
-    return IGF.unimplemented(SourceLoc(), "divergent emission to memory");
-  }
-    
-  llvm_unreachable("bad difference kind");
+  emitToUnmappedMemory(origAddr);
 }
 
 /// Emit the result of this call to an explosion.
@@ -2442,17 +2402,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
       ->getCanonicalType();
 
   // Okay, we're naturally emitting to an explosion.
-  // Figure out how the substituted result differs from the original.
-  auto resultDiff = computeResultDifference(IGF.IGM, origResultType,
-                                          substResultType.getSwiftRValueType());
-
-  switch (resultDiff) {
-  // If they don't differ at all, we're good. 
-  case ResultDifference::Identical:
-    emitToUnmappedExplosion(out);
-    return;
-
-  case ResultDifference::Aliasable: {
+  if (origResultType != substResultType.getSwiftRValueType()) {
     Explosion temp;
     emitToUnmappedExplosion(temp);
     ExplosionSchema resultSchema = substResultTI.getSchema();
@@ -2468,48 +2418,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
     return;
   }
 
-  // If they do differ, we need to remap.
-  case ResultDifference::Divergent:
-    if (substResultType.is<MetatypeType>() &&
-        isa<MetatypeType>(origResultType)) {
-      // If we got here, it's because the substituted metatype is trivial.
-      // Remapping is easy--the substituted type is empty, so we drop the
-      // nontrivial representation of the original type.
-      assert(substResultType.castTo<MetatypeType>()->getRepresentation()
-               == MetatypeRepresentation::Thin
-             && "remapping to non-thin metatype?!");
-      
-      Explosion temp;
-      emitToUnmappedExplosion(temp);
-      temp.claimAll();
-      return;
-    }
-      
-    if (auto origArchetype = dyn_cast<ArchetypeType>(origResultType)) {
-      if (origArchetype->requiresClass()) {
-        // Remap a class archetype to an instance.
-        assert(substResultType.hasReferenceSemantics() &&
-               "remapping class archetype to non-class?!");
-        auto schema = substResultTI.getSchema();
-        assert(schema.size() == 1 && schema.begin()->isScalar()
-               && "remapping class archetype to non-single-scalar");
-        Explosion temp;
-        emitToUnmappedExplosion(temp);
-        llvm::Value *pointer = temp.claimNext();
-        pointer = IGF.Builder.CreateBitCast(pointer,
-                                            schema.begin()->getScalarType());
-        out.add(pointer);
-        return;
-      }
-    }
-      
-    // There's a related FIXME in the Builtin.load/move code.
-    IGF.unimplemented(SourceLoc(), "remapping explosion");
-    IGF.emitFakeExplosion(substResultTI, out);
-    return;
-  }
-    
-  llvm_unreachable("bad difference kind");
+  emitToUnmappedExplosion(out);
 }
 
 CallEmission::CallEmission(CallEmission &&other)

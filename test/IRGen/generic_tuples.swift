@@ -48,7 +48,39 @@ func dup<T>(var x: T) -> (T, T) { return (x,x) }
 // CHECK-NEXT: [[TAKE_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call [[OPAQUE]]* [[TAKE_FN]]([[OPAQUE]]* [[SND]], [[OPAQUE]]* [[X]], [[TYPE]]* %T)
 
-// CHECK: ret void
+struct S {}
+
+
+func callDup(let s: S) { _ = dup(s) }
+// CHECK-LABEL: define hidden void @_TF14generic_tuples7callDupFVS_1ST_()
+// CHECK-NEXT: entry:
+// CHECK-NEXT: call void @_TF14generic_tuples3dupurFq_Tq_q__({{.*}} undef, {{.*}} undef, %swift.type* getelementptr {{.*}} @_TMdV14generic_tuples1S {{.*}})
+// CHECK-NEXT: ret void
+
+class C {}
+
+func dupC<T : C>(let x: T) -> (T, T) { return (x, x) }
+// CHECK-LABEL: define hidden { %C14generic_tuples1C*, %C14generic_tuples1C* } @_TF14generic_tuples4dupCuRdq_CS_1C_Fq_Tq_q__(%C14generic_tuples1C*, %swift.type* %T)
+// CHECK-NEXT: entry:
+// CHECK:      [[REF:%.*]] = bitcast %C14generic_tuples1C* %0 to %swift.refcounted*
+// CHECK-NEXT: call void @swift_retain_noresult(%swift.refcounted* [[REF]])
+// CHECK-NEXT: [[TUP1:%.*]] = insertvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } undef, %C14generic_tuples1C* %0, 0
+// CHECK-NEXT: [[TUP2:%.*]] = insertvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUP1:%.*]], %C14generic_tuples1C* %0, 1
+// CHECK-NEXT: ret { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUP2]]
+
+func callDupC(let c: C) { _ = dupC(c) }
+// CHECK-LABEL: define hidden void @_TF14generic_tuples8callDupCFCS_1CT_(%C14generic_tuples1C*)
+// CHECK-NEXT: entry:
+// CHECK-NEXT: [[REF:%.*]] = bitcast %C14generic_tuples1C* %0 to %swift.refcounted*
+// CHECK-NEXT: call void @swift_retain_noresult(%swift.refcounted* [[REF]])
+// CHECK-NEXT: [[METATYPE:%.*]] = call %swift.type* @_TMaC14generic_tuples1C()
+// CHECK-NEXT: [[TUPLE:%.*]] = call { %C14generic_tuples1C*, %C14generic_tuples1C* } @_TF14generic_tuples4dupCuRdq_CS_1C_Fq_Tq_q__(%C14generic_tuples1C* %0, %swift.type* [[METATYPE]])
+// CHECK-NEXT: [[LEFT:%.*]] = extractvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUPLE]], 0
+// CHECK-NEXT: [[RIGHT:%.*]] = extractvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUPLE]], 1
+// CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%C14generic_tuples1C*)*)(%C14generic_tuples1C* [[RIGHT]])
+// CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%C14generic_tuples1C*)*)(%C14generic_tuples1C* [[LEFT]])
+// CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%C14generic_tuples1C*)*)(%C14generic_tuples1C* %0)
+// CHECK-NEXT: ret void
 
 // CHECK: define hidden void @_TF14generic_tuples4lump{{.*}}(<{ %Si }>* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T)
 func lump<T>(x: T) -> (Int, T, T) { return (0,x,x) }
