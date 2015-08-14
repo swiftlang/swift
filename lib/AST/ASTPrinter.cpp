@@ -635,16 +635,6 @@ bool PrintAST::shouldPrint(const Decl *D) {
       return false;
   }
 
-  if (Options.AccessibilityFilter > Accessibility::Private) {
-    // If getting no formal access, we ask the attribute instead.
-    for(auto Att : D->getAttrs()) {
-      if (auto Acc = dyn_cast<AccessibilityAttr>(Att)) {
-        if (Acc->getAccess() < Options.AccessibilityFilter)
-          return false;
-      }
-    }
-  }
-
   if (Options.SkipPrivateStdlibDecls && D->isPrivateStdlibDecl())
       return false;
 
