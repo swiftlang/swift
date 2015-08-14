@@ -149,7 +149,8 @@ public:
   virtual void completeImportDecl() = 0;
 
   /// Complete unresolved members after dot.
-  virtual void completeUnresolvedMember(UnresolvedMemberExpr *E) = 0;
+  virtual void completeUnresolvedMember(UnresolvedMemberExpr *E,
+                                        ArrayRef<StringRef> Identifiers) = 0;
 
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

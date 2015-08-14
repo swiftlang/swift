@@ -848,15 +848,27 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     SourceLoc NameLoc;
 
     if (Tok.is(tok::code_complete)) {
-      consumeToken();
       auto Expr = new (Context) UnresolvedMemberExpr(DotLoc,
         DotLoc.getAdvancedLoc(1), Context.getIdentifier("_"), nullptr);
       Result = makeParserResult(Expr);
       if (CodeCompletion) {
-        CodeCompletion->completeUnresolvedMember(Expr);
+        std::vector<StringRef> Identifiers;
+
+        // Move lexer to the start of the current line.
+        L->backtrackToState(L->getStateForBeginningOfTokenLoc(
+          L->getLocForStartOfLine(SourceMgr, Tok.getLoc())));
+
+        // Until we see the code completion token, collect identifiers.
+        for (L->lex(Tok); !Tok.is(tok::code_complete); consumeToken()) {
+          if (Tok.is(tok::identifier)) {
+            Identifiers.push_back(Tok.getText());
+          }
+        }
+        CodeCompletion->completeUnresolvedMember(Expr, Identifiers);
       } else {
         Result.setHasCodeCompletion();
       }
+      consumeToken();
       return Result;
     }
 

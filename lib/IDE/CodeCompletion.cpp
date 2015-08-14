@@ -846,7 +846,8 @@ public:
 
   void completePoundAvailablePlatform() override;
   void completeImportDecl() override;
-  void completeUnresolvedMember(UnresolvedMemberExpr *E) override;
+  void completeUnresolvedMember(UnresolvedMemberExpr *E,
+                                ArrayRef<StringRef> Identifiers) override;
 
   void addKeywords(CodeCompletionResultSink &Sink);
 
@@ -2565,7 +2566,8 @@ void CodeCompletionCallbacksImpl::completeImportDecl() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeUnresolvedMember(UnresolvedMemberExpr *E) {
+void CodeCompletionCallbacksImpl::completeUnresolvedMember(UnresolvedMemberExpr *E,
+    ArrayRef<StringRef> Identifiers) {
   Kind = CompletionKind::UnresolvedMember;
   CurDeclContext = P.CurDeclContext;
   UnresolvedExpr = E;
