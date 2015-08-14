@@ -62,6 +62,13 @@ func testInlineRedeclaredWrapped() -> CInt {
 
 // CHECK-LABEL: define internal i32 @wrappedZeroRedeclared() #{{[0-9]+}} {
 
+// CHECK-LABEL: define hidden i32 @_TF12clang_inline22testStaticButNotInlineFT_VSs5Int32() {{.*}} {
+func testStaticButNotInline() -> CInt {
+  return staticButNotInline()
+}
+
+// CHECK-LABEL: define internal i32 @staticButNotInline() #{{[0-9]+}} {
+
 // CHECK-LABEL: define internal i32 @innerZero()
 // CHECK:         [[INNER_ZERO_ATTR:#[0-9]+]] {
 // CHECK-LABEL: declare i32 @getInt()

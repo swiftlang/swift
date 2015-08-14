@@ -55,6 +55,8 @@ static inline int zeroRedeclared(void);
 static inline int wrappedZeroRedeclared(void) { return zeroRedeclared(); }
 static inline int zeroRedeclared(void) { return innerZero(); }
 
+static int staticButNotInline(void) { return innerZero(); }
+
 @interface NSView : NSObject
 - (struct NSRect) convertRectFromBase: (struct NSRect) r;
 @end

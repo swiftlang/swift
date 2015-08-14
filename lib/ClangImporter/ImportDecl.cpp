@@ -2254,7 +2254,8 @@ namespace {
 
       // Keep track of inline function bodies so that we can generate
       // IR from them using Clang's IR generator.
-      if ((decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>())
+      if ((decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>() ||
+           !decl->isExternallyVisible())
           && decl->hasBody()) {
         Impl.registerExternalDecl(result);
       }
