@@ -6,9 +6,16 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_6 | FileCheck %s -check-prefix=UNRESOLVED_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_7 | FileCheck %s -check-prefix=UNRESOLVED_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_10 | FileCheck %s -check-prefix=UNRESOLVED_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_11 | FileCheck %s -check-prefix=UNRESOLVED_2
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_8 | FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_9 | FileCheck %s -check-prefix=UNRESOLVED_3
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_12 | FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_13 | FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_14 | FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_15 | FileCheck %s -check-prefix=UNRESOLVED_1
 
 enum SomeEnum1 {
   case South
@@ -29,7 +36,8 @@ struct SomeOptions1 : OptionSetType {
   static let Option1 = SomeOptions1(rawValue: 1 << 1)
   static let Option2 = SomeOptions1(rawValue: 1 << 2)
   static let Option3 = SomeOptions1(rawValue: 1 << 3)
-  let NotStaticOption = (rawValue: 1 << 4)
+  let NotStaticOption = SomeOptions1(rawValue: 1 << 4)
+  static let NotOption = 1
 }
 
 struct SomeOptions2 : OptionSetType {
@@ -42,6 +50,16 @@ struct SomeOptions2 : OptionSetType {
 func OptionSetTaker1(Op : SomeOptions1) {}
 
 func OptionSetTaker2(Op : SomeOptions2) {}
+
+func OptionSetTaker3(Op1: SomeOptions1, Op2: SomeOptions2) {}
+
+func OptionSetTaker4(Op1: SomeOptions2, Op2: SomeOptions1) {}
+
+func OptionSetTaker5(Op1: SomeOptions1, Op2: SomeOptions2, En1 : SomeEnum1, En2: SomeEnum2) {}
+
+func OptionSetTaker6(Op1: SomeOptions1, Op2: SomeOptions2) {}
+
+func OptionSetTaker6(Op1: SomeOptions2, Op2: SomeOptions1) {}
 
 func EnumTaker1(E : SomeEnum1) {}
 
@@ -73,8 +91,7 @@ class C2 {
 // UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal: Option2[#SomeOptions1#]; name=Option2
 // UNRESOLVED_1-DAG:  Decl[StaticVar]/CurrNominal: Option3[#SomeOptions1#]; name=Option3
 // UNRESOLVED_1-NOT:  SomeOptions2
-// UNRESOLVED_1-NOT:  NotOptions1
-// UNRESOLVED_1-NOT:  NotStaticOption
+// UNRESOLVED_1-NOT:  Not
 }
 
 class C3 {
@@ -91,8 +108,7 @@ class C3 {
 // UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal: Option5[#SomeOptions2#]; name=Option5
 // UNRESOLVED_2-DAG:  Decl[StaticVar]/CurrNominal: Option6[#SomeOptions2#]; name=Option6
 // UNRESOLVED_2-NOT:  SomeOptions1
-// UNRESOLVED_2-NOT:  NotOptions1
-// UNRESOLVED_2-NOT:  NotStaticOption
+// UNRESOLVED_2-NOT:  Not
 }
 
 class C4 {
@@ -103,6 +119,9 @@ class C4 {
   func f2() {
     EnumTaker1(.#^UNRESOLVED_9^#)
   }
+  func f3() {
+    OptionSetTaker5(.Option1, .Option4, .#^UNRESOLVED_12^#, .West)
+  }
 }
 // UNRESOLVED_3: Begin completions
 // UNRESOLVED_3-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#]; name=North
@@ -110,3 +129,25 @@ class C4 {
 // UNRESOLVED_3-NOT: SomeEnum2
 // UNRESOLVED_3-NOT: SomeOptions1
 // UNRESOLVED_3-NOT: SomeOptions2
+
+class C5 {
+  func f1() {
+    OptionSetTaker3(.Option1, .#^UNRESOLVED_10^#)
+  }
+  func f2() {
+    OptionSetTaker4(.#^UNRESOLVED_11^#, .Option1)
+  }
+}
+
+OptionSetTaker5(.Option1, .Option4, .#^UNRESOLVED_13^#, .West)
+OptionSetTaker5(.#^UNRESOLVED_14^#, .Option4, .South, .West)
+OptionSetTaker5([.#^UNRESOLVED_15^#], .Option4, .South, .West)
+
+// FIXME: Overload needs to be handled.
+OptionSetTaker6(.#^UNRESOLVED_16^#, .Option4)
+OptionSetTaker6(.Option4, .#^UNRESOLVED_17^#,)
+
+// FIXME: Unresolved member completion does not work inside closures.
+var a = {() in
+  OptionSetTaker5([.#^UNRESOLVED_18^#], .Option4, .South, .West)
+}

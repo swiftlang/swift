@@ -371,9 +371,9 @@ func testWithInvalid1() {
   y = .#^UNRESOLVED_1^#
 // FIXME: Only contains resolvable ones.
 // UNRESOLVED_1:  Begin completions
-// UNRESOLVED_1-NOT:  Decl[EnumElement]/ExprSpecific:     Baz2({#T#})[#(T) -> BazEnum<T>#]; name=Baz2(T)
-// UNRESOLVED_1-NOT:  Decl[EnumElement]/ExprSpecific:     Baz1[#BazEnum<T>#]; name=Baz1
-// UNRESOLVED_1-NOT:  Decl[EnumElement]/ExprSpecific:     Bar8({#a: Int#}, b: ({#c: Float#}, {#d: Double#}))[#(a: Int, b: (c: Float, d: Double)) -> BarEnum#]; name=Bar8(a: Int, b: (c: Float, d: Double))
+// UNRESOLVED_1-NOT:  Baz
+// UNRESOLVED_1-NOT:  Bar
+// UNRESOLVED_1-DAG:  Decl[EnumElement]/ExprSpecific:     Qux1[#QuxEnum#]; name=Qux1
 // UNRESOLVED_1-DAG:  Decl[EnumElement]/ExprSpecific:     Qux2[#QuxEnum#]; name=Qux2
-// UNRESOLVED_1-NOT:  Decl[EnumElement]/ExprSpecific:     Okay[#WithInvalid#]; name=Okay
+// UNRESOLVED_1-NOT:  Okay
 }

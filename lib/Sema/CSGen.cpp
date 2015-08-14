@@ -2757,7 +2757,7 @@ public:
 bool swift::typeCheckUnresolvedMember(DeclContext &DC,
                                       UnresolvedMemberExpr* E, Expr *Parent,
                                       SmallVectorImpl<Type> &PossibleTypes) {
-  ConstraintSystemOptions Options;
+  ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
   auto *TypeChecker = static_cast<class TypeChecker*>(DC.getASTContext().
                                                       getLazyResolver());
   ConstraintSystem CS(*TypeChecker, &DC, Options);

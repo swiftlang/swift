@@ -883,8 +883,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
     EnumElement,
     Type,
     TypeInDeclContext,
-    ImportFromModule,
-    EnumElementAndOptionSetType,
+    ImportFromModule
   };
 
   LookupKind Kind;
@@ -1462,7 +1461,6 @@ public:
         }
       }
       break;
-    case LookupKind::EnumElementAndOptionSetType:
     case LookupKind::EnumElement:
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
@@ -1945,12 +1943,6 @@ public:
       handleEnumElement(D, Reason);
       return;
 
-    case LookupKind::EnumElementAndOptionSetType:
-      if (!handleEnumElement(D, Reason)) {
-        handleOptionSetType(D, Reason);
-      }
-      return;
-
     case LookupKind::Type:
     case LookupKind::TypeInDeclContext:
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -1980,15 +1972,16 @@ public:
   bool handleEnumElement(Decl *D, DeclVisibilityKind Reason) {
     if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
       addEnumElementRef(EED, Reason, /*HasTypeContext=*/true);
+      return true;
     } else if (auto *ED = dyn_cast<EnumDecl>(D)) {
       llvm::DenseSet<EnumElementDecl *> Elements;
       ED->getAllElements(Elements);
       for (auto *Ele : Elements) {
         addEnumElementRef(Ele, Reason, /*HasTypeContext=*/true);
       }
-    } else
-      return false;
-    return true;
+      return true;
+    }
+    return false;
   }
 
   void handleOptionSetType(Decl *D, DeclVisibilityKind Reason) {
@@ -2122,13 +2115,14 @@ public:
   }
 
   void getUnresolvedMemberCompletions(SourceLoc Loc, SmallVectorImpl<Type> &Types) {
-    llvm::SaveAndRestore<LookupKind> ChangeLookupKind(Kind, LookupKind::
-                                                      EnumElementAndOptionSetType);
     NeedLeadingDot = !HaveDot;
     for (auto T : Types) {
-      if (T && T->getNominalOrBoundGenericNominal())
-        foundDecl(T->getNominalOrBoundGenericNominal(),
-                  DeclVisibilityKind::MemberOfCurrentNominal);
+      if (T && T->getNominalOrBoundGenericNominal()) {
+        auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
+        if (!handleEnumElement(T->getNominalOrBoundGenericNominal(), Reason)) {
+          handleOptionSetType(T->getNominalOrBoundGenericNominal(), Reason);
+        }
+      }
     }
   }
 
