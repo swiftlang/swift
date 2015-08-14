@@ -841,11 +841,48 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
 // Diagnose availability.
 //===--------------------------------------------------------------------===//
 
+static void tryFixPrintWithAppendNewline(const ValueDecl *D,
+                                         const Expr *ParentExpr,
+                                         InFlightDiagnostic &Diag) {
+  if (!D || !ParentExpr)
+    return;
+  if (!D->getModuleContext()->isStdlibModule())
+    return;
+
+  SmallString<128> NameBuf;
+  llvm::raw_svector_ostream OS(NameBuf);
+  OS << D->getFullName();
+  if (OS.str() != "print(_:appendNewline:)")
+    return;
+
+  // Go through the expr to determine if second parameter is boolean literal.
+  auto *CE = dyn_cast_or_null<CallExpr>(ParentExpr);
+  if (!CE) return;
+  auto *TE = dyn_cast<TupleExpr>(CE->getArg());
+  if (!TE) return;
+  if (TE->getNumElements() != 2) return;
+  auto *SCE = dyn_cast<CallExpr>(TE->getElement(1));
+  if (!SCE || !SCE->isImplicit()) return;
+  auto *STE = dyn_cast<TupleExpr>(SCE->getArg());
+  if (!STE || !STE->isImplicit()) return;
+  if (STE->getNumElements() != 1) return;
+  auto *BE = dyn_cast<BooleanLiteralExpr>(STE->getElement(0));
+  if (!BE) return;
+
+  std::string termStr = "terminator: \"";
+  if (BE->getValue()) termStr += "\\n";
+  termStr += "\"";
+
+  SourceRange RangeToFix(TE->getElementNameLoc(1), BE->getEndLoc());
+  Diag.fixItReplace(RangeToFix, termStr);
+}
+
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted=".
 static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
                                            SourceRange R,
-                                           const DeclContext *DC) {
+                                           const DeclContext *DC,
+                                           const Expr *ParentExpr = nullptr) {
   auto *Attr = AvailableAttr::isUnavailable(D);
   if (!Attr)
     return false;
@@ -883,8 +920,9 @@ static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
       TC.diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
     } else {
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      TC.diagnose(Loc, diag::availability_decl_unavailable_msg, Name,
-                  EncodedMessage.Message).highlight(R);
+      tryFixPrintWithAppendNewline(D, ParentExpr,
+        TC.diagnose(Loc, diag::availability_decl_unavailable_msg, Name,
+                    EncodedMessage.Message).highlight(R));
     }
     break;
 
@@ -925,11 +963,12 @@ static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
 /// Diagnose uses of unavailable declarations. Returns true if a diagnostic
 /// was emitted.
 static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
-                             SourceRange R, const DeclContext *DC) {
+                             SourceRange R, const DeclContext *DC,
+                             const Expr *ParentExpr = nullptr) {
   if (!D)
     return false;
 
-  if (diagnoseExplicitUnavailability(TC, D, R, DC))
+  if (diagnoseExplicitUnavailability(TC, D, R, DC, ParentExpr))
     return true;
 
   // Diagnose for deprecation
@@ -972,6 +1011,7 @@ class AvailabilityWalker : public ASTWalker {
   TypeChecker &TC;
   const DeclContext *DC;
   const MemberAccessContext AccessContext;
+  SmallVector<const Expr *, 16> ExprStack;
 
 public:
   AvailabilityWalker(
@@ -980,11 +1020,20 @@ public:
       : TC(TC), DC(DC), AccessContext(AccessContext) {}
 
   virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    ExprStack.push_back(E);
+
+    auto visitChildren = [&]() { return std::make_pair(true, E); };
+    auto skipChildren = [&]() {
+      ExprStack.pop_back();
+      return std::make_pair(false, E);
+    };
+
     if (auto DR = dyn_cast<DeclRefExpr>(E))
-      diagAvailability(TC, DR->getDecl(), DR->getSourceRange(), DC);
+      diagAvailability(TC, DR->getDecl(), DR->getSourceRange(), DC,
+                       getParentForDeclRef());
     if (auto MR = dyn_cast<MemberRefExpr>(E)) {
       walkMemberRef(MR);
-      return std::make_pair(false, E);
+      return skipChildren();
     }
     if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
       diagAvailability(TC, OCDR->getDecl(), OCDR->getConstructorLoc(), DC);
@@ -998,14 +1047,21 @@ public:
     }
     if (auto A = dyn_cast<AssignExpr>(E)) {
       walkAssignExpr(A);
-      return std::make_pair(false, E);
+      return skipChildren();
     }
     if (auto IO = dyn_cast<InOutExpr>(E)) {
       walkInOutExpr(IO);
-      return std::make_pair(false, E);
+      return skipChildren();
     }
     
-    return std::make_pair(true, E);
+    return visitChildren();
+  }
+
+  virtual Expr *walkToExprPost(Expr *E) override {
+    assert(ExprStack.back() == E);
+    ExprStack.pop_back();
+
+    return E;
   }
 
 private:
@@ -1111,6 +1167,26 @@ private:
                                                  MaybeUnavail.getValue(),
                                                  ForInout);
     }
+  }
+
+  const Expr *getParentForDeclRef() {
+    assert(isa<DeclRefExpr>(ExprStack.back()));
+    ArrayRef<const Expr *> Stack = ExprStack;
+
+    const Expr *Parent = nullptr;
+    auto popToParent = [&]{
+      Stack = Stack.drop_back();
+      if (!Stack.empty())
+        Parent = Stack.back();
+    };
+
+    popToParent();
+    if (!Parent)
+      return nullptr;
+    if (isa<DotSyntaxBaseIgnoredExpr>(Parent))
+      popToParent();
+
+    return Parent;
   }
 };
 }
