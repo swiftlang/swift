@@ -849,28 +849,39 @@ static void tryFixPrintWithAppendNewline(const ValueDecl *D,
   if (!D->getModuleContext()->isStdlibModule())
     return;
 
-  SmallString<128> NameBuf;
-  llvm::raw_svector_ostream OS(NameBuf);
-  OS << D->getFullName();
-  if (OS.str() != "print(_:appendNewline:)")
+  DeclName Name = D->getFullName();
+  if (Name.getBaseName().str() != "print")
+    return;
+  auto ArgNames = Name.getArgumentNames();
+  if (ArgNames.size() != 2)
+    return;
+  if (ArgNames[1].str() != "appendNewline")
     return;
 
   // Go through the expr to determine if second parameter is boolean literal.
   auto *CE = dyn_cast_or_null<CallExpr>(ParentExpr);
-  if (!CE) return;
+  if (!CE)
+    return;
   auto *TE = dyn_cast<TupleExpr>(CE->getArg());
-  if (!TE) return;
-  if (TE->getNumElements() != 2) return;
+  if (!TE)
+    return;
+  if (TE->getNumElements() != 2)
+    return;
   auto *SCE = dyn_cast<CallExpr>(TE->getElement(1));
-  if (!SCE || !SCE->isImplicit()) return;
+  if (!SCE || !SCE->isImplicit())
+    return;
   auto *STE = dyn_cast<TupleExpr>(SCE->getArg());
-  if (!STE || !STE->isImplicit()) return;
-  if (STE->getNumElements() != 1) return;
+  if (!STE || !STE->isImplicit())
+    return;
+  if (STE->getNumElements() != 1)
+    return;
   auto *BE = dyn_cast<BooleanLiteralExpr>(STE->getElement(0));
-  if (!BE) return;
+  if (!BE)
+    return;
 
-  std::string termStr = "terminator: \"";
-  if (BE->getValue()) termStr += "\\n";
+  SmallString<20> termStr = StringRef("terminator: \"");
+  if (BE->getValue())
+    termStr += "\\n";
   termStr += "\"";
 
   SourceRange RangeToFix(TE->getElementNameLoc(1), BE->getEndLoc());
@@ -1173,20 +1184,16 @@ private:
     assert(isa<DeclRefExpr>(ExprStack.back()));
     ArrayRef<const Expr *> Stack = ExprStack;
 
-    const Expr *Parent = nullptr;
-    auto popToParent = [&]{
-      Stack = Stack.drop_back();
-      if (!Stack.empty())
-        Parent = Stack.back();
-    };
-
-    popToParent();
-    if (!Parent)
+    Stack = Stack.drop_back();
+    if (Stack.empty())
       return nullptr;
-    if (isa<DotSyntaxBaseIgnoredExpr>(Parent))
-      popToParent();
 
-    return Parent;
+    if (isa<DotSyntaxBaseIgnoredExpr>(Stack.back()))
+      Stack = Stack.drop_back();
+    if (Stack.empty())
+      return nullptr;
+    
+    return Stack.back();
   }
 };
 }
