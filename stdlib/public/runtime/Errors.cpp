@@ -27,9 +27,7 @@
 #include <asl.h>
 #endif
 
-#if SWIFT_HAVE_CRASHREPORTERCLIENT
-
-#include <CrashReporterClient.h>
+#ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 #include <malloc/malloc.h>
 
 // Instead of linking to CrashReporterClient.a (because it complicates the
@@ -41,7 +39,7 @@ extern "C" {
 CRASH_REPORTER_CLIENT_HIDDEN
 struct crashreporter_annotations_t gCRAnnotations
     __attribute__((section("__DATA," CRASHREPORTER_ANNOTATIONS_SECTION))) = {
-        CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0};
+        CRASHREPORTER_ANNOTATIONS_VERSION, 0, 0, 0, 0, 0, 0, 0};
 }
 
 // Report a message to any forthcoming crash log.
