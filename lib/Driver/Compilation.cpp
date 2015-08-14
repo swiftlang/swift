@@ -155,10 +155,10 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   out << "build_time: ";
   writeTimeValue(out, buildTime);
   out << "\n";
-  out << "inputs: \n";
+  out << "inputs:\n";
 
   for (auto &entry : inputs) {
-    out << "\t\"" << llvm::yaml::escape(entry.first->getValue()) << "\": ";
+    out << "  \"" << llvm::yaml::escape(entry.first->getValue()) << "\": ";
 
     switch (entry.second.status) {
     case CompileJobAction::InputInfo::UpToDate:
