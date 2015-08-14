@@ -32,10 +32,7 @@
 #include <unistd.h>
 #include "../SwiftShims/RuntimeShims.h"
 #if SWIFT_OBJC_INTEROP
-# include <objc/NSObject.h>
-# include <objc/runtime.h>
-# include <objc/message.h>
-# include <objc/objc.h>
+# include <objc/objc-runtime.h>
 #endif
 #if SWIFT_RUNTIME_ENABLE_DTRACE
 # include "SwiftRuntimeDTraceProbes.h"
