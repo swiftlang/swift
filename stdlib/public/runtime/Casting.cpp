@@ -59,7 +59,11 @@ using namespace swift;
 using namespace metadataimpl;
 
 #if SWIFT_OBJC_INTEROP
-#include <objc/objc-runtime.h>
+//#include <objc/objc-runtime.h>
+#include <objc/NSObject.h>
+#include <objc/runtime.h>
+#include <objc/message.h>
+#include <objc/objc.h>
 
 // Aliases for Objective-C runtime entry points.
 const char *class_getName(const ClassMetadata* type) {

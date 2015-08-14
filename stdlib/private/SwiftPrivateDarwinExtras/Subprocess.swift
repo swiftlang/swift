@@ -17,6 +17,36 @@ import Darwin
 import Glibc
 #endif
 
+// swift_posix_spawn isn't available in the public watchOS SDK, we sneak by the
+// unavailable attribute declaration here of the APIs that we need.
+
+@asmname("posix_spawn_file_actions_init")
+func swift_posix_spawn_file_actions_init(
+  file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>) -> CInt
+
+@asmname("posix_spawn_file_actions_destroy")
+func swift_posix_spawn_file_actions_destroy(
+  file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>) -> CInt
+
+@asmname("posix_spawn_file_actions_addclose")
+func swift_posix_spawn_file_actions_addclose(file_actions:
+  UnsafeMutablePointer<posix_spawn_file_actions_t>, _ filedes: CInt) -> CInt
+
+@asmname("posix_spawn_file_actions_adddup2")
+func swift_posix_spawn_file_actions_adddup2(
+  file_actions: UnsafeMutablePointer<posix_spawn_file_actions_t>,
+  _ filedes: CInt,
+  _ newfiledes: CInt) -> CInt
+
+@asmname("posix_spawn")
+func swift_posix_spawn(
+  pid: UnsafeMutablePointer<pid_t>,
+  _ file: UnsafePointer<Int8>,
+  _ file_actions: UnsafePointer<posix_spawn_file_actions_t>,
+  _ attrp: UnsafePointer<posix_spawnattr_t>,
+  _ argv: UnsafePointer<UnsafeMutablePointer<Int8>>,
+  _ envp: UnsafePointer<UnsafeMutablePointer<Int8>>) -> CInt
+
 /// Calls POSIX `pipe()`.
 func posixPipe() -> (readFD: CInt, writeFD: CInt) {
   var fds: [CInt] = [ -1, -1 ]
@@ -35,61 +65,61 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
 public func spawnChild(args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
   var fileActions = posix_spawn_file_actions_t()
-  if posix_spawn_file_actions_init(&fileActions) != 0 {
-    preconditionFailure("posix_spawn_file_actions_init() failed")
+  if swift_posix_spawn_file_actions_init(&fileActions) != 0 {
+    preconditionFailure("swift_posix_spawn_file_actions_init() failed")
   }
 
   let childStdin = posixPipe()
   // Close the write end of the pipe on the child side.
-  if posix_spawn_file_actions_addclose(
+  if swift_posix_spawn_file_actions_addclose(
     &fileActions, childStdin.writeFD) != 0 {
-    preconditionFailure("posix_spawn_file_actions_addclose() failed")
+    preconditionFailure("swift_posix_spawn_file_actions_addclose() failed")
   }
 
   // Remap child's stdin.
-  if posix_spawn_file_actions_adddup2(
+  if swift_posix_spawn_file_actions_adddup2(
     &fileActions, childStdin.readFD, STDIN_FILENO) != 0 {
-    preconditionFailure("posix_spawn_file_actions_adddup2() failed")
+    preconditionFailure("swift_posix_spawn_file_actions_adddup2() failed")
   }
 
   let childStdout = posixPipe()
   // Close the read end of the pipe on the child side.
-  if posix_spawn_file_actions_addclose(
+  if swift_posix_spawn_file_actions_addclose(
     &fileActions, childStdout.readFD) != 0 {
-    preconditionFailure("posix_spawn_file_actions_addclose() failed")
+    preconditionFailure("swift_posix_spawn_file_actions_addclose() failed")
   }
 
   // Remap child's stdout.
-  if posix_spawn_file_actions_adddup2(
+  if swift_posix_spawn_file_actions_adddup2(
     &fileActions, childStdout.writeFD, STDOUT_FILENO) != 0 {
-    preconditionFailure("posix_spawn_file_actions_adddup2() failed")
+    preconditionFailure("swift_posix_spawn_file_actions_adddup2() failed")
   }
 
   let childStderr = posixPipe()
   // Close the read end of the pipe on the child side.
-  if posix_spawn_file_actions_addclose(
+  if swift_posix_spawn_file_actions_addclose(
     &fileActions, childStderr.readFD) != 0 {
-    preconditionFailure("posix_spawn_file_actions_addclose() failed")
+    preconditionFailure("swift_posix_spawn_file_actions_addclose() failed")
   }
 
   // Remap child's stderr.
-  if posix_spawn_file_actions_adddup2(
+  if swift_posix_spawn_file_actions_adddup2(
     &fileActions, childStderr.writeFD, STDERR_FILENO) != 0 {
-    preconditionFailure("posix_spawn_file_actions_adddup2() failed")
+    preconditionFailure("swift_posix_spawn_file_actions_adddup2() failed")
   }
 
   var pid: pid_t = -1
   let spawnResult = withArrayOfCStrings([ Process.arguments[0] ] as Array + args) {
-    posix_spawn(
+    swift_posix_spawn(
       &pid, Process.arguments[0], &fileActions, nil, $0, _getEnviron())
   }
   if spawnResult != 0 {
     print(String.fromCString(strerror(spawnResult)))
-    preconditionFailure("posix_spawn() failed")
+    preconditionFailure("swift_posix_spawn() failed")
   }
 
-  if posix_spawn_file_actions_destroy(&fileActions) != 0 {
-    preconditionFailure("posix_spawn_file_actions_destroy() failed")
+  if swift_posix_spawn_file_actions_destroy(&fileActions) != 0 {
+    preconditionFailure("swift_posix_spawn_file_actions_destroy() failed")
   }
 
   // Close the read end of the pipe on the parent side.

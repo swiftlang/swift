@@ -9,6 +9,7 @@ set(SWIFT_CONFIGURED_SDKS)
 function(_report_sdk prefix)
   message(STATUS "${SWIFT_SDK_${prefix}_NAME} SDK:")
   message(STATUS "  Path: ${SWIFT_SDK_${prefix}_PATH}")
+  message(STATUS "  Path (public): ${SWIFT_SDK_${prefix}_PUBLIC_PATH}")
   message(STATUS "  Version: ${SWIFT_SDK_${prefix}_VERSION}")
   message(STATUS "  Build number: ${SWIFT_SDK_${prefix}_BUILD_NUMBER}")
   message(STATUS "  Deployment version: ${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
@@ -36,7 +37,8 @@ endfunction()
 #     version_min_name   # The name used in the -mOS-version-min flag
 #     triple_name        # The name used in Swift's -triple
 #     architectures      # A list of architectures this SDK supports
-#     internal           # Whether the prefer the internal SDK, if present
+#     internal           # Whether the prefer the internal SDK, if present,
+#                        # for building C code and linking
 #   )
 #
 # Sadly there are three OS naming conventions.
@@ -48,7 +50,8 @@ endfunction()
 # defines a number of variables:
 #
 #   SWIFT_SDK_${prefix}_NAME                Display name for the SDK
-#   SWIFT_SDK_${prefix}_PATH                Path to the SDK
+#   SWIFT_SDK_${prefix}_PATH                Path to the SDK (possibly internal)
+#   SWIFT_SDK_${prefix}_PUBLIC_PATH         Path to the public SDK
 #   SWIFT_SDK_${prefix}_VERSION             SDK version number (e.g., 10.9, 7.0)
 #   SWIFT_SDK_${prefix}_BUILD_NUMBER        SDK build number (e.g., 14A389a)
 #   SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION  Deployment version (e.g., 10.9, 7.0)
@@ -64,6 +67,21 @@ macro(configure_sdk_darwin
   # variables.
 
   # Find the SDK
+  set(SWIFT_SDK_${prefix}_PUBLIC_PATH "" CACHE PATH
+      "Path to the ${name} pubilc SDK")
+
+  if(NOT SWIFT_SDK_${prefix}_PUBLIC_PATH)
+    execute_process(
+        COMMAND "xcrun" "--sdk" "${xcrun_name}" "--show-sdk-path"
+        OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PUBLIC_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+  endif()
+
+  if(NOT EXISTS "${SWIFT_SDK_${prefix}_PUBLIC_PATH}/System/Library/Frameworks/module.map")
+    message(FATAL_ERROR "${name} SDK not found at SWIFT_SDK_${prefix}_PUBLIC_PATH.")
+  endif()
+
+  # Find the SDK
   set(SWIFT_SDK_${prefix}_PATH "" CACHE PATH "Path to the ${name} SDK")
 
   if(NOT SWIFT_SDK_${prefix}_PATH)
@@ -76,10 +94,7 @@ macro(configure_sdk_darwin
   endif()
 
   if(NOT SWIFT_SDK_${prefix}_PATH)
-    execute_process(
-        COMMAND "xcrun" "--sdk" "${xcrun_name}" "--show-sdk-path"
-        OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PATH
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    set(SWIFT_SDK_${prefix}_PATH "${SWIFT_SDK_${prefix}_PUBLIC_PATH}")
   endif()
 
   if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/Frameworks/module.map")
@@ -123,6 +138,7 @@ macro(configure_sdk_unix
 
   set(SWIFT_SDK_${prefix}_NAME "${name}")
   set(SWIFT_SDK_${prefix}_PATH "/")
+  set(SWIFT_SDK_${prefix}_PUBLIC_PATH "/")
   set(SWIFT_SDK_${prefix}_VERSION "don't use")
   set(SWIFT_SDK_${prefix}_BUILD_NUMBER "don't use")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "don't use")
