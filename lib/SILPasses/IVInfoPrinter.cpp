@@ -39,7 +39,7 @@ class IVInfoPrinter : public SILFunctionTransform {
   void run() override {
     auto *IV = PM->getAnalysis<IVAnalysis>();
     auto *F = getFunction();
-    auto &Info = IV->getIVInfo(F);
+    auto &Info = *IV->get(F);
 
     bool FoundIV = false;
 

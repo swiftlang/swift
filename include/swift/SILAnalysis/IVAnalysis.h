@@ -79,37 +79,25 @@ private:
   void visit(SCCType &SCC);
 };
 
-class IVAnalysis : public SILAnalysis {
+class IVAnalysis final : public FunctionAnalysisBase<IVInfo> {
 public:
-  IVAnalysis(SILModule *) : SILAnalysis(AnalysisKind::IVAnalysis) {}
-  ~IVAnalysis();
+  IVAnalysis(SILModule *)
+      : FunctionAnalysisBase<IVInfo>(AnalysisKind::IVAnalysis) {}
+  IVAnalysis(const IVAnalysis &) = delete;
+  IVAnalysis &operator=(const IVAnalysis &) = delete;
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::IVAnalysis;
   }
 
-  IVInfo &getIVInfo(SILFunction *F) {
-    if (!IVInfos.count(F))
-      IVInfos[F] = new IVInfo(*F);
-    return *IVInfos[F];
+  IVInfo *newFunctionAnalysis(SILFunction *F) override {
+    return new IVInfo(*F);
   }
 
-  virtual void invalidate(SILAnalysis::PreserveKind K) {
-      for (auto IVI : IVInfos)
-        delete IVI.second;
-
-      IVInfos.clear();
+  /// For now we always invalidate.
+  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
+    return true;
   }
-
-  virtual void invalidate(SILFunction *F, SILAnalysis::PreserveKind K) {
-      if (IVInfos.count(F)) {
-        delete IVInfos[F];
-        IVInfos.erase(F);
-      }
-  }
-
-private:
-  llvm::DenseMap<SILFunction *, IVInfo *> IVInfos;
 };
 
 }

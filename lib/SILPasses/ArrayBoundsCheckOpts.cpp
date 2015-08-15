@@ -1091,7 +1091,7 @@ public:
     assert(LI);
     DominanceInfo *DT = DA->get(F);
     assert(DT);
-    IVInfo &IVs = IVA->getIVInfo(F);
+    IVInfo &IVs = *IVA->get(F);
     auto *RCIA = getAnalysis<RCIdentityAnalysis>()->get(F);
     auto *DestAnalysis = PM->getAnalysis<DestructorAnalysis>();
 

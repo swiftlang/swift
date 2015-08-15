@@ -96,8 +96,3 @@ void IVInfo::visit(SCCType &SCC) {
   for (auto V : SCC)
     InductionVariableMap[V] = IV;
 }
-
-IVAnalysis::~IVAnalysis() {
-  for (auto I = IVInfos.begin(), E = IVInfos.end(); I != E; ++I)
-    delete I->second;
-}
