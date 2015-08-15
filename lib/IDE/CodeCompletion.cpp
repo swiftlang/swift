@@ -696,6 +696,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   };
 
   UnresolvedMemberExpr *UnresolvedExpr;
+  std::vector<std::string> TokensBeforeUnresolvedExpr;
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
   SourceLoc DotLoc;
@@ -2114,6 +2115,63 @@ public:
     RequestedCachedResults = RequestedResultsTy::toplevelResults();
   }
 
+  class LookupFuncByName : public swift::VisibleDeclConsumer {
+    CompletionLookup &Lookup;
+    std::vector<std::string> &SortedFuncNames;
+    llvm::SmallPtrSet<Decl*, 3> HandledDecls;
+
+    bool isNameHit(StringRef Name) {
+      return std::binary_search(SortedFuncNames.begin(), SortedFuncNames.end(),
+                                Name);
+    }
+
+    void collectFuncTypes(FuncDecl *FD) {
+      if (isNameHit(FD->getNameStr()) && FD->getType() &&
+          FD-> getType()->is<FunctionType>()) {
+        unboxType(FD->getType()->getAs<FunctionType>()->getInput());
+        unboxType(FD->getType()->getAs<FunctionType>()->getResult());
+      }
+    }
+
+    void unboxType(Type T) {
+      if (T->getKind() == TypeKind::Paren) {
+        unboxType(T->getDesugaredType());
+      } else if (T->getKind() == TypeKind::Tuple) {
+        for (auto Ele : T->getAs<TupleType>()->getElements()) {
+          unboxType(Ele.getType());
+        }
+      } else if (auto NTD = T->getNominalOrBoundGenericNominal()){
+        if (HandledDecls.count(NTD) == 0) {
+          auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
+          if (!Lookup.handleEnumElement(NTD, Reason)) {
+            Lookup.handleOptionSetType(NTD, Reason);
+          }
+          HandledDecls.insert(NTD);
+        }
+      }
+    }
+
+  public:
+    LookupFuncByName(CompletionLookup &Lookup,
+                     std::vector<std::string> &SortedFuncNames) :
+                       Lookup(Lookup), SortedFuncNames(SortedFuncNames) {
+      std::sort(SortedFuncNames.begin(), SortedFuncNames.end());
+    }
+
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+      if (auto FD = dyn_cast<FuncDecl>(VD)) {
+        collectFuncTypes(FD);
+      }
+      if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
+        for (auto M : NTD->getMembers()) {
+          if (auto FD = dyn_cast<FuncDecl>(M)) {
+            collectFuncTypes(FD);
+          }
+        }
+      }
+    }
+  };
+
   void getUnresolvedMemberCompletions(SourceLoc Loc, SmallVectorImpl<Type> &Types) {
     NeedLeadingDot = !HaveDot;
     for (auto T : Types) {
@@ -2124,6 +2182,13 @@ public:
         }
       }
     }
+  }
+
+  void getUnresolvedMemberCompletions(SourceLoc Loc,
+                                      std::vector<std::string> &FuncNames) {
+    NeedLeadingDot = !HaveDot;
+    LookupFuncByName Lookup(*this, FuncNames);
+    lookupVisibleDecls(Lookup, CurrDeclContext, TypeResolver.get(), true);
   }
 
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
@@ -2565,6 +2630,9 @@ void CodeCompletionCallbacksImpl::completeUnresolvedMember(UnresolvedMemberExpr 
   Kind = CompletionKind::UnresolvedMember;
   CurDeclContext = P.CurDeclContext;
   UnresolvedExpr = E;
+  for (auto Id : Identifiers) {
+    TokensBeforeUnresolvedExpr.push_back(Id);
+  }
 }
 
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
@@ -2900,11 +2968,17 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     ExprParentFinder Walker(CurDeclContext->getASTContext().SourceMgr,
                             UnresolvedExpr, [&](Expr* E) { return true; });
     CurDeclContext->walkContext(Walker);
+    bool Success = false;
     if(Walker.ParentExprFarthest) {
-      typeCheckUnresolvedMember(*CurDeclContext, UnresolvedExpr,
-                                Walker.ParentExprFarthest, PossibleTypes);
+      Success = typeCheckUnresolvedMember(*CurDeclContext, UnresolvedExpr,
+                                          Walker.ParentExprFarthest,
+                                          PossibleTypes);
       Lookup.getUnresolvedMemberCompletions(
         P.Context.SourceMgr.getCodeCompletionLoc(), PossibleTypes);
+    }
+    if (!Success) {
+      Lookup.getUnresolvedMemberCompletions(
+        P.Context.SourceMgr.getCodeCompletionLoc(), TokensBeforeUnresolvedExpr);
     }
     break;
   }

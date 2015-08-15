@@ -17,6 +17,13 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_14 | FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_15 | FileCheck %s -check-prefix=UNRESOLVED_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_16 | FileCheck %s -check-prefix=UNRESOLVED_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_17 | FileCheck %s -check-prefix=UNRESOLVED_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_18 | FileCheck %s -check-prefix=UNRESOLVED_4
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_19 | FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_20 | FileCheck %s -check-prefix=UNRESOLVED_3
+
 enum SomeEnum1 {
   case South
   case North
@@ -62,6 +69,11 @@ func OptionSetTaker6(Op1: SomeOptions1, Op2: SomeOptions2) {}
 func OptionSetTaker6(Op1: SomeOptions2, Op2: SomeOptions1) {}
 
 func EnumTaker1(E : SomeEnum1) {}
+
+class OptionTakerContainer1 {
+  func OptionSetTaker1(op : SomeOptions1) {}
+  func EnumTaker1(E : SomeEnum1) {}
+}
 
 class C1 {
   func f1() {
@@ -147,7 +159,17 @@ OptionSetTaker5([.#^UNRESOLVED_15^#], .Option4, .South, .West)
 OptionSetTaker6(.#^UNRESOLVED_16^#, .Option4)
 OptionSetTaker6(.Option4, .#^UNRESOLVED_17^#,)
 
-// FIXME: Unresolved member completion does not work inside closures.
 var a = {() in
   OptionSetTaker5([.#^UNRESOLVED_18^#], .Option4, .South, .West)
 }
+var Containner = OptionTakerContainer1()
+Container.OptionSetTaker1(.#^UNRESOLVED_19^#
+Container.EnumTaker1(.#^UNRESOLVED_20^#
+
+// UNRESOLVED_4: Begin completions
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option1[#SomeOptions1#]; name=Option1
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option2[#SomeOptions1#]; name=Option2
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option3[#SomeOptions1#]; name=Option3
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option4[#SomeOptions2#]; name=Option4
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option5[#SomeOptions2#]; name=Option5
+// UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option6[#SomeOptions2#]; name=Option6
