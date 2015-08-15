@@ -321,7 +321,7 @@ namespace {
         const Optional<DIKind> local = LocalAvailability.getConditional(i);
         Optional<DIKind> result;
         if (local.hasValue()) {
-          // A local availibility overrides the incoming value.
+          // A local availability overrides the incoming value.
           result = local;
         } else {
           result = mergeKinds(out, Pred.OutAvailability.getConditional(i));

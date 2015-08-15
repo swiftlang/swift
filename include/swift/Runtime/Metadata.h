@@ -530,12 +530,16 @@ typedef int getExtraInhabitantIndex(const OpaqueValue *src,
                                     const Metadata *self);
 
 /// Given a valid object of this enum type, extracts the tag value indicating
-/// which case of the enum is inhabited.
+/// which case of the enum is inhabited. The tag value can be used to index
+/// into the array returned by the NominalTypeDescriptor's GetCaseTypes
+/// function to get the payload type and check if the payload is indirect.
 typedef unsigned getEnumTag(const OpaqueValue *src,
                             const Metadata *self);
 
-/// Given a valid object of this enum type, extracts the tag value indicating
-/// which case of the enum is inhabited.
+/// Given a valid object of this enum type, destructively strips the tag
+/// bits, leaving behind a value of the inhabited case payload type.
+/// If the case is indirect, the payload can then be projected from the box
+/// with swift_projectBox().
 typedef OpaqueValue *destructiveProjectEnumData(OpaqueValue *src,
                                                 const Metadata *self);
 
