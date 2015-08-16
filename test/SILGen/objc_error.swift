@@ -11,6 +11,13 @@ func NSErrorErrorType_erasure(x: NSError) -> ErrorType {
   return x
 }
 
+// CHECK-LABEL: sil hidden @_TF10objc_error34NSErrorErrorType_archetype_erasureuRdq_CSo7NSError_Fq_PSs9ErrorType_
+// CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $T : $T, $ErrorType
+// CHECK:         return [[ERROR_TYPE]]
+func NSErrorErrorType_archetype_erasure<T : NSError>(t: T) -> ErrorType {
+  return t
+}
+
 // Test patterns that are non-trivial, but irrefutable.  SILGen shouldn't crash
 // on these.
 func test_doesnt_throw() {
