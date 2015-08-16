@@ -3511,8 +3511,9 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
 
   auto &entry = SGF.OpaqueValues[E];
 
-  // If the context wants a +0 value, guaranteed or immediate, we can give it to
-  // them, because OpenExistential emission guarantees the value.
+  // If the context wants a +0 value, guaranteed or immediate, we can
+  // give it to them, because OpenExistential emission guarantees the
+  // value.
   if (C.isGuaranteedPlusZeroOk()) {
     return RValue(SGF, E, ManagedValue::forUnmanaged(entry.value));
   }
@@ -3526,7 +3527,17 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(entry.value));
   }
 
-  // Otherwise, copy the value.
+  // If the context wants us to initialize a buffer, copy there instead
+  // of making a temporary allocation.
+  if (auto I = C.getEmitInto()) {
+    if (SILValue address = getAddressForInPlaceInitialization(I)) {
+      ManagedValue::forUnmanaged(entry.value).copyInto(SGF, address, E);
+      I->finishInitialization(SGF);
+      return RValue();
+    }
+  }
+
+  // Otherwise, copy the value into a temporary.
   return RValue(SGF, E,
                 ManagedValue::forUnmanaged(entry.value).copyUnmanaged(SGF, E));
 }
