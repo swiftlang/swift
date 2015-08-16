@@ -419,7 +419,8 @@ enum class ConventionsKind : uint8_t {
 
       auto &substTL = M.Types.getTypeLowering(origType, substType);
       ParameterConvention convention;
-      if (origType.getAs<InOutType>()) {
+      if (isa<InOutType>(substType)) {
+        assert(origType.isOpaque() || origType.getAs<InOutType>());
         convention = ParameterConvention::Indirect_Inout;
       } else if (isPassedIndirectly(origType, substType, substTL)) {
         convention = Convs.getIndirectParameter(origParamIndex, origType);

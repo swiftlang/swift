@@ -34,3 +34,32 @@ func testThrows(x: Any) {
   _ = x as? () -> ()
   _ = x as? () throws -> ()
 }
+
+// Make sure that we preserve inout-ness when lowering types with maximum
+// abstraction level -- <rdar://problem/21329377>
+class C {}
+
+struct Box<T> {
+  let t: T
+}
+
+func notFun(inout c: C, i: Int) {}
+
+func testInoutOpaque(var c: C, i: Int) {
+  let box = Box(t: notFun)
+  box.t(&c, i: i)
+}
+
+// CHECK-LABEL: sil hidden @_TF10reabstract15testInoutOpaqueFTCS_1C1iSi_T_
+// CHECK:         function_ref @_TF10reabstract6notFunFTRCS_1C1iSi_T_
+// CHECK:         thin_to_thick_function %8
+// CHECK:         function_ref @_TTRXFo_lC10reabstract1CdSi_dT__XFo_lS0_iSi_iT__
+// CHECK:         partial_apply
+// CHECK:         store
+// CHECK:         load
+// CHECK:         function_ref @_TTRXFo_lC10reabstract1CiSi_iT__XFo_lS0_dSi_dT__
+// CHECK:         partial_apply
+// CHECK:         apply
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_lC10reabstract1CdSi_dT__XFo_lS0_iSi_iT__ : $@convention(thin) (@out (), @inout C, @in Int, @owned @callee_owned (@inout C, Int) -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_lC10reabstract1CiSi_iT__XFo_lS0_dSi_dT__ : $@convention(thin) (@inout C, Int, @owned @callee_owned (@out (), @inout C, @in Int) -> ()) -> () {
