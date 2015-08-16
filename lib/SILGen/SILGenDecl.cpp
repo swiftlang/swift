@@ -1029,6 +1029,51 @@ CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
   return Cleanups.getTopCleanup();
 }
 
+namespace {
+  /// A cleanup that deinitializes an opaque existential container
+  /// before a value has been stored into it, or after its value was taken.
+  class DeinitExistentialCleanup: public Cleanup {
+    SILValue existentialAddr;
+    CanType concreteFormalType;
+    ExistentialRepresentation repr;
+  public:
+    DeinitExistentialCleanup(SILValue existentialAddr,
+                             CanType concreteFormalType,
+                             ExistentialRepresentation repr)
+      : existentialAddr(existentialAddr),
+        concreteFormalType(concreteFormalType),
+        repr(repr) {}
+    
+    void emit(SILGenFunction &gen, CleanupLocation l) override {
+      switch (repr) {
+      case ExistentialRepresentation::None:
+      case ExistentialRepresentation::Class:
+      case ExistentialRepresentation::Metatype:
+        llvm_unreachable("cannot cleanup existential");
+      case ExistentialRepresentation::Opaque:
+        gen.B.createDeinitExistentialAddr(l, existentialAddr);
+        break;
+      case ExistentialRepresentation::Boxed:
+        gen.B.createDeallocExistentialBox(l, concreteFormalType,
+                                          existentialAddr);
+        break;
+      }
+    }
+  };
+}
+
+/// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
+/// of the specified value.
+CleanupHandle SILGenFunction::enterDeinitExistentialCleanup(
+                                               SILValue valueOrAddr,
+                                               CanType concreteFormalType,
+                                               ExistentialRepresentation repr) {
+  Cleanups.pushCleanup<DeinitExistentialCleanup>(valueOrAddr,
+                                                 concreteFormalType,
+                                                 repr);
+  return Cleanups.getTopCleanup();
+}
+
 void SILGenModule::emitExternalWitnessTable(ProtocolConformance *c) {
   auto root = c->getRootNormalConformance();
   // Emit the witness table right now if we used it.

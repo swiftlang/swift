@@ -1350,21 +1350,6 @@ static RValue emitClassBoundedErasure(SILGenFunction &gen, ErasureExpr *E) {
   return RValue(gen, E, ManagedValue(v, sub.getCleanup()));
 }
 
-namespace {
-  /// A cleanup that deinitializes an opaque existential container
-  /// after its value is taken.
-  class TakeFromExistentialCleanup: public Cleanup {
-    SILValue existentialAddr;
-  public:
-    TakeFromExistentialCleanup(SILValue existentialAddr)
-      : existentialAddr(existentialAddr) {}
-    
-    void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.createDeinitExistentialAddr(l, existentialAddr);
-    }
-  };
-}
-
 static std::pair<ManagedValue, CanArchetypeType>
 emitOpenExistentialForErasure(SILGenFunction &gen,
                               SILLocation loc,
@@ -1395,8 +1380,8 @@ emitOpenExistentialForErasure(SILGenFunction &gen,
     // If we're going to take the payload, we need to deinit the leftover
     // existential shell.
     if (isTake)
-      gen.Cleanups.pushCleanup<TakeFromExistentialCleanup>(
-                                                     subExistential.getValue());
+      gen.enterDeinitExistentialCleanup(subExistential.getValue(), CanType(),
+                                        ExistentialRepresentation::Opaque);
 
     break;
   case ExistentialRepresentation::Class:
@@ -1422,12 +1407,37 @@ emitOpenExistentialForErasure(SILGenFunction &gen,
   return {subMV, subFormalTy};
 }
 
+namespace {
+
+/// This is an initialization for an address-only existential in memory.
+class ExistentialInitialization : public KnownAddressInitialization {
+  CleanupHandle Cleanup;
+public:
+  /// \param existential The existential container
+  /// \param address Address of value in existential container
+  /// \param concreteFormalType Unlowered AST type of value
+  /// \param repr Representation of container
+  ExistentialInitialization(SILValue existential, SILValue address,
+                            CanType concreteFormalType,
+                            ExistentialRepresentation repr,
+                            SILGenFunction &gen)
+      : KnownAddressInitialization(address) {
+    // Any early exit before we store a value into the existential must
+    // clean up the existential container.
+    Cleanup = gen.enterDeinitExistentialCleanup(existential,
+                                                concreteFormalType,
+                                                repr);
+  }
+
+  void finishInitialization(SILGenFunction &gen) {
+    gen.Cleanups.setCleanupState(Cleanup, CleanupState::Dead);
+  }
+};
+
+}
+
 static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
                                      SGFContext C) {
-  // FIXME: Need to stage cleanups here. If code fails between
-  // InitExistential and initializing the value, clean up using
-  // DeinitExistential.
-  
   // Allocate the existential.
   auto &existentialTL = gen.getTypeLowering(E->getType());
   SILValue existential =
@@ -1469,7 +1479,10 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
                                 concreteTL.getLoweredType(),
                                 E->getConformances());
     // Initialize the concrete value in-place.
-    InitializationPtr init(new KnownAddressInitialization(valueAddr));
+    InitializationPtr init(
+        new ExistentialInitialization(existential, valueAddr, concreteFormalType,
+                                      ExistentialRepresentation::Opaque,
+                                      gen));
     ManagedValue mv = gen.emitRValueAsOrig(E->getSubExpr(), abstractionPattern,
                                            concreteTL, SGFContext(init.get()));
     if (!mv.isInContext()) {
@@ -1483,9 +1496,6 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
 }
 
 static RValue emitBoxedErasure(SILGenFunction &gen, ErasureExpr *E) {
-  // FIXME: Need to stage cleanups here. If code fails between
-  // AllocExistentialBox and initializing the value, clean up using
-  // DeallocExistentialBox.
   auto &existentialTL = gen.getTypeLowering(E->getType());
 
   Type subType = E->getSubExpr()->getType();
@@ -1526,7 +1536,10 @@ static RValue emitBoxedErasure(SILGenFunction &gen, ErasureExpr *E) {
     auto valueAddr = box->getValueAddressResult();
     
     // Initialize the concrete value in-place.
-    InitializationPtr init(new KnownAddressInitialization(valueAddr));
+    InitializationPtr init(
+        new ExistentialInitialization(existential, valueAddr, concreteFormalType,
+                                      ExistentialRepresentation::Boxed,
+                                      gen));
     ManagedValue mv = gen.emitRValueAsOrig(E->getSubExpr(), abstractionPattern,
                                            concreteTL, SGFContext(init.get()));
     if (!mv.isInContext()) {
@@ -3426,8 +3439,8 @@ void SILGenFunction::emitOpenExistentialImpl(
     if (existentialValue.hasCleanup()) {
       canConsume = true;
       // Leave a cleanup to deinit the existential container.
-      Cleanups.pushCleanup<TakeFromExistentialCleanup>(
-                                                   existentialValue.getValue());
+      enterDeinitExistentialCleanup(existentialValue.getValue(), CanType(),
+                                    ExistentialRepresentation::Opaque);
     } else {
       canConsume = false;
     }

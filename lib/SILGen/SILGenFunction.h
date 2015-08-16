@@ -1441,8 +1441,14 @@ public:
   /// Enter a cleanup to deallocate a stack variable.
   CleanupHandle enterDeallocStackCleanup(SILValue address);
   
-  /// Enter a cleanup to emit a ReleaseValue/destroyAddr of the specified value.
+  /// Enter a cleanup to emit a ReleaseValue/DestroyAddr of the specified value.
   CleanupHandle enterDestroyCleanup(SILValue valueOrAddr);
+  
+  /// Enter a cleanup to emit a DeinitExistentialAddr or DeinitExistentialBox
+  /// of the specified value.
+  CleanupHandle enterDeinitExistentialCleanup(SILValue valueOrAddr,
+                                              CanType concreteFormalType,
+                                              ExistentialRepresentation repr);
 
   /// Evaluate an Expr as an lvalue.
   LValue emitLValue(Expr *E, AccessKind accessKind);

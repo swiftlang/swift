@@ -501,19 +501,6 @@ namespace {
     }
   };
 
-  /// A cleanup that deinitializes an opaque existential container
-  /// after its value is taken.
-  class TakeFromExistentialCleanup: public Cleanup {
-    SILValue existentialAddr;
-  public:
-    TakeFromExistentialCleanup(SILValue existentialAddr)
-    : existentialAddr(existentialAddr) {}
-
-    void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.createDeinitExistentialAddr(l, existentialAddr);
-    }
-  };
-
   /// A physical path component which projects out an opened archetype
   /// from an existential.
   class OpenOpaqueExistentialComponent : public PhysicalPathComponent {
@@ -537,7 +524,8 @@ namespace {
 
       if (base.hasCleanup()) {
         // Leave a cleanup to deinit the existential container.
-        gen.Cleanups.pushCleanup<TakeFromExistentialCleanup>(base.getValue());
+        gen.enterDeinitExistentialCleanup(base.getValue(), CanType(),
+                                          ExistentialRepresentation::Opaque);
       }
 
       gen.setArchetypeOpeningSite(cast<ArchetypeType>(getSubstFormalType()),

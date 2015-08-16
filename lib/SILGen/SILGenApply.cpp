@@ -690,21 +690,6 @@ static ManagedValue maybeEnterCleanupForTransformed(SILGenFunction &gen,
   }
 }
 
-namespace {
-  /// A cleanup that deinitializes an opaque existential container
-  /// after its value is taken.
-  class TakeFromExistentialCleanup: public Cleanup {
-    SILValue existentialAddr;
-  public:
-    TakeFromExistentialCleanup(SILValue existentialAddr)
-      : existentialAddr(existentialAddr) {}
-
-    void emit(SILGenFunction &gen, CleanupLocation l) override {
-      gen.B.createDeinitExistentialAddr(l, existentialAddr);
-    }
-  };
-}
-
 static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                                      SILDeclRef constant,
                                      ArgumentSource &selfValue,
