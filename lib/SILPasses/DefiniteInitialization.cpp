@@ -313,7 +313,7 @@ namespace {
     }
 
     /// Merge the state from a predecessor block into the OutAvailability.
-    /// Returns true if the l
+    /// Returns true if the live out set changed.
     bool mergeFromPred(const LiveOutBlockState &Pred) {
       bool changed = false;
       for (unsigned i = 0, e = OutAvailability.size(); i != e; ++i) {

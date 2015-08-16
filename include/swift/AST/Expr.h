@@ -2077,11 +2077,9 @@ public:
 /// \brief An expression that opens up a value of protocol or protocol
 /// composition type and gives a name to its dynamic type.
 ///
-/// This expression is implicitly created by the type checker in
-/// narrow circumstances where we need a way to refer to the dynamic
-/// type, i.e., when calling a method on a protocol that returns
-/// Self. In the future, this may become an actual operation within
-/// the language.
+/// This expression is implicitly created by the type checker when
+/// calling a method on a protocol. In the future, this may become an
+/// actual operation within the language.
 class OpenExistentialExpr : public Expr {
   Expr *ExistentialValue;
   OpaqueValueExpr *OpaqueValue;
