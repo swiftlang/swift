@@ -412,7 +412,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::MetatypeConversion:
   case ExprKind::CollectionUpcastConversion:
   case ExprKind::Erasure:
-  case ExprKind::MetatypeErasure:
   case ExprKind::DerivedToBase:
   case ExprKind::ArchetypeToSuper:
   case ExprKind::InjectIntoOptional:
@@ -957,7 +956,7 @@ TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
 
 ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   auto type = getOpaqueValue()->getType()->getRValueType();
-  if (auto metaTy = type->getAs<MetatypeType>())
+  while (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
   return type->castTo<ArchetypeType>();
 }

@@ -2458,8 +2458,16 @@ public:
   }
 };
   
-/// AnyErasureExpr - An abstract class for implicit conversions that
-/// erase a type into an existential in some way.
+/// ErasureExpr - Perform type erasure by converting a value to existential
+/// type. For example:
+///
+/// \code
+/// protocol Printable {}
+/// struct Book {}
+///
+/// var printable: Printable = Book() // erases type
+/// var printableType: Printable.Type = Book.self // erases metatype
+/// \endcode
 ///
 /// The type of the expression should always satisfy isAnyExistentialType().
 ///
@@ -2470,16 +2478,15 @@ public:
 ///
 /// "Appropriate kind" means e.g. a concrete/existential metatype if the
 /// result is an existential metatype.
-class AnyErasureExpr : public ImplicitConversionExpr {
+class ErasureExpr : public ImplicitConversionExpr {
   ArrayRef<ProtocolConformance *> Conformances;
 
-protected:
-  AnyErasureExpr(ExprKind kind, Expr *subExpr, Type type,
-                 ArrayRef<ProtocolConformance *> conformances)
-    : ImplicitConversionExpr(kind, subExpr, type),
+public:
+  ErasureExpr(Expr *subExpr, Type type,
+              ArrayRef<ProtocolConformance *> conformances)
+    : ImplicitConversionExpr(ExprKind::Erasure, subExpr, type),
       Conformances(conformances) {}
 
-public:
   /// \brief Retrieve the mapping specifying how the type of the subexpression
   /// maps to the resulting existential type. If the resulting existential
   /// type involves several different protocols, there will be mappings for each
@@ -2495,64 +2502,7 @@ public:
   }
   
   static bool classof(const Expr *E) {
-    return E->getKind() >= ExprKind::First_AnyErasureExpr
-        && E->getKind() <= ExprKind::Last_AnyErasureExpr;
-  }
-};
-
-/// ErasureExpr - Perform type erasure by converting a value to existential
-/// type. For example:
-///
-/// \code
-/// protocol Printable {
-///   func print()
-/// }
-///
-/// struct Book {
-///   func print() { ... }
-/// }
-///
-/// var printable : Printable = Book() // erases type
-/// \endcode
-///
-/// The result type is always a existential value (i.e. not an
-/// existential metatype).
-class ErasureExpr : public AnyErasureExpr {
-public:
-  ErasureExpr(Expr *subExpr, Type ty,
-              ArrayRef<ProtocolConformance *> conformances)
-    : AnyErasureExpr(ExprKind::Erasure, subExpr, ty, conformances) {}
-
-  static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Erasure;
-  }
-};
-
-/// MetatypeErasureExpr - Perform type erasure by converting a
-/// metatype to an existential metatype type. For example:
-///
-/// \code
-/// protocol Singleton {
-///   static func getSingleton() -> Self
-/// }
-///
-/// class Book : Singleton {
-///   class func getSingleton() -> Self { ... }
-/// }
-///
-/// var singletonType : Singleton.Type = Book.self // erases type
-/// \endcode
-///
-/// The type is always an existential metatype; the operand may be a
-/// concrete or existential metatype.
-class MetatypeErasureExpr : public AnyErasureExpr {
-public:
-  MetatypeErasureExpr(Expr *subExpr, Type ty,
-                      ArrayRef<ProtocolConformance *> conformances)
-    : AnyErasureExpr(ExprKind::MetatypeErasure, subExpr, ty, conformances) {}
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::MetatypeErasure;
   }
 };
 

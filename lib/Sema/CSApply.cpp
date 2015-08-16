@@ -404,25 +404,20 @@ namespace {
 
     /// \brief Coerce the given value to existential type.
     ///
+    /// The following conversions are supported:
+    /// - concrete to existential
+    /// - existential to existential
+    /// - concrete metatype to existential metatype
+    /// - existential metatype to existential metatype
+    ///
     /// \param expr The expression to be coerced.
-    /// \param toType The tupe to which the expression will be coerced.
+    /// \param toType The type to which the expression will be coerced.
     /// \param locator Locator describing where this conversion occurs.
     ///
     /// \return The coerced expression, whose type will be equivalent to
     /// \c toType.
     Expr *coerceExistential(Expr *expr, Type toType,
                             ConstraintLocatorBuilder locator);
-
-    /// \brief Coerce the given value to an existential metatype type.
-    ///
-    /// \param expr The expression to be coerced.
-    /// \param toType The tupe to which the expression will be coerced.
-    /// \param locator Locator describing where this conversion occurs.
-    ///
-    /// \return The coerced expression, whose type will be equivalent to
-    /// \c toType.
-    Expr *coerceExistentialMetatype(Expr *expr, Type toType,
-                                    ConstraintLocatorBuilder locator);
 
     /// \brief Coerce an expression of (possibly unchecked) optional
     /// type to have a different (possibly unchecked) optional type.
@@ -3913,44 +3908,60 @@ collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
   return tc.Context.AllocateCopy(conformances);
 }
 
+static CanType getOpenedExistentialType(Type fromType) {
+  if (auto metatypeTy = fromType->getAs<ExistentialMetatypeType>()) {
+    auto instanceTy = metatypeTy->getInstanceType();
+    return CanMetatypeType::get(getOpenedExistentialType(instanceTy));
+  }
+  assert(fromType->isExistentialType());
+  return ArchetypeType::getOpened(fromType);
+}
+
 Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
                                       ConstraintLocatorBuilder locator) {
   auto &tc = solution.getConstraintSystem().getTypeChecker();
   Type fromType = expr->getType();
-  
+
   // Handle existential coercions that implicitly look through ImplicitlyUnwrappedOptional<T>.
   if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
     expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
     
     fromType = expr->getType();
-    
+    assert(!fromType->is<AnyMetatypeType>());
+
     // FIXME: Hack. We shouldn't try to coerce existential when there is no
     // existential upcast to perform.
     if (fromType->isEqual(toType))
       return expr;
   }
 
-  auto conformances =
-    collectExistentialConformances(tc, fromType, toType, cs.DC);
-  return new (tc.Context) ErasureExpr(expr, toType, conformances);
-}
-
-Expr *ExprRewriter::coerceExistentialMetatype(Expr *expr, Type toType,
-                                              ConstraintLocatorBuilder locator) {
-  auto &tc = solution.getConstraintSystem().getTypeChecker();
-  Type fromType = expr->getType();
   Type fromInstanceType = fromType;
   Type toInstanceType = toType;
 
-  do {
+  // Look through metatypes
+  while (fromInstanceType->is<AnyMetatypeType>() &&
+         toInstanceType->is<ExistentialMetatypeType>()) {
     fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
     toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getInstanceType();
-  } while(fromInstanceType->is<AnyMetatypeType>() &&
-          toInstanceType->is<ExistentialMetatypeType>());
+  }
+
+  ASTContext &ctx = tc.Context;
 
   auto conformances =
     collectExistentialConformances(tc, fromInstanceType, toInstanceType, cs.DC);
-  return new (tc.Context) MetatypeErasureExpr(expr, toType, conformances);
+
+  // For existential-to-existential coercions, open the source existential.
+  if (fromType->isAnyExistentialType()) {
+    fromType = getOpenedExistentialType(fromType);
+    
+    auto archetypeVal = new (ctx) OpaqueValueExpr(expr->getLoc(), fromType);
+    archetypeVal->setUniquelyReferenced(true);
+    
+    auto result = new (ctx) ErasureExpr(archetypeVal, toType, conformances);
+    return new (ctx) OpenExistentialExpr(expr, archetypeVal, result);
+  }
+
+  return new (ctx) ErasureExpr(expr, toType, conformances);
 }
 
 static uint getOptionalBindDepth(const BoundGenericType *bgt) {
@@ -5014,13 +5025,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Coercions from a type to an existential type.
-  if (toType->isExistentialType()) {
+  if (toType->isAnyExistentialType()) {
     return coerceExistential(expr, toType, locator);
-  }
-
-  // Coercions to an existential metatype.
-  if (toType->is<ExistentialMetatypeType>()) {
-    return coerceExistentialMetatype(expr, toType, locator);
   }
 
   // Coercion to Optional<T>.
