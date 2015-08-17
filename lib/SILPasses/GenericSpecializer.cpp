@@ -11,20 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "generic-specializer"
-
 #include "swift/SILPasses/Utils/Generics.h"
-#include "swift/SILPasses/Passes.h"
-
 #include "swift/AST/ASTContext.h"
-
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
+#include "swift/SILPasses/Passes.h"
+#include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Generics.h"
 #include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/SmallString.h"

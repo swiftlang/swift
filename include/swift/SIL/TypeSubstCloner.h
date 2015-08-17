@@ -56,7 +56,7 @@ public:
                   SILFunction &From,
                   TypeSubstitutionMap &ContextSubs,
                   ArrayRef<Substitution> ApplySubs,
-                  bool Inlining =false)
+                  bool Inlining = false)
     : SILClonerWithScopes<ImplClass>(To, Inlining),
       SwiftMod(From.getModule().getSwiftModule()),
       SubsMap(ContextSubs),
