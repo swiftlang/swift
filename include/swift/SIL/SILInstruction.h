@@ -2778,15 +2778,14 @@ public:
 class InitExistentialMetatypeInst
   : public UnaryInstructionBase<ValueKind::InitExistentialMetatypeInst>
 {
-  ArrayRef<ProtocolConformance*> Conformances;
+  /// Pointer to the last of our tail allocated conformances. Null if this
+  /// existential metatype does not have any conformances.
+  NullablePtr<ProtocolConformance *> LastConformance;
 
-  InitExistentialMetatypeInst(SILLocation loc,
-                              SILType existentialMetatypeType,
+  InitExistentialMetatypeInst(SILLocation loc, SILType existentialMetatypeType,
                               SILValue metatype,
-                         ArrayRef<ProtocolConformance*> conformances)
-    : UnaryInstructionBase(loc, metatype, existentialMetatypeType),
-      Conformances(conformances)
-  {}
+                              ArrayRef<ProtocolConformance *> conformances);
+
 public:
   static InitExistentialMetatypeInst *
   create(SILLocation loc, SILType existentialMetatypeType,
@@ -2806,10 +2805,8 @@ public:
     assert(exType.isExistentialType());
     return concreteType;
   }
-  
-  ArrayRef<ProtocolConformance*> getConformances() const {
-    return Conformances;
-  }
+
+  ArrayRef<ProtocolConformance *> getConformances() const;
 };
 
 /// DeinitExistentialAddrInst - Given an address of an existential that has been

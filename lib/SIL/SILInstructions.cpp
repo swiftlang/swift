@@ -1274,6 +1274,19 @@ InitExistentialRefInst::create(SILLocation Loc, SILType ExistentialType,
                                                Conformances);
 }
 
+InitExistentialMetatypeInst::InitExistentialMetatypeInst(
+    SILLocation loc, SILType existentialMetatypeType, SILValue metatype,
+    ArrayRef<ProtocolConformance *> conformances)
+    : UnaryInstructionBase(loc, metatype, existentialMetatypeType),
+      LastConformance(nullptr) {
+  if (conformances.empty())
+    return;
+  auto **offset = reinterpret_cast<ProtocolConformance **>(this + 1);
+  memcpy(offset, &conformances[0],
+         conformances.size() * sizeof(ProtocolConformance *));
+  LastConformance = &offset[conformances.size() - 1];
+}
+
 InitExistentialMetatypeInst *
 InitExistentialMetatypeInst::create(SILLocation loc,
                                     SILType existentialMetatypeType,
@@ -1281,12 +1294,26 @@ InitExistentialMetatypeInst::create(SILLocation loc,
                                ArrayRef<ProtocolConformance *> conformances,
                                     SILFunction *F) {
   SILModule &M = F->getModule();
-  void *buffer = M.allocate(sizeof(InitExistentialMetatypeInst),
-                            alignof(InitExistentialMetatypeInst));
+  unsigned size = sizeof(InitExistentialMetatypeInst);
+  size += conformances.size() * sizeof(ProtocolConformance *);
+
+  void *buffer = M.allocate(size, alignof(InitExistentialMetatypeInst));
   for (ProtocolConformance *conformance : conformances)
     if (!M.lookUpWitnessTable(conformance, false).first)
       declareWitnessTable(M, conformance);
 
-  return ::new (buffer) InitExistentialMetatypeInst(loc, existentialMetatypeType,
-                                                    metatype, conformances);
+  return ::new (buffer) InitExistentialMetatypeInst(
+      loc, existentialMetatypeType, metatype, conformances);
+}
+
+ArrayRef<ProtocolConformance *>
+InitExistentialMetatypeInst::getConformances() const {
+  if (!LastConformance)
+    return ArrayRef<ProtocolConformance *>();
+  // The first conformance is going to be at *this[1];
+  auto **FirstConformance = reinterpret_cast<ProtocolConformance **>(
+      const_cast<InitExistentialMetatypeInst *>(this) + 1);
+  // Construct the protocol conformance list from the range of our conformances.
+  return ArrayRef<ProtocolConformance *>(FirstConformance,
+                                         LastConformance.get() + 1);
 }
