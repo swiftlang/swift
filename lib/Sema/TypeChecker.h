@@ -151,6 +151,9 @@ enum ContextualTypePurpose {
 
   CTP_CallArgument,     ///< Call to function or operator requires type.
   CTP_ClosureResult,    ///< Closure result expects a specific type.
+  CTP_ArrayElement,     ///< ArrayExpr wants elements to have a specific type.
+  CTP_DictionaryKey,    ///< DictionaryExpr keys should have a specific type.
+  CTP_DictionaryValue,  ///< DictionaryExpr values should have a specific type.
 
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };

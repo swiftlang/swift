@@ -18,8 +18,11 @@ func useDict<K, V>(d: Dictionary<K,V>) {}
 // Concrete dictionary literals.
 useDictStringInt([ "Hello" : 1 ])
 useDictStringInt([ "Hello" : 1, "World" : 2])
-useDictStringInt([ "Hello" : 1, "World" : 2.5]) // expected-error{{cannot convert value of type 'Dictionary<String, Double>' to expected argument type 'DictStringInt'}}
-useDictStringInt([ 7 : 1, "World" : 2]) // expected-error{{type of expression is ambiguous without more context}}
+useDictStringInt([ "Hello" : 1, "World" : 2.5]) // expected-error{{cannot convert value of type 'Double' to expected dictionary value type 'Int'}}
+useDictStringInt([ 4.5 : 2]) // expected-error{{cannot convert value of type 'Double' to expected dictionary key type 'String'}}
+useDictStringInt([ nil : 2]) // expected-error{{nil is not compatible with expected dictionary key type 'String'}}
+
+useDictStringInt([ 7 : 1, "World" : 2]) // expected-error{{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
 
 // Generic dictionary literals.
 useDict(["Hello" : 1])

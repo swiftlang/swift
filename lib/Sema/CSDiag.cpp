@@ -1812,6 +1812,8 @@ private:
   bool diagnoseGeneralConversionFailure(Constraint *constraint);
      
   bool visitExpr(Expr *E);
+  bool visitArrayExpr(ArrayExpr *E);
+  bool visitDictionaryExpr(DictionaryExpr *E);
 
   bool visitForceValueExpr(ForceValueExpr *FVE);
   bool visitBindOptionalExpr(BindOptionalExpr *BOE);
@@ -2774,6 +2776,15 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
       case CTP_ClosureResult:
         nilDiag = diag::cannot_convert_closure_result_nil;
         break;
+      case CTP_ArrayElement:
+        nilDiag = diag::cannot_convert_array_element_nil;
+        break;
+      case CTP_DictionaryKey:
+        nilDiag = diag::cannot_convert_dict_key_nil;
+        break;
+      case CTP_DictionaryValue:
+        nilDiag = diag::cannot_convert_dict_value_nil;
+        break;
       }
       
       if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
@@ -2840,6 +2851,18 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
     case CTP_ClosureResult:
       diagID = diag::cannot_convert_closure_result;
       diagIDProtocol = diag::cannot_convert_closure_result_protocol;
+      break;
+    case CTP_ArrayElement:
+      diagID = diag::cannot_convert_array_element;
+      diagIDProtocol = diag::cannot_convert_array_element_protocol;
+      break;
+    case CTP_DictionaryKey:
+      diagID = diag::cannot_convert_dict_key;
+      diagIDProtocol = diag::cannot_convert_dict_key_protocol;
+      break;
+    case CTP_DictionaryValue:
+      diagID = diag::cannot_convert_dict_value;
+      diagIDProtocol = diag::cannot_convert_dict_value_protocol;
       break;
     }
     
@@ -3674,12 +3697,6 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
   auto falseExpr = typeCheckChildIndependently(IE->getElseExpr());
   if (!falseExpr) return true;
 
-  // If the condition wasn't of boolean type, diagnose the problem.
-  auto booleanType = CS->TC.getProtocol(IE->getQuestionLoc(),
-                                        KnownProtocolKind::BooleanType);
-  if (!booleanType) return true;
-  
-  
   // Check for "=" converting to BooleanType.  The user probably meant ==.
   if (auto *AE = dyn_cast<AssignExpr>(condExpr->getValueProvidingExpr())) {
     diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
@@ -3688,7 +3705,12 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
       .highlight(AE->getSrc()->getLoc());
     return true;
   }
-  
+
+  // If the condition wasn't of boolean type, diagnose the problem.
+  auto booleanType = CS->TC.getProtocol(IE->getQuestionLoc(),
+                                        KnownProtocolKind::BooleanType);
+  if (!booleanType) return true;
+
   if (!CS->TC.conformsToProtocol(condExpr->getType(), booleanType, CS->DC,
                                  ConformanceCheckFlags::InExpression,
                                  nullptr, condExpr->getLoc()))
@@ -3799,6 +3821,116 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   return false;
 }
 
+bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
+  Type contextualElementType;
+  auto elementTypePurpose = CTP_Unused;
+
+  // FIXME: This isn't handling Array -> pointer impl conversions yet.
+
+  // If we had a contextual type, then it either conforms to
+  // ArrayLiteralConvertible or it is an invalid contextual type.
+  if (auto contextualType = CS->getContextualType()) {
+    auto ALC = CS->TC.getProtocol(E->getLoc(),
+                                  KnownProtocolKind::ArrayLiteralConvertible);
+    
+    // Validate that the contextual type conforms to
+    // DictionaryLiteralConvertible (emitting an error if not) *and* figure out
+    // what the contextual Key/Value types are in place.
+    ProtocolConformance *Conformance = nullptr;
+    if (!ALC || !CS->TC.conformsToProtocol(contextualType, ALC, CS->DC,
+                                           ConformanceCheckFlags::InExpression,
+                                           &Conformance, E->getLoc()))
+      return true;
+    
+    Conformance->forEachTypeWitness(&CS->TC,
+                                    [&](AssociatedTypeDecl *ATD,
+                          const Substitution &subst, TypeDecl *d)->bool
+    {
+      if (ATD->getName().str() == "Element")
+        contextualElementType = d->getDeclaredType()->getDesugaredType();
+      return false;
+    });
+    assert(contextualElementType &&
+           "Could not find 'Element' ArrayLiteral associated types from"
+           " contextual type conformance");
+
+    elementTypePurpose = CTP_ArrayElement;
+  }
+
+  // Type check each of the subexpressions in place, passing down the contextual
+  // type information if we have it.
+  for (auto elt : E->getElements()) {
+    if (typeCheckChildIndependently(elt, contextualElementType,
+                                    elementTypePurpose) == nullptr)
+      return true;
+  }
+
+  // If that didn't turn up an issue, then we don't know what to do.
+  // TODO: When a contextual type is missing, we could try to diagnose cases
+  // where the element types mismatch... but theoretically they should type
+  // unify to Any, so that could never happen?
+  return false;
+}
+
+bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
+  Type contextualKeyType, contextualValueType;
+  auto keyTypePurpose = CTP_Unused, valueTypePurpose = CTP_Unused;
+
+  // If we had a contextual type, then it either conforms to
+  // DictionaryLiteralConvertible or it is an invalid contextual type.
+  if (auto contextualType = CS->getContextualType()) {
+    auto DLC = CS->TC.getProtocol(E->getLoc(),
+                            KnownProtocolKind::DictionaryLiteralConvertible);
+    
+    // Validate that the contextual type conforms to
+    // DictionaryLiteralConvertible (emitting an error if not) *and* figure out
+    // what the contextual Key/Value types are in place.
+    ProtocolConformance *Conformance = nullptr;
+    if (!DLC || !CS->TC.conformsToProtocol(contextualType, DLC, CS->DC,
+                                           ConformanceCheckFlags::InExpression,
+                                           &Conformance, E->getLoc()))
+      return true;
+
+    Conformance->forEachTypeWitness(&CS->TC,
+                                    [&](AssociatedTypeDecl *ATD,
+                          const Substitution &subst, TypeDecl *d)->bool
+    {
+      if (ATD->getName().str() == "Key")
+        contextualKeyType = d->getDeclaredType()->getDesugaredType();
+      else if (ATD->getName().str() == "Value")
+        contextualValueType = d->getDeclaredType()->getDesugaredType();
+      return false;
+    });
+    assert(contextualKeyType && contextualValueType &&
+           "Could not find Key/Value DictionaryLiteral associated types from"
+           " contextual type conformance");
+    
+    keyTypePurpose = CTP_DictionaryKey;
+    valueTypePurpose = CTP_DictionaryValue;
+  }
+  
+  // Type check each of the subexpressions in place, passing down the contextual
+  // type information if we have it.
+  for (auto elt : E->getElements()) {
+    auto TE = dyn_cast<TupleExpr>(elt);
+    if (!TE || TE->getNumElements() != 2) continue;
+
+    if (!typeCheckChildIndependently(TE->getElement(0),
+                                     contextualKeyType, keyTypePurpose))
+      return true;
+    if (!typeCheckChildIndependently(TE->getElement(1),
+                                     contextualValueType, valueTypePurpose))
+      return true;
+  }
+
+  // If that didn't turn up an issue, then we don't know what to do.
+  // TODO: When a contextual type is missing, we could try to diagnose cases
+  // where the element types mismatch.  There is no Any equivalent since they
+  // keys need to be hashable.
+  return false;
+}
+
+
 bool FailureDiagnosis::visitExpr(Expr *E) {
   // Check each of our immediate children to see if any of them are
   // independently invalid.
@@ -3836,7 +3968,8 @@ bool FailureDiagnosis::diagnoseExprFailure() {
   // subexpression.  If so, then we know it must be some conversion constraint
   // binding the result of the expression to a type that fails.
   if (!CS->TC.isExprBeingDiagnosed(expr) ||
-      (CS->getContextualType() && !isa<ClosureExpr>(expr))) {
+      (CS->getContextualType() && !isa<ClosureExpr>(expr) &&
+       !isa<CollectionExpr>(expr))) {
     // Make sure we retypecheck this expression, without context.
     CS->TC.addExprForDiagnosis(expr, nullptr);
 

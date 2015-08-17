@@ -243,9 +243,42 @@ ERROR(cannot_convert_closure_result,sema,none,
       "cannot convert value of type %0 to closure result type %1",
       (Type,Type))
 ERROR(cannot_convert_closure_result_protocol,sema_tcd,none,
-      "argument type %0 does not conform to closure result type %1", (Type, Type))
+      "result value of type %0 does not conform to closure result type %1",
+      (Type, Type))
 ERROR(cannot_convert_closure_result_nil,sema,none,
       "nil is not compatible with closure result type %0", (Type))
+
+// Array Element
+ERROR(cannot_convert_array_element,sema,none,
+      "cannot convert value of type %0 to expected element type %1",
+      (Type,Type))
+ERROR(cannot_convert_array_element_protocol,sema_tcd,none,
+      "value of type %0 does not conform to expected element type %1",
+      (Type, Type))
+ERROR(cannot_convert_array_element_nil,sema,none,
+      "nil is not compatible with expected element type %0", (Type))
+
+// Dictionary Key
+ERROR(cannot_convert_dict_key,sema,none,
+      "cannot convert value of type %0 to expected dictionary key type %1",
+      (Type,Type))
+ERROR(cannot_convert_dict_key_protocol,sema_tcd,none,
+      "value of type %0 does not conform to expected dictionary key type %1",
+      (Type, Type))
+ERROR(cannot_convert_dict_key_nil,sema,none,
+      "nil is not compatible with expected dictionary key type %0", (Type))
+
+// Dictionary Value
+ERROR(cannot_convert_dict_value,sema,none,
+      "cannot convert value of type %0 to expected dictionary value type %1",
+      (Type,Type))
+ERROR(cannot_convert_dict_value_protocol,sema_tcd,none,
+      "value of type %0 does not conform to expected dictionary value type %1",
+      (Type, Type))
+ERROR(cannot_convert_dict_value_nil,sema,none,
+      "nil is not compatible with expected dictionary value type %0", (Type))
+
+
 
 
 ERROR(throws_functiontype_mismatch,sema_tcc,none,

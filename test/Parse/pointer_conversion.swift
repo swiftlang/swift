@@ -94,7 +94,8 @@ func constPointerArguments(p: UnsafeMutablePointer<Int>,
   takesConstPointer(ii)
   takesConstPointer(ff) // expected-error{{cannot convert value of type '[Float]' to expected argument type 'UnsafePointer<Int>'}}
   takesConstPointer([0, 1, 2])
-  takesConstPointer([0.0, 1.0, 2.0]) // expected-error{{cannot convert value of type '[Double]' to expected argument type 'UnsafePointer<Int>'}}
+  // FIXME: improve QoI: rdar://22308330
+  takesConstPointer([0.0, 1.0, 2.0]) // expected-error{{type 'UnsafePointer<Int>' does not conform to protocol 'ArrayLiteralConvertible'}}
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafePointer<Int> = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafePointer<Int>'}}
