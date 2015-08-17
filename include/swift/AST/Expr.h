@@ -504,6 +504,8 @@ class LiteralExpr : public Expr {
 public:
   LiteralExpr(ExprKind Kind, bool Implicit) : Expr(Kind, Implicit) {}
   
+  // Make an exact copy of this one AST node.
+  LiteralExpr *shallowClone(ASTContext &Ctx) const;
   
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_LiteralExpr &&
@@ -534,6 +536,8 @@ class NumberLiteralExpr : public LiteralExpr {
   /// The value of the literal as an ASTContext-owned string. Underscores must
   /// be stripped.
   StringRef Val;  // Use StringRef instead of APInt or APFloat, which leak.
+  
+protected:
   SourceLoc MinusLoc;
   SourceLoc DigitsLoc;
   
@@ -573,7 +577,7 @@ public:
 /// a BuiltinIntegerType.
 class IntegerLiteralExpr : public NumberLiteralExpr {
 public:
-  IntegerLiteralExpr(StringRef Val, SourceLoc DigitsLoc, bool Implicit)
+  IntegerLiteralExpr(StringRef Val, SourceLoc DigitsLoc, bool Implicit = false)
       : NumberLiteralExpr(ExprKind::IntegerLiteral,
                           Val, DigitsLoc, Implicit)
   {}
@@ -591,7 +595,7 @@ public:
 /// BuiltinFloatingPointType.
 class FloatLiteralExpr : public NumberLiteralExpr {
 public:
-  FloatLiteralExpr(StringRef Val, SourceLoc Loc, bool Implicit)
+  FloatLiteralExpr(StringRef Val, SourceLoc Loc, bool Implicit = false)
     : NumberLiteralExpr(ExprKind::FloatLiteral, Val, Loc, Implicit)
   {}
   
@@ -723,9 +727,8 @@ private:
   SourceLoc Loc;
   
 public:
-  MagicIdentifierLiteralExpr(Kind kind, SourceLoc loc, bool implicit)
-    : LiteralExpr(ExprKind::MagicIdentifierLiteral, implicit), Loc(loc)
-  {
+  MagicIdentifierLiteralExpr(Kind kind, SourceLoc loc, bool implicit = false)
+    : LiteralExpr(ExprKind::MagicIdentifierLiteral, implicit), Loc(loc) {
     MagicIdentifierLiteralExprBits.Kind = static_cast<unsigned>(kind);
     MagicIdentifierLiteralExprBits.StringEncoding
       = static_cast<unsigned>(StringLiteralExpr::UTF8);

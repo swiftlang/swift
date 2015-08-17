@@ -545,6 +545,96 @@ llvm::DenseMap<Expr *, unsigned> Expr::getPreorderIndexMap() {
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
 
+static LiteralExpr *shallowCloneImpl(const NilLiteralExpr *E, ASTContext &Ctx) {
+  return new (Ctx) NilLiteralExpr(E->getLoc());
+}
+
+static LiteralExpr *
+shallowCloneImpl(const IntegerLiteralExpr *E, ASTContext &Ctx) {
+  auto res = new (Ctx) IntegerLiteralExpr(E->getDigitsText(),
+                                          E->getSourceRange().End);
+  if (E->isNegative())
+    res->setNegative(E->getSourceRange().Start);
+  return res;
+}
+
+static LiteralExpr *shallowCloneImpl(const FloatLiteralExpr *E, ASTContext &Ctx) {
+  auto res = new (Ctx) FloatLiteralExpr(E->getDigitsText(),
+                                        E->getSourceRange().End);
+  if (E->isNegative())
+    res->setNegative(E->getSourceRange().Start);
+  return res;
+}
+static LiteralExpr *
+shallowCloneImpl(const BooleanLiteralExpr *E, ASTContext &Ctx) {
+  return new (Ctx) BooleanLiteralExpr(E->getValue(), E->getLoc());
+}
+static LiteralExpr *shallowCloneImpl(const StringLiteralExpr *E, ASTContext &Ctx) {
+  auto res = new (Ctx) StringLiteralExpr(E->getValue(), E->getSourceRange());
+  res->setEncoding(E->getEncoding());
+  return res;
+}
+
+static LiteralExpr *
+shallowCloneImpl(const InterpolatedStringLiteralExpr *E, ASTContext &Ctx) {
+  auto res = new (Ctx) InterpolatedStringLiteralExpr(E->getLoc(),
+                const_cast<InterpolatedStringLiteralExpr*>(E)->getSegments());
+  res->setSemanticExpr(E->getSemanticExpr());
+  return res;
+}
+
+
+static LiteralExpr *
+shallowCloneImpl(const MagicIdentifierLiteralExpr *E, ASTContext &Ctx) {
+  auto res = new (Ctx) MagicIdentifierLiteralExpr(E->getKind(),
+                                                  E->getSourceRange().End);
+  if (res->isString())
+    res->setStringEncoding(E->getStringEncoding());
+  return res;
+}
+
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
+static LiteralExpr *
+shallowCloneImpl(const ObjectLiteralExpr *E, ASTContext &Ctx) {
+  auto res = new (Ctx) ObjectLiteralExpr(E->getStartLoc(), E->getName(),
+                                         E->getNameLoc(), E->getArg(),
+                                         E->getEndLoc());
+  res->setSemanticExpr(E->getSemanticExpr());
+  return res;
+}
+#endif
+
+// Make an exact copy of this AST node.
+LiteralExpr *LiteralExpr::shallowClone(ASTContext &Ctx) const {
+  LiteralExpr *Result = nullptr;
+  switch (getKind()) {
+  default: llvm_unreachable("Unknown literal type!");
+#define DISPATCH_CLONE(KIND) \
+  case ExprKind::KIND: \
+    Result = shallowCloneImpl(cast<KIND##Expr>(this), Ctx); \
+    break;
+
+  DISPATCH_CLONE(NilLiteral)
+  DISPATCH_CLONE(IntegerLiteral)
+  DISPATCH_CLONE(FloatLiteral)
+  DISPATCH_CLONE(BooleanLiteral)
+  DISPATCH_CLONE(StringLiteral)
+  DISPATCH_CLONE(InterpolatedStringLiteral)
+#ifdef SWIFT_ENABLE_OBJECT_LITERALS
+  DISPATCH_CLONE(ObjectLiteral)
+#endif // SWIFT_ENABLE_OBJECT_LITERALS
+  DISPATCH_CLONE(MagicIdentifierLiteral)
+#undef DISPATCH_CLONE
+  }
+  
+  Result->setType(getType());
+  Result->setImplicit(isImplicit());
+  return Result;
+}
+
+
+
+
 static APInt getIntegerLiteralValue(bool IsNegative, StringRef Text,
                                     unsigned BitWidth) {
   llvm::APInt Value(BitWidth, 0);
