@@ -3229,35 +3229,10 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseSILType(ExistentialTy))
       return true;
-
-    // Parse all of the conformances.
-    llvm::SmallVector<ProtocolConformance *, 1> Conformances;
-    while (P.Tok.is(tok::comma)) {
-      P.consumeToken(tok::comma);
-
-      // If we see the word opaque, then we put in a nullptr. This is b/c we do
-      // not know what the underlying conformance is since it is provided via a
-      // different existential.
-      //
-      // TODO: It would be better to add in a real OpaqueProtocolConformance
-      // class. This would be a significant amount of work since we would need
-      // to mess with the TypeChecker and make sure that everything goes through
-      // the whole system. This preserves the behavior and ensures we can parse
-      // ok.
-      if (P.Tok.is(tok::kw_opaque)) {
-        P.consumeToken(tok::kw_opaque);
-        Conformances.push_back(nullptr);
-        continue;
-      }
-
-      ProtocolDecl *proto;
-      ProtocolConformance *C =
-          parseProtocolConformanceHelper(proto, true /*localScope*/);
-      Conformances.push_back(C);
-    }
-
+    
+    // FIXME: We should be parsing conformances here.
     ResultVal = B.createInitExistentialMetatype(InstLoc, Val, ExistentialTy,
-                                                Conformances);
+                                           ArrayRef<ProtocolConformance*>());
     break;
   }
   case ValueKind::DynamicMethodBranchInst: {
