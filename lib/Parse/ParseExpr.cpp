@@ -858,13 +858,17 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         L->backtrackToState(L->getStateForBeginningOfTokenLoc(
           L->getLocForStartOfLine(SourceMgr, Tok.getLoc())));
 
+        bool HasReturn = false;
+
         // Until we see the code completion token, collect identifiers.
         for (L->lex(Tok); !Tok.is(tok::code_complete); consumeToken()) {
+          if (!HasReturn)
+            HasReturn = Tok.is(tok::kw_return);
           if (Tok.is(tok::identifier)) {
             Identifiers.push_back(Tok.getText());
           }
         }
-        CodeCompletion->completeUnresolvedMember(Expr, Identifiers);
+        CodeCompletion->completeUnresolvedMember(Expr, Identifiers, HasReturn);
       } else {
         Result.setHasCodeCompletion();
       }

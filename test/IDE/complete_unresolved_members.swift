@@ -23,6 +23,11 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_19 | FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_20 | FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_21 | FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_22 | FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_23 | FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_24 | FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_25 | FileCheck %s -check-prefix=UNRESOLVED_3
 
 enum SomeEnum1 {
   case South
@@ -32,6 +37,10 @@ enum SomeEnum1 {
 enum SomeEnum2 {
   case East
   case West
+}
+
+enum SomeEnum3 {
+  case Payload(SomeEnum1)
 }
 
 struct NotOptions1 {
@@ -173,3 +182,26 @@ Container.EnumTaker1(.#^UNRESOLVED_20^#
 // UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option4[#SomeOptions2#]; name=Option4
 // UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option5[#SomeOptions2#]; name=Option5
 // UNRESOLVED_4-DAG: Decl[StaticVar]/CurrNominal:        Option6[#SomeOptions2#]; name=Option6
+
+var OpIns1 : SomeOptions1 = .#^UNRESOLVED_21^#
+
+var c1 = {() -> SomeOptions1 in
+  return .#^UNRESOLVED_22^#
+}
+
+class C6 {
+  func f1() -> SomeOptions1 {
+    return .#^UNRESOLVED_23^#
+  }
+  func f2(P : SomeEnum3) {
+  switch p {
+  case .Payload(.#^UNRESOLVED_24^#)
+  }
+  }
+}
+
+class C6 {
+  func f1(e: SomeEnum1) {
+    if let x = Optional(e) where x == .#^UNRESOLVED_25^#
+  }
+}

@@ -696,6 +696,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   };
 
   UnresolvedMemberExpr *UnresolvedExpr;
+  bool UnresolvedExprInReturn;
   std::vector<std::string> TokensBeforeUnresolvedExpr;
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
@@ -848,7 +849,8 @@ public:
   void completePoundAvailablePlatform() override;
   void completeImportDecl() override;
   void completeUnresolvedMember(UnresolvedMemberExpr *E,
-                                ArrayRef<StringRef> Identifiers) override;
+                                ArrayRef<StringRef> Identifiers,
+                                bool HasReturn) override;
 
   void addKeywords(CodeCompletionResultSink &Sink);
 
@@ -2115,21 +2117,18 @@ public:
     RequestedCachedResults = RequestedResultsTy::toplevelResults();
   }
 
-  class LookupFuncByName : public swift::VisibleDeclConsumer {
+  struct LookupByName : public swift::VisibleDeclConsumer {
     CompletionLookup &Lookup;
-    std::vector<std::string> &SortedFuncNames;
+    std::vector<std::string> &SortedNames;
     llvm::SmallPtrSet<Decl*, 3> HandledDecls;
 
     bool isNameHit(StringRef Name) {
-      return std::binary_search(SortedFuncNames.begin(), SortedFuncNames.end(),
-                                Name);
+      return std::binary_search(SortedNames.begin(), SortedNames.end(), Name);
     }
 
-    void collectFuncTypes(FuncDecl *FD) {
-      if (isNameHit(FD->getNameStr()) && FD->getType() &&
-          FD-> getType()->is<FunctionType>()) {
-        unboxType(FD->getType()->getAs<FunctionType>()->getInput());
-        unboxType(FD->getType()->getAs<FunctionType>()->getResult());
+    void collectEnumElementTypes(EnumElementDecl *EED) {
+      if (isNameHit(EED->getNameStr()) && EED->getType()) {
+        unboxType(EED->getType());
       }
     }
 
@@ -2140,6 +2139,9 @@ public:
         for (auto Ele : T->getAs<TupleType>()->getElements()) {
           unboxType(Ele.getType());
         }
+      } else if (auto FT = T->getAs<FunctionType>()) {
+        unboxType(FT->getInput());
+        unboxType(FT->getResult());
       } else if (auto NTD = T->getNominalOrBoundGenericNominal()){
         if (HandledDecls.count(NTD) == 0) {
           auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
@@ -2151,23 +2153,24 @@ public:
       }
     }
 
-  public:
-    LookupFuncByName(CompletionLookup &Lookup,
-                     std::vector<std::string> &SortedFuncNames) :
-                       Lookup(Lookup), SortedFuncNames(SortedFuncNames) {
-      std::sort(SortedFuncNames.begin(), SortedFuncNames.end());
+    LookupByName(CompletionLookup &Lookup, std::vector<std::string> &SortedNames) :
+                   Lookup(Lookup), SortedNames(SortedNames) {
+      std::sort(SortedNames.begin(), SortedNames.end());
     }
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-      if (auto FD = dyn_cast<FuncDecl>(VD)) {
-        collectFuncTypes(FD);
-      }
       if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
+        if (isNameHit(NTD->getNameStr())) {
+          unboxType(NTD->getDeclaredType());
+        }
         for (auto M : NTD->getMembers()) {
-          if (auto FD = dyn_cast<FuncDecl>(M)) {
-            collectFuncTypes(FD);
+          if (M->getKind() == DeclKind::Func ||
+              M->getKind() == DeclKind::EnumElement) {
+            foundDecl(dyn_cast<ValueDecl>(M), Reason);
           }
         }
+      } else if (isNameHit(VD->getNameStr())) {
+        unboxType(VD->getType());
       }
     }
   };
@@ -2185,10 +2188,17 @@ public:
   }
 
   void getUnresolvedMemberCompletions(SourceLoc Loc,
-                                      std::vector<std::string> &FuncNames) {
+                                      std::vector<std::string> &FuncNames,
+                                      bool HasReturn) {
     NeedLeadingDot = !HaveDot;
-    LookupFuncByName Lookup(*this, FuncNames);
+    LookupByName Lookup(*this, FuncNames);
     lookupVisibleDecls(Lookup, CurrDeclContext, TypeResolver.get(), true);
+    if (!HasReturn)
+      return;
+    if (auto FD = dyn_cast_or_null<AbstractFunctionDecl>(
+        CurrDeclContext->getInnermostMethodContext())) {
+      Lookup.unboxType(FD->getType());
+    }
   }
 
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
@@ -2626,10 +2636,11 @@ void CodeCompletionCallbacksImpl::completeImportDecl() {
 }
 
 void CodeCompletionCallbacksImpl::completeUnresolvedMember(UnresolvedMemberExpr *E,
-    ArrayRef<StringRef> Identifiers) {
+    ArrayRef<StringRef> Identifiers, bool HasReturn) {
   Kind = CompletionKind::UnresolvedMember;
   CurDeclContext = P.CurDeclContext;
   UnresolvedExpr = E;
+  UnresolvedExprInReturn = HasReturn;
   for (auto Id : Identifiers) {
     TokensBeforeUnresolvedExpr.push_back(Id);
   }
@@ -2978,7 +2989,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     }
     if (!Success) {
       Lookup.getUnresolvedMemberCompletions(
-        P.Context.SourceMgr.getCodeCompletionLoc(), TokensBeforeUnresolvedExpr);
+        P.Context.SourceMgr.getCodeCompletionLoc(),
+        TokensBeforeUnresolvedExpr,
+        UnresolvedExprInReturn);
     }
     break;
   }

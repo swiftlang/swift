@@ -150,7 +150,8 @@ public:
 
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(UnresolvedMemberExpr *E,
-                                        ArrayRef<StringRef> Identifiers) = 0;
+                                        ArrayRef<StringRef> Identifiers,
+                                        bool HasReturn) = 0;
 
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.
