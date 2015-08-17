@@ -4098,11 +4098,6 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
       if (diagnoseFailure(*this, *failure, expr, false))
         return true;
     }
-
-    // If none of the failures wanted to print themselves, emit them in
-    // expression order.
-    diagnoseFailureForExpr(expr);
-    return true;
   }
 
   // There were no unavoidable failures, so attempt to solve again, capturing
