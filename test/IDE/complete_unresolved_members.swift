@@ -28,6 +28,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_23 | FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_24 | FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_25 | FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_26 | FileCheck %s -check-prefix=UNRESOLVED_3
 
 enum SomeEnum1 {
   case South
@@ -205,3 +206,10 @@ class C6 {
     if let x = Optional(e) where x == .#^UNRESOLVED_25^#
   }
 }
+class C7 {}
+extension C7 {
+  func extendedf1(e :SomeEnum1) {}
+}
+
+var cInst1 = C7()
+cInst1.extendedf1(.#^UNRESOLVED_26^#

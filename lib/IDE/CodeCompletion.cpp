@@ -2158,16 +2158,23 @@ public:
       std::sort(SortedNames.begin(), SortedNames.end());
     }
 
+    void handleDeclRange(const DeclRange &Members,
+                         DeclVisibilityKind Reason) {
+      for (auto M : Members) {
+        if (auto VD = dyn_cast<ValueDecl>(M)) {
+          foundDecl(VD, Reason);
+        }
+      }
+    }
+
     void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
       if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
         if (isNameHit(NTD->getNameStr())) {
           unboxType(NTD->getDeclaredType());
         }
-        for (auto M : NTD->getMembers()) {
-          if (M->getKind() == DeclKind::Func ||
-              M->getKind() == DeclKind::EnumElement) {
-            foundDecl(dyn_cast<ValueDecl>(M), Reason);
-          }
+        handleDeclRange(NTD->getMembers(), Reason);
+        for (auto Ex : NTD->getExtensions()) {
+          handleDeclRange(Ex->getMembers(), Reason);
         }
       } else if (isNameHit(VD->getNameStr())) {
         unboxType(VD->getType());
