@@ -122,35 +122,57 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   return %5 : $()
 }
 
-//==========================================
-// Check an apply with the nothrow attribute
+//========================================
+// @owned => @guaranteed with error result
 
-// CHECK-LABEL: sil [fragile] [thunk] @dead_arg_with_error_result : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
-// CHECK: bb0
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @_TTSf4d__dead_arg_with_error_result : $@convention(thin) () -> @error ErrorType
-// CHECK-NEXT: apply [nothrow]
-// CHECK-NEXT: return
-sil [fragile] @dead_arg_with_error_result: $@convention(thin) (Builtin.NativeObject) -> @error ErrorType {
-bb0(%0 : $Builtin.NativeObject):
-  %4 = tuple()
-  return %4 : $()
+// CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
+// CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
+// CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
+// CHECK-NEXT: release_value
+// CHECK-NEXT: return [[NORMRET]]
+// CHECK: bb2([[THROW:%[0-9]+]] : $ErrorType):
+// CHECK-NEXT: release_value
+// CHECK-NEXT: throw [[THROW]]
+sil [fragile] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+bb0(%0 : $Builtin.NativeObject, %1 : $Int):
+  %f1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %f1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  release_value %0 : $Builtin.NativeObject
+  return %1 : $Int
 }
 
-// CHECK-LABEL: sil [fragile] @dead_arg_with_error_callsite : $@convention(thin) (Builtin.NativeObject) -> () {
-// CHECK: bb0
-// CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @_TTSf4d__dead_arg_with_error_result : $@convention(thin) () -> @error ErrorType
-// CHECK-NEXT: apply [nothrow] [[OPT_FUN]](
-sil [fragile] @dead_arg_with_error_callsite : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %2 = function_ref @dead_arg_with_error_result: $@convention(thin) (Builtin.NativeObject) -> @error ErrorType
-  %3 = apply [nothrow] %2(%0) : $@convention(thin) (Builtin.NativeObject) -> @error ErrorType
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
+// CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
+// CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
+// CHECK-NEXT: release_value
+// CHECK-NEXT: return [[NORMRET]]
+// CHECK: bb2([[THROW:%[0-9]+]] : $ErrorType):
+// CHECK-NEXT: release_value
+// CHECK-NEXT: throw [[THROW]]
+sil [fragile] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+bb0(%0 : $Builtin.NativeObject, %1 : $Int):
+  %f1 = function_ref @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType)
+  try_apply %f1(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType), normal bb1, error bb2
 
-  // This ensures that %0 is not dead in this function. We don't want to specialize this.
-  %4 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %4(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  %7 = tuple()
-  return %7 : $()
+bb1(%a1 : $Int):
+  return %a1 : $Int
+
+bb2(%a2 : $ErrorType):
+  throw %a2 : $ErrorType
+}
+
+// CHECK-LABEL: sil [fragile] @owned_to_guaranteed_with_nothrow_caller : $@convention(thin) (Builtin.NativeObject, Int) -> Int {
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
+// CHECK: [[NORMRET:%[0-9]+]] = apply [nothrow] [[FUNC_REF]]
+// CHECK-NEXT: release_value
+// CHECK-NEXT: return [[NORMRET]]
+sil [fragile] @owned_to_guaranteed_with_nothrow_caller : $@convention(thin) (Builtin.NativeObject, Int) -> Int {
+bb0(%0 : $Builtin.NativeObject, %1 : $Int):
+  %f1 = function_ref @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType)
+  %r1 = apply [nothrow] %f1(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error ErrorType)
+  return %r1 : $Int
 }
 
 //======================
@@ -464,3 +486,4 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-NEXT:  apply
 // CHECK-NEXT:  tuple
 // CHECK-NEXT:  return
+

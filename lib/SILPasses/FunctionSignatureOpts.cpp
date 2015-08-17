@@ -166,9 +166,18 @@ struct ArgumentDescriptor {
   void
   computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &Out) const;
 
+  /// Returns the argument for the given apply or try_apply instruction.
+  SILValue getArg(SILInstruction *AI) const {
+    if (auto *RealAI = dyn_cast<ApplyInst>(AI)) {
+      return RealAI->getArgument(Index);
+    } else {
+      return cast<TryApplyInst>(AI)->getArgument(Index);
+    }
+  }
+  
   /// Add potentially multiple new arguments to NewArgs from the caller's apply
-  /// inst.
-  void addCallerArgs(SILBuilder &Builder, ApplyInst *AI,
+  /// or try_apply inst.
+  void addCallerArgs(SILBuilder &Builder, SILInstruction *AI,
                      SmallVectorImpl<SILValue> &NewArgs) const;
 
   /// Add potentially multiple new arguments to NewArgs from the thunk's
@@ -293,18 +302,18 @@ computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &Out) const {
 
 void
 ArgumentDescriptor::
-addCallerArgs(SILBuilder &B, ApplyInst *AI,
+addCallerArgs(SILBuilder &B, SILInstruction *AI,
               llvm::SmallVectorImpl<SILValue> &NewArgs) const {
   if (IsDead)
     return;
 
+  SILValue Arg = getArg(AI);
   if (!shouldExplode()) {
-    NewArgs.push_back(AI->getArgument(Index));
+    NewArgs.push_back(Arg);
     return;
   }
 
-  ProjTree.createTreeFromValue(B, AI->getLoc(), AI->getArgument(Index),
-                               NewArgs);
+  ProjTree.createTreeFromValue(B, AI->getLoc(), Arg, NewArgs);
 }
 
 void
@@ -656,11 +665,16 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     if (!Edge->getApply().getFunction()->shouldOptimize())
       continue;
 
-    // TODO: Update for TryApply
-    auto *AI = cast<ApplyInst>(Edge->getApply().getInstruction());
+    auto *AI = Edge->getApply().getInstruction();
+    
+    if (ApplyInst *RealAI = dyn_cast<ApplyInst>(AI)) {
+      if (!isSupportedCallee(RealAI->getCallee()))
+        continue;
+    } else {
+      if (!isSupportedCallee(cast<TryApplyInst>(AI)->getCallee()))
+        continue;
+    }
 
-    if (!isSupportedCallee(AI->getCallee()))
-      continue;
 
     SILBuilderWithScope<16> Builder(AI);
 
@@ -680,19 +694,37 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     SILLocation Loc = AI->getLoc();
 
     // Create the new apply.
-    ApplyInst *NewAI = Builder.createApply(Loc, FRI, LoweredType, ResultType,
+    SILInstruction *NewAI;
+    if (ApplyInst *RealAI = dyn_cast<ApplyInst>(AI)) {
+      NewAI = Builder.createApply(Loc, FRI, LoweredType, ResultType,
                                            ArrayRef<Substitution>(), NewArgs,
-                                           AI->isNonThrowing());
+                                           RealAI->isNonThrowing());
+      // Replace all uses of the old apply with the new apply.
+      AI->replaceAllUsesWith(NewAI);
+    } else {
+      auto *TAI = cast<TryApplyInst>(AI);
+      NewAI = Builder.createTryApply(Loc, FRI, LoweredType,
+                                  ArrayRef<Substitution>(), NewArgs,
+                                  TAI->getNormalBB(), TAI->getErrorBB());
 
-    // Replace all uses of the old apply with the new apply.
-    AI->replaceAllUsesWith(NewAI);
+      Builder.setInsertionPoint(TAI->getErrorBB(), TAI->getErrorBB()->begin());
+      // If we have any arguments that were consumed but are now guaranteed,
+      // insert a release_value in the error block.
+      for (auto &ArgDesc : ArgDescs) {
+        if (!ArgDesc.CalleeRelease)
+          continue;
+        Builder.createReleaseValue(Loc, ArgDesc.getArg(AI));
+      }
+      // Also insert release_value in the normal block (done below).
+      Builder.setInsertionPoint(TAI->getNormalBB(), TAI->getNormalBB()->begin());
+    }
 
     // If we have any arguments that were consumed but are now guaranteed,
     // insert a release_value.
     for (auto &ArgDesc : ArgDescs) {
       if (!ArgDesc.CalleeRelease)
         continue;
-      Builder.createReleaseValue(Loc, AI->getArgument(ArgDesc.Index));
+      Builder.createReleaseValue(Loc, ArgDesc.getArg(AI));
     }
 
     // Erase the old apply and its callee.
@@ -723,10 +755,38 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
   // now.
   SILType LoweredType = NewF->getLoweredType();
   SILType ResultType = LoweredType.getFunctionInterfaceResultType();
-  SILValue ReturnValue = Builder.createApply(Loc, FRI, LoweredType, ResultType,
-                                             ArrayRef<Substitution>(),
-                                             ThunkArgs,
-                      LoweredType.castTo<SILFunctionType>()->hasErrorResult());
+  SILValue ReturnValue;
+  auto FunctionTy = LoweredType.castTo<SILFunctionType>();
+  if (FunctionTy->hasErrorResult()) {
+    // We need a try_apply to call a function with an error result.
+    SILFunction *Thunk = BB->getParent();
+    SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
+    ReturnValue = NormalBlock->createBBArg(ResultType, 0);
+    SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
+    SILType ErrorType = SILType::getPrimitiveObjectType(
+                                      FunctionTy->getErrorResult().getType());
+    auto *ErrorArg = ErrorBlock->createBBArg(ErrorType, 0);
+    Builder.createTryApply(Loc, FRI, LoweredType,
+                                   ArrayRef<Substitution>(), ThunkArgs,
+                                   NormalBlock, ErrorBlock);
+    
+    // If we have any arguments that were consumed but are now guaranteed,
+    // insert a release_value in the error block.
+    Builder.setInsertionPoint(ErrorBlock);
+    for (auto &ArgDesc : ArgDescs) {
+      if (!ArgDesc.CalleeRelease)
+        continue;
+      Builder.createReleaseValue(Loc, BB->getBBArg(ArgDesc.Index));
+    }
+    Builder.createThrow(Loc, ErrorArg);
+
+    // Also insert release_value in the normal block (done below).
+    Builder.setInsertionPoint(NormalBlock);
+  } else {
+    ReturnValue = Builder.createApply(Loc, FRI, LoweredType, ResultType,
+                                               ArrayRef<Substitution>(),
+                                               ThunkArgs, false);
+  }
 
   // If we have any arguments that were consumed but are now guaranteed,
   // insert a release_value.
@@ -802,8 +862,6 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
                      << "\n");
 
   assert(!CallSites.empty() && "Unexpected empty set of call sites!");
-  if (isa<TryApplyInst>((*CallSites.begin())->getApply().getInstruction()))
-    return false;
 
   // An array containing our ArgumentDescriptor objects that contain information
   // from our analysis.
