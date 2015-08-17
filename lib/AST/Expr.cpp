@@ -186,12 +186,13 @@ Expr *Expr::getValueProvidingExpr() {
 /// Enumerate each immediate child expression of this node, invoking the
 /// specific functor on it.  This ignores statements and other non-expression
 /// children.
-void Expr::forEachChildExpr(const std::function<void(Expr*)> &callback) {
+void Expr::
+forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback) {
   struct ChildWalker : ASTWalker {
-    const std::function<void(Expr*)> &callback;
+    const std::function<Expr*(Expr*)> &callback;
     Expr *ThisNode;
     
-    ChildWalker(const std::function<void(Expr*)> &callback, Expr *ThisNode)
+    ChildWalker(const std::function<Expr*(Expr*)> &callback, Expr *ThisNode)
       : callback(callback), ThisNode(ThisNode) {}
     
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -201,8 +202,7 @@ void Expr::forEachChildExpr(const std::function<void(Expr*)> &callback) {
         return { true, E };
 
       // Otherwise we must be a child of our expression, enumerate it!
-      callback(E);
-      return { false, E };
+      return { false, callback(E) };
     }
     
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -220,6 +220,35 @@ void Expr::forEachChildExpr(const std::function<void(Expr*)> &callback) {
   this->walk(ChildWalker(callback, this));
 }
 
+/// Enumerate each immediate child expression of this node, invoking the
+/// specific functor on it.  This ignores statements and other non-expression
+/// children.
+void Expr::forEachChildExpr(const std::function<Expr*(Expr*)> &callback) {
+  struct ChildWalker : ASTWalker {
+    const std::function<Expr*(Expr*)> &callback;
+
+    ChildWalker(const std::function<Expr*(Expr*)> &callback)
+    : callback(callback) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      // Enumerate the node!
+      return { true, callback(E) };
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      return { false, P };
+    }
+    bool walkToDeclPre(Decl *D) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+  };
+
+  this->walk(ChildWalker(callback));
+}
 
 Initializer *Expr::findExistingInitializerContext() {
   struct FindExistingInitializer : ASTWalker {

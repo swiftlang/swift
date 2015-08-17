@@ -401,8 +401,14 @@ public:
   /// Enumerate each immediate child expression of this node, invoking the
   /// specific functor on it.  This ignores statements and other non-expression
   /// children.
-  void forEachChildExpr(const std::function<void(Expr*)> &callback);
-  
+  void forEachImmediateChildExpr(const std::function<Expr*(Expr*)> &callback);
+
+  /// Enumerate each expr node within this expression subtree, invoking the
+  /// specific functor on it.  This ignores statements and other non-expression
+  /// children, and if there is a closure within the expression, this does not
+  /// walk into the body of it (unless it is single-expression).
+  void forEachChildExpr(const std::function<Expr*(Expr*)> &callback);
+
   /// findExistingInitializerContext - Given that this expression is
   /// an initializer that belongs in some sort of Initializer
   /// context, look through it for any existing context object.

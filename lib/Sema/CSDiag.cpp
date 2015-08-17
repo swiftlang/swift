@@ -3936,12 +3936,19 @@ bool FailureDiagnosis::visitExpr(Expr *E) {
   // independently invalid.
   bool errorInSubExpr = false;
   
-  E->forEachChildExpr([&](Expr *Child) {
+  E->forEachImmediateChildExpr([&](Expr *Child) -> Expr*{
     // If we already found an error, stop checking.
-    if (errorInSubExpr) return;
-    
-    // Otherwise this subexpr is an error if type checking it produces an error.
-    errorInSubExpr |= !typeCheckChildIndependently(Child);
+    if (errorInSubExpr) return Child;
+
+    // Otherwise just type check the subexpression independently.  If that
+    // succeeds, then we stitch the result back into our expression.
+    if (typeCheckChildIndependently(Child))
+      return Child;
+
+    // Otherwise, it failed, which emitted a diagnostic.  Keep track of this
+    // so that we don't emit multiple diagnostics.
+    errorInSubExpr = true;
+    return Child;
   });
   
   // If any of the children were errors, we're done.
