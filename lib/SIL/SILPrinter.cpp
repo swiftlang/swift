@@ -702,7 +702,21 @@ public:
                [&] { *this << ", "; });
     *this << '>';
   }
-  
+
+  void printConformances(ArrayRef<ProtocolConformance *> Conformances) {
+    if (Conformances.empty())
+      return;
+    interleave(Conformances,
+               [&](const ProtocolConformance *C) {
+                 if (!C) {
+                   *this << "opaque";
+                   return;
+                 }
+                 C->printName(PrintState.OS);
+               },
+               [&] { *this << ", "; });
+  }
+
   void visitApplyInst(ApplyInst *AI) {
     *this << "apply ";
     if (AI->isNonThrowing())
@@ -1155,6 +1169,7 @@ public:
     *this << "open_existential_box " << getIDAndType(OI->getOperand())
        << " to " << OI->getType();
   }
+
   void visitInitExistentialAddrInst(InitExistentialAddrInst *AEI) {
     *this << "init_existential_addr " << getIDAndType(AEI->getOperand()) << ", $"
           << AEI->getFormalConcreteType();
@@ -1167,6 +1182,12 @@ public:
   void visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *AEI) {
     *this << "init_existential_metatype " << getIDAndType(AEI->getOperand())
        << ", " << AEI->getType();
+    auto Conformances = AEI->getConformances();
+    if (Conformances.size()) {
+      // TODO: Can this instruction ever not have conformances?
+      *this << ", ";
+      printConformances(Conformances);
+    }
   }
   void visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
     *this << "alloc_existential_box " << AEBI->getExistentialType()

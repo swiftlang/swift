@@ -1044,6 +1044,7 @@ instances. Derived classes inherit the witness tables of their base class.
   protocol-conformance ::= 'specialize' '<' substitution* '>'
                            '(' protocol-conformance ')'
   protocol-conformance ::= 'dependent'
+  protocol-conformance ::= 'opaque'
   normal-protocol-conformance ::= identifier ':' identifier 'module' identifier
 
 Witness tables are keyed by *protocol conformance*, which is a unique identifier
@@ -1060,6 +1061,9 @@ for a concrete type's conformance to a protocol.
 - If an instance of a generic type conforms to a protocol, it does so with a
   *specialized conformance*, which provides the generic parameter bindings
   to the normal conformance, which should be for a generic type.
+- If an existential metatype conforms to a protocol P by being produced from a
+  second existential metatype that conforms to protocol P, we say the
+  existential metatype has a *opaque conformance*.
 
 Witness tables are only directly associated with normal conformances.
 Inherited and specialized conformances indirectly reference the witness table of
@@ -3320,13 +3324,18 @@ init_existential_metatype
 `````````````````````````
 ::
 
-  sil-instruction ::= 'init_existential_metatype' sil-operand ',' sil-type
+  sil-instruction ::= 'init_existential_metatype' sil-operand ',' sil-type (',' protocol-conformance)*
 
-  %1 = init_existential_metatype $0 : $@<rep> T.Type, $@<rep> P.Type
+   %1 = init_existential_metatype $0 : $@<rep> T.Type, $@<rep> P.Type, opaque
   // %0 must be of a metatype type $@<rep> T.Type where T: P
   // %@<rep> P.Type must be the existential metatype of a protocol or protocol
   //    composition, with the same metatype representation <rep>
+  // opaque means that the conformance of T: P is unknown at compile time since T is an archetype.
+  //
   // %1 will be of type $@<rep> P.Type
+
+   %1 = init_existential_metatype $0 : $@<rep> T.Type, $@<rep> P.Type, T: P module <module name>
+  // In this case the conformance at the end is a normal protocol conformance.
 
 Creates a metatype existential container of type ``$P.Type`` containing the
 conforming metatype of ``$T``.
