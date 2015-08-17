@@ -1,3 +1,5 @@
+:orphan:
+
 One of the issues that came up in our design discussions around ``Result`` was
 that enum cases don't really follow the conventions of anything else in our
 system. Our current convention for enum cases is to use
