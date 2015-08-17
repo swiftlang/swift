@@ -5118,6 +5118,11 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
       return nullptr;
     }
 
+    // Instead of updating the literal expr in place, allocate a new node.  This
+    // avoids issues where Builtin types end up on expr nodes and pollute
+    // diagnostics.
+    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context);
+
     // The literal expression has this type.
     literal->setType(argType);
 

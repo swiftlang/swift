@@ -2729,10 +2729,34 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     prevValue = elt->getRawValueExpr();
     assert(prevValue && "continued without setting raw value of enum case");
 
+    // If we didn't find a valid initializer (maybe the initial value was
+    // incompatible with the raw value type) mark the entry as being erroneous.
+    if (!elt->getTypeCheckedRawValueExpr()) {
+      elt->setInvalid();
+      continue;
+    }
+
     TC.checkEnumElementErrorHandling(elt);
 
+    // Find the type checked version of the LiteralExpr used for the raw value.
+    // this is unfortunate, but is needed because we're digging into the
+    // literals to get information about them, instead of accepting general
+    // expressions.
+    LiteralExpr *rawValue = elt->getRawValueExpr();
+    if (!rawValue->getType()) {
+      elt->getTypeCheckedRawValueExpr()->forEachChildExpr([&](Expr *E)->Expr* {
+        if (E->getKind() == rawValue->getKind())
+          rawValue = cast<LiteralExpr>(E);
+        return E;
+      });
+      elt->setRawValueExpr(rawValue);
+    }
+
+    prevValue = rawValue;
+    assert(prevValue && "continued without setting raw value of enum case");
+
     // Check that the raw value is unique.
-    RawValueKey key(elt->getRawValueExpr());
+    RawValueKey key(rawValue);
     RawValueSource source{elt, lastExplicitValueElt};
 
     auto insertIterPair = uniqueRawValues.insert({key, source});
