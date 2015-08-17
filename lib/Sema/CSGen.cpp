@@ -92,10 +92,10 @@ namespace {
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       
       // Store top-level binary exprs for further analysis.
-      if (dyn_cast<BinaryExpr>(expr) ||
+      if (isa<BinaryExpr>(expr) ||
           
           // Literal exprs are contextually typed, so store them off as well.
-          dyn_cast<LiteralExpr>(expr)) {
+          isa<LiteralExpr>(expr)) {
         LinkedExprs.push_back(expr);
         return {false, expr};
       }
@@ -1253,11 +1253,8 @@ namespace {
       ArrayRef<ValueDecl*> decls = expr->getDecls();
       SmallVector<OverloadChoice, 4> choices;
       
-      if (decls.size()) {
-        if (isDelayedOperatorDecl(decls[0])) {
-          expr->setIsPotentiallyDelayedGlobalOperator();
-        }
-      }
+      if (!decls.empty() && isDelayedOperatorDecl(decls[0]))
+        expr->setIsPotentiallyDelayedGlobalOperator();
       
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
         // If the result is invalid, skip it.
