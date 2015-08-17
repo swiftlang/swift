@@ -549,7 +549,7 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
 
   Combiner->replaceInstUsesWith(*PAI, PAI2->getArgument(0).getDef());
   Combiner->eraseInstFromFunction(*PAI);
-  assert(PAI2->use_empty() && "Should not have any uses");
+  assert(hasNoUsesExceptDebug(PAI2) && "Should not have any uses");
   Combiner->eraseInstFromFunction(*PAI2);
 
   return true;

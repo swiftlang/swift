@@ -2693,6 +2693,7 @@ bb0(%0 : $@callee_owned (@owned String) -> Bool):
   // function_ref reabstraction thunk helper from @callee_owned (@owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String) -> (@out Swift.Bool)
   %2 = function_ref @_TTRXFo_oSS_dSb_XFo_iSS_iSb_ : $@convention(thin) (@out Bool, @in String, @owned @callee_owned (@owned String) -> Bool) -> ()
   %3 = partial_apply %2(%0) : $@convention(thin) (@out Bool, @in String, @owned @callee_owned (@owned String) -> Bool) -> ()
+  debug_value %3 : $@callee_owned (@out Bool, @in String) -> ()
   // function_ref reabstraction thunk helper from @callee_owned (@in Swift.String) -> (@out Swift.Bool) to @callee_owned (@owned Swift.String) -> (@unowned Swift.Bool)
   %4 = function_ref @_TTRXFo_iSS_iSb_XFo_oSS_dSb_ : $@convention(thin) (@owned String, @owned @callee_owned (@out Bool, @in String) -> ()) -> Bool
   %5 = partial_apply %4(%3) : $@convention(thin) (@owned String, @owned @callee_owned (@out Bool, @in String) -> ()) -> Bool
