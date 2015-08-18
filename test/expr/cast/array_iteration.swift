@@ -16,7 +16,7 @@ for view in rootView.subviews as! [View] {
   doFoo()
 }
 
-for view:View in rootView.subviews { // expected-error{{'Array<AnyObject>!' is not convertible to 'View'}}
+for view:View in rootView.subviews { // expected-error{{'AnyObject' is not convertible to 'View'}}
   doFoo()
 }
 

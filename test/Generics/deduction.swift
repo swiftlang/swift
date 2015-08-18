@@ -88,7 +88,10 @@ func testReturnTuple(x: Int, y: Float) {
   
   var _ : (Int, Float) = returnTuple(x)
   var _ : (Float, Float) = returnTuple(y)
-  var _ : (Int, Float) = returnTuple(y) // expected-error{{cannot convert value of type '(Float, _)' to specified type '(Int, Float)'}}
+
+  // FIXME rdar://22333090: Improve diagnostic
+  var _ : (Int, Float) = returnTuple(y) // expected-error{{cannot invoke 'returnTuple' with an argument list of type '(Float)'}}
+  // expected-note @-1 {{expected an argument list of type '(T)'}}
 }
 
 

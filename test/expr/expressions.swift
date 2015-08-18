@@ -47,8 +47,13 @@ func basictest() {
   x8 = x8 + 1
   x8 + 1
   0 + x8
-  1.0 + x8 // expected-error{{binary operator '+' cannot be applied to operands of type 'Double' and 'Int8'}} expected-note {{overloads for '+' exist with these partially matching parameter lists:}}
-  var x9 : Int16 = x8 + 1 // expected-error{{cannot convert value of type 'Int8' to specified type 'Int16'}}
+  1.0 + x8 // expected-error{{binary operator '+' cannot be applied to operands of type 'Double' and 'Int8'}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
+
+
+  // FIXME rdar://22333090 - Improve diagnostic.
+  var x9 : Int16 = x8 + 1 // expected-error{{binary operator '+' cannot be applied to operands of type 'Int8' and 'Int'}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
 
   // Various tuple types.
   var tuple1 : ()
@@ -139,8 +144,8 @@ acceptsInt(unknown_var) // expected-error {{use of unresolved identifier 'unknow
 // and support the '=' operator.
 
 
-// FIXME: Bogus error
-var test1a: (Int) -> (Int) -> Int = { { $0 } } // expected-error{{type of expression is ambiguous without more context}}
+// FIXME rdar://22333281: Poor error message.
+var test1a: (Int) -> (Int) -> Int = { { $0 } } // expected-error{{tuple pattern cannot match values of the non-tuple type 'Int'}}
 var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
@@ -629,13 +634,13 @@ func unusedExpressionResults() {
 func arrayLiterals() { 
   var a = [1,2,3]
   var b : [Int] = []
-  var c = []  // expected-error {{type '[_]' does not conform to protocol 'ArrayLiteralConvertible'}}
+  var c = []  // expected-error {{expression type '[_]' is ambiguous without more context}}
 }
 
 func dictionaryLiterals() {
   var a = [1 : "foo",2 : "bar",3 : "baz"]
   var b : Dictionary<Int, String> = [:]
-  var c = [:]  // expected-error {{type '[_ : _]' does not conform to protocol 'DictionaryLiteralConvertible'}} 
+  var c = [:]  // expected-error {{expression type '[_ : _]' is ambiguous without more context}}
 }
 
 func invalidDictionaryLiteral() {

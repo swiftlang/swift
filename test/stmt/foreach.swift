@@ -60,7 +60,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleGeneratorType) {
   var sumf : Float
   for i : Int in gir { sum = sum + i }
   for i in gir { sum = sum + i }
-  for f : Float in gir { sum = sum + f } // expected-error{{'GoodRange<Int>' is not convertible to 'Float'}}
+  for f : Float in gir { sum = sum + f } // expected-error{{'Int' is not convertible to 'Float'}}
 
   for (i, f) : (Int, Float) in gtr { sum = sum + i }
 
@@ -72,7 +72,7 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleGeneratorType) {
 
   for (i, _) : (Int, Float) in gtr { sum = sum + i }
 
-  for (i, _) : (Int, Int) in gtr { sum = sum + i } // expected-error{{'GoodTupleGeneratorType' is not convertible to '(Int, Int)'}}
+  for (i, _) : (Int, Int) in gtr { sum = sum + i } // expected-error{{'Element' (aka '(Int, Float)') is not convertible to '(Int, Int)'}}
 
   for (i, f) in gtr {}
 }

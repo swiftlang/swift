@@ -88,8 +88,8 @@ let _: () -> Any = {  // expected-error {{function signature '() -> Int' is not 
   return 0
 }
 
-let _: () -> Int = { // expected-error {{cannot convert value of type '() -> String' to specified type '() -> Int'}}
-  () -> String in
+let _: () -> Int = { 
+  () -> String in  // expected-error {{declared closure result 'String' is incompatible with contextual type 'Int'}}
   return ""
 }
 

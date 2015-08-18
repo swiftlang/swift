@@ -1543,7 +1543,6 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
     return;
   }
 
-
   if (auto AE = dyn_cast<ApplyExpr>(fn)) {
     collectCalleeCandidates(AE->getFn());
 
@@ -1555,6 +1554,17 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
       return;
     }
   }
+
+  if (auto *OVE = dyn_cast<OpenExistentialExpr>(fn)) {
+    collectCalleeCandidates(OVE->getSubExpr());
+    return;
+  }
+
+  if (auto *CFCE = dyn_cast<CovariantFunctionConversionExpr>(fn)) {
+    collectCalleeCandidates(CFCE->getSubExpr());
+    return;
+  }
+
 
   // Otherwise, we couldn't tell structurally what is going on here, so try to
   // dig something out of the constraint system.
@@ -1792,13 +1802,13 @@ public:
   /// Emit an ambiguity diagnostic about the specified expression.
   void diagnoseAmbiguity(Expr *E);
 
-  
-private:
-    
   /// Attempt to produce a diagnostic for a mismatch between an expression's
   /// type and its assumed contextual type.
-  bool diagnoseContextualConversionError(Type exprResultType);
-  
+  bool diagnoseContextualConversionError();
+
+
+private:
+    
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
   bool diagnoseGeneralMemberFailure(Constraint *constraint);
@@ -2509,7 +2519,11 @@ static void eraseTypeData(Expr *expr) {
       // doesn't know how to reconstruct it.
       if (isa<OtherConstructorDeclRefExpr>(expr))
         return { false, expr };
-      
+
+      // TypeExpr's are relabeled by CSGen.
+      if (isa<TypeExpr>(expr))
+        return { false, expr };
+
       // If a literal has a Builtin.Int or Builtin.FP type on it already,
       // then sema has already expanded out a call to
       //   Init.init(<builtinliteral>)
@@ -2775,288 +2789,132 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
 }
 
 
-bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
-  // If we don't have a type for the expression, then we cannot use it in
-  // diagnostic generation.  A common cause of this failure is that the
-  // subexpression has no inherent type (e.g. nil), and we're trying to convert
-  // it to something it isn't compatible with (e.g. Int).  Handle a few of these
-  // cases.
-  if (exprType->is<TypeVariableType>()) {
-    if (Type contextualType = CS->getContextualType()) {
-      Diag<Type> nilDiag;
-
-      switch (CS->getContextualTypePurpose()) {
-      case CTP_Unused:
-      case CTP_CannotFail:
-        llvm_unreachable("These contextual type purposes cannot fail with a "
-                         "conversion type specified!");
-      case CTP_Initialization:
-        nilDiag = diag::cannot_convert_initializer_value_nil;
-        break;
-      case CTP_ReturnStmt:
-        nilDiag = diag::cannot_convert_to_return_type_nil;
-        break;
-      case CTP_ThrowStmt:
-        nilDiag = diag::cannot_convert_thrown_type;
-        break;
-        
-      case CTP_EnumCaseRawValue:
-        nilDiag = diag::cannot_convert_raw_initializer_value_nil;
-        break;
-      case CTP_DefaultParameter:
-        nilDiag = diag::cannot_convert_default_arg_value_nil;
-        break;
-        
-      case CTP_CallArgument:
-        nilDiag = diag::cannot_convert_argument_value_nil;
-        break;
-      case CTP_ClosureResult:
-        nilDiag = diag::cannot_convert_closure_result_nil;
-        break;
-      case CTP_ArrayElement:
-        nilDiag = diag::cannot_convert_array_element_nil;
-        break;
-      case CTP_DictionaryKey:
-        nilDiag = diag::cannot_convert_dict_key_nil;
-        break;
-      case CTP_DictionaryValue:
-        nilDiag = diag::cannot_convert_dict_value_nil;
-        break;
-      case CTP_CoerceOperand:
-        nilDiag = diag::cannot_convert_coerce_nil;
-        break;
-      }
-      
-      if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
-        diagnose(expr->getLoc(), nilDiag, contextualType);
-        return true;
-      }
-    }
-    
-    // Otherwise, we can't do anything smart.
+bool FailureDiagnosis::diagnoseContextualConversionError() {
+  // If the constraint system has a contextual type, then we can test to see if
+  // this is the problem that prevents us from solving the system.
+  Type contextualType = CS->getContextualType();
+  if (!contextualType)
     return false;
-  }
-  
+
+  // Try re-type-checking the expression without the contextual type to see if
+  // it can work without it.  If so, the contextual type is the problem.
+
+  CS->TC.addExprForDiagnosis(expr, nullptr);
+
+  // Type check the expression independently of any contextual constraints.
+  auto exprType = getTypeOfTypeCheckedChildIndependently(expr,
+                                               TCCFlags::TCC_AllowUnresolved);
+  // If it failed an diagnosed something, then we're done.
+  if (!exprType) return true;
+
   // Try to find the contextual type in a variety of ways.  If the constraint
   // system had a contextual type specified, we use it - it will have a purpose
   // indicator which allows us to give a very "to the point" diagnostic.
-  if (Type contextualType = CS->getContextualType()) {
-    Diag<Type, Type> diagID;
-    Diag<Type, Type> diagIDProtocol;
-    
-    // If this is conversion failure due to a return statement with an argument
-    // that cannot be coerced to the result type of the function, emit a
-    // specific error.
-    switch (CS->getContextualTypePurpose()) {
-    case CTP_Unused:
-    case CTP_CannotFail:
-      llvm_unreachable("These contextual type purposes cannot fail with a "
-                       "conversion type specified!");
-    case CTP_Initialization:
-      diagID = diag::cannot_convert_initializer_value;
-      diagIDProtocol = diag::cannot_convert_initializer_value_protocol;
-      break;
-    case CTP_ReturnStmt:
-      // Special case the "conversion to void" case.
-      if (contextualType->isVoid()) {
-        diagnose(expr->getLoc(), diag::cannot_return_value_from_void_func)
-          .highlight(expr->getSourceRange());
-        return true;
-      }
+  Diag<Type, Type> diagID;
+  Diag<Type, Type> diagIDProtocol;
+  Diag<Type> nilDiag;
 
-      diagID = diag::cannot_convert_to_return_type;
-      diagIDProtocol = diag::cannot_convert_to_return_type_protocol;
-      break;
-    case CTP_ThrowStmt:
-      // The conversion destination of throw is always ErrorType (at the moment)
-      // if this ever expands, this should be a specific form like () is for
-      // return.
-      diagnose(expr->getLoc(), diag::cannot_convert_thrown_type, exprType)
+  // If this is conversion failure due to a return statement with an argument
+  // that cannot be coerced to the result type of the function, emit a
+  // specific error.
+  switch (CS->getContextualTypePurpose()) {
+  case CTP_Unused:
+  case CTP_CannotFail:
+    llvm_unreachable("These contextual type purposes cannot fail with a "
+                     "conversion type specified!");
+  case CTP_Initialization:
+    diagID = diag::cannot_convert_initializer_value;
+    diagIDProtocol = diag::cannot_convert_initializer_value_protocol;
+    nilDiag = diag::cannot_convert_initializer_value_nil;
+    break;
+  case CTP_ReturnStmt:
+    // Special case the "conversion to void" case.
+    if (contextualType->isVoid()) {
+      diagnose(expr->getLoc(), diag::cannot_return_value_from_void_func)
         .highlight(expr->getSourceRange());
       return true;
-        
-    case CTP_EnumCaseRawValue:
-      diagID = diag::cannot_convert_raw_initializer_value;
-      diagIDProtocol = diag::cannot_convert_raw_initializer_value;
-      break;
-    case CTP_DefaultParameter:
-      diagID = diag::cannot_convert_default_arg_value;
-      diagIDProtocol = diag::cannot_convert_default_arg_value_protocol;
-      break;
-
-    case CTP_CallArgument:
-      diagID = diag::cannot_convert_argument_value;
-      diagIDProtocol = diag::cannot_convert_argument_value_protocol;
-      break;
-    case CTP_ClosureResult:
-      diagID = diag::cannot_convert_closure_result;
-      diagIDProtocol = diag::cannot_convert_closure_result_protocol;
-      break;
-    case CTP_ArrayElement:
-      diagID = diag::cannot_convert_array_element;
-      diagIDProtocol = diag::cannot_convert_array_element_protocol;
-      break;
-    case CTP_DictionaryKey:
-      diagID = diag::cannot_convert_dict_key;
-      diagIDProtocol = diag::cannot_convert_dict_key_protocol;
-      break;
-    case CTP_DictionaryValue:
-      diagID = diag::cannot_convert_dict_value;
-      diagIDProtocol = diag::cannot_convert_dict_value_protocol;
-      break;
-    case CTP_CoerceOperand:
-      diagID = diag::cannot_convert_coerce;
-      diagIDProtocol = diag::cannot_convert_coerce_protocol;
-      break;
     }
-    
-    // When complaining about conversion to a protocol type, complain about
-    // conformance instead of "conversion".
-    if (contextualType->is<ProtocolType>() ||
-        contextualType->is<ProtocolCompositionType>())
-      diagID = diagIDProtocol;
-    
-    // Try to simplify irrelevant details of function types.  For example, if
-    // someone passes a "() -> Float" function to a "() throws -> Int"
-    // parameter, then uttering the "throws" may confuse them into thinking that
-    // that is the problem, even though there is a clear subtype relation.
-    if (auto srcFT = exprType->getAs<FunctionType>())
-      if (auto destFT = contextualType->getAs<FunctionType>()) {
-        auto destExtInfo = destFT->getExtInfo();
-        
-        if (!srcFT->isNoEscape()) destExtInfo = destExtInfo.withNoEscape(false);
-        if (!srcFT->throws()) destExtInfo = destExtInfo.withThrows(false);
-        if (destExtInfo != destFT->getExtInfo())
-          contextualType = FunctionType::get(destFT->getInput(),
-                                             destFT->getResult(), destExtInfo);
 
-        // If this is a function conversion that discards throwability or
-        // noescape, emit a specific diagnostic about that.
-        if (srcFT->throws() && !destFT->throws())
-          diagID = diag::throws_functiontype_mismatch;
-        else if (srcFT->isNoEscape() && !destFT->isNoEscape())
-          diagID = diag::noescape_functiontype_mismatch;
-      }
-    
-    diagnose(expr->getLoc(), diagID, exprType, contextualType)
-      .highlight(expr->getSourceRange());
-    return true;
-  }
-  
-  
-  // If we didn't have a specified conversion constraint, try to dig the most
-  // likely offender out of the constraint system.
-  Constraint *foundConstraint = nullptr;
-  
-  auto checkConstraint = [&](Constraint *C) {
-    // Ignore non-conversion constraints.
-    if (!isConversionConstraint(C)) return;
-    
-    // If we already found a favored constraint, don't replace it.
-    if (foundConstraint && foundConstraint->isFavored())
-      return;
-    
-    // Ignore conversion constraints that aren't on the root expression.
-    if (!C->getLocator() || C->getLocator()->getAnchor() != expr)
-      return;
+    diagID = diag::cannot_convert_to_return_type;
+    diagIDProtocol = diag::cannot_convert_to_return_type_protocol;
+    nilDiag = diag::cannot_convert_to_return_type_nil;
+    break;
+  case CTP_ThrowStmt:
+    // TODO: Better diagnostic for 'throw nil'.
 
-    // Don't take a constraint that won't tell us anything.
-    if (C->getSecondType()->hasTypeVariable() ||
-        C->getSecondType()->hasUnresolvedType())
-      return;
-    
-    foundConstraint = C;
-  };
-
-  // Check the failed constraint, if present.
-  if (CS->failedConstraint)
-    checkConstraint(CS->failedConstraint);
-    
-  // Scan through all of the inactive constraints as well.
-  for (auto &constraint : CS->getConstraints())
-    checkConstraint(&constraint);
-  
-  // If we didn't find a conversion constraint, we have no type.
-  if (!foundConstraint)
-    return false;
-
-  Type contextualType = foundConstraint->getSecondType();
-  
-  // The contextual type relates to the overall expression, but may be
-  // describing only part of the type.  Dive into the overall type to narrow
-  // it down based on the locator path.
-  for (auto &elt : foundConstraint->getLocator()->getPath()) {
-    switch (elt.getKind()) {
-    case ConstraintLocator::FunctionArgument:
-      if (auto FTy = exprType->getAs<AnyFunctionType>())
-        exprType = FTy->getInput();
-      else
-        return false;
-      break;
-    case ConstraintLocator::FunctionResult:
-      if (auto FTy = exprType->getAs<AnyFunctionType>())
-        exprType = FTy->getResult();
-      else
-        return false;
-      break;
-    default:
-      // Don't know how to process this path element yet.  Don't emit a
-      // warpo diagnostic.
+    if (exprType->is<UnresolvedType>() || exprType->hasTypeVariable())
       return false;
-    }
-  }
-
-  // If we have a type that is the same as what we're looking for, we'd produce
-  // a "Int is not convertible to Int" diagnostic and look idiotic, so don't do
-  // that.
-  if (exprType->isEqual(contextualType))
-    return false;
-
-  // If the destination type is a protocol, then use conformsToProtocol to
-  // produce a more specific diagnostic.
-  if (auto *PT = contextualType->getAs<ProtocolType>()) {
-    // Check for "=" converting to BooleanType.  The user probably meant ==.
-    if (auto *AE = dyn_cast<AssignExpr>(expr->getValueProvidingExpr()))
-      if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::BooleanType)) {
-        diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
-          .fixItReplace(AE->getEqualLoc(), "==")
-          .highlight(AE->getDest()->getLoc())
-          .highlight(AE->getSrc()->getLoc());
-        return true;
-      }
-    
-    if (!CS->TC.conformsToProtocol(exprType, PT->getDecl(), CS->DC,
-                                   ConformanceCheckFlags::InExpression,
-                                   nullptr, expr->getLoc()))
-      return true;
-  }
-
-  Failure::FailureKind failureKind;
-  switch (foundConstraint->getKind()) {
-  case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
-    if (auto pt = contextualType->getAs<ProtocolType>())
-      if (pt->getDecl()->
-          isSpecificProtocol(KnownProtocolKind::NilLiteralConvertible)) {
-        diagnose(expr->getLoc(), diag::cannot_use_nil_with_this_type,
-                 contextualType)
-          .highlight(expr->getSourceRange());
-        return true;
-      }
-
-    diagnose(expr->getLoc(), diag::type_does_not_conform,
-             exprType, contextualType)
+      
+    // The conversion destination of throw is always ErrorType (at the moment)
+    // if this ever expands, this should be a specific form like () is for
+    // return.
+    diagnose(expr->getLoc(), diag::cannot_convert_thrown_type, exprType)
       .highlight(expr->getSourceRange());
     return true;
       
-  case ConstraintKind::Subtype:
-    failureKind = Failure::FailureKind::TypesNotSubtypes;
+  case CTP_EnumCaseRawValue:
+    diagID = diag::cannot_convert_raw_initializer_value;
+    diagIDProtocol = diag::cannot_convert_raw_initializer_value;
+    nilDiag = diag::cannot_convert_raw_initializer_value_nil;
     break;
-  default:
-    failureKind = Failure::FailureKind::TypesNotConvertible;
+  case CTP_DefaultParameter:
+    diagID = diag::cannot_convert_default_arg_value;
+    diagIDProtocol = diag::cannot_convert_default_arg_value_protocol;
+    nilDiag = diag::cannot_convert_default_arg_value_nil;
+    break;
+
+  case CTP_CallArgument:
+    diagID = diag::cannot_convert_argument_value;
+    diagIDProtocol = diag::cannot_convert_argument_value_protocol;
+    nilDiag = diag::cannot_convert_argument_value_nil;
+    break;
+  case CTP_ClosureResult:
+    diagID = diag::cannot_convert_closure_result;
+    diagIDProtocol = diag::cannot_convert_closure_result_protocol;
+    nilDiag = diag::cannot_convert_closure_result_nil;
+    break;
+  case CTP_ArrayElement:
+    diagID = diag::cannot_convert_array_element;
+    diagIDProtocol = diag::cannot_convert_array_element_protocol;
+    nilDiag = diag::cannot_convert_array_element_nil;
+    break;
+  case CTP_DictionaryKey:
+    diagID = diag::cannot_convert_dict_key;
+    diagIDProtocol = diag::cannot_convert_dict_key_protocol;
+    nilDiag = diag::cannot_convert_dict_key_nil;
+    break;
+  case CTP_DictionaryValue:
+    diagID = diag::cannot_convert_dict_value;
+    diagIDProtocol = diag::cannot_convert_dict_value_protocol;
+    nilDiag = diag::cannot_convert_dict_value_nil;
+    break;
+  case CTP_CoerceOperand:
+    diagID = diag::cannot_convert_coerce;
+    diagIDProtocol = diag::cannot_convert_coerce_protocol;
+    nilDiag = diag::cannot_convert_coerce_nil;
     break;
   }
 
+  // If we're diagnostic an issue with 'nil', produce a specific diagnostic,
+  // instead of uttering NilLiteralConvertible.
+  if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
+    diagnose(expr->getLoc(), nilDiag, contextualType);
+    return true;
+  }
+  
+  // If we don't have a type for the expression, then we cannot use it in
+  // conversion constraint diagnostic generation.
+  if (exprType->is<UnresolvedType>() || exprType->hasTypeVariable()) {
+    // We can't do anything smart.
+    return false;
+  }
+  
+  // When complaining about conversion to a protocol type, complain about
+  // conformance instead of "conversion".
+  if (contextualType->is<ProtocolType>() ||
+      contextualType->is<ProtocolCompositionType>())
+    diagID = diagIDProtocol;
+  
   // Try to simplify irrelevant details of function types.  For example, if
   // someone passes a "() -> Float" function to a "() throws -> Int"
   // parameter, then uttering the "throws" may confuse them into thinking that
@@ -3064,7 +2922,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
   if (auto srcFT = exprType->getAs<FunctionType>())
     if (auto destFT = contextualType->getAs<FunctionType>()) {
       auto destExtInfo = destFT->getExtInfo();
-
+      
       if (!srcFT->isNoEscape()) destExtInfo = destExtInfo.withNoEscape(false);
       if (!srcFT->throws()) destExtInfo = destExtInfo.withThrows(false);
       if (destExtInfo != destFT->getExtInfo())
@@ -3073,26 +2931,14 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
 
       // If this is a function conversion that discards throwability or
       // noescape, emit a specific diagnostic about that.
-      if (srcFT->throws() && !destFT->throws()) {
-        diagnose(expr->getLoc(), diag::throws_functiontype_mismatch,
-                 exprType, contextualType)
-          .highlight(expr->getSourceRange());
-        return true;
-      }
-
-      if (srcFT->isNoEscape() && !destFT->isNoEscape()) {
-        diagnose(expr->getLoc(), diag::noescape_functiontype_mismatch,
-                 exprType, contextualType)
-          .highlight(expr->getSourceRange());
-        return true;
-      }
+      if (srcFT->throws() && !destFT->throws())
+        diagID = diag::throws_functiontype_mismatch;
+      else if (srcFT->isNoEscape() && !destFT->isNoEscape())
+        diagID = diag::noescape_functiontype_mismatch;
     }
-
-  diagnose(expr->getLoc(), diag::invalid_relation,
-           failureKind - Failure::FailureKind::TypesNotEqual,
-           exprType, contextualType)
+  
+  diagnose(expr->getLoc(), diagID, exprType, contextualType)
     .highlight(expr->getSourceRange());
-
   return true;
 }
 
@@ -3626,6 +3472,9 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
     return true;
   }
 
+  // FIXME: Should check dest expr first, then contextually convert the source
+  // to it.
+  
   // If the source type is already an error type, we've already posted an error.
   auto srcExpr = typeCheckChildIndependently(assignExpr->getSrc());
   if (!srcExpr) return true;
@@ -3643,6 +3492,14 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
     CS->diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc());
     return true;
   }
+
+  // If the two types are ok, it must be a contextual problem.
+  if (srcType->isEqual(destType->getRValueType()))
+    return false;
+
+  // If the two types are ok, it must be a contextual problem.
+  if (srcType->isEqual(destType->getRValueType()))
+    return false;
 
   diagnose(srcExpr->getLoc(), diag::cannot_assign_values, srcType,
            destType->getRValueType());
@@ -3741,6 +3598,14 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
                                  nullptr, condExpr->getLoc()))
     return true;
   
+  // If the true/false values already match, it must be a contextual problem.
+  if (trueExpr->getType()->isEqual(falseExpr->getType()))
+    return false;
+  
+  // If the true/false values already match, it must be a contextual problem.
+  if (trueExpr->getType()->isEqual(falseExpr->getType()))
+    return false;
+  
   // Otherwise, the true/false result types must not be matching.
   diagnose(IE->getColonLoc(), diag::if_expr_cases_mismatch,
            trueExpr->getType(), falseExpr->getType())
@@ -3759,10 +3624,6 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
 
 
 bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
-  // If this is a complex leaf closure, give up.
-  if (!CE->hasSingleExpressionBody())
-    return false;
-
   Type expectedResultType;
   
   // If we have a contextual type available for this closure, apply it to the
@@ -3770,6 +3631,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   // appropriate types.
   if (CS->getContextualType() &&
       CS->getContextualType()->is<AnyFunctionType>()) {
+
     auto fnType = CS->getContextualType()->castTo<AnyFunctionType>();
     Pattern *params = CE->getParams();
     TypeResolutionOptions TROptions;
@@ -3795,7 +3657,11 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
         VD->overwriteType(CS->getASTContext().TheUnresolvedType);
     });
   }
-  
+
+  // If this is a complex leaf closure, there is nothing more we can do.
+  if (!CE->hasSingleExpressionBody())
+    return false;
+
   // If the closure had an expected result type, use it.
   if (CE->hasExplicitResultType())
     expectedResultType = CE->getExplicitResultTypeLoc().getType();
@@ -3826,7 +3692,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     if (CE->hasExplicitResultType() &&
         CE->getExplicitResultTypeLoc().getTypeRepr()) {
       auto explicitResultTy = CE->getExplicitResultTypeLoc().getType();
-      if (!explicitResultTy->isEqual(fnType->getResult())) {
+      if (fnType && !explicitResultTy->isEqual(fnType->getResult())) {
         auto repr = CE->getExplicitResultTypeLoc().getTypeRepr();
         diagnose(repr->getStartLoc(), diag::incorrect_explicit_closure_result,
                  explicitResultTy, fnType->getResult())
@@ -3834,15 +3700,9 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
         return true;
       }
     }
-    
-    // Otherwise, diagnose a general error talking about the type of the closure
-    // in-aggregate.
-    if (diagnoseContextualConversionError(CE->getType()))
-      return true;
   }
-  
-  
-  // Otherwise, produce a generic error.
+
+  // Otherwise, we can't produce a specific diagnostic.
   return false;
 }
 
@@ -3858,14 +3718,15 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     auto ALC = CS->TC.getProtocol(E->getLoc(),
                                   KnownProtocolKind::ArrayLiteralConvertible);
     
-    // Validate that the contextual type conforms to
-    // DictionaryLiteralConvertible (emitting an error if not) *and* figure out
-    // what the contextual Key/Value types are in place.
+    // Validate that the contextual type conforms to ArrayLiteralConvertible and
+    // figure out what the contextual Key/Value types are in place.  If this
+    // doesn't conform, then it is a contextual error that we'll emit later with
+    // a good message.
     ProtocolConformance *Conformance = nullptr;
     if (!ALC || !CS->TC.conformsToProtocol(contextualType, ALC, CS->DC,
                                            ConformanceCheckFlags::InExpression,
-                                           &Conformance, E->getLoc()))
-      return true;
+                                           &Conformance))
+      return visitExpr(E);
     
     Conformance->forEachTypeWitness(&CS->TC,
                                     [&](AssociatedTypeDecl *ATD,
@@ -3907,14 +3768,15 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
     auto DLC = CS->TC.getProtocol(E->getLoc(),
                             KnownProtocolKind::DictionaryLiteralConvertible);
     
-    // Validate that the contextual type conforms to
-    // DictionaryLiteralConvertible (emitting an error if not) *and* figure out
-    // what the contextual Key/Value types are in place.
+    // Validate the contextual type conforms to DictionaryLiteralConvertible
+    // and figure out what the contextual Key/Value types are in place.  If this
+    // doesn't conform, then it is a contextual error that we'll emit later with
+    // a good message.
     ProtocolConformance *Conformance = nullptr;
     if (!DLC || !CS->TC.conformsToProtocol(contextualType, DLC, CS->DC,
                                            ConformanceCheckFlags::InExpression,
                                            &Conformance, E->getLoc()))
-      return true;
+      return visitExpr(E);
 
     Conformance->forEachTypeWitness(&CS->TC,
                                     [&](AssociatedTypeDecl *ATD,
@@ -3961,7 +3823,7 @@ bool FailureDiagnosis::visitExpr(Expr *E) {
   // independently invalid.
   bool errorInSubExpr = false;
   
-  E->forEachImmediateChildExpr([&](Expr *Child) -> Expr*{
+  E->forEachImmediateChildExpr([&](Expr *Child) -> Expr* {
     // If we already found an error, stop checking.
     if (errorInSubExpr) return Child;
 
@@ -3993,31 +3855,6 @@ bool FailureDiagnosis::diagnoseExprFailure() {
   // be type checked on its own (even to an incomplete type) then that is where
   // we focus our attention.  If we do find a type, we use it to check for
   // contextual type mismatches.
-  
-  // If we're at the top-level of the expression fresh in from a client whose
-  // constraint system failed, check to see if we can type check the expression
-  // by itself.  If not, then we'll get a more specific failure in the
-  // subexpression.  If so, then we know it must be some conversion constraint
-  // binding the result of the expression to a type that fails.
-  if (!CS->TC.isExprBeingDiagnosed(expr) ||
-      (CS->getContextualType() && !isa<ClosureExpr>(expr) &&
-       !isa<CollectionExpr>(expr))) {
-    // Make sure we retypecheck this expression, without context.
-    CS->TC.addExprForDiagnosis(expr, nullptr);
-
-    // Type check the expression independently of any contextual constraints.
-    auto subExprTy = getTypeOfTypeCheckedChildIndependently(expr,
-                                                 TCCFlags::TCC_AllowUnresolved);
-    
-    // If it failed an diagnosed something, then we're done.
-    if (!subExprTy) return true;
-    
-    // Otherwise, it is almost certainly a contextual constraint mismatch, dig
-    // one out.
-    if (diagnoseContextualConversionError(subExprTy))
-      return true;
-  }
-
   return visit(expr);
 }
 
@@ -4044,7 +3881,11 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   // Now, attempt to diagnose the failure from the info we've collected.
   if (diagnosis.diagnoseExprFailure())
     return;
-  
+
+  // If this is a contextual conversion problem, dig out some information.
+  if (diagnosis.diagnoseContextualConversionError())
+    return;
+
   // If we can diagnose a problem based on the constraints left laying around in
   // the system, do so now.
   if (diagnosis.diagnoseConstraintFailure())
