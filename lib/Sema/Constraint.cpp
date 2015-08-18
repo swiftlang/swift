@@ -32,8 +32,7 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
     RememberChoice(false), IsFavored(false), NumTypeVariables(typeVars.size()),
     Nested(constraints), Locator(locator)
 {
-  assert(kind == ConstraintKind::Conjunction ||
-         kind == ConstraintKind::Disjunction);
+  assert(kind == ConstraintKind::Disjunction);
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
@@ -90,9 +89,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::BindOverload:
     llvm_unreachable("Wrong constructor for overload binding constraint");
-
-  case ConstraintKind::Conjunction:
-    llvm_unreachable("Conjunction constraints should use create()");
 
   case ConstraintKind::Disjunction:
     llvm_unreachable("Disjunction constraints should use create()");
@@ -187,25 +183,16 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
     return create(cs, getKind(), getFirstType(), Type(), DeclName(),
                   getLocator());
 
-  case ConstraintKind::Conjunction:
-    return createConjunction(cs, getNestedConstraints(), getLocator());
-
   case ConstraintKind::Disjunction:
     return createDisjunction(cs, getNestedConstraints(), getLocator());
   }
 }
 
 void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
-  if (Kind == ConstraintKind::Conjunction ||
-      Kind == ConstraintKind::Disjunction) {
-    bool isConjunction = (Kind == ConstraintKind::Conjunction);
-    if (isConjunction) {
-      Out << "conjunction";
-    } else {
-      Out << "disjunction";
-      if (shouldRememberChoice())
-        Out << " (remembered)";
-    }
+  if (Kind == ConstraintKind::Disjunction) {
+    Out << "disjunction";
+    if (shouldRememberChoice())
+      Out << " (remembered)";
     if (Locator) {
       Out << " [[";
       Locator->dump(sm, Out);
@@ -217,8 +204,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     for (auto constraint : getNestedConstraints()) {
       if (first)
         first = false;
-      else if (isConjunction)
-        Out << " and ";
       else
         Out << " or ";
 
@@ -321,9 +306,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::Defaultable:
     Out << " can default to ";
     break;
-  case ConstraintKind::Conjunction:
   case ConstraintKind::Disjunction:
-    llvm_unreachable("Conjunction/disjunction handled above");
+    llvm_unreachable("disjunction handled above");
   }
 
   if (!skipSecond)
@@ -506,7 +490,6 @@ static void
 gatherReferencedTypeVars(Constraint *constraint,
                          SmallVectorImpl<TypeVariableType *> &typeVars) {
   switch (constraint->getKind()) {
-  case ConstraintKind::Conjunction:
   case ConstraintKind::Disjunction:
     for (auto nested : constraint->getNestedConstraints())
       gatherReferencedTypeVars(nested, typeVars);
@@ -636,60 +619,6 @@ Constraint *Constraint::createFixed(ConstraintSystem &cs, ConstraintKind kind,
   + typeVars.size() * sizeof(TypeVariableType*);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, fix, first, second, locator, typeVars);
-}
-
-Constraint *Constraint::createConjunction(ConstraintSystem &cs,
-                                          ArrayRef<Constraint *> constraints,
-                                          ConstraintLocator *locator) {
-  // Unwrap any conjunctions inside the conjunction constraint.
-  SmallVector<TypeVariableType *, 4> typeVars;
-  bool unwrappedAny = false;
-  SmallVector<Constraint *, 1> unwrapped;
-  unsigned index = 0;
-  for (auto constraint : constraints) {
-    // Gather type variables from this constraint.
-    gatherReferencedTypeVars(constraint, typeVars);
-
-    // If we have a nested conjunction, unwrap it.
-    if (constraint->getKind() == ConstraintKind::Conjunction) {
-      // If we haven't unwrapped anything before, copy all of the constraints
-      // we skipped.
-      if (!unwrappedAny) {
-        unwrapped.append(constraints.begin(), constraints.begin() + index);
-        unwrappedAny = true;
-      }
-
-      // Add all of the constraints in the conjunction.
-      unwrapped.append(constraint->getNestedConstraints().begin(),
-                       constraint->getNestedConstraints().end());
-    } else if (unwrappedAny) {
-      // Since we unwrapped constraints before, add this constraint.
-      unwrapped.push_back(constraint);
-    }
-
-    // FIXME: If we find any disjunctions in here, should we distribute them?
-
-    ++index;
-  }
-
-  // If we unwrapped anything, our list of constraints is the unwrapped list.
-  if (unwrappedAny)
-    constraints = unwrapped;
-
-  assert(!constraints.empty() && "Empty conjunction constraint");
-
-  // If there is a single constraint, this isn't a disjunction at all.
-  if (constraints.size() == 1)
-    return constraints.front();
-
-  // Create the conjunction constraint.
-  uniqueTypeVariables(typeVars);
-  unsigned size = sizeof(Constraint) 
-                + typeVars.size() * sizeof(TypeVariableType*);
-  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return new (mem) Constraint(ConstraintKind::Conjunction,
-                              cs.allocateCopy(constraints), locator, typeVars);
-
 }
 
 Constraint *Constraint::createDisjunction(ConstraintSystem &cs,

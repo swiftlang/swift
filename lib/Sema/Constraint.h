@@ -115,9 +115,6 @@ enum class ConstraintKind : char {
   /// cannot be dependent).  This is more like a type property than a
   /// relational constraint.
   Defaultable,
-  /// \brief A conjunction constraint that specifies that all of the stored
-  /// constraints must hold.
-  Conjunction,
   /// \brief A disjunction constraint that specifies that one or more of the
   /// stored constraints must hold.
   Disjunction,
@@ -137,9 +134,6 @@ enum class ConstraintClassification : char {
 
   /// \brief An property of a single type, such as whether it is an archetype.
   TypeProperty,
-
-  /// \brief A conjunction constraint.
-  Conjunction,
 
   /// \brief A disjunction constraint.
   Disjunction
@@ -447,11 +441,6 @@ public:
                                  Type first, Type second,
                                  ConstraintLocator *locator);
 
-  /// Create a new conjunction constraint.
-  static Constraint *createConjunction(ConstraintSystem &cs,
-                                       ArrayRef<Constraint *> constraints,
-                                       ConstraintLocator *locator);
-
   /// Create a new disjunction constraint.
   static Constraint *createDisjunction(ConstraintSystem &cs,
                                        ArrayRef<Constraint *> constraints,
@@ -531,9 +520,6 @@ public:
     case ConstraintKind::Defaultable:
       return ConstraintClassification::TypeProperty;
 
-    case ConstraintKind::Conjunction:
-      return ConstraintClassification::Conjunction;
-
     case ConstraintKind::Disjunction:
       return ConstraintClassification::Disjunction;
     }
@@ -541,8 +527,7 @@ public:
 
   /// \brief Retrieve the first type in the constraint.
   Type getFirstType() const {
-    assert(getKind() != ConstraintKind::Disjunction &&
-           getKind() != ConstraintKind::Conjunction);
+    assert(getKind() != ConstraintKind::Disjunction);
 
     if (getKind() == ConstraintKind::BindOverload)
       return Overload.First;
@@ -552,8 +537,7 @@ public:
 
   /// \brief Retrieve the second type in the constraint.
   Type getSecondType() const {
-    assert(getKind() != ConstraintKind::Disjunction &&
-           getKind() != ConstraintKind::Conjunction);
+    assert(getKind() != ConstraintKind::Disjunction);
     return Types.Second;
   }
 
@@ -575,10 +559,9 @@ public:
         || kind == ConstraintKind::TypeMember;
   }
 
-  /// Retrieve the set of constraints in a conjunction or disjunction.
+  /// Retrieve the set of constraints in a disjunction.
   ArrayRef<Constraint *> getNestedConstraints() const {
-    assert(Kind == ConstraintKind::Conjunction ||
-           Kind == ConstraintKind::Disjunction);
+    assert(Kind == ConstraintKind::Disjunction);
     return Nested;
   }
 

@@ -640,7 +640,6 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::Class:
   case ConstraintKind::BridgedToObjectiveC:
   case ConstraintKind::Defaultable:
-  case ConstraintKind::Conjunction:
   case ConstraintKind::Disjunction:
     llvm_unreachable("shouldBindToValueType() may only be called on "
                      "relational constraints");
@@ -703,9 +702,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // Do these in a separate pass.
       hasDefaultableConstraint = true;
       continue;
-
-    case ConstraintKind::Conjunction:
-      llvm_unreachable("conjunctions should have been unwrapped");
 
     case ConstraintKind::Disjunction:
       // FIXME: Recurse into these constraints to see whether this
@@ -1457,12 +1453,6 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   // Implicit conversions are better than checked casts.
   if (constraint->getKind() == ConstraintKind::CheckedCast)
     return true;
-
-  // For a conjunction, check if any of the terms should be skipped.
-  if (constraint->getKind() == ConstraintKind::Conjunction)
-    for (auto nested : constraint->getNestedConstraints())
-      if (shortCircuitDisjunctionAt(nested, successfulConstraint))
-        return true;
 
   // Binding an operator overloading to a generic operator is weaker than
   // binding to a non-generic operator, always.

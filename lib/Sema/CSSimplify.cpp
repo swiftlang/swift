@@ -3722,7 +3722,6 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::Defaultable:
     llvm_unreachable("Type properties don't involve type matches");
 
-  case ConstraintKind::Conjunction:
   case ConstraintKind::Disjunction:
     llvm_unreachable("Con/disjunction constraints don't involve type matches");
   }
@@ -4600,15 +4599,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::Defaultable:
     return simplifyDefaultableConstraint(constraint);
-
-  case ConstraintKind::Conjunction:
-    // Process all of the constraints in the conjunction.
-    for (auto con : constraint.getNestedConstraints()) {
-      addConstraint(con);
-      if (failedConstraint)
-        return SolutionKind::Error;
-    }
-    return SolutionKind::Solved;
 
   case ConstraintKind::Disjunction:
     // Disjunction constraints are never solved here.
