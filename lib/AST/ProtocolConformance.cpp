@@ -2043,6 +2043,9 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
   auto &reqs = ConformingDeclMap[member];
   if (isa<TypeDecl>(member)) {
     for (auto *conf : result) {
+      if (conf->isInvalid())
+        continue;
+
       conf->forEachTypeWitness(resolver, [&](const AssociatedTypeDecl *assoc,
                                              const Substitution &subst,
                                              TypeDecl *typeDecl) -> bool {
@@ -2053,6 +2056,9 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
     }
   } else {
     for (auto *conf : result) {
+      if (conf->isInvalid())
+        continue;
+
       conf->forEachValueWitness(resolver, [&](ValueDecl *req,
                                               ConcreteDeclRef witness) {
         if (witness.getDecl() == member)
