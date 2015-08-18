@@ -2282,6 +2282,11 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
 
 
 bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
+  // FIXME: Throwing all "other" constraints into this path.
+  if (constraint->getKind() == ConstraintKind::Disjunction)
+    return false;
+  
+  
   auto anchor = expr;
   if (auto locator = constraint->getLocator()) {
     anchor = simplifyLocatorToAnchor(*CS, locator);
