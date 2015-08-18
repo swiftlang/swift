@@ -68,7 +68,7 @@ to all three of the components.
   non-class type, the performance of ``Array<T>`` is identical to that
   of ``ContiguousArray<T>``.
 
-  .. image:: Array.png
+  .. image:: ArrayImplementation.png
 
 * ``Slice<T>`` is a subrange of some ``Array<T>`` or
   ``ContiguousArray<T>``; it's the result of using slice notation,
