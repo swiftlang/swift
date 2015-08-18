@@ -5049,7 +5049,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     auto toMeta = toType->castTo<MetatypeType>();
     return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
   }
-  
+
+  // Conversion to/from UnresolvedType.
+  if (fromType->is<UnresolvedType>() || toType->is<UnresolvedType>())
+    return new (tc.Context) UnresolvedTypeConversionExpr(expr, toType);
+
   llvm_unreachable("Unhandled coercion");
 }
 

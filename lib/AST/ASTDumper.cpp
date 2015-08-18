@@ -1700,6 +1700,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E) {
+    printCommon(E, "unresolvedtype_conversion_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitFunctionConversionExpr(FunctionConversionExpr *E) {
     printCommon(E, "function_conversion_expr") << '\n';
     printRec(E->getSubExpr());

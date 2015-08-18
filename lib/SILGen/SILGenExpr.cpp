@@ -177,6 +177,8 @@ namespace {
              CollectionUpcastConversionExpr *E,
              SGFContext C);
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
+    RValue visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E,
+                                             SGFContext C);
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                        SGFContext C);
     RValue visitCovariantFunctionConversionExpr(
@@ -745,6 +747,12 @@ RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
 
   return RValue(SGF, E, ManagedValue(Result, Self.getCleanup()));
 
+}
+
+RValue RValueEmitter::
+visitUnresolvedTypeConversionExpr(UnresolvedTypeConversionExpr *E,
+                                  SGFContext C) {
+  llvm_unreachable("invalid code made its way into SILGen");
 }
 
 RValue RValueEmitter::visitOtherConstructorDeclRefExpr(

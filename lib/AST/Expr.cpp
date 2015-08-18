@@ -435,6 +435,7 @@ bool Expr::canAppendCallParentheses() const {
 
   case ExprKind::Load:
   case ExprKind::TupleShuffle:
+  case ExprKind::UnresolvedTypeConversion:
   case ExprKind::FunctionConversion:
   case ExprKind::CovariantFunctionConversion:
   case ExprKind::CovariantReturnConversion:
