@@ -88,7 +88,7 @@ func arrayToNSArray() {
   nsa = [BridgedClass]() as NSArray
   nsa = [OtherClass]() as NSArray
   nsa = [BridgedStruct]() as NSArray
-  nsa = [NotBridgedStruct]() as NSArray // expected-error{{'[NotBridgedStruct]' is not convertible to 'NSArray'}}
+  nsa = [NotBridgedStruct]() as NSArray // expected-error{{cannot convert value of type '[NotBridgedStruct]' to type 'NSArray' in coercion}}
   _ = nsa
 }
 
@@ -104,7 +104,7 @@ func nsArrayToArray(nsa: NSArray) {
   var _: [BridgedClass] = nsa as [BridgedClass] // expected-error{{'NSArray' is not convertible to '[BridgedClass]'; did you mean to use 'as!' to force downcast?}} {{31-33=as!}}
   var _: [OtherClass] = nsa as [OtherClass] // expected-error{{'NSArray' is not convertible to '[OtherClass]'; did you mean to use 'as!' to force downcast?}} {{29-31=as!}}
   var _: [BridgedStruct] = nsa as [BridgedStruct] // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'; did you mean to use 'as!' to force downcast?}} {{32-34=as!}}
-  var _: [NotBridgedStruct] = nsa as [NotBridgedStruct] // expected-error{{'NSArray' is not convertible to '[NotBridgedStruct]'}}
+  var _: [NotBridgedStruct] = nsa as [NotBridgedStruct] // expected-error{{cannot convert value of type 'NSArray' to type '[NotBridgedStruct]' in coercion}}
 
   var arr6: Array = nsa as Array
   arr6 = arr1
@@ -125,12 +125,12 @@ func dictionaryToNSDictionary() {
   nsd = [NSObject : BridgedStruct]()
   nsd = [NSObject : BridgedStruct]() as NSDictionary
   nsd = [NSObject : NotBridgedStruct]() // expected-error{{cannot assign a value of type '[NSObject : NotBridgedStruct]' to a value of type 'NSDictionary'}}
-  nsd = [NSObject : NotBridgedStruct]() as NSDictionary // expected-error{{'[NSObject : NotBridgedStruct]' is not convertible to 'NSDictionary'}}
+  nsd = [NSObject : NotBridgedStruct]() as NSDictionary // expected-error{{cannot convert value of type '[NSObject : NotBridgedStruct]' to type 'NSDictionary' in coercion}}
 
   nsd = [NSObject : BridgedClass?]() // expected-error{{cannot assign a value of type '[NSObject : BridgedClass?]' to a value of type 'NSDictionary'}}
-  nsd = [NSObject : BridgedClass?]() as NSDictionary // expected-error{{'[NSObject : BridgedClass?]' is not convertible to 'NSDictionary'}}
+  nsd = [NSObject : BridgedClass?]() as NSDictionary // expected-error{{cannot convert value of type '[NSObject : BridgedClass?]' to type 'NSDictionary' in coercion}}
   nsd = [NSObject : BridgedStruct?]()  // expected-error{{cannot assign a value of type '[NSObject : BridgedStruct?]' to a value of type 'NSDictionary'}}
-  nsd = [NSObject : BridgedStruct?]() as NSDictionary //expected-error{{'[NSObject : BridgedStruct?]' is not convertible to 'NSDictionary'}}
+  nsd = [NSObject : BridgedStruct?]() as NSDictionary //expected-error{{cannot convert value of type '[NSObject : BridgedStruct?]' to type 'NSDictionary' in coercion}}
 
   nsd = [BridgedClass : AnyObject]()
   nsd = [BridgedClass : AnyObject]() as NSDictionary
@@ -139,7 +139,7 @@ func dictionaryToNSDictionary() {
   nsd = [BridgedStruct : AnyObject]()
   nsd = [BridgedStruct : AnyObject]() as NSDictionary
   nsd = [NotBridgedStruct : AnyObject]()  // expected-error{{cannot assign a value of type '[NotBridgedStruct : AnyObject]' to a value of type 'NSDictionary'}}
-  nsd = [NotBridgedStruct : AnyObject]() as NSDictionary  // expected-error{{'[NotBridgedStruct : AnyObject]' is not convertible to 'NSDictionary'}}
+  nsd = [NotBridgedStruct : AnyObject]() as NSDictionary  // expected-error{{cannot convert value of type '[NotBridgedStruct : AnyObject]' to type 'NSDictionary' in coercion}}
 
   // <rdar://problem/17134986>
   var bcOpt: BridgedClass?

@@ -154,7 +154,8 @@ enum ContextualTypePurpose {
   CTP_ArrayElement,     ///< ArrayExpr wants elements to have a specific type.
   CTP_DictionaryKey,    ///< DictionaryExpr keys should have a specific type.
   CTP_DictionaryValue,  ///< DictionaryExpr values should have a specific type.
-
+  CTP_CoerceOperand,    ///< CoerceExpr operand coerced to specific type.
+  
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
 

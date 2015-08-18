@@ -2785,6 +2785,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
       case CTP_DictionaryValue:
         nilDiag = diag::cannot_convert_dict_value_nil;
         break;
+      case CTP_CoerceOperand:
+        nilDiag = diag::cannot_convert_coerce_nil;
+        break;
       }
       
       if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
@@ -2863,6 +2866,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
     case CTP_DictionaryValue:
       diagID = diag::cannot_convert_dict_value;
       diagIDProtocol = diag::cannot_convert_dict_value_protocol;
+      break;
+    case CTP_CoerceOperand:
+      diagID = diag::cannot_convert_coerce;
+      diagIDProtocol = diag::cannot_convert_coerce_protocol;
       break;
     }
     
@@ -3627,21 +3634,14 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
   return false;
 }
 
-// FIXME: Change this to be visitExplicitCastExpr, which is a superclass of
-// CoerceExpr & ForcedCheckedCastExpr and other stuff.
 bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
-  Expr *subExpr = typeCheckChildIndependently(CE->getSubExpr());
-  if (!subExpr) return true;
-  Type subType = subExpr->getType();
-
-  if (!subType->is<TypeVariableType>()) {
-    diagnose(CE->getLoc(), diag::invalid_relation,
-             Failure::TypesNotConvertible - Failure::TypesNotEqual,
-             subType, CE->getType())
-      .highlight(CE->getSourceRange());
+  // Coerce the input to whatever type is specified by the CoerceExpr.
+  if (!typeCheckChildIndependently(CE->getSubExpr(),
+                                   CE->getCastTypeLoc().getType(),
+                                   CTP_CoerceOperand))
     return true;
-  }
 
+  // If that worked, then there must be something other issue.
   return false;
 }
 
@@ -4012,6 +4012,13 @@ bool FailureDiagnosis::diagnoseExprFailure() {
 /// This is guaranteed to always emit an error message.
 ///
 void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
+  // Continue simplifying any active constraints left in the system.  We can end
+  // up with them because the solver bails out as soon as it sees a Failure.  We
+  // don't want to leave them around in the system because later diagnostics
+  // will assume they are unsolvable and may otherwise leave the system in an
+  // inconsistent state.
+  simplify(/*ContinueAfterFailures*/true);
+  
   if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
     expr = RB->getSubExpr();
   
@@ -4171,13 +4178,6 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     highlight(expr->getSourceRange());
     return true;
   }
-
-  // Continue simplifying any active constraints left in the system.  We can end
-  // up with them because the solver bails out as soon as it sees a Failure.  We
-  // don't want to leave them around in the system because later diagnostics
-  // will assume they are unsolvable and may otherwise leave the system in an
-  // inconsistent state.
-  simplify(/*ContinueAfterFailures*/true);
 
   // If all else fails, diagnose the failure by looking through the system's
   // constraints.

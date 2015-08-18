@@ -71,23 +71,23 @@ if let castX = c as! C4? {} // expected-error {{cannot downcast from 'AnyObject'
 
 // Only suggest replacing 'as' with 'as!' if it would fix the error.
 C3() as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to use 'as!' to force downcast?}} {{6-8=as!}}
-C3() as C5 // expected-error {{'C3' is not convertible to 'C5'}}
+C3() as C5 // expected-error {{cannot convert value of type 'C3' to type 'C5' in coercion}}
 
 // Diagnostic shouldn't include @lvalue in type of c3.
 var c3 = C3()
 c3 as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to use 'as!' to force downcast?}} {{4-6=as!}}
 
 // <rdar://problem/19495142> Various incorrect diagnostics for explicit type conversions
-1 as Double as Float // expected-error{{'Double' is not convertible to 'Float'}}
-1 as Int as String // expected-error{{'Int' is not convertible to 'String'}}
-Double(1) as Double as String // expected-error{{'Double' is not convertible to 'String'}}
-["awd"] as [Int] // expected-error{{'[String]' is not convertible to '[Int]'}}
-([1, 2, 1.0], 1) as ([String], Int) // expected-error{{'([Double], Int)' (aka '(Array<Double>, Int)') is not convertible to '([String], Int)'}}
+1 as Double as Float // expected-error{{cannot convert value of type 'Double' to type 'Float' in coercion}}
+1 as Int as String // expected-error{{cannot convert value of type 'Int' to type 'String' in coercion}}
+Double(1) as Double as String // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}}
+["awd"] as [Int] // expected-error{{type of expression is ambiguous without more context}}
+([1, 2, 1.0], 1) as ([String], Int) // expected-error{{cannot convert value of type '([Double], Int)' (aka '(Array<Double>, Int)') to type '([String], Int)' (aka '(Array<String>, Int)') in coercion}}
 // FIXME: below diagnostic should say [[Int]], not [Array<Int>]
-[[1]] as [[String]] // expected-error{{'[Array<Int>]' is not convertible to '[[String]]'}}
-(1, 1.0) as (Int, Int) // expected-error{{'(Int, Double)' is not convertible to '(Int, Int)'}}
-(1.0, 1, "asd") as (String, Int, Float) // expected-error{{'(Double, Int, String)' is not convertible to '(String, Int, Float)'}}
-(1, 1.0, "a", [1, 23]) as (Int, Double, String, [String]) // expected-error{{'(Int, Double, String, [Int])' (aka '(Int, Double, String, Array<Int>)') is not convertible to '(Int, Double, String, [String])'}}
+[[1]] as [[String]] // expected-error{{type of expression is ambiguous without more context}}
+(1, 1.0) as (Int, Int) // expected-error{{cannot convert value of type '(Int, Double)' to type '(Int, Int)' in coercion}}
+(1.0, 1, "asd") as (String, Int, Float) // expected-error{{cannot convert value of type '(Double, Int, String)' to type '(String, Int, Float)' in coercion}}
+(1, 1.0, "a", [1, 23]) as (Int, Double, String, [String]) // expected-error{{cannot convert value of type '(Int, Double, String, [Int])' (aka '(Int, Double, String, Array<Int>)') to type '(Int, Double, String, [String])' (aka '(Int, Double, String, Array<String>)') in coercion}}
 
 [1] as! [String] // expected-error{{'[Int]' is not convertible to '[String]'}}
 [(1, (1, 1))] as! [(Int, (String, Int))] // expected-error{{'[(Int, (Int, Int))]' is not convertible to '[(Int, (String, Int))]'}}
@@ -98,7 +98,7 @@ Double(1) as Double as String // expected-error{{'Double' is not convertible to 
 // <rdar://problem/19499340> QoI: Nimble as -> as! changes not covered by Fix-Its
 func f(x : String) {}
 f("what" as Any as String) // expected-error{{'Any' (aka 'protocol<>') is not convertible to 'String'; did you mean to use 'as!' to force downcast?}} {{17-19=as!}}
-f(1 as String) // expected-error{{'Int' is not convertible to 'String'}}
+f(1 as String) // expected-error{{cannot convert value of type 'Int' to type 'String' in coercion}}
 
 // <rdar://problem/19650402> Swift compiler segfaults while running the annotation tests
 let s : AnyObject = C3()

@@ -9,7 +9,7 @@ func testNSArrayBridging(hive: Hive) {
 }
 
 func testNSDictionaryBridging(hive: Hive) {
-  _ = hive.beesByName as [String : Bee] // expected-error{{'[String : Bee]?' is not convertible to '[String : Bee]'}}
+  _ = hive.beesByName as [String : Bee] // expected-error{{value of optional type '[String : Bee]?' not unwrapped; did you mean to use '!' or '?'?}}
 
   var dict1 = hive.anythingToBees
   let dict2: [NSObject : Bee] = dict1

@@ -282,6 +282,15 @@ ERROR(cannot_convert_dict_value_protocol,sema_tcd,none,
 ERROR(cannot_convert_dict_value_nil,sema,none,
       "nil is not compatible with expected dictionary value type %0", (Type))
 
+// Coerce Expr
+ERROR(cannot_convert_coerce,sema,none,
+      "cannot convert value of type %0 to type %1 in coercion",
+      (Type,Type))
+ERROR(cannot_convert_coerce_protocol,sema_tcd,none,
+      "value of type %0 does not conform to %1 in coercion",
+      (Type, Type))
+ERROR(cannot_convert_coerce_nil,sema,none,
+      "nil is not compatible with type %0 in coercion", (Type))
 
 
 

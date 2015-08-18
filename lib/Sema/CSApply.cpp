@@ -6202,13 +6202,10 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
           switch (castKind) {
           // Invalid cast.
           case CheckedCastKind::Unresolved:
-            TC.diagnose(coerceExpr->getLoc(), diag::invalid_relation,
-                        Failure::TypesNotConvertible - Failure::TypesNotEqual,
-                        fromType, toType)
-              .highlight(coerceExpr->getSourceRange());
+            // Fix didn't work, let diagnoseFailureForExpr handle this.
             break;
           case CheckedCastKind::Coercion:
-            llvm_unreachable("Coercions handled in other branch of disjunction");
+            llvm_unreachable("Coercions handled in other disjunction branch");
 
           // Valid casts.
           case CheckedCastKind::ArrayDowncast:
@@ -6222,10 +6219,9 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                         fromType, toType)
               .highlight(coerceExpr->getSourceRange())
               .fixItReplace(coerceExpr->getLoc(), "as!");
+            diagnosed = true;
             break;
           }
-          
-          diagnosed = true;
         }
         break;
       }
@@ -6241,7 +6237,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
     // We didn't manage to diagnose anything well, so fall back to
     // diagnosing mining the system to construct a reasonable error message.
-    this->diagnoseFailureForExpr(expr);
+    diagnoseFailureForExpr(expr);
 
     return nullptr;
   }

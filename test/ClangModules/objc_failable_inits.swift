@@ -13,7 +13,7 @@ func testDictionary() {
 func testString() throws {
   // Optional
   let stringOpt = NSString(path: "blah", encoding: 0)
-  _ = stringOpt as NSString // expected-error{{'NSString?' is not convertible to 'NSString'}}
+  _ = stringOpt as NSString // expected-error{{value of optional type 'NSString?' not unwrapped; did you mean to use '!' or '?'?}}
 
   // Implicitly unwrapped optional
   let stringIUO = NSString(path: "blah")

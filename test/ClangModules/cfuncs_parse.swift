@@ -19,19 +19,19 @@ func test_cfunc2(i: Int) {
 func test_cfunc3_a() {
   let b = cfunc3( { (a : Double, b : Double) -> Double in a + b } )
   _ = b(1.5, 2.5) as Double
-  _ = b as Double// expected-error{{'double_bin_op_block!' is not convertible to 'Double'}}
+  _ = b as Double// expected-error{{cannot convert value of type 'double_bin_op_block!' to type 'Double' in coercion}}
 }
 
 func test_cfunc3_b() {
   let b = cfunc3( { a, b in a + b } )
   _ = b(1.5, 2.5) as Double
-  _ = b as Double// expected-error{{'double_bin_op_block!' is not convertible to 'Double'}}
+  _ = b as Double// expected-error{{cannot convert value of type 'double_bin_op_block!' to type 'Double' in coercion}}
 }
 
 func test_cfunc3_c() {
   let b = cfunc3({ $0 + $1 })
   _ = b(1.5, 2.5) as Double
-  _ = b as Double// expected-error{{'double_bin_op_block!' is not convertible to 'Double'}}
+  _ = b as Double// expected-error{{cannot convert value of type 'double_bin_op_block!' to type 'Double' in coercion}}
 }
 
 func test_cfunc3_d() {

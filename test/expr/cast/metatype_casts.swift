@@ -43,9 +43,9 @@ use(c as! CP.Type)
 use(c as! CP.Protocol) // expected-warning{{always fails}}
 use(c as! Int.Type) // expected-warning{{always fails}}
 
-use(C.self as AnyObject.Protocol) // expected-error{{'C.Type' is not convertible to 'AnyObject.Protocol'}}
+use(C.self as AnyObject.Protocol) // expected-error{{cannot convert value of type 'C.Type' to type 'AnyObject.Protocol' in coercion}}
 use(C.self as AnyObject.Type)
 use(C.self as P.Type) // expected-error{{'C.Type' is not convertible to 'P.Type'; did you mean to use 'as!' to force downcast?}} {{12-14=as!}}
 
-use(E.self as P.Protocol) // expected-error{{'E.Type' is not convertible to 'P.Protocol'}}
+use(E.self as P.Protocol) // expected-error{{cannot convert value of type 'E.Type' to type 'P.Protocol' in coercion}}
 use(E.self as P.Type)
