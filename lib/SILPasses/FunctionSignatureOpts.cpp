@@ -166,18 +166,9 @@ struct ArgumentDescriptor {
   void
   computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &Out) const;
 
-  /// Returns the argument for the given apply or try_apply instruction.
-  SILValue getArg(SILInstruction *AI) const {
-    if (auto *RealAI = dyn_cast<ApplyInst>(AI)) {
-      return RealAI->getArgument(Index);
-    } else {
-      return cast<TryApplyInst>(AI)->getArgument(Index);
-    }
-  }
-  
   /// Add potentially multiple new arguments to NewArgs from the caller's apply
   /// or try_apply inst.
-  void addCallerArgs(SILBuilder &Builder, SILInstruction *AI,
+  void addCallerArgs(SILBuilder &Builder, FullApplySite FAS,
                      SmallVectorImpl<SILValue> &NewArgs) const;
 
   /// Add potentially multiple new arguments to NewArgs from the thunk's
@@ -302,18 +293,18 @@ computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &Out) const {
 
 void
 ArgumentDescriptor::
-addCallerArgs(SILBuilder &B, SILInstruction *AI,
+addCallerArgs(SILBuilder &B, FullApplySite FAS,
               llvm::SmallVectorImpl<SILValue> &NewArgs) const {
   if (IsDead)
     return;
 
-  SILValue Arg = getArg(AI);
+  SILValue Arg = FAS.getArgument(Index);
   if (!shouldExplode()) {
     NewArgs.push_back(Arg);
     return;
   }
 
-  ProjTree.createTreeFromValue(B, AI->getLoc(), Arg, NewArgs);
+  ProjTree.createTreeFromValue(B, FAS.getLoc(), Arg, NewArgs);
 }
 
 void
@@ -665,16 +656,11 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     if (!Edge->getApply().getFunction()->shouldOptimize())
       continue;
 
-    auto *AI = Edge->getApply().getInstruction();
+    const FullApplySite FAS = Edge->getApply();
+    auto *AI = FAS.getInstruction();
     
-    if (ApplyInst *RealAI = dyn_cast<ApplyInst>(AI)) {
-      if (!isSupportedCallee(RealAI->getCallee()))
+    if (!isSupportedCallee(FAS.getCallee()))
         continue;
-    } else {
-      if (!isSupportedCallee(cast<TryApplyInst>(AI)->getCallee()))
-        continue;
-    }
-
 
     SILBuilderWithScope<16> Builder(AI);
 
@@ -684,7 +670,7 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     llvm::SmallVector<SILValue, 8> NewArgs;
     ArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
     for (auto &ArgDesc : ArgDescs) {
-      ArgDesc.addCallerArgs(Builder, AI, NewArgs);
+      ArgDesc.addCallerArgs(Builder, FAS, NewArgs);
     }
 
     // We are ignoring generic functions and functions with out parameters for
@@ -713,7 +699,7 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
       for (auto &ArgDesc : ArgDescs) {
         if (!ArgDesc.CalleeRelease)
           continue;
-        Builder.createReleaseValue(Loc, ArgDesc.getArg(AI));
+        Builder.createReleaseValue(Loc, FAS.getArgument(ArgDesc.Index));
       }
       // Also insert release_value in the normal block (done below).
       Builder.setInsertionPoint(TAI->getNormalBB(), TAI->getNormalBB()->begin());
@@ -724,7 +710,7 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     for (auto &ArgDesc : ArgDescs) {
       if (!ArgDesc.CalleeRelease)
         continue;
-      Builder.createReleaseValue(Loc, ArgDesc.getArg(AI));
+      Builder.createReleaseValue(Loc, FAS.getArgument(ArgDesc.Index));
     }
 
     // Erase the old apply and its callee.
