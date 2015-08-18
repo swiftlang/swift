@@ -650,7 +650,8 @@ public:
   ManagedValue emitGlobalVariableRef(SILLocation loc, VarDecl *var);
 
   /// Generate a lazy global initializer.
-  void emitLazyGlobalInitializer(PatternBindingDecl *binding);
+  void emitLazyGlobalInitializer(PatternBindingDecl *binding,
+                                 unsigned pbdEntry);
   
   /// Generate a global accessor, using the given initializer token and
   /// function
@@ -1383,6 +1384,8 @@ public:
   void visitNominalTypeDecl(NominalTypeDecl *D);
   void visitFuncDecl(FuncDecl *D);
   void visitPatternBindingDecl(PatternBindingDecl *D);
+
+  void emitPatternBinding(PatternBindingDecl *D, unsigned entry);
   
   std::unique_ptr<Initialization>
   emitPatternBindingInitialization(Pattern *P, JumpDest failureDest);

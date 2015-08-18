@@ -711,7 +711,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                                  *f));
   f->setLocation(binding);
 
-  SILGenFunction(*this, *f).emitLazyGlobalInitializer(binding);
+  SILGenFunction(*this, *f).emitLazyGlobalInitializer(binding, pbdEntry);
 
   f->verify();
 

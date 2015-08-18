@@ -243,12 +243,13 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
     .visit(pd->getPattern(pbdEntry));
 }
 
-void SILGenFunction::emitLazyGlobalInitializer(PatternBindingDecl *binding) {
+void SILGenFunction::emitLazyGlobalInitializer(PatternBindingDecl *binding,
+                                               unsigned pbdEntry) {
   {
     Scope scope(Cleanups, binding);
 
     // Emit the initialization sequence.
-    visit(binding);
+    emitPatternBinding(binding, pbdEntry);
   }
 
   // Return void.

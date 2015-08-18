@@ -896,22 +896,28 @@ InitializationPtr SILGenFunction::emitInitializationForVarDecl(VarDecl *vd) {
   return Result;
 }
 
+void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
+                                        unsigned pbdEntry) {
+  auto &entry = PBD->getPatternList()[pbdEntry];
+  auto initialization = emitPatternBindingInitialization(entry.getPattern(),
+                                                         JumpDest::invalid());
+
+  // If an initial value expression was specified by the decl, emit it into
+  // the initialization. Otherwise, mark it uninitialized for DI to resolve.
+  if (auto *Init = entry.getInit()) {
+    FullExpr Scope(Cleanups, CleanupLocation(Init));
+    emitExprInto(Init, initialization.get());
+  } else {
+    initialization->finishInitialization(*this);
+  }
+}
+
 void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
-  for (auto entry : PBD->getPatternList()) {
-    auto initialization = emitPatternBindingInitialization(entry.getPattern(),
-                                                           JumpDest::invalid());
-
-    // If an initial value expression was specified by the decl, emit it into
-    // the initialization. Otherwise, mark it uninitialized for DI to resolve.
-    if (auto *Init = entry.getInit()) {
-      FullExpr Scope(Cleanups, CleanupLocation(Init));
-      emitExprInto(Init, initialization.get());
-    } else {
-      initialization->finishInitialization(*this);
-    }
+  for (unsigned i : indices(PBD->getPatternList())) {
+    emitPatternBinding(PBD, i);
   }
 }
 
