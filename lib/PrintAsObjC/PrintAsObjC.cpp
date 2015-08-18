@@ -15,6 +15,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Comment.h"
 #include "swift/Basic/Version.h"
@@ -112,6 +113,7 @@ public:
     : M(mod), os(out), minRequiredAccess(access) {}
 
   void print(const Decl *D) {
+    PrettyStackTraceDecl trace("printing", D);
     visit(const_cast<Decl *>(D));
   }
 
@@ -1153,6 +1155,8 @@ private:
 public:
   void print(Type ty, Optional<OptionalTypeKind> optionalKind, 
              StringRef name = "") {
+    PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
+
     decltype(openFunctionTypes) savedFunctionTypes;
     savedFunctionTypes.swap(openFunctionTypes);
 
@@ -1825,5 +1829,6 @@ public:
 bool swift::printAsObjC(llvm::raw_ostream &os, Module *M,
                         StringRef bridgingHeader,
                         Accessibility minRequiredAccess) {
+  llvm::PrettyStackTraceString trace("While generating Objective-C header");
   return ModuleWriter(*M, bridgingHeader, minRequiredAccess).writeToStream(os);
 }
