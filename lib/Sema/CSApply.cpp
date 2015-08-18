@@ -5822,8 +5822,393 @@ namespace {
     /// \brief Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
-
 }
+
+/// \brief Apply the specified Fix # to this solution, producing a fixit hint
+/// diagnostic for it and returning true.  If the fixit hint turned out to be
+/// bogus, this returns false and doesn't emit anything.
+bool ConstraintSystem::applySolutionFix(Expr *expr,
+                                        const Solution &solution,
+                                        unsigned fixNo) {
+  auto &fix = solution.Fixes[fixNo];
+  
+  // Some fixes need more information from the locator itself, including
+  // tweaking the locator. Deal with those now.
+  ConstraintLocator *locator = fix.second;
+
+  // Removing a nullary call to a non-function requires us to have an
+  // 'ApplyFunction', which we strip.
+  if (fix.first.getKind() == FixKind::RemoveNullaryCall) {
+    auto anchor = locator->getAnchor();
+    auto path = locator->getPath();
+    if (!path.empty() &&
+        path.back().getKind() == ConstraintLocator::ApplyFunction) {
+      locator = getConstraintLocator(anchor, path.slice(0, path.size()-1),
+                                     locator->getSummaryFlags());
+    } else {
+      return false;
+    }
+  }
+
+  // Resolve the locator to a specific expression.
+  SourceRange range;
+  ConstraintLocator *resolved = simplifyLocator(*this, locator, range);
+
+  // If we didn't manage to resolve directly to an expression, we don't
+  // have a great diagnostic to give, so bail.
+  if (!resolved || !resolved->getAnchor() || !resolved->getPath().empty())
+    return false;
+
+  Expr *affected = resolved->getAnchor();
+
+  switch (fix.first.getKind()) {
+  case FixKind::None:
+    llvm_unreachable("no-fix marker should never make it into solution");
+
+  case FixKind::NullaryCall: {
+    // Dig for the function we want to call.
+    auto type = solution.simplifyType(TC, affected->getType())
+                  ->getRValueType();
+    if (auto tupleTy = type->getAs<TupleType>()) {
+      if (tupleTy->getElementTypes().size()) {
+        if (auto tuple = dyn_cast<TupleExpr>(affected))
+          affected = tuple->getElement(0);
+        type = tupleTy->getElement(0).getType()->getRValueType();
+      }
+    }
+
+    if (auto optTy = type->getAnyOptionalObjectType())
+      type = optTy;
+
+    if (type->is<AnyFunctionType>()) {
+      type = type->castTo<AnyFunctionType>()->getResult();
+    }
+    
+    TC.diagnose(affected->getLoc(), diag::missing_nullary_call, type)
+      .fixItInsertAfter(affected->getEndLoc(), "()");
+    return true;
+  }
+
+  case FixKind::RemoveNullaryCall:
+    if (auto apply = dyn_cast<ApplyExpr>(affected)) {
+      auto type = solution.simplifyType(TC, apply->getFn()->getType())
+                    ->getRValueObjectType();
+      TC.diagnose(affected->getLoc(), diag::extra_call_nonfunction, type)
+        .fixItRemove(apply->getArg()->getSourceRange());
+      return true;
+    }
+    return false;
+
+  case FixKind::ForceOptional: {
+    const Expr *unwrapped = affected->getValueProvidingExpr();
+    auto type = solution.simplifyType(TC, affected->getType())
+                  ->getRValueObjectType();
+
+    if (auto tryExpr = dyn_cast<OptionalTryExpr>(unwrapped)) {
+      TC.diagnose(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try,
+                  type)
+        .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()},
+                      "try!");
+
+    } else {
+      auto diag = TC.diagnose(affected->getLoc(),
+                              diag::missing_unwrap_optional, type);
+      bool parensNeeded =
+          (getInfixDataForFixIt(DC, affected).getPrecedence() <
+           IntrinsicPrecedences::PostfixUnaryExpr) ||
+          isa<OptionalEvaluationExpr>(affected);
+
+      if (parensNeeded) {
+        diag.fixItInsert(affected->getStartLoc(), "(")
+            .fixItInsertAfter(affected->getEndLoc(), ")!");
+      } else {
+        diag.fixItInsertAfter(affected->getEndLoc(), "!");
+      }
+    }
+    return true;
+  }
+
+  case FixKind::ForceDowncast: {
+    auto fromType = solution.simplifyType(TC, affected->getType())
+                      ->getRValueObjectType();
+    Type toType = solution.simplifyType(TC,
+                                        fix.first.getTypeArgument(*this));
+    bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
+    bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType,
+                                                        DC);
+    if (!useAs && !useAsBang)
+      return false;
+
+    bool needsParensInside = exprNeedsParensBeforeAddingAs(DC, affected);
+    bool needsParensOutside = exprNeedsParensAfterAddingAs(DC, affected,
+                                                           expr);
+    llvm::SmallString<2> insertBefore;
+    llvm::SmallString<32> insertAfter;
+    if (needsParensOutside) {
+      insertBefore += "(";
+    }
+    if (needsParensInside) {
+      insertBefore += "(";
+      insertAfter += ")";
+    }
+    insertAfter += useAs ? " as " : " as! ";
+    insertAfter += toType.getString();
+    if (needsParensOutside)
+      insertAfter += ")";
+    
+    auto diagID = useAs ? diag::missing_explicit_conversion
+                        : diag::missing_forced_downcast;
+    auto diag = TC.diagnose(affected->getLoc(), diagID, fromType, toType);
+    if (!insertBefore.empty()) {
+      diag.fixItInsert(affected->getStartLoc(), insertBefore);
+    }
+    diag.fixItInsertAfter(affected->getEndLoc(), insertAfter);
+    return true;
+  }
+
+  case FixKind::AddressOf: {
+    auto type = solution.simplifyType(TC, affected->getType())
+                  ->getRValueObjectType();
+    TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
+      .fixItInsert(affected->getStartLoc(), "&");
+    return true;
+  }
+
+  case FixKind::TupleToScalar: 
+  case FixKind::ScalarToTuple:
+  case FixKind::RelabelCallTuple:
+    return diagnoseRelabel(TC, affected, fix.first.getRelabelTupleNames(*this),
+                           /*isSubscript=*/locator->getPath().back().getKind()
+                           == ConstraintLocator::SubscriptIndex);
+    
+  case FixKind::OptionalToBoolean: {
+    // If we're implicitly trying to treat an optional type as a boolean,
+    // let the user know that they should be testing for a value manually
+    // instead.
+    Expr *errorExpr = expr;
+    StringRef prefix = "((";
+    StringRef suffix = ") != nil)";
+    
+    // In the common case of a !x, post the error against the inner
+    // expression as an == comparison.
+    if (auto PUE =
+        dyn_cast<PrefixUnaryExpr>(errorExpr->getSemanticsProvidingExpr())){
+      bool isNot = false;
+      if (auto *D = PUE->getCalledValue())
+        isNot = D->getNameStr() == "!";
+      else if (auto *ODR = dyn_cast<OverloadedDeclRefExpr>(PUE->getFn()))
+        isNot = ODR->getDecls()[0]->getNameStr() == "!";
+      
+      if (isNot) {
+        suffix = ") == nil)";
+        errorExpr = PUE->getArg();
+        
+        // Check if we need the inner parentheses.
+        // Technically we only need them if there's something in 'expr' with
+        // lower precedence than '!=', but the code actually comes out nicer
+        // in most cases with parens on anything non-trivial.
+        if (errorExpr->canAppendCallParentheses()) {
+          prefix = prefix.drop_back();
+          suffix = suffix.drop_front();
+        }
+        // FIXME: The outer parentheses may be superfluous too.
+
+        
+        TC.diagnose(errorExpr->getLoc(),diag::optional_used_as_true_boolean,
+                    simplifyType(errorExpr->getType())->getRValueType())
+          .fixItRemove(PUE->getLoc())
+          .fixItInsert(errorExpr->getStartLoc(), prefix)
+          .fixItInsertAfter(errorExpr->getEndLoc(), suffix);
+        return true;
+      }
+    }
+    
+    // If we can, post the fix-it to the sub-expression if it's a better
+    // fit.
+    if (auto ifExpr = dyn_cast<IfExpr>(errorExpr))
+      errorExpr = ifExpr->getCondExpr();
+    if (auto prefixUnaryExpr = dyn_cast<PrefixUnaryExpr>(errorExpr))
+      errorExpr = prefixUnaryExpr->getArg();
+    
+
+    // Check if we need the inner parentheses.
+    // Technically we only need them if there's something in 'expr' with
+    // lower precedence than '!=', but the code actually comes out nicer
+    // in most cases with parens on anything non-trivial.
+    if (errorExpr->canAppendCallParentheses()) {
+      prefix = prefix.drop_back();
+      suffix = suffix.drop_front();
+    }
+    // FIXME: The outer parentheses may be superfluous too.
+
+    TC.diagnose(errorExpr->getLoc(), diag::optional_used_as_boolean,
+                simplifyType(errorExpr->getType())->getRValueType())
+      .fixItInsert(errorExpr->getStartLoc(), prefix)
+      .fixItInsertAfter(errorExpr->getEndLoc(), suffix);
+    
+    return true;
+  }
+
+  case FixKind::FromRawToInit: {
+    // Chase the parent map to find the reference to 'fromRaw' and
+    // the call to it. We'll need these for the Fix-It.
+    UnresolvedDotExpr *fromRawRef = nullptr;
+    CallExpr *fromRawCall = nullptr;
+    auto parentMap = expr->getParentMap();
+    Expr *current = affected;
+    do {
+      if (!fromRawRef) {
+        // We haven't found the reference to fromRaw yet, look for it now.
+        fromRawRef = dyn_cast<UnresolvedDotExpr>(current);
+        if (fromRawRef && fromRawRef->getName() != TC.Context.Id_fromRaw)
+          fromRawRef = nullptr;
+
+        current = parentMap[current];
+        continue;
+      } 
+      
+      // We previously found the reference to fromRaw, so we're
+      // looking for the call.
+      fromRawCall = dyn_cast<CallExpr>(current);
+      if (fromRawCall)
+        break;
+      
+      current = parentMap[current];
+      continue;          
+    } while (current);
+
+    if (fromRawCall) {
+      TC.diagnose(fromRawRef->getNameLoc(), 
+                  diag::migrate_from_raw_to_init)
+        .fixItReplace(SourceRange(fromRawRef->getDotLoc(),
+                                  fromRawCall->getArg()->getStartLoc()),
+                      "(rawValue: ");
+    } else {
+      // Diagnostic without Fix-It; we couldn't find what we needed.
+      TC.diagnose(affected->getLoc(), diag::migrate_from_raw_to_init);
+    }
+    return true;
+  }
+
+  case FixKind::ToRawToRawValue: {
+    // Chase the parent map to find the reference to 'toRaw' and
+    // the call to it. We'll need these for the Fix-It.
+    UnresolvedDotExpr *toRawRef = nullptr;
+    CallExpr *toRawCall = nullptr;
+    auto parentMap = expr->getParentMap();
+    Expr *current = affected;
+    do {
+      if (!toRawRef) {
+        // We haven't found the reference to toRaw yet, look for it now.
+        toRawRef = dyn_cast<UnresolvedDotExpr>(current);
+        if (toRawRef && toRawRef->getName() != TC.Context.Id_toRaw)
+          toRawRef = nullptr;
+
+        current = parentMap[current];
+        continue;
+      } 
+      
+      // We previously found the reference to toRaw, so we're
+      // looking for the call.
+      toRawCall = dyn_cast<CallExpr>(current);
+      if (toRawCall)
+        break;
+      
+      current = parentMap[current];
+      continue;          
+    } while (current);
+
+    if (toRawCall) {
+      TC.diagnose(toRawRef->getNameLoc(),
+                  diag::migrate_to_raw_to_raw_value)
+        .fixItReplace(SourceRange(toRawRef->getNameLoc(),
+                                  toRawCall->getArg()->getEndLoc()),
+                      "rawValue");
+    } else {
+      TC.diagnose(affected->getLoc(), diag::migrate_to_raw_to_raw_value);
+    }
+    return true;
+  }
+  case FixKind::AllZerosToInit: {
+    // Chase the parent map to find the reference to 'allZeros' and
+    // the call to it. We'll need these for the Fix-It.
+    UnresolvedDotExpr *allZerosRef = nullptr;
+    auto parentMap = expr->getParentMap();
+    Expr *current = affected;
+    do {
+      // We haven't found the reference to allZeros yet, look for it now.
+      if ((allZerosRef = dyn_cast<UnresolvedDotExpr>(current))) {
+        if (allZerosRef->getName().str() == "allZeros")
+          break;
+        allZerosRef = nullptr;
+      }
+
+      current = parentMap[current];
+    } while (current);
+
+    if (allZerosRef) {
+      TC.diagnose(allZerosRef->getNameLoc(),
+                  diag::migrate_from_allZeros)
+        .fixItReplace(SourceRange(allZerosRef->getDotLoc(),
+                                  allZerosRef->getNameLoc()),
+                      "()");
+    } else {
+      // Diagnostic without Fix-It; we couldn't find what we needed.
+      TC.diagnose(affected->getLoc(), diag::migrate_from_allZeros);
+    }
+    return true;
+  }
+
+  case FixKind::CoerceToCheckedCast: {
+    if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
+      Expr *subExpr = coerceExpr->getSubExpr();
+      auto fromType =
+        solution.simplifyType(TC, subExpr->getType())->getRValueType();
+      auto toType =
+        solution.simplifyType(TC, coerceExpr->getCastTypeLoc().getType());
+      auto castKind = TC.typeCheckCheckedCast(
+                        fromType, toType, DC,
+                        coerceExpr->getLoc(),
+                        subExpr->getSourceRange(),
+                        coerceExpr->getCastTypeLoc().getSourceRange(),
+                        [&](Type commonTy) -> bool {
+                          return TC.convertToType(subExpr, commonTy, DC);
+                        },
+                        /*suppressDiagnostics=*/ true);
+
+      switch (castKind) {
+      // Invalid cast.
+      case CheckedCastKind::Unresolved:
+        // Fix didn't work, let diagnoseFailureForExpr handle this.
+        return false;
+      case CheckedCastKind::Coercion:
+        llvm_unreachable("Coercions handled in other disjunction branch");
+
+      // Valid casts.
+      case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::DictionaryDowncast:
+      case CheckedCastKind::DictionaryDowncastBridged:
+      case CheckedCastKind::SetDowncast:
+      case CheckedCastKind::SetDowncastBridged:
+      case CheckedCastKind::ValueCast:
+      case CheckedCastKind::BridgeFromObjectiveC:
+        TC.diagnose(coerceExpr->getLoc(), diag::missing_forced_downcast,
+                    fromType, toType)
+          .highlight(coerceExpr->getSourceRange())
+          .fixItReplace(coerceExpr->getLoc(), "as!");
+        return true;
+      }
+    }
+    return false;
+  }
+  }
+
+  // FIXME: It would be really nice to emit a follow-up note showing where
+  // we got the other type information from, e.g., the parameter we're
+  // initializing.
+  return false;
+}
+
 
 /// \brief Apply a given solution to the expression, producing a fully
 /// type-checked expression.
@@ -5835,409 +6220,13 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
     bool diagnosed = false;
-    for (auto fix : solution.Fixes) {
-      // Some fixes need more information from the locator itself, including
-      // tweaking the locator. Deal with those now.
-      ConstraintLocator *locator = fix.second;
-
-      // Removing a nullary call to a non-function requires us to have an
-      // 'ApplyFunction', which we strip.
-      if (fix.first.getKind() == FixKind::RemoveNullaryCall) {
-        auto anchor = locator->getAnchor();
-        auto path = locator->getPath();
-        if (!path.empty() &&
-            path.back().getKind() == ConstraintLocator::ApplyFunction) {
-          locator = getConstraintLocator(anchor, path.slice(0, path.size()-1),
-                                         locator->getSummaryFlags());
-        } else {
-          continue;
-        }
-      }
-
-      // Resolve the locator to a specific expression.
-      SourceRange range;
-      ConstraintLocator *resolved = simplifyLocator(*this, locator, range);
-
-      // If we didn't manage to resolve directly to an expression, we don't
-      // have a great diagnostic to give, so continue.
-      if (!resolved || !resolved->getAnchor() || !resolved->getPath().empty())
-        continue;
-
-      Expr *affected = resolved->getAnchor();
-
-      switch (fix.first.getKind()) {
-      case FixKind::None:
-        llvm_unreachable("no-fix marker should never make it into solution");
-
-      case FixKind::NullaryCall: {
-        // Dig for the function we want to call.
-        auto type = solution.simplifyType(TC, affected->getType())
-                      ->getRValueType();
-        if (auto tupleTy = type->getAs<TupleType>()) {
-          if (tupleTy->getElementTypes().size()) {
-            if (auto tuple = dyn_cast<TupleExpr>(affected))
-              affected = tuple->getElement(0);
-            type = tupleTy->getElement(0).getType()->getRValueType();
-          }
-        }
-
-        if (auto optTy = type->getAnyOptionalObjectType())
-          type = optTy;
-
-        if (type->is<AnyFunctionType>()) {
-          type = type->castTo<AnyFunctionType>()->getResult();
-        }
-        
-        TC.diagnose(affected->getLoc(), diag::missing_nullary_call, type)
-          .fixItInsertAfter(affected->getEndLoc(), "()");
-        diagnosed = true;
-        break;
-      }
-
-      case FixKind::RemoveNullaryCall: {
-        if (auto apply = dyn_cast<ApplyExpr>(affected)) {
-          auto type = solution.simplifyType(TC, apply->getFn()->getType())
-                        ->getRValueObjectType();
-          TC.diagnose(affected->getLoc(), diag::extra_call_nonfunction, type)
-            .fixItRemove(apply->getArg()->getSourceRange());
-          diagnosed = true;
-        }
-        break;
-      }
-
-      case FixKind::ForceOptional: {
-        const Expr *unwrapped = affected->getValueProvidingExpr();
-        auto type = solution.simplifyType(TC, affected->getType())
-                      ->getRValueObjectType();
-
-        if (auto tryExpr = dyn_cast<OptionalTryExpr>(unwrapped)) {
-          TC.diagnose(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try,
-                      type)
-            .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()},
-                          "try!");
-
-        } else {
-          auto diag = TC.diagnose(affected->getLoc(),
-                                  diag::missing_unwrap_optional, type);
-          bool parensNeeded =
-              (getInfixDataForFixIt(DC, affected).getPrecedence() <
-               IntrinsicPrecedences::PostfixUnaryExpr) ||
-              isa<OptionalEvaluationExpr>(affected);
-
-          if (parensNeeded) {
-            diag.fixItInsert(affected->getStartLoc(), "(")
-                .fixItInsertAfter(affected->getEndLoc(), ")!");
-          } else {
-            diag.fixItInsertAfter(affected->getEndLoc(), "!");
-          }
-        }
-        diagnosed = true;
-        break;
-      }
-
-      case FixKind::ForceDowncast: {
-        auto fromType = solution.simplifyType(TC, affected->getType())
-                          ->getRValueObjectType();
-        Type toType = solution.simplifyType(TC,
-                                            fix.first.getTypeArgument(*this));
-        bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
-        bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType,
-                                                            DC);
-        if (!(useAs || useAsBang)) {
-          break;
-        }
-
-        bool needsParensInside = exprNeedsParensBeforeAddingAs(DC, affected);
-        bool needsParensOutside = exprNeedsParensAfterAddingAs(DC, affected,
-                                                               expr);
-        llvm::SmallString<2> insertBefore;
-        llvm::SmallString<32> insertAfter;
-        if (needsParensOutside) {
-          insertBefore += "(";
-        }
-        if (needsParensInside) {
-          insertBefore += "(";
-          insertAfter += ")";
-        }
-        if (useAs) {
-          insertAfter += " as ";
-        } else {
-          insertAfter += " as! ";
-        }
-        insertAfter += toType.getString();
-        if (needsParensOutside) {
-          insertAfter += ")";
-        }
-        auto diagID = useAs ? diag::missing_explicit_conversion
-                            : diag::missing_forced_downcast;
-        auto diag = TC.diagnose(affected->getLoc(), diagID, fromType, toType);
-        if (!insertBefore.empty()) {
-          diag.fixItInsert(affected->getStartLoc(), insertBefore);
-        }
-        diag.fixItInsertAfter(affected->getEndLoc(), insertAfter);
-        diagnosed = true;
-        break;
-      }
-
-      case FixKind::AddressOf: {
-        auto type = solution.simplifyType(TC, affected->getType())
-                      ->getRValueObjectType();
-        TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
-          .fixItInsert(affected->getStartLoc(), "&");
-        diagnosed = true;
-        break;
-      }
-
-      case FixKind::TupleToScalar: 
-      case FixKind::ScalarToTuple:
-      case FixKind::RelabelCallTuple: {
-        if (diagnoseRelabel(TC,affected,fix.first.getRelabelTupleNames(*this),
-                            /*isSubscript=*/locator->getPath().back().getKind()
-                              == ConstraintLocator::SubscriptIndex))
-          diagnosed = true;
-        break;
-      }
-          
-      case FixKind::OptionalToBoolean: {
-        // If we're implicitly trying to treat an optional type as a boolean,
-        // let the user know that they should be testing for a value manually
-        // instead.
-        Expr *errorExpr = expr;
-        StringRef prefix = "((";
-        StringRef suffix = ") != nil)";
-        
-        // In the common case of a !x, post the error against the inner
-        // expression as an == comparison.
-        if (auto PUE =
-            dyn_cast<PrefixUnaryExpr>(errorExpr->getSemanticsProvidingExpr())){
-          bool isNot = false;
-          if (auto *D = PUE->getCalledValue())
-            isNot = D->getNameStr() == "!";
-          else if (auto *ODR = dyn_cast<OverloadedDeclRefExpr>(PUE->getFn()))
-            isNot = ODR->getDecls()[0]->getNameStr() == "!";
-          
-          if (isNot) {
-            suffix = ") == nil)";
-            errorExpr = PUE->getArg();
-            
-            // Check if we need the inner parentheses.
-            // Technically we only need them if there's something in 'expr' with
-            // lower precedence than '!=', but the code actually comes out nicer
-            // in most cases with parens on anything non-trivial.
-            if (errorExpr->canAppendCallParentheses()) {
-              prefix = prefix.drop_back();
-              suffix = suffix.drop_front();
-            }
-            // FIXME: The outer parentheses may be superfluous too.
-
-            
-            TC.diagnose(errorExpr->getLoc(),diag::optional_used_as_true_boolean,
-                        simplifyType(errorExpr->getType())->getRValueType())
-              .fixItRemove(PUE->getLoc())
-              .fixItInsert(errorExpr->getStartLoc(), prefix)
-              .fixItInsertAfter(errorExpr->getEndLoc(), suffix);
-            diagnosed = true;
-            break;
-          }
-        }
-        
-        // If we can, post the fix-it to the sub-expression if it's a better
-        // fit.
-        if (auto ifExpr = dyn_cast<IfExpr>(errorExpr)) {
-          errorExpr = ifExpr->getCondExpr();
-        }
-        if (auto prefixUnaryExpr = dyn_cast<PrefixUnaryExpr>(errorExpr)) {
-          errorExpr = prefixUnaryExpr->getArg();
-        }
-
-        // Check if we need the inner parentheses.
-        // Technically we only need them if there's something in 'expr' with
-        // lower precedence than '!=', but the code actually comes out nicer
-        // in most cases with parens on anything non-trivial.
-        if (errorExpr->canAppendCallParentheses()) {
-          prefix = prefix.drop_back();
-          suffix = suffix.drop_front();
-        }
-        // FIXME: The outer parentheses may be superfluous too.
-
-        TC.diagnose(errorExpr->getLoc(), diag::optional_used_as_boolean,
-                    simplifyType(errorExpr->getType())->getRValueType())
-          .fixItInsert(errorExpr->getStartLoc(), prefix)
-          .fixItInsertAfter(errorExpr->getEndLoc(), suffix);
-        
-        diagnosed = true;
-        break;
-      }
-
-      case FixKind::FromRawToInit: {
-        // Chase the parent map to find the reference to 'fromRaw' and
-        // the call to it. We'll need these for the Fix-It.
-        UnresolvedDotExpr *fromRawRef = nullptr;
-        CallExpr *fromRawCall = nullptr;
-        auto parentMap = expr->getParentMap();
-        Expr *current = affected;
-        do {
-          if (!fromRawRef) {
-            // We haven't found the reference to fromRaw yet, look for it now.
-            fromRawRef = dyn_cast<UnresolvedDotExpr>(current);
-            if (fromRawRef && fromRawRef->getName() != TC.Context.Id_fromRaw)
-              fromRawRef = nullptr;
-
-            current = parentMap[current];
-            continue;
-          } 
-          
-          // We previously found the reference to fromRaw, so we're
-          // looking for the call.
-          fromRawCall = dyn_cast<CallExpr>(current);
-          if (fromRawCall)
-            break;
-          
-          current = parentMap[current];
-          continue;          
-        } while (current);
-
-        if (fromRawCall) {
-          TC.diagnose(fromRawRef->getNameLoc(), 
-                      diag::migrate_from_raw_to_init)
-            .fixItReplace(SourceRange(fromRawRef->getDotLoc(),
-                                      fromRawCall->getArg()->getStartLoc()),
-                          "(rawValue: ");
-        } else {
-          // Diagnostic without Fix-It; we couldn't find what we needed.
-          TC.diagnose(affected->getLoc(), diag::migrate_from_raw_to_init);
-        }
-        diagnosed = true;
-        break;
-      }
-
-      case FixKind::ToRawToRawValue: {
-        // Chase the parent map to find the reference to 'toRaw' and
-        // the call to it. We'll need these for the Fix-It.
-        UnresolvedDotExpr *toRawRef = nullptr;
-        CallExpr *toRawCall = nullptr;
-        auto parentMap = expr->getParentMap();
-        Expr *current = affected;
-        do {
-          if (!toRawRef) {
-            // We haven't found the reference to toRaw yet, look for it now.
-            toRawRef = dyn_cast<UnresolvedDotExpr>(current);
-            if (toRawRef && toRawRef->getName() != TC.Context.Id_toRaw)
-              toRawRef = nullptr;
-
-            current = parentMap[current];
-            continue;
-          } 
-          
-          // We previously found the reference to toRaw, so we're
-          // looking for the call.
-          toRawCall = dyn_cast<CallExpr>(current);
-          if (toRawCall)
-            break;
-          
-          current = parentMap[current];
-          continue;          
-        } while (current);
-
-        if (toRawCall) {
-          TC.diagnose(toRawRef->getNameLoc(),
-                      diag::migrate_to_raw_to_raw_value)
-            .fixItReplace(SourceRange(toRawRef->getNameLoc(),
-                                      toRawCall->getArg()->getEndLoc()),
-                          "rawValue");
-        } else {
-          TC.diagnose(affected->getLoc(), diag::migrate_to_raw_to_raw_value);
-        }
-        diagnosed = true;
-        break;
-      }
-      case FixKind::AllZerosToInit: {
-        // Chase the parent map to find the reference to 'allZeros' and
-        // the call to it. We'll need these for the Fix-It.
-        UnresolvedDotExpr *allZerosRef = nullptr;
-        auto parentMap = expr->getParentMap();
-        Expr *current = affected;
-        do {
-          // We haven't found the reference to allZeros yet, look for it now.
-          if ((allZerosRef = dyn_cast<UnresolvedDotExpr>(current))) {
-            if (allZerosRef->getName().str() == "allZeros")
-              break;
-            allZerosRef = nullptr;
-          }
-
-          current = parentMap[current];
-        } while (current);
-
-        if (allZerosRef) {
-          TC.diagnose(allZerosRef->getNameLoc(),
-                      diag::migrate_from_allZeros)
-            .fixItReplace(SourceRange(allZerosRef->getDotLoc(),
-                                      allZerosRef->getNameLoc()),
-                          "()");
-        } else {
-          // Diagnostic without Fix-It; we couldn't find what we needed.
-          TC.diagnose(affected->getLoc(), diag::migrate_from_allZeros);
-        }
-        diagnosed = true;
-        break;
-      }
-
-      case FixKind::CoerceToCheckedCast: {
-        if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
-          Expr *subExpr = coerceExpr->getSubExpr();
-          auto fromType =
-            solution.simplifyType(TC, subExpr->getType())->getRValueType();
-          auto toType =
-            solution.simplifyType(TC, coerceExpr->getCastTypeLoc().getType());
-          auto castKind = TC.typeCheckCheckedCast(
-                            fromType, toType, DC,
-                            coerceExpr->getLoc(),
-                            subExpr->getSourceRange(),
-                            coerceExpr->getCastTypeLoc().getSourceRange(),
-                            [&](Type commonTy) -> bool {
-                              return TC.convertToType(subExpr, commonTy, DC);
-                            },
-                            /*suppressDiagnostics=*/ true);
-
-          switch (castKind) {
-          // Invalid cast.
-          case CheckedCastKind::Unresolved:
-            // Fix didn't work, let diagnoseFailureForExpr handle this.
-            break;
-          case CheckedCastKind::Coercion:
-            llvm_unreachable("Coercions handled in other disjunction branch");
-
-          // Valid casts.
-          case CheckedCastKind::ArrayDowncast:
-          case CheckedCastKind::DictionaryDowncast:
-          case CheckedCastKind::DictionaryDowncastBridged:
-          case CheckedCastKind::SetDowncast:
-          case CheckedCastKind::SetDowncastBridged:
-          case CheckedCastKind::ValueCast:
-          case CheckedCastKind::BridgeFromObjectiveC:
-            TC.diagnose(coerceExpr->getLoc(), diag::missing_forced_downcast,
-                        fromType, toType)
-              .highlight(coerceExpr->getSourceRange())
-              .fixItReplace(coerceExpr->getLoc(), "as!");
-            diagnosed = true;
-            break;
-          }
-        }
-        break;
-      }
-      }
-
-      // FIXME: It would be really nice to emit a follow-up note showing where
-      // we got the other type information from, e.g., the parameter we're
-      // initializing.
-    }
-
-    if (diagnosed)
-      return nullptr;
-
-    // We didn't manage to diagnose anything well, so fall back to
+    for (unsigned i = 0, e = solution.Fixes.size(); i != e; ++i)
+      diagnosed |= applySolutionFix(expr, solution, i);
+    
+    // If we didn't manage to diagnose anything well, so fall back to
     // diagnosing mining the system to construct a reasonable error message.
-    diagnoseFailureForExpr(expr);
+    if (!diagnosed)
+      diagnoseFailureForExpr(expr);
 
     return nullptr;
   }

@@ -1514,6 +1514,12 @@ private:
   /// constraint system for further exploration.
   void applySolution(const Solution &solution);
 
+  /// \brief Apply the specified Fix # to this solution, producing a fixit hint
+  /// diagnostic for it and returning true.  If the fixit hint turned out to be
+  /// bogus, this returns false and doesn't emit anything.
+  bool applySolutionFix(Expr *expr, const Solution &solution, unsigned fixNo);
+  
+  
   /// \brief Restore the type variable bindings to what they were before
   /// we attempted to solve this constraint system.
   ///
