@@ -108,7 +108,7 @@ Fortunately, this should be fairly simple: when inferring the type of a property
 Proposed Architecture
 ---------------------
 
-To address the problems with the current declaration type checker, we propose a new architecture. The key components of the new architecture are::
+To address the problems with the current declaration type checker, we propose a new architecture. The key components of the new architecture are:
 
 **Represent phases in the AST**: Each AST node should know to which phase it has been type-checked. Any accessor on the AST has a corresponding minimum phase, which it can assert. For example, the accessor that retrieves the superclass of a class declaration will assert that the class is at least at the "type hierarchies" phase; it's programmer error to not have established that the class is at that phase before asking the question.
 
@@ -148,7 +148,7 @@ Note that the conformance lookup table does *not* implement a dependency graph o
 How do we get there?
 ~~~~~~~~~~~~~~~~~~~~
 
-The proposed architecture is significantly different from the current type checker architecture, so how do we get there from here? There are a few concrete steps we can take::
+The proposed architecture is significantly different from the current type checker architecture, so how do we get there from here? There are a few concrete steps we can take:
 
 **Make all AST nodes phase-aware**: Introduce a trait that can ask an arbitrary AST node (``Decl``, ``TypeRepr``, ``Pattern``, etc.) its current phase. AST nodes may compute this information on-the-fly or store it, as appropriate. For example, a ``TypeRepr`` can generally determine its phase based on the existing state of the ``IdentTypeRepr`` nodes it includes.
 
@@ -174,7 +174,7 @@ How do we test it?
 How do we measure progress?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The proposed change is a major architectural shift, and it's only complete when we have eliminated all ad hoc recursion from the front end. There are a few ways in which we can measure progress along the way::
+The proposed change is a major architectural shift, and it's only complete when we have eliminated all ad hoc recursion from the front end. There are a few ways in which we can measure progress along the way:
 
 **AST nodes that implement the phase-aware trait**: Eventually, all of our AST nodes will implement the phase-aware trait. The number of AST nodes that do properly implement that trait (reporting current phase, enumerating dependencies for a phase transition) and become part of the dependency graph and priorty queue gives an indication of how far we've gotten.
 
