@@ -2228,8 +2228,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
     if (AE->getFn()->getSemanticsProvidingExpr() == anchor) {
       // Type check the argument list independently to try to get a concrete
       // type (ignoring context).
-      argExpr = typeCheckArbitrarySubExprIndependently(AE->getArg(),
-                                                       TCC_AllowUnresolved);
+      argExpr = typeCheckArbitrarySubExprIndependently(AE->getArg());
       if (!argExpr) return true;
     }
 
