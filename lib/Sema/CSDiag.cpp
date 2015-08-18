@@ -4106,10 +4106,30 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     return;
   }
   
+
+  // Attempt to re-type-check the entire expression, while allowing ambiguity.
+  auto exprType = getTypeOfTypeCheckedChildIndependently(expr,
+                                               TCCFlags::TCC_AllowUnresolved);
+  // If it failed an diagnosed something, then we're done.
+  if (!exprType) return;
+
+  // If we were able to find something more specific than "unknown" (perhaps
+  // something like "[_:_]" for a dictionary literal), include it in the
+  // diagnostic.
+  if (!exprType->is<UnresolvedType>() && !exprType->is<TypeVariableType>()) {
+    diagnose(E->getLoc(), diag::specific_type_of_expression_is_ambiguous,
+             exprType)
+      .highlight(E->getSourceRange());
+    return;
+  }
+
+  
+  
   // If there are no posted constraints or failures, then there was
   // not enough contextual information available to infer a type for the
   // expression.
-  diagnose(E->getLoc(), diag::type_of_expression_is_ambiguous);
+  diagnose(E->getLoc(), diag::type_of_expression_is_ambiguous)
+    .highlight(E->getSourceRange());
 }
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {

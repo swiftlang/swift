@@ -730,7 +730,7 @@ func inoutTests(inout arr: Int) {
 
   inoutTests(true ? &x : &y);  // expected-error 2 {{'&' can only appear immediately in a call argument list}}
 
-  &_ // expected-error {{type of expression is ambiguous without more context}}
+  &_ // expected-error {{expression type 'inout _' is ambiguous without more context}}
 
   inoutTests((&x))   // expected-error {{'&' can only appear immediately in a call argument list}}
   inoutTests(&x)

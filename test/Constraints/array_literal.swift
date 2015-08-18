@@ -101,4 +101,4 @@ func longArray() {
   var _=["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
 }
 
-[1,2].map // expected-error {{type of expression is ambiguous without more context}}
+[1,2].map // expected-error {{expression type '(@noescape (Int) throws -> _) throws -> [_]' is ambiguous without more context}}
