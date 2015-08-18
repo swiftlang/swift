@@ -2394,14 +2394,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     return true;
   }
 
-  // FIXME: diag::invalid_relation is total overkill for this. In terms of the
-  // number of messages it can produce.
-  auto failureKind = Failure::FailureKind::TypesNotConvertible;
-  if (constraint->getKind() == ConstraintKind::Subtype)
-    failureKind = Failure::FailureKind::TypesNotSubtypes;
-
-  diagnose(anchor->getLoc(), diag::invalid_relation,
-           failureKind - Failure::TypesNotEqual,
+  diagnose(anchor->getLoc(), diag::types_not_convertible,
+           constraint->getKind() == ConstraintKind::Subtype,
            fromType, toType)
     .highlight(anchor->getSourceRange());
 
