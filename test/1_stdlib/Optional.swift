@@ -1,6 +1,21 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
+protocol TestProtocol1 {}
+
+// Check that the generic parameter is called 'Memory'.
+extension Optional where Wrapped : TestProtocol1 {
+  var _wrappedIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension ImplicitlyUnwrappedOptional where Wrapped : TestProtocol1 {
+  var _wrappedIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 var x : Optional<Int> = nil
 if x != nil { 
   print("x is non-empty!")

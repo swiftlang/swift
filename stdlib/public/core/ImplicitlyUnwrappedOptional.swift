@@ -14,22 +14,25 @@
 /// magic).
 ///
 /// The compiler has special knowledge of the existence of
-/// `ImplicitlyUnwrappedOptional<T>`, but always interacts with it using the
-/// library intrinsics below.
-public enum ImplicitlyUnwrappedOptional<T>
+/// `ImplicitlyUnwrappedOptional<Wrapped>`, but always interacts with it using
+/// the library intrinsics below.
+public enum ImplicitlyUnwrappedOptional<Wrapped>
   : _Reflectable, NilLiteralConvertible {
   case None
-  case Some(T)
+  case Some(Wrapped)
+
+  @available(*, unavailable, renamed="Wrapped")
+  public typealias T = Wrapped
 
   /// Construct a `nil` instance.
   public init() { self = .None }
 
   /// Construct a non-`nil` instance that stores `some`.
-  public init(_ some : T) { self = .Some(some) }
+  public init(_ some: Wrapped) { self = .Some(some) }
 
   /// Construct an instance from an explicitly unwrapped optional
-  /// (`T?`).
-  public init(_ v : T?) {
+  /// (`Wrapped?`).
+  public init(_ v: Wrapped?) {
     switch v {
     case .Some(let some):
       self = .Some(some)
@@ -46,7 +49,7 @@ public enum ImplicitlyUnwrappedOptional<T>
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
   @warn_unused_result
-  public func map<U>(@noescape f: (T) throws -> U)
+  public func map<U>(@noescape f: (Wrapped) throws -> U)
       rethrows -> ImplicitlyUnwrappedOptional<U> {
     switch self {
     case .Some(let y):
@@ -58,8 +61,9 @@ public enum ImplicitlyUnwrappedOptional<T>
 
   /// Returns `nil` if `self` is nil, `f(self!)` otherwise.
   @warn_unused_result
-  public func flatMap<U>(@noescape f: (T) throws -> ImplicitlyUnwrappedOptional<U>)
-      rethrows -> ImplicitlyUnwrappedOptional<U> {
+  public func flatMap<U>(
+    @noescape f: (Wrapped) throws -> ImplicitlyUnwrappedOptional<U>
+  ) rethrows -> ImplicitlyUnwrappedOptional<U> {
     switch self {
     case .Some(let y):
       return try f(y)
@@ -74,7 +78,7 @@ public enum ImplicitlyUnwrappedOptional<T>
     if let value = self {
       return _reflect(value)
     } else {
-      return _OptionalMirror<T>(.None)
+      return _OptionalMirror<Wrapped>(.None)
     }
   }
 }
@@ -94,7 +98,7 @@ extension ImplicitlyUnwrappedOptional : CustomStringConvertible {
 @transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC
-func _getImplicitlyUnwrappedOptionalValue<T>(v: T!) -> T {
+func _getImplicitlyUnwrappedOptionalValue<Wrapped>(v: Wrapped!) -> Wrapped {
   switch v {
   case .Some(let x):
     return x
@@ -107,21 +111,23 @@ func _getImplicitlyUnwrappedOptionalValue<T>(v: T!) -> T {
 @transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC
-func _injectValueIntoImplicitlyUnwrappedOptional<T>(v: T) -> T! {
+func _injectValueIntoImplicitlyUnwrappedOptional<Wrapped>(
+  v: Wrapped
+) -> Wrapped! {
   return .Some(v)
 }
 
 @transparent
 @warn_unused_result
 public // COMPILER_INTRINSIC
-func _injectNothingIntoImplicitlyUnwrappedOptional<T>() -> T! {
+func _injectNothingIntoImplicitlyUnwrappedOptional<Wrapped>() -> Wrapped! {
   return .None
 }
 
 #if _runtime(_ObjC)
 extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
   public static func _getObjectiveCType() -> Any.Type {
-    return Swift._getBridgedObjectiveCType(T.self)!
+    return Swift._getBridgedObjectiveCType(Wrapped.self)!
   }
 
   public func _bridgeToObjectiveC() -> AnyObject {
@@ -136,16 +142,17 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
 
   public static func _forceBridgeFromObjectiveC(
     x: AnyObject,
-    inout result: T!?
+    inout result: Wrapped!?
   ) {
-    result = Swift._forceBridgeFromObjectiveC(x, T.self)
+    result = Swift._forceBridgeFromObjectiveC(x, Wrapped.self)
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     x: AnyObject,
-    inout result: T!?
+    inout result: Wrapped!?
   ) -> Bool {
-    let bridged: T? = Swift._conditionallyBridgeFromObjectiveC(x, T.self)
+    let bridged: Wrapped? =
+      Swift._conditionallyBridgeFromObjectiveC(x, Wrapped.self)
     if let value = bridged {
       result = value
     }
@@ -154,7 +161,7 @@ extension ImplicitlyUnwrappedOptional : _ObjectiveCBridgeable {
   }
 
   public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(T.self)
+    return Swift._isBridgedToObjectiveC(Wrapped.self)
   }
 }
 #endif
