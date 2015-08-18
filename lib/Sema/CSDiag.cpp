@@ -1832,7 +1832,6 @@ private:
   bool visitAssignExpr(AssignExpr *AE);
   bool visitInOutExpr(InOutExpr *IOE);
   bool visitCoerceExpr(CoerceExpr *CE);
-  bool visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCCE);
   bool visitIfExpr(IfExpr *IE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
   bool visitClosureExpr(ClosureExpr *CE);
@@ -1842,9 +1841,7 @@ private:
 
 
 static bool isMemberConstraint(Constraint *C) {
-  return C->getKind() == ConstraintKind::ValueMember ||
-         C->getKind() == ConstraintKind::UnresolvedValueMember ||
-         C->getKind() == ConstraintKind::TypeMember;
+  return C->getClassification() == ConstraintClassification::Member;
 }
 
 static bool isOverloadConstraint(Constraint *C) {
@@ -1861,23 +1858,7 @@ static bool isOverloadConstraint(Constraint *C) {
 /// Return true if this constraint is a conversion or requirement between two
 /// types.
 static bool isConversionConstraint(const Constraint *C) {
-  switch (C->getKind()) {
-  case ConstraintKind::Bind:
-  case ConstraintKind::Equal:
-  case ConstraintKind::Conversion:
-  case ConstraintKind::ExplicitConversion:
-  case ConstraintKind::ArgumentConversion:
-  case ConstraintKind::ArgumentTupleConversion:
-  case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
-  case ConstraintKind::Subtype:
-  case ConstraintKind::CheckedCast:
-  case ConstraintKind::ApplicableFunction:
-    return true;
-    
-  default:
-    return false;
-  }
+  return C->getClassification() == ConstraintClassification::Relational;
 }
 
 /// Return true if this member constraint is a low priority for diagnostics, so
@@ -2345,52 +2326,14 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 
   fromType = fromType->getRValueType();
   auto toType = CS->simplifyType(constraint->getSecondType());
-  
-  // If this constraint doesn't simplify into an error, then
-  if (CS->simplifyConstraint(*constraint) !=
-      ConstraintSystem::SolutionKind::Error)
-    return false;
-  
 
   // If the second type is a type variable, the expression itself is
   // ambiguous.  Bail out so the general ambiguity diagnosing logic can handle
   // it.
-  if (fromType->is<TypeVariableType>() ||
-      fromType->is<UnresolvedType>() ||
+  if (fromType->is<TypeVariableType>() || fromType->is<UnresolvedType>() ||
       fromType->is<UnboundGenericType>() ||
-      toType->is<TypeVariableType>() ||
-      toType->is<UnresolvedType>()) {
-    diagnoseAmbiguity(anchor);
-    return true;
-  }
-  
-  auto failureKind = Failure::FailureKind::TypesNotConvertible;
-  switch (constraint->getKind()) {
-  case ConstraintKind::ConformsTo:
-  case ConstraintKind::SelfObjectOfProtocol:
-    if (auto pt = toType->getAs<ProtocolType>())
-      if (pt->getDecl()->
-          isSpecificProtocol(KnownProtocolKind::NilLiteralConvertible)) {
-        diagnose(expr->getLoc(), diag::cannot_use_nil_with_this_type, toType)
-          .highlight(expr->getSourceRange());
-        return true;
-      }
-
-    diagnose(anchor->getLoc(), diag::type_does_not_conform,
-             fromType, toType)
-      .highlight(expr->getSourceRange());
-      return true;
-      
-    case ConstraintKind::Subtype:
-      failureKind = Failure::FailureKind::TypesNotSubtypes;
-      break;
-    case ConstraintKind::Conversion:
-    case ConstraintKind::ExplicitConversion:
-      failureKind = Failure::FailureKind::TypesNotConvertible;
-      break;
-    case ConstraintKind::ArgumentTupleConversion:
-    default: break;
-  }
+      toType->is<TypeVariableType>() || toType->is<UnresolvedType>())
+    return false;
 
   // Try to simplify irrelevant details of function types.  For example, if
   // someone passes a "() -> Float" function to a "() throws -> Int"
@@ -2423,6 +2366,49 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       }
     }
 
+  // Check to see if this constraint came from a forced cast instruction. If so,
+  // and if this conversion constraint is different than the types being cast,
+  // produce a note that talks about the overall expression.
+  if (constraint->getLocator() && constraint->getLocator()->getAnchor() ==expr){
+    if (auto ECE = dyn_cast<ExplicitCastExpr>(expr))
+      if (!toType->isEqual(ECE->getCastTypeLoc().getType()))
+        diagnose(expr->getLoc(), diag::in_cast_expr_types,
+                 ECE->getSubExpr()->getType()->getRValueType(),
+                 ECE->getCastTypeLoc().getType()->getRValueType())
+        .highlight(ECE->getSubExpr()->getSourceRange())
+        .highlight(ECE->getCastTypeLoc().getSourceRange());
+  }
+
+  if (auto PT = toType->getAs<ProtocolType>()) {
+    // Check for "=" converting to BooleanType.  The user probably meant ==.
+    if (auto *AE = dyn_cast<AssignExpr>(expr->getValueProvidingExpr()))
+      if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::BooleanType)) {
+        diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
+        .fixItReplace(AE->getEqualLoc(), "==")
+        .highlight(AE->getDest()->getLoc())
+        .highlight(AE->getSrc()->getLoc());
+        return true;
+      }
+ 
+    if (PT->getDecl()->
+        isSpecificProtocol(KnownProtocolKind::NilLiteralConvertible)) {
+      diagnose(expr->getLoc(), diag::cannot_use_nil_with_this_type, toType)
+        .highlight(expr->getSourceRange());
+      return true;
+    }
+
+    // Emit a conformance error through conformsToProtocol.  If this succeeds,
+    // then keep searching.
+    if (CS->TC.conformsToProtocol(fromType, PT->getDecl(), CS->DC,
+                                  ConformanceCheckFlags::InExpression,
+                                  nullptr, expr->getLoc()))
+      return false;
+    return true;
+  }
+
+  auto failureKind = Failure::FailureKind::TypesNotConvertible;
+  if (constraint->getKind() == ConstraintKind::Subtype)
+    failureKind = Failure::FailureKind::TypesNotSubtypes;
 
   diagnose(anchor->getLoc(), diag::invalid_relation,
            failureKind - Failure::TypesNotEqual,
@@ -2431,6 +2417,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   
   return true;
 }
+
 namespace {
   class ExprTypeSaver {
     llvm::DenseMap<Expr*, Type> ExprTypes;
@@ -2746,6 +2733,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
 /// of the specified node.
 Expr *FailureDiagnosis::
 typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
+  // If we're type checking an arbitrary subexpr, always allow ambiguity given
+  // that arbitrary contextual information has been stripped off.
+  options |= TCC_AllowUnresolved;
+
   if (subExpr == expr)
     return typeCheckChildIndependently(subExpr, options);
   
@@ -3684,23 +3675,6 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
     return true;
 
   // If that worked, then there must be something other issue.
-  return false;
-}
-
-bool FailureDiagnosis::
-visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCE) {
-  Expr *subExpr = typeCheckChildIndependently(FCE->getSubExpr());
-  if (!subExpr) return true;
-  Type subType = subExpr->getType();
-
-  if (!subType->is<TypeVariableType>()) {
-    diagnose(FCE->getLoc(), diag::invalid_relation,
-             Failure::TypesNotConvertible - Failure::TypesNotEqual,
-             subType, FCE->getType())
-      .highlight(FCE->getSourceRange());
-    return true;
-  }
-
   return false;
 }
 

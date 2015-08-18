@@ -461,6 +461,9 @@ ERROR(invalid_relation,sema_tcc,none,
       "%1 is not %select{identical to|a subtype of|"
       "convertible to|constructible with|identical to}0 %2",
       (unsigned, Type, Type))
+NOTE(in_cast_expr_types,sema_tcc,none,
+      "in cast from type %0 to %1",
+      (Type, Type))
 
 ERROR(invalid_force_unwrap,sema_tcc,none,
       "cannot force unwrap value of non-optional type %0", (Type))

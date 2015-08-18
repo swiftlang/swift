@@ -32,7 +32,9 @@ setD = setC as! Set<D>
 if let setD = setC as? Set<D> { }
 
 // Test set downcasts to unrelated types.
-setC as! Set<U> // expected-error{{'Set<C>' is not convertible to 'Set<U>'}}
+setC as! Set<U> // expected-error{{'U' is not a subtype of 'C'}}
+// expected-note @-1 {{in cast from type 'Set<C>' to 'Set<U>'}}
 
 // Test set conditional downcasts to unrelated types
 if let setU = setC as? Set<U> { } // expected-error{{'U' is not a subtype of 'C'}}
+// expected-note @-1 {{in cast from type 'Set<C>' to 'Set<U>'}}
