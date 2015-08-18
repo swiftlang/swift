@@ -406,16 +406,34 @@ var st_u8 = " \u{DFFF} "  // expected-error {{invalid unicode scalar}}
 var st_u10 = " \u{0010FFFD} "  // Last valid codepoint, 0xFFFE and 0xFFFF are reserved in each plane
 var st_u11 = " \u{00110000} "  // expected-error {{invalid unicode scalar}}
 
-func stringliterals() {
+func stringliterals(d: [String: Int]) {
 
   // rdar://11385385
   var x = 4
   "Hello \(x+1) world"
   
-  "Error: \(x+1"; // expected-error {{unexpected '"' character in string interpolation}}
+  "Error: \(x+1"; // expected-error {{unterminated string literal}}
   
   "Error: \(x+1   // expected-error {{unterminated string literal}}
   ;
+
+  // rdar://14050788 [DF] String Interpolations can't contain quotes
+  "test \("nested")"
+  "test \("\("doubly nested")")"
+  "test \(d["hi"])"
+  "test \("quoted-paren )")"
+  "test \("quoted-paren (")"
+  "test \("\\")"
+  "test \("\n")"
+  "test \("\")" // expected-error {{unterminated string literal}}
+
+  "test \
+  // expected-error @-1 {{unterminated string literal}} expected-error @-1 {{invalid escape sequence in literal}}
+  "test \("\
+  // expected-error @-1 {{unterminated string literal}}
+  "test newline \("something" +
+    "something else")"
+  // expected-error @-2 {{unterminated string literal}} expected-error @-1 {{unterminated string literal}}
 
   // FIXME: bad diagnostics.
   /* expected-error {{unterminated string literal}} expected-error {{expected ',' separator}} expected-error {{expected ',' separator}} expected-note {{to match this opening '('}}  */ var x2 : () = ("hello" + "

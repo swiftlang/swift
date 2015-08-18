@@ -1019,40 +1019,62 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
 }
 
 /// skipToEndOfInterpolatedExpression - Given the first character after a \(
-/// sequence in a string literal (the start of an interpolated expression), 
+/// sequence in a string literal (the start of an interpolated expression),
 /// scan forward to the end of the interpolated expression and return the end.
-/// On success, the returned pointer will point to a ')'.  On failure, it will
-/// point to something else.  This basically just does brace matching.
+/// On success, the returned pointer will point to the ')' at the end of the
+/// interpolated expression.  On failure, it will point to the first character
+/// that cannot be lexed as part of the interpolated expression; this character
+/// will never be ')'.
+///
+/// This function performs brace and quote matching, keeping a stack of
+/// outstanding delimiters as it scans the string.
 static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
                                                      const char *EndPtr,
                                                      DiagnosticEngine *Diags) {
-  SourceLoc InterpStart = Lexer::getSourceLoc(CurPtr-1);
-  unsigned ParenCount = 1;
+  llvm::SmallVector<char, 4> OpenDelimiters;
+  auto inStringLiteral = [&]() {
+    return !OpenDelimiters.empty() && OpenDelimiters.back() == '"';
+  };
   while (true) {
-    // This is a very simple scanner.  The implications of this include not
-    // being able to use string literals in an interpolated string, and not
+    // This is a simple scanner, capable of recognizing nested parentheses and
+    // string literals but not much else.  The implications of this include not
     // being able to break an expression over multiple lines in an interpolated
-    // string.  Both of these limitations make this simple and allow us to
-    // recover from common errors though.
+    // string.  This limitation allows us to recover from common errors though.
     //
     // On success scanning the expression body, the real lexer will be used to
     // relex the body when parsing the expressions.  We let it diagnose any
     // issues with malformed tokens or other problems.
     switch (*CurPtr++) {
-    // String literals in general cannot be split across multiple lines,
+    // String literals in general cannot be split across multiple lines;
     // interpolated ones are no exception.
     case '\n':
     case '\r':
       // Will be diagnosed as an unterminated string literal.
       return CurPtr-1;
 
-    // String literals cannot be used in interpolated string literals.
     case '"':
-      if (Diags)
-        Diags->diagnose(Lexer::getSourceLoc(CurPtr - 1),
-                        diag::lex_unexpected_quote_string_interpolation)
-            .highlightChars(InterpStart, Lexer::getSourceLoc(CurPtr-1));
-      return CurPtr-1;
+      if (inStringLiteral()) {
+        OpenDelimiters.pop_back();
+      } else {
+        OpenDelimiters.push_back('"');
+      }
+      continue;
+    case '\\':
+      if (inStringLiteral()) {
+        char escapedChar = *CurPtr++;
+        switch (escapedChar) {
+        case '(':
+          // Entering a recursive interpolated expression
+          OpenDelimiters.push_back('(');
+          continue;
+        case '\n': case '\r': case 0:
+          // Don't jump over newline/EOF due to preceding backslash!
+          return CurPtr-1;
+        default:
+          continue;
+        }
+      }
+      continue;
     case 0:
       // If we hit EOF, we fail.
       if (CurPtr-1 == EndPtr) {
@@ -1065,13 +1087,23 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
         
     // Paren nesting deeper to support "foo = \((a+b)-(c*d)) bar".
     case '(':
-      ++ParenCount;
+      if (!inStringLiteral()) {
+        OpenDelimiters.push_back('(');
+      }
       continue;
     case ')':
-      // If this is the last level of nesting, then we're done!
-      if (--ParenCount == 0)
+      if (OpenDelimiters.empty()) {
+        // No outstanding open delimiters; we're done.
         return CurPtr-1;
-      continue;
+      } else if (OpenDelimiters.back() == '(') {
+        // Pop the matching bracket and keep going.
+        OpenDelimiters.pop_back();
+        continue;
+      } else {
+        // It's a right parenthesis in a string literal.
+        assert(inStringLiteral());
+        continue;
+      }
     default:
       // Normal token character.
       continue;
@@ -1098,6 +1130,7 @@ void Lexer::lexStringLiteral() {
         // Successfully scanned the body of the expression literal.
         CurPtr = EndPtr+1;
       } else {
+        CurPtr = EndPtr;
         wasErroneous = true;
       }
       continue;
