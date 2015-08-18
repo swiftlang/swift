@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 210; // Last change: nothrow flag in apply_inst
+const uint16_t VERSION_MINOR = 211; // Last change: generic param inherited list
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -755,7 +755,7 @@ namespace decls_block {
     BCVBR<4>,    // index
     TypeIDField, // superclass type
     TypeIDField, // archetype type
-    BCArray<DeclIDField> // protocols
+    BCArray<TypeIDField> // inherited types
   >;
 
   using AssociatedTypeDeclLayout = BCRecordLayout<

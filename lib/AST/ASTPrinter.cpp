@@ -1020,8 +1020,7 @@ void PrintAST::printInherited(const ExtensionDecl *decl) {
 }
 
 void PrintAST::printInherited(const GenericTypeParamDecl *D) {
-  printInherited(D, D->getInherited(), D->getConformingProtocols(nullptr),
-                 D->getSuperclass(), false, true);
+  printInherited(D, D->getInherited(), { });
 }
 
 static void getModuleEntities(const clang::Module *ClangMod,
@@ -1220,8 +1219,7 @@ void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
       Printer.printName(decl->getName());
     });
 
-  printInherited(decl, decl->getInherited(),
-                 decl->getConformingProtocols(nullptr), decl->getSuperclass());
+  printInherited(decl, decl->getInherited(), { });
 }
 
 void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {

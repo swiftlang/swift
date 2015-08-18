@@ -2091,7 +2091,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     unsigned index;
     TypeID superclassID;
     TypeID archetypeID;
-    ArrayRef<uint64_t> rawProtocolIDs;
+    ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::GenericTypeParamDeclLayout::readRecord(scratch, nameID,
                                                         contextID,
@@ -2100,7 +2100,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                         index,
                                                         superclassID,
                                                         archetypeID,
-                                                        rawProtocolIDs);
+                                                        rawInheritedIDs);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
 
@@ -2120,11 +2120,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     genericParam->setSuperclass(getType(superclassID));
     genericParam->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
 
-    auto protos = ctx.Allocate<ProtocolDecl *>(rawProtocolIDs.size());
-    for_each(protos, rawProtocolIDs, [this](ProtocolDecl *&p, uint64_t rawID) {
-      p = cast<ProtocolDecl>(getDecl(rawID));
+    auto inherited = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
+    for_each(inherited, rawInheritedIDs, [this](TypeLoc &loc, uint64_t rawID) {
+      loc.setType(getType(rawID));
     });
-    genericParam->setProtocols(protos);
+    genericParam->setInherited(inherited);
+
+    genericParam->setProtocols({ });
 
     genericParam->setCheckedInheritanceClause();
     break;

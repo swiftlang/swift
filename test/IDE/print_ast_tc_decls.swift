@@ -852,7 +852,7 @@ protocol AssociatedType1 {
 // PASS_ONE_LINE-DAG: {{^}}  typealias AssociatedTypeDecl2 : FooProtocol{{$}}
 
   typealias AssociatedTypeDecl3 : FooProtocol, BarProtocol
-// PASS_ONE_LINE-DAG: {{^}}  typealias AssociatedTypeDecl3 : FooProtocol, BarProtocol{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  typealias AssociatedTypeDecl3 : FooProtocol, BarProtocol{{$}}
 }
 
 //===---

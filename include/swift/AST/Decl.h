@@ -2530,10 +2530,7 @@ public:
 
   /// Retrieve the set of protocols to which this abstract type
   /// parameter conforms.
-  ArrayRef<ProtocolDecl *> getConformingProtocols(
-                             LazyResolver *resolver) const {
-    return getProtocols();
-  }
+  ArrayRef<ProtocolDecl *> getConformingProtocols(LazyResolver *resolver) const;
 
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractTypeParamDecl &&
@@ -3591,10 +3588,7 @@ public:
   using Decl::getASTContext;
 
   /// Retrieve the set of protocols inherited from this protocol.
-  ArrayRef<ProtocolDecl *> getInheritedProtocols(
-                             LazyResolver *resolver) const {
-    return getProtocols();
-  }
+  ArrayRef<ProtocolDecl *> getInheritedProtocols(LazyResolver *resolver) const;
 
   /// \brief Determine whether this protocol inherits from the given ("super")
   /// protocol.

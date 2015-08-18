@@ -2059,6 +2059,14 @@ SourceRange TypeAliasDecl::getSourceRange() const {
   return { TypeAliasLoc, getNameLoc() };
 }
 
+ArrayRef<ProtocolDecl *> AbstractTypeParamDecl::getConformingProtocols(
+                             LazyResolver *resolver) const {
+  if (Archetype)
+    return Archetype->getConformsTo();
+
+  return getProtocols();
+}
+
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,
                                            SourceLoc nameLoc,
                                            unsigned depth, unsigned index)
@@ -2407,6 +2415,11 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   ProtocolDeclBits.HasMissingRequirements = false;
   ProtocolDeclBits.InheritedProtocolsWereDeserialized = false;
+}
+
+ArrayRef<ProtocolDecl *>
+ProtocolDecl::getInheritedProtocols(LazyResolver *resolver) const {
+  return getProtocols();
 }
 
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
