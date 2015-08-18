@@ -3300,6 +3300,15 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   auto lhsType = lhsExpr->getType()->getRValueType();
   auto rhsType = rhsExpr->getType()->getRValueType();
 
+  if (binop->isImplicit() && overloadName == "~=") {
+    // This binop was synthesized when typechecking an expression pattern.
+    diagnose(lhsExpr->getLoc(),
+             diag::cannot_match_expr_pattern_with_value, lhsType, rhsType)
+      .highlight(lhsExpr->getSourceRange())
+      .highlight(rhsExpr->getSourceRange());
+    return true;
+  }
+
   // If this is a comparison against nil, then we should produce a specific
   // diagnostic.
   if (isa<NilLiteralExpr>(rhsExpr->getValueProvidingExpr()) &&
