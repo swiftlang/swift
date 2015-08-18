@@ -2156,7 +2156,7 @@ ERROR(class_super_access,sema_tcd,none,
       "superclass is %select{private|internal|PUBLIC}2",
       (bool, Accessibility, Accessibility))
 ERROR(dot_protocol_on_non_existential,sema_tct,none,
-      "'Protocol' type only applies to existential types", ())
+      "cannot use 'Protocol' with non-protocol type %0", (Type))
 ERROR(tuple_single_element,sema_tcd,none,
       "cannot create a single-element tuple with an element label", ())
 ERROR(tuple_ellipsis,sema_tcd,none,

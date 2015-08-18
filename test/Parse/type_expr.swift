@@ -61,6 +61,8 @@ func unqualifiedType() {
 
 func qualifiedType() {
   _ = Foo.Bar.self
+  let _ : Foo.Bar.Type = Foo.Bar.self
+  let _ : Foo.Protocol = Foo.self // expected-error{{cannot use 'Protocol' with non-protocol type 'Foo'}}
   _ = Foo.Bar()
   _ = Foo.Bar.prop
   _ = Foo.Bar.meth
@@ -164,7 +166,7 @@ func meta_metatypes() {
   let _: P.Protocol = P.self
   _ = P.Type.self
   _ = P.Protocol.self
-  _ = P.Protocol.Protocol.self // expected-error{{'Protocol' type only applies to existential types}}
+  _ = P.Protocol.Protocol.self // expected-error{{cannot use 'Protocol' with non-protocol type 'P.Protocol'}}
   _ = P.Protocol.Type.self
   _ = B.Type.self
 }

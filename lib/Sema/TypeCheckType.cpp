@@ -2105,7 +2105,8 @@ Type TypeResolver::buildProtocolType(ProtocolTypeRepr *repr,
                                      Type instanceType,
                                      Optional<MetatypeRepresentation> storedRepr) {
   if (!instanceType->isAnyExistentialType()) {
-    TC.diagnose(repr->getProtocolLoc(), diag::dot_protocol_on_non_existential);
+    TC.diagnose(repr->getProtocolLoc(), diag::dot_protocol_on_non_existential,
+                instanceType);
     return ErrorType::get(TC.Context);
   }
 
