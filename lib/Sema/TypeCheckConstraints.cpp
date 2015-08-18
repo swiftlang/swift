@@ -1145,7 +1145,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // Verify that a purpose was specified if a convertType was.
   assert(!convertType == (convertTypePurpose == CTP_Unused) &&
          "Purpose for conversion type was not specified");
-  
+
   // If we're asked to convert to an UnresolvedType, then ignore the request.
   // This happens when CSDiags nukes a type.
   if (convertType) {
@@ -1155,7 +1155,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
       convertTypePurpose = CTP_Unused;
     }
   }
-  
+
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
   if (!convertType.isNull())

@@ -2632,14 +2632,20 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   
   // If we have a conversion type, but it has type variables (from the current
   // ConstraintSystem), then we can't use it.
-  if (convertType &&
-      (convertType->hasTypeVariable() ||
-       // If the contextual type has an archetype, we need to open it, but
-       // don't know how yet.
-       // FIXME: implement opening of archetypes.
-       convertType->hasArchetype())) {
-    convertType = Type();
-    convertTypePurpose = CTP_Unused;
+  if (convertType) {
+    // If the conversion type contains no info, drop it.
+    if (convertType->is<UnresolvedType>() ||
+        (convertType->is<MetatypeType>() && convertType->hasUnresolvedType()) ||
+
+        convertType->hasTypeVariable() ||
+        // If the contextual type has an archetype, we need to open it, but
+        // don't know how yet.
+        // FIXME: implement opening of archetypes, or map them to protocols or
+        // to UnresolvedTypes.
+        convertType->hasArchetype()) {
+      convertType = Type();
+      convertTypePurpose = CTP_Unused;
+    }
   }
 
   if (isa<ClosureExpr>(subExpr))
@@ -3506,7 +3512,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 
   // If we resolved a concrete expression for the callee, and it has
   // non-function/non-metatype type, then we cannot call it!
-  if (!fnType->hasTypeVariable() &&
+  if (!fnType->hasUnresolvedType() && !fnType->hasTypeVariable() &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
     
     // If the argument is a trailing ClosureExpr (i.e. {....}) and it is on a
