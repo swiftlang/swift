@@ -41,7 +41,6 @@
 
 #include <dlfcn.h>
 #include <cstring>
-#include <deque>
 #include <mutex>
 #include <atomic>
 #include <sstream>
@@ -2178,15 +2177,6 @@ const {
 // protocol conformance lookup.
 static std::once_flag InstallProtocolConformanceAddImageCallbackOnce;
 
-// Monotonic generation number that is increased when we load an image with
-// new protocol conformances.
-//
-// Although this is atomically readable, writes or cached stores of the value
-// must be guarded by the SectionsToScanLock in order to ensure the generation
-// number agrees with the state of the queue at the time of caching.
-static std::atomic<unsigned> ProtocolConformanceGeneration
-  = ATOMIC_VAR_INIT(0);
-
 namespace {
   struct ConformanceSection {
     const ProtocolConformanceRecord *Begin, *End;
@@ -2286,10 +2276,11 @@ namespace {
 
 struct ConformanceState {
   ConcurrentMap<size_t, ConformanceCacheEntry> Cache;
-  std::deque<ConformanceSection> SectionsToScan;
+  std::vector<ConformanceSection> SectionsToScan;
   pthread_mutex_t SectionsToScanLock;
   
   ConformanceState() {
+    SectionsToScan.reserve(16);
     pthread_mutex_init(&SectionsToScanLock, nullptr);
   }
 };
@@ -2304,12 +2295,11 @@ void
 swift::swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
                                           const ProtocolConformanceRecord *end){
   auto &C = Conformances.get();
-  
+
   pthread_mutex_lock(&C.SectionsToScanLock);
-  // Increase the generation to invalidate cached negative lookups.
-  ++ProtocolConformanceGeneration;
-  
+
   C.SectionsToScan.push_back(ConformanceSection{begin, end});
+
   pthread_mutex_unlock(&C.SectionsToScanLock);
 }
 
@@ -2410,8 +2400,12 @@ static size_t hashTypeProtocolPair(const void *type,
 static
 std::pair<const WitnessTable *, bool>
 searchInConformanceCache(const Metadata *type,
-                         const ProtocolDescriptor *protocol){
+                         const ProtocolDescriptor *protocol,
+                         ConformanceCacheEntry *&foundEntry) {
   auto &C = Conformances.get();
+  auto origType = type;
+
+  foundEntry = nullptr;
 
 recur_inside_cache_lock:
 
@@ -2430,8 +2424,11 @@ recur_inside_cache_lock:
       return std::make_pair(Entry.getWitnessTable(), true);
     }
 
+    if (type == origType)
+      foundEntry = &Entry;
+
     // If we got a cached negative response, check the generation number.
-    if (Entry.getFailureGeneration() == ProtocolConformanceGeneration) {
+    if (Entry.getFailureGeneration() == C.SectionsToScan.size()) {
       // We found an entry with a negative value.
       return std::make_pair(nullptr, true);
     }
@@ -2469,6 +2466,42 @@ recur_inside_cache_lock:
   return std::make_pair(nullptr, false);
 }
 
+/// Checks if a given candidate is a type itself, one of its
+/// superclasses or a related generic type.
+/// This check is supposed to use the same logic that is used
+/// by searchInConformanceCache.
+static
+bool isRelatedType(const Metadata *type, const void *candidate) {
+
+  while (true) {
+    if (type == candidate)
+      return true;
+
+    // If the type is generic, see if there's a shared nondependent witness table
+    // for its instances.
+    if (auto generic = type->getGenericPattern()) {
+      if (generic == candidate)
+        return true;
+    }
+
+    // If the type is a class, try its superclass.
+    if (const ClassMetadata *classType = type->getClassObject()) {
+      if (auto super = classType->SuperClass) {
+        if (super != getRootSuperclass()) {
+          type = swift_getObjCClassMetadata(super);
+          if (type == candidate)
+            return true;
+          continue;
+        }
+      }
+    }
+
+    break;
+  }
+
+  return false;
+}
+
 const WitnessTable *
 swift::swift_conformsToProtocol(const Metadata *type,
                                 const ProtocolDescriptor *protocol) {
@@ -2478,15 +2511,24 @@ swift::swift_conformsToProtocol(const Metadata *type,
   // scan it.
   installCallbacksToInspectDylib();
   auto origType = type;
+  
+  unsigned numSections = 0;
+
+  ConformanceCacheEntry *foundEntry;
 
 recur:
   // See if we have a cached conformance. The ConcurrentMap data structure
   // allows us to insert and search the map concurrently without locking.
   // We do lock the slow path because the SectionsToScan data structure is not
   // concurrent.
-  auto FoundConformance = searchInConformanceCache(type, protocol);
+  auto FoundConformance = searchInConformanceCache(type, protocol, foundEntry);
+  // The negative answer does not always mean that there is no conformance,
+  // unless it is an exact match on the type. If it is not an exact match,
+  // it may mean that all of the superclasses do not have this conformance,
+  // but the actual type may still have this conformance.
   if (FoundConformance.second) {
-    return FoundConformance.first;
+    if (FoundConformance.first || foundEntry)
+      return FoundConformance.first;
   }
 
   unsigned failedGeneration = ConformanceCacheGeneration;
@@ -2496,7 +2538,7 @@ recur:
 
   // If we have no new information to pull in (and nobody else pulled in
   // new information while we waited on the lock), we're done.
-  if (C.SectionsToScan.empty()) {
+  if (C.SectionsToScan.size() == numSections) {
     if (failedGeneration != ConformanceCacheGeneration) {
       // Someone else pulled in new conformances while we were waiting.
       // Start over with our newly-populated cache.
@@ -2511,20 +2553,32 @@ recur:
     ConcurrentList<ConformanceCacheEntry> &Bucket =
       C.Cache.findOrAllocateNode(hash);
     Bucket.push_front(ConformanceCacheEntry::createFailure(
-        type, protocol, ProtocolConformanceGeneration));
+        type, protocol, C.SectionsToScan.size()));
     pthread_mutex_unlock(&C.SectionsToScanLock);
     return nullptr;
   }
 
-  while (!C.SectionsToScan.empty()) {
-    auto section = C.SectionsToScan.front();
-    C.SectionsToScan.pop_front();
+  // Update the last known number of sections to scan.
+  numSections = C.SectionsToScan.size();
 
+  // Scan only sections that were not scanned yet.
+  unsigned sectionIdx = foundEntry ? foundEntry->getFailureGeneration() : 0;
+  unsigned endSectionIdx = C.SectionsToScan.size();
+
+  for (; sectionIdx < endSectionIdx; ++sectionIdx) {
+    auto &section = C.SectionsToScan[sectionIdx];
     // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {
       // If the record applies to a specific type, cache it.
       if (auto metadata = record.getCanonicalTypeMetadata()) {
         auto P = record.getProtocol();
+
+        // Look for an exact match.
+        if (protocol != P)
+          continue;
+
+        if (!isRelatedType(type, metadata))
+          continue;
 
         // Hash and lookup the type-protocol pair in the cache.
         size_t hash = hashTypeProtocolPair(metadata, P);
@@ -2537,7 +2591,7 @@ recur:
               ConformanceCacheEntry::createSuccess(metadata, P, witness));
         else
           Bucket.push_front(ConformanceCacheEntry::createFailure(
-              metadata, P, ProtocolConformanceGeneration));
+              metadata, P, C.SectionsToScan.size()));
 
       // If the record provides a nondependent witness table for all instances
       // of a generic type, cache it for the generic pattern.
@@ -2551,6 +2605,13 @@ recur:
 
         auto R = record.getGenericPattern();
         auto P = record.getProtocol();
+
+        // Look for an exact match.
+        if (protocol != P)
+          continue;
+
+        if (!isRelatedType(type, R))
+          continue;
 
         // Hash and lookup the type-protocol pair in the cache.
         size_t hash = hashTypeProtocolPair(R, P);
