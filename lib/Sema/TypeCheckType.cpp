@@ -2943,16 +2943,20 @@ isElementRepresentableInObjC(TypeChecker &TC, const DeclContext *DC, Type T) {
   if (isObjCRepresentableCollection(TC, DC, T))
     return true;
 
-  ProtocolDecl *bridgingProto =
-      TC.getProtocol({}, KnownProtocolKind::_ObjectiveCBridgeable);
-  if (bridgingProto &&
-      TC.conformsToProtocol(T, bridgingProto, const_cast<DeclContext *>(DC),
-                            ConformanceCheckOptions())) {
-    return true;
-  }
-
   if (auto fnTy = T->getAs<AnyFunctionType>())
     return fnTy->getRepresentation() == FunctionTypeRepresentation::Block;
+
+  if (!T->getAs<BoundGenericType>()) {
+    // Don't check this path for collections and other things that are only
+    // conditionally bridged to Objective-C.
+    ProtocolDecl *bridgingProto =
+        TC.getProtocol({}, KnownProtocolKind::_ObjectiveCBridgeable);
+    if (bridgingProto &&
+        TC.conformsToProtocol(T, bridgingProto, const_cast<DeclContext *>(DC),
+                              ConformanceCheckOptions())) {
+      return true;
+    }
+  }
 
   return false;
 }

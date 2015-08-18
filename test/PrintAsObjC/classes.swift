@@ -374,6 +374,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull array;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> * __nonnull arrayOfArrays;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray<BOOL (^)(id __nonnull, NSInteger)> * __nonnull arrayOfBlocks;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray<NSArray<void (^)(void)> *> * __nonnull arrayOfArrayOfBlocks;
 // CHECK-NEXT: @property (nonatomic, copy) NSDictionary<NSString *, NSString *> * __nonnull dictionary;
 // CHECK-NEXT: @property (nonatomic, copy) NSDictionary<NSString *, NSNumber *> * __nonnull dictStringInt;
 // CHECK-NEXT: @property (nonatomic, copy) NSSet<NSString *> * __nonnull stringSet;
@@ -432,6 +433,7 @@ public class NonObjCClass { }
   var array: Array<AnyObject> = []
   var arrayOfArrays: Array<Array<Int>> = []
   var arrayOfBlocks: Array<@convention(block) (AnyObject, Int) -> Bool> = []
+  var arrayOfArrayOfBlocks: Array<Array<@convention(block) () -> Void>> = []
   var dictionary: Dictionary<String, String> = [:]
   var dictStringInt: Dictionary<String, Int> = [:]
   var stringSet: Set<String> = []
