@@ -4,7 +4,6 @@
 // RUN: %S/../../utils/line-directive %t/Slice.swift -- %target-build-swift %t/Slice.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/Slice.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
-// REQUIRES: optimized_stdlib
 
 import StdlibUnittest
 import SwiftPrivate
@@ -256,105 +255,5 @@ SliceTests.test("MutableSlice.subscript(_: Index)/{get,set}") {
     expectEqualSequence(test.collection, base) { $0.value == $1.value }
   }
 }
-
-// FIXME: We should split this block up even further, it's too slow for
-// debug-assert builds.
-
-% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-// This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
-%   for base_kind in [ 'Defaulted', 'Minimal' ]:
-// This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
-%     for mutable in [ False, True ]:
-// This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
-%       Base = "%s%s%sCollection" % (base_kind, traversal, 'Mutable' if mutable else '')
-// Test Slice<Base> and MutableSlice<Base> of various collections using value
-// types as elements.
-%       wrapper_types = [ 'Slice', 'MutableSlice' ] if mutable else [ 'Slice' ]
-%       for WrapperType in wrapper_types:
-// This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
-%         for name, prefix, suffix in [
-%           ('FullWidth', '[]', '[]'),
-%           ('WithPrefix', '[ -9999, -9998, -9997 ]', '[]'),
-%           ('WithSuffix', '[]', '[ -9999, -9998, -9997 ]'),
-%           ('WithPrefixAndSuffix', '[ -9999, -9998, -9997, -9996, -9995 ]', '[ -9994, -9993, -9992 ]')
-%         ]:
-if true {
-  let prefix: [Int] = ${prefix}
-  let suffix: [Int] = ${suffix}
-
-  func makeCollection(elements: [OpaqueValue<Int>])
-    -> ${WrapperType}<${Base}<OpaqueValue<Int>>> {
-    var baseElements = prefix.map(OpaqueValue.init)
-    baseElements.appendContentsOf(elements)
-    baseElements.appendContentsOf(suffix.map(OpaqueValue.init))
-    let base = ${Base}(elements: baseElements)
-    let startIndex = base.startIndex.advancedBy(numericCast(prefix.count))
-    let endIndex = base.startIndex.advancedBy(
-      numericCast(prefix.count + elements.count))
-    return ${WrapperType}(
-      base: base,
-      bounds: startIndex..<endIndex)
-  }
-
-  func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
-    -> ${WrapperType}<${Base}<MinimalEquatableValue>> {
-    var baseElements = prefix.map(MinimalEquatableValue.init)
-    baseElements.appendContentsOf(elements)
-    baseElements.appendContentsOf(suffix.map(MinimalEquatableValue.init))
-    let base = ${Base}(elements: baseElements)
-    let startIndex = base.startIndex.advancedBy(numericCast(prefix.count))
-    let endIndex = base.startIndex.advancedBy(
-      numericCast(prefix.count + elements.count))
-    return ${WrapperType}(
-      base: base,
-      bounds: startIndex..<endIndex)
-  }
-
-  func makeCollectionOfComparable(elements: [MinimalComparableValue])
-    -> ${WrapperType}<${Base}<MinimalComparableValue>> {
-    var baseElements = prefix.map(MinimalComparableValue.init)
-    baseElements.appendContentsOf(elements)
-    baseElements.appendContentsOf(suffix.map(MinimalComparableValue.init))
-    let base = ${Base}(elements: baseElements)
-    let startIndex = base.startIndex.advancedBy(numericCast(prefix.count))
-    let endIndex = base.startIndex.advancedBy(
-      numericCast(prefix.count + elements.count))
-    return ${WrapperType}(
-      base: base,
-      bounds: startIndex..<endIndex)
-  }
-
-  var checksAdded: Box<Set<String>> = Box([])
-  var resiliencyChecks = CollectionMisuseResiliencyChecks.all
-  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
-  resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior = .Trap
-  resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior = .Trap
-
-  SliceTests.add${traversal}${'Mutable' if WrapperType == 'MutableSlice' else ''}CollectionTests(
-    "${name}.",
-    makeCollection: makeCollection,
-    wrapValue: identity,
-    extractValue: identity,
-    makeCollectionOfEquatable: makeCollectionOfEquatable,
-    wrapValueIntoEquatable: identityEq,
-    extractValueFromEquatable: identityEq,
-%           if WrapperType == 'MutableSlice':
-    makeCollectionOfComparable: makeCollectionOfComparable,
-    wrapValueIntoComparable: identityComp,
-    extractValueFromComparable: identityComp,
-%           end
-    checksAdded: checksAdded,
-    resiliencyChecks: resiliencyChecks,
-    outOfBoundsIndexOffset: 6
-%           if WrapperType == 'MutableSlice':
-    , withUnsafeMutableBufferPointerIsSupported: false
-%           end
-    )
-}
-%         end
-%       end
-%     end
-%   end
-% end
 
 runAllTests()
