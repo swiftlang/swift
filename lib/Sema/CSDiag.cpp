@@ -1958,15 +1958,9 @@ bool FailureDiagnosis::diagnoseConstraintFailure() {
     if (LHS.second > RHS.second)
       return false;
     // Next priority is favored constraints.
-    if (LHS.first->isFavored())
-      return true;
-    if (RHS.first->isFavored())
-      return false;
-    // Finally, rank disjunction constraints lower than non-disjunction
-    // constraints.
-    bool LHSDisj = LHS.first->getKind() == ConstraintKind::Disjunction;
-    bool RHSDisj = RHS.first->getKind() == ConstraintKind::Disjunction;
-    return LHSDisj < RHSDisj;
+    if (LHS.first->isFavored() != RHS.first->isFavored())
+      return LHS.first->isFavored();
+    return false;
   });
  
   // Now that we have a sorted precedence of constraints to diagnose, charge
@@ -2363,19 +2357,6 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       }
     }
 
-  // Check to see if this constraint came from a cast instruction. If so,
-  // and if this conversion constraint is different than the types being cast,
-  // produce a note that talks about the overall expression.
-  if (constraint->getLocator() && constraint->getLocator()->getAnchor() ==expr){
-    if (auto ECE = dyn_cast<ExplicitCastExpr>(expr))
-      if (!toType->isEqual(ECE->getCastTypeLoc().getType()))
-        diagnose(expr->getLoc(), diag::in_cast_expr_types,
-                 ECE->getSubExpr()->getType()->getRValueType(),
-                 ECE->getCastTypeLoc().getType()->getRValueType())
-        .highlight(ECE->getSubExpr()->getSourceRange())
-        .highlight(ECE->getCastTypeLoc().getSourceRange());
-  }
-
   if (auto PT = toType->getAs<ProtocolType>()) {
     // Check for "=" converting to BooleanType.  The user probably meant ==.
     if (auto *AE = dyn_cast<AssignExpr>(expr->getValueProvidingExpr()))
@@ -2403,6 +2384,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     return true;
   }
 
+  // FIXME: diag::invalid_relation is total overkill for this. In terms of the
+  // number of messages it can produce.
   auto failureKind = Failure::FailureKind::TypesNotConvertible;
   if (constraint->getKind() == ConstraintKind::Subtype)
     failureKind = Failure::FailureKind::TypesNotSubtypes;
@@ -2411,7 +2394,20 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
            failureKind - Failure::TypesNotEqual,
            fromType, toType)
     .highlight(anchor->getSourceRange());
-  
+
+  // Check to see if this constraint came from a cast instruction. If so,
+  // and if this conversion constraint is different than the types being cast,
+  // produce a note that talks about the overall expression.
+  if (constraint->getLocator() && constraint->getLocator()->getAnchor() ==expr){
+    if (auto ECE = dyn_cast<ExplicitCastExpr>(expr))
+      if (!toType->isEqual(ECE->getCastTypeLoc().getType()))
+        diagnose(expr->getLoc(), diag::in_cast_expr_types,
+                 ECE->getSubExpr()->getType()->getRValueType(),
+                 ECE->getCastTypeLoc().getType()->getRValueType())
+        .highlight(ECE->getSubExpr()->getSourceRange())
+        .highlight(ECE->getCastTypeLoc().getSourceRange());
+  }
+
   return true;
 }
 
