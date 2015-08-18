@@ -87,58 +87,12 @@ to all three of the components.
 Mutation Semantics
 ------------------
 
-Originally, the plan was to give *ArrayType*\ s full value semantics
-via copy-on-write (COW).  However, that COW requires a check for
-unique ownership before every write, which is only compatible with our
-primary performance goal if those checks can be hoisted out of loops.
-Since we can almost certainly not get hoisting uniqueness checks for
-1.0, subscript assignments on an array will be visible through all
-copies of that array::
+The *ArrayType*\ s have full value semantics via copy-on-write (COW)::
 
   var a = [1, 2, 3]
   let b = a
   a[1] = 42
-  print(b[1]) // prints "42"
-
-This implies that the elments of an array are notionally not part of
-the array's value, and indeed subscript assignment is a non-mutating
-operation:
-
-.. parsed-literal::
-
-  **let** a = [1, 2, 3]
-  **a[1] = 42** // OK
-
-Unfortunately, full consistent reference semantics would also be
-problematic with this design, because during array growth, at some
-point available capacity is filled, and the array's buffer needs be
-reallocated.  The only way to keep changes to the array visible
-through its copies once the buffer is reallocated would be to add a
-level of indirection between the arrays and their shared buffer, which
-would conflict with our primary performance goals, requiring a hoist
-optimization that we are again unlikely to get for 1.0.
-
-Therefore, potentially size-changing operations such as ``append`` do
-*not* have reference semantics, as they always (effectively) copy the
-array to ensure unique ownership before mutating it::
-
-  var a = [1, 2, 3]
-  let b = a
-  a[1] = 42
-  print(b[1]) // prints "42"
-
-Shared Subscript Assignment and ``NSArray``
--------------------------------------------
-
-For ``Array`` there is one more wrinkle: when its storage is backed by
-an immutable ``NSArray``, shared semantics for subscript assignment
-implies that we add a level of indirection anyway: the ``NSArray``
-needs to be replaced by an array buffer containing the new value, and
-that change needs to be visible through all copies of the array.
-Remember that this indirection has no cost in cases like
-``Array<Int>``, where it is statically known to be unneeded.
-
-.. image:: ArrayBridge.png
+  print(b[1]) // prints "2"
 
 Bridging Rules and Terminology for all Types
 --------------------------------------------
@@ -268,6 +222,8 @@ Both upcasts and forced downcasts raise type-safety issues.
 
 Upcasts
 .......
+
+TODO: this section is outdated.
 
 When up-casting an ``Derived[]`` to ``Base[]``, a buffer of
 ``Derived`` object can simply be ``unsafeBitCast``\ 'ed to a buffer
