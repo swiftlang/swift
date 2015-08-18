@@ -2256,8 +2256,12 @@ ERROR(sil_metatype_multiple_reprs,type_parsing,none,
 //------------------------------------------------------------------------------
 
 ERROR(attr_used_without_required_module, sema_tcd, none,
-  "%0 attribute used without importing module %1", (DeclAttribute, Identifier))
+      "%0 attribute used without importing module %1",
+      (DeclAttribute, Identifier))
 
+ERROR(invalid_objc_decl_context,sema_tcd,none,
+      "@objc can only be used with members of classes, @objc protocols, and "
+      "concrete extensions of classes", ())
 ERROR(invalid_objc_decl,sema_tcd,none,
       "only classes, protocols, methods, initializers, properties, and "
       "subscript declarations can be declared @objc", ())
@@ -2267,8 +2271,7 @@ ERROR(invalid_nonobjc_decl,sema_tcd,none,
       "only methods, initializers, properties and subscript declarations can "
       "be declared @nonobjc", ())
 ERROR(objc_in_extension_context,sema_objc,none,
-      "members of %select{constrained|protocol}0 extensions cannot be declared "
-      "@objc", (bool))
+      "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,sema_objc,none,
       "@objc is not supported within extensions of generic classes", ())
 ERROR(objc_for_generic_class,sema_objc,none,

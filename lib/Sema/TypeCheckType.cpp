@@ -2325,26 +2325,18 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
   return true;
 }
 
-/// Check whether the given declaration occurs within a generic protocol
-/// extension context and, therefore, is not representable in Objective-C.
+/// Check whether the given declaration occurs within a constrained
+/// extension, or an extension of a class with generic ancestry, and
+/// therefore is not representable in Objective-C.
 static bool checkObjCInExtensionContext(TypeChecker &tc,
                                         const ValueDecl *value,
                                         bool diagnose) {
   auto DC = value->getDeclContext();
 
   if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
-    if (ED->isProtocolExtensionContext()) {
-      if (diagnose) {
-        tc.diagnose(value->getLoc(), diag::objc_in_extension_context,
-                    /*is protocol*/true);
-      }
-      return true;
-    }
-
     if (ED->getTrailingWhereClause()) {
       if (diagnose) {
-        tc.diagnose(value->getLoc(), diag::objc_in_extension_context,
-                    /*is protocol*/false);
+        tc.diagnose(value->getLoc(), diag::objc_in_extension_context);
       }
       return true;
     }

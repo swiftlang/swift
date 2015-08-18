@@ -2259,7 +2259,7 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
   bool genericAncestry = false, isObjC = false;
   const ClassDecl *CD = this;
 
-  while (CD) {
+  for (;;) {
     // If we hit circularity, we will diagnose at some point in typeCheckDecl().
     // However we have to explicitly guard against that here because we get
     // called as part of validateDecl().
@@ -2272,17 +2272,18 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     if (CD->isObjC())
       isObjC = true;
 
-    const ClassDecl *superclassDecl = nullptr;
-    if (CD->hasSuperclass())
-      superclassDecl = CD->getSuperclass()->getClassOrBoundGenericClass();
-    CD = superclassDecl;
+    if (!CD->hasSuperclass())
+      break;
+    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
   }
-
 
   if (!isObjC)
     return ObjCClassKind::NonObjC;
   if (genericAncestry)
     return ObjCClassKind::ObjCMembers;
+  if (CD == this || !CD->isObjC())
+    return ObjCClassKind::ObjCWithSwiftRoot;
+
   return ObjCClassKind::ObjC;
 }
 

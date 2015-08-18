@@ -5775,27 +5775,24 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
   ObjCClassKind kind = CD->checkObjCAncestry();
 
   if (auto attr = CD->getAttrs().getAttribute<ObjCAttr>()) {
-    if (kind == ObjCClassKind::ObjC)
-      return ObjCReason::ExplicitlyObjC;
-
     if (kind == ObjCClassKind::ObjCMembers) {
-      ObjCClassKind superclassKind = ObjCClassKind::NonObjC;
-      if (CD->hasSuperclass()) {
-        if (auto *super = CD->getSuperclass()->getClassOrBoundGenericClass()) {
-          superclassKind = super->checkObjCAncestry();
-        }
-      }
-
-      auto diagID = diag::objc_for_generic_class;
-      if (superclassKind == ObjCClassKind::NonObjC)
-        diagID = diag::invalid_objc_swift_rooted_class;
-
-      TC.diagnose(attr->getLocation(), diagID)
+      TC.diagnose(attr->getLocation(), diag::objc_for_generic_class)
         .fixItRemove(attr->getRangeWithAt());
     }
+
+    // Only allow ObjC-rooted classes to be @objc.
+    // (Leave a hole for test cases.)
+    if (kind == ObjCClassKind::ObjCWithSwiftRoot &&
+        TC.getLangOpts().EnableObjCAttrRequiresFoundation) {
+      TC.diagnose(attr->getLocation(), diag::invalid_objc_swift_rooted_class)
+        .fixItRemove(attr->getRangeWithAt());
+    }
+
+    return ObjCReason::ExplicitlyObjC;
   }
 
-  if (kind == ObjCClassKind::ObjC)
+  if (kind == ObjCClassKind::ObjCWithSwiftRoot ||
+      kind == ObjCClassKind::ObjC)
     return ObjCReason::ImplicitlyObjC;
 
   return None;
@@ -7080,49 +7077,40 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
 static void validateAttributes(TypeChecker &TC, Decl *D) {
   DeclAttributes &Attrs = D->getAttrs();
 
-  auto isInClassOrProtocolContext = [](Decl *vd) {
-   Type ContextTy = vd->getDeclContext()->getDeclaredTypeInContext();
-    if (!ContextTy)
-      return false;
-    return bool(ContextTy->getClassOrBoundGenericClass()) ||
-           ContextTy->is<ProtocolType>();
+  auto checkObjCDeclContext = [](Decl *D) {
+    DeclContext *DC = D->getDeclContext();
+    if (DC->isClassOrClassExtensionContext())
+      return true;
+    if (auto *PD = dyn_cast<ProtocolDecl>(DC))
+      if (PD->isObjC())
+        return true;
+    return false;
   };
 
   if (auto objcAttr = Attrs.getAttribute<ObjCAttr>()) {
     // Only certain decls can be ObjC.
     Optional<Diag<>> error;
-    if (auto *CD = dyn_cast<ClassDecl>(D)) {
-      // Only allow ObjC-rooted classes to be @objc.
-      // (Leave a hole for test cases.)
-      const ClassDecl *superclassDecl = nullptr;
-      if (CD->hasSuperclass())
-        superclassDecl = CD->getSuperclass()->getClassOrBoundGenericClass();
-      if ((!superclassDecl || !superclassDecl->isObjC()) &&
-          TC.getLangOpts().EnableObjCAttrRequiresFoundation) {
-        error = diag::invalid_objc_swift_rooted_class;
-      }
-
-    } else if (isa<FuncDecl>(D) && isInClassOrProtocolContext(D)) {
-      auto func = cast<FuncDecl>(D);
-      if (func->isOperator())
-        error = diag::invalid_objc_decl;
-      else if (func->isAccessor() && !func->isGetterOrSetter()) {
-        error = diag::objc_observing_accessor;
-      }
-    } else if (isa<ConstructorDecl>(D) && isInClassOrProtocolContext(D)) {
-      /* ok */
-    } else if (isa<DestructorDecl>(D)) {
-      /* ok */
-    } else if (isa<SubscriptDecl>(D) && isInClassOrProtocolContext(D)) {
-      /* ok */
-    } else if (auto *VD = dyn_cast<VarDecl>(D)) {
-      if (!isInClassOrProtocolContext(VD))
-        error = diag::invalid_objc_decl;
-    } else if (isa<ProtocolDecl>(D)) {
+    if (isa<ClassDecl>(D) ||
+        isa<ProtocolDecl>(D)) {
       /* ok */
     } else if (auto ED = dyn_cast<EnumDecl>(D)) {
       if (ED->isGenericContext())
         error = diag::objc_enum_generic;
+    } else if (isa<FuncDecl>(D)) {
+      auto func = cast<FuncDecl>(D);
+      if (!checkObjCDeclContext(D))
+        error = diag::invalid_objc_decl_context;
+      else if (func->isOperator())
+        error = diag::invalid_objc_decl;
+      else if (func->isAccessor() && !func->isGetterOrSetter())
+        error = diag::objc_observing_accessor;
+    } else if (isa<ConstructorDecl>(D) ||
+               isa<DestructorDecl>(D) ||
+               isa<SubscriptDecl>(D) ||
+               isa<VarDecl>(D)) {
+      if (!checkObjCDeclContext(D))
+        error = diag::invalid_objc_decl_context;
+      /* ok */
     } else {
       error = diag::invalid_objc_decl;
     }
@@ -7210,7 +7198,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     auto func = dyn_cast<FuncDecl>(D);
     if (func &&
         (isa<DestructorDecl>(func) ||
-         !isInClassOrProtocolContext(func) ||
+         !checkObjCDeclContext(func) ||
          (func->isAccessor() && !func->isGetterOrSetter()))) {
       error = diag::invalid_nonobjc_decl;
     }

@@ -3407,9 +3407,18 @@ enum class ArtificialMainKind : uint8_t {
 };
 
 enum class ObjCClassKind : uint8_t {
+  /// Neither the class nor any of its superclasses are @objc.
   NonObjC,
+  /// One of the superclasses is @objc but another superclass or the
+  /// class itself has generic parameters, so while it cannot be
+  /// directly represented in Objective-C, it has implicitly @objc
+  /// members.
   ObjCMembers,
-  ObjC
+  /// The top-level ancestor of this class is not @objc, but the
+  /// class itself is.
+  ObjCWithSwiftRoot,
+  /// The class is bona-fide @objc.
+  ObjC,
 };
 
 /// ClassDecl - This is the declaration of a class, for example:
