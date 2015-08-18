@@ -2210,13 +2210,11 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   // UnresolvedDotExpr.  Look at the parent node in the AST to find the Apply to
   // give a better diagnostic.
   Expr *call = expr->getParentMap()[anchor];
-  // Ignore parens around the callee.
-  while (call) {
-    bool shouldIgnore = isa<IdentityExpr>(call);
-    if (!shouldIgnore)
-      shouldIgnore = isa<AnyTryExpr>(call) && !isa<OptionalTryExpr>(call);
-    if (shouldIgnore)
-      break;
+  // We look through some simple things that get in between the overload set
+  // and the apply.
+  while (call &&
+         (isa<IdentityExpr>(call) ||
+          isa<TryExpr>(call) || isa<ForceTryExpr>(call))) {
     call = expr->getParentMap()[call];
   }
   
@@ -2365,7 +2363,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       }
     }
 
-  // Check to see if this constraint came from a forced cast instruction. If so,
+  // Check to see if this constraint came from a cast instruction. If so,
   // and if this conversion constraint is different than the types being cast,
   // produce a note that talks about the overall expression.
   if (constraint->getLocator() && constraint->getLocator()->getAnchor() ==expr){
@@ -3673,7 +3671,6 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
                                    CTP_CoerceOperand))
     return true;
 
-  // If that worked, then there must be something other issue.
   return false;
 }
 
@@ -3684,7 +3681,8 @@ bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
 
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
-  if (argType->getOptionalObjectType().isNull()) {
+  if (!argType->is<TypeVariableType>() && !argType->is<UnresolvedType>() &&
+      argType->getAnyOptionalObjectType().isNull()) {
     diagnose(FVE->getLoc(), diag::invalid_force_unwrap, argType)
       .fixItRemove(FVE->getExclaimLoc())
       .highlight(FVE->getSourceRange());
@@ -3701,7 +3699,8 @@ bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
 
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
-  if (argType->getOptionalObjectType().isNull()) {
+  if (!argType->is<TypeVariableType>() && !argType->is<UnresolvedType>() &&
+      argType->getAnyOptionalObjectType().isNull()) {
     diagnose(BOE->getQuestionLoc(), diag::invalid_optional_chain, argType)
       .highlight(BOE->getSourceRange())
       .fixItRemove(BOE->getQuestionLoc());
@@ -4033,7 +4032,8 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   // will assume they are unsolvable and may otherwise leave the system in an
   // inconsistent state.
   simplify(/*ContinueAfterFailures*/true);
-  
+
+  // Look through RebindSelfInConstructorExpr to avoid weird sema issues.
   if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
     expr = RB->getSubExpr();
   
@@ -4132,8 +4132,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
       .highlight(E->getSourceRange());
     return;
   }
-
-  
   
   // If there are no posted constraints or failures, then there was
   // not enough contextual information available to infer a type for the
