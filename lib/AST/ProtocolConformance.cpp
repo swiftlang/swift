@@ -1446,8 +1446,12 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
 
     // Visit the protocols inherited by this protocol, adding them as
     // implied conformances.
-    if (resolver)
-      resolver->resolveInheritanceClause(dc);
+    if (resolver) {
+      if (nominal == dc)
+        resolver->resolveInheritanceClause(nominal);
+      else
+        resolver->resolveInheritanceClause(cast<ExtensionDecl>(dc));
+    }
 
     // An @objc enum that explicitly conforms to the ErrorType protocol also
     // implicitly conforms to _ObjectiveCBridgeableErrorType, via the known

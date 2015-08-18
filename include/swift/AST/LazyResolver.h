@@ -32,6 +32,7 @@ class NormalProtocolConformance;
 class ProtocolConformance;
 class ProtocolDecl;
 class Substitution;
+class TypeDecl;
 class ValueDecl;
 
 /// Abstract interface used to lazily resolve aspects of the AST, such as the
@@ -85,9 +86,10 @@ public:
   virtual void resolveDeclSignature(ValueDecl *VD) = 0;
 
   /// Resolve the types in the inheritance clause of the given
-  /// declaration context, which will be a nominal type declaration or
+  /// declaration context, which will be a type declaration or
   /// extension declaration.
-  virtual void resolveInheritanceClause(DeclContext *dc) = 0;
+  virtual void resolveInheritanceClause(
+                 llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) = 0;
 
   /// Resolve the superclass of the given class.
   virtual void resolveSuperclass(ClassDecl *classDecl) = 0;

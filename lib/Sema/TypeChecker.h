@@ -950,7 +950,8 @@ public:
   /// Resolve the types in the inheritance clause of the given
   /// declaration context, which will be a nominal type declaration or
   /// extension declaration.
-  void resolveInheritanceClause(DeclContext *dc) override;
+  void resolveInheritanceClause(
+         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) override;
 
   /// Check the inheritance clause of the given declaration.
   void checkInheritanceClause(Decl *decl,
