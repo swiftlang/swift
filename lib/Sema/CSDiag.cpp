@@ -3719,7 +3719,7 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
                           const Substitution &subst, TypeDecl *d)->bool
     {
       if (ATD->getName().str() == "Element")
-        contextualElementType = d->getDeclaredType()->getDesugaredType();
+        contextualElementType = subst.getReplacement()->getDesugaredType();
       return false;
     });
     assert(contextualElementType &&
@@ -3769,9 +3769,9 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
                           const Substitution &subst, TypeDecl *d)->bool
     {
       if (ATD->getName().str() == "Key")
-        contextualKeyType = d->getDeclaredType()->getDesugaredType();
+        contextualKeyType = subst.getReplacement()->getDesugaredType();
       else if (ATD->getName().str() == "Value")
-        contextualValueType = d->getDeclaredType()->getDesugaredType();
+        contextualValueType = subst.getReplacement()->getDesugaredType();
       return false;
     });
     assert(contextualKeyType && contextualValueType &&

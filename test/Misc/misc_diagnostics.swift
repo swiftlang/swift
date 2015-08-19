@@ -24,7 +24,7 @@ let median = total / count // expected-error {{binary operator '/' cannot be app
 if (1) {} // expected-error{{type 'Int' does not conform to protocol 'BooleanType'}}
 if 1 {} // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
 
-var a: [String] = [1] // expected-error{{cannot convert value of type '[Int]' to specified type '[String]'}}
+var a: [String] = [1] // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
 var b: Int = [1, 2, 3] // expected-error{{cannot convert value of type '[Int]' to specified type 'Int'}}
 
 var f1: Float = 2.0
