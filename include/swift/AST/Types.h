@@ -3995,7 +3995,12 @@ public:
     return T->getKind() == TypeKind::WeakStorage;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(WeakStorageType, ReferenceStorageType)
+BEGIN_CAN_TYPE_WRAPPER(WeakStorageType, ReferenceStorageType)
+  static CanWeakStorageType get(CanType referent) {
+    return cast<WeakStorageType>(
+       CanType(WeakStorageType::get(referent, referent->getASTContext())));
+  }
+END_CAN_TYPE_WRAPPER(WeakStorageType, ReferenceStorageType)
 
 /// \brief A type variable used during type checking.
 class TypeVariableType : public TypeBase {

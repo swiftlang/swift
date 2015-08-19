@@ -985,8 +985,47 @@ namespace {
     /// @unowned is basically like a reference type lowering except
     /// it manipulates unowned reference counts instead of strong.
     const TypeLowering *visitUnownedStorageType(CanUnownedStorageType type) {
+      // Lower 'Self' as if it were the base type.
+      if (auto dynamicSelfType
+            = dyn_cast<DynamicSelfType>(type.getReferentType())) {
+        auto unownedBaseType = CanUnownedStorageType::get(
+                                                dynamicSelfType.getSelfType());
+
+        return LowerType(TC, unownedBaseType, Dependent)
+          .visit(unownedBaseType);
+      }
+
       return new (TC, Dependent) UnownedTypeLowering(
                                       SILType::getPrimitiveObjectType(OrigType));
+    }
+
+    const TypeLowering *visitUnmanagedStorageType(
+                                          CanUnmanagedStorageType type) {
+      if (auto dynamicSelfType
+            = dyn_cast<DynamicSelfType>(type.getReferentType())) {
+        auto unmanagedBaseType = CanUnmanagedStorageType::get(
+                                                dynamicSelfType.getSelfType());
+
+        return LowerType(TC, unmanagedBaseType, Dependent)
+          .visit(unmanagedBaseType);
+      }
+
+      return this->TypeClassifierBase::visitUnmanagedStorageType(type);
+    }
+
+    const TypeLowering *visitWeakStorageType(CanWeakStorageType type) {
+      OptionalTypeKind OTK;
+      auto objectType = type.getReferentType().getAnyOptionalObjectType(OTK);
+      if (auto dynamicSelfType = dyn_cast<DynamicSelfType>(objectType)) {
+        auto optBaseType = OptionalType::get(OTK, dynamicSelfType.getSelfType())
+          ->getCanonicalType();
+        auto weakBaseType = CanWeakStorageType::get(optBaseType);
+
+        return LowerType(TC, weakBaseType, Dependent)
+          .visit(weakBaseType);
+      }
+
+      return this->TypeClassifierBase::visitWeakStorageType(type);
     }
 
     const TypeLowering *
