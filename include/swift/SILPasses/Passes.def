@@ -74,8 +74,6 @@ PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
 PASS(FunctionSignatureOpts, "function-signature-opts",
      "Optimize Function Signatures")
-PASS(GenericSpecializer, "specialize",
-     "Specialize generic functions")
 PASS(GlobalARCOpts, "global-arc-opts",
      "Perform multiple basic block arc optimizations")
 PASS(GlobalLoadStoreOpts, "global-load-store-opts",

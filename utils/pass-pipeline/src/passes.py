@@ -24,7 +24,6 @@ DiagnosticConstantPropagation = Pass('DiagnosticConstantPropagation')
 EarlyInliner = Pass('EarlyInliner')
 EmitDFDiagnostics = Pass('EmitDFDiagnostics')
 FunctionSignatureOpts = Pass('FunctionSignatureOpts')
-GenericSpecializer = Pass('GenericSpecializer')
 GlobalARCOpts = Pass('GlobalARCOpts')
 GlobalLoadStoreOpts = Pass('GlobalLoadStoreOpts')
 GlobalOpt = Pass('GlobalOpt')
@@ -74,7 +73,6 @@ PASSES = [
     EarlyInliner,
     EmitDFDiagnostics,
     FunctionSignatureOpts,
-    GenericSpecializer,
     GlobalARCOpts,
     GlobalLoadStoreOpts,
     GlobalOpt,

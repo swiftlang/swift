@@ -81,7 +81,6 @@ def ssapass_passlist(optlevel):
         p.CodeMotion, # Need to add proper argument here
         p.GlobalARCOpts,
         p.SpeculativeDevirtualizer,
-        p.GenericSpecializer,
         p.SILLinker,
         inliner_for_optlevel(optlevel),
         p.SimplifyCFG,
@@ -100,9 +99,6 @@ def lower_passlist():
         p.FunctionSignatureOpts,
     ])
         
-def specialization_passlist():
-    return ppipe.PassList([p.SILLinker, p.GenericSpecializer])
-
 def normal_passpipelines():
     result = []
 

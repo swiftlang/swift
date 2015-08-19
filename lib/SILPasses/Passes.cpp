@@ -192,7 +192,6 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addEarlyCodeMotion();
   PM.addGlobalARCOpts();
 
-  PM.addGenericSpecializer();
   PM.addSILLinker();
 
   switch (OpLevel) {
@@ -233,9 +232,8 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   SILPassManager PM(&Module, "PreSpecialize");
   registerAnalysisPasses(PM);
 
-  // Start by specializing generics and by cloning functions from stdlib.
+  // Start by cloning functions from stdlib.
   PM.addSILLinker();
-  PM.addGenericSpecializer();
   PM.run();
   PM.resetAndRemoveTransformations();
 
