@@ -3914,19 +3914,16 @@ namespace {
     /// given declaration.
     void addObjCProtocolConformances(Decl *decl,
                                      ArrayRef<ProtocolDecl*> protocols) {
-      // Copy the list of protocols.
-      MutableArrayRef<ProtocolDecl *> allProtocols 
-        = Impl.SwiftContext.AllocateCopy(protocols);
-
       // Set the protocols.
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+        // Copy the list of protocols.
+        MutableArrayRef<ProtocolDecl *> allProtocols
+          = Impl.SwiftContext.AllocateCopy(protocols);
+
         if (auto proto = dyn_cast<ProtocolDecl>(nominal))
           proto->setDirectlyInheritedProtocols(allProtocols);
         else
           nominal->setProtocols(allProtocols);
-      } else {
-        auto ext = cast<ExtensionDecl>(decl);
-        ext->setProtocols(allProtocols);
       }
 
       // Protocols don't require conformances.
@@ -3940,12 +3937,12 @@ namespace {
 ;
       auto dc = decl->getInnermostDeclContext();
       auto &ctx = Impl.SwiftContext;
-      for (unsigned i = 0, n = allProtocols.size(); i != n; ++i) {
+      for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
         // FIXME: Build a superclass conformance if the superclass
         // conforms.
         auto conformance
           = ctx.getConformance(dc->getDeclaredTypeOfContext(),
-                               allProtocols[i], SourceLoc(),
+                               protocols[i], SourceLoc(),
                                dc,
                                ProtocolConformanceState::Incomplete);
         Impl.scheduleFinishProtocolConformance(conformance);

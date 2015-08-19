@@ -561,14 +561,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     inherited.setInvalidType(Context);
   }
 
-  // Record the protocols to which this declaration conforms along with the
-  // superclass.
-  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    assert(!superclassTy && "Extensions can't add superclasses");
-    ext->setProtocols(Context.AllocateCopy(allProtocols));
-    return;
-  }
-
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     // FIXME: If we already set the protocols, bail out. We'd rather not have
     // to check this.
@@ -2877,7 +2869,9 @@ public:
                                !isPrivateConformer(D));
     }
 
-    D->overrideProtocols(TC.Context.AllocateCopy(protocols));
+    if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
+      nominal->overrideProtocols(TC.Context.AllocateCopy(protocols));
+    }
 
     // Diagnose any conflicts attributed to this declaration context.
     for (const auto &diag : diagnostics) {
@@ -6466,13 +6460,6 @@ ArrayRef<ProtocolDecl *>
 TypeChecker::getDirectConformsTo(NominalTypeDecl *nominal) {
   checkInheritanceClause(nominal);
   return nominal->getProtocols();
-}
-
-ArrayRef<ProtocolDecl *>
-TypeChecker::getDirectConformsTo(ExtensionDecl *ext) {
-  validateExtension(ext);
-  checkInheritanceClause(ext);
-  return ext->getProtocols();
 }
 
 /// Build a default initializer string for the given pattern.

@@ -964,9 +964,6 @@ public:
   /// or superclasses need to be extracted separately.
   ArrayRef<ProtocolDecl *> getDirectConformsTo(NominalTypeDecl *nominal);
 
-  /// Retrieve the set of protocols to which this extension directly conforms.
-  ArrayRef<ProtocolDecl *> getDirectConformsTo(ExtensionDecl *extension);
-
   /// \brief Add any implicitly-defined constructors required for the given
   /// struct or class.
   void addImplicitConstructors(NominalTypeDecl *typeDecl);

@@ -1966,20 +1966,21 @@ void Serializer::writeDecl(const Decl *D) {
     // parameters.
     (void)addDeclRef(baseTy->getAnyNominal());
 
-    SmallVector<DeclID, 8> protocolsAndInherited;
-    for (auto proto : extension->getLocalProtocols())
-      protocolsAndInherited.push_back(addDeclRef(proto));
-    unsigned numProtocols = protocolsAndInherited.size();
+    auto conformances = extension->getLocalConformances(
+                          ConformanceLookupKind::All,
+                          nullptr, /*sorted=*/true);
+
+    SmallVector<TypeID, 8> inheritedTypes;
     for (auto inherited : extension->getInherited())
-      protocolsAndInherited.push_back(addTypeRef(inherited.getType()));
+      inheritedTypes.push_back(addTypeRef(inherited.getType()));
 
     unsigned abbrCode = DeclTypeAbbrCodes[ExtensionLayout::Code];
     ExtensionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addTypeRef(baseTy),
                                 contextID,
                                 extension->isImplicit(),
-                                numProtocols,
-                                protocolsAndInherited);
+                                conformances.size(),
+                                inheritedTypes);
 
     bool isClassExtension = false;
     if (auto baseNominal = baseTy->getAnyNominal()) {
@@ -1990,10 +1991,7 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(extension->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(extension->getGenericRequirements());
     writeMembers(extension->getMembers(), isClassExtension);
-    writeConformances(extension->getLocalConformances(
-                        ConformanceLookupKind::All,
-                        nullptr, /*sorted=*/true),
-                      DeclTypeAbbrCodes);
+    writeConformances(conformances, DeclTypeAbbrCodes);
 
     break;
   }

@@ -3038,12 +3038,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     TypeID baseID;
     DeclContextID contextID;
     bool isImplicit;
-    unsigned numProtocols;
-    ArrayRef<uint64_t> rawProtocolAndInheriteIDs;
+    unsigned numConformances;
+    ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::ExtensionLayout::readRecord(scratch, baseID, contextID,
-                                             isImplicit, numProtocols,
-                                             rawProtocolAndInheriteIDs);
+                                             isImplicit, numConformances,
+                                             rawInheritedIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3063,19 +3063,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       extension->setImplicit();
 
-    auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
-    for (unsigned i = 0; i != numProtocols; ++i) {
-      protocols[i] = cast<ProtocolDecl>(getDecl(rawProtocolAndInheriteIDs[i]));
-    }
-    extension->setProtocols(protocols);
-
-    unsigned numInherited = rawProtocolAndInheriteIDs.size() - numProtocols;
-    auto inheritedTypes = ctx.Allocate<TypeLoc>(numInherited);
-    for (unsigned i = 0; i != numInherited; ++i) {
-      uint64_t rawID = rawProtocolAndInheriteIDs[i + numProtocols];
-      inheritedTypes[i] = TypeLoc::withoutLoc(getType(rawID));
-    }
+    auto inheritedTypes = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
+    for_each(inheritedTypes, rawInheritedIDs,
+             [this](TypeLoc &tl, uint64_t rawID) {
+      tl = TypeLoc::withoutLoc(getType(rawID));;
+    });
     extension->setInherited(inheritedTypes);
+    extension->setCheckedInheritanceClause();
 
     // Generic parameters.
     GenericParamList *genericParams = maybeReadGenericParams(DC,
@@ -3105,12 +3099,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
     extension->setConformanceLoader(
       this,
-      encodeLazyConformanceContextData(protocols.size(),
+      encodeLazyConformanceContextData(numConformances,
                                        DeclTypeCursor.GetCurrentBitNo()));
 
     nominal->addExtension(extension);
     extension->setValidated(true);
-    extension->setCheckedInheritanceClause();
 
     break;
   }

@@ -1652,9 +1652,6 @@ class ExtensionDecl final : public Decl, public DeclContext,
   /// moves the trailing where clause into the generic parameter list.
   TrailingWhereClause *TrailingWhere;
 
-  /// \brief The set of protocols to which this extension conforms.
-  ArrayRef<ProtocolDecl *> Protocols;
-
   /// \brief The next extension in the linked list of extensions.
   ///
   /// The bit indicates whether this extension has been resolved to refer to
@@ -1806,19 +1803,6 @@ public:
         (1 << static_cast<unsigned>(maxAccess));
     assert(getDefaultAccessibility() == defaultAccess && "not enough bits");
     assert(getMaxAccessibility() == maxAccess && "not enough bits");
-  }
-
-  /// \brief Retrieve the set of protocols to which this extension conforms.
-  ArrayRef<ProtocolDecl *> getProtocols() const {
-    return Protocols;
-  }
-
-  void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
-    Protocols = protocols;
-  }
-
-  void overrideProtocols(ArrayRef<ProtocolDecl *> protocols) {
-    Protocols = protocols;
   }
 
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
