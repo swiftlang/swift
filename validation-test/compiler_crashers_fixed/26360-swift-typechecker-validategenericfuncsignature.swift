@@ -1,12 +1,7 @@
-// RUN: not --crash %target-swift-frontend %s -parse
-
+// RUN: not %target-swift-frontend %s -parse
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-enum A : b
-protocol b {
-protocol a {
-typealias f : e = T>?) -> {
-}
-typealias e
+func a:A
+protocol A{typealias B:A protocol A:e>func b<b typealias e

@@ -158,6 +158,9 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
         typeResolver->resolveDeclSignature(decl);
       if (!decl->hasType())
         continue;
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
+        if (!assocType->getArchetype())
+          continue;
     }
     
     // If the decl is currently being validated, this is likely a recursive
