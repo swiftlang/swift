@@ -3892,6 +3892,8 @@ will be the operand of this ``return`` instruction.
 
 ``return`` does not retain or release its operand or any other values.
 
+A function must not contain more than one ``return`` instruction.
+
 autorelease_return
 ``````````````````
 ::
@@ -3925,6 +3927,8 @@ Control will resume in the error destination of that instruction, and
 the basic block argument will be the operand of the ``throw``.
 
 ``throw`` does not retain or release its operand or any other values.
+
+A function must not contain more than one ``throw`` instruction.
 
 br
 ``

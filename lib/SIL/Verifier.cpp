@@ -2753,13 +2753,19 @@ public:
             "entry point argument types do not match function type");
   }
 
-  void verifyEpilogBlock(SILFunction *F) {
-    bool FoundEpilogBlock = false;
+  void verifyEpilogBlocks(SILFunction *F) {
+    bool FoundReturnBlock = false;
+    bool FoundThrowBlock = false;
     for (auto &BB : *F) {
       if (isa<ReturnInst>(BB.getTerminator())) {
-        require(FoundEpilogBlock == false,
-                "more than one function epilog block");
-        FoundEpilogBlock = true;
+        require(FoundReturnBlock == false,
+                "more than one return block in function");
+        FoundReturnBlock = true;
+      }
+      if (isa<ThrowInst>(BB.getTerminator())) {
+        require(FoundThrowBlock == false,
+                "more than one throw block in function");
+        FoundThrowBlock = true;
       }
     }
   }
@@ -2964,7 +2970,7 @@ public:
 
     // Otherwise, verify the body of the function.
     verifyEntryPointArguments(F->getBlocks().begin());
-    verifyEpilogBlock(F);
+    verifyEpilogBlocks(F);
     verifyStackHeight(F);
     verifyBranches(F);
     SILVisitor::visitSILFunction(F);
