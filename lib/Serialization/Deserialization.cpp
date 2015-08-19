@@ -2089,7 +2089,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit;
     unsigned depth;
     unsigned index;
-    TypeID superclassID;
     TypeID archetypeID;
     ArrayRef<uint64_t> rawInheritedIDs;
 
@@ -2098,7 +2097,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                         isImplicit,
                                                         depth,
                                                         index,
-                                                        superclassID,
                                                         archetypeID,
                                                         rawInheritedIDs);
 
@@ -2117,7 +2115,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       genericParam->setImplicit();
 
-    genericParam->setSuperclass(getType(superclassID));
     genericParam->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
 
     auto inherited = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
@@ -2125,9 +2122,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       loc.setType(getType(rawID));
     });
     genericParam->setInherited(inherited);
-
-    genericParam->setProtocols({ });
-
     genericParam->setCheckedInheritanceClause();
     break;
   }
@@ -2135,7 +2129,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::ASSOCIATED_TYPE_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    TypeID superclassID;
     TypeID archetypeID;
     TypeID defaultDefinitionID;
     bool isImplicit;
@@ -2143,7 +2136,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::AssociatedTypeDeclLayout::readRecord(scratch, nameID,
                                                       contextID,
-                                                      superclassID,
                                                       archetypeID,
                                                       defaultDefinitionID,
                                                       isImplicit,
@@ -2161,12 +2153,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     assocType->computeType();
     assocType->setAccessibility(cast<ProtocolDecl>(DC)->getFormalAccess());
-    assocType->setSuperclass(getType(superclassID));
     assocType->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());
     if (isImplicit)
       assocType->setImplicit();
-
-    assocType->setProtocols({ });
 
     auto inherited = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
     for_each(inherited, rawInheritedIDs, [this](TypeLoc &loc, uint64_t rawID) {

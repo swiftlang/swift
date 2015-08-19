@@ -561,53 +561,30 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     inherited.setInvalidType(Context);
   }
 
-  // For an associated type, find associated types with the same name
-  // in inherited protocols and add their conformances.
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-    auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
-    for (auto inheritedProto : proto->getInheritedProtocols(this)) {
-      SmallVector<ValueDecl *, 4> lookupResults;
-      unsigned subOptions
-        = NL_QualifiedDefault & ~(NL_RemoveNonVisible | NL_RemoveOverridden);
-      inheritedProto->lookupQualified(inheritedProto->getDeclaredType(),
-                                      assocType->getName(), subOptions, this,
-                                      lookupResults);
-
-      for (auto member : lookupResults) {
-        if (auto inheritedAssoc = dyn_cast<AssociatedTypeDecl>(member)) {
-          validateDecl(inheritedAssoc);
-          auto conforming = inheritedAssoc->getConformingProtocols(this);
-          allProtocols.insert(conforming.begin(), conforming.end());
-        }
-      }
-    }
-  }
-
   // Record the protocols to which this declaration conforms along with the
   // superclass.
-  auto allProtocolsCopy = Context.AllocateCopy(allProtocols);
   if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     assert(!superclassTy && "Extensions can't add superclasses");
-    ext->setProtocols(allProtocolsCopy);
+    ext->setProtocols(Context.AllocateCopy(allProtocols));
     return;
   }
 
-  auto typeDecl = cast<TypeDecl>(decl);
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    // FIXME: If we already set the protocols, bail out. We'd rather not have
+    // to check this.
+    if (nominal->isProtocolsValid())
+      return;
 
-  // FIXME: If we already set the protocols, bail out. We'd rather not have
-  // to check this.
-  if (typeDecl->isProtocolsValid())
-    return;
-
-  typeDecl->setProtocols(allProtocolsCopy);
-  if (superclassTy) {
-    if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
-      classDecl->setSuperclass(superclassTy);
-      resolveImplicitConstructors(superclassTy->getClassOrBoundGenericClass());
-    } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
-      enumDecl->setRawType(superclassTy);
-    } else {
-      cast<AbstractTypeParamDecl>(decl)->setSuperclass(superclassTy);
+    nominal->setProtocols(Context.AllocateCopy(allProtocols));
+    if (superclassTy) {
+      if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+        classDecl->setSuperclass(superclassTy);
+        resolveImplicitConstructors(
+          superclassTy->getClassOrBoundGenericClass());
+      } else {
+        auto enumDecl = cast<EnumDecl>(decl);
+        enumDecl->setRawType(superclassTy);
+      }
     }
   }
 }

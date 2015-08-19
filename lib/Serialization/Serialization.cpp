@@ -2110,7 +2110,6 @@ void Serializer::writeDecl(const Decl *D) {
                                 genericParam->isImplicit(),
                                 genericParam->getDepth(),
                                 genericParam->getIndex(),
-                                addTypeRef(genericParam->getSuperclass()),
                                 addTypeRef(genericParam->getArchetype()),
                                 inheritedTypes);
     break;
@@ -2131,7 +2130,6 @@ void Serializer::writeDecl(const Decl *D) {
       Out, ScratchRecord, abbrCode,
       addIdentifierRef(assocType->getName()),
       contextID,
-      addTypeRef(assocType->getSuperclass()),
       addTypeRef(assocType->getArchetype()),
       addTypeRef(assocType->getDefaultDefinitionType()),
       assocType->isImplicit(),

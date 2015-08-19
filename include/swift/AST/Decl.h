@@ -451,12 +451,9 @@ class alignas(1 << DeclAlignInBits) Decl {
     ///
     /// FIXME: Is this too fine-grained?
     unsigned CheckedInheritanceClause : 1;
-
-    /// Whether we have already set the protocols to which this type conforms.
-    unsigned ProtocolsSet : 1;
   };
 
-  enum { NumTypeDeclBits = NumValueDeclBits + 2 };
+  enum { NumTypeDeclBits = NumValueDeclBits + 1 };
   static_assert(NumTypeDeclBits <= 32, "fits in an unsigned");
   
   class NominalTypeDeclBitFields {
@@ -470,8 +467,11 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     unsigned AddedImplicitInitializers : 1;
+
+    /// Whether we have already set the protocols to which this type conforms.
+    unsigned ProtocolsSet : 1;
   };
-  enum { NumNominalTypeDeclBits = NumTypeDeclBits + 2 };
+  enum { NumNominalTypeDeclBits = NumTypeDeclBits + 3 };
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
   class ProtocolDeclBitfields {
@@ -2391,11 +2391,7 @@ protected:
     ValueDecl(K, context, name, NameLoc), Inherited(inherited)
   {
     TypeDeclBits.CheckedInheritanceClause = false;
-    TypeDeclBits.ProtocolsSet = false;
   }
-  
-  /// \brief The set of protocols to which this type conforms.
-  ArrayRef<ProtocolDecl *> Protocols;
 
 public:
   Type getDeclaredType() const;
@@ -2415,32 +2411,6 @@ public:
   /// Note that we have already type-checked the inheritance clause.
   void setCheckedInheritanceClause(bool checked = true) {
     TypeDeclBits.CheckedInheritanceClause = checked;
-  }
-
-  /// \brief Retrieve the set of protocols to which this type conforms.
-  ///
-  /// FIXME: Include protocol conformance from extensions? This will require
-  /// semantic analysis to compute.
-  ArrayRef<ProtocolDecl *> getProtocols() const;
-
-  void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
-    assert((!TypeDeclBits.ProtocolsSet || protocols.empty()) &&
-           "protocols already set");
-    TypeDeclBits.ProtocolsSet = true;
-    Protocols = protocols;
-  }
-
-  void overrideProtocols(ArrayRef<ProtocolDecl *> protocols) {
-    TypeDeclBits.ProtocolsSet = true;
-    Protocols = protocols;
-  }
-
-  bool isProtocolsValid() const {
-    return TypeDeclBits.ProtocolsSet;
-  }
-
-  void clearProtocolsValid() {
-    TypeDeclBits.ProtocolsSet = false;
   }
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
@@ -2502,9 +2472,6 @@ public:
 /// whose common purpose is to anchor the abstract type parameter and specify
 /// requirements for any corresponding type argument.
 class AbstractTypeParamDecl : public TypeDecl {
-  /// The superclass of the generic parameter.
-  Type SuperclassTy;
-
   /// The archetype describing this abstract type parameter within its scope.
   ArchetypeType *Archetype;
 
@@ -2515,14 +2482,7 @@ protected:
 
 public:
   /// Return the superclass of the generic parameter.
-  Type getSuperclass() const {
-    return SuperclassTy;
-  }
-
-  /// Set the superclass of the generic parameter.
-  void setSuperclass(Type superclassTy) {
-    SuperclassTy = superclassTy;
-  }
+  Type getSuperclass() const;
 
   /// Retrieve the archetype that describes this abstract type parameter
   /// within its scope.
@@ -2996,6 +2956,9 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   friend ArrayRef<ValueDecl *>
            ValueDecl::getSatisfiedProtocolRequirements(bool) const;
 
+  /// \brief The set of protocols to which this type conforms.
+  ArrayRef<ProtocolDecl *> Protocols;
+
 protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
@@ -3017,6 +2980,7 @@ protected:
     setGenericParams(GenericParams);
     NominalTypeDeclBits.HasDelayedMembers = false;
     NominalTypeDeclBits.AddedImplicitInitializers = false;
+    NominalTypeDeclBits.ProtocolsSet = false;
     ExtensionGeneration = 0;
     ValidatingGenericSignature = false;
     SearchedForFailableInits = false;
@@ -3175,6 +3139,28 @@ public:
   bool lookupConformance(
          ModuleDecl *module, ProtocolDecl *protocol,
          SmallVectorImpl<ProtocolConformance *> &conformances) const;
+
+  /// \brief Retrieve the set of protocols to which this type conforms.
+  ///
+  /// FIXME: Include protocol conformance from extensions? This will require
+  /// semantic analysis to compute.
+  ArrayRef<ProtocolDecl *> getProtocols() const { return Protocols; }
+
+  void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
+    assert((!NominalTypeDeclBits.ProtocolsSet || protocols.empty()) &&
+           "protocols already set");
+    NominalTypeDeclBits.ProtocolsSet = true;
+    Protocols = protocols;
+  }
+
+  void overrideProtocols(ArrayRef<ProtocolDecl *> protocols) {
+    NominalTypeDeclBits.ProtocolsSet = true;
+    Protocols = protocols;
+  }
+
+  bool isProtocolsValid() const {
+    return NominalTypeDeclBits.ProtocolsSet;
+  }
 
   /// Retrieve all of the protocols that this nominal type conforms to.
   SmallVector<ProtocolDecl *, 2> getAllProtocols() const;

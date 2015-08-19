@@ -1794,14 +1794,6 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   return interfaceType->castTo<MetatypeType>()->getInstanceType();
 }
 
-ArrayRef<ProtocolDecl *> TypeDecl::getProtocols() const {
-  if (auto abstractTypeParam = dyn_cast<AbstractTypeParamDecl>(this)) {
-    return abstractTypeParam->getConformingProtocols(nullptr);
-  }
-
-  return Protocols;
-}
-
 /// Provide the set of parameters to a generic type, or null if
 /// this function is not generic.
 void NominalTypeDecl::setGenericParams(GenericParamList *params) {
@@ -2062,11 +2054,20 @@ SourceRange TypeAliasDecl::getSourceRange() const {
   return { TypeAliasLoc, getNameLoc() };
 }
 
+Type AbstractTypeParamDecl::getSuperclass() const {
+  if (Archetype)
+    return Archetype->getSuperclass();
+
+  // FIXME: Assert that this is never queried.
+  return nullptr;
+}
+
 ArrayRef<ProtocolDecl *> AbstractTypeParamDecl::getConformingProtocols(
                              LazyResolver *resolver) const {
   if (Archetype)
     return Archetype->getConformsTo();
 
+  // FIXME: Assert that this is never queried.
   return { };
 }
 
