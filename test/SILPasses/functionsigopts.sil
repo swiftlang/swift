@@ -138,8 +138,15 @@ sil [fragile] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owne
 bb0(%0 : $Builtin.NativeObject, %1 : $Int):
   %f1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
   apply %f1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
   release_value %0 : $Builtin.NativeObject
   return %1 : $Int
+
+bb2:
+  release_value %0 : $Builtin.NativeObject
+  throw undef : $ErrorType
 }
 
 // CHECK-LABEL: sil [fragile] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
@@ -458,6 +465,10 @@ bb0(%0 : $Builtin.Int32):
 
 // CHECK-LABEL: sil private [fragile] @_TTSf4d_n__private_dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0(
+
+// CHECK-LABEL: sil [fragile] @_TTSf4g_n__owned_to_guaranteed_with_error_result : $@convention(thin) (@guaranteed Builtin.NativeObject, Int) -> (Int, @error ErrorType) {
+// CHECK-NOT: release
+// CHECK: throw
 
 // CHECK-LABEL: sil [fragile] @_TTSf4g__owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 

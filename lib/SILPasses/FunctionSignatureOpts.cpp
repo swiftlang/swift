@@ -132,10 +132,14 @@ struct ArgumentDescriptor {
   /// Was this parameter originally dead?
   bool IsDead;
 
-  /// If non-null, this is the release in the callee associated with this
-  /// parameter if it is @owned. If the parameter is not @owned or we could not
-  /// find such a release in the callee, this is null.
+  /// If non-null, this is the release in the return block of the callee, which
+  /// is associated with this parameter if it is @owned. If the parameter is not
+  /// @owned or we could not find such a release in the callee, this is null.
   SILInstruction *CalleeRelease;
+
+  /// The same as CalleeRelease, but the release in the throw block, if it is a
+  /// function which has a throw block.
+  SILInstruction *CalleeReleaseInThrowBlock;
 
   /// The projection tree of this arguments.
   ProjectionTree ProjTree;
@@ -152,7 +156,7 @@ struct ArgumentDescriptor {
   ArgumentDescriptor(llvm::BumpPtrAllocator &BPA, SILArgument *A)
     : Arg(A), Index(A->getIndex()), ParameterInfo(A->getParameterInfo()),
       Decl(A->getDecl()), IsDead(false), CalleeRelease(),
-      ProjTree(A->getModule(), BPA, A->getType()) {
+      CalleeReleaseInThrowBlock(), ProjTree(A->getModule(), BPA, A->getType()) {
     ProjTree.computeUsesAndLiveness(A);
   }
 
@@ -339,6 +343,12 @@ updateOptimizedBBArgs(SILBuilder &Builder, SILBasicBlock *BB,
       SILType CalleeReleaseTy = CalleeRelease->getOperand(0).getType();
       CalleeRelease->setOperand(0, SILUndef::get(CalleeReleaseTy,
                                                  Builder.getModule()));
+      
+      // TODO: Currently we cannot mark arguments as dead if they are released
+      // in a throw block. But as soon as we can do this, we have to handle
+      // CalleeReleaseInThrowBlock as well.
+      assert(!CalleeReleaseInThrowBlock &&
+             "released arg in throw block cannot be dead");
     }
 
     // We should be able to recursively delete all of the remaining
@@ -484,7 +494,12 @@ FunctionAnalyzer::analyze() {
 
   // A map from consumed SILArguments to the release associated with an
   // argument.
-  ConsumedArgToEpilogueReleaseMatcher ArgToEpilogueReleaseMap(RCIA, F);
+  ConsumedArgToEpilogueReleaseMatcher ArgToReturnReleaseMap(RCIA, F);
+  ConsumedArgToEpilogueReleaseMatcher ArgToThrowReleaseMap;
+  auto ThrowBBIter = F->findThrowBB();
+  if (ThrowBBIter != F->end())
+    ArgToThrowReleaseMap.findMatchingReleases(RCIA, ThrowBBIter);
+
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
     ArgumentDescriptor A(Allocator, Args[i]);
     bool HaveOptimizedArg = false;
@@ -503,13 +518,24 @@ FunctionAnalyzer::analyze() {
     // See if we can find a ref count equivalent strong_release or release_value
     // at the end of this function if our argument is an @owned parameter.
     if (A.hasConvention(ParameterConvention::Direct_Owned)) {
-      if (auto *Release = ArgToEpilogueReleaseMap.releaseForArgument(A.Arg)) {
-        if (OnlyRelease && OnlyRelease.getValue().getPtrOrNull() == Release) {
-          A.IsDead = true;
+      if (auto *Release = ArgToReturnReleaseMap.releaseForArgument(A.Arg)) {
+        SILInstruction *ReleaseInThrow = nullptr;
+        
+        // If the function has a throw block we must also find a matching
+        // release in the throw block.
+        if (ThrowBBIter == F->end() ||
+            (ReleaseInThrow = ArgToThrowReleaseMap.releaseForArgument(A.Arg))) {
+        
+          // TODO: accept a second release in the throw block to let the
+          // argument be dead.
+          if (OnlyRelease && OnlyRelease.getValue().getPtrOrNull() == Release) {
+            A.IsDead = true;
+          }
+          A.CalleeRelease = Release;
+          A.CalleeReleaseInThrowBlock = ReleaseInThrow;
+          HaveOptimizedArg = true;
+          ++NumOwnedConvertedToGuaranteed;
         }
-        A.CalleeRelease = Release;
-        HaveOptimizedArg = true;
-        ++NumOwnedConvertedToGuaranteed;
       }
     }
 
@@ -896,6 +922,9 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   for (auto &A : Analyzer.getArgDescList()) {
     if (A.CalleeRelease) {
       A.CalleeRelease->eraseFromParent();
+      if (A.CalleeReleaseInThrowBlock) {
+        A.CalleeReleaseInThrowBlock->eraseFromParent();
+      }
     }
   }
 

@@ -668,10 +668,13 @@ ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCIA,
                                     SILFunction *F) {
   // Find the return BB of F. If we fail, then bail.
   auto ReturnBB = F->findReturnBB();
-  if (ReturnBB == F->end())
-    return;
+  if (ReturnBB != F->end())
+    findMatchingReleases(RCIA, ReturnBB);
+}
 
-  for (auto II = std::next(ReturnBB->rbegin()), IE = ReturnBB->rend();
+void ConsumedArgToEpilogueReleaseMatcher::
+findMatchingReleases(RCIdentityFunctionInfo *RCIA, SILBasicBlock *BB) {
+  for (auto II = std::next(BB->rbegin()), IE = BB->rend();
        II != IE; ++II) {
     // If we do not have a release_value or strong_release...
     if (!isa<ReleaseValueInst>(*II) && !isa<StrongReleaseInst>(*II)) {

@@ -498,6 +498,26 @@ public:
     });
   }
 
+  /// Return the unique basic block containing a throw inst if it
+  /// exists. Otherwise, returns end.
+  iterator findThrowBB() {
+    return std::find_if(begin(), end(),
+                        [](const SILBasicBlock &BB) -> bool {
+                          const TermInst *TI = BB.getTerminator();
+                          return isa<ThrowInst>(TI);
+                        });
+  }
+  
+  /// Return the unique basic block containing a throw inst if it
+  /// exists. Otherwise, returns end.
+  const_iterator findThrowBB() const {
+    return std::find_if(begin(), end(),
+                        [](const SILBasicBlock &BB) -> bool {
+                          const TermInst *TI = BB.getTerminator();
+                          return isa<ThrowInst>(TI);
+                        });
+  }
+    
   //===--------------------------------------------------------------------===//
   // Argument Helper Methods
   //===--------------------------------------------------------------------===//

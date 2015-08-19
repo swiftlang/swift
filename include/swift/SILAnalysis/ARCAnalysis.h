@@ -152,8 +152,16 @@ class ConsumedArgToEpilogueReleaseMatcher {
   llvm::SmallMapVector<SILArgument *, SILInstruction *, 8> ArgInstMap;
 
 public:
+  /// Default constructor: does not find matching releases, so
+  /// findMatchingReleases should be called explicitly.
+  ConsumedArgToEpilogueReleaseMatcher() { }
+
+  /// Finds matching releases in the return block of the function \p F.
   ConsumedArgToEpilogueReleaseMatcher(RCIdentityFunctionInfo *RCIA,
                                       SILFunction *F);
+
+  /// Finds matching releases in the provided block \p BB.
+  void findMatchingReleases(RCIdentityFunctionInfo *RCIA, SILBasicBlock *BB);
 
   bool argumentHasRelease(SILArgument *Arg) const {
     return ArgInstMap.find(Arg) != ArgInstMap.end();
