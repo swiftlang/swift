@@ -176,6 +176,11 @@ __attribute__((availability(ios,introduced=8.0)))
 @end
 
 @interface NSNumber : NSValue
+- (NSNumber *)initWithInteger:(NSInteger)value;
+- (NSNumber *)initWithUnsignedInteger:(NSUInteger)value;
+
+@property NSInteger integerValue;
+@property NSUInteger unsignedIntegerValue;
 @end
 
 @interface NSDecimalNumber : NSObject

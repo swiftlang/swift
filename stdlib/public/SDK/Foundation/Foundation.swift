@@ -221,16 +221,14 @@ extension UInt : _ObjectiveCBridgeable {
 
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSNumber {
-    // FIXME: Need a blacklist for certain methods that should not
-    // import NSUInteger as Int.
-    return NSNumber(unsignedInteger: Int(self.value))
+    return NSNumber(unsignedInteger: self)
   }
 
   public static func _forceBridgeFromObjectiveC(
     x: NSNumber,
     inout result: UInt?
   ) {
-    result = UInt(x.unsignedIntegerValue.value)
+    result = x.unsignedIntegerValue
   }
   public static func _conditionallyBridgeFromObjectiveC(
     x: NSNumber,

@@ -84,6 +84,11 @@ module ObjCParseExtrasTooHelper {
   export *
 }
 
+module ObjCParseExtrasSystem [system] {
+  header "ObjCParseExtrasSystem.h"
+  export *
+}
+
 module ObjCImplicitProperties {
   header "ObjCImplicitProperties.h"
   export *

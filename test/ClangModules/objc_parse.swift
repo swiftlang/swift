@@ -10,6 +10,7 @@ import TestProtocols
 
 import ObjCParseExtras
 import ObjCParseExtrasToo
+import ObjCParseExtrasSystem
 
 func markUsed<T>(t: T) {}
 
@@ -541,4 +542,50 @@ func testSetInitializers() {
 
   let _ = NSCountedSet(array: a)
   let _ = NSMutableSet(array: a)
+}
+
+
+func testNSUInteger(obj: NSUIntegerTests, uint: UInt, int: Int) {
+  obj.consumeUnsigned(uint) // okay
+  obj.consumeUnsigned(int) // expected-error {{cannot invoke 'consumeUnsigned' with an argument list of type '(Int)'}} expected-note {{expected an argument list of type '(UInt)'}}
+
+  obj.consumeUnsigned(0, withTheNSUIntegerHere: uint) // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+  obj.consumeUnsigned(0, withTheNSUIntegerHere: int) // okay
+
+  obj.consumeUnsigned(uint, andAnother: uint) // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+  obj.consumeUnsigned(uint, andAnother: int) // okay
+
+  do {
+    let x = obj.unsignedProducer()
+    let _: String = x // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
+  }
+
+  do {
+    obj.unsignedProducer(uint, fromCount: uint) // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+    obj.unsignedProducer(int, fromCount: int) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
+    let x = obj.unsignedProducer(uint, fromCount: int) // okay
+    let _: String = x // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
+  }
+
+  do {
+    obj.normalProducer(uint, fromUnsigned: uint) // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+    obj.normalProducer(int, fromUnsigned: int) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
+    let x = obj.normalProducer(int, fromUnsigned: uint)
+    let _: String = x // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+  }
+
+  let _: String = obj.normalProp // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+  let _: String = obj.unsignedProp // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
+
+  do {
+    testUnsigned(int, uint) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
+    testUnsigned(uint, int) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
+    let x = testUnsigned(uint, uint) // okay
+    let _: String = x // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
+  }
+
+  // NSNumber
+  NSNumber(unsignedInteger: int) // expected-error {{(unsignedInteger: Int)' is not convertible to '(unsignedInteger: UInt)'}}
+  let num = NSNumber(unsignedInteger: uint)
+  let _: String = num.unsignedIntegerValue // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
 }

@@ -1028,8 +1028,8 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // When NSUInteger is used as an enum's underlying type or if it does not come
   // from a system module, make sure it stays unsigned.
   if (hint == ImportHint::NSUInteger) {
-    if (importKind == ImportTypeKind::Enum || !isUsedInSystemModule) {
-      return impl.getNamedSwiftType(impl.getStdlibModule(), "UInt");
+    if (importKind == ImportTypeKind::Enum || !allowNSUIntegerAsInt) {
+      return importedType = impl.SwiftContext.getUIntDecl()->getDeclaredType();
     }
   }
 
@@ -1047,7 +1047,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // may result in compiler crashes further down the line.
   if (hint == ImportHint::NSString && canBridgeTypes(importKind) &&
       (impl.tryLoadFoundationModule() || impl.ImportForwardDeclarations)) {
-    importedType = impl.getNamedSwiftType(impl.getStdlibModule(), "String");
+    importedType = impl.SwiftContext.getStringDecl()->getDeclaredType();
   }
 
 
@@ -1192,6 +1192,15 @@ bool ClangImporter::Implementation::shouldImportGlobalAsLet(
   return false;
 }
 
+/// Returns true if \p name contains the substring "Unsigned" or "unsigned".
+static bool nameContainsUnsigned(StringRef name) {
+  size_t pos = name.find("nsigned");
+  if (pos == StringRef::npos || pos == 0)
+    return false;
+  --pos;
+  return (name[pos] == 'u') || (name[pos] == 'U');
+}
+
 Type ClangImporter::Implementation::importPropertyType(
        const clang::ObjCPropertyDecl *decl,
        bool isFromSystemModule) {
@@ -1200,8 +1209,14 @@ Type ClangImporter::Implementation::importPropertyType(
     if (auto nullability = info->getNullability())
       optionality = translateNullability(*nullability);
   }
+
+  bool allowNSUIntegerAsInt = isFromSystemModule;
+  if (allowNSUIntegerAsInt)
+    allowNSUIntegerAsInt = !nameContainsUnsigned(decl->getName());
+
   return importType(decl->getType(), ImportTypeKind::Property,
-                    isFromSystemModule, /*isFullyBridgeable*/true, optionality);
+                    allowNSUIntegerAsInt, /*isFullyBridgeable*/true,
+                    optionality);
 }
 
 /// Get a bit vector indicating which arguments are non-null for a
@@ -1266,6 +1281,13 @@ Type ClangImporter::Implementation::importFunctionType(
   if (isVariadic)
     return Type();
 
+  bool allowNSUIntegerAsInt = isFromSystemModule;
+  if (allowNSUIntegerAsInt) {
+    if (const clang::IdentifierInfo *clangNameID = clangDecl->getIdentifier()) {
+      allowNSUIntegerAsInt = !nameContainsUnsigned(clangNameID->getName());
+    }
+  }
+
   // CF function results can be managed if they are audited or
   // the ownership convention is explicitly declared.
   bool isAuditedResult =
@@ -1294,7 +1316,7 @@ Type ClangImporter::Implementation::importFunctionType(
                                   (isAuditedResult
                                     ? ImportTypeKind::AuditedResult
                                     : ImportTypeKind::Result),
-                                  isFromSystemModule,
+                                  allowNSUIntegerAsInt,
                                   /*isFullyBridgeable*/true,
                                   OptionalityOfReturn);
   if (!swiftResultTy)
@@ -1339,7 +1361,7 @@ Type ClangImporter::Implementation::importFunctionType(
 
     // Import the parameter type into Swift.
     Type swiftParamTy = importType(paramTy, importKind,
-                                   isFromSystemModule,
+                                   allowNSUIntegerAsInt,
                                    /*isFullyBridgeable*/true,
                                    OptionalityOfParam);
     if (!swiftParamTy)
@@ -2011,8 +2033,17 @@ Type ClangImporter::Implementation::importMethodType(
       OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
     }
 
+    bool allowNSUIntegerAsIntInResult = isFromSystemModule;
+    if (allowNSUIntegerAsIntInResult) {
+      Identifier name = methodName.getBaseName();
+      if (!name.empty()) {
+        allowNSUIntegerAsIntInResult = !nameContainsUnsigned(name.str());
+      }
+    }
+
     swiftResultTy = importType(resultType, resultKind,
-                               isFromSystemModule, /*isFullyBridgeable*/true,
+                               allowNSUIntegerAsIntInResult,
+                               /*isFullyBridgeable*/true,
                                OptionalityOfReturn);
 
     if (swiftResultTy &&
@@ -2103,6 +2134,17 @@ Type ClangImporter::Implementation::importMethodType(
         translateNullability(knownMethod->getParamTypeInfo(paramIndex));
     }
 
+    bool allowNSUIntegerAsIntInParam = isFromSystemModule;
+    if (allowNSUIntegerAsIntInParam) {
+      Identifier name;
+      if (nameIndex < argNames.size())
+        name = argNames[nameIndex];
+      if (name.empty() && nameIndex == 0)
+        name = methodName.getBaseName();
+      if (!name.empty())
+        allowNSUIntegerAsIntInParam = !nameContainsUnsigned(name.str());
+    }
+
     Type swiftParamTy;
     if (paramIndex == 0 && isPropertySetter) {
       swiftParamTy = importPropertyType(property, isFromSystemModule);
@@ -2114,7 +2156,7 @@ Type ClangImporter::Implementation::importMethodType(
     } else if (kind == SpecialMethodKind::PropertyAccessor) {
       swiftParamTy = importType(paramTy,
                                 ImportTypeKind::PropertyAccessor,
-                                isFromSystemModule,
+                                allowNSUIntegerAsIntInParam,
                                 /*isFullyBridgeable*/true,
                                 optionalityOfParam);
     } else {
@@ -2124,8 +2166,10 @@ Type ClangImporter::Implementation::importMethodType(
       else if (param->hasAttr<clang::CFReturnsNotRetainedAttr>())
         importKind = ImportTypeKind::CFUnretainedOutParameter;
       
-      swiftParamTy = importType(paramTy, importKind, isFromSystemModule,
-                                /*isFullyBridgeable*/true, optionalityOfParam);
+      swiftParamTy = importType(paramTy, importKind,
+                                allowNSUIntegerAsIntInParam,
+                                /*isFullyBridgeable*/true,
+                                optionalityOfParam);
     }
     if (!swiftParamTy)
       return Type();
