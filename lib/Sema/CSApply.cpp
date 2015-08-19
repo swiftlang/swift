@@ -1706,9 +1706,8 @@ namespace {
     }
 
     Expr *visitBooleanLiteralExpr(BooleanLiteralExpr *expr) {
-      if (expr->getType() && expr->getType()->is<BuiltinIntegerType>()) {
+      if (expr->getType() && expr->getType()->is<BuiltinIntegerType>())
         return expr;
-      }
 
       auto &tc = cs.getTypeChecker();
       ProtocolDecl *protocol
@@ -1742,6 +1741,9 @@ namespace {
     }
 
     Expr *handleStringLiteralExpr(LiteralExpr *expr) {
+      if (expr->getType() && !expr->getType()->hasTypeVariable())
+        return expr;
+      
       auto stringLiteral = dyn_cast<StringLiteralExpr>(expr);
       auto magicLiteral = dyn_cast<MagicIdentifierLiteralExpr>(expr);
       assert(bool(stringLiteral) != bool(magicLiteral) &&

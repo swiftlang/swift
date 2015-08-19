@@ -438,7 +438,7 @@ let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{type
 
 let _: Int -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{type of expression is ambiguous without more context}}
 
-let _: Color = .Unknown("") // expected-error {{'String' is not convertible to '(_builtinStringLiteral: RawPointer, byteSize: Word, isASCII: Int1)' (aka '(_builtinStringLiteral: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1)')}}
+let _: Color = .Unknown("") // expected-error {{type of expression is ambiguous without more context}}
 
 func testTypeSugar(a : Int) {
   typealias Stride = Int
