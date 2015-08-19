@@ -1,20 +1,17 @@
-// RUN: %target-swift-frontend -O %s -emit-sil -sil-inline-threshold 1000 | FileCheck %s
+// RUN: %target-swift-frontend -O %s -emit-sil | FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances.
 
 // CHECK-LABEL: sil @_TF28devirt_inherited_conformance6driverFT_T_ : $@convention(thin) () -> () {
 // CHECK: bb0
-// CHECK: function_ref unknown2a
-// CHECK-NEXT: function_ref @unknown2a : $@convention(thin) () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK: function_ref unknown3a
-// CHECK-NEXT: function_ref @unknown3a : $@convention(thin) () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: [[UNKNOWN2a:%.*]] = function_ref @unknown2a : $@convention(thin) () -> ()
+// CHECK: apply [[UNKNOWN2a]]
+// CHECK: apply [[UNKNOWN2a]]
+// CHECK: [[UNKNOWN3a:%.*]] = function_ref @unknown3a : $@convention(thin) () -> ()
+// CHECK: apply [[UNKNOWN3a]]
+// CHECK: apply [[UNKNOWN3a]]
+// CHECK: return
 
 @asmname("unknown1a")
 func unknown1a() -> ()
