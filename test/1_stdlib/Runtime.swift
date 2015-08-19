@@ -1198,8 +1198,8 @@ enum SinglePayloadNonGenericEnumWithDefaultMirror {
 
 Reflection.test("Enum/SinglePayloadNonGeneric/DefaultMirror") {
   do {
-    let value: [SinglePayloadNonGenericEnumWithDefaultMirror] =
-        [.Cat, .Dog]
+    let value = [SinglePayloadNonGenericEnumWithDefaultMirror.Cat,
+                 SinglePayloadNonGenericEnumWithDefaultMirror.Dog]
     var output = ""
     dump(value, &output)
 
@@ -1234,15 +1234,12 @@ enum SinglePayloadGenericEnumWithDefaultMirror<T, U> {
 
 Reflection.test("Enum/SinglePayloadGeneric/DefaultMirror") {
   do {
-    let value: [SinglePayloadGenericEnumWithDefaultMirror<Int, [Int]>] =
-        [.Well, .Faucet]
+    let value = SinglePayloadGenericEnumWithDefaultMirror<Int, [Int]>.Faucet
     var output = ""
     dump(value, &output)
 
     let expected =
-      "▿ 2 elements\n" +
-      "  - [0]: a.SinglePayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.Array<Swift.Int>>.Well\n" +
-      "  - [1]: a.SinglePayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.Array<Swift.Int>>.Faucet\n"
+      "- a.SinglePayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.Array<Swift.Int>>.Faucet\n"
 
     expectEqual(expected, output)
   }
@@ -1264,26 +1261,11 @@ Reflection.test("Enum/SinglePayloadGeneric/DefaultMirror") {
 }
 
 enum MultiPayloadTagBitsNonGenericEnumWithDefaultMirror {
-  case Plus
-  case SE30
   case Classic(mhz: Int)
   case Performa(model: Int)
 }
 
 Reflection.test("Enum/MultiPayloadTagBitsNonGeneric/DefaultMirror") {
-  do {
-    let value: [MultiPayloadTagBitsNonGenericEnumWithDefaultMirror] =
-        [.Plus, .SE30]
-    var output = ""
-    dump(value, &output)
-
-    let expected =
-      "▿ 2 elements\n" +
-      "  - [0]: a.MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.Plus\n" +
-      "  - [1]: a.MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.SE30\n"
-
-    expectEqual(expected, output)
-  }
   do {
     let value = MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.Classic(
         mhz: 16)
@@ -1322,51 +1304,33 @@ class CDROM {
   init(capacity: Int) { self.capacity = capacity }
 }
 
-enum MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror {
-  case MacWrite
-  case MacPaint
-  case FileMaker
+enum MultiPayloadExtraInhabitantNonGenericEnumWithDefaultMirror {
   case ClarisWorks(floppy: Floppy)
   case HyperCard(cdrom: CDROM)
 }
 
-Reflection.test("Enum/MultiPayloadSpareBitsNonGeneric/DefaultMirror") {
+Reflection.test("Enum/MultiPayloadExtraInhabitantsNonGeneric/DefaultMirror") {
   do {
-    let value: [MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror] =
-        [.MacWrite, .MacPaint, .FileMaker]
-
-    var output = ""
-    dump(value, &output)
-
-    let expected =
-      "▿ 3 elements\n" +
-      "  - [0]: a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.MacWrite\n" +
-      "  - [1]: a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.MacPaint\n" +
-      "  - [2]: a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.FileMaker\n"
-
-    expectEqual(expected, output)
-  }
-  do {
-    let value = MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror
+    let value = MultiPayloadExtraInhabitantNonGenericEnumWithDefaultMirror
         .ClarisWorks(floppy: Floppy(capacity: 800))
     var output = ""
     dump(value, &output)
 
     let expected =
-      "▿ a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.ClarisWorks\n" +
+      "▿ a.MultiPayloadExtraInhabitantNonGenericEnumWithDefaultMirror.ClarisWorks\n" +
       "  ▿ ClarisWorks: a.Floppy #0\n" +
       "    - capacity: 800\n"
 
     expectEqual(expected, output)
   }
   do {
-    let value = MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror
+    let value = MultiPayloadExtraInhabitantNonGenericEnumWithDefaultMirror
         .HyperCard(cdrom: CDROM(capacity: 600))
     var output = ""
     dump(value, &output)
 
     let expected =
-      "▿ a.MultiPayloadSpareBitsNonGenericEnumWithDefaultMirror.HyperCard\n" +
+      "▿ a.MultiPayloadExtraInhabitantNonGenericEnumWithDefaultMirror.HyperCard\n" +
       "  ▿ HyperCard: a.CDROM #0\n" +
       "    - capacity: 600\n"
 
@@ -1375,8 +1339,6 @@ Reflection.test("Enum/MultiPayloadSpareBitsNonGeneric/DefaultMirror") {
 }
 
 enum MultiPayloadGenericEnumWithDefaultMirror<T, U> {
-  case IIe
-  case IIgs
   case Centris(ram: T)
   case Quadra(hdd: U)
   case PowerBook170
@@ -1384,19 +1346,6 @@ enum MultiPayloadGenericEnumWithDefaultMirror<T, U> {
 }
 
 Reflection.test("Enum/MultiPayloadGeneric/DefaultMirror") {
-  do {
-    let value: [MultiPayloadGenericEnumWithDefaultMirror<Int, String>] =
-        [.IIe, .IIgs]
-    var output = ""
-    dump(value, &output)
-
-    let expected =
-      "▿ 2 elements\n" +
-      "  - [0]: a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.IIe\n" +
-      "  - [1]: a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.IIgs\n"
-
-    expectEqual(expected, output)
-  }
   do {
     let value = MultiPayloadGenericEnumWithDefaultMirror<Int, String>
         .Centris(ram: 4096)

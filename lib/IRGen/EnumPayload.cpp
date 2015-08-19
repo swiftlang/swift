@@ -654,7 +654,6 @@ EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
     
     unsigned size = DL.getTypeSizeInBits(v->getType());
     // Slice the spare bit vector.
-    // FIXME: this is inefficient.
     auto spareBitsPart = SpareBitVector::getConstant(size, false);
     unsigned numBitsInPart = 0;
     for (unsigned i = 0; i < size; ++i)
@@ -669,9 +668,6 @@ EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
     if (numBitsInPart == 0)
       continue;
     
-    if (firstBitOffset >= bitWidth)
-      break;
-
     // Get the spare bits from this part.
     auto bits = irgen::emitGatherSpareBits(IGF, spareBitsPart,
                                            v, firstBitOffset, bitWidth);
