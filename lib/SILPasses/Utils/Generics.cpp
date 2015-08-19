@@ -85,6 +85,7 @@ bool swift::isWhitelistedSpecialization(StringRef SpecName) {
       "_ContiguousArrayBuffer",
       "Range",
       "RangeGenerator",
+      "_allocateUninitializedArray",
       "UTF8",
       "UTF16",
       "String",
