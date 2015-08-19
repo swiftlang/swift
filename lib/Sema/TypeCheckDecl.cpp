@@ -753,12 +753,6 @@ ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
            *mod, Diags, this,
            [=](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
              return getDirectConformsTo(protocol);
-           },
-           [=](AbstractTypeParamDecl *assocType) -> 
-                 std::pair<Type, ArrayRef<ProtocolDecl *>> {
-             checkInheritanceClause(assocType);
-             return std::make_pair(assocType->getSuperclass(),
-                                   assocType->getConformingProtocols(this));
            });
 }
 
@@ -3031,7 +3025,7 @@ public:
     // Note: The Else body is type checked when the enclosing BraceStmt is
     // checked.
     
-    if (PBD->isInvalid())
+    if (PBD->isInvalid() || PBD->isBeingTypeChecked())
       return;
 
     // If the initializers in the PBD aren't checked yet, do so now.
@@ -5978,6 +5972,14 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     
     auto gp = proto->getGenericParams();
 
+    // Resolve the inheritance clauses for each of the associated
+    // types.
+    for (auto member : proto->getMembers()) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        resolveInheritanceClause(assocType);
+      }
+    }
+
     // Validate the generic type signature, which is just <Self : P>.
     validateGenericTypeSignature(proto);
 
@@ -6008,6 +6010,12 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (!archetype)
           return;
 
+        // FIXME: Trigger type checking of the inheritance clause.
+        if (assocType->getConformingProtocols(this).empty()) {
+          assocType->setCheckedInheritanceClause(false);
+          assocType->clearProtocolsValid();
+          checkInheritanceClause(assocType, nullptr);
+        }
 #ifndef NDEBUG
         auto conformingProtocols = assocType->getConformingProtocols(this);
         SmallVector<ProtocolDecl *, 4> protocols(conformingProtocols.begin(),

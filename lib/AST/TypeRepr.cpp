@@ -206,6 +206,27 @@ TypeRepr *TypeRepr::clone(ASTContext &ctx) const {
   return visitor.visit(const_cast<TypeRepr *>(this));
 }
 
+void TypeRepr::visitTopLevelTypeReprs(
+       llvm::function_ref<void(IdentTypeRepr *)> visitor) {
+  TypeRepr *typeRepr = this;
+
+  // Look through attributed type representations.
+  while (auto attr = dyn_cast<AttributedTypeRepr>(typeRepr))
+    typeRepr = attr->getTypeRepr();
+
+  // Handle identifier type representations.
+  if (auto ident = dyn_cast<IdentTypeRepr>(typeRepr)) {
+    visitor(ident);
+    return;
+  }
+
+  // Recurse into protocol compositions.
+  if (auto composition = dyn_cast<ProtocolCompositionTypeRepr>(typeRepr)) {
+    for (auto ident : composition->getProtocols())
+      ident->visitTopLevelTypeReprs(visitor);
+    return;
+  }
+}
 
 void ErrorTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {

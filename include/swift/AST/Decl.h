@@ -2439,6 +2439,10 @@ public:
     return TypeDeclBits.ProtocolsSet;
   }
 
+  void clearProtocolsValid() {
+    TypeDeclBits.ProtocolsSet = false;
+  }
+
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
   static bool classof(const Decl *D) {

@@ -169,10 +169,6 @@ struct ArchetypeBuilder::Implementation {
   /// inherited by its argument.
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols;
 
-  /// Callback that produces the superclass and protocol requirements placed
-  /// on the given generic type parameter.
-  GetConformsToCallback getConformsTo;
-
   /// A mapping from generic parameters to the corresponding potential
   /// archetypes.
   llvm::MapVector<GenericTypeParamKey, PotentialArchetype*> PotentialArchetypes;
@@ -676,22 +672,16 @@ ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
   Impl->getInheritedProtocols = [](ProtocolDecl *protocol) {
     return protocol->getInheritedProtocols(nullptr);
   };
-  Impl->getConformsTo = [](AbstractTypeParamDecl *assocType) {
-    return std::make_pair(assocType->getSuperclass(), 
-                          assocType->getConformingProtocols(nullptr));
-  };
 }
 
 ArchetypeBuilder::ArchetypeBuilder(
   Module &mod, DiagnosticEngine &diags, 
   LazyResolver *lazyResolver,
-  std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols,
-  GetConformsToCallback getConformsTo)
+  std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols)
   : Mod(mod), Context(mod.getASTContext()), Diags(diags),
     Resolver(lazyResolver), Impl(new Implementation)
 {
   Impl->getInheritedProtocols = std::move(getInheritedProtocols);
-  Impl->getConformsTo = std::move(getConformsTo);
 }
 
 ArchetypeBuilder::ArchetypeBuilder(ArchetypeBuilder &&) = default;
@@ -755,24 +745,11 @@ bool ArchetypeBuilder::addGenericParameter(GenericTypeParamDecl *GenericParam) {
   if (!PA)
     return true;
   
-  // FIXME: Poor source-location information.
-  RequirementSource source(RequirementSource::Explicit, GenericParam->getLoc());
-
-  // Add each of the conformance requirements placed on this type parameter.
-  // FIXME: Would prefer not the walk the protocols. Walk the "inherited" types
-  // directly instead, so we have good location information.
-  for (auto Proto : GenericParam->getConformingProtocols(nullptr)) {
-    if (addConformanceRequirement(PA, Proto, source))
-      return true;
-  }
-
-  // If the type parameter has a superclass, add that requirement.
-  if (auto superclassTy = GenericParam->getSuperclass()) {
-    // FIXME: Poor location info.
-    addSuperclassRequirement(PA, superclassTy, source);
-  }
-
-  return false;
+  // Add the requirements from the declaration.
+  llvm::SmallPtrSet<ProtocolDecl *, 8> visited;
+  return addAbstractTypeParamRequirements(GenericParam, PA,
+                                          RequirementSource::Explicit,
+                                          visited);
 }
 
 bool ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
@@ -827,31 +804,10 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
       // Add requirements placed directly on this associated type.
       auto AssocPA = T->getNestedType(AssocType->getName(), *this, nullptr);
       if (AssocPA != T) {
-        auto superclassAndConformsTo = Impl->getConformsTo(AssocType);
-        if (auto superclassTy = superclassAndConformsTo.first) {
-          if (addSuperclassRequirement(AssocPA, superclassTy, InnerSource))
-            return true;
-        }
-
-        for (auto InheritedProto : superclassAndConformsTo.second) {
-          // If it's a recursive requirement, add it directly to the associated
-          // archetype.
-          if (Visited.count(InheritedProto)) {
-            // FIXME: Drop InheritedProto!
-            if (!AssocPA->isRecursive() && !AssocType->isRecursive()) {
-              Diags.diagnose(AssocType->getLoc(),
-                             diag::recursive_requirement_reference);
-              AssocType->setIsRecursive();
-            }
-            AssocPA->setIsRecursive();
-            AssocPA->addConformance(InheritedProto, Source, *this);
-            continue;
-          }
-          
-          if (addConformanceRequirement(AssocPA, InheritedProto, InnerSource,
-                                        Visited))
-            return true;
-        }
+        if (addAbstractTypeParamRequirements(AssocType, AssocPA,
+                                             RequirementSource::Protocol,
+                                             Visited))
+          return true;
       }
 
       continue;
@@ -1094,6 +1050,113 @@ bool ArchetypeBuilder::addSameTypeRequirement(Type Reqt1, Type Reqt2,
   if (T1)
     return addSameTypeRequirementToConcrete(T1, Reqt2, Source);
   return addSameTypeRequirementToConcrete(T2, Reqt1, Source);
+}
+
+bool ArchetypeBuilder::addAbstractTypeParamRequirements(
+       AbstractTypeParamDecl *decl,
+       PotentialArchetype *pa,
+       RequirementSource::Kind kind,
+       llvm::SmallPtrSetImpl<ProtocolDecl *> &visited) {
+  // Local function to mark the given associated type as recursive,
+  // diagnosing it if this is the first such occurrence.
+  auto markRecursive = [&](AssociatedTypeDecl *assocType,
+                           ProtocolDecl *proto,
+                           SourceLoc loc ) {
+    if (!pa->isRecursive() && !assocType->isRecursive()) {
+      Diags.diagnose(assocType->getLoc(),
+                     diag::recursive_requirement_reference);
+      assocType->setIsRecursive();
+    }
+    pa->setIsRecursive();
+
+    // FIXME: Drop this protocol.
+    pa->addConformance(proto, RequirementSource(kind, loc), *this);
+  };
+
+  // If the abstract type parameter already has an archetype assigned,
+  // use that information.
+  if (auto archetype = decl->getArchetype()) {
+    SourceLoc loc = decl->getLoc();
+
+    // Superclass requirement.
+    if (auto superclass = archetype->getSuperclass()) {
+      if (addSuperclassRequirement(pa, superclass,
+                                   RequirementSource(kind, loc)))
+        return true;
+    }
+
+    // Conformance requirements.
+    for (auto proto : archetype->getConformsTo()) {
+      if (visited.count(proto)) {
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
+          markRecursive(assocType, proto, loc);
+
+        continue;
+      }
+
+      if (addConformanceRequirement(pa, proto, RequirementSource(kind, loc),
+                                    visited))
+        return true;
+    }
+
+    return false;
+  }
+
+  // Local function that (recursively) adds inherited types.
+  bool isInvalid = false;
+  std::function<void(Type, SourceLoc)> addInherited;
+  addInherited = [&](Type inheritedType, SourceLoc loc) {
+    // Protocol requirement.
+    if (auto protocolType = inheritedType->getAs<ProtocolType>()) {
+      if (visited.count(protocolType->getDecl())) {
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
+          markRecursive(assocType, protocolType->getDecl(), loc);
+
+        return;
+      }
+
+      isInvalid |= addConformanceRequirement(pa, protocolType->getDecl(),
+                                             RequirementSource(kind, loc),
+                                             visited);
+      return;
+    }
+
+    // Protocol composition.
+    if (auto compositionType
+          = inheritedType->getAs<ProtocolCompositionType>()) {
+      for (auto protoType : compositionType->getProtocols()) {
+        addInherited(protoType, loc);
+      }
+      return;
+    }
+
+    // Superclass requirement.
+    if (inheritedType->getClassOrBoundGenericClass()) {
+      isInvalid |= addSuperclassRequirement(pa, inheritedType,
+                                            RequirementSource(kind, loc));
+      return;
+    }
+
+    // Note: anything else is an error, to be diagnosed later.
+  };
+
+  // Otherwise, walk the 'inherited' list to identify requirements.
+  Mod.getASTContext().getLazyResolver()->resolveInheritanceClause(decl);
+  for (auto inherited : decl->getInherited()) {
+    inherited.getTypeRepr()->visitTopLevelTypeReprs([&](IdentTypeRepr *ident) {
+      auto *component = ident->getComponentRange().back();
+      if (component->isBoundType()) {
+        addInherited(component->getBoundType(), component->getIdLoc());
+      } else if (component->isBoundDecl()) {
+        if (auto typeDecl = dyn_cast<TypeDecl>(component->getBoundDecl())) {
+          addInherited(typeDecl->getDeclaredInterfaceType(),
+                       component->getIdLoc());
+        }
+      }
+    });
+  }
+
+  return isInvalid;
 }
 
 bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {

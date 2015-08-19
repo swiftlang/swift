@@ -23,11 +23,13 @@
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
   class ASTWalker;
   class DeclContext;
+  class IdentTypeRepr;
   class ValueDecl;
   class ExprHandle;
   class NamedTypeRepr;
@@ -82,6 +84,13 @@ public:
 
   /// Clone the given type representation.
   TypeRepr *clone(ASTContext &ctx) const;
+
+  /// Visit the top-level types in the given type representation,
+  /// which includes the types referenced by \c IdentTypeReprs either
+  /// directly or within a protocol composition type.
+  ///
+  /// \param visitor Each top-level type representation is passed to the visitor.
+  void visitTopLevelTypeReprs(llvm::function_ref<void(IdentTypeRepr *)> visitor);
 };
 
 /// \brief A TypeRepr for a type with a syntax error.  Can be used both as a

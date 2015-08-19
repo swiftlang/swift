@@ -157,19 +157,20 @@ private:
   /// archetypes should map to the equivalent archetype.
   bool addSameTypeRequirement(Type T1, Type T2, RequirementSource Source);
 
+  /// Add the requirements placed on the given abstract type parameter
+  /// to the given potential archetype.
+  bool addAbstractTypeParamRequirements(
+         AbstractTypeParamDecl *decl,
+         PotentialArchetype *pa,
+         RequirementSource::Kind kind,
+         llvm::SmallPtrSetImpl<ProtocolDecl *> &visited);
+
   /// Visit all of the potential archetypes.
   template<typename F>
   void visitPotentialArchetypes(F f);
 
 public:
   ArchetypeBuilder(ModuleDecl &mod, DiagnosticEngine &diags);
-
-  /// The type of a callback used to retrieve the superclass and
-  /// protocol requirements placed on
-  /// the given generic type parameter or associated type.
-  typedef std::function<std::pair<Type, ArrayRef<ProtocolDecl *>>(
-                          AbstractTypeParamDecl *)>
-    GetConformsToCallback;
 
   /// Construct a new archtype builder.
   ///
@@ -180,15 +181,10 @@ public:
   /// \param getInheritedProtocols A function that determines the set of
   /// protocols inherited from the given protocol. This produces the final
   /// results of ProtocolDecl::getProtocols().
-  ///
-  /// \param getConformsTo A function that determines the set of protocols
-  /// to which the given type parameter conforms. The produces the final
-  /// results of AbstractTypeParamDecl::getProtocols() for an associated type.
   ArchetypeBuilder(
     ModuleDecl &mod, DiagnosticEngine &diags, LazyResolver *resolver,
     std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
-      getInheritedProtocols,
-    GetConformsToCallback getConformsTo);
+      getInheritedProtocols);
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
 
