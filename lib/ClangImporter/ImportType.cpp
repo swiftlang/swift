@@ -205,14 +205,14 @@ namespace {
     public clang::TypeVisitor<SwiftTypeConverter, ImportResult>
   {
     ClangImporter::Implementation &Impl;
-    bool IsUsedInSystemModule;
+    bool AllowNSUIntegerAsInt;
     bool CanFullyBridgeTypes;
 
   public:
     SwiftTypeConverter(ClangImporter::Implementation &impl,
-                       bool isUsedInSystemModule,
+                       bool allowNSUIntegerAsInt,
                        bool canFullyBridgeTypes)
-      : Impl(impl), IsUsedInSystemModule(isUsedInSystemModule),
+      : Impl(impl), AllowNSUIntegerAsInt(allowNSUIntegerAsInt),
         CanFullyBridgeTypes(canFullyBridgeTypes) {}
 
     using TypeVisitor::Visit;
@@ -328,7 +328,7 @@ namespace {
       else
         pointeeType = Impl.importType(pointeeQualType,
                                       ImportTypeKind::Pointee,
-                                      IsUsedInSystemModule,
+                                      AllowNSUIntegerAsInt,
                                       /*can fully bridge*/false);
 
       // If the pointed-to type is unrepresentable in Swift, import as
@@ -377,7 +377,7 @@ namespace {
       // Block pointer types are mapped to function types.
       Type pointeeType = Impl.importType(type->getPointeeType(),
                                          ImportTypeKind::Abstract,
-                                         IsUsedInSystemModule,
+                                         AllowNSUIntegerAsInt,
                                          CanFullyBridgeTypes);
       if (!pointeeType)
         return Type();
@@ -416,7 +416,7 @@ namespace {
       
       Type elementType = Impl.importType(type->getElementType(),
                                          ImportTypeKind::Pointee,
-                                         IsUsedInSystemModule,
+                                         AllowNSUIntegerAsInt,
                                          /*can fully bridge*/false);
       if (!elementType)
         return Type();
@@ -472,7 +472,7 @@ namespace {
       // for this to be audited.
       auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result,
-                                      IsUsedInSystemModule,
+                                      AllowNSUIntegerAsInt,
                                       CanFullyBridgeTypes);
       if (!resultTy)
         return Type();
@@ -482,7 +482,7 @@ namespace {
              paramEnd = type->param_type_end();
            param != paramEnd; ++param) {
         auto swiftParamTy = Impl.importType(*param, ImportTypeKind::Parameter,
-                                            IsUsedInSystemModule,
+                                            AllowNSUIntegerAsInt,
                                             CanFullyBridgeTypes);
         if (!swiftParamTy)
           return Type();
@@ -505,7 +505,7 @@ namespace {
       // Import functions without prototypes as functions with no parameters.
       auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result,
-                                      IsUsedInSystemModule,
+                                      AllowNSUIntegerAsInt,
                                       CanFullyBridgeTypes);
       if (!resultTy)
         return Type();
@@ -565,7 +565,7 @@ namespace {
       // Otherwise, recurse on the underlying type in order to compute
       // the hint correctly.
       } else {
-        SwiftTypeConverter innerConverter(Impl, IsUsedInSystemModule,
+        SwiftTypeConverter innerConverter(Impl, AllowNSUIntegerAsInt,
                                           /*can fully bridge*/false);
         auto underlyingResult = innerConverter.Visit(type->desugar());
 #ifndef NDEBUG
@@ -707,7 +707,7 @@ namespace {
           if (typeArgs.size() == 1) {
             Type elementType = Impl.importType(typeArgs[0],
                                                ImportTypeKind::BridgedValue,
-                                               IsUsedInSystemModule,
+                                               AllowNSUIntegerAsInt,
                                                CanFullyBridgeTypes,
                                                OTK_None);
             return { importedType,
@@ -723,12 +723,12 @@ namespace {
           if (typeArgs.size() == 2) {
             Type keyType = Impl.importType(typeArgs[0],
                                            ImportTypeKind::BridgedValue,
-                                           IsUsedInSystemModule,
+                                           AllowNSUIntegerAsInt,
                                            CanFullyBridgeTypes,
                                            OTK_None);
             Type objectType = Impl.importType(typeArgs[1],
                                               ImportTypeKind::BridgedValue,
-                                              IsUsedInSystemModule,
+                                              AllowNSUIntegerAsInt,
                                               CanFullyBridgeTypes,
                                               OTK_None);
             if (keyType.isNull() != objectType.isNull()) {
@@ -750,7 +750,7 @@ namespace {
           if (typeArgs.size() == 1) {
             Type elementType = Impl.importType(typeArgs[0],
                                                ImportTypeKind::BridgedValue,
-                                               IsUsedInSystemModule,
+                                               AllowNSUIntegerAsInt,
                                                CanFullyBridgeTypes,
                                                OTK_None);
             return { importedType,
@@ -867,7 +867,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
                                         Type importedType,
                                         ImportTypeKind importKind,
                                         ImportHint hint,
-                                        bool isUsedInSystemModule,
+                                        bool allowNSUIntegerAsInt,
                                         bool canFullyBridgeTypes,
                                         OptionalTypeKind optKind) {
   if (importKind == ImportTypeKind::Abstract) {
@@ -896,7 +896,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     // Import the underlying type.
     auto objectType = impl.importType(refType->getPointeeType(),
                                       ImportTypeKind::Pointee,
-                                      isUsedInSystemModule,
+                                      allowNSUIntegerAsInt,
                                       canFullyBridgeTypes);
     if (!objectType)
       return nullptr;
@@ -998,7 +998,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
         // besides optionality.
         Type underlyingTy = impl.importType(typedefType->desugar(),
                                             importKind,
-                                            isUsedInSystemModule,
+                                            allowNSUIntegerAsInt,
                                             canFullyBridgeTypes,
                                             OTK_None);
         if (Type unwrappedTy = underlyingTy->getAnyOptionalObjectType())
@@ -1122,7 +1122,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
 Type ClangImporter::Implementation::importType(clang::QualType type,
                                                ImportTypeKind importKind,
-                                               bool isUsedInSystemModule,
+                                               bool allowNSUIntegerAsInt,
                                                bool canFullyBridgeTypes,
                                                OptionalTypeKind optionality) {
   if (type.isNull())
@@ -1163,13 +1163,13 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
   }
 
   // Perform abstract conversion, ignoring how the type is actually used.
-  SwiftTypeConverter converter(*this, isUsedInSystemModule,canFullyBridgeTypes);
+  SwiftTypeConverter converter(*this, allowNSUIntegerAsInt,canFullyBridgeTypes);
   auto importResult = converter.Visit(type);
 
   // Now fix up the type based on we're concretely using it.
   return adjustTypeForConcreteImport(*this, type, importResult.AbstractType,
                                      importKind, importResult.Hint,
-                                     isUsedInSystemModule,
+                                     allowNSUIntegerAsInt,
                                      canFullyBridgeTypes,
                                      optionality);
 }

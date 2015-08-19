@@ -987,8 +987,8 @@ public:
   ///
   /// \param kind The kind of type import we're performing.
   ///
-  /// \param isUsedInSystemModule Tells us that the use of the type is comming
-  ///        from system module.
+  /// \param allowNSUIntegerAsInt If true, NSUInteger will be imported as Int
+  ///        in certain contexts. If false, it will always be imported as UInt.
   ///
   /// \param canFullyBridgeTypes True if we can bridge types losslessly.
   ///        This is an additional guarantee on top of the ImportTypeKind
@@ -998,7 +998,7 @@ public:
   /// not be represented in Swift.
   Type importType(clang::QualType type,
                   ImportTypeKind kind,
-                  bool isUsedInSystemModule,
+                  bool allowNSUIntegerAsInt,
                   bool canFullyBridgeTypes,
                   OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional);
 
