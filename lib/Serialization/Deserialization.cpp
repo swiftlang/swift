@@ -2139,7 +2139,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     TypeID archetypeID;
     TypeID defaultDefinitionID;
     bool isImplicit;
-    ArrayRef<uint64_t> rawProtocolIDs;
+    ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::AssociatedTypeDeclLayout::readRecord(scratch, nameID,
                                                       contextID,
@@ -2147,7 +2147,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                       archetypeID,
                                                       defaultDefinitionID,
                                                       isImplicit,
-                                                      rawProtocolIDs);
+                                                      rawInheritedIDs);
 
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2166,11 +2166,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       assocType->setImplicit();
 
-    auto protos = ctx.Allocate<ProtocolDecl *>(rawProtocolIDs.size());
-    for_each(protos, rawProtocolIDs, [this](ProtocolDecl *&p, uint64_t rawID) {
-      p = cast<ProtocolDecl>(getDecl(rawID));
+    assocType->setProtocols({ });
+
+    auto inherited = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
+    for_each(inherited, rawInheritedIDs, [this](TypeLoc &loc, uint64_t rawID) {
+      loc.setType(getType(rawID));
     });
-    assocType->setProtocols(protos);
+    assocType->setInherited(inherited);
 
     assocType->setCheckedInheritanceClause();
     break;

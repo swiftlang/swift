@@ -1232,8 +1232,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
       Printer.printName(decl->getName());
     });
 
-  printInherited(decl, decl->getInherited(),
-                 decl->getConformingProtocols(nullptr), decl->getSuperclass());
+  printInherited(decl, decl->getInherited(), { });
 
   if (!decl->getDefaultDefinitionLoc().isNull()) {
     Printer << " = ";

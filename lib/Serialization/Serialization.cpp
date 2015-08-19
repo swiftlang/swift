@@ -2122,9 +2122,9 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(assocType->getDeclContext());
 
-    SmallVector<DeclID, 4> protocols;
-    for (auto proto : assocType->getConformingProtocols(nullptr))
-      protocols.push_back(addDeclRef(proto));
+    SmallVector<TypeID, 4> inheritedTypes;
+    for (auto inherited : assocType->getInherited())
+      inheritedTypes.push_back(addTypeRef(inherited.getType()));
 
     unsigned abbrCode = DeclTypeAbbrCodes[AssociatedTypeDeclLayout::Code];
     AssociatedTypeDeclLayout::emitRecord(
@@ -2135,7 +2135,7 @@ void Serializer::writeDecl(const Decl *D) {
       addTypeRef(assocType->getArchetype()),
       addTypeRef(assocType->getDefaultDefinitionType()),
       assocType->isImplicit(),
-      protocols);
+      inheritedTypes);
     break;
   }
 

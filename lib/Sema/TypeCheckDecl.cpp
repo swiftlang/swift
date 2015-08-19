@@ -3315,6 +3315,8 @@ public:
     if (!assocType->hasAccessibility())
       assocType->setAccessibility(assocType->getProtocol()->getFormalAccess());
 
+    TC.checkInheritanceClause(assocType);
+
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
     if (!defaultDefinition.isNull() &&
@@ -6010,20 +6012,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         if (!archetype)
           return;
 
-        // FIXME: Trigger type checking of the inheritance clause.
-        if (assocType->getConformingProtocols(this).empty()) {
-          assocType->setCheckedInheritanceClause(false);
-          assocType->clearProtocolsValid();
-          checkInheritanceClause(assocType, nullptr);
-        }
-#ifndef NDEBUG
-        auto conformingProtocols = assocType->getConformingProtocols(this);
-        SmallVector<ProtocolDecl *, 4> protocols(conformingProtocols.begin(),
-                                                 conformingProtocols.end());
-        ProtocolType::canonicalizeProtocols(protocols);
-        assert(llvm::makeArrayRef(protocols) == archetype->getConformsTo() ||
-               archetype->getIsRecursive());
-#endif
         if (!assocType->hasType())
           assocType->computeType();
         assocType->setArchetype(archetype);

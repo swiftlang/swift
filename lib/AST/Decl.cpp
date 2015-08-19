@@ -1795,6 +1795,10 @@ Type TypeDecl::getDeclaredInterfaceType() const {
 }
 
 ArrayRef<ProtocolDecl *> TypeDecl::getProtocols() const {
+  if (auto abstractTypeParam = dyn_cast<AbstractTypeParamDecl>(this)) {
+    return abstractTypeParam->getConformingProtocols(nullptr);
+  }
+
   return Protocols;
 }
 
@@ -2055,7 +2059,6 @@ void TypeAliasDecl::computeType() {
 SourceRange TypeAliasDecl::getSourceRange() const {
   if (UnderlyingTy.hasLocation())
     return { TypeAliasLoc, UnderlyingTy.getSourceRange().End };
-  // FIXME: Inherits clauses
   return { TypeAliasLoc, getNameLoc() };
 }
 
@@ -2064,7 +2067,7 @@ ArrayRef<ProtocolDecl *> AbstractTypeParamDecl::getConformingProtocols(
   if (Archetype)
     return Archetype->getConformsTo();
 
-  return getProtocols();
+  return { };
 }
 
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,

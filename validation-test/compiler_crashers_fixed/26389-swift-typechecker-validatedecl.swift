@@ -1,8 +1,9 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol d{protocol a{typealias e
-typealias e:d
-}let:d
+var b{struct B:A
+protocol A{
+typealias e:CollectionType
+typealias e
