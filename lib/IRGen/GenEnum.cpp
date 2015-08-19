@@ -1246,11 +1246,11 @@ namespace {
       return NumExtraInhabitantTagValues;
     }
 
-    /// Emit a call into the runtime to get the current enum case; this is
-    /// an internal form that returns -1 in the payload case, or an index of
+    /// Emit a call into the runtime to get the current enum payload tag; this
+    /// is an internal form that returns -1 in the payload case, or an index of
     /// an empty case.
     llvm::Value *
-    emitGetEnumCase(IRGenFunction &IGF, Address enumAddr, SILType T) const {
+    loadPayloadTag(IRGenFunction &IGF, Address enumAddr, SILType T) const {
       auto payloadMetadata = emitPayloadMetadataForLayout(IGF, T);
       auto numEmptyCases = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
@@ -1269,7 +1269,7 @@ namespace {
     llvm::Value *
     emitGetEnumTag(IRGenFunction &IGF, Address enumAddr, SILType T)
     const override {
-      auto value = emitGetEnumCase(IGF, enumAddr, T);
+      auto value = loadPayloadTag(IGF, enumAddr, T);
       return IGF.Builder.CreateAdd(value,
                                    llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1));
     }
@@ -1625,7 +1625,7 @@ namespace {
       }
 
       // Ask the runtime to find the case index.
-      auto caseIndex = emitGetEnumCase(IGF, addr, T);
+      auto caseIndex = loadPayloadTag(IGF, addr, T);
 
       // Switch on the index.
       auto *swi = IGF.Builder.CreateSwitch(caseIndex, defaultDest);
@@ -1863,7 +1863,7 @@ namespace {
       auto *noPayloadBB = llvm::BasicBlock::Create(C);
 
       // Ask the runtime what case we have.
-      llvm::Value *which = emitGetEnumCase(IGF, addr, T);
+      llvm::Value *which = loadPayloadTag(IGF, addr, T);
 
       // If it's -1 then we have the payload.
       llvm::Value *hasPayload = IGF.Builder.CreateICmpEQ(which,
@@ -2835,9 +2835,56 @@ namespace {
   public:
 
     llvm::Value *
-    emitGetEnumTag(IRGenFunction &IGF, Address enumAddr, SILType T)
+    emitGetEnumTag(IRGenFunction &IGF, Address addr, SILType T)
     const override {
-      return loadPayloadTag(IGF, enumAddr, T);
+      if (TIK < Fixed) {
+        // Ask the runtime to extract the dynamically-placed tag.
+        return loadDynamicTag(IGF, addr, T);
+      }
+
+      // For fixed-size enums, the currently inhabited case is a function of
+      // both the payload tag and for no-payload cases, the payload value.
+
+      // Load the fixed-size representation and derive the tags.
+      EnumPayload payload; llvm::Value *extraTagBits;
+      std::tie(payload, extraTagBits)
+        = emitPrimitiveLoadPayloadAndExtraTag(IGF, addr);
+
+      // Load the tag for discriminating between payload cases.
+      llvm::Value *tagValue = extractPayloadTag(IGF, payload, extraTagBits);
+      tagValue = IGF.Builder.CreateZExtOrTrunc(tagValue, IGF.IGM.Int32Ty);
+
+      // For non-payload cases, gather the occupied bits.
+      auto OccupiedBits = CommonSpareBits;
+      OccupiedBits.flipAll();
+
+      llvm::Value *payloadValue = payload.emitGatherSpareBits(
+          IGF, OccupiedBits, 0, 32);
+
+      // Calculate the enum case for the no payload case.
+      llvm::Value *currentCase;
+
+      // First, subtract number of payload cases from the tag.
+      llvm::Constant *payloadCases =
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithPayload.size());
+      currentCase = IGF.Builder.CreateSub(tagValue, payloadCases);
+
+      // Now, multiply the tag by the number of cases per tag.
+      llvm::Constant *numCaseBits =
+          llvm::ConstantInt::get(IGF.IGM.Int32Ty, getNumCaseBits());
+      currentCase = IGF.Builder.CreateShl(currentCase, numCaseBits);
+
+      // Add the case number to the tag.
+      currentCase = IGF.Builder.CreateOr(currentCase, payloadValue);
+
+      // Finally, add the tag number.
+      currentCase = IGF.Builder.CreateAdd(currentCase, tagValue);
+
+      // Test if this is a payload or no payload tag.
+      llvm::Value *match = IGF.Builder.CreateICmpUGE(tagValue, payloadCases);
+
+      // Return either the current payload tag or no payload case.
+      return IGF.Builder.CreateSelect(match, currentCase, tagValue);
     }
 
     llvm::Value *
@@ -4430,7 +4477,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   unsigned fixedExtraInhabitants = 0;
   unsigned numTags = ElementsWithNoPayload.size();
 
-  auto &payloadTI = getFixedPayloadTypeInfo(); // FIXME non-fixed payload
+  auto &payloadTI = getFixedPayloadTypeInfo();
   fixedExtraInhabitants = payloadTI.getFixedExtraInhabitantCount(TC.IGM);
 
   // Determine how many tag bits we need. Given N extra inhabitants, we
