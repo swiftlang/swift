@@ -1188,6 +1188,9 @@ ERROR(unsupported_build_config_unary_expression,parsing,none,
       "expected unary '!' expression", ())
 ERROR(unsupported_target_config_expression,parsing,none,
       "unexpected target configuration expression (expected 'os' or 'arch')",())
+ERROR(unsupported_target_config_runtime_argument,parsing,none,
+      "unexpected argument for the '_runtime' target configuration, "
+      "expected '_Native' or '_ObjC'", ())
 ERROR(unsupported_target_config_argument_type,parsing,none,
       "unexpected target configuration expression argument type", ())
 ERROR(unsupported_config_conditional_expression_type,parsing,none,

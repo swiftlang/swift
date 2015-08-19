@@ -1552,8 +1552,18 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
     // The sub expression should be an UnresolvedDeclRefExpr (we won't
     // tolerate extra parens).
     auto *UDRE = cast<UnresolvedDeclRefExpr>(PE->getSubExpr());
+    auto targetString = UDRE->getName().str();
+
+    // Error for values that don't make sense if there's a clear definition
+    // of the possible values (as there is for _runtime).
+    if (targetValue.equals("_runtime") &&
+        !targetString.equals("_ObjC") && !targetString.equals("_Native")) {
+      diagnose(CE->getLoc(), diag::unsupported_target_config_runtime_argument);
+      return false;
+    }
+
     auto target = Context.LangOpts.getTargetConfigOption(targetValue);
-    return target == UDRE->getName().str();
+    return target == targetString;
   }
   
   // "#if 0" isn't valid, but it is common, so recognize it and handle it

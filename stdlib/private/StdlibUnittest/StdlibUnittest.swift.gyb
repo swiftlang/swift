@@ -754,7 +754,7 @@ public func runAllTests() {
   }
   PersistentState.runAllTestsWasCalled = true
 
-#if _runtime(ObjC)
+#if _runtime(_ObjC)
   autoreleasepool {
     _stdlib_initializeReturnAutoreleased()
   }
