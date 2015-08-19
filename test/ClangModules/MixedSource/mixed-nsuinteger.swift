@@ -18,6 +18,7 @@ var userTypedObj = NSUIntTest()
 var ur: UInt = userTypedObj.myCustomMethodThatOperatesOnNSUIntegers(ui)
 
 userTypedObj.IntProp = ui
+userTypedObj.TypedefProp = ui
 ur = testFunction(ui)
 testFunctionInsideMacro(ui)
 

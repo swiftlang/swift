@@ -27,6 +27,7 @@
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
+#include "swift/Basic/Fallthrough.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "clang/AST/ASTContext.h"
@@ -567,11 +568,24 @@ namespace {
         SwiftTypeConverter innerConverter(Impl, IsUsedInSystemModule,
                                           /*can fully bridge*/false);
         auto underlyingResult = innerConverter.Visit(type->desugar());
-        if (underlyingResult.Hint != ImportHint::Block) {
+#ifndef NDEBUG
+        switch (underlyingResult.Hint) {
+        case ImportHint::Block:
+          // Blocks change in all sorts of ways, due to bridging.
+          break;
+        case ImportHint::NSUInteger:
+          // NSUInteger might be imported as Int rather than UInt depending
+          // on where the import lives.
+          if (underlyingResult.AbstractType->getAnyNominal() ==
+              Impl.SwiftContext.getIntDecl())
+            break;
+          SWIFT_FALLTHROUGH;
+        default:
           assert(underlyingResult.AbstractType->isEqual(mappedType) &&
                  "typedef without special typedef kind was mapped "
                  "differently from its underlying type?");
         }
+#endif
         hint = underlyingResult.Hint;
       }
 
