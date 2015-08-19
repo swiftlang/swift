@@ -412,7 +412,7 @@ namespace {
       if (KindString)
         OS << " kind=" << KindString;
 
-      OS << " ";
+      OS << " '";
       interleave(ID->getFullAccessPath(),
                  [&](const ImportDecl::AccessPathElement &Elem) {
                    OS << Elem.first;
@@ -442,7 +442,7 @@ namespace {
 
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
-      OS << " type=";
+      OS << " type='";
       if (TAD->hasUnderlyingType())
         OS << TAD->getUnderlyingType().getString();
       else
