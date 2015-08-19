@@ -1966,20 +1966,16 @@ void Serializer::writeDecl(const Decl *D) {
     // parameters.
     (void)addDeclRef(baseTy->getAnyNominal());
 
-    SmallVector<DeclID, 8> protocolsAndInherited;
+    SmallVector<DeclID, 8> protocols;
     for (auto proto : extension->getLocalProtocols())
-      protocolsAndInherited.push_back(addDeclRef(proto));
-    unsigned numProtocols = protocolsAndInherited.size();
-    for (auto inherited : extension->getInherited())
-      protocolsAndInherited.push_back(addTypeRef(inherited.getType()));
+      protocols.push_back(addDeclRef(proto));
 
     unsigned abbrCode = DeclTypeAbbrCodes[ExtensionLayout::Code];
     ExtensionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addTypeRef(baseTy),
                                 contextID,
                                 extension->isImplicit(),
-                                numProtocols,
-                                protocolsAndInherited);
+                                protocols);
 
     bool isClassExtension = false;
     if (auto baseNominal = baseTy->getAnyNominal()) {

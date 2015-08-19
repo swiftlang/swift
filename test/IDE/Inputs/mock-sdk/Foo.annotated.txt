@@ -152,7 +152,7 @@ protocol <loc>FooProtocolBase</loc> {
 }</decl>
 
 <decl:Class>/// Aaa.  FooClassDerived.  Bbb.
-class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref> {
+class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref>, <ref:Protocol>FooProtocolBase</ref> {
   <decl:Var>var <loc>fooProperty1</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Var>var <loc>fooProperty2</loc>: <ref:Struct>Int32</ref></decl>
   <decl:Var>var <loc>fooProperty3</loc>: <ref:Struct>Int32</ref> { get }</decl>

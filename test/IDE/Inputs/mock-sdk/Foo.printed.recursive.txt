@@ -152,7 +152,7 @@ class FooClassBase {
 }
 
 /// Aaa.  FooClassDerived.  Bbb.
-class FooClassDerived : FooClassBase, FooProtocolDerived {
+class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   var fooProperty1: Int32
   var fooProperty2: Int32
   var fooProperty3: Int32 { get }

@@ -1013,7 +1013,10 @@ void PrintAST::printInherited(const EnumDecl *decl) {
 }
 
 void PrintAST::printInherited(const ExtensionDecl *decl) {
-  printInherited(decl, decl->getInherited(), { });
+  printInherited(
+    decl,
+    decl->getInherited(),
+    decl->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
 }
 
 void PrintAST::printInherited(const GenericTypeParamDecl *D) {

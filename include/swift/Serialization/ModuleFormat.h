@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 214; // Last change: extension inherited list
+const uint16_t VERSION_MINOR = 213; // Last change: generic param superclass
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -967,8 +967,7 @@ namespace decls_block {
     TypeIDField, // base type
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit flag
-    BCVBR<4>,    // # of protocols
-    BCArray<DeclIDField> // protocols and inherited types
+    BCArray<DeclIDField> // protocols
     // Trailed by the generic parameter lists, members record, and then
     // conformance info (if any).
   >;
