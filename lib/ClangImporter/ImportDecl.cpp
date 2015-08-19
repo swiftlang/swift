@@ -1616,6 +1616,19 @@ namespace {
       return CD;
     }
 
+    template<unsigned N>
+    void populateInheritedTypes(NominalTypeDecl *nominal,
+                                ProtocolDecl * const (&protocols)[N]) {
+      TypeLoc inheritedTypes[N];
+      for_each(MutableArrayRef<TypeLoc>(inheritedTypes),
+               ArrayRef<ProtocolDecl *>(protocols),
+               [](TypeLoc &tl, ProtocolDecl *proto) {
+                 tl = TypeLoc::withoutLoc(proto->getDeclaredType());
+               });
+      nominal->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
+      nominal->setCheckedInheritanceClause();
+    }
+
     NominalTypeDecl *importAsOptionSetType(DeclContext *dc,
                                            Identifier name,
                                            const clang::EnumDecl *decl) {
@@ -1672,6 +1685,7 @@ namespace {
       ProtocolDecl *protocols[]
         = {cxt.getProtocol(KnownProtocolKind::OptionSetType)};
       structDecl->setProtocols(Impl.SwiftContext.AllocateCopy(protocols));
+      populateInheritedTypes(structDecl, protocols);
 
       structDecl->addMember(labeledValueConstructor);
       structDecl->addMember(patternBinding);
@@ -1731,6 +1745,7 @@ namespace {
           = {cxt.getProtocol(KnownProtocolKind::RawRepresentable)};
         auto protoList = Impl.SwiftContext.AllocateCopy(protocols);
         structDecl->setProtocols(protoList);
+        populateInheritedTypes(structDecl, protocols);
 
         // Note that this is a raw representable type.
         structDecl->getAttrs().add(
@@ -1823,7 +1838,11 @@ namespace {
         };
         auto protoList = Impl.SwiftContext.AllocateCopy(protocols);
         enumDecl->setProtocols(protoList);
-        
+        enumDecl->setInherited(
+          Impl.SwiftContext.AllocateCopy(
+            llvm::makeArrayRef(TypeLoc::withoutLoc(underlyingType))));
+        enumDecl->setCheckedInheritanceClause();
+
         // Provide custom implementations of the init(rawValue:) and rawValue
         // conversions that just do a bitcast. We can't reliably filter a
         // C enum without additional knowledge that the type has no

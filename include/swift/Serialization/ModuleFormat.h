@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 214; // Last change: extension inherited list
+const uint16_t VERSION_MINOR = 215; // Last change: nominal inherited lists
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -773,7 +773,8 @@ namespace decls_block {
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
     AccessibilityKindField, // accessibility
-    BCArray<DeclIDField>    // protocols
+    BCVBR<4>,               // number of protocols
+    BCArray<DeclIDField>    // protocols and inherited types
     // Trailed by the generic parameters (if any), the members record, and
     // finally conformance info (if any).
   >;
@@ -785,7 +786,8 @@ namespace decls_block {
     BCFixed<1>,             // implicit flag
     TypeIDField,            // raw type
     AccessibilityKindField, // accessibility
-    BCArray<DeclIDField>    // protocols
+    BCVBR<4>,               // number of protocols
+    BCArray<DeclIDField>    // protocols and inherited types
     // Trailed by the generic parameters (if any), the members record, and
     // finally conformance info (if any).
   >;
@@ -800,7 +802,8 @@ namespace decls_block {
     BCFixed<1>,        // foreign
     TypeIDField,       // superclass
     AccessibilityKindField, // accessibility
-    BCArray<DeclIDField>    // protocols
+    BCVBR<4>,               // number of protocols
+    BCArray<DeclIDField>    // protocols and inherited types
     // Trailed by the generic parameters (if any), the members record, and
     // finally conformance info (if any).
   >;
@@ -813,7 +816,8 @@ namespace decls_block {
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
     AccessibilityKindField, // accessibility
-    BCArray<DeclIDField>    // protocols
+    BCVBR<4>,               // number of protocols
+    BCArray<DeclIDField>    // protocols and inherited types
     // Trailed by the generic parameters (if any) and the members record
   >;
 

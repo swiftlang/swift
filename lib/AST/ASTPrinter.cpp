@@ -999,17 +999,11 @@ void PrintAST::printInherited(const Decl *decl,
 
 void PrintAST::printInherited(const NominalTypeDecl *decl,
                               bool explicitClass) {
-  printInherited(
-    decl, decl->getInherited(),
-    decl->getLocalProtocols(ConformanceLookupKind::OnlyExplicit), nullptr,
-    explicitClass);
+  printInherited(decl, decl->getInherited(), { }, nullptr, explicitClass);
 }
 
 void PrintAST::printInherited(const EnumDecl *decl) {
-  printInherited(
-    decl, decl->getInherited(),
-    decl->getLocalProtocols(ConformanceLookupKind::OnlyExplicit),
-    decl->getRawType());
+  printInherited(decl, decl->getInherited(), { });
 }
 
 void PrintAST::printInherited(const ExtensionDecl *decl) {
@@ -1280,10 +1274,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
       printNominalDeclName(decl);
     });
 
-  printInherited(
-    decl, decl->getInherited(),
-    decl->getLocalProtocols(ConformanceLookupKind::OnlyExplicit),
-    decl->getSuperclass());
+  printInherited(decl);
 
   if (Options.TypeDefinitions) {
     printMembers(decl->getMembers());

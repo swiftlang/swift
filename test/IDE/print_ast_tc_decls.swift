@@ -781,6 +781,11 @@ struct StructWithInheritance1 : FooProtocol {}
 struct StructWithInheritance2 : FooProtocol, BarProtocol {}
 // PASS_ONE_LINE-DAG: {{^}}struct StructWithInheritance2 : FooProtocol, BarProtocol {{{$}}
 
+struct StructWithInheritance3 : QuxProtocol, SubFooProtocol {
+  typealias Qux = Int
+}
+// PASS_ONE_LINE-DAG: {{^}}struct StructWithInheritance3 : QuxProtocol, SubFooProtocol {{{$}}
+
 //===---
 //===--- Inheritance list in classes.
 //===---
@@ -803,6 +808,11 @@ class ClassWithInheritance4 : FooClass, FooProtocol {}
 class ClassWithInheritance5 : FooClass, FooProtocol, BarProtocol {}
 // PASS_ONE_LINE-DAG: {{^}}class ClassWithInheritance5 : FooClass, FooProtocol, BarProtocol {{{$}}
 
+class ClassWithInheritance6 : QuxProtocol, SubFooProtocol {
+  typealias Qux = Int
+}
+// PASS_ONE_LINE-DAG: {{^}}class ClassWithInheritance6 : QuxProtocol, SubFooProtocol {{{$}}
+
 //===---
 //===--- Inheritance list in enums.
 //===---
@@ -822,6 +832,11 @@ enum EnumDeclWithUnderlyingType1 : Int { case X }
 enum EnumDeclWithUnderlyingType2 : Int, FooProtocol { case X }
 // PASS_ONE_LINE-DAG: {{^}}enum EnumDeclWithUnderlyingType2 : Int, FooProtocol {{{$}}
 
+enum EnumWithInheritance3 : QuxProtocol, SubFooProtocol {
+  typealias Qux = Int
+}
+// PASS_ONE_LINE-DAG: {{^}}enum EnumWithInheritance3 : QuxProtocol, SubFooProtocol {{{$}}
+
 //===---
 //===--- Inheritance list in protocols.
 //===---
@@ -832,8 +847,12 @@ protocol ProtocolWithoutInheritance1 {}
 protocol ProtocolWithInheritance1 : FooProtocol {}
 // PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance1 : FooProtocol {{{$}}
 
-protocol ProtocolWithInheritance2 : FooProtocol, BarProtocol {}
+protocol ProtocolWithInheritance2 : FooProtocol, BarProtocol { }
 // PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance2 : FooProtocol, BarProtocol {{{$}}
+
+protocol ProtocolWithInheritance3 : QuxProtocol, SubFooProtocol {
+}
+// PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance3 : QuxProtocol, SubFooProtocol {{{$}}
 
 //===---
 //===--- Inheritance list in extensions

@@ -2147,9 +2147,12 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(theStruct->getDeclContext());
 
-    SmallVector<DeclID, 8> protocols;
+    SmallVector<DeclID, 8> protocolsAndInherited;
     for (auto proto : theStruct->getLocalProtocols())
-      protocols.push_back(addDeclRef(proto));
+      protocolsAndInherited.push_back(addDeclRef(proto));
+    unsigned numProtocols = protocolsAndInherited.size();
+    for (auto inherited : theStruct->getInherited())
+      protocolsAndInherited.push_back(addTypeRef(inherited.getType()));
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(theStruct->getFormalAccess());
@@ -2160,7 +2163,8 @@ void Serializer::writeDecl(const Decl *D) {
                              contextID,
                              theStruct->isImplicit(),
                              rawAccessLevel,
-                             protocols);
+                             numProtocols,
+                             protocolsAndInherited);
 
 
     writeGenericParams(theStruct->getGenericParams(), DeclTypeAbbrCodes);
@@ -2179,9 +2183,12 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(theEnum->getDeclContext());
 
-    SmallVector<DeclID, 8> protocols;
+    SmallVector<DeclID, 8> protocolsAndInherited;
     for (auto proto : theEnum->getLocalProtocols())
-      protocols.push_back(addDeclRef(proto));
+      protocolsAndInherited.push_back(addDeclRef(proto));
+    unsigned numProtocols = protocolsAndInherited.size();
+    for (auto inherited : theEnum->getInherited())
+      protocolsAndInherited.push_back(addTypeRef(inherited.getType()));
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(theEnum->getFormalAccess());
@@ -2193,7 +2200,8 @@ void Serializer::writeDecl(const Decl *D) {
                             theEnum->isImplicit(),
                             addTypeRef(theEnum->getRawType()),
                             rawAccessLevel,
-                            protocols);
+                            numProtocols,
+                            protocolsAndInherited);
 
     writeGenericParams(theEnum->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theEnum->getGenericRequirements());
@@ -2211,9 +2219,12 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(theClass->getDeclContext());
 
-    SmallVector<DeclID, 8> protocols;
+    SmallVector<DeclID, 8> protocolsAndInherited;
     for (auto proto : theClass->getLocalProtocols())
-      protocols.push_back(addDeclRef(proto));
+      protocolsAndInherited.push_back(addDeclRef(proto));
+    unsigned numProtocols = protocolsAndInherited.size();
+    for (auto inherited : theClass->getInherited())
+      protocolsAndInherited.push_back(addTypeRef(inherited.getType()));
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(theClass->getFormalAccess());
@@ -2228,7 +2239,8 @@ void Serializer::writeDecl(const Decl *D) {
                             theClass->isForeign(),
                             addTypeRef(theClass->getSuperclass()),
                             rawAccessLevel,
-                            protocols);
+                            numProtocols,
+                            protocolsAndInherited);
 
     writeGenericParams(theClass->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theClass->getGenericRequirements());
@@ -2247,9 +2259,12 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(proto->getDeclContext());
 
-    SmallVector<DeclID, 8> protocols;
+    SmallVector<DeclID, 8> protocolsAndInherited;
     for (auto proto : proto->getInheritedProtocols(nullptr))
-      protocols.push_back(addDeclRef(proto));
+      protocolsAndInherited.push_back(addDeclRef(proto));
+    unsigned numProtocols = protocolsAndInherited.size();
+    for (auto inherited : proto->getInherited())
+      protocolsAndInherited.push_back(addTypeRef(inherited.getType()));
 
     uint8_t rawAccessLevel =
       getRawStableAccessibility(proto->getFormalAccess());
@@ -2263,7 +2278,8 @@ void Serializer::writeDecl(const Decl *D) {
                                  ->requiresClass(),
                                proto->isObjC(),
                                rawAccessLevel,
-                               protocols);
+                               numProtocols,
+                               protocolsAndInherited);
 
     writeGenericParams(proto->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(proto->getGenericRequirements());
