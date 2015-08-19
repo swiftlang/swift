@@ -154,7 +154,7 @@ func WhatShouldIDo2(p : P) {
 }
 
 public func driver1<X>(x:X) {
-  var b = B3<X>()
+  let b = B3<X>()
   WhatShouldIDo(b)
   WhatShouldIDo2(b)
 }
@@ -165,15 +165,15 @@ public func driver2() {
 
 
 public func driver() {
-  var a1 = A1()
-  var a2 = A2()
-  var a3 = A3<S>()
-  var a4 = A4<S>()
-  var a5 = A5<S>()
-  var b1 = B1<S>()
-  var b2 = B2<S>()
-  var b3 = B3<S>()
-  var b4 = B4<S>()
+  let a1 = A1()
+  let a2 = A2()
+  let a3 = A3<S>()
+  let a4 = A4<S>()
+  let a5 = A5<S>()
+  let b1 = B1<S>()
+  let b2 = B2<S>()
+  let b3 = B3<S>()
+  let b4 = B4<S>()
 
   WhatShouldIDo(a1)
   WhatShouldIDo2(a1)

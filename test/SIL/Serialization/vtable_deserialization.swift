@@ -10,7 +10,7 @@ func WhatShouldIDoImBored<T : P>(t : T) {
 }
 
 func MakeItNotAGlobal() -> Y {
-  var x = Y()
+  let x = Y()
   WhatShouldIDoImBored(x)
   return x
 }

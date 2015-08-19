@@ -90,9 +90,9 @@ func WhatShouldIDo2(p : P, _ x : Int32) {
 }
 
 public func driver() -> () {
-  var b2 = B2()
-  var b3 = B3()
-  var x = Int32()
+  let b2 = B2()
+  let b3 = B3()
+  let x = Int32()
 
   WhatShouldIDo(b2, x)
   WhatShouldIDo2(b2, x)
