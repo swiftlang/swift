@@ -3870,7 +3870,8 @@ namespace {
     // implicitly-provided protocols, and attach them to the given
     // declaration.
     void importObjCProtocols(Decl *decl,
-                             const clang::ObjCProtocolList &clangProtocols) {
+                             const clang::ObjCProtocolList &clangProtocols,
+                             SmallVectorImpl<TypeLoc> &inheritedTypes) {
       SmallVector<ProtocolDecl *, 4> protocols;
       llvm::SmallPtrSet<ProtocolDecl *, 4> knownProtocols;
       if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
@@ -3882,6 +3883,8 @@ namespace {
            cp != cpEnd; ++cp) {
         if (auto proto = cast_or_null<ProtocolDecl>(Impl.importDecl(*cp))) {
           addProtocols(proto, protocols, knownProtocols);
+          inheritedTypes.push_back(
+            TypeLoc::withoutLoc(proto->getDeclaredType()));
         }
       }
 
@@ -4488,8 +4491,11 @@ namespace {
                       { }, dc, nullptr, decl);
       objcClass->addExtension(result);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-      importObjCProtocols(result, decl->getReferencedProtocols());
+      SmallVector<TypeLoc, 4> inheritedTypes;
+      importObjCProtocols(result, decl->getReferencedProtocols(),
+                          inheritedTypes);
       result->setValidated();
+      result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
       result->setCheckedInheritanceClause();
       result->setMemberLoader(&Impl, 0);
 
@@ -4696,7 +4702,10 @@ namespace {
       result->setCircularityCheck(CircularityCheck::Checked);
 
       // Import protocols this protocol conforms to.
-      importObjCProtocols(result, decl->getReferencedProtocols());
+      SmallVector<TypeLoc, 4> inheritedTypes;
+      importObjCProtocols(result, decl->getReferencedProtocols(),
+                          inheritedTypes);
+      result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
       result->setCheckedInheritanceClause();
 
       result->setMemberLoader(&Impl, 0);
@@ -4816,16 +4825,20 @@ namespace {
         markMissingSwiftDecl(result);
 
       // If this Objective-C class has a supertype, import it.
+      SmallVector<TypeLoc, 4> inheritedTypes;
       if (auto objcSuper = decl->getSuperClass()) {
         auto super = cast_or_null<ClassDecl>(Impl.importDecl(objcSuper));
         if (!super)
           return nullptr;
 
         result->setSuperclass(super->getDeclaredType());
+        inheritedTypes.push_back(TypeLoc::withoutLoc(super->getDeclaredType()));
       }
 
       // Import protocols this class conforms to.
-      importObjCProtocols(result, decl->getReferencedProtocols());
+      importObjCProtocols(result, decl->getReferencedProtocols(),
+                          inheritedTypes);
+      result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
       result->setCheckedInheritanceClause();
 
       // Add inferred attributes.
