@@ -352,13 +352,7 @@ void SILPassManager::run() {
       }
     }
   }
-  // Keep optimizing the module until no pass requested another iteration
-  // of the pass or we reach the maximum.
-  const unsigned IterationLimit = 20;
-  do {
-    anotherIteration = false;
-    runOneIteration();
-  } while (anotherIteration && NumOptimizationIterations < IterationLimit);
+  runOneIteration();
 }
 
 /// D'tor.
@@ -383,7 +377,6 @@ void SILPassManager::resetAndRemoveTransformations() {
 
   Transformations.clear();
   NumOptimizationIterations = 0;
-  anotherIteration = false;
 }
 
 void SILPassManager::setStageName(llvm::StringRef NextStage) {

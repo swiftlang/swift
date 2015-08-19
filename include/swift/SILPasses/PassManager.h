@@ -31,9 +31,6 @@ class SILTransform;
 
 /// \brief The SIL pass manager.
 class SILPassManager {
-  /// When set to True the pass manager will re-run the transformation pipe.
-  bool anotherIteration;
-
   /// The module that the pass manager will transform.
   SILModule *Mod;
 
@@ -66,7 +63,7 @@ class SILPassManager {
   public:
   /// C'tor
   SILPassManager(SILModule *M, llvm::StringRef Stage = "") :
-    anotherIteration(false), Mod(M), StageName(Stage) {
+    Mod(M), StageName(Stage) {
   }
 
   const SILOptions &getOptions() const;
@@ -94,9 +91,6 @@ class SILPassManager {
 
   /// \brief Run one iteration of the optimization pipeline.
   void runOneIteration();
-
-  /// \brief Request another invocation of the transformation pipeline.
-  void scheduleAnotherIteration() { anotherIteration = true; }
 
   ///  \brief Broadcast the invalidation of the module to all analysis.
   void invalidateAnalysis(SILAnalysis::PreserveKind K) {
