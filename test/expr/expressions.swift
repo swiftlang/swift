@@ -764,3 +764,9 @@ func r22211854() {
     f(h() == 1) // expected-error{{cannot invoke 'f' with an argument list of type '(Bool)'}} expected-note{{expected an argument list of type '(Int, Int, String)'}}
     g(h() == 1) // expected-error{{cannot invoke 'g' with an argument list of type '(Bool)'}} expected-note{{expected an argument list of type '(T, T, String)'}}
 }
+
+// <rdar://problem/22348394> Compiler crash on invoking function with labeled defaulted param with non-labeled argument
+func r22348394() {
+  func f(x x: Int = 0) { }
+  f(Int(3)) // expected-error{{missing argument label 'x:' in call}}
+}

@@ -1442,6 +1442,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             !tupleTy->getElements().empty() &&
             (tupleTy->hasAnyDefaultValues() ||
              tupleTy->getElement(0).isVararg()) &&
+            !tupleTy->getElement(0).hasName() &&
             tupleTypeRequiredArgCount(tupleTy) <= 1) {
               
           // Look through vararg types, if necessary.
