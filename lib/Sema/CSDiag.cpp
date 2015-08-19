@@ -3491,10 +3491,6 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   if (srcType->isEqual(destType->getRValueType()))
     return false;
 
-  // If the two types are ok, it must be a contextual problem.
-  if (srcType->isEqual(destType->getRValueType()))
-    return false;
-
   diagnose(srcExpr->getLoc(), diag::cannot_assign_values, srcType,
            destType->getRValueType());
   return true;
@@ -3591,10 +3587,6 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
                                  ConformanceCheckFlags::InExpression,
                                  nullptr, condExpr->getLoc()))
     return true;
-  
-  // If the true/false values already match, it must be a contextual problem.
-  if (trueExpr->getType()->isEqual(falseExpr->getType()))
-    return false;
   
   // If the true/false values already match, it must be a contextual problem.
   if (trueExpr->getType()->isEqual(falseExpr->getType()))
