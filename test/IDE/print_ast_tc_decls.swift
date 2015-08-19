@@ -96,6 +96,8 @@ protocol QuxProtocol {
   typealias Qux
 }
 
+protocol SubFooProtocol : FooProtocol { }
+
 class FooProtocolImpl : FooProtocol {}
 class FooBarProtocolImpl : FooProtocol, BarProtocol {}
 class BazProtocolImpl : BazProtocol { func baz() {} }
@@ -832,6 +834,17 @@ protocol ProtocolWithInheritance1 : FooProtocol {}
 
 protocol ProtocolWithInheritance2 : FooProtocol, BarProtocol {}
 // PASS_ONE_LINE-DAG: {{^}}protocol ProtocolWithInheritance2 : FooProtocol, BarProtocol {{{$}}
+
+//===---
+//===--- Inheritance list in extensions
+//===---
+
+struct StructInherited { }
+
+// PASS_ONE_LINE-DAG: {{.*}}extension StructInherited : QuxProtocol, SubFooProtocol {{{$}}
+extension StructInherited : QuxProtocol, SubFooProtocol {
+  typealias Qux = Int
+}
 
 //===---
 //===--- Typealias printing.

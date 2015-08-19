@@ -3022,10 +3022,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     TypeID baseID;
     DeclContextID contextID;
     bool isImplicit;
-    ArrayRef<uint64_t> rawProtocolIDs;
+    unsigned numProtocols;
+    ArrayRef<uint64_t> rawProtocolAndInheriteIDs;
 
     decls_block::ExtensionLayout::readRecord(scratch, baseID, contextID,
-                                             isImplicit, rawProtocolIDs);
+                                             isImplicit, numProtocols,
+                                             rawProtocolAndInheriteIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3045,12 +3047,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       extension->setImplicit();
 
-    unsigned numProtocols = rawProtocolIDs.size();
     auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
     for (unsigned i = 0; i != numProtocols; ++i) {
-      protocols[i] = cast<ProtocolDecl>(getDecl(rawProtocolIDs[i]));
+      protocols[i] = cast<ProtocolDecl>(getDecl(rawProtocolAndInheriteIDs[i]));
     }
     extension->setProtocols(protocols);
+
+    unsigned numInherited = rawProtocolAndInheriteIDs.size() - numProtocols;
+    auto inheritedTypes = ctx.Allocate<TypeLoc>(numInherited);
+    for (unsigned i = 0; i != numInherited; ++i) {
+      uint64_t rawID = rawProtocolAndInheriteIDs[i + numProtocols];
+      inheritedTypes[i] = TypeLoc::withoutLoc(getType(rawID));
+    }
+    extension->setInherited(inheritedTypes);
 
     // Generic parameters.
     GenericParamList *genericParams = maybeReadGenericParams(DC,
