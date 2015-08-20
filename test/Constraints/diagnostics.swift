@@ -433,12 +433,16 @@ func rdar20868864(var s: String) {
 enum Color {
   case Red
   case Unknown(description: String)
+
+  static func rainbow() -> Color {}
 }
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{type of expression is ambiguous without more context}}
 
 let _: Int -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{type of expression is ambiguous without more context}}
 
 let _: Color = .Unknown("") // expected-error {{type of expression is ambiguous without more context}}
+
+let _ : Color = .rainbow(42)  // expected-error {{type of expression is ambiguous without more context}}
 
 func testTypeSugar(a : Int) {
   typealias Stride = Int
@@ -461,6 +465,11 @@ func r22020088Foo<T>(t: T) {}
 
 func r22020088bar(p: r22020088P?) {
   r22020088Foo(p.fdafs)  // expected-error {{value of type 'r22020088P?' has no member 'fdafs'}}
+}
+
+// <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type
+func f(arguments: [String]) -> [ArraySlice<String>] {
+  return arguments.split(1, allowEmptySlices: true, isSeparator: { $0 == "--" })
 }
 
 
