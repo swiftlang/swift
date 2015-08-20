@@ -228,11 +228,11 @@ class ProtocolDescriptorFlags {
     DispatchStrategyMask  = 0xFU << 2U,
     DispatchStrategyShift = 2,
 
-    SpecialProtocolMask  = 0x7F000000U,
-    SpecialProtocolShift = 24,
+    SpecialProtocolMask  = 0x000003C0U,
+    SpecialProtocolShift = 6,
     
     /// Reserved by the ObjC runtime.
-    _ObjC_FixedUp     = 1U << 31U,
+    _ObjCReserved        = 0xFFFF0000U,
   };
 
   int_type Data;
@@ -259,7 +259,7 @@ public:
                                      | (int_type(sp) << SpecialProtocolShift));
   }
   
-  /// Was the protocol defined in Swift?
+  /// Was the protocol defined in Swift 1 or 2?
   bool isSwift() const { return Data & IsSwift; }
 
   /// Is the protocol class-constrained?
