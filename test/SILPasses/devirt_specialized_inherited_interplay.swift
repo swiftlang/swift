@@ -44,14 +44,13 @@
 // CHECK: apply [[F8]]
 // CHECK: apply [[F8]]
 // CHECK: strong_release [[B4]]
-// CHECK-NEXT: strong_release [[B3]]
-// CHECK-NEXT: strong_release [[B2]]
-// CHECK-NEXT: strong_release [[B1]]
-// CHECK-NEXT: strong_release [[A5]]
-// CHECK-NEXT: strong_release [[A4]]
-// CHECK-NEXT: strong_release [[A3]]
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// CHECK: strong_release [[B3]]
+// CHECK: strong_release [[B2]]
+// CHECK: strong_release [[B1]]
+// CHECK: strong_release [[A5]]
+// CHECK: strong_release [[A4]]
+// CHECK: strong_release [[A3]]
+// CHECK: return
 
 @asmname("unknown0")
 func unknown0() -> ()
