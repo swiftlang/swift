@@ -33,11 +33,16 @@ namespace swift {
   /// \returns true on success, false on error.
   bool typeCheckCompletionDecl(Decl *D);
 
+  /// \brief Check if T1 is convertible to T2.
+  ///
+  /// \returns true on convertible, false on not.
+  bool isConvertibleTo(Type T1, Type T2, DeclContext *DC);
+
   /// \brief Given an unresolved member E and its parent P, this function tries
   /// to infer the type of E.
   /// \returns true on success, false on error.
-  bool typeCheckUnresolvedMember(DeclContext &DC, UnresolvedMemberExpr* E,
-                                 Expr *P, SmallVectorImpl<Type> &PossibleTypes);
+  bool typeCheckUnresolvedExpr(DeclContext &DC, Expr* E,
+                               Expr *P, SmallVectorImpl<Type> &PossibleTypes);
 
   /// \brief Return the type of an expression parsed during code completion, or
   /// None on error.

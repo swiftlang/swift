@@ -197,7 +197,7 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
                                              bool isConfigCondition) {
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
-  
+
   while (true) {
     if (isConfigCondition && Tok.isAtStartOfLine())
       break;
@@ -271,6 +271,24 @@ parse_operator:
       auto *assign = new (Context) AssignExpr(equalsLoc);
       SequencedExprs.push_back(assign);
       Message = diag::expected_expr_assignment;
+      if (Tok.is(tok::code_complete)) {
+        if (CodeCompletion) {
+          auto RHS = new (Context) ErrorExpr(
+            SourceRange(Tok.getRange().getStart(), Tok.getRange().getEnd()));
+          assign->setSrc(RHS);
+          SequencedExprs.pop_back();
+          assign->setDest(SequencedExprs.back());
+          SequencedExprs.pop_back();
+          SequencedExprs.push_back(assign);
+          CodeCompletion->completeAssignmentRHS(assign);
+        }
+        consumeToken();
+        auto Result = SequencedExprs.size() == 1 ?
+          makeParserResult(SequencedExprs[0]):
+          makeParserResult(SequenceExpr::create(Context, SequencedExprs));
+        Result.setHasCodeCompletion();
+        return Result;
+      }
       break;
     }
         

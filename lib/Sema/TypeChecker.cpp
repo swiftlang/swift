@@ -671,6 +671,20 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   return true;
 }
 
+bool swift::isConvertibleTo(Type Ty1, Type Ty2, DeclContext *DC) {
+  auto &Ctx = DC->getASTContext();
+
+  // We try to reuse the type checker associated with the ast context first.
+  if (Ctx.getLazyResolver()) {
+    TypeChecker *TC = static_cast<TypeChecker*>(Ctx.getLazyResolver());
+    return TC->isConvertibleTo(Ty1, Ty2, DC);
+  } else {
+    DiagnosticEngine Diags(Ctx.SourceMgr);
+    TypeChecker TC(Ctx, Diags);
+    return TC.isConvertibleTo(Ty1, Ty2, DC);
+  }
+}
+
 /// \brief Return the type of an expression parsed during code completion, or
 /// a null \c Type on error.
 Optional<Type> swift::getTypeOfCompletionContextExpr(ASTContext &Ctx,

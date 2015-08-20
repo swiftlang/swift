@@ -40,6 +40,9 @@
 using namespace swift;
 using namespace ide;
 
+typedef llvm::function_ref<bool(ValueDecl*, DeclVisibilityKind)> DeclFilter;
+DeclFilter DefaultFilter = [] (ValueDecl* VD, DeclVisibilityKind Kind) {return true;};
+
 std::string swift::ide::removeCodeCompletionTokens(
     StringRef Input, StringRef TokenName, unsigned *CompletionOffset) {
   assert(TokenName.size() >= 1);
@@ -693,8 +696,10 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     AttributeBegin,
     AttributeDeclParen,
     PoundAvailablePlatform,
+    AssignmentRHS,
   };
 
+  AssignExpr *AssignmentExpr;
   UnresolvedMemberExpr *UnresolvedExpr;
   bool UnresolvedExprInReturn;
   std::vector<std::string> TokensBeforeUnresolvedExpr;
@@ -851,7 +856,7 @@ public:
   void completeUnresolvedMember(UnresolvedMemberExpr *E,
                                 ArrayRef<StringRef> Identifiers,
                                 bool HasReturn) override;
-
+  void completeAssignmentRHS(AssignExpr *E) override;
   void addKeywords(CodeCompletionResultSink &Sink);
 
   void doneParsing() override;
@@ -2108,13 +2113,28 @@ public:
     }
   }
 
-  void getValueCompletionsInDeclContext(SourceLoc Loc) {
+  struct FilteredDeclConsumer : public swift::VisibleDeclConsumer {
+    swift::VisibleDeclConsumer &Consumer;
+    DeclFilter Filter;
+    FilteredDeclConsumer(swift::VisibleDeclConsumer &Consumer,
+                         DeclFilter Filter) : Consumer(Consumer), Filter(Filter) {}
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Kind) override {
+      if (Filter(VD, Kind))
+        Consumer.foundDecl(VD, Kind);
+    }
+  };
+
+  void getValueCompletionsInDeclContext(SourceLoc Loc,
+                                        DeclFilter Filter = DefaultFilter,
+                                        bool IncludeTopLevel = false,
+                                        bool RequestCache = true) {
     Kind = LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
-    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
-                       /*IncludeTopLevel=*/false, Loc);
-
-    RequestedCachedResults = RequestedResultsTy::toplevelResults();
+    FilteredDeclConsumer Consumer(*this, Filter);
+    lookupVisibleDecls(Consumer, CurrDeclContext, TypeResolver.get(),
+                       /*IncludeTopLevel=*/IncludeTopLevel, Loc);
+    if (RequestCache)
+      RequestedCachedResults = RequestedResultsTy::toplevelResults();
   }
 
   struct LookupByName : public swift::VisibleDeclConsumer {
@@ -2653,6 +2673,13 @@ void CodeCompletionCallbacksImpl::completeUnresolvedMember(UnresolvedMemberExpr 
   }
 }
 
+void CodeCompletionCallbacksImpl::completeAssignmentRHS(AssignExpr *E) {
+  AssignmentExpr = E;
+  ParsedExpr = E->getDest();
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::AssignmentRHS;
+}
+
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
     SmallVectorImpl<StringRef> &Keywords) {
   assert(!InEnumElementRawValue);
@@ -2748,6 +2775,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::PoundAvailablePlatform:
   case CompletionKind::Import:
   case CompletionKind::UnresolvedMember:
+  case CompletionKind::AssignmentRHS:
     break;
 
   case CompletionKind::PostfixExprBeginning:
@@ -2846,7 +2874,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setIsStaticMetatype(ParsedExpr->isStaticallyDerivedMetatype());
   }
 
-  auto DoPostfixExprBeginning = [&] {
+  auto DoPostfixExprBeginning = [&] (){
     if (CStyleForLoopIterationVariable)
       Lookup.addExpressionSpecificDecl(CStyleForLoopIterationVariable);
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
@@ -2988,9 +3016,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     CurDeclContext->walkContext(Walker);
     bool Success = false;
     if(Walker.ParentExprFarthest) {
-      Success = typeCheckUnresolvedMember(*CurDeclContext, UnresolvedExpr,
-                                          Walker.ParentExprFarthest,
-                                          PossibleTypes);
+      Success = typeCheckUnresolvedExpr(*CurDeclContext, UnresolvedExpr,
+                                        Walker.ParentExprFarthest,
+                                        PossibleTypes);
       Lookup.getUnresolvedMemberCompletions(
         P.Context.SourceMgr.getCodeCompletionLoc(), PossibleTypes);
     }
@@ -3001,6 +3029,18 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         UnresolvedExprInReturn);
     }
     break;
+  }
+  case CompletionKind::AssignmentRHS : {
+    auto Ty = AssignmentExpr->getDest()->getType()->getRValueType();
+    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    DeclFilter Filter = [&](ValueDecl *VD, DeclVisibilityKind Kind) {
+      if (auto FD = dyn_cast<FuncDecl>(VD)) {
+        return isConvertibleTo(FD->getResultType(), Ty, CurDeclContext);
+      }
+      return isConvertibleTo(VD->getType(), Ty, CurDeclContext);
+    };
+    Lookup.getValueCompletionsInDeclContext(Loc, Filter,
+                                            /*IncludeTopLevel*/true, false);
   }
   }
 

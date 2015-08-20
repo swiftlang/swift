@@ -153,6 +153,8 @@ public:
                                         ArrayRef<StringRef> Identifiers,
                                         bool HasReturn) = 0;
 
+  virtual void completeAssignmentRHS(AssignExpr *E) = 0;
+
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.
   virtual void doneParsing() = 0;

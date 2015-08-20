@@ -991,7 +991,7 @@ namespace {
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
     
-    Type visitErrorExpr(ErrorExpr *E) {
+    virtual Type visitErrorExpr(ErrorExpr *E) {
       // FIXME: Can we do anything with error expressions at this point?
       return nullptr;
     }
@@ -2726,22 +2726,35 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
 
 class InferUnresolvedMemberConstraintGenerator : public ConstraintGenerator {
   Expr *Target;
-  TypeVariableType* VT;
-public:
+  TypeVariableType *VT;
 
+  Type createFreeTypeVariableType(Expr *E) {
+    auto &CS = getConstraintSystem();
+    return VT = CS.createTypeVariable(CS.getConstraintLocator(nullptr),
+                                      TypeVariableOptions::TVO_CanBindToLValue);
+  }
+
+public:
   InferUnresolvedMemberConstraintGenerator(Expr *Target, ConstraintSystem &CS) :
     ConstraintGenerator(CS), Target(Target) {};
   virtual ~InferUnresolvedMemberConstraintGenerator() = default;
 
-  Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *expr) override {
-    if (Target != expr) {
+  Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *Expr) override {
+    if (Target != Expr) {
       // If expr is not the target, do the default constraint generation.
-      return ConstraintGenerator::visitUnresolvedMemberExpr(expr);
+      return ConstraintGenerator::visitUnresolvedMemberExpr(Expr);
     }
     // Otherwise, create a type variable saying we know nothing about this expr.
-    auto &CS = getConstraintSystem();
-    return VT = CS.createTypeVariable(CS.getConstraintLocator(nullptr),
-                                      TypeVariableOptions::TVO_CanBindToLValue);
+    return createFreeTypeVariableType(Expr);
+  }
+
+  Type visitErrorExpr(ErrorExpr *Expr) override {
+    if (Target != Expr) {
+      // If expr is not the target, do the default constraint generation.
+      return ConstraintGenerator::visitErrorExpr(Expr);
+    }
+    // Otherwise, create a type variable saying we know nothing about this expr.
+    return createFreeTypeVariableType(Expr);
   }
 
   Type getResolvedType(Solution &S) {
@@ -2749,9 +2762,9 @@ public:
   }
 };
 
-bool swift::typeCheckUnresolvedMember(DeclContext &DC,
-                                      UnresolvedMemberExpr* E, Expr *Parent,
-                                      SmallVectorImpl<Type> &PossibleTypes) {
+bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
+                                    Expr *E, Expr *Parent,
+                                    SmallVectorImpl<Type> &PossibleTypes) {
   ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
   auto *TypeChecker = static_cast<class TypeChecker*>(DC.getASTContext().
                                                       getLazyResolver());
