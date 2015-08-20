@@ -2064,6 +2064,9 @@ namespace {
 
 #ifdef SWIFT_ENABLE_OBJECT_LITERALS
     Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
+      if (expr->getType() && !expr->getType()->hasTypeVariable())
+        return expr;
+
       auto &ctx = cs.getASTContext();
       auto &tc = cs.getTypeChecker();
 

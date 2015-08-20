@@ -22,7 +22,7 @@ struct X2<T> {
   static var NotAnX2 = 0 // expected-error {{static stored properties not yet supported in generic types}}
 }
 
-var x2: X2<Int> = .AnX2  // expected-error {{type of expression is ambiguous without more context}}
+var x2: X2<Int> = .AnX2 
 x2 = .AnX2     // expected-error {{type of expression is ambiguous without more context}}
 x2 = .NotAnX2 // expected-error{{type of expression is ambiguous without more context}}
 

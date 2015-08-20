@@ -59,7 +59,7 @@ func retV() { return true } // expected-error {{unexpected non-void return value
 func retAI() -> Int {
     let a = [""]
     let b = [""]
-    return (a + b) // expected-error {{cannot convert return expression of type '[String]' to return type 'Int'}}
+    return (a + b) // expected-error {{binary operator '+' cannot be applied to two '[String]' operands}}
 }
 
 func bad_return1() {

@@ -437,12 +437,10 @@ enum Color {
   static func rainbow() -> Color {}
 }
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{type of expression is ambiguous without more context}}
-
 let _: Int -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{type of expression is ambiguous without more context}}
-
 let _: Color = .Unknown("") // expected-error {{type of expression is ambiguous without more context}}
-
-let _ : Color = .rainbow(42)  // expected-error {{type of expression is ambiguous without more context}}
+let _: Color = .Unknown(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+let _ : Color = .rainbow(42)  // expected-error {{cannot convert value of type 'Int' to expected argument type '()'}}
 
 func testTypeSugar(a : Int) {
   typealias Stride = Int

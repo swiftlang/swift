@@ -262,6 +262,7 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::Load:
     case ConstraintLocator::RvalueAdjustment:
     case ConstraintLocator::ScalarToTuple:
+    case ConstraintLocator::UnresolvedMember:
       // Loads, rvalue adjustment, and scalar-to-tuple conversions are implicit.
       path = path.slice(1);
       continue;
@@ -1371,6 +1372,11 @@ namespace {
     /// Analyze a locator for a SubscriptExpr for its candidate set.
     CalleeCandidateInfo(ConstraintLocator *locator, ConstraintSystem *CS);
 
+    CalleeCandidateInfo(UncurriedCandidate cand, ConstraintSystem *CS): CS(CS) {
+      candidates.push_back(cand);
+      closeness = CC_ExactMatch;
+    }
+
     typedef const std::function<CandidateCloseness(UncurriedCandidate)>
     &ClosenessPredicate;
 
@@ -1822,6 +1828,9 @@ private:
   bool diagnoseGeneralConversionFailure(Constraint *constraint);
      
   bool visitExpr(Expr *E);
+  bool visitIdentityExpr(IdentityExpr *E);
+  
+  bool visitUnresolvedMemberExpr(UnresolvedMemberExpr *E);
   bool visitArrayExpr(ArrayExpr *E);
   bool visitDictionaryExpr(DictionaryExpr *E);
 
@@ -3801,6 +3810,118 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
   return false;
 }
 
+bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
+  // If we have no contextual type, there is no way to resolve this.  Just
+  // diagnose this as an ambiguity.
+  if (!CS->getContextualType())
+    return false;
+
+  // OTOH, if we do have a contextual type, we can provide a more specific
+  // error.  Dig out the UnresolvedValueMember constraint for this expr node.
+  Constraint *memberConstraint = nullptr;
+  auto checkConstraint = [&](Constraint *C) {
+    if (C->getKind() == ConstraintKind::UnresolvedValueMember &&
+        simplifyLocatorToAnchor(*CS, C->getLocator()) == E)
+      memberConstraint = C;
+  };
+  
+  if (CS->failedConstraint)
+    checkConstraint(CS->failedConstraint);
+  for (auto &C : CS->getConstraints()) {
+    if (memberConstraint) break;
+    checkConstraint(&C);
+  }
+  
+  // If we can't find the member constraint in question, then we failed.
+  if (!memberConstraint)
+    return false;
+  
+  // If we succeeded, get ready to do the member lookup.
+  auto baseObjTy = CS->getContextualType()->getRValueType();
+
+  // If the base object is already a metatype type, then something weird is
+  // going on.  For now, just generate a generic error.
+  if (baseObjTy->is<MetatypeType>())
+    return false;
+
+  // Otherwise, we'll perform a lookup against the metatype of our contextual
+  // type.
+  baseObjTy = MetatypeType::get(baseObjTy);
+  auto result = CS->performMemberLookup(baseObjTy, *memberConstraint);
+
+  switch (result.OverallResult) {
+  case MemberLookupResult::Unsolved:
+    llvm_unreachable("base expr type should be resolved at this point");
+  case MemberLookupResult::ErrorAlreadyDiagnosed:
+    // If an error was already emitted, then we're done, don't emit anything
+    // redundant.
+    return true;
+  case MemberLookupResult::HasResults:
+    break;    // Interesting case. :-)
+  }
+
+  // If we found no results at all, mention that fact.
+  if (result.ViableCandidates.empty() &&
+      result.UnviableCandidates.empty()) {
+    // TODO: This should handle tuple member lookups, like x.1231 as well.
+    if (auto MTT = baseObjTy->getAs<MetatypeType>())
+      diagnose(E->getLoc(), diag::could_not_find_type_member,
+               MTT->getInstanceType(), E->getName())
+       .highlight(expr->getSourceRange()).highlight(E->getNameLoc());
+    else
+      diagnose(E->getLoc(), diag::could_not_find_value_member,
+               baseObjTy, E->getName())
+       .highlight(E->getNameLoc());
+    return true;
+  }
+
+  // If we have unviable candidates (e.g. because of access control or some
+  // other problem) we should diagnose the problem.
+  if (result.ViableCandidates.empty())
+    // TODO: not handled yet.
+    return false;
+
+  // If we have multiple viable candidates, then we have an overload ambiguity
+  // between static factory methods.
+  // TODO: not handled yet.
+  if (result.ViableCandidates.size() != 1 ||
+      !result.ViableCandidates[0].isDecl())
+    return false;
+
+  // Finally, if we have one viable candidate, then we have a valid reference to
+  // an enum method or static "factory" method, but have some other problem in
+  // the expression tree.  Propagate the type information we have to the
+  // subexpression.
+  auto candidate = result.ViableCandidates[0].getDecl();
+
+
+  CalleeCandidateInfo candInfo({ candidate, 1 }, CS);
+
+  // The candidate we found must have function type, e.g.:
+  //    baseTy.Type -> argList -> baseTy
+  // If so, and if we have a subexpression, then the subexpr can be contextually
+  // checked with "argList" as its type.
+  if (auto CFD = candidate->getType()->getAs<AnyFunctionType>())
+    if (auto RFD = CFD->getResult()->getAs<AnyFunctionType>())
+      if (auto *arg = E->getArgument()) {
+        if (!typeCheckArgumentChildIndependently(arg, RFD->getInput(),
+                                                 candInfo))
+          return true;
+        return false;
+      }
+
+  return false;
+}
+
+
+/// An IdentityExpr doesn't change its argument, but it *can* propagate its
+/// contextual type information down.
+bool FailureDiagnosis::visitIdentityExpr(IdentityExpr *E) {
+  if (!typeCheckChildIndependently(E->getSubExpr(), CS->getContextualType(),
+                                   CS->getContextualTypePurpose()))
+    return true;
+  return false;
+}
 
 bool FailureDiagnosis::visitExpr(Expr *E) {
   // Check each of our immediate children to see if any of them are

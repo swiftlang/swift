@@ -123,18 +123,12 @@ func errorRecovery() {
     case bar
     case baz
   }
-  var a: Int =
-      .hello // expected-error {{type of expression is ambiguous without more context}}
+  var a: Int = .hello // expected-error {{type 'Int' has no member 'hello'}}
   var b: union1 = .bar // ok
-  var c: union1 =
-      .xyz  // expected-error {{type of expression is ambiguous without more context}}
-  var d: (Int,Int,Int) =
-      (1,2) // expected-error {{different number of elements}}
-  var e: (Int,Int) =
-      (1, 2, 3) // expected-error {{different number of elements}}
-
-  var f: (Int,Int) =
-      (1, 2, f : 3) // expected-error {{different number of elements}}
+  var c: union1 = .xyz  // expected-error {{type 'union1' has no member 'xyz'}}
+  var d: (Int,Int,Int) = (1,2) // expected-error {{different number of elements}}
+  var e: (Int,Int) = (1, 2, 3) // expected-error {{different number of elements}}
+  var f: (Int,Int) = (1, 2, f : 3) // expected-error {{different number of elements}}
 }
 
 func acceptsInt(x: Int) {}

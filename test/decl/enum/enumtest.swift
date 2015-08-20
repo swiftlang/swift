@@ -83,7 +83,8 @@ func test3(a: ZeroOneTwoThree) {
   
   var _ : ZeroOneTwoThree = .One(4)
   
-  var _ : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{type of expression is ambiguous without more context}}
+  var _ : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{type '(Int, Int) -> ZeroOneTwoThree' has no member 'Two'}}
+  var _ : Int = .Two // expected-error{{type 'Int' has no member 'Two'}}
 }
 
 func test3a(a: ZeroOneTwoThree) {
@@ -218,8 +219,8 @@ func f() {
 func union_error(a: ZeroOneTwoThree) {
   var _ : ZeroOneTwoThree = .Zero(1) // expected-error {{type of expression is ambiguous without more context}}
   var _ : ZeroOneTwoThree = .One // expected-error {{type of expression is ambiguous without more context}}
-  var _ : ZeroOneTwoThree = .foo // expected-error {{type of expression is ambiguous without more context}}
-  var _ : ZeroOneTwoThree = .foo() // expected-error {{type of expression is ambiguous without more context}}
+  var _ : ZeroOneTwoThree = .foo // expected-error {{type 'ZeroOneTwoThree' has no member 'foo'}}
+  var _ : ZeroOneTwoThree = .foo() // expected-error {{type 'ZeroOneTwoThree' has no member 'foo'}}
 }
 
 func local_struct() {

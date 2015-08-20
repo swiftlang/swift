@@ -13,7 +13,7 @@ func nonOptContext() -> Foo {
   case ():
     return .someVar
   case ():
-    return .someOptVar // expected-error{{}} {{23-23=!}}
+    return .someOptVar // expected-error 2 {{value of optional type 'Foo' not unwrapped; did you mean to use '!' or '?'?}} {{23-23=!}}
   // TODO
   //case ():
   //  return .someOptVar!

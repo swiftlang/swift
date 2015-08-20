@@ -357,7 +357,7 @@ enum DuplicateMembers7 : String {
 // Refs to duplicated enum cases shouldn't crash the compiler.
 // rdar://problem/20922401
 func check20922401() -> String {
-  let x: DuplicateMembers1 = .Foo // expected-error {{type of expression is ambiguous without more context}}
+  let x: DuplicateMembers1 = .Foo 
   switch x {
     case .Foo:
       return "Foo"
