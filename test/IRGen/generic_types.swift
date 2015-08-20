@@ -22,7 +22,7 @@ import Swift
 // CHECK:   i64 0,
 // CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
-// CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
+// CHECK:   %swift.opaque* null,
 // CHECK:   i64 1,
 // CHECK:   i32 3,
 // CHECK:   i32 0,
@@ -46,7 +46,7 @@ import Swift
 // CHECK:   i64 0,
 // CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
-// CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
+// CHECK:   %swift.opaque* null,
 // CHECK:   i64 1,
 // CHECK:   i32 3,
 // CHECK:   i32 0,
@@ -63,7 +63,7 @@ import Swift
 // CHECK:   i64 0,
 // CHECK:   %swift.type* null,
 // CHECK:   %swift.opaque* @_objc_empty_cache,
-// CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
+// CHECK:   %swift.opaque* null,
 // CHECK:   i64 1,
 // CHECK:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
 // CHECK: }
@@ -73,7 +73,7 @@ import Swift
 // FIXME:   i64 0,
 // FIXME:   %swift.type* null,
 // FIXME:   %swift.opaque* @_objc_empty_cache,
-// FIXME:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
+// FIXME:   %swift.opaque* null,
 // FIXME:   i64 1,
 // FIXME:   void (i64, [[D]]*)* @_TFC13generic_types1D3run
 // FIXME: }

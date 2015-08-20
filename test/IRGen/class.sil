@@ -40,7 +40,7 @@ sil_vtable C {}
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1C to i64),
 // \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$_SwiftObject",
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
-// \ CHECK:   [[OPAQUE]]* {{(@_objc_empty_vtable|null)}},
+// \ CHECK:   [[OPAQUE]]* null,
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1C to i64), i64 1)
 // \ CHECK: }
 
@@ -50,7 +50,7 @@ sil_vtable C {}
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1D to i64),
 // \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$_SwiftObject",
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
-// \ CHECK:   [[OPAQUE]]* {{(@_objc_empty_vtable|null)}},
+// \ CHECK:   [[OPAQUE]]* null,
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1D to i64), i64 1),
 // \ CHECK:   i32 3,
 // \ CHECK:   i32 0,

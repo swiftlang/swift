@@ -78,7 +78,7 @@ import gizmo
 // CHECK:   i64 ptrtoint (%objc_class* @_TMmC15generic_classes14RootNonGeneric to i64),
 // CHECK:   %objc_class* @"OBJC_CLASS_$_SwiftObject",
 // CHECK:   %swift.opaque* @_objc_empty_cache,
-// CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
+// CHECK:   %swift.opaque* null,
 // CHECK:   @_DATA__TtC15generic_classes14RootNonGeneric
 // CHECK:   i32 33,
 // CHECK:   i16 7,

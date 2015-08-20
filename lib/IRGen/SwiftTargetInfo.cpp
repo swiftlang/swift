@@ -69,10 +69,6 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
       SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER;
   }
 
-  // On simulator targets, use null instead of &_objc_empty_vtable.
-  if (triple.isiOS())
-    target.ObjCUseNullForEmptyVTable = true;
-  
   // x86-64 has every objc_msgSend variant known to humankind.
   target.ObjCUseFPRet = true;
   target.ObjCUseFP2Ret = true;
@@ -84,10 +80,6 @@ static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
 /// Configures target-specific information for 32-bit x86 platforms.
 static void configureX86(IRGenModule &IGM, const llvm::Triple &triple,
                          SwiftTargetInfo &target) {
-  // On simulator targets, use null instead of &_objc_empty_vtable.
-  if (triple.isiOS())
-    target.ObjCUseNullForEmptyVTable = true;
-  
   // x86 uses objc_msgSend_fpret but not objc_msgSend_fp2ret.
   target.ObjCUseFPRet = true;
 }
@@ -149,12 +141,6 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
   default:
     // FIXME: Complain here? Default target info is unlikely to be correct.
     break;
-  }
-
-  // The JIT does not support absolute symbols, so we have to use null
-  // for &objc_empty_vtable.
-  if (IGM.Opts.UseJIT) {
-    target.ObjCUseNullForEmptyVTable = true;
   }
 
   return target;

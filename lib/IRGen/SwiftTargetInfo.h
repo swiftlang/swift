@@ -82,7 +82,6 @@ public:
   bool ObjCUseStret = true;
   bool ObjCUseFPRet = false;
   bool ObjCUseFP2Ret = false;
-  bool ObjCUseNullForEmptyVTable = false;
   bool ObjCUseISAMask = false;
   
   /// The value stored in a Builtin.once predicate to indicate that an
