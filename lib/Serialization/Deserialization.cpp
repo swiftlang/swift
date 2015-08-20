@@ -955,11 +955,14 @@ bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
 static Optional<swift::CtorInitializerKind>
 getActualCtorInitializerKind(uint8_t raw) {
   switch (serialization::CtorInitializerKind(raw)) {
-  case serialization::Designated:
-    return swift::CtorInitializerKind::Designated;
-
-  case serialization::Convenience:
-    return swift::CtorInitializerKind::Convenience;
+#define CASE(NAME) \
+  case serialization::CtorInitializerKind::NAME: \
+    return swift::CtorInitializerKind::NAME;
+  CASE(Designated)
+  CASE(Convenience)
+  CASE(Factory)
+  CASE(ConvenienceFactory)
+#undef CASE
   }
   return None;
 }

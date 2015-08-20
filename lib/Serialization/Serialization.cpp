@@ -1257,16 +1257,12 @@ static serialization::AccessorKind getStableAccessorKind(swift::AccessorKind K){
 static serialization::CtorInitializerKind
 getStableCtorInitializerKind(swift::CtorInitializerKind K){
   switch (K) {
-  case swift::CtorInitializerKind::ConvenienceFactory:
-    llvm_unreachable("Convenience factory initializers cannot be uttered");
-
-  case swift::CtorInitializerKind::Factory:
-    llvm_unreachable("Factory initializers cannot be uttered");
-
 #define CASE(NAME) \
   case swift::CtorInitializerKind::NAME: return serialization::NAME;
       CASE(Designated)
       CASE(Convenience)
+      CASE(Factory)
+      CASE(ConvenienceFactory)
 #undef CASE
   }
 }

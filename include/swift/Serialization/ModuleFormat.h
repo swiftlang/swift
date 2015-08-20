@@ -167,9 +167,11 @@ using AccessorKindField = BCFixed<3>;
 // VERSION_MAJOR.
 enum CtorInitializerKind : uint8_t {
   Designated = 0,
-  Convenience = 1
+  Convenience = 1,
+  Factory = 2,
+  ConvenienceFactory = 3,
 };
-using CtorInitializerKindField = BCFixed<1>;
+using CtorInitializerKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
