@@ -134,19 +134,6 @@ public struct Character :
     return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
   }
 
-  @warn_unused_result
-  internal static func _makeSmallUTF8Generator(var u8: UInt64)
-    -> AnyGenerator<UTF8.CodeUnit> {
-    return anyGenerator {
-      let result = UInt8(truncatingBitPattern: u8)
-      if result == 0xFF {
-        return nil
-      }
-      u8 = u8 >> 8
-      return result
-    }
-  }
-
   internal struct _SmallUTF8 : CollectionType {
     init(_ u8: UInt64) {
       let count = Character._smallSize(u8)
@@ -184,6 +171,27 @@ public struct Character :
         truncatingBitPattern: data >> (UInt64(position) &* 8))
     }
 
+    internal struct Generator : GeneratorType {
+      init(_ data: UInt64) {
+        self._data = data
+      }
+
+      internal mutating func next() -> UInt8? {
+        let result = UInt8(truncatingBitPattern: _data)
+        if result == 0xFF {
+          return nil
+        }
+        _data = (_data >> 8) | 0xFF00_0000_0000_0000
+        return result
+      }
+
+      internal var _data: UInt64
+    }
+
+    internal func generate() -> Generator {
+      return Generator(data)
+    }
+
     var count: UInt16
     var data: UInt64
   }
@@ -191,7 +199,7 @@ public struct Character :
   struct _SmallUTF16 : CollectionType {
     init(_ u8: UInt64) {
       let count = UTF16.measure(
-        UTF8.self, input: Character._makeSmallUTF8Generator(u8),
+        UTF8.self, input: _SmallUTF8(u8).generate(),
         repairIllFormedSequences: true)!.0
       _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
       self.count = UInt16(count)
@@ -201,7 +209,7 @@ public struct Character :
         u16 = u16 | UInt64($0)
       }
       transcode(
-        UTF8.self, UTF16.self, Character._makeSmallUTF8Generator(u8), output,
+        UTF8.self, UTF16.self, _SmallUTF8(u8).generate(), output,
         stopOnError: false)
       self.data = u16
     }

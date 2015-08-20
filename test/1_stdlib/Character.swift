@@ -244,6 +244,17 @@ CharacterTests.test(
     { x in { String(Character(x)) < String(Character($0)) } } as PredicateFn)
 }
 
+CharacterTests.test("String.append(_: Character)") {
+  for test in testCharacters {
+    let character = Character(test)
+    var result = ""
+    result.append(character)
+    expectEqualSequence(
+      test.unicodeScalars,
+      result.unicodeScalars)
+  }
+}
+
 var UnicodeScalarTests = TestSuite("UnicodeScalar")
 
 UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)") {
