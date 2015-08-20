@@ -897,9 +897,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createAllocRefDynamic(
                   Loc,
                   getLocalValue(ValID, ValResNum,
-                                getSILType(MF->getType(TyID),
-                                           (SILValueCategory)TyCategory)),
-                  getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2),
+                                getSILType(MF->getType(TyID2),
+                                           (SILValueCategory)TyCategory2)),
+                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
                   isObjC);
     break;
   }

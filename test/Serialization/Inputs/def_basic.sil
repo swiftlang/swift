@@ -212,6 +212,18 @@ bb0:
   %7 = return %6 : $()
 }
 
+// CHECK-LABEL: @objc_classes : $@convention(thin) (@thick NSObject.Type) -> ()
+sil [fragile] @objc_classes : $@convention(thin) (@thick NSObject.Type) -> () {
+bb0(%0 : $@thick NSObject.Type):
+  %1 = thick_to_objc_metatype %0 : $@thick NSObject.Type to $@objc_metatype NSObject.Type
+  // CHECK: %2 = alloc_ref_dynamic [objc] %1 : $@objc_metatype NSObject.Type, $NSObject
+  %2 = alloc_ref_dynamic [objc] %1 : $@objc_metatype NSObject.Type, $NSObject
+  dealloc_ref [constructor] %2 : $NSObject
+
+  %void = tuple ()
+  return %void : $()
+} // CHECK: {{^}$}}
+
 // Generated from:
 // func archetype_member_ref<T : Runcible>(x: T) {
 //   x.free_method()
@@ -1278,6 +1290,7 @@ bb0:
   %13 = function_ref @return_constant : $@convention(thin) () -> Int
   %23 = function_ref @existentials : $@convention(thin) (@in P) -> ()
   %25 = function_ref @classes : $@convention(thin) () -> ()
+  %26 = function_ref @objc_classes : $@convention(thin) (@thick NSObject.Type) -> ()
   %27 = function_ref @_TF4todo18erasure_from_protoFT1xPS_8RuncibleS_8Bendable__PS0__ : $@convention(thin) (@out Runcible, @in protocol<Bendable, Runcible>) -> ()
   %29 = function_ref @_TF4todo18class_bound_methodFT1xPS_10ClassBound__T_ : $@convention(thin) (@owned ClassBound) -> ()
   %31 = function_ref @_TFV6struct5AlephCfMS0_FT1aCS_3Ref1bVS_3Val_S0_ : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
