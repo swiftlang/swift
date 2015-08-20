@@ -1083,6 +1083,9 @@ public:
     InterfaceHash.update(a);
   }
 
+  const llvm::MD5 &getInterfaceHashState() { return InterfaceHash; }
+  void setInterfaceHashState(const llvm::MD5 &state) { InterfaceHash = state; }
+
   void getInterfaceHash(llvm::SmallString<32> &str) {
     llvm::MD5::MD5Result result;
     InterfaceHash.final(result);
