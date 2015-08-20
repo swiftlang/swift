@@ -41,3 +41,23 @@ func basic(a : Int32) {
 
   // CHECK-NOT: builtin "int_instrprof_increment"
 }
+
+// CHECK: sil hidden @[[F_THROWING_NOP:.*throwing_nop.*]] :
+func throwing_nop() throws {}
+// CHECK: sil hidden @[[F_EXCEPTIONS:.*exceptions.*]] :
+// CHECK: %[[NAME:.*]] = string_literal utf8 "[[F_EXCEPTIONS]]"
+// CHECK: %[[HASH:.*]] = integer_literal $Builtin.Int64,
+// CHECK: %[[NCOUNTS:.*]] = integer_literal $Builtin.Int32, 3
+// CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0
+// CHECK: builtin "int_instrprof_increment"(%[[NAME]] : {{.*}}, %[[HASH]] : {{.*}}, %[[NCOUNTS]] : {{.*}}, %[[INDEX]] : {{.*}})
+func exceptions() {
+  do {
+    try throwing_nop()
+    // CHECK: builtin "int_instrprof_increment"
+  } catch {
+    // CHECK: builtin "int_instrprof_increment"
+    return
+  }
+
+  // CHECK-NOT: builtin "int_instrprof_increment"
+}

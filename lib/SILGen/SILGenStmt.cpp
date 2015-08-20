@@ -121,8 +121,8 @@ static SILBasicBlock *getOrEraseBlock(SILGenFunction &SGF, JumpDest &dest) {
 
 /// emitOrDeleteBlock - If there are branches to the specified JumpDest,
 /// emit it per emitBlock.  If there aren't, then just delete the block - it
-/// turns out to have not been needed. Returns true if the block was emitted.
-static bool emitOrDeleteBlock(SILGenFunction &SGF, JumpDest &dest,
+/// turns out to have not been needed.
+static void emitOrDeleteBlock(SILGenFunction &SGF, JumpDest &dest,
                               SILLocation BranchLoc) {
   // If we ever add a single-use optimization here (to just continue
   // the predecessor instead of branching to a separate block), we'll
@@ -131,11 +131,8 @@ static bool emitOrDeleteBlock(SILGenFunction &SGF, JumpDest &dest,
   // doesn't leave us emitting the rest of the function in the
   // postmatter section.
   SILBasicBlock *BB = getOrEraseBlock(SGF, dest);
-  if (BB != nullptr) {
+  if (BB != nullptr)
     SGF.B.emitBlock(BB, BranchLoc);
-    return true;
-  }
-  return false;
 }
 
 Condition SILGenFunction::emitCondition(Expr *E,
@@ -537,6 +534,9 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
     llvm::SaveAndRestore<JumpDest> savedThrowDest(SGF.ThrowDest, throwDest);
 
     visit(S->getBody());
+    // We emit the counter for exiting the do-block here, as we may not have a
+    // valid insertion point when falling out.
+    SGF.emitProfilerIncrement(S);
   }
 
   // Emit the catch clauses, but only if the body of the function
@@ -570,8 +570,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // left in the original function section after this.  So if
   // emitOrDeleteBlock ever learns to just continue in the
   // predecessor, we'll need to suppress that here.
-  if (emitOrDeleteBlock(SGF, endDest, CleanupLocation(S->getBody())))
-    SGF.emitProfilerIncrement(S);
+  emitOrDeleteBlock(SGF, endDest, CleanupLocation(S->getBody()));
 }
 
 void StmtEmitter::visitCatchStmt(CatchStmt *S) {

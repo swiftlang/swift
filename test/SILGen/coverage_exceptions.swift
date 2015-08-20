@@ -45,6 +45,8 @@ func foo() -> Int32 {
     try baz { () throws -> () in throw SomeErr.Err1 }
   } catch _ {}
 
+  try! baz { () throws -> () in return }
+
   return x
 }
 
