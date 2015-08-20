@@ -38,6 +38,7 @@ class CodeCompletionResultBuilder {
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
+  Type ExpectedType;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -64,8 +65,10 @@ class CodeCompletionResultBuilder {
 public:
   CodeCompletionResultBuilder(CodeCompletionResultSink &Sink,
                               CodeCompletionResult::ResultKind Kind,
-                              SemanticContextKind SemanticContext)
-      : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext) {
+                              SemanticContextKind SemanticContext,
+                              Type ExpectedType)
+      : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext),
+        ExpectedType(ExpectedType) {
   }
 
   ~CodeCompletionResultBuilder() {

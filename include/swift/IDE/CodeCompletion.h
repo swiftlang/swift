@@ -411,6 +411,23 @@ public:
     Pattern
   };
 
+  /// Describing the relationship between the type of the completion results and
+  /// the expected type at the code completion position.
+  enum ExpectedTypeRelation {
+
+    /// Cannot determine the relationship.
+    Undetermined,
+
+    /// The result's type is invalid at the expected position.
+    Invalid,
+
+    /// The result's type is convertible to the type of the expected.
+    Convertible,
+
+    /// The result's type is identical to the type of the expected.
+    Identical,
+  };
+
 private:
   unsigned Kind : 2;
   unsigned AssociatedDeclKind : 8;
@@ -430,6 +447,7 @@ private:
   StringRef ModuleName;
   StringRef BriefDocComment;
   ArrayRef<StringRef> AssociatedUSRs;
+  unsigned TypeDistance : 3;
 
 public:
   /// Constructs a \c Pattern or \c Keyword result.
@@ -444,6 +462,7 @@ public:
         CompletionString(CompletionString) {
     assert(Kind != Declaration && "use the other constructor");
     assert(CompletionString);
+    TypeDistance = ExpectedTypeRelation::Undetermined;
   }
 
   /// Constructs a \c Declaration result.
@@ -456,12 +475,14 @@ public:
                        CodeCompletionString *CompletionString,
                        const Decl *AssociatedDecl, StringRef ModuleName,
                        bool NotRecommended, StringRef BriefDocComment,
-                       ArrayRef<StringRef> AssociatedUSRs)
+                       ArrayRef<StringRef> AssociatedUSRs,
+                       enum ExpectedTypeRelation TypeDistance)
       : Kind(ResultKind::Declaration),
         SemanticContext(unsigned(SemanticContext)),
         NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
         CompletionString(CompletionString), ModuleName(ModuleName),
-        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs) {
+        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
+        TypeDistance(TypeDistance) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedDeclKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     assert(CompletionString);
@@ -481,6 +502,7 @@ public:
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs) {
     AssociatedDeclKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
+    TypeDistance = ExpectedTypeRelation::Undetermined;
   }
 
   ResultKind getKind() const { return static_cast<ResultKind>(Kind); }
@@ -488,6 +510,11 @@ public:
   CodeCompletionDeclKind getAssociatedDeclKind() const {
     assert(getKind() == Declaration);
     return static_cast<CodeCompletionDeclKind>(AssociatedDeclKind);
+  }
+
+  ExpectedTypeRelation getExpectedTypeRelation() const {
+    assert(getKind() == Declaration);
+    return static_cast<ExpectedTypeRelation>(TypeDistance);
   }
 
   SemanticContextKind getSemanticContext() const {
