@@ -10,13 +10,13 @@
 
 // CHECK-LABEL: sil @_TF38devirt_specialized_inherited_interplay6driverFT_T_ : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK: [[A1:%[0-9]+]] = alloc_ref $A3<S>
-// CHECK: [[A2:%[0-9]+]] = alloc_ref $A4<S>
-// CHECK: [[A3:%[0-9]+]] = alloc_ref $A5<S>
-// CHECK: [[A4:%[0-9]+]] = alloc_ref $B1<S>
-// CHECK: [[A5:%[0-9]+]] = alloc_ref $B2<S>
-// CHECK: [[A6:%[0-9]+]] = alloc_ref $B3<S>
-// CHECK: [[A7:%[0-9]+]] = alloc_ref $B4<S>
+// CHECK: [[A3:%[0-9]+]] = alloc_ref $A3<S>
+// CHECK: [[A4:%[0-9]+]] = alloc_ref $A4<S>
+// CHECK: [[A5:%[0-9]+]] = alloc_ref $A5<S>
+// CHECK: [[B1:%[0-9]+]] = alloc_ref $B1<S>
+// CHECK: [[B2:%[0-9]+]] = alloc_ref $B2<S>
+// CHECK: [[B3:%[0-9]+]] = alloc_ref $B3<S>
+// CHECK: [[B4:%[0-9]+]] = alloc_ref $B4<S>
 // CHECK: [[F0:%[0-9]+]] = function_ref @unknown0 : $@convention(thin) () -> ()
 // CHECK: apply [[F0]]
 // CHECK: apply [[F0]]
@@ -43,13 +43,13 @@
 // CHECK: [[F8:%[0-9]+]] = function_ref @unknown8 :
 // CHECK: apply [[F8]]
 // CHECK: apply [[F8]]
-// CHECK: strong_release [[A7]]
-// CHECK-NEXT: strong_release [[A6]]
+// CHECK: strong_release [[B4]]
+// CHECK-NEXT: strong_release [[B3]]
+// CHECK-NEXT: strong_release [[B2]]
+// CHECK-NEXT: strong_release [[B1]]
 // CHECK-NEXT: strong_release [[A5]]
 // CHECK-NEXT: strong_release [[A4]]
 // CHECK-NEXT: strong_release [[A3]]
-// CHECK-NEXT: strong_release [[A2]]
-// CHECK-NEXT: strong_release [[A1]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 
