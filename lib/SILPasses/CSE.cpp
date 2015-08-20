@@ -25,6 +25,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
+#include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/SimplifyInstruction.h"
 #include "llvm/ADT/Hashing.h"
@@ -50,7 +51,7 @@ struct SimpleValue {
   SILInstruction *Inst;
 
   SimpleValue(SILInstruction *I) : Inst(I) {
-    assert((isSentinel() || canHandle(I)) && "Inst can't be handled!");
+    assert((isSentinel() || canHandle(I, true)) && "Inst can't be handled!");
   }
 
   bool isSentinel() const {
@@ -58,9 +59,27 @@ struct SimpleValue {
            Inst == llvm::DenseMapInfo<SILInstruction *>::getTombstoneKey();
   }
 
-  static bool canHandle(SILInstruction *Inst) {
+  static bool canHandle(SILInstruction *Inst, bool acceptSemanticCalls) {
     if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
-      return !AI->mayReadOrWriteMemory();
+      if (!AI->mayReadOrWriteMemory())
+        return true;
+      
+      if (acceptSemanticCalls) {
+        ArraySemanticsCall SemCall(AI);
+        switch (SemCall.getKind()) {
+          case ArrayCallKind::kGetCount:
+          case ArrayCallKind::kGetCapacity:
+          case ArrayCallKind::kCheckIndex:
+          case ArrayCallKind::kCheckSubscript:
+            if (SemCall.hasGuaranteedSelf()) {
+              return true;
+            }
+            return false;
+          default:
+            return false;
+        }
+      }
+      return false;
     }
     if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
       return !BI->mayReadOrWriteMemory();
@@ -455,11 +474,16 @@ public:
   /// their lookup.
   ScopedHTType *AvailableValues;
 
-  CSE() {}
+  CSE(bool RunsOnHighLevelSil) : RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
 
 private:
+  
+  /// True if CSE is done on high-level SIL, i.e. semantic calls are not inlined
+  /// yet. In this case some semantic calls can be CSEd.
+  bool RunsOnHighLevelSil;
+  
   // NodeScope - almost a POD, but needs to call the constructors for the
   // scoped hash tables so that a new scope gets pushed on. These are RAII so
   // that the scope gets popped when the NodeScope is destroyed.
@@ -593,7 +617,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     }
 
     // If this is not a simple instruction that we can value number, skip it.
-    if (!SimpleValue::canHandle(Inst))
+    if (!SimpleValue::canHandle(Inst, RunsOnHighLevelSil))
       continue;
 
     // If an instruction can be handled here, then it must also be handled
@@ -624,21 +648,37 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 
 namespace {
 class SILCSE : public SILFunctionTransform {
+  
+  /// True if CSE is done on high-level SIL, i.e. semantic calls are not inlined
+  /// yet. In this case some semantic calls can be CSEd.
+  /// We only CSE semantic calls on high-level SIL because we can be sure that
+  /// e.g. an Array as SILValue is really immutable (including its content).
+  bool RunsOnHighLevelSil;
+  
   void run() override {
     DEBUG(llvm::dbgs() << "***** CSE on function: " << getFunction()->getName()
           << " *****\n");
 
     DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
 
-    CSE C;
+    CSE C(RunsOnHighLevelSil);
     if (C.processFunction(*getFunction(), DA->get(getFunction())))
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 
-  StringRef getName() override { return "CSE"; }
+  StringRef getName() override {
+    return RunsOnHighLevelSil ? "High-level CSE" : "CSE";
+  }
+  
+public:
+  SILCSE(bool RunsOnHighLevelSil) : RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 };
 } // end anonymous namespace
 
 SILTransform *swift::createCSE() {
-  return new SILCSE();
+  return new SILCSE(false);
+}
+
+SILTransform *swift::createHighLevelCSE() {
+  return new SILCSE(true);
 }

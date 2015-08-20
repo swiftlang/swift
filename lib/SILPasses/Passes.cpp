@@ -151,7 +151,8 @@ void AddHighLevelLoopOptPasses(SILPassManager &PM) {
 
   // Cleanup.
   PM.addDCE();
-  PM.addCSE();
+  // Also CSE semantic calls.
+  PM.addHighLevelCSE();
   PM.addSILCombine();
   PM.addSimplifyCFG();
   PM.addLICM();

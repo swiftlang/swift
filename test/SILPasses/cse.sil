@@ -1006,6 +1006,22 @@ bb0(%0 : $Builtin.RawPointer):
   return %3 : $(@convention(thin) () -> (), @convention(thin) () -> ())
 }
 
+sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
+
+// CHECK-LABEL:   sil @dont_cse_get_count_on_low_level_sil
+// CHECK:           [[R1:%[0-9]+]] = apply
+// CHECK:           [[R2:%[0-9]+]] = apply
+// CHECK:           tuple ([[R1]] : $Int, [[R2]] : $Int)
+// CHECK-NEXT:      return
+sil @dont_cse_get_count_on_low_level_sil : $@convention(thin) (@guaranteed Array<Int>) -> (Int, Int) {
+bb0(%0 : $Array<Int>):
+  %f1 = function_ref @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %c1 = apply %f1(%0) : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %c2 = apply %f1(%0) : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %r1 = tuple (%c1 : $Int, %c2 : $Int)
+  return %r1 : $(Int, Int)
+}
+
 
 class Ping {
   func ping() -> Ping

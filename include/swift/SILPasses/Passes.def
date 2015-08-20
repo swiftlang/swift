@@ -42,6 +42,8 @@ PASS(COWArrayOpts, "cowarray-opt",
      "COW Array optimizations")
 PASS(CSE, "cse",
      "Constant subexpression elimination")
+PASS(HighLevelCSE, "high-level-cse",
+     "Constant subexpression elimination on High-level SIL")
 PASS(CapturePromotion, "capture-promotion",
      "Promote closure variables from the heap to the stack")
 PASS(CapturePropagation, "capture-prop",
