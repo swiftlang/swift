@@ -3275,7 +3275,7 @@ void SILGenFunction::emitOpenExistentialImpl(
   }
 
   // Open the existential value into the opened archetype value.
-  bool isUnique = E->getOpaqueValue()->isUniquelyReferenced();
+  bool isUnique = true;
   bool canConsume;
   SILValue archetypeValue;
   

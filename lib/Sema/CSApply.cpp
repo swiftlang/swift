@@ -643,7 +643,6 @@ namespace {
 
       ASTContext &ctx = tc.Context;
       auto archetypeVal = new (ctx) OpaqueValueExpr(base->getLoc(), opaqueType);
-      archetypeVal->setUniquelyReferenced(true);
 
       // Record the opened existential.
       OpenedExistentials.push_back({archetype, base, archetypeVal, depth});
@@ -3960,7 +3959,6 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
     fromType = getOpenedExistentialType(fromType);
     
     auto archetypeVal = new (ctx) OpaqueValueExpr(expr->getLoc(), fromType);
-    archetypeVal->setUniquelyReferenced(true);
     
     auto result = new (ctx) ErasureExpr(archetypeVal, toType, conformances);
     return new (ctx) OpenExistentialExpr(expr, archetypeVal, result);
