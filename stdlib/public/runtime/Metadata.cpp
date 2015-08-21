@@ -36,6 +36,10 @@
 #include "Debug.h"
 #include "Private.h"
 
+#if __APPLE__
+#include <mach/vm_page_size.h>
+#endif
+
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 #endif
@@ -44,8 +48,11 @@ using namespace swift;
 using namespace metadataimpl;
 
 void *MetadataAllocator::alloc(size_t size) {
+#if __APPLE__
+  static const uintptr_t pagesizeMask = vm_page_mask;
+#else
   static const uintptr_t pagesizeMask = sysconf(_SC_PAGESIZE) - 1;
-  
+#endif
   // If the requested size is a page or larger, map page(s) for it
   // specifically.
   if (LLVM_UNLIKELY(size > pagesizeMask)) {
