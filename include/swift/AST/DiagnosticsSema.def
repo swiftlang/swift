@@ -69,6 +69,11 @@ ERROR(could_not_find_value_member,sema,none,
 ERROR(could_not_find_type_member,sema,none,
       "type %0 has no member %1", (Type, DeclName))
 
+ERROR(expected_argument_in_contextual_member,sema,none,
+      "contextual member %0 expects argument of type %1", (Identifier, Type))
+ERROR(unexpected_argument_in_contextual_member,sema,none,
+      "contextual member %0 has no associated value", (Identifier))
+
 ERROR(could_not_use_value_member,sema,none,
       "member %1 cannot be used on value of type %0", (Type, DeclName))
 ERROR(could_not_use_type_member,sema,none,

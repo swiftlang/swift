@@ -435,12 +435,29 @@ enum Color {
   case Unknown(description: String)
 
   static func rainbow() -> Color {}
+  
+  static func overload(a a : Int) -> Color {}
+  static func overload(b b : Int) -> Color {}
+  
+  static func frob(a : Int, inout b : Int) -> Color {}
 }
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{type of expression is ambiguous without more context}}
 let _: Int -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{type of expression is ambiguous without more context}}
 let _: Color = .Unknown("") // expected-error {{type of expression is ambiguous without more context}}
+let _: Color = .Unknown // expected-error {{contextual member 'Unknown' expects argument of type '(description: String)'}}
 let _: Color = .Unknown(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 let _ : Color = .rainbow(42)  // expected-error {{cannot convert value of type 'Int' to expected argument type '()'}}
+
+// FIXME: Why two errors?
+let _ : Color = .rainbow  // expected-error 2 {{function produces expected type 'Color'; did you mean to call it with '()'?}}
+
+let _: Color = .overload(a : 1.0)  // expected-error {{type of expression is ambiguous without more context}}
+let _: Color = .overload(1.0)  // expected-error {{type of expression is ambiguous without more context}}
+let _: Color = .overload(1)  // expected-error {{type of expression is ambiguous without more context}}
+let _: Color = .frob(1.0, &i) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+let _: Color = .frob(1, i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+let _: Color = .frob(1, &d) // expected-error {{cannot convert value of type 'inout Double' to expected argument type 'inout Int'}}
+
 
 func testTypeSugar(a : Int) {
   typealias Stride = Int

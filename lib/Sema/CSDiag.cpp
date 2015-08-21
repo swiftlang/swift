@@ -1291,13 +1291,13 @@ namespace {
   /// The result is captured in this enum value, where the earlier entries are
   /// most specific.
   enum CandidateCloseness {
-    CC_ExactMatch,             // This is a perfect match for the arguments.
-    CC_NonLValueInOut,         // First argument is inout but no lvalue present.
-    CC_OneArgumentMismatch,    // All arguments except one match.
-    CC_SelfMismatch,           // Self argument mismatches.
-    CC_ArgumentMismatch,       // Argument list mismatch.
-    CC_ArgumentCountMismatch,  // This candidate has wrong # arguments.
-    CC_GeneralMismatch         // Something else is wrong.
+    CC_ExactMatch,            ///< This is a perfect match for the arguments.
+    CC_NonLValueInOut,       ///< First argument is inout but no lvalue present.
+    CC_OneArgumentMismatch,   ///< All arguments except one match.
+    CC_SelfMismatch,          ///< Self argument mismatches.
+    CC_ArgumentMismatch,      ///< Argument list mismatch.
+    CC_ArgumentCountMismatch, ///< This candidate has wrong # arguments.
+    CC_GeneralMismatch        ///< Something else is wrong.
   };
 
   /// This is a candidate for a callee, along with an uncurry level.
@@ -1372,10 +1372,8 @@ namespace {
     /// Analyze a locator for a SubscriptExpr for its candidate set.
     CalleeCandidateInfo(ConstraintLocator *locator, ConstraintSystem *CS);
 
-    CalleeCandidateInfo(UncurriedCandidate cand, ConstraintSystem *CS): CS(CS) {
-      candidates.push_back(cand);
-      closeness = CC_ExactMatch;
-    }
+    CalleeCandidateInfo(ArrayRef<OverloadChoice> candidates,
+                        unsigned UncurryLevel, ConstraintSystem *CS);
 
     typedef const std::function<CandidateCloseness(UncurriedCandidate)>
     &ClosenessPredicate;
@@ -1385,6 +1383,7 @@ namespace {
     /// resultant set.
     void filterList(Type actualArgsType);
     void filterList(ClosenessPredicate predicate);
+    void filterContextualMemberList(Expr *argExpr);
 
     bool empty() const { return candidates.empty(); }
     unsigned size() const { return candidates.size(); }
@@ -1465,9 +1464,18 @@ evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
   // Count the number of mismatched arguments.
   unsigned mismatchingArgs = 0;
   for (unsigned i = 0, e = actualArgs.size(); i != e; ++i) {
+    // If the argument has an unresolved type, then we're not actually matching
+    // against it.
+    if (actualArgs[i]->is<UnresolvedType>())
+      continue;
+    if (auto *LVT = actualArgs[i]->getAs<LValueType>())
+      if (LVT->getObjectType()->is<UnresolvedType>())
+        continue;
+    
     // FIXME: Right now, a "matching" overload is one with a parameter whose
     // type is identical to one of the argument types. We can obviously do
     // something more sophisticated with this.
+    // FIXME: We definitely need to handle archetypes for same-type constraints.
     if (!actualArgs[i]->getRValueType()->isEqual(candArgs[i]))
       ++mismatchingArgs;
   }
@@ -1489,7 +1497,6 @@ evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
   
   return CC_GeneralMismatch;
 }
-
 
 void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
   fn = fn->getValueProvidingExpr();
@@ -1646,6 +1653,57 @@ void CalleeCandidateInfo::filterList(Type actualArgsType) {
   });
 }
 
+void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
+  auto URT = CS->getASTContext().TheUnresolvedType;
+
+  // If the argument is not present then we expect members without arguments.
+  if (!argExpr) {
+    return filterList([&](UncurriedCandidate candidate) -> CandidateCloseness {
+      auto inputType = candidate.getArgumentType();
+      // If this candidate has no arguments, then we're a match.
+      if (!inputType) return CC_ExactMatch;
+      
+      // Otherwise, if this is a function candidate with an argument, we
+      // mismatch argument count.
+      return CC_ArgumentCountMismatch;
+    });
+  }
+  
+  // Build an argument list type to filter against based on the expression we
+  // have.  This really just provides us a structure to match against.
+  // Normally, an argument list is a TupleExpr or a ParenExpr, though sometimes
+  // the ParenExpr goes missing.
+  auto *argTuple = dyn_cast<TupleExpr>(argExpr);
+  if (!argTuple) {
+    // If we have a single argument, look through the paren expr.
+    if (auto *PE = dyn_cast<ParenExpr>(argExpr))
+      argExpr = PE->getSubExpr();
+    
+    Type argType = URT;
+    // If the argument has an & specified, then we expect an lvalue.
+    if (isa<InOutExpr>(argExpr))
+      argType = LValueType::get(argType);
+    
+    return filterList(argType);
+  }
+  
+  // If we have a tuple expression, form a tuple type.
+  SmallVector<TupleTypeElt, 4> ArgElts;
+  for (unsigned i = 0, e = argTuple->getNumElements(); i != e; ++i) {
+    // If the argument has an & specified, then we expect an lvalue.
+    Type argType = URT;
+    if (isa<InOutExpr>(argTuple->getElement(i)))
+      argType = LValueType::get(argType);
+
+    
+    ArgElts.push_back({ argType, argTuple->getElementName(i) });
+  }
+
+  return filterList(TupleType::get(ArgElts, CS->getASTContext()));
+
+}
+
+
 CalleeCandidateInfo::CalleeCandidateInfo(ConstraintLocator *locator,
                                          ConstraintSystem *CS) : CS(CS) {
   if (auto decl = findResolvedMemberRef(locator, *CS)) {
@@ -1665,6 +1723,15 @@ CalleeCandidateInfo::CalleeCandidateInfo(ConstraintLocator *locator,
           candidates.push_back({ c.getDecl(), 0 });
       }
     }
+  }
+}
+
+CalleeCandidateInfo::CalleeCandidateInfo(ArrayRef<OverloadChoice> overloads,
+                                         unsigned uncurryLevel,
+                                         ConstraintSystem *CS) : CS(CS) {
+  for (auto cand : overloads) {
+    if (cand.isDecl())
+      candidates.push_back({ cand.getDecl(), uncurryLevel });
   }
 }
 
@@ -2046,7 +2113,7 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   // call the function, e.g. in "a.b.c" where they had to write "a.b().c".
   // Produce a specific diagnostic + fixit for this situation.
   if (auto baseFTy = baseObjTy->getAs<AnyFunctionType>()) {
-    if (baseFTy->getInput()->isEqual(CS->TC.Context.TheEmptyTupleType)) {
+    if (baseFTy->getInput()->isVoid()) {
       SourceLoc insertLoc = anchor->getEndLoc();
     
       if (auto *DRE = dyn_cast<DeclRefExpr>(anchor)) {
@@ -3881,36 +3948,73 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     // TODO: not handled yet.
     return false;
 
-  // If we have multiple viable candidates, then we have an overload ambiguity
-  // between static factory methods.
-  // TODO: not handled yet.
-  if (result.ViableCandidates.size() != 1 ||
-      !result.ViableCandidates[0].isDecl())
+  // Dump all of our viable candidates into a CalleeCandidateInfo (with an
+  // uncurry level of 1 to represent the contextual type) and sort it out.
+  CalleeCandidateInfo candidateInfo(result.ViableCandidates, 1, CS);
+
+  // Filter the candidate list based on the argument we may or may not have.
+  candidateInfo.filterContextualMemberList(E->getArgument());
+
+  // If we have multiple candidates, then we have an ambiguity.
+  if (candidateInfo.size() != 1)
+    return false;
+  
+  // Depending on how we matched, produce tailored diagnostics.
+  switch (candidateInfo.closeness) {
+  case CC_NonLValueInOut:      // First argument is inout but no lvalue present.
+  case CC_OneArgumentMismatch: // All arguments except one match.
+  case CC_SelfMismatch:        // Self argument mismatches.
+  case CC_ArgumentMismatch:    // Argument list mismatch.
+    assert(0 && "These aren't produced by filterContextualMemberList");
     return false;
 
-  // Finally, if we have one viable candidate, then we have a valid reference to
-  // an enum method or static "factory" method, but have some other problem in
-  // the expression tree.  Propagate the type information we have to the
-  // subexpression.
-  auto candidate = result.ViableCandidates[0].getDecl();
+  case CC_ExactMatch: {        // This is a perfect match for the arguments.
+    // If we have an exact match, then we must have an argument list.
+    // If we didn't have an argument or an arg type, the expr would be valid.
+    auto argTy = candidateInfo[0].getArgumentType();
+    if (!argTy) {
+      assert(!E->getArgument() && "Not an exact match");
+      // If this is an exact match, return false to diagnose this as an
+      // ambiguity.  It must be some other problem, such as failing to infer a
+      // generic argument on the enum type.
+      return false;
+    }
+    
+    assert(E->getArgument() && argTy && "Exact match without an argument?");
+    return !typeCheckArgumentChildIndependently(E->getArgument(), argTy,
+                                                candidateInfo);
+  }
 
+  case CC_GeneralMismatch:     // Something else is wrong.
+  case CC_ArgumentCountMismatch:  // This candidate has wrong # arguments.
+    // If we have no argument, the candidates must have expected one.
+    if (!E->getArgument()) {
+      
+      auto expectedTy = candidateInfo[0].getArgumentType();
+      if (!expectedTy)
+        return false; // Candidate must be incorrect for some other reason.
+      
+      // Pick one of the arguments that are expected as an exemplar.
+      diagnose(E->getNameLoc(), diag::expected_argument_in_contextual_member,
+               E->getName(), expectedTy);
+      return true;
+    }
+     
+    // If an argument value was specified, but this is a simple enumerator, then
+    // we fail with a nice error message.
+    auto argTy = candidateInfo[0].getArgumentType();
+    if (!argTy) {
+      diagnose(E->getNameLoc(), diag::unexpected_argument_in_contextual_member,
+               E->getName());
+      return true;
+    }
 
-  CalleeCandidateInfo candInfo({ candidate, 1 }, CS);
+    assert(E->getArgument() && argTy && "Exact match without an argument?");
+    return !typeCheckArgumentChildIndependently(E->getArgument(), argTy,
+                                                candidateInfo);
+  }
 
-  // The candidate we found must have function type, e.g.:
-  //    baseTy.Type -> argList -> baseTy
-  // If so, and if we have a subexpression, then the subexpr can be contextually
-  // checked with "argList" as its type.
-  if (auto CFD = candidate->getType()->getAs<AnyFunctionType>())
-    if (auto RFD = CFD->getResult()->getAs<AnyFunctionType>())
-      if (auto *arg = E->getArgument()) {
-        if (!typeCheckArgumentChildIndependently(arg, RFD->getInput(),
-                                                 candInfo))
-          return true;
-        return false;
-      }
-
-  return false;
+  llvm_unreachable("all cases should be handled");
 }
 
 

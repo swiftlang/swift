@@ -217,8 +217,8 @@ func f() {
 }
 
 func union_error(a: ZeroOneTwoThree) {
-  var _ : ZeroOneTwoThree = .Zero(1) // expected-error {{type of expression is ambiguous without more context}}
-  var _ : ZeroOneTwoThree = .One // expected-error {{type of expression is ambiguous without more context}}
+  var _ : ZeroOneTwoThree = .Zero(1) // expected-error {{contextual member 'Zero' has no associated value}}
+  var _ : ZeroOneTwoThree = .One // expected-error {{contextual member 'One' expects argument of type 'Int'}}
   var _ : ZeroOneTwoThree = .foo // expected-error {{type 'ZeroOneTwoThree' has no member 'foo'}}
   var _ : ZeroOneTwoThree = .foo() // expected-error {{type 'ZeroOneTwoThree' has no member 'foo'}}
 }
