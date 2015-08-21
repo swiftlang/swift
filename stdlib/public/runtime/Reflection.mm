@@ -914,7 +914,7 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
 // -- MagicMirror implementation.
 
 // TODO: There are other non-Apple platforms that underscore asm symbols.
-#if __APPLE__
+#if defined(__APPLE__)
 # define UNDERSCORE "_"
 #else
 # define UNDERSCORE
