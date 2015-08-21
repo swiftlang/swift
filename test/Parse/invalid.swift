@@ -11,6 +11,12 @@ func foo(a: Int) {
 func test1(inout var x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{18-22=}}
 func test2(inout let x : Int) {}  // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{18-22=}}
 
+func test3() {
+  undeclared_func( // expected-error {{use of unresolved identifier 'undeclared_func'}} expected-note {{to match this opening '('}} expected-error {{expected ',' separator}} {{19-19=,}}
+} // expected-error {{expected expression in list of expressions}} expected-error {{expected ')' in expression list}}
+
+func runAction() {}
+
 // rdar://16601779
 func foo() {
   runAction(SKAction.sequence() // expected-error {{use of unresolved identifier 'SKAction'}}  expected-note {{to match this opening '('}} expected-error {{expected ',' separator}} {{32-32=,}}

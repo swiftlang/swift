@@ -1143,13 +1143,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         return makeParserCodeCompletionResult<Expr>();
       }
       ParserResult<Expr> Arg = parseExprList(tok::l_paren, tok::r_paren);
+      Result = makeParserResult(new (Context) CallExpr(Result.get(), Arg.get(),
+                                                       /*Implicit=*/false));
       if (Arg.hasCodeCompletion())
-        return makeParserCodeCompletionResult<Expr>();
+        Result.setHasCodeCompletion();
 
       if (Arg.isParseError())
-        return nullptr;
-      Result = makeParserResult(
-          new (Context) CallExpr(Result.get(), Arg.get(), /*Implicit=*/false));
+        Result.setIsParseError();
+
       continue;
     }
     
@@ -2117,16 +2118,17 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn,
   }
 
   ParserResult<Expr> firstArg = parseExprList(Tok.getKind(), tok::r_paren);
-  if (firstArg.hasCodeCompletion())
-    return firstArg;
-  if (fn.isParseError())
-    return fn;
-  if (firstArg.isParseError())
-    return firstArg;
 
   // Form the call.
-  return makeParserResult(new (Context) CallExpr(fn.get(), firstArg.get(),
-                                                 /*Implicit=*/false));
+  auto Result = makeParserResult(new (Context) CallExpr(fn.get(), firstArg.get(),
+                                                        /*Implicit=*/false));
+  if (fn.isParseError() || firstArg.isParseError())
+    Result.setIsParseError();
+
+  if (fn.hasCodeCompletion() || firstArg.hasCodeCompletion())
+    Result.setHasCodeCompletion();
+
+  return Result;
 }
 
 /// parseExprCollection - Parse a collection literal expression.

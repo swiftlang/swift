@@ -2752,11 +2752,6 @@ public:
   }
 
   Type visitErrorExpr(ErrorExpr *Expr) override {
-    if (Target != Expr) {
-      // If expr is not the target, do the default constraint generation.
-      return ConstraintGenerator::visitErrorExpr(Expr);
-    }
-    // Otherwise, create a type variable saying we know nothing about this expr.
     return createFreeTypeVariableType(Expr);
   }
 
