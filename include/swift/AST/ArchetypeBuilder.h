@@ -165,6 +165,13 @@ private:
          RequirementSource::Kind kind,
          llvm::SmallPtrSetImpl<ProtocolDecl *> &visited);
 
+  /// Visit all of the types that show up in the list of inherited
+  /// types.
+  ///
+  /// \returns true if any of the invocations of \c visitor returned true.
+  bool visitInherited(ArrayRef<TypeLoc> inheritedTypes,
+                      llvm::function_ref<bool(Type, SourceLoc)> visitor);
+
   /// Visit all of the potential archetypes.
   template<typename F>
   void visitPotentialArchetypes(F f);

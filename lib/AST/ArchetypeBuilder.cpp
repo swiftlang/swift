@@ -1102,55 +1102,64 @@ bool ArchetypeBuilder::addAbstractTypeParamRequirements(
     return false;
   }
 
-  // Local function that (recursively) adds inherited types.
-  bool isInvalid = false;
-  std::function<void(Type, SourceLoc)> addInherited;
-  addInherited = [&](Type inheritedType, SourceLoc loc) {
+  // Otherwise, walk the 'inherited' list to identify requirements.
+  if (auto resolver = getLazyResolver())
+    resolver->resolveInheritanceClause(decl);
+  return visitInherited(decl->getInherited(),
+                        [&](Type inheritedType, SourceLoc loc) -> bool {
     // Protocol requirement.
     if (auto protocolType = inheritedType->getAs<ProtocolType>()) {
       if (visited.count(protocolType->getDecl())) {
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl))
           markRecursive(assocType, protocolType->getDecl(), loc);
 
-        return;
+        return true;
       }
 
-      isInvalid |= addConformanceRequirement(pa, protocolType->getDecl(),
-                                             RequirementSource(kind, loc),
-                                             visited);
-      return;
-    }
-
-    // Protocol composition.
-    if (auto compositionType
-          = inheritedType->getAs<ProtocolCompositionType>()) {
-      for (auto protoType : compositionType->getProtocols()) {
-        addInherited(protoType, loc);
-      }
-      return;
+      return addConformanceRequirement(pa, protocolType->getDecl(),
+                                       RequirementSource(kind, loc),
+                                       visited);
     }
 
     // Superclass requirement.
     if (inheritedType->getClassOrBoundGenericClass()) {
-      isInvalid |= addSuperclassRequirement(pa, inheritedType,
-                                            RequirementSource(kind, loc));
-      return;
+      return addSuperclassRequirement(pa, inheritedType,
+                                      RequirementSource(kind, loc));
     }
 
     // Note: anything else is an error, to be diagnosed later.
+    return false;
+  });
+}
+
+bool ArchetypeBuilder::visitInherited(
+       ArrayRef<TypeLoc> inheritedTypes,
+       llvm::function_ref<bool(Type, SourceLoc)> visitor) {
+  // Local function that (recursively) adds inherited types.
+  bool isInvalid = false;
+  std::function<void(Type, SourceLoc)> visitInherited;
+  visitInherited = [&](Type inheritedType, SourceLoc loc) {
+    // Decompose protocol compositions.
+    if (auto compositionType
+          = inheritedType->getAs<ProtocolCompositionType>()) {
+      for (auto protoType : compositionType->getProtocols())
+        visitInherited(protoType, loc);
+      return;
+    }
+
+    isInvalid |= visitor(inheritedType, loc);
   };
 
-  // Otherwise, walk the 'inherited' list to identify requirements.
-  Mod.getASTContext().getLazyResolver()->resolveInheritanceClause(decl);
-  for (auto inherited : decl->getInherited()) {
+  // Visit all of the inherited types.
+  for (auto inherited : inheritedTypes) {
     inherited.getTypeRepr()->visitTopLevelTypeReprs([&](IdentTypeRepr *ident) {
       auto *component = ident->getComponentRange().back();
       if (component->isBoundType()) {
-        addInherited(component->getBoundType(), component->getIdLoc());
+        visitInherited(component->getBoundType(), component->getIdLoc());
       } else if (component->isBoundDecl()) {
         if (auto typeDecl = dyn_cast<TypeDecl>(component->getBoundDecl())) {
-          addInherited(typeDecl->getDeclaredInterfaceType(),
-                       component->getIdLoc());
+          visitInherited(typeDecl->getDeclaredInterfaceType(),
+                         component->getIdLoc());
         }
       }
     });
