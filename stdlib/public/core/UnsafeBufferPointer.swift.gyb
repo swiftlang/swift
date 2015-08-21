@@ -31,6 +31,8 @@ public struct UnsafeBufferPointerGenerator<Element>
 /// A non-owning pointer to buffer of ${Mutable.lower()} `Element`s stored
 /// contiguously in memory, presenting a `Collection` interface to the
 /// underlying elements.
+///
+/// The pointer should be aligned to `alignof(Element.self)`.
 public struct Unsafe${Mutable}BufferPointer<Element>
   : ${Mutable}CollectionType {
 
