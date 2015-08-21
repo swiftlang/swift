@@ -49,7 +49,7 @@ using namespace metadataimpl;
 
 void *MetadataAllocator::alloc(size_t size) {
 #if defined(__APPLE__)
-  static const uintptr_t pagesizeMask = vm_page_mask;
+  const uintptr_t pagesizeMask = vm_page_mask;
 #else
   static const uintptr_t pagesizeMask = sysconf(_SC_PAGESIZE) - 1;
 #endif
