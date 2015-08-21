@@ -1863,11 +1863,11 @@ LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
                                               AccessKind accessKind) {
   // If the opaque value is not an lvalue, open the existential immediately.
   if (!e->getOpaqueValue()->getType()->is<LValueType>()) {
-    return gen.emitOpenExistential<LValue>(e,
-                                           [&](Expr *subExpr) -> LValue {
-                                             return visitRec(subExpr,
-                                                             accessKind);
-                                           });
+    return gen.emitOpenExistentialExpr<LValue>(e,
+                                               [&](Expr *subExpr) -> LValue {
+                                                 return visitRec(subExpr,
+                                                                 accessKind);
+                                               });
   }
 
   // Record the fact that we're opening this existential. The actual

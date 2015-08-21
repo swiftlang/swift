@@ -1625,8 +1625,8 @@ public:
     // When we have an open existential, open it and then emit the
     // member reference.
     if (openExistential) {
-      SGF.emitOpenExistential(openExistential,
-                              [&](Expr*) { emitDynamicMemberRef(); });
+      SGF.emitOpenExistentialExpr(openExistential,
+                                  [&](Expr*) { emitDynamicMemberRef(); });
     } else {
       emitDynamicMemberRef();
     }

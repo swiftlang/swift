@@ -1547,7 +1547,7 @@ struct ASTNodeBase {};
 
       ++OpaqueValues[E];
 
-      // Make sure opque values are uniquely referenced.
+      // Make sure opaque values are uniquely-referenced.
       if (OpaqueValues[E] > 1) {
         Out << "Multiple references to unique OpaqueValueExpr\n";
         abort();

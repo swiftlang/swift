@@ -466,24 +466,17 @@ public:
   class OpaqueValueRAII {
     SILGenFunction &Self;
     OpaqueValueExpr *OpaqueValue;
-    bool Destroy;
 
     OpaqueValueRAII(const OpaqueValueRAII &) = delete;
     OpaqueValueRAII &operator=(const OpaqueValueRAII &) = delete;
 
   public:
     OpaqueValueRAII(SILGenFunction &self, OpaqueValueExpr *opaqueValue,
-                    SILValue value, bool destroy,
-                    bool isUniquelyReferenced)
-      : Self(self), OpaqueValue(opaqueValue), Destroy(destroy)
-    {
+                    OpaqueValueState state)
+    : Self(self), OpaqueValue(opaqueValue) {
       assert(Self.OpaqueValues.count(OpaqueValue) == 0 &&
              "Opaque value already has a binding");
-      Self.OpaqueValues[OpaqueValue] = OpaqueValueState{
-        value,
-        /*isConsumable*/ isUniquelyReferenced && destroy,
-        /*hasBeenConsumed*/ false
-      };
+      Self.OpaqueValues[OpaqueValue] = state;
     }
 
     ~OpaqueValueRAII();
@@ -1200,6 +1193,18 @@ public:
   /// Emit a dynamic subscript.
   RValue emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, SGFContext c);
 
+  /// Open up the given existential value and project its payload.
+  ///
+  /// \param existentialValue The existential value.
+  /// \param openedArchetype The opened existential archetype.
+  /// \param loweredOpenedType The lowered type of the projection, which in
+  /// practice will be the openedArchetype, possibly wrapped in a metatype.
+  SILGenFunction::OpaqueValueState
+  emitOpenExistential(SILLocation loc,
+                      ManagedValue existentialValue,
+                      CanArchetypeType openedArchetype,
+                      SILType loweredOpenedType);
+
   /// Open up the given existential expression and emit its
   /// subexpression in a caller-specified manner.
   ///
@@ -1207,8 +1212,8 @@ public:
   ///
   /// \param emitSubExpr A function to call to emit the subexpression
   /// (which will be passed in).
-  void emitOpenExistentialImpl(OpenExistentialExpr *e,
-                               llvm::function_ref<void(Expr *)> emitSubExpr);
+  void emitOpenExistentialExprImpl(OpenExistentialExpr *e,
+                                  llvm::function_ref<void(Expr *)> emitSubExpr);
 
   /// Open up the given existential expression and emit its
   /// subexpression in a caller-specified manner.
@@ -1218,9 +1223,9 @@ public:
   /// \param emitSubExpr A function to call to emit the subexpression
   /// (which will be passed in).
   template<typename R, typename F>
-  R emitOpenExistential(OpenExistentialExpr *e, F emitSubExpr) {
+  R emitOpenExistentialExpr(OpenExistentialExpr *e, F emitSubExpr) {
     Optional<R> result;
-    emitOpenExistentialImpl(e,
+    emitOpenExistentialExprImpl(e,
                             [&](Expr *subExpr) {
                               result.emplace(emitSubExpr(subExpr));
                             });
@@ -1235,9 +1240,25 @@ public:
   /// \param emitSubExpr A function to call to emit the subexpression
   /// (which will be passed in).
   template<typename F>
-  void emitOpenExistential(OpenExistentialExpr *e, F emitSubExpr) {
-    emitOpenExistentialImpl(e, emitSubExpr);
+  void emitOpenExistentialExpr(OpenExistentialExpr *e, F emitSubExpr) {
+    emitOpenExistentialExprImpl(e, emitSubExpr);
   }
+
+  /// \brief Wrap the given value in an existential container.
+  ///
+  /// \param concreteFormalType AST type of value.
+  /// \param concreteTL Type lowering of value.
+  /// \param existentialTL Type lowering of existential type.
+  /// \param F Function reference to emit the existential contents with the
+  /// given context.
+  ManagedValue emitExistentialErasure(
+                            SILLocation loc,
+                            CanType concreteFormalType,
+                            const TypeLowering &concreteTL,
+                            const TypeLowering &existentialTL,
+                            const ArrayRef<ProtocolConformance *> &conformances,
+                            SGFContext C,
+                            llvm::function_ref<ManagedValue (SGFContext)> F);
 
   /// \brief Emit a conditional checked cast branch. Does not
   /// re-abstract the argument to the success branch. Terminates the

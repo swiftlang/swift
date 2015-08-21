@@ -3178,6 +3178,15 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
   return CanArchetypeType(result);
 }
 
+CanType ArchetypeType::getAnyOpened(Type existential) {
+  if (auto metatypeTy = existential->getAs<ExistentialMetatypeType>()) {
+    auto instanceTy = metatypeTy->getInstanceType();
+    return CanMetatypeType::get(ArchetypeType::getAnyOpened(instanceTy));
+  }
+  assert(existential->isExistentialType());
+  return ArchetypeType::getOpened(existential);
+}
+
 void *ExprHandle::operator new(size_t Bytes, ASTContext &C,
                             unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);

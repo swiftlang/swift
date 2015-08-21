@@ -3912,15 +3912,6 @@ collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
   return tc.Context.AllocateCopy(conformances);
 }
 
-static CanType getOpenedExistentialType(Type fromType) {
-  if (auto metatypeTy = fromType->getAs<ExistentialMetatypeType>()) {
-    auto instanceTy = metatypeTy->getInstanceType();
-    return CanMetatypeType::get(getOpenedExistentialType(instanceTy));
-  }
-  assert(fromType->isExistentialType());
-  return ArchetypeType::getOpened(fromType);
-}
-
 Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
                                       ConstraintLocatorBuilder locator) {
   auto &tc = solution.getConstraintSystem().getTypeChecker();
@@ -3956,7 +3947,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
 
   // For existential-to-existential coercions, open the source existential.
   if (fromType->isAnyExistentialType()) {
-    fromType = getOpenedExistentialType(fromType);
+    fromType = ArchetypeType::getAnyOpened(fromType);
     
     auto archetypeVal = new (ctx) OpaqueValueExpr(expr->getLoc(), fromType);
     

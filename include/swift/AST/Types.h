@@ -3524,6 +3524,12 @@ public:
                         getOpened(Type existential, 
                                   Optional<UUID> knownID = None);
 
+  /// Create a new archetype that represents the opened type
+  /// of an existential value.
+  ///
+  /// \param existential The existential type or existential metatype to open.
+  static CanType getAnyOpened(Type existential);
+
   /// \brief Retrieve the name of this archetype.
   Identifier getName() const { return Name; }
 
