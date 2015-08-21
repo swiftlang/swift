@@ -2,8 +2,19 @@
 
 import ctypes
 
-func useUnion(vec: GLKVector4) -> GLKVector4 {
-  // TODO: Make union fields available
+func useStructWithUnion(var vec: GLKVector4) -> GLKVector4 {
+  _ = vec.v.0
+  _ = vec.v.1
+  _ = vec.v.2
+  _ = vec.v.3
+
+  vec.v = (0, 0, 0, 0)
+}
+
+func useUnionIndirectFields(vec: GLKVector4) -> GLKVector4 {
+  // TODO: Make indirect fields from anonymous structs in unions
+  // accessible.
+  // Anonymous indirect fields
   let x: CFloat = vec.x // expected-error{{}}
   let y: CFloat = vec.y // expected-error{{}}
   let z: CFloat = vec.z // expected-error{{}}
@@ -19,15 +30,25 @@ func useUnion(vec: GLKVector4) -> GLKVector4 {
   let p: CFloat = vec.p // expected-error{{}}
   let q: CFloat = vec.q // expected-error{{}}
 
-  let v0: CFloat = vec.v.0 // expected-error{{}}
-  let v1: CFloat = vec.v.1 // expected-error{{}}
-  let v2: CFloat = vec.v.2 // expected-error{{}}
-  let v3: CFloat = vec.v.3 // expected-error{{}}
+  // Named indirect fields
+  let v0: CFloat = vec.v.0
+  let v1: CFloat = vec.v.1
+  let v2: CFloat = vec.v.2
+  let v3: CFloat = vec.v.3
   return vec
 }
 
+func useStructWithNamedUnion(u: NamedUnion) -> NamedUnion {
+  var u1 = NamedUnion()
+  u1.a = u.a
+  u1.b = u.b
+  u1.intfloat = u.intfloat
+  return u1
+}
+
 func useStructWithAnonymousUnion(u: AnonUnion) -> AnonUnion {
-  // TODO: Make union fields available
+  // TODO: Make union indirect fields from anonymous structs in unions
+  // accessible.
   let a: CFloat = u.a // expected-error{{}}
   let b: CFloat = u.b // expected-error{{}}
   let c: CFloat = u.c // expected-error{{}}

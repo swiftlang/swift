@@ -3323,13 +3323,13 @@ public:
   static bool classof(const IterableDeclContext *C) {
     return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
   }
-  
+
   /// Does this struct contain unreferenceable storage, such as C fields that
   /// cannot be represented in Swift?
   bool hasUnreferenceableStorage() const {
     return StructDeclBits.HasUnreferenceableStorage;
   }
-  
+
   void setHasUnreferenceableStorage(bool v) {
     StructDeclBits.HasUnreferenceableStorage = v;
   }

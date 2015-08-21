@@ -183,6 +183,17 @@ union _GLKVector4 {
 } __attribute__((aligned(16)));
 typedef union _GLKVector4 GLKVector4;
 
+typedef union IntOrFloat {
+  int i;
+  float f;
+} IntOrFloat;
+
+typedef struct NamedUnion {
+  int a;
+  int b;
+  IntOrFloat intfloat;
+} NamedUnion;
+
 typedef struct AnonUnion {
   union {
     float a;

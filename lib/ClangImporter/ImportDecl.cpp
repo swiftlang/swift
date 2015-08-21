@@ -85,7 +85,8 @@ static bool isInSystemModule(DeclContext *D) {
 /// Note that this decl is created, but it is returned with an incorrect
 /// DeclContext that needs to be reset once the method exists.
 ///
-static VarDecl *createSelfDecl(DeclContext *DC, bool isStaticMethod) {
+static VarDecl *createSelfDecl(DeclContext *DC, bool isStaticMethod,
+                               bool isInOut = false) {
   auto selfType = getSelfTypeForContext(DC);
 
   ASTContext &C = DC->getASTContext();
@@ -95,7 +96,10 @@ static VarDecl *createSelfDecl(DeclContext *DC, bool isStaticMethod) {
 
   bool isLet = true;
   if (auto *ND = selfType->getAnyNominal())
-    isLet = !isa<StructDecl>(ND) && !isa<EnumDecl>(ND);
+    isLet = !isInOut && !isa<StructDecl>(ND) && !isa<EnumDecl>(ND);
+
+  if (isInOut)
+    selfType = InOutType::get(selfType);
 
   VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/isLet, SourceLoc(), 
                                         Identifier(), SourceLoc(), C.Id_self, 
@@ -104,12 +108,11 @@ static VarDecl *createSelfDecl(DeclContext *DC, bool isStaticMethod) {
   return selfDecl;
 }
 
-
-
 /// Create a typedpattern(namedpattern(decl))
 static Pattern *createTypedNamedPattern(VarDecl *decl) {
   ASTContext &Ctx = decl->getASTContext();
   Type ty = decl->getType();
+
   Pattern *P = new (Ctx) NamedPattern(decl);
   P->setType(ty);
   P->setImplicit();
@@ -679,6 +682,194 @@ static FuncDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   getterDecl->setBody(body);
   C.addedExternalDecl(getterDecl);
   return getterDecl;
+}
+
+/// Build the union field getter and setter.
+///
+/// \code
+/// struct SomeImportedUnion {
+///   var myField: Int {
+///     get {
+///       return Builtin.reinterpretCast(self)
+///     }
+///     set(newValue) {
+///       Builtin.initialize(Builtin.addressof(self), newValue))
+///     }
+///   }
+/// }
+/// \endcode
+///
+/// \returns a pair of the getter and setter function decls.
+static std::pair<FuncDecl *, FuncDecl *>
+makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
+                        StructDecl *importedUnionDecl,
+                        VarDecl *fieldDecl) {
+  auto &C = Impl.SwiftContext;
+  auto selfDecl = createSelfDecl(importedUnionDecl, /*is static*/ false);
+  auto selfPattern = createTypedNamedPattern(selfDecl);
+
+  auto inoutSelfDecl = createSelfDecl(importedUnionDecl,
+                                      /*isStaticMethod*/ false,
+                                      /*isInOut*/ true);
+  auto inoutSelfPattern = createTypedNamedPattern(inoutSelfDecl);
+
+  auto voidTy = TupleType::getEmpty(C);
+
+  // Create the field getter
+  auto getterFnTy = FunctionType::get(voidTy, fieldDecl->getType());
+
+  // Getter methods need to take self as the first argument. Wrap the
+  // function type to take the self type.
+  getterFnTy = FunctionType::get(selfDecl->getType(), getterFnTy);
+
+  auto getterFnRetTypeLoc = TypeLoc::withoutLoc(fieldDecl->getType());
+  auto getterMethodParam = TuplePattern::create(C, SourceLoc(), {}, SourceLoc());
+  Pattern *getterParams[] = { selfPattern, getterMethodParam };
+
+
+  auto getterDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
+                                     SourceLoc(), DeclName(), SourceLoc(),
+                                     SourceLoc(), nullptr, Type(), getterParams,
+                                     getterFnRetTypeLoc, importedUnionDecl);
+
+  getterDecl->setType(getterFnTy);
+  getterDecl->setBodyResultType(fieldDecl->getType());
+  getterDecl->setAccessibility(Accessibility::Public);
+
+  // Create the field setter
+  auto setterFnTy = FunctionType::get(fieldDecl->getType(), voidTy);
+  
+  // Setter methods need to take self as the first argument. Wrap the
+  // function type to take the self type.
+  setterFnTy = FunctionType::get(InOutType::get(selfDecl->getType()),
+                                 setterFnTy);
+
+  auto setterFnRetTypeLoc = TypeLoc::withoutLoc(voidTy);
+
+  auto newValueDecl = new (C) ParamDecl(/*isLet */ true, SourceLoc(),
+                                        Identifier(), SourceLoc(), C.Id_value,
+                                        fieldDecl->getType(),
+                                        importedUnionDecl);
+  Pattern *setterNewValueParam = createTypedNamedPattern(newValueDecl);
+
+  // FIXME: Remove ParenPattern?
+  setterNewValueParam = new (C) ParenPattern(SourceLoc(), setterNewValueParam,
+                                             SourceLoc());
+  setterNewValueParam->setType(ParenType::get(C, fieldDecl->getType()));
+
+  Pattern *setterParams[] = { inoutSelfPattern, setterNewValueParam };
+
+  auto setterDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
+                                     SourceLoc(), DeclName(), SourceLoc(),
+                                     SourceLoc(), nullptr, Type(), setterParams,
+                                     setterFnRetTypeLoc, importedUnionDecl);
+
+  setterDecl->setType(setterFnTy);
+  setterDecl->setBodyResultType(voidTy);
+  setterDecl->setAccessibility(Accessibility::Public);
+  setterDecl->setMutating();
+
+  fieldDecl->makeComputed(SourceLoc(), getterDecl, setterDecl, nullptr,
+                          SourceLoc());
+
+  // Don't bother synthesizing the body if we've already finished type-checking.
+  if (Impl.hasFinishedTypeChecking())
+    return { getterDecl, setterDecl };
+
+  // Synthesize the getter body
+  {
+    auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
+    auto reinterpretCast = cast<FuncDecl>(getBuiltinValueDecl(
+        C, C.getIdentifier("reinterpretCast")));
+    auto reinterpretCastRef
+      = new (C) DeclRefExpr(reinterpretCast, SourceLoc(), /*implicit*/ true);
+    auto reinterpreted = new (C) CallExpr(reinterpretCastRef, selfRef,
+                                          /*implicit*/ true);
+    auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
+    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                  /*implicit*/ true);
+    getterDecl->setBody(body);
+    C.addedExternalDecl(getterDecl);
+  }
+
+  // Synthesize the setter body
+  {
+    auto inoutSelfRef = new (C) DeclRefExpr(inoutSelfDecl, SourceLoc(),
+                                            /*implicit*/ true);
+    auto inoutSelf = new (C) InOutExpr(SourceLoc(), inoutSelfRef,
+      InOutType::get(importedUnionDecl->getType()), /*implicit*/ true);
+    auto newValueRef = new (C) DeclRefExpr(newValueDecl, SourceLoc(),
+                                           /*implicit*/ true);
+    auto addressofFn = cast<FuncDecl>(getBuiltinValueDecl(
+      C, C.getIdentifier("addressof")));
+    auto addressofFnRef
+      = new (C) DeclRefExpr(addressofFn, SourceLoc(), /*implicit*/ true);
+    auto selfPointer = new (C) CallExpr(addressofFnRef, inoutSelf,
+                                          /*implicit*/ true);
+    auto initializeFn = cast<FuncDecl>(getBuiltinValueDecl(
+      C, C.getIdentifier("initialize")));
+    auto initializeFnRef
+      = new (C) DeclRefExpr(initializeFn, SourceLoc(), /*implicit*/ true);
+    auto initalizeArgs = TupleExpr::createImplicit(C,
+                                                   { newValueRef, selfPointer },
+                                                   {});
+    auto initialize = new (C) CallExpr(initializeFnRef, initalizeArgs,
+                                       /*implicit*/ true);
+    auto body = BraceStmt::create(C, SourceLoc(), { initialize }, SourceLoc(),
+                                  /*implicit*/ true);
+    setterDecl->setBody(body);
+    C.addedExternalDecl(setterDecl);
+  }
+
+  return { getterDecl, setterDecl };
+}
+
+static ConstructorDecl *makeUnionConstructor(ClangImporter::Implementation &Impl,
+                                             StructDecl *importedUnionDecl,
+                                             VarDecl *fieldDecl) {
+  auto &C = Impl.SwiftContext;
+
+  auto selfDecl = createSelfDecl(importedUnionDecl, /*is static*/ false);
+  auto selfType = importedUnionDecl->getDeclaredTypeInContext();
+  auto selfMetatype = MetatypeType::get(selfType);
+  auto selfPattern = createTypedNamedPattern(selfDecl);
+
+  auto fieldName = fieldDecl->getName();
+  auto paramDecl = new (C) ParamDecl(/*IsLet*/ true, SourceLoc(), fieldName,
+                                     SourceLoc(), fieldName,
+                                     fieldDecl->getType(), importedUnionDecl);
+
+  auto paramPattern = TuplePattern::create(C, SourceLoc(), {
+    TuplePatternElt(createTypedNamedPattern(paramDecl))
+  }, SourceLoc());
+
+  auto paramTy = TupleType::get(
+    TupleTypeElt(paramDecl->getType(), fieldName), C);
+
+  DeclName name(C, C.Id_init, { fieldName });
+  auto ctor = new (C) ConstructorDecl(name, importedUnionDecl->getLoc(),
+                                      OTK_None, SourceLoc(), selfPattern,
+                                      paramPattern, nullptr, SourceLoc(),
+                                      importedUnionDecl);
+
+  auto fnTy = FunctionType::get(paramTy, selfType);
+  auto allocFnTy = FunctionType::get(selfMetatype, fnTy);
+  auto initFnTy = FunctionType::get(selfType, fnTy);
+  ctor->setType(allocFnTy);
+  ctor->setInitializerType(initFnTy);
+  ctor->setAccessibility(Accessibility::Public);
+
+  auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
+  auto memberRef = new (C) MemberRefExpr(selfRef, SourceLoc(), fieldDecl,
+                                         SourceLoc(), /*implicit*/ true);
+  auto paramRef = new (C) DeclRefExpr(paramDecl, SourceLoc(), /*implicit*/ true);
+  auto initAssign = new (C) AssignExpr(memberRef, SourceLoc(), paramRef,
+                                       /*implicit*/ true);
+  auto body = BraceStmt::create(C, SourceLoc(), { initAssign },
+                                SourceLoc(), /*implicit*/ true);
+  ctor->setBody(body);
+  Impl.registerExternalDecl(ctor);
+  return ctor;
 }
 
 namespace {
@@ -1934,9 +2125,8 @@ namespace {
       // Track whether this record contains fields that can't be zero-
       // initialized.
       bool hasZeroInitializableStorage = true;
-      
+
       if (decl->isUnion())
-        // Import the union, but don't make its storage accessible for now.
         hasUnreferenceableStorage = true;
 
       // FIXME: Skip Microsoft __interfaces.
@@ -1991,9 +2181,10 @@ namespace {
       // functions.
 
       // Import each of the members.
-      // TODO: Implement union members.
       SmallVector<Decl *, 4> members;
-      if (!decl->isUnion()) {
+      // FIXME: Import anonymous union fields and support field access when
+      // it is nested in a struct.
+      if (!(decl->isUnion() && decl->isAnonymousStructOrUnion())) {
         for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
              m != mEnd; ++m) {
           auto nd = dyn_cast<clang::NamedDecl>(*m);
@@ -2014,12 +2205,11 @@ namespace {
               if (*nullability == clang::NullabilityKind::NonNull)
                 hasZeroInitializableStorage = false;
             }
-            
+
             // TODO: If we had the notion of a closed enum with no private
             // cases or resilience concerns, then complete NS_ENUMs with
             // no case corresponding to zero would also not be zero-
             // initializable.
-            
           }
 
           auto member = Impl.importDecl(nd);
@@ -2029,23 +2219,47 @@ namespace {
             // TODO: For C++ types we *would* want to preserve the nesting.
             if (dyn_cast_or_null<TypeDecl>(member))
               continue;
-            
+
             // Otherwise, we don't know what this field is. Assume it may be
             // important in C.
             hasUnreferenceableStorage = true;
             continue;
           }
-          
-          members.push_back(member);
+
+          if (decl->isUnion()) {
+            // Union fields should only be available indirectly via a computed
+            // property. Since the union is made of all of the fields at once,
+            // this is a trivial accessor that casts self to the correct
+            // field type.
+
+            // FIXME: Allow indirect field access of anonymous structs.
+            if (isa<clang::IndirectFieldDecl>(nd))
+              continue;
+
+            if (auto VD = dyn_cast<VarDecl>(member)) {
+              VD->setLet(false);
+              Decl *getter, *setter;
+              std::tie(getter, setter) = makeUnionFieldAccessors(Impl, result,
+                                                                 VD);
+              members.push_back(VD);
+
+              // Create labeled inititializers for unions that take one of the
+              // fields, which only initializes the data for that field.
+              auto valueCtor = makeUnionConstructor(Impl, result, VD);
+              members.push_back(valueCtor);
+            }
+          } else {
+            members.push_back(member);
+          }
         }
       }
-      
+
       bool hasReferenceableFields = !members.empty();
 
       if (hasZeroInitializableStorage) {
         // Add constructors for the struct.
         members.push_back(createDefaultConstructor(result));
-        if (hasReferenceableFields && !hasUnreferenceableStorage) {
+        if (!decl->isUnion() && hasReferenceableFields && !hasUnreferenceableStorage) {
           // The default zero initializer suppresses the implicit value
           // constructor that would normally be formed, so we have to add that
           // explicitly as well. We leave the body implicit in order to match
@@ -2061,14 +2275,14 @@ namespace {
       for (auto member : members) {
         result->addMember(member);
       }
-      
+
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
-      
+
       // Add the struct decl to ExternalDefinitions so that IRGen can emit
       // metadata for it.
       // FIXME: There might be better ways to do this.
       Impl.registerExternalDecl(result);
-      
+
       return result;
     }
 
@@ -2188,7 +2402,6 @@ namespace {
             return nullptr;
         }
       }
-
       auto name = Impl.importName(decl);
       if (name.empty())
         return nullptr;
