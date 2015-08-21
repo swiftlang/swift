@@ -1,8 +1,11 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
+
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol a:a{let a:a
-func a
-typealias e:AnyObject
+protocol a {
+func g(p: a {
+return ["
+protocol a : a {
+func a: Co

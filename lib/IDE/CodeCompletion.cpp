@@ -2070,8 +2070,13 @@ public:
   }
 
   bool isOptionSetTypeDecl(NominalTypeDecl *D) {
-    return std::find(D->getProtocols().begin(), D->getProtocols().end(),
-                    Ctx.getOptionSetTypeDecl()) != D->getProtocols().end();
+    auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetTypeDecl());
+    if (!optionSetType)
+      return false;
+
+    SmallVector<ProtocolConformance *, 1> conformances;
+    return D->lookupConformance(CurrDeclContext->getParentModule(),
+                                optionSetType, conformances);
   }
 
   bool isOptionSetType(Type Ty) {

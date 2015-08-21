@@ -2418,13 +2418,14 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   ProtocolDeclBits.KnownProtocol = 0;
   ProtocolDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
-  ProtocolDeclBits.HasMissingRequirements = false;
-  ProtocolDeclBits.InheritedProtocolsWereDeserialized = false;
+  HasMissingRequirements = false;
+  InheritedProtocolsWereDeserialized = false;
+  InheritedProtocolsSet = false;
 }
 
 ArrayRef<ProtocolDecl *>
 ProtocolDecl::getInheritedProtocols(LazyResolver *resolver) const {
-  return getProtocols();
+  return InheritedProtocols;
 }
 
 bool ProtocolDecl::inheritsFrom(const ProtocolDecl *super) const {
@@ -2440,7 +2441,7 @@ bool ProtocolDecl::requiresClassSlow() {
   ProtocolDeclBits.RequiresClass = false;
 
   // Ensure that the result can not change in future.
-  assert(isProtocolsValid() || isBeingTypeChecked());
+  assert(isInheritedProtocolsValid() || isBeingTypeChecked());
 
   if (getAttrs().hasAttribute<ObjCAttr>() || isObjC()) {
     ProtocolDeclBits.RequiresClass = true;

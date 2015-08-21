@@ -957,12 +957,8 @@ public:
   void checkInheritanceClause(Decl *decl,
                               GenericTypeResolver *resolver = nullptr);
 
-  /// Retrieve the set of protocols to which this nominal type declaration
-  /// directly conforms, i.e., as specified in its own inheritance clause.
-  ///
-  /// Protocols to which this nominal type declaration conforms via extensions
-  /// or superclasses need to be extracted separately.
-  ArrayRef<ProtocolDecl *> getDirectConformsTo(NominalTypeDecl *nominal);
+  /// Retrieve the set of inherited protocols for this protocol type.
+  ArrayRef<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
 
   /// \brief Add any implicitly-defined constructors required for the given
   /// struct or class.

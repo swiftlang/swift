@@ -1830,28 +1830,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   PrivateDiscriminatorRAII privateDiscriminatorRAII{*this, declOrOffset};
   LocalDiscriminatorRAII localDiscriminatorRAII(declOrOffset);
 
-  // Local function that handles the list of protocols to which a nominal type
-  // conforms as well as the "inherited" list as written in the source.
-  auto handleProtocolsAndInherited
-    = [&](NominalTypeDecl *nominal, unsigned numProtocols,
-          ArrayRef<uint64_t> rawProtocolAndInheritedIDs) {
-      auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
-      for_each(protocols, rawProtocolAndInheritedIDs.slice(0, numProtocols),
-               [this](ProtocolDecl *&p, uint64_t rawID) {
-                 p = cast<ProtocolDecl>(getDecl(rawID));
-               });
-      if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-        proto->setDirectlyInheritedProtocols(protocols);
-      } else {
-        nominal->setProtocols(protocols);
-      }
-
-      unsigned numInherited = rawProtocolAndInheritedIDs.size() - numProtocols;
-      auto inheritedTypes = ctx.Allocate<TypeLoc>(numInherited);
-      for (unsigned i = 0; i != numInherited; ++i) {
-        uint64_t rawID = rawProtocolAndInheritedIDs[i + numProtocols];
-        inheritedTypes[i] = TypeLoc::withoutLoc(getType(rawID));
-      }
+  // Local function that handles the "inherited" list for a type.
+  auto handleInherited
+    = [&](TypeDecl *nominal, ArrayRef<uint64_t> rawInheritedIDs) {
+      auto inheritedTypes = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
+      for_each(inheritedTypes, rawInheritedIDs,
+               [this](TypeLoc &tl, uint64_t rawID) {
+         tl = TypeLoc::withoutLoc(getType(rawID));
+      });
       nominal->setInherited(inheritedTypes);
       nominal->setCheckedInheritanceClause();
   };
@@ -2201,13 +2187,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclContextID contextID;
     bool isImplicit;
     uint8_t rawAccessLevel;
-    unsigned numProtocols;
-    ArrayRef<uint64_t> rawProtocolAndInheritedIDs;
+    unsigned numConformances;
+    ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::StructLayout::readRecord(scratch, nameID, contextID,
                                           isImplicit, rawAccessLevel,
-                                          numProtocols,
-                                          rawProtocolAndInheritedIDs);
+                                          numConformances,
+                                          rawInheritedIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2248,14 +2234,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     theStruct->computeType();
 
-    handleProtocolsAndInherited(theStruct, numProtocols,
-                                rawProtocolAndInheritedIDs);
+    handleInherited(theStruct, rawInheritedIDs);
 
     theStruct->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
     theStruct->setConformanceLoader(
       this,
-      encodeLazyConformanceContextData(numProtocols,
+      encodeLazyConformanceContextData(numConformances,
                                        DeclTypeCursor.GetCurrentBitNo()));
 
     break;
@@ -2687,8 +2672,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       proto->setImplicit();
     proto->computeType();
 
-    handleProtocolsAndInherited(proto, numProtocols,
-                                rawProtocolAndInheritedIDs);
+    auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
+    for_each(protocols, rawProtocolAndInheritedIDs.slice(0, numProtocols),
+             [this](ProtocolDecl *&p, uint64_t rawID) {
+               p = cast<ProtocolDecl>(getDecl(rawID));
+             });
+    proto->setDirectlyInheritedProtocols(protocols);
+
+    handleInherited(proto, rawProtocolAndInheritedIDs.slice(numProtocols));
 
     proto->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     proto->setCircularityCheck(CircularityCheck::Checked);
@@ -2772,14 +2763,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit, isObjC, requiresStoredPropertyInits, foreign;
     TypeID superclassID;
     uint8_t rawAccessLevel;
-    unsigned numProtocols;
-    ArrayRef<uint64_t> rawProtocolAndInheritedIDs;
+    unsigned numConformances;
+    ArrayRef<uint64_t> rawInheritedIDs;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
                                          requiresStoredPropertyInits,
                                          foreign, superclassID, rawAccessLevel,
-                                         numProtocols,
-                                         rawProtocolAndInheritedIDs);
+                                         numConformances,
+                                         rawInheritedIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2825,15 +2816,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
     theClass->computeType();
 
-    handleProtocolsAndInherited(theClass, numProtocols,
-                                rawProtocolAndInheritedIDs);
+    handleInherited(theClass, rawInheritedIDs);
 
     theClass->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     theClass->setHasDestructor();
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
     theClass->setConformanceLoader(
       this,
-      encodeLazyConformanceContextData(numProtocols,
+      encodeLazyConformanceContextData(numConformances,
                                        DeclTypeCursor.GetCurrentBitNo()));
 
     theClass->setCircularityCheck(CircularityCheck::Checked);
@@ -2846,13 +2836,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit;
     TypeID rawTypeID;
     uint8_t rawAccessLevel;
-    unsigned numProtocols;
-    ArrayRef<uint64_t> rawProtocolAndInheritedIDs;
+    unsigned numConformances;
+    ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::EnumLayout::readRecord(scratch, nameID, contextID,
                                         isImplicit, rawTypeID, rawAccessLevel,
-                                        numProtocols,
-                                        rawProtocolAndInheritedIDs);
+                                        numConformances, rawInheritedIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2894,17 +2883,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     theEnum->computeType();
 
-    handleProtocolsAndInherited(theEnum, numProtocols,
-                                rawProtocolAndInheritedIDs);
+    handleInherited(theEnum, rawInheritedIDs);
 
     theEnum->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);
     theEnum->setConformanceLoader(
       this,
-      encodeLazyConformanceContextData(numProtocols,
+      encodeLazyConformanceContextData(numConformances,
                                        DeclTypeCursor.GetCurrentBitNo()));
-
-    theEnum->setCheckedInheritanceClause();
     break;
   }
 

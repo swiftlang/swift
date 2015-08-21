@@ -561,22 +561,43 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     inherited.setInvalidType(Context);
   }
 
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    // FIXME: If we already set the protocols, bail out. We'd rather not have
-    // to check this.
-    if (nominal->isProtocolsValid())
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    // FIXME: If we already set the inherited protocols, bail out. We'd rather
+    // not have to check this.
+    if (proto->isInheritedProtocolsValid())
       return;
 
-    nominal->setProtocols(Context.AllocateCopy(allProtocols));
-    if (superclassTy) {
-      if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
-        classDecl->setSuperclass(superclassTy);
-        resolveImplicitConstructors(
-          superclassTy->getClassOrBoundGenericClass());
-      } else {
-        auto enumDecl = cast<EnumDecl>(decl);
-        enumDecl->setRawType(superclassTy);
+    // Check for circular inheritance.
+    // FIXME: The diagnostics here should be improved.
+    bool diagnosedCircularity = false;
+    for (unsigned i = 0, n = allProtocols.size(); i != n; /*in loop*/) {
+      if (allProtocols[i] == proto || allProtocols[i]->inheritsFrom(proto)) {
+        if (!diagnosedCircularity) {
+          diagnose(proto, diag::circular_protocol_def, proto->getName().str());
+          diagnosedCircularity = true;
+        }
+
+        allProtocols.remove(allProtocols[i]);
+        --n;
+        continue;
       }
+
+      ++i;
+    }
+
+    proto->setInheritedProtocols(Context.AllocateCopy(allProtocols));
+    return;
+  }
+
+  if (superclassTy) {
+    if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+      classDecl->setSuperclass(superclassTy);
+      resolveImplicitConstructors(
+                                  superclassTy->getClassOrBoundGenericClass());
+    } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
+      enumDecl->setRawType(superclassTy);
+    } else {
+      assert(isa<AbstractTypeParamDecl>(decl));
     }
   }
 }
@@ -620,7 +641,7 @@ static ArrayRef<EnumDecl *> getInheritedForCycleCheck(TypeChecker &tc,
 //
 // FIXME: Just remove the problematic inheritance?
 static void breakInheritanceCycle(ProtocolDecl *proto) {
-  proto->setProtocols({ });
+  proto->clearInheritedProtocols();
 }
 
 /// Break the inheritance cycle for a class by removing its superclass.
@@ -2867,10 +2888,6 @@ public:
       if (tracker)
         tracker->addUsedMember({conformance->getProtocol(), Identifier()},
                                !isPrivateConformer(D));
-    }
-
-    if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
-      nominal->overrideProtocols(TC.Context.AllocateCopy(protocols));
     }
 
     // Diagnose any conflicts attributed to this declaration context.
@@ -6457,9 +6474,9 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 }
 
 ArrayRef<ProtocolDecl *>
-TypeChecker::getDirectConformsTo(NominalTypeDecl *nominal) {
-  checkInheritanceClause(nominal);
-  return nominal->getProtocols();
+TypeChecker::getDirectConformsTo(ProtocolDecl *proto) {
+  checkInheritanceClause(proto);
+  return proto->getInheritedProtocols(nullptr);
 }
 
 /// Build a default initializer string for the given pattern.

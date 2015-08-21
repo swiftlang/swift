@@ -186,21 +186,16 @@ void TypeChecker::contextualizeTopLevelCode(TopLevelContext &TLC,
 ///   }
 /// \endcode
 static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
-                                                       Expr *E,
-                                                       Type ResultType) {
+                                                    Expr *E,
+                                                    Type ResultType,
+                                                    Module *module) {
   auto *NTD = ResultType->getAnyNominal();
   if (!NTD)
     return;
-  bool IsOptionSet = false;
-  for (auto *PD : NTD->getProtocols()) {
-    if (auto KnownP = PD->getKnownProtocolKind()) {
-      if (KnownP.getValue() == KnownProtocolKind::OptionSetType) {
-        IsOptionSet = true;
-        break;
-      }
-    }
-  }
-  if (!IsOptionSet)
+  auto optionSetType = dyn_cast<ProtocolDecl>(Ctx.getOptionSetTypeDecl());
+  SmallVector<ProtocolConformance *, 4> conformances;
+  if (!(optionSetType &&
+        NTD->lookupConformance(module, optionSetType, conformances)))
     return;
 
   CallExpr *CE = dyn_cast<CallExpr>(E);
@@ -405,7 +400,8 @@ public:
     RS->setResult(E);
     
     if (failed) {
-      tryDiagnoseUnnecessaryCastOverOptionSet(TC.Context, E, ResultTy);
+      tryDiagnoseUnnecessaryCastOverOptionSet(TC.Context, E, ResultTy,
+                                              DC->getParentModule());
       return nullptr;
     }
     

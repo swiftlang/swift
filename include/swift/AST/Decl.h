@@ -467,11 +467,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     unsigned AddedImplicitInitializers : 1;
-
-    /// Whether we have already set the protocols to which this type conforms.
-    unsigned ProtocolsSet : 1;
   };
-  enum { NumNominalTypeDeclBits = NumTypeDeclBits + 3 };
+  enum { NumNominalTypeDeclBits = NumTypeDeclBits + 2 };
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
   class ProtocolDeclBitfields {
@@ -502,18 +499,8 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// The stage of the circularity check for this protocol.
     unsigned Circularity : 2;
-
-    /// True if the protocol has requirements that cannot be satisfied (e.g.
-    /// because they could not be imported from Objective-C).
-    unsigned HasMissingRequirements : 1;
-
-    /// Whether the set of inherited protocols was deserialized and
-    /// has not yet been pulled into the
-    ///
-    /// FIXME: this should be much, much lazier.
-    unsigned InheritedProtocolsWereDeserialized : 1;
   };
-  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 13 };
+  enum { NumProtocolDeclBits = NumNominalTypeDeclBits + 14 };
   static_assert(NumProtocolDeclBits <= 32, "fits in an unsigned");
 
   class ClassDeclBitfields {
@@ -2940,9 +2927,6 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   friend ArrayRef<ValueDecl *>
            ValueDecl::getSatisfiedProtocolRequirements(bool) const;
 
-  /// \brief The set of protocols to which this type conforms.
-  ArrayRef<ProtocolDecl *> Protocols;
-
 protected:
   Type DeclaredTy;
   Type DeclaredTyInContext;
@@ -2964,7 +2948,6 @@ protected:
     setGenericParams(GenericParams);
     NominalTypeDeclBits.HasDelayedMembers = false;
     NominalTypeDeclBits.AddedImplicitInitializers = false;
-    NominalTypeDeclBits.ProtocolsSet = false;
     ExtensionGeneration = 0;
     ValidatingGenericSignature = false;
     SearchedForFailableInits = false;
@@ -3123,28 +3106,6 @@ public:
   bool lookupConformance(
          ModuleDecl *module, ProtocolDecl *protocol,
          SmallVectorImpl<ProtocolConformance *> &conformances) const;
-
-  /// \brief Retrieve the set of protocols to which this type conforms.
-  ///
-  /// FIXME: Include protocol conformance from extensions? This will require
-  /// semantic analysis to compute.
-  ArrayRef<ProtocolDecl *> getProtocols() const { return Protocols; }
-
-  void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
-    assert((!NominalTypeDeclBits.ProtocolsSet || protocols.empty()) &&
-           "protocols already set");
-    NominalTypeDeclBits.ProtocolsSet = true;
-    Protocols = protocols;
-  }
-
-  void overrideProtocols(ArrayRef<ProtocolDecl *> protocols) {
-    NominalTypeDeclBits.ProtocolsSet = true;
-    Protocols = protocols;
-  }
-
-  bool isProtocolsValid() const {
-    return NominalTypeDeclBits.ProtocolsSet;
-  }
 
   /// Retrieve all of the protocols that this nominal type conforms to.
   SmallVector<ProtocolDecl *, 2> getAllProtocols() const;
@@ -3558,6 +3519,21 @@ public:
 class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
+  ArrayRef<ProtocolDecl *> InheritedProtocols;
+
+  /// True if the protocol has requirements that cannot be satisfied (e.g.
+  /// because they could not be imported from Objective-C).
+  unsigned HasMissingRequirements : 1;
+
+  /// Whether the set of inherited protocols was deserialized and
+  /// has not yet been pulled into the conformance lookup table.
+  ///
+  /// FIXME: this should be much, much lazier.
+  unsigned InheritedProtocolsWereDeserialized : 1;
+
+  /// Whether we have already set the list of inherited protocols.
+  unsigned InheritedProtocolsSet : 1;
+
   bool requiresClassSlow();
 
   bool existentialConformsToSelfSlow();
@@ -3670,27 +3646,43 @@ public:
   /// with requirements that cannot be represented in Swift.
   bool hasMissingRequirements() const {
     (void)getMembers();
-    return ProtocolDeclBits.HasMissingRequirements;
+    return HasMissingRequirements;
   }
 
   void setHasMissingRequirements(bool newValue) {
-    ProtocolDeclBits.HasMissingRequirements = newValue;
+    HasMissingRequirements = newValue;
+  }
+
+  /// Set the list of inherited protocols.
+  void setInheritedProtocols(ArrayRef<ProtocolDecl *> protocols) {
+    assert(!InheritedProtocolsSet && "protocols already set");
+    InheritedProtocolsSet = true;
+    InheritedProtocols = protocols;
+  }
+
+  void clearInheritedProtocols() {
+    InheritedProtocolsSet = true;
+    InheritedProtocols = { };
+  }
+
+  bool isInheritedProtocolsValid() const {
+    return InheritedProtocolsSet;
   }
 
   /// Set the directly inherited protocols from a non-parsed
   /// representation, e.g., a module file or imported Clang module.
   void setDirectlyInheritedProtocols(ArrayRef<ProtocolDecl *> protocols) {
-    setProtocols(protocols);
-    ProtocolDeclBits.InheritedProtocolsWereDeserialized = true;
+    setInheritedProtocols(protocols);
+    InheritedProtocolsWereDeserialized = true;
   }
 
   /// Take the directly-inherited protocols set by \c
   /// setDirectlyInheritedProtocols.
   ArrayRef<ProtocolDecl *> takeDirectlyInheritedProtocols() {
-    if (!ProtocolDeclBits.InheritedProtocolsWereDeserialized)
+    if (!InheritedProtocolsWereDeserialized)
       return { };
 
-    ProtocolDeclBits.InheritedProtocolsWereDeserialized = false;
+    InheritedProtocolsWereDeserialized = false;
     return getInheritedProtocols(nullptr);
   }
 

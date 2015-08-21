@@ -1684,7 +1684,6 @@ namespace {
       // Build an OptionSetType conformance for the type.
       ProtocolDecl *protocols[]
         = {cxt.getProtocol(KnownProtocolKind::OptionSetType)};
-      structDecl->setProtocols(Impl.SwiftContext.AllocateCopy(protocols));
       populateInheritedTypes(structDecl, protocols);
 
       structDecl->addMember(labeledValueConstructor);
@@ -1743,8 +1742,6 @@ namespace {
 
         ProtocolDecl *protocols[]
           = {cxt.getProtocol(KnownProtocolKind::RawRepresentable)};
-        auto protoList = Impl.SwiftContext.AllocateCopy(protocols);
-        structDecl->setProtocols(protoList);
         populateInheritedTypes(structDecl, protocols);
 
         // Note that this is a raw representable type.
@@ -1831,13 +1828,6 @@ namespace {
         enumDecl->setRawType(underlyingType);
         
         // Add protocol declarations to the enum declaration.
-        ProtocolDecl *protocols[] = {
-          cxt.getProtocol(KnownProtocolKind::RawRepresentable),
-          cxt.getProtocol(KnownProtocolKind::Hashable),
-          cxt.getProtocol(KnownProtocolKind::Equatable),
-        };
-        auto protoList = Impl.SwiftContext.AllocateCopy(protocols);
-        enumDecl->setProtocols(protoList);
         enumDecl->setInherited(
           Impl.SwiftContext.AllocateCopy(
             llvm::makeArrayRef(TypeLoc::withoutLoc(underlyingType))));
@@ -3914,21 +3904,15 @@ namespace {
     /// given declaration.
     void addObjCProtocolConformances(Decl *decl,
                                      ArrayRef<ProtocolDecl*> protocols) {
-      // Set the protocols.
-      if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      // Set the inherited protocols of a protocol.
+      if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
         // Copy the list of protocols.
         MutableArrayRef<ProtocolDecl *> allProtocols
           = Impl.SwiftContext.AllocateCopy(protocols);
+        proto->setDirectlyInheritedProtocols(allProtocols);
 
-        if (auto proto = dyn_cast<ProtocolDecl>(nominal))
-          proto->setDirectlyInheritedProtocols(allProtocols);
-        else
-          nominal->setProtocols(allProtocols);
-      }
-
-      // Protocols don't require conformances.
-      if (isa<ProtocolDecl>(decl))
         return;
+      }
 
       Impl.recordImportedProtocols(decl, protocols);
 
