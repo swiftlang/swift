@@ -238,3 +238,51 @@ public var SIG_HOLD: sig_t { return unsafeBitCast(5, sig_t.self) }
 internal var _ignore = _UnsupportedPlatformError()
 #endif
 
+//===----------------------------------------------------------------------===//
+// semaphore.h
+//===----------------------------------------------------------------------===//
+
+/// The value returned by `sem_open()` in the case of failure.
+public var SEM_FAILED: UnsafeMutablePointer<sem_t> {
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+  // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
+  return UnsafeMutablePointer<sem_t>(bitPattern: -1)
+#else
+  _UnsupportedPlatformError()
+#endif
+}
+
+@warn_unused_result
+@asmname("_swift_Darwin_sem_open2")
+internal func _swift_Darwin_sem_open2(
+  name: UnsafePointer<CChar>,
+  _ oflag: CInt
+) -> UnsafeMutablePointer<sem_t>
+
+@warn_unused_result
+@asmname("_swift_Darwin_sem_open4")
+internal func _swift_Darwin_sem_open4(
+  name: UnsafePointer<CChar>,
+  _ oflag: CInt,
+  _ mode: mode_t,
+  _ value: CUnsignedInt
+) -> UnsafeMutablePointer<sem_t>
+
+@warn_unused_result
+public func sem_open(
+  name: UnsafePointer<CChar>,
+  _ oflag: CInt
+) -> UnsafeMutablePointer<sem_t> {
+  return _swift_Darwin_sem_open2(name, oflag)
+}
+
+@warn_unused_result
+public func sem_open(
+  name: UnsafePointer<CChar>,
+  _ oflag: CInt,
+  _ mode: mode_t,
+  _ value: CUnsignedInt
+) -> UnsafeMutablePointer<sem_t> {
+  return _swift_Darwin_sem_open4(name, oflag, mode, value)
+}
+

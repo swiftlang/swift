@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <fcntl.h>
+#include <semaphore.h>
 
 extern "C" int 
 _swift_Darwin_open(const char *path, int oflag, mode_t mode) {
@@ -21,3 +22,13 @@ extern "C" int
 _swift_Darwin_openat(int fd, const char *path, int oflag, mode_t mode) {
   return openat(fd, path, oflag, mode);
 }
+
+extern "C" sem_t *_swift_Darwin_sem_open2(const char *name, int oflag) {
+  return sem_open(name, oflag);
+}
+
+extern "C" sem_t *_swift_Darwin_sem_open4(const char *name, int oflag,
+                                          mode_t mode, unsigned int value) {
+  return sem_open(name, oflag, mode, value);
+}
+
