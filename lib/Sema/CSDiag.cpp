@@ -1055,15 +1055,15 @@ static Expr *unwrapParenExpr(Expr *e) {
   return e;
 }
 
-static SmallVector<Type, 4> decomposeArgumentType(Type ty) {
-  SmallVector<Type, 4> result;
+static SmallVector<TupleTypeElt, 4> decomposeArgumentType(Type ty) {
+  SmallVector<TupleTypeElt, 4> result;
 
   // Assemble the parameter type list.
   if (auto parenType = dyn_cast<ParenType>(ty.getPointer())) {
     result.push_back(parenType->getUnderlyingType());
   } else if (auto tupleType = ty->getAs<TupleType>()) {
-    for (auto field : tupleType->getElements())
-      result.push_back(field.getType());
+    result.append(tupleType->getElements().begin(),
+                  tupleType->getElements().end());
   } else {
     result.push_back(ty);
   }
@@ -1381,7 +1381,10 @@ namespace {
     /// After the candidate list is formed, it can be filtered down to discard
     /// obviously mismatching candidates and compute a "closeness" for the
     /// resultant set.
-    void filterList(Type actualArgsType);
+    void filterList(ArrayRef<TupleTypeElt> actualArgs);
+    void filterList(Type actualArgsType) {
+      return filterList(decomposeArgumentType(actualArgsType));
+    }
     void filterList(ClosenessPredicate predicate);
     void filterContextualMemberList(Expr *argExpr);
 
@@ -1441,7 +1444,7 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
 /// Determine how close an argument list is to an already decomposed argument
 /// list.
 static CandidateCloseness
-evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
+evaluateCloseness(Type candArgListType, ArrayRef<TupleTypeElt> actualArgs) {
   auto candArgs = decomposeArgumentType(candArgListType);
 
   // FIXME: This isn't handling varargs, and isn't handling default values
@@ -1464,11 +1467,13 @@ evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
   // Count the number of mismatched arguments.
   unsigned mismatchingArgs = 0;
   for (unsigned i = 0, e = actualArgs.size(); i != e; ++i) {
+    auto argType = actualArgs[i].getType();
+
     // If the argument has an unresolved type, then we're not actually matching
     // against it.
-    if (actualArgs[i]->is<UnresolvedType>())
+    if (argType->is<UnresolvedType>())
       continue;
-    if (auto *LVT = actualArgs[i]->getAs<LValueType>())
+    if (auto *LVT = argType->getAs<LValueType>())
       if (LVT->getObjectType()->is<UnresolvedType>())
         continue;
     
@@ -1476,7 +1481,7 @@ evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
     // type is identical to one of the argument types. We can obviously do
     // something more sophisticated with this.
     // FIXME: We definitely need to handle archetypes for same-type constraints.
-    if (!actualArgs[i]->getRValueType()->isEqual(candArgs[i]))
+    if (!argType->getRValueType()->isEqual(candArgs[i].getType()))
       ++mismatchingArgs;
   }
   
@@ -1487,7 +1492,8 @@ evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
   
   // Check to see if the first argument expects an inout argument, but is not
   // an lvalue.
-  if (candArgs[0]->is<InOutType>() && !actualArgs[0]->isLValueType())
+  if (candArgs[0].getType()->is<InOutType>() &&
+      !actualArgs[0].getType()->isLValueType())
     return CC_NonLValueInOut;
   
   if (mismatchingArgs == 1)
@@ -1640,10 +1646,9 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
 /// After the candidate list is formed, it can be filtered down to discard
 /// obviously mismatching candidates and compute a "closeness" for the
 /// resultant set.
-void CalleeCandidateInfo::filterList(Type actualArgsType) {
+void CalleeCandidateInfo::filterList(ArrayRef<TupleTypeElt> actualArgs) {
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
-  auto actualArgs = decomposeArgumentType(actualArgsType);
   filterList([&](UncurriedCandidate candidate) -> CandidateCloseness {
     auto inputType = candidate.getArgumentType();
     // If this isn't a function or isn't valid at this uncurry level, treat it
@@ -1684,7 +1689,7 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
     if (isa<InOutExpr>(argExpr))
       argType = LValueType::get(argType);
     
-    return filterList(argType);
+    return filterList(TupleTypeElt(argType));
   }
   
   // If we have a tuple expression, form a tuple type.
@@ -1699,7 +1704,7 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
     ArgElts.push_back({ argType, argTuple->getElementName(i) });
   }
 
-  return filterList(TupleType::get(ArgElts, CS->getASTContext()));
+  return filterList(ArgElts);
 
 }
 
