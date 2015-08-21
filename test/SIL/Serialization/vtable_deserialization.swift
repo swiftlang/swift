@@ -9,6 +9,7 @@ func WhatShouldIDoImBored<T : P>(t : T) {
   t.doSomething()
 }
 
+@inline(__always)
 func MakeItNotAGlobal() -> Y {
   let x = Y()
   WhatShouldIDoImBored(x)
@@ -19,12 +20,10 @@ func MakeItNotAGlobal() -> Y {
 // Make sure all abstractions have been removed and everything inlined into top_level_method.
 // CHECK-LABEL: sil @main
 // CHECK-NEXT: bb0({{.*}}):
-// CHECK-NEXT: function_ref unknown
-// CHECK-NEXT: function_ref @unknown
-// CHECK-NEXT: apply
-// CHECK-NEXT: integer_literal
-// CHECK-NEXT: return
-// CHECK-NEXT: }
+// CHECK: [[UNKNOWN:%.*]] = function_ref @unknown
+// CHECK: apply [[UNKNOWN]]
+// CHECK: integer_literal
+// CHECK: return
 MakeItNotAGlobal()
 
 // Make sure our vtable/witness tables are properly deserialized.
