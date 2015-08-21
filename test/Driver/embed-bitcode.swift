@@ -33,12 +33,13 @@
 // CHECK-MODULE-DAG: -Xllvm -fake-llvm-option
 // CHECK-MODULE-DAG: -emit-module-path
 // CHECK-MODULE: -frontend
+// CHECK-MODULE: -emit-module
+// CHECK-MODULE: -frontend
+// CHECK-MODULE: -c
 // CHECK-MODULE-NOT: -Xcc
 // CHECK-MODULE-NOT: -DDEBUG
 // CHECK-MODULE-NOT: -fake-llvm-option
 // CHECK-MODULE-NOT: -emit-module-path
-// CHECK-MODULE: -frontend
-// CHECK-MODULE: -emit-module
 
 // RUN: %target-swiftc_driver -embed-bitcode -force-single-frontend-invocation %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-SINGLE
 // CHECK-SINGLE: -frontend
@@ -63,16 +64,16 @@
 // CHECK-LIB: -emit-bc
 // CHECK-LIB: -primary-file
 // CHECK-LIB: swift -frontend
-// CHECK-LIB: -c
-// CHECK-LIB: -embed-bitcode
-// CHECK-LIB: -disable-llvm-optzns
-// CHECK-LIB: swift -frontend
 // CHECK-LIB: -emit-bc
 // CHECK-LIB: -primary-file
 // CHECK-LIB: swift -frontend
+// CHECK-LIB: -emit-module
+// CHECK-LIB: swift -frontend
 // CHECK-LIB: -c
 // CHECK-LIB: -embed-bitcode
 // CHECK-LIB: -disable-llvm-optzns
 // CHECK-LIB: swift -frontend
-// CHECK-LIB: -emit-module
+// CHECK-LIB: -c
+// CHECK-LIB: -embed-bitcode
+// CHECK-LIB: -disable-llvm-optzns
 // CHECK-LIB-NOT: swift -frontend

@@ -1108,7 +1108,9 @@ void Driver::buildActions(const ToolChain &TC,
     return;
   }
 
-  ActionList CompileActions;
+  ActionList AllModuleInputs;
+  ActionList AllLinkerInputs;
+
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::UpdateCode: {
@@ -1132,19 +1134,24 @@ void Driver::buildActions(const ToolChain &TC,
           Current.reset(new CompileJobAction(Current.release(),
                                              types::TY_LLVM_BC,
                                              previousBuildState));
+          AllModuleInputs.push_back(Current.get());
           Current.reset(new BackendJobAction(Current.release(),
                                              OI.CompilerOutputType, 0));
-        } else
+        } else {
           Current.reset(new CompileJobAction(Current.release(),
                                              OI.CompilerOutputType,
                                              previousBuildState));
+          AllModuleInputs.push_back(Current.get());
+        }
         break;
       }
       case types::TY_SwiftModuleFile:
       case types::TY_SwiftModuleDocFile:
         // Module inputs are okay if generating a module or linking.
-        if (OI.ShouldGenerateModule)
+        if (OI.ShouldGenerateModule) {
+          AllModuleInputs.push_back(Current.get());
           break;
+        }
         SWIFT_FALLTHROUGH;
       case types::TY_AutolinkFile:
       case types::TY_Object:
@@ -1175,7 +1182,7 @@ void Driver::buildActions(const ToolChain &TC,
         llvm_unreachable("these types should never be inferred");
       }
 
-      CompileActions.push_back(Current.release());
+      AllLinkerInputs.push_back(Current.release());
     }
     break;
   }
@@ -1195,6 +1202,8 @@ void Driver::buildActions(const ToolChain &TC,
       if (HandledHere) {
         // Create a single CompileJobAction and a single BackendJobAction.
         std::unique_ptr<Action> CA(new CompileJobAction(types::TY_LLVM_BC));
+        AllModuleInputs.push_back(CA.get());
+
         int InputIndex = 0;
         for (const InputPair &Input : Inputs) {
           types::ID InputType = Input.first;
@@ -1209,7 +1218,7 @@ void Driver::buildActions(const ToolChain &TC,
             // Only the first backend job owns the compilation job (to prevent
             // multiple de-allocations of the compilation job).
             BJA->setOwnsInputs(InputIndex == 0);
-            CompileActions.push_back(BJA);
+            AllLinkerInputs.push_back(BJA);
           }
           InputIndex++;
         }
@@ -1219,7 +1228,7 @@ void Driver::buildActions(const ToolChain &TC,
           // file.
           CA.reset(new BackendJobAction(CAReleased,
                                         OI.CompilerOutputType, 0));
-          CompileActions.push_back(CA.release());
+          AllLinkerInputs.push_back(CA.release());
         }
         break;
       }
@@ -1237,7 +1246,8 @@ void Driver::buildActions(const ToolChain &TC,
 
         CA->addInput(new InputAction(*InputArg, InputType));
       }
-      CompileActions.push_back(CA.release());
+      AllModuleInputs.push_back(CA.get());
+      AllLinkerInputs.push_back(CA.release());
     }
     break;
   }
@@ -1257,32 +1267,35 @@ void Driver::buildActions(const ToolChain &TC,
         Mode = REPLJobAction::Mode::Integrated;
     }
 
-    CompileActions.push_back(new REPLJobAction(Mode));
-    break;
+    Actions.push_back(new REPLJobAction(Mode));
+    return;
   }
   }
 
-  if (CompileActions.empty())
+  if (AllLinkerInputs.empty())
     // If there are no compile actions, don't attempt to set up any downstream
     // actions.
     return;
 
   std::unique_ptr<Action> MergeModuleAction;
   if (OI.ShouldGenerateModule &&
-      OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
+      OI.CompilerMode != OutputInfo::Mode::SingleCompile &&
+      !AllModuleInputs.empty()) {
     // We're performing multiple compilations; set up a merge module step
     // so we generate a single swiftmodule as output.
-    MergeModuleAction.reset(new MergeModuleJobAction(CompileActions));
+    MergeModuleAction.reset(new MergeModuleJobAction(AllModuleInputs));
+    MergeModuleAction->setOwnsInputs(false);
   }
 
   if (OI.shouldLink()) {
-    Action *LinkAction = new LinkJobAction(CompileActions, OI.LinkAction);
+    Action *LinkAction = new LinkJobAction(AllLinkerInputs, OI.LinkAction);
 
     if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {
       // On ELF platforms there's no built in autolinking mechanism, so we
       // pull the info we need from the .o files directly and pass them as an
       // argument input file to the linker.
-      Action *AutolinkExtractAction = new AutolinkExtractJobAction(CompileActions);
+      Action *AutolinkExtractAction =
+          new AutolinkExtractJobAction(AllLinkerInputs);
       // Takes the same inputs as the linker, but doesn't own them.
       AutolinkExtractAction->setOwnsInputs(false);
       // And gives its output to the linker.
@@ -1290,10 +1303,6 @@ void Driver::buildActions(const ToolChain &TC,
     }
 
     if (MergeModuleAction) {
-      // We have a MergeModuleJobAction; this needs to be an input to the
-      // LinkJobAction. It shares inputs with the LinkAction, so tell it that it
-      // no longer owns its inputs.
-      MergeModuleAction->setOwnsInputs(false);
       if (OI.DebugInfoKind == IRGenDebugInfoKind::Normal)
         LinkAction->addInput(MergeModuleAction.release());
       else
@@ -1306,10 +1315,14 @@ void Driver::buildActions(const ToolChain &TC,
       dSYMAction->setOwnsInputs(false);
       Actions.push_back(dSYMAction);
     }
-  } else if (MergeModuleAction) {
-    Actions.push_back(MergeModuleAction.release());
   } else {
-    Actions = CompileActions;
+    // The merge module action needs to be first to force the right outputs
+    // for the other actions. However, we can't rely on it being the only
+    // action because there may be other actions (e.g. BackenJobActions) that
+    // are not merge-module inputs but nonetheless should be run.
+    if (MergeModuleAction)
+      Actions.push_back(MergeModuleAction.release());
+    Actions.append(AllLinkerInputs.begin(), AllLinkerInputs.end());
   }
 }
 

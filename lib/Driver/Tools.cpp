@@ -55,17 +55,6 @@ static void addInputsOfType(ArgStringList &Arguments,
     auto &output = Cmd->getOutput().getAnyOutputForType(InputType);
     if (!output.empty())
       Arguments.push_back(output.c_str());
-    else if (isa<BackendJobAction>(Cmd->getSource()) &&
-             InputType == types::TY_SwiftModuleFile) {
-      // Since BackendJobAction does not generate Swift module files, we look
-      // through BackendJobAction's inputs (CompileJobAction) to find the Swift
-      // module files.
-      assert(Cmd->getInputs().size() == 1);
-      auto *CompileJob = Cmd->getInputs().front();
-      auto &output = CompileJob->getOutput().getAnyOutputForType(InputType);
-      if (!output.empty())
-        Arguments.push_back(output.c_str());
-    }
   }
 }
 
@@ -649,15 +638,18 @@ darwin::Linker::constructArgumentList(const JobAction &JA,
   addInputsOfType(Arguments, InputActions, types::TY_Object);
 
   if (OI.DebugInfoKind == IRGenDebugInfoKind::Normal) {
-    Arguments.push_back("-add_ast_path");
 
     size_t argCount = Arguments.size();
     if (OI.CompilerMode == OutputInfo::Mode::SingleCompile)
       addInputsOfType(Arguments, Inputs, types::TY_SwiftModuleFile);
     else
       addPrimaryInputsOfType(Arguments, Inputs, types::TY_SwiftModuleFile);
-    assert(argCount + 1 == Arguments.size() && "no swiftmodule found for -g");
-    (void)argCount;
+
+    if (Arguments.size() > argCount) {
+      assert(argCount + 1 == Arguments.size() &&
+             "multiple swiftmodules found for -g");
+      Arguments.insert(Arguments.end() - 1, "-add_ast_path");
+    }
   }
 
   switch (cast<LinkJobAction>(JA).getKind()) {

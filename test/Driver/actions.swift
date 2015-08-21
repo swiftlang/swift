@@ -85,6 +85,7 @@
 
 // RUN: touch %t/a.o %t/b.o
 // RUN: %swiftc_driver -driver-print-actions %t/a.o %t/b.o -o main 2>&1 | FileCheck %s -check-prefix=LINK-ONLY
+// RUN: %swiftc_driver -driver-print-actions -g %t/a.o %t/b.o -o main 2>&1 | FileCheck %s -check-prefix=LINK-ONLY
 // LINK-ONLY: 0: input, "{{.*}}/a.o", object
 // LINK-ONLY: 1: input, "{{.*}}/b.o", object
 // LINK-ONLY: 2: link, {0, 1}, image
@@ -95,7 +96,7 @@
 // DEBUG-LINK-ONLY: 1: input, "{{.*}}/b.o", object
 // DEBUG-LINK-ONLY: 2: input, "{{.*}}/a.swiftmodule", swiftmodule
 // DEBUG-LINK-ONLY: 3: input, "{{.*}}/b.swiftmodule", swiftmodule
-// DEBUG-LINK-ONLY: 4: merge-module, {0, 1, 2, 3}, swiftmodule
+// DEBUG-LINK-ONLY: 4: merge-module, {2, 3}, swiftmodule
 // DEBUG-LINK-ONLY: 5: link, {0, 1, 2, 3, 4}, image
 // DEBUG-LINK-ONLY: 6: generate-dSYM, {5}, dSYM
 
