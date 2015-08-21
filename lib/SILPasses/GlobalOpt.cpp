@@ -150,6 +150,11 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
     for (auto I : Insns) {
       process(I);
     }
+
+    // Set proper debug scope.
+    for (auto &I : *DestBB) {
+      I.setDebugScope(DestBB->getParent()->getDebugScope());
+    }
   }
 };
 

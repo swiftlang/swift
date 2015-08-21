@@ -362,6 +362,11 @@ class BasicBlockCloner : public BaseThreadingCloner {
     for (auto &I : *FromBB) {
       process(&I);
     }
+
+    // Set proper debug scope.
+    for (auto &I : *DestBB) {
+      I.setDebugScope(DestBB->getParent()->getDebugScope());
+    }
   }
 
   SILBasicBlock *getDestBB() { return DestBB; }
