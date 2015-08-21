@@ -331,18 +331,13 @@ public postfix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
 /// Used to force conformers of RandomAccessIndexType to implement
 /// `advancedBy` methods and `distanceTo`.
 public protocol _RandomAccessAmbiguity {
-  typealias Distance
+  typealias Distance : _SignedIntegerType = Int
 }
 
 extension _RandomAccessAmbiguity {
   @warn_unused_result
   public func advancedBy(n: Distance) -> Self {
     fatalError("advancedBy(n) not implememented")
-  }
-
-  @warn_unused_result
-  public func advancedBy(n: Distance, limit: Self) -> Self {
-    fatalError("advancedBy(n, limit:) not implememented")
   }
 }
 
