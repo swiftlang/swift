@@ -692,10 +692,11 @@ extension PlaygroundQuickLook {
 
 /// A type that explicitly supplies its own PlaygroundQuickLook.
 ///
-/// Instances of any type can be `Mirror(reflect:)`'ed upon, but if you are
-/// not satisfied with the `Mirror` supplied for your type by default,
-/// you can make it conform to `CustomReflectable` and return a custom
-/// `Mirror`.
+/// Instances of any type can be `PlaygroundQuickLook(reflect:)`'ed
+/// upon, but if you are not satisfied with the `PlaygroundQuickLook`
+/// supplied for your type by default, you can make it conform to
+/// `CustomPlaygroundQuickLookable` and return a custom
+/// `PlaygroundQuickLook`.
 public protocol CustomPlaygroundQuickLookable {
   /// Return the `Mirror` for `self`.
   ///
