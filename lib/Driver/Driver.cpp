@@ -1143,21 +1143,26 @@ void Driver::buildActions(const ToolChain &TC,
                                              previousBuildState));
           AllModuleInputs.push_back(Current.get());
         }
+        AllLinkerInputs.push_back(Current.release());
         break;
       }
       case types::TY_SwiftModuleFile:
       case types::TY_SwiftModuleDocFile:
-        // Module inputs are okay if generating a module or linking.
+        // Module inputs are okay if generating a module.
         if (OI.ShouldGenerateModule) {
-          AllModuleInputs.push_back(Current.get());
+          AllModuleInputs.push_back(Current.release());
           break;
         }
-        SWIFT_FALLTHROUGH;
+        Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
+                       InputArg->getValue());
+        continue;
       case types::TY_AutolinkFile:
       case types::TY_Object:
         // Object inputs are only okay if linking.
-        if (OI.shouldLink())
+        if (OI.shouldLink()) {
+          AllLinkerInputs.push_back(Current.release());
           break;
+        }
         SWIFT_FALLTHROUGH;
       case types::TY_Image:
       case types::TY_dSYM:
@@ -1172,7 +1177,7 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_Remapping:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
-        Diags.diagnose(SourceLoc(), diag::error_unknown_file_type,
+        Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
                        InputArg->getValue());
         continue;
       case types::TY_RawSIB:
@@ -1181,8 +1186,6 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_INVALID:
         llvm_unreachable("these types should never be inferred");
       }
-
-      AllLinkerInputs.push_back(Current.release());
     }
     break;
   }
@@ -1236,19 +1239,20 @@ void Driver::buildActions(const ToolChain &TC,
     SWIFT_FALLTHROUGH;
   }
   case OutputInfo::Mode::Immediate: {
-    if (!Inputs.empty()) {
-      // Create a single CompileJobAction for all of the driver's inputs.
-      // Don't create a CompileJobAction if there are no inputs, though.
-      std::unique_ptr<Action> CA(new CompileJobAction(OI.CompilerOutputType));
-      for (const InputPair &Input : Inputs) {
-        types::ID InputType = Input.first;
-        const Arg *InputArg = Input.second;
+    if (Inputs.empty())
+      return;
 
-        CA->addInput(new InputAction(*InputArg, InputType));
-      }
-      AllModuleInputs.push_back(CA.get());
-      AllLinkerInputs.push_back(CA.release());
+    // Create a single CompileJobAction for all of the driver's inputs.
+    // Don't create a CompileJobAction if there are no inputs, though.
+    std::unique_ptr<Action> CA(new CompileJobAction(OI.CompilerOutputType));
+    for (const InputPair &Input : Inputs) {
+      types::ID InputType = Input.first;
+      const Arg *InputArg = Input.second;
+
+      CA->addInput(new InputAction(*InputArg, InputType));
     }
+    AllModuleInputs.push_back(CA.get());
+    AllLinkerInputs.push_back(CA.release());
     break;
   }
   case OutputInfo::Mode::REPL: {
@@ -1272,11 +1276,6 @@ void Driver::buildActions(const ToolChain &TC,
   }
   }
 
-  if (AllLinkerInputs.empty())
-    // If there are no compile actions, don't attempt to set up any downstream
-    // actions.
-    return;
-
   std::unique_ptr<Action> MergeModuleAction;
   if (OI.ShouldGenerateModule &&
       OI.CompilerMode != OutputInfo::Mode::SingleCompile &&
@@ -1287,7 +1286,7 @@ void Driver::buildActions(const ToolChain &TC,
     MergeModuleAction->setOwnsInputs(false);
   }
 
-  if (OI.shouldLink()) {
+  if (OI.shouldLink() && !AllLinkerInputs.empty()) {
     Action *LinkAction = new LinkJobAction(AllLinkerInputs, OI.LinkAction);
 
     if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {

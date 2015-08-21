@@ -47,3 +47,8 @@
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 %t/a.o %t/b.o -o main 2>&1 | FileCheck %s -check-prefix=LINK-ONLY
 // RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -g %t/a.o %t/b.o -o main 2>&1 | FileCheck %s -check-prefix=LINK-ONLY
 // LINK-ONLY: # "x86_64-apple-macosx10.9" - "darwin::Linker", inputs: ["{{.*}}/a.o", "{{.*}}/b.o"], output: {image: "main"}
+
+// RUN: touch %t/a.swiftmodule %t/b.swiftmodule
+// RUN: %swiftc_driver -driver-print-bindings -target x86_64-apple-macosx10.9 -g %t/a.o %t/b.o %t/a.swiftmodule %t/b.swiftmodule -o main 2>&1 | FileCheck %s -check-prefix=DEBUG-LINK-ONLY
+// DEBUG-LINK-ONLY: # "x86_64-apple-macosx10.9" - "merge-module", inputs: ["{{.*}}/a.swiftmodule", "{{.*}}/b.swiftmodule"], output: {swiftmodule: "[[MERGED:.+\.swiftmodule]]", swiftdoc: "{{.+}}.swiftdoc"}
+// DEBUG-LINK-ONLY: # "x86_64-apple-macosx10.9" - "darwin::Linker", inputs: ["{{.*}}/a.o", "{{.*}}/b.o", "[[MERGED]]"], output: {image: "main"}

@@ -70,7 +70,7 @@ ERROR(error_unable_to_make_temporary_file,driver,none,
 ERROR(error_no_input_files,driver,none,
       "no input files", ())
 
-ERROR(error_unknown_file_type,driver,none,
+ERROR(error_unexpected_input_file,driver,none,
       "unexpected input file: %0", (StringRef))
 
 ERROR(error_unknown_target,driver,none,

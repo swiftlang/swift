@@ -97,7 +97,7 @@
 // DEBUG-LINK-ONLY: 2: input, "{{.*}}/a.swiftmodule", swiftmodule
 // DEBUG-LINK-ONLY: 3: input, "{{.*}}/b.swiftmodule", swiftmodule
 // DEBUG-LINK-ONLY: 4: merge-module, {2, 3}, swiftmodule
-// DEBUG-LINK-ONLY: 5: link, {0, 1, 2, 3, 4}, image
+// DEBUG-LINK-ONLY: 5: link, {0, 1, 4}, image
 // DEBUG-LINK-ONLY: 6: generate-dSYM, {5}, dSYM
 
 
