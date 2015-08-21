@@ -53,45 +53,41 @@ STATISTIC(DeadAllocApplyEliminated,
 
 using UserList = llvm::SmallSetVector<SILInstruction *, 16>;
 
-static SILFunction *getDestructor(AllocationInst* AI) {
-  if (auto *ARI = dyn_cast<AllocRefInst>(AI)) {
-    // We only support classes.
-    ClassDecl *ClsDecl = ARI->getType().getClassOrBoundGenericClass();
-    if (!ClsDecl)
-      return nullptr;
+static SILFunction *getDestructor(AllocRefInst *ARI) {
+  // We only support classes.
+  ClassDecl *ClsDecl = ARI->getType().getClassOrBoundGenericClass();
+  if (!ClsDecl)
+    return nullptr;
 
-    // Look up the destructor of ClsDecl.
-    DestructorDecl *Destructor = ClsDecl->getDestructor();
-    assert(Destructor && "getDestructor() should never return a nullptr.");
+  // Look up the destructor of ClsDecl.
+  DestructorDecl *Destructor = ClsDecl->getDestructor();
+  assert(Destructor && "getDestructor() should never return a nullptr.");
 
-    // Find the destructor name via SILDeclRef.
-    // FIXME: When destructors get moved into vtables, update this to use the
-    // vtable for the class.
-    SmallVector<char, 128> buffer;
-    StringRef Name = SILDeclRef(Destructor).mangle(buffer);
-    DEBUG(llvm::dbgs() << "    Looking up destructor: " << Name << "\n");
+  // Find the destructor name via SILDeclRef.
+  // FIXME: When destructors get moved into vtables, update this to use the
+  // vtable for the class.
+  SmallVector<char, 128> buffer;
+  StringRef Name = SILDeclRef(Destructor).mangle(buffer);
+  DEBUG(llvm::dbgs() << "    Looking up destructor: " << Name << "\n");
 
-    // Then try to lookup the destructor from the module.
-    SILFunction *Fn = ARI->getModule().lookUpFunction(Name);
-    if (!Fn || Fn->empty()) {
-      DEBUG(llvm::dbgs() << "    Could not find destructor.\n");
-      return nullptr;
-    }
-
-    DEBUG(llvm::dbgs() << "    Found destructor!\n");
-
-    // If the destructor has an objc_method calling convention, we can not
-    // analyze it since it could be swapped out from under us at runtime.
-    if (Fn->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
-      DEBUG(llvm::dbgs() << "        Found objective-c destructor. Can't "
-            "analyze!\n");
-      return nullptr;
-    }
-
-    return Fn;
+  // Then try to lookup the destructor from the module.
+  SILFunction *Fn = ARI->getModule().lookUpFunction(Name);
+  if (!Fn || Fn->empty()) {
+    DEBUG(llvm::dbgs() << "    Could not find destructor.\n");
+    return nullptr;
   }
 
-  return nullptr;
+  DEBUG(llvm::dbgs() << "    Found destructor!\n");
+
+  // If the destructor has an objc_method calling convention, we can not
+  // analyze it since it could be swapped out from under us at runtime.
+  if (Fn->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
+    DEBUG(llvm::dbgs() << "        Found objective-c destructor. Can't "
+          "analyze!\n");
+    return nullptr;
+  }
+
+  return Fn;
 }
 
 /// Analyze the destructor for the class of ARI to see if any instructions in it
