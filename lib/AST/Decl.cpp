@@ -2419,7 +2419,6 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   ProtocolDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   HasMissingRequirements = false;
-  InheritedProtocolsWereDeserialized = false;
   InheritedProtocolsSet = false;
 }
 

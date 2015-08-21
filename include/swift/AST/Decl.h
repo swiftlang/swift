@@ -3525,12 +3525,6 @@ class ProtocolDecl : public NominalTypeDecl {
   /// because they could not be imported from Objective-C).
   unsigned HasMissingRequirements : 1;
 
-  /// Whether the set of inherited protocols was deserialized and
-  /// has not yet been pulled into the conformance lookup table.
-  ///
-  /// FIXME: this should be much, much lazier.
-  unsigned InheritedProtocolsWereDeserialized : 1;
-
   /// Whether we have already set the list of inherited protocols.
   unsigned InheritedProtocolsSet : 1;
 
@@ -3667,23 +3661,6 @@ public:
 
   bool isInheritedProtocolsValid() const {
     return InheritedProtocolsSet;
-  }
-
-  /// Set the directly inherited protocols from a non-parsed
-  /// representation, e.g., a module file or imported Clang module.
-  void setDirectlyInheritedProtocols(ArrayRef<ProtocolDecl *> protocols) {
-    setInheritedProtocols(protocols);
-    InheritedProtocolsWereDeserialized = true;
-  }
-
-  /// Take the directly-inherited protocols set by \c
-  /// setDirectlyInheritedProtocols.
-  ArrayRef<ProtocolDecl *> takeDirectlyInheritedProtocols() {
-    if (!InheritedProtocolsWereDeserialized)
-      return { };
-
-    InheritedProtocolsWereDeserialized = false;
-    return getInheritedProtocols(nullptr);
   }
 
   /// Retrieve the name to use for this protocol when interoperating

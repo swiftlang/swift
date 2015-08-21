@@ -1055,15 +1055,6 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       resolver->resolveDeclSignature(nominal);
     }
 
-    // For a protocol that has been deserialized, adopt the inherited
-    // protocols as explicit conformances.
-    if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-      for (auto inherited : proto->takeDirectlyInheritedProtocols()) {
-        addProtocol(proto, inherited, SourceLoc(),
-                    ConformanceSource::forExplicit(proto));
-      }
-    }
-
     nominalFunc(nominal);
   }
 
@@ -1430,6 +1421,11 @@ void ConformanceLookupTable::addProtocols(NominalTypeDecl *nominal,
                      [&](ProtocolDecl *protocol, SourceLoc loc) {
                        addProtocol(nominal, protocol, loc, source);
                      });
+    } else {
+      visitProtocols(entry.getType(), SourceLoc(),
+                     [&](ProtocolDecl *protocol, SourceLoc loc) {
+                       addProtocol(nominal, protocol, loc, source);
+                     });
     }
   }
 }
@@ -1467,27 +1463,10 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
       }
     }
 
-    // FIXME: It's odd that the inheritance clause isn't loaded at all during
-    // deserialization, so we have this weird separate path.
-    if (!conformingProtocol->getParentSourceFile()) {
-      for (auto protocol : conformingProtocol->getInheritedProtocols(
-                             resolver)) {
-        addProtocol(nominal, protocol, SourceLoc(),
-                    ConformanceSource::forImplied(conformanceEntry));
-      }
-      continue;
-    }
-    
-    for (const auto &entry : conformingProtocol->getInherited()) {
-      if (auto typeRepr = entry.getTypeRepr()) {
-        visitProtocols(typeRepr, resolver,
-                       [&](ProtocolDecl *protocol, SourceLoc loc) {
-                         addProtocol(nominal, protocol, loc, 
-                                     ConformanceSource::forImplied(
-                                       conformanceEntry));
-                       });
-      }
-    }
+    // Add inherited protocols.
+    addProtocols(nominal, conformingProtocol->getInherited(),
+                 ConformanceSource::forImplied(conformanceEntry),
+                 resolver);
   }
 }
 
@@ -2225,7 +2204,7 @@ DeclContext::getLocalProtocols(
     nullptr,
     diagnostics);
 
-  /// Sort if requred.
+  // Sort if requred.
   if (sorted) {
     llvm::array_pod_sort(result.begin(), result.end(),
                          &ProtocolType::compareProtocols);

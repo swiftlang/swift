@@ -2652,6 +2652,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
+    auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
+    for_each(protocols, rawProtocolAndInheritedIDs.slice(0, numProtocols),
+             [this](ProtocolDecl *&p, uint64_t rawID) {
+               p = cast<ProtocolDecl>(getDecl(rawID));
+             });
+    proto->setInheritedProtocols(protocols);
+
+    handleInherited(proto, rawProtocolAndInheritedIDs.slice(numProtocols));
+
     if (auto genericParams = maybeReadGenericParams(DC, DeclTypeCursor)) {
       proto->setGenericParams(genericParams);
       SmallVector<GenericTypeParamType *, 4> paramTypes;
@@ -2671,15 +2680,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       proto->setImplicit();
     proto->computeType();
-
-    auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
-    for_each(protocols, rawProtocolAndInheritedIDs.slice(0, numProtocols),
-             [this](ProtocolDecl *&p, uint64_t rawID) {
-               p = cast<ProtocolDecl>(getDecl(rawID));
-             });
-    proto->setDirectlyInheritedProtocols(protocols);
-
-    handleInherited(proto, rawProtocolAndInheritedIDs.slice(numProtocols));
 
     proto->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     proto->setCircularityCheck(CircularityCheck::Checked);

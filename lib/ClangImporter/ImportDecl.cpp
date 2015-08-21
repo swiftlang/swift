@@ -3909,7 +3909,7 @@ namespace {
         // Copy the list of protocols.
         MutableArrayRef<ProtocolDecl *> allProtocols
           = Impl.SwiftContext.AllocateCopy(protocols);
-        proto->setDirectlyInheritedProtocols(allProtocols);
+        proto->setInheritedProtocols(allProtocols);
 
         return;
       }
