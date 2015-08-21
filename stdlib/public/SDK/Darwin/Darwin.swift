@@ -237,6 +237,3 @@ public let SIG_ERR = unsafeBitCast(-1, sig_t.self)
 public let SIG_HOLD = unsafeBitCast(5, sig_t.self)
 #endif
 
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:
