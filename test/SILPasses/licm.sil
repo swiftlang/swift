@@ -155,3 +155,28 @@ bb4:
   %10 = tuple ()
   return %10 : $()
 }
+
+sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
+sil @user : $@convention(thin) (Int) -> ()
+
+// CHECK-LABEL:   sil @dont_hoist_get_count_on_low_level_sil
+// CHECK:         {{^}}bb1:
+// CHECK:           apply
+// CHECK:           apply
+// CHECK:         {{^}}bb2:
+// CHECK:           return
+sil @dont_hoist_get_count_on_low_level_sil : $@convention(thin) (@guaranteed Array<Int>) -> () {
+bb0(%0 : $Array<Int>):
+  br bb1
+
+bb1:
+  %f1 = function_ref @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %f2 = function_ref @user : $@convention(thin) (Int) -> ()
+  %c1 = apply %f1(%0) : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %c2 = apply %f2(%c1) : $@convention(thin) (Int) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %r1 = tuple ()
+  return %r1 : $()
+}

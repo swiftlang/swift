@@ -94,6 +94,8 @@ PASS(InstCount, "inst-count",
      "Count all instructions in the module using llvm Statistics")
 PASS(LICM, "licm",
      "Loop invariant code motion")
+PASS(HighLevelLICM, "high-level-licm",
+     "High Level Loop invariant code motion")
 PASS(LateInliner, "late-inline",
      "Run the late inliner")
 PASS(LoopInfoPrinter, "loop-info-printer",

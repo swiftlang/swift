@@ -213,6 +213,8 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
   case ArrayCallKind::kArrayPropsIsNative:
   case ArrayCallKind::kArrayPropsIsNativeNoTypeCheck:
   case ArrayCallKind::kGetElementAddress:
+  case ArrayCallKind::kGetCount:
+  case ArrayCallKind::kGetCapacity:
     return canHoistArrayArgument(SemanticsCall, getSelf(), InsertBefore, DT);
 
   case ArrayCallKind::kCheckSubscript:
@@ -255,16 +257,11 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
 static SILValue copyArrayLoad(SILValue ArrayStructValue,
                                SILInstruction *InsertBefore,
                                DominanceInfo *DT) {
-  if (isa<SILArgument>(ArrayStructValue.getDef())) {
-    // Assume that the argument dominates the insert point.
-    assert(DT->dominates(ArrayStructValue.getDef()->getParentBB(),
-                         InsertBefore->getParent()));
+  if (DT->dominates(ArrayStructValue.getDef()->getParentBB(),
+                    InsertBefore->getParent()))
     return ArrayStructValue;
-  }
 
   auto *LI = cast<LoadInst>(ArrayStructValue.getDef());
-  if (DT->dominates(LI->getParent(), InsertBefore->getParent()))
-    return ArrayStructValue;
 
   // Recursively move struct_element_addr.
   auto *Val = LI->getOperand().getDef();
@@ -333,7 +330,9 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
   auto Kind = getKind();
   switch (Kind) {
   case ArrayCallKind::kArrayPropsIsNative:
-  case ArrayCallKind::kArrayPropsIsNativeNoTypeCheck: {
+  case ArrayCallKind::kArrayPropsIsNativeNoTypeCheck:
+  case ArrayCallKind::kGetCount:
+  case ArrayCallKind::kGetCapacity: {
     assert(SemanticsCall->getNumArguments() == 1 &&
            "Expect 'self' parameter only");
 

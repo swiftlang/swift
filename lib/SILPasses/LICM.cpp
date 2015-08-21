@@ -17,6 +17,7 @@
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
+#include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
@@ -154,8 +155,47 @@ static bool sinkCondFail(SILLoop *Loop) {
   return Changed;
 }
 
+
+static bool canHoistInstruction(SILInstruction *Inst, SILLoop *Loop,
+                                ReadSet &SafeReads) {
+  // Can't hoist terminators.
+  if (isa<TermInst>(Inst))
+    return false;
+  
+  // Can't hoist allocation and dealloc stacks.
+  if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
+    return false;
+
+  // Can't hoist instructions which may have side effects.
+  // We can (and must) hoist cond_fail instructions if the operand is
+  // invariant. We must hoist them so that we preserve memory safety. A
+  // cond_fail that would have protected (executed before) a memory access
+  // must - after hoisting - also be executed before said access.
+  if (Inst->mayHaveSideEffects() && !isa<CondFailInst>(Inst)) {
+    DEBUG(llvm::dbgs() << "   not side effect free.\n");
+    return false;
+  }
+  
+  // Can't hoist if the instruction could read from memory and is not marked
+  // as safe.
+  LoadInst *LI = nullptr;
+  if (Inst->mayReadFromMemory() && !isa<CondFailInst>(Inst) &&
+      (!(LI = dyn_cast<LoadInst>(Inst)) || !SafeReads.count(LI))) {
+    DEBUG(llvm::dbgs() << "   may read aliased writes\n");
+    return false;
+  }
+  
+  // The operands need to be loop invariant.
+  if (!hasLoopInvariantOperands(Inst, Loop)) {
+    DEBUG(llvm::dbgs() << "   loop variant operands\n");
+    return false;
+  }
+  
+  return true;
+}
+
 static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
-                              ReadSet &SafeReads) {
+                              ReadSet &SafeReads, bool RunsOnHighLevelSil) {
   auto Preheader = Loop->getLoopPreheader();
   if (!Preheader)
     return false;
@@ -193,43 +233,25 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
       SILInstruction *Inst = &*InstIt;
       ++InstIt;
       DEBUG(llvm::dbgs() << "  looking at " << *Inst);
-
-      // Can't hoist terminators.
-      if (isa<TermInst>(Inst))
-        continue;
-
-      // Can't hoist allocation and dealloc stacks.
-      if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
-        continue;
-
-      // Can't hoist instructions which may have side effects.
-      // We can (and must) hoist cond_fail instructions if the operand is
-      // invariant. We must hoist them so that we preserve memory safety. A
-      // cond_fail that would have protected (executed before) a memory access
-      // must - after hoisting - also be executed before said access.
-      if (Inst->mayHaveSideEffects() && !isa<CondFailInst>(Inst)) {
-        DEBUG(llvm::dbgs() << "   not side effect free.\n");
-        continue;
+      if (canHoistInstruction(Inst, Loop, SafeReads)) {
+        DEBUG(llvm::dbgs() << "   hoisting to preheader.\n");
+        Changed = true;
+        Inst->moveBefore(Preheader->getTerminator());
+      } else if (RunsOnHighLevelSil){
+        ArraySemanticsCall semCall(Inst);
+        switch (semCall.getKind()) {
+        case ArrayCallKind::kGetCount:
+        case ArrayCallKind::kGetCapacity:
+          if (hasLoopInvariantOperands(Inst, Loop) &&
+              semCall.canHoist(Preheader->getTerminator(), DT)) {
+            Changed = true;
+            semCall.hoist(Preheader->getTerminator(), DT);
+          }
+          break;
+        default:
+          break;
+        }
       }
-
-      // Can't hoist if the instruction could read from memory and is not marked
-      // as safe.
-      LoadInst *LI = nullptr;
-      if (Inst->mayReadFromMemory() && !isa<CondFailInst>(Inst) &&
-          (!(LI = dyn_cast<LoadInst>(Inst)) || !SafeReads.count(LI))) {
-        DEBUG(llvm::dbgs() << "   may read aliased writes\n");
-        continue;
-      }
-
-      // The operands need to be loop invariant.
-      if (!hasLoopInvariantOperands(Inst, Loop)) {
-        DEBUG(llvm::dbgs() << "   loop variant operands\n");
-        continue;
-      }
-
-      DEBUG(llvm::dbgs() << "   hoisting to preheader.\n");
-      Changed = true;
-      Inst->moveBefore(Preheader->getTerminator());
     }
 
     // Next block in dominator tree.
@@ -329,10 +351,16 @@ class LoopTreeOptimization {
   DominanceInfo *DomTree;
   bool Changed;
 
+  /// True if LICM is done on high-level SIL, i.e. semantic calls are not
+  /// inlined yet. In this case some semantic calls can be hoisted.
+  bool RunsOnHighLevelSil;
+
 public:
   LoopTreeOptimization(SILLoop *TopLevelLoop, SILLoopInfo *LI,
-                       AliasAnalysis *AA, DominanceInfo *DT)
-      : LoopInfo(LI), AA(AA), DomTree(DT), Changed(false) {
+                       AliasAnalysis *AA, DominanceInfo *DT,
+                       bool RunsOnHighLevelSil)
+      : LoopInfo(LI), AA(AA), DomTree(DT), Changed(false),
+        RunsOnHighLevelSil(RunsOnHighLevelSil) {
     // Collect loops for a recursive bottom-up traversal in the loop tree.
     BotUpWorkList.push_back(TopLevelLoop);
     for (unsigned i = 0; i < BotUpWorkList.size(); ++i) {
@@ -423,7 +451,8 @@ void LoopTreeOptimization::analyzeCurrentLoop(
 void LoopTreeOptimization::optimizeLoop(SILLoop *CurrentLoop,
                                         ReadSet &SafeReads) {
   Changed |= sinkCondFail(CurrentLoop);
-  Changed |= hoistInstructions(CurrentLoop, DomTree, SafeReads);
+  Changed |= hoistInstructions(CurrentLoop, DomTree, SafeReads,
+                               RunsOnHighLevelSil);
   Changed |= sinkFixLiftime(CurrentLoop, DomTree, LoopInfo);
 }
 
@@ -432,9 +461,18 @@ namespace {
 class LICM : public SILFunctionTransform {
 
 public:
-  LICM() {}
+  LICM(bool RunsOnHighLevelSil) : RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
-  StringRef getName() override { return "SIL Loop Invariant Code Motion"; }
+  /// True if LICM is done on high-level SIL, i.e. semantic calls are not
+  /// inlined yet. In this case some semantic calls can be hoisted.
+  /// We only hoist semantic calls on high-level SIL because we can be sure that
+  /// e.g. an Array as SILValue is really immutable (including its content).
+  bool RunsOnHighLevelSil;
+  
+  StringRef getName() override {
+    return RunsOnHighLevelSil ? "High-level Loop Invariant Code Motion" :
+                                "Loop Invariant Code Motion";
+  }
 
   void run() override {
     SILFunction *F = getFunction();
@@ -455,7 +493,8 @@ public:
 
     for (auto *TopLevelLoop : *LoopInfo) {
       if (!DomTree) DomTree = DA->get(F);
-      LoopTreeOptimization Opt(TopLevelLoop, LoopInfo, AA, DomTree);
+      LoopTreeOptimization Opt(TopLevelLoop, LoopInfo, AA, DomTree,
+                               RunsOnHighLevelSil);
       Changed |= Opt.optimize();
     }
 
@@ -471,5 +510,9 @@ public:
 }
 
 SILTransform *swift::createLICM() {
-  return new LICM();
+  return new LICM(false);
+}
+
+SILTransform *swift::createHighLevelLICM() {
+  return new LICM(true);
 }
