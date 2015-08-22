@@ -30,9 +30,15 @@ public var errno: Int32 {
 //===----------------------------------------------------------------------===//
 
 #if os(Linux)
-public let SIG_DFL: __sighandler_t? = nil
-public let SIG_IGN = unsafeBitCast(1, __sighandler_t.self)
-public let SIG_ERR = unsafeBitCast(-1, __sighandler_t.self)
-public let SIG_HOLD = unsafeBitCast(2, __sighandler_t.self)
+public var SIG_DFL: __sighandler_t? { return nil }
+public var SIG_IGN: __sighandler_t {
+  return unsafeBitCast(1, __sighandler_t.self)
+}
+public var SIG_ERR: __sighandler_t {
+  return unsafeBitCast(-1, __sighandler_t.self)
+}
+public var SIG_HOLD: __sighandler_t {
+  return unsafeBitCast(2, __sighandler_t.self)
+}
 #endif
 

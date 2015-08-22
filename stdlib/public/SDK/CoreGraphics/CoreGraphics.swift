@@ -17,10 +17,6 @@ import Darwin
 // CGGeometry
 //===----------------------------------------------------------------------===//
 
-internal func _unavailableValue<T>() -> T {
-  fatalError("can't retrieve unavailable property")
-}
-
 public extension CGPoint {
   static var zero: CGPoint {
     @transparent // @fragile
@@ -38,7 +34,9 @@ public extension CGPoint {
   }
 
   @available(*, unavailable, renamed="zero")
-  static var zeroPoint: CGPoint = _unavailableValue()
+  static var zeroPoint: CGPoint {
+    fatalError("can't retrieve unavailable property")
+  }
 }
 
 extension CGPoint : Equatable {}
@@ -65,7 +63,9 @@ public extension CGSize {
   }
 
   @available(*, unavailable, renamed="zero")
-  static var zeroSize: CGSize = _unavailableValue()
+  static var zeroSize: CGSize {
+    fatalError("can't retrieve unavailable property")
+  }
 }
 
 extension CGSize : Equatable {}
@@ -92,7 +92,9 @@ public extension CGVector {
   }
 
   @available(*, unavailable, renamed="zero")
-  static var zeroVector: CGVector = _unavailableValue()
+  static var zeroVector: CGVector {
+    fatalError("can't retrieve unavailable property")
+  }
 }
 
 extension CGVector : Equatable {}
@@ -274,13 +276,19 @@ public extension CGRect {
   }
 
   @available(*, unavailable, renamed="zero")
-  static var zeroRect: CGRect = _unavailableValue()
+  static var zeroRect: CGRect {
+    fatalError("can't retrieve unavailable property")
+  }
 
   @available(*, unavailable, renamed="infinite")
-  static var infiniteRect: CGRect = _unavailableValue()
+  static var infiniteRect: CGRect {
+    fatalError("can't retrieve unavailable property")
+  }
 
   @available(*, unavailable, renamed="null")
-  static var nullRect: CGRect = _unavailableValue()
+  static var nullRect: CGRect {
+    fatalError("can't retrieve unavailable property")
+  }
 
   @available(*, unavailable, renamed="standardized")
   var standardizedRect: CGRect {

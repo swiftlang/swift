@@ -157,114 +157,208 @@ public func ~=(match: NSCocoaError, error: ErrorType) -> Bool {
 }
 
 public extension NSCocoaError {
-  static let FileNoSuchFileError = NSCocoaError(rawValue: 4)
-  static let FileLockingError = NSCocoaError(rawValue: 255)
-  static let FileReadUnknownError = NSCocoaError(rawValue: 256)
-  static let FileReadNoPermissionError = NSCocoaError(rawValue: 257)
-  static let FileReadInvalidFileNameError = NSCocoaError(rawValue: 258)
-  static let FileReadCorruptFileError = NSCocoaError(rawValue: 259)
-  static let FileReadNoSuchFileError = NSCocoaError(rawValue: 260)
-  static let FileReadInapplicableStringEncodingError = NSCocoaError(rawValue: 261)
-  static let FileReadUnsupportedSchemeError = NSCocoaError(rawValue: 262)
+  public static var FileNoSuchFileError: NSCocoaError {
+    return NSCocoaError(rawValue: 4)
+  }
+  public static var FileLockingError: NSCocoaError {
+    return NSCocoaError(rawValue: 255)
+  }
+  public static var FileReadUnknownError: NSCocoaError {
+    return NSCocoaError(rawValue: 256)
+  }
+  public static var FileReadNoPermissionError: NSCocoaError {
+    return NSCocoaError(rawValue: 257)
+  }
+  public static var FileReadInvalidFileNameError: NSCocoaError {
+    return NSCocoaError(rawValue: 258)
+  }
+  public static var FileReadCorruptFileError: NSCocoaError {
+    return NSCocoaError(rawValue: 259)
+  }
+  public static var FileReadNoSuchFileError: NSCocoaError {
+    return NSCocoaError(rawValue: 260)
+  }
+  public static var FileReadInapplicableStringEncodingError: NSCocoaError {
+    return NSCocoaError(rawValue: 261)
+  }
+  public static var FileReadUnsupportedSchemeError: NSCocoaError {
+    return NSCocoaError(rawValue: 262)
+  }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let FileReadTooLargeError = NSCocoaError(rawValue: 263)
+  public static var FileReadTooLargeError: NSCocoaError {
+    return NSCocoaError(rawValue: 263)
+  }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let FileReadUnknownStringEncodingError = NSCocoaError(rawValue: 264)
+  public static var FileReadUnknownStringEncodingError: NSCocoaError {
+    return NSCocoaError(rawValue: 264)
+  }
 
-  static let FileWriteUnknownError = NSCocoaError(rawValue: 512)
-  static let FileWriteNoPermissionError = NSCocoaError(rawValue: 513)
-  static let FileWriteInvalidFileNameError = NSCocoaError(rawValue: 514)
+  public static var FileWriteUnknownError: NSCocoaError {
+    return NSCocoaError(rawValue: 512)
+  }
+  public static var FileWriteNoPermissionError: NSCocoaError {
+    return NSCocoaError(rawValue: 513)
+  }
+  public static var FileWriteInvalidFileNameError: NSCocoaError {
+    return NSCocoaError(rawValue: 514)
+  }
 
   @available(OSX, introduced=10.7) @available(iOS, introduced=5.0)
-  static let FileWriteFileExistsError = NSCocoaError(rawValue: 516)
+  public static var FileWriteFileExistsError: NSCocoaError {
+    return NSCocoaError(rawValue: 516)
+  }
 
-  static let FileWriteInapplicableStringEncodingError = NSCocoaError(rawValue: 517)
-  static let FileWriteUnsupportedSchemeError = NSCocoaError(rawValue: 518)
-  static let FileWriteOutOfSpaceError = NSCocoaError(rawValue: 640)
+  public static var FileWriteInapplicableStringEncodingError: NSCocoaError {
+    return NSCocoaError(rawValue: 517)
+  }
+  public static var FileWriteUnsupportedSchemeError: NSCocoaError {
+    return NSCocoaError(rawValue: 518)
+  }
+  public static var FileWriteOutOfSpaceError: NSCocoaError {
+    return NSCocoaError(rawValue: 640)
+  }
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  static let FileWriteVolumeReadOnlyError = NSCocoaError(rawValue: 642)
+  public static var FileWriteVolumeReadOnlyError: NSCocoaError {
+    return NSCocoaError(rawValue: 642)
+  }
 
   @available(OSX, introduced=10.11) @available(iOS, unavailable)
-  static let FileManagerUnmountUnknownError = NSCocoaError(rawValue: 768)
+  public static var FileManagerUnmountUnknownError: NSCocoaError {
+    return NSCocoaError(rawValue: 768)
+  }
 
   @available(OSX, introduced=10.11) @available(iOS, unavailable)
-  static let FileManagerUnmountBusyError = NSCocoaError(rawValue: 769)
+  public static var FileManagerUnmountBusyError: NSCocoaError {
+    return NSCocoaError(rawValue: 769)
+  }
 
-  static let KeyValueValidationError = NSCocoaError(rawValue: 1024)
-  static let FormattingError = NSCocoaError(rawValue: 2048)
-  static let UserCancelledError = NSCocoaError(rawValue: 3072)
+  public static var KeyValueValidationError: NSCocoaError {
+    return NSCocoaError(rawValue: 1024)
+  }
+  public static var FormattingError: NSCocoaError {
+    return NSCocoaError(rawValue: 2048)
+  }
+  public static var UserCancelledError: NSCocoaError {
+    return NSCocoaError(rawValue: 3072)
+  }
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  static let FeatureUnsupportedError = NSCocoaError(rawValue: 3328)
+  public static var FeatureUnsupportedError: NSCocoaError {
+    return NSCocoaError(rawValue: 3328)
+  }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let ExecutableNotLoadableError = NSCocoaError(rawValue: 3584)
+  public static var ExecutableNotLoadableError: NSCocoaError {
+    return NSCocoaError(rawValue: 3584)
+  }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let ExecutableArchitectureMismatchError = NSCocoaError(rawValue: 3585)
+  public static var ExecutableArchitectureMismatchError: NSCocoaError {
+    return NSCocoaError(rawValue: 3585)
+  }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let ExecutableRuntimeMismatchError = NSCocoaError(rawValue: 3586)
+  public static var ExecutableRuntimeMismatchError: NSCocoaError {
+    return NSCocoaError(rawValue: 3586)
+  }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let ExecutableLoadError = NSCocoaError(rawValue: 3587)
+  public static var ExecutableLoadError: NSCocoaError {
+    return NSCocoaError(rawValue: 3587)
+  }
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let ExecutableLinkError = NSCocoaError(rawValue: 3588)
+  public static var ExecutableLinkError: NSCocoaError {
+    return NSCocoaError(rawValue: 3588)
+  }
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  static let PropertyListReadCorruptError = NSCocoaError(rawValue: 3840)
+  public static var PropertyListReadCorruptError: NSCocoaError {
+    return NSCocoaError(rawValue: 3840)
+  }
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  static let PropertyListReadUnknownVersionError = NSCocoaError(rawValue: 3841)
+  public static var PropertyListReadUnknownVersionError: NSCocoaError {
+    return NSCocoaError(rawValue: 3841)
+  }
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  static let PropertyListReadStreamError = NSCocoaError(rawValue: 3842)
+  public static var PropertyListReadStreamError: NSCocoaError {
+    return NSCocoaError(rawValue: 3842)
+  }
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  static let PropertyListWriteStreamError = NSCocoaError(rawValue: 3851)
+  public static var PropertyListWriteStreamError: NSCocoaError {
+    return NSCocoaError(rawValue: 3851)
+  }
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  static let PropertyListWriteInvalidError = NSCocoaError(rawValue: 3852)
+  public static var PropertyListWriteInvalidError: NSCocoaError {
+    return NSCocoaError(rawValue: 3852)
+  }
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  static let XPCConnectionInterrupted = NSCocoaError(rawValue: 4097)
+  public static var XPCConnectionInterrupted: NSCocoaError {
+    return NSCocoaError(rawValue: 4097)
+  }
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  static let XPCConnectionInvalid = NSCocoaError(rawValue: 4099)
+  public static var XPCConnectionInvalid: NSCocoaError {
+    return NSCocoaError(rawValue: 4099)
+  }
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  static let XPCConnectionReplyInvalid = NSCocoaError(rawValue: 4101)
+  public static var XPCConnectionReplyInvalid: NSCocoaError {
+    return NSCocoaError(rawValue: 4101)
+  }
 
   @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
-  static let UbiquitousFileUnavailableError = NSCocoaError(rawValue: 4353)
+  public static var UbiquitousFileUnavailableError: NSCocoaError {
+    return NSCocoaError(rawValue: 4353)
+  }
 
   @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
-  static let UbiquitousFileNotUploadedDueToQuotaError = NSCocoaError(rawValue: 4354)
+  public static var UbiquitousFileNotUploadedDueToQuotaError: NSCocoaError {
+    return NSCocoaError(rawValue: 4354)
+  }
 
   @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
-  static let UbiquitousFileUbiquityServerNotAvailable = NSCocoaError(rawValue: 4355)
+  public static var UbiquitousFileUbiquityServerNotAvailable: NSCocoaError {
+    return NSCocoaError(rawValue: 4355)
+  }
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  static let UserActivityHandoffFailedError = NSCocoaError(rawValue: 4608)
+  public static var UserActivityHandoffFailedError: NSCocoaError {
+    return NSCocoaError(rawValue: 4608)
+  }
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  static let UserActivityConnectionUnavailableError = NSCocoaError(rawValue: 4609)
+  public static var UserActivityConnectionUnavailableError: NSCocoaError {
+    return NSCocoaError(rawValue: 4609)
+  }
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  static let UserActivityRemoteApplicationTimedOutError = NSCocoaError(rawValue: 4610)
+  public static var UserActivityRemoteApplicationTimedOutError: NSCocoaError {
+    return NSCocoaError(rawValue: 4610)
+  }
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  static let UserActivityHandoffUserInfoTooLargeError = NSCocoaError(rawValue: 4611)
+  public static var UserActivityHandoffUserInfoTooLargeError: NSCocoaError {
+    return NSCocoaError(rawValue: 4611)
+  }
 
   @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)
-  static let CoderReadCorruptError = NSCocoaError(rawValue: 4864)
+  public static var CoderReadCorruptError: NSCocoaError {
+    return NSCocoaError(rawValue: 4864)
+  }
 
   @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)
-  static let CoderValueNotFoundError = NSCocoaError(rawValue: 4865)
+  public static var CoderValueNotFoundError: NSCocoaError {
+    return NSCocoaError(rawValue: 4865)
+  }
 
 
   @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)

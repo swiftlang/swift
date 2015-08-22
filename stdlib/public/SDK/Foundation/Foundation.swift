@@ -21,33 +21,33 @@ import CoreGraphics
 // FIXME: one day this will be bridged from CoreFoundation and we
 // should drop it here. <rdar://problem/14497260> (need support
 // for CF bridging)
-public let kCFStringEncodingASCII: CFStringEncoding = 0x0600
+public var kCFStringEncodingASCII: CFStringEncoding { return 0x0600 }
 
 // FIXME: <rdar://problem/16074941> NSStringEncoding doesn't work on 32-bit
 public typealias NSStringEncoding = UInt
-public let NSASCIIStringEncoding: UInt = 1
-public let NSNEXTSTEPStringEncoding: UInt = 2
-public let NSJapaneseEUCStringEncoding: UInt = 3
-public let NSUTF8StringEncoding: UInt = 4
-public let NSISOLatin1StringEncoding: UInt = 5
-public let NSSymbolStringEncoding: UInt = 6
-public let NSNonLossyASCIIStringEncoding: UInt = 7
-public let NSShiftJISStringEncoding: UInt = 8
-public let NSISOLatin2StringEncoding: UInt = 9
-public let NSUnicodeStringEncoding: UInt = 10
-public let NSWindowsCP1251StringEncoding: UInt = 11
-public let NSWindowsCP1252StringEncoding: UInt = 12
-public let NSWindowsCP1253StringEncoding: UInt = 13
-public let NSWindowsCP1254StringEncoding: UInt = 14
-public let NSWindowsCP1250StringEncoding: UInt = 15
-public let NSISO2022JPStringEncoding: UInt = 21
-public let NSMacOSRomanStringEncoding: UInt = 30
-public let NSUTF16StringEncoding: UInt = NSUnicodeStringEncoding
-public let NSUTF16BigEndianStringEncoding: UInt = 0x90000100
-public let NSUTF16LittleEndianStringEncoding: UInt = 0x94000100
-public let NSUTF32StringEncoding: UInt = 0x8c000100
-public let NSUTF32BigEndianStringEncoding: UInt = 0x98000100
-public let NSUTF32LittleEndianStringEncoding: UInt = 0x9c000100
+public var NSASCIIStringEncoding: UInt { return 1 }
+public var NSNEXTSTEPStringEncoding: UInt { return 2 }
+public var NSJapaneseEUCStringEncoding: UInt { return 3 }
+public var NSUTF8StringEncoding: UInt { return 4 }
+public var NSISOLatin1StringEncoding: UInt { return 5 }
+public var NSSymbolStringEncoding: UInt { return 6 }
+public var NSNonLossyASCIIStringEncoding: UInt { return 7 }
+public var NSShiftJISStringEncoding: UInt { return 8 }
+public var NSISOLatin2StringEncoding: UInt { return 9 }
+public var NSUnicodeStringEncoding: UInt { return 10 }
+public var NSWindowsCP1251StringEncoding: UInt { return 11 }
+public var NSWindowsCP1252StringEncoding: UInt { return 12 }
+public var NSWindowsCP1253StringEncoding: UInt { return 13 }
+public var NSWindowsCP1254StringEncoding: UInt { return 14 }
+public var NSWindowsCP1250StringEncoding: UInt { return 15 }
+public var NSISO2022JPStringEncoding: UInt { return 21 }
+public var NSMacOSRomanStringEncoding: UInt { return 30 }
+public var NSUTF16StringEncoding: UInt { return NSUnicodeStringEncoding }
+public var NSUTF16BigEndianStringEncoding: UInt { return 0x90000100 }
+public var NSUTF16LittleEndianStringEncoding: UInt { return 0x94000100 }
+public var NSUTF32StringEncoding: UInt { return 0x8c000100 }
+public var NSUTF32BigEndianStringEncoding: UInt { return 0x98000100 }
+public var NSUTF32LittleEndianStringEncoding: UInt { return 0x9c000100 }
 
 //===----------------------------------------------------------------------===//
 // NSObject

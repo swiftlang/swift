@@ -1,13 +1,31 @@
 public extension NSCocoaError {
-  static let TextReadInapplicableDocumentTypeError = NSCocoaError(rawValue: 65806)
-  static let TextWriteInapplicableDocumentTypeError = NSCocoaError(rawValue: 66062)
-  static let ServiceApplicationNotFoundError = NSCocoaError(rawValue: 66560)
-  static let ServiceApplicationLaunchFailedError = NSCocoaError(rawValue: 66561)
-  static let ServiceRequestTimedOutError = NSCocoaError(rawValue: 66562)
-  static let ServiceInvalidPasteboardDataError = NSCocoaError(rawValue: 66563)
-  static let ServiceMalformedServiceDictionaryError = NSCocoaError(rawValue: 66564)
-  static let ServiceMiscellaneousError = NSCocoaError(rawValue: 66800)
-  static let SharingServiceNotConfiguredError = NSCocoaError(rawValue: 67072)
+  public static var TextReadInapplicableDocumentTypeError: NSCocoaError {
+    return NSCocoaError(rawValue: 65806)
+  }
+  public static var TextWriteInapplicableDocumentTypeError: NSCocoaError {
+    return NSCocoaError(rawValue: 66062)
+  }
+  public static var ServiceApplicationNotFoundError: NSCocoaError {
+    return NSCocoaError(rawValue: 66560)
+  }
+  public static var ServiceApplicationLaunchFailedError: NSCocoaError {
+    return NSCocoaError(rawValue: 66561)
+  }
+  public static var ServiceRequestTimedOutError: NSCocoaError {
+    return NSCocoaError(rawValue: 66562)
+  }
+  public static var ServiceInvalidPasteboardDataError: NSCocoaError {
+    return NSCocoaError(rawValue: 66563)
+  }
+  public static var ServiceMalformedServiceDictionaryError: NSCocoaError {
+    return NSCocoaError(rawValue: 66564)
+  }
+  public static var ServiceMiscellaneousError: NSCocoaError {
+    return NSCocoaError(rawValue: 66800)
+  }
+  public static var SharingServiceNotConfiguredError: NSCocoaError {
+    return NSCocoaError(rawValue: 67072)
+  }
 
   public var isServiceError: Bool {
     return rawValue >= 66560 && rawValue <= 66817;

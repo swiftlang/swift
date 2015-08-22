@@ -211,10 +211,14 @@ public func autoreleasepool(@noescape code: () -> ()) {
 // Mark YES and NO unavailable.
 //===----------------------------------------------------------------------===//
 
-@available(*, unavailable, message="Use 'Bool' value 'true' instead") public
-let YES = ObjCBool(true)
-@available(*, unavailable, message="Use 'Bool' value 'false' instead") public
-let NO = ObjCBool(false)
+@available(*, unavailable, message="Use 'Bool' value 'true' instead")
+public var YES: ObjCBool {
+  fatalError("can't retrieve unavailable property")
+}
+@available(*, unavailable, message="Use 'Bool' value 'false' instead")
+public var NO: ObjCBool {
+  fatalError("can't retrieve unavailable property")
+}
 
 // FIXME: We can't make the fully-generic versions @transparent due to
 // rdar://problem/19418937, so here are some @transparent overloads

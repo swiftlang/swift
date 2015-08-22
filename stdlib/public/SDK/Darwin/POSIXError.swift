@@ -45,7 +45,7 @@
 
 /* non-blocking and interrupt i/o */
   case EAGAIN          = 35              /* Resource temporarily unavailable */
-  static let EWOULDBLOCK = EAGAIN        /* Operation would block */
+  public static var EWOULDBLOCK: POSIXError { return EAGAIN } /* Operation would block */
   case EINPROGRESS     = 36              /* Operation now in progress */
   case EALREADY        = 37              /* Operation already in progress */
 
@@ -138,7 +138,7 @@
   case EOWNERDEAD      = 105             /* Previous owner died */
 
   case EQFULL          = 106             /* Interface output queue is full */
-  static let ELAST     = EQFULL         /* Must be equal largest errno */
+  public static var ELAST: POSIXError { return EQFULL } /* Must be equal largest errno */
 
   // FIXME: EOPNOTSUPP has different values depending on __DARWIN_UNIX03 and
   // KERNEL.
