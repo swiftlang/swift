@@ -2734,29 +2734,6 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
     }
   }
 
-  // These expression types can never be checked without their enclosing
-  // context, so don't try - it would just make bogus diagnostics.
-  if (isa<NilLiteralExpr>(subExpr)) {
-    
-    // If we have a contextual conversion type, then we *can* type check these.
-    if (!convertType)
-      return subExpr;
-  }
-  
-  // TupleExpr often contains things that cannot be typechecked without
-  // context (usually from a parameter list), but we do it if they already have
-  // an unspecialized type.
-  // FIXME: This is a total hack.
-  if ((isa<TupleExpr>(subExpr) ||
-      
-       // InOutExpr needs contextual information otherwise we complain about it
-       // not being in an argument context.
-       isa<InOutExpr>(subExpr)) &&
-      !subExpr->getType()->hasTypeVariable() &&
-      !convertType)
-    return subExpr;
-
-  
   ExprTypeSaver SavedTypeData;
   SavedTypeData.save(subExpr);
   
@@ -3232,6 +3209,27 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   auto argTupleType = argExpr->getType()->castTo<TupleType>();
   calleeInfo.filterList(argTupleType);
 
+  std::string overloadName = calleeInfo[0].decl->getNameStr();
+  assert(!overloadName.empty());
+
+  auto lhsExpr = argExpr->getElement(0), rhsExpr = argExpr->getElement(1);
+  auto lhsType = lhsExpr->getType()->getRValueType();
+  auto rhsType = rhsExpr->getType()->getRValueType();
+
+  // If this is a comparison against nil, then we should produce a specific
+  // diagnostic.
+  if (isa<NilLiteralExpr>(rhsExpr->getValueProvidingExpr()) &&
+      !lhsType->hasTypeVariable() && !lhsType->is<UnresolvedType>()) {
+    if (overloadName == "=="  || overloadName == "!=" ||
+        overloadName == "===" || overloadName == "!==" ||
+        overloadName == "<"   || overloadName == ">" ||
+        overloadName == "<="  || overloadName == ">=") {
+      diagnose(binop->getLoc(), diag::comparison_with_nil_illegal, lhsType)
+      .highlight(lhsExpr->getSourceRange());
+      return true;
+    }
+  }
+
   // Otherwise, whatever the result type of the call happened to be must not
   // have been what we were looking for - diagnose this as a conversion
   // failure.
@@ -3248,13 +3246,6 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
     return true;
   }
 
-  std::string overloadName = calleeInfo[0].decl->getNameStr();
-  assert(!overloadName.empty());
-
-  auto lhsExpr = argExpr->getElement(0), rhsExpr = argExpr->getElement(1);
-  auto lhsType = lhsExpr->getType()->getRValueType();
-  auto rhsType = rhsExpr->getType()->getRValueType();
-
   if (binop->isImplicit() && overloadName == "~=") {
     // This binop was synthesized when typechecking an expression pattern.
     diagnose(lhsExpr->getLoc(),
@@ -3263,21 +3254,6 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
       .highlight(rhsExpr->getSourceRange());
     return true;
   }
-
-  // If this is a comparison against nil, then we should produce a specific
-  // diagnostic.
-  if (isa<NilLiteralExpr>(rhsExpr->getValueProvidingExpr()) &&
-      !lhsType->hasTypeVariable()) {
-    if (overloadName == "=="  || overloadName == "!=" ||
-        overloadName == "===" || overloadName == "!==" ||
-        overloadName == "<"   || overloadName == ">" ||
-        overloadName == "<="  || overloadName == ">=") {
-      diagnose(binop->getLoc(), diag::comparison_with_nil_illegal, lhsType)
-        .highlight(lhsExpr->getSourceRange());
-      return true;
-    }
-  }
-  
   
   if (!lhsType->isEqual(rhsType)) {
     diagnose(binop->getLoc(), diag::cannot_apply_binop_to_args,

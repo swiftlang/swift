@@ -657,8 +657,10 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 Int.self == nil // expected-error {{value of type 'Int.Type' can never be nil, comparison isn't allowed}}
 nil == Int.self // expected-error {{binary operator '==' cannot be applied to operands}}
+// expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists}}
 Int.self != nil // expected-error {{value of type 'Int.Type' can never be nil, comparison isn't allowed}}
 nil != Int.self // expected-error {{binary operator '!=' cannot be applied to operands}}
+// expected-note @-1 {{overloads for '!=' exist with these partially matching parameter lists}}
 
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining

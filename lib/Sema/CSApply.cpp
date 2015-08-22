@@ -5091,6 +5091,19 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
                                    Diag<> brokenBuiltinProtocolDiag) {
   auto &tc = cs.getTypeChecker();
 
+  // If coercing a literal to an unresolved type, we don't try to look up the
+  // witness members, just do it.
+  if (type->is<UnresolvedType>()) {
+    // Instead of updating the literal expr in place, allocate a new node.  This
+    // avoids issues where Builtin types end up on expr nodes and pollute
+    // diagnostics.
+    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context);
+    
+    // The literal expression has this type.
+    literal->setType(type);
+    return literal;
+  }
+  
   // Check whether this literal type conforms to the builtin protocol.
   ProtocolConformance *builtinConformance = nullptr;
   if (builtinProtocol &&
