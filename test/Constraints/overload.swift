@@ -27,7 +27,7 @@ f1(identity(1))
 f0(x) // expected-error{{cannot invoke 'f0' with an argument list of type '(X)'}}
 // expected-note @-1 {{overloads for 'f0' exist with these partially matching parameter lists: (Float), (Int)}}
 
-f + 1
+_ = f + 1
 f2(i)
 f2((i, f))
 

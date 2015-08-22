@@ -19,7 +19,7 @@ func weirdConcat<T : ConcatToAnything, U>(t: T, u: U) {
 
 // Make sure that the protocol operators don't get in the way.
 var b1, b2 : Bool
-b1 != b2
+_ = b1 != b2
 
 extension UnicodeScalar {
   func isAlpha2() -> Bool {

@@ -215,15 +215,15 @@ func rdar19770981(s: String, ns: NSString) {
   f(ns as String)
   // 'as' has higher precedence than '>' so no parens are necessary with the fixit:
   s > ns // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{9-9= as String}}
-  s > ns as String
+  _ = s > ns as String
   ns > s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{5-5= as String}}
-  ns as String > s
+  _ = ns as String > s
 
   // 'as' has lower precedence than '+' so add parens with the fixit:
   s + ns // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{7-7=(}}{{9-9= as String)}}
-  s + (ns as String)
+  _ = s + (ns as String)
   ns + s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{3-3=(}}{{5-5= as String)}}
-  (ns as String) + s
+  _ = (ns as String) + s
 }
 
 // <rdar://problem/19831919> Fixit offers as! conversions that are known to always fail

@@ -107,25 +107,25 @@ extension NSAliasesEnum {
 }
 
 // Test NS_SWIFT_NAME:
-NSXMLNodeKind.DTDKind == .InvalidKind
+_ = NSXMLNodeKind.DTDKind == .InvalidKind
 
-NSPrefixWordBreakCustom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
+_ = NSPrefixWordBreakCustom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
 
-NSPrefixWordBreak2Custom.ProblemCase == .GoodCase
-NSPrefixWordBreak2Custom.ProblemCase == .PrefixWordBreak2DeprecatedBadCase // expected-warning {{deprecated}}
-NSPrefixWordBreak2Custom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
+_ = NSPrefixWordBreak2Custom.ProblemCase == .GoodCase
+_ = NSPrefixWordBreak2Custom.ProblemCase == .PrefixWordBreak2DeprecatedBadCase // expected-warning {{deprecated}}
+_ = NSPrefixWordBreak2Custom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
 
-NSPrefixWordBreakReversedCustom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
+_ = NSPrefixWordBreakReversedCustom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
 
-NSPrefixWordBreakReorderedCustom.ProblemCase == .GoodCase
-NSPrefixWordBreakReorderedCustom.ProblemCase == .PrefixWordBreakReorderedDeprecatedBadCase // expected-warning {{deprecated}}
-NSPrefixWordBreakReorderedCustom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
+_ = NSPrefixWordBreakReorderedCustom.ProblemCase == .GoodCase
+_ = NSPrefixWordBreakReorderedCustom.ProblemCase == .PrefixWordBreakReorderedDeprecatedBadCase // expected-warning {{deprecated}}
+_ = NSPrefixWordBreakReorderedCustom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
 
-NSPrefixWordBreakReordered2Custom.ProblemCase == .GoodCase
-NSPrefixWordBreakReordered2Custom.ProblemCase == .PrefixWordBreakReordered2DeprecatedBadCase // expected-warning {{deprecated}}
-NSPrefixWordBreakReordered2Custom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
+_ = NSPrefixWordBreakReordered2Custom.ProblemCase == .GoodCase
+_ = NSPrefixWordBreakReordered2Custom.ProblemCase == .PrefixWordBreakReordered2DeprecatedBadCase // expected-warning {{deprecated}}
+_ = NSPrefixWordBreakReordered2Custom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
 
-NSSwiftNameAllTheThings.Foo == .Bar
+_ = NSSwiftNameAllTheThings.Foo == .Bar
 _ = NSSwiftNameBad.`class`
 
 

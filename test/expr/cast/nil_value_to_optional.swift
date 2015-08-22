@@ -24,6 +24,6 @@ var d = D()
 var dopt: D? = nil
 var diuopt: D! = nil
 
-d == nil // expected-error{{value of type 'D' can never be nil, comparison isn't allowed}}
-dopt == nil
-diuopt == nil
+_ = d == nil // expected-error{{value of type 'D' can never be nil, comparison isn't allowed}}
+_ = dopt == nil
+_ = diuopt == nil
