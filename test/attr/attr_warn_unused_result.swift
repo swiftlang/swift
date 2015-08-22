@@ -99,3 +99,20 @@ class BadAttributes2 {
 }
 
 @warn_unused_result(mutable_variant="oops") func badMutableVariant() { } // expected-error{{'mutable_variant' parameter of 'warn_unused_result' attribute does not make sense on a non-method}}
+
+
+// ---------------------------------------------------------------------------
+// @warn_unused_result should work on operators as well
+// ---------------------------------------------------------------------------
+
+struct S : Equatable {}
+
+@warn_unused_result
+func == (lhs: S, rhs: S) -> Bool { return true }
+
+func testUnusedOperators() {
+  // rdar://18904720
+  S() == S()  // expected-warning {{result of call to '==' is unused}}
+  S() != S()  // expected-warning {{result of call to '!=' is unused}}
+}
+

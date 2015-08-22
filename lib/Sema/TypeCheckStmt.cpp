@@ -999,7 +999,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
   // FIXME: Complain about literals
 
   // Check if we have a call to a function marked warn_unused_result.
-  if (auto call = dyn_cast<CallExpr>(valueE)) {
+  if (auto call = dyn_cast<ApplyExpr>(valueE)) {
     // Dig through all levels of calls.
     Expr *fn = call->getFn()->getSemanticsProvidingExpr();
     bool baseIsLValue = false;
