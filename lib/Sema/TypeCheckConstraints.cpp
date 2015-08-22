@@ -1185,7 +1185,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // check for them now.  We cannot apply the solution with unresolved TypeVars,
   // because they will leak out into arbitrary places in the resultant AST.
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
-      (viable.size() != 1 || viable[0].hasUnresolvedTypeVars())) {
+      viable.size() != 1) {
     expr->setType(ErrorType::get(Context));
     return false;
   }
