@@ -585,7 +585,8 @@ func testNSUInteger(obj: NSUIntegerTests, uint: UInt, int: Int) {
   }
 
   // NSNumber
-  NSNumber(unsignedInteger: int) // expected-error {{(unsignedInteger: Int)' is not convertible to '(unsignedInteger: UInt)'}}
+  NSNumber(unsignedInteger: int) // expected-error {{cannot invoke initializer for type 'NSNumber' with an argument list of type '(unsignedInteger: Int)'}}
+  // expected-note @-1 {{expected an argument list of type '(unsignedInteger: UInt)'}}
   let num = NSNumber(unsignedInteger: uint)
   let _: String = num.unsignedIntegerValue // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
 }

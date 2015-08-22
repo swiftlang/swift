@@ -1296,6 +1296,7 @@ namespace {
     CC_OneArgumentMismatch,   ///< All arguments except one match.
     CC_SelfMismatch,          ///< Self argument mismatches.
     CC_ArgumentMismatch,      ///< Argument list mismatch.
+    CC_ArgumentLabelMismatch, ///< Argument label mismatch.
     CC_ArgumentCountMismatch, ///< This candidate has wrong # arguments.
     CC_GeneralMismatch        ///< Something else is wrong.
   };
@@ -1467,6 +1468,13 @@ evaluateCloseness(Type candArgListType, ArrayRef<TupleTypeElt> actualArgs) {
   // Count the number of mismatched arguments.
   unsigned mismatchingArgs = 0;
   for (unsigned i = 0, e = actualArgs.size(); i != e; ++i) {
+    // Check to see if the keyword arguments line up.  If not, this is a bad
+    // issue, which is considered to be more severe than a type mismatch: if
+    // the labels are wrong, the user may be passing a value to the wrong
+    // argument entirely - a type mismatch would be the wrong thing to report.
+    if (actualArgs[i].getName() != candArgs[i].getName())
+      return CC_ArgumentLabelMismatch;
+
     auto argType = actualArgs[i].getType();
 
     // If the argument has an unresolved type, then we're not actually matching
@@ -1484,6 +1492,7 @@ evaluateCloseness(Type candArgListType, ArrayRef<TupleTypeElt> actualArgs) {
     if (!argType->getRValueType()->isEqual(candArgs[i].getType()))
       ++mismatchingArgs;
   }
+
   
   // If the arguments match up exactly, then we have an exact match.  This
   // handles the no-argument cases as well.
@@ -1495,12 +1504,12 @@ evaluateCloseness(Type candArgListType, ArrayRef<TupleTypeElt> actualArgs) {
   if (candArgs[0].getType()->is<InOutType>() &&
       !actualArgs[0].getType()->isLValueType())
     return CC_NonLValueInOut;
-  
+
+  // If we have exactly one argument mismatching, classify it specially, so that
+  // close matches are prioritized against obviously wrong ones.
   if (mismatchingArgs == 1)
     return actualArgs.size() != 1 ? CC_OneArgumentMismatch :CC_ArgumentMismatch;
 
-  // TODO: Keyword argument mismatches.
-  
   return CC_GeneralMismatch;
 }
 
@@ -3961,9 +3970,18 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   candidateInfo.filterContextualMemberList(E->getArgument());
 
   // If we have multiple candidates, then we have an ambiguity.
-  if (candidateInfo.size() != 1)
-    return false;
+  if (candidateInfo.size() != 1) {
+    SourceRange argRange;
+    if (auto arg = E->getArgument()) argRange = arg->getSourceRange();
+    diagnose(E->getNameLoc(), diag::ambiguous_member_overload_set,
+             E->getName().str())
+      .highlight(argRange);
+    candidateInfo.suggestPotentialOverloads(E->getName().str(),E->getNameLoc());
+    return true;
+  }
   
+  auto argumentTy = candidateInfo[0].getArgumentType();
+
   // Depending on how we matched, produce tailored diagnostics.
   switch (candidateInfo.closeness) {
   case CC_NonLValueInOut:      // First argument is inout but no lvalue present.
@@ -3976,8 +3994,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   case CC_ExactMatch: {        // This is a perfect match for the arguments.
     // If we have an exact match, then we must have an argument list.
     // If we didn't have an argument or an arg type, the expr would be valid.
-    auto argTy = candidateInfo[0].getArgumentType();
-    if (!argTy) {
+    if (!argumentTy) {
       assert(!E->getArgument() && "Not an exact match");
       // If this is an exact match, return false to diagnose this as an
       // ambiguity.  It must be some other problem, such as failing to infer a
@@ -3985,23 +4002,43 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
       return false;
     }
     
-    assert(E->getArgument() && argTy && "Exact match without an argument?");
-    return !typeCheckArgumentChildIndependently(E->getArgument(), argTy,
+    assert(E->getArgument() && argumentTy && "Exact match without argument?");
+    return !typeCheckArgumentChildIndependently(E->getArgument(), argumentTy,
                                                 candidateInfo);
   }
 
-  case CC_GeneralMismatch:     // Something else is wrong.
+  case CC_ArgumentLabelMismatch: { // Argument labels are not correct.
+    auto argExpr = typeCheckArgumentChildIndependently(E->getArgument(),
+                                                       argumentTy,
+                                                       candidateInfo);
+    if (!argExpr) return true;
+
+    // Construct the actual expected argument labels that our candidate
+    // expected.
+    assert(argumentTy &&
+           "Candidate must expect an argument to have a label mismatch");
+    auto arguments = decomposeArgumentType(argumentTy);
+    
+    // TODO: This is probably wrong for varargs, e.g. calling "print" with the
+    // wrong label.
+    SmallVector<Identifier, 4> expectedNames;
+    for (auto &arg : arguments)
+      expectedNames.push_back(arg.getName());
+
+    return CS->diagnoseArgumentLabelError(argExpr, expectedNames,
+                                          /*isSubscript*/false);
+  }
+    
+  case CC_GeneralMismatch:        // Something else is wrong.
   case CC_ArgumentCountMismatch:  // This candidate has wrong # arguments.
     // If we have no argument, the candidates must have expected one.
     if (!E->getArgument()) {
-      
-      auto expectedTy = candidateInfo[0].getArgumentType();
-      if (!expectedTy)
+      if (!argumentTy)
         return false; // Candidate must be incorrect for some other reason.
       
       // Pick one of the arguments that are expected as an exemplar.
       diagnose(E->getNameLoc(), diag::expected_argument_in_contextual_member,
-               E->getName(), expectedTy);
+               E->getName(), argumentTy);
       return true;
     }
      

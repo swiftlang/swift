@@ -78,9 +78,9 @@ struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'Not
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error{{circular protocol inheritance 'CircleMiddle' -> 'CircleStart' -> 'CircleEnd' -> 'CircleMiddle'}}
-protocol CircleStart : CircleEnd { func circle_start() } // expected-note{{protocol 'CircleStart' declared here}}
-protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error{{circular protocol inheritance CircleMiddle}}
+protocol CircleStart : CircleEnd { func circle_start() }
+protocol CircleEnd : CircleMiddle { func circle_end()}
 
 protocol CircleEntry : CircleTrivial { }
 protocol CircleTrivial : CircleTrivial { } // expected-error{{circular protocol inheritance CircleTrivial}}
