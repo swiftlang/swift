@@ -3377,18 +3377,8 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
   auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
   if (!fnExpr) return true;
+  
   auto fnType = fnExpr->getType()->getRValueType();
-
-  CalleeCandidateInfo calleeInfo(fnExpr, CS);
-
-  // If we weren't able to resolve the entire callee function expression, but
-  // we were able to find a single candidate, use it to inform the type of the
-  // argument analysis stuff.
-  // TODO: If all candidates have the same type for some argument, we could pass
-  // down partial information.
-  if (fnType->hasTypeVariable() && calleeInfo.size() == 1 &&
-      calleeInfo[0].getUncurriedFunctionType())
-    fnType = calleeInfo[0].getUncurriedFunctionType();
 
   // If we resolved a concrete expression for the callee, and it has
   // non-function/non-metatype type, then we cannot call it!
@@ -3414,6 +3404,9 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     .highlight(fnExpr->getSourceRange());
     return true;
   }
+  
+
+  CalleeCandidateInfo calleeInfo(fnExpr, CS);
   
   Type argType;  // Type of the argument list, if knowable.
   if (auto FTy = fnType->getAs<AnyFunctionType>())
