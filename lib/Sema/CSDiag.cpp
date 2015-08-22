@@ -1905,6 +1905,7 @@ private:
      
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
+  bool visitTupleExpr(TupleExpr *E);
   
   bool visitUnresolvedMemberExpr(UnresolvedMemberExpr *E);
   bool visitArrayExpr(ArrayExpr *E);
@@ -4021,6 +4022,92 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   llvm_unreachable("all cases should be handled");
 }
 
+/// A TupleExpr propagate contextual type information down to its children and
+/// can be erroneous when there is a label mismatch etc.
+bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
+  // If we know the requested argType to use, use computeTupleShuffle to produce
+  // the shuffle of input arguments to destination values.  It requires a
+  // TupleType to compute the mapping from argExpr.  Conveniently, it doesn't
+  // care about the actual types though, so we can just use 'void' for them.
+  if (!CS->getContextualType() || !CS->getContextualType()->is<TupleType>())
+    return visitExpr(TE);
+  
+  auto contextualTT = CS->getContextualType()->castTo<TupleType>();
+  
+  SmallVector<TupleTypeElt, 4> ArgElts;
+  auto voidTy = CS->getASTContext().TheEmptyTupleType;
+
+  for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i)
+    ArgElts.push_back({ voidTy, TE->getElementName(i) });
+  auto TEType = TupleType::get(ArgElts, CS->getASTContext());
+  
+  if (!TEType->is<TupleType>())
+    return visitExpr(TE);
+
+  SmallVector<int, 4> sources;
+  SmallVector<unsigned, 4> variadicArgs;
+  
+  // If the shuffle is invalid, then there is a type error.  We could diagnose
+  // it specifically here, but the general logic does a fine job so we let it
+  // do it.
+  if (computeTupleShuffle(TEType->castTo<TupleType>(), contextualTT,
+                          sources, variadicArgs))
+    return visitExpr(TE);
+
+  // If we got a correct shuffle, we can perform the analysis of all of
+  // the input elements, with their expected types.
+  for (unsigned i = 0, e = sources.size(); i != e; ++i) {
+    // If the value is taken from a default argument, ignore it.
+    if (sources[i] == TupleShuffleExpr::DefaultInitialize ||
+        sources[i] == TupleShuffleExpr::Variadic ||
+        sources[i] == TupleShuffleExpr::CallerDefaultInitialize)
+      continue;
+    
+    assert(sources[i] >= 0 && "Unknown sources index");
+    
+    // Otherwise, it must match the corresponding expected argument type.
+    unsigned inArgNo = sources[i];
+    auto actualType = contextualTT->getElementType(i);
+    
+    TCCOptions options;
+    if (actualType->is<InOutType>())
+      options |= TCC_AllowLValue;
+    
+    auto exprResult =
+      typeCheckChildIndependently(TE->getElement(inArgNo), actualType,
+                                  CS->getContextualTypePurpose(), options);
+    // If there was an error type checking this argument, then we're done.
+    if (!exprResult) return true;
+    
+    // If the caller expected something inout, but we didn't have
+    // something of inout type, diagnose it.
+    if (auto IOE =
+          dyn_cast<InOutExpr>(exprResult->getSemanticsProvidingExpr())) {
+      if (!actualType->is<InOutType>()) {
+        diagnose(exprResult->getLoc(), diag::extra_address_of,
+                 exprResult->getType()->getInOutObjectType())
+        .highlight(exprResult->getSourceRange())
+        .fixItRemove(IOE->getStartLoc());
+        return true;
+      }
+    }
+  }
+  
+  if (!variadicArgs.empty()) {
+    auto varargsTy = contextualTT->getVarArgsBaseType();
+    for (unsigned i = 0, e = variadicArgs.size(); i != e; ++i) {
+      unsigned inArgNo = variadicArgs[i];
+      
+      auto expr =
+        typeCheckChildIndependently(TE->getElement(inArgNo), varargsTy,
+                                    CS->getContextualTypePurpose());
+      // If there was an error type checking this argument, then we're done.
+      if (!expr) return true;
+    }
+  }
+  
+  return false;
+}
 
 /// An IdentityExpr doesn't change its argument, but it *can* propagate its
 /// contextual type information down.

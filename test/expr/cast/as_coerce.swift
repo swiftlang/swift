@@ -82,11 +82,11 @@ c3 as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to us
 1 as Int as String // expected-error{{cannot convert value of type 'Int' to type 'String' in coercion}}
 Double(1) as Double as String // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}}
 ["awd"] as [Int] // expected-error{{cannot convert value of type 'String' to expected element type 'Int'}}
-([1, 2, 1.0], 1) as ([String], Int) // expected-error{{cannot convert value of type '([Double], Int)' (aka '(Array<Double>, Int)') to type '([String], Int)' (aka '(Array<String>, Int)') in coercion}}
+([1, 2, 1.0], 1) as ([String], Int) // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
 [[1]] as [[String]] // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
-(1, 1.0) as (Int, Int) // expected-error{{cannot convert value of type '(Int, Double)' to type '(Int, Int)' in coercion}}
-(1.0, 1, "asd") as (String, Int, Float) // expected-error{{cannot convert value of type '(Double, Int, String)' to type '(String, Int, Float)' in coercion}}
-(1, 1.0, "a", [1, 23]) as (Int, Double, String, [String]) // expected-error{{cannot convert value of type '(Int, Double, String, [Int])' (aka '(Int, Double, String, Array<Int>)') to type '(Int, Double, String, [String])' (aka '(Int, Double, String, Array<String>)') in coercion}}
+(1, 1.0) as (Int, Int) // expected-error{{cannot convert value of type 'Double' to type 'Int' in coercion}}
+(1.0, 1, "asd") as (String, Int, Float) // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}}
+(1, 1.0, "a", [1, 23]) as (Int, Double, String, [String]) // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
 
 [1] as! [String] // expected-error{{'[Int]' is not convertible to '[String]'}}
 [(1, (1, 1))] as! [(Int, (String, Int))] // expected-error{{'[(Int, (Int, Int))]' is not convertible to '[(Int, (String, Int))]'}}

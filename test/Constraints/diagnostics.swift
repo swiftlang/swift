@@ -442,11 +442,13 @@ enum Color {
   static func frob(a : Int, inout b : Int) -> Color {}
 }
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{type of expression is ambiguous without more context}}
-let _: Int -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{type of expression is ambiguous without more context}}
+let _: Int -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing argument label 'description:' in call}} {{46-46=description: }}
 let _: Color = .Unknown("") // expected-error {{missing argument label 'description:' in call}} {{25-25=description: }}
 let _: Color = .Unknown // expected-error {{contextual member 'Unknown' expects argument of type '(description: String)'}}
 let _: Color = .Unknown(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 let _ : Color = .rainbow(42)  // expected-error {{cannot convert value of type 'Int' to expected argument type '()'}}
+
+let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type 'Double' to specified type 'Int'}}
 
 // FIXME: Why two errors?
 let _ : Color = .rainbow  // expected-error 2 {{function produces expected type 'Color'; did you mean to call it with '()'?}}
