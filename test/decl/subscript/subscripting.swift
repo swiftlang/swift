@@ -65,7 +65,7 @@ struct Y1 {
       return x // expected-error{{cannot convert return expression of type 'X' to return type 'Int'}}
     }
     set {
-      x = newValue // expected-error{{cannot assign a value of type 'Int' to a value of type 'X'}}
+      x = newValue // expected-error{{cannot assign value of type 'Int' to type 'X'}}
     }
   }
 }

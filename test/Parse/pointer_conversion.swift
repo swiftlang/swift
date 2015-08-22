@@ -40,7 +40,7 @@ func mutablePointerArguments(p: UnsafeMutablePointer<Int>,
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafeMutablePointer<Int> = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeMutablePointer<Int>'}}
-  x = &ii // expected-error{{cannot assign a value of type 'inout [Int]' (aka 'inout Array<Int>') to a value of type 'UnsafeMutablePointer<Int>'}}
+  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' (aka 'inout Array<Int>') to type 'UnsafeMutablePointer<Int>'}}
   _ = x
 }
 
@@ -70,8 +70,8 @@ func mutableVoidPointerArguments(p: UnsafeMutablePointer<Int>,
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafeMutablePointer<Void> = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
-  x = p // expected-error{{cannot assign a value of type 'UnsafeMutablePointer<Int>' to a value of type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
-  x = &ii // expected-error{{cannot assign a value of type 'inout [Int]' (aka 'inout Array<Int>') to a value of type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
+  x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
+  x = &ii // expected-error{{cannot assign value of type 'inout [Int]' (aka 'inout Array<Int>') to type 'UnsafeMutablePointer<Void>' (aka 'UnsafeMutablePointer<()>')}}
   _ = x
 }
 
@@ -99,9 +99,9 @@ func constPointerArguments(p: UnsafeMutablePointer<Int>,
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafePointer<Int> = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafePointer<Int>'}}
-  x = ii // expected-error{{cannot assign a value of type '[Int]' to a value of type 'UnsafePointer<Int>'}}
-  x = p // expected-error{{cannot assign a value of type 'UnsafeMutablePointer<Int>' to a value of type 'UnsafePointer<Int>'}}
-  x = ap // expected-error{{cannot assign a value of type 'AutoreleasingUnsafeMutablePointer<Int>' to a value of type 'UnsafePointer<Int>'}}
+  x = ii // expected-error{{cannot assign value of type '[Int]' to type 'UnsafePointer<Int>'}}
+  x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafePointer<Int>'}}
+  x = ap // expected-error{{cannot assign value of type 'AutoreleasingUnsafeMutablePointer<Int>' to type 'UnsafePointer<Int>'}}
 }
 
 func constVoidPointerArguments(p: UnsafeMutablePointer<Int>,
@@ -133,13 +133,13 @@ func constVoidPointerArguments(p: UnsafeMutablePointer<Int>,
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafePointer<Void> = &i // expected-error{{cannot convert value of type 'inout Int' to specified type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
-  x = ii // expected-error{{cannot assign a value of type '[Int]' to a value of type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
-  x = p // expected-error{{cannot assign a value of type 'UnsafeMutablePointer<Int>' to a value of type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
-  x = fp // expected-error{{cannot assign a value of type 'UnsafeMutablePointer<Float>' to a value of type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
-  x = cp // expected-error{{cannot assign a value of type 'UnsafePointer<Int>' to a value of type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
-  x = cfp // expected-error{{cannot assign a value of type 'UnsafePointer<Float>' to a value of type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
-  x = ap // expected-error{{cannot assign a value of type 'AutoreleasingUnsafeMutablePointer<Int>' to a value of type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
-  x = afp // expected-error{{cannot assign a value of type 'AutoreleasingUnsafeMutablePointer<Float>' to a value of type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
+  x = ii // expected-error{{cannot assign value of type '[Int]' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
+  x = p // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Int>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
+  x = fp // expected-error{{cannot assign value of type 'UnsafeMutablePointer<Float>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
+  x = cp // expected-error{{cannot assign value of type 'UnsafePointer<Int>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
+  x = cfp // expected-error{{cannot assign value of type 'UnsafePointer<Float>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
+  x = ap // expected-error{{cannot assign value of type 'AutoreleasingUnsafeMutablePointer<Int>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
+  x = afp // expected-error{{cannot assign value of type 'AutoreleasingUnsafeMutablePointer<Float>' to type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
   _ = x
 }
 

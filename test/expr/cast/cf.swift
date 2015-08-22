@@ -11,7 +11,7 @@ func testCFToObjC(cfStr: CFString, cfMutableStr: CFMutableString) {
   _ = nsStr
 
   var nsMutableStr: NSMutableString = cfMutableStr
-  nsMutableStr = cfStr // expected-error{{cannot assign a value of type 'CFString' to a value of type 'NSMutableString'}}
+  nsMutableStr = cfStr // expected-error{{cannot assign value of type 'CFString' to type 'NSMutableString'}}
 
   // sanity check
   nsStr = nsMutableStr
@@ -22,7 +22,7 @@ func testObjCToCF(nsStr: NSString, nsMutableStr: NSMutableString) {
   cfStr = nsMutableStr
 
   var cfMutableStr: CFMutableString = nsMutableStr
-  cfMutableStr = cfStr // expected-error{{cannot assign a value of type 'CFString' to a value of type 'CFMutableString'}}
+  cfMutableStr = cfStr // expected-error{{cannot assign value of type 'CFString' to type 'CFMutableString'}}
 
   // sanity check
   cfStr = cfMutableStr

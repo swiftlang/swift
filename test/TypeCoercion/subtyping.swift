@@ -31,7 +31,7 @@ func protocolConformance(@autoclosure ac1: () -> CustomStringConvertible,
   // FIXME: closures make ABI conversions explicit. rdar://problem/19517003
   f1 = { f2(p: $0) } // okay
   f1 = { f3(p: $0) } // okay
-  f2 = f1 // expected-error{{cannot assign a value of type '(fp: FormattedPrintable) -> CustomStringConvertible' to a value of type '(p: CustomStringConvertible) -> FormattedPrintable'}}
+  f2 = f1 // expected-error{{cannot assign value of type '(fp: FormattedPrintable) -> CustomStringConvertible' to type '(p: CustomStringConvertible) -> FormattedPrintable'}}
 
   accept_creates_Printable(ac1)
   accept_creates_Printable({ ac2($0) })
@@ -51,6 +51,6 @@ func nonTrivialNested() {
   let f3 : (_ : () -> FormattedPrintable) -> CustomStringConvertible = fp_gen_to_p
 
   f1 = { f2($0) } // okay
-  f1 = f3 // expected-error{{annot assign a value of type '(() -> FormattedPrintable) -> CustomStringConvertible' to a value of type '(() -> CustomStringConvertible) -> CustomStringConvertible'}}
+  f1 = f3 // expected-error{{cannot assign value of type '(() -> FormattedPrintable) -> CustomStringConvertible' to type '(() -> CustomStringConvertible) -> CustomStringConvertible'}}
   _ = f1
 }

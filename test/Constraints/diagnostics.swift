@@ -376,7 +376,7 @@ var afterMessageCount : Int? = nil
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(a : () -> ()) {}
 takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot assign a value of type 'UInt' to a value of type 'Int?'}}
+  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}}
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
@@ -425,7 +425,7 @@ zip(numbers, numbers).filter { $0.2 > 1 }  // expected-error {{value of tuple ty
 func foo20868864(callback: ([String]) -> ()) { }
 func rdar20868864(var s: String) {
   foo20868864 { (strings: [String]) in
-    s = strings   // expected-error {{cannot assign a value of type '[String]' to a value of type 'String'}}
+    s = strings   // expected-error {{cannot assign value of type '[String]' to type 'String'}}
   }
 }
 
@@ -459,8 +459,8 @@ let _: Color = .overload(1)  // expected-error {{ambiguous reference to member '
 let _: Color = .frob(1.0, &i) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
 let _: Color = .frob(1, &d) // expected-error {{cannot convert value of type 'inout Double' to expected argument type 'inout Int'}}
-let _ : Color = .red // expected-error {{type 'Color' has no member 'red'}}
-
+var someColor : Color = .red // expected-error {{type 'Color' has no member 'red'}}
+someColor = .red  // expected-error {{type 'Color' has no member 'red'}}
 
 func testTypeSugar(a : Int) {
   typealias Stride = Int

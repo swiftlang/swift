@@ -57,10 +57,10 @@ func testUpcastBridge() {
   setO = setB; _ = setO
 
   // Upcast object to bridged type
-  setB = setO // expected-error{{cannot assign a value of type 'Set<ObjC>' to a value of type 'Set<BridgedToObjC>'}}
+  setB = setO // expected-error{{cannot assign value of type 'Set<ObjC>' to type 'Set<BridgedToObjC>'}}
 
   // Failed upcast
-  setD = setB // expected-error{{cannot assign a value of type 'Set<BridgedToObjC>' to a value of type 'Set<DerivesObjC>'}}
+  setD = setB // expected-error{{cannot assign value of type 'Set<BridgedToObjC>' to type 'Set<DerivesObjC>'}}
   _ = setD
 }
 

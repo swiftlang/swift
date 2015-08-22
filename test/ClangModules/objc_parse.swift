@@ -193,7 +193,7 @@ func testProtocols(b: B, bp: BProto) {
   var c1 : Cat1Proto = b
   var bcat1 = b.getAsProtoWithCat()
   c1 = bcat1
-  bcat1 = c1 // expected-error{{cannot assign a value of type 'Cat1Proto' to a value of type 'protocol<BProto, Cat1Proto>!'}}
+  bcat1 = c1 // expected-error{{cannot assign value of type 'Cat1Proto' to type 'protocol<BProto, Cat1Proto>!'}}
 }
 
 // Methods only defined in a protocol

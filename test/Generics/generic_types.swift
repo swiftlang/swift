@@ -205,7 +205,7 @@ func useNested(ii: Int, hni: HasNested<Int>,
   var ids = xis.g(1, u: "Hello", v: 3.14159)
   ids = (2, "world", 2.71828)
 
-  xis = xfs // expected-error{{cannot assign a value of type 'HasNested<Float>.InnerGeneric<String>' to a value of type 'HasNested<Int>.InnerGeneric<String>'}}
+  xis = xfs // expected-error{{cannot assign value of type 'HasNested<Float>.InnerGeneric<String>' to type 'HasNested<Int>.InnerGeneric<String>'}}
 }
 
 var dfail : Dictionary<Int> // expected-error{{generic type 'Dictionary' specialized with too few type parameters (got 1, but expected 2)}}

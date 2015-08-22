@@ -80,12 +80,12 @@ func testUpcastBridge() {
   dictBO = dictBB
   dictOB = dictBB
 
-  dictBB = dictBO // expected-error{{cannot assign a value of type 'Dictionary<BridgedToObjC, ObjC>' to a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
-  dictBB = dictOB // expected-error{{cannot assign a value of type 'Dictionary<ObjC, BridgedToObjC>' to a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
+  dictBB = dictBO // expected-error{{cannot assign value of type 'Dictionary<BridgedToObjC, ObjC>' to type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
+  dictBB = dictOB // expected-error{{cannot assign value of type 'Dictionary<ObjC, BridgedToObjC>' to type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
 
-  dictDO = dictBB // expected-error{{cannot assign a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to a value of type 'Dictionary<DerivesObjC, ObjC>'}}
-  dictOD = dictBB // expected-error{{cannot assign a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to a value of type 'Dictionary<ObjC, DerivesObjC>'}}
-  dictDD = dictBB // expected-error{{cannot assign a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to a value of type 'Dictionary<DerivesObjC, DerivesObjC>'}}
+  dictDO = dictBB // expected-error{{cannot assign value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to type 'Dictionary<DerivesObjC, ObjC>'}}
+  dictOD = dictBB // expected-error{{cannot assign value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to type 'Dictionary<ObjC, DerivesObjC>'}}
+  dictDD = dictBB // expected-error{{cannot assign value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to type 'Dictionary<DerivesObjC, DerivesObjC>'}}
   
   _ = dictDD; _ = dictDO; _ = dictOD; _ = dictOO; _ = dictOR; _ = dictOR; _ = dictRR; _ = dictRO
 }

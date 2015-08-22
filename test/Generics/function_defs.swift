@@ -48,11 +48,11 @@ protocol OtherEqualComparable {
 
 func otherExistential<T : EqualComparable>(t1: T) {
   var otherEqComp : OtherEqualComparable = t1 // expected-error{{value of type 'T' does not conform to specified type 'OtherEqualComparable'}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}}
-  otherEqComp = t1 // expected-error{{cannot assign a value of type 'T' to a value of type 'OtherEqualComparable'}}
+  otherEqComp = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp
   
   var otherEqComp2 : OtherEqualComparable // expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}}
-  otherEqComp2 = t1 // expected-error{{cannot assign a value of type 'T' to a value of type 'OtherEqualComparable'}}
+  otherEqComp2 = t1 // expected-error{{value of type 'T' does not conform to 'OtherEqualComparable' in assignment}}
   _ = otherEqComp2
 
   _ = t1 as protocol<EqualComparable, OtherEqualComparable> // expected-error{{'T' is not convertible to 'protocol<EqualComparable, OtherEqualComparable>'; did you mean to use 'as!' to force downcast?}} {{10-12=as!}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}

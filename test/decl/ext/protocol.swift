@@ -410,7 +410,8 @@ func testSomeCollections(sc1: SomeCollection1, sc2: SomeCollection2) {
   _ = mig
 
   var ig = sc2.myGenerate()
-  ig = MyIndexedGenerator(container: sc2, index: sc2.myStartIndex) // expected-error{{cannot assign a value of type 'MyIndexedGenerator<SomeCollection2>' to a value of type 'OtherIndexedGenerator<SomeCollection2>'}}
+  ig = MyIndexedGenerator(container: sc2, index: sc2.myStartIndex) // expected-error{{cannot invoke initializer for type 'MyIndexedGenerator<_>' with an argument list of type '(container: SomeCollection2, index: Int)'}}
+  // expected-note @-1 {{expected an argument list of type '(container: C, index: C.Index)'}}
   _ = ig
 }
 

@@ -18,4 +18,4 @@ var setD = Set<D>()
 
 // Test set upcasts
 setC = setD
-setD = setC // expected-error{{cannot assign a value of type 'Set<C>' to a value of type 'Set<D>'}}
+setD = setC // expected-error{{cannot assign value of type 'Set<C>' to type 'Set<D>'}}

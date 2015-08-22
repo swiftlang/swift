@@ -35,12 +35,12 @@ var b: [B] = []
 
 a = b
 
-b = a // expected-error {{cannot assign a value of type '[A]' to a value of type '[B]'}}
+b = a // expected-error {{cannot assign value of type '[A]' to type '[B]'}}
 
 var aa: [[A]] = []
 var bb: [[B]] = []
 
-aa = bb // expected-error {{cannot assign a value of type '[[B]]' to a value of type '[[A]]'}}
+aa = bb // expected-error {{cannot assign value of type '[[B]]' to type '[[A]]'}}
 
 class C {
 }
@@ -78,7 +78,7 @@ var e: [E] = []
 var f: [F] = []
 
 e = f
-f = e // expected-error {{cannot assign a value of type '[E]' to a value of type '[F]'}}
+f = e // expected-error {{cannot assign value of type '[E]' to type '[F]'}}
 
 class G {
   var x = 0
@@ -141,4 +141,4 @@ var aoa: [AnyObject] = []
 var i: [I] = []
 
 aoa = i
-i = aoa // expected-error {{cannot assign a value of type '[AnyObject]' to a value of type '[I]'}}
+i = aoa // expected-error {{cannot assign value of type '[AnyObject]' to type '[I]'}}

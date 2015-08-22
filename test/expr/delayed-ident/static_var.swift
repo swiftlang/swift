@@ -23,7 +23,7 @@ struct X2<T> {
 }
 
 var x2: X2<Int> = .AnX2 
-x2 = .AnX2     // expected-error {{type of expression is ambiguous without more context}}
+x2 = .AnX2    // reference to isInvalid() decl.
 x2 = .NotAnX2 // expected-error{{type of expression is ambiguous without more context}}
 
 // Static variables through operators.

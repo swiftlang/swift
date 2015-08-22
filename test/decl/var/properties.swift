@@ -385,7 +385,7 @@ var x20: X {
     return y // expected-error{{cannot convert return expression of type 'Y' to return type 'X'}}
   }
   set {
-    y = newValue // expected-error{{cannot assign a value of type 'X' to a value of type 'Y'}}
+    y = newValue // expected-error{{cannot assign value of type 'X' to type 'Y'}}
   }
 }
 
@@ -394,7 +394,7 @@ var x21: X {
     return y // expected-error{{cannot convert return expression of type 'Y' to return type 'X'}}
   }
   set(v) {
-    y = v // expected-error{{cannot assign a value of type 'X' to a value of type 'Y'}}
+    y = v // expected-error{{cannot assign value of type 'X' to type 'Y'}}
   }
 }
 

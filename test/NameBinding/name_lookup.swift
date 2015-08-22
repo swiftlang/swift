@@ -460,7 +460,7 @@ struct DefaultArgumentFromExtension {
   func g(x: (DefaultArgumentFromExtension) -> () -> () = f) {
     let f = 42
     var x2 = x
-    x2 = f // expected-error{{cannot assign a value of type 'Int' to a value of type '(DefaultArgumentFromExtension) -> () -> ()'}}
+    x2 = f // expected-error{{cannot assign value of type 'Int' to type '(DefaultArgumentFromExtension) -> () -> ()'}}
     _ = x2
   }
   var x : (DefaultArgumentFromExtension) -> () -> () = f

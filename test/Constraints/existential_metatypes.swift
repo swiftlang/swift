@@ -10,11 +10,11 @@ var qp: Q.Protocol
 var pp: P.Protocol = qp // expected-error{{cannot convert value of type 'Q.Protocol' to specified type 'P.Protocol'}}
 
 var qt: Q.Type
-qt = qp // expected-error{{cannot assign a value of type 'Q.Protocol' to a value of type 'Q.Type'}}
-qp = qt // expected-error{{cannot assign a value of type 'Q.Type' to a value of type 'Q.Protocol'}}
+qt = qp // expected-error{{cannot assign value of type 'Q.Protocol' to type 'Q.Type'}}
+qp = qt // expected-error{{cannot assign value of type 'Q.Type' to type 'Q.Protocol'}}
 var pt: P.Type = qt // expected-error{{cannot convert value of type 'Q.Type' to specified type 'P.Type'}}
-pt = pp // expected-error{{cannot assign a value of type 'P.Protocol' to a value of type 'P.Type'}}
-pp = pt // expected-error{{cannot assign a value of type 'P.Type' to a value of type 'P.Protocol'}}
+pt = pp // expected-error{{cannot assign value of type 'P.Protocol' to type 'P.Type'}}
+pp = pt // expected-error{{cannot assign value of type 'P.Type' to type 'P.Protocol'}}
 
 var pqt: protocol<P, Q>.Type
 pt = pqt
@@ -22,11 +22,11 @@ qt = pqt
 
 
 var pqp: protocol<P, Q>.Protocol
-pp = pqp // expected-error{{cannot assign}}
-qp = pqp // expected-error{{cannot assign}}
+pp = pqp // expected-error{{cannot assign value of type 'protocol<P, Q>.Protocol' to type 'P.Protocol'}}
+qp = pqp // expected-error{{cannot assign value of type 'protocol<P, Q>.Protocol' to type 'Q.Protocol'}}
 
 var ppp: PP.Protocol
-pp = ppp // expected-error{{cannot assign}}
+pp = ppp // expected-error{{cannot assign value of type 'PP.Protocol' to type 'P.Protocol'}}
 
 var ppt: PP.Type
 pt = ppt
@@ -35,8 +35,8 @@ var at: Any.Type
 at = pt
 
 var ap: Any.Protocol
-ap = pp // expected-error{{cannot assign}}
-ap = pt // expected-error{{cannot assign}}
+ap = pp // expected-error{{cannot assign value of type 'P.Protocol' to type 'Any.Protocol' (aka 'protocol<>.Protocol')}}
+ap = pt // expected-error{{cannot assign value of type 'P.Type' to type 'Any.Protocol' (aka 'protocol<>.Protocol')}}
 
 // Meta-metatypes
 

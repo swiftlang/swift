@@ -2975,6 +2975,11 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     diagIDProtocol = diag::cannot_convert_coerce_protocol;
     nilDiag = diag::cannot_convert_coerce_nil;
     break;
+  case CTP_AssignSource:
+    diagID = diag::cannot_convert_assign;
+    diagIDProtocol = diag::cannot_convert_assign_protocol;
+    nilDiag = diag::cannot_convert_assign_nil;
+    break;
   }
 
   // If we're diagnostic an issue with 'nil', produce a specific diagnostic,
@@ -3554,34 +3559,25 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
     return true;
   }
 
-  // FIXME: Should check dest expr first, then contextually convert the source
-  // to it.
-  
-  // If the source type is already an error type, we've already posted an error.
-  auto srcExpr = typeCheckChildIndependently(assignExpr->getSrc());
-  if (!srcExpr) return true;
-
+  // Type check the destination first, so we can coerce the source to it.
   auto destExpr = typeCheckChildIndependently(assignExpr->getDest(),
                                               TCC_AllowLValue);
   if (!destExpr) return true;
 
-  auto destType = destExpr->getType();
-  auto srcType = srcExpr->getType();
-
   // If the result type is a non-lvalue, then we are failing because it is
   // immutable and that's not a great thing to assign to.
+  auto destType = destExpr->getType();
   if (!destType->isLValueType()) {
     CS->diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc());
     return true;
   }
 
-  // If the two types are ok, it must be a contextual problem.
-  if (srcType->isEqual(destType->getRValueType()))
-    return false;
-
-  diagnose(srcExpr->getLoc(), diag::cannot_assign_values, srcType,
-           destType->getRValueType());
-  return true;
+  // If the source type is already an error type, we've already posted an error.
+  auto srcExpr = typeCheckChildIndependently(assignExpr->getSrc(),
+                                     destType->getLValueOrInOutObjectType(),
+                                             CTP_AssignSource);
+  if (!srcExpr) return true;
+  return false;
 }
 
 bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {

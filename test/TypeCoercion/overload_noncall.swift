@@ -52,7 +52,7 @@ func test_inout() {
   x = accept_XY(&xy);
 
   x = xy;
-  x = &xy; // expected-error{{cannot assign a value of type 'inout X' to a value of type 'X'}}
+  x = &xy; // expected-error{{cannot assign value of type 'inout X' to type 'X'}}
   accept_Z(&xy); // expected-error{{cannot convert value of type 'inout X' to expected argument type 'inout Z'}}
 }
 

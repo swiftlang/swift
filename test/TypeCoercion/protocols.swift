@@ -45,9 +45,9 @@ func testPrintableCoercion(ip1: IsPrintable1,
   var p : MyPrintable = ip1 // okay
   p = ip1 // okay
   p = ip2 // okay
-  p = inp1 // expected-error{{cannot assign a value of type 'IsNotPrintable1' to a value of type 'MyPrintable'}}
-  p = inp2 // expected-error{{cannot assign a value of type 'IsNotPrintable2' to a value of type 'MyPrintable'}}
-  p = op // expected-error{{cannot assign a value of type 'OtherPrintable' to a value of type 'MyPrintable'}}
+  p = inp1 // expected-error{{value of type 'IsNotPrintable1' does not conform to 'MyPrintable' in assignment}}
+  p = inp2 // expected-error{{value of type 'IsNotPrintable2' does not conform to 'MyPrintable' in assignment}}
+  p = op // expected-error{{value of type 'OtherPrintable' does not conform to 'MyPrintable' in assignment}}
   _ = p
 }
 
@@ -57,8 +57,8 @@ func testTitledCoercion(ip1: IsPrintable1, book: Book, lackey: Lackey,
   t = ip1
   t = book
   t = lackey
-  t = number // expected-error{{cannot assign a value of type 'Number' to a value of type 'Titled'}}
-  t = ip2 // expected-error{{cannot assign a value of type 'IsPrintable2' to a value of type 'Titled'}}
+  t = number // expected-error{{value of type 'Number' does not conform to 'Titled' in assignment}}
+  t = ip2 // expected-error{{value of type 'IsPrintable2' does not conform to 'Titled' in assignment}}
   _ = t
 }
 
@@ -90,11 +90,11 @@ func testFormattedPrintableCoercion(ip1: IsPrintable1,
                                     inout op: OtherPrintable,
                                     nfp1: NotFormattedPrintable1) {
   fp = ip1
-  fp = ip2 // expected-error{{cannot assign a value of type 'IsPrintable2' to a value of type 'FormattedPrintable'}}
-  fp = nfp1 // expected-error{{cannot assign a value of type 'NotFormattedPrintable1' to a value of type 'FormattedPrintable'}}
+  fp = ip2 // expected-error{{value of type 'IsPrintable2' does not conform to 'FormattedPrintable' in assignment}}
+  fp = nfp1 // expected-error{{value of type 'NotFormattedPrintable1' does not conform to 'FormattedPrintable' in assignment}}
   p = fp
-  op = fp // expected-error{{cannot assign a value of type 'FormattedPrintable' to a value of type 'OtherPrintable'}}
-  fp = op // expected-error{{cannot assign a value of type 'OtherPrintable' to a value of type 'FormattedPrintable'}}
+  op = fp // expected-error{{value of type 'FormattedPrintable' does not conform to 'OtherPrintable' in assignment}}
+  fp = op // expected-error{{value of type 'OtherPrintable' does not conform to 'FormattedPrintable' in assignment}}
 }
 
 protocol Document : Titled, MyPrintable {
@@ -109,7 +109,7 @@ func testMethodsAndVars(fp: FormattedPrintable, f: TestFormat, inout doc: Docume
 
 func testDocumentCoercion(inout doc: Document, ip1: IsPrintable1, l: Lackey) {
   doc = ip1
-  doc = l // expected-error{{cannot assign a value of type 'Lackey' to a value of type 'Document'}}
+  doc = l // expected-error{{value of type 'Lackey' does not conform to 'Document' in assignment}}
 }
 
 // Check coercion of references.
@@ -146,8 +146,8 @@ func testIntSubscripting(inout i_s: IntSubscriptable,
   i_s[5] = 7 // expected-error{{cannot assign through subscript: subscript is get-only}}
 
   i_s = iis
-  i_s = ids // expected-error{{cannot assign a value of type 'IsDoubleSubscriptable' to a value of type 'IntSubscriptable'}}
-  i_s = iiss // expected-error{{cannot assign a value of type 'IsIntToStringSubscriptable' to a value of type 'IntSubscriptable'}}
+  i_s = ids // expected-error{{value of type 'IsDoubleSubscriptable' does not conform to 'IntSubscriptable' in assignment}}
+  i_s = iiss // expected-error{{value of type 'IsIntToStringSubscriptable' does not conform to 'IntSubscriptable' in assignment}}
 }
 
 protocol MyREPLPrintable {

@@ -6,8 +6,8 @@
 
 func identity<T>(value: T) -> T { return value }
 
-func identity2<T>(value: T) -> T { return value } // expected-note {{found this candidate}}
-func identity2<T>(value: T) -> Int { return 0 } // expected-note {{found this candidate}}
+func identity2<T>(value: T) -> T { return value }
+func identity2<T>(value: T) -> Int { return 0 }
 
 struct X { }
 struct Y { }
@@ -24,8 +24,10 @@ func useIdentity(x: Int, y: Float, i32: Int32) {
   // FIXME: Is this actually the behavior we want? It's strange that these
   // two have different behavior.
   var xx : X, yy : Y
-  xx = identity(yy) // expected-error{{cannot assign a value of type 'Y' to a value of type 'X'}}
-  xx = identity2(yy) // expected-error{{ambiguous use of 'identity2'}}
+  xx = identity(yy) // expected-error{{cannot invoke 'identity' with an argument list of type '(Y)'}}
+  // expected-note @-1 {{expected an argument list of type '(T)'}}
+  xx = identity2(yy) // expected-error{{cannot invoke 'identity2' with an argument list of type '(Y)'}}
+  // expected-note @-1 {{expected an argument list of type '(T)'}}
 }
 
 // FIXME: Crummy diagnostic!
