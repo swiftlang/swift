@@ -454,7 +454,7 @@ func testInOut(inout arg: Int) {
   var x: Int
   takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{20-20=&}}
   takesExplicitInt(&x)
-  takesInt(&x) // expected-error{{cannot convert value of type 'inout Int' to expected argument type 'Int'}}
+  takesInt(&x) // expected-error{{'&' used with non-inout argument of type 'Int'}}
   var y = &x // expected-error{{'&' can only appear immediately in a call argument list}} \
              // expected-error {{type 'inout Int' of variable is not materializable}}
   var z = &arg // expected-error{{'&' can only appear immediately in a call argument list}} \

@@ -460,7 +460,7 @@ let _: Color = .overload(1)  // expected-error {{ambiguous reference to member '
 // expected-note @-1 {{overloads for 'overload' exist with these partially matching parameter lists: (a: Int), (b: Int)}}
 let _: Color = .frob(1.0, &i) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
-let _: Color = .frob(1, &d) // expected-error {{cannot convert value of type 'inout Double' to expected argument type 'inout Int'}}
+let _: Color = .frob(1, &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 var someColor : Color = .red // expected-error {{type 'Color' has no member 'red'}}
 someColor = .red  // expected-error {{type 'Color' has no member 'red'}}
 

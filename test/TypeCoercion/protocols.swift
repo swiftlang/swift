@@ -119,8 +119,8 @@ var fp : FormattedPrintable = IsPrintable1()
 var ip1 : IsPrintable1
 
 refCoercion(&p)
-refCoercion(&fp) // expected-error{{cannot convert value of type 'inout FormattedPrintable' to expected argument type 'inout MyPrintable'}}
-refCoercion(&ip1) // expected-error{{cannot convert value of type 'inout IsPrintable1' to expected argument type 'inout MyPrintable'}}
+refCoercion(&fp) // expected-error{{cannot pass immutable value of type 'MyPrintable' as inout argument}}
+refCoercion(&ip1) // expected-error{{cannot pass immutable value of type 'MyPrintable' as inout argument}}
 
 protocol IntSubscriptable {
   subscript(i: Int) -> Int { get }

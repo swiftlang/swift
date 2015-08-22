@@ -123,7 +123,7 @@ z.non_settable_reftype.property += 1.0
 ++z.non_settable_reftype.property
 
 // regressions with non-settable subscripts in value contexts
-z[0] == 0
+_ = z[0] == 0
 var d : Double
 d = z[0]
 
@@ -156,7 +156,7 @@ func testFooStruct() {
 func takesInt(x: Int) {}
 func testInOut(inout arg: Int) {
   var x : Int
-  takesInt(&x) // expected-error{{cannot convert value of type 'inout Int' to expected argument type 'Int'}}
+  takesInt(&x) // expected-error{{'&' used with non-inout argument of type 'Int'}}
 }
 
 // Don't infer inout types.

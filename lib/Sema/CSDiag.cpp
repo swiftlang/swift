@@ -3405,8 +3405,13 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     return true;
   }
   
-
+  // Collect a full candidate list of callees based on the partially type
+  // checked function.
   CalleeCandidateInfo calleeInfo(fnExpr, CS);
+  
+  // Filter the candidate list based on the argument we may or may not have.
+  calleeInfo.filterContextualMemberList(callExpr->getArg());
+  
   
   Type argType;  // Type of the argument list, if knowable.
   if (auto FTy = fnType->getAs<AnyFunctionType>())
@@ -3419,7 +3424,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
       argType = instanceTy;
     }
   }
-
+  
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
   //
@@ -3533,7 +3538,24 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 }
 
 bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
-  auto subExpr = typeCheckChildIndependently(IOE->getSubExpr(),TCC_AllowLValue);
+  // If we have a contextual type, it must be an inout type.
+  auto contextualType = CS->getContextualType();
+  
+  if (contextualType) {
+    if (!contextualType->is<InOutType>()) {
+      // If the caller expected something inout, but we didn't have
+      // something of inout type, diagnose it.
+      diagnose(IOE->getLoc(), diag::extra_address_of, contextualType)
+        .highlight(IOE->getSourceRange())
+        .fixItRemove(IOE->getStartLoc());
+      return true;
+    }
+    contextualType = contextualType->getInOutObjectType();
+  }
+  
+  auto subExpr = typeCheckChildIndependently(IOE->getSubExpr(), contextualType,
+                                             CS->getContextualTypePurpose(),
+                                             TCC_AllowLValue);
   if (!subExpr) return true;
 
   auto subExprType = subExpr->getType();

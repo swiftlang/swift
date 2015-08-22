@@ -547,7 +547,7 @@ func testSetInitializers() {
 
 func testNSUInteger(obj: NSUIntegerTests, uint: UInt, int: Int) {
   obj.consumeUnsigned(uint) // okay
-  obj.consumeUnsigned(int) // expected-error {{cannot invoke 'consumeUnsigned' with an argument list of type '(Int)'}} expected-note {{expected an argument list of type '(UInt)'}}
+  obj.consumeUnsigned(int) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
 
   obj.consumeUnsigned(0, withTheNSUIntegerHere: uint) // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
   obj.consumeUnsigned(0, withTheNSUIntegerHere: int) // okay
@@ -585,8 +585,7 @@ func testNSUInteger(obj: NSUIntegerTests, uint: UInt, int: Int) {
   }
 
   // NSNumber
-  NSNumber(unsignedInteger: int) // expected-error {{cannot invoke initializer for type 'NSNumber' with an argument list of type '(unsignedInteger: Int)'}}
-  // expected-note @-1 {{expected an argument list of type '(unsignedInteger: UInt)'}}
+  NSNumber(unsignedInteger: int) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UInt'}}
   let num = NSNumber(unsignedInteger: uint)
   let _: String = num.unsignedIntegerValue // expected-error {{cannot convert value of type 'UInt' to specified type 'String'}}
 }
