@@ -1679,28 +1679,14 @@ static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
 }
 #endif
 
-static bool isNative(SILFunctionTypeRepresentation rep) {
-  switch (rep) {
-  case SILFunctionTypeRepresentation::CFunctionPointer:
-  case SILFunctionTypeRepresentation::ObjCMethod:
-  case SILFunctionTypeRepresentation::Block:
-    return false;
-  case SILFunctionTypeRepresentation::Thin:
-  case SILFunctionTypeRepresentation::Thick:
-  case SILFunctionTypeRepresentation::Method:
-  case SILFunctionTypeRepresentation::WitnessMethod:
-    return true;
-  }
-  llvm_unreachable("bad CC");
-}
-
 /// Given two SIL types which are representations of the same type,
 /// check whether they have an abstraction difference.
 static bool hasAbstractionDifference(SILFunctionTypeRepresentation rep,
                                      SILType type1, SILType type2) {
   CanType ct1 = type1.getSwiftRValueType();
   CanType ct2 = type2.getSwiftRValueType();
-  assert(!isNative(rep) || areOnlyAbstractionDifferent(ct1, ct2));
+  assert(getSILFunctionLanguage(rep) == SILFunctionLanguage::C ||
+         areOnlyAbstractionDifferent(ct1, ct2));
   (void)ct1;
   (void)ct2;
 
@@ -2579,13 +2565,16 @@ namespace {
                     AbstractionPattern origParamType,
                     SILParameterInfo param, SGFContext ctxt) {
       auto value = std::move(arg).getScalarValue();
-      if (isNative(Rep)) {
+      switch (getSILFunctionLanguage(Rep)) {
+      case SILFunctionLanguage::Swift:
         value = SGF.emitSubstToOrigValue(loc, value, origParamType,
                                          arg.getType(), ctxt);
-      } else {
+        break;
+      case SILFunctionLanguage::C:
         value = SGF.emitNativeToBridgedValue(loc, value, Rep,
                                              origParamType,
                                              arg.getType(), param.getType());
+        break;
       }
       Args.push_back(value);
     }

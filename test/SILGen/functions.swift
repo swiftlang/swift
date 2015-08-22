@@ -513,24 +513,6 @@ func applyTransparent(x: Bool) -> Bool {
   return testTransparent(x)
 }
 
-// CHECK-LABEL: sil hidden @_TF9functions11funcToBlock{{.*}} : $@convention(thin) (@owned @callee_owned () -> ()) -> @owned @convention(block) () -> ()
-// CHECK:         [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage
-// CHECK:         [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]]
-// CHECK:         [[COPY:%.*]] = copy_block [[BLOCK]] : $@convention(block) () -> ()
-// CHECK:         return [[COPY]]
-func funcToBlock(x: () -> ()) -> @convention(block) () -> () {
-  return x
-}
-
-// CHECK-LABEL: sil hidden @_TF9functions11blockToFunc{{.*}} : $@convention(thin) (@owned @convention(block) () -> ()) -> @owned @callee_owned () -> ()
-// CHECK:         [[COPIED:%.*]] = copy_block %0
-// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb__dT__XFo__dT__
-// CHECK:         [[FUNC:%.*]] = partial_apply [[THUNK]]([[COPIED]])
-// CHECK:         return [[FUNC]]
-func blockToFunc(x: @convention(block) () -> ()) -> () -> () {
-  return x
-}
-
 // CHECK-LABEL: sil hidden [noinline] @_TF9functions15noinline_calleeFT_T_ : $@convention(thin) () -> ()
 @inline(never)
 func noinline_callee() {}

@@ -343,7 +343,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
   explodeTuple(SGF, Loc, inputTuple, inputElts);
 
   // Track all the managed elements whether or not we're actually
-  // emitting to an address, just so that we can disable them ater.
+  // emitting to an address, just so that we can disable them after.
   SmallVector<ManagedValue, 4> outputElts;
 
   for (auto index : indices(inputType->getElementTypes())) {

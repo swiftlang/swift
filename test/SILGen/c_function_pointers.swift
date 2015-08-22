@@ -45,4 +45,3 @@ func pointers_to_swift_functions(x: Int) {
   // CHECK:   [[NO_ARGS_C:%.*]] = function_ref @_TToF19c_function_pointers7no_argsFT_Si
   // CHECK:   apply {{.*}}([[NO_ARGS_C]])
 }
-

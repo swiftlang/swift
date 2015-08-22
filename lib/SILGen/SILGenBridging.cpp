@@ -409,16 +409,11 @@ ManagedValue SILGenFunction::emitNativeToBridgedValue(SILLocation loc,
                                                 AbstractionPattern origNativeTy,
                                                       CanType substNativeTy,
                                                       CanType loweredBridgedTy){
-  switch (destRep) {
-  case SILFunctionTypeRepresentation::Thin:
-  case SILFunctionTypeRepresentation::Thick:
-  case SILFunctionTypeRepresentation::Method:
-  case SILFunctionTypeRepresentation::WitnessMethod:
+  switch (getSILFunctionLanguage(destRep)) {
+  case SILFunctionLanguage::Swift:
     // No additional bridging needed for native functions.
     return v;
-  case SILFunctionTypeRepresentation::CFunctionPointer:
-  case SILFunctionTypeRepresentation::ObjCMethod:
-  case SILFunctionTypeRepresentation::Block:
+  case SILFunctionLanguage::C:
     return emitNativeToCBridgedValue(*this, loc, v,
                            SILType::getPrimitiveObjectType(loweredBridgedTy));
   }
@@ -603,17 +598,12 @@ ManagedValue SILGenFunction::emitBridgedToNativeValue(SILLocation loc,
                                           ManagedValue v,
                                           SILFunctionTypeRepresentation srcRep,
                                           CanType nativeTy) {
-  switch (srcRep) {
-  case SILFunctionTypeRepresentation::Thick:
-  case SILFunctionTypeRepresentation::Thin:
-  case SILFunctionTypeRepresentation::Method:
-  case SILFunctionTypeRepresentation::WitnessMethod:
+  switch (getSILFunctionLanguage(srcRep)) {
+  case SILFunctionLanguage::Swift:
     // No additional bridging needed for native functions.
     return v;
 
-  case SILFunctionTypeRepresentation::CFunctionPointer:
-  case SILFunctionTypeRepresentation::Block:
-  case SILFunctionTypeRepresentation::ObjCMethod:
+  case SILFunctionLanguage::C:
     return emitCBridgedToNativeValue(*this, loc, v, getLoweredType(nativeTy));
   }
   llvm_unreachable("bad CC");
