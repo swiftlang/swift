@@ -80,7 +80,9 @@ protocol _ArrayType
   var _buffer: _Buffer {get}
 }
 
-internal struct _ArrayTypeMirror<T : _ArrayType> : _MirrorType {
+internal struct _ArrayTypeMirror<
+  T : _ArrayType where T.Index == Int
+> : _MirrorType {
   let _value : T
 
   init(_ v : T) { _value = v }
@@ -95,7 +97,7 @@ internal struct _ArrayTypeMirror<T : _ArrayType> : _MirrorType {
 
   subscript(i: Int) -> (String, _MirrorType) {
     _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
-    return ("[\(i)]", _reflect(_value[i]))
+    return ("[\(i)]", _reflect(_value[_value.startIndex + i]))
   }
 
   var summary: String {
