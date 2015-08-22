@@ -1047,14 +1047,6 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
   return false;
 }
 
-/// Conveniently unwrap a paren expression, if necessary.
-static Expr *unwrapParenExpr(Expr *e) {
-  if (auto parenExpr = dyn_cast<ParenExpr>(e))
-    return unwrapParenExpr(parenExpr->getSubExpr());
-  
-  return e;
-}
-
 static SmallVector<TupleTypeElt, 4> decomposeArgumentType(Type ty) {
   SmallVector<TupleTypeElt, 4> result;
 
@@ -3067,7 +3059,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
       }
     
     auto CTPurpose = argType ? CTP_CallArgument : CTP_Unused;
-    return typeCheckChildIndependently(unwrapParenExpr(argExpr), argType,
+    return typeCheckChildIndependently(argExpr, argType,
                                        CTPurpose, options);
   }
 
@@ -4112,7 +4104,15 @@ bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
 /// An IdentityExpr doesn't change its argument, but it *can* propagate its
 /// contextual type information down.
 bool FailureDiagnosis::visitIdentityExpr(IdentityExpr *E) {
-  if (!typeCheckChildIndependently(E->getSubExpr(), CS->getContextualType(),
+  auto contextualType = CS->getContextualType();
+  
+  // If we have a paren expr and our contextual type is a ParenType, remove the
+  // paren expr sugar.
+  if (isa<ParenExpr>(E) && contextualType)
+    if (auto *PT = dyn_cast<ParenType>(contextualType.getPointer()))
+      contextualType = PT->getUnderlyingType();
+  
+  if (!typeCheckChildIndependently(E->getSubExpr(), contextualType,
                                    CS->getContextualTypePurpose()))
     return true;
   return false;
