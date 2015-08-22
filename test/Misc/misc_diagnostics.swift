@@ -50,7 +50,7 @@ struct MyArray<Element> {}
 class A {
     var a: MyArray<Int>
     init() {
-        a = MyArray<Int // expected-error{{argument for generic parameter 'Element' could not be inferred}}
+        a = MyArray<Int // expected-error{{binary operator '<' cannot be applied to operands of type 'MyArray<_>.Type' and 'Int.Type'}}
     }
 }
 

@@ -241,11 +241,11 @@ func r18800223(i : Int) {
 
   
   var buttonTextColor: String?
-  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{type of expression is ambiguous without more context}}
+  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{unable to infer closure return type in current context}}
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
-_ = { $0 }  // expected-error {{type of expression is ambiguous without more context}}
+_ = { $0 }  // expected-error {{unable to infer closure return type in current context}}
 
 
 

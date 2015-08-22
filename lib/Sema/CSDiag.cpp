@@ -1805,14 +1805,9 @@ suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
 
 /// Flags that can be used to control name lookup.
 enum TCCFlags {
-  /// Don't force the subexpression to resolve to a specific type.  If the
-  /// subexpr is ambiguous, don't diagnose an error.
-  /// FIXME: this should always be on.
-  TCC_AllowUnresolved = 0x01,
-
   /// Allow the result of the subexpression to be an lvalue.  If this is not
   /// specified, any lvalue will be forced to be loaded into an rvalue.
-  TCC_AllowLValue = 0x02
+  TCC_AllowLValue = 0x01
 };
 
 typedef OptionSet<TCCFlags> TCCOptions;
@@ -2468,8 +2463,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
         return true;
       }
  
-    if (PT->getDecl()->
-        isSpecificProtocol(KnownProtocolKind::NilLiteralConvertible)) {
+    if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
       diagnose(expr->getLoc(), diag::cannot_use_nil_with_this_type, toType)
         .highlight(expr->getSourceRange());
       return true;
@@ -2740,19 +2734,9 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
     }
   }
 
-  if (isa<ClosureExpr>(subExpr))
-    options |= TCC_AllowUnresolved;
-  
   // These expression types can never be checked without their enclosing
   // context, so don't try - it would just make bogus diagnostics.
-  if (isa<NilLiteralExpr>(subExpr) ||
-  
-      // A '_' is only allowed on the LHS of an assignment, so we can't descend
-      // past the AssignExpr.  This is a problem below because we're not
-      // allowing ambiguous solutions for subexprs, and thus the code below is
-      // forced to diagnose "discard_expr_outside_of_assignment".  This should
-      // really allow ambiguous expressions and diagnose it only in MiscDiags.
-      isa<DiscardAssignmentExpr>(subExpr)) {
+  if (isa<NilLiteralExpr>(subExpr)) {
     
     // If we have a contextual conversion type, then we *can* type check these.
     if (!convertType)
@@ -2793,7 +2777,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   if (options.contains(TCC_AllowLValue))
     TCEOptions |= TypeCheckExprFlags::IsDiscarded;
 
-  if (options.contains(TCC_AllowUnresolved) && !convertType)
+  // If there is no contextual type available, tell typeCheckExpression that it
+  // is ok to produce an ambiguous result, it can just fill in holes with
+  // UnresolvedType and we'll deal with it.
+  if (!convertType)
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
 
   bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, convertType,
@@ -2828,10 +2815,6 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
 /// of the specified node.
 Expr *FailureDiagnosis::
 typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
-  // If we're type checking an arbitrary subexpr, always allow ambiguity given
-  // that arbitrary contextual information has been stripped off.
-  options |= TCC_AllowUnresolved;
-
   if (subExpr == expr)
     return typeCheckChildIndependently(subExpr, options);
   
@@ -2884,8 +2867,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   CS->TC.addExprForDiagnosis(expr, nullptr);
 
   // Type check the expression independently of any contextual constraints.
-  auto exprType = getTypeOfTypeCheckedChildIndependently(expr,
-                                               TCCFlags::TCC_AllowUnresolved);
+  auto exprType = getTypeOfTypeCheckedChildIndependently(expr);
+  
   // If it failed an diagnosed something, then we're done.
   if (!exprType) return true;
 
@@ -3423,8 +3406,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
-  auto fnExpr = typeCheckChildIndependently(callExpr->getFn(),
-                                            TCC_AllowUnresolved);
+  auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
   if (!fnExpr) return true;
   auto fnType = fnExpr->getType()->getRValueType();
 
@@ -3564,9 +3546,17 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
                                               TCC_AllowLValue);
   if (!destExpr) return true;
 
+  auto destType = destExpr->getType();
+  if (destType->is<UnresolvedType>() || destType->hasTypeVariable()) {
+    // If we have no useful type information from the destination, just type
+    // check the source without contextual information.  If it succeeds, then we
+    // win, but if it fails, we'll have to diagnose this another way.
+    return !typeCheckChildIndependently(assignExpr->getSrc());
+  }
+  
+  
   // If the result type is a non-lvalue, then we are failing because it is
   // immutable and that's not a great thing to assign to.
-  auto destType = destExpr->getType();
   if (!destType->isLValueType()) {
     CS->diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc());
     return true;
@@ -4208,8 +4198,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   
 
   // Attempt to re-type-check the entire expression, while allowing ambiguity.
-  auto exprType = getTypeOfTypeCheckedChildIndependently(expr,
-                                               TCCFlags::TCC_AllowUnresolved);
+  auto exprType = getTypeOfTypeCheckedChildIndependently(expr);
   // If it failed an diagnosed something, then we're done.
   if (!exprType) return;
 

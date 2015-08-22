@@ -236,7 +236,7 @@ func rdar19831698() {
   var v70 = true + 1 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (UnsafeMutablePointer<Memory>, Int), (UnsafePointer<Memory>, Int)}}
   var v71 = true + 1.0 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Double'}} expected-note {{expected an argument list of type '(Double, Double)'}}
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
-  var v73 = true + [] // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'NSArray'}}
+  var v73 = true + [] // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and '[_]'}}
   var v75 = true + "str" // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'String'}} expected-note {{expected an argument list of type '(String, String)'}}
 }
 

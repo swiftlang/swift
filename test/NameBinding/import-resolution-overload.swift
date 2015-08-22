@@ -23,7 +23,7 @@ var _ : Int = something(1)
 var _ : (Int, Int) = something(1, 2)
 var _ : LocalType = something(LocalType())
 var _ : () = something(1, 2, 3)
-something = 42 // expected-error {{ambiguous use of 'something'}}
+something = 42 // expected-error {{ambiguous reference to member 'something'}}
 
 let ambValue = ambiguousWithVar // no-warning - var preferred
 let ambValueChecked: Int = ambValue
@@ -41,12 +41,12 @@ scopedVar(42) // expected-error {{cannot call value of non-function type 'Int'}}
 
 var _ : Bool = scopedFunction(true)
 var _ : Int  = scopedFunction(42)
-scopedFunction = 42 // expected-error {{ambiguous use of 'scopedFunction'}}
+scopedFunction = 42 // expected-error {{ambiguous reference to member 'scopedFunction'}}
 
 // FIXME: Should be an error -- a type name and a function cannot overload.
 var _ : Int = TypeNameWins(42)
 
-TypeNameWins = 42 // expected-error {{ambiguous use of 'TypeNameWins'}}
+TypeNameWins = 42 // expected-error {{ambiguous reference to member 'TypeNameWins'}}
 var _ : TypeNameWins // no-warning
 
 // rdar://problem/21739333
