@@ -158,7 +158,7 @@ SILValue SILValue::stripAddressProjections() {
   }
 }
 
-SILValue SILValue::stripAggregateProjections() {
+SILValue SILValue::stripValueProjections() {
   SILValue V = *this;
 
   while (true) {

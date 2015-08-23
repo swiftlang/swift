@@ -254,7 +254,7 @@ public:
   //
   // An aggregate projection instruction is either a struct_extract or a
   // tuple_extract instruction.
-  SILValue stripAggregateProjections();
+  SILValue stripValueProjections();
 
   // Return the underlying SILValue after stripping off all indexing
   // instructions.
