@@ -1849,6 +1849,177 @@ CanSILFunctionType TypeConverter::getConstantOverrideType(SILDeclRef derived,
                                   derived.kind);
 }
 
+/// Given that type1 is known to be a subtype of type2, check if the two
+/// types have the same calling convention representation.
+static bool areTypesABICompatible(CanType type1, CanType type2) {
+  // Unwrap optionals, but remember that we did.
+  OptionalTypeKind OTK1, OTK2;
+  CanType object1 = type1.getAnyOptionalObjectType(OTK1);
+  CanType object2 = type2.getAnyOptionalObjectType(OTK2);
+  
+  if (OTK1 == OTK_None)
+    object1 = type1;
+  if (OTK2 == OTK_None)
+    object2 = type2;
+  
+  // Forcing IUOs always requires a thunk.
+  if (OTK1 == OTK_ImplicitlyUnwrappedOptional && OTK2 == OTK_None)
+    return false;
+  
+  // Except for the above case, we should not be making a value less optional.
+  assert(OTK1 == OTK_None || OTK2 != OTK_None);
+  
+  // If we're introducing a level of optionality, only certain types are
+  // ABI-compatible -- check below.
+  bool optionalityChange = (OTK1 == OTK_None && OTK2 != OTK_None);
+  bool optionalToOptional = (OTK1 != OTK_None && OTK2 != OTK_None);
+
+  // If the types are identical and there was no optionality change,
+  // we're done.
+  if (object1 == object2 && !optionalityChange)
+    return true;
+  
+  // Classes, class-constrained archetypes, and pure-ObjC existential types
+  // all have single retainable pointer representation; optionality change
+  // is allowed.
+  if ((object1->mayHaveSuperclass() || object1->isObjCExistentialType()) &&
+      (object2->mayHaveSuperclass() || object2->isObjCExistentialType()))
+    return true;
+
+  // Function parameters are ABI compatible if their differences are
+  // trivial.
+  //
+  // FIXME: Optionality change is permitted for @block representation, but we
+  // can't really express that here.
+  //
+  // Note: The overall function type conversion still needs a thunk if a
+  // parameter or result type is a function requiring a thin-to-thick
+  // conversion.
+  if (auto fnTy1 = dyn_cast<SILFunctionType>(object1)) {
+    if (auto fnTy2 = dyn_cast<SILFunctionType>(object2)) {
+      // If the payload of an optional is a function, it was supposed to be
+      // an AST type.
+      assert(!optionalityChange && !optionalToOptional);
+
+      return (fnTy1->checkForABIDifferences(fnTy2) ==
+              SILFunctionType::ABIDifference::Trivial);
+    }
+  }
+  
+  // Metatypes are ABI-compatible if they have the same representation.
+  if (auto meta1 = dyn_cast<MetatypeType>(object1)) {
+    if (auto meta2 = dyn_cast<MetatypeType>(object2)) {
+      // thick metatypes are ABI-compatible with optional thick metatypes.
+      if (optionalityChange)
+        return meta1->getRepresentation() == MetatypeRepresentation::Thick;
+
+      // optional payload types are unlowered, so if we're doing optional to
+      // optional we're all set.
+      if (optionalToOptional)
+        return true;
+
+      return meta1->getRepresentation() == meta2->getRepresentation();
+    }
+  }
+  
+  // Existential metatypes which are not identical are only ABI-compatible
+  // in @objc representation.
+  if (auto meta1 = dyn_cast<ExistentialMetatypeType>(object1)) {
+    if (auto meta2 = dyn_cast<ExistentialMetatypeType>(object2)) {
+      if (optionalityChange || optionalToOptional)
+        return false;
+
+      return (meta1->getRepresentation() == meta2->getRepresentation() &&
+              meta1->getRepresentation() == MetatypeRepresentation::ObjC);
+    }
+  }
+
+  // Tuple types are ABI-compatible if their elements are.
+  // When doing optional to optional, the types are unlowered, so let's
+  // just conservatively say that they're only ABI compatible if they're
+  // identical, to avoid recursing into unlowered types.
+  if (!optionalityChange && !optionalToOptional) {
+    if (auto tuple1 = dyn_cast<TupleType>(object1)) {
+      if (auto tuple2 = dyn_cast<TupleType>(object2)) {
+        if (tuple1->getNumElements() != tuple2->getNumElements())
+          return false;
+        
+        for (unsigned i = 0, e = tuple1->getNumElements(); i < e; i++) {
+          if (!areTypesABICompatible(tuple1.getElementType(i),
+                                     tuple2.getElementType(i)))
+            return false;
+        }
+      }
+    }
+  }
+
+  // The types are different, or there was an optionality change resulting
+  // in a change in representation.
+  return false;
+}
+
+SILFunctionType::ABIDifference
+SILFunctionType::checkForABIDifferences(SILFunctionType *other) {
+  if (getParameters().size() != other->getParameters().size())
+    return ABIDifference::NeedsThunk;
+
+  if (hasIndirectResult() != other->hasIndirectResult())
+    return ABIDifference::NeedsThunk;
+
+  // If we don't have a context but the other type does, we'll return
+  // ABIDifference::ThinToThick below.
+  if (getExtInfo().hasContext() &&
+      getCalleeConvention() != other->getCalleeConvention())
+    return ABIDifference::NeedsThunk;
+
+  auto result1 = getResult(), result2 = other->getResult();
+  
+  if (result1.getConvention() != result2.getConvention())
+    return ABIDifference::NeedsThunk;
+
+  if (!areTypesABICompatible(result1.getType(), result2.getType()))
+    return ABIDifference::NeedsThunk;
+
+  // If one type does not have an error result, we can still trivially cast
+  // (casting away an error result is only safe if the function never throws,
+  // of course).
+  if (hasErrorResult() && other->hasErrorResult()) {
+    auto error1 = getErrorResult(), error2 = other->getErrorResult();
+
+    if (error1.getConvention() != error2.getConvention())
+      return ABIDifference::NeedsThunk;
+
+    if (!areTypesABICompatible(error1.getType(), error2.getType()))
+      return ABIDifference::NeedsThunk;
+  }
+
+  for (unsigned i = 0, e = getParameters().size(); i < e; ++i) {
+    auto param1 = getParameters()[i], param2 = other->getParameters()[i];
+    
+    if (param1.getConvention() != param2.getConvention())
+      return ABIDifference::NeedsThunk;
+
+    // Parameters are contravariant and our relation is not symmetric, so
+    // make sure to flip the relation around.
+    if (!param1.isIndirectResult())
+      std::swap(param1, param2);
+
+    if (!areTypesABICompatible(param1.getType(), param2.getType()))
+      return ABIDifference::NeedsThunk;
+  }
+
+  auto rep1 = getRepresentation(), rep2 = other->getRepresentation();
+  if (rep1 != rep2) {
+    if (rep1 == SILFunctionTypeRepresentation::Thin &&
+        rep2 == SILFunctionTypeRepresentation::Thick)
+      return ABIDifference::ThinToThick;
+
+    return ABIDifference::NeedsThunk;
+  }
+
+  return ABIDifference::Trivial;
+}
+
 namespace {
   /// Given a lowered SIL type, apply a substitution to it to produce another
   /// lowered SIL type which uses the same abstraction conventions.

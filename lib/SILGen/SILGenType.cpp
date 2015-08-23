@@ -84,62 +84,13 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   auto derivedSubstTy = derivedInfo.getSILType()
     .castTo<SILFunctionType>();
 
-  // Types are ABI-compatible if they're the same type, or if they're both
-  // bridgeable object types.
-  // TODO: Are there other cases that apply?
-  auto ABICompatible = [](CanType a, CanType b) -> bool {
-    if (a == b)
-      return true;
-    
-    if (a->hasRetainablePointerRepresentation()
-        && b->hasRetainablePointerRepresentation())
-      return true;
-    
-    return false;
-  };
+  // The override member type is semantically a subtype of the base
+  // member type. If the override is ABI compatible, we do not need
+  // a thunk.
+  if (derivedSubstTy->checkForABIDifferences(derivedOrigTy) ==
+      SILFunctionType::ABIDifference::Trivial)
+    return getFunction(derived, NotForDefinition);
   
-  if (derivedOrigTy->getParameters().size()
-        != derivedSubstTy->getParameters().size())
-    goto needs_thunk;
-  
-  if (derivedOrigTy->hasIndirectResult() != derivedSubstTy->hasIndirectResult())
-    goto needs_thunk;
-
-  {
-    auto origResult = derivedOrigTy->getResult(),
-         substResult = derivedSubstTy->getResult();
-    
-    if (origResult.getConvention() != substResult.getConvention())
-      goto needs_thunk;
-    
-    if (!ABICompatible(origResult.getType(), substResult.getType()))
-      goto needs_thunk;
-  }
-  
-  for (unsigned i = 0, e = derivedOrigTy->getParameters().size();
-       i < e; ++i) {
-    auto origParam = derivedOrigTy->getParameters()[i];
-    auto substParam = derivedSubstTy->getParameters()[i];
-    
-    if (origParam.getConvention() != substParam.getConvention())
-      goto needs_thunk;
-    
-    if (!ABICompatible(origParam.getType(), substParam.getType()))
-      goto needs_thunk;
-    
-    // Forcing IUOs always requires a thunk.
-    OptionalTypeKind origOTK, substOTK;
-    origParam.getType().getAnyOptionalObjectType(origOTK);
-    substParam.getType().getAnyOptionalObjectType(substOTK);
-    if (origOTK == OTK_ImplicitlyUnwrappedOptional
-        && substOTK == OTK_None)
-      goto needs_thunk;
-  }
-  
-  // If we got here, no thunk is necessary. Use the original.
-  return getFunction(derived, NotForDefinition);
-  
-needs_thunk:
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
   SILLocation loc(derivedDecl);
   auto thunk = SILFunction::create(M, SILLinkage::Private, name,

@@ -1291,21 +1291,6 @@ emitGeneralizeFunctionWithThunk(SILGenFunction &gen,
                      origFormalType, substFormalType, expectedTL);
 }
 
-static bool representationChangeRequiresThunk(
-                                            SILFunctionTypeRepresentation from,
-                                            SILFunctionTypeRepresentation to) {
-  // No representation change, no thunk necessary.
-  if (from == to)
-    return false;
-  // Thin-to-thick is a trivial change.
-  if (from == SILFunctionTypeRepresentation::Thin
-      && to == SILFunctionTypeRepresentation::Thick)
-    return false;
-  
-  // Conservatively assume other representation changes get thunked.
-  return true;
-}
-
 ManagedValue
 SILGenFunction::emitGeneralizedFunctionValue(SILLocation loc,
                                            ManagedValue fn,
@@ -1326,13 +1311,9 @@ SILGenFunction::emitGeneralizedFunctionValue(SILLocation loc,
     return fn;
   }
 
-  // Any of these changes requires a conversion thunk.
-  if (fnType->getResult() != expectedFnType->getResult() ||
-      fnType->getParameters() != expectedFnType->getParameters() ||
-      (fnType->getExtInfo().hasContext() &&
-       fnType->getCalleeConvention() != expectedFnType->getCalleeConvention())||
-      representationChangeRequiresThunk(fnType->getRepresentation(),
-                                        expectedFnType->getRepresentation())) {
+  // Check if we require a re-abstraction thunk.
+  if (fnType->checkForABIDifferences(expectedFnType) ==
+      SILFunctionType::ABIDifference::NeedsThunk) {
     assert(expectedFnType->getExtInfo().hasContext()
            && "conversion thunk will not be thin!");
     return emitGeneralizeFunctionWithThunk(*this, loc, fn,
