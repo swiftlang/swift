@@ -55,7 +55,7 @@ class alignas(8) ValueBase : public SILAllocated<ValueBase> {
   Operand *FirstUse = nullptr;
   friend class Operand;
   friend class SILValue;
-  
+
   const ValueKind Kind;
 
   ValueBase(const ValueBase &) = delete;
@@ -66,7 +66,7 @@ protected:
     : TypeOrTypeList(TypeList), Kind(Kind) {}
   ValueBase(ValueKind Kind, SILType Ty)
     : TypeOrTypeList(Ty), Kind(Kind) {}
-  
+
 public:
   ~ValueBase() {
     assert(use_empty() && "Cannot destroy a value that still has uses!");
@@ -76,7 +76,7 @@ public:
   ValueKind getKind() const { return Kind; }
 
   ArrayRef<SILType> getTypes() const;
-  
+
   /// True if the "value" is actually a value that can be used by other
   /// instructions.
   bool hasValue() const { return !TypeOrTypeList.isNull(); }
@@ -88,7 +88,7 @@ public:
     }
     return getTypes()[i];
   }
-  
+
   unsigned getNumTypes() const {
     if (TypeOrTypeList.isNull())
       return 0;
@@ -112,10 +112,10 @@ public:
 
   inline use_iterator use_begin() const;
   inline use_iterator use_end() const;
-  
+
   /// Returns a range of all uses, which is useful for iterating over all uses.
   /// To ignore debug-info instructions use swift::getNonDebugUses instead
-  // (see comment in DebugUtils.h).
+  /// (see comment in DebugUtils.h).
   inline iterator_range<use_iterator> getUses() const;
 
   /// Returns true if this value has exactly one use.
@@ -126,7 +126,7 @@ public:
   /// Pretty-print the value.
   void dump() const;
   void print(raw_ostream &OS) const;
-  
+
   /// Pretty-print the value in context, preceded by its operands (if the
   /// value represents the result of an instruction) and followed by its
   /// users.
@@ -135,8 +135,8 @@ public:
 
   static bool classof(const ValueBase *V) { return true; }
 
-  // If this is a SILArgument or a SILInstruction get its parent basic block,
-  // otherwise return null.
+  /// If this is a SILArgument or a SILInstruction get its parent basic block,
+  /// otherwise return null.
   SILBasicBlock *getParentBB();
 };
 
@@ -148,16 +148,16 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 }  // end namespace swift
 
 namespace llvm {
-// ValueBase* is always at least eight-byte aligned; make the three tag bits
-// available through PointerLikeTypeTraits.
+/// ValueBase * is always at least eight-byte aligned; make the three tag bits
+/// available through PointerLikeTypeTraits.
 template<>
-class PointerLikeTypeTraits<swift::ValueBase*> {
+class PointerLikeTypeTraits<swift::ValueBase *> {
 public:
   static inline void *getAsVoidPointer(swift::ValueBase *I) {
     return (void*)I;
   }
   static inline swift::ValueBase *getFromVoidPointer(void *P) {
-    return (swift::ValueBase*)P;
+    return (swift::ValueBase *)P;
   }
   enum { NumLowBitsAvailable = 3 };
 };
@@ -175,16 +175,16 @@ enum {
 /// SILValue - A SILValue is a use of a specific result of an ValueBase.  As
 /// such, it is a pair of the ValueBase and the result number being referenced.
 class SILValue {
-  llvm::PointerIntPair<ValueBase*, ValueResultNumberBits> ValueAndResultNumber;
-  
+  llvm::PointerIntPair<ValueBase *, ValueResultNumberBits> ValueAndResultNumber;
+
   explicit SILValue(void *p) {
     ValueAndResultNumber =
       decltype(ValueAndResultNumber)::getFromOpaqueValue(p);
   }
-  
+
 public:
   SILValue(const ValueBase *V = 0, unsigned ResultNumber = 0)
-    : ValueAndResultNumber((ValueBase*)V, ResultNumber) {
+    : ValueAndResultNumber((ValueBase *)V, ResultNumber) {
     assert(ResultNumber == getResultNumber() && "Overflow");
   }
 
@@ -230,40 +230,40 @@ public:
   /// (see comment in DebugUtils.h).
   inline bool hasOneUse() const;
 
-  // Return the underlying SILValue after stripping off all casts from the
-  // current SILValue.
+  /// Return the underlying SILValue after stripping off all casts from the
+  /// current SILValue.
   SILValue stripCasts();
 
-  // Return the underlying SILValue after stripping off all upcasts from the
-  // current SILValue.
+  /// Return the underlying SILValue after stripping off all upcasts from the
+  /// current SILValue.
   SILValue stripUpCasts();
 
   /// Return the underlying SILValue after stripping off all
   /// upcasts and downcasts.
   SILValue stripClassCasts();
 
-  // Return the underlying SILValue after stripping off all casts and
-  // address projection instructions.
-  //
-  // An address projection instruction is one of one of ref_element_addr,
-  // struct_element_addr, tuple_element_addr.
+  /// Return the underlying SILValue after stripping off all casts and
+  /// address projection instructions.
+  ///
+  /// An address projection instruction is one of one of ref_element_addr,
+  /// struct_element_addr, tuple_element_addr.
   SILValue stripAddressProjections();
 
-  // Return the underlying SILValue after stripping off all aggregate projection
-  // instructions.
-  //
-  // An aggregate projection instruction is either a struct_extract or a
-  // tuple_extract instruction.
+  /// Return the underlying SILValue after stripping off all aggregate projection
+  /// instructions.
+  ///
+  /// An aggregate projection instruction is either a struct_extract or a
+  /// tuple_extract instruction.
   SILValue stripValueProjections();
 
-  // Return the underlying SILValue after stripping off all indexing
-  // instructions.
-  //
-  // An indexing inst is either index_addr or index_raw_pointer.
+  /// Return the underlying SILValue after stripping off all indexing
+  /// instructions.
+  ///
+  /// An indexing inst is either index_addr or index_raw_pointer.
   SILValue stripIndexingInsts();
 
-  // Returns the underlying value after stripping off a builtin expect
-  // intrinsic call.
+  /// Returns the underlying value after stripping off a builtin expect
+  /// intrinsic call.
   SILValue stripExpectIntrinsic();
 
   void replaceAllUsesWith(SILValue V);
@@ -271,21 +271,28 @@ public:
   void dump() const;
   void print(raw_ostream &os) const;
 
-  // Check validity.
+  /// Return true if underlying ValueBase of this SILValue is non-null. Return
+  /// false otherwise.
   bool isValid() const { return getDef() != nullptr; }
+  /// Return true if underlying ValueBase of this SILValue is non-null. Return
+  /// false otherwise.
   explicit operator bool() const { return getDef() != nullptr; }
-  
-  // Use as a pointer-like type.
+
+  /// Convert this SILValue into an opaque pointer like type. For use with
+  /// PointerLikeTypeTraits.
   void *getOpaqueValue() const {
     return ValueAndResultNumber.getOpaqueValue();
   }
+
+  /// Convert the given opaque pointer into a SILValue. For use with
+  /// PointerLikeTypeTraits.
   static SILValue getFromOpaqueValue(void *p) {
     return SILValue(p);
   }
 
-  // Get the SILLocation associated with the value, if it has any.
+  /// Get the SILLocation associated with the value, if it has any.
   Optional<SILLocation> getLoc() const;
-  
+
   enum {
     NumLowBitsAvailable =
       llvm::PointerLikeTypeTraits<decltype(ValueAndResultNumber)>::
@@ -321,7 +328,7 @@ class Operand {
   template<unsigned N> friend class TailAllocatedOperandList;
 
 public:
-  // Operands are not copyable.
+  /// Operands are not copyable.
   Operand(const Operand &use) = delete;
   Operand &operator=(const Operand &use) = delete;
 
@@ -333,7 +340,7 @@ public:
     // It's probably not worth optimizing for the case of switching
     // operands on a single value.
     removeFromCurrent();
-    assert(reinterpret_cast<ValueBase*>(Owner) != newValue.getDef() &&
+    assert(reinterpret_cast<ValueBase *>(Owner) != newValue.getDef() &&
         "Cannot add a value as an operand of the instruction that defines it!");
     TheValue = newValue;
     insertIntoCurrent();
@@ -362,15 +369,15 @@ public:
   /// Return the user that owns this use.
   SILInstruction *getUser() { return Owner; }
   const SILInstruction *getUser() const { return Owner; }
-  
+
   /// getOperandNumber - Return which operand this is in the operand list of the
   /// using instruction.
   unsigned getOperandNumber() const;
 
-  // Hoist the address projection rooted in this operand to \p InsertBefore.
-  // Requires the projected value to dominate the insertion point.
-  //
-  // Will look through single basic block predeccessor arguments.
+  /// Hoist the address projection rooted in this operand to \p InsertBefore.
+  /// Requires the projected value to dominate the insertion point.
+  ///
+  /// Will look through single basic block predeccessor arguments.
   void hoistAddressProjections(SILInstruction *InsertBefore,
                                DominanceInfo *DomTree);
 
@@ -426,10 +433,10 @@ public:
   iterator end() const { return iterator(Operands.end()); }
   size_t size() const { return Operands.size(); }
   bool empty() const { return Operands.empty(); }
-  
+
   SILValue front() const { return Operands.front().get(); }
   SILValue back() const { return Operands.back().get(); }
-  
+
   SILValue operator[](unsigned i) const { return Operands[i].get(); }
   OperandValueArrayRef slice(unsigned begin, unsigned length) const {
     return OperandValueArrayRef(Operands.slice(begin, length));
@@ -440,7 +447,7 @@ public:
   OperandValueArrayRef drop_back() const {
     return OperandValueArrayRef(Operands.drop_back());
   }
-  
+
   bool operator==(const OperandValueArrayRef RHS) const {
     if (size() != RHS.size())
       return false;
@@ -449,7 +456,7 @@ public:
         return false;
     return true;
   }
-  
+
   bool operator!=(const OperandValueArrayRef RHS) const {
     return !(*this == RHS);
   }
@@ -526,7 +533,7 @@ public:
   SILInstruction *getUser() const {
     return CurAndResultNumber.getPointer()->getUser();
   }
-                                                 
+
   ValueUseIterator &operator++() {
     Operand *next = CurAndResultNumber.getPointer();
     assert(next && "incrementing past end()!");
@@ -762,7 +769,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
 
 
 namespace llvm {
-  // A SILValue casts like a ValueBase*.
+  /// A SILValue casts like a ValueBase *.
   template<> struct simplify_type<const ::swift::SILValue> {
     typedef ::swift::ValueBase *SimpleType;
     static SimpleType getSimplifiedValue(::swift::SILValue Val) {
@@ -786,15 +793,15 @@ namespace llvm {
       auto ResultNumHash =
         DenseMapInfo<unsigned>::getHashValue(V.getResultNumber());
       auto ValueBaseHash =
-        DenseMapInfo<swift::ValueBase*>::getHashValue(V.getDef());
+        DenseMapInfo<swift::ValueBase *>::getHashValue(V.getDef());
       return hash_combine(ResultNumHash, ValueBaseHash);
     }
     static bool isEqual(swift::SILValue LHS, swift::SILValue RHS) {
       return LHS == RHS;
     }
   };
-  
-  // SILValue is a PointerLikeType.
+
+  /// SILValue is a PointerLikeType.
   template<> class PointerLikeTypeTraits<::swift::SILValue> {
     using SILValue = ::swift::SILValue;
   public:
@@ -804,7 +811,7 @@ namespace llvm {
     static SILValue getFromVoidPointer(void *p) {
       return SILValue::getFromOpaqueValue(p);
     }
-    
+
     enum { NumLowBitsAvailable = swift::SILValue::NumLowBitsAvailable };
   };
 
