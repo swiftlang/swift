@@ -59,16 +59,8 @@ enum OptimizationLevelKind {
 
 static void registerAnalysisPasses(SILPassManager &PM) {
   SILModule *Mod = PM.getModule();
-  PM.registerAnalysis(createCallGraphAnalysis(Mod));
-  PM.registerAnalysis(createAliasAnalysis(Mod));
-  PM.registerAnalysis(createDominanceAnalysis(Mod));
-  PM.registerAnalysis(createPostDominanceAnalysis(Mod));
-  PM.registerAnalysis(createLoopInfoAnalysis(Mod, &PM));
-  PM.registerAnalysis(createInductionVariableAnalysis(Mod));
-  PM.registerAnalysis(createPostOrderAnalysis(Mod));
-  PM.registerAnalysis(createClassHierarchyAnalysis(Mod));
-  PM.registerAnalysis(createRCIdentityAnalysis(Mod, &PM));
-  PM.registerAnalysis(createDestructorAnalysis(Mod));
+#define ANALYSIS(NAME) PM.registerAnalysis(create##NAME##Analysis(Mod, &PM));
+#include "swift/SILAnalysis/Analysis.def"
 }
 
 bool swift::runSILDiagnosticPasses(SILModule &Module) {

@@ -808,6 +808,6 @@ AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V,
   return MemoryBehaviorVisitor(*this, V, IgnoreRefCountIncrements).visit(Inst);
 }
 
-SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
+SILAnalysis *swift::createAliasAnalysis(SILModule *M, SILPassManager *) {
   return new AliasAnalysis(M);
 }

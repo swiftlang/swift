@@ -35,7 +35,7 @@ class SILLoopAnalysis : public SILAnalysis {
   SILPassManager *PM;
 public:
   SILLoopAnalysis(SILModule *, SILPassManager *PM)
-      : SILAnalysis(AnalysisKind::LoopInfo), PM(PM) {}
+      : SILAnalysis(AnalysisKind::Loop), PM(PM) {}
 
   virtual ~SILLoopAnalysis() {
     for (auto LI : LoopInfos)
@@ -43,7 +43,7 @@ public:
   }
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::LoopInfo;
+    return S->getKind() == AnalysisKind::Loop;
   }
 
   virtual void invalidate(SILAnalysis::PreserveKind K) {

@@ -30,16 +30,15 @@ public:
   typedef llvm::SmallVector<ClassDecl *, 8> ClassList;
   typedef llvm::SmallPtrSet<ClassDecl *, 32> ClassSet;
 
-
-  ClassHierarchyAnalysis(SILModule *Mod) :
-  SILAnalysis(AnalysisKind::ClassHierarchyAnalysis), M(Mod) {
+  ClassHierarchyAnalysis(SILModule *Mod)
+      : SILAnalysis(AnalysisKind::ClassHierarchy), M(Mod) {
       init(); 
     }
 
   ~ClassHierarchyAnalysis();
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::ClassHierarchyAnalysis;
+    return S->getKind() == AnalysisKind::ClassHierarchy;
   }
 
   virtual void invalidate(SILAnalysis::PreserveKind K) {

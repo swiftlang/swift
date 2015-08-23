@@ -150,16 +150,8 @@ ASTVerifierProcessId("ast-verifier-process-id", llvm::cl::Hidden,
 static void runCommandLineSelectedPasses(SILModule *Module) {
   SILPassManager PM(Module);
 
-  PM.registerAnalysis(createCallGraphAnalysis(Module));
-  PM.registerAnalysis(createAliasAnalysis(Module));
-  PM.registerAnalysis(createDominanceAnalysis(Module));
-  PM.registerAnalysis(createPostDominanceAnalysis(Module));
-  PM.registerAnalysis(createLoopInfoAnalysis(Module, &PM));
-  PM.registerAnalysis(createInductionVariableAnalysis(Module));
-  PM.registerAnalysis(createPostOrderAnalysis(Module));
-  PM.registerAnalysis(createClassHierarchyAnalysis(Module));
-  PM.registerAnalysis(createRCIdentityAnalysis(Module, &PM));
-  PM.registerAnalysis(createDestructorAnalysis(Module));
+#define ANALYSIS(NAME) PM.registerAnalysis(create##Name##Analysis(Module, &PM));
+#include "swift/SILAnalysis/Analysis.def"
 
   for (auto Pass : Passes) {
     PM.addPass(Pass);

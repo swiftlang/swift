@@ -82,12 +82,12 @@ private:
 class IVAnalysis final : public FunctionAnalysisBase<IVInfo> {
 public:
   IVAnalysis(SILModule *)
-      : FunctionAnalysisBase<IVInfo>(AnalysisKind::IVAnalysis) {}
+      : FunctionAnalysisBase<IVInfo>(AnalysisKind::InductionVariable) {}
   IVAnalysis(const IVAnalysis &) = delete;
   IVAnalysis &operator=(const IVAnalysis &) = delete;
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::IVAnalysis;
+    return S->getKind() == AnalysisKind::InductionVariable;
   }
 
   IVInfo *newFunctionAnalysis(SILFunction *F) override {

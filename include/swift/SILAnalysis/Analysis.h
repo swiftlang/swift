@@ -80,17 +80,8 @@ namespace swift {
 
     /// A list of the known analysis.
     enum class AnalysisKind {
-      CompleteFuncs,
-      CallGraph,
-      Dominance,
-      PostDominance,
-      Alias,
-      LoopInfo,
-      IVAnalysis,
-      PostOrder,
-      ClassHierarchyAnalysis,
-      RCIdentity,
-      Destructor
+#define ANALYSIS(NAME) NAME,
+#include "Analysis.def"
     };
 
   private:
@@ -222,16 +213,9 @@ namespace swift {
     }
   };
 
-  SILAnalysis *createCallGraphAnalysis(SILModule *M);
-  SILAnalysis *createAliasAnalysis(SILModule *M);
-  SILAnalysis *createDominanceAnalysis(SILModule *M);
-  SILAnalysis *createPostDominanceAnalysis(SILModule *M);
-  SILAnalysis *createLoopInfoAnalysis(SILModule *M, SILPassManager *PM);
-  SILAnalysis *createInductionVariableAnalysis(SILModule *M);
-  SILAnalysis *createPostOrderAnalysis(SILModule *M);
-  SILAnalysis *createClassHierarchyAnalysis(SILModule *M);
-  SILAnalysis *createRCIdentityAnalysis(SILModule *M, SILPassManager *PM);
-  SILAnalysis *createDestructorAnalysis(SILModule *M);
+#define ANALYSIS(NAME)                                                         \
+  SILAnalysis *create##NAME##Analysis(SILModule *, SILPassManager *);
+#include "Analysis.def"
 
   /// A builder struct that can be used by passes to manage the building of a
   /// SILAnalysis::PreserveKind when multiple SILAnalysis::PreserveKind can be

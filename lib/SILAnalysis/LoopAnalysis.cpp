@@ -29,6 +29,6 @@ SILLoopInfo *SILLoopAnalysis::getLoopInfo(SILFunction *F) {
   return LoopInfos[F];
 }
 
-SILAnalysis *swift::createLoopInfoAnalysis(SILModule *M, SILPassManager *PM) {
+SILAnalysis *swift::createLoopAnalysis(SILModule *M, SILPassManager *PM) {
   return new SILLoopAnalysis(M, PM);
 }
