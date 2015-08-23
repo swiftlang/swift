@@ -2101,8 +2101,8 @@ public:
     auto ToTy = UI->getType();
     auto FromTy = UI->getOperand().getType();
 
-    // Upcast from Optional<B> to Optional<B> is legal
-    // as long as B is a subclass of A.
+    // Upcast from Optional<B> to Optional<A> is legal as long as B is a
+    // subclass of A.
     if (ToTy.getSwiftRValueType().getAnyOptionalObjectType() &&
         FromTy.getSwiftRValueType().getAnyOptionalObjectType()) {
       ToTy = SILType::getPrimitiveObjectType(
