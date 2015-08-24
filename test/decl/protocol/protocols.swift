@@ -1,6 +1,4 @@
 // RUN: %target-parse-verify-swift
-// XFAIL'd temporarily due to <rdar://problem/21547909> "Constraint system missed a conformance?" x2
-// XFAIL: *
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
@@ -78,7 +76,8 @@ struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'Not
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error{{circular protocol inheritance CircleMiddle}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error {{circular protocol inheritance CircleMiddle}}
+// expected-error @+1 {{circular protocol inheritance CircleStart}}
 protocol CircleStart : CircleEnd { func circle_start() }
 protocol CircleEnd : CircleMiddle { func circle_end()}
 
@@ -137,7 +136,7 @@ struct AnRange<Int> : StreamWithAssoc {
 // Okay: Word is a typealias for Int
 struct AWordStreamType : StreamWithAssoc {
   typealias Element = Int
-  func get() -> Word {}
+  func get() -> Int {}
 }
 
 struct NotAStreamType : StreamWithAssoc { // expected-error{{type 'NotAStreamType' does not conform to protocol 'StreamWithAssoc'}}
