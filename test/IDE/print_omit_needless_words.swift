@@ -49,6 +49,9 @@
 // Note: struct name matching, dropping of "With"
 // CHECK-FOUNDATION: class func value(range: NSRange) -> NSValue
 
+// Note: built-in types.
+// CHECK-FOUNDATION: init!(_ value: Double)
+
 // Note: multi-word enum name matching, dropping of "With"
 // CHECK-FOUNDATION: func someMethod(options: NSDeprecatedOptions)
 

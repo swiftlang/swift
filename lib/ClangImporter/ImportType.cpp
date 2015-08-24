@@ -1873,9 +1873,31 @@ StringRef ClangImporter::Implementation::getClangTypeNameForOmission(
     return StringRef();
   }
 
-  // Objective-C selector type.
-  if (type->isSpecificBuiltinType(clang::BuiltinType::ObjCSel))
-    return "Selector";
+  if (auto builtinTy = type->getAs<clang::BuiltinType>()) {
+    switch (builtinTy->getKind()) {
+    case clang::BuiltinType::ObjCSel:
+      // Objective-C selector type.
+      return "Selector";
+
+    case clang::BuiltinType::Bool:
+      return "Bool";
+
+    case clang::BuiltinType::Double:
+      return "Double";
+
+    case clang::BuiltinType::Float:
+      return "Float";
+
+    case clang::BuiltinType::Int:
+      return "Int";
+
+    case clang::BuiltinType::UInt:
+      return "UInt";
+
+    default:
+      break;
+    }
+  }
 
   // Tag types.
   if (auto tagType = type->getAs<clang::TagType>())

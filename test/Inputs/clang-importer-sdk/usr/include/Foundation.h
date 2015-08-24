@@ -178,6 +178,7 @@ __attribute__((availability(ios,introduced=8.0)))
 @interface NSNumber : NSValue
 - (NSNumber *)initWithInteger:(NSInteger)value;
 - (NSNumber *)initWithUnsignedInteger:(NSUInteger)value;
+- (NSNumber *)initWithDouble:(double)value;
 
 @property NSInteger integerValue;
 @property NSUInteger unsignedIntegerValue;
