@@ -2886,7 +2886,8 @@ public:
 
   void visitArchetypeType(ArchetypeType *T) {
     if (auto existentialTy = T->getOpenedExistentialType()) {
-      Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
+      if (Options.PrintForSIL)
+        Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
       visit(existentialTy);
     } else {
       if (auto parent = T->getParent()) {
