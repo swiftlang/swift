@@ -1580,6 +1580,9 @@ void Mangler::mangleEntity(const ValueDecl *decl,
     Buffer << 'v';
   } else if (isa<SubscriptDecl>(decl)) {
     Buffer << 's';
+  } else if (isa<GenericTypeParamDecl>(decl)) {
+    shouldBindParent = BindGenerics::None;
+    Buffer << 't';
   } else {
     assert(isa<AbstractFunctionDecl>(decl) ||
            isa<EnumElementDecl>(decl));
