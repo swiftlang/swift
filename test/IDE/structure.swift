@@ -154,3 +154,27 @@ enum Rawness : Int {
 
 // CHECK: <ffunc>func <name>rethrowFunc(<param>f</param>: () throws -> ())</name> rethrows {}</ffunc>
 func rethrowFunc(f: () throws -> ()) rethrows {}
+
+class NestedPoundIf{
+    func foo1() {
+        #if os(OSX)
+          var a = 1
+            #if USE_METAL
+              var b = 2
+              #if os(iOS)
+                var c = 3
+              #else
+                var c = 3
+              #endif
+            #else
+              var b = 2
+            #endif
+           #else
+            var a = 1
+        #endif
+    }
+    func foo2() {}
+    func foo3() {}
+}
+// CHECK: <ifunc>func <name>foo2()</name> {}</ifunc>
+// CHECK: <ifunc>func <name>foo3()</name> {}</ifunc>

@@ -31,6 +31,24 @@
 using namespace swift;
 using namespace ide;
 
+namespace llvm {
+  using swift::ASTNode;
+  template <> struct DenseMapInfo<ASTNode> {
+    static inline ASTNode getEmptyKey() {
+      return DenseMapInfo<swift::Expr *>::getEmptyKey();
+    }
+    static inline ASTNode getTombstoneKey() {
+      return DenseMapInfo<swift::Expr *>::getTombstoneKey();
+    }
+    static unsigned getHashValue(const ASTNode Val) {
+      return DenseMapInfo<void *>::getHashValue(Val.getOpaqueValue());
+    }
+    static bool isEqual(const ASTNode LHS, const ASTNode RHS) {
+      return LHS.getOpaqueValue() == RHS.getOpaqueValue();
+    }
+  };
+}
+
 void SyntaxModelWalker::anchor() {}
 
 struct SyntaxModelContext::Implementation {
@@ -243,6 +261,7 @@ class ModelASTWalker : public ASTWalker {
 
   Optional<SyntaxNode> parseFieldNode(StringRef Text, StringRef OrigText,
                                       SourceLoc OrigLoc);
+  llvm::DenseSet<ASTNode> VisitedNodesInsideIfConfig;
 
 public:
   SyntaxModelWalker &Walker;
@@ -301,6 +320,9 @@ private:
   bool searchForURL(CharSourceRange Range);
   bool findFieldsInDocCommentLine(SyntaxNode Node);
   bool findFieldsInDocCommentBlock(SyntaxNode Node);
+  bool isVisitedBeforeInIfConfigStmt(ASTNode Node) {
+    return VisitedNodesInsideIfConfig.count(Node) > 0;
+  }
 };
 
 const std::regex ModelASTWalker::URLRxs[3] =  {
@@ -399,6 +421,9 @@ void ModelASTWalker::visitSourceFile(SourceFile &SrcFile,
 }
 
 std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
+  if (isVisitedBeforeInIfConfigStmt(E))
+    return {false, E};
+
   if (E->isImplicit())
     return { true, E };
 
@@ -503,6 +528,9 @@ void ModelASTWalker::handleStmtCondition(StmtCondition cond) {
 
 
 std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
+  if (isVisitedBeforeInIfConfigStmt(S)) {
+    return {false, S};
+  }
   auto addExprElem = [&](SyntaxStructureElementKind K, const Expr *Elem,
                          SyntaxStructureNode &SN) {
     if (isa<ErrorExpr>(Elem))
@@ -658,7 +686,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
 
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return { false, nullptr };
-      
+
       for(auto &Element : Clause.Elements) {
         if (Expr *E = Element.dyn_cast<Expr*>()) {
           E->walk(*this);
@@ -667,6 +695,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
         } else {
           Element.get<Decl*>()->walk(*this);
         }
+        VisitedNodesInsideIfConfig.insert(Element);
       }
     }
     
@@ -688,6 +717,8 @@ Stmt *ModelASTWalker::walkToStmtPost(Stmt *S) {
 }
 
 bool ModelASTWalker::walkToDeclPre(Decl *D) {
+  if (isVisitedBeforeInIfConfigStmt(D))
+    return false;
   if (D->isImplicit())
     return false;
 

@@ -273,4 +273,46 @@ class C2 {
   #if os(iOS)
   // CHECK: <kw>func</kw> foo() {}
   func foo() {}
+  #endif
+}
+
+class NestedPoundIf {
+// CHECK: <kw>class</kw> NestedPoundIf {
+    func foo1() {
+// CHECK: <kw>func</kw> foo1() {
+        #if os(OSX)
+// CHECK: <#kw>#if</#kw> <#id>os</#id>(<#id>OSX</#id>)
+          var a = 1
+// CHECK: <kw>var</kw> a = <int>1</int>
+            #if USE_METAL
+// CHECK: <#kw>#if</#kw> <#id>USE_METAL</#id>
+              var b = 2
+// CHECK: <kw>var</kw> b = <int>2</int>
+              #if os(iOS)
+// CHECK: <#kw>#if</#kw> <#id>os</#id>(<#id>iOS</#id>)
+                var c = 3
+// CHECK: <kw>var</kw> c = <int>3</int>
+              #else
+// CHECK: <#kw>#else</#kw>
+                var c = 3
+// CHECK: <kw>var</kw> c = <int>3</int>
+              #endif
+// CHECK: <#kw>#endif</#kw>
+            #else
+// CHECK: <#kw>#else</#kw>
+              var b = 2
+// CHECK: <kw>var</kw> b = <int>2</int>
+            #endif
+// CHECK: <#kw>#endif</#kw>
+           #else
+// CHECK: <#kw>#else</#kw>
+            var a = 1
+// CHECK: <kw>var</kw> a = <int>1</int>
+        #endif
+// CHECK: <#kw>#endif</#kw>
+    }
+    func foo2() {}
+// CHECK: <kw>func</kw> foo2() {}
+    func foo3() {}
+// CHECK: <kw>func</kw> foo3() {}
 }
