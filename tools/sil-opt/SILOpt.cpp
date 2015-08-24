@@ -22,6 +22,7 @@
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/PassManager.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -150,7 +151,7 @@ ASTVerifierProcessId("ast-verifier-process-id", llvm::cl::Hidden,
 static void runCommandLineSelectedPasses(SILModule *Module) {
   SILPassManager PM(Module);
 
-#define ANALYSIS(NAME) PM.registerAnalysis(create##Name##Analysis(Module, &PM));
+#define ANALYSIS(NAME) PM.registerAnalysis(create##NAME##Analysis(Module, &PM));
 #include "swift/SILAnalysis/Analysis.def"
 
   for (auto Pass : Passes) {

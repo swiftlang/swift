@@ -24,6 +24,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
+#include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/PassManager.h"
 #include "swift/SIL/SILUndef.h"
@@ -128,7 +129,7 @@ removeUnwantedFunctions(SILModule *M, llvm::StringRef Name) {
 
   // Remove dead functions.
   SILPassManager PM(M);
-  PM.registerAnalysis(createCallGraphAnalysis(M));
+  PM.registerAnalysis(createCallGraphAnalysis(M, &PM));
   PM.addDeadFunctionElimination();
   PM.run();
 }
