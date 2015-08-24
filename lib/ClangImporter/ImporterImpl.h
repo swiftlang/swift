@@ -699,7 +699,8 @@ public:
              ArrayRef<const clang::ParmVarDecl *> params,
              clang::QualType resultType,
              const clang::DeclContext *dc,
-             bool returnsSelf);
+             bool returnsSelf,
+             bool failableInitializer);
 
   /// \brief Converts the given Swift identifier for Clang.
   clang::DeclarationName exportName(Identifier name);

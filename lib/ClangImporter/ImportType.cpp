@@ -1894,7 +1894,8 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
            ArrayRef<const clang::ParmVarDecl *> params,
            clang::QualType resultType,
            const clang::DeclContext *dc,
-           bool returnsSelf) {
+           bool returnsSelf,
+           bool isFailableInitializer) {
   ASTContext &ctx = SwiftContext;
 
   // Collect the argument names.
@@ -1918,7 +1919,7 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
                          getClangTypeNameForOmission(resultType),
                          getClangTypeNameForOmission(
                            getClangDeclContextType(dc)),
-                         paramTypes, returnsSelf))
+                         paramTypes, returnsSelf, isFailableInitializer))
     return name;
 
   /// Retrieve a replacement identifier.
@@ -2070,10 +2071,14 @@ Type ClangImporter::Implementation::importMethodType(
 
   // If we should omit needless words and don't have a custom name, do so.
   if (OmitNeedlessWords && !isCustomName && clangDecl) {
+    bool isFailableInitializer = kind == SpecialMethodKind::Constructor &&
+                                 swiftResultTy->getOptionalObjectType();
+
     methodName = omitNeedlessWordsInFunctionName(
                    methodName, params, resultType,
                    clangDecl->getDeclContext(),
-                   clangDecl->hasRelatedResultType());
+                   clangDecl->hasRelatedResultType(),
+                   isFailableInitializer);
   }
 
   // Import the parameters.

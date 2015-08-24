@@ -377,7 +377,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                               StringRef resultType,
                               StringRef contextType,
                               ArrayRef<StringRef> paramTypes,
-                              bool returnsSelf) {
+                              bool returnsSelf,
+                              bool failableInitializer) {
   // For zero-parameter methods that return 'Self' or a result type
   // that matches the declaration context, omit needless words from
   // the base name.
@@ -405,6 +406,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     // Omit needless words based on the type of the parameter.
     NameRole role = i > 0 ? NameRole::SubsequentParameter
       : argNames[0].empty() ? NameRole::BaseName
+      : failableInitializer ? NameRole::SubsequentParameter
       : NameRole::FirstParameter;
 
     StringRef name = role == NameRole::BaseName ? baseName : argNames[i];

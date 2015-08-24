@@ -1830,20 +1830,22 @@ void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
   bool returnsSelf = false;
-
+  bool isFailableInitializer = false;
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     resultType = func->getResultType();
     returnsSelf = func->hasDynamicSelf();
-  } else if (isa<ConstructorDecl>(afd)) {
+  } else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
     resultType = contextType;
     returnsSelf = true;
+    isFailableInitializer = ctor->getFailability() == OTK_Optional;
   }
 
   if (!omitNeedlessWords(baseNameStr, argNameStrs,
                          getTypeNameForOmission(resultType),
                          getTypeNameForOmission(contextType),
                          paramTypeStrs,
-                         returnsSelf))
+                         returnsSelf,
+                         isFailableInitializer))
     return;
 
   /// Retrieve a replacement identifier.
