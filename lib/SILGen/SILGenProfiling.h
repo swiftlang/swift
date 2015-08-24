@@ -17,24 +17,6 @@
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Stmt.h"
 
-namespace llvm {
-using swift::ASTNode;
-template <> struct DenseMapInfo<ASTNode> {
-  static inline ASTNode getEmptyKey() {
-    return DenseMapInfo<swift::Expr *>::getEmptyKey();
-  }
-  static inline ASTNode getTombstoneKey() {
-    return DenseMapInfo<swift::Expr *>::getTombstoneKey();
-  }
-  static unsigned getHashValue(const ASTNode Val) {
-    return DenseMapInfo<void *>::getHashValue(Val.getOpaqueValue());
-  }
-  static bool isEqual(const ASTNode LHS, const ASTNode RHS) {
-    return LHS.getOpaqueValue() == RHS.getOpaqueValue();
-  }
-};
-}
-
 namespace swift {
 
 class AbstractFunctionDecl;
