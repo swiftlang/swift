@@ -489,12 +489,14 @@ private:
   bool isCFTypeRef(Type ty) {
     if (ID_CFTypeRef.empty())
       ID_CFTypeRef = M.getASTContext().getIdentifier("CFTypeRef");
+
+    const TypeAliasDecl *TAD = nullptr;
     while (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
-      const TypeAliasDecl *TAD = aliasTy->getDecl();
-      if (TAD->hasClangNode() && TAD->getName() == ID_CFTypeRef)
-        return true;
+      TAD = aliasTy->getDecl();
+      ty = TAD->getUnderlyingType();
     }
-    return false;
+
+    return TAD && TAD->getName() == ID_CFTypeRef && TAD->hasClangNode();
   }
 
   void visitVarDecl(VarDecl *VD) {

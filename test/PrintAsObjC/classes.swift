@@ -368,6 +368,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic) CFTypeRef __nullable weakCF;
 // CHECK-NEXT: @property (nonatomic) CFStringRef __nullable weakCFString;
 // CHECK-NEXT: @property (nonatomic) CFTypeRef __nullable strongCF;
+// CHECK-NEXT: @property (nonatomic) CFTypeRef __nullable strongCFAlias;
 // CHECK-NEXT: @property (nonatomic, weak) IBOutlet id __null_unspecified outlet;
 // CHECK-NEXT: @property (nonatomic, strong) IBOutlet Properties * __null_unspecified typedOutlet;
 // CHECK-NEXT: @property (nonatomic, copy) NSString * __nonnull string;
@@ -424,7 +425,10 @@ public class NonObjCClass { }
   weak var weakCF: CFTypeRef?
   weak var weakCFString: CFStringRef?
 
+  typealias CFTypeRefAlias = CFTypeRef
+
   var strongCF: CFTypeRef?
+  var strongCFAlias: CFTypeRefAlias?
 
   @IBOutlet weak var outlet: AnyObject!
   @IBOutlet var typedOutlet: Properties!
