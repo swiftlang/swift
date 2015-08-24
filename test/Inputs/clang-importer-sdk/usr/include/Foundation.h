@@ -118,7 +118,7 @@ __attribute__((availability(ios,introduced=8.0)))
 @end
 
 @protocol NSCoding
-- (instancetype)initWithCoder:(nonnull NSCoder *)aCoder;
+- (nullable instancetype)initWithCoder:(nonnull NSCoder *)aCoder;
 @end
 
 @protocol NSSecureCoding <NSCoding>
