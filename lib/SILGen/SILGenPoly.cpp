@@ -191,43 +191,55 @@ static ManagedValue emitMatchedOptionalToOptional(SILGenFunction &gen,
   return input;
 }
 
+// FIXME: need to sit down and abstract away differences between
+// SGF::emitInjectOptionalInto(), SGF::emitInjectOptionalValueInto(),
+// SGF::getOptionalSomeValue(), and this function...
+static ManagedValue emitInjectOptional(SILGenFunction &SGF,
+                                       SILLocation loc,
+                                       ManagedValue v,
+                                       CanType substFormalType) {
+  // Optional's payload is currently maximally abstracted. FIXME: Eventually
+  // it shouldn't be.
+  auto opaque = AbstractionPattern::getOpaque();
+
+  OptionalTypeKind substOTK;
+  auto substObjectType = substFormalType.getAnyOptionalObjectType(substOTK);
+  
+  auto loweredTy = SGF.getLoweredType(opaque, substObjectType);
+  if (v.getType() != loweredTy)
+    v = SGF.emitSubstToOrigValue(loc, v, opaque, substObjectType);
+  
+  auto someDecl = SGF.getASTContext().getOptionalSomeDecl(substOTK);
+  SILType optTy = SGF.getLoweredType(substFormalType);
+  if (v.getType().isAddress()) {
+    auto buf = SGF.emitTemporaryAllocation(loc, optTy);
+    auto payload = SGF.B.createInitEnumDataAddr(loc, buf, someDecl,
+                                                v.getType());
+    SGF.B.createCopyAddr(loc, v.forward(SGF), payload,
+                         IsTake, IsInitialization);
+    SGF.B.createInjectEnumAddr(loc, buf, someDecl);
+    v = SGF.emitManagedBufferWithCleanup(buf);
+  } else {
+    auto some = SGF.B.createEnum(loc, v.getValue(), someDecl, optTy);
+    v = ManagedValue(some, v.getCleanup());
+  }
+
+  return v;
+}
+
 /// Apply this transformation to an arbitrary value.
 ManagedValue Transform::transform(ManagedValue v,
                                   AbstractionPattern origFormalType,
                                   CanType substFormalType,
                                   SGFContext ctxt) {
   OptionalTypeKind substOTK, valueOTK;
-  auto substOptionalType = substFormalType;
-  auto substObjectType
-    = substFormalType.getAnyOptionalObjectType(substOTK);
+  substFormalType.getAnyOptionalObjectType(substOTK);
   v.getType().getAnyOptionalObjectType(SGF.SGM.M, valueOTK);
-  
+
   // If the value is less optional than the desired formal type, wrap in
   // an optional.
-  if (substObjectType && valueOTK == OTK_None) {
-    // Optional's payload is currently maximally abstracted. FIXME: Eventually
-    // it shouldn't be.
-    auto opaque = AbstractionPattern::getOpaque();
-    
-    auto loweredTy = SGF.getLoweredType(opaque, substObjectType);
-    if (v.getType() != loweredTy)
-      v = SGF.emitSubstToOrigValue(Loc, v, opaque, substObjectType);
-    
-    auto someDecl = SGF.getASTContext().getOptionalSomeDecl(substOTK);
-    SILType optTy = SGF.getLoweredType(substOptionalType);
-    if (v.getType().isAddress()) {
-      auto buf = SGF.emitTemporaryAllocation(Loc, optTy);
-      auto payload = SGF.B.createInitEnumDataAddr(Loc, buf, someDecl,
-                                                  v.getType());
-      SGF.B.createCopyAddr(Loc, v.forward(SGF), payload,
-                           IsTake, IsInitialization);
-      SGF.B.createInjectEnumAddr(Loc, buf, someDecl);
-      v = SGF.emitManagedBufferWithCleanup(buf);
-    } else {
-      auto some = SGF.B.createEnum(Loc, v.getValue(), someDecl, optTy);
-      v = ManagedValue(some, v.getCleanup());
-    }
-    return v;
+  if (substOTK != OTK_None && valueOTK == OTK_None) {
+    return emitInjectOptional(SGF, Loc, v, substFormalType);
   }
 
   // If the value is IUO, but the desired formal type isn't optional, force it.
@@ -239,8 +251,9 @@ ManagedValue Transform::transform(ManagedValue v,
     valueOTK = OTK_None;
   }
 
+  // Optional-to-optional conversion.
   if (valueOTK != OTK_None && substOTK != OTK_None && valueOTK != substOTK) {
-    SILType optTy = SGF.getLoweredType(substOptionalType);
+    SILType optTy = SGF.getLoweredType(substFormalType);
     v = SGF.emitOptionalToOptional(Loc, v, optTy,
                                    emitMatchedOptionalToOptional);
   }
@@ -473,15 +486,17 @@ static void collectParams(SILGenFunction &gen,
 }
 
 enum class TranslationKind {
-  Generalize, OrigToSubst, SubstToOrig
+  /// Convert a value with the abstraction patterns of the original type
+  /// to a value with the abstraction patterns of the substituted type.
+  OrigToSubst,
+  /// Convert a value with the abstraction patterns of the substituted
+  /// type to a value with the abstraction patterns of the original type.
+  SubstToOrig
 };
 
 /// Flip the direction of translation.
 static TranslationKind getInverse(TranslationKind kind) {
   switch (kind) {
-  case TranslationKind::Generalize:
-    // This is a bit odd?
-    return TranslationKind::SubstToOrig;
   case TranslationKind::OrigToSubst:
     return TranslationKind::SubstToOrig;
   case TranslationKind::SubstToOrig:
@@ -492,7 +507,6 @@ static TranslationKind getInverse(TranslationKind kind) {
 
 static bool isOutputSubstituted(TranslationKind kind) {
   switch (kind) {
-  case TranslationKind::Generalize: return true;
   case TranslationKind::OrigToSubst: return true;
   case TranslationKind::SubstToOrig: return false;
   }
@@ -518,8 +532,6 @@ static ManagedValue emitTranslatePrimitive(SILGenFunction &SGF,
   }
 
   switch (kind) {
-  case TranslationKind::Generalize:
-    return SGF.emitGeneralizedValue(loc, input, origType, substType, context);
   case TranslationKind::SubstToOrig:
     return SGF.emitSubstToOrigValue(loc, input, origType, substType, context);
   case TranslationKind::OrigToSubst:
@@ -1281,25 +1293,16 @@ static ManagedValue createThunk(SILGenFunction &gen,
 }
 
 static ManagedValue
-emitGeneralizeFunctionWithThunk(SILGenFunction &gen,
-                                SILLocation loc,
-                                ManagedValue fn,
-                                AbstractionPattern origFormalType,
-                                CanAnyFunctionType substFormalType,
-                                const TypeLowering &expectedTL) {
-  return createThunk(gen, loc, TranslationKind::Generalize, fn,
-                     origFormalType, substFormalType, expectedTL);
-}
-
-ManagedValue
-SILGenFunction::emitGeneralizedFunctionValue(SILLocation loc,
-                                           ManagedValue fn,
-                                           AbstractionPattern origFormalType,
-                                           CanAnyFunctionType substFormalType) {
+emitTransformedFunctionValue(SILGenFunction &gen,
+                             SILLocation loc,
+                             TranslationKind kind,
+                             ManagedValue fn,
+                             AbstractionPattern origFormalType,
+                             CanAnyFunctionType substFormalType,
+                             const TypeLowering &expectedTL) {
   assert(fn.getType().isObject() &&
-         "expected input to emitGeneralizedValue to be loaded");
+         "expected input to emitTransformedFunctionValue to be loaded");
 
-  auto &expectedTL = getTypeLowering(substFormalType);
   auto expectedFnType = expectedTL.getLoweredType().castTo<SILFunctionType>();
 
   auto fnType = fn.getType().castTo<SILFunctionType>();
@@ -1316,44 +1319,32 @@ SILGenFunction::emitGeneralizedFunctionValue(SILLocation loc,
       SILFunctionType::ABIDifference::NeedsThunk) {
     assert(expectedFnType->getExtInfo().hasContext()
            && "conversion thunk will not be thin!");
-    return emitGeneralizeFunctionWithThunk(*this, loc, fn,
-                                           origFormalType, substFormalType,
-                                           expectedTL);
+    return createThunk(gen, loc, kind, fn,
+                       origFormalType, substFormalType, expectedTL);
   }
 
-  // Otherwise, we should just have trivial-ish ExtInfo differences.
-  auto fnEI = fnType->getExtInfo();
+  // We do not, conversion is trivial.
   auto expectedEI = expectedFnType->getExtInfo();
-  assert(fnEI != expectedEI && "unhandled difference in function types?");
-  assert(adjustFunctionType(fnType, expectedEI,
-                            expectedFnType->getCalleeConvention())
-           == expectedFnType);
-
-  auto emitConversion = [&](SILFunctionType::ExtInfo newEI,
-                            ParameterConvention newCalleeConvention,
-                            ValueKind kind) {
-    if (fnEI == newEI) return;
-    fnType = adjustFunctionType(fnType, newEI, newCalleeConvention);
-    SILType resTy = SILType::getPrimitiveObjectType(fnType);
-    SILValue converted;
-    if (kind == ValueKind::ConvertFunctionInst) {
-      converted = B.createConvertFunction(loc, fn.forward(*this), resTy);
-    } else {
-      assert(kind == ValueKind::ThinToThickFunctionInst);
-      converted = B.createThinToThickFunction(loc, fn.forward(*this), resTy);
-    }
-    fnEI = newEI;
-    fn = emitManagedRValueWithCleanup(converted);
-  };
-
-  // Apply any trivial conversions before doing thin-to-thick.
-  emitConversion(expectedEI.withRepresentation(fnEI.getRepresentation()),
-                 fnType->getCalleeConvention(),
-                 ValueKind::ConvertFunctionInst);
+  auto newEI = expectedEI.withRepresentation(fnType->getRepresentation());
+  auto newFnType = adjustFunctionType(expectedFnType, newEI,
+                                      fnType->getCalleeConvention());
+  // Apply any ABI-compatible conversions before doing thin-to-thick.
+  if (fnType != newFnType) {
+    SILType resTy = SILType::getPrimitiveObjectType(newFnType);
+    fn = gen.emitManagedRValueWithCleanup(
+        gen.B.createConvertFunction(loc, fn.forward(gen), resTy));
+  }
 
   // Now do thin-to-thick if necessary.
-  emitConversion(expectedEI, expectedFnType->getCalleeConvention(),
-                 ValueKind::ThinToThickFunctionInst);
+  if (newFnType != expectedFnType) {
+    assert(expectedEI.getRepresentation() ==
+           SILFunctionTypeRepresentation::Thick &&
+           "all other conversions should have been handled by "
+           "FunctionConversionExpr");
+    SILType resTy = SILType::getPrimitiveObjectType(expectedFnType);
+    fn = gen.emitManagedRValueWithCleanup(
+        gen.B.createThinToThickFunction(loc, fn.forward(gen), resTy));
+  }
 
   return fn;
 }
@@ -1485,49 +1476,17 @@ static ManagedValue emitSubstToOrigMetatype(SILGenFunction &gen,
 }
 
 namespace {
-  /// A transformation for applying value generalization.
-  struct Generalize final : Transform {
-    using Transform::Transform;
-    ManagedValue transformFunction(ManagedValue fn,
-                                   AbstractionPattern origType,
-                                   CanAnyFunctionType substType) override {
-      return SGF.emitGeneralizedFunctionValue(Loc, fn, origType, substType);
-    }
-
-    const TypeLowering &getExpectedTypeLowering(AbstractionPattern origType,
-                                                CanType substType) override {
-      return SGF.getTypeLowering(substType);
-    }
-    
-    ManagedValue transformMetatype(ManagedValue meta,
-                                   AbstractionPattern origType,
-                                   CanAnyMetatypeType substType) override {
-      return emitOrigToSubstMetatype(SGF, Loc, meta, origType, substType);
-    }
-  };
-}
-
-/// Apply value generalization to the given value.
-///
-/// Value generalization is the process of converting specific
-/// representation forms (such as thin functions) into the format
-/// expected by an ordinary swift Type.
-ManagedValue
-SILGenFunction::emitGeneralizedValue(SILLocation loc, ManagedValue v,
-                                     AbstractionPattern origFormalType,
-                                     CanType substFormalType,
-                                     SGFContext ctxt) {
-  return Generalize(*this, loc).transform(v, origFormalType,
-                                          substFormalType, ctxt);
-}
-
-namespace {
   /// A transformation for applying orig-to-subst re-abstraction.
   struct OrigToSubst final : Transform {
     using Transform::Transform;
     ManagedValue transformFunction(ManagedValue fn,
                                    AbstractionPattern origType,
-                                   CanAnyFunctionType substType) override;
+                                   CanAnyFunctionType substType) override {
+      return emitTransformedFunctionValue(SGF, Loc, TranslationKind::OrigToSubst,
+                                          fn, origType, substType,
+                                          getExpectedTypeLowering(origType,
+                                                                  substType));
+    }
 
     ManagedValue transformMetatype(ManagedValue meta,
                                    AbstractionPattern origType,
@@ -1540,16 +1499,6 @@ namespace {
       return SGF.getTypeLowering(substType);
     }
   };
-}
-
-ManagedValue OrigToSubst::transformFunction(ManagedValue fn,
-                                            AbstractionPattern origFormalType,
-                                            CanAnyFunctionType substFormalType) {
-  auto &expectedTL = SGF.getTypeLowering(substFormalType);
-  if (expectedTL.getLoweredType() == fn.getType()) return fn;
-
-  return createThunk(SGF, Loc, TranslationKind::OrigToSubst, fn,
-                     origFormalType, substFormalType, expectedTL);
 }
 
 /// Given a value with the abstraction patterns of the original formal
@@ -1569,7 +1518,12 @@ namespace {
     using Transform::Transform;
     ManagedValue transformFunction(ManagedValue fn,
                                    AbstractionPattern origType,
-                                   CanAnyFunctionType substType) override;
+                                   CanAnyFunctionType substType) override {
+      return emitTransformedFunctionValue(SGF, Loc, TranslationKind::SubstToOrig,
+                                          fn, origType, substType,
+                                          getExpectedTypeLowering(origType,
+                                                                  substType));
+    }
 
     const TypeLowering &getExpectedTypeLowering(AbstractionPattern origType,
                                                 CanType substType) override {
@@ -1582,16 +1536,6 @@ namespace {
       return emitSubstToOrigMetatype(SGF, Loc, meta, origType, substType);
     }
   };
-}
-
-ManagedValue SubstToOrig::transformFunction(ManagedValue fn,
-                                            AbstractionPattern origFormalType,
-                                            CanAnyFunctionType substFormalType) {
-  auto &expectedTL = SGF.getTypeLowering(origFormalType, substFormalType);
-  if (expectedTL.getLoweredType() == fn.getType()) return fn;
-
-  return createThunk(SGF, Loc, TranslationKind::SubstToOrig, fn,
-                     origFormalType, substFormalType, expectedTL);
 }
 
 /// Given a value with the abstraction patterns of the substituted

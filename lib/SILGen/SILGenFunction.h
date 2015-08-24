@@ -1084,20 +1084,6 @@ public:
                                     AbstractionPattern origType,
                                     CanType substType,
                                     SGFContext ctx = SGFContext());
-
-  /// Convert a value with a specialized representation (such as a thin function
-  /// reference, or a function reference with a foreign calling convention) to
-  /// the generalized representation of its Swift type, which can then be stored
-  /// to a variable or passed as an argument or return value.
-  ManagedValue emitGeneralizedValue(SILLocation loc, ManagedValue input,
-                                    AbstractionPattern origType,
-                                    CanType substType,
-                                    SGFContext ctxt = SGFContext());
-
-  ManagedValue emitGeneralizedFunctionValue(SILLocation loc,
-                                            ManagedValue input,
-                                            AbstractionPattern origType,
-                                            CanAnyFunctionType resultType);
   
   /// Convert a native Swift value to a value that can be passed as an argument
   /// to or returned as the result of a function with the given calling

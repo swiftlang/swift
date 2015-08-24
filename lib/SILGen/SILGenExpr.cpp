@@ -499,8 +499,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   }
 
   // Generalize if necessary.
-  return emitGeneralizedFunctionValue(loc, result, origLoweredFormalType,
-                                      substLoweredFormalType);
+  return emitOrigToSubstValue(loc, result, origLoweredFormalType,
+                              substLoweredFormalType);
 }
 
 static AbstractionPattern

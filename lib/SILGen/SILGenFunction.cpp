@@ -337,8 +337,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   if (!TheClosure.getCaptureInfo().hasLocalCaptures() && !wasSpecialized) {
     auto result = ManagedValue::forUnmanaged(functionRef);
-    return emitGeneralizedFunctionValue(loc, result,
-                             AbstractionPattern(expectedType), expectedType);
+    return emitOrigToSubstValue(loc, result,
+                                AbstractionPattern(expectedType),
+                                expectedType);
   }
 
   SmallVector<ManagedValue, 4> capturedArgs;
@@ -359,9 +360,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                          forwardSubs, forwardedArgs, closureTy);
   auto result = emitManagedRValueWithCleanup(toClosure);
 
-  return emitGeneralizedFunctionValue(loc, result,
-                                      AbstractionPattern(expectedType),
-                                      expectedType);
+  return emitOrigToSubstValue(loc, result,
+                              AbstractionPattern(expectedType),
+                              expectedType);
 }
 
 void SILGenFunction::emitFunction(FuncDecl *fd) {
