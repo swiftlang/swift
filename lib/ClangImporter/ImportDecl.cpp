@@ -3396,38 +3396,15 @@ namespace {
         return nullptr;
 
       // Determine the failability of this initializer.
-      OptionalTypeKind failability = OTK_ImplicitlyUnwrappedOptional;
-      auto fnType = type->getAs<AnyFunctionType>();
-      
-      // If the function throws, it cannot be failable.
-      if (!fnType->throws()) {
-        // If the return type provides nullability inforomation, map it
-        // to failability information.
-        if (auto nullability = objcMethod->getReturnType()->getNullability(
-                                 Impl.getClangASTContext())) {
-          failability = Impl.translateNullability(*nullability);
-        } else {
-          // If the method is known to have nullability information for
-          // its return type, use that.
-          if (auto known = Impl.getKnownObjCMethod(objcMethod)) {
-            if (known->NullabilityAudited) {
-              failability = Impl.translateNullability(known->getReturnTypeInfo());
-            }
-          }
-        }
-      } else {
-        failability = OTK_None;
-      }
+      auto oldFnType = type->castTo<AnyFunctionType>();
+      OptionalTypeKind failability;
+      (void)oldFnType->getResult()->getAnyOptionalObjectType(failability);
 
-      // Determine the type of the result.
+      // Rebuild the function type with the appropriate result type;
       Type resultTy = selfTy;
-      if (failability != OTK_None &&
-          (!errorConvention || !errorConvention->stripsResultOptionality())) {
+      if (failability)
         resultTy = OptionalType::get(failability, resultTy);
-      }
 
-      // A constructor returns an object of the type, not 'id'.
-      auto oldFnType = type->castTo<FunctionType>();
       type = FunctionType::get(oldFnType->getInput(), resultTy,
                                oldFnType->getExtInfo());
 
