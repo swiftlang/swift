@@ -246,3 +246,7 @@ extern NSString *NSViewFocusDidChangeNotification;
 @protocol NSApplicationDelegate
 @end
 
+struct Point3D { double x, y, z; };
+@interface NSString (Drawing)
+-(void)drawInAirAtPoint:(struct Point3D)point;
+@end

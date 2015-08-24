@@ -21,6 +21,7 @@ void CCRefrigeratorInsert(CCMutableRefrigeratorRef fridge, CCItemRef ref);
 
 @interface Kitchen
 @property CCRefrigeratorRef fridge;
+-(void)replacePowerSupply:(CCPowerSupplyRef)powerSupply;
 @end
 
 @interface Duct

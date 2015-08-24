@@ -17,6 +17,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -250,6 +251,31 @@ static bool isKeyword(StringRef identifier) {
     .Default(false);
 }
 
+/// Skip a type suffix that can be dropped.
+static Optional<StringRef> skipTypeSuffix(StringRef typeName) {
+  if (typeName.empty()) return None;
+
+  // "Ptr" and "Ref" are common suffixes we can ignore.
+  if (typeName.endswith("Ref") || typeName.endswith("Ptr")) {
+    return typeName.drop_back(3);
+  }
+
+  /// \d+D for dimensionality.
+  if (typeName.back() == 'D' && typeName.size() > 1) {
+    unsigned firstDigit = typeName.size() - 1;
+    while (firstDigit > 0) {
+      if (!isdigit(typeName[firstDigit-1])) break;
+      --firstDigit;
+    }
+
+    if (firstDigit < typeName.size()-1) {
+      return typeName.substr(0, firstDigit);
+    }
+  }
+
+  return None;
+}
+
 StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
                                    NameRole role) {
   if (name.empty() || typeName.empty()) return name;
@@ -261,6 +287,7 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
   // Match the last words in the type name to the last words in the
   // name.
   auto nameWordRevIter = nameWords.rbegin(),
+    nameWordRevIterBegin = nameWordRevIter,
     nameWordRevIterEnd = nameWords.rend();
   auto typeWordRevIter = typeWords.rbegin(),
     typeWordRevIterEnd = typeWords.rend();
@@ -289,6 +316,17 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
         ++nameWordRevIter;
         typeWordRevIter = nextTypeWordRevIter;
         ++typeWordRevIter;
+        continue;
+      }
+    }
+
+    // If this is a skippable suffix, skip it and keep looking.
+    if (nameWordRevIter == nameWordRevIterBegin) {
+      if (auto withoutSuffix = skipTypeSuffix(typeName)) {
+        typeName = *withoutSuffix;
+        typeWords = camel_case::getWords(typeName);
+        typeWordRevIter = typeWords.rbegin();
+        typeWordRevIterEnd = typeWords.rend();
         continue;
       }
     }
