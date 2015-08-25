@@ -3373,6 +3373,15 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     Invalid = true;
   }
 
+  // Lazy var should not have explicit getter/setter.
+  // For error-recovery, we mark them as invalid.
+  if (Attributes.hasAttribute<LazyAttr>()){
+    if (accessors.Get)
+      accessors.Get->setInvalid();
+    if (accessors.Set)
+      accessors.Set->setInvalid();
+  }
+
   accessors.record(*this, PrimaryVar, Invalid, Flags, StaticLoc,
                    Attributes, TyLoc, /*indices*/ nullptr, Decls);
 
