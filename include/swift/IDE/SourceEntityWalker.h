@@ -107,6 +107,9 @@ public:
 
   virtual bool shouldWalkIntoFunctionGenericParams() { return true; }
 
+  /// Returns true if the walker should visit subscript end location
+  virtual bool shouldWalkIntoSubscriptEndLoc() { return true; }
+
 protected:
   SourceEntityWalker() = default;
   SourceEntityWalker(const SourceEntityWalker &) = default;

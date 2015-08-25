@@ -226,7 +226,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!SE->getIndex()->walk(*this))
       return { false, nullptr };
 
-    if (SubscrD) {
+    if ((SubscrD != nullptr) && SEWalker.shouldWalkIntoSubscriptEndLoc()) {
       if (!passReference(SubscrD, E->getEndLoc()))
         return { false, nullptr };
     }
