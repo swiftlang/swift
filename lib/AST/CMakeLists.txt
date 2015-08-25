@@ -11,6 +11,7 @@ add_swift_library(swiftAST
   Builtins.cpp
   CaptureInfo.cpp
   ConcreteDeclRef.cpp
+  ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
   DiagnosticList.cpp
