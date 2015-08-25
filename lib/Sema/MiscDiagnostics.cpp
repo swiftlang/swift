@@ -1791,13 +1791,15 @@ static StringRef getTypeNameForOmission(Type type) {
   return "";
 }
 
-void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {
+/// Attempt to omit needless words from the name of the given declaration.
+static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
+  auto &Context = afd->getASTContext();
   if (!Context.LangOpts.WarnOmitNeedlessWords)
-    return;
+    return None;
 
   DeclName name = afd->getFullName();
   if (!name)
-    return;
+    return None;
 
   // String'ify the arguments.
   StringRef baseNameStr = name.getBaseName().str();
@@ -1840,13 +1842,13 @@ void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {
     isFailableInitializer = ctor->getFailability() == OTK_Optional;
   }
 
-  if (!omitNeedlessWords(baseNameStr, argNameStrs,
-                         getTypeNameForOmission(resultType),
-                         getTypeNameForOmission(contextType),
-                         paramTypeStrs,
-                         returnsSelf,
-                         isFailableInitializer))
-    return;
+  if (!swift::omitNeedlessWords(baseNameStr, argNameStrs,
+                                getTypeNameForOmission(resultType),
+                                getTypeNameForOmission(contextType),
+                                paramTypeStrs,
+                                returnsSelf,
+                                isFailableInitializer))
+    return None;
 
   /// Retrieve a replacement identifier.
   auto getReplacementIdentifier = [&](StringRef name,
@@ -1869,43 +1871,64 @@ void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {
                                                    oldArgNames[i]));
   }
 
-  DeclName newName = DeclName(Context, newBaseName, newArgNames);
-  InFlightDiagnostic diag = diagnose(afd->getLoc(), diag::omit_needless_words,
-                                     name, newName);
-  fixAbstractFunctionNames(diag, afd, newName);
+  return DeclName(Context, newBaseName, newArgNames);
 }
 
-void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
+/// Attempt to omit needless words from the name of the given declaration.
+static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
+  auto &Context = var->getASTContext();
+
   if (!Context.LangOpts.WarnOmitNeedlessWords)
-    return;
+    return None;
 
   auto name = var->getName();
   if (name.empty())
-    return;
+    return None;
 
   // Dig out the context type.
   Type contextType = var->getDeclContext()->getDeclaredInterfaceType();
   if (!contextType)
-    return;
+    return None;
 
   // Dig out the type of the variable.
   Type type = var->getInterfaceType()->getReferenceStorageReferent()
-                ->getLValueOrInOutObjectType();
+  ->getLValueOrInOutObjectType();
   while (auto optObjectTy = type->getAnyOptionalObjectType())
     type = optObjectTy;
 
   // If the types refer to different nominal types, we're done.
   if (contextType->getAnyNominal() != type->getAnyNominal())
-    return;
+    return None;
 
   // Omit needless words.
-  StringRef newName = omitNeedlessWords(name.str(),
-                                        getTypeNameForOmission(var->getType()),
-                                        NameRole::Property);
+  StringRef newName
+    = swift::omitNeedlessWords(name.str(),
+                               getTypeNameForOmission(var->getType()),
+                               NameRole::Property);
+
   if (newName == name.str())
+    return None;
+
+  return Context.getIdentifier(newName);
+}
+
+void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {
+  auto newName = ::omitNeedlessWords(afd);
+  if (!newName)
     return;
 
-  diagnose(var->getLoc(), diag::omit_needless_words, name,
-           Context.getIdentifier(newName))
-    .fixItReplace(var->getLoc(), newName);
+  auto name = afd->getFullName();
+  InFlightDiagnostic diag = diagnose(afd->getLoc(), diag::omit_needless_words,
+                                     name, *newName);
+  fixAbstractFunctionNames(diag, afd, *newName);
+}
+
+void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
+  auto newName = ::omitNeedlessWords(var);
+  if (!newName)
+    return;
+
+  auto name = var->getName();
+  diagnose(var->getLoc(), diag::omit_needless_words, name, *newName)
+    .fixItReplace(var->getLoc(), newName->str());
 }
