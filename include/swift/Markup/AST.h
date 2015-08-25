@@ -14,6 +14,7 @@
 #define LLVM_MARKUP_AST_H
 
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/ADT/Optional.h"
 #include "swift/Markup/LineList.h"
 
 namespace llvm {
@@ -557,6 +558,7 @@ class Image final : public InlineContent {
   size_t NumChildren;
   // FIXME: Hyperlink destinations can't be wrapped - use a Line
   std::string Destination;
+  Optional<std::string> Title;
 
   MarkupASTNode **getChildrenBuffer() {
     return reinterpret_cast<MarkupASTNode**>(this + 1);
@@ -565,11 +567,13 @@ class Image final : public InlineContent {
     return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
   }
 
-  Image(std::string Destination, ArrayRef<MarkupASTNode *> Children);
+  Image(std::string Destination, Optional<std::string> Title,
+        ArrayRef<MarkupASTNode *> Children);
 
 public:
   static Image *create(MarkupContext &MC,
                       std::string Destination,
+                      Optional<std::string> Title,
                       ArrayRef<MarkupASTNode *> Children);
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
@@ -582,6 +586,14 @@ public:
 
   StringRef getDestination() const {
     return StringRef(Destination.c_str(), Destination.size());
+  }
+
+  bool hasTitle() const {
+    return Title.hasValue();
+  }
+
+  StringRef getTitle() const {
+    return StringRef(Title.getValue());
   }
 
   static bool classof(const MarkupASTNode *N) {

@@ -70,3 +70,19 @@ func warning() {}
 
 /// ![/bogus/url/as/title]()
 func imageWithEmptyURLAndBogusTitle () {}
+
+/// Brief.
+///
+/// ![Image Alt](/swift.png "Image Title")
+func imageTitleAndAlt() {}
+
+/// Brief.
+///
+/// ![Image *Alt*](/swift.png)
+func imageAlt() {}
+
+/// Brief.
+///
+/// ![Image _Alt_](/swift.png "Image Title")
+func imageTitle() {}
+

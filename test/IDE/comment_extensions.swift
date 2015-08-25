@@ -48,4 +48,10 @@
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>warning()</Name><USR>s:F14swift_ide_test7warningFT_T_</USR><Declaration>func warning()</Declaration><Discussion><Warning><Para>Share the road.</Para></Warning></Discussion></Function>]
 
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>imageWithEmptyURLAndBogusTitle()</Name><USR>s:F14swift_ide_test30imageWithEmptyURLAndBogusTitleFT_T_</USR><Declaration>func imageWithEmptyURLAndBogusTitle()</Declaration><Abstract><Para><rawHTML><![CDATA[<img src=""/>]]></rawHTML></Para></Abstract></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>imageWithEmptyURLAndBogusTitle()</Name><USR>s:F14swift_ide_test30imageWithEmptyURLAndBogusTitleFT_T_</USR><Declaration>func imageWithEmptyURLAndBogusTitle()</Declaration><Abstract><Para><rawHTML><![CDATA[<img src="" alt="/bogus/url/as/title"\>]]></rawHTML></Para></Abstract></Function>]
+
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>imageTitleAndAlt()</Name><USR>s:F14swift_ide_test16imageTitleAndAltFT_T_</USR><Declaration>func imageTitleAndAlt()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><Para><rawHTML><![CDATA[<img src="/swift.png" title="Image Title" alt="Image Alt"\>]]></rawHTML></Para></Discussion></Function>]
+
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>imageAlt()</Name><USR>s:F14swift_ide_test8imageAltFT_T_</USR><Declaration>func imageAlt()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><Para><rawHTML><![CDATA[<img src="/swift.png" alt="Image Alt"\>]]></rawHTML></Para></Discussion></Function>]
+
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>imageTitle()</Name><USR>s:F14swift_ide_test10imageTitleFT_T_</USR><Declaration>func imageTitle()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><Para><rawHTML><![CDATA[<img src="/swift.png" title="Image Title" alt="Image Alt"\>]]></rawHTML></Para></Discussion></Function>]

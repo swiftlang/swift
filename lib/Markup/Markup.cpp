@@ -182,11 +182,16 @@ ParseResult<Image> parseImage(MarkupContext &MC, LineList &LL, ParseState State)
   assert(cmark_node_get_type(State.Node) == CMARK_NODE_IMAGE
       && State.Event == CMARK_EVENT_ENTER);
   std::string Destination(cmark_node_get_url(State.Node));
+  
+  auto NodeTitle = cmark_node_get_title(State.Node);
+  std::string TitleString = NodeTitle ? NodeTitle : "";
+  auto Title = TitleString.empty() ? None : Optional<std::string>(TitleString);
+
   SmallVector<MarkupASTNode *, 2> Children;
   auto ResultState = parseChildren(MC, LL, State, Children);
   assert(State.Node == ResultState.Node
       && ResultState.Event == CMARK_EVENT_EXIT);
-  return { Image::create(MC, Destination, Children), ResultState.next() };
+  return { Image::create(MC, Destination, Title, Children), ResultState.next() };
 }
 
 ParseResult<Item> parseItem(MarkupContext &MC, LineList &LL, ParseState State) {

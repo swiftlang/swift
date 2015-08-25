@@ -107,18 +107,21 @@ Link *Link::create(MarkupContext &MC, std::string Destination,
   return new (Mem) Link(Destination, Children);
 }
 
-Image::Image(std::string Destination, ArrayRef<MarkupASTNode *> Children)
+Image::Image(std::string Destination, Optional<std::string> Title,
+             ArrayRef<MarkupASTNode *> Children)
     : InlineContent(ASTNodeKind::Image),
       NumChildren(Children.size()),
-      Destination(Destination) {
+      Destination(Destination),
+      Title(Title) {
   std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
 }
 
 Image *Image::create(MarkupContext &MC, std::string Destination,
+                     Optional<std::string> Title,
                      ArrayRef<MarkupASTNode *> Children) {
   void *Mem = MC.allocate(sizeof(Image) + Children.size()
       * sizeof(MarkupASTNode *), alignof(Image));
-  return new (Mem) Image(Destination, Children);
+  return new (Mem) Image(Destination, Title, Children);
 }
 
 Header::Header(unsigned Level, ArrayRef<MarkupASTNode *> Children)

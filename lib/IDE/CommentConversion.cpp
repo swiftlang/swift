@@ -192,7 +192,16 @@ struct CommentToXMLConverter {
   void printImage(const Image *I) {
     SmallString<64> Tag;
     llvm::raw_svector_ostream S(Tag);
-    S << "<img src=\"" << I->getDestination() << "\"/>";
+    S << "<img src=\"" << I->getDestination() << "\"";
+    if (I->hasTitle())
+      S << " title=\"" << I->getTitle() << "\"";
+    if (I->getChildren().size()) {
+      S << " alt=\"";
+      for (const auto N : I->getChildren())
+        printInlinesUnder(N, S);
+      S << "\"";
+    }
+    S << "\\>";
     printRawHTML(S.str());
   }
 
@@ -545,7 +554,16 @@ break;
   void printImage(const Image *I) {
     SmallString<64> Tag;
     llvm::raw_svector_ostream S(Tag);
-    S << "<img src=\"" << I->getDestination() << "\"/>";
+    S << "<img src=\"" << I->getDestination() << "\"";
+    if (I->hasTitle())
+      S << " title=\"" << I->getTitle() << "\"";
+    if (I->getChildren().size()) {
+      S << " alt=\"";
+      for (const auto N : I->getChildren())
+        printInlinesUnder(N, S);
+      S << "\"";
+    }
+    S << "\\>";
     print(S.str());
   }
 
