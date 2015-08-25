@@ -1708,6 +1708,13 @@ public:
 
   /// Check for needless words in the name of the given variable.
   void checkOmitNeedlessWords(VarDecl *var);
+
+  /// Check for needless words in the name of the function/constructor being
+  /// called.
+  void checkOmitNeedlessWords(ApplyExpr *apply);
+
+  /// Check for needless words in the member reference.
+  void checkOmitNeedlessWords(MemberRefExpr *memberRef);
 };
 
 /// \brief RAII object that cleans up the given expression if not explicitly

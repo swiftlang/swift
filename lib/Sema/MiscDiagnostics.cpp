@@ -315,9 +315,13 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         // Verify warn_unqualified_access uses.
         checkUnqualifiedAccessUse(DRE);
       }
-      if (auto *MRE = dyn_cast<MemberRefExpr>(Base))
+      if (auto *MRE = dyn_cast<MemberRefExpr>(Base)) {
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
           checkUseOfMetaTypeName(Base);
+
+        // Check whether there are needless words that could be omitted.
+        TC.checkOmitNeedlessWords(MRE);
+      }
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
@@ -382,6 +386,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
             checkNoEscapeParameterUse(DRE, Call);
         }
+
+        // Check whether there are needless words that could be omitted.
+        TC.checkOmitNeedlessWords(Call);
       }
       
       // If we have an assignment expression, scout ahead for acceptable _'s.
@@ -1931,4 +1938,100 @@ void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
   auto name = var->getName();
   diagnose(var->getLoc(), diag::omit_needless_words, name, *newName)
     .fixItReplace(var->getLoc(), newName->str());
+}
+
+void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
+  if (!Context.LangOpts.WarnOmitNeedlessWords)
+    return;
+
+  // Find the callee.
+  ApplyExpr *innermostApply = apply;
+  unsigned numApplications = 0;
+  while (auto fnApply = dyn_cast<ApplyExpr>(
+                          innermostApply->getFn()->getValueProvidingExpr())) {
+    innermostApply = fnApply;
+    ++numApplications;
+  }
+
+  DeclRefExpr *fnRef
+    = dyn_cast<DeclRefExpr>(innermostApply->getFn()->getValueProvidingExpr());
+  if (!fnRef)
+    return;
+
+  auto *afd = dyn_cast<AbstractFunctionDecl>(fnRef->getDecl());
+  if (!afd)
+    return;
+
+  // Determine whether the callee has any needless words in it.
+  auto newName = ::omitNeedlessWords(afd);
+  if (!newName)
+    return;
+
+  // Make sure to apply the fix at the right application level.
+  auto name = afd->getFullName();
+  bool argNamesChanged = newName->getArgumentNames() != name.getArgumentNames();
+  if (argNamesChanged && numApplications != 1)
+    return;
+  else if (!argNamesChanged && numApplications != 0)
+    return;
+
+  // Dig out the argument tuple.
+  Expr *arg = apply->getArg()->getSemanticsProvidingExpr();
+  if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg))
+    arg = shuffle->getSubExpr()->getSemanticsProvidingExpr();
+  TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
+  if (argNamesChanged && !argTuple)
+    return;
+
+  InFlightDiagnostic diag = diagnose(fnRef->getLoc(),
+                                     diag::omit_needless_words,
+                                     name, *newName);
+
+  // Fix the base name.
+  if (newName->getBaseName() != name.getBaseName()) {
+    diag.fixItReplace(fnRef->getLoc(), newName->getBaseName().str());
+  }
+
+  // Fix the argument names.
+  if (argNamesChanged) {
+    auto oldArgNames = name.getArgumentNames();
+    auto newArgNames = newName->getArgumentNames();
+    for (unsigned i = 0, n = newArgNames.size(); i != n; ++i) {
+      auto newArgName = newArgNames[i];
+      if (oldArgNames[i] == newArgName) continue;
+
+      if (i > argTuple->getNumElements()) break;
+      if (argTuple->getElementName(i) != oldArgNames[i]) continue;
+
+      auto nameLoc = argTuple->getElementNameLoc(i);
+      if (nameLoc.isInvalid()) continue;
+
+      if (newArgName.empty()) {
+        // Delete the argument label.
+        diag.fixItRemoveChars(nameLoc, argTuple->getElement(i)->getStartLoc());
+      } else {
+        // Fix the argument label.
+        diag.fixItReplace(nameLoc, newArgName.str());
+      }
+    }
+  }
+}
+
+void TypeChecker::checkOmitNeedlessWords(MemberRefExpr *memberRef) {
+  if (!Context.LangOpts.WarnOmitNeedlessWords)
+    return;
+
+  auto var = dyn_cast<VarDecl>(memberRef->getMember().getDecl());
+  if (!var)
+    return;
+
+  // Check whether any needless words were omitted.
+  auto newName = ::omitNeedlessWords(var);
+  if (!newName)
+    return;
+
+  // Fix the name.
+  auto name = var->getName();
+  diagnose(memberRef->getNameLoc(), diag::omit_needless_words, name, *newName)
+    .fixItReplace(memberRef->getNameLoc(), newName->str());
 }
