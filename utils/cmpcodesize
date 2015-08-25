@@ -76,8 +76,12 @@ Prefixes = {
     "__Tw"  : "Value Witness",
     "__TM"  : "Type Metadata",
     "__TF"  : "Swift Function",
-    "__TTS" : "Specialization",
-    "__TZF" : "Static Func"
+    "__TTSg" : "Generic Spec",
+    "__TTSf" : "FuncSig Spec",
+    "__TZF" : "Static Func",
+    # Function signature specialization of a generic specialization.
+    "__TTSGF" : "FuncSigGen Spec",
+    "__TTo" : "Swift @objc Func",
 }
 
 SortedPrefixes = sorted(Prefixes)
@@ -91,6 +95,10 @@ def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
     if groupByPrefix:
         for prefix in SortedPrefixes:
             if function.startswith(prefix):
+                # Special handling for function signature specializations
+                # of generic specializations.
+                if prefix == "__TTSf" and "__TTSg" in function:
+                    prefix = "__TTSGF"
                 sizes[Prefixes[prefix]] += size
                 return
         sizes["Unknown"] += size
