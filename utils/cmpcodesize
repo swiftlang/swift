@@ -112,8 +112,8 @@ def readSizes(sizes, fileName, functionDetails, groupByPrefix):
 
     sectionPattern = re.compile(' +sectname ([\S]+)')
     sizePattern = re.compile(' +size ([\da-fx]+)')
-    labelPattern = re.compile('^([^\/\s]+):$')
     asmlinePattern = re.compile('^([0-9a-f]+)\s')
+    labelPattern = re.compile('^((\-*\[[^\]]*\])|[^\/\s]+):$')
 
     for line in content:
         asmlineMatch = asmlinePattern.match(line)
