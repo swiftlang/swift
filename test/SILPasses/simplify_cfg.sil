@@ -2125,3 +2125,55 @@ bb2(%8 : $ErrorType):
   unreachable
 }
 
+public class EE {
+  init()
+}
+
+public class BB {
+  init()
+}
+
+public class CC : BB {
+  @inline(never) init(e: EE)
+  override init()
+}
+
+public protocol PP {
+  var prop1: BB? { get }
+}
+
+public class DD : PP {
+  public var prop1: BB? { get }
+  init()
+}
+
+
+// CHECK-LABEL: sil @replace_try_apply_with_apply_cast_return_type : $@convention(method) (@guaranteed DD) -> @owned Optional<BB>
+// CHECK: bb0
+// CHECK: apply %{{.*}}
+// CHECK: convert_function
+// CHECK-NOT: try_apply
+// CHECK: apply
+// Check that return value is properly casted
+// CHECK-NEXT: enum $Optional<CC>, #Optional.Some!enumelt.1, %{{.*}} : $CC
+// CHECK-NEXT: upcast %{{.*}} : $Optional<CC> to $Optional<BB>
+// CHECK-NEXT: return
+sil @replace_try_apply_with_apply_cast_return_type: $@convention(method) (@guaranteed DD) -> @owned Optional<BB> {
+bb0(%0 : $DD):
+  %1 = alloc_ref $EE
+  debug_value %1 : $EE
+  %3 = function_ref @initCC : $@convention(thin) (@thick CC.Type) -> @owned @callee_owned (@owned EE) -> @owned CC
+  %4 = metatype $@thick CC.Type
+  %5 = apply %3(%4) : $@convention(thin) (@thick CC.Type) -> @owned @callee_owned (@owned EE) -> @owned CC
+  %6 = convert_function %5 : $@callee_owned (@owned EE) -> @owned CC to $@callee_owned (@owned EE) -> (@owned Optional<BB>, @error ErrorType)
+  try_apply %6(%1) : $@callee_owned (@owned EE) -> (@owned Optional<BB>, @error ErrorType), normal bb1, error bb2
+
+bb1(%8 : $Optional<BB>):
+  return %8 : $Optional<BB>
+
+bb2(%10 : $ErrorType):
+  unreachable
+}
+
+
+sil [noinline] @initCC : $@convention(thin) (@thick CC.Type) -> @owned @callee_owned (@owned EE) -> @owned CC

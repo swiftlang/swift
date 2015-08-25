@@ -1856,25 +1856,30 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 
     auto CalleeFnTy = cast<SILFunctionType>(CalleeType.getSwiftRValueType());
 
+    auto ReturnTy = CalleeFnTy->getSILResult();
+    auto OrigReturnTy = TAI->getNormalBB()->getBBArg(0)->getType();
+
     assert (CalleeFnTy->getParameters().size() == Args.size() &&
             "The number of arguments should match");
-    
-    assert(TAI->getNormalBB()->getBBArg(0)->getType() ==
-           CalleeFnTy->getSILResult() &&
-           "Return types should be the same");
-    
+
     SILBuilderWithScope<1> Builder(TAI);
     ApplyInst *NewAI = Builder.createApply(TAI->getLoc(), Callee,
-                        CalleeType,
-                        TAI->getNormalBB()->getBBArg(0)->getType(),
-                        TAI->getSubstitutions(),
-                        Args, CalleeFnTy->hasErrorResult());
-
-    Builder.createBranch(TAI->getLoc(), TAI->getNormalBB(), { SILValue(NewAI) });
+                                           CalleeType,
+                                           ReturnTy,
+                                           TAI->getSubstitutions(),
+                                           Args, CalleeFnTy->hasErrorResult());
 
     if (CG) {
       CG->addEdgesForApply(NewAI);
     }
+
+    auto Loc = TAI->getLoc();
+    auto *NormalBB = TAI->getNormalBB();
+
+    auto CastedReturnValue = castReturnValue(Builder, NewAI, Loc,
+                                             ReturnTy, OrigReturnTy);
+
+    Builder.createBranch(Loc, NormalBB, { CastedReturnValue });
     TAI->eraseFromParent();
     return true;
   }
