@@ -579,17 +579,10 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
             bufferName += ext->getExtendedType().getString();
           }
 
-          // Don't print bodies if we're looking at a top-level decl.
-          PrintOptions options;
-          if (decl->getDeclContext()->isModuleScopeContext())
-            options = PrintOptions();
-          else
-            options = PrintOptions::printVerbose();
-
           // Pretty-print the declaration we've picked.
           llvm::raw_svector_ostream out(buffer);
           TrackingPrinter printer(entries, out);
-          ppDecl->print(printer, options);
+          ppDecl->print(printer, PrintOptions::printInterface(false));
         }
 
         // Build a buffer with the pretty-printed declaration.

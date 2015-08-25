@@ -188,16 +188,19 @@ struct PrintOptions {
   }
 
   /// Retrieve the set of options suitable for interface generation.
-  static PrintOptions printInterface() {
+  static PrintOptions printInterface(bool skipHidden = true) {
     PrintOptions result = printVerbose();
     result.PrintAccessibility = true;
     result.Indent = 4;
     result.FullyQualifiedTypesIfAmbiguous = true;
     result.SynthesizeSugarOnTypes = true;
-    result.SkipUnavailable = true;
-    result.SkipImplicit = true;
-    result.SkipPrivateStdlibDecls = true;
-    result.SkipDeinit = true;
+
+    if (skipHidden) {
+      result.SkipUnavailable = true;
+      result.SkipImplicit = true;
+      result.SkipPrivateStdlibDecls = true;
+      result.SkipDeinit = true;
+    }
     result.PrintUserInaccessibleAttrs = false;
     result.PrintImplicitAttrs = false;
     result.ExcludeAttrList.push_back(DAK_Exported);
