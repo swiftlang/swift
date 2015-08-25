@@ -30,9 +30,6 @@
 // Note: Class -> "Class"
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
 
-// Note: failable initializers don't drop the first parameter name.
-// CHECK-FOUNDATION: init?(coder aCoder: NSCoder)
-
 // Note: Pointer-to-struct name matching, dropping of "With".
 // CHECK-FOUNDATION: func copy(zone: NSZone) -> AnyObject!
 

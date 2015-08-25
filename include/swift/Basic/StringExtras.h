@@ -291,16 +291,13 @@ StringRef omitNeedlessWords(StringRef name, StringRef typeName, NameRole role);
 /// \param returnsSelf Whether the result of the function is 'Self'
 /// (in Swift) or 'instancetype' (in Objective-C).
 ///
-/// \param failableInitializer Whether the result is a failable initializer.
-///
 /// \returns true if any words were omitted, false otherwise.
 bool omitNeedlessWords(StringRef &baseName,
                        MutableArrayRef<StringRef> argNames,
                        StringRef resultType,
                        StringRef contextType,
                        ArrayRef<StringRef> paramTypes,
-                       bool returnsSelf,
-                       bool failableInitializer);
+                       bool returnsSelf);
 }
 
 #endif // LLVM_SWIFT_BASIC_STRINGEXTRAS_HPP

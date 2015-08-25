@@ -1839,22 +1839,20 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
   bool returnsSelf = false;
-  bool isFailableInitializer = false;
+
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     resultType = func->getResultType();
     returnsSelf = func->hasDynamicSelf();
-  } else if (auto ctor = dyn_cast<ConstructorDecl>(afd)) {
+  } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;
     returnsSelf = true;
-    isFailableInitializer = ctor->getFailability() == OTK_Optional;
   }
 
   if (!swift::omitNeedlessWords(baseNameStr, argNameStrs,
                                 getTypeNameForOmission(resultType),
                                 getTypeNameForOmission(contextType),
                                 paramTypeStrs,
-                                returnsSelf,
-                                isFailableInitializer))
+                                returnsSelf))
     return None;
 
   /// Retrieve a replacement identifier.
