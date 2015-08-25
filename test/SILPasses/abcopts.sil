@@ -54,29 +54,34 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   retain_value %5 : $Builtin.NativeObject
 
   // First check.
-  %6 = integer_literal $Builtin.Int32, 0
-  %7 = struct $Int32(%6 : $Builtin.Int32)
-  %8 = apply %2(%7, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %x1 = integer_literal $Builtin.Int32, 1
+  %i1 = struct $Int32(%x1 : $Builtin.Int32)
+  %8 = apply %2(%i1, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK: [[IDX1:%[0-9]+]] = struct $Int32
   // CHECK: apply [[CHECKBOUNDS]]([[IDX1]]
 
   // Redundant same index and array.
   retain_value %5 : $Builtin.NativeObject
-  %9 = apply %2(%7, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %9 = apply %2(%i1, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]]
 
   // Redundant same index and array and retain the array directly instead of
   // through the array buffer storage.
   retain_value %3 : $ArrayInt
-  %r9 = apply %2(%7, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %r9 = apply %2(%i1, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]]
 
+  // Redundant same index and array, but loaded again.
+  %l0 = load %0 : $*ArrayInt
+  retain_value %5 : $Builtin.NativeObject
+  %10 = apply %2(%i1, %102, %l0) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK-NOT: apply [[CHECKBOUNDS]]([[IDX1]]
 
   // Not redundant - different index.
-  %10 = integer_literal $Builtin.Int32, 1
-  %11 = struct $Int32(%10 : $Builtin.Int32)
+  %x2 = integer_literal $Builtin.Int32, 2
+  %i2 = struct $Int32(%x2 : $Builtin.Int32)
   retain_value %5 : $Builtin.NativeObject
-  %12 = apply %2(%11, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %12 = apply %2(%i2, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK: [[IDX2:%[0-9]+]] = struct $Int32
   // CHECK: apply [[CHECKBOUNDS]]([[IDX2]]
 
@@ -85,7 +90,7 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   %14 = struct_extract %13 : $ArrayInt, #ArrayInt.buffer
   %15 = struct_extract %14 : $ArrayIntBuffer, #ArrayIntBuffer.storage
   retain_value %15 : $Builtin.NativeObject
-  %16 = apply %2(%7, %102, %13) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %16 = apply %2(%i1, %102, %13) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK: [[LD2:%[0-9]+]] = load %1
   // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD2]]
 
@@ -94,32 +99,45 @@ bb0(%0 : $*ArrayInt, %1 : $*ArrayInt):
   %18 = alloc_stack $Int32
   %19 = apply %17(%18#1, %0) : $@convention(method) (@in Int32, @inout ArrayInt) -> ()
   retain_value %5 : $Builtin.NativeObject
-  %20 = apply %2(%7, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
-  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
+  %l2 = load %0 : $*ArrayInt
+  %20 = apply %2(%i1, %102, %l2) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK: [[LD2:%[0-9]+]] = load %0
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD2]]
+
 
   // Not redundant same index and array but unknown function in between.
+  %x3 = integer_literal $Builtin.Int32, 3
+  %i3 = struct $Int32(%x3 : $Builtin.Int32)
   retain_value %5 : $Builtin.NativeObject
-  %21 = apply %2(%7, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %21 = apply %2(%i3, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK: [[IDX3:%[0-9]+]] = struct $Int32
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX3]], {{.*}}[[LD1]]
   %22 = function_ref @unknown_func : $@convention(thin) () -> ()
   %23 = apply %22() : $@convention(thin) () -> ()
-  retain_value %5 : $Builtin.NativeObject
-  %24 = apply %2(%7, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
-  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
   // CHECK: [[UNKNOWN:%[0-9]+]] = function_ref @unknown_func
   // CHECK: apply [[UNKNOWN]]()
-  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
+  %l3 = load %0 : $*ArrayInt
+  // CHECK: [[LD3:%[0-9]+]] = load %0
+  retain_value %5 : $Builtin.NativeObject
+  %24 = apply %2(%i3, %102, %l3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX3]], {{.*}}[[LD3]]
 
   // Not redundant same index and array but odd store in between.
+  %x4 = integer_literal $Builtin.Int32, 4
+  %i4 = struct $Int32(%x4 : $Builtin.Int32)
   retain_value %5 : $Builtin.NativeObject
-  %25 = apply %2(%7, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %25 = apply %2(%i4, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  // CHECK: [[IDX4:%[0-9]+]] = struct $Int32
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX4]], {{.*}}[[LD1]]
   %26 = ref_to_raw_pointer %5 : $Builtin.NativeObject to $Builtin.RawPointer
   %27 = pointer_to_address %26 : $Builtin.RawPointer to $*Builtin.Int32
-  %29 = store %6 to %27 : $*Builtin.Int32
+  %29 = store %x1 to %27 : $*Builtin.Int32
+  %l4 = load %0 : $*ArrayInt
   retain_value %5 : $Builtin.NativeObject
-  %30 = apply %2(%7, %102, %3) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %30 = apply %2(%i4, %102, %l4) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
   // CHECK: store
-  // CHECK: apply [[CHECKBOUNDS]]([[IDX1]], {{.*}}[[LD1]]
-
+  // CHECK: [[LD4:%[0-9]+]] = load %0
+  // CHECK: apply [[CHECKBOUNDS]]([[IDX4]], {{.*}}[[LD4]]
 
   %98 = dealloc_stack %18#0 : $*@local_storage Int32
   %99 = tuple ()
@@ -481,6 +499,47 @@ bb3:
   return %23 : $Int32
 }
 
+// HOIST-LABEL: sil @hoistinvariant_array_is_not_an_arg
+
+// HOIST:    bb0{{.*}}:
+// HOIST:      [[CB:%[0-9]+]] = function_ref @checkbounds
+// HOIST:      apply [[CB]]
+// HOIST:      br bb1
+// HOIST:    bb3{{.*}}:
+// HOIST-NOT:  apply
+// HOIST:    return
+
+sil @hoistinvariant_array_is_not_an_arg : $@convention(thin) (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
+  %1 = struct_extract %0 : $Int32, #Int32.value
+  %2 = integer_literal $Builtin.Int32, 0
+  %37 = struct $Int32(%2 : $Builtin.Int32)
+  %f1 = function_ref @getArray : $@convention(thin) () -> ArrayInt
+  %x53 = apply %f1() : $@convention(thin) () -> ArrayInt
+  %x54 = struct_extract %x53 : $ArrayInt, #ArrayInt.buffer
+  %x55 = struct_extract %x54 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+  retain_value %x55 : $Builtin.NativeObject
+  br bb1(%2 : $Builtin.Int32)
+
+bb1(%4 : $Builtin.Int32):
+  %52 = function_ref @checkbounds : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %58 = apply %52(%37, %101, %x53) : $@convention(method) (Int32, Bool, @owned ArrayInt) -> ()
+  %10 = integer_literal $Builtin.Int32, 1
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %10 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
+  %22 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %22 : $Builtin.Int1
+  %8 = builtin "cmp_eq_Int32"(%4 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb2, bb1(%21 : $Builtin.Int32)
+
+bb2:
+  %23 = struct $Int32 (%4 : $Builtin.Int32)
+  return %23 : $Int32
+}
+
 // HOIST-LABEL: sil @hoist_rangechecked
 // HOIST: bb0
 // HOIST:  cond_br {{.*}}, bb1{{.*}}, bb2
@@ -541,6 +600,91 @@ bb4:
 bb3:
   %23 = struct $Int32 (%4 : $Builtin.Int32)
   return %23 : $Int32
+}
+
+// HOIST-LABEL: sil @eliminate_zero_to_count
+// HOIST-NOT: function_ref @checkbounds2
+// HOIST:  return
+
+sil @eliminate_zero_to_count : $@convention(thin) (@owned Array<Int>) -> () {
+bb0(%0 : $Array<Int>):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
+  %z0 = integer_literal $Builtin.Int32, 0
+  %f1 = function_ref @getCount2 : $@convention(method) (@owned Array<Int>) -> Int32
+  retain_value %0 : $Array<Int>
+  %t1 = apply %f1(%0) : $@convention(method) (@owned Array<Int>) -> Int32
+  %c1 = struct_extract %t1 : $Int32, #Int32.value
+  %t2 = builtin "cmp_eq_Int32"(%z0 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %t2, bb5, bb1
+
+bb1:
+  br bb2(%z0 : $Builtin.Int32)
+
+bb2(%i0 : $Builtin.Int32):
+  cond_br undef, bb3, bb4
+
+bb3:
+  %f2 = function_ref @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> ()
+  retain_value %0 : $Array<Int>
+  %t3 = struct $Int32(%i0 : $Builtin.Int32)
+
+  // This subscript check can be completely eliminated because the loop goes
+  // from 0 to array.count.
+  // It's even not required that this loop block dominates the exit block.
+  %t4 = apply %f2(%t3, %101, %0) : $@convention(method) (Int32, Bool, @owned Array<Int>) -> ()
+  br bb4
+
+bb4:
+  %t5 = integer_literal $Builtin.Int1, 0
+  %i2 = integer_literal $Builtin.Int32, 1
+  %t6 = builtin "sadd_with_overflow_Int32"(%i0 : $Builtin.Int32, %i2 : $Builtin.Int32, %t5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %t7 = tuple_extract %t6 : $(Builtin.Int32, Builtin.Int1), 0
+  %8 = builtin "cmp_eq_Int32"(%t7 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb5, bb2(%t7 : $Builtin.Int32)
+
+bb5:
+  %r1 = tuple ()
+  return %r1 : $()
+}
+
+// HOIST-LABEL: sil @dont_eliminate_zero_to_count_for_slices
+// HOIST: {{^}}bb1:
+// HOIST:   [[F:%[0-9]+]] = function_ref @checkbounds3
+// HOIST:   apply [[F]]
+// HOIST:  return
+
+sil @dont_eliminate_zero_to_count_for_slices : $@convention(thin) (@owned ArraySlice<Int>) -> () {
+bb0(%0 : $ArraySlice<Int>):
+  %100 = integer_literal $Builtin.Int1, -1
+  %101 = struct $Bool(%100 : $Builtin.Int1)
+  %z0 = integer_literal $Builtin.Int32, 0
+  %f1 = function_ref @getCount3 : $@convention(method) (@owned ArraySlice<Int>) -> Int32
+  retain_value %0 : $ArraySlice<Int>
+  %t1 = apply %f1(%0) : $@convention(method) (@owned ArraySlice<Int>) -> Int32
+  %c1 = struct_extract %t1 : $Int32, #Int32.value
+  %t2 = builtin "cmp_eq_Int32"(%z0 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %t2, bb2, bb1(%z0 : $Builtin.Int32)
+
+bb1(%i0 : $Builtin.Int32):
+  %f2 = function_ref @checkbounds3 : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> ()
+  retain_value %0 : $ArraySlice<Int>
+  %t3 = struct $Int32(%i0 : $Builtin.Int32)
+
+  // Slices don't necessarily have a zero lower bound. So we can't elminate the
+  // subscript check for 0..<count loops.
+  %t4 = apply %f2(%t3, %101, %0) : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> ()
+
+  %t5 = integer_literal $Builtin.Int1, 0
+  %i2 = integer_literal $Builtin.Int32, 1
+  %t6 = builtin "sadd_with_overflow_Int32"(%i0 : $Builtin.Int32, %i2 : $Builtin.Int32, %t5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %t7 = tuple_extract %t6 : $(Builtin.Int32, Builtin.Int1), 0
+  %8 = builtin "cmp_eq_Int32"(%t7 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb2, bb1(%t7 : $Builtin.Int32)
+
+bb2:
+  %r1 = tuple ()
+  return %r1 : $()
 }
 
 // HOIST-LABEL: sil @hoist_rangechecked_addr_proj_store
@@ -850,6 +994,11 @@ sil public_external [_semantics "array.init"] @arrayinit : $@convention(thin) ()
   unreachable
 }
 
+sil public_external [_semantics "array.get_count"] @getCount : $@convention(method) (@owned ArrayInt) -> Int32 {
+  bb0(%0: $ArrayInt):
+    unreachable
+}
+
 sil @unknown_func : $@convention(thin) () -> () {
   bb0:
   unreachable
@@ -859,4 +1008,12 @@ sil @take_array : $@convention(thin) (@inout ArrayInt) -> () {
 bb0(%0 : $*ArrayInt):
   unreachable
 }
+
+sil @getArray : $@convention(thin) () -> ArrayInt
+
+sil [_semantics "array.get_count"] @getCount2 : $@convention(method) (@owned Array<Int>) -> Int32
+sil [_semantics "array.check_subscript"] @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> ()
+
+sil [_semantics "array.get_count"] @getCount3 : $@convention(method) (@owned ArraySlice<Int>) -> Int32
+sil [_semantics "array.check_subscript"] @checkbounds3 : $@convention(method) (Int32, Bool, @owned ArraySlice<Int>) -> ()
 
