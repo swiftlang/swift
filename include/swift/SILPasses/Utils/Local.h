@@ -92,6 +92,13 @@ void eraseUsesOfValue(SILValue V, bool DeleteDebug=false);
 
 FullApplySite findApplyFromDevirtualizedResult(SILInstruction *I);
 
+/// Cast a return value into expected type if necessary.
+/// This may happen e.g. when:
+/// - a type of the return value is a subclass of the expected return type.
+/// - actual return type and expected return type differ in optionality.
+SILValue castReturnValue(SILBuilder &B, SILValue ReturnValue, SILLocation Loc,
+                         SILType ReturnTy, SILType ExpectedReturnTy);
+
 /// Replace an apply with an instruction that produces the same value,
 /// then delete the apply and the instructions that produce its callee
 /// if possible.

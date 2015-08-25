@@ -443,6 +443,8 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
     B.setInsertionPoint(ResultBB);
   }
 
+  // Check if any casting is required for the return value.
+
   SILInstruction *CastedReturnValue = NewAI.getInstruction();
 
   if (ReturnType == AI.getType()) {
@@ -477,102 +479,19 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
     }
   }
 
-
-  // Check if the return type is an optional of the apply_inst type
-  // or the other way around
-  bool UnwrapOptionalResult = false;
-  bool WrapOptionalResult = false;
-  OptionalTypeKind OTK;
-  OptionalTypeKind AI_OTK;
-
-  auto OptionalReturnType = ReturnType.getSwiftRValueType()
-    .getAnyOptionalObjectType(OTK);
-
-  auto OptionalAIType = AI.getType().getSwiftRValueType()
-    .getAnyOptionalObjectType(AI_OTK);
-
-  // Return type if not an optional, but the expected type is an optional
-  // and the first one is the subclass of the second one.
-  if (OptionalAIType && !OptionalReturnType &&
-      SILType::getPrimitiveObjectType(OptionalAIType)
-               .isSuperclassOf(ReturnType)) {
-    // The devirtualized method returns a non-optional result.
-    // We need to wrap it into an optional.
-    auto OptType = OptionalType::get(AI_OTK,
-                                     ReturnType.getSwiftRValueType()).
-                                 getCanonicalTypeOrNull();
-    ResultValue = B.createOptionalSome(AI.getLoc(), ResultValue,
-                                       AI_OTK,
-                                       SILType::getPrimitiveObjectType(OptType));
-    OptionalReturnType = ReturnType.getSwiftRValueType();
-
-    if (OptionalAIType == OptionalReturnType) {
-      DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
-      NumClassDevirt++;
-      CastedReturnValue = dyn_cast<SILInstruction>(ResultValue.getDef());
-      if (NormalBB) {
-        B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnValue });
-        return NewAI.getInstruction();
-      }
-      return CastedReturnValue;
-    }
-  }
-
-  if (OptionalReturnType && OptionalAIType &&
-      SILType::getPrimitiveObjectType(OptionalAIType)
-          .isSuperclassOf(
-              SILType::getPrimitiveObjectType(OptionalReturnType))) {
-    // Both types are optional and one of them is the superclass of the other.
-    DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
-    NumClassDevirt++;
-    CastedReturnValue = B.createUpcast(AI.getLoc(), ResultValue, AI.getType());
-    if (NormalBB) {
-      B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnValue });
-      return NewAI.getInstruction();
-    }
-    return CastedReturnValue;
-  }
-
-  if (OptionalReturnType == AI.getType().getSwiftRValueType()) {
-    UnwrapOptionalResult = true;
-  }
-
-  if (OptionalAIType == ReturnType.getSwiftRValueType()) {
-    WrapOptionalResult = true;
-  }
-
-  assert((ReturnType.isAddress() ||
-          ReturnType.isHeapObjectReferenceType() ||
-          UnwrapOptionalResult || WrapOptionalResult) &&
-         "Only addresses and refs can have their types changed due to "
-         "covariant return types or contravariant argument types.");
-
-  if (UnwrapOptionalResult) {
-    // The devirtualized method returns an optional result.
-    // We need to extract the actual result from the optional.
-    auto *SomeDecl = B.getASTContext().getOptionalSomeDecl(OTK);
-    CastedReturnValue = B.createUncheckedEnumData(AI.getLoc(),
-                                                  ResultValue, SomeDecl);
-  } else if (WrapOptionalResult) {
-    // The devirtualized method returns a non-optional result.
-    // We need to wrap it into an optional.
-    CastedReturnValue = B.createOptionalSome(AI.getLoc(), ResultValue,
-                                             AI_OTK, AI.getType());
-  } else if (ReturnType.isAddress()) {
-    CastedReturnValue = B.createUncheckedAddrCast(AI.getLoc(),
-                                                  ResultValue, AI.getType());
-  } else {
-    CastedReturnValue = B.createUncheckedRefCast(AI.getLoc(),
-                                                 ResultValue, AI.getType());
-  }
+  auto CastedReturnSILValue = castReturnValue(B, ResultValue, NewAI.getLoc(),
+                                              ReturnType, AI.getType());
 
   DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
   NumClassDevirt++;
+
   if (NormalBB) {
-    B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnValue });
+    B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnSILValue });
     return NewAI.getInstruction();
   }
-  return CastedReturnValue;
+
+  assert(isa<SILInstruction>(CastedReturnSILValue));
+  return cast<SILInstruction>(CastedReturnSILValue);
 }
 
 SILInstruction *swift::tryDevirtualizeClassMethod(FullApplySite AI,

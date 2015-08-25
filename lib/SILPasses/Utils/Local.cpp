@@ -225,6 +225,98 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
   return FullApplySite();
 }
 
+/// Cast a return value into expected type if necessary.
+/// This may happen e.g. when:
+/// - a type of the return value is a subclass of the expected return type.
+/// - actual return type and expected return type differ in optionality.
+SILValue swift::castReturnValue(SILBuilder &B, SILValue ReturnValue,
+                                SILLocation Loc,
+                                SILType ReturnTy, SILType ExpectedReturnTy) {
+  // No conversion is needed if types are the same.
+  if (ReturnTy == ExpectedReturnTy)
+    return ReturnValue;
+
+  // Check if the return type is an optional of the apply_inst type
+  // or the other way around
+  bool UnwrapOptionalResult = false;
+  bool WrapOptionalResult = false;
+  OptionalTypeKind OTK;
+  OptionalTypeKind AI_OTK;
+
+  auto ResultValue = ReturnValue;
+
+  // Eventually, the return type should be casted into the original
+  // expected type.
+  auto OptionalReturnType =
+      ReturnTy.getSwiftRValueType().getAnyOptionalObjectType(OTK);
+
+  auto OptionalAIType =
+      ExpectedReturnTy.getSwiftRValueType().getAnyOptionalObjectType(AI_OTK);
+
+  if (!OptionalAIType && !OptionalReturnType
+      && ExpectedReturnTy.isSuperclassOf(ReturnTy)) {
+    return B.createUpcast(Loc, ResultValue, ExpectedReturnTy);
+  }
+
+  // Return type if not an optional, but the expected type is an optional
+  // and the first one is the subclass of the second one.
+  if (OptionalAIType && !OptionalReturnType
+      && SILType::getPrimitiveObjectType(OptionalAIType).isSuperclassOf(
+          ReturnTy)) {
+    // The function returns a non-optional result.
+    // We need to wrap it into an optional.
+    auto OptType =
+        OptionalType::get(AI_OTK, ReturnTy.getSwiftRValueType()).
+                      getCanonicalTypeOrNull();
+    ResultValue = B.createOptionalSome(Loc, ResultValue, AI_OTK,
+        SILType::getPrimitiveObjectType(OptType));
+    OptionalReturnType = ReturnTy.getSwiftRValueType();
+
+    if (OptionalAIType == OptionalReturnType) {
+      return ResultValue;
+    }
+  }
+
+  if (OptionalReturnType && OptionalAIType
+      && SILType::getPrimitiveObjectType(OptionalAIType).isSuperclassOf(
+          SILType::getPrimitiveObjectType(OptionalReturnType))) {
+    // Both types have the same optionality and one of them
+    // is the superclass of the other.
+    return B.createUpcast(Loc, ResultValue, ExpectedReturnTy);
+  }
+
+  if (OptionalReturnType == ExpectedReturnTy.getSwiftRValueType()) {
+    UnwrapOptionalResult = true;
+  }
+
+  if (OptionalAIType == ReturnTy.getSwiftRValueType()) {
+    WrapOptionalResult = true;
+  }
+
+  assert((ReturnTy.isAddress() || ReturnTy.isHeapObjectReferenceType()
+          || UnwrapOptionalResult || WrapOptionalResult)
+          && "Only addresses and refs can have their types changed due to "
+             "covariant return types or contravariant argument types.");
+
+  if (UnwrapOptionalResult) {
+    // The function returns an optional result.
+    // We need to extract the actual result from the optional.
+    auto *SomeDecl = B.getASTContext().getOptionalSomeDecl(OTK);
+    return B.createUncheckedEnumData(Loc, ResultValue, SomeDecl);
+  }
+
+  if (WrapOptionalResult) {
+    // The function returns a non-optional result.
+    // We need to wrap it into an optional.
+    return B.createOptionalSome(Loc, ResultValue, AI_OTK, ExpectedReturnTy);
+  }
+  if (ReturnTy.isAddress()) {
+    return B.createUncheckedAddrCast(Loc, ResultValue, ExpectedReturnTy);
+  }
+
+  return B.createUncheckedRefCast(Loc, ResultValue, ExpectedReturnTy);
+}
+
 // Replace a dead apply with a new instruction that computes the same
 // value, and delete the old apply.
 void swift::replaceDeadApply(ApplySite Old, SILInstruction *New) {
