@@ -599,6 +599,9 @@ public:
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                             uint64_t contextData) override;
 
+  virtual void finishNormalConformance(NormalProtocolConformance *conformance,
+                                       uint64_t contextData) override;
+
   Optional<BriefAndRawComment> getCommentForDecl(const Decl *D);
   Optional<BriefAndRawComment> getCommentForDeclByUSR(StringRef USR);
 
@@ -654,8 +657,8 @@ public:
   ProtocolConformance *readConformance(llvm::BitstreamCursor &Cursor);
 
   /// Read the given normal conformance from the current module file.
-  NormalProtocolConformance *readNormalConformance(
-                               serialization::NormalConformanceID id);
+  NormalProtocolConformance *
+  readNormalConformance(serialization::NormalConformanceID id);
 
   /// Reads a generic param list from \c DeclTypeCursor.
   ///

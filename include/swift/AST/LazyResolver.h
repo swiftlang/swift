@@ -144,6 +144,13 @@ public:
     llvm_unreachable("unimplemented");
   }
 
+  /// Populates the given vector with all conformances for \p D.
+  virtual void
+  finishNormalConformance(NormalProtocolConformance *conformance,
+                          uint64_t contextData) {
+    llvm_unreachable("unimplemented");
+  }
+
   /// Returns the default definition type for \p ATD.
   virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                             uint64_t contextData) {

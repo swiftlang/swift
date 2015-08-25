@@ -313,6 +313,9 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// otherwise deduced the result.
   llvm::SmallPtrSet<ValueDecl *, 4> DefaultedDefinitions;
 
+  LazyMemberLoader *Resolver = nullptr;
+  uint64_t ResolverContextData;
+
   friend class ASTContext;
 
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
@@ -322,6 +325,8 @@ class NormalProtocolConformance : public ProtocolConformance,
       ProtocolAndState(protocol, state), Loc(loc), DCAndInvalid(dc, false)
   {
   }
+
+  void resolveLazyInfo() const;
 
 public:
   /// Get the protocol being conformed to.
@@ -374,6 +379,8 @@ public:
   /// Determine whether the protocol conformance has a witness for the given
   /// requirement.
   bool hasWitness(ValueDecl *requirement) const {
+    if (Resolver)
+      resolveLazyInfo();
     return Mapping.count(requirement) > 0;
   }
 
@@ -404,11 +411,15 @@ public:
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
   bool usesDefaultDefinition(ValueDecl *requirement) const {
+    if (Resolver)
+      resolveLazyInfo();
     return DefaultedDefinitions.count(requirement) > 0;
   }
 
   /// Retrieve the complete set of defaulted definitions.
   const llvm::SmallPtrSet<ValueDecl *, 4> &getDefaultedDefinitions() const {
+    if (Resolver)
+      resolveLazyInfo();
     return DefaultedDefinitions;
   }
 
@@ -416,6 +427,8 @@ public:
   void addDefaultDefinition(ValueDecl *requirement) {
     DefaultedDefinitions.insert(requirement);
   }
+
+  void setLazyLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getProtocol(), getDeclContext());

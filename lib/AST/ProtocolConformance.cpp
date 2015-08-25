@@ -179,8 +179,30 @@ GenericSignature *ProtocolConformance::getGenericSignature() const {
   }
 }
 
+void NormalProtocolConformance::resolveLazyInfo() const {
+  assert(Resolver);
+  assert(isComplete());
+
+  auto *resolver = Resolver;
+  auto *mutableThis = const_cast<NormalProtocolConformance *>(this);
+  mutableThis->Resolver = nullptr;
+  mutableThis->setState(ProtocolConformanceState::Incomplete);
+  resolver->finishNormalConformance(mutableThis, ResolverContextData);
+  mutableThis->setState(ProtocolConformanceState::Complete);
+}
+
+void NormalProtocolConformance::setLazyLoader(LazyMemberLoader *resolver,
+                                              uint64_t contextData) {
+  assert(!Resolver && "already has a resolver");
+  Resolver = resolver;
+  ResolverContextData = contextData;
+}
+
 bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
                                                LazyResolver *resolver) const {
+  if (Resolver)
+    resolveLazyInfo();
+
   if (TypeWitnesses.find(assocType) != TypeWitnesses.end()) {
     return true;
   }
@@ -197,6 +219,9 @@ std::pair<const Substitution &, TypeDecl *>
 NormalProtocolConformance::getTypeWitnessSubstAndDecl(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver) const {
+  if (Resolver)
+    resolveLazyInfo();
+
   auto known = TypeWitnesses.find(assocType);
   if (known == TypeWitnesses.end()) {
     assert(resolver && "Unable to resolve type witness");
@@ -224,6 +249,9 @@ ConcreteDeclRef NormalProtocolConformance::getWitness(
                   ValueDecl *requirement, 
                   LazyResolver *resolver) const {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
+  if (Resolver)
+    resolveLazyInfo();
+
   auto known = Mapping.find(requirement);
   if (known == Mapping.end()) {
     assert(resolver && "Unable to resolve witness without resolver");

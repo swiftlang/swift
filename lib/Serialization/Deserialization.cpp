@@ -529,12 +529,12 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   if (conformanceEntry.isComplete())
     return conformance;
 
+  uint64_t offset = conformanceEntry;
   conformanceEntry = conformance;
 
   dc->isNominalTypeOrNominalTypeExtensionContext()
     ->registerProtocolConformance(conformance);
 
-  ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
 
   // Read inherited conformances.
   InheritedConformanceMap inheritedConformances;
@@ -553,73 +553,8 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
     for (auto inherited : inheritedConformances)
       conformance->setInheritedConformance(inherited.first, inherited.second);
 
-  WitnessMap witnesses;
-  while (valueCount--) {
-    auto first = cast<ValueDecl>(getDecl(*rawIDIter++));
-    auto second = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
-    assert(second || first->getAttrs().hasAttribute<OptionalAttr>() ||
-           first->getAttrs().isUnavailable(ctx));
-
-    unsigned substitutionCount = *rawIDIter++;
-
-    SmallVector<Substitution, 8> substitutions;
-    while (substitutionCount--) {
-      auto sub = maybeReadSubstitution(DeclTypeCursor);
-      assert(sub.hasValue());
-      substitutions.push_back(sub.getValue());
-    }
-
-    ConcreteDeclRef witness;
-    if (substitutions.empty())
-      witness = ConcreteDeclRef(second);
-    else
-      witness = ConcreteDeclRef(ctx, second, substitutions);
-
-    witnesses.insert(std::make_pair(first, witness));
-  }
-  assert(rawIDIter <= rawIDs.end() && "read too much");
-
-  TypeWitnessMap typeWitnesses;
-  while (typeCount--) {
-    // FIXME: We don't actually want to allocate an archetype here; we just
-    // want to get an access path within the protocol.
-    auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
-    auto second = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
-    auto third = maybeReadSubstitution(DeclTypeCursor);
-    assert(third.hasValue());
-    typeWitnesses[first] = std::make_pair(*third, second);
-  }
-  assert(rawIDIter <= rawIDs.end() && "read too much");
-
-  SmallVector<ValueDecl *, 4> defaultedDefinitions;
-  while (defaultedCount--) {
-    auto decl = cast<ValueDecl>(getDecl(*rawIDIter++));
-    defaultedDefinitions.push_back(decl);
-  }
-  assert(rawIDIter <= rawIDs.end() && "read too much");
-
-  // If we have a complete protocol conformance do not attempt to initialize
-  // it. Just return the conformance.
-  if (conformance->getState() == ProtocolConformanceState::Complete)
-    return conformance;
-
-  // Set type witnesses.
-  for (auto typeWitness : typeWitnesses) {
-    conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
-                                typeWitness.second.second);
-  }
-
-  // Set witnesses.
-  for (auto witness : witnesses) {
-    conformance->setWitness(witness.first, witness.second);
-  }
-
-  // Note any defaulted definitions.
-  for (auto defaulted : defaultedDefinitions) {
-    conformance->addDefaultDefinition(defaulted);
-  }
-
   conformance->setState(ProtocolConformanceState::Complete);
+  conformance->setLazyLoader(this, offset);
   return conformance;
 }
 
@@ -4000,6 +3935,100 @@ TypeLoc
 ModuleFile::loadAssociatedTypeDefault(const swift::AssociatedTypeDecl *ATD,
                                       uint64_t contextData) {
   return TypeLoc::withoutLoc(getType(contextData));
+}
+
+void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
+                                         uint64_t contextData) {
+  using namespace decls_block;
+
+  // Find the conformance record.
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(contextData);
+  auto entry = DeclTypeCursor.advance();
+  assert(entry.Kind == llvm::BitstreamEntry::Record &&
+         "registered lazy loader incorrectly");
+
+  DeclID protoID;
+  DeclContextID contextID;
+  unsigned valueCount, typeCount, inheritedCount, defaultedCount;
+  ArrayRef<uint64_t> rawIDs;
+  SmallVector<uint64_t, 16> scratch;
+
+  unsigned kind = DeclTypeCursor.readRecord(entry.ID, scratch);
+  assert(kind == NORMAL_PROTOCOL_CONFORMANCE &&
+         "registered lazy loader incorrectly");
+  NormalProtocolConformanceLayout::readRecord(scratch, protoID,
+                                              contextID, valueCount,
+                                              typeCount, inheritedCount,
+                                              defaultedCount, rawIDs);
+
+  // Skip trailing inherited conformances.
+  while (inheritedCount--)
+    (void)readConformance(DeclTypeCursor);
+
+  ASTContext &ctx = getContext();
+  ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
+
+  WitnessMap witnesses;
+  while (valueCount--) {
+    auto first = cast<ValueDecl>(getDecl(*rawIDIter++));
+    auto second = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
+    assert(second || first->getAttrs().hasAttribute<OptionalAttr>() ||
+           first->getAttrs().isUnavailable(ctx));
+
+    unsigned substitutionCount = *rawIDIter++;
+
+    SmallVector<Substitution, 8> substitutions;
+    while (substitutionCount--) {
+      auto sub = maybeReadSubstitution(DeclTypeCursor);
+      assert(sub.hasValue());
+      substitutions.push_back(sub.getValue());
+    }
+
+    ConcreteDeclRef witness;
+    if (substitutions.empty())
+      witness = ConcreteDeclRef(second);
+    else
+      witness = ConcreteDeclRef(ctx, second, substitutions);
+
+    witnesses.insert(std::make_pair(first, witness));
+  }
+  assert(rawIDIter <= rawIDs.end() && "read too much");
+
+  TypeWitnessMap typeWitnesses;
+  while (typeCount--) {
+    // FIXME: We don't actually want to allocate an archetype here; we just
+    // want to get an access path within the protocol.
+    auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
+    auto second = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
+    auto third = maybeReadSubstitution(DeclTypeCursor);
+    assert(third.hasValue());
+    typeWitnesses[first] = std::make_pair(*third, second);
+  }
+  assert(rawIDIter <= rawIDs.end() && "read too much");
+
+  SmallVector<ValueDecl *, 4> defaultedDefinitions;
+  while (defaultedCount--) {
+    auto decl = cast<ValueDecl>(getDecl(*rawIDIter++));
+    defaultedDefinitions.push_back(decl);
+  }
+  assert(rawIDIter <= rawIDs.end() && "read too much");
+
+  // Set type witnesses.
+  for (auto typeWitness : typeWitnesses) {
+    conformance->setTypeWitness(typeWitness.first, typeWitness.second.first,
+                                typeWitness.second.second);
+  }
+
+  // Set witnesses.
+  for (auto witness : witnesses) {
+    conformance->setWitness(witness.first, witness.second);
+  }
+
+  // Note any defaulted definitions.
+  for (auto defaulted : defaultedDefinitions) {
+    conformance->addDefaultDefinition(defaulted);
+  }
 }
 
 static Optional<ForeignErrorConvention::Kind>
