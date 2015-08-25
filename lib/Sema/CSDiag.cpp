@@ -2322,7 +2322,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
       diagnose(anchor->getLoc(), diag::cannot_find_appropriate_overload,
                overloadName)
         .highlight(anchor->getSourceRange());
-      diagnose(overloadChoice.getDecl()->getLoc(), diag::found_candidate);
+      diagnose(overloadChoice.getDecl(), diag::found_candidate);
       return true;
     }
 
@@ -2333,7 +2333,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
     for (auto elt : constraint->getNestedConstraints()) {
       if (elt->getKind() != ConstraintKind::BindOverload) continue;
       auto candidate = elt->getOverloadChoice().getDecl();
-      diagnose(candidate->getLoc(), diag::found_candidate);
+      diagnose(candidate, diag::found_candidate);
     }
 
     return true;
