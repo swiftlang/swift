@@ -38,8 +38,8 @@ static bool canApplyDecrementRefCount(OperandValueArrayRef Ops, SILValue Ptr,
                                       AliasAnalysis *AA) {
   // Ok, this apply *MAY* decrement ref counts. Now our strategy is to attempt
   // to use properties of the pointer, the function's arguments, and the
-  // function itself to prove that the pointer can not have its ref count be
-  // effected by function.
+  // function itself to prove that the pointer cannot have its ref count
+  // affected by the applied function.
 
   // TODO: Put in function property check section here when we get access to
   // such information.
