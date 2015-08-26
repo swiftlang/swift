@@ -13,11 +13,13 @@
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/DemangleWrappers.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/GraphWriter.h"
 #include <algorithm>
 #include <utility>
 
@@ -576,3 +578,209 @@ void CallGraphAnalysis::verify() const {
   CG->verify();
 #endif
 }
+
+//===----------------------------------------------------------------------===//
+//                          View CG Implementation
+//===----------------------------------------------------------------------===//
+
+#ifndef NDEBUG
+
+/// Another representation of the call graph using sorted vectors instead of
+/// sets. Used for viewing the callgraph as dot file with llvm::ViewGraph.
+struct OrderedCallGraph {
+  
+  struct Node;
+  
+  struct Edge {
+    Edge(CallGraphEdge *CGEdge, Node *Child) : CGEdge(CGEdge), Child(Child) { }
+    CallGraphEdge *CGEdge;
+    Node *Child;
+  };
+  
+  struct Node {
+    CallGraphNode *CGNode;
+    OrderedCallGraph *OCG;
+    int NumCallSites = 0;
+    SmallVector<Edge, 8> Children;
+  };
+  
+  struct child_iterator : public std::iterator<std::random_access_iterator_tag,
+                                               Node *, ptrdiff_t> {
+    SmallVectorImpl<Edge>::iterator baseIter;
+    
+    child_iterator(SmallVectorImpl<Edge>::iterator baseIter) :
+      baseIter(baseIter)
+    { }
+    
+    child_iterator &operator++() { baseIter++; return *this; }
+    child_iterator operator++(int) { auto tmp = *this; baseIter++; return tmp; }
+    Node *operator*() const { return baseIter->Child; }
+    bool operator==(const child_iterator &RHS) const {
+      return baseIter == RHS.baseIter;
+    }
+    bool operator!=(const child_iterator &RHS) const {
+      return baseIter != RHS.baseIter;
+    }
+    difference_type operator-(const child_iterator &RHS) const {
+      return baseIter - RHS.baseIter;
+    }
+  };
+  
+  OrderedCallGraph(CallGraph *CG);
+  
+  CallGraph *CG;
+  std::vector<Node> Nodes;
+
+  /// The SILValue IDs which are printed as edge source labels.
+  llvm::DenseMap<SILInstruction *, unsigned> InstToIDMap;
+
+  typedef std::vector<Node>::iterator iterator;
+};
+
+OrderedCallGraph::OrderedCallGraph(CallGraph *CG) {
+  auto const &Funcs = CG->getBottomUpFunctionOrder();
+  Nodes.resize(Funcs.size());
+  llvm::DenseMap<CallGraphNode *, Node *> NodeMap;
+  int idx = 0;
+  for (auto *F : Funcs) {
+    auto *CGNode = CG->getCallGraphNode(F);
+    assert(CGNode);
+    Node &ONode = Nodes[idx++];
+    ONode.CGNode = CGNode;
+    ONode.OCG = this;
+    NodeMap[CGNode] = &ONode;
+    
+    // Do the same numbering as SILPrinter does.
+    unsigned idx = 0;
+    for (auto &BB : *F) {
+      for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
+        ++idx;
+      
+      for (auto &I : BB) {
+        InstToIDMap[&I] = ++idx;
+      }
+    }
+  }
+
+  for (Node &ONode : Nodes) {
+    llvm::SmallVector<CallGraphEdge *, 8> OrderedEdges;
+    orderEdges(ONode.CGNode->getCalleeEdges(), OrderedEdges);
+    
+    ONode.NumCallSites = OrderedEdges.size();
+    for (auto *CGEdge : OrderedEdges) {
+      llvm::SmallVector<CallGraphNode *, 4> OrderedCallees;
+      orderCallees(CGEdge->getPartialCalleeSet(), OrderedCallees);
+
+      for (auto *CalleeNode : OrderedCallees) {
+        auto *OrderedChild = NodeMap[CalleeNode];
+        assert(OrderedChild);
+        ONode.Children.push_back(Edge(CGEdge, OrderedChild));
+      }
+    }
+  }
+}
+
+namespace llvm {
+  
+  /// Wraps a dot node label string to multiple lines. The \p NumEdgeLabels
+  /// gives an estimate on the minimum width of the node shape.
+  static void wrap(std::string &Str, int NumEdgeLabels) {
+    unsigned ColNum = 0;
+    unsigned LastSpace = 0;
+    unsigned MaxColumns = std::max(60, NumEdgeLabels * 8);
+    for (unsigned i = 0; i != Str.length(); ++i) {
+      if (ColNum == MaxColumns) {
+        if (!LastSpace)
+          LastSpace = i;
+        Str.insert(LastSpace + 1, "\\l");
+        ColNum = i - LastSpace - 1;
+        LastSpace = 0;
+      } else
+        ++ColNum;
+      if (Str[i] == ' ' || Str[i] == '.')
+        LastSpace = i;
+    }
+  }
+  
+  /// CallGraph GraphTraits specialization so the CallGraph can be
+  /// iterable by generic graph iterators.
+  template <> struct GraphTraits<OrderedCallGraph::Node *> {
+    typedef OrderedCallGraph::Node NodeType;
+    typedef OrderedCallGraph::child_iterator ChildIteratorType;
+    
+    static NodeType *getEntryNode(NodeType *N) { return N; }
+    static inline ChildIteratorType child_begin(NodeType *N) {
+      return N->Children.begin();
+    }
+    static inline ChildIteratorType child_end(NodeType *N) {
+      return N->Children.end();
+    }
+  };
+
+  template <> struct GraphTraits<OrderedCallGraph *>
+  : public GraphTraits<OrderedCallGraph::Node *> {
+    typedef OrderedCallGraph *GraphType;
+    
+    static NodeType *getEntryNode(GraphType F) { return nullptr; }
+    
+    typedef OrderedCallGraph::iterator nodes_iterator;
+    static nodes_iterator nodes_begin(GraphType OCG) {
+      return OCG->Nodes.begin();
+    }
+    static nodes_iterator nodes_end(GraphType OCG) { return OCG->Nodes.end(); }
+    static unsigned size(GraphType CG) { return CG->Nodes.size(); }
+  };
+
+  /// This is everything the llvm::GraphWriter needs to write the call graph in
+  /// a dot file.
+  template <>
+  struct DOTGraphTraits<OrderedCallGraph *> : public DefaultDOTGraphTraits {
+    
+    DOTGraphTraits(bool isSimple = false) : DefaultDOTGraphTraits(isSimple) {}
+    
+    std::string getNodeLabel(const OrderedCallGraph::Node *Node,
+                             const OrderedCallGraph *Graph) {
+      SILFunction *F = Node->CGNode->getFunction();
+      std::string Label = F->getName();
+      wrap(Label, Node->NumCallSites);
+      return Label;
+    }
+    
+    std::string getNodeDescription(const OrderedCallGraph::Node *Node,
+                             const OrderedCallGraph *Graph) {
+      SILFunction *F = Node->CGNode->getFunction();
+      std::string Label = demangle_wrappers::
+                          demangleSymbolAsString(F->getName());
+      wrap(Label, Node->NumCallSites);
+      return Label;
+    }
+    
+    static std::string getEdgeSourceLabel(const OrderedCallGraph::Node *Node,
+                                          OrderedCallGraph::child_iterator I) {
+      std::string Label;
+      raw_string_ostream O(Label);
+      SILInstruction *Inst = I.baseIter->CGEdge->getApply().getInstruction();
+      O << '%' << Node->OCG->InstToIDMap[Inst];
+      return Label;
+    }
+    
+    static std::string getEdgeAttributes(const OrderedCallGraph::Node *Node,
+                                         OrderedCallGraph::child_iterator I,
+                                         const OrderedCallGraph *Graph) {
+      CallGraphEdge *Edge = I.baseIter->CGEdge;
+      if (!Edge->isCalleeSetComplete())
+        return "color=\"red\"";
+      return "";
+    }
+  };
+} // end llvm namespace
+#endif
+
+void CallGraph::viewCG() {
+  /// When asserts are disabled, this should be a NoOp.
+#ifndef NDEBUG
+  OrderedCallGraph OCG(this);
+  llvm::ViewGraph(&OCG, "callgraph");
+#endif
+}
+

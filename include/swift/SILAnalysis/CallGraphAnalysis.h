@@ -345,6 +345,12 @@ public:
 
   void dump();
 
+  /// This function is meant for use from the debugger.  You can just say 'call
+  /// CG->viewCG()' and a dot graph viewer window should pop up from the
+  /// program, displaying the call graph. This depends on there being a dot
+  /// graph viewer program, like 'graphviz', in your path.
+  void viewCG();
+  
   void verify() const;
 
 private:
