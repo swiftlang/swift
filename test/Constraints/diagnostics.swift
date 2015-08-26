@@ -444,6 +444,9 @@ enum Color {
   static func frob(a : Int, inout b : Int) -> Color {}
 }
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{type of expression is ambiguous without more context}}
+let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{type of expression is ambiguous without more context}}
+let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{type of expression is ambiguous without more context}}
+
 let _: Int -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing argument label 'description:' in call}} {{46-46=description: }}
 let _: Color = .Unknown("") // expected-error {{missing argument label 'description:' in call}} {{25-25=description: }}
 let _: Color = .Unknown // expected-error {{contextual member 'Unknown' expects argument of type '(description: String)'}}
