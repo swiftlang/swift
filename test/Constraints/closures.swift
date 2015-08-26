@@ -89,3 +89,7 @@ func testMap() {
   [1,a].map { $0 + 1.0 } // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Memory>), (Int, UnsafePointer<Memory>)}}
 }
+
+// <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
+[].reduce { $0 + $1 }  // expected-error {{'(_, _) -> _' is not convertible to '(_, combine: @noescape (_, _) throws -> _)'}}
+

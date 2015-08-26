@@ -2794,8 +2794,7 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
   ClosureExpr *NearestClosure = nullptr;
   
   // Walk the parents of the specified expression, handling any ClosureExprs.
-  for (Expr *node = parentMap[subExpr]; node && node != expr;
-       node = parentMap[node]) {
+  for (Expr *node = parentMap[subExpr]; node; node = parentMap[node]) {
     auto *CE = dyn_cast<ClosureExpr>(node);
     if (!CE) continue;
     
