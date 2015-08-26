@@ -84,12 +84,16 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   auto derivedSubstTy = derivedInfo.getSILType()
     .castTo<SILFunctionType>();
 
-  // The override member type is semantically a subtype of the base
-  // member type. If the override is ABI compatible, we do not need
-  // a thunk.
-  if (derivedSubstTy->checkForABIDifferences(derivedOrigTy) ==
-      SILFunctionType::ABIDifference::Trivial)
-    return getFunction(derived, NotForDefinition);
+  {
+    GenericContextScope scope(Types, derivedSubstTy->getGenericSignature());
+
+    // The override member type is semantically a subtype of the base
+    // member type. If the override is ABI compatible, we do not need
+    // a thunk.
+    if (Types.checkForABIDifferences(derivedSubstTy, derivedOrigTy) ==
+          TypeConverter::ABIDifference::Trivial)
+      return getFunction(derived, NotForDefinition);
+  }
   
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
   SILLocation loc(derivedDecl);

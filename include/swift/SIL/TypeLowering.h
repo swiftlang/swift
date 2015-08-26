@@ -810,7 +810,31 @@ public:
   /// Get the capture list from a closure, with transitive function captures
   /// flattened.
   ArrayRef<CapturedValue> getLoweredLocalCaptures(AnyFunctionRef fn);
+
+  enum class ABIDifference : uint8_t {
+    // No ABI differences, function can be trivially bitcast to result type.
+    Trivial,
+    // Representation difference requires thin-to-thick conversion.
+    ThinToThick,
+    // Non-trivial difference requires thunk.
+    NeedsThunk
+  };
   
+  /// \brief Test if type1 is ABI compatible with type2, and can be converted
+  /// with a trivial bitcast.
+  ///
+  /// Note that type1 and type2 must be lowered types, and type1 must be a
+  /// subtype of type2.
+  ///
+  /// The ABI compatible relation is not symmetric on function types -- while
+  /// T and T! are both subtypes of each other, a calling convention conversion
+  /// of T! to T always requires a thunk.
+  ABIDifference checkForABIDifferences(CanType type1, CanType type2);
+
+  /// \brief Same as above but for SIL function types.
+  ABIDifference checkFunctionForABIDifferences(SILFunctionType *fnTy1,
+                                               SILFunctionType *fnTy2);
+
 private:
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
                               bool canBridgeBool,

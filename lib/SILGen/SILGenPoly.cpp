@@ -1315,8 +1315,8 @@ emitTransformedFunctionValue(SILGenFunction &gen,
   }
 
   // Check if we require a re-abstraction thunk.
-  if (fnType->checkForABIDifferences(expectedFnType) ==
-      SILFunctionType::ABIDifference::NeedsThunk) {
+  if (gen.SGM.Types.checkForABIDifferences(fnType, expectedFnType) ==
+        TypeConverter::ABIDifference::NeedsThunk) {
     assert(expectedFnType->getExtInfo().hasContext()
            && "conversion thunk will not be thin!");
     return createThunk(gen, loc, kind, fn,

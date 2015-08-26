@@ -3011,29 +3011,6 @@ public:
     return getExtInfo().isNoReturn();
   }
 
-  enum class ABIDifference : uint8_t {
-    // No ABI differences, function can be trivially bitcast to result type.
-    Trivial,
-    // Representation difference requires thin-to-thick conversion.
-    ThinToThick,
-    // Non-trivial difference requires thunk.
-    NeedsThunk
-  };
-
-  /// \brief Test if the function is ABI compatible with the given function,
-  /// and can be converted with a trivial bitcast.
-  ///
-  /// This function must be a subtype of the other function. The ABI compatible
-  /// relation is not symmetric -- while T and T! are both subtypes of each
-  /// other, a calling convention conversion of T! to T always requires a
-  /// thunk.
-  ///
-  /// Note that this is a conservative approximation because it does not
-  /// know about generic parameters.
-  ///
-  /// \return An ABIDifference.
-  ABIDifference checkForABIDifferences(SILFunctionType *other);
-
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                                ModuleDecl *astModule,
                                                ArrayRef<Substitution> subs);
