@@ -786,20 +786,14 @@ Type TypeBase::getWithoutParens() {
 }
 
 Type TypeBase::replaceCovariantResultType(Type newResultType,
-                                          unsigned uncurryLevel) {
+                                          unsigned uncurryLevel,
+                                          bool preserveOptionality) {
   if (uncurryLevel == 0) {
-    // Preserve optionality of the result.
-    assert(!newResultType->getAnyOptionalObjectType());
-    if (auto boundGeneric = getAs<BoundGenericType>()) {
-      switch (boundGeneric->getDecl()->classifyAsOptionalType()) {
-      case OTK_None:
-        return newResultType;
-      case OTK_Optional:
-        return OptionalType::get(newResultType);
-      case OTK_ImplicitlyUnwrappedOptional:
-        return ImplicitlyUnwrappedOptionalType::get(newResultType);
-      }
-      llvm_unreachable("bad optional type kind");
+    if (preserveOptionality) {
+      assert(!newResultType->getAnyOptionalObjectType());
+      OptionalTypeKind resultOTK;
+      if (getAnyOptionalObjectType(resultOTK))
+        return OptionalType::get(resultOTK, newResultType);
     }
 
     return newResultType;
@@ -810,7 +804,8 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   Type inputType = fnType->getInput();
   Type resultType =
     fnType->getResult()->replaceCovariantResultType(newResultType,
-                                                    uncurryLevel - 1);
+                                                    uncurryLevel - 1,
+                                                    preserveOptionality);
   
   // Produce the resulting function type.
   if (auto genericFn = dyn_cast<GenericFunctionType>(fnType)) {
@@ -826,6 +821,41 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   }
   
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
+}
+
+/// Rebuilds the given 'self' type using the given object type as the
+/// replacement for the object type of self.
+static Type rebuildSelfTypeWithObjectType(Type selfTy, Type objectTy) {
+  auto existingObjectTy = selfTy->getRValueInstanceType();
+  return selfTy.transform([=](Type type) -> Type {
+    if (type->isEqual(existingObjectTy))
+      return objectTy;
+    return type;
+  });
+}
+
+/// Returns a new function type exactly like this one but with the self
+/// parameter replaced. Only makes sense for members of types.
+Type TypeBase::replaceSelfParameterType(Type newSelf) {
+  auto fnTy = castTo<AnyFunctionType>();
+  Type input = rebuildSelfTypeWithObjectType(fnTy->getInput(), newSelf);
+
+  if (auto genericFnTy = getAs<GenericFunctionType>()) {
+    return GenericFunctionType::get(genericFnTy->getGenericSignature(),
+                                    input,
+                                    fnTy->getResult(),
+                                    fnTy->getExtInfo());
+  }
+
+  if (auto polyFnTy = getAs<PolymorphicFunctionType>()) {
+    return PolymorphicFunctionType::get(input,
+                                        fnTy->getResult(),
+                                        &polyFnTy->getGenericParams());
+  }
+
+  return FunctionType::get(input,
+                           fnTy->getResult(),
+                           fnTy->getExtInfo());
 }
 
 Type TypeBase::getWithoutNoReturn(unsigned UncurryLevel) {
@@ -850,7 +880,7 @@ Type TypeBase::getWithoutNoReturn(unsigned UncurryLevel) {
 }
 
 /// Retrieve the object type for a 'self' parameter, digging into one-element
-/// tuples, lvalue types, and metatypes.
+/// tuples, inout types, and metatypes.
 Type TypeBase::getRValueInstanceType() {
   Type type = this;
   
@@ -863,7 +893,7 @@ Type TypeBase::getRValueInstanceType() {
   if (auto metaTy = type->getAs<AnyMetatypeType>())
     return metaTy->getInstanceType();
 
-  // For @mutable value type methods, we need to dig through inout types.
+  // For mutable value type methods, we need to dig through inout types.
   return type->getInOutObjectType();
 }
 

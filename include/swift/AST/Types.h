@@ -658,9 +658,14 @@ public:
   /// replacing the type. With uncurry level == 0, this simply
   /// replaces the current type with the new result type.
   Type replaceCovariantResultType(Type newResultType,
-                                  unsigned uncurryLevel);
+                                  unsigned uncurryLevel,
+                                  bool preserveOptionality = true);
 
-  /// Returns a function type that is not 'noreturn', but is otherwis the same
+  /// Returns a new function type exactly like this one but with the self
+  /// parameter replaced. Only makes sense for function members of types.
+  Type replaceSelfParameterType(Type newSelf);
+
+  /// Returns a function type that is not 'noreturn', but is otherwise the same
   /// as this type.
   Type getWithoutNoReturn(unsigned UncurryLevel);
 
@@ -682,7 +687,7 @@ public:
   Type getLValueOrInOutObjectType();
 
   /// Retrieves the rvalue instance type, looking through single-element
-  /// tuples, lvalue types, and metatypes.
+  /// tuples, inout types, and metatypes.
   Type getRValueInstanceType();
 
   /// For a ReferenceStorageType like @unowned, this returns the referent.

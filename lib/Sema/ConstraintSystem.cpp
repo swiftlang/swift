@@ -1039,17 +1039,6 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
                    cs.getConstraintLocator(locator));
 }
 
-/// Rebuilds the given 'self' type using the given object type as the
-/// replacement for the object type of self.
-static Type rebuildSelfTypeWithObjectType(Type selfTy, Type objectTy) {
-  auto existingObjectTy = selfTy->getRValueInstanceType();
-  return selfTy.transform([=](Type type) -> Type {
-    if (type->isEqual(existingObjectTy))
-      return objectTy;
-    return type;
-  });
-}
-
 Type ConstraintSystem::replaceSelfTypeInArchetype(ArchetypeType *archetype) {
   assert(SelfTypeVar && "Meaningless unless there is a type variable for Self");
   if (auto parent = archetype->getParent()) {
@@ -1224,16 +1213,14 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   // If this is an initializer, replace the result type with the base
   // object type.
   else if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
-    auto outerFnType = openedType->castTo<FunctionType>();
-    auto innerFnType = outerFnType->getResult()->castTo<FunctionType>();
     auto resultTy = baseObjTy;
     if (ctor->getFailability() != OTK_None)
       resultTy = OptionalType::get(ctor->getFailability(), resultTy);
 
-    openedType = FunctionType::get(innerFnType->getInput(), resultTy,
-                                   innerFnType->getExtInfo());
-    openedType = FunctionType::get(outerFnType->getInput(), openedType,
-                                   outerFnType->getExtInfo());
+    openedType = openedType->replaceCovariantResultType(
+                     resultTy,
+                     /*uncurryLevel=*/ 2,
+                     /*preserveOptionality=*/ false);
   }
 
   // If we are looking at a member of an existential, open the existential.
@@ -1304,18 +1291,15 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     // For a dynamic result referring to an instance function through
     // an object of metatype type, replace the 'Self' parameter with
     // a AnyObject member.
-    auto funcTy = type->castTo<AnyFunctionType>();
-    Type resultTy = funcTy->getResult();
-    Type inputTy = TC.getProtocol(SourceLoc(), KnownProtocolKind::AnyObject)
-                     ->getDeclaredTypeOfContext();
-    type = FunctionType::get(inputTy, resultTy, funcTy->getExtInfo());
+    Type anyObjectTy = TC.getProtocol(SourceLoc(),
+                                      KnownProtocolKind::AnyObject)
+                                          ->getDeclaredTypeOfContext();
+
+    type = openedFnType->replaceSelfParameterType(anyObjectTy);
   } else {
     // For an unbound instance method reference, replace the 'Self'
     // parameter with the base type.
-    auto selfTy = rebuildSelfTypeWithObjectType(openedFnType->getInput(),
-                                                baseObjTy);
-    type = FunctionType::get(selfTy, openedFnType->getResult(),
-                             openedFnType->getExtInfo());
+    type = openedFnType->replaceSelfParameterType(baseObjTy);
   }
 
   // If we opened up any type variables, record the replacements.
