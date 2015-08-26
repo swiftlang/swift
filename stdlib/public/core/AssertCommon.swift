@@ -90,6 +90,7 @@ func _reportUnimplementedInitializer(
 /// This function should not be inlined because it is cold and it inlining just
 /// bloats code.
 @noreturn @inline(never)
+@_semantics("stdlib_binary_only")
 func _assertionFailed(
   prefix: StaticString, _ message: StaticString,
   _ file: StaticString, _ line: UInt
@@ -117,6 +118,7 @@ func _assertionFailed(
 /// This function should not be inlined because it is cold and it inlining just
 /// bloats code.
 @noreturn @inline(never)
+@_semantics("stdlib_binary_only")
 func _assertionFailed(
   prefix: StaticString, _ message: String,
   _ file: StaticString, _ line: UInt
