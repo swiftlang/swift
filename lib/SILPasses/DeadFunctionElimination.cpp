@@ -63,11 +63,6 @@ protected:
     if (isPossiblyUsedExternally(F->getLinkage(), Module->isWholeModule()))
       return true;
 
-    // TODO: main is currently marked as internal so we explicitly check
-    // for functions with this name and keep them around.
-    if (F->getName() == SWIFT_ENTRY_POINT_FUNCTION)
-      return true;
-
     // ObjC functions are called through the runtime and are therefore alive
     // even if not referenced inside SIL.
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
