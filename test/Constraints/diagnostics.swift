@@ -275,6 +275,8 @@ func rdar19804707() {
   knownOps = Op.BinaryOperator{$1 - $0}
 
   knownOps = .BinaryOperator({$1 - $0})
+
+  // FIXME: rdar://19804707 - These two statements should be accepted by the type checker.
   knownOps = .BinaryOperator(){$1 - $0} // expected-error {{type of expression is ambiguous without more context}}
   knownOps = .BinaryOperator{$1 - $0}   // expected-error {{type of expression is ambiguous without more context}}
 }

@@ -3046,61 +3046,65 @@ static bool isSettable(const AbstractStorageDecl *decl) {
 /// is a let member in an initializer.
 bool VarDecl::isSettable(const DeclContext *UseDC,
                          const DeclRefExpr *base) const {
-  if (isLet()) {
-    // If the decl has a value bound to it but has no PBD, then it is
-    // initialized.
-    if (hasNonPatternBindingInit())
-      return false;
+  // If this is a 'var' decl, then we're settable if we have storage or a
+  // setter.
+  if (!isLet())
+    return ::isSettable(this);
+
+  // If the decl has a value bound to it but has no PBD, then it is
+  // initialized.
+  if (hasNonPatternBindingInit())
+    return false;
+  
+  // 'let' parameters are never settable.
+  if (isa<ParamDecl>(this))
+    return false;
+  
+  // Properties in structs/classes are only ever mutable in their designated
+  // initializer(s).
+  if (isInstanceMember()) {
+    auto *CD = dyn_cast_or_null<ConstructorDecl>(UseDC);
+    if (!CD) return false;
     
-    // 'let' parameters are never settable.
-    if (isa<ParamDecl>(this))
-      return false;
-    
-    // Properties in structs/classes are only ever mutable in their designated
-    // initializer(s).
-    if (isInstanceMember()) {
-      auto *CD = dyn_cast_or_null<ConstructorDecl>(UseDC);
-      if (!CD) return false;
+    auto *CDC = CD->getDeclContext();
       
-      auto *CDC = CD->getDeclContext();
-        
-      // If this init is defined inside of the same type (or in an extension
-      // thereof) as the let property, then it is mutable.
-      if (!CDC->isTypeContext() ||
-          CDC->getDeclaredTypeInContext()->getAnyNominal() !=
-          getDeclContext()->getDeclaredTypeInContext()->getAnyNominal())
-        return false;
-
-      if (base && CD->getImplicitSelfDecl() != base->getDecl())
-        return false;
-
-      // If this is a convenience initializer (i.e. one that calls
-      // self.init), then let properties are never mutable in it.  They are
-      // only mutable in designated initializers.
-      if (CD->getDelegatingOrChainedInitKind(nullptr) ==
-          ConstructorDecl::BodyInitKind::Delegating)
-        return false;
-
-      return true;
-    } else {
-      // Normal variables (e.g. globals) are only mutable in the context of the
-      // declaration.  To handle top-level code properly, we look through
-      // the TopLevelCode decl on the use (if present) since the vardecl will be
-      // one level up.
-      if (UseDC && isa<TopLevelCodeDecl>(UseDC))
-        UseDC = UseDC->getParent();
-      
-      if (getDeclContext() != UseDC)
-        return false;
-    }
-    
-    // If the decl has an explicitly written initializer with a pattern binding,
-    // then it isn't settable.
-    if (getParentInitializer() != nullptr)
+    // If this init is defined inside of the same type (or in an extension
+    // thereof) as the let property, then it is mutable.
+    if (!CDC->isTypeContext() ||
+        CDC->getDeclaredTypeInContext()->getAnyNominal() !=
+        getDeclContext()->getDeclaredTypeInContext()->getAnyNominal())
       return false;
+
+    if (base && CD->getImplicitSelfDecl() != base->getDecl())
+      return false;
+
+    // If this is a convenience initializer (i.e. one that calls
+    // self.init), then let properties are never mutable in it.  They are
+    // only mutable in designated initializers.
+    if (CD->getDelegatingOrChainedInitKind(nullptr) ==
+        ConstructorDecl::BodyInitKind::Delegating)
+      return false;
+
+    return true;
   }
 
-  return ::isSettable(this);
+  // If the decl has an explicitly written initializer with a pattern binding,
+  // then it isn't settable.
+  if (getParentInitializer() != nullptr)
+    return false;
+
+  // Normal lets (e.g. globals) are only mutable in the context of the
+  // declaration.  To handle top-level code properly, we look through
+  // the TopLevelCode decl on the use (if present) since the vardecl may be
+  // one level up.
+  if (getDeclContext() == UseDC)
+    return true;
+
+  if (UseDC && isa<TopLevelCodeDecl>(UseDC) &&
+      getDeclContext() == UseDC->getParent())
+    return true;
+
+  return false;
 }
 
 bool SubscriptDecl::isSettable() const {

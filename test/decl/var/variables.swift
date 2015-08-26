@@ -97,3 +97,11 @@ func test21057425() -> (Int, Int) {
 func test21081340() {
   let (x: a, y: b): () = foo() // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
 }
+
+// <rdar://problem/22322266> Swift let late initialization in top level control flow statements
+if true {
+  let s : Int
+  s = 42  // should be valid.
+}
+
+
