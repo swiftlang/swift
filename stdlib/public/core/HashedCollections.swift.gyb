@@ -1384,11 +1384,18 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 /// - Precondition: `SwiftKey` and `SwiftValue` are bridged to Objective-C,
 ///   and at least one of them requires non-trivial bridging.
 @warn_unused_result
+@inline(never)
+@_semantics("stdlib_binary_only")
 public func _dictionaryBridgeToObjectiveC<
   SwiftKey, SwiftValue, ObjCKey, ObjCValue
 >(
   source: Dictionary<SwiftKey, SwiftValue>
 ) -> Dictionary<ObjCKey, ObjCValue> {
+
+  // Note: We force this function to stay in the swift dylib because
+  // it is not performance sensitive and keeping it in the dylib saves
+  // a new kilobytes for each specialization for all users of dictionary.
+
   _sanityCheck(
     !_isBridgedVerbatimToObjectiveC(SwiftKey.self) ||
     !_isBridgedVerbatimToObjectiveC(SwiftValue.self))
