@@ -1864,13 +1864,18 @@ let comparisonTests = [
 
   // ASCII cases
   ComparisonTest(.LT, "t", "tt"),
-  ComparisonTest(.GT, "t", "Tt"),
-  ComparisonTest(.GT, "\u{0}", ""),
-  ComparisonTest(.EQ, "\u{0}", "\u{0}"),
+  // According to DUCET: a < A < b < B.
+  // This is NOT ascii order.
+  ComparisonTest(.GT, "T", "t"),
+  // According to DUCET \0 has no collation value and so is ignored in the
+  // ordering relation.
+  ComparisonTest(.EQ, "\u{0}", ""),
+  ComparisonTest(.EQ, "\u{1}", "\u{0}"),
+  ComparisonTest(.LT, "\r\n", "t"),
   // Currently fails:
-  // ComparisonTest(.LT, "\r\n", "t"),
-  // ComparisonTest(.GT, "\r\n", "\n"),
-  // ComparisonTest(.LT, "\u{0}", "\u{0}\u{0}"),
+  //ComparisonTest(.GT, "\r\n", "\n"),
+
+  ComparisonTest(.EQ, "\u{0}", "\u{0}\u{0}"),
 
   // Whitespace
   // U+000A LINE FEED (LF)
@@ -1885,7 +1890,6 @@ let comparisonTests = [
   ComparisonTest(.GT, "\u{2028}", "\n"),
   ComparisonTest(.GT, "\u{2029}", "\n"),
   ComparisonTest(.GT, "\r\n\r\n", "\r\n"),
-
   // U+0301 COMBINING ACUTE ACCENT
   // U+00E1 LATIN SMALL LETTER A WITH ACUTE
   ComparisonTest(.EQ, "a\u{301}", "\u{e1}"),
@@ -1908,7 +1912,8 @@ let comparisonTests = [
   ComparisonTest(.EQ, "\u{212b}", "A\u{30a}"),
   ComparisonTest(.EQ, "\u{212b}", "\u{c5}"),
   ComparisonTest(.EQ, "A\u{30a}", "\u{c5}"),
-  ComparisonTest(.LT, "A\u{30a}", "a"),
+
+  ComparisonTest(.GT, "A\u{30a}", "a"),
   ComparisonTest(.LT, "A", "A\u{30a}"),
 
   // U+2126 OHM SIGN
@@ -1931,7 +1936,7 @@ let comparisonTests = [
   ComparisonTest(.EQ, "\u{fb01}", "\u{fb01}"),
   ComparisonTest(.LT, "fi", "\u{fb01}"),
 
-  // Test that Unicode collation is performed in deterministic mode.
+  // We don't perform Unicode collation in semi-stable mode.
   //
   // U+0301 COMBINING ACUTE ACCENT
   // U+0341 COMBINING ACUTE TONE MARK
@@ -1945,8 +1950,8 @@ let comparisonTests = [
   // U+0301 and U+0954 don't decompose in the canonical decomposition mapping.
   // U+0341 has a canonical decomposition mapping of U+0301.
   ComparisonTest(.EQ, "\u{0301}", "\u{0341}"),
-  ComparisonTest(.LT, "\u{0301}", "\u{0954}"),
-  ComparisonTest(.LT, "\u{0341}", "\u{0954}"),
+  ComparisonTest(.EQ, "\u{0301}", "\u{0954}"),
+  ComparisonTest(.EQ, "\u{0341}", "\u{0954}"),
 ]
 
 func checkStringComparison(
@@ -2068,8 +2073,8 @@ NSStringAPIs.test("hasPrefix,hasSuffix") {
   }
 }
 
-NSStringAPIs.test("Failures{hasPrefix,hasSuffix}-CF")
-  .xfail(.Custom({ true }, reason: "rdar://problem/19034601")).code {
+NSStringAPIs.test("Failures{hasPrefix,hasSuffix}-CF") {
+  //.xfail(.Custom({ true }, reason: "rdar://problem/19034601")).code {
   let test = ComparisonTest(.LT, "\u{0}", "\u{0}\u{0}")
   checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
 }
