@@ -64,6 +64,8 @@ private:
   bool passReference(ValueDecl *D, SourceLoc Loc);
   bool passReference(ModuleEntity Mod, std::pair<Identifier, SourceLoc> IdLoc);
 
+  bool passSubscriptReference(ValueDecl *D, SourceLoc Loc, bool IsOpenBracket);
+
   bool passCallArgNames(Expr *Fn, TupleExpr *TupleE);
 
   TypeDecl *getTypeDecl(Type Ty);
@@ -219,7 +221,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       SubscrD = SE->getDecl().getDecl();
 
     if (SubscrD) {
-      if (!passReference(SubscrD, E->getLoc()))
+      if (!passSubscriptReference(SubscrD, E->getLoc(), true))
         return { false, nullptr };
     }
 
@@ -227,7 +229,7 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return { false, nullptr };
 
     if (SubscrD) {
-      if (!passReference(SubscrD, E->getEndLoc()))
+      if (!passSubscriptReference(SubscrD, E->getEndLoc(), false))
         return { false, nullptr };
     }
 
@@ -343,10 +345,20 @@ bool SemaAnnotator::passModulePathElements(
   return passReference(ClangMod, Path.back());
 }
 
+bool SemaAnnotator::passSubscriptReference(ValueDecl *D, SourceLoc Loc,
+                                           bool IsOpenBracket) {
+  CharSourceRange Range = Loc.isValid()
+                        ? CharSourceRange(Loc, 1)
+                        : CharSourceRange();
+
+  bool Continue = SEWalker.visitSubscriptReference(D, Range, IsOpenBracket);
+  if (!Continue)
+    Cancelled = true;
+  return Continue;
+}
+
 bool SemaAnnotator::passReference(ValueDecl *D, SourceLoc Loc) {
   unsigned NameLen = D->getName().getLength();
-  if (isa<SubscriptDecl>(D))
-    NameLen = 1;
   TypeDecl *CtorTyRef = nullptr;
 
   if (TypeDecl *TD = dyn_cast<TypeDecl>(D)) {
@@ -442,6 +454,15 @@ bool SourceEntityWalker::walk(Decl *D) {
 bool SourceEntityWalker::walk(DeclContext *DC) {
   SemaAnnotator Annotator(*this);
   return DC->walkContext(Annotator);
+}
+
+bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
+                                                 CharSourceRange Range,
+                                                 bool IsOpenBracket) {
+  // Most of the clients treat subscript reference the same way as a
+  // regular reference when called on the open open bracket and
+  // ignore the closing one.
+  return IsOpenBracket ? visitDeclReference(D, Range, nullptr) : true;
 }
 
 bool SourceEntityWalker::visitCallArgName(Identifier Name,

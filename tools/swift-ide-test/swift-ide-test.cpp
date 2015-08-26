@@ -1159,6 +1159,11 @@ private:
     return true;
   }
 
+  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+                               bool IsOpenBracket) override {
+    return visitDeclReference(D, Range, nullptr);
+  }
+
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
                         ValueDecl *D) override {
     annotateSourceEntity({ Range, D, nullptr, /*IsRef=*/true });

@@ -89,6 +89,20 @@ public:
   virtual bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                                   TypeDecl *CtorTyRef) { return true; }
 
+  /// This method is called when a ValueDecl for a subscript is referenced in
+  /// source. If it returns false, the remaining traversal is terminated
+  /// and returns failure.
+  ///
+  /// Unlike the ordinary decl reference (\c visitDeclReference), this method
+  /// is called twice for each subscript reference: on open and close brackets.
+  ///
+  /// \param D the referenced decl.
+  /// \param Range the source range of the source reference.
+  /// \param IsOpenBracket this is \c true when the method is called on an
+  /// open bracket.
+  virtual bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+                                       bool IsOpenBracket);
+
   /// This method is called for each keyword argument in a call expression.
   /// If it returns false, the remaining traversal is terminated and returns
   /// failure.
