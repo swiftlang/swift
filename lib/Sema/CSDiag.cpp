@@ -1799,7 +1799,12 @@ suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
 enum TCCFlags {
   /// Allow the result of the subexpression to be an lvalue.  If this is not
   /// specified, any lvalue will be forced to be loaded into an rvalue.
-  TCC_AllowLValue = 0x01
+  TCC_AllowLValue = 0x01,
+  
+  /// Re-type-check the given subexpression even if the expression has already
+  /// been checked already.  The client is asserting that infinite recursion is
+  /// not possible because it has relaxed a constraint on the system.
+  TCC_ForceRecheck = 0x02
 };
 
 typedef OptionSet<TCCFlags> TCCOptions;
@@ -2701,13 +2706,15 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
                                                     Type convertType,
                                        ContextualTypePurpose convertTypePurpose,
                                                     TCCOptions options) {
-  // Track if this sub-expression is currently being diagnosed.
-  if (Expr *res = CS->TC.isExprBeingDiagnosed(subExpr))
-    return res;
+  // If this sub-expression is currently being diagnosed, refuse to recheck the
+  // expression (which may lead to infinite recursion).  If the client is
+  // telling us that it knows what it is doing, then believe it.
+  if (!options.contains(TCC_ForceRecheck)) {
+    if (Expr *res = CS->TC.isExprBeingDiagnosed(subExpr))
+      return res;
   
-  // FIXME: expressions are never removed from this set.
-  CS->TC.addExprForDiagnosis(subExpr, subExpr);
-  
+    CS->TC.addExprForDiagnosis(subExpr, subExpr);
+  }
   
   // If we have a conversion type, but it has type variables (from the current
   // ConstraintSystem), then we can't use it.
@@ -2831,12 +2838,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     return false;
 
   // Try re-type-checking the expression without the contextual type to see if
-  // it can work without it.  If so, the contextual type is the problem.
-
-  CS->TC.addExprForDiagnosis(expr, nullptr);
-
-  // Type check the expression independently of any contextual constraints.
-  auto exprType = getTypeOfTypeCheckedChildIndependently(expr);
+  // it can work without it.  If so, the contextual type is the problem.  We
+  // force a recheck, because "expr" is likely in our table with the extra
+  // contextual constraint that we know we are relaxing.
+  auto exprType = getTypeOfTypeCheckedChildIndependently(expr,TCC_ForceRecheck);
   
   // If it failed an diagnosed something, then we're done.
   if (!exprType) return true;
