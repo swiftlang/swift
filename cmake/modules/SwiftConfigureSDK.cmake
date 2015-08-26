@@ -37,8 +37,6 @@ endfunction()
 #     version_min_name   # The name used in the -mOS-version-min flag
 #     triple_name        # The name used in Swift's -triple
 #     architectures      # A list of architectures this SDK supports
-#     internal           # Whether the prefer the internal SDK, if present,
-#                        # for building C code and linking
 #   )
 #
 # Sadly there are three OS naming conventions.
@@ -62,7 +60,7 @@ endfunction()
 #   SWIFT_SDK_${prefix}_ARCH_${ARCH}_TRIPLE Triple name
 macro(configure_sdk_darwin
     prefix name deployment_version xcrun_name
-    version_min_name triple_name architectures internal)
+    version_min_name triple_name architectures)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
@@ -85,7 +83,8 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_PATH "" CACHE PATH "Path to the ${name} SDK")
 
   if(NOT SWIFT_SDK_${prefix}_PATH)
-    if(${internal})
+    if(${SWIFT_USE_INTERNAL_SDK})
+      # Prefer the internal SDK, if present, for building C code and linking.
       execute_process(
           COMMAND "xcrun" "--sdk" "${xcrun_name}.internal" "--show-sdk-path"
           OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PATH
