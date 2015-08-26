@@ -100,10 +100,9 @@ class F: D {
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D1gfS0_FTGSqPS_8AddrOnly__1yPS1___PS1__
 // TODO: extra copies here
-// CHECK:         [[WRAPPED_X_ADDR_1:%.*]] = init_enum_data_addr [[WRAP_X_ADDR_1:%.*]] :
-// CHECK:         copy_addr [take] {{%.*}} to [initialization] [[WRAPPED_X_ADDR_1]]
-// CHECK:         inject_enum_addr [[WRAP_X_ADDR_1]]
-// CHECK:         copy_addr [take] [[WRAP_X_ADDR_1]] to [initialization] [[WRAP_X_ADDR:%.*]] :
+// CHECK:         [[WRAPPED_X_ADDR:%.*]] = init_enum_data_addr [[WRAP_X_ADDR:%.*]] :
+// CHECK:         copy_addr [take] {{%.*}} to [initialization] [[WRAPPED_X_ADDR]]
+// CHECK:         inject_enum_addr [[WRAP_X_ADDR]]
 // CHECK:         [[RES_ADDR:%.*]] = alloc_stack
 // CHECK:         apply {{%.*}}([[RES_ADDR]]#1, [[WRAP_X_ADDR]], %2, %3)
 // CHECK:         [[DEST_ADDR:%.*]] = init_enum_data_addr %0
@@ -149,6 +148,10 @@ class Aap {
 
   func catFast(s: S?) -> S? {}
   func dogFast(s: S!) -> S! {}
+
+  func flip() -> (() -> S?) {}
+
+  func map() -> S -> () -> Aap? {}
 }
 
 class Noot : Aap {
@@ -157,6 +160,10 @@ class Noot : Aap {
 
   override func catFast(s: S!) -> S! {}
   override func dogFast(s: S?) -> S? {}
+
+  override func flip() -> (() -> S) {}
+
+  override func map() -> S? -> () -> Noot {}
 }
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks3Bar3foofS0_FGSqFSiSi_FSiSi : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<Int -> Int>
@@ -165,6 +172,30 @@ class Noot : Aap {
 // CHECK:         apply [[IMPL]]
 // CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 
+// CHECK-LABEL: sil private @_TTVFC13vtable_thunks4Noot4flipfS0_FT_FT_VS_1S
+// CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks4Noot4flipfS0_FT_FT_VS_1S
+// CHECK:         [[INNER:%.*]] = apply %1(%0)
+// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo__dV13vtable_thunks1S_XFo__dGSqS0___
+// CHECK:         [[OUTER:%.*]] = partial_apply [[THUNK]]([[INNER]])
+// CHECK:         return [[OUTER]]
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dV13vtable_thunks1S_XFo__dGSqS0___
+// CHECK:         [[INNER:%.*]] = apply %0()
+// CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, %1 : $S
+// CHECK:         return [[OUTER]] : $Optional<S>
+
+// CHECK-LABEL: sil private @_TTVFC13vtable_thunks4Noot3mapfS0_FT_FGSqVS_1S_FT_S0_
+// CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks4Noot3mapfS0_FT_FGSqVS_1S_FT_S0_
+// CHECK:         [[INNER:%.*]] = apply %1(%0)
+// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo_dGSqV13vtable_thunks1S__oXFo__oCS_4Noot__XFo_dS0__oXFo__oGSqCS_3Aap___
+// CHECK:         [[OUTER:%.*]] = partial_apply [[THUNK]]([[INNER]])
+// CHECK:         return [[OUTER]]
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dGSqV13vtable_thunks1S__oXFo__oCS_4Noot__XFo_dS0__oXFo__oGSqCS_3Aap___
+// CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, %0
+// CHECK:         [[INNER:%.*]] = apply %1(%2)
+// CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_owned () -> @owned Noot to $@callee_owned () -> @owned Optional<Aap>
+// CHECK:         return [[OUTER]]
 // CHECK-LABEL: sil_vtable D {
 // CHECK:         #B.iuo!1: _TTVF{{[A-Z0-9a-z_]*}}1D
 // CHECK:         #B.f!1: _TF{{[A-Z0-9a-z_]*}}1D

@@ -576,7 +576,7 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
                  (hasAbstraction ? SGFContext() : C), IsNotTake);
   if (hasAbstraction) {
     result = SGF.emitOrigToSubstValue(loc, result, origFormalType,
-                                      substFormalType, C);
+                                      substFormalType, substFormalType, C);
   }
 
   switch (cast<FuncDecl>(accessor.getDecl())->getAddressorKind()) {
@@ -674,7 +674,8 @@ ManagedValue SILGenFunction::emitRValueForPropertyLoad(
     auto Result = emitLoadOfLValue(loc, std::move(LV), C, isGuaranteedValid);
     if (hasAbstractionChange)
       Result =
-          emitOrigToSubstValue(loc, Result, origFormalType, substFormalType, C);
+          emitOrigToSubstValue(loc, Result, origFormalType,
+                               substFormalType, substFormalType, C);
     return Result;
   }
 
@@ -714,7 +715,7 @@ ManagedValue SILGenFunction::emitRValueForPropertyLoad(
   // now.
   if (hasAbstractionChange)
     Result = emitOrigToSubstValue(loc, Result, origFormalType,
-                                  substFormalType, C);
+                                  substFormalType, substFormalType, C);
   return Result;
 }
 

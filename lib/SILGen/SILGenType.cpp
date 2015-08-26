@@ -78,33 +78,25 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   auto derivedInfo = Types.getConstantInfo(derived);
   auto basePattern = AbstractionPattern(baseInfo.LoweredType);
   
-  auto derivedOrigTy = M.Types.getConstantOverrideType(derived, base);
+  auto overrideInfo = M.Types.getConstantOverrideInfo(derived, base);
 
-  // Check the signature for changes that require thunking.
-  auto derivedSubstTy = derivedInfo.getSILType()
-    .castTo<SILFunctionType>();
+  // The override member type is semantically a subtype of the base
+  // member type. If the override is ABI compatible, we do not need
+  // a thunk.
+  if (overrideInfo == derivedInfo)
+    return getFunction(derived, NotForDefinition);
 
-  {
-    GenericContextScope scope(Types, derivedSubstTy->getGenericSignature());
-
-    // The override member type is semantically a subtype of the base
-    // member type. If the override is ABI compatible, we do not need
-    // a thunk.
-    if (Types.checkForABIDifferences(derivedSubstTy, derivedOrigTy) ==
-          TypeConverter::ABIDifference::Trivial)
-      return getFunction(derived, NotForDefinition);
-  }
-  
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
   SILLocation loc(derivedDecl);
   auto thunk = SILFunction::create(M, SILLinkage::Private, name,
-                                   derivedOrigTy,
+                                   overrideInfo.SILFnType,
                                    derivedDecl->getGenericParams(),
                                    loc, IsBare, IsNotTransparent, IsNotFragile);
   thunk->setDebugScope(new (M) SILDebugScope(loc, *thunk));
 
   SILGenFunction(*this, *thunk)
-    .emitVTableThunk(derived, basePattern, derivedInfo.LoweredType);
+    .emitVTableThunk(derived, basePattern,
+                     overrideInfo.LoweredType, derivedInfo.LoweredType);
 
   return thunk;
 }

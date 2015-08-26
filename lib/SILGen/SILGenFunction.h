@@ -675,8 +675,13 @@ public:
                                CanSILFunctionType funcTy);
   
   /// Thunk between a derived and base class.
+  ///
+  /// \param origPattern Abstraction pattern of base class method
+  /// \param inputTy Formal AST type of base class method
+  /// \param substTy Formal AST type of derived class method
   void emitVTableThunk(SILDeclRef derived,
                        AbstractionPattern origPattern,
+                       CanAnyFunctionType inputTy,
                        CanAnyFunctionType substTy);
   
   //===--------------------------------------------------------------------===//
@@ -1075,16 +1080,18 @@ public:
   /// to a value with the abstraction patterns of the substituted type.
   ManagedValue emitOrigToSubstValue(SILLocation loc, ManagedValue input,
                                     AbstractionPattern origType,
-                                    CanType substType,
+                                    CanType inputType,
+                                    CanType substType = CanType(),
                                     SGFContext ctx = SGFContext());
 
   /// Convert a value with the abstraction patterns of the substituted
   /// type to a value with the abstraction patterns of the original type.
   ManagedValue emitSubstToOrigValue(SILLocation loc, ManagedValue input,
                                     AbstractionPattern origType,
-                                    CanType substType,
+                                    CanType inputType,
+                                    CanType substType = CanType(),
                                     SGFContext ctx = SGFContext());
-  
+
   /// Convert a native Swift value to a value that can be passed as an argument
   /// to or returned as the result of a function with the given calling
   /// convention.

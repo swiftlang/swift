@@ -365,10 +365,10 @@ struct FailableModel: FailableRequirement, IUOFailableRequirement {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses13FailableModelS_22IUOFailableRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSQq__
   // CHECK: bb0([[SELF:%[0-9]+]] : $*ImplicitlyUnwrappedOptional<FailableModel>, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick FailableModel.Type):
   // CHECK: [[FN:%.*]] = function_ref @_TFV9witnesses13FailableModelCfMS0_FT3fooSi_GSqS0__
-  // CHECK: [[RESULT:%.*]] = apply [[FN]](
-  // CHECK: select_enum [[RESULT]] : $Optional<FailableModel>,
-  // CHECK: cond_br
-  // CHECK: enum $ImplicitlyUnwrappedOptional<FailableModel>, #ImplicitlyUnwrappedOptional.None!enumelt
+  // CHECK: [[INNER:%.*]] = apply [[FN]](
+  // CHECK: [[OUTER:%.*]] = unchecked_trivial_bit_cast [[INNER]] : $Optional<FailableModel> to $ImplicitlyUnwrappedOptional<FailableModel>
+  // CHECK: store [[OUTER]] to %0
+  // CHECK: return
   init?(foo: Int) {}
 }
 
@@ -415,11 +415,10 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses18FailableClassModelS_24FailableClassRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSqq__
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses18FailableClassModelS_27IUOFailableClassRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSQq__
-  // CHECK: select_enum
-  // CHECK: unchecked_enum_data
-  // CHECK: enum $ImplicitlyUnwrappedOptional{{.*}}Some
-  // CHECK: enum $ImplicitlyUnwrappedOptional{{.*}}None
-  // CHECK: return [[RESULT:%[0-9]+]] : $ImplicitlyUnwrappedOptional<FailableClassModel>
+  // CHECK: [[FUNC:%.*]] = function_ref @_TFC9witnesses18FailableClassModelCfMS0_FT3fooSi_GSqS0__
+  // CHECK: [[INNER:%.*]] = apply [[FUNC]](%0, %1)
+  // CHECK: [[OUTER:%.*]] = unchecked_ref_bit_cast [[INNER]] : $Optional<FailableClassModel> to $ImplicitlyUnwrappedOptional<FailableClassModel>
+  // CHECK: return [[OUTER]] : $ImplicitlyUnwrappedOptional<FailableClassModel>
   init?(foo: Int) {}
 }
 
@@ -432,11 +431,10 @@ final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassR
   init!(foo: Int) {}
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSqq__
-  // CHECK: select_enum
-  // CHECK: unchecked_enum_data
-  // CHECK: enum $Optional{{.*}}Some
-  // CHECK: enum $Optional{{.*}}None
-  // CHECK: return {{.*}} : $Optional<IUOFailableClassModel>
+  // CHECK: [[FUNC:%.*]] = function_ref @_TFC9witnesses21IUOFailableClassModelCfMS0_FT3fooSi_GSQS0__
+  // CHECK: [[INNER:%.*]] = apply [[FUNC]](%0, %1)
+  // CHECK: [[OUTER:%.*]] = unchecked_ref_bit_cast [[INNER]] : $ImplicitlyUnwrappedOptional<IUOFailableClassModel> to $Optional<IUOFailableClassModel>
+  // CHECK: return [[OUTER]] : $Optional<IUOFailableClassModel>
 }
 
 protocol HasAssoc {
@@ -485,15 +483,22 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK: upcast
   // CHECK-NEXT: [[METH:%.*]] = class_method {{%.*}} : $PropertyRequirementBase, #PropertyRequirementBase.width!materializeForSet.1
   // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]
-  // CHECK-NEXT: [[RES_CAST:%.*]] = unchecked_trivial_bit_cast [[RES]]
+  // CHECK-NEXT: [[CAR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 0
+  // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
+  // CHECK-NEXT: [[CAST:%.*]] = unchecked_trivial_bit_cast [[CADR]]
+  // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CAST]] : {{.*}})
   // CHECK-NEXT: strong_release
-  // CHECK-NEXT: return [[RES_CAST]]
+  // CHECK-NEXT: return [[TUPLE]]
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses34PropertyRequirementWitnessFromBaseS_19PropertyRequirementS_ZFS1_m6heightSi : {{.*}} {
+  // CHECK: [[OBJ:%.*]] = upcast %2 : $@thick PropertyRequirementWitnessFromBase.Type to $@thick PropertyRequirementBase.Type
   // CHECK: [[METH:%.*]] = function_ref @_TZFC9witnesses23PropertyRequirementBasem6heightSi
   // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]
-  // CHECK-NEXT: [[RES_CAST:%.*]] = unchecked_trivial_bit_cast [[RES]]
-  // CHECK-NEXT: return [[RES_CAST]]
+  // CHECK-NEXT: [[CAR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 0
+  // CHECK-NEXT: [[CADR:%.*]] = tuple_extract [[RES]] : $({{.*}}), 1
+  // CHECK-NEXT: [[CAST:%.*]] = unchecked_trivial_bit_cast [[CADR]]
+  // CHECK-NEXT: [[TUPLE:%.*]] = tuple ([[CAR]] : {{.*}}, [[CAST]] : {{.*}})
+  // CHECK-NEXT: return [[TUPLE]]
 
   // Otherwise, we shouldn't need the bit_cast:
 

@@ -487,6 +487,23 @@ class TypeConverter {
     return {origTy, substTy, uncurryLevel};
   }
   
+  struct OverrideKey {
+    SILDeclRef derived;
+    SILDeclRef base;
+    
+    friend bool operator==(const OverrideKey &lhs,
+                           const OverrideKey &rhs) {
+      return lhs.derived == rhs.derived
+          && lhs.base == rhs.base;
+    }
+    friend bool operator!=(const OverrideKey &lhs,
+                           const OverrideKey &rhs) {
+      return !(lhs == rhs);
+    }
+  };
+  
+  friend struct llvm::DenseMapInfo<OverrideKey>;
+
   /// Find an cached TypeLowering by TypeKey, or return null if one doesn't
   /// exist.
   const TypeLowering *find(TypeKey k);
@@ -501,6 +518,8 @@ class TypeConverter {
   llvm::DenseMap<CachingTypeKey, const TypeLowering *> DependentTypes;
   
   llvm::DenseMap<SILDeclRef, SILConstantInfo> ConstantTypes;
+  
+  llvm::DenseMap<OverrideKey, SILConstantInfo> ConstantOverrideTypes;
   
   llvm::DenseMap<AnyFunctionRef, std::vector<CapturedValue>> LoweredCaptures;
   
@@ -696,8 +715,14 @@ public:
     
     return getConstantOverrideType(constant, base);
   }
+
   CanSILFunctionType getConstantOverrideType(SILDeclRef constant,
-                                             SILDeclRef base);
+                                             SILDeclRef base) {
+    return getConstantOverrideInfo(constant, base).SILFnType;
+  }
+
+  SILConstantInfo getConstantOverrideInfo(SILDeclRef constant,
+                                          SILDeclRef base);
 
   /// Substitute the given function type so that it implements the
   /// given substituted type.
@@ -910,6 +935,26 @@ namespace llvm {
       return hash_combine(hashOrig, hashSubst, val.UncurryLevel);
     }
     static bool isEqual(CachingTypeKey LHS, CachingTypeKey RHS) {
+      return LHS == RHS;
+    }
+  };
+
+  template<> struct DenseMapInfo<swift::Lowering::TypeConverter::OverrideKey> {
+    typedef swift::Lowering::TypeConverter::OverrideKey OverrideKey;
+
+    using SILDeclRefInfo = DenseMapInfo<swift::SILDeclRef>;
+
+    static OverrideKey getEmptyKey() {
+      return {SILDeclRefInfo::getEmptyKey(), SILDeclRefInfo::getEmptyKey()};
+    }
+    static OverrideKey getTombstoneKey() {
+      return {SILDeclRefInfo::getTombstoneKey(), SILDeclRefInfo::getTombstoneKey()};
+    }
+    static unsigned getHashValue(OverrideKey val) {
+      return hash_combine(SILDeclRefInfo::getHashValue(val.base),
+                          SILDeclRefInfo::getHashValue(val.derived));
+    }
+    static bool isEqual(OverrideKey LHS, OverrideKey RHS) {
       return LHS == RHS;
     }
   };

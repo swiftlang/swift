@@ -2007,8 +2007,8 @@ ManagedValue SILGenFunction::emitApply(
       emitManagedBufferWithCleanup(resultAddr, actualResultTL);
 
     if (!hasAbsDiffs) return managedActualResult;
-    return emitOrigToSubstValue(loc, managedActualResult,
-                                origResultType, substResultType,
+    return emitOrigToSubstValue(loc, managedActualResult, origResultType,
+                                substResultType, substResultType,
                                 evalContext);
   }
 
@@ -2070,8 +2070,7 @@ ManagedValue SILGenFunction::emitApply(
   if (!origResultType.isExactType(substResultType)) {
     managedScalar = emitOrigToSubstValue(loc, managedScalar,
                                          origResultType,
-                                         substResultType,
-                                         SGFContext());
+                                         substResultType);
   }
 
   // Convert the result to a native value.
@@ -2568,11 +2567,10 @@ namespace {
       switch (getSILFunctionLanguage(Rep)) {
       case SILFunctionLanguage::Swift:
         value = SGF.emitSubstToOrigValue(loc, value, origParamType,
-                                         arg.getType(), ctxt);
+                                         arg.getType(), arg.getType(), ctxt);
         break;
       case SILFunctionLanguage::C:
-        value = SGF.emitNativeToBridgedValue(loc, value, Rep,
-                                             origParamType,
+        value = SGF.emitNativeToBridgedValue(loc, value, Rep, origParamType,
                                              arg.getType(), param.getType());
         break;
       }

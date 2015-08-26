@@ -35,7 +35,9 @@ class B : A, Barrable {}
 // CHECK-NOT: sil hidden [transparent] [thunk] @_TTWC21witnesses_inheritance1BS_7FooableS_FS1_3foouRq_S1__fq_FT_T_
 // CHECK-NOT: sil hidden [transparent] [thunk] @_TTWC21witnesses_inheritance1BS_7FooableS_ZFS1_9class_foouRq_S1__fMq_FT_T_
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC21witnesses_inheritance1BS_8BarrableS_FS1_3baruRq_S1__fq_FT_T_
-// CHECK:         upcast {{%.*}} : $*B to $*A
+// CHECK:         [[B:%.*]] = load {{%.*}} : $*B
+// CHECK-NEXT:    [[A:%.*]] = upcast [[B]] : $B to $A
+// CHECK-NEXT:    [[METH:%.*]] = class_method [[A]] : $A, #A.bar!1
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC21witnesses_inheritance1BS_8BarrableS_ZFS1_9class_baruRq_S1__fMq_FT_T_
 // CHECK:         upcast {{%.*}} : $@thick B.Type to $@thick A.Type
 
