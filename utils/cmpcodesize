@@ -105,13 +105,37 @@ def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
     else:
         sizes[function] += size
 
+def flatten(*args):
+    for x in args:
+        if hasattr(x, '__iter__'):
+            for y in flatten(*x):
+                yield y
+        else:
+            yield x
+
 def readSizes(sizes, fileName, functionDetails, groupByPrefix):
+    # Check if multiple architectures are supported by the object file.
+    # Prefer arm64 if available.
+    architectures = subprocess.check_output(["otool", "-V", "-f", fileName]).split("\n")
+    arch = None
+    archPattern = re.compile('architecture ([\S]+)')
+    for architecture in architectures:
+        archMatch = archPattern.match(architecture)
+        if archMatch:
+            if arch is None:
+                arch = archMatch.group(1)
+            if "arm64" in arch:
+                arch = "arm64"
+    if arch is not None:
+      archParams = ["-arch", arch]
+    else:
+      archParams = []
 
     if functionDetails:
-        content = subprocess.check_output(["otool", "-l", "-v", "-t", fileName]).split("\n")
-        content += subprocess.check_output(["otool", "-v", "-s", "__TEXT", "__textcoal_nt", fileName]).split("\n")
+        content = subprocess.check_output(flatten(["otool", archParams, "-l", "-v", "-t", fileName])).split("\n")
+        content += subprocess.check_output(flatten(["otool", archParams, "-v", "-s", "__TEXT", "__textcoal_nt", fileName])).split("\n")
     else:
-        content = subprocess.check_output(["otool", "-l", fileName]).split("\n")
+        content = subprocess.check_output(flatten(["otool", archParams, "-l", fileName])).split("\n")
 
     sectName = None
     currFunc = None
