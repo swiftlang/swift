@@ -1,6 +1,6 @@
 add_swift_library(swiftImmediate
-  Helpers.cpp
   Immediate.cpp
+  REPL.cpp
   LINK_LIBRARIES
     swiftIDE
     swiftFrontend

@@ -23,7 +23,6 @@
 
 namespace swift {
   class CompilerInstance;
-  class SILModule;
   class IRGenOptions;
   class SILOptions;
 
@@ -33,23 +32,6 @@ namespace swift {
   // supports LLVM containers.
   using ProcessCmdLine = std::vector<std::string>;
   
-  /// Publicly available REPL state information.
-  class REPLContext {
-  public:
-    /// The SourceMgr buffer ID of the REPL input.
-    unsigned CurBufferID;
-    
-    /// The index into the source file's Decls at which to start
-    /// typechecking the next REPL input.
-    unsigned CurElem;
-
-    /// The index into the source file's Decls at which to start
-    /// irgenning the next REPL input.
-    unsigned CurIRGenElem;
-
-    /// \brief Whether we have run replApplicationMain().
-    bool RanREPLApplicationMain;
-  };
 
   /// Attempt to run the script identified by the given compiler instance.
   ///
@@ -57,8 +39,8 @@ namespace swift {
   int RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                      IRGenOptions &IRGenOpts, const SILOptions &SILOpts);
 
-  void REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine, bool ParseStdlib);
-  void REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine, bool ParseStdlib);
+  void runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
+               bool ParseStdlib);
 }  // end namespace swift
 
 #endif
