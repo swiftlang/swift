@@ -40,12 +40,18 @@ endfunction()
 
 
 function(_add_variant_c_compile_link_flags
-    sdk arch build_type enable_assertions result_var_name)
-  set(result ${${result_var_name}})
+    sdk arch build_type enable_assertions use_internal_sdk result_var_name)
+  set(result
+    ${${result_var_name}}
+    "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
 
-  list(APPEND result
-      "-isysroot" "${SWIFT_SDK_${sdk}_PATH}"
-      "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
+  if(use_internal_sdk)
+    list(APPEND result
+      "-isysroot" "${SWIFT_SDK_${sdk}_INTERNAL_PATH}")
+  else()
+    list(APPEND result
+      "-isysroot" "${SWIFT_SDK_${sdk}_PATH}")
+  endif()
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     list(APPEND result
@@ -59,7 +65,7 @@ function(_add_variant_c_compile_link_flags
 endfunction()
 
 function(_add_variant_c_compile_flags
-    sdk arch build_type enable_assertions result_var_name)
+    sdk arch build_type enable_assertions use_internal_sdk result_var_name)
   set(result ${${result_var_name}})
 
   _add_variant_c_compile_link_flags(
@@ -67,6 +73,7 @@ function(_add_variant_c_compile_flags
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
+      ${use_internal_sdk}
       result)
 
   is_build_type_optimized("${build_type}" optimized)
@@ -135,7 +142,7 @@ function(_add_variant_swift_compile_flags
 endfunction()
 
 function(_add_variant_link_flags
-    sdk arch build_type enable_assertions result_var_name)
+    sdk arch build_type enable_assertions use_internal_sdk result_var_name)
 
   if("${sdk}" STREQUAL "")
     message(FATAL_ERROR "Should specify an SDK")
@@ -152,6 +159,7 @@ function(_add_variant_link_flags
       "${arch}"
       "${build_type}"
       "${enable_assertions}"
+      ${use_internal_sdk}
       result)
 
   if("${sdk}" STREQUAL "LINUX")
@@ -626,6 +634,7 @@ endfunction()
 #   _add_swift_library_single(
 #     target
 #     name
+#     [USE_INTERNAL_SDK]
 #     [SHARED]
 #     [SDK sdk]
 #     [ARCHITECTURE architecture]
@@ -706,12 +715,15 @@ endfunction()
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
+# USE_INTERNAL_SDK
+#   Use the 'internal' sdk variant.
+#
 # source1 ...
 #   Sources to add into this library
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
       SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
-      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
+      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE USE_INTERNAL_SDK)
   cmake_parse_arguments(SWIFTLIB_SINGLE
     "${SWIFTLIB_SINGLE_options}"
     "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT"
@@ -963,9 +975,17 @@ function(_add_swift_library_single target name)
     target_link_libraries("${target}" INTERFACE ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
   endif()
 
+  # Don't add the icucore target.
+  set(SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU)
+  foreach(item ${SWIFTLIB_SINGLE_LINK_LIBRARIES})
+    if(NOT "${item}" STREQUAL "icucore")
+      list(APPEND SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU "{$item}")
+    endif()
+  endforeach()
+
   if(target_static)
     _list_add_string_suffix(
-        "${SWIFTLIB_SINGLE_LINK_LIBRARIES}"
+        "${SWIFTLIB_SINGLE_LINK_LIBRARIES_WITHOUT_ICU}"
         "-static"
         target_static_depends)
     # FIXME: should this be target_link_libraries?
@@ -1006,12 +1026,14 @@ function(_add_swift_library_single target name)
       "${SWIFTLIB_SINGLE_ARCHITECTURE}"
       "${build_type}"
       "${enable_assertions}"
+      ${SWIFTLIB_SINGLE_USE_INTERNAL_SDK}
       c_compile_flags)
   _add_variant_link_flags(
       "${SWIFTLIB_SINGLE_SDK}"
       "${SWIFTLIB_SINGLE_ARCHITECTURE}"
       "${build_type}"
       "${enable_assertions}"
+      ${SWIFTLIB_SINGLE_USE_INTERNAL_SDK}
       link_flags)
 
   # Configure plist creation for OS X.
@@ -1187,12 +1209,15 @@ endfunction()
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
+# USE_INTERNAL_SDK
+#   Use the 'internal' sdk variant.
+#
 # source1 ...
 #   Sources to add into this library.
 function(add_swift_library name)
   set(SWIFTLIB_options
       SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY
-      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
+      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE USE_INTERNAL_SDK)
   cmake_parse_arguments(SWIFTLIB
     "${SWIFTLIB_options}"
     "INSTALL_IN_COMPONENT"
@@ -1328,6 +1353,7 @@ function(add_swift_library name)
         _add_swift_library_single(
           ${VARIANT_NAME}
           ${name}
+          ${SWIFTLIB_USE_INTERNAL_SDK_keyword}
           ${SWIFTLIB_SHARED_keyword}
           ${SWIFTLIB_SOURCES}
           SDK ${sdk}
@@ -1351,15 +1377,19 @@ function(add_swift_library name)
 
         # Add dependencies on the (not-yet-created) custom lipo target.
         foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
-          add_dependencies(${VARIANT_NAME}
+          if (NOT "${DEP}" STREQUAL "icucore")
+            add_dependencies(${VARIANT_NAME}
               "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+          endif()
         endforeach()
 
         if (SWIFT_BUILD_STATIC_STDLIB AND SWIFTLIB_IS_STDLIB)
           # Add dependencies on the (not-yet-created) custom lipo target.
           foreach(DEP ${SWIFTLIB_LINK_LIBRARIES})
-            add_dependencies("${VARIANT_NAME}-static"
+            if (NOT "${DEP}" STREQUAL "icucore")
+              add_dependencies("${VARIANT_NAME}-static"
                 "${DEP}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-static")
+            endif()
           endforeach()
         endif()
 
@@ -1490,6 +1520,7 @@ function(add_swift_library name)
     _add_swift_library_single(
       ${name}
       ${name}
+      ${SWIFTLIB_USE_INTERNAL_SDK_keyword}
       ${SWIFTLIB_SHARED_keyword}
       ${SWIFTLIB_SOURCES}
       SDK ${sdk}
@@ -1563,12 +1594,14 @@ function(_add_swift_executable_single name)
       "${SWIFTEXE_SINGLE_ARCHITECTURE}"
       "${CMAKE_BUILD_TYPE}"
       "${LLVM_ENABLE_ASSERTIONS}"
+      FALSE
       c_compile_flags)
   _add_variant_link_flags(
       "${SWIFTEXE_SINGLE_SDK}"
       "${SWIFTEXE_SINGLE_ARCHITECTURE}"
       "${CMAKE_BUILD_TYPE}"
       "${LLVM_ENABLE_ASSERTIONS}"
+      FALSE
       link_flags)
 
   list(APPEND link_flags
@@ -1801,6 +1834,7 @@ function(add_swift_llvm_loadable_module name)
       "${arch}"
       "${CMAKE_BUILD_TYPE}"
       "${LLVM_ENABLE_ASSERTIONS}"
+      FALSE
       c_compile_flags)
 
   set(link_flags)
@@ -1809,6 +1843,7 @@ function(add_swift_llvm_loadable_module name)
       "${arch}"
       "${CMAKE_BUILD_TYPE}"
       "${LLVM_ENABLE_ASSERTIONS}"
+      FALSE
       link_flags)
 
   # Convert variables to space-separated strings.

@@ -128,6 +128,9 @@ option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
     "Whether to enable CrashReporter integration"
     FALSE)
 
+set(SWIFT_DARWIN_ICU_INCLUDE_PATH "" CACHE STRING
+    "Path to the directory where the ICU headers are located")
+
 #
 # User-configurable debugging options.
 #

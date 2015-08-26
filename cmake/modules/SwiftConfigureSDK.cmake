@@ -97,6 +97,25 @@ macro(configure_sdk_darwin
     set(SWIFT_SDK_${prefix}_PATH "${SWIFT_SDK_${prefix}_PUBLIC_PATH}")
   endif()
 
+  # Find the internal SDK if the user has not specified to use an external ICU
+  # library. Otherwise, we will just use the regular SDK.
+  set(SWIFT_SDK_${prefix}_INTERNAL_PATH "" CACHE PATH "Path to the internal ${name} SDK")
+  if (NOT SWIFT_DARWIN_ICU_INCLUDE_PATH)
+    if ("${prefix}" STREQUAL "IOS_SIMULATOR" OR
+        "${prefix}" STREQUAL "WATCHOS_SIMULATOR" OR
+        "${prefix}" STREQUAL "TVOS_SIMULATOR")
+      set(SWIFT_SDK_${prefix}_INTERNAL_PATH "${SWIFT_SDK_${prefix}_PATH}")
+    else()
+      execute_process(
+        COMMAND "xcrun" "--sdk" "${xcrun_name}.internal" "--show-sdk-path"
+        OUTPUT_VARIABLE SWIFT_SDK_${prefix}_INTERNAL_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    endif()
+  else()
+    set(SWIFT_SDK_${prefix}_INTERNAL_PATH "${SWIFT_SDK_${prefix}_PATH}")
+  endif()
+
+
   if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/Frameworks/module.map")
     message(FATAL_ERROR "${name} SDK not found at SWIFT_SDK_${prefix}_PATH.")
   endif()
@@ -139,6 +158,7 @@ macro(configure_sdk_unix
   set(SWIFT_SDK_${prefix}_NAME "${name}")
   set(SWIFT_SDK_${prefix}_PATH "/")
   set(SWIFT_SDK_${prefix}_PUBLIC_PATH "/")
+  set(SWIFT_SDK_${prefix}_INTERNAL_PATH "/")
   set(SWIFT_SDK_${prefix}_VERSION "don't use")
   set(SWIFT_SDK_${prefix}_BUILD_NUMBER "don't use")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "don't use")
