@@ -7,18 +7,14 @@
 // use StdlibUnittest because that doesn't work on linux yet. May go away in
 // favour of the more comprehensive tests that already exist once it does.
 
-// ASCII strings
-// CHECK: 5308980208032766932
-print("boom".hashValue)
-// CHECK-NEXT: 6894346571320922064
-print("zoom".hashValue)
-
-// Unicode strings
-// CHECK-NEXT: 3514641426931780352
-print("ZOO≪M".hashValue)
-// CHECK-NEXT: 7349636929305805742
-print("moo≪m".hashValue)
-
 // Let's not crash on changing case.
 let upper = "\u{00df}".uppercaseString
 let lower = "\u{0130}".lowercaseString
+
+// ASCII strings
+// CHECK: true
+print("abc".hashValue == "\0abc".hashValue)
+
+// Unicode strings
+// CHECK-NEXT: true
+print("abc\u{0130}".hashValue == "\0abc\u{0130}".hashValue)

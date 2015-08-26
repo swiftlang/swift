@@ -138,6 +138,10 @@ static intptr_t hashChunk(const UCollator *Collator, intptr_t HashState,
     Collator, Str, Length, ErrorCode);
   while (U_SUCCESS(*ErrorCode)) {
     intptr_t Elem = ucol_next(CollationIterator, ErrorCode);
+    // Ignore zero valued collation elements. They don't participate in the
+    // ordering relation.
+    if (Elem == 0)
+      continue;
     if (Elem != UCOL_NULLORDER) {
       Elem *= HASH_M;
       Elem ^= Elem >> HASH_R;
@@ -162,7 +166,7 @@ static intptr_t hashFinish(intptr_t HashState) {
 extern "C"
 intptr_t _swift_stdlib_unicode_hash(const uint16_t *Str, int32_t Length) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
-  intptr_t HashState = HASH_SEED ^ (Length * HASH_M);
+  intptr_t HashState = HASH_SEED;
   HashState = hashChunk(GetRootCollator(), HashState, Str, Length, &ErrorCode);
 
   if (U_FAILURE(ErrorCode)) {
@@ -176,7 +180,7 @@ extern "C"
 intptr_t _swift_stdlib_unicode_hash_ascii(const char *Str, int32_t Length) {
   UErrorCode ErrorCode = U_ZERO_ERROR;
   const UCollator *Collator = GetRootCollator();
-  intptr_t HashState = HASH_SEED ^ (Length * HASH_M);
+  intptr_t HashState = HASH_SEED;
   uint16_t HashBuffer[ASCII_HASH_BUFFER_SIZE];
 
   int32_t Pos = 0;
