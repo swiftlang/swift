@@ -756,7 +756,7 @@ function(_add_swift_library_single target name)
     if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
       set(SWIFTLIB_SINGLE_C_COMPILE_FLAGS "${SWIFTLIB_SINGLE_C_COMPILE_FLAGS}" "-fembed-bitcode")
       set(SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}" "-embed-bitcode")
-      set(SWIFTLIB_SINGLE_LINK_FLAGS "${SWIFTLIB_SINGLE_LINK_FLAGS}" "-Xlinker -bitcode_bundle -Xlinker -lto_library -Xlinker ${LLVM_LIBRARY_DIR}/libLTO.dylib")
+      set(SWIFTLIB_SINGLE_LINK_FLAGS "${SWIFTLIB_SINGLE_LINK_FLAGS}" "-Xlinker -bitcode_bundle -Xlinker -bitcode_hide_symbols -Xlinker -lto_library -Xlinker ${LLVM_LIBRARY_DIR}/libLTO.dylib")
     endif()
   endif()
 
