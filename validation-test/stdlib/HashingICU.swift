@@ -18,3 +18,7 @@ print("zoom".hashValue)
 print("ZOO≪M".hashValue)
 // CHECK-NEXT: 7349636929305805742
 print("moo≪m".hashValue)
+
+// Let's not crash on changing case.
+let upper = "\u{00df}".uppercaseString
+let lower = "\u{0130}".lowercaseString

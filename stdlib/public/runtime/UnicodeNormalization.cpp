@@ -204,6 +204,10 @@ intptr_t _swift_stdlib_unicode_hash_ascii(const char *Str, int32_t Length) {
   return hashFinish(HashState);
 }
 
+/// Convert the unicode string to uppercase. This function will return the
+/// required buffer length as a result. If this length does not match the
+/// 'DestinationCapacity' this function must be called again with a buffer of
+/// the required length to get an uppercase version of the string.
 extern "C"
 int32_t _swift_stdlib_unicode_strToUpper(uint16_t *Destination,
                                          int32_t DestinationCapacity,
@@ -213,12 +217,16 @@ int32_t _swift_stdlib_unicode_strToUpper(uint16_t *Destination,
   uint32_t OutputLength = u_strToUpper(Destination, DestinationCapacity,
                                        Source, SourceLength,
                                        "", &ErrorCode);
-  if (U_FAILURE(ErrorCode)) {
+  if (U_FAILURE(ErrorCode) && ErrorCode != U_BUFFER_OVERFLOW_ERROR) {
     swift::crash("u_strToUpper: Unexpected error uppercasing unicode string.");
   }
   return OutputLength;
 }
 
+/// Convert the unicode string to lowercase. This function will return the
+/// required buffer length as a result. If this length does not match the
+/// 'DestinationCapacity' this function must be called again with a buffer of
+/// the required length to get an lowercase version of the string.
 extern "C"
 int32_t _swift_stdlib_unicode_strToLower(uint16_t *Destination,
                                          int32_t DestinationCapacity,
@@ -228,7 +236,7 @@ int32_t _swift_stdlib_unicode_strToLower(uint16_t *Destination,
   uint32_t OutputLength = u_strToLower(Destination, DestinationCapacity,
                                        Source, SourceLength,
                                        "", &ErrorCode);
-  if (U_FAILURE(ErrorCode)) {
+  if (U_FAILURE(ErrorCode) && ErrorCode != U_BUFFER_OVERFLOW_ERROR) {
     swift::crash("u_strToLower: Unexpected error lowercasing unicode string.");
   }
   return OutputLength;
