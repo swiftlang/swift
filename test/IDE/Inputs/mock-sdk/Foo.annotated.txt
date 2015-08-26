@@ -3,7 +3,7 @@
 
 
 <decl:Struct>/// Aaa.  FooEnum1.  Bbb.
-struct <loc>FooEnum1</loc> : <ref:Protocol>RawRepresentable</ref> {
+struct <loc>FooEnum1</loc> : <ref:Protocol>RawRepresentable</ref>, <ref:Protocol>Equatable</ref> {
   <decl:Constructor><loc>init(_ rawValue: <ref:Struct>UInt32</ref>)</loc></decl>
   <decl:Constructor><loc>init(rawValue: <ref:Struct>UInt32</ref>)</loc></decl>
   <decl:Var>var <loc>rawValue</loc>: <ref:Struct>UInt32</ref></decl>
@@ -11,14 +11,14 @@ struct <loc>FooEnum1</loc> : <ref:Protocol>RawRepresentable</ref> {
 
 <decl:Var>/// Aaa.  FooEnum1X.  Bbb.
 var <loc>FooEnum1X</loc>: <ref:Struct>FooEnum1</ref> { get }</decl>
-<decl:Struct>struct <loc>FooEnum2</loc> : <ref:Protocol>RawRepresentable</ref> {
+<decl:Struct>struct <loc>FooEnum2</loc> : <ref:Protocol>RawRepresentable</ref>, <ref:Protocol>Equatable</ref> {
   <decl:Constructor><loc>init(_ rawValue: <ref:Struct>UInt32</ref>)</loc></decl>
   <decl:Constructor><loc>init(rawValue: <ref:Struct>UInt32</ref>)</loc></decl>
   <decl:Var>var <loc>rawValue</loc>: <ref:Struct>UInt32</ref></decl>
 }</decl>
 <decl:Var>var <loc>FooEnum2X</loc>: <ref:Struct>FooEnum2</ref> { get }</decl>
 <decl:Var>var <loc>FooEnum2Y</loc>: <ref:Struct>FooEnum2</ref> { get }</decl>
-<decl:Struct>struct <loc>FooEnum3</loc> : <ref:Protocol>RawRepresentable</ref> {
+<decl:Struct>struct <loc>FooEnum3</loc> : <ref:Protocol>RawRepresentable</ref>, <ref:Protocol>Equatable</ref> {
   <decl:Constructor><loc>init(_ rawValue: <ref:Struct>UInt32</ref>)</loc></decl>
   <decl:Constructor><loc>init(rawValue: <ref:Struct>UInt32</ref>)</loc></decl>
   <decl:Var>var <loc>rawValue</loc>: <ref:Struct>UInt32</ref></decl>

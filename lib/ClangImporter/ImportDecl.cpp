@@ -1932,7 +1932,8 @@ namespace {
         structDecl->computeType();
 
         ProtocolDecl *protocols[]
-          = {cxt.getProtocol(KnownProtocolKind::RawRepresentable)};
+          = {cxt.getProtocol(KnownProtocolKind::RawRepresentable),
+             cxt.getProtocol(KnownProtocolKind::Equatable)};
         populateInheritedTypes(structDecl, protocols);
 
         // Note that this is a raw representable type.

@@ -11,12 +11,22 @@ import CoreFoundation
 var cgPointVar: CGPoint
 
 func checkRawRepresentable<T: RawRepresentable>(_: T) {}
+func checkEquatable<T: Equatable>(_: T) -> Bool {}
+func checkEquatablePattern(c: Color) {
+  switch c {
+    case red: return
+    case green: return
+    case blue: return
+  }
+}
 
 func testColor() {
   var c: Color = red
   c = blue
   _ = c.rawValue
   checkRawRepresentable(c)
+  checkEquatable(c)
+  checkEquatablePattern(c)
 }
 
 func testTribool() {

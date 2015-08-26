@@ -11,7 +11,7 @@
 // Yo.
 
 /// Aaa.  FooEnum1.  Bbb.
-struct FooEnum1 : RawRepresentable {
+struct FooEnum1 : RawRepresentable, Equatable {
   init(_ rawValue: UInt32)
   init(rawValue: UInt32)
   var rawValue: UInt32
@@ -20,14 +20,14 @@ struct FooEnum1 : RawRepresentable {
 /// Aaa.  FooEnum1X.  Bbb.
 var FooEnum1X: FooEnum1 { get }
 
-struct FooEnum2 : RawRepresentable {
+struct FooEnum2 : RawRepresentable, Equatable {
   init(_ rawValue: UInt32)
   init(rawValue: UInt32)
   var rawValue: UInt32
 }
 var FooEnum2X: FooEnum2 { get }
 var FooEnum2Y: FooEnum2 { get }
-struct FooEnum3 : RawRepresentable {
+struct FooEnum3 : RawRepresentable, Equatable {
   init(_ rawValue: UInt32)
   init(rawValue: UInt32)
   var rawValue: UInt32
