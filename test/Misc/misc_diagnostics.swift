@@ -15,7 +15,7 @@ var pi = 3.14159265358979
 var d: CGFloat = 2.0
 var dpi:CGFloat = d*pi // expected-error{{binary operator '*' cannot be applied to operands of type 'CGFloat' and 'Double'}} expected-note{{overloads for '*' exist with these partially matching parameter lists: (Double, Double), (CGFloat, CGFloat)}}
 
-let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'Float' to specified type 'CGFloat'}}
+let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert call result type 'Float' to expected type 'CGFloat'}}
 
 let total = 15.0
 let count = 7
@@ -85,7 +85,7 @@ func ==(lhs:MyBadReturnClass, rhs:MyBadReturnClass) {
 
 
 func testIS1() -> Int { return 0 }
-let _: String = testIS1() // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
+let _: String = testIS1() // expected-error {{cannot convert call result type 'Int' to expected type 'String'}}
 
 func insertA<T>(inout array : [T], elt : T) {
   array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}}

@@ -21,5 +21,6 @@ func test15921530() {
         x in ()
       }
     }
-    var _: (inout X)->() = makef() // expected-error{{cannot convert value of type '(_) -> ()' to specified type '(inout X) -> ()'}}
+    // FIXME: poor error message.
+    var _: (inout X)->() = makef() // expected-error{{'() -> (_) -> ()' is not a subtype of '()'}}
 }

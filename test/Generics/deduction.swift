@@ -21,13 +21,9 @@ func useIdentity(x: Int, y: Float, i32: Int32) {
   var i32_2 : Int32 = identity(17)
 
   // Deduction where the result type and input type can get different results
-  // FIXME: Is this actually the behavior we want? It's strange that these
-  // two have different behavior.
   var xx : X, yy : Y
-  xx = identity(yy) // expected-error{{cannot invoke 'identity' with an argument list of type '(Y)'}}
-  // expected-note @-1 {{expected an argument list of type '(T)'}}
-  xx = identity2(yy) // expected-error{{cannot invoke 'identity2' with an argument list of type '(Y)'}}
-  // expected-note @-1 {{expected an argument list of type '(T)'}}
+  xx = identity(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
+  xx = identity2(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
 }
 
 // FIXME: Crummy diagnostic!
@@ -91,9 +87,8 @@ func testReturnTuple(x: Int, y: Float) {
   var _ : (Int, Float) = returnTuple(x)
   var _ : (Float, Float) = returnTuple(y)
 
-  // FIXME rdar://22333090: Improve diagnostic
-  var _ : (Int, Float) = returnTuple(y) // expected-error{{cannot invoke 'returnTuple' with an argument list of type '(Float)'}}
-  // expected-note @-1 {{expected an argument list of type '(T)'}}
+  // <rdar://problem/22333090> QoI: Propagate contextual information in a call to operands
+  var _ : (Int, Float) = returnTuple(y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
 

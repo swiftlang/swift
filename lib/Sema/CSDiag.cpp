@@ -1853,7 +1853,8 @@ public:
   ///
   Expr *typeCheckChildIndependently(Expr *subExpr, Type convertType = Type(),
                           ContextualTypePurpose convertTypePurpose = CTP_Unused,
-                                    TCCOptions options = TCCOptions());
+                                    TCCOptions options = TCCOptions(),
+                                    ExprTypeCheckListener *listener = nullptr);
   Expr *typeCheckChildIndependently(Expr *subExpr, TCCOptions options) {
     return typeCheckChildIndependently(subExpr, Type(), CTP_Unused, options);
   }
@@ -2403,7 +2404,15 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 
   Type fromType = CS->simplifyType(constraint->getFirstType());
   if (fromType->is<TypeVariableType>()) {
-    auto sub = typeCheckArbitrarySubExprIndependently(anchor);
+    TCCOptions options;
+    
+    // If we know we're removing a contextual constraint, then we can force a
+    // type check of the subexpr because we know we're eliminating that
+    // constraint.
+    if (CS->getContextualTypePurpose() != CTP_Unused)
+      options |= TCC_ForceRecheck;
+      
+    auto sub = typeCheckArbitrarySubExprIndependently(anchor, options);
     if (!sub) return true;
     fromType = sub->getType();
   }
@@ -2450,6 +2459,31 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       }
     }
 
+  // If this is a callee that mismatches an expected return type, we can emit a
+  // very nice and specific error.  In this case, what we'll generally see is
+  // a failed conversion constraint of "A -> B" to "_ -> C", where the error is
+  // that B isn't convertible to C.
+  if (CS->getContextualTypePurpose() == CTP_CalleeResult) {
+    if (auto destFT = toType->getAs<FunctionType>()) {
+      auto srcFT = fromType->getAs<FunctionType>();
+      
+      // If the constraint failure is from "T" to "_ -> C" where T isn't a
+      // function type at all, then there is a more basic error here.
+      if (!srcFT) {
+        diagnose(expr->getLoc(), diag::cannot_call_non_function_value,
+                 fromType)
+          .highlight(expr->getSourceRange());
+        return true;
+      }
+      
+      // Otherwise, the error is that the result types mismatch.
+      diagnose(expr->getLoc(), diag::invalid_callee_result_type,
+               srcFT->getResult(), destFT->getResult())
+        .highlight(expr->getSourceRange());
+      return true;
+    }
+  }
+  
   if (auto PT = toType->getAs<ProtocolType>()) {
     // Check for "=" converting to BooleanType.  The user probably meant ==.
     if (auto *AE = dyn_cast<AssignExpr>(expr->getValueProvidingExpr()))
@@ -2475,6 +2509,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       return false;
     return true;
   }
+  
 
   diagnose(anchor->getLoc(), diag::types_not_convertible,
            constraint->getKind() == ConstraintKind::Subtype,
@@ -2702,10 +2737,12 @@ static void eraseOpenedExistentials(Expr *&expr) {
 ///
 /// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
 /// resolved) and returns null when the subexpression fails to typecheck.
-Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
-                                                    Type convertType,
-                                       ContextualTypePurpose convertTypePurpose,
-                                                    TCCOptions options) {
+Expr *FailureDiagnosis::
+typeCheckChildIndependently(Expr *subExpr, Type convertType,
+                            ContextualTypePurpose convertTypePurpose,
+                            TCCOptions options,
+                            ExprTypeCheckListener *listener) {
+  
   // If this sub-expression is currently being diagnosed, refuse to recheck the
   // expression (which may lead to infinite recursion).  If the client is
   // telling us that it knows what it is doing, then believe it.
@@ -2761,7 +2798,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
 
   bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, convertType,
-                                             convertTypePurpose, TCEOptions);
+                                             convertTypePurpose, TCEOptions,
+                                             listener);
 
   // This is a terrible hack to get around the fact that typeCheckExpression()
   // might change subExpr to point to a new OpenExistentialExpr. In that case,
@@ -2861,6 +2899,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   case CTP_CannotFail:
     llvm_unreachable("These contextual type purposes cannot fail with a "
                      "conversion type specified!");
+  case CTP_CalleeResult:
+    llvm_unreachable("CTP_CalleeResult does not actually install a "
+                     "contextual type");
   case CTP_Initialization:
     diagID = diag::cannot_convert_initializer_value;
     diagIDProtocol = diag::cannot_convert_initializer_value_protocol;
@@ -3377,9 +3418,64 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 }
 
 
+namespace {
+  /// Type checking listener for pattern binding initializers.
+  class CalleeListener : public ExprTypeCheckListener {
+    Type contextualType;
+  public:
+    explicit CalleeListener(Type contextualType)
+      : contextualType(contextualType) { }
+
+    virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
+      // If we have no contextual type, there is nothing to do.
+      if (!contextualType) return false;
+
+      // If the expresion is obviously something that produces a metatype,
+      // then don't put a constraint on it.
+      auto semExpr = expr->getValueProvidingExpr();
+      if (isa<TypeExpr>(semExpr) ||isa<UnresolvedConstructorExpr>(semExpr))
+        return false;
+      
+      // We're making the expr have a function type, whose result is the same
+      // as our contextual type.
+      auto inputLocator =
+        cs.getConstraintLocator(expr, ConstraintLocator::FunctionResult);
+
+      auto tv = cs.createTypeVariable(inputLocator,
+                                 TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
+
+      // In order to make this work, we pick the most general function type and
+      // use a conversion constraint.  This gives us:
+      //    "$T0 throws -> contextualType"
+      // this allows things that are throws and not throws, and allows escape
+      // and noescape functions.
+      auto extInfo = FunctionType::ExtInfo().withThrows();
+      auto fTy = FunctionType::get(tv, contextualType, extInfo);
+
+      auto locator = cs.getConstraintLocator(expr);
+
+      // Add a conversion constraint between the types.
+      cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
+                       fTy, locator, /*isFavored*/true);
+
+      // If this constraint system fails to be solved, we want to know that it
+      // was because of this contextual constraint that we're adding.
+      assert(!cs.getContextualTypePurpose() &&
+             "Shouldn't already have a contextual type");
+      cs.setContextualType(expr, Type(), CTP_CalleeResult);
+      return false;
+    }
+  };
+}
+
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
-  auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
+  // If we have a contextual type, we use it to inform the result type of the
+  // function.
+  CalleeListener listener(CS->getContextualType());
+  auto fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
+                                            CTP_Unused, TCCOptions(),
+                                            &listener);
   if (!fnExpr) return true;
   
   auto fnType = fnExpr->getType()->getRValueType();

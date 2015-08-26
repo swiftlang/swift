@@ -96,10 +96,9 @@ func defaultArgTuplesNotMaterializable(x: Int, y: Int = 0) {}
 
 defaultArgTuplesNotMaterializable(identity(5))
 
-// FIXME: 22333090 - Improve diagnostic
+// <rdar://problem/22333090> QoI: Propagate contextual information in a call to operands
 defaultArgTuplesNotMaterializable(identity((5, y: 10)))
-// expected-error@-1 {{cannot invoke 'identity' with an argument list of type '(Int, y: Int)'}}
-// expected-note@-2 {{expected an argument list of type '(T)'}}
+// expected-error@-1 {{cannot convert value of type '(Int, y: Int)' to expected argument type 'Int'}}
 
 
 // rdar://problem/21799331

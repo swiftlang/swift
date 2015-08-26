@@ -82,7 +82,7 @@ f5(i)  // expected-error {{cannot invoke 'f5' with an argument list of type '(In
 // <rdar://problem/20598568>
 func pancakes(p: P2) {
   f4(p.wonka) // expected-error{{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
-  f4(p.wonka()) // expected-error{{cannot convert value of type '()' to expected argument type 'Int'}}
+  f4(p.wonka()) // expected-error{{cannot convert call result type '()' to expected type 'Int'}}
 }
 
 protocol Shoes {
@@ -91,7 +91,7 @@ protocol Shoes {
 
 // Here the opaque value has type (metatype_type (archetype_type ... ))
 func f(x: Shoes, asType t: Shoes.Type) {
-  return t.select(x) // expected-error{{unexpected non-void return value in void function}}
+  return t.select(x) // expected-error{{cannot convert call result type 'Shoes' to expected type '()'}}
 }
 
 infix operator **** {
@@ -378,7 +378,7 @@ var afterMessageCount : Int? = nil
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(a : () -> ()) {}
 takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}}
+  afterMessageCount = uintFunc()  // expected-error {{cannot convert call result type 'UInt' to expected type 'Int?'}}
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
@@ -443,9 +443,9 @@ enum Color {
   
   static func frob(a : Int, inout b : Int) -> Color {}
 }
-let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{type of expression is ambiguous without more context}}
-let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{type of expression is ambiguous without more context}}
-let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{type of expression is ambiguous without more context}}
+let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{cannot convert call result type '[_]' to expected type '(Int, Color)'}}
+let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}} {{51-51=description: }}
+let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{missing argument label 'description:' in call}} {{44-44=description: }}
 
 let _: Int -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing argument label 'description:' in call}} {{46-46=description: }}
 let _: Color = .Unknown("") // expected-error {{missing argument label 'description:' in call}} {{25-25=description: }}
