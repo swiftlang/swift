@@ -95,6 +95,31 @@ swift_stdlib_NSObject_isEqual(NSObject *NS_RELEASES_ARGUMENT lhs,
   return Result;
 }
 
+extern "C" int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
+    NSString *NS_RELEASES_ARGUMENT lhs, NSString *NS_RELEASES_ARGUMENT rhs) {
+  // 'kCFCompareNonliteral' actually means "normalize to NFD".
+  int Result = CFStringCompare((__bridge CFStringRef)lhs,
+                               (__bridge CFStringRef)rhs, kCFCompareNonliteral);
+  swift_unknownRelease(lhs);
+  swift_unknownRelease(rhs);
+  return Result;
+}
+
+extern "C" size_t
+swift_stdlib_NSStringNFDHashValue(NSString *NS_RELEASES_ARGUMENT str) {
+  int Result = str.decomposedStringWithCanonicalMapping.hash;
+  swift_unknownRelease(str);
+  return Result;
+}
+
+// For strings we know only have ASCII
+extern "C" size_t
+swift_stdlib_NSStringASCIIHashValue(NSString *NS_RELEASES_ARGUMENT str) {
+  int Result = str.hash;
+  swift_unknownRelease(str);
+  return Result;
+}
+
 extern "C" bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
                                                   NSString *prefix) {
   auto Length = CFStringGetLength((__bridge CFStringRef)theString);
@@ -117,6 +142,20 @@ swift_stdlib_NSStringHasSuffixNFD(NSString *NS_RELEASES_ARGUMENT theString,
       kCFCompareAnchored | kCFCompareBackwards | kCFCompareNonliteral, nullptr);
   swift_unknownRelease(theString);
   swift_unknownRelease(suffix);
+  return Result;
+}
+
+extern "C" NS_RETURNS_RETAINED NSString *
+swift_stdlib_NSStringLowercaseString(NSString *NS_RELEASES_ARGUMENT str) {
+  NSString *Result = objc_retain(str.lowercaseString);
+  swift_unknownRelease(str);
+  return Result;
+}
+
+extern "C" NS_RETURNS_RETAINED NSString *
+swift_stdlib_NSStringUppercaseString(NSString *NS_RELEASES_ARGUMENT str) {
+  NSString *Result = objc_retain(str.uppercaseString);
+  swift_unknownRelease(str);
   return Result;
 }
 

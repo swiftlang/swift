@@ -32,7 +32,6 @@ __swift_size_t strlen(const char *s);
 char *strcpy(char *__restrict__ dst, const char *__restrict__ src);
 int strcmp(const char *s1, const char *s2);
 int memcmp(const void *s1, const void *s2, __swift_size_t n);
-void *malloc(__swift_size_t size);
 
 int putchar(int c);
 __swift_ssize_t read(int fildes, void *buf, __swift_size_t nbyte);

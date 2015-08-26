@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-import SwiftShims
-
 /// `Character` represents some Unicode grapheme cluster as
 /// defined by a canonical, localized, or otherwise tailored
 /// segmentation algorithm.
@@ -312,13 +310,7 @@ public func ==(lhs: Character, rhs: Character) -> Bool {
   case let (.Small(lbits), .Small(rbits)) where
     Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
     && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
-
-    let table: UnsafePointer<Int8> =
-      _swift_stdlib_unicode_ascii_collation_table
-    let leftKey = table[Int(Int8(Builtin.trunc_Int63_Int8(lbits)))]
-    let rightKey = table[Int(Int8(Builtin.trunc_Int63_Int8(rbits)))]
-    return Bool(leftKey == rightKey)
-
+    return Bool(Builtin.cmp_eq_Int63(lbits, rbits))
   default:
     // FIXME(performance): constructing two temporary strings is extremely
     // wasteful and inefficient.
@@ -334,13 +326,7 @@ public func <(lhs: Character, rhs: Character) -> Bool {
     // See String._lessThanASCII.
     Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
     && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
-
-    let table: UnsafePointer<Int8> =
-      _swift_stdlib_unicode_ascii_collation_table
-    let leftKey = table[Int(Int8(Builtin.trunc_Int63_Int8(lbits)))]
-    let rightKey = table[Int(Int8(Builtin.trunc_Int63_Int8(rbits)))]
-    return Bool(leftKey - rightKey < 0)
-
+    return Bool(Builtin.cmp_ult_Int63(lbits, rbits))
   default:
     // FIXME(performance): constructing two temporary strings is extremely
     // wasteful and inefficient.

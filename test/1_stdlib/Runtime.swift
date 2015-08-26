@@ -920,6 +920,39 @@ var nsStringCanaryCount = 0
   }
 }
 
+RuntimeFoundationWrappers.test(
+  "_stdlib_compareNSStringDeterministicUnicodeCollation/NoLeak"
+) {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    let b = NSStringCanary()
+    expectEqual(2, nsStringCanaryCount)
+    _stdlib_compareNSStringDeterministicUnicodeCollation(a, b)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringNFDHashValue/NoLeak") {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_NSStringNFDHashValue(a)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringASCIIHashValue/NoLeak") {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_NSStringASCIIHashValue(a)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
 RuntimeFoundationWrappers.test("_stdlib_NSStringHasPrefixNFD/NoLeak") {
   nsStringCanaryCount = 0
   autoreleasepool {
@@ -938,6 +971,26 @@ RuntimeFoundationWrappers.test("_stdlib_NSStringHasSuffixNFD/NoLeak") {
     let b = NSStringCanary()
     expectEqual(2, nsStringCanaryCount)
     _stdlib_NSStringHasSuffixNFD(a, b)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringLowercaseString/NoLeak") {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_NSStringLowercaseString(a)
+  }
+  expectEqual(0, nsStringCanaryCount)
+}
+
+RuntimeFoundationWrappers.test("_stdlib_NSStringUppercaseString/NoLeak") {
+  nsStringCanaryCount = 0
+  autoreleasepool {
+    let a = NSStringCanary()
+    expectEqual(1, nsStringCanaryCount)
+    _stdlib_NSStringUppercaseString(a)
   }
   expectEqual(0, nsStringCanaryCount)
 }
