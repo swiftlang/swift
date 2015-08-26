@@ -845,7 +845,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
         P.CodeCompletion->completeCaseStmtBeginning();
         break;
       case GuardedPatternContext::Catch:
-        P.CodeCompletion->completePostfixExprBeginning();
+        P.CodeCompletion->completePostfixExprBeginning(nullptr);
         break;
       }
       P.consumeToken();

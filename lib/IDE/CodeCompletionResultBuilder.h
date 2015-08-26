@@ -38,7 +38,7 @@ class CodeCompletionResultBuilder {
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
-  Type ExpectedType;
+  ArrayRef<Type> ExpectedTypes;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -66,9 +66,9 @@ public:
   CodeCompletionResultBuilder(CodeCompletionResultSink &Sink,
                               CodeCompletionResult::ResultKind Kind,
                               SemanticContextKind SemanticContext,
-                              Type ExpectedType)
+                              ArrayRef<Type> ExpectedTypes)
       : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext),
-        ExpectedType(ExpectedType) {
+        ExpectedTypes(ExpectedTypes) {
   }
 
   ~CodeCompletionResultBuilder() {
@@ -226,6 +226,11 @@ public:
     }
 #include "swift/Parse/Tokens.def"
     return false;
+  }
+
+  void addCallParameterColon() {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::
+                     CallParameterColon, ": ");
   }
 
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,

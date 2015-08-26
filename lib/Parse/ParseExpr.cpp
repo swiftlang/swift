@@ -955,10 +955,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   }
 
   case tok::code_complete:
+    Result = makeParserResult(new (Context) ErrorExpr(SourceRange(Tok.getRange().
+      getStart(), Tok.getRange().getEnd())));
+    Result.setHasCodeCompletion();
     if (CodeCompletion)
-      CodeCompletion->completePostfixExprBeginning();
+      CodeCompletion->completePostfixExprBeginning(dyn_cast<ErrorExpr>(Result.get()));
     consumeToken(tok::code_complete);
-    return makeParserCodeCompletionResult<Expr>();
+    break;
 
   // Eat an invalid token in an expression context.  Error tokens are diagnosed
   // by the lexer, so there is no reason to emit another diagnostic.
@@ -2125,8 +2128,12 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn,
   if (fn.isParseError() || firstArg.isParseError())
     Result.setIsParseError();
 
-  if (fn.hasCodeCompletion() || firstArg.hasCodeCompletion())
+  if (fn.hasCodeCompletion() || firstArg.hasCodeCompletion()) {
+    if (CodeCompletion) {
+      CodeCompletion->completeCallArg(Result.get());
+    }
     Result.setHasCodeCompletion();
+  }
 
   return Result;
 }

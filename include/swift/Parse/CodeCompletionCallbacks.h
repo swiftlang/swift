@@ -98,7 +98,7 @@ public:
 
   /// \brief Complete the beginning of expr-postfix -- no tokens provided
   /// by user.
-  virtual void completePostfixExprBeginning() = 0;
+  virtual void completePostfixExprBeginning(ErrorExpr *E) = 0;
 
   /// \brief Complete a given expr-postfix.
   virtual void completePostfixExpr(Expr *E) = 0;
@@ -154,6 +154,8 @@ public:
                                         bool HasReturn) = 0;
 
   virtual void completeAssignmentRHS(AssignExpr *E) = 0;
+
+  virtual void completeCallArg(CallExpr *E) = 0;
 
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

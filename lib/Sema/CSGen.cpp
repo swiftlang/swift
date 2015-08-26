@@ -1494,7 +1494,7 @@ namespace {
       return expr->getType();
     }
 
-    Type visitTupleExpr(TupleExpr *expr) {
+    virtual Type visitTupleExpr(TupleExpr *expr) {
       // The type of a tuple expression is simply a tuple of the types of
       // its subexpressions.
       SmallVector<TupleTypeElt, 4> elements;
@@ -2731,15 +2731,15 @@ class InferUnresolvedMemberConstraintGenerator : public ConstraintGenerator {
   Expr *Target;
   TypeVariableType *VT;
 
-  Type createFreeTypeVariableType(Expr *E) {
+  TypeVariableType *createFreeTypeVariableType(Expr *E) {
     auto &CS = getConstraintSystem();
-    return VT = CS.createTypeVariable(CS.getConstraintLocator(nullptr),
+    return CS.createTypeVariable(CS.getConstraintLocator(nullptr),
                                       TypeVariableOptions::TVO_CanBindToLValue);
   }
 
 public:
   InferUnresolvedMemberConstraintGenerator(Expr *Target, ConstraintSystem &CS) :
-    ConstraintGenerator(CS), Target(Target) {};
+    ConstraintGenerator(CS), Target(Target), VT(nullptr) {};
   virtual ~InferUnresolvedMemberConstraintGenerator() = default;
 
   Type visitUnresolvedMemberExpr(UnresolvedMemberExpr *Expr) override {
@@ -2748,7 +2748,18 @@ public:
       return ConstraintGenerator::visitUnresolvedMemberExpr(Expr);
     }
     // Otherwise, create a type variable saying we know nothing about this expr.
-    return createFreeTypeVariableType(Expr);
+    assert(!VT && "cannot reassign type viriable.");
+    return VT = createFreeTypeVariableType(Expr);
+  }
+
+  Type visitTupleExpr(TupleExpr *Expr) override {
+    if (Target != Expr) {
+      // If expr is not the target, do the default constraint generation.
+      return ConstraintGenerator::visitTupleExpr(Expr);
+    }
+    // Otherwise, create a type variable saying we know nothing about this expr.
+    assert(!VT && "cannot reassign type viriable.");
+    return VT = createFreeTypeVariableType(Expr);
   }
 
   Type visitErrorExpr(ErrorExpr *Expr) override {
@@ -2771,11 +2782,12 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   ConstraintWalker cw(MCG);
   Parent->walk(cw);
   SmallVector<Solution, 3> solutions;
-  if (CS.solve(solutions)) {
+  if (CS.solve(solutions, FreeTypeVariableBinding::Allow)) {
     return false;
   }
   for (auto &S : solutions) {
-    PossibleTypes.push_back(MCG.getResolvedType(S));
+    if (auto Bind = MCG.getResolvedType(S))
+      PossibleTypes.push_back(Bind);
   }
-  return true;
+  return !PossibleTypes.empty();
 }
