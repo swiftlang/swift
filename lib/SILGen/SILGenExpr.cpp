@@ -211,6 +211,7 @@ namespace {
 #ifdef SWIFT_ENABLE_OBJECT_LITERALS
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
 #endif // SWIFT_ENABLE_OBJECT_LITERALS
+    RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
                                            SGFContext C);
     RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
@@ -2073,6 +2074,11 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr(), C);
 }
 #endif // SWIFT_ENABLE_OBJECT_LITERALS
+
+RValue RValueEmitter::
+visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C) {
+  return visit(E->getSemanticExpr(), C);
+}
 
 static StringRef
 getMagicFunctionString(SILGenFunction &gen) {
