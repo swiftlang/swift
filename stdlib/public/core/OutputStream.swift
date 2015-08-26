@@ -161,6 +161,7 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
 }
 
 @inline(never)
+@_semantics("stdlib_binary_only")
 internal func _print_unlocked<T, TargetStream : OutputStreamType>(
   value: T, inout _ target: TargetStream
 ) {
