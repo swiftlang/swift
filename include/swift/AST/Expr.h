@@ -3678,7 +3678,6 @@ class EditorPlaceholderExpr : public Expr {
   SourceLoc Loc;
   TypeLoc PlaceholderTy;
   TypeRepr *ExpansionTyR;
-  Expr *SemanticExpr;
 
 public:
   EditorPlaceholderExpr(Identifier Placeholder, SourceLoc Loc,
@@ -3687,8 +3686,7 @@ public:
     : Expr(ExprKind::EditorPlaceholder, /*Implicit=*/false),
       Placeholder(Placeholder), Loc(Loc),
       PlaceholderTy(PlaceholderTy),
-      ExpansionTyR(ExpansionTyR),
-      SemanticExpr(nullptr) {
+      ExpansionTyR(ExpansionTyR) {
   }
 
   Identifier getPlaceholder() const { return Placeholder; }
@@ -3702,9 +3700,6 @@ public:
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::EditorPlaceholder;
   }
-
-  Expr *getSemanticExpr() const { return SemanticExpr; }
-  void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
 };
 
 #undef SWIFT_FORWARD_SOURCE_LOCS_TO

@@ -1381,9 +1381,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       TypeResolutionOptions options;
       options |= TR_OverrideType;
       options |= TR_InExpression;
-      if (isa<EditorPlaceholderExpr>(expr->getSemanticsProvidingExpr())) {
-        options |= TR_EditorPlaceholder;
-      }
       if (tc.coercePatternToType(pattern, DC, patternType, options)) {
         return nullptr;
       }

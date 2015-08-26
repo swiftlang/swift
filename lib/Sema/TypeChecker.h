@@ -355,9 +355,6 @@ enum TypeResolutionFlags {
   /// Whether we are in the inheritance clause of a nominal type declaration
   /// or extension.
   TR_InheritanceClause = 0x80000,
-
-  /// Whether this is the type of an editor placeholder.
-  TR_EditorPlaceholder = 0x100000,
 };
 
 /// Option set describing how type resolution should work.

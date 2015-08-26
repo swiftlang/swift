@@ -818,7 +818,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
     return E;
   }
 

@@ -1017,8 +1017,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     
     if (shouldRequireType && 
         !(options & TR_FromNonInferredPattern) &&
-        !(options & TR_EnumerationVariable) &&
-        !(options & TR_EditorPlaceholder)) {
+        !(options & TR_EnumerationVariable)) {
       diagnose(NP->getLoc(), diag::type_inferred_to_undesirable_type,
                NP->getDecl()->getName(), type, NP->getDecl()->isLet());
       diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence);
