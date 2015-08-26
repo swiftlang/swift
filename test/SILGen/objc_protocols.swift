@@ -87,10 +87,10 @@ class Foo : NSRuncing, NSFunging, Ansible {
   func anse() {}
 }
 
-// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Foo5runcefS0_FT_CSo8NSObject
-// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Foo11copyRuncingfS0_FT_CSo8NSObject
-// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Foo5fungefS0_FT_T_
-// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Foo3foofS0_FT_T_
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo5runcefS0_FT_CSo8NSObject
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo11copyRuncingfS0_FT_CSo8NSObject
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo5fungefS0_FT_T_
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo3foofS0_FT_T_
 // CHECK-NOT: sil hidden @_TToF{{.*}}anse{{.*}}
 
 class Bar { }
@@ -101,9 +101,9 @@ extension Bar : NSRuncing {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Bar5runcefS0_FT_CSo8NSObject
-// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Bar11copyRuncingfS0_FT_CSo8NSObject
-// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Bar3foofS0_FT_T_
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar5runcefS0_FT_CSo8NSObject
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar11copyRuncingfS0_FT_CSo8NSObject
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar3foofS0_FT_T_
 
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
@@ -112,8 +112,8 @@ extension Bas : NSRuncing {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden  @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas11copyRuncingfS1_FT_CSo8NSObject
-// CHECK-LABEL: sil hidden  @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas3foofS1_FT_T_
+// CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas11copyRuncingfS1_FT_CSo8NSObject
+// CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas3foofS1_FT_T_
 
 // -- Inherited objc protocols
 
@@ -124,8 +124,8 @@ class Zim : Fungible {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Zim5fungefS0_FT_T_
-// CHECK-LABEL: sil hidden  @_TToFC14objc_protocols3Zim3foofS0_FT_T_
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Zim5fungefS0_FT_T_
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Zim3foofS0_FT_T_
 
 // class Zang from objc_protocols_Bas module
 extension Zang : Fungible {
@@ -133,7 +133,7 @@ extension Zang : Fungible {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden  @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang3foofS1_FT_T_
+// CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang3foofS1_FT_T_
 
 // -- objc protocols with property requirements in extensions
 //    <rdar://problem/16284574>
@@ -147,14 +147,14 @@ class StoredPropertyCount {
 }
 
 extension StoredPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden [transparent] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
 
 class ComputedPropertyCount {
   @objc var count: Int { return 0 }
 }
 
 extension ComputedPropertyCount: NSCounting {}
-// CHECK-LABEL: sil hidden @_TToFC14objc_protocols21ComputedPropertyCountg5countSi
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols21ComputedPropertyCountg5countSi
 
 // -- adding @objc protocol conformances to native ObjC classes should not
 //    emit thunks since the methods are already available to ObjC.
@@ -197,7 +197,7 @@ func testInitializableExistential(im: Initializable.Type, i: Int) -> Initializab
 class InitializableConformer: Initializable {
   @objc required init(int: Int) {}
 }
-// CHECK-LABEL: sil hidden @_TToFC14objc_protocols22InitializableConformercfMS0_FT3intSi_S0_
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols22InitializableConformercfMS0_FT3intSi_S0_
 
 final class InitializableConformerByExtension {
   init() {}
@@ -208,4 +208,4 @@ extension InitializableConformerByExtension: Initializable {
     self.init()
   }
 }
-// CHECK-LABEL: sil hidden @_TToFC14objc_protocols33InitializableConformerByExtensioncfMS0_FT3intSi_S0_
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols33InitializableConformerByExtensioncfMS0_FT3intSi_S0_

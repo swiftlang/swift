@@ -189,23 +189,23 @@ extension NSString {
     get { return NSS }
     set {}
   }
-  // CHECK-LABEL: sil hidden @_TToFE13objc_bridgingCSo8NSStringg13nsstrFakePropS0_
+  // CHECK-LABEL: sil hidden [thunk] @_TToFE13objc_bridgingCSo8NSStringg13nsstrFakePropS0_
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
-  // CHECK-LABEL: sil hidden @_TToFE13objc_bridgingCSo8NSStrings13nsstrFakePropS0_
+  // CHECK-LABEL: sil hidden [thunk] @_TToFE13objc_bridgingCSo8NSStrings13nsstrFakePropS0_
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
   func nsstrResult() -> NSString { return NSS }
-  // CHECK-LABEL: sil hidden @_TToFE13objc_bridgingCSo8NSString11nsstrResultfS0_FT_S0_
+  // CHECK-LABEL: sil hidden [thunk] @_TToFE13objc_bridgingCSo8NSString11nsstrResultfS0_FT_S0_
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
   func nsstrArg(s: NSString) { }
-  // CHECK-LABEL: sil hidden @_TToFE13objc_bridgingCSo8NSString8nsstrArgfS0_FS0_T_
+  // CHECK-LABEL: sil hidden [thunk] @_TToFE13objc_bridgingCSo8NSString8nsstrArgfS0_FS0_T_
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
@@ -215,7 +215,7 @@ extension NSString {
 class Bas : NSObject {
   // -- Bridging thunks for String properties convert between NSString
   var strRealProp: String = "Hello"
-  // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Basg11strRealPropSS : $@convention(objc_method) (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Basg11strRealPropSS : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK: bb0([[THIS:%.*]] : $Bas):
   // CHECK:   strong_retain [[THIS]] : $Bas
   // CHECK:   // function_ref objc_bridging.Bas.strRealProp.getter
@@ -234,7 +234,7 @@ class Bas : NSObject {
   // CHECK:   retain_value [[PROP]] : $String
 
 
-  // CHECK-LABEL: sil hidden [transparent]  @_TToFC13objc_bridging3Bass11strRealPropSS : $@convention(objc_method) (NSString, Bas) -> () {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Bass11strRealPropSS : $@convention(objc_method) (NSString, Bas) -> () {
   // CHECK: bb0([[VALUE:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
   // CHECK:   [[VALUE_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[VALUE]]
@@ -254,7 +254,7 @@ class Bas : NSObject {
     get { return "" }
     set {}
   }
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Basg11strFakePropSS : $@convention(objc_method) (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Basg11strFakePropSS : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK: bb0([[THIS:%.*]] : $Bas):
   // CHECK:   [[GETTER:%.*]] = function_ref @_TFC13objc_bridging3Basg11strFakePropSS
   // CHECK:   [[STR:%.*]] = apply [[GETTER]]([[THIS]])
@@ -263,7 +263,7 @@ class Bas : NSObject {
   // CHECK:   autorelease_return [[NSSTR]]
   // CHECK: }
 
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bass11strFakePropSS : $@convention(objc_method) (NSString, Bas) -> () {
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bass11strFakePropSS : $@convention(objc_method) (NSString, Bas) -> () {
   // CHECK: bb0([[NSSTR:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
   // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[NSSTR]]
@@ -278,19 +278,19 @@ class Bas : NSObject {
     get { return NSS }
     set {}
   }
-  // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Basg13nsstrRealPropCSo8NSString : $@convention(objc_method) (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Basg13nsstrRealPropCSo8NSString : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
-  // CHECK-LABEL: sil hidden [transparent]  @_TToFC13objc_bridging3Bass13nsstrRealPropCSo8NSString : $@convention(objc_method) (NSString, Bas) ->
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Bass13nsstrRealPropCSo8NSString : $@convention(objc_method) (NSString, Bas) ->
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
 
   // -- Bridging thunks for String methods convert between NSString
   func strResult() -> String { return "" }
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas9strResultfS0_FT_SS : $@convention(objc_method) (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas9strResultfS0_FT_SS : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK: bb0([[THIS:%.*]] : $Bas):
   // CHECK:   [[METHOD:%.*]] = function_ref @_TFC13objc_bridging3Bas9strResultfS0_FT_SS
   // CHECK:   [[STR:%.*]] = apply [[METHOD]]([[THIS]])
@@ -299,7 +299,7 @@ class Bas : NSObject {
   // CHECK:   autorelease_return [[NSSTR]]
   // CHECK: }
   func strArg(s: String) { }
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas6strArg
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas6strArg
   // CHECK: bb0([[NSSTR:%.*]] : $NSString, [[THIS:%.*]] : $Bas):
   // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @swift_NSStringToString
   // CHECK:   [[NSSTR_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[NSSTR]]
@@ -310,7 +310,7 @@ class Bas : NSObject {
 
   // -- Bridging thunks for explicitly NSString properties don't convert
   func nsstrResult() -> NSString { return NSS }
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas11nsstrResultfS0_FT_CSo8NSString : $@convention(objc_method) (Bas) -> @autoreleased NSString {
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas11nsstrResultfS0_FT_CSo8NSString : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: swift_NSStringToString
   // CHECK: }
@@ -325,7 +325,7 @@ class Bas : NSObject {
     super.init()
   }
 
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas8arrayArg{{.*}} : $@convention(objc_method) (NSArray, Bas) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas8arrayArg{{.*}} : $@convention(objc_method) (NSArray, Bas) -> ()
   // CHECK: bb0([[NSARRAY:%[0-9]+]] : $NSArray, [[SELF:%[0-9]+]] : $Bas):
   // CHECK:   strong_retain [[NSARRAY]] : $NSArray
   // CHECK:   strong_retain [[SELF]] : $Bas
@@ -338,7 +338,7 @@ class Bas : NSObject {
   // CHECK:   return [[RESULT]] : $()
   func arrayArg(array: [AnyObject]) { }
   
-  // CHECK-LABEL: sil hidden @_TToFC13objc_bridging3Bas11arrayResult{{.*}} : $@convention(objc_method) (Bas) -> @autoreleased NSArray
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC13objc_bridging3Bas11arrayResult{{.*}} : $@convention(objc_method) (Bas) -> @autoreleased NSArray
   // CHECK: bb0([[SELF:%[0-9]+]] : $Bas):
   // CHECK:   strong_retain [[SELF]] : $Bas
   // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC13objc_bridging3Bas11arrayResult{{.*}} : $@convention(method) (@guaranteed Bas) -> @owned Array<AnyObject>
@@ -349,8 +349,8 @@ class Bas : NSObject {
   // CHECK:   autorelease_return [[NSARRAY]]
   func arrayResult() -> [AnyObject] { return [] }
 
-  // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Basg9arrayPropGSaSS_ : $@convention(objc_method) (Bas) -> @autoreleased NSArray
-  // CHECK-LABEL: sil hidden [transparent] @_TToFC13objc_bridging3Bass9arrayPropGSaSS_ : $@convention(objc_method) (NSArray, Bas) -> ()
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Basg9arrayPropGSaSS_ : $@convention(objc_method) (Bas) -> @autoreleased NSArray
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC13objc_bridging3Bass9arrayPropGSaSS_ : $@convention(objc_method) (NSArray, Bas) -> ()
   var arrayProp: [String] = []
 }
 
