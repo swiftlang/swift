@@ -279,11 +279,6 @@ public:
   /// constraint system, or false otherwise.
   virtual bool builtConstraints(constraints::ConstraintSystem &cs, Expr *expr);
 
-  /// Callback invoked once the constraint system has been solved.
-  ///
-  /// \param solution The chosen solution.
-  virtual void solvedConstraints(constraints::Solution &solution);
-
   /// Callback invokes once the chosen solution has been applied to the
   /// expression.
   ///

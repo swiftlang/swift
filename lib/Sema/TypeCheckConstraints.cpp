@@ -974,8 +974,6 @@ bool ExprTypeCheckListener::builtConstraints(ConstraintSystem &cs, Expr *expr) {
   return false;
 }
 
-void ExprTypeCheckListener::solvedConstraints(Solution &solution) { }
-
 Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
   return expr;
 }
@@ -1050,12 +1048,6 @@ solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
         viable[i].dump(log);
       }
     }
-  }
-
-  // Notify the listener that we have a solution.
-  if (listener) {
-    assert(viable.size() == 1 && "Can only inform listener of one solution");
-    listener->solvedConstraints(viable[0]);
   }
 
   return false;
