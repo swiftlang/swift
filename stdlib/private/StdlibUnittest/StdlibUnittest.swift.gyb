@@ -2377,6 +2377,20 @@ public func expectEqualFunctionsForDomain<ArgumentType, Result : Equatable>(
   }
 }
 
+public func expectEqualFunctionsForDomain2<ArgumentType, Result : Equatable>(
+    arguments: [ArgumentType], _ arguments2: [ArgumentType],
+    _ function1: (ArgumentType, ArgumentType) -> Result,
+    _ function2: (ArgumentType, ArgumentType) -> Result
+) {
+  for a in arguments {
+    for a2 in arguments2 {
+      let expected = function1(a, a2)
+      let actual = function2(a, a2)
+      expectEqual(expected, actual, "where the argument is: \(a), \(a2)")
+    }
+  }
+}
+
 public func expectEqualMethodsForDomain<
   SelfType, ArgumentType, Result : Equatable
 >(

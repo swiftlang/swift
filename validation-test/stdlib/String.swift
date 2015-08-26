@@ -884,6 +884,15 @@ StringTests.test("Conversions") {
   }
 }
 
+// Check the internal functions are correct for ASCII values
+StringTests.test(
+  "forall x: Int8, y: Int8 . x < 128 ==> x <ascii y == x <unicode y") {
+  let asciiDomain = (0..<128).map({ String(UnicodeScalar($0)) })
+  expectEqualFunctionsForDomain2(
+    asciiDomain, asciiDomain,
+    _compareDeterministicUnicodeCollation, _compareString)
+}
+
 StringTests.test("lowercaseString") {
   // Use setlocale so tolower() is correct on ASCII.
   setlocale(LC_ALL, "C")
