@@ -1954,11 +1954,26 @@ let comparisonTests = [
   ComparisonTest(.EQ, "\u{0341}", "\u{0954}"),
 ]
 
-func checkStringComparison(
-  expected: ExpectedComparisonResult,
-  _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
+func forceUTF16String(var str: String) -> String {
+  if str._core.isASCII {
+    str.insert("\u{0130}", atIndex: str.startIndex)
+    str.removeAtIndex(str.startIndex)
+  }
+  return str
+}
+
+func toCocoaBackedString(str: String) -> String {
+  let utf16String = forceUTF16String(str)
+
+  return String(NSString(
+    characters: utf16String._core.startUTF16,
+    length: utf16String._core.count))
+}
+
+func checkStringComparisons(
+  expected: ExpectedComparisonResult, _ lhs: String, _ rhs: String,
+  _ stackTrace: SourceLocStack
 ) {
-  // String / String
   expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
   expectEqual(expected.isNE(), lhs != rhs, stackTrace: stackTrace)
   checkHashable(
@@ -1969,6 +1984,14 @@ func checkStringComparison(
   expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
   expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
   checkComparable(expected, lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
+}
+
+func checkStringComparison(
+  expected: ExpectedComparisonResult,
+  _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
+) {
+  // String / String
+  checkStringComparisons(expected, lhs, rhs, stackTrace.withCurrentLoc())
 
   // NSString / NSString
   let lhsNSString = lhs as NSString
@@ -1985,6 +2008,20 @@ func checkStringComparison(
   checkHashable(
     expectedEqualUnicodeScalars, lhsNSString, rhsNSString,
     stackTrace: stackTrace.withCurrentLoc())
+
+  // Test cocoa backed Strings
+  let lhsWithCocoaBuffer = toCocoaBackedString(lhs)
+  let rhsWithCocoaBuffer = toCocoaBackedString(rhs)
+
+  // String (cocoa) / String (cocoa)
+  checkStringComparisons(expected, lhsWithCocoaBuffer, rhsWithCocoaBuffer,
+    stackTrace.withCurrentLoc())
+  // String / String (cocoa)
+  checkStringComparisons(expected, lhs, rhsWithCocoaBuffer,
+    stackTrace.withCurrentLoc())
+  // String (cocoa) / String
+  checkStringComparisons(expected, lhsWithCocoaBuffer, rhs,
+    stackTrace.withCurrentLoc())
 }
 
 NSStringAPIs.test("String.{Equatable,Hashable,Comparable}") {
