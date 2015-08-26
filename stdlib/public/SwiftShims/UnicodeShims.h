@@ -73,5 +73,6 @@ __swift_int32_t _swift_stdlib_unicode_strToLower(
   __swift_uint16_t *Destination, __swift_int32_t DestinationCapacity,
   const __swift_uint16_t *Source, __swift_int32_t SourceLength);
 
+extern const __swift_int8_t *_swift_stdlib_unicode_ascii_collation_table;
 
 #endif

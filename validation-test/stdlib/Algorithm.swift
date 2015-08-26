@@ -28,12 +28,10 @@ Algorithm.test("min,max") {
   // condition.
 }
 
-Algorithm.test("sorted/strings")
-  .xfail(.LinuxAny(reason: "String comparison: ICU vs. Foundation"))
-  .code {
+Algorithm.test("sorted/strings") {
   expectEqual(
-    [ "Banana", "apple", "cherry" ],
-    [ "apple", "Banana", "cherry" ].sort())
+    [ "apple", "Banana", "cherry" ],
+    [ "cherry", "Banana", "apple" ].sort())
 
   let s = ["apple", "Banana", "cherry"].sort() {
     $0.characters.count > $1.characters.count

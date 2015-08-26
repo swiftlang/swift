@@ -39,9 +39,16 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
       SwiftObject.mm
       SwiftNativeNSXXXBase.mm.gyb
       Remangle.cpp
-      Reflection.mm)
-  set(LLVM_OPTIONAL_SOURCES
+      Reflection.mm
       UnicodeNormalization.cpp)
+   if(SWIFT_DARWIN_ICU_INCLUDE_PATH)
+     # The icu install needs to be configured with --disable-renaming, otherwise
+     # we get the version number postfixed to the api calls.
+     include_directories(${SWIFT_DARWIN_ICU_INCLUDE_PATH})
+     list(APPEND swift_runtime_compile_flags
+       "-DU_DISABLE_RENAMING=1")
+   endif()
+  set(swift_runtime_link_libraries icucore)
 else()
   find_package(ICU REQUIRED COMPONENTS uc i18n)
   set(swift_runtime_unicode_normalization_sources
@@ -56,7 +63,7 @@ endif()
 check_cxx_compiler_flag("-Werror -Wglobal-constructors" CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING)
 append_if(CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING "-Wglobal-constructors" swift_runtime_compile_flags)
 
-add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
+add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE USE_INTERNAL_SDK
   Casting.cpp
   Demangle.cpp
   ErrorObject.cpp
