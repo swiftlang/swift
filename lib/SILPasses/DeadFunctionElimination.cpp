@@ -138,7 +138,7 @@ protected:
       for (SILInstruction &I : BB) {
         if (auto *MI = dyn_cast<MethodInst>(&I)) {
           auto *funcDecl =
-              dyn_cast<AbstractFunctionDecl>(MI->getMember().getDecl());
+              cast<AbstractFunctionDecl>(MI->getMember().getDecl());
           MethodInfo *mi = getMethodInfo(getBase(funcDecl));
           ensureAlive(mi);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
@@ -243,7 +243,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     for (SILVTable &vTable : Module->getVTableList()) {
       for (auto &entry : vTable.getEntries()) {
         SILFunction *F = entry.second;
-        auto *fd = dyn_cast<AbstractFunctionDecl>(entry.first.getDecl());
+        auto *fd = cast<AbstractFunctionDecl>(entry.first.getDecl());
         fd = getBase(fd);
         MethodInfo *mi = getMethodInfo(fd);
         addImplementingFunction(mi, F);
@@ -270,7 +270,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
       for (const SILWitnessTable::Entry &entry : WT.getEntries()) {
         if (entry.getKind() == SILWitnessTable::Method) {
           auto methodWitness = entry.getMethodWitness();
-          auto *fd = dyn_cast<AbstractFunctionDecl>(methodWitness.Requirement.
+          auto *fd = cast<AbstractFunctionDecl>(methodWitness.Requirement.
                                                     getDecl());
           assert(fd == getBase(fd) && "key in witness table is overridden");
           SILFunction *F = methodWitness.Witness;
