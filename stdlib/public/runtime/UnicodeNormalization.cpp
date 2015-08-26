@@ -26,6 +26,19 @@
 #include <unicode/ucoleitr.h>
 #include <unicode/uiter.h>
 
+/// Zero weight 0-8, 14-31, 127.
+const int8_t _swift_stdlib_unicode_ascii_collation_table_impl[128] = {
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  2,  3,  4,  5,  0,   0,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  6,  12,  16, 28, 38, 29,
+    27, 15, 17, 18, 24, 32, 9,  8,  14, 25, 39, 40, 41, 42, 43,  44, 45, 46, 47,
+    48, 11, 10, 33, 34, 35, 13, 23, 50, 52, 54, 56, 58, 60, 62,  64, 66, 68, 70,
+    72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 19, 26, 20, 31,
+    7,  30, 49, 51, 53, 55, 57, 59, 61, 63, 65, 67, 69, 71, 73,  75, 77, 79, 81,
+    83, 85, 87, 89, 91, 93, 95, 97, 99, 21, 36, 22, 37, 0};
+
+const int8_t *_swift_stdlib_unicode_ascii_collation_table =
+    _swift_stdlib_unicode_ascii_collation_table_impl;
+
 static const UCollator *MakeRootCollator() {
   UErrorCode ErrorCode = U_ZERO_ERROR;
   UCollator *root = ucol_open("", &ErrorCode);
@@ -51,6 +64,59 @@ static const UCollator *GetRootCollator() {
   static const UCollator *RootCollator = MakeRootCollator();
   return RootCollator;
 }
+
+/// This class caches the collation element results for the ASCII subset of
+/// unicode.
+class ASCIICollation {
+  int32_t CollationTable[128];
+public:
+
+  static const ASCIICollation *getTable() {
+    // We are reallying on C++11's guarantueed of thread safe static variable
+    // initialization.
+    static ASCIICollation collation;
+    return &collation;
+  }
+
+  /// Maps an ASCII character to an collation element priority as would be
+  /// returned by a call to ucol_next().
+  int32_t map(unsigned char c) const {
+    return CollationTable[c];
+  }
+
+private:
+  /// Construct the ASCII collation table.
+  ASCIICollation() {
+    const UCollator *Collator = GetRootCollator();
+    for (unsigned char c = 0; c < 128; ++c) {
+      UErrorCode ErrorCode = U_ZERO_ERROR;
+      intptr_t NumCollationElts = 0;
+      uint16_t Buffer[1];
+      Buffer[0] = c;
+
+      UCollationElements *CollationIterator =
+          ucol_openElements(Collator, Buffer, 1, &ErrorCode);
+
+      while (U_SUCCESS(ErrorCode)) {
+        intptr_t Elem = ucol_next(CollationIterator, &ErrorCode);
+        if (Elem != UCOL_NULLORDER) {
+          CollationTable[c] = Elem;
+          ++NumCollationElts;
+        } else {
+          break;
+        }
+      }
+
+      ucol_closeElements(CollationIterator);
+      if (U_FAILURE(ErrorCode) || NumCollationElts != 1) {
+        swift::crash("Error setting up the ASCII collation table");
+      }
+    }
+  }
+
+  ASCIICollation &operator=(const ASCIICollation &) = delete;
+  ASCIICollation(const ASCIICollation &) = delete;
+};
 
 /// Compares the strings via the Unicode Collation Algorithm on the root locale.
 /// Results are the usual string comparison results:
@@ -156,6 +222,7 @@ static intptr_t hashChunk(const UCollator *Collator, intptr_t HashState,
   ucol_closeElements(CollationIterator);
   return HashState;
 }
+
 static intptr_t hashFinish(intptr_t HashState) {
   HashState ^= HashState >> HASH_R;
   HashState *= HASH_M;
@@ -175,35 +242,25 @@ intptr_t _swift_stdlib_unicode_hash(const uint16_t *Str, int32_t Length) {
   return hashFinish(HashState);
 }
 
-#define ASCII_HASH_BUFFER_SIZE 16
-extern "C"
-intptr_t _swift_stdlib_unicode_hash_ascii(const char *Str, int32_t Length) {
-  UErrorCode ErrorCode = U_ZERO_ERROR;
-  const UCollator *Collator = GetRootCollator();
+extern "C" intptr_t _swift_stdlib_unicode_hash_ascii(const char *Str,
+                                                     int32_t Length) {
+  const ASCIICollation *Table = ASCIICollation::getTable();
   intptr_t HashState = HASH_SEED;
-  uint16_t HashBuffer[ASCII_HASH_BUFFER_SIZE];
-
   int32_t Pos = 0;
   while (Pos < Length) {
-    // Copy into the buffer up to ASCII_HASH_BUFFER_SIZE.
-    // Note that we assume that chunking the ASCII string up like this
-    // does not cause the collation elements to be wrong because there are
-    // no contractions in the 7 bit ascii set in the root locale.
-    int32_t BufferPos = 0;
-    while (Pos < Length && BufferPos < ASCII_HASH_BUFFER_SIZE) {
-      assert((Str[Pos] & 0x80) == 0); // UTF-8 breaks the above assumptions.
-      HashBuffer[BufferPos++] = Str[Pos++];
-    }
-    // Do hash with what's in the buffer now, if anything.
-    if (BufferPos > 0) {
-      HashState = hashChunk(Collator, HashState,
-        HashBuffer, BufferPos,
-        &ErrorCode);
-    }
+    const char c = Str[Pos++];
+    assert((c & 0x80) == 0 && "This table only exists for the ASCII subset");
+    intptr_t Elem = Table->map(c);
+    // Ignore zero valued collation elements. They don't participate in the
+    // ordering relation.
+    if (Elem == 0)
+      continue;
+    Elem *= HASH_M;
+    Elem ^= Elem >> HASH_R;
+    Elem *= HASH_M;
 
-    if (U_FAILURE(ErrorCode)) {
-      swift::crash("hashChunk: Unexpected error hashing ascii string.");
-    }
+    HashState *= HASH_M;
+    HashState ^= Elem;
   }
   return hashFinish(HashState);
 }
