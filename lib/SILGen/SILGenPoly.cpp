@@ -1332,6 +1332,11 @@ static ManagedValue createThunk(SILGenFunction &gen,
                                 const TypeLowering &expectedTL) {
   auto expectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
 
+  // We can't do bridging here.
+  assert(expectedType->getLanguage() ==
+         fn.getType().castTo<SILFunctionType>()->getLanguage() &&
+         "bridging in re-abstraction thunk?");
+
   // Declare the thunk.
   SmallVector<Substitution, 4> substitutions;
   CanSILFunctionType substFnType;

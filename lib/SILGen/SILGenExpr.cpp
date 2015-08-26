@@ -1194,12 +1194,13 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   
   // First, the signature:
   
-  auto srcTy = e->getSubExpr()->getType()->castTo<FunctionType>();
-  CanAnyFunctionType destRepTy
-    = cast<FunctionType>(e->getType()->getCanonicalType());
+  CanAnyFunctionType srcTy =
+      cast<FunctionType>(e->getSubExpr()->getType()->getCanonicalType());
+  CanAnyFunctionType destRepTy =
+      cast<FunctionType>(e->getType()->getCanonicalType());
   CanAnyFunctionType destTy = CanFunctionType::get(
-       destRepTy.getInput(), destRepTy.getResult(),
-       destRepTy->getExtInfo().withRepresentation(srcTy->getRepresentation()));
+      destRepTy.getInput(), destRepTy.getResult(),
+      destRepTy->getExtInfo().withRepresentation(srcTy->getRepresentation()));
   
   // Retain the thinness of the original function type.
   auto origRep = original.getType().castTo<SILFunctionType>()->getRepresentation();
@@ -1225,20 +1226,19 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     destTy = adjustFunctionType(destTy, astRep);
   }
 
-  SILType resultType = SGF.getLoweredType(destTy);
-  auto resultFTy = resultType.castTo<SILFunctionType>();
+  // Transform the AST-level types in the function signature without an
+  // abstraction or representation change.
+  AbstractionPattern abstractionPattern(destTy);
+  ManagedValue result = SGF.emitOrigToSubstValue(e, original,
+                                                 abstractionPattern,
+                                                 srcTy, destTy);
 
-  ManagedValue result;
-  if (resultType == original.getType()) {
-    // Don't make a conversion instruction if it's unnecessary.
-    result = original;
-  } else {
-    SILValue converted =
-      SGF.B.createConvertFunction(e, original.getValue(), resultType);
-    result = ManagedValue(converted, original.getCleanup());
-  }
+  SILType resultType = result.getType();
+  assert(resultType == SGF.getLoweredType(destTy));
+
+  auto resultFTy = resultType.castTo<SILFunctionType>();
   
-  // Now, the representation:
+  // Now, change the representation:
   if (destRepTy != destTy) {
     // Note that conversions to and from block require a thunk
     switch (destRepTy->getRepresentation()) {
