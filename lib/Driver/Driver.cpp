@@ -1879,7 +1879,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
   JobCache[Key] = J;
 
   if (DriverPrintBindings) {
-    llvm::outs() << "# \"" << T->getToolChain().getTripleString()
+    llvm::outs() << "# \"" << T->getToolChain().getTriple().str()
       << "\" - \"" << T->getName()
       << "\", inputs: [";
 
@@ -1985,7 +1985,7 @@ void Driver::printJobs(const Compilation &C) const {
 
 void Driver::printVersion(const ToolChain &TC, raw_ostream &OS) const {
   OS << version::getSwiftFullVersion() << '\n';
-  OS << "Target: " << TC.getTripleString() << '\n';
+  OS << "Target: " << TC.getTriple().str() << '\n';
 }
 
 void Driver::printHelp(bool ShowHidden) const {

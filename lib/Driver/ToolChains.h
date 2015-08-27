@@ -27,11 +27,6 @@ protected:
 public:
   Darwin(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Darwin() = default;
-
-  /// Get the "Darwin" arch name for particular compiler arguments.
-  /// For example, Darwin treats each different ARM variation as a distinct
-  /// architecture.
-  StringRef getDarwinArchName(const llvm::opt::ArgList &Args) const;
 };
 
 #if defined(SWIFT_ENABLE_TARGET_LINUX)

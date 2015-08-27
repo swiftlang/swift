@@ -66,13 +66,6 @@ public:
   const Driver &getDriver() const { return D; }
   const llvm::Triple &getTriple() const { return Triple; }
 
-  llvm::Triple::ArchType getArch() const { return Triple.getArch(); }
-  StringRef getArchName() const { return Triple.getArchName(); }
-  StringRef getPlatform() const { return Triple.getVendorName(); }
-  StringRef getOS() const { return Triple.getOSName(); }
-
-  std::string getTripleString() const { return Triple.getTriple(); }
-
   /// Choose a tool to use to handle the action \p JA.
   virtual Tool *selectTool(const JobAction &JA) const;
 

@@ -25,10 +25,6 @@ std::unique_ptr<Tool> Darwin::buildLinker() const {
   return std::unique_ptr<Tool>(new tools::darwin::Linker(*this));
 }
 
-StringRef Darwin::getDarwinArchName(const ArgList &Args) const {
-  return getArchName();
-}
-
 #if defined(SWIFT_ENABLE_TARGET_LINUX)
 
 /// Linux

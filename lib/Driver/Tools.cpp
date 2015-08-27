@@ -79,8 +79,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
                                   const ArgList &inputArgs,
                                   ArgStringList &arguments) {
   arguments.push_back("-target");
-  std::string TripleStr = TC.getTripleString();
-  arguments.push_back(inputArgs.MakeArgString(TripleStr));
+  arguments.push_back(inputArgs.MakeArgString(TC.getTriple().str()));
   const llvm::Triple &Triple = TC.getTriple();
 
   // Enable address top-byte ignored in the ARM64 backend.
@@ -324,10 +323,10 @@ Swift::constructArgumentList(const JobAction &JA,
   // Only white-listed flags below are allowed to be embedded.
   if (Args.hasArg(options::OPT_embed_bitcode) &&
       isa<BackendJobAction>(JA)) {
-    Arguments.push_back("-target");
-    std::string TripleStr = getToolChain().getTripleString();
-    Arguments.push_back(Args.MakeArgString(TripleStr));
     const llvm::Triple &Triple = getToolChain().getTriple();
+
+    Arguments.push_back("-target");
+    Arguments.push_back(Args.MakeArgString(Triple.str()));
 
     // Enable address top-byte ignored in the ARM64 backend.
     if (Triple.getArch() == llvm::Triple::aarch64) {
@@ -713,9 +712,8 @@ darwin::Linker::constructArgumentList(const JobAction &JA,
   Arguments.push_back("-lobjc");
   Arguments.push_back("-lSystem");
 
-  StringRef ArchName = TC.getDarwinArchName(Args);
   Arguments.push_back("-arch");
-  Arguments.push_back(Args.MakeArgString(ArchName));
+  Arguments.push_back(Args.MakeArgString(TC.getTriple().getArchName()));
 
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
@@ -885,8 +883,10 @@ linux::Linker::constructArgumentList(const JobAction &JA,
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", CLANG_VERSION_STRING);
 
-    llvm::sys::path::append(LibProfile, "lib", TC.getOS(),
-                            "libclang_rt.profile-" + TC.getArchName() + ".a");
+    llvm::sys::path::append(LibProfile, "lib", TC.getTriple().getOSName(),
+                            Twine("libclang_rt.profile-") +
+                              TC.getTriple().getArchName() +
+                              ".a");
     Arguments.push_back(Args.MakeArgString(LibProfile));
   }
 
