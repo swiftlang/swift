@@ -290,9 +290,11 @@ static void removeToken(SILValue Op) {
 
   if (GlobalAddrInst *GAI = dyn_cast<GlobalAddrInst>(Op)) {
     auto *Global = GAI->getReferencedGlobal();
-    if (! (GAI->use_empty() || GAI->hasOneUse()) ||
-        !Global ||
-        Global->getName().find("_token") == StringRef::npos)
+    // If "global_addr token" is used more than one time, bail.
+    if (!(GAI->use_empty() || GAI->hasOneUse()))
+      return;
+    // If it is not a *_token global variable, bail.
+    if (!Global || Global->getName().find("_token") == StringRef::npos)
       return;
     GAI->getModule().eraseGlobalVariable(Global);
     GAI->replaceAllUsesWithUndef();
