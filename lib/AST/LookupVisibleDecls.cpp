@@ -618,8 +618,8 @@ public:
     auto FoundSignature = VD->getOverloadSignature();
     if (FoundSignature.InterfaceType && shouldSubst) {
       auto subs = BaseTy->getMemberSubstitutions(VD->getDeclContext());
-      FoundSignature.InterfaceType =
-          FoundSignature.InterfaceType.subst(M, subs, None)->getCanonicalType();
+      if (auto CT = FoundSignature.InterfaceType.subst(M, subs, None))
+        FoundSignature.InterfaceType = CT->getCanonicalType();
     }
 
     for (auto I = PossiblyConflicting.begin(), E = PossiblyConflicting.end();
