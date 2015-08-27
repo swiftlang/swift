@@ -47,7 +47,7 @@ f1(b) // expected-error{{argument type 'Barable' does not conform to expected ty
 //===--------------------------------------------------------------------===//
 // Subtyping
 //===--------------------------------------------------------------------===//
-g(f0) // expected-error{{function signature '(Barable) -> ()' is not compatible with expected type '(protocol<Barable, Fooable>) -> ()'}} expected-note{{use a closure to safely wrap calls to the function}} {{3-3={ }} {{5-5=($0) }}}
+g(f0) // okay (subtype)
 g(f1) // okay (exact match)
 
 g(f2) // expected-error{{cannot convert value of type '(Float) -> ()' to expected argument type '(protocol<Barable, Fooable>) -> ()'}}
@@ -55,7 +55,7 @@ g(f2) // expected-error{{cannot convert value of type '(Float) -> ()' to expecte
 // FIXME: Workaround for ?? not playing nice with function types.
 infix operator ??* {}
 func ??*<T>(lhs: T?, rhs: T) -> T { return lhs ?? rhs }
-g(nilFunc ??* f0) // expected-error {{function signature '(Barable) -> ()' is not compatible with expected type '(protocol<Barable, Fooable>) -> ()'}} expected-note {{use a closure to safely wrap calls to the function}} {{3-3={ (}} {{17-17=)($0) }}}
+g(nilFunc ??* f0)
 
 gc(fc0) // okay
 gc(fc1) // okay
@@ -71,19 +71,19 @@ func castToClass(object: Any) -> SomeArbitraryClass? {
   return object as? SomeArbitraryClass
 }
 
-_ = getAnyObject().map(castToClass) // expected-error{{function signature '(Any) -> SomeArbitraryClass?' is not compatible with expected type '(AnyObject) throws -> SomeArbitraryClass?'}} expected-note {{use a closure to safely wrap calls to the function}} {{24-24={ }} {{35-35=($0) }}}
+_ = getAnyObject().map(castToClass)
 
 
-_ = { (_: Any) -> Void in // expected-error {{function signature 'Any -> Void' is not compatible with expected type '(Int) -> Void'}}
+_ = { (_: Any) -> Void in
   return
 } as ((Int) -> Void)
 
-let _: (Int) -> Void = {  // expected-error {{function signature 'Any -> Void' is not compatible with expected type '(Int) -> Void'}}
+let _: (Int) -> Void = {
   (_: Any) -> Void in
   return
 }
 
-let _: () -> Any = {  // expected-error {{function signature '() -> Int' is not compatible with expected type '() -> Any'}}
+let _: () -> Any = {
   () -> Int in
   return 0
 }

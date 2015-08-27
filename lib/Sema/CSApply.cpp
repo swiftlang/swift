@@ -4553,57 +4553,6 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
     
     tc.diagnose(expr->getLoc(),
                 diag::invalid_c_function_pointer_conversion_expr);
-
-    return;
-  }
-  
-  // Check ABI compatibility of thick functions. TODO: In the fullness of time
-  // these ought to be implementable by thunking.
-  
-  if (areConvertibleTypesABICompatible(fromType->getCanonicalType(),
-                                       toType->getCanonicalType())) {
-    return;
-  }
-
-  // Strip @noescape from the types. It's not relevant: any function type with
-  // otherwise matching flags can be converted to a noescape function type.
-  {
-    assert(fromFnType);
-    auto prettyFromExtInfo = fromFnType->getExtInfo().withNoEscape(false);
-    fromType = fromFnType->withExtInfo(prettyFromExtInfo);
-
-    auto prettyToExtInfo = toType->getExtInfo().withNoEscape(false);
-    toType = toType->withExtInfo(prettyToExtInfo);
-  }
-
-  tc.diagnose(expr->getLoc(), diag::invalid_function_conversion,
-              fromType, toType);
-
-  if (!isa<ClosureExpr>(expr) && !isa<CaptureListExpr>(expr)) {
-    // If the function value we're converting isn't a closure, suggest
-    // wrapping it in one
-    bool needsParens = !expr->canAppendCallParentheses();
-
-    auto insertClosureNote = tc.diagnose(expr->getLoc(),
-                                  diag::invalid_function_conversion_closure);
-
-    auto hasAnyLabeledParams = [](const AnyFunctionType *fnTy) -> bool {
-      auto *params = fnTy->getInput()->getAs<TupleType>();
-      if (!params)
-        return false;
-      return std::any_of(params->getElements().begin(),
-                         params->getElements().end(),
-                         [](TupleTypeElt field) {
-                           return field.hasName();
-                         });
-    };
-
-    if (!hasAnyLabeledParams(toType->castTo<AnyFunctionType>())) {
-      insertClosureNote.fixItInsert(expr->getStartLoc(),
-                                    needsParens ? "{ (" : "{ ");
-      insertClosureNote.fixItInsertAfter(expr->getEndLoc(),
-                                         needsParens ? ")($0) }" : "($0) }");
-    }
   }
 }
 

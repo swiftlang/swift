@@ -607,11 +607,6 @@ ERROR(unbound_generic_parameter,sema_tcc,none,
 ERROR(cannot_bind_generic_parameter_to_type,sema_tcc,none,
       "cannot bind generic parameter to type %0",
       (Type))
-ERROR(invalid_function_conversion,sema_tcc,none,
-      "function signature %0 is not compatible with expected type %1",
-      (Type, Type))
-NOTE(invalid_function_conversion_closure,sema_tcc,none,
-     "use a closure to safely wrap calls to the function", ())
 
 ERROR(invalid_c_function_pointer_conversion_expr,sema_tcc,none,
       "a C function pointer can only be formed from a reference to a 'func' or "
