@@ -21,7 +21,7 @@
 namespace swift {
 
 // _direct type metadata for Swift._EmptyArrayStorage
-extern "C" ClassMetadata _TMdCSs18_EmptyArrayStorage;
+extern "C" FullMetadata<ClassMetadata> _TMdCSs18_EmptyArrayStorage;
 
 extern "C" _SwiftEmptyArrayStorage _swiftEmptyArrayStorage = {
   // HeapObject header;

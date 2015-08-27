@@ -170,8 +170,7 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
                             // TODO: reactivate the linker mode if it is
                             // supported in llvm again. Otherwise remove the
                             // commented code completely.
-                            /*, llvm::Linker::LinkerMode LinkerMode */)
-{
+                            /*, llvm::Linker::LinkerMode LinkerMode */) {
   llvm::LLVMContext &Ctx = SubModule->getContext();
   auto OldHandler = Ctx.getDiagnosticHandler();
   void *OldDiagnosticContext = Ctx.getDiagnosticContext();
@@ -181,7 +180,6 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
                               // commented code completely.
   bool Failed = llvm::Linker::LinkModules(Module, SubModule /*, LinkerMode*/);
   Ctx.setDiagnosticHandler(OldHandler, OldDiagnosticContext);
-
   return !Failed;
 }
 
@@ -343,3 +341,4 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   llvm::Function *EntryFn = Module->getFunction("main");
   return EE->runFunctionAsMain(EntryFn, CmdLine, 0);
 }
+

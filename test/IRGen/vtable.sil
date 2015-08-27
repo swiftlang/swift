@@ -19,7 +19,7 @@ sil @_TFC6vtable1CcfMS0_FT_S0_ : $@convention(method) (@owned C) -> @owned C
 sil @_TFC6vtable1Cd : $@convention(method) (@owned C) -> @owned Builtin.NativeObject
 sil @_TFC6vtable1CD : $@convention(method) (@owned C) -> ()
 
-// CHECK-objc: @_TMfC6vtable1C = internal global [[C_METADATA_T:{.*\* }]] {
+// CHECK-objc: @_TMdC6vtable1C = global [[C_METADATA_T:{.*\* }]] {
 // CHECK-objc: void ([[C]]*)* @_TFC6vtable1CD,
 // CHECK-objc: i8** @_TWVBo,
 // CHECK-objc: i64 ptrtoint (%objc_class* @_TMmC6vtable1C to i64),

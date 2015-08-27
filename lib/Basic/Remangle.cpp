@@ -607,11 +607,6 @@ void Remangler::mangleTypeMetadata(Node *node) {
   mangleChildNodes(node); // directness, type
 }
 
-void Remangler::mangleFullTypeMetadata(Node *node) {
-  Out << "Mf";
-  mangleChildNodes(node); // type
-}
-
 void Remangler::manglePartialApplyForwarder(Node *node) {
   Out << "PA__T";
   mangleSingleChildNode(node); // global

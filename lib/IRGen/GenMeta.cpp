@@ -3532,19 +3532,29 @@ namespace {
 /// references, we emit the symbol as a global asm block.
 static void emitObjCClassSymbol(IRGenModule &IGM,
                                 ClassDecl *classDecl,
-                                llvm::GlobalValue *metadata) {
+                                llvm::GlobalVariable *fullMetadata) {
   llvm::SmallString<128> asmString;
   llvm::raw_svector_ostream os(asmString);
   
   llvm::SmallString<32> classSymbol;
   LinkEntity::forObjCClass(classDecl).mangle(classSymbol);
   
-  auto metadataTy = cast<llvm::PointerType>(metadata->getType());
+  // Get the address point offset into the full metadata.
+  auto addrPointOffset
+    = llvm::ConstantInt::get(IGM.Int32Ty, MetadataAdjustmentIndex::Class);
+  llvm::Constant *gepIndexes[] = {
+    llvm::ConstantInt::get(IGM.Int32Ty, 0),
+    addrPointOffset,
+  };
+  auto addressPoint
+    = llvm::ConstantExpr::getGetElementPtr(
+        /*Ty=*/nullptr, fullMetadata, gepIndexes);
+  auto addressPointTy = cast<llvm::PointerType>(addressPoint->getType());
   
   // Create the alias.
-  llvm::GlobalAlias::create(metadataTy,
-                            metadata->getLinkage(), classSymbol.str(),
-                            metadata, IGM.getModule());
+  llvm::GlobalAlias::create(addressPointTy,
+                            fullMetadata->getLinkage(), classSymbol.str(),
+                            addressPoint, IGM.getModule());
 }
 
 /// Emit the type metadata or metadata template for a class.
@@ -3578,25 +3588,36 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   // For now, all type metadata is directly stored.
   bool isIndirect = false;
 
-  StringRef section{};
-  if (classDecl->isObjC())
-    section = "__DATA,__objc_data, regular";
+  auto var = cast<llvm::GlobalVariable>(
+                     IGM.getAddrOfTypeMetadata(declaredType,
+                                               isIndirect, isPattern,
+                                               init->getType()));
+  var->setInitializer(init);
 
-  auto var = IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
-               // TODO: the metadata global can actually be constant in a very
-               // special case: it's not a pattern, ObjC interoperation isn't
-               // required, there are no class fields, and there is nothing that
-               // needs to be runtime-adjusted.
-               /*isConstant*/ false, init, section);
+  // TODO: the metadata global can actually be constant in a very
+  // special case: it's not a pattern, ObjC interoperation isn't
+  // required, there are no class fields, and there is nothing that
+  // needs to be runtime-adjusted.
+  var->setConstant(false);
 
   // Add non-generic classes to the ObjC class list.
   if (IGM.ObjCInterop && !isPattern && !isIndirect && !hasRuntimeBase) {    
+    // We can't just use 'var' here because it's unadjusted.  Instead
+    // of re-implementing the adjustment logic, just pull the metadata
+    // pointer again.
+    auto metadata =
+      IGM.getAddrOfTypeMetadata(declaredType, isIndirect, isPattern);
+
     // Emit the ObjC class symbol to make the class visible to ObjC.
     if (classDecl->isObjC()) {
+      // FIXME: Put the variable in a no_dead_strip section, as a workaround to
+      // avoid linker transformations that may break up the symbol.
+      var->setSection("__DATA,__objc_data, regular, no_dead_strip");
+      
       emitObjCClassSymbol(IGM, classDecl, var);
     }
 
-    IGM.addObjCClass(var,
+    IGM.addObjCClass(metadata,
               classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
   }
 }
@@ -4418,8 +4439,12 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
   bool isIndirect = false;
 
   CanType declaredType = structDecl->getDeclaredType()->getCanonicalType();
-  IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
-                         /*isConstant*/!isPattern, init);
+  auto var = cast<llvm::GlobalVariable>(
+                     IGM.getAddrOfTypeMetadata(declaredType,
+                                               isIndirect, isPattern,
+                                               init->getType()));
+  var->setConstant(!isPattern);
+  var->setInitializer(init);
 }
 
 // Enums
@@ -4550,8 +4575,12 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   bool isIndirect = false;
   
   CanType declaredType = theEnum->getDeclaredType()->getCanonicalType();
-  IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
-                         /*isConstant*/!isPattern, init);
+  auto var = cast<llvm::GlobalVariable>(
+                              IGM.getAddrOfTypeMetadata(declaredType,
+                                                        isIndirect, isPattern,
+                                                        init->getType()));
+  var->setConstant(!isPattern);
+  var->setInitializer(init);
 }
 
 llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
