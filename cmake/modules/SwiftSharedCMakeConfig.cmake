@@ -126,12 +126,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
         OBJ_ROOT_DIR llvm_config_obj_root
         SOURCE_DIR llvm_config_src_dir
     )
-    if(NOT MSVC_IDE)
-      set(LLVM_ENABLE_ASSERTIONS ${llvm_config_enable_assertions}
-        CACHE BOOL "Enable assertions")
-      # Assertions should follow llvm-config's.
-      mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
-    endif()
 
     set(LLVM_TOOLS_BINARY_DIR "${llvm_config_tools_binary_dir}" CACHE PATH "Path to llvm/bin")
     set(LLVM_LIBRARY_DIR "${llvm_config_library_dir}" CACHE PATH "Path to llvm/lib")
@@ -212,13 +206,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   get_filename_component(PATH_TO_CLANG_BUILD "${${product}_PATH_TO_CLANG_BUILD}"
     ABSOLUTE)
 
-  # MSVC has a gazillion warnings with this.
-  if( MSVC )
-    set(LLVM_ENABLE_WARNINGS "Enable compiler warnings." OFF)
-  else( MSVC )
-    set(LLVM_ENABLE_WARNINGS "Enable compiler warnings." ON)
-  endif()
-
   set(LLVM_ABI_BREAKING_CHECKS "WITH_ASSERTS")
 
   include(AddLLVM)
@@ -248,7 +235,7 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
       "${PATH_TO_CLANG_BUILD}/${CMAKE_CFG_INTDIR}/lib")
 
   set(LIT_ARGS_DEFAULT "-sv")
-  if(MSVC OR XCODE)
+  if(XCODE)
     set(LIT_ARGS_DEFAULT "${LIT_ARGS_DEFAULT} --no-progress-bar")
   endif()
   set(LLVM_LIT_ARGS "${LIT_ARGS_DEFAULT}" CACHE STRING "Default options for lit")

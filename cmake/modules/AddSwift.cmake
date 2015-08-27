@@ -761,7 +761,7 @@ function(_add_swift_library_single target name)
   endif()
 
 
-  if(MSVC_IDE OR XCODE)
+  if(XCODE)
     string(REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
     list(GET split_path -1 dir)
     file(GLOB_RECURSE SWIFTLIB_SINGLE_HEADERS
@@ -773,7 +773,7 @@ function(_add_swift_library_single target name)
     source_group("TableGen descriptions" FILES ${SWIFTLIB_SINGLE_TDS})
 
     set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES} ${SWIFTLIB_SINGLE_HEADERS} ${SWIFTLIB_SINGLE_TDS})
-  endif(MSVC_IDE OR XCODE)
+  endif()
 
   if(MODULE)
     set(libkind MODULE)
