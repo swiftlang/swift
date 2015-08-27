@@ -135,3 +135,21 @@ func count16078944<C: CollectionType>(x: C) -> Int { return 0 }
 func test16078944 <T: ForwardIndexType>(lhs: T, args: T) -> Int {
     return count16078944(lhs..<args) // don't crash
 }
+
+
+// <rdar://problem/22409190> QoI: Passing unsigned integer to ManagedBuffer elements.destroy()
+class r22409190ManagedBuffer<Value, Element> {
+  final var value: Value { get {} set {}}
+  func withUnsafeMutablePointerToElements<R>(
+    body: (UnsafeMutablePointer<Element>)->R) -> R {
+  }
+}
+class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
+  deinit {
+    self.withUnsafeMutablePointerToElements { elems->Void in
+      elems.destroy(self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+    }
+  }
+}
+
+

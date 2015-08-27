@@ -2729,6 +2729,21 @@ static void eraseOpenedExistentials(Expr *&expr) {
   expr->walk(ExistentialEraser());
 }
 
+/// Rewrite any type variables & archetypes in the specified type with
+/// UnresolvedType.
+static Type replaceArchetypesAndTypeVarsWithUnresolved(Type ty) {
+  if (!ty) return ty;
+
+ auto &ctx = ty->getASTContext();
+
+  return ty.transform([&](Type type) -> Type {
+    if (type->is<TypeVariableType>())
+      return ctx.TheUnresolvedType;
+    if (type->is<ArchetypeType>())
+      return ctx.TheUnresolvedType;
+    return type;
+  });
+}
 
 /// Unless we've already done this, retypecheck the specified subexpression on
 /// its own, without including any contextual constraints or parent expr
@@ -2756,16 +2771,12 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // If we have a conversion type, but it has type variables (from the current
   // ConstraintSystem), then we can't use it.
   if (convertType) {
+    if (convertType->hasTypeVariable() || convertType->hasArchetype())
+      convertType = replaceArchetypesAndTypeVarsWithUnresolved(convertType);
+    
     // If the conversion type contains no info, drop it.
     if (convertType->is<UnresolvedType>() ||
-        (convertType->is<MetatypeType>() && convertType->hasUnresolvedType()) ||
-
-        convertType->hasTypeVariable() ||
-        // If the contextual type has an archetype, we need to open it, but
-        // don't know how yet.
-        // FIXME: implement opening of archetypes, or map them to protocols or
-        // to UnresolvedTypes.
-        convertType->hasArchetype()) {
+        (convertType->is<MetatypeType>() && convertType->hasUnresolvedType())) {
       convertType = Type();
       convertTypePurpose = CTP_Unused;
     }
