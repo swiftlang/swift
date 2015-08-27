@@ -272,6 +272,18 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
   return input;
 }
 
+// Single @objc protocol value metatypes can be converted to the ObjC
+// Protocol class type.
+static bool isProtocolClass(Type t) {
+  auto classDecl = t->getClassOrBoundGenericClass();
+  if (!classDecl)
+    return false;
+
+  ASTContext &ctx = classDecl->getASTContext();
+  return (classDecl->getName() == ctx.Id_Protocol &&
+          classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC);
+};
+
 /// Apply this transformation to an arbitrary value.
 ManagedValue Transform::transform(ManagedValue v,
                                   AbstractionPattern origFormalType,
@@ -407,6 +419,28 @@ ManagedValue Transform::transform(ManagedValue v,
                             v.getCleanup());
       }
     }
+  }
+
+  // - metatype to Protocol conversion
+  if (isProtocolClass(substFormalType)) {
+    if (auto metatypeTy = dyn_cast<MetatypeType>(inputFormalType)) {
+      return SGF.emitProtocolMetatypeToObject(Loc, metatypeTy,
+                                   SGF.getLoweredLoadableType(substFormalType));
+    }
+  }
+
+  // - metatype to AnyObject conversion
+  if (substFormalType->isAnyObject() &&
+      isa<MetatypeType>(inputFormalType)) {
+    return SGF.emitClassMetatypeToObject(Loc, v,
+                                   SGF.getLoweredLoadableType(substFormalType));
+  }
+  
+  // - existential metatype to AnyObject conversion
+  if (substFormalType->isAnyObject() &&
+      isa<ExistentialMetatypeType>(inputFormalType)) {
+    return SGF.emitExistentialMetatypeToObject(Loc, v,
+                                   SGF.getLoweredLoadableType(substFormalType));
   }
 
   //  - existentials
