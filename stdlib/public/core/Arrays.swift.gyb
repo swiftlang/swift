@@ -471,16 +471,25 @@ extension ${Self} : _ArrayType {
     }
   }
 
+  @inline(never)
+  internal static func _allocateBufferUninitialized(count : Int) -> _Buffer {
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      count: 0, minimumCapacity: count)
+    return _Buffer(newBuffer, shiftedToStartIndex: 0)
+  }
+
   /// Construct a ${Self} of `count` uninitialized elements.
   internal init(_uninitializedCount count: Int) {
     _precondition(count >= 0, "Can't construct ${Self} with count < 0")
-    _buffer = _Buffer()
-
-    // Performance optimization: avoid reserveCapacity call if not needed.
     if count > 0 {
-      reserveCapacity(count)
+      // Creating a buffer instead of calling reserveCapacity saves doing an
+      // unneccessary uniqueness check. We disable inlining here to curb code
+      // growth.
+      _buffer = ${Self}._allocateBufferUninitialized(count)
+      _buffer.count = count
+    } else {
+      _buffer = _Buffer()
     }
-    _buffer.count = count
   }
 
   /// Entry point for `Array` literal construction; builds and returns
