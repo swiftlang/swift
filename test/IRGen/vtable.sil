@@ -34,7 +34,7 @@ sil @_TFC6vtable1CD : $@convention(method) (@owned C) -> ()
 // CHECK-objc: [[C]]* ([[C]]*)* @_TFC6vtable1CcfMS0_FT_S0_
 // CHECK-objc: }
 
-// CHECK-native: @_TMdC6vtable1C = global [[C_METADATA_T:{.*\* }]] {
+// CHECK-native: @_TMfC6vtable1C = internal global [[C_METADATA_T:{.*\* }]] {
 // CHECK-native: void ([[C]]*)* @_TFC6vtable1CD,
 // CHECK-native: i8** @_TWVBo,
 // CHECK-native: i64 0,
