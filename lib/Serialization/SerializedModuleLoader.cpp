@@ -253,7 +253,8 @@ FileUnit *SerializedModuleLoader::loadAST(
                          missingNames);
     }
 
-    if (Ctx.SearchPathOpts.SDKPath.empty()) {
+    if (Ctx.SearchPathOpts.SDKPath.empty() &&
+        llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
     }
@@ -263,7 +264,8 @@ FileUnit *SerializedModuleLoader::loadAST(
   case serialization::Status::MissingShadowedModule: {
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_shadowed_module,
                        M.getName());
-    if (Ctx.SearchPathOpts.SDKPath.empty()) {
+    if (Ctx.SearchPathOpts.SDKPath.empty() &&
+        llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
       Ctx.Diags.diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
     }

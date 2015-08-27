@@ -169,7 +169,8 @@ void NameBinder::addImport(
       diagKind = diag::sema_no_import_repl;
     diagnose(ID->getLoc(), diagKind, modulePathStr);
 
-    if (Context.SearchPathOpts.SDKPath.empty()) {
+    if (Context.SearchPathOpts.SDKPath.empty() &&
+        llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
       diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
       diagnose(SourceLoc(), diag::sema_no_import_no_sdk_xcrun);
     }
