@@ -189,47 +189,6 @@ namespace {
   };
 };
 
-// FIXME: need to sit down and abstract away differences between
-// SGF::emitInjectOptionalInto(), SGF::emitInjectOptionalValueInto(),
-// SGF::getOptionalSomeValue(), and this function...
-static ManagedValue emitInjectOptional(SILGenFunction &SGF,
-                                       SILLocation loc,
-                                       ManagedValue v,
-                                       CanType inputFormalType,
-                                       CanType substFormalType,
-                                       const TypeLowering &expectedTL,
-                                       SGFContext ctxt) {
-  // Optional's payload is currently maximally abstracted. FIXME: Eventually
-  // it shouldn't be.
-  auto opaque = AbstractionPattern::getOpaque();
-
-  OptionalTypeKind substOTK;
-  auto substObjectType = substFormalType.getAnyOptionalObjectType(substOTK);
-  
-  auto loweredTy = SGF.getLoweredType(opaque, substObjectType);
-  if (v.getType() != loweredTy)
-    v = SGF.emitSubstToOrigValue(loc, v, opaque,
-                                 inputFormalType, substObjectType);
-  
-  auto someDecl = SGF.getASTContext().getOptionalSomeDecl(substOTK);
-  SILType optTy = SGF.getLoweredType(substFormalType);
-  if (v.getType().isAddress()) {
-    auto buf = SGF.getBufferForExprResult(loc, optTy.getObjectType(), ctxt);
-    auto payload = SGF.B.createInitEnumDataAddr(loc, buf, someDecl,
-                                                v.getType());
-    // FIXME: Is it correct to use IsTake here even if v doesn't have a cleanup?
-    SGF.B.createCopyAddr(loc, v.forward(SGF), payload,
-                         IsTake, IsInitialization);
-    SGF.B.createInjectEnumAddr(loc, buf, someDecl);
-    v = SGF.manageBufferForExprResult(buf, expectedTL, ctxt);
-  } else {
-    auto some = SGF.B.createEnum(loc, v.getValue(), someDecl, optTy);
-    v = ManagedValue(some, v.getCleanup());
-  }
-
-  return v;
-}
-
 static ArrayRef<ProtocolConformance*>
 collectExistentialConformances(Module *M, Type fromType, Type toType) {
   assert(!fromType->isAnyExistentialType());
@@ -340,9 +299,9 @@ ManagedValue Transform::transform(ManagedValue v,
   // If the value is less optional than the desired formal type, wrap in
   // an optional.
   if (substOTK != OTK_None && inputOTK == OTK_None) {
-    return emitInjectOptional(SGF, Loc, v,
-                              inputFormalType, substFormalType,
-                              expectedTL, ctxt);
+    return SGF.emitInjectOptional(Loc, v,
+                                  inputFormalType, substFormalType,
+                                  expectedTL, ctxt);
   }
 
   // If the value is IUO, but the desired formal type isn't optional, force it.
@@ -438,7 +397,7 @@ ManagedValue Transform::transform(ManagedValue v,
 
   //  - upcasts from an archetype
   if (substFormalType->getClassOrBoundGenericClass()) {
-    if (auto archetypeType = inputFormalType->getAs<ArchetypeType>()) {
+    if (auto archetypeType = dyn_cast<ArchetypeType>(inputFormalType)) {
       if (archetypeType->getSuperclass()) {
         // Replace the cleanup with a new one on the superclass value so we
         // always use concrete retain/release operations.

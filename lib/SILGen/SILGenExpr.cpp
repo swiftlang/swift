@@ -46,21 +46,6 @@
 using namespace swift;
 using namespace Lowering;
 
-/// Destroy the value, unless it was both uniquely referenced and consumed.
-void SILGenFunction::OpaqueValueState::destroy(SILGenFunction &gen,
-                                               SILLocation loc) {
-  if (isConsumable && !hasBeenConsumed) {
-    auto &lowering = gen.getTypeLowering(value.getType().getSwiftRValueType());
-    lowering.emitDestroyRValue(gen.B, loc, value);
-  }
-}
-
-SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
-  auto entry = Self.OpaqueValues.find(OpaqueValue);
-  entry->second.destroy(Self, OpaqueValue);
-  Self.OpaqueValues.erase(entry);
-}
-
 ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
                                                SILValue v) {
   auto &lowering = getTypeLowering(v.getType().getSwiftRValueType());
@@ -1347,125 +1332,6 @@ RValue RValueEmitter::visitCovariantReturnConversionExpr(
   return RValue(SGF, e, result);
 }
 
-namespace {
-
-/// This is an initialization for an address-only existential in memory.
-class ExistentialInitialization : public KnownAddressInitialization {
-  CleanupHandle Cleanup;
-public:
-  /// \param existential The existential container
-  /// \param address Address of value in existential container
-  /// \param concreteFormalType Unlowered AST type of value
-  /// \param repr Representation of container
-  ExistentialInitialization(SILValue existential, SILValue address,
-                            CanType concreteFormalType,
-                            ExistentialRepresentation repr,
-                            SILGenFunction &gen)
-      : KnownAddressInitialization(address) {
-    // Any early exit before we store a value into the existential must
-    // clean up the existential container.
-    Cleanup = gen.enterDeinitExistentialCleanup(existential,
-                                                concreteFormalType,
-                                                repr);
-  }
-
-  void finishInitialization(SILGenFunction &gen) {
-    gen.Cleanups.setCleanupState(Cleanup, CleanupState::Dead);
-  }
-};
-
-}
-
-ManagedValue SILGenFunction::emitExistentialErasure(
-                            SILLocation loc,
-                            CanType concreteFormalType,
-                            const TypeLowering &concreteTL,
-                            const TypeLowering &existentialTL,
-                            const ArrayRef<ProtocolConformance *> &conformances,
-                            SGFContext C,
-                            llvm::function_ref<ManagedValue (SGFContext)> F) {
-  // Mark the needed conformances as used.
-  for (auto *conformance : conformances)
-    SGM.useConformance(conformance);
-
-  switch (existentialTL.getLoweredType().getObjectType()
-            .getPreferredExistentialRepresentation(SGM.M, concreteFormalType)) {
-  case ExistentialRepresentation::None:
-    llvm_unreachable("not an existential type");
-  case ExistentialRepresentation::Metatype: {
-    assert(existentialTL.isLoadable());
-
-    SILValue metatype = F(SGFContext()).getUnmanagedValue();
-    assert(metatype.getType().castTo<AnyMetatypeType>()->getRepresentation()
-             == MetatypeRepresentation::Thick);
-
-    auto upcast =
-      B.createInitExistentialMetatype(loc, metatype,
-                                      existentialTL.getLoweredType(),
-                                      conformances);
-    return ManagedValue::forUnmanaged(upcast);
-  }
-  case ExistentialRepresentation::Class: {
-    assert(existentialTL.isLoadable());
-
-    ManagedValue sub = F(SGFContext());
-    SILValue v = B.createInitExistentialRef(loc,
-                                            existentialTL.getLoweredType(),
-                                            concreteFormalType,
-                                            sub.getValue(),
-                                            conformances);
-    return ManagedValue(v, sub.getCleanup());
-  }
-  case ExistentialRepresentation::Boxed: {
-    // Allocate the existential.
-    auto box = B.createAllocExistentialBox(loc,
-                                           existentialTL.getLoweredType(),
-                                           concreteFormalType,
-                                           concreteTL.getLoweredType(),
-                                           conformances);
-    auto existential = box->getExistentialResult();
-    auto valueAddr = box->getValueAddressResult();
-
-    // Initialize the concrete value in-place.
-    InitializationPtr init(
-        new ExistentialInitialization(existential, valueAddr, concreteFormalType,
-                                      ExistentialRepresentation::Boxed,
-                                      *this));
-    ManagedValue mv = F(SGFContext(init.get()));
-    if (!mv.isInContext()) {
-      mv.forwardInto(*this, loc, init->getAddress());
-      init->finishInitialization(*this);
-    }
-    
-    return emitManagedRValueWithCleanup(existential);
-  }
-  case ExistentialRepresentation::Opaque: {
-    // Allocate the existential.
-    SILValue existential =
-      getBufferForExprResult(loc, existentialTL.getLoweredType(), C);
-
-    // Allocate the concrete value inside the container.
-    SILValue valueAddr = B.createInitExistentialAddr(
-                            loc, existential,
-                            concreteFormalType,
-                            concreteTL.getLoweredType(),
-                            conformances);
-    // Initialize the concrete value in-place.
-    InitializationPtr init(
-        new ExistentialInitialization(existential, valueAddr, concreteFormalType,
-                                      ExistentialRepresentation::Opaque,
-                                      *this));
-    ManagedValue mv = F(SGFContext(init.get()));
-    if (!mv.isInContext()) {
-      mv.forwardInto(*this, loc, init->getAddress());
-      init->finishInitialization(*this);
-    }
-
-    return manageBufferForExprResult(existential, existentialTL, C);
-  }
-  }
-}
-
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   auto &existentialTL = SGF.getTypeLowering(E->getType());
   auto concreteFormalType = E->getSubExpr()->getType()->getCanonicalType();
@@ -2502,61 +2368,28 @@ RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,
 RValue RValueEmitter::visitClassMetatypeToObjectExpr(
                                                    ClassMetatypeToObjectExpr *E,
                                                    SGFContext C) {
-  SILValue value = SGF.emitRValueAsSingleValue(E->getSubExpr())
-    .getUnmanagedValue();
-  
-  // Convert the metatype to objc representation.
-  auto metatypeTy = value.getType().castTo<MetatypeType>();
-  auto objcMetatypeTy = CanMetatypeType::get(metatypeTy.getInstanceType(),
-                                             MetatypeRepresentation::ObjC);
-  value = SGF.B.createThickToObjCMetatype(E, value,
-                               SILType::getPrimitiveObjectType(objcMetatypeTy));
-  
-  // Convert to an object reference.
-  value = SGF.B.createObjCMetatypeToObject(E, value,
-                                      SGF.getLoweredLoadableType(E->getType()));
-  
-  return RValue(SGF, E, ManagedValue::forUnmanaged(value));
+  ManagedValue v = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  SILType resultTy = SGF.getLoweredLoadableType(E->getType());
+  return RValue(SGF, E, SGF.emitClassMetatypeToObject(E, v, resultTy));
 }
 
 RValue RValueEmitter::visitExistentialMetatypeToObjectExpr(
                                              ExistentialMetatypeToObjectExpr *E,
                                              SGFContext C) {
-  SILValue value = SGF.emitRValueAsSingleValue(E->getSubExpr())
-    .getUnmanagedValue();
-  
-  // Convert the metatype to objc representation.
-  auto metatypeTy = value.getType().castTo<ExistentialMetatypeType>();
-  auto objcMetatypeTy = CanExistentialMetatypeType::get(
-                                              metatypeTy.getInstanceType(),
-                                              MetatypeRepresentation::ObjC);
-  value = SGF.B.createThickToObjCMetatype(E, value,
-                               SILType::getPrimitiveObjectType(objcMetatypeTy));
-  
-  // Convert to an object reference.
-  value = SGF.B.createObjCExistentialMetatypeToObject(E, value,
-                                      SGF.getLoweredLoadableType(E->getType()));
-  
-  return RValue(SGF, E, ManagedValue::forUnmanaged(value));
+  ManagedValue v = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  SILType resultTy = SGF.getLoweredLoadableType(E->getType());
+  return RValue(SGF, E, SGF.emitExistentialMetatypeToObject(E, v, resultTy));
 }
 
 RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
                                                 ProtocolMetatypeToObjectExpr *E,
                                                 SGFContext C) {
   SGF.emitIgnoredExpr(E->getSubExpr());
-  ProtocolDecl *protocol = E->getSubExpr()->getType()->castTo<MetatypeType>()
-    ->getInstanceType()->castTo<ProtocolType>()->getDecl();
-  SILValue value = SGF.B.createObjCProtocol(E, protocol,
-                                      SGF.getLoweredLoadableType(E->getType()));
-  
-  // Protocol objects, despite being global objects, inherit default reference
-  // counting semantics from NSObject, so we need to retain the protocol
-  // reference when we use it to prevent it being released and attempting to
-  // deallocate itself. It doesn't matter if we ever actually clean up that
-  // retain though.
-  SGF.B.createStrongRetain(E, value);
-  
-  return RValue(SGF, E, ManagedValue::forUnmanaged(value));
+  CanType inputTy = E->getSubExpr()->getType()->getCanonicalType();
+  SILType resultTy = SGF.getLoweredLoadableType(E->getType());
+
+  ManagedValue v = SGF.emitProtocolMetatypeToObject(E, inputTy, resultTy);
+  return RValue(SGF, E, v);
 }
 
 RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
@@ -2634,86 +2467,6 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C) {
   return visit(E->getSubExpr(), C);
-}
-
-/// Emit an optional-to-optional transformation.
-ManagedValue
-SILGenFunction::emitOptionalToOptional(SILLocation loc,
-                                       ManagedValue input,
-                                       SILType resultTy,
-                                       const ValueTransform &transformValue) {
-  auto contBB = createBasicBlock();
-  auto isNotPresentBB = createBasicBlock();
-  auto isPresentBB = createBasicBlock();
-
-  // Create a temporary for the output optional.
-  auto &resultTL = getTypeLowering(resultTy);
-
-  // If the result is address-only, we need to return something in memory,
-  // otherwise the result is the BBArgument in the merge point.
-  SILValue result;
-  if (resultTL.isAddressOnly())
-    result = emitTemporaryAllocation(loc, resultTy);
-  else
-    result = new (F.getModule()) SILArgument(contBB, resultTL.getLoweredType());
-
-  
-  // Branch on whether the input is optional, this doesn't consume the value.
-  auto isPresent = emitDoesOptionalHaveValue(loc, input.getValue());
-  B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
-
-  // If it's present, apply the recursive transformation to the value.
-  B.emitBlock(isPresentBB);
-  SILValue branchArg;
-  {
-    // Don't allow cleanups to escape the conditional block.
-    FullExpr presentScope(Cleanups, CleanupLocation::get(loc));
-
-    CanType resultValueTy =
-      resultTy.getSwiftRValueType().getAnyOptionalObjectType();
-    assert(resultValueTy);
-    SILType loweredResultValueTy = getLoweredType(resultValueTy);
-
-    // Pull the value out.  This will load if the value is not address-only.
-    auto &inputTL = getTypeLowering(input.getType());
-    auto inputValue = emitUncheckedGetOptionalValueFrom(loc, input,
-                                                        inputTL, SGFContext());
-
-    // Transform it.
-    auto resultValue = transformValue(*this, loc, inputValue,
-                                      loweredResultValueTy);
-
-    // Inject that into the result type if the result is address-only.
-    if (resultTL.isAddressOnly()) {
-      ArgumentSource resultValueRV(loc, RValue(resultValue, resultValueTy));
-      emitInjectOptionalValueInto(loc, std::move(resultValueRV),
-                                  result, resultTL);
-    } else {
-      resultValue = getOptionalSomeValue(loc, resultValue, resultTL);
-      branchArg = resultValue.forward(*this);
-    }
-  }
-  if (branchArg)
-    B.createBranch(loc, contBB, branchArg);
-  else
-    B.createBranch(loc, contBB);
-
-  // If it's not present, inject 'nothing' into the result.
-  B.emitBlock(isNotPresentBB);
-  if (resultTL.isAddressOnly()) {
-    emitInjectOptionalNothingInto(loc, result, resultTL);
-    B.createBranch(loc, contBB);
-  } else {
-    branchArg = getOptionalNoneValue(loc, resultTL);
-    B.createBranch(loc, contBB, branchArg);
-  }
-
-  // Continue.
-  B.emitBlock(contBB);
-  if (resultTL.isAddressOnly())
-    return emitManagedBufferWithCleanup(result, resultTL);
-
-  return emitManagedRValueWithCleanup(result, resultTL);
 }
 
 RValue SILGenFunction::emitEmptyTupleRValue(SILLocation loc,
@@ -3240,117 +2993,6 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
     SGF.emitCheckedGetOptionalValueFrom(loc,
                                         optTemp->getManagedAddress(), optTL, C);
   return RValue(SGF, loc, valueType->getCanonicalType(), V);
-}
-
-SILGenFunction::OpaqueValueState
-SILGenFunction::emitOpenExistential(
-       SILLocation loc,
-       ManagedValue existentialValue,
-       CanArchetypeType openedArchetype,
-       SILType loweredOpenedType) {
-  // Open the existential value into the opened archetype value.
-  bool isUnique = true;
-  bool canConsume;
-  SILValue archetypeValue;
-  
-  SILType existentialType = existentialValue.getType();
-  switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
-  case ExistentialRepresentation::Opaque:
-    assert(existentialType.isAddress());
-    archetypeValue = B.createOpenExistentialAddr(
-                       loc, existentialValue.forward(*this),
-                       loweredOpenedType);
-    if (existentialValue.hasCleanup()) {
-      canConsume = true;
-      // Leave a cleanup to deinit the existential container.
-      enterDeinitExistentialCleanup(existentialValue.getValue(), CanType(),
-                                    ExistentialRepresentation::Opaque);
-    } else {
-      canConsume = false;
-    }
-    break;
-  case ExistentialRepresentation::Metatype:
-    assert(existentialType.isObject());
-    archetypeValue = B.createOpenExistentialMetatype(
-                       loc, existentialValue.forward(*this),
-                       loweredOpenedType);
-    // Metatypes are always trivial. Consuming would be a no-op.
-    canConsume = false;
-    break;
-  case ExistentialRepresentation::Class:
-    assert(existentialType.isObject());
-    archetypeValue = B.createOpenExistentialRef(
-                       loc, existentialValue.forward(*this),
-                       loweredOpenedType);
-    canConsume = existentialValue.hasCleanup();
-    break;
-  case ExistentialRepresentation::Boxed:
-    if (existentialType.isAddress()) {
-      existentialValue = emitLoad(loc, existentialValue.getValue(),
-                                  getTypeLowering(existentialType),
-                                  SGFContext::AllowGuaranteedPlusZero,
-                                  IsNotTake);
-    }
-
-    existentialType = existentialValue.getType();
-    assert(existentialType.isObject());
-    // NB: Don't forward the cleanup, because consuming a boxed value won't
-    // consume the box reference.
-    archetypeValue = B.createOpenExistentialBox(
-                       loc, existentialValue.getValue(),
-                       loweredOpenedType);
-    // The boxed value can't be assumed to be uniquely referenced. We can never
-    // consume it.
-    // TODO: We could use isUniquelyReferenced to shorten the duration of
-    // the box to the point that the opaque value is copied out.
-    isUnique = false;
-    canConsume = false;
-    break;
-  case ExistentialRepresentation::None:
-    llvm_unreachable("not existential");
-  }
-  setArchetypeOpeningSite(openedArchetype, archetypeValue);
-
-  assert(!canConsume || isUnique);
-
-  return SILGenFunction::OpaqueValueState{
-    archetypeValue,
-    /*isConsumable*/ canConsume,
-    /*hasBeenConsumed*/ false
-  };
-}
-
-ManagedValue SILGenFunction::manageOpaqueValue(OpaqueValueState &entry,
-                                               SILLocation loc,
-                                               SGFContext C) {
-  // If the context wants a +0 value, guaranteed or immediate, we can
-  // give it to them, because OpenExistential emission guarantees the
-  // value.
-  if (C.isGuaranteedPlusZeroOk()) {
-    return ManagedValue::forUnmanaged(entry.value);
-  }
-
-  // If the opaque value is consumable, we can just return the
-  // value with a cleanup. There is no need to retain it separately.
-  if (entry.isConsumable) {
-    assert(!entry.hasBeenConsumed
-           && "Uniquely-referenced opaque value already consumed");
-    entry.hasBeenConsumed = true;
-    return emitManagedRValueWithCleanup(entry.value);
-  }
-
-  // If the context wants us to initialize a buffer, copy there instead
-  // of making a temporary allocation.
-  if (auto I = C.getEmitInto()) {
-    if (SILValue address = getAddressForInPlaceInitialization(I)) {
-      ManagedValue::forUnmanaged(entry.value).copyInto(*this, address, loc);
-      I->finishInitialization(*this);
-      return ManagedValue::forInContext();
-    }
-  }
-
-  // Otherwise, copy the value into a temporary.
-  return ManagedValue::forUnmanaged(entry.value).copyUnmanaged(*this, loc);
 }
 
 void SILGenFunction::emitOpenExistentialExprImpl(

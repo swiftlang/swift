@@ -9,6 +9,7 @@ add_swift_library(swiftSILGen
   SILGenBridging.cpp
   SILGenBuiltin.cpp
   SILGenConstructor.cpp
+  SILGenConvert.cpp
   SILGenDecl.cpp
   SILGenDestructor.cpp
   SILGenDynamicCast.cpp

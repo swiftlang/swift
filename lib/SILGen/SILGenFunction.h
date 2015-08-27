@@ -172,18 +172,6 @@ inline ApplyOptions &operator-=(ApplyOptions &lhs, ApplyOptions rhs) {
 class PatternMatchContext;
 struct LValueWriteback;
 
-/// A thunk action that a vtable thunk needs to perform on its result.
-enum class VTableResultThunk {
-  None, ///< No result change.
-  MakeOptional, ///< Wrap the result in an optional.
-};
-/// A thunk action that a vtable thunk needs to perform on a parameter.
-enum class VTableParamThunk {
-  None, ///< No result change.
-  MakeOptional, ///< Wrap the param in an optional.
-  ForceIUO, ///< Force-unwrap the IUO param.
-};
-
 /// A formal section of the function.  This is a SILGen-only concept,
 /// meant to improve locality.  It's only reflected in the generated
 /// SIL implicitly.
@@ -413,22 +401,7 @@ public:
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
-
-  /// OpenedArchetypes - Mappings of opened archetypes back to the
-  /// instruction which opened them.
-  llvm::DenseMap<CanType, SILValue> ArchetypeOpenings;
-
-  SILValue getArchetypeOpeningSite(CanArchetypeType archetype) const {
-    auto it = ArchetypeOpenings.find(archetype);
-    assert(it != ArchetypeOpenings.end() &&
-           "opened archetype was not registered with SILGenFunction");
-    return it->second;
-  }
-
-  void setArchetypeOpeningSite(CanArchetypeType archetype, SILValue site) {
-    ArchetypeOpenings.insert({archetype, site});
-  }
-    
+ 
   /// When rebinding 'self' during an initializer delegation, we have to be
   /// careful to preserve the object at 1 retain count during the delegation
   /// because of assumptions in framework code. This enum tracks the state of
@@ -447,42 +420,6 @@ public:
   
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
-  
-  struct OpaqueValueState {
-    SILValue value;
-    bool isConsumable;
-    bool hasBeenConsumed;
-
-    void destroy(SILGenFunction &gen, SILLocation loc);
-  };
-
-  /// Mapping from active opaque value expressions to their values,
-  /// along with a bit for each indicating whether it has been consumed yet.
-  llvm::DenseMap<OpaqueValueExpr *, OpaqueValueState> OpaqueValues;
-
-  /// RAII object that introduces a temporary binding for an opaque value.
-  ///
-  /// Each time the opaque value expression is referenced, it will be
-  /// retained/released separately. When this RAII object goes out of
-  /// scope, the value will be destroyed if requested.
-  class OpaqueValueRAII {
-    SILGenFunction &Self;
-    OpaqueValueExpr *OpaqueValue;
-
-    OpaqueValueRAII(const OpaqueValueRAII &) = delete;
-    OpaqueValueRAII &operator=(const OpaqueValueRAII &) = delete;
-
-  public:
-    OpaqueValueRAII(SILGenFunction &self, OpaqueValueExpr *opaqueValue,
-                    OpaqueValueState state)
-    : Self(self), OpaqueValue(opaqueValue) {
-      assert(Self.OpaqueValues.count(OpaqueValue) == 0 &&
-             "Opaque value already has a binding");
-      Self.OpaqueValues[OpaqueValue] = state;
-    }
-
-    ~OpaqueValueRAII();
-  };
 
   /// True if 'return' without an operand or falling off the end of the current
   /// function is valid.
@@ -824,6 +761,148 @@ public:
                                          SGFContext C);
   
   //===--------------------------------------------------------------------===//
+  // Type conversions for expr emission and thunks
+  //===--------------------------------------------------------------------===//
+
+  ManagedValue emitInjectOptional(SILLocation loc,
+                                  ManagedValue v,
+                                  CanType inputFormalType,
+                                  CanType substFormalType,
+                                  const TypeLowering &expectedTL,
+                                  SGFContext ctxt);
+
+  /// Initialize a memory location with an optional value.
+  ///
+  /// \param loc   The location to use for the resulting optional.
+  /// \param value The value to inject into an optional.
+  /// \param dest  The uninitialized memory in which to store the result value.
+  /// \param optTL Type lowering information for the optional to create.
+  void emitInjectOptionalValueInto(SILLocation loc,
+                                   ArgumentSource &&value,
+                                   SILValue dest,
+                                   const TypeLowering &optTL);
+
+  /// Initialize a memory location with an optional "nothing"
+  /// value.
+  ///
+  /// \param loc   The location to use for the resulting optional.
+  /// \param dest  The uninitialized memory in which to store the result value.
+  /// \param optTL Type lowering information for the optional to create.
+  void emitInjectOptionalNothingInto(SILLocation loc,
+                                     SILValue dest,
+                                     const TypeLowering &optTL);
+
+  /// Return a value for an optional ".None" of the specified type. This only
+  /// works for loadable enum types.
+  SILValue getOptionalNoneValue(SILLocation loc, const TypeLowering &optTL);
+
+  /// Return a value for an optional ".Some(x)" of the specified type. This only
+  /// works for loadable enum types.
+  ManagedValue getOptionalSomeValue(SILLocation loc, ManagedValue value,
+                                    const TypeLowering &optTL);
+
+  /// \brief Emit a call to the library intrinsic _doesOptionalHaveValue.
+  ///
+  /// The result is a Builtin.Int1.
+  SILValue emitDoesOptionalHaveValue(SILLocation loc, SILValue addrOrValue);
+
+  /// \brief Emit a call to the library intrinsic _preconditionOptionalHasValue.
+  void emitPreconditionOptionalHasValue(SILLocation loc, SILValue addr);
+
+  /// \brief Emit a call to the library intrinsic _getOptionalValue
+  /// given the address of the optional, which checks that an optional contains
+  /// some value and either returns the value or traps if there is none.
+  ManagedValue emitCheckedGetOptionalValueFrom(SILLocation loc,
+                                               ManagedValue addr,
+                                               const TypeLowering &optTL,
+                                               SGFContext C);
+  
+  /// \brief Extract the value from an optional, which must be known to contain
+  /// a value.
+  ManagedValue emitUncheckedGetOptionalValueFrom(SILLocation loc,
+                                                 ManagedValue addrOrValue,
+                                                 const TypeLowering &optTL,
+                                                 SGFContext C = SGFContext());
+
+  typedef std::function<ManagedValue(SILGenFunction &gen,
+                                     SILLocation loc,
+                                     ManagedValue input,
+                                     SILType loweredResultTy)> ValueTransform;
+
+  /// Emit a transformation on the value of an optional type.
+  ManagedValue emitOptionalToOptional(SILLocation loc,
+                                      ManagedValue input,
+                                      SILType loweredResultTy,
+                                      const ValueTransform &transform);
+
+  ManagedValue emitClassMetatypeToObject(SILLocation loc,
+                                         ManagedValue v,
+                                         SILType resultTy);
+
+  ManagedValue emitExistentialMetatypeToObject(SILLocation loc,
+                                               ManagedValue v,
+                                               SILType resultTy);
+
+  ManagedValue emitProtocolMetatypeToObject(SILLocation loc,
+                                            CanType inputTy,
+                                            SILType resultTy);
+
+  /// OpenedArchetypes - Mappings of opened archetypes back to the
+  /// instruction which opened them.
+  llvm::DenseMap<CanType, SILValue> ArchetypeOpenings;
+
+  SILValue getArchetypeOpeningSite(CanArchetypeType archetype) const {
+    auto it = ArchetypeOpenings.find(archetype);
+    assert(it != ArchetypeOpenings.end() &&
+           "opened archetype was not registered with SILGenFunction");
+    return it->second;
+  }
+
+  void setArchetypeOpeningSite(CanArchetypeType archetype, SILValue site) {
+    ArchetypeOpenings.insert({archetype, site});
+  }
+
+  struct OpaqueValueState {
+    SILValue value;
+    bool isConsumable;
+    bool hasBeenConsumed;
+
+    void destroy(SILGenFunction &gen, SILLocation loc);
+  };
+
+  ManagedValue manageOpaqueValue(OpaqueValueState &entry,
+                                 SILLocation loc,
+                                 SGFContext C);
+
+  /// Open up the given existential value and project its payload.
+  ///
+  /// \param existentialValue The existential value.
+  /// \param openedArchetype The opened existential archetype.
+  /// \param loweredOpenedType The lowered type of the projection, which in
+  /// practice will be the openedArchetype, possibly wrapped in a metatype.
+  SILGenFunction::OpaqueValueState
+  emitOpenExistential(SILLocation loc,
+                      ManagedValue existentialValue,
+                      CanArchetypeType openedArchetype,
+                      SILType loweredOpenedType);
+
+  /// \brief Wrap the given value in an existential container.
+  ///
+  /// \param concreteFormalType AST type of value.
+  /// \param concreteTL Type lowering of value.
+  /// \param existentialTL Type lowering of existential type.
+  /// \param F Function reference to emit the existential contents with the
+  /// given context.
+  ManagedValue emitExistentialErasure(
+                            SILLocation loc,
+                            CanType concreteFormalType,
+                            const TypeLowering &concreteTL,
+                            const TypeLowering &existentialTL,
+                            const ArrayRef<ProtocolConformance *> &conformances,
+                            SGFContext C,
+                            llvm::function_ref<ManagedValue (SGFContext)> F);
+
+  //===--------------------------------------------------------------------===//
   // Recursive entry points
   //===--------------------------------------------------------------------===//
 
@@ -1078,55 +1157,6 @@ public:
   ManagedValue getManagedValue(SILLocation loc,
                                ConsumableManagedValue value);
 
-  /// Convert a value with the abstraction patterns of the original type
-  /// to a value with the abstraction patterns of the substituted type.
-  ManagedValue emitOrigToSubstValue(SILLocation loc, ManagedValue input,
-                                    AbstractionPattern origType,
-                                    CanType inputType,
-                                    CanType substType = CanType(),
-                                    SGFContext ctx = SGFContext());
-
-  /// Convert a value with the abstraction patterns of the substituted
-  /// type to a value with the abstraction patterns of the original type.
-  ManagedValue emitSubstToOrigValue(SILLocation loc, ManagedValue input,
-                                    AbstractionPattern origType,
-                                    CanType inputType,
-                                    CanType substType = CanType(),
-                                    SGFContext ctx = SGFContext());
-
-  /// Convert a native Swift value to a value that can be passed as an argument
-  /// to or returned as the result of a function with the given calling
-  /// convention.
-  ManagedValue emitNativeToBridgedValue(SILLocation loc, ManagedValue v,
-                                        SILFunctionTypeRepresentation destRep,
-                                        AbstractionPattern origNativeTy,
-                                        CanType substNativeTy,
-                                        CanType bridgedTy);
-  
-  /// Convert a value received as the result or argument of a function with
-  /// the given calling convention to a native Swift value of the given type.
-  ManagedValue emitBridgedToNativeValue(SILLocation loc, ManagedValue v,
-                                        SILFunctionTypeRepresentation srcRep,
-                                        CanType nativeTy);
-
-  /// Convert a bridged error type to the native Swift ErrorType
-  /// representation.  The value may be optional.
-  ManagedValue emitBridgedToNativeError(SILLocation loc, ManagedValue v);
-
-  /// Convert a value in the native Swift ErrorType representation to
-  /// a bridged error type representation.
-  ManagedValue emitNativeToBridgedError(SILLocation loc, ManagedValue v,
-                                        CanType bridgedType);
-
-  /// Emit the control flow for an optional 'bind' operation, branching to the
-  /// active failure destination if the optional value addressed by optionalAddr
-  /// is nil, and leaving the insertion point on the success branch.
-  ///
-  /// NOTE: This operation does *not* consume the managed value.
-  ///
-  void emitBindOptional(SILLocation loc, ManagedValue optionalAddrOrValue,
-                        unsigned depth);
-
   //
   // Helpers for emitting ApplyExpr chains.
   //
@@ -1188,22 +1218,6 @@ public:
   /// Emit a dynamic subscript.
   RValue emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, SGFContext c);
 
-  ManagedValue manageOpaqueValue(OpaqueValueState &entry,
-                                 SILLocation loc,
-                                 SGFContext C);
-
-  /// Open up the given existential value and project its payload.
-  ///
-  /// \param existentialValue The existential value.
-  /// \param openedArchetype The opened existential archetype.
-  /// \param loweredOpenedType The lowered type of the projection, which in
-  /// practice will be the openedArchetype, possibly wrapped in a metatype.
-  SILGenFunction::OpaqueValueState
-  emitOpenExistential(SILLocation loc,
-                      ManagedValue existentialValue,
-                      CanArchetypeType openedArchetype,
-                      SILType loweredOpenedType);
-
   /// Open up the given existential expression and emit its
   /// subexpression in a caller-specified manner.
   ///
@@ -1243,21 +1257,33 @@ public:
     emitOpenExistentialExprImpl(e, emitSubExpr);
   }
 
-  /// \brief Wrap the given value in an existential container.
+  /// Mapping from active opaque value expressions to their values,
+  /// along with a bit for each indicating whether it has been consumed yet.
+  llvm::DenseMap<OpaqueValueExpr *, OpaqueValueState> OpaqueValues;
+
+  /// RAII object that introduces a temporary binding for an opaque value.
   ///
-  /// \param concreteFormalType AST type of value.
-  /// \param concreteTL Type lowering of value.
-  /// \param existentialTL Type lowering of existential type.
-  /// \param F Function reference to emit the existential contents with the
-  /// given context.
-  ManagedValue emitExistentialErasure(
-                            SILLocation loc,
-                            CanType concreteFormalType,
-                            const TypeLowering &concreteTL,
-                            const TypeLowering &existentialTL,
-                            const ArrayRef<ProtocolConformance *> &conformances,
-                            SGFContext C,
-                            llvm::function_ref<ManagedValue (SGFContext)> F);
+  /// Each time the opaque value expression is referenced, it will be
+  /// retained/released separately. When this RAII object goes out of
+  /// scope, the value will be destroyed if requested.
+  class OpaqueValueRAII {
+    SILGenFunction &Self;
+    OpaqueValueExpr *OpaqueValue;
+
+    OpaqueValueRAII(const OpaqueValueRAII &) = delete;
+    OpaqueValueRAII &operator=(const OpaqueValueRAII &) = delete;
+
+  public:
+    OpaqueValueRAII(SILGenFunction &self, OpaqueValueExpr *opaqueValue,
+                    OpaqueValueState state)
+    : Self(self), OpaqueValue(opaqueValue) {
+      assert(Self.OpaqueValues.count(OpaqueValue) == 0 &&
+             "Opaque value already has a binding");
+      Self.OpaqueValues[OpaqueValue] = state;
+    }
+
+    ~OpaqueValueRAII();
+  };
 
   /// \brief Emit a conditional checked cast branch. Does not
   /// re-abstract the argument to the success branch. Terminates the
@@ -1296,77 +1322,43 @@ public:
                              std::function<void(ManagedValue)> handleTrue,
                              std::function<void()> handleFalse);
 
-  /// Initialize a memory location with an optional value.
+  /// Emit the control flow for an optional 'bind' operation, branching to the
+  /// active failure destination if the optional value addressed by optionalAddr
+  /// is nil, and leaving the insertion point on the success branch.
   ///
-  /// \param loc   The location to use for the resulting optional.
-  /// \param value The value to inject into an optional.
-  /// \param dest  The uninitialized memory in which to store the result value.
-  /// \param optTL Type lowering information for the optional to create.
-  void emitInjectOptionalValueInto(SILLocation loc,
-                                   ArgumentSource &&value,
-                                   SILValue dest,
-                                   const TypeLowering &optTL);
-
-  /// Initialize a memory location with an optional "nothing"
-  /// value.
+  /// NOTE: This operation does *not* consume the managed value.
   ///
-  /// \param loc   The location to use for the resulting optional.
-  /// \param dest  The uninitialized memory in which to store the result value.
-  /// \param optTL Type lowering information for the optional to create.
-  void emitInjectOptionalNothingInto(SILLocation loc,
-                                     SILValue dest,
-                                     const TypeLowering &optTL);
+  void emitBindOptional(SILLocation loc, ManagedValue optionalAddrOrValue,
+                        unsigned depth);
 
-  /// Return a value for an optional ".None" of the specified type. This only
-  /// works for loadable enum types.
-  SILValue getOptionalNoneValue(SILLocation loc, const TypeLowering &optTL);
+  //===--------------------------------------------------------------------===//
+  // Bridging thunks
+  //===--------------------------------------------------------------------===//
 
-  /// Return a value for an optional ".Some(x)" of the specified type. This only
-  /// works for loadable enum types.
-  ManagedValue getOptionalSomeValue(SILLocation loc, ManagedValue value,
-                                    const TypeLowering &optTL);
-
+  /// Convert a native Swift value to a value that can be passed as an argument
+  /// to or returned as the result of a function with the given calling
+  /// convention.
+  ManagedValue emitNativeToBridgedValue(SILLocation loc, ManagedValue v,
+                                        SILFunctionTypeRepresentation destRep,
+                                        AbstractionPattern origNativeTy,
+                                        CanType substNativeTy,
+                                        CanType bridgedTy);
   
-  /// \brief Emit a call to the library intrinsic _preconditionOptionalHasValue.
-  void emitPreconditionOptionalHasValue(SILLocation loc, SILValue addr);
-  
-  /// \brief Emit a call to the library intrinsic _doesOptionalHaveValue.
-  ///
-  /// The result is a Builtin.Int1.
-  SILValue emitDoesOptionalHaveValue(SILLocation loc, SILValue addrOrValue);
-  
-  /// \brief Emit a call to the library intrinsic _getOptionalValue
-  /// given the address of the optional, which checks that an optional contains
-  /// some value and either returns the value or traps if there is none.
-  ManagedValue emitCheckedGetOptionalValueFrom(SILLocation loc,
-                                               ManagedValue addr,
-                                               const TypeLowering &optTL,
-                                               SGFContext C);
-  
-  /// \brief Extract the value from an optional, which must be known to contain
-  /// a value.
-  ManagedValue emitUncheckedGetOptionalValueFrom(SILLocation loc,
-                                                 ManagedValue addrOrValue,
-                                                 const TypeLowering &optTL,
-                                                 SGFContext C = SGFContext());
+  /// Convert a value received as the result or argument of a function with
+  /// the given calling convention to a native Swift value of the given type.
+  ManagedValue emitBridgedToNativeValue(SILLocation loc, ManagedValue v,
+                                        SILFunctionTypeRepresentation srcRep,
+                                        CanType nativeTy);
 
-  typedef std::function<ManagedValue(SILGenFunction &gen,
-                                     SILLocation loc,
-                                     ManagedValue input,
-                                     SILType loweredResultTy)> ValueTransform;
+  /// Convert a bridged error type to the native Swift ErrorType
+  /// representation.  The value may be optional.
+  ManagedValue emitBridgedToNativeError(SILLocation loc, ManagedValue v);
 
-  /// Emit a transformation on the value of an optional type.
-  ManagedValue emitOptionalToOptional(SILLocation loc,
-                                      ManagedValue input,
-                                      SILType loweredResultTy,
-                                      const ValueTransform &transform);
+  /// Convert a value in the native Swift ErrorType representation to
+  /// a bridged error type representation.
+  ManagedValue emitNativeToBridgedError(SILLocation loc, ManagedValue v,
+                                        CanType bridgedType);
   
-  /// Build the type of a function transformation thunk.
-  CanSILFunctionType buildThunkType(ManagedValue fn,
-                                    CanSILFunctionType expectedType,
-                                    CanSILFunctionType &substFnType,
-                                    SmallVectorImpl<Substitution> &subs);
-
   SILValue emitBridgeErrorForForeignError(SILLocation loc,
                                           SILValue nativeError,
                                           SILType bridgedResultType,
@@ -1392,6 +1384,32 @@ public:
                                      ManagedValue errorSlot,
                                      bool suppressErrorCheck,
                                const ForeignErrorConvention &foreignError);
+
+  //===--------------------------------------------------------------------===//
+  // Re-abstraction thunks
+  //===--------------------------------------------------------------------===//
+
+  /// Convert a value with the abstraction patterns of the original type
+  /// to a value with the abstraction patterns of the substituted type.
+  ManagedValue emitOrigToSubstValue(SILLocation loc, ManagedValue input,
+                                    AbstractionPattern origType,
+                                    CanType inputType,
+                                    CanType substType = CanType(),
+                                    SGFContext ctx = SGFContext());
+
+  /// Convert a value with the abstraction patterns of the substituted
+  /// type to a value with the abstraction patterns of the original type.
+  ManagedValue emitSubstToOrigValue(SILLocation loc, ManagedValue input,
+                                    AbstractionPattern origType,
+                                    CanType inputType,
+                                    CanType substType = CanType(),
+                                    SGFContext ctx = SGFContext());
+
+  /// Build the type of a function transformation thunk.
+  CanSILFunctionType buildThunkType(ManagedValue fn,
+                                    CanSILFunctionType expectedType,
+                                    CanSILFunctionType &substFnType,
+                                    SmallVectorImpl<Substitution> &subs);
 
   //===--------------------------------------------------------------------===//
   // Declarations
