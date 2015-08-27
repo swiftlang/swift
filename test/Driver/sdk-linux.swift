@@ -3,7 +3,7 @@
 
 // CHECK-NOT: warning: no such SDK:
 // CHECK: bin/swift
-// CHECK: Driver/sdk.swift
+// CHECK: Driver/sdk-linux.swift
 // CHECK: -sdk /{{ }}
 // CHECK-NEXT: bin/swift
 // CHECK: -sdk /{{ }}
