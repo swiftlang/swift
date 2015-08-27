@@ -132,20 +132,20 @@ class TestComputedOutlet : NSObject {
 
 class Singleton : NSObject {
   // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(thin) (@thick Singleton.Type) -> @owned Singleton
-  // CHECK-DAG: sil hidden [transparent] @_TToZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased Singleton {
+  // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletong14sharedInstanceS0_ : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased Singleton {
   static let sharedInstance = Singleton()
 
   // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1iSi : $@convention(thin) (@thick Singleton.Type) -> Int
-  // CHECK-DAG: sil hidden [transparent] @_TToZFC15objc_properties9Singletong1iSi : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Int
+  // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletong1iSi : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Int
   static let i = 2
 
   // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletong1jSS : $@convention(thin) (@thick Singleton.Type) -> @owned String
-  // CHECK-DAG: sil hidden [transparent] @_TToZFC15objc_properties9Singletong1jSS : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased NSString
+  // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletong1jSS : $@convention(objc_method) (@objc_metatype Singleton.Type) -> @autoreleased NSString
   // CHECK-DAG: sil hidden [transparent] @_TZFC15objc_properties9Singletons1jSS : $@convention(thin) (@owned String, @thick Singleton.Type) -> ()
-  // CHECK-DAG: sil hidden [transparent] @_TToZFC15objc_properties9Singletons1jSS : $@convention(objc_method) (NSString, @objc_metatype Singleton.Type) -> ()
+  // CHECK-DAG: sil hidden [transparent] [thunk] @_TToZFC15objc_properties9Singletons1jSS : $@convention(objc_method) (NSString, @objc_metatype Singleton.Type) -> ()
   static var j = "Hello"
 
-  // CHECK-DAG: sil hidden @_TToZFC15objc_properties9Singletong1kSd : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Double
+  // CHECK-DAG: sil hidden [thunk] @_TToZFC15objc_properties9Singletong1kSd : $@convention(objc_method) (@objc_metatype Singleton.Type) -> Double
   // CHECK-DAG: sil hidden @_TZFC15objc_properties9Singletong1kSd : $@convention(thin) (@thick Singleton.Type) -> Double
   static var k: Double {
     return 7.7
@@ -153,7 +153,7 @@ class Singleton : NSObject {
 }
 
 class HasUnmanaged : NSObject {
-  // CHECK-LABEL: sil hidden [transparent] @_TToFC15objc_properties12HasUnmanagedg3refGSqGVSs9UnmanagedPSs9AnyObject___
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15objc_properties12HasUnmanagedg3refGSqGVSs9UnmanagedPSs9AnyObject___
   // CHECK: [[NATIVE:%.+]] = function_ref @_TFC15objc_properties12HasUnmanagedg3refGSqGVSs9UnmanagedPSs9AnyObject___
   // CHECK: [[RESULT:%.+]] = apply [[NATIVE]](%0)
   // CHECK-NOT: {{(retain|release)}}
@@ -161,7 +161,7 @@ class HasUnmanaged : NSObject {
   // CHECK-NOT: {{(retain|release)}}
   // CHECK: return [[RESULT]] : $Optional<Unmanaged<AnyObject>>
 
-  // CHECK-LABEL: sil hidden [transparent] @_TToFC15objc_properties12HasUnmanageds3refGSqGVSs9UnmanagedPSs9AnyObject___
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15objc_properties12HasUnmanageds3refGSqGVSs9UnmanagedPSs9AnyObject___
   // CHECK-NOT: {{(retain|release)}}
   // CHECK: strong_retain %1 : $HasUnmanaged
   // CHECK-NOT: {{(retain|release)}}
@@ -191,5 +191,5 @@ class NonObjCBaseClass : NSObject {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TToFC15objc_properties12ObjCSubclassg8propertySi
-// CHECK-LABEL: sil hidden @_TToFC15objc_properties12ObjCSubclasss8propertySi
+// CHECK-LABEL: sil hidden [thunk] @_TToFC15objc_properties12ObjCSubclassg8propertySi
+// CHECK-LABEL: sil hidden [thunk] @_TToFC15objc_properties12ObjCSubclasss8propertySi

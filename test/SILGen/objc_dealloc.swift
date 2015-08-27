@@ -42,7 +42,7 @@ class SwiftGizmo : Gizmo {
   }
 
   // Objective-C deallocation deinit thunk (i.e., -dealloc).
-  // CHECK-LABEL: sil hidden @_TToFC12objc_dealloc10SwiftGizmoD : $@convention(objc_method) (SwiftGizmo) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC12objc_dealloc10SwiftGizmoD : $@convention(objc_method) (SwiftGizmo) -> ()
   // CHECK: bb0([[SELF:%[0-9]+]] : $SwiftGizmo):
   // CHECK:   strong_retain
 
@@ -72,6 +72,6 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT: return [[RESULT]] : $()
 }
 
-// CHECK-NOT: sil hidden @_TToFCSo11SwiftGizmo2E : $@convention(objc_method) (SwiftGizmo2) -> ()
+// CHECK-NOT: sil hidden [thunk] @_TToFCSo11SwiftGizmo2E : $@convention(objc_method) (SwiftGizmo2) -> ()
 class SwiftGizmo2 : Gizmo {
 }

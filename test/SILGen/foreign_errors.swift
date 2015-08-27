@@ -53,7 +53,7 @@ extension NSObject {
   @objc func abort() throws {
     throw NSError(domain: "", code: 1, userInfo: [:])
   }
-// CHECK-LABEL: sil hidden @_TToFE14foreign_errorsCSo8NSObject5abortfS0_FzT_T_ : $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> Bool
+// CHECK-LABEL: sil hidden [thunk] @_TToFE14foreign_errorsCSo8NSObject5abortfS0_FzT_T_ : $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> Bool
 // CHECK: [[T0:%.*]] = function_ref @_TFE14foreign_errorsCSo8NSObject5abortfS0_FzT_T_ : $@convention(method) (@guaranteed NSObject) -> @error ErrorType
 // CHECK: try_apply [[T0]](
 // CHECK: bb1(
@@ -78,7 +78,7 @@ extension NSObject {
   @objc func badDescription() throws -> String {
     throw NSError(domain: "", code: 1, userInfo: [:])
   }
-// CHECK-LABEL: sil hidden @_TToFE14foreign_errorsCSo8NSObject14badDescriptionfS0_FzT_SS : $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> @autoreleased Optional<NSString>
+// CHECK-LABEL: sil hidden [thunk] @_TToFE14foreign_errorsCSo8NSObject14badDescriptionfS0_FzT_SS : $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> @autoreleased Optional<NSString>
 // CHECK: [[T0:%.*]] = function_ref @_TFE14foreign_errorsCSo8NSObject14badDescriptionfS0_FzT_SS : $@convention(method) (@guaranteed NSObject) -> (@owned String, @error ErrorType)
 // CHECK: try_apply [[T0]](
 // CHECK: bb1([[RESULT:%.*]] : $String):
@@ -100,11 +100,11 @@ extension NSObject {
 // CHECK: bb3([[T0:%.*]] : $Optional<NSString>):
 // CHECK:   autorelease_return [[T0]] : $Optional<NSString>
 
-// CHECK-LABEL: sil hidden @_TToFE14foreign_errorsCSo8NSObject7takeIntfS0_FzSiT_ : $@convention(objc_method) (Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> Bool
+// CHECK-LABEL: sil hidden [thunk] @_TToFE14foreign_errorsCSo8NSObject7takeIntfS0_FzSiT_ : $@convention(objc_method) (Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> Bool
 // CHECK: bb0([[I:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>, [[SELF:%[0-9]+]] : $NSObject)
   @objc func takeInt(i: Int) throws { }
 
-// CHECK-LABEL: sil hidden @_TToFE14foreign_errorsCSo8NSObject10takeDoublefS0_FzTSd3intSi7closureFSiSi_T_ : $@convention(objc_method) (Double, Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @convention(block) (Int) -> Int, NSObject) -> Bool
+// CHECK-LABEL: sil hidden [thunk] @_TToFE14foreign_errorsCSo8NSObject10takeDoublefS0_FzTSd3intSi7closureFSiSi_T_ : $@convention(objc_method) (Double, Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @convention(block) (Int) -> Int, NSObject) -> Bool
 // CHECK: bb0([[D:%[0-9]+]] : $Double, [[INT:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>, [[CLOSURE:%[0-9]+]] : $@convention(block) (Int) -> Int, [[SELF:%[0-9]+]] : $NSObject):
   @objc func takeDouble(d: Double, int: Int, closure: (Int) -> Int) throws {
     throw NSError(domain: "", code: 1, userInfo: [:])
@@ -179,7 +179,7 @@ class ExtremelyErrorProne : ErrorProne {
   override func conflict3(obj: AnyObject, error: ()) throws {}
 }
 // CHECK: sil hidden @_TFC14foreign_errors19ExtremelyErrorProne9conflict3fS0_FzTPSs9AnyObject_5errorT__T_
-// CHECK: sil hidden @_TToFC14foreign_errors19ExtremelyErrorProne9conflict3fS0_FzTPSs9AnyObject_5errorT__T_ : $@convention(objc_method) (AnyObject, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, ExtremelyErrorProne) -> Bool
+// CHECK: sil hidden [thunk] @_TToFC14foreign_errors19ExtremelyErrorProne9conflict3fS0_FzTPSs9AnyObject_5errorT__T_ : $@convention(objc_method) (AnyObject, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, ExtremelyErrorProne) -> Bool
 
 // These conventions are usable because of swift_error. rdar://21715350
 func testNonNilError() throws -> Float {

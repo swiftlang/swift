@@ -16,7 +16,7 @@ class Generic<T>: NSObject {
 
   // CHECK-LABEL: sil hidden @_TFC18objc_generic_class7GenericD : $@convention(method) <T> (@owned Generic<T>) -> () {
   // CHECK-NEXT:  bb0({{%.*}} : $Generic<T>):
-  // CHECK-LABEL: sil hidden @_TToFC18objc_generic_class7GenericD : $@convention(objc_method) <T> (Generic<T>) -> () {
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC18objc_generic_class7GenericD : $@convention(objc_method) <T> (Generic<T>) -> () {
   // CHECK-NEXT:  bb0([[SELF:%.*]] : $Generic<T>):
   // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC18objc_generic_class7GenericD
   // CHECK:         apply [[NATIVE]]<T>([[SELF]])

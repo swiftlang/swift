@@ -14,6 +14,6 @@ class DesignatedStubs : Gizmo {
 // CHECK-DEBUG: sil hidden @_TFC25unimplemented_initializer15DesignatedStubscfMS0_FT7bellsOnSi_GSQS0__
 // CHECK-DEBUG: string_literal utf8 "{{.*}}unimplemented_initializer.swift"
 
-// CHECK-RELEASE: sil hidden @_TFC25unimplemented_initializer15DesignatedStubscfMS0_FT7bellsOnSi_GSQS0__
+// CHECK-RELEASE: sil hidden [thunk] @_TFC25unimplemented_initializer15DesignatedStubscfMS0_FT7bellsOnSi_GSQS0__
 // CHECK-RELEASE-NOT: unimplemented_initializer.swift"
 
