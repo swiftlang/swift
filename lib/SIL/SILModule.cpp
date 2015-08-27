@@ -548,6 +548,12 @@ void SILModule::eraseFunction(SILFunction *F) {
   }
 }
 
+/// Erase a global SIL variable from the module.
+void SILModule::eraseGlobalVariable(SILGlobalVariable *G) {
+  GlobalVariableTable.erase(G->getName());
+  getSILGlobalList().erase(G);
+}
+
 SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
                                    std::function<void(SILFunction *)> Callback) {
   if (!C)

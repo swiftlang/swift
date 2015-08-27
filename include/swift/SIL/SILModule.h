@@ -210,6 +210,9 @@ public:
   /// Erase a function from the module.
   void eraseFunction(SILFunction *F);
 
+  /// Erase a global SIL variable from the module.
+  void eraseGlobalVariable(SILGlobalVariable *G);
+
   /// Construct a SIL module from an AST module.
   ///
   /// The module will be constructed in the Raw stage. The provided AST module
