@@ -34,8 +34,8 @@ enum TreeB<T> {
 
 // CHECK-LABEL: define private %swift.type** @get_field_types_Foo
 // -- Foo(Int)
-// CHECK-64:         (i64 or (i64 ptrtoint (%swift.type* {{.*}} @_TMdSi, {{.*}}), [[WORD]] 1)
-// CHECK-32:         (i32 or (i32 ptrtoint (%swift.type* {{.*}} @_TMdSi, {{.*}}), [[WORD]] 1)
+// CHECK-64:         (i64 or (i64 ptrtoint (%swift.type* @_TMdSi {{.*}}), [[WORD]] 1)
+// CHECK-32:         (i32 or (i32 ptrtoint (%swift.type* @_TMdSi {{.*}}), [[WORD]] 1)
 // -- Bar(T)
 // CHECK-NOT:     ptrtoint %swift.type* %T
 enum Foo<T> {

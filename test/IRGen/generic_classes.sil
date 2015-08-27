@@ -72,7 +72,7 @@ import gizmo
 // CHECK:   i32 0, i32 0
 // CHECK: }
 
-// CHECK: @_TMdC15generic_classes14RootNonGeneric = global { {{.*}} } {
+// CHECK: @_TMfC15generic_classes14RootNonGeneric = internal global { {{.*}} } {
 // CHECK:   void (%C15generic_classes14RootNonGeneric*)* @_TFC15generic_classes14RootNonGenericD,
 // CHECK:   i8** @_TWVBo,
 // CHECK:   i64 ptrtoint (%objc_class* @_TMmC15generic_classes14RootNonGeneric to i64),

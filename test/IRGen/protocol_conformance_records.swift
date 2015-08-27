@@ -17,7 +17,7 @@ protocol Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE:%swift.protocol\* @_TMp28protocol_conformance_records8Runcible]]
 // -- type metadata
-// CHECK:           @_TMdV28protocol_conformance_records15NativeValueType
+// CHECK:           @_TMfV28protocol_conformance_records15NativeValueType
 // -- witness table
 // CHECK:           @_TWPV28protocol_conformance_records15NativeValueTypeS_8Runcible
 // -- flags 0x01: unique direct metadata
@@ -32,7 +32,7 @@ struct NativeValueType: Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
 // -- class object (TODO should be class ref variable)
-// CHECK:           @_TMdC28protocol_conformance_records15NativeClassType
+// CHECK:           @_TMfC28protocol_conformance_records15NativeClassType
 // -- witness table
 // CHECK:           @_TWPC28protocol_conformance_records15NativeClassTypeS_8Runcible
 // -- flags 0x01: unique direct metadata (TODO should be 0x03 indirect class)

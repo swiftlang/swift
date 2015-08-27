@@ -76,13 +76,13 @@ import Builtin
 // CHECK: }
 
 // -- Fixed-layout struct metadata contains fixed field offsets
-// CHECK: @_TMdV15generic_structs6Intish = constant { {{.*}} i64 } {
+// CHECK: @_TMfV15generic_structs6Intish = internal constant { {{.*}} i64 } {
 // CHECK:   i64 0
 // CHECK: }
-// CHECK: @_TMdV15generic_structs7Chareth = constant { {{.*}} i64 } {
+// CHECK: @_TMfV15generic_structs7Chareth = internal constant { {{.*}} i64 } {
 // CHECK:   i64 0
 // CHECK: }
-// CHECK: @_TMdV15generic_structs8Stringly = constant { {{.*}} i64, i64, i64 } {
+// CHECK: @_TMfV15generic_structs8Stringly = internal constant { {{.*}} i64, i64, i64 } {
 // CHECK:   i64 0, i64 8, i64 16
 // CHECK: }
 

@@ -85,6 +85,7 @@ _TMPiC3foo3bar ---> indirect generic type metadata pattern for foo.bar
 _TMnC3foo3bar ---> nominal type descriptor for foo.bar
 _TMmC3foo3bar ---> metaclass for foo.bar
 _TMdC3foo3bar ---> direct type metadata for foo.bar
+_TMfC3foo3bar ---> full type metadata for foo.bar
 _TwalC3foo3bar ---> allocateBuffer value witness for foo.bar
 _TwcaC3foo3bar ---> assignWithCopy value witness for foo.bar
 _TwtaC3foo3bar ---> assignWithTake value witness for foo.bar

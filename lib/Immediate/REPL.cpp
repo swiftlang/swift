@@ -765,7 +765,7 @@ private:
 
   void stripPreviouslyGenerated(llvm::Module &M) {
 
-    for (auto& function : M.getFunctionList()) {
+    for (auto &function : M.getFunctionList()) {
       function.setVisibility(llvm::GlobalValue::DefaultVisibility);
       if (FuncsAlreadyGenerated.count(function.getName()))
         function.deleteBody();
@@ -775,7 +775,7 @@ private:
       }
     }
 
-    for (auto& global : M.globals()) {
+    for (auto &global : M.globals()) {
       if (!global.hasName())
         continue;
 
@@ -788,6 +788,35 @@ private:
           global.setInitializer(nullptr);
         else
           GlobalsAlreadyEmitted.insert(global.getName());
+      }
+    }
+
+
+    for (auto alias = M.alias_begin(); alias != M.alias_end();) {
+      alias->setVisibility(llvm::GlobalValue::DefaultVisibility);
+      if (!alias->hasAvailableExternallyLinkage() &&
+          !alias->hasAppendingLinkage() &&
+          !alias->hasCommonLinkage()) {
+        alias->setLinkage(llvm::GlobalValue::ExternalLinkage);
+        if (GlobalsAlreadyEmitted.count(alias->getName())) {
+          // Replace already-emitted aliases with external declarations.
+          SmallString<32> name = alias->getName();
+          alias->setName("");
+          auto external = new llvm::GlobalVariable(
+            M,
+            alias->getType()->getPointerElementType(),
+            /*isConstant*/ false,
+            alias->getLinkage(),
+            /*initializer*/ nullptr,
+            name);
+          alias->replaceAllUsesWith(external);
+          auto &aliasToRemove = *alias;
+          ++alias;
+          aliasToRemove.eraseFromParent();
+        } else {
+          GlobalsAlreadyEmitted.insert(alias->getName());
+          ++alias;
+        }
       }
     }
   }

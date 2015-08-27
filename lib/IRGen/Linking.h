@@ -43,7 +43,14 @@ namespace swift {
 namespace irgen {
 class TypeInfo;
 class IRGenModule;
-  
+
+/// Selector for type metadata symbol kinds.
+enum class TypeMetadataAddress {
+  Direct,
+  DirectFullMetadata,
+  Indirect,
+};
+
 /// A link entity is some sort of named declaration, combined with all
 /// the information necessary to distinguish specific implementations
 /// of the declaration from each other.
@@ -68,10 +75,13 @@ class LinkEntity {
 
     // This field appears in the ValueWitness kind.
     ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
-    
-    // These fields appear in the TypeMetadata kind.
+
+    // These fields appear in the FieldOffset kind.
     IsIndirectShift = 8, IsIndirectMask = 0x0100,
-    IsPatternShift = 9, IsPatternMask = 0x0200,
+
+    // These fields appear in the TypeMetadata kind.
+    MetadataAddressShift = 8, MetadataAddressMask = 0x0300,
+    IsPatternShift = 10, IsPatternMask = 0x0400,
     
     // This field appears in ProtocolConformance kinds.
     ConformanceLinkageShift = 8, ConformanceLinkageMask = 0x0700,
@@ -277,12 +287,13 @@ public:
     return entity;
   }
 
-  static LinkEntity forTypeMetadata(CanType concreteType, bool isIndirect,
+  static LinkEntity forTypeMetadata(CanType concreteType,
+                                    TypeMetadataAddress addr,
                                     bool isPattern) {
     LinkEntity entity;
     entity.Pointer = concreteType.getPointer();
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::TypeMetadata))
-                | LINKENTITY_SET_FIELD(IsIndirect, unsigned(isIndirect))
+                | LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr))
                 | LINKENTITY_SET_FIELD(IsPattern, unsigned(isPattern));
     return entity;
   }
@@ -420,9 +431,9 @@ public:
     assert(getKind() == Kind::ValueWitness);
     return ValueWitness(LINKENTITY_GET_FIELD(Data, ValueWitness));
   }
-  bool isMetadataIndirect() const {
+  TypeMetadataAddress getMetadataAddress() const {
     assert(getKind() == Kind::TypeMetadata);
-    return LINKENTITY_GET_FIELD(Data, IsIndirect);
+    return (TypeMetadataAddress)LINKENTITY_GET_FIELD(Data, MetadataAddress);
   }
   bool isMetadataPattern() const {
     assert(getKind() == Kind::TypeMetadata);
@@ -485,6 +496,8 @@ public:
                                   DebugTypeInfo DebugType=DebugTypeInfo(),
                                   Optional<SILLocation> DebugLoc = None,
                                   StringRef DebugName = StringRef());
+
+  bool isUsed() const;
 };
 
 } // end namespace irgen

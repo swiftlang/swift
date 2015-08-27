@@ -519,6 +519,11 @@ private:
         DEMANGLE_CHILD_OR_RETURN(nominalType, Type);
         return nominalType;
       }
+      if (Mangled.nextIf('f')) {
+        auto metadata = NodeFactory::create(Node::Kind::FullTypeMetadata);
+        DEMANGLE_CHILD_OR_RETURN(metadata, Type);
+        return metadata;
+      }
       auto metadata = NodeFactory::create(Node::Kind::TypeMetadata);
       DEMANGLE_CHILD_AS_NODE_OR_RETURN(metadata, Directness);
       DEMANGLE_CHILD_OR_RETURN(metadata, Type);
@@ -2298,6 +2303,7 @@ private:
     case Node::Kind::ExplicitClosure:
     case Node::Kind::Extension:
     case Node::Kind::FieldOffset:
+    case Node::Kind::FullTypeMetadata:
     case Node::Kind::Function:
     case Node::Kind::FunctionSignatureSpecialization:
     case Node::Kind::FunctionSignatureSpecializationParam:
@@ -3175,6 +3181,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::Metaclass:
     Printer << "metaclass for ";
     print(pointer->getFirstChild());
+    return;
+  case Node::Kind::FullTypeMetadata:
+    Printer << "full type metadata for ";
+    print(pointer->getChild(0));
     return;
   case Node::Kind::TypeMetadata:
     print(pointer->getChild(0)); // directness

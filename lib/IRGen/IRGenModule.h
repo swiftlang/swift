@@ -665,14 +665,20 @@ public:
                                         ValueWitness index,
                                         ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
-                                             llvm::Type *definitionType = nullptr);
+                                         llvm::Type *definitionType = nullptr);
   Optional<llvm::Function*> getAddrOfObjCIVarInitDestroy(
                               ClassDecl *cd,
                               bool isDestroyer,
                               ForDefinition_t forDefinition);
+  llvm::GlobalValue *defineTypeMetadata(CanType concreteType,
+                                        bool isIndirect,
+                                        bool isPattern,
+                                        bool isConstant,
+                                        llvm::Constant *init,
+                                        llvm::StringRef section = {});
+
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
-                                        bool isIndirect, bool isPattern,
-                                        llvm::Type *definitionType = nullptr);
+                                        bool isIndirect, bool isPattern);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,

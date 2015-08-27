@@ -106,7 +106,7 @@ class Hoozit : NSObject {
 
 // CHECK-LABEL: @"_CATEGORY__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
 // CHECK:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
-// CHECK:   %swift.type* getelementptr inbounds ({{.*}} @_TMdC15objc_extensions6Hoozit {{.*}}),
+// CHECK:   %swift.type* {{.*}} @_TMfC15objc_extensions6Hoozit,
 // CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
 // CHECK:   {{.*}} @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
 // CHECK:   i8* null,

@@ -655,19 +655,19 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
 
 #if SWIFT_OBJC_INTEROP  
 
-extern "C" const FullMetadata<Metadata> _TMdSb; // Bool
-extern "C" const FullMetadata<Metadata> _TMdSi; // Int
-extern "C" const FullMetadata<Metadata> _TMdSu; // UInt
-extern "C" const FullMetadata<Metadata> _TMdSf; // Float
-extern "C" const FullMetadata<Metadata> _TMdSd; // Double
-extern "C" const FullMetadata<Metadata> _TMdVSs4Int8;
-extern "C" const FullMetadata<Metadata> _TMdVSs5Int16;
-extern "C" const FullMetadata<Metadata> _TMdVSs5Int32;
-extern "C" const FullMetadata<Metadata> _TMdVSs5Int64;
-extern "C" const FullMetadata<Metadata> _TMdVSs5UInt8;
-extern "C" const FullMetadata<Metadata> _TMdVSs6UInt16;
-extern "C" const FullMetadata<Metadata> _TMdVSs6UInt32;
-extern "C" const FullMetadata<Metadata> _TMdVSs6UInt64;
+extern "C" const Metadata _TMdSb; // Bool
+extern "C" const Metadata _TMdSi; // Int
+extern "C" const Metadata _TMdSu; // UInt
+extern "C" const Metadata _TMdSf; // Float
+extern "C" const Metadata _TMdSd; // Double
+extern "C" const Metadata _TMdVSs4Int8;
+extern "C" const Metadata _TMdVSs5Int16;
+extern "C" const Metadata _TMdVSs5Int32;
+extern "C" const Metadata _TMdVSs5Int64;
+extern "C" const Metadata _TMdVSs5UInt8;
+extern "C" const Metadata _TMdVSs6UInt16;
+extern "C" const Metadata _TMdVSs6UInt32;
+extern "C" const Metadata _TMdVSs6UInt64;
   
 // Set to 1 to enable reflection of objc ivars.
 #define REFLECT_OBJC_IVARS 0
@@ -922,46 +922,46 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
 
 // Addresses of the type metadata and Mirror witness tables for the primitive
 // mirrors.
-extern "C" const FullMetadata<Metadata> OpaqueMirrorMetadata
+extern "C" const Metadata OpaqueMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs13_OpaqueMirror");
 extern "C" const MirrorWitnessTable OpaqueMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVSs13_OpaqueMirrorSs11_MirrorTypeSs");
-extern "C" const FullMetadata<Metadata> TupleMirrorMetadata
+extern "C" const Metadata TupleMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs12_TupleMirror");
 extern "C" const MirrorWitnessTable TupleMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVSs12_TupleMirrorSs11_MirrorTypeSs");
 
-extern "C" const FullMetadata<Metadata> StructMirrorMetadata
+extern "C" const Metadata StructMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs13_StructMirror");
 extern "C" const MirrorWitnessTable StructMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVSs13_StructMirrorSs11_MirrorTypeSs");
 
-extern "C" const FullMetadata<Metadata> EnumMirrorMetadata
+extern "C" const Metadata EnumMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs11_EnumMirror");
 extern "C" const MirrorWitnessTable EnumMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVSs11_EnumMirrorSs11_MirrorTypeSs");
 
-extern "C" const FullMetadata<Metadata> ClassMirrorMetadata
+extern "C" const Metadata ClassMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs12_ClassMirror");
 extern "C" const MirrorWitnessTable ClassMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVSs12_ClassMirrorSs11_MirrorTypeSs");
 
-extern "C" const FullMetadata<Metadata> ClassSuperMirrorMetadata
+extern "C" const Metadata ClassSuperMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs17_ClassSuperMirror");
 extern "C" const MirrorWitnessTable ClassSuperMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVSs17_ClassSuperMirrorSs11_MirrorTypeSs");
 
-extern "C" const FullMetadata<Metadata> MetatypeMirrorMetadata
+extern "C" const Metadata MetatypeMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs15_MetatypeMirror");
 extern "C" const MirrorWitnessTable MetatypeMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVSs15_MetatypeMirrorSs11_MirrorTypeSs");
   
 #if SWIFT_OBJC_INTEROP
-extern "C" const FullMetadata<Metadata> ObjCMirrorMetadata
+extern "C" const Metadata ObjCMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs11_ObjCMirror");
 extern "C" const MirrorWitnessTable ObjCMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVSs11_ObjCMirrorSs11_MirrorTypeSs");
-extern "C" const FullMetadata<Metadata> ObjCSuperMirrorMetadata
+extern "C" const Metadata ObjCSuperMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs16_ObjCSuperMirror");
 extern "C" const MirrorWitnessTable ObjCSuperMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVSs16_ObjCSuperMirrorSs11_MirrorTypeSs");
