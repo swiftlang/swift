@@ -575,6 +575,10 @@ public:
   /// '@function_mangled_name'.
   void printName(raw_ostream &OS) const;
 
+  /// Assigns consecutive numbers to all SILValues in the function.
+  void numberValues(llvm::DenseMap<const ValueBase*,
+                    unsigned> &ValueToNumberMap) const;
+
   ASTContext &getASTContext() const;
 
   /// This function is meant for use from the debugger.  You can just say 'call

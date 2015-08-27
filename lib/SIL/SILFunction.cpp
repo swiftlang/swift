@@ -14,6 +14,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILModule.h"
 // FIXME: For mapTypeInContext
@@ -128,6 +129,19 @@ void SILFunction::setDeclContext(Decl *D) {
 void SILFunction::setDeclContext(Expr *E) {
   DeclCtx = dyn_cast_or_null<AbstractClosureExpr>(E);
 }
+
+void SILFunction::numberValues(llvm::DenseMap<const ValueBase*,
+                               unsigned> &ValueToNumberMap) const {
+  unsigned idx = 0;
+  for (auto &BB : *this) {
+    for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
+      ValueToNumberMap[*I] = idx++;
+    
+    for (auto &I : BB)
+      ValueToNumberMap[&I] = idx++;
+  }
+}
+
 
 ASTContext &SILFunction::getASTContext() const {
   return getModule().getASTContext();

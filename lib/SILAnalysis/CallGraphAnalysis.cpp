@@ -328,13 +328,7 @@ void CallGraphEdge::dump() {
 #ifndef NDEBUG
   auto &CalleeSet = getPartialCalleeSet();
   llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
-  for (auto *Node : CalleeSet)
-    OrderedNodes.push_back(Node);
-
-  std::sort(OrderedNodes.begin(), OrderedNodes.end(),
-            [](CallGraphNode *left, CallGraphNode *right) {
-              return left->getOrdinal() < right->getOrdinal();
-            });
+  orderCallees(CalleeSet, OrderedNodes);
 
   llvm::errs() << Ordinal;
   llvm::errs() << (!CalleeSet.empty() && isCalleeSetComplete() ?
@@ -356,13 +350,7 @@ void CallGraphNode::dump() {
 #ifndef NDEBUG
   auto &Edges = getCalleeEdges();
   llvm::SmallVector<CallGraphEdge *, 8> OrderedEdges;
-  for (auto *Edge : Edges)
-    OrderedEdges.push_back(Edge);
-
-  std::sort(OrderedEdges.begin(), OrderedEdges.end(),
-            [](CallGraphEdge *left, CallGraphEdge *right) {
-              return left->getOrdinal() < right->getOrdinal();
-            });
+  orderEdges(Edges, OrderedEdges);
 
   llvm::errs() << Ordinal;
   if (isDead())
@@ -632,7 +620,7 @@ struct OrderedCallGraph {
   std::vector<Node> Nodes;
 
   /// The SILValue IDs which are printed as edge source labels.
-  llvm::DenseMap<SILInstruction *, unsigned> InstToIDMap;
+  llvm::DenseMap<const ValueBase *, unsigned> InstToIDMap;
 
   typedef std::vector<Node>::iterator iterator;
 };
@@ -649,17 +637,8 @@ OrderedCallGraph::OrderedCallGraph(CallGraph *CG) {
     ONode.CGNode = CGNode;
     ONode.OCG = this;
     NodeMap[CGNode] = &ONode;
-    
-    // Do the same numbering as SILPrinter does.
-    unsigned idx = 0;
-    for (auto &BB : *F) {
-      for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
-        ++idx;
-      
-      for (auto &I : BB) {
-        InstToIDMap[&I] = ++idx;
-      }
-    }
+
+    F->numberValues(InstToIDMap);
   }
 
   for (Node &ONode : Nodes) {

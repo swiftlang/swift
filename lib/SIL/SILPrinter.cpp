@@ -1428,30 +1428,14 @@ ID SILPrinter::getID(SILValue V) {
 
   // Lazily initialize the instruction -> ID mapping.
   if (ValueToIDMap.empty()) {
-    const SILBasicBlock *ParentBB;
-    if (const SILInstruction *I = dyn_cast<SILInstruction>(V))
-      ParentBB = I->getParent();
-    else
-      ParentBB = cast<SILArgument>(V)->getParent();
-
-    // Keep the values in ValueToIDMap with a +1 bias so that lookups will get
-    // 0 for invalid numbers.
-    unsigned idx = 0;
-    for (auto &BB : *ParentBB->getParent()) {
-      for (auto I = BB.bbarg_begin(), E = BB.bbarg_end(); I != E; ++I)
-        ValueToIDMap[*I] = ++idx;
-
-      for (auto &I : BB) {
-        ValueToIDMap[&I] = ++idx;
-      }
-    }
+    V->getParentBB()->getParent()->numberValues(ValueToIDMap);
   }
 
   int ResultNumber = -1;
   if (V.getDef()->getTypes().size() > 1)
     ResultNumber = V.getResultNumber();
 
-  ID R = { ID::SSAValue, ValueToIDMap[V.getDef()]-1, ResultNumber };
+  ID R = { ID::SSAValue, ValueToIDMap[V.getDef()], ResultNumber };
   return R;
 }
 
