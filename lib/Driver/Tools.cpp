@@ -853,11 +853,6 @@ linux::Linker::constructArgumentList(const JobAction &JA,
   Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   Args.AddAllArgs(Arguments, options::OPT_F);
 
-  if (!OI.SDKPath.empty()) {
-    Arguments.push_back("--sysroot");
-    Arguments.push_back(Args.MakeArgString(OI.SDKPath));
-  }
-
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
   // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
