@@ -7,6 +7,8 @@
 // CHECK: -sdk {{.*}}/Inputs/clang-importer-sdk
 // CHECK-NEXT: bin/swift
 // CHECK: -sdk {{.*}}/Inputs/clang-importer-sdk
+// CHECK-NEXT: bin/{{.+}} {{.*}}.o{{[ "]}}
+// CHECK: {{-syslibroot|--sysroot}} {{.*}}/Inputs/clang-importer-sdk
 
 // RUN: %swift_driver -driver-print-jobs -repl -sdk %S/Inputs/nonexistent-sdk 2>&1 | FileCheck %s --check-prefix=SDKWARNING
 // RUN: %swift_driver -driver-print-jobs -sdk %S/Inputs/nonexistent-sdk 2>&1 | FileCheck %s --check-prefix=SDKWARNING
@@ -17,4 +19,4 @@
 
 // RUN: %swiftc_driver -driver-print-jobs -parse -sdk %S/../Inputs/clang-importer-sdk -module-cache-path /path/to/cache %s 2>&1 | FileCheck %s --check-prefix=CACHE-PATH
 
-// CACHE-PATH: /path/to/cache
+// CACHE-PATH: -module-cache-path /path/to/cache
