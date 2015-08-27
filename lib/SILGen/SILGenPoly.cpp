@@ -133,6 +133,7 @@
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -227,6 +228,89 @@ static ManagedValue emitInjectOptional(SILGenFunction &SGF,
   }
 
   return v;
+}
+
+static ArrayRef<ProtocolConformance*>
+collectExistentialConformances(Module *M, Type fromType, Type toType) {
+  assert(!fromType->isAnyExistentialType());
+  
+  SmallVector<ProtocolDecl *, 4> protocols;
+  toType->getAnyExistentialTypeProtocols(protocols);
+  
+  SmallVector<ProtocolConformance *, 4> conformances;
+  for (auto proto : protocols) {
+    ProtocolConformance *conformance =
+    M->lookupConformance(fromType, proto, nullptr).getPointer();
+    conformances.push_back(conformance);
+  }
+  
+  return M->getASTContext().AllocateCopy(conformances);
+}
+
+static CanArchetypeType getOpenedArchetype(Type openedType) {
+  while (auto metatypeTy = openedType->getAs<MetatypeType>())
+    openedType = metatypeTy->getInstanceType();
+  return cast<ArchetypeType>(openedType->getCanonicalType());
+}
+
+static ManagedValue emitTransformExistential(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             ManagedValue input,
+                                             CanType inputType,
+                                             CanType substType,
+                                             SGFContext ctxt) {
+  assert(inputType != substType);
+
+  SILGenFunction::OpaqueValueState state;
+  CanArchetypeType openedArchetype;
+
+  if (inputType->isAnyExistentialType()) {
+    CanType openedType = ArchetypeType::getAnyOpened(inputType);
+    SILType loweredOpenedType = SGF.getLoweredType(openedType);
+
+    // Unwrap zero or more metatype levels
+    openedArchetype = getOpenedArchetype(openedType);
+
+    state = SGF.emitOpenExistential(loc, input,
+                                    openedArchetype, loweredOpenedType);
+    inputType = openedType;
+  }
+
+  // Build conformance table
+  Type fromInstanceType = inputType;
+  Type toInstanceType = substType;
+  
+  // Look through metatypes
+  while (fromInstanceType->is<AnyMetatypeType>() &&
+         toInstanceType->is<ExistentialMetatypeType>()) {
+    fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()
+        ->getInstanceType();
+    toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()
+        ->getInstanceType();
+  }
+
+  ArrayRef<ProtocolConformance *> conformances =
+      collectExistentialConformances(SGF.SGM.M.getSwiftModule(),
+                                     fromInstanceType,
+                                     toInstanceType);
+
+  // Build result existential
+  AbstractionPattern opaque = AbstractionPattern::getOpaque();
+  const TypeLowering &concreteTL = SGF.getTypeLowering(opaque, inputType);
+  const TypeLowering &expectedTL = SGF.getTypeLowering(substType);
+  input = SGF.emitExistentialErasure(
+                   loc, inputType, concreteTL, expectedTL,
+                   conformances, ctxt,
+                   [&](SGFContext C) -> ManagedValue {
+                     if (openedArchetype)
+                       return SGF.manageOpaqueValue(state, loc, C);
+                     return input;
+                   });
+  
+  if (openedArchetype)
+    state.destroy(SGF, loc);
+
+  return input;
 }
 
 /// Apply this transformation to an arbitrary value.
@@ -366,6 +450,15 @@ ManagedValue Transform::transform(ManagedValue v,
     }
   }
 
+  //  - existentials
+  if (substFormalType->isAnyExistentialType()) {
+    // We have to re-abstract payload if its a metatype or a function
+    v = SGF.emitSubstToOrigValue(Loc, v, AbstractionPattern::getOpaque(),
+                                 inputFormalType, inputFormalType);
+    return emitTransformExistential(SGF, Loc, v,
+                                    inputFormalType, substFormalType,
+                                    ctxt);
+  }
 
   // Should have handled the conversion in one of the cases above.
   llvm_unreachable("Unhandled transform?");

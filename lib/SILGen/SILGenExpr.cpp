@@ -46,16 +46,18 @@
 using namespace swift;
 using namespace Lowering;
 
-SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
-  // Destroy the value, unless it was both uniquely referenced and consumed.
-  auto entry = Self.OpaqueValues.find(OpaqueValue);
-  if (entry->second.isConsumable && !entry->second.hasBeenConsumed) {
-    const SILValue &value = entry->second.value;
-    auto &lowering = Self.getTypeLowering(value.getType().getSwiftRValueType());
-    lowering.emitDestroyRValue(Self.B, OpaqueValue, value);
+/// Destroy the value, unless it was both uniquely referenced and consumed.
+void SILGenFunction::OpaqueValueState::destroy(SILGenFunction &gen,
+                                               SILLocation loc) {
+  if (isConsumable && !hasBeenConsumed) {
+    auto &lowering = gen.getTypeLowering(value.getType().getSwiftRValueType());
+    lowering.emitDestroyRValue(gen.B, loc, value);
   }
+}
 
-  // Remove the opaque value.
+SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
+  auto entry = Self.OpaqueValues.find(OpaqueValue);
+  entry->second.destroy(Self, OpaqueValue);
   Self.OpaqueValues.erase(entry);
 }
 
@@ -3318,6 +3320,39 @@ SILGenFunction::emitOpenExistential(
   };
 }
 
+ManagedValue SILGenFunction::manageOpaqueValue(OpaqueValueState &entry,
+                                               SILLocation loc,
+                                               SGFContext C) {
+  // If the context wants a +0 value, guaranteed or immediate, we can
+  // give it to them, because OpenExistential emission guarantees the
+  // value.
+  if (C.isGuaranteedPlusZeroOk()) {
+    return ManagedValue::forUnmanaged(entry.value);
+  }
+
+  // If the opaque value is consumable, we can just return the
+  // value with a cleanup. There is no need to retain it separately.
+  if (entry.isConsumable) {
+    assert(!entry.hasBeenConsumed
+           && "Uniquely-referenced opaque value already consumed");
+    entry.hasBeenConsumed = true;
+    return emitManagedRValueWithCleanup(entry.value);
+  }
+
+  // If the context wants us to initialize a buffer, copy there instead
+  // of making a temporary allocation.
+  if (auto I = C.getEmitInto()) {
+    if (SILValue address = getAddressForInPlaceInitialization(I)) {
+      ManagedValue::forUnmanaged(entry.value).copyInto(*this, address, loc);
+      I->finishInitialization(*this);
+      return ManagedValue::forInContext();
+    }
+  }
+
+  // Otherwise, copy the value into a temporary.
+  return ManagedValue::forUnmanaged(entry.value).copyUnmanaged(*this, loc);
+}
+
 void SILGenFunction::emitOpenExistentialExprImpl(
        OpenExistentialExpr *E,
        llvm::function_ref<void(Expr *)> emitSubExpr) {
@@ -3363,38 +3398,8 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
 
 RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
   assert(SGF.OpaqueValues.count(E) && "Didn't bind OpaqueValueExpr");
-
   auto &entry = SGF.OpaqueValues[E];
-
-  // If the context wants a +0 value, guaranteed or immediate, we can
-  // give it to them, because OpenExistential emission guarantees the
-  // value.
-  if (C.isGuaranteedPlusZeroOk()) {
-    return RValue(SGF, E, ManagedValue::forUnmanaged(entry.value));
-  }
-
-  // If the opaque value is consumable, we can just return the
-  // value with a cleanup. There is no need to retain it separately.
-  if (entry.isConsumable) {
-    assert(!entry.hasBeenConsumed
-           && "Uniquely-referenced opaque value already consumed");
-    entry.hasBeenConsumed = true;
-    return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(entry.value));
-  }
-
-  // If the context wants us to initialize a buffer, copy there instead
-  // of making a temporary allocation.
-  if (auto I = C.getEmitInto()) {
-    if (SILValue address = getAddressForInPlaceInitialization(I)) {
-      ManagedValue::forUnmanaged(entry.value).copyInto(SGF, address, E);
-      I->finishInitialization(SGF);
-      return RValue();
-    }
-  }
-
-  // Otherwise, copy the value into a temporary.
-  return RValue(SGF, E,
-                ManagedValue::forUnmanaged(entry.value).copyUnmanaged(SGF, E));
+  return RValue(SGF, E, SGF.manageOpaqueValue(entry, E, C));
 }
 
 ProtocolDecl *SILGenFunction::getPointerProtocol() {

@@ -452,6 +452,8 @@ public:
     SILValue value;
     bool isConsumable;
     bool hasBeenConsumed;
+
+    void destroy(SILGenFunction &gen, SILLocation loc);
   };
 
   /// Mapping from active opaque value expressions to their values,
@@ -1185,6 +1187,10 @@ public:
 
   /// Emit a dynamic subscript.
   RValue emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, SGFContext c);
+
+  ManagedValue manageOpaqueValue(OpaqueValueState &entry,
+                                 SILLocation loc,
+                                 SGFContext C);
 
   /// Open up the given existential value and project its payload.
   ///
