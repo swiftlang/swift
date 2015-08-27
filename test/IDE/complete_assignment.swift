@@ -2,6 +2,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_2 | FileCheck %s -check-prefix=ASSIGN_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_3 | FileCheck %s -check-prefix=ASSIGN_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_4 | FileCheck %s -check-prefix=ASSIGN_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_5 | FileCheck %s -check-prefix=ASSIGN_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_6 | FileCheck %s -check-prefix=ASSIGN_6
 
 class C1 {
 var I1 = 1
@@ -11,6 +13,15 @@ var IO1 : Int?
 var S1 = ""
 var S2 = ""
 var SO1 : String?
+
+enum D1 {
+  case case1
+  case case2
+}
+enum D2 {
+  case case3
+  case case4
+}
 
 func IntGenerator() -> Int {
   return 0
@@ -84,4 +95,22 @@ func f2() {
 // ASSIGN_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]:    StringOpGenerator()[#String?#]; name=StringOpGenerator()
 // ASSIGN_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:      VoidGen()[#Void#]; name=VoidGen()
 // ASSIGN_4-DAG: Decl[InstanceVar]/CurrNominal:                               I1[#Int#]; name=I1
+
+	func f5() {
+	  var d : D1
+	  d = .#^ASSIGN_5^#
+	}
+
+// ASSIGN_5: Begin completions, 2 items
+// ASSIGN_5-DAG: Decl[EnumElement]/ExprSpecific:     case2[#C1.D1#]; name=case2
+// ASSIGN_5-DAG: Decl[EnumElement]/ExprSpecific:     case1[#C1.D1#]; name=case1
+
+	func f6() {
+	  var d : D2
+	  d = .#^ASSIGN_6^#
+	}
+// ASSIGN_6: Begin completions, 2 items
+// ASSIGN_6-DAG: Decl[EnumElement]/ExprSpecific:     case3[#C1.D2#]; name=case3
+// ASSIGN_6-DAG:Decl[EnumElement]/ExprSpecific:     case4[#C1.D2#]; name=case4
+
 }
