@@ -5,7 +5,7 @@
 import Foundation
 
 @objc class Foo {
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC20objc_blocks_bridging3Foo3foo
+  // CHECK-LABEL: sil hidden @_TToFC20objc_blocks_bridging3Foo3foo
   // CHECK:         [[COPY:%.*]] = copy_block %0
   // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb_dSi_dSi_XFo_dSi_dSi_
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[COPY]])
@@ -15,7 +15,7 @@ import Foundation
     return f(x)
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC20objc_blocks_bridging3Foo3bar
+  // CHECK-LABEL: sil hidden @_TToFC20objc_blocks_bridging3Foo3bar
   // CHECK:         [[COPY:%.*]] = copy_block %0
   // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb_dCSo8NSString_aS__XFo_oSS_oSS_
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[COPY]])
@@ -25,7 +25,7 @@ import Foundation
     return f(x)
   }
 
-  // CHECK-LABEL: sil hidden [thunk]  @_TToFC20objc_blocks_bridging3Foo3bas
+  // CHECK-LABEL: sil hidden @_TToFC20objc_blocks_bridging3Foo3bas
   // CHECK:         [[COPY:%.*]] = copy_block %0
   // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb_dGSqCSo8NSString__aGSqS___XFo_oGSqSS__oGSqSS__
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [[THUNK]]([[COPY]])
@@ -35,7 +35,7 @@ import Foundation
     return f(x)
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC20objc_blocks_bridging3Foo16cFunctionPointerfS0_FTcSiSi1xSi_Si : $@convention(objc_method) (@convention(c) (Int) -> Int, Int, Foo) -> Int
+  // CHECK-LABEL: sil hidden @_TToFC20objc_blocks_bridging3Foo16cFunctionPointerfS0_FTcSiSi1xSi_Si : $@convention(objc_method) (@convention(c) (Int) -> Int, Int, Foo) -> Int
   // CHECK:       bb0([[F:%.*]] : $@convention(c) (Int) -> Int, [[X:%.*]] : $Int, [[SELF:%.*]] : $Foo):
   // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo16cFunctionPointerfS0_FTcSiSi1xSi_Si
   // CHECK:         apply [[NATIVE]]([[F]], [[X]], [[SELF]])
@@ -44,7 +44,7 @@ import Foundation
   }
 
   // Blocks and C function pointers must not be reabstracted when placed in optionals.
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC20objc_blocks_bridging3Foo7optFunc
+  // CHECK-LABEL: sil hidden @_TToFC20objc_blocks_bridging3Foo7optFunc
   // CHECK:         [[COPY:%.*]] = copy_block %0
   // CHECK:         [[BLOCK:%.*]] = unchecked_enum_data [[COPY]]
   // TODO: redundant reabstractions here

@@ -11,7 +11,7 @@ class A {
   @objc func foo() -> String? {
     return ""
   }
-// CHECK-LABEL:    sil hidden [thunk] @_TToFC8optional1A3foofS0_FT_GSqSS_ : $@convention(objc_method) (A) -> @autoreleased Optional<NSString>
+// CHECK-LABEL:    sil hidden @_TToFC8optional1A3foofS0_FT_GSqSS_ : $@convention(objc_method) (A) -> @autoreleased Optional<NSString>
 // CHECK:      [[T0:%.*]] = function_ref @_TFC8optional1A3foofS0_FT_GSqSS_
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]](%0)
 // CHECK-NEXT: strong_release
@@ -31,7 +31,7 @@ class A {
 // CHECK-NEXT: autorelease_return [[T0]]
 
   @objc func bar(x x : String?) {}
-// CHECK-LABEL:    sil hidden [thunk] @_TToFC8optional1A3barfS0_FT1xGSqSS__T_ : $@convention(objc_method) (Optional<NSString>, A) -> ()
+// CHECK-LABEL:    sil hidden @_TToFC8optional1A3barfS0_FT1xGSqSS__T_ : $@convention(objc_method) (Optional<NSString>, A) -> ()
 // CHECK:      [[T1:%.*]] = select_enum %0
 // CHECK-NEXT: cond_br [[T1]]
 //   Something branch: project value, translate, inject into result.

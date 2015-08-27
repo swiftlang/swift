@@ -7,7 +7,7 @@ import gizmo
 
 @objc class Foo : NSObject {
   // Bridging set parameters
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC17objc_set_bridging3Foo16bridge_Set_param{{.*}} : $@convention(objc_method) (NSSet, Foo) -> ()
+  // CHECK-LABEL: sil hidden @_TToFC17objc_set_bridging3Foo16bridge_Set_param{{.*}} : $@convention(objc_method) (NSSet, Foo) -> ()
   func bridge_Set_param(s: Set<Foo>) {
     // CHECK: bb0([[NSSET:%[0-9]+]] : $NSSet, [[SELF:%[0-9]+]] : $Foo):
     // CHECK:   strong_retain [[NSSET]] : $NSSet
@@ -21,7 +21,7 @@ import gizmo
   }
 
   // Bridging set results
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC17objc_set_bridging3Foo17bridge_Set_result{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSSet {
+  // CHECK-LABEL: sil hidden @_TToFC17objc_set_bridging3Foo17bridge_Set_result{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSSet {
   func bridge_Set_result() -> Set<Foo> { 
     // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
     // CHECK: strong_retain [[SELF]] : $Foo
@@ -35,7 +35,7 @@ import gizmo
   var property: Set<Foo> = Set()
 
   // Property getter
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC17objc_set_bridging3Foog8property{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSSet
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC17objc_set_bridging3Foog8property{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSSet
   // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
   // CHECK:   strong_retain [[SELF]] : $Foo
   // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_TFC17objc_set_bridging3Foog8property{{.*}} : $@convention(method) (@guaranteed Foo) -> @owned Set<Foo>
@@ -45,7 +45,7 @@ import gizmo
   // CHECK:   autorelease_return [[NSSET]] : $NSSet
   
   // Property setter
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC17objc_set_bridging3Foos8property{{.*}} : $@convention(objc_method) (NSSet, Foo) -> () {
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC17objc_set_bridging3Foos8property{{.*}} : $@convention(objc_method) (NSSet, Foo) -> () {
   // CHECK: bb0([[NSSET:%[0-9]+]] : $NSSet, [[SELF:%[0-9]+]] : $Foo):
   // CHECK:   strong_retain [[NSSET]] : $NSSet
   // CHECK:   strong_retain [[SELF]] : $Foo
@@ -57,8 +57,8 @@ import gizmo
   // CHECK:   strong_release [[SELF]] : $Foo
   // CHECK:   return [[RESULT]] : $()
   
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC17objc_set_bridging3Foog19nonVerbatimProperty{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSSet
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC17objc_set_bridging3Foos19nonVerbatimProperty{{.*}} : $@convention(objc_method) (NSSet, Foo) -> () {
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC17objc_set_bridging3Foog19nonVerbatimProperty{{.*}} : $@convention(objc_method) (Foo) -> @autoreleased NSSet
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC17objc_set_bridging3Foos19nonVerbatimProperty{{.*}} : $@convention(objc_method) (NSSet, Foo) -> () {
   @objc var nonVerbatimProperty: Set<String> = Set()
 }
 

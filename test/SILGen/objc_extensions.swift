@@ -12,7 +12,7 @@ extension Sub {
     didSet {
       // Ignore it.
     }
-    // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15objc_extensions3Subg4propGSQSS_
+    // CHECK-LABEL: sil hidden [transparent] @_TToFC15objc_extensions3Subg4propGSQSS_
     // CHECK: = super_method [volatile] %1 : $Sub, #Base.prop!setter.1.foreign
     // CHECK: = function_ref @_TFC15objc_extensions3SubW4propGSQSS_
     // CHECK: }

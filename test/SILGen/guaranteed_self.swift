@@ -287,7 +287,7 @@ class C: Fooable, Barrable {
   // CHECK:         return [[MARKED_SELF]]
 
   // @objc thunk for initializing constructor
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC15guaranteed_self1CcfMS0_FT_S0_ : $@convention(objc_method) (@owned C) -> @owned C
+  // CHECK-LABEL: sil hidden @_TToFC15guaranteed_self1CcfMS0_FT_S0_ : $@convention(objc_method) (@owned C) -> @owned C
   // CHECK:       bb0([[SELF:%.*]] : $C):
   // CHECK-NOT:     retain{{.*}} [[SELF]]
   // CHECK:         [[SELF2:%.*]] = apply {{%.*}}([[SELF]])
@@ -302,7 +302,7 @@ class C: Fooable, Barrable {
   // CHECK-NOT:     retain
   // CHECK-NOT:     release
 
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC15guaranteed_self1C3foofS0_FSiT_ : $@convention(objc_method) (Int, C) -> () {
+  // CHECK-LABEL: sil hidden @_TToFC15guaranteed_self1C3foofS0_FSiT_ : $@convention(objc_method) (Int, C) -> () {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
   // CHECK:         retain{{.*}} [[SELF]]
   // CHECK:         apply {{.*}} [[SELF]]
@@ -318,14 +318,14 @@ class C: Fooable, Barrable {
     self.bas()
   }
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15guaranteed_self1Cg5prop1Si : $@convention(objc_method) (C) -> Int
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC15guaranteed_self1Cg5prop1Si : $@convention(objc_method) (C) -> Int
   // CHECK:       bb0([[SELF:%.*]] : $C):
   // CHECK:         retain{{.*}} [[SELF]]
   // CHECK:         apply {{.*}}([[SELF]])
   // CHECK:         release{{.*}} [[SELF]]
   // CHECK-NOT:     release{{.*}} [[SELF]]
 
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC15guaranteed_self1Cs5prop1Si : $@convention(objc_method) (Int, C) -> ()
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC15guaranteed_self1Cs5prop1Si : $@convention(objc_method) (Int, C) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
   // CHECK:         retain{{.*}} [[SELF]]
   // CHECK:         apply {{.*}} [[SELF]]

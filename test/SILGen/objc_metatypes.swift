@@ -9,7 +9,7 @@ import gizmo
 class A {
   // CHECK-LABEL: sil hidden @_TFC14objc_metatypes1A3foo
 
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_metatypes1A3foo
+  // CHECK-LABEL: sil hidden @_TToFC14objc_metatypes1A3foo
   dynamic func foo(m: ObjCClass.Type) -> ObjCClass.Type {
     // CHECK: bb0([[M:%[0-9]+]] : $@objc_metatype ObjCClass.Type, [[SELF:%[0-9]+]] : $A):
     // CHECK:   strong_retain [[SELF]] : $A
@@ -24,7 +24,7 @@ class A {
 
   // CHECK-LABEL: sil hidden @_TZFC14objc_metatypes1A3bar
 
-  // CHECK-LABEL: sil hidden [thunk] @_TToZFC14objc_metatypes1A3bar
+  // CHECK-LABEL: sil hidden @_TToZFC14objc_metatypes1A3bar
   // CHECK: bb0([[SELF:%[0-9]+]] : $@objc_metatype A.Type):
   // CHECK-NEXT:   [[OBJC_SELF:%[0-9]+]] = objc_to_thick_metatype [[SELF]] : $@objc_metatype A.Type to $@thick A.Type
   // CHECK:   [[BAR:%[0-9]+]] = function_ref @_TZFC14objc_metatypes1A3barfMS0_FT_T_ : $@convention(thin) (@thick A.Type) -> ()

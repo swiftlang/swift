@@ -63,12 +63,12 @@ protocol Proto {
 // CHECK-LABEL: sil hidden @_TFC7dynamic3FooCfMS0_FT4objcSi_S0_
 // CHECK:         function_ref @_TFC7dynamic3FoocfMS0_FT4objcSi_S0_
 
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3FoocfMS0_FT4objcSi_S0_
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foo10objcMethodfS0_FT_T_
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foog8objcPropSi
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foos8objcPropSi
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foog9subscriptFT4objcPSs9AnyObject__Si
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foos9subscriptFT4objcPSs9AnyObject__Si
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3FoocfMS0_FT4objcSi_S0_
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3Foo10objcMethodfS0_FT_T_
+// CHECK-LABEL: sil hidden [transparent] @_TToFC7dynamic3Foog8objcPropSi
+// CHECK-LABEL: sil hidden [transparent] @_TToFC7dynamic3Foos8objcPropSi
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3Foog9subscriptFT4objcPSs9AnyObject__Si
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3Foos9subscriptFT4objcPSs9AnyObject__Si
 
 // TODO: dynamic initializing ctor must be objc dispatched
 // CHECK-LABEL: sil hidden @_TFC7dynamic3FooCfMS0_FT7dynamicSi_S0_
@@ -76,12 +76,12 @@ protocol Proto {
 // CHECK-LABEL: sil shared [transparent] @_TTDFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.init!initializer.1.foreign :
 
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foo13dynamicMethodfS0_FT_T_
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foog11dynamicPropSi
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foos11dynamicPropSi
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foog9subscriptFT7dynamicSi_Si
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foos9subscriptFT7dynamicSi_Si
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3FoocfMS0_FT7dynamicSi_S0_
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3Foo13dynamicMethodfS0_FT_T_
+// CHECK-LABEL: sil hidden [transparent] @_TToFC7dynamic3Foog11dynamicPropSi
+// CHECK-LABEL: sil hidden [transparent] @_TToFC7dynamic3Foos11dynamicPropSi
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3Foog9subscriptFT7dynamicSi_Si
+// CHECK-LABEL: sil hidden @_TToFC7dynamic3Foos9subscriptFT7dynamicSi_Si
 
 // Protocol witnesses use best appropriate dispatch
 
