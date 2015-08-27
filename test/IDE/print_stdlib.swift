@@ -13,6 +13,7 @@
 
 // CHECK-ARGC: static var argc: CInt { get }
 
+// CHECK-NOT: @rethrows
 // CHECK-NOT: {{^}}import
 // CHECK-NOT: _Double
 // CHECK-NOT: _StringBuffer
