@@ -3,7 +3,8 @@
 import Builtin
 import Swift
 
-// CHECK: sil_global private @globalinit_token0 : $Builtin.Word
+// Check that token0 gets eliminated as it is not used after removing the once call.
+// CHECK-NOT: sil_global private @globalinit_token0 : $Builtin.Word
 sil_global private @globalinit_token0 : $Builtin.Word
 
 // CHECK: sil_global @_Tv2ch1xSi : $Int32, @globalinit_func0 : $@convention(thin) () -> ()
@@ -22,7 +23,7 @@ bb0:
 
 // CHECK-LABEL: sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
 // CHECK-NEXT: bb0:
-// CHECK-NEXT: global_addr @globalinit_token0
+// CHECK-NOT: global_addr @globalinit_token0
 // CHECK-NEXT: address_to_pointer
 // CHECK: function_ref @globalinit_func0 : $@convention(thin) () -> ()
 // CHECK-NEXT: global_addr @_Tv2ch1xSi : $*Int32

@@ -280,6 +280,26 @@ static bool analyzeStaticInitializer(SILValue V,
   return false;
 }
 
+/// Remove an unused global token used by once calls.
+static void removeToken(SILValue Op) {
+  if (auto *ATPI = dyn_cast<AddressToPointerInst>(Op)) {
+    Op = ATPI->getOperand();
+    if (ATPI->use_empty())
+      ATPI->eraseFromParent();
+  }
+
+  if (GlobalAddrInst *GAI = dyn_cast<GlobalAddrInst>(Op)) {
+    auto *Global = GAI->getReferencedGlobal();
+    if (! (GAI->use_empty() || GAI->hasOneUse()) ||
+        !Global ||
+        Global->getName().find("_token") == StringRef::npos)
+      return;
+    GAI->getModule().eraseGlobalVariable(Global);
+    GAI->replaceAllUsesWithUndef();
+    GAI->eraseFromParent();
+  }
+}
+
 /// Generate getter from the initialization code whose
 /// result is stored by a given store instruction.
 static SILFunction *genGetterFromInit(StoreInst *Store,
@@ -717,6 +737,7 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
          "The value of the initializer should be known at compile-time");
   assert(SILG->getDecl() &&
          "Decl corresponding to the global variable should be known");
+  removeToken(CallToOnce->getOperand(0));
   eraseUsesOfInstruction(CallToOnce);
   recursivelyDeleteTriviallyDeadInstructions(CallToOnce, true);
 
@@ -806,6 +827,7 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF, GlobalInitCalls &Call
 
   // Remove "once" call from the addressor.
   if (!isAssignedOnlyOnceInInitializer(SILG) || !SILG->getDecl()) {
+    removeToken(CallToOnce->getOperand(0));
     CallToOnce->eraseFromParent();
     SILG->setInitializer(InitF);
     HasChanged = true;
