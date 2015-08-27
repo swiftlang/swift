@@ -1842,22 +1842,16 @@ NSStringAPIs.test("stringByApplyingTransform(_:reverse:)") {
 
 struct ComparisonTest {
   let expectedUnicodeCollation: ExpectedComparisonResult
-  let expectedHasPrefix: Bool
-  let expectedHasSuffix: Bool
   let lhs: String
   let rhs: String
   let loc: SourceLoc
 
   init(
-    hasPrefix: Bool,
-    hasSuffix: Bool,
     _ expectedUnicodeCollation: ExpectedComparisonResult,
     _ lhs: String, _ rhs: String,
     file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.expectedUnicodeCollation = expectedUnicodeCollation
-    self.expectedHasPrefix = hasPrefix
-    self.expectedHasSuffix = hasSuffix
     self.lhs = lhs
     self.rhs = rhs
     self.loc = SourceLoc(file, line, comment: "test data")
@@ -1865,23 +1859,18 @@ struct ComparisonTest {
 }
 
 let comparisonTests = [
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .EQ, "", ""),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .LT, "", "a"),
+  ComparisonTest(.EQ, "", ""),
+  ComparisonTest(.LT, "", "a"),
 
   // ASCII cases
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .LT, "t", "tt"),
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .GT, "tt", "t"),
-  // According to DUCET: a < A < b < B.
-  // This is NOT ascii order.
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .GT, "T", "t"),
-  // According to DUCET \0 has no collation value and so is ignored in the
-  // ordering relation.
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .EQ, "\u{0}", ""),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .EQ, "\u{1}", "\u{0}"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .LT, "\r\n", "t"),
-  ComparisonTest(hasPrefix: false, hasSuffix: true, .GT, "\r\n", "\n"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .EQ, "\u{0}", "\u{0}\u{0}"),
-  ComparisonTest(hasPrefix: false, hasSuffix: true, .EQ, "\u{0}\u{0}", "\u{0}"),
+  ComparisonTest(.LT, "t", "tt"),
+  ComparisonTest(.GT, "t", "Tt"),
+  ComparisonTest(.GT, "\u{0}", ""),
+  ComparisonTest(.EQ, "\u{0}", "\u{0}"),
+  // Currently fails:
+  // ComparisonTest(.LT, "\r\n", "t"),
+  // ComparisonTest(.GT, "\r\n", "\n"),
+  // ComparisonTest(.LT, "\u{0}", "\u{0}\u{0}"),
 
   // Whitespace
   // U+000A LINE FEED (LF)
@@ -1890,60 +1879,59 @@ let comparisonTests = [
   // U+0085 NEXT LINE (NEL)
   // U+2028 LINE SEPARATOR
   // U+2029 PARAGRAPH SEPARATOR
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .GT, "\u{0085}", "\n"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .GT, "\u{000b}", "\n"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .GT, "\u{000c}", "\n"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .GT, "\u{2028}", "\n"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .GT, "\u{2029}", "\n"),
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .GT, "\r\n\r\n", "\r\n"),
+  ComparisonTest(.GT, "\u{0085}", "\n"),
+  ComparisonTest(.GT, "\u{000b}", "\n"),
+  ComparisonTest(.GT, "\u{000c}", "\n"),
+  ComparisonTest(.GT, "\u{2028}", "\n"),
+  ComparisonTest(.GT, "\u{2029}", "\n"),
+  ComparisonTest(.GT, "\r\n\r\n", "\r\n"),
 
   // U+0301 COMBINING ACUTE ACCENT
   // U+00E1 LATIN SMALL LETTER A WITH ACUTE
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "a\u{301}", "\u{e1}"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .LT, "a", "a\u{301}"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .LT, "a", "\u{e1}"),
+  ComparisonTest(.EQ, "a\u{301}", "\u{e1}"),
+  ComparisonTest(.LT, "a", "a\u{301}"),
+  ComparisonTest(.LT, "a", "\u{e1}"),
 
   // U+304B HIRAGANA LETTER KA
   // U+304C HIRAGANA LETTER GA
   // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{304b}", "\u{304b}"),
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{304c}", "\u{304c}"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .LT, "\u{304b}", "\u{304c}"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .LT, "\u{304b}", "\u{304c}\u{3099}"),
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{304c}", "\u{304b}\u{3099}"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .LT, "\u{304c}", "\u{304c}\u{3099}"),
+  ComparisonTest(.EQ, "\u{304b}", "\u{304b}"),
+  ComparisonTest(.EQ, "\u{304c}", "\u{304c}"),
+  ComparisonTest(.LT, "\u{304b}", "\u{304c}"),
+  ComparisonTest(.LT, "\u{304b}", "\u{304c}\u{3099}"),
+  ComparisonTest(.EQ, "\u{304c}", "\u{304b}\u{3099}"),
+  ComparisonTest(.LT, "\u{304c}", "\u{304c}\u{3099}"),
 
   // U+212B ANGSTROM SIGN
   // U+030A COMBINING RING ABOVE
   // U+00C5 LATIN CAPITAL LETTER A WITH RING ABOVE
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{212b}", "A\u{30a}"),
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{212b}", "\u{c5}"),
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "A\u{30a}", "\u{c5}"),
-
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .GT, "A\u{30a}", "a"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .LT, "A", "A\u{30a}"),
+  ComparisonTest(.EQ, "\u{212b}", "A\u{30a}"),
+  ComparisonTest(.EQ, "\u{212b}", "\u{c5}"),
+  ComparisonTest(.EQ, "A\u{30a}", "\u{c5}"),
+  ComparisonTest(.LT, "A\u{30a}", "a"),
+  ComparisonTest(.LT, "A", "A\u{30a}"),
 
   // U+2126 OHM SIGN
   // U+03A9 GREEK CAPITAL LETTER OMEGA
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{2126}", "\u{03a9}"),
+  ComparisonTest(.EQ, "\u{2126}", "\u{03a9}"),
 
   // U+0323 COMBINING DOT BELOW
   // U+0307 COMBINING DOT ABOVE
   // U+1E63 LATIN SMALL LETTER S WITH DOT BELOW
   // U+1E69 LATIN SMALL LETTER S WITH DOT BELOW AND DOT ABOVE
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{1e69}", "s\u{323}\u{307}"),
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{1e69}", "s\u{307}\u{323}"),
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{1e69}", "\u{1e63}\u{307}"),
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{1e63}", "s\u{323}"),
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{1e63}\u{307}", "s\u{323}\u{307}"),
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{1e63}\u{307}", "s\u{307}\u{323}"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .LT, "s\u{323}", "\u{1e69}"),
+  ComparisonTest(.EQ, "\u{1e69}", "s\u{323}\u{307}"),
+  ComparisonTest(.EQ, "\u{1e69}", "s\u{307}\u{323}"),
+  ComparisonTest(.EQ, "\u{1e69}", "\u{1e63}\u{307}"),
+  ComparisonTest(.EQ, "\u{1e63}", "s\u{323}"),
+  ComparisonTest(.EQ, "\u{1e63}\u{307}", "s\u{323}\u{307}"),
+  ComparisonTest(.EQ, "\u{1e63}\u{307}", "s\u{307}\u{323}"),
+  ComparisonTest(.LT, "s\u{323}", "\u{1e69}"),
 
   // U+FB01 LATIN SMALL LIGATURE FI
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{fb01}", "\u{fb01}"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .LT, "fi", "\u{fb01}"),
+  ComparisonTest(.EQ, "\u{fb01}", "\u{fb01}"),
+  ComparisonTest(.LT, "fi", "\u{fb01}"),
 
-  // We don't perform Unicode collation in semi-stable mode.
+  // Test that Unicode collation is performed in deterministic mode.
   //
   // U+0301 COMBINING ACUTE ACCENT
   // U+0341 COMBINING ACUTE TONE MARK
@@ -1956,31 +1944,16 @@ let comparisonTests = [
   //
   // U+0301 and U+0954 don't decompose in the canonical decomposition mapping.
   // U+0341 has a canonical decomposition mapping of U+0301.
-  ComparisonTest(hasPrefix: true, hasSuffix: true, .EQ, "\u{0301}", "\u{0341}"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .EQ, "\u{0301}", "\u{0954}"),
-  ComparisonTest(hasPrefix: false, hasSuffix: false, .EQ, "\u{0341}", "\u{0954}"),
+  ComparisonTest(.EQ, "\u{0301}", "\u{0341}"),
+  ComparisonTest(.LT, "\u{0301}", "\u{0954}"),
+  ComparisonTest(.LT, "\u{0341}", "\u{0954}"),
 ]
 
-func forceUTF16String(var str: String) -> String {
-  if str._core.isASCII {
-    str.insert("\u{0130}", atIndex: str.startIndex)
-    str.removeAtIndex(str.startIndex)
-  }
-  return str
-}
-
-func toCocoaBackedString(str: String) -> String {
-  let utf16String = forceUTF16String(str)
-
-  return String(NSString(
-    characters: utf16String._core.startUTF16,
-    length: utf16String._core.count))
-}
-
-func checkStringComparisons(
-  expected: ExpectedComparisonResult, _ lhs: String, _ rhs: String,
-  _ stackTrace: SourceLocStack
+func checkStringComparison(
+  expected: ExpectedComparisonResult,
+  _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
 ) {
+  // String / String
   expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
   expectEqual(expected.isNE(), lhs != rhs, stackTrace: stackTrace)
   checkHashable(
@@ -1991,14 +1964,6 @@ func checkStringComparisons(
   expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
   expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
   checkComparable(expected, lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
-}
-
-func checkStringComparison(
-  expected: ExpectedComparisonResult,
-  _ lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
-) {
-  // String / String
-  checkStringComparisons(expected, lhs, rhs, stackTrace.withCurrentLoc())
 
   // NSString / NSString
   let lhsNSString = lhs as NSString
@@ -2015,20 +1980,6 @@ func checkStringComparison(
   checkHashable(
     expectedEqualUnicodeScalars, lhsNSString, rhsNSString,
     stackTrace: stackTrace.withCurrentLoc())
-
-  // Test cocoa backed Strings
-  let lhsWithCocoaBuffer = toCocoaBackedString(lhs)
-  let rhsWithCocoaBuffer = toCocoaBackedString(rhs)
-
-  // String (cocoa) / String (cocoa)
-  checkStringComparisons(expected, lhsWithCocoaBuffer, rhsWithCocoaBuffer,
-    stackTrace.withCurrentLoc())
-  // String / String (cocoa)
-  checkStringComparisons(expected, lhs, rhsWithCocoaBuffer,
-    stackTrace.withCurrentLoc())
-  // String (cocoa) / String
-  checkStringComparisons(expected, lhsWithCocoaBuffer, rhs,
-    stackTrace.withCurrentLoc())
 }
 
 NSStringAPIs.test("String.{Equatable,Hashable,Comparable}") {
@@ -2075,8 +2026,7 @@ NSStringAPIs.test("Character.{Equatable,Hashable,Comparable}") {
 }
 
 func checkHasPrefixHasSuffix(
-  expectedHasPrefix: Bool, _ expectedHasSuffix: Bool,  _ lhs: String,
-  _ rhs: String, _ stackTrace: SourceLocStack
+  lhs: String, _ rhs: String, _ stackTrace: SourceLocStack
 ) {
   if lhs == "" {
     return
@@ -2087,18 +2037,49 @@ func checkHasPrefixHasSuffix(
     return
   }
 
-  expectEqual(expectedHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
+  // To determine the expected results, compare grapheme clusters,
+  // scalar-to-scalar, of the NFD form of the strings.
+  let lhsNFDGraphemeClusters =
+    lhs.decomposedStringWithCanonicalMapping.characters.map {
+      Array(String($0).unicodeScalars)
+    }
+  let rhsNFDGraphemeClusters =
+    rhs.decomposedStringWithCanonicalMapping.characters.map {
+      Array(String($0).unicodeScalars)
+    }
+  let expectHasPrefix = lhsNFDGraphemeClusters.startsWith(
+    rhsNFDGraphemeClusters, isEquivalent: (==))
+  let expectHasSuffix =
+    lhsNFDGraphemeClusters.lazy.reverse().startsWith(
+      rhsNFDGraphemeClusters.lazy.reverse(), isEquivalent: (==))
+
+  expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
   expectEqual(
-    expectedHasPrefix, (lhs + "abc").hasPrefix(rhs), stackTrace: stackTrace)
-  expectEqual(expectedHasSuffix, lhs.hasSuffix(rhs), stackTrace: stackTrace)
+    expectHasPrefix, (lhs + "abc").hasPrefix(rhs), stackTrace: stackTrace)
+  expectEqual(expectHasSuffix, lhs.hasSuffix(rhs), stackTrace: stackTrace)
   expectEqual(
-    expectedHasSuffix, ("abc" + lhs).hasSuffix(rhs), stackTrace: stackTrace)
+    expectHasSuffix, ("abc" + lhs).hasSuffix(rhs), stackTrace: stackTrace)
 }
 
 NSStringAPIs.test("hasPrefix,hasSuffix") {
   for test in comparisonTests {
-    checkHasPrefixHasSuffix(test.expectedHasPrefix, test.expectedHasSuffix,
-      test.lhs, test.rhs, test.loc.withCurrentLoc())
+    checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
+    checkHasPrefixHasSuffix(test.rhs, test.lhs, test.loc.withCurrentLoc())
+  }
+}
+
+NSStringAPIs.test("Failures{hasPrefix,hasSuffix}-CF")
+  .xfail(.Custom({ true }, reason: "rdar://problem/19034601")).code {
+  let test = ComparisonTest(.LT, "\u{0}", "\u{0}\u{0}")
+  checkHasPrefixHasSuffix(test.lhs, test.rhs, test.loc.withCurrentLoc())
+}
+
+NSStringAPIs.test("Failures{hasPrefix,hasSuffix}")
+  .xfail(.Custom({ true }, reason: "blocked on rdar://problem/19036555")).code {
+  let tests =
+    [ComparisonTest(.LT, "\r\n", "t"), ComparisonTest(.GT, "\r\n", "\n")]
+  tests.forEach {
+    checkHasPrefixHasSuffix($0.lhs, $0.rhs, $0.loc.withCurrentLoc())
   }
 }
 

@@ -26,17 +26,6 @@
 #include <unicode/ucoleitr.h>
 #include <unicode/uiter.h>
 
-// We want to cache the unicode collation values for the ASCII range and use
-// this cache instead for a quicker lookup than going through the root collator.
-//
-// For this purpose we create two tables. One that caches the ASCII ordering as
-// returned by the root collator. This table is static and we can use this for
-// comparison and ordering.
-// The second table is cached the first time it is queried. This table caches
-// the actual collation values. We use this table for hashing. Collation values
-// might change between versions of the ICU dylib and so we can't store this in
-// a static table.
-
 /// Zero weight 0-8, 14-31, 127.
 const int8_t _swift_stdlib_unicode_ascii_collation_table_impl[128] = {
     0,  0,  0,  0,  0,  0,  0,  0,  0,  1,  2,  3,  4,  5,  0,   0,  0,  0,  0,

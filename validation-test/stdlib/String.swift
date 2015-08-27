@@ -888,9 +888,9 @@ StringTests.test("Conversions") {
 StringTests.test(
   "forall x: Int8, y: Int8 . x < 128 ==> x <ascii y == x <unicode y") {
   let asciiDomain = (0..<128).map({ String(UnicodeScalar($0)) })
-  expectEqualFunctionsForDomain2(
-    asciiDomain, asciiDomain,
-    _compareDeterministicUnicodeCollation, _compareString)
+  expectEqualMethodsForDomain(
+    asciiDomain, asciiDomain, 
+    String._compareDeterministicUnicodeCollation, String._compareASCII)
 }
 
 StringTests.test("lowercaseString") {
