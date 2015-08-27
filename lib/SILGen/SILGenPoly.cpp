@@ -165,9 +165,9 @@ namespace {
     /// Transform a metatype value.
     virtual ManagedValue transformMetatype(ManagedValue fn,
                                            AbstractionPattern origType,
-                                           CanAnyMetatypeType inputType,
-                                           CanAnyMetatypeType substType) = 0;
-    
+                                           CanMetatypeType inputType,
+                                           CanMetatypeType substType) = 0;
+
     /// Transform a tuple value.
     ManagedValue transformTuple(ManagedValue input,
                                 AbstractionPattern origType,
@@ -324,14 +324,9 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   //  - metatypes
-  if (auto substMetaType = dyn_cast<AnyMetatypeType>(substFormalType)) {
-    auto inputMetaType = cast<AnyMetatypeType>(inputFormalType);
-    v = transformMetatype(v, origFormalType, inputMetaType, substMetaType);
-
-    // Check if we have any more conversions remaining -- we might have to
-    // upcast the metatype also.
-    if (v.getType() == loweredResultTy)
-      return v;
+  if (auto substMetaType = dyn_cast<MetatypeType>(substFormalType)) {
+    auto inputMetaType = cast<MetatypeType>(inputFormalType);
+    return transformMetatype(v, origFormalType, inputMetaType, substMetaType);
   }
 
   // Subtype conversions:
@@ -364,21 +359,13 @@ ManagedValue Transform::transform(ManagedValue v,
         // Replace the cleanup with a new one on the superclass value so we
         // always use concrete retain/release operations.
         return ManagedValue(SGF.B.createUpcast(Loc,
-                                               v.forward(SGF),
+                                               v.getValue(),
                                                loweredResultTy),
                             v.getCleanup());
       }
     }
   }
 
-  //  - class metatype upcasts
-  if (auto substMetaType = dyn_cast<MetatypeType>(substFormalType)) {
-    if (substMetaType->getInstanceType()->getClassOrBoundGenericClass()) {
-      return ManagedValue::forUnmanaged(SGF.B.createUpcast(Loc,
-                                                           v.getUnmanagedValue(),
-                                                           loweredResultTy));
-    }
-  }
 
   // Should have handled the conversion in one of the cases above.
   llvm_unreachable("Unhandled transform?");
@@ -1428,132 +1415,26 @@ emitTransformedFunctionValue(SILGenFunction &gen,
   return fn;
 }
 
-// Convert a metatype to the appropriate representation.
-static ManagedValue emitOrigToSubstMetatype(SILGenFunction &gen,
-                                            SILLocation loc,
-                                            ManagedValue meta,
-                                            AbstractionPattern origType,
-                                            CanAnyMetatypeType inputType,
-                                            CanAnyMetatypeType substType) {
+// Convert a metatype to 'thin' or 'thick'.
+static ManagedValue emitReabstractMetatype(SILGenFunction &gen,
+                                           SILLocation loc,
+                                           ManagedValue meta,
+                                           SILType expectedType) {
   assert(!meta.hasCleanup() && "metatype with cleanup?!");
 
-  auto substSILType = gen.getLoweredLoadableType(substType);
+  auto wasRepr = meta.getType().castTo<MetatypeType>()->getRepresentation();
+  auto willBeRepr = expectedType.castTo<MetatypeType>()->getRepresentation();
 
-  auto wasRepr = meta.getType().castTo<AnyMetatypeType>()->getRepresentation();
-  auto willBeRepr = substSILType.castTo<AnyMetatypeType>()->getRepresentation();
-  
-  // Convert the representation appropriately.
-  switch (wasRepr) {
-  case MetatypeRepresentation::Thick:
-    switch (willBeRepr) {
-    case MetatypeRepresentation::Thin: {
-      // Thin -> thick conversion.
-      assert(substSILType.is<MetatypeType>());
-      auto metaTy = gen.B.createMetatype(loc, substSILType);
-      return ManagedValue::forUnmanaged(metaTy);
-    }
-
-    case MetatypeRepresentation::Thick:
-      // No conversion necessary.
-      return meta;
-
-    case MetatypeRepresentation::ObjC:
-      // FIXME: Thick -> ObjC.
-      llvm_unreachable("Unhandled thick -> ObjC metatype conversion");
-    }
-
-  case MetatypeRepresentation::Thin:
-    switch (willBeRepr) {
-    case MetatypeRepresentation::Thin:
-      // No conversion necessary.
-      return meta;
-
-    case MetatypeRepresentation::Thick:
-      llvm_unreachable("abstracting thick to thin metatype?!");
-
-    case MetatypeRepresentation::ObjC:
-      llvm_unreachable("abstracting ObjC to thin metatype?!");
-    }
-
-  case MetatypeRepresentation::ObjC:
-    switch (willBeRepr) {
-    case MetatypeRepresentation::Thin: {
-      // Thin -> thick conversion.
-      auto metaTy = gen.B.createMetatype(loc, substSILType);
-      return ManagedValue::forUnmanaged(metaTy);
-    }
-
-    case MetatypeRepresentation::Thick:
-      // FIXME: Thick -> ObjC.
-      llvm_unreachable("Unhandled ObjC -> thick metatype conversion");
-
-    case MetatypeRepresentation::ObjC:
-      // No conversion necessary.
-      return meta;
-    }
+  if ((wasRepr == MetatypeRepresentation::Thick &&
+       willBeRepr == MetatypeRepresentation::Thin) ||
+      (wasRepr == MetatypeRepresentation::Thin &&
+       willBeRepr == MetatypeRepresentation::Thick)) {
+    auto metaTy = gen.B.createMetatype(loc, expectedType);
+    return ManagedValue::forUnmanaged(metaTy);
   }
-}
 
-// Convert a metatype to 'thick' if its abstraction pattern requires it.
-static ManagedValue emitSubstToOrigMetatype(SILGenFunction &gen,
-                                            SILLocation loc,
-                                            ManagedValue meta,
-                                            AbstractionPattern origType,
-                                            CanAnyMetatypeType inputType,
-                                            CanAnyMetatypeType substType) {
-  assert(!meta.hasCleanup() && "metatype with cleanup?!");
-  
-  auto loweredTy = gen.getLoweredType(origType, substType);
-
-  auto wasRepr = meta.getType().castTo<AnyMetatypeType>()->getRepresentation();
-  auto willBeRepr = loweredTy.castTo<AnyMetatypeType>()->getRepresentation();
-  
-  // Convert the representation appropriately.
-  switch (wasRepr) {
-  case MetatypeRepresentation::Thick:
-    switch (willBeRepr) {
-    case MetatypeRepresentation::Thin:
-      llvm_unreachable("Cannot convert thick to thin metatype");
-
-    case MetatypeRepresentation::Thick:
-      // No conversion necessary.
-      return meta;
-
-    case MetatypeRepresentation::ObjC:
-      llvm_unreachable("Cannot convert ObjC to thin metatype");
-    }
-
-  case MetatypeRepresentation::Thin:
-    switch (willBeRepr) {
-    case MetatypeRepresentation::Thin:
-      // No conversion necessary.
-      return meta;
-
-    case MetatypeRepresentation::Thick: {
-      // Thin -> thick conversion.
-      auto metaTy = gen.B.createMetatype(loc, loweredTy);
-      return ManagedValue::forUnmanaged(metaTy);
-    }
-
-    case MetatypeRepresentation::ObjC:
-      // FIXME: Thin -> ObjC.
-      llvm_unreachable("Unhandled Thin -> ObjC");
-    }
-
-  case MetatypeRepresentation::ObjC:
-    switch (willBeRepr) {
-    case MetatypeRepresentation::Thin:
-      llvm_unreachable("Cannot convert ObjC to thin metatype");
-
-    case MetatypeRepresentation::Thick:
-      // FIXME: Objc -> Thick.
-      llvm_unreachable("Unhandled ObjC -> thick");
-
-    case MetatypeRepresentation::ObjC:
-      // No conversion necessary.
-      return meta;
-    }
-  }
+  assert(wasRepr == willBeRepr && "Unhandled metatype conversion");
+  return meta;
 }
 
 namespace {
@@ -1573,10 +1454,17 @@ namespace {
 
     ManagedValue transformMetatype(ManagedValue meta,
                                    AbstractionPattern origType,
-                                   CanAnyMetatypeType inputType,
-                                   CanAnyMetatypeType substType) override {
-      return emitOrigToSubstMetatype(SGF, Loc, meta,
-                                     origType, inputType, substType);
+                                   CanMetatypeType inputType,
+                                   CanMetatypeType substType) override {
+      if (inputType.getInstanceType() != substType.getInstanceType()) {
+        auto expectedType = SGF.getLoweredType(origType, substType);
+
+        meta = ManagedValue::forUnmanaged(
+            SGF.B.createUpcast(Loc, meta.getUnmanagedValue(), expectedType));
+      }
+
+      return emitReabstractMetatype(SGF, Loc, meta,
+                                    SGF.getLoweredType(substType));
     }
     
     const TypeLowering &getExpectedTypeLowering(AbstractionPattern origType,
@@ -1623,10 +1511,18 @@ namespace {
     
     ManagedValue transformMetatype(ManagedValue meta,
                                    AbstractionPattern origType,
-                                   CanAnyMetatypeType inputType,
-                                   CanAnyMetatypeType substType) override {
-      return emitSubstToOrigMetatype(SGF, Loc, meta,
-                                     origType, inputType, substType);
+                                   CanMetatypeType inputType,
+                                   CanMetatypeType substType) override {
+      meta = emitReabstractMetatype(SGF, Loc, meta,
+                                    SGF.getLoweredType(origType, inputType));
+
+      if (inputType.getInstanceType() == substType.getInstanceType())
+        return meta;
+
+      return ManagedValue::forUnmanaged(
+          SGF.B.createUpcast(Loc,
+                             meta.getUnmanagedValue(),
+                             SGF.getLoweredType(substType)));
     }
   };
 }
