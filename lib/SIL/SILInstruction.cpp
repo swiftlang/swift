@@ -589,6 +589,19 @@ namespace {
              X->getType()    == RHS->getType();
     }
 
+    bool visitWitnessMethodInst(const WitnessMethodInst *RHS) {
+      auto *X = cast<WitnessMethodInst>(LHS);
+      if (X->isVolatile() != RHS->isVolatile())
+        return false;
+      if (X->getMember() != RHS->getMember())
+        return false;
+      if (X->getLookupType() != RHS->getLookupType())
+        return false;
+      if (X->getConformance() != RHS->getConformance())
+        return false;
+      return true;
+    }
+
   private:
     const SILInstruction *LHS;
   };

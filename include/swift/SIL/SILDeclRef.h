@@ -23,6 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/Types.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -262,6 +263,15 @@ struct SILDeclRef {
 
   /// \brief Return the expected linkage of this declaration.
   SILLinkage getLinkage(ForDefinition_t forDefinition) const;
+
+  /// \brief Return the hash code for the SIL declaration.
+  llvm::hash_code getHashCode() const {
+    return llvm::hash_combine(loc.getOpaqueValue(),
+                              static_cast<int>(kind),
+                              Expansion, uncurryLevel,
+                              isForeign, isDirectReference,
+                              defaultArgIndex);
+  }
 
   bool operator==(SILDeclRef rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()

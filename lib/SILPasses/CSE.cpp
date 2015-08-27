@@ -87,6 +87,9 @@ struct SimpleValue {
     if (auto *CMI = dyn_cast<ClassMethodInst>(Inst)) {
       return !CMI->isVolatile();
     }
+    if (auto *WMI = dyn_cast<WitnessMethodInst>(Inst)) {
+      return !WMI->isVolatile();
+    }
     switch (Inst->getKind()) {
     case ValueKind::FunctionRefInst:
     case ValueKind::GlobalAddrInst:
@@ -431,6 +434,19 @@ public:
 
   hash_code visitPointerToThinFunctionInst(PointerToThinFunctionInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
+  }
+
+  hash_code visitWitnessMethodInst(WitnessMethodInst *X) {
+    OperandValueArrayRef Operands(X->getAllOperands());
+    return llvm::hash_combine(X->getKind(),
+                              X->getLookupType().getPointer(),
+                              X->getMember().getHashCode(),
+                              X->getConformance(),
+                              X->getType(),
+                              X->hasOperand(),
+                              llvm::hash_combine_range(
+                              Operands.begin(),
+                              Operands.end()));
   }
 };
 } // end anonymous namespace
