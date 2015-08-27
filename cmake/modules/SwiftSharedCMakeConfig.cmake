@@ -127,6 +127,11 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
         SOURCE_DIR llvm_config_src_dir
     )
 
+    # Assertions should follow llvm-config's setting by default.
+    set(LLVM_ENABLE_ASSERTIONS ${llvm_config_enable_assertions}
+        CACHE BOOL "Enable assertions")
+    mark_as_advanced(LLVM_ENABLE_ASSERTIONS)
+
     set(LLVM_TOOLS_BINARY_DIR "${llvm_config_tools_binary_dir}" CACHE PATH "Path to llvm/bin")
     set(LLVM_LIBRARY_DIR "${llvm_config_library_dir}" CACHE PATH "Path to llvm/lib")
     set(LLVM_MAIN_INCLUDE_DIR "${llvm_config_include_dir}" CACHE PATH "Path to llvm/include")
