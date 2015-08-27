@@ -590,9 +590,8 @@ public:
   /// \returns True if this type is \c ty or a superclass of \c ty.
   bool isSuperclassOf(Type ty, LazyResolver *resolver);
 
-  /// \brief Determines whether this type is a subtype of the \p other,
-  /// guaranteed to have the same representation, and is permitted in an
-  /// override.
+  /// \brief Determines whether this type is permitted as a method override
+  /// of the \p other.
   bool canOverride(Type other, bool allowUnsafeParameterOverride,
                    LazyResolver *resolver);
 
