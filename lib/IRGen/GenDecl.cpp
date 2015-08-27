@@ -974,9 +974,18 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   switch (getKind()) {
   // Most type metadata depend on the formal linkage of their type.
   case Kind::ValueWitnessTable:
-  case Kind::TypeMetadata:
   case Kind::TypeMangling:
     return getSILLinkage(getTypeLinkage(getType()), forDefinition);
+
+  case Kind::TypeMetadata:
+    switch (getMetadataAddress()) {
+    case TypeMetadataAddress::DirectFullMetadata:
+      // The full metadata object is private to the containing module.
+      return SILLinkage::Private;
+    case TypeMetadataAddress::Direct:
+    case TypeMetadataAddress::Indirect:
+      return getSILLinkage(getTypeLinkage(getType()), forDefinition);
+    }
 
   // ...but we don't actually expose individual value witnesses (right now).
   case Kind::ValueWitness:
@@ -1215,36 +1224,43 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
   return fn;
 }
 
+bool LinkInfo::isUsed() const {
+  // Everything externally visible is considered used in Swift.
+  // That mostly means we need to be good at not marking things external.
+  return ForDefinition &&
+      Linkage == llvm::GlobalValue::ExternalLinkage &&
+      Visibility == llvm::GlobalValue::DefaultVisibility;
+}
+
 /// Get or create an LLVM global variable with these linkage rules.
 llvm::GlobalVariable *LinkInfo::createVariable(IRGenModule &IGM,
                                                llvm::Type *storageType,
                                                DebugTypeInfo DebugType,
                                                Optional<SILLocation> DebugLoc,
                                                StringRef DebugName) {
-  llvm::GlobalVariable *existing = IGM.Module.getNamedGlobal(getName());
-  if (existing) {
-    if (isPointerTo(existing->getType(), storageType))
-      return existing;
+  llvm::GlobalValue *existingValue = IGM.Module.getNamedGlobal(getName());
+  if (existingValue) {
+    auto existingVar = dyn_cast<llvm::GlobalVariable>(existingValue);
+    if (existingVar && isPointerTo(existingVar->getType(), storageType))
+      return existingVar;
 
     IGM.error(SourceLoc(),
               "program too clever: variable collides with existing symbol "
                 + getName());
 
     // Note that this will implicitly unique if the .unique name is also taken.
-    existing->setName(getName() + ".unique");
+    existingValue->setName(getName() + ".unique");
   }
 
-  llvm::GlobalVariable *var
-    = new llvm::GlobalVariable(IGM.Module, storageType, /*constant*/ false,
-                               getLinkage(), /*initializer*/ nullptr,
-                               getName());
+  auto var = new llvm::GlobalVariable(IGM.Module, storageType,
+                                      /*constant*/ false,
+                                      getLinkage(), /*initializer*/ nullptr,
+                                      getName());
   var->setVisibility(getVisibility());
 
   // Everything externally visible is considered used in Swift.
   // That mostly means we need to be good at not marking things external.
-  if (ForDefinition &&
-      Linkage == llvm::GlobalValue::ExternalLinkage &&
-      Visibility == llvm::GlobalValue::DefaultVisibility) {
+  if (isUsed()) {
     IGM.addUsedGlobal(var);
   }
 
@@ -1489,12 +1505,12 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
                                              llvm::Type *defaultType,
                                              llvm::Type *pointerToDefaultType,
                                              DebugTypeInfo debugType) {
-  // This function assumes that 'globals' only contains GlobalVariable
+  // This function assumes that 'globals' only contains GlobalValue
   // values for the entities that it will look up.
 
   auto &entry = globals[entity];
   if (entry) {
-    auto existing = cast<llvm::GlobalVariable>(entry);
+    auto existing = cast<llvm::GlobalValue>(entry);
 
     // If we're looking to define something, we may need to replace a
     // forward declaration.
@@ -1530,7 +1546,7 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
   // If we have an existing entry, destroy it, replacing it with the
   // new variable.
   if (entry) {
-    auto existing = cast<llvm::GlobalVariable>(entry);
+    auto existing = cast<llvm::GlobalValue>(entry);
     auto castVar = llvm::ConstantExpr::getBitCast(var, pointerToDefaultType);
     existing->replaceAllUsesWith(castVar);
     existing->eraseFromParent();
@@ -1568,7 +1584,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass,
 }
 
 /// Fetch a global reference to the given Objective-C metaclass.
-/// The result is always a GlobalVariable of ObjCClassPtrTy.
+/// The result is always a GlobalValue of ObjCClassPtrTy.
 llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass,
                                                 ForDefinition_t forDefinition) {
   assert(ObjCInterop && "getting address of ObjC metaclass in no-interop mode");
@@ -1582,7 +1598,7 @@ llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass,
 }
 
 /// Fetch the declaration of the metaclass stub for the given class type.
-/// The result is always a GlobalVariable of ObjCClassPtrTy.
+/// The result is always a GlobalValue of ObjCClassPtrTy.
 llvm::Constant *IRGenModule::getAddrOfSwiftMetaclassStub(ClassDecl *theClass,
                                                 ForDefinition_t forDefinition) {
   assert(ObjCInterop && "getting address of metaclass stub in no-interop mode");
@@ -1638,7 +1654,7 @@ IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
   llvm::Constant *&entry = GlobalVars[entity];
   if (entry) {
     if (forDefinition)
-      updateLinkageForDefinition(*this, cast<llvm::GlobalVariable>(entry),
+      updateLinkageForDefinition(*this, cast<llvm::GlobalValue>(entry),
                                  entity);
     return entry;
   }
@@ -1648,11 +1664,128 @@ IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
   return entry;
 }
 
+/// Define the metadata for a type.
+///
+/// Some type metadata has information before the address point that the
+/// public symbol for the metadata references. This function will rewrite any
+/// existing external declaration to the address point as an alias into the
+/// full metadata object.
+llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
+                                                   bool isIndirect,
+                                                   bool isPattern,
+                                                   bool isConstant,
+                                                   llvm::Constant *init,
+                                                   llvm::StringRef section) {
+  assert(init);
+  assert(!isIndirect && "indirect type metadata not used yet");
+
+  /// For concrete metadata, we want to use the initializer on the
+  /// "full metadata", and define the "direct" address point as an alias.
+  /// For generic metadata patterns, the address point is always at the
+  /// beginning of the template (for now...).
+  TypeMetadataAddress addrKind;
+  llvm::Type *defaultVarTy;
+  llvm::Type *defaultVarPtrTy;
+  unsigned adjustmentIndex;
+
+  if (isPattern) {
+    addrKind = TypeMetadataAddress::Direct;
+    defaultVarTy = TypeMetadataPatternStructTy;
+    defaultVarPtrTy = TypeMetadataPatternPtrTy;
+    adjustmentIndex = MetadataAdjustmentIndex::None;
+  } else if (concreteType->getClassOrBoundGenericClass()) {
+    addrKind = TypeMetadataAddress::DirectFullMetadata;
+    defaultVarTy = FullHeapMetadataStructTy;
+    defaultVarPtrTy = FullHeapMetadataPtrTy;
+    adjustmentIndex = MetadataAdjustmentIndex::Class;
+  } else {
+    addrKind = TypeMetadataAddress::DirectFullMetadata;
+    defaultVarTy = FullTypeMetadataStructTy;
+    defaultVarPtrTy = FullTypeMetadataPtrTy;
+    adjustmentIndex = MetadataAdjustmentIndex::ValueType;
+  }
+
+  auto entity = LinkEntity::forTypeMetadata(concreteType, addrKind, isPattern);
+
+  auto DbgTy = DebugTypeInfo(MetatypeType::get(concreteType), defaultVarPtrTy,
+                             0, 1, nullptr);
+
+  // Define the variable.
+  llvm::GlobalVariable *var = cast<llvm::GlobalVariable>(
+                                       getAddrOfLLVMVariable(*this, GlobalVars,
+                                                              entity,
+                                                              init->getType(),
+                                                              defaultVarTy,
+                                                              defaultVarPtrTy,
+                                                              DbgTy));
+
+  var->setInitializer(init);
+  var->setConstant(isConstant);
+  if (!section.empty())
+    var->setSection(section);
+
+  // For metadata patterns, we're done.
+  if (isPattern)
+    return var;
+
+  // For concrete metadata, declare the alias to its address point.
+  auto directEntity = LinkEntity::forTypeMetadata(concreteType,
+                                                  TypeMetadataAddress::Direct,
+                                                  /*isPattern*/ false);
+
+  llvm::Constant *addr = var;
+  // Do an adjustment if necessary.
+  if (adjustmentIndex) {
+    llvm::Constant *indices[] = {
+      llvm::ConstantInt::get(Int32Ty, 0),
+      llvm::ConstantInt::get(Int32Ty, adjustmentIndex)
+    };
+    addr = llvm::ConstantExpr::getInBoundsGetElementPtr(/*Ty=*/nullptr,
+                                                        addr, indices);
+  }
+  addr = llvm::ConstantExpr::getBitCast(addr, TypeMetadataPtrTy);
+
+  // Check for an existing forward declaration of the address point.
+  auto &directEntry = GlobalVars[directEntity];
+  llvm::GlobalValue *existingVal = nullptr;
+  if (directEntry) {
+    existingVal = cast<llvm::GlobalValue>(directEntry);
+    // Clear the existing value's name so we can steal it.
+    existingVal->setName("");
+  }
+
+  LinkInfo link = LinkInfo::get(*this, directEntity, ForDefinition);
+  auto alias = llvm::GlobalAlias::create(
+                                     cast<llvm::PointerType>(addr->getType()),
+                                     link.getLinkage(),
+                                     link.getName(), addr, &Module);
+  alias->setVisibility(link.getVisibility());
+
+  // The full metadata is used based on the visibility of the address point,
+  // not the metadata itself.
+  if (link.isUsed()) {
+    addUsedGlobal(var);
+    addUsedGlobal(alias);
+  }
+
+  // Replace an existing external declaration for the address point.
+  if (directEntry) {
+    auto existingVal = cast<llvm::GlobalValue>(directEntry);
+    auto aliasCast = llvm::ConstantExpr::getBitCast(alias,
+                                                    directEntry->getType());
+    existingVal->replaceAllUsesWith(aliasCast);
+    existingVal->eraseFromParent();
+  }
+  directEntry = alias;
+
+  return alias;
+}
+
 /// Fetch the declaration of the metadata (or metadata template) for a
-/// class.
+/// type.
 ///
 /// If the definition type is specified, the result will always be a
-/// GlobalVariable of the given type, which may not be at the
+/// GlobalValue of the given type, which may not be at the
 /// canonical address point for a type metadata.
 ///
 /// If the definition type is not specified, then:
@@ -1665,49 +1798,54 @@ IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
 ///     for a type metadata and it will have type TypeMetadataPtrTy.
 llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                                                    bool isIndirect,
-                                                   bool isPattern,
-                                                   llvm::Type *definitionType) {
+                                                   bool isPattern) {
   assert(isPattern || !isa<UnboundGenericType>(concreteType));
 
   llvm::Type *defaultVarTy;
   llvm::Type *defaultVarPtrTy;
   unsigned adjustmentIndex;
+
   ClassDecl *ObjCClass = nullptr;
   
   // Patterns use the pattern type and no adjustment.
   if (isPattern) {
     defaultVarTy = TypeMetadataPatternStructTy;
     defaultVarPtrTy = TypeMetadataPatternPtrTy;
-    adjustmentIndex = MetadataAdjustmentIndex::None;
+    adjustmentIndex = 0;
 
-  // Objective-C classes use the generic metadata type and need no adjustment.
+  // Objective-C classes use the ObjC class object.
   } else if (isa<ClassType>(concreteType) &&
              !hasKnownSwiftMetadata(*this,
                                     cast<ClassType>(concreteType)->getDecl())) {
     defaultVarTy = TypeMetadataStructTy;
     defaultVarPtrTy = TypeMetadataPtrTy;
-    adjustmentIndex = MetadataAdjustmentIndex::None;
+    adjustmentIndex = 0;
     ObjCClass = cast<ClassType>(concreteType)->getDecl();
-  // Class direct metadata use the heap type and require a two-word
-  // adjustment (due to the heap-metadata header).
+  // The symbol for other nominal type metadata is generated at the address
+  // point.
   } else if (isa<ClassType>(concreteType) ||
              isa<BoundGenericClassType>(concreteType)) {
     assert(!concreteType->getClassOrBoundGenericClass()->isForeign()
            && "metadata for foreign classes should be emitted as "
               "foreign candidate");
-    defaultVarTy = FullHeapMetadataStructTy;
-    defaultVarPtrTy = FullHeapMetadataPtrTy;
-    adjustmentIndex = MetadataAdjustmentIndex::Class;
-
-  // All other non-pattern direct metadata use the full type and
-  // require an adjustment.
-  } else {
+    defaultVarTy = TypeMetadataStructTy;
+    defaultVarPtrTy = TypeMetadataPtrTy;
+    adjustmentIndex = 0;
+  } else if (concreteType->getAnyNominal()) {
     auto nom = concreteType->getNominalOrBoundGenericNominal();
     assert((!nom || !nom->hasClangNode())
            && "metadata for foreign type should be emitted as "
               "foreign candidate");
     (void)nom;
     
+    defaultVarTy = TypeMetadataStructTy;
+    defaultVarPtrTy = TypeMetadataPtrTy;
+    adjustmentIndex = 0;
+  } else {
+    // FIXME: Non-nominal metadata provided by the C++ runtime is exported
+    // with the address of the start of the full metadata object, since
+    // Clang doesn't provide an easy way to emit symbols aliasing into the
+    // middle of an object.
     defaultVarTy = FullTypeMetadataStructTy;
     defaultVarPtrTy = FullTypeMetadataPtrTy;
     adjustmentIndex = MetadataAdjustmentIndex::ValueType;
@@ -1715,7 +1853,7 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   // If this is a use, and the type metadata is emitted lazily,
   // trigger lazy emission of the metadata.
-  if (!definitionType && isTypeMetadataEmittedLazily(concreteType)) {
+  if (isTypeMetadataEmittedLazily(concreteType)) {
     dispatcher.addLazyTypeMetadata(concreteType);
   }
 
@@ -1724,13 +1862,15 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   if (isIndirect) {
     defaultVarTy = defaultVarPtrTy;
     defaultVarPtrTy = defaultVarTy->getPointerTo();
-    adjustmentIndex = MetadataAdjustmentIndex::None;
+    adjustmentIndex = 0;
   }
 
   LinkEntity entity
-    = ObjCClass? LinkEntity::forObjCClass(ObjCClass)
-               : LinkEntity::forTypeMetadata(concreteType, isIndirect,
-                                             isPattern);
+    = ObjCClass ? LinkEntity::forObjCClass(ObjCClass)
+                : LinkEntity::forTypeMetadata(concreteType,
+                                     isIndirect ? TypeMetadataAddress::Indirect
+                                                : TypeMetadataAddress::Direct,
+                                     isPattern);
 
   auto DbgTy = ObjCClass 
     ? DebugTypeInfo(ObjCClass, ObjCClassPtrTy,
@@ -1739,19 +1879,19 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                     0, 1, nullptr);
 
   auto addr = getAddrOfLLVMVariable(*this, GlobalVars, entity,
-                                    definitionType, defaultVarTy,
+                                    nullptr, defaultVarTy,
                                     defaultVarPtrTy, DbgTy);
 
-  // Do an adjustment if necessary.
-  if (adjustmentIndex && !definitionType) {
+  // Adjust if necessary.
+  if (adjustmentIndex) {
     llvm::Constant *indices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, adjustmentIndex)
     };
     addr = llvm::ConstantExpr::getInBoundsGetElementPtr(
-        /*Ty=*/nullptr, addr, indices);
+                                                 /*Ty=*/nullptr, addr, indices);
   }
-
+  
   return addr;
 }
 
@@ -1864,7 +2004,7 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
 
 /// Returns the address of a value-witness table.  If a definition
 /// type is provided, the table is created with that type; the return
-/// value will be an llvm::GlobalVariable.  Otherwise, the result will
+/// value will be an llvm::GlobalValue.  Otherwise, the result will
 /// have type WitnessTablePtrTy.
 llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType,
                                                   llvm::Type *definitionType) {
@@ -1885,7 +2025,7 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
   // Check whether it's already cached.
   llvm::Constant *&entry = cache[entity];
   if (entry) {
-    auto existing = cast<llvm::GlobalVariable>(entry);
+    auto existing = cast<llvm::GlobalValue>(entry);
     assert(alignment == Alignment(existing->getAlignment()));
     if (forDefinition) updateLinkageForDefinition(IGM, existing, entity);
     return Address(entry, alignment);
@@ -1933,7 +2073,7 @@ Address IRGenModule::getAddrOfWitnessTableOffset(VarDecl *field,
 /// or a metadata object in order to find an offset to apply to an
 /// object (if indirect).
 ///
-/// The result is always a GlobalVariable.
+/// The result is always a GlobalValue.
 Address IRGenModule::getAddrOfFieldOffset(VarDecl *var, bool isIndirect,
                                           ForDefinition_t forDefinition) {
   LinkEntity entity = LinkEntity::forFieldOffset(var, isIndirect);

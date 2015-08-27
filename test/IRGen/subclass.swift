@@ -10,10 +10,9 @@
 // CHECK: [[REF]] = type {
 // CHECK: [[INT:%Si]] = type <{ i64 }>
 // CHECK: [[B:%C8subclass1B]] = type <{ [[REF]], [[INT]], [[INT]], [[INT]] }>
-// CHECK: [[FULL_HEAPMETADATA:%swift.full_heapmetadata]] = type
 
 // CHECK: @_DATA__TtC8subclass1A = private constant {{.*\* } }}{
-// CHECK: @_TMdC8subclass1A = global [[A_METADATA:{.*i64 }]] {
+// CHECK: @_TMfC8subclass1A = internal global [[A_METADATA:{.*i64 }]] {
 // CHECK:   void ([[A]]*)* @_TFC8subclass1AD,
 // CHECK:   i8** @_TWVBo,
 // CHECK:   i64 ptrtoint ([[OBJC_CLASS]]* @_TMmC8subclass1A to i64),
@@ -25,11 +24,11 @@
 // CHECK:   [[A]]* ([[TYPE]]*)* @_TZFC8subclass1A1gfMS0_FT_S0_
 // CHECK: }
 // CHECK: @_DATA__TtC8subclass1B = private constant {{.*\* } }}{
-// CHECK: @_TMdC8subclass1B = global { {{.*}} } {
+// CHECK: @_TMfC8subclass1B = internal global { {{.*}} } {
 // CHECK:   void ([[B]]*)* @_TFC8subclass1BD,
 // CHECK:   i8** @_TWVBo,
 // CHECK:   i64 ptrtoint ([[OBJC_CLASS]]* @_TMmC8subclass1B to i64),
-// CHECK:   [[TYPE]]* getelementptr inbounds ([[FULL_HEAPMETADATA]], [[FULL_HEAPMETADATA]]* bitcast ([[A_METADATA]]* @_TMdC8subclass1A to [[FULL_HEAPMETADATA]]*), i32 0, i32 2),
+// CHECK:   [[TYPE]]* @_TMdC8subclass1A,
 // CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // CHECK:   [[OPAQUE]]* null,
 // CHECK:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1B to i64), i64 1),

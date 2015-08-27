@@ -41,7 +41,7 @@ bb0:
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]
 // CHECK:      [[T0:%.*]] = call %swift.type* @_TMaC12typemetadata1C()
-// CHECK-NEXT: [[T1:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* {{.*}} @_TMdV12typemetadata1S {{.*}}, %swift.type* [[T0]], i8* null, i8** null)
+// CHECK-NEXT: [[T1:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* @_TMdV12typemetadata1S, %swift.type* [[T0]], i8* null, i8** null)
 // CHECK-NEXT: store %swift.type* [[T1]], %swift.type** @_TMLTV12typemetadata1SCS_1C_, align 8
 // CHECK-NEXT: br label
 // CHECK:      [[RES:%.*]] = phi

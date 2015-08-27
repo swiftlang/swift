@@ -34,7 +34,7 @@ sil_vtable C {}
 // \ CHECK:   i8* null
 // \ CHECK: }
 
-//   CHECK: @_TMdC5class1C = global { {{.*}} } {
+//   CHECK: @_TMfC5class1C = internal global { {{.*}} } {
 // \ CHECK:   void ([[C_CLASS]]*)* @_TFC5class1CD,
 // \ CHECK:   i8** @_TWVBo,
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1C to i64),
@@ -44,7 +44,7 @@ sil_vtable C {}
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1C to i64), i64 1)
 // \ CHECK: }
 
-//   CHECK: @_TMdC5class1D = global { {{.*}} } {
+//   CHECK: @_TMfC5class1D = internal global { {{.*}} } {
 // \ CHECK:   void ([[D_CLASS]]*)* @_TFC5class1DD,
 // \ CHECK:   i8** @_TWVBo,
 // \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @_TMmC5class1D to i64),

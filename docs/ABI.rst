@@ -715,7 +715,8 @@ Globals
 ::
 
   global ::= 't' type                    // standalone type (for DWARF)
-  global ::= 'M' directness type         // type metadata
+  global ::= 'M' directness type         // type metadata (address point)
+  global ::= 'Mf'  type                  // 'full' type metadata (start of object)
   global ::= 'MP' directness type        // type metadata pattern
   global ::= 'Ma' type                   // type metadata access function
   global ::= 'ML' type                   // type metadata lazy cache variable

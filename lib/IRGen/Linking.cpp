@@ -117,11 +117,20 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
     return;
 
+  //   global ::= 'Mf' type                       // 'full' type metadata
   //   global ::= 'M' directness type             // type metadata
   //   global ::= 'MP' directness type            // type metadata pattern
   case Kind::TypeMetadata:
-    mangler.mangleTypeMetadataFull(getType(), isMetadataPattern(),
-                                   isMetadataIndirect());
+    switch (getMetadataAddress()) {
+    case TypeMetadataAddress::DirectFullMetadata:
+      mangler.mangleTypeFullDirectMetadataFull(getType());
+      break;
+    case TypeMetadataAddress::Indirect:
+    case TypeMetadataAddress::Direct:
+      mangler.mangleTypeMetadataFull(getType(), isMetadataPattern(),
+                         getMetadataAddress() == TypeMetadataAddress::Indirect);
+      break;
+    }
     return;
 
   //   global ::= 'M' directness type             // type metadata

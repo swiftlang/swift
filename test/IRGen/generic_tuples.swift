@@ -54,7 +54,7 @@ struct S {}
 func callDup(let s: S) { _ = dup(s) }
 // CHECK-LABEL: define hidden void @_TF14generic_tuples7callDupFVS_1ST_()
 // CHECK-NEXT: entry:
-// CHECK-NEXT: call void @_TF14generic_tuples3dupurFq_Tq_q__({{.*}} undef, {{.*}} undef, %swift.type* getelementptr {{.*}} @_TMdV14generic_tuples1S {{.*}})
+// CHECK-NEXT: call void @_TF14generic_tuples3dupurFq_Tq_q__({{.*}} undef, {{.*}} undef, %swift.type* @_TMdV14generic_tuples1S)
 // CHECK-NEXT: ret void
 
 class C {}

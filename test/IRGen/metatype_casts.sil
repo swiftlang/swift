@@ -71,7 +71,7 @@ sil_vtable OtherClass {}
 // CHECK-LABEL: define void @value_metatype_cast(%C14metatype_casts9SomeClass*)
 // CHECK:         [[T0:%.*]] = bitcast %C14metatype_casts9SomeClass* %0 to %swift.type**
 // CHECK:         [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]]
-// CHECK:         [[T2:%.*]] = icmp eq %swift.type* [[T1]], getelementptr {{.*}} @_TMdC14metatype_casts10OtherClass
+// CHECK:         [[T2:%.*]] = icmp eq %swift.type* [[T1]], @_TMdC14metatype_casts10OtherClass
 sil @value_metatype_cast : $@convention(thin) (SomeClass) -> () {
 entry(%0 : $SomeClass):
   %1 = value_metatype $@thick SomeClass.Type, %0 : $SomeClass
