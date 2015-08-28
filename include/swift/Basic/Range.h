@@ -85,6 +85,11 @@ public:
     T operator*() const { return Value; }
     iterator &operator++() { Value++; return *this; }
     iterator operator++(int) { return iterator(Value++); }
+    iterator &operator--() {
+      Value--;
+      return *this;
+    }
+    iterator operator--(int) { return iterator(Value--); }
     bool operator==(iterator rhs) { return Value == rhs.Value; }
     bool operator!=(iterator rhs) { return Value != rhs.Value; }
 
