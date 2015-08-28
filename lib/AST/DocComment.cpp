@@ -68,9 +68,9 @@ Optional<llvm::markup::ParamField *> extractParamOutlineItem(
   return llvm::markup::ParamField::create(MC, Name, Children);
 }
 
-bool extractParameterOutline(llvm::markup::MarkupContext &MC,
-                             llvm::markup::List *L,
-                             DocComment::CommentParts &Parts) {
+bool extractParameterOutline(
+    llvm::markup::MarkupContext &MC, llvm::markup::List *L,
+    SmallVectorImpl<const llvm::markup::ParamField *> &ParamFields) {
   SmallVector<llvm::markup::MarkupASTNode *, 8> NormalItems;
   auto Children = L->getChildren();
   if (Children.empty())
@@ -130,7 +130,7 @@ bool extractParameterOutline(llvm::markup::MarkupContext &MC,
       for (auto SubListChild : SubList->getChildren()) {
         auto Param = extractParamOutlineItem(MC, SubListChild);
         if (Param.hasValue()) {
-          Parts.ParamFields.push_back(Param.getValue());
+          ParamFields.push_back(Param.getValue());
         }
       }
     }
@@ -143,9 +143,9 @@ bool extractParameterOutline(llvm::markup::MarkupContext &MC,
   return NormalItems.size() == 0;
 }
 
-bool extractSeparatedParams(llvm::markup::MarkupContext &MC,
-                            llvm::markup::List *L,
-                            DocComment::CommentParts &Parts) {
+bool extractSeparatedParams(
+    llvm::markup::MarkupContext &MC, llvm::markup::List *L,
+    SmallVectorImpl<const llvm::markup::ParamField *> &ParamFields) {
   SmallVector<llvm::markup::MarkupASTNode *, 8> NormalItems;
   auto Children = L->getChildren();
 
@@ -196,7 +196,7 @@ bool extractSeparatedParams(llvm::markup::MarkupContext &MC,
 
     auto ParamField = extractParamOutlineItem(MC, I);
     if (ParamField.hasValue())
-      Parts.ParamFields.push_back(ParamField.getValue());
+      ParamFields.push_back(ParamField.getValue());
     else
       NormalItems.push_back(Child);
   }
@@ -207,9 +207,10 @@ bool extractSeparatedParams(llvm::markup::MarkupContext &MC,
   return NormalItems.size() == 0;
 }
 
-bool extractSimpleField(llvm::markup::MarkupContext &MC,
-                        llvm::markup::List *L,
-                        DocComment::CommentParts &Parts) {
+bool extractSimpleField(
+    llvm::markup::MarkupContext &MC, llvm::markup::List *L,
+    DocComment::CommentParts &Parts,
+    SmallVectorImpl<const llvm::markup::MarkupASTNode *> &BodyNodes) {
   auto Children = L->getChildren();
   SmallVector<llvm::markup::MarkupASTNode *, 8> NormalItems;
   for (auto Child : Children) {
@@ -264,7 +265,7 @@ bool extractSimpleField(llvm::markup::MarkupContext &MC,
     else if (auto TF = dyn_cast<llvm::markup::ThrowsField>(Field))
       Parts.ThrowsField = TF;
     else
-      Parts.BodyNodes.push_back(Field);
+      BodyNodes.push_back(Field);
   }
 
   if (NormalItems.size() != Children.size())
@@ -273,9 +274,9 @@ bool extractSimpleField(llvm::markup::MarkupContext &MC,
   return NormalItems.size() == 0;
 }
 
-
-DocComment::CommentParts extractCommentParts(llvm::markup::MarkupContext &MC,
-                                             llvm::markup::Document *Doc){
+static DocComment::CommentParts
+extractCommentParts(llvm::markup::MarkupContext &MC,
+                    llvm::markup::Document *Doc) {
 
   DocComment::CommentParts Parts;
   auto Children = Doc->getChildren();
@@ -286,6 +287,9 @@ DocComment::CommentParts extractCommentParts(llvm::markup::MarkupContext &MC,
       = dyn_cast<llvm::markup::Paragraph>(Doc->getChildren().front());
   if (FirstParagraph)
     Parts.Brief = FirstParagraph;
+
+  SmallVector<const llvm::markup::MarkupASTNode *, 4> BodyNodes;
+  SmallVector<const llvm::markup::ParamField *, 8> ParamFields;
 
   // Look for special top-level lists
   size_t StartOffset = FirstParagraph == nullptr ? 0 : 1;
@@ -300,14 +304,19 @@ DocComment::CommentParts extractCommentParts(llvm::markup::MarkupContext &MC,
       //    - parameter x: ...
       //    - parameter y: ...
       // 3. Some other simple field, including "returns" (see SimpleFields.def)
-      auto ListNowEmpty = extractParameterOutline(MC, L, Parts);
-      ListNowEmpty |= extractSeparatedParams(MC, L, Parts);
-      ListNowEmpty |= extractSimpleField(MC, L, Parts);
+      auto ListNowEmpty = extractParameterOutline(MC, L, ParamFields);
+      ListNowEmpty |= extractSeparatedParams(MC, L, ParamFields);
+      ListNowEmpty |= extractSimpleField(MC, L, Parts, BodyNodes);
       if (ListNowEmpty)
         continue; // This drops the empty list from the doc comment body.
     }
-    Parts.BodyNodes.push_back(*C);
+    BodyNodes.push_back(*C);
   }
+
+  // Copy BodyNodes and ParamFields into the MarkupContext.
+  Parts.BodyNodes = MC.allocateCopy(llvm::makeArrayRef(BodyNodes));
+  Parts.ParamFields = MC.allocateCopy(llvm::makeArrayRef(ParamFields));
+
   return Parts;
 }
 

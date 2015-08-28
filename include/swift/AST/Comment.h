@@ -25,8 +25,8 @@ class DocComment {
 public:
   struct CommentParts {
     Optional<const llvm::markup::Paragraph *>Brief;
-    SmallVector<const llvm::markup::MarkupASTNode *, 4> BodyNodes;
-    SmallVector<const llvm::markup::ParamField *, 8> ParamFields;
+    ArrayRef<const llvm::markup::MarkupASTNode *> BodyNodes;
+    ArrayRef<const llvm::markup::ParamField *> ParamFields;
     Optional<const llvm::markup::ReturnsField *> ReturnsField;
     Optional<const llvm::markup::ThrowsField *> ThrowsField;
 
