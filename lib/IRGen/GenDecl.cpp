@@ -1632,19 +1632,37 @@ getAddrOfVariableOrGOTEquivalent(IRGenModule &IGM,
                           DebugTypeInfo());
   }
 
-  // If the variable isn't public, it doesn't need a GOT entry, and we can
+  // Guess whether a global entry is a definition from this TU. This isn't
+  // bulletproof, but at the point we emit conformance tables, we're far enough
+  // along that we should have emitted any metadata objects we were going to.
+  auto isDefinition = [&](llvm::Constant *global) -> bool {
+    // We only emit aliases for definitions. (An extern alias would be an
+    // extern global.)
+    if (isa<llvm::GlobalAlias>(global))
+      return true;
+    // Global vars are definitions if they have an initializer.
+    if (auto var = dyn_cast<llvm::GlobalVariable>(global))
+      return var->hasInitializer();
+    // Assume anything else isn't a definition.
+    return false;
+  };
+
+  // If the variable isn't public, or has already been defined in this TU,
+  // then it definitely doesn't need a GOT entry, and we can
   // relative-reference it directly.
   //
-  // TODO: Public symbols that are defined in the current TU could use direct
+  // TODO: Internal symbols from other TUs we know are destined to be linked
+  // into the same image as us could use direct
   // relative references too, to avoid producing unnecessary GOT entries in
   // the final image.
   //
   // FIXME: MCJIT doesn't support direct relative references with SUBTRACTOR
   // relocations, so always emit a "GOT" entry for the JIT.
   // rdar://problem/22467267
-  if (!hasPublicVisibility(entity.getLinkage(NotForDefinition))
-      && !IGM.Opts.UseJIT) {
-    return {globals[entity], DirectOrGOT::Direct};
+  if (!IGM.Opts.UseJIT) {
+    if (!hasPublicVisibility(entity.getLinkage(NotForDefinition))
+        || isDefinition(globals[entity]))
+      return {globals[entity], DirectOrGOT::Direct};
   }
 
   auto &entry = gotEquivalents[entity];
