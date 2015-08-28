@@ -185,7 +185,7 @@ ParseResult<Image> parseImage(MarkupContext &MC, LineList &LL, ParseState State)
   
   auto NodeTitle = cmark_node_get_title(State.Node);
   std::string TitleString = NodeTitle ? NodeTitle : "";
-  auto Title = TitleString.empty() ? None : Optional<std::string>(TitleString);
+  auto Title = TitleString.empty() ? None : Optional<StringRef>(TitleString);
 
   SmallVector<MarkupASTNode *, 2> Children;
   auto ResultState = parseChildren(MC, LL, State, Children);
@@ -337,5 +337,6 @@ Document *llvm::markup::parseDocument(MarkupContext &MC, LineList &LL) {
   State = ResultState.next();
   assert(State.Event == CMARK_EVENT_DONE);
   cmark_node_free(CMarkDoc);
+  cmark_iter_free(State.Iter);
   return Document::create(MC, Children);
 }

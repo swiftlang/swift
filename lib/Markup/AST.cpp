@@ -93,21 +93,22 @@ Item *Item::create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children) {
   return new (Mem) Item(Children);
 }
 
-Link::Link(std::string Destination, ArrayRef<MarkupASTNode *> Children)
+Link::Link(StringRef Destination, ArrayRef<MarkupASTNode *> Children)
     : InlineContent(ASTNodeKind::Link),
       NumChildren(Children.size()),
       Destination(Destination) {
   std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
 }
 
-Link *Link::create(MarkupContext &MC, std::string Destination,
+Link *Link::create(MarkupContext &MC, StringRef Destination,
                    ArrayRef<MarkupASTNode *> Children) {
   void *Mem = MC.allocate(sizeof(Link) + Children.size()
       * sizeof(MarkupASTNode *), alignof(Link));
-  return new (Mem) Link(Destination, Children);
+  StringRef DestinationCopy = MC.allocateCopy(Destination);
+  return new (Mem) Link(DestinationCopy, Children);
 }
 
-Image::Image(std::string Destination, Optional<std::string> Title,
+Image::Image(StringRef Destination, Optional<StringRef> Title,
              ArrayRef<MarkupASTNode *> Children)
     : InlineContent(ASTNodeKind::Image),
       NumChildren(Children.size()),
@@ -116,12 +117,16 @@ Image::Image(std::string Destination, Optional<std::string> Title,
   std::uninitialized_copy(Children.begin(), Children.end(), getChildrenBuffer());
 }
 
-Image *Image::create(MarkupContext &MC, std::string Destination,
-                     Optional<std::string> Title,
+Image *Image::create(MarkupContext &MC, StringRef Destination,
+                     Optional<StringRef> Title,
                      ArrayRef<MarkupASTNode *> Children) {
   void *Mem = MC.allocate(sizeof(Image) + Children.size()
       * sizeof(MarkupASTNode *), alignof(Image));
-  return new (Mem) Image(Destination, Title, Children);
+  StringRef DestinationCopy = MC.allocateCopy(Destination);
+  Optional<StringRef> TitleCopy;
+  if (Title)
+    TitleCopy = MC.allocateCopy(*Title);
+  return new (Mem) Image(DestinationCopy, TitleCopy, Children);
 }
 
 Header::Header(unsigned Level, ArrayRef<MarkupASTNode *> Children)

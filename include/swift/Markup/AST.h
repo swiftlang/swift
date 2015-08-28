@@ -520,8 +520,7 @@ public:
 
 class Link final : public InlineContent {
   size_t NumChildren;
-  // FIXME: Use StringRef/Line here
-  std::string Destination;
+  StringRef Destination;
 
   MarkupASTNode **getChildrenBuffer() {
     return reinterpret_cast<MarkupASTNode**>(this + 1);
@@ -530,16 +529,14 @@ class Link final : public InlineContent {
     return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
   }
 
-  Link(std::string Destination, ArrayRef<MarkupASTNode *> Children);
+  Link(StringRef Destination, ArrayRef<MarkupASTNode *> Children);
 
 public:
   static Link *create(MarkupContext &MC,
-                      std::string Destination,
+                      StringRef Destination,
                       ArrayRef<MarkupASTNode *> Children);
 
-  StringRef getDestination() const {
-    return StringRef(Destination.c_str(), Destination.size());
-  }
+  StringRef getDestination() const { return Destination; }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
     return ArrayRef<const MarkupASTNode *>(getChildrenBuffer(), NumChildren);
@@ -557,8 +554,8 @@ public:
 class Image final : public InlineContent {
   size_t NumChildren;
   // FIXME: Hyperlink destinations can't be wrapped - use a Line
-  std::string Destination;
-  Optional<std::string> Title;
+  StringRef Destination;
+  Optional<StringRef> Title;
 
   MarkupASTNode **getChildrenBuffer() {
     return reinterpret_cast<MarkupASTNode**>(this + 1);
@@ -567,13 +564,13 @@ class Image final : public InlineContent {
     return reinterpret_cast<const MarkupASTNode *const *>(this + 1);
   }
 
-  Image(std::string Destination, Optional<std::string> Title,
+  Image(StringRef Destination, Optional<StringRef> Title,
         ArrayRef<MarkupASTNode *> Children);
 
 public:
   static Image *create(MarkupContext &MC,
-                      std::string Destination,
-                      Optional<std::string> Title,
+                      StringRef Destination,
+                      Optional<StringRef> Title,
                       ArrayRef<MarkupASTNode *> Children);
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
@@ -584,9 +581,7 @@ public:
     return ArrayRef<MarkupASTNode *>(getChildrenBuffer(), NumChildren);
   }
 
-  StringRef getDestination() const {
-    return StringRef(Destination.c_str(), Destination.size());
-  }
+  StringRef getDestination() const { return Destination; }
 
   bool hasTitle() const {
     return Title.hasValue();
