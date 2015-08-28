@@ -73,12 +73,12 @@ static inline bool shouldRunBasicAA() {
   return unsigned(AAKind(DebugAAKinds)) & unsigned(AAKind::BasicAA);
 }
 
+#endif
+
 static llvm::cl::opt<bool>
     CacheAAResults("cache-aa-results",
                    llvm::cl::desc("Should AA results be cached"),
                    llvm::cl::init(true));
-
-#endif
 
 //===----------------------------------------------------------------------===//
 //                                 Utilities
