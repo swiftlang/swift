@@ -46,6 +46,8 @@ private:
 
   using MemoryBehavior = SILInstruction::MemoryBehavior;
 
+  AliasResult cacheValue(AliasCacheKey Key, AliasResult Result);
+
 public:
   AliasAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Alias), Mod(M) {}
 

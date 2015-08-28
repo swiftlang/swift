@@ -73,6 +73,11 @@ static inline bool shouldRunBasicAA() {
   return unsigned(AAKind(DebugAAKinds)) & unsigned(AAKind::BasicAA);
 }
 
+static llvm::cl::opt<bool>
+    CacheAAResults("cache-aa-results",
+                   llvm::cl::desc("Should AA results be cached"),
+                   llvm::cl::init(true));
+
 #endif
 
 //===----------------------------------------------------------------------===//
@@ -502,12 +507,14 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
   auto Key = V1 < V2? std::make_pair(V1, V2) : std::make_pair(V2, V1);
 
   // If we find our key in the cache, just return the alias result.
-  auto Pair = AliasCache.find(Key);
-  if (Pair != AliasCache.end()) {
-    DEBUG(llvm::dbgs() << "      Found value in the cache: "
-          << Pair->second << "\n");
+  if (CacheAAResults) {
+    auto Pair = AliasCache.find(Key);
+    if (Pair != AliasCache.end()) {
+      DEBUG(llvm::dbgs() << "      Found value in the cache: " << Pair->second
+                         << "\n");
 
-    return Pair->second;
+      return Pair->second;
+    }
   }
 
   // Ok, we need to actually compute an Alias Analysis result for V1, V2. Begin
@@ -517,11 +524,10 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
   DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1.getDef());
   DEBUG(llvm::dbgs() << "        Underlying V2:" << *O2.getDef());
 
-
   // If O1 and O2 do not equal, see if we can prove that they can not be the
   // same object. If we can, return No Alias.
   if (O1 != O2 && aliasUnequalObjects(O1, O2))
-    return AliasCache[Key] = AliasResult::NoAlias;
+    return cacheValue(Key, AliasResult::NoAlias);
 
   // Ok, either O1, O2 are the same or we could not prove anything based off of
   // their inequality. Now we climb up use-def chains and attempt to do tricks
@@ -539,7 +545,7 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
   if (Projection::isAddrProjection(V1)) {
     AliasResult Result = aliasAddressProjection(*this, V1, V2, O1, O2);
     if (Result != AliasResult::MayAlias)
-      return AliasCache[Key] = Result;
+      return cacheValue(Key, Result);
   }
 
 
@@ -806,6 +812,15 @@ AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V,
   DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
         << *V.getDef());
   return MemoryBehaviorVisitor(*this, V, IgnoreRefCountIncrements).visit(Inst);
+}
+
+AliasAnalysis::AliasResult AliasAnalysis::cacheValue(AliasCacheKey Key,
+                                                     AliasResult Result) {
+  if (!CacheAAResults)
+    return Result;
+  DEBUG(llvm::dbgs() << "Caching Alias Result: " << Result << "\n" << Key.first
+                     << Key.second << "\n");
+  return AliasCache[Key] = Result;
 }
 
 SILAnalysis *swift::createAliasAnalysis(SILModule *M, SILPassManager *) {
