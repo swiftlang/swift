@@ -114,8 +114,6 @@ public:
                                     const llvm::opt::ArgList &args,
                                     const OutputInfo &OI) const;
 
-  /// Look up \p Name in the list of program search paths.
-  ///
   /// Return the default langauge type to use for the given extension.
   virtual types::ID lookupTypeForExtension(StringRef Ext) const;
 };

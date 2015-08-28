@@ -1849,7 +1849,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
     }
   }
 
-  // 5. Construct a Job which produces the right CommandOutput.
+  // 4. Construct a Job which produces the right CommandOutput.
   std::unique_ptr<Job> ownedJob = TC.constructJob(*JA, std::move(InputJobs),
                                                   std::move(Output),
                                                   InputActions, C.getArgs(),
@@ -1867,7 +1867,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
     }
   }
 
-  // 6. Add it to the JobCache, so we don't construct the same Job multiple
+  // 5. Add it to the JobCache, so we don't construct the same Job multiple
   // times.
   JobCache[Key] = J;
 
