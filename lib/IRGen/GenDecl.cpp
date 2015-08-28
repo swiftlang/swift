@@ -1608,6 +1608,7 @@ getAddrOfVariableOrGOTEquivalent(IRGenModule &IGM,
     // candidates wouldn't normally require this because they're always emitted
     // locally. We need this open-coded path because we don't normally generate
     // an address point symbol for foreign metadata.
+    // rdar://problem/22467267
     if (IGM.Opts.UseJIT) {
       llvm::SmallString<64> name;
       entity.mangle(name);
@@ -1640,6 +1641,7 @@ getAddrOfVariableOrGOTEquivalent(IRGenModule &IGM,
   //
   // FIXME: MCJIT doesn't support direct relative references with SUBTRACTOR
   // relocations, so always emit a "GOT" entry for the JIT.
+  // rdar://problem/22467267
   if (!hasPublicVisibility(entity.getLinkage(NotForDefinition))
       && !IGM.Opts.UseJIT) {
     return {globals[entity], DirectOrGOT::Direct};
@@ -1833,6 +1835,7 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     std::pair<llvm::Constant*, DirectOrGOT> witnessTableRef;
     // FIXME: MCJIT doesn't support direct relative references with SUBTRACTOR
     // relocations, so always emit a "GOT" entry for the JIT.
+    // rdar://problem/22467267
     if (Opts.UseJIT) {
       witnessTableRef = getAddrOfVariableOrGOTEquivalent(*this,
          GlobalVars, GlobalGOTEquivalents,
