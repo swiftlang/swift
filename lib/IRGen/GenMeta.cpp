@@ -3533,9 +3533,6 @@ namespace {
 static void emitObjCClassSymbol(IRGenModule &IGM,
                                 ClassDecl *classDecl,
                                 llvm::GlobalValue *metadata) {
-  llvm::SmallString<128> asmString;
-  llvm::raw_svector_ostream os(asmString);
-  
   llvm::SmallString<32> classSymbol;
   LinkEntity::forObjCClass(classDecl).mangle(classSymbol);
   

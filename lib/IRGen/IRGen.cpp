@@ -406,6 +406,15 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     }
   }
 
+  // Register our info with the runtime if needed.
+  if (Opts.UseJIT) {
+    IGM.emitRuntimeRegistration();
+  } else {
+    // Emit protocol conformances into a section we can recognize at runtime.
+    // In JIT mode these are manually registered above.
+    IGM.emitProtocolConformances();
+  }
+
   // Okay, emit any definitions that we suddenly need.
   dispatcher.emitLazyDefinitions();
 
@@ -415,10 +424,6 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Verify type layout if we were asked to.
   if (!Opts.VerifyTypeLayoutNames.empty())
     IGM.emitTypeVerifier();
-
-  // Register our info with the runtime if needed.
-  if (Opts.UseJIT)
-    IGM.emitRuntimeRegistration();
 
   std::for_each(Opts.LinkLibraries.begin(), Opts.LinkLibraries.end(),
                 [&](LinkLibrary linkLib) {

@@ -11,13 +11,13 @@ protocol Runcible {
   func runce()
 }
 
-// CHECK-LABEL: @protocol_conformances = internal constant [
+// CHECK-LABEL: @"\01l_protocol_conformances" = private constant [
 
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
-// CHECK:           [[RUNCIBLE:%swift.protocol\* @_TMp28protocol_conformance_records8Runcible]]
+// CHECK:           [[RUNCIBLE:%swift.protocol\*\* @got._TMp28protocol_conformance_records8Runcible]]
 // -- type metadata
-// CHECK:           @_TMfV28protocol_conformance_records15NativeValueType
+// CHECK:           @got._TMdV28protocol_conformance_records15NativeValueType
 // -- witness table
 // CHECK:           @_TWPV28protocol_conformance_records15NativeValueTypeS_8Runcible
 // -- flags 0x01: unique direct metadata
@@ -32,7 +32,7 @@ struct NativeValueType: Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
 // -- class object (TODO should be class ref variable)
-// CHECK:           @_TMfC28protocol_conformance_records15NativeClassType
+// CHECK:           @got._TMdC28protocol_conformance_records15NativeClassType
 // -- witness table
 // CHECK:           @_TWPC28protocol_conformance_records15NativeClassTypeS_8Runcible
 // -- flags 0x01: unique direct metadata (TODO should be 0x03 indirect class)
@@ -46,7 +46,7 @@ class NativeClassType: Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
 // -- generic metadata pattern
-// CHECK:           @_TMPdV28protocol_conformance_records17NativeGenericType
+// CHECK:           @got._TMPdV28protocol_conformance_records17NativeGenericType
 // -- witness table
 // CHECK:           @_TWPurGV28protocol_conformance_records17NativeGenericTypeq__S_8RuncibleS_
 // -- flags 0x04: unique direct generic metadata pattern
@@ -75,7 +75,7 @@ extension NSRect: Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
 // -- class object (TODO should be class ref variable)
-// CHECK:           @"OBJC_CLASS_$_Gizmo"
+// CHECK:           @"got.OBJC_CLASS_$_Gizmo"
 // -- witness table
 // CHECK:           @_TWPCSo5Gizmo28protocol_conformance_records8Runcible
 // -- flags 0x01: unique direct metadata (TODO should be 0x03 indirect class)

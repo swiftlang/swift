@@ -29,6 +29,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
 #include "swift/Basic/FlaggedPointer.h"
+#include "swift/Basic/RelativePointer.h"
 
 namespace swift {
 
@@ -2080,11 +2081,11 @@ struct GenericMetadata {
 /// type's conformance to a protocol.
 struct ProtocolConformanceRecord {
 public:
-  using WitnessTableAccessor_t = const WitnessTable *(*)(const Metadata*);
+  using WitnessTableAccessorFn = const WitnessTable *(const Metadata*);
 
 private:
   /// The protocol being conformed to.
-  const ProtocolDescriptor *Protocol;
+  RelativePointer<ProtocolDescriptor> Protocol;
   
   // Some description of the type that conforms to the protocol.
   union {
@@ -2092,26 +2093,26 @@ private:
     ///
     /// Depending on the conformance kind, this may not be usable
     /// metadata without being first processed by the runtime.
-    const Metadata *DirectType;
+    RelativePointer<Metadata> DirectType;
     
     /// An indirect reference to the metadata.
-    const ClassMetadata * const *IndirectClass;
+    RelativePointer<const ClassMetadata *> IndirectClass;
     
     /// The generic metadata pattern for a generic type which has instances that
     /// conform to the protocol.
-    const GenericMetadata *GenericPattern;
+    RelativePointer<GenericMetadata> GenericPattern;
   };
   
   
   // The conformance, or a generator function for the conformance.
   union {
     /// A direct reference to the witness table for the conformance.
-    const WitnessTable *WitnessTable;
+    RelativePointer<WitnessTable> WitnessTable;
     
     /// A function that produces the witness table given an instance of the
     /// type. The function may return null if a specific instance does not
     /// conform to the protocol.
-    WitnessTableAccessor_t WitnessTableAccessor;
+    RelativeFunctionPointer<WitnessTableAccessorFn> WitnessTableAccessor;
   };
   
   /// Flags describing the protocol conformance.
@@ -2135,7 +2136,9 @@ public:
   
   const Metadata *getDirectType() const {
     switch (Flags.getTypeKind()) {
-    case ProtocolConformanceTypeKind::Universal: // will be null in this case
+    case ProtocolConformanceTypeKind::Universal:
+      return nullptr;
+
     case ProtocolConformanceTypeKind::UniqueDirectType:
     case ProtocolConformanceTypeKind::NonuniqueDirectType:
       break;
@@ -2152,7 +2155,8 @@ public:
   // FIXME: This shouldn't exist
   const ClassMetadata *getDirectClass() const {
     switch (Flags.getTypeKind()) {
-    case ProtocolConformanceTypeKind::Universal: // will be null in this case
+    case ProtocolConformanceTypeKind::Universal:
+      return nullptr;
     case ProtocolConformanceTypeKind::UniqueDirectClass:
       break;
         
@@ -2162,14 +2166,17 @@ public:
     case ProtocolConformanceTypeKind::UniqueIndirectClass:
       assert(false && "not direct class object");
     }
-    
-    return static_cast<const ClassMetadata*>(DirectType);
+
+    const Metadata *metadata = DirectType;
+    return static_cast<const ClassMetadata*>(metadata);
     
   }
   
   const ClassMetadata * const *getIndirectClass() const {
     switch (Flags.getTypeKind()) {
-    case ProtocolConformanceTypeKind::Universal: // will be null in this case
+    case ProtocolConformanceTypeKind::Universal:
+      return nullptr;
+
     case ProtocolConformanceTypeKind::UniqueIndirectClass:
       break;
         
@@ -2185,7 +2192,9 @@ public:
   
   const GenericMetadata *getGenericPattern() const {
     switch (Flags.getTypeKind()) {
-    case ProtocolConformanceTypeKind::Universal: // will be null in this case
+    case ProtocolConformanceTypeKind::Universal:
+      return nullptr;
+
     case ProtocolConformanceTypeKind::UniqueGenericPattern:
       break;
         
@@ -2211,7 +2220,7 @@ public:
     return WitnessTable;
   }
   
-  WitnessTableAccessor_t getWitnessTableAccessor() const {
+  WitnessTableAccessorFn *getWitnessTableAccessor() const {
     switch (Flags.getConformanceKind()) {
     case ProtocolConformanceReferenceKind::WitnessTableAccessor:
       break;

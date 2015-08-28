@@ -321,7 +321,10 @@ public:
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
   llvm::IntegerType *Int16Ty;          /// i16
-  llvm::IntegerType *Int32Ty;          /// i32
+  union {
+    llvm::IntegerType *Int32Ty;          /// i32
+    llvm::IntegerType *RelativeAddressTy;
+  };
   llvm::IntegerType *Int64Ty;          /// i64
   union {
     llvm::IntegerType *SizeTy;         /// usually i32 or i64
@@ -500,14 +503,16 @@ public:
                                            ForDefinition_t forDefinition);
   void addUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
-  void addProtocolConformanceRecord(llvm::Constant *record);
+  void addProtocolConformanceRecord(NormalProtocolConformance *conformance);
 
   void addLazyFieldTypeAccessor(NominalTypeDecl *type,
                                 ArrayRef<FieldTypeInfo> fieldTypes,
                                 llvm::Function *fn);
+  llvm::Constant *emitProtocolConformances();
 
 private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
+  llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::DenseSet<const clang::Decl *> GlobalClangDecls;
   llvm::StringMap<llvm::Constant*> GlobalStrings;
@@ -534,8 +539,8 @@ private:
   SmallVector<llvm::WeakVH, 4> ObjCNonLazyClasses;
   /// List of Objective-C categories, bitcast to i8*.
   SmallVector<llvm::WeakVH, 4> ObjCCategories;
-  /// List of protocol conformance records.
-  SmallVector<llvm::WeakVH, 4> ProtocolConformanceRecords;
+  /// List of protocol conformances to generate records for.
+  SmallVector<NormalProtocolConformance *, 4> ProtocolConformances;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -572,7 +577,6 @@ private:
   void emitLazyObjCProtocolDefinitions();
   void emitLazyObjCProtocolDefinition(ProtocolDecl *proto);
 
-  llvm::Constant *emitProtocolConformances();
   void emitGlobalLists();
   void emitAutolinkInfo();
   void cleanupClangCodeGenMetadata();

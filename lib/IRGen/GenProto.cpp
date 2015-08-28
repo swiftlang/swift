@@ -3285,68 +3285,6 @@ ProtocolInfo::getConformance(IRGenModule &IGM, CanType concreteType,
   return *res.first->second;
 }
 
-std::pair<unsigned, llvm::Constant*>
-getTypeReferenceForProtocolConformanceRecord(IRGenModule &IGM,
-                                             ProtocolConformance *conformance) {
-  ProtocolConformanceTypeKind typeKind;
-  llvm::Constant *typeRef;
-
-  // TODO: Should use accessor kind for lazy conformances
-  ProtocolConformanceReferenceKind conformanceKind
-    = ProtocolConformanceReferenceKind::WitnessTable;
-
-  auto conformingType = conformance->getType()->getCanonicalType();
-  if (auto bgt = dyn_cast<BoundGenericType>(conformingType)) {
-    // Conformances for generics are represented by referencing the metadata
-    // pattern for the generic type.
-    typeKind = ProtocolConformanceTypeKind::UniqueGenericPattern;
-    typeRef = IGM.getAddrOfTypeMetadata(bgt->getDecl()->getDeclaredType()
-                                          ->getCanonicalType(),
-                                        /* indirect */ false,
-                                        /* pattern */ true);
-  } else if (auto ct = dyn_cast<ClassType>(conformingType)) {
-    auto clas = ct->getDecl();
-    if (clas->isForeign()) {
-      typeKind = ProtocolConformanceTypeKind::NonuniqueDirectType;
-      typeRef = IGM.getAddrOfForeignTypeMetadataCandidate(ct);
-    } else {
-      // TODO: We should indirectly reference classes. For now directly
-      // reference the class object, which is totally wrong for ObjC interop.
-
-      typeKind = ProtocolConformanceTypeKind::UniqueDirectClass;
-      typeRef = IGM.getAddrOfTypeMetadata(ct,
-                                          /* indirect */ false,
-                                          /* pattern */ false);
-    }
-  } else if (auto nom = conformingType->getNominalOrBoundGenericNominal()) {
-    // TODO: Metadata for Clang types should be uniqued like foreign classes.
-    if (nom->hasClangNode()) {
-      typeKind = ProtocolConformanceTypeKind::NonuniqueDirectType;
-      typeRef = IGM.getAddrOfForeignTypeMetadataCandidate(conformingType);
-    } else {
-      // We can reference the canonical metadata for native value types
-      // directly.
-      typeKind = ProtocolConformanceTypeKind::UniqueDirectType;
-      typeRef = IGM.getAddrOfTypeMetadata(nom->getDeclaredType()
-                                            ->getCanonicalType(),
-                                          /* indirect */ false,
-                                          /* pattern */ false);
-    }
-  } else {
-    // TODO: Universal and/or structural conformances
-    llvm_unreachable("unhandled protocol conformance");
-  }
-
-  // Cast the type reference to OpaquePtrTy.
-  typeRef = llvm::ConstantExpr::getBitCast(typeRef, IGM.OpaquePtrTy);
-
-  auto flags = ProtocolConformanceFlags()
-    .withTypeKind(typeKind)
-    .withConformanceKind(conformanceKind);
-
-  return {flags.getValue(), typeRef};
-}
-
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Don't emit a witness table if it is a declaration.
   if (wt->isDeclaration())
@@ -3380,31 +3318,7 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (isAvailableExternally(wt->getLinkage()))
     return;
 
-  unsigned flags;
-  llvm::Constant *typeRef;
-  std::tie(flags, typeRef)
-    = getTypeReferenceForProtocolConformanceRecord(*this, wt->getConformance());
-
-  llvm::Constant *recordFields[] = {
-    // Protocol descriptor
-    getAddrOfProtocolDescriptor(wt->getConformance()->getProtocol(),
-                                NotForDefinition),
-    // Type reference
-    typeRef,
-    // Witness table
-    // TODO: This needs to be a generator function if the witness table requires
-    // lazy initialization or instantiation.
-    llvm::ConstantExpr::getBitCast(global, OpaquePtrTy),
-    // Flags
-    llvm::ConstantInt::get(Int32Ty, flags),
-  };
-
-  auto record = llvm::ConstantStruct::get(ProtocolConformanceRecordTy,
-                                          recordFields);
-  addProtocolConformanceRecord(record);
-
-  // TODO: We should record what access mode the witness table requires:
-  // direct, lazily initialized, or runtime instantiated template.
+  addProtocolConformanceRecord(wt->getConformance());
 }
 
 namespace {

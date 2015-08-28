@@ -7,3 +7,14 @@ import Cocoa
 
 // CHECK: 0{{$}}
 print(NSNumber(integer: 0).description)
+
+protocol Q { func foo() }
+
+extension CGRect: Q {
+  func foo() {
+    print(self)
+  }
+}
+
+(CGRect() as Any as! Q).foo()
+// CHECK: (0.0, 0.0, 0.0, 0.0)

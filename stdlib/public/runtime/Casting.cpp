@@ -2135,7 +2135,8 @@ const {
     return swift_getForeignTypeMetadata((ForeignTypeMetadata*)getDirectType());
   case ProtocolConformanceTypeKind::UniqueIndirectClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
-    // metadata.
+    // metadata. The class additionally may be weak-linked, so we have to check
+    // for null.
     if (auto *ClassMetadata = *getIndirectClass())
       return swift_getObjCClassMetadata(ClassMetadata);
     return nullptr;
@@ -2166,9 +2167,9 @@ const {
 }
 
 #if defined(__APPLE__) && defined(__MACH__)
-#define SWIFT_PROTOCOL_CONFORMANCES_SECTION "__swift1_proto"
+#define SWIFT_PROTOCOL_CONFORMANCES_SECTION "__swift2_proto"
 #elif defined(__ELF__)
-#define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".swift1_protocol_conformances_start"
+#define SWIFT_PROTOCOL_CONFORMANCES_SECTION ".swift2_protocol_conformances_start"
 #endif
 
 // FIXME: Implement this callback on non-apple platforms.
@@ -2327,11 +2328,11 @@ static void _addImageProtocolConformances(const mach_header *mh,
   using mach_header_platform = mach_header;
 #endif
   
-  // Look for a __swift1_proto section.
+  // Look for a __swift2_proto section.
   unsigned long conformancesSize;
   const uint8_t *conformances =
     getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
-                   SEG_DATA, SWIFT_PROTOCOL_CONFORMANCES_SECTION,
+                   SEG_TEXT, SWIFT_PROTOCOL_CONFORMANCES_SECTION,
                    &conformancesSize);
   
   if (!conformances)

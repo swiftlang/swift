@@ -764,7 +764,6 @@ private:
 private:
 
   void stripPreviouslyGenerated(llvm::Module &M) {
-
     for (auto &function : M.getFunctionList()) {
       function.setVisibility(llvm::GlobalValue::DefaultVisibility);
       if (FuncsAlreadyGenerated.count(function.getName()))
@@ -777,6 +776,8 @@ private:
 
     for (auto &global : M.globals()) {
       if (!global.hasName())
+        continue;
+      if (global.hasUnnamedAddr())
         continue;
 
       global.setVisibility(llvm::GlobalValue::DefaultVisibility);

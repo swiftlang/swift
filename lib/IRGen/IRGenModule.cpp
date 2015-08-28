@@ -238,9 +238,9 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
 
   ProtocolConformanceRecordTy
     = createStructType(*this, "swift.protocol_conformance", {
-      ProtocolDescriptorPtrTy,
-      OpaquePtrTy,
-      OpaquePtrTy,
+      RelativeAddressTy,
+      RelativeAddressTy,
+      RelativeAddressTy,
       Int32Ty
     });
   ProtocolConformanceRecordPtrTy

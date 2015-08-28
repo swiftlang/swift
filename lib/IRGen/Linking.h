@@ -439,6 +439,9 @@ public:
     assert(getKind() == Kind::TypeMetadata);
     return LINKENTITY_GET_FIELD(Data, IsPattern);
   }
+  bool isForeignTypeMetadataCandidate() const {
+    return getKind() == Kind::ForeignTypeMetadataCandidate;
+  }
 
   bool isOffsetIndirect() const {
     assert(getKind() == Kind::FieldOffset);
