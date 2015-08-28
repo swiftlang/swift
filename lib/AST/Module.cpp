@@ -33,6 +33,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -60,10 +61,8 @@ public:
 BuiltinUnit::LookupCache &BuiltinUnit::getCache() const {
   // FIXME: This leaks. Sticking this into ASTContext isn't enough because then
   // the DenseMap will leak.
-  if (!Cache) {
-    const_cast<BuiltinUnit *>(this)->Cache = new LookupCache();
-    getASTContext().addDestructorCleanup(*Cache);
-  }
+  if (!Cache)
+    const_cast<BuiltinUnit *>(this)->Cache = llvm::make_unique<LookupCache>();
   return *Cache;
 }
 
@@ -165,8 +164,8 @@ using SourceLookupCache = SourceFile::LookupCache;
 
 SourceLookupCache &SourceFile::getCache() const {
   if (!Cache) {
-    const_cast<SourceFile *>(this)->Cache = new SourceLookupCache(*this);
-    getASTContext().addDestructorCleanup(*Cache);
+    const_cast<SourceFile *>(this)->Cache =
+        llvm::make_unique<SourceLookupCache>(*this);
   }
   return *Cache;
 }
@@ -1442,7 +1441,7 @@ void SourceFile::clearLookupCache() {
 
   // Abandon any current cache. We'll rebuild it on demand.
   Cache->invalidate();
-  Cache = nullptr;
+  Cache.reset();
 }
 
 void

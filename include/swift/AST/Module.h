@@ -850,7 +850,7 @@ public:
   using ImportOptions = OptionSet<ImportFlags>;
 
 private:
-  LookupCache *Cache = nullptr;
+  std::unique_ptr<LookupCache> Cache;
   LookupCache &getCache() const;
 
   /// This is the list of modules that are imported by this module.
@@ -1107,7 +1107,7 @@ public:
   class LookupCache;
 
 private:
-  LookupCache *Cache = nullptr;
+  std::unique_ptr<LookupCache> Cache;
   LookupCache &getCache() const;
 
   friend ASTContext;
