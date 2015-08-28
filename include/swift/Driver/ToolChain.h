@@ -13,67 +13,109 @@
 #ifndef SWIFT_DRIVER_TOOLCHAIN_H
 #define SWIFT_DRIVER_TOOLCHAIN_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Types.h"
-#include "llvm/Support/Program.h"
+#include "swift/Basic/LLVM.h"
+#include "llvm/Option/Option.h"
 #include "llvm/ADT/Triple.h"
 
 #include <memory>
 
-namespace llvm {
-namespace opt {
-  class ArgList;
-  class DerivedArgList;
-  class InputArgList;
-}
-}
-
 namespace swift {
 namespace driver {
+  class CommandOutput;
   class Compilation;
   class Driver;
-  class Tool;
+  class Job;
+  class OutputInfo;
 
+/// A ToolChain is responsible for turning abstract Actions into concrete,
+/// runnable Jobs.
+///
+/// The primary purpose of a ToolChain is built around the
+/// \c constructInvocation family of methods. This is a set of callbacks
+/// following the Visitor pattern for the various JobAction subclasses, which
+/// returns an executable name and arguments for the Job to be run. The base
+/// ToolChain knows how to perform most operations, but some (like linking)
+/// require platform-specific knowledge, provided in subclasses.
 class ToolChain {
   const Driver &D;
   const llvm::Triple Triple;
-
-  mutable std::unique_ptr<Tool> Swift;
-  mutable std::unique_ptr<Tool> MergeModule;
-  mutable std::unique_ptr<Tool> LLDB;
-  mutable std::unique_ptr<Tool> Linker;
-  mutable std::unique_ptr<Tool> Dsymutil;
-  mutable std::unique_ptr<Tool> AutolinkExtract;
-
-  Tool *getSwift() const;
-  Tool *getMergeModule() const;
-  Tool *getLLDB() const;
-  Tool *getLinker() const;
-  Tool *getDsymutil() const;
-  Tool *getAutolinkExtract() const;
+  mutable llvm::StringMap<std::string> ProgramLookupCache;
 
 protected:
   ToolChain(const Driver &D, const llvm::Triple &T) : D(D), Triple(T) {}
 
-  virtual std::unique_ptr<Tool> buildLinker() const = 0;
+  /// A special name used to identify the Swift executable itself.
+  constexpr static const char * const SWIFT_EXECUTABLE_NAME = "swift";
+
+  /// Packs together the supplementary information about the job being created.
+  struct JobContext {
+    ArrayRef<const Job *> Inputs;
+    const CommandOutput &Output;
+    ArrayRef<const Action *> InputActions;
+    const llvm::opt::ArgList &Args;
+    const OutputInfo &OI;
+  };
+
+  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  constructInvocation(const CompileJobAction &job,
+                      const JobContext &context) const;
+  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  constructInvocation(const BackendJobAction &job,
+                      const JobContext &context) const;
+  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  constructInvocation(const MergeModuleJobAction &job,
+                      const JobContext &context) const;
+
+  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  constructInvocation(const REPLJobAction &job,
+                      const JobContext &context) const;
+
+  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  constructInvocation(const GenerateDSYMJobAction &job,
+                      const JobContext &context) const;
+  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  constructInvocation(const AutolinkExtractJobAction &job,
+                      const JobContext &context) const;
+  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  constructInvocation(const LinkJobAction &job,
+                      const JobContext &context) const;
+
+  /// Searches for the given executable in appropriate paths relative to the
+  /// Swift binary.
+  ///
+  /// This method caches its results.
+  ///
+  /// \sa findProgramRelativeToSwiftImpl
+  std::string findProgramRelativeToSwift(StringRef name) const;
+
+  /// An override point for platform-specific subclasses to customize how to
+  /// do relative searches for programs.
+  ///
+  /// This method is invoked by findProgramRelativeToSwift().
+  virtual std::string findProgramRelativeToSwiftImpl(StringRef name) const;
 
 public:
   virtual ~ToolChain() = default;
 
-  // Accessors
-
   const Driver &getDriver() const { return D; }
   const llvm::Triple &getTriple() const { return Triple; }
 
-  /// Choose a tool to use to handle the action \p JA.
-  virtual Tool *selectTool(const JobAction &JA) const;
+  /// Construct a Job for the action \p JA, taking the given information into
+  /// account.
+  ///
+  /// This method dispatches to the various \c constructInvocation methods,
+  /// which may be overridden by platform-specific subclasses.
+  std::unique_ptr<Job> constructJob(const JobAction &JA,
+                                    SmallVectorImpl<const Job *> &&inputs,
+                                    std::unique_ptr<CommandOutput> output,
+                                    const ActionList &inputActions,
+                                    const llvm::opt::ArgList &args,
+                                    const OutputInfo &OI) const;
 
   /// Look up \p Name in the list of program search paths.
-  virtual std::string getProgramPath(StringRef Name) const;
-
-  // Platform defaults information
-
+  ///
   /// Return the default langauge type to use for the given extension.
   virtual types::ID lookupTypeForExtension(StringRef Ext) const;
 };

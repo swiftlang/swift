@@ -3,6 +3,6 @@
 
 // REQUIRES: asserts
 
-// CHECK: error: swift frontend command failed due to signal
+// CHECK: error: compile command failed due to signal
 
 print("Hello, World")

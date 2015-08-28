@@ -16,7 +16,6 @@
 
 #include "swift/Driver/Driver.h"
 
-#include "Tools.h"
 #include "ToolChains.h"
 #include "swift/Strings.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -1607,6 +1606,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
                                 const ToolChain &TC, bool AtTopLevel,
                                 JobCacheMap &JobCache) const {
   assert(!isa<InputAction>(A) && "unexpected unprocessed input");
+  const auto *JA = cast<JobAction>(A);
 
   // 1. See if we've already got this cached.
   std::pair<const Action *, const ToolChain *> Key(A, &TC);
@@ -1630,13 +1630,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
     }
   }
 
-  // 3. Select the right tool for the job.
-  const JobAction *JA = cast<JobAction>(A);
-  const Tool *T = TC.selectTool(*JA);
-  if (!T)
-    return nullptr;
-
-  // 4. Determine the CommandOutput for the job.
+  // 3. Determine the CommandOutput for the job.
   StringRef BaseInput;
   if (!InputActions.empty()) {
     // Use the first InputAction as our BaseInput.
@@ -1856,9 +1850,10 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
   }
 
   // 5. Construct a Job which produces the right CommandOutput.
-  std::unique_ptr<Job> ownedJob = T->constructJob(*JA, std::move(InputJobs),
-                                           std::move(Output),
-                                           InputActions, C.getArgs(), OI);
+  std::unique_ptr<Job> ownedJob = TC.constructJob(*JA, std::move(InputJobs),
+                                                  std::move(Output),
+                                                  InputActions, C.getArgs(),
+                                                  OI);
   Job *J = C.addJob(std::move(ownedJob));
 
   // If we track dependencies for this job, we may be able to avoid running it.
@@ -1877,8 +1872,8 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
   JobCache[Key] = J;
 
   if (DriverPrintBindings) {
-    llvm::outs() << "# \"" << T->getToolChain().getTriple().str()
-      << "\" - \"" << T->getName()
+    llvm::outs() << "# \"" << TC.getTriple().str()
+      << "\" - \"" << llvm::sys::path::filename(J->getExecutable())
       << "\", inputs: [";
 
     interleave(InputActions.begin(), InputActions.end(),

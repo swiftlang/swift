@@ -2,7 +2,7 @@
 
 // RUN: not %swiftc_driver -emit-executable -o %t.exe %s -Xfrontend -debug-crash-after-parse 2>&1 | FileCheck %s
 
-// CHECK: error: swift frontend command failed due to signal
+// CHECK: error: compile command failed due to signal
 
 func anchor() {}
 anchor()

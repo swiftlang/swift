@@ -33,7 +33,6 @@ namespace driver {
 class Action;
 class InputAction;
 class Job;
-class Tool;
 
 class CommandOutput {
   types::ID PrimaryOutputType;
@@ -89,12 +88,9 @@ public:
   };
 
 private:
-  /// The action which caused the creation of this Job.
-  const Action &Source;
-
-  /// The tool which created this Job, and the conditions under which it must
-  /// be run.
-  llvm::PointerIntPair<const Tool *, 2, Condition> CreatorAndCondition;
+  /// The action which caused the creation of this Job, and the conditions
+  /// under which it must be run.
+  llvm::PointerIntPair<const Action *, 2, Condition> SourceAndCondition;
 
   /// The list of other Jobs which are inputs to this Job.
   SmallVector<const Job *, 4> Inputs;
@@ -113,17 +109,16 @@ private:
   llvm::sys::TimeValue InputModTime = llvm::sys::TimeValue::MaxTime();
 
 public:
-  Job(const Action &Source, const Tool &Creator,
+  Job(const Action &Source,
       SmallVectorImpl<const Job *> &&Inputs,
       std::unique_ptr<CommandOutput> Output,
       const char *Executable,
       llvm::opt::ArgStringList Arguments)
-      : Source(Source), CreatorAndCondition(&Creator, Condition::Always),
+      : SourceAndCondition(&Source, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(std::move(Arguments)) {}
 
-  const Action &getSource() const { return Source; }
-  const Tool &getCreator() const { return *CreatorAndCondition.getPointer(); }
+  const Action &getSource() const { return *SourceAndCondition.getPointer(); }
 
   const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
@@ -132,10 +127,10 @@ public:
   const CommandOutput &getOutput() const { return *Output; }
 
   Condition getCondition() const {
-    return CreatorAndCondition.getInt();
+    return SourceAndCondition.getInt();
   }
   void setCondition(Condition Cond) {
-    CreatorAndCondition.setInt(Cond);
+    SourceAndCondition.setInt(Cond);
   }
 
   void setInputModTime(llvm::sys::TimeValue time) {

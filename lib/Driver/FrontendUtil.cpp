@@ -17,7 +17,6 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
-#include "swift/Driver/Tool.h"
 #include "swift/Frontend/Frontend.h"
 
 using namespace swift;
@@ -57,7 +56,7 @@ swift::driver::createCompilerInvocation(ArrayRef<const char *> ArgList,
   }
 
   const Job *Cmd = *CompileCommands.begin();
-  if (Cmd->getCreator().getName() != "swift") {
+  if (Cmd->getArguments().front() != "-frontend") {
     Diags.diagnose(SourceLoc(), diag::error_expected_frontend_command);
     return nullptr;
   }

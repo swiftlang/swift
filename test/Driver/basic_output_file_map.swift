@@ -10,4 +10,4 @@
 // BINDINGS: # "x86_64-apple-macosx10.9" - "swift", inputs: ["{{.*}}/basic_output_file_map.swift"], output: {object: "/build/basic_output_file_map.o"}
 // BINDINGS: # "x86_64-apple-macosx10.9" - "swift", inputs: ["{{.*}}/Inputs/main.swift"], output: {object: "/build/main.o"}
 // BINDINGS: # "x86_64-apple-macosx10.9" - "swift", inputs: ["{{.*}}/Inputs/lib.swift"], output: {object: "/build/lib.o"}
-// BINDINGS: # "x86_64-apple-macosx10.9" - "darwin::Linker", inputs: ["/build/basic_output_file_map.o", "/build/main.o", "/build/lib.o"], output: {image: "/build/basic_output_file_map.out"}
+// BINDINGS: # "x86_64-apple-macosx10.9" - "ld", inputs: ["/build/basic_output_file_map.o", "/build/main.o", "/build/lib.o"], output: {image: "/build/basic_output_file_map.out"}

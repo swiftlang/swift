@@ -23,7 +23,6 @@
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
-#include "swift/Driver/Tool.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -338,7 +337,7 @@ int Compilation::performJobsImpl() {
     }
   }
 
-  int Result = 0;
+  int Result = EXIT_SUCCESS;
 
   // Set up a callback which will be called immediately after a task has
   // started. This callback may be used to provide output indicating that the
@@ -374,21 +373,23 @@ int Compilation::performJobsImpl() {
         llvm::errs() << Output;
     }
 
-    if (ReturnCode != 0) {
+    if (ReturnCode != EXIT_SUCCESS) {
       // The task failed, so return true without performing any further
       // dependency analysis.
 
       // Store this task's ReturnCode as our Result if we haven't stored
       // anything yet.
-      if (Result == 0)
+      if (Result == EXIT_SUCCESS)
         Result = ReturnCode;
 
-      if (!FinishedCmd->getCreator().hasGoodDiagnostics() || ReturnCode != 1)
+      if (!isa<CompileJobAction>(FinishedCmd->getSource()) ||
+          ReturnCode != EXIT_FAILURE) {
         Diags.diagnose(SourceLoc(), diag::error_command_failed,
-                       FinishedCmd->getCreator().getNameForDiagnostics(),
+                       FinishedCmd->getSource().getClassName(),
                        ReturnCode);
+      }
 
-      return ContinueBuildingAfterErrors ? 
+      return ContinueBuildingAfterErrors ?
           TaskFinishedResponse::ContinueExecution :
           TaskFinishedResponse::StopExecution;
     }
@@ -455,7 +456,7 @@ int Compilation::performJobsImpl() {
                      ErrorMsg);
 
     Diags.diagnose(SourceLoc(), diag::error_command_signalled,
-                   SignalledCmd->getCreator().getNameForDiagnostics());
+                   SignalledCmd->getSource().getClassName());
 
     // Since the task signalled, so unconditionally set result to -2.
     Result = -2;

@@ -72,7 +72,7 @@ def driver_print_actions : Flag<["-"], "driver-print-actions">,
 def driver_print_output_file_map : Flag<["-"], "driver-print-output-file-map">,
   InternalDebugOpt, HelpText<"Dump the contents of the output file map">;
 def driver_print_bindings : Flag<["-"], "driver-print-bindings">,
-  InternalDebugOpt, HelpText<"Dump list of bindings">;
+  InternalDebugOpt, HelpText<"Dump list of job inputs and outputs">;
 def driver_print_jobs : Flag<["-"], "driver-print-jobs">, InternalDebugOpt,
   HelpText<"Dump list of jobs to execute">;
 def _HASH_HASH_HASH : Flag<["-"], "###">, Alias<driver_print_jobs>;

@@ -9,80 +9,100 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+/// \file This file defines the base implementation of the ToolChain class.
+/// The platform-specific subclasses are implemented in ToolChains.cpp.
+/// For organizational purposes, the platform-independent logic for
+/// constructing job invocations is also located in ToolChains.cpp.
+//
+//===----------------------------------------------------------------------===//
 
 #include "swift/Driver/ToolChain.h"
 
-#include "Tools.h"
-#include "swift/Driver/Tool.h"
+#include "swift/Driver/Driver.h"
+#include "swift/Driver/Job.h"
+#include "llvm/Option/ArgList.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
+#include "llvm/Support/Program.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-template <typename T>
-static Tool *cacheTool(const ToolChain &TC,
-                       const std::unique_ptr<Tool> &tool) {
-  if (!tool)
-    const_cast<std::unique_ptr<Tool> &>(tool).reset(new T(TC));
-  return tool.get();
-}
+const char * const ToolChain::SWIFT_EXECUTABLE_NAME;
 
-#define CACHE_TOOL(X) \
-Tool *ToolChain::get##X() const { \
-  return cacheTool<tools::X>(*this, X); \
-}
+std::unique_ptr<Job>
+ToolChain::constructJob(const JobAction &JA,
+                        SmallVectorImpl<const Job *> &&inputs,
+                        std::unique_ptr<CommandOutput> output,
+                        const ActionList &inputActions,
+                        const llvm::opt::ArgList &args,
+                        const OutputInfo &OI) const {
+  JobContext context{inputs, *output, inputActions, args, OI};
 
-CACHE_TOOL(Swift)
-CACHE_TOOL(MergeModule)
-CACHE_TOOL(LLDB)
-CACHE_TOOL(Dsymutil)
-CACHE_TOOL(AutolinkExtract)
-
-Tool *ToolChain::getLinker() const {
-  if (!Linker)
-    Linker = buildLinker();
-  return Linker.get();
-}
-
-Tool *ToolChain::selectTool(const JobAction &JA) const {
+  const char *executableName;
+  llvm::opt::ArgStringList arguments;
   switch (JA.getKind()) {
-  case Action::CompileJob:
-  case Action::BackendJob:
-    return getSwift();
-  case Action::MergeModuleJob:
-    return getMergeModule();
-  case Action::LinkJob:
-    return getLinker();
-  case Action::GenerateDSYMJob:
-    return getDsymutil();
-  case Action::AutolinkExtractJob:
-    return getAutolinkExtract();
-  case Action::REPLJob:
-    switch (cast<REPLJobAction>(JA).getRequestedMode()) {
-    case REPLJobAction::Mode::Integrated:
-      return getSwift();
-    case REPLJobAction::Mode::RequireLLDB:
-      return getLLDB();
-    case REPLJobAction::Mode::PreferLLDB:
-      if (static_cast<tools::LLDB *>(getLLDB())->isPresentRelativeToDriver())
-        return getLLDB();
-      return getSwift();
-    }
+#define CASE(K) case Action::K: \
+    std::tie(executableName, arguments) = \
+        constructInvocation(cast<K##Action>(JA), context); \
+    break;
+  CASE(CompileJob)
+  CASE(BackendJob)
+  CASE(MergeModuleJob)
+  CASE(LinkJob)
+  CASE(GenerateDSYMJob)
+  CASE(AutolinkExtractJob)
+  CASE(REPLJob)
+#undef CASE
   case Action::Input:
-    llvm_unreachable("Invalid tool kind.");
+    llvm_unreachable("not a JobAction");
   }
 
-  llvm_unreachable("Invalid tool kind.");
+  // Special-case the Swift frontend.
+  const char *executablePath = nullptr;
+  if (StringRef(SWIFT_EXECUTABLE_NAME) == executableName) {
+    executablePath = getDriver().getSwiftProgramPath().c_str();
+  } else {
+    std::string relativePath = findProgramRelativeToSwift(executableName);
+    if (!relativePath.empty()) {
+      executablePath = args.MakeArgString(relativePath);
+    } else {
+      auto systemPath = llvm::sys::findProgramByName(executableName);
+      if (systemPath) {
+        executablePath = args.MakeArgString(systemPath.get());
+      } else {
+        // For debugging purposes.
+        executablePath = executableName;
+      }
+    }
+  }
+
+  return llvm::make_unique<Job>(JA, std::move(inputs), std::move(output),
+                                executablePath, std::move(arguments));
 }
 
-std::string ToolChain::getProgramPath(StringRef Name) const {
-  // TODO: perform ToolChain-specific lookup
+std::string
+ToolChain::findProgramRelativeToSwift(StringRef executableName) const {
+  auto insertionResult =
+      ProgramLookupCache.insert(std::make_pair(executableName, ""));
+  if (insertionResult.second) {
+    std::string path = findProgramRelativeToSwiftImpl(executableName);
+    insertionResult.first->setValue(std::move(path));
+  }
+  return insertionResult.first->getValue();
+}
 
-  auto P = llvm::sys::findProgramByName(Name);
-  if (!P.getError())
-    return *P;
-
-  return Name;
+std::string
+ToolChain::findProgramRelativeToSwiftImpl(StringRef executableName) const {
+  llvm::SmallString<128> path{getDriver().getSwiftProgramPath()};
+  llvm::sys::path::remove_filename(path);
+  auto result = llvm::sys::findProgramByName(executableName, {path});
+  if (result)
+    return result.get();
+  return {};
 }
 
 types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {

@@ -1,4 +1,4 @@
-//===--- ToolChains.h - ToolChain Implementations ---------------*- C++ -*-===//
+//===--- ToolChains.h - Platform-specific ToolChain logic -------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -23,17 +23,29 @@ namespace toolchains {
 
 class LLVM_LIBRARY_VISIBILITY Darwin : public ToolChain {
 protected:
-  virtual std::unique_ptr<Tool> buildLinker() const;
+  std::pair<const char *, llvm::opt::ArgStringList>
+  constructInvocation(const LinkJobAction &job,
+                      const JobContext &context) const override;
+
+  std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
+
 public:
   Darwin(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Darwin() = default;
+
 };
 
 #if defined(SWIFT_ENABLE_TARGET_LINUX)
 
 class LLVM_LIBRARY_VISIBILITY Linux : public ToolChain {
 protected:
-  virtual std::unique_ptr<Tool> buildLinker() const;
+  std::pair<const char *, llvm::opt::ArgStringList>
+  constructInvocation(const AutolinkExtractJobAction &job,
+                      const JobContext &context) const override;
+  std::pair<const char *, llvm::opt::ArgStringList>
+  constructInvocation(const LinkJobAction &job,
+                      const JobContext &context) const override;
+
 public:
   Linux(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Linux() = default;

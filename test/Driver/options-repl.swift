@@ -44,6 +44,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t/usr/bin/
 // RUN: touch %t/usr/bin/lldb
+// RUN: chmod +x %t/usr/bin/lldb
 // RUN: ln %swift_driver_plain %t/usr/bin/swift
 // RUN: %t/usr/bin/swift -repl -### | FileCheck -check-prefix=LLDB %s
 // RUN: %t/usr/bin/swift -### | FileCheck -check-prefix=LLDB %s

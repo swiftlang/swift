@@ -35,8 +35,13 @@
 // RUN: cp %s %t
 // RUN: not %swiftc_driver -driver-print-jobs -c -target x86_64-apple-macosx10.9 %s %t/driver-compile.swift 2>&1 | FileCheck -check-prefix DUPLICATE-NAME %s
 
-// RUN: %swiftc_driver -driver-print-jobs -update-code -c -target x86_64-apple-macosx10.9 -emit-module -emit-module-path %t.mod %s 2>&1 > %t.upd.txt
+// RUN: rm -rf %t && mkdir -p %t/DISTINCTIVE-PATH/usr/bin/
+// RUN: ln %swift_driver_plain %t/DISTINCTIVE-PATH/usr/bin/swiftc
+// RUN: ln -s "swiftc" %t/DISTINCTIVE-PATH/usr/bin/swift-update
+// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -driver-print-jobs -update-code -c -target x86_64-apple-macosx10.9 -emit-module -emit-module-path %t.mod %s 2>&1 > %t.upd.txt
 // RUN: FileCheck -check-prefix UPDATE-CODE %s < %t.upd.txt
+// Clean up the test executable because hard links are expensive.
+// RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc
 
 // RUN: %swiftc_driver -driver-print-jobs -fixit-code -c -target x86_64-apple-macosx10.9 -emit-module -emit-module-path %t.mod %s 2>&1 > %t.upd.txt
 // RUN: FileCheck -check-prefix FIXIT-CODE %s < %t.upd.txt
@@ -97,10 +102,10 @@
 // DUPLICATE-NAME: error: filename "driver-compile.swift" used twice: '{{.*}}test/Driver/driver-compile.swift' and '{{.*}}driver-compile.swift'
 // DUPLICATE-NAME: note: filenames are used to distinguish private declarations with the same name
 
-// UPDATE-CODE: bin/swift-update
+// UPDATE-CODE: DISTINCTIVE-PATH/usr/bin/swift-update
 // UPDATE-CODE: -c{{ }}
 // UPDATE-CODE: -o {{.+}}.remap
-// UPDATE-CODE: bin/swift-update
+// UPDATE-CODE: DISTINCTIVE-PATH/usr/bin/swift-update
 // UPDATE-CODE: -emit-module{{ }}
 // UPDATE-CODE: -o {{.+}}.mod
 

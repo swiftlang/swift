@@ -7,12 +7,9 @@ set(swiftDriver_sources
   Job.cpp
   OutputFileMap.cpp
   ParseableOutput.cpp
-  Tool.cpp
-  Tools.cpp
   ToolChain.cpp
   ToolChains.cpp
   Types.cpp
-  Util.cpp
   )
 
 add_swift_library(swiftDriver

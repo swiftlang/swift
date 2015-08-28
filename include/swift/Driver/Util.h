@@ -30,17 +30,6 @@ namespace driver {
     DynamicLibrary
   };
 
-  /// Searches for an executable relative to the compiler itself.
-  ///
-  /// This first looks next to the compiler binary, then checks to see if the
-  /// compiler is in an Xcode toolchain and looks in the bin directory outside
-  /// the toolchain.
-  ///
-  /// \returns The path to the executable being searched for, or an empty string
-  /// if it cannot be found.
-  std::string findRelativeExecutable(StringRef compilerPath,
-                                     StringRef executableName);
-
 } // end namespace driver
 } // end namespace swift
 
