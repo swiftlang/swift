@@ -97,9 +97,10 @@ ToolChain::findProgramRelativeToSwift(StringRef executableName) const {
 
 std::string
 ToolChain::findProgramRelativeToSwiftImpl(StringRef executableName) const {
-  llvm::SmallString<128> path{getDriver().getSwiftProgramPath()};
-  llvm::sys::path::remove_filename(path);
-  auto result = llvm::sys::findProgramByName(executableName, {path});
+  StringRef swiftPath = getDriver().getSwiftProgramPath();
+  StringRef swiftBinDir = llvm::sys::path::parent_path(swiftPath);
+
+  auto result = llvm::sys::findProgramByName(executableName, {swiftBinDir});
   if (result)
     return result.get();
   return {};

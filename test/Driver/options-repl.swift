@@ -48,10 +48,3 @@
 // RUN: ln %swift_driver_plain %t/usr/bin/swift
 // RUN: %t/usr/bin/swift -repl -### | FileCheck -check-prefix=LLDB %s
 // RUN: %t/usr/bin/swift -### | FileCheck -check-prefix=LLDB %s
-
-// RUN: mkdir -p %t/Toolchains/Test.xctoolchain/usr/bin/
-// RUN: mv %t/usr/bin/swift %t/Toolchains/Test.xctoolchain/usr/bin/swift
-// RUN: %t/Toolchains/Test.xctoolchain/usr/bin/swift -repl -### | FileCheck -check-prefix=LLDB %s
-
-// Clean up the test executable because hard links are expensive.
-// RUN: rm -rf %t/Toolchains/Test.xctoolchain/usr/bin/swift
