@@ -3468,12 +3468,6 @@ namespace {
       // Add a conversion constraint between the types.
       cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
                        fTy, locator, /*isFavored*/true);
-
-      // If this constraint system fails to be solved, we want to know that it
-      // was because of this contextual constraint that we're adding.
-      assert(!cs.getContextualTypePurpose() &&
-             "Shouldn't already have a contextual type");
-      cs.setContextualType(expr, Type(), CTP_CalleeResult);
       return false;
     }
   };
@@ -3485,7 +3479,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // function.
   CalleeListener listener(CS->getContextualType());
   auto fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
-                                            CTP_Unused, TCCOptions(),
+                                            CTP_CalleeResult, TCCOptions(),
                                             &listener);
   if (!fnExpr) return true;
   

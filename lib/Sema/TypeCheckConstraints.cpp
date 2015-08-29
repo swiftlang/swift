@@ -1135,8 +1135,10 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
   ExprCleanser cleanup2(expr);
 
-  // Verify that a purpose was specified if a convertType was.
-  assert(!convertType == (convertTypePurpose == CTP_Unused) &&
+  // Verify that a purpose was specified if a convertType was.  Note that it is
+  // ok to have a purpose without a convertType (which is used for call
+  // return types).
+  assert((!convertType || convertTypePurpose != CTP_Unused) &&
          "Purpose for conversion type was not specified");
 
   // If we're asked to convert to an UnresolvedType, then ignore the request.
@@ -1151,8 +1153,7 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
-  if (!convertType.isNull())
-    cs.setContextualType(expr, convertType.getPointer(), convertTypePurpose);
+  cs.setContextualType(expr, convertType.getPointer(), convertTypePurpose);
 
   // If the convertType is *only* provided for that hint, then null it out so
   // that we don't later treat it as an actual conversion constraint.

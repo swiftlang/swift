@@ -564,3 +564,14 @@ func r22263468(a : String?) {
   typealias MyTuple = (Int, String)
   _ = MyTuple(42, a) // expected-error {{value of optional type 'String?' not unwrapped; did you mean to use '!' or '?'?}} {{20-20=!}}
 }
+
+
+// rdar://22470302 - Crash with parenthesized call result.
+class r22470302Class {
+  func f() {}
+}
+
+func r22470302(c: r22470302Class) {
+  print((c.f)(c))  // expected-error {{cannot convert call result type '()' to expected type '[Any]'}}
+}
+
