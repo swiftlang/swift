@@ -372,6 +372,7 @@ public:
   void replaceApplyWithNew(FullApplySite Old,
                            llvm::SmallVectorImpl<FullApplySite> &NewApplies);
   void addCallGraphNode(SILFunction *F) { CG.addCallGraphNode(F); }
+  void removeEdgesForApply(FullApplySite AI) { CG.removeEdgesForApply(AI); }
   void addEdgesForApply(FullApplySite AI) { CG.addEdgesForApply(AI); }
 };
 
