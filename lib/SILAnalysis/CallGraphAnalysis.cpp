@@ -31,7 +31,6 @@ STATISTIC(NumCallGraphNodes, "# of call graph nodes created");
 STATISTIC(NumAppliesWithEdges, "# of call sites with edges");
 STATISTIC(NumAppliesWithoutEdges,
           "# of call sites without edges");
-STATISTIC(NumAppliesOfBuiltins, "# of call sites calling builtins");
 STATISTIC(NumCallGraphsBuilt, "# of times the call graph is built");
 
 llvm::cl::opt<bool> DumpCallGraph("sil-dump-call-graph",
@@ -150,10 +149,6 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
     // TODO: It would be good to tunnel through extracts so that we
     //       can build a more accurate call graph prior to any
     //       optimizations.
-    return false;
-
-  case ValueKind::BuiltinInst:
-    ++NumAppliesOfBuiltins;
     return false;
 
   case ValueKind::WitnessMethodInst: {
