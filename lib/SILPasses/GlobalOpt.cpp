@@ -992,8 +992,8 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
   for (auto *Load: GlobalLoadMap[SILG]) {
     SILBuilderWithScope<1> B(Load);
     auto *GetterRef = B.createFunctionRef(Load->getLoc(), GetterF);
-    SILInstruction *Value = B.createApply(Load->getLoc(), GetterRef, {}, false);
-    addApply(cast<ApplyInst>(Value));
+    auto *Value = B.createApply(Load->getLoc(), GetterRef, {}, false);
+    addApply(Value);
 
     convertLoadSequence(Load, Value, B);
     HasChanged = true;
