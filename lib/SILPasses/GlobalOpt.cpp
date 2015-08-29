@@ -672,7 +672,7 @@ static void replaceLoadSequence(SILInstruction *I,
                                 SILInstruction *Value,
                                 SILBuilder &B) {
   if (auto *LI = dyn_cast<LoadInst>(I)) {
-    SILValue(LI, 0).replaceAllUsesWith(SILValue(Value, 0));
+    LI->replaceAllUsesWith(Value);
     return;
   }
 
@@ -709,7 +709,7 @@ static SILInstruction *convertLoadSequence(SILInstruction *I,
 
   if (auto *LI = dyn_cast<LoadInst>(I)) {
     Value = convertLoadSequence(dyn_cast<SILInstruction>(LI->getOperand()), Value, B);
-    SILValue(LI, 0).replaceAllUsesWith(SILValue(Value, 0));
+    LI->replaceAllUsesWith(Value);
     return Value;
   }
 
@@ -750,7 +750,7 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
     SILBuilderWithScope<1> B(Call);
     SmallVector<SILValue, 1> Args;
     auto *NewAI = B.createApply(Call->getLoc(), Call->getCallee(), Args, false);
-    SILValue(Call, 0).replaceAllUsesWith(SILValue(NewAI, 0));
+    Call->replaceAllUsesWith(NewAI);
     removeApply(Call);
     addApply(NewAI);
     eraseUsesOfInstruction(Call);
