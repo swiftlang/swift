@@ -22,6 +22,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
