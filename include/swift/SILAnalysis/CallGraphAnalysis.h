@@ -295,12 +295,9 @@ public:
   }
 
   CallGraphNode *getCallGraphNode(SILFunction *F) {
-    auto Found = FunctionToNodeMap.find(F);
-    if (Found == FunctionToNodeMap.end())
-      return nullptr;
-
-    assert(Found->second && "Unexpected null call graph node in map!");
-    return Found->second;
+    auto *CGN = tryGetCallGraphNode(F);
+    assert(CGN && "Expected call graph node for function!");
+    return CGN;
   }
 
   CallGraphEdge *getCallGraphEdge(FullApplySite AI) {
@@ -354,7 +351,25 @@ public:
   void verify() const;
 
 private:
-  void addCallGraphNode(SILFunction *F);
+  CallGraphNode *tryGetCallGraphNode(SILFunction *F) const {
+    return const_cast<CallGraph *>(this)->tryGetCallGraphNode(F);
+  }
+
+  CallGraphNode *tryGetCallGraphNode(SILFunction *F) {
+    auto Found = FunctionToNodeMap.find(F);
+    if (Found == FunctionToNodeMap.end())
+      return nullptr;
+
+    assert(Found->second && "Unexpected null call graph node in map!");
+    return Found->second;
+  }
+
+  CallGraphNode *getOrAddCallGraphNode(SILFunction *F) {
+    if (auto *CGN = tryGetCallGraphNode(F))
+      return CGN;
+    return addCallGraphNode(F);
+  }
+  CallGraphNode *addCallGraphNode(SILFunction *F);
   void addEdges(SILFunction *F);
   bool tryGetCalleeSet(SILValue Callee, CallGraphEdge::CalleeSetType &CalleeSet,
                        bool &Complete);
@@ -374,13 +389,14 @@ public:
   void addCallGraphNode(SILFunction *F) { CG.addCallGraphNode(F); }
   void removeEdgesForApply(FullApplySite AI) { CG.removeEdgesForApply(AI); }
   void addEdgesForApply(FullApplySite AI) { CG.addEdgesForApply(AI); }
+  void addEdgesForFunction(SILFunction *F) { CG.addEdges(F); }
 };
 
 class CallGraphLinkerEditor {
   CallGraph &CG;
 
   void callback(SILFunction *F) {
-    CallGraphEditor(CG).addCallGraphNode(F);
+    CallGraphEditor(CG).addEdgesForFunction(F);
   }
 
 public:
