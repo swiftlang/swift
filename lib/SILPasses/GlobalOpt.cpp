@@ -708,20 +708,20 @@ static SILInstruction *convertLoadSequence(SILInstruction *I,
     return Value;
 
   if (auto *LI = dyn_cast<LoadInst>(I)) {
-    Value = convertLoadSequence(dyn_cast<SILInstruction>(LI->getOperand()), Value, B);
+    Value = convertLoadSequence(cast<SILInstruction>(LI->getOperand()), Value, B);
     LI->replaceAllUsesWith(Value);
     return Value;
   }
 
   // It is a series of struct_element_addr followed by load.
   if(auto *SEAI = dyn_cast<StructElementAddrInst>(I)) {
-    Value = convertLoadSequence(dyn_cast<SILInstruction>(SEAI->getOperand()), Value, B);
+    Value = convertLoadSequence(cast<SILInstruction>(SEAI->getOperand()), Value, B);
     auto *SEI = B.createStructExtract(SEAI->getLoc(), Value, SEAI->getField());
     return SEI;
   }
 
   if(auto *TEAI = dyn_cast<TupleElementAddrInst>(I)) {
-    Value = convertLoadSequence(dyn_cast<SILInstruction>(TEAI->getOperand()), Value, B);
+    Value = convertLoadSequence(cast<SILInstruction>(TEAI->getOperand()), Value, B);
     auto *TEI = B.createTupleExtract(TEAI->getLoc(), Value, TEAI->getFieldNo());
     return TEI;
   }
