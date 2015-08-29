@@ -56,7 +56,7 @@ swift::driver::createCompilerInvocation(ArrayRef<const char *> ArgList,
   }
 
   const Job *Cmd = *CompileCommands.begin();
-  if (Cmd->getArguments().front() != "-frontend") {
+  if (StringRef("-frontend") != Cmd->getArguments().front()) {
     Diags.diagnose(SourceLoc(), diag::error_expected_frontend_command);
     return nullptr;
   }
