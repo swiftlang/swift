@@ -2780,9 +2780,10 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 /// The list returned includes the viable candidates as well as the unviable
 /// ones (along with reasons why they aren't viable).
 MemberLookupResult ConstraintSystem::
-performMemberLookup(Type baseTy, const Constraint &constraint) {
+performMemberLookup(ConstraintKind constraintKind,
+                    DeclName memberName, Type baseTy,
+                    ConstraintLocator *memberLocator) {
   Type baseObjTy = baseTy->getRValueType();
-  DeclName name = constraint.getMember();
 
   // Dig out the instance type and figure out what members of the instance type
   // we are going to see.
@@ -2841,10 +2842,10 @@ performMemberLookup(Type baseTy, const Constraint &constraint) {
   // of the tuple.
   if (auto baseTuple = baseObjTy->getAs<TupleType>()) {
     // Tuples don't have compound-name members.
-    if (!name.isSimpleName())
+    if (!memberName.isSimpleName())
       return result;  // No result.
     
-    StringRef nameStr = name.getBaseName().str();
+    StringRef nameStr = memberName.getBaseName().str();
     int fieldIdx = -1;
     // Resolve a number reference into the tuple type.
     unsigned Value = 0;
@@ -2852,7 +2853,7 @@ performMemberLookup(Type baseTy, const Constraint &constraint) {
         Value < baseTuple->getNumElements()) {
       fieldIdx = Value;
     } else {
-      fieldIdx = baseTuple->getNamedElementId(name.getBaseName());
+      fieldIdx = baseTuple->getNamedElementId(memberName.getBaseName());
     }
     
     if (fieldIdx == -1)
@@ -2867,16 +2868,17 @@ performMemberLookup(Type baseTy, const Constraint &constraint) {
   // If we have a simple name, determine whether there are argument
   // labels we can use to restrict the set of lookup results.
   Optional<ArrayRef<Identifier>> argumentLabels;
-  if (name.isSimpleName()) {
+  if (memberName.isSimpleName()) {
     argumentLabels = getArgumentLabels(*this,
-                             ConstraintLocatorBuilder(constraint.getLocator()));
+                                       ConstraintLocatorBuilder(memberLocator));
 
     // If we're referencing AnyObject and we have argument labels, put
     // the argument labels into the name: we don't want to look for
     // anything else, because the cost of the general search is so
     // high.
     if (baseObjTy->isAnyObject() && argumentLabels) {
-      name = DeclName(TC.Context, name.getBaseName(), *argumentLabels);
+      memberName = DeclName(TC.Context, memberName.getBaseName(),
+                            *argumentLabels);
       argumentLabels.reset();
     }
   }
@@ -2907,7 +2909,7 @@ performMemberLookup(Type baseTy, const Constraint &constraint) {
 
   
   // Handle initializers, they have their own approach to name lookup.
-  if (name.isSimpleName(TC.Context.Id_init)) {
+  if (memberName.isSimpleName(TC.Context.Id_init)) {
     NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
     if (isa<AbstractFunctionDecl>(DC))
       lookupOptions |= NameLookupFlags::KnownPrivate;
@@ -2920,7 +2922,7 @@ performMemberLookup(Type baseTy, const Constraint &constraint) {
       return result;
     
     TypeBase *favoredType = nullptr;
-    if (auto anchor = constraint.getLocator()->getAnchor()) {
+    if (auto anchor = memberLocator->getAnchor()) {
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
         auto argExpr = applyExpr->getArg();
         favoredType = getFavoredType(argExpr);
@@ -3001,16 +3003,16 @@ performMemberLookup(Type baseTy, const Constraint &constraint) {
   }
 
   // If we want member types only, use member type lookup.
-  if (constraint.getKind() == ConstraintKind::TypeMember) {
+  if (constraintKind == ConstraintKind::TypeMember) {
     // Types don't have compound names.
     // FIXME: Customize diagnostic to mention types and compound names.
-    if (!name.isSimpleName())
+    if (!memberName.isSimpleName())
       return result;    // No result.
     
     NameLookupOptions lookupOptions = defaultMemberTypeLookupOptions;
     if (isa<AbstractFunctionDecl>(DC))
       lookupOptions |= NameLookupFlags::KnownPrivate;
-    auto lookup = TC.lookupMemberType(DC, baseObjTy, name.getBaseName(),
+    auto lookup = TC.lookupMemberType(DC, baseObjTy, memberName.getBaseName(),
                                       lookupOptions);
     // Form the overload set.
     for (auto candidate : lookup) {
@@ -3028,7 +3030,7 @@ performMemberLookup(Type baseTy, const Constraint &constraint) {
   
 
   // Look for members within the base.
-  LookupResult &lookup = lookupMember(baseObjTy, name);
+  LookupResult &lookup = lookupMember(baseObjTy, memberName);
 
   // The set of directly accessible types, which is only used when
   // we're performing dynamic lookup into an existential type.
@@ -3158,7 +3160,7 @@ retry_after_fail:
   // If the instance type is a bridged to an Objective-C type, perform
   // a lookup into that Objective-C type.
   if (bridgedType) {
-    LookupResult &bridgedLookup = lookupMember(bridgedClass, name);
+    LookupResult &bridgedLookup = lookupMember(bridgedClass, memberName);
     Module *foundationModule = nullptr;
     for (auto result : bridgedLookup) {
       // Ignore results from the Objective-C "Foundation"
@@ -3185,10 +3187,10 @@ retry_after_fail:
   //
   // FIXME: The short-circuit here is lame.
   if (result.ViableCandidates.empty() && isMetatype &&
-      constraint.getKind() == ConstraintKind::UnresolvedValueMember) {
+      constraintKind == ConstraintKind::UnresolvedValueMember) {
     if (auto objectType = instanceTy->getAnyOptionalObjectType()) {
       LookupResult &optionalLookup = lookupMember(MetatypeType::get(objectType),
-                                                  name);
+                                                  memberName);
       for (auto result : optionalLookup)
         addChoice(result, /*bridged*/false, /*isUnwrappedOptional=*/true);
     }
@@ -3225,8 +3227,9 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       baseTy = objTy;
   }
 
-  // FIXME: The third bool argument should be eliminated here.
-  MemberLookupResult result = performMemberLookup(baseTy, constraint);
+  MemberLookupResult result =
+    performMemberLookup(constraint.getKind(), constraint.getMember(),
+                        baseTy, constraint.getLocator());
   
   DeclName name = constraint.getMember();
   Type memberTy = constraint.getSecondType();

@@ -2243,8 +2243,9 @@ public:
   /// perform a lookup into the specified base type to find a candidate list.
   /// The list returned includes the viable candidates as well as the unviable
   /// ones (along with reasons why they aren't viable).
-  MemberLookupResult performMemberLookup(Type baseTy,
-                                         const Constraint &constraint);
+  MemberLookupResult performMemberLookup(ConstraintKind constraintKind,
+                                         DeclName memberName, Type baseTy,
+                                         ConstraintLocator *memberLocator);
 
 private:
 

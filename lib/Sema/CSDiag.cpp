@@ -2159,7 +2159,9 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     return true;
   }
   
-  MemberLookupResult result = CS->performMemberLookup(baseObjTy, *constraint);
+  MemberLookupResult result =
+    CS->performMemberLookup(constraint->getKind(), constraint->getMember(),
+                            baseObjTy, constraint->getLocator());
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
@@ -3981,7 +3983,10 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   // Otherwise, we'll perform a lookup against the metatype of our contextual
   // type.
   baseObjTy = MetatypeType::get(baseObjTy);
-  auto result = CS->performMemberLookup(baseObjTy, *memberConstraint);
+  MemberLookupResult result =
+    CS->performMemberLookup(memberConstraint->getKind(),
+                            memberConstraint->getMember(),
+                            baseObjTy, memberConstraint->getLocator());
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
