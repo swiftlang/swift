@@ -1284,6 +1284,7 @@ namespace {
   /// most specific.
   enum CandidateCloseness {
     CC_ExactMatch,            ///< This is a perfect match for the arguments.
+    CC_Unavailable,           ///< Marked unavailable with the @available attr.
     CC_NonLValueInOut,       ///< First argument is inout but no lvalue present.
     CC_OneArgumentMismatch,   ///< All arguments except one match.
     CC_SelfMismatch,          ///< Self argument mismatches.
@@ -1411,7 +1412,16 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
   SmallVector<CandidateCloseness, 4> closenessList;
   closenessList.reserve(candidates.size());
   for (auto decl : candidates) {
-    closenessList.push_back(predicate(decl));
+    auto declCloseness = predicate(decl);
+    
+    // If this candidate otherwise matched but was marked unavailable, then
+    // treat it as unavailable, which is a very close failure.
+    if (declCloseness == CC_ExactMatch &&
+        decl.decl->getAttrs().isUnavailable(CS->getASTContext()) &&
+        !CS->TC.getLangOpts().DisableAvailabilityChecking)
+      declCloseness = CC_Unavailable;
+    
+    closenessList.push_back(declCloseness);
     closeness = std::min(closeness, closenessList.back());
   }
 
@@ -2068,11 +2078,13 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   
   auto memberName = constraint->getMember();
   
-  // Get the referenced expression from the failed constraint.
+  // Get the referenced base expression from the failed constraint, along with
+  // the SourceRange for the member ref.  In "x.y", this returns the expr for x
+  // and the source range for y.
   auto anchor = expr;
-  SourceRange range = anchor->getSourceRange();
+  SourceRange memberRange = anchor->getSourceRange();
   if (auto locator = constraint->getLocator()) {
-    locator = simplifyLocator(*CS, locator, range);
+    locator = simplifyLocator(*CS, locator, memberRange);
     if (locator->getAnchor())
       anchor = locator->getAnchor();
   }
@@ -2087,13 +2099,13 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   // If the base type is an IUO, look through it.  Odds are, the code is not
   // trying to find a member of it.
   if (auto objTy = CS->lookThroughImplicitlyUnwrappedOptionalType(baseObjTy))
-    baseObjTy = objTy;
+    baseTy = baseObjTy = objTy;
 
   
   if (auto moduleTy = baseObjTy->getAs<ModuleType>()) {
     diagnose(anchor->getLoc(), diag::no_member_of_module,
              moduleTy->getModule()->getName(), memberName)
-      .highlight(anchor->getSourceRange()).highlight(range);
+      .highlight(anchor->getSourceRange()).highlight(memberRange);
     return true;
   }
   
@@ -2129,13 +2141,13 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   if (baseObjTy->is<TupleType>()) {
     diagnose(anchor->getLoc(), diag::could_not_find_tuple_member,
              baseObjTy, memberName)
-      .highlight(anchor->getSourceRange()).highlight(range);
+      .highlight(anchor->getSourceRange()).highlight(memberRange);
     return true;
   }
   
   MemberLookupResult result =
     CS->performMemberLookup(constraint->getKind(), constraint->getMember(),
-                            baseObjTy, constraint->getLocator());
+                            baseTy, constraint->getLocator());
 
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
@@ -2174,14 +2186,30 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     break;
   }
   
-  // We know that this is a failing lookup, so we should have no viable
-  // candidates here.
-  if (!result.ViableCandidates.empty())
-    return false;
-
-  diagnoseUnviableLookupResults(result, baseObjTy, anchor, memberName,
-                                range.Start, anchor->getLoc());
-  return true;
+  // If this is a failing lookup, it has no viable candidates here.
+  if (result.ViableCandidates.empty()) {
+    diagnoseUnviableLookupResults(result, baseObjTy, anchor, memberName,
+                                  memberRange.Start, anchor->getLoc());
+    return true;
+  }
+  
+  
+  bool allUnavailable = !CS->TC.getLangOpts().DisableAvailabilityChecking;
+  for (auto match : result.ViableCandidates) {
+    if (!match.isDecl() ||
+        !match.getDecl()->getAttrs().isUnavailable(CS->getASTContext()))
+      allUnavailable = false;
+  }
+  
+  if (allUnavailable) {
+    auto firstDecl = result.ViableCandidates[0].getDecl();
+    if (CS->TC.diagnoseExplicitUnavailability(firstDecl, anchor->getLoc(),
+                                              CS->DC, nullptr))
+      return true;
+  }
+  
+  // Otherwise, we don't know why this failed.
+  return false;
 }
 
 
@@ -2211,6 +2239,9 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
     }
     return;
   }
+
+  
+  
   
   // Otherwise, we have at least one (and potentially many) viable candidates
   // sort them out.  If all of the candidates have the same problem (commonly
@@ -2245,7 +2276,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       return;
         
     case MemberLookupResult::UR_MutatingMemberOnRValue:
-    case MemberLookupResult::UR_MutatingGetterOnRValue:
+    case MemberLookupResult::UR_MutatingGetterOnRValue: {
       auto diagIDsubelt = diag::cannot_pass_rvalue_mutating_subelement;
       auto diagIDmember = diag::cannot_pass_rvalue_mutating;
       if (firstProblem == MemberLookupResult::UR_MutatingGetterOnRValue) {
@@ -2256,6 +2287,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
       diagnoseSubElementFailure(baseExpr, loc, *CS,
                                 diagIDsubelt, diagIDmember);
       return;
+    }
     }
   }
 
@@ -3231,6 +3263,13 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   if (calleeInfo.closeness == CC_ExactMatch)
     return false;
   
+  if (calleeInfo.closeness == CC_Unavailable) {
+    if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
+                                              binop->getLoc(), CS->DC, nullptr))
+      return true;
+    return false;
+  }
+  
   // A common error is to apply an operator that only has an inout LHS (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
   // case.
@@ -3287,6 +3326,14 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
     // or ambiguity failure.
     return false;
   }
+  
+  if (calleeInfo.closeness == CC_Unavailable) {
+    if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
+                                              applyExpr->getLoc(),
+                                              CS->DC, nullptr))
+      return true;
+    return false;
+  }
 
   // A common error is to apply an operator that only has inout forms (e.g. ++)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -3309,6 +3356,8 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
 }
 
 bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
+  // FIXME: Why isn't this passing TCC_AllowLValue?  It seems that this could
+  // cause problems with subscripts that have mutating getters.
   auto baseExpr = typeCheckChildIndependently(SE->getBase());
   if (!baseExpr) return true;
   auto baseType = baseExpr->getType();
@@ -3395,6 +3444,14 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
       diagnose(candidate.decl, diag::found_candidate);
 
     return true;
+  }
+  
+  if (calleeInfo.closeness == CC_Unavailable) {
+    if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
+                                              SE->getLoc(),
+                                              CS->DC, nullptr))
+      return true;
+    return false;
   }
 
   // If the closes matches all mismatch on self, we either have something that
@@ -3533,6 +3590,13 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   if (calleeInfo.closeness == CC_ExactMatch)
     return false;
 
+  if (calleeInfo.closeness == CC_Unavailable) {
+    if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
+                                              callExpr->getLoc(),
+                                              CS->DC, nullptr))
+      return true;
+    return false;
+  }
   
   bool isInitializer = isa<TypeExpr>(fnExpr);
   auto overloadName = calleeInfo.declName;
@@ -4007,7 +4071,9 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   }
 
   // If we have unviable candidates (e.g. because of access control or some
-  // other problem) we should diagnose the problem.
+  // other problem) we should diagnose the problem.  Note that we diagnose this
+  // here instead of letting diagnoseGeneralMemberFailure handle it, because it
+  // doesn't know how to handle lookup into a contextual type for an URME.
   if (result.ViableCandidates.empty()) {
     diagnoseUnviableLookupResults(result, baseObjTy, /*no base expr*/nullptr,
                                   E->getName(), E->getNameLoc(),
@@ -4060,6 +4126,12 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
                                                 candidateInfo);
   }
 
+  case CC_Unavailable:
+    if (CS->TC.diagnoseExplicitUnavailability(candidateInfo[0].decl,
+                                              E->getLoc(), CS->DC, nullptr))
+      return true;
+    return false;
+      
   case CC_ArgumentLabelMismatch: { // Argument labels are not correct.
     auto argExpr = typeCheckArgumentChildIndependently(E->getArgument(),
                                                        argumentTy,
@@ -4227,7 +4299,7 @@ bool FailureDiagnosis::visitExpr(Expr *E) {
 
     // Otherwise just type check the subexpression independently.  If that
     // succeeds, then we stitch the result back into our expression.
-    if (typeCheckChildIndependently(Child))
+    if (typeCheckChildIndependently(Child, TCC_AllowLValue))
       return Child;
 
     // Otherwise, it failed, which emitted a diagnostic.  Keep track of this

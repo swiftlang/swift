@@ -512,11 +512,10 @@ func test15117741(s: r15117741S) {
 // <rdar://problem/22491394> References to unavailable decls sometimes diagnosed as ambiguous
 struct UnavailMember {
   @available(*, unavailable)
-  static var XYZ : X { get {} }
+  static var XYZ : X { get {} } // expected-note {{'XYZ' has been explicitly marked unavailable here}}
 }
 
-// TODO: This is a poor diagnostic.
-let _ : [UnavailMember] = [.XYZ] // expected-error {{type of expression is ambiguous without more context}}
+let _ : [UnavailMember] = [.XYZ] // expected-error {{'XYZ' is unavailable}}
 let _ : [UnavailMember] = [.ABC] // expected-error {{type 'UnavailMember' has no member 'ABC'}}
 
 

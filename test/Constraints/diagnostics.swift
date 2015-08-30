@@ -575,3 +575,19 @@ func r22470302(c: r22470302Class) {
   print((c.f)(c))  // expected-error {{cannot convert call result type '()' to expected type '[Any]'}}
 }
 
+
+
+// <rdar://problem/21928143> QoI: Pointfree reference to generic initializer in generic context does not compile
+extension String {
+  @available(*, unavailable, message="calling this is unwise")
+  func unavail<T : SequenceType where T.Generator.Element == String> // expected-note {{'unavail' has been explicitly marked unavailable here}}
+    (a : T) -> String {}
+}
+extension Array {
+  func g() -> String {
+    return "foo".unavail([1])  // expected-error {{'unavail' is unavailable: calling this is unwise}}
+  }
+}
+
+
+

@@ -897,10 +897,10 @@ static void tryFixPrintWithAppendNewline(const ValueDecl *D,
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted=".
-static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
-                                           SourceRange R,
-                                           const DeclContext *DC,
-                                           const Expr *ParentExpr = nullptr) {
+bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
+                                                 SourceRange R,
+                                                 const DeclContext *DC,
+                                                 const Expr *ParentExpr) {
   auto *Attr = AvailableAttr::isUnavailable(D);
   if (!Attr)
     return false;
@@ -910,8 +910,8 @@ static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
   // contained in a declaration that is itself marked unavailable.
   // The right thing to do here is to not synthesize that code in the
   // first place. rdar://problem/20491640
-  if (R.isInvalid() && TC.isInsideImplicitFunction(R, DC) &&
-      TC.isInsideUnavailableDeclaration(R, DC)) {
+  if (R.isInvalid() && isInsideImplicitFunction(R, DC) &&
+      isInsideUnavailableDeclaration(R, DC)) {
     return false;
   }
 
@@ -926,53 +926,53 @@ static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
   case UnconditionalAvailabilityKind::Unavailable:
     if (!Attr->Rename.empty()) {
       if (Attr->Message.empty()) {
-        TC.diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
-                    Attr->Rename)
+        diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
+                 Attr->Rename)
           .fixItReplace(R, Attr->Rename);
       } else {
-        TC.diagnose(Loc, diag::availability_decl_unavailable_rename_msg, Name,
-                    Attr->Rename, Attr->Message)
+        diagnose(Loc, diag::availability_decl_unavailable_rename_msg, Name,
+                 Attr->Rename, Attr->Message)
           .fixItReplace(R, Attr->Rename);
       }
     } else if (Attr->Message.empty()) {
-      TC.diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
+      diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
     } else {
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
       tryFixPrintWithAppendNewline(D, ParentExpr,
-        TC.diagnose(Loc, diag::availability_decl_unavailable_msg, Name,
+        diagnose(Loc, diag::availability_decl_unavailable_msg, Name,
                     EncodedMessage.Message).highlight(R));
     }
     break;
 
   case UnconditionalAvailabilityKind::UnavailableInSwift:
     if (Attr->Message.empty()) {
-      TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift, Name)
-          .highlight(R);
+      diagnose(Loc, diag::availability_decl_unavailable_in_swift, Name)
+        .highlight(R);
     } else {
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift_msg, Name,
+      diagnose(Loc, diag::availability_decl_unavailable_in_swift_msg, Name,
                   EncodedMessage.Message).highlight(R);
     }
     break;
   }
 
-  auto MinVersion = TC.Context.LangOpts.getMinPlatformVersion();
+  auto MinVersion = Context.LangOpts.getMinPlatformVersion();
   switch (Attr->getMinVersionAvailability(MinVersion)) {
   case MinVersionComparison::Available:
   case MinVersionComparison::PotentiallyUnavailable:
     llvm_unreachable("These aren't considered unavailable");
 
   case MinVersionComparison::Unavailable:
-    TC.diagnose(D, diag::availability_marked_unavailable, Name)
+    diagnose(D, diag::availability_marked_unavailable, Name)
         .highlight(Attr->getRange());
     break;
 
   case MinVersionComparison::Obsoleted:
     // FIXME: Use of the platformString here is non-awesome for application
     // extensions.
-    TC.diagnose(D, diag::availability_obsoleted, Name,
-                Attr->prettyPlatformString(),
-                *Attr->Obsoleted).highlight(Attr->getRange());
+    diagnose(D, diag::availability_obsoleted, Name,
+             Attr->prettyPlatformString(),
+             *Attr->Obsoleted).highlight(Attr->getRange());
     break;
   }
   return true;
@@ -986,7 +986,7 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
   if (!D)
     return false;
 
-  if (diagnoseExplicitUnavailability(TC, D, R, DC, ParentExpr))
+  if (TC.diagnoseExplicitUnavailability(D, R, DC, ParentExpr))
     return true;
 
   // Diagnose for deprecation
