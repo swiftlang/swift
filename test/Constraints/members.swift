@@ -508,3 +508,17 @@ func test15117741(s: r15117741S) {
   s.g() // expected-error {{static member 'g' cannot be used on instance of type 'r15117741S'}}
 }
 
+
+// <rdar://problem/22491394> References to unavailable decls sometimes diagnosed as ambiguous
+struct UnavailMember {
+  @available(*, unavailable)
+  static var XYZ : X { get {} }
+}
+
+// TODO: This is a poor diagnostic.
+let _ : [UnavailMember] = [.XYZ] // expected-error {{type of expression is ambiguous without more context}}
+let _ : [UnavailMember] = [.ABC] // expected-error {{type 'UnavailMember' has no member 'ABC'}}
+
+
+
+

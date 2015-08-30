@@ -1893,6 +1893,13 @@ private:
   /// the exact expression kind).
   bool diagnoseGeneralMemberFailure(Constraint *constraint);
   
+  /// Given a result of name lookup that had no viable results, diagnose the
+  /// unviable ones.
+  void diagnoseUnviableLookupResults(MemberLookupResult &lookupResults,
+                                     Type baseObjTy, Expr *baseExpr,
+                                     DeclName memberName, SourceLoc nameLoc,
+                                     SourceLoc loc);
+  
   /// Produce a diagnostic for a general overload resolution failure
   /// (irrespective of the exact expression kind).
   bool diagnoseGeneralOverloadFailure(Constraint *constraint);
@@ -2196,18 +2203,33 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   if (!result.ViableCandidates.empty())
     return false;
 
+  diagnoseUnviableLookupResults(result, baseObjTy, anchor, memberName,
+                                range.Start, anchor->getLoc());
+  return true;
+}
+
+
+/// Given a result of name lookup that had no viable results, diagnose the
+/// unviable ones.
+void FailureDiagnosis::
+diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
+                              Expr *baseExpr,
+                              DeclName memberName, SourceLoc nameLoc,
+                              SourceLoc loc) {
+  SourceRange baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
+  
   // If we found no results at all, mention that fact.
   if (result.UnviableCandidates.empty()) {
     // TODO: This should handle tuple member lookups, like x.1231 as well.
     if (auto MTT = baseObjTy->getAs<MetatypeType>())
-      diagnose(anchor->getLoc(), diag::could_not_find_type_member,
+      diagnose(loc, diag::could_not_find_type_member,
                MTT->getInstanceType(), memberName)
-        .highlight(anchor->getSourceRange()).highlight(range);
+        .highlight(baseRange).highlight(nameLoc);
     else
-      diagnose(anchor->getLoc(), diag::could_not_find_value_member,
+      diagnose(loc, diag::could_not_find_value_member,
                baseObjTy, memberName)
-        .highlight(anchor->getSourceRange()).highlight(range);
-    return true;
+        .highlight(baseRange).highlight(nameLoc);
+    return;
   }
   
   // Otherwise, we have at least one (and potentially many) viable candidates
@@ -2227,20 +2249,20 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
     case MemberLookupResult::UR_LabelMismatch:
       break;
     case MemberLookupResult::UR_UnavailableInExistential:
-      diagnose(anchor->getLoc(), diag::could_not_use_member_on_existential,
+      diagnose(loc, diag::could_not_use_member_on_existential,
                instanceTy, memberName)
-        .highlight(anchor->getSourceRange()).highlight(range);
-      return true;
+        .highlight(baseRange).highlight(nameLoc);
+      return;
     case MemberLookupResult::UR_InstanceMemberOnType:
-      diagnose(anchor->getLoc(), diag::could_not_use_instance_member_on_type,
+      diagnose(loc, diag::could_not_use_instance_member_on_type,
                instanceTy, memberName)
-        .highlight(anchor->getSourceRange()).highlight(range);
-      return true;
+        .highlight(baseRange).highlight(nameLoc);
+      return;
     case MemberLookupResult::UR_TypeMemberOnInstance:
-      diagnose(anchor->getLoc(), diag::could_not_use_type_member_on_instance,
+      diagnose(loc, diag::could_not_use_type_member_on_instance,
                baseObjTy, memberName)
-        .highlight(anchor->getSourceRange()).highlight(range);
-      return true;
+        .highlight(baseRange).highlight(nameLoc);
+      return;
         
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue:
@@ -2250,9 +2272,10 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
         diagIDsubelt = diag::cannot_pass_rvalue_mutating_getter_subelement;
         diagIDmember = diag::cannot_pass_rvalue_mutating_getter;
       }
-      diagnoseSubElementFailure(anchor, anchor->getLoc(), *CS,
+      assert(baseExpr && "Cannot have a mutation failure without a base");
+      diagnoseSubElementFailure(baseExpr, loc, *CS,
                                 diagIDsubelt, diagIDmember);
-      return true;
+      return;
     }
   }
 
@@ -2262,14 +2285,14 @@ bool FailureDiagnosis::diagnoseGeneralMemberFailure(Constraint *constraint) {
   // Otherwise, we don't have a specific issue to diagnose.  Just say the vague
   // 'cannot use' diagnostic.
   if (!baseObjTy->isEqual(instanceTy))
-    diagnose(anchor->getLoc(), diag::could_not_use_type_member,
+    diagnose(loc, diag::could_not_use_type_member,
              instanceTy, memberName)
-    .highlight(anchor->getSourceRange()).highlight(range);
+    .highlight(baseRange).highlight(nameLoc);
   else
-    diagnose(anchor->getLoc(), diag::could_not_use_value_member,
+    diagnose(loc, diag::could_not_use_value_member,
              baseObjTy, memberName)
-    .highlight(anchor->getSourceRange()).highlight(range);
-  return true;
+    .highlight(baseRange).highlight(nameLoc);
+  return;
 }
 
 // In the absense of a better conversion constraint failure, point out the
@@ -4021,26 +4044,14 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     break;    // Interesting case. :-)
   }
 
-  // If we found no results at all, mention that fact.
-  if (result.ViableCandidates.empty() &&
-      result.UnviableCandidates.empty()) {
-    // TODO: This should handle tuple member lookups, like x.1231 as well.
-    if (auto MTT = baseObjTy->getAs<MetatypeType>())
-      diagnose(E->getLoc(), diag::could_not_find_type_member,
-               MTT->getInstanceType(), E->getName())
-       .highlight(expr->getSourceRange()).highlight(E->getNameLoc());
-    else
-      diagnose(E->getLoc(), diag::could_not_find_value_member,
-               baseObjTy, E->getName())
-       .highlight(E->getNameLoc());
-    return true;
-  }
-
   // If we have unviable candidates (e.g. because of access control or some
   // other problem) we should diagnose the problem.
-  if (result.ViableCandidates.empty())
-    // TODO: not handled yet.
-    return false;
+  if (result.ViableCandidates.empty()) {
+    diagnoseUnviableLookupResults(result, baseObjTy, /*no base expr*/nullptr,
+                                  E->getName(), E->getNameLoc(),
+                                  E->getLoc());
+    return true;
+  }
 
   // Dump all of our viable candidates into a CalleeCandidateInfo (with an
   // uncurry level of 1 to represent the contextual type) and sort it out.
