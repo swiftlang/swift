@@ -2330,7 +2330,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   }
   
   // FIXME: This is only needed because binops don't respect contextual types.
-  if (isa<ApplyExpr>(call))
+  if (call && isa<ApplyExpr>(call))
     return false;
 
   // This happens, for example, with ambiguous OverloadedDeclRefExprs. We should
