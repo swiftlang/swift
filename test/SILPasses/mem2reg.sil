@@ -236,3 +236,61 @@ bb3(%20 : $Builtin.Int64):
   return %22 : $Int64
 }
 
+sil @first : $@convention(thin) () -> Int
+sil @second : $@convention(thin) () -> Int
+
+// CHECK: sil @promote_function_refs
+sil @promote_function_refs : $@convention(thin) (Bool) -> Int {
+// CHECK: bb0
+bb0(%0 : $Bool):
+// CHECK-NOT: [[STACK:%.*]] = alloc_stack
+  %1 = alloc_stack $@callee_owned () -> Int
+  debug_value %0 : $Bool
+  %3 = struct_extract %0 : $Bool, #Bool.value
+  cond_br %3, bb1, bb2
+
+// CHECK: bb1
+bb1:
+// CHECK: [[FIRSTREF:%.*]] = function_ref @first
+  %5 = function_ref @first : $@convention(thin) () -> Int
+// CHECK: [[FIRSTTHICK:%.*]] =  thin_to_thick_function [[FIRSTREF]]
+  %6 = thin_to_thick_function %5 : $@convention(thin) () -> Int to $@callee_owned () -> Int
+// CHECK-NOT: store
+  store %6 to %1#1 : $*@callee_owned () -> Int
+// CHECK: br bb3([[FIRSTTHICK]] : $@callee_owned () -> Int
+  br bb3
+
+// CHECK: bb2
+bb2:
+// CHECK: [[SECONDREF:%.*]] = function_ref @second
+  %9 = function_ref @second : $@convention(thin) () -> Int
+// CHECK: [[SECONDTHICK:%.*]] =  thin_to_thick_function [[SECONDREF]]
+  %10 = thin_to_thick_function %9 : $@convention(thin) () -> Int to $@callee_owned () -> Int
+// CHECK-NOT: store
+  store %10 to %1#1 : $*@callee_owned () -> Int
+// CHECK: br bb3([[SECONDTHICK]] : $@callee_owned () -> Int)
+  br bb3
+
+// CHECK: bb3([[ARG:%.*]] : $@callee_owned () -> Int):
+bb3:
+// CHECK-NOT: load [[STACK]]#1
+  %13 = load %1#1 : $*@callee_owned () -> Int
+// CHECK: strong_retain [[ARG]]
+  strong_retain %13 : $@callee_owned () -> Int
+// CHECK: [[RESULT:%.*]] = apply [[ARG]]
+  %15 = apply %13() : $@callee_owned () -> Int
+  br bb4
+
+  // NOTE: This block and the branch above exist to ensure that we
+  //       test what happens when %1#1 hasn't already been loaded in this
+  //       block.
+// CHECK: bb4
+bb4:
+// CHECK-NOT: destroy_addr [[STACK]]#1
+// CHECK: strong_release [[ARG]]
+  destroy_addr %1#1 : $*@callee_owned () -> Int
+// CHECK-NOT: dealloc_stack [[STACK]]#1
+  dealloc_stack %1#0 : $*@local_storage @callee_owned () -> Int
+// CHECK: return [[RESULT]]
+  return %15 : $Int
+}

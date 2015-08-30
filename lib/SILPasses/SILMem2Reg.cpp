@@ -29,6 +29,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Projection.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILPasses/Utils/Local.h"
@@ -225,6 +226,12 @@ static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
     if (isa<DeallocStackInst>(II) || isa<DebugValueAddrInst>(II))
       continue;
 
+    // Destroys of loadable types can be rewritten as releases, so
+    // they are fine.
+    if (auto *DAI = dyn_cast<DestroyAddrInst>(II))
+      if (DAI->getOperand().getType().isLoadable(DAI->getModule()))
+        continue;
+
     // Other instructions are assumed to capture the AllocStack.
     DEBUG(llvm::dbgs() << "*** AllocStack is captured by: " << *II);
     return true;
@@ -255,6 +262,12 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI,
     // DebugValueAddr uses.
     if (!Promoted && isa<DebugValueAddrInst>(II))
       continue;
+
+    // Destroys of loadable types can be rewritten as releases, so
+    // they are fine.
+    if (auto *DAI = dyn_cast<DestroyAddrInst>(II))
+      if (!Promoted && DAI->getOperand().getType().isLoadable(DAI->getModule()))
+        continue;
 
     // Can't do anything else with it.
     DEBUG(llvm::dbgs() << "*** AllocStack has non-write use: " << *II);
@@ -333,6 +346,21 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
   }
 }
 
+static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
+  assert(DAI->getOperand().getType().isLoadable(DAI->getModule()) &&
+         "Unexpected promotion of address-only type!");
+
+  assert(NewValue.isValid() && "Expected a value to release!");
+
+  SILBuilderWithScope<16> Builder(DAI);
+
+  auto Ty = DAI->getOperand().getType();
+  auto &TL = DAI->getModule().getTypeLowering(Ty);
+  TL.emitLoweredReleaseValue(Builder, DAI->getLoc(), NewValue,
+                             Lowering::TypeLowering::LoweringStyle::DeepNoEnum);
+  DAI->eraseFromParent();
+}
+
 StoreInst *
 StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
   DEBUG(llvm::dbgs() << "*** Promoting ASI in block: " << *ASI);
@@ -389,6 +417,15 @@ StackAllocationPromoter::promoteAllocationInBlock(SILBasicBlock *BB) {
       if (DVAI->getOperand() == ASI->getAddressResult() &&
           RunningVal.isValid())
         promoteDebugValueAddr(DVAI, RunningVal, B);
+      continue;
+    }
+
+    // Replace destroys with a release of the value.
+    if (auto *DAI = dyn_cast<DestroyAddrInst>(Inst)) {
+      if (DAI->getOperand() == ASI->getAddressResult() &&
+          RunningVal.isValid()) {
+        replaceDestroy(DAI, RunningVal);
+      }
       continue;
     }
 
@@ -454,6 +491,14 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
                  "Expected initialization of non-void type!");
           DVAI->eraseFromParent();
         }
+      }
+      continue;
+    }
+
+    // Replace destroys with a release of the value.
+    if (auto *DAI = dyn_cast<DestroyAddrInst>(Inst)) {
+      if (DAI->getOperand() == ASI->getAddressResult()) {
+        replaceDestroy(DAI, RunningVal);
       }
       continue;
     }
@@ -554,6 +599,7 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
   for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E;) {
     auto *Inst = UI->getUser();
     UI++;
+    bool removedUser = false;
 
     collectedLoads.clear();
     collectLoads(Inst, collectedLoads);
@@ -574,23 +620,36 @@ void StackAllocationPromoter::fixBranchesAndUses(BlockSet &PhiBlocks) {
         
       // Replace the load with the definition that we found.
       replaceLoad(LI, Def, ASI);
+      removedUser = true;
       NumInstRemoved++;
     }
-    if (isa<DebugValueAddrInst>(Inst)) {
-      // If this block has no predecessors then nothing dominates it and
-      // the instruction is unreachable. If the instruction we're
-      // examining is a value, replace it with undef. Either way, delete
-      // the instruction and move on.
-      SILBasicBlock *BB = Inst->getParent();
-      if (BB->pred_empty() || !DT->getNode(BB)) {
-        Inst->eraseFromParent();
-      } else {
-        // Otherwise we expect a DebugValueAddr, which we will replace
-        // with a DebugValue.
-        SILValue Def = getLiveInValue(PhiBlocks, BB);
-        promoteDebugValueAddr(cast<DebugValueAddrInst>(Inst), Def, B);
-      }
+
+    if (removedUser)
+      continue;
+
+    // If this block has no predecessors then nothing dominates it and
+    // the instruction is unreachable. Delete the instruction and move
+    // on.
+    SILBasicBlock *BB = Inst->getParent();
+    if (BB->pred_empty() || !DT->getNode(BB)) {
+      Inst->eraseFromParent();
       NumInstRemoved++;
+      continue;
+    }
+
+    if (auto *DVAI = dyn_cast<DebugValueAddrInst>(Inst)) {
+      // Replace DebugValueAddr with DebugValue.
+      SILValue Def = getLiveInValue(PhiBlocks, BB);
+      promoteDebugValueAddr(DVAI, Def, B);
+      NumInstRemoved++;
+      continue;
+    }
+
+    // Replace destroys with a release of the value.
+    if (auto *DAI = dyn_cast<DestroyAddrInst>(Inst)) {
+      SILValue Def = getLiveInValue(PhiBlocks, BB);
+      replaceDestroy(DAI, Def);
+      continue;
     }
   }
 
