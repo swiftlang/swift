@@ -2392,7 +2392,9 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   return true;
 }
 
-
+static bool isUnresolvedOrTypeVarType(Type ty) {
+  return ty->is<TypeVariableType>() || ty->is<UnresolvedType>();
+}
 
 bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   auto anchor = expr;
@@ -2423,10 +2425,10 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // If the second type is a type variable, the expression itself is
   // ambiguous.  Bail out so the general ambiguity diagnosing logic can handle
   // it.
-  if (fromType->is<TypeVariableType>() || fromType->is<UnresolvedType>() ||
-      fromType->is<UnboundGenericType>() ||
-      toType->is<TypeVariableType>() || toType->is<UnresolvedType>())
-    return false;
+  if (isUnresolvedOrTypeVarType(fromType) ||
+      isUnresolvedOrTypeVarType(toType) ||
+      // FIXME: Why reject unbound generic types here?
+      fromType->is<UnboundGenericType>())
 
   // Try to simplify irrelevant details of function types.  For example, if
   // someone passes a "() -> Float" function to a "() throws -> Int"
@@ -2476,11 +2478,13 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
         return true;
       }
       
-      // Otherwise, the error is that the result types mismatch.
-      diagnose(expr->getLoc(), diag::invalid_callee_result_type,
-               srcFT->getResult(), destFT->getResult())
-        .highlight(expr->getSourceRange());
-      return true;
+      if (!isUnresolvedOrTypeVarType(srcFT->getResult())) {
+        // Otherwise, the error is that the result types mismatch.
+        diagnose(expr->getLoc(), diag::invalid_callee_result_type,
+                 srcFT->getResult(), destFT->getResult())
+          .highlight(expr->getSourceRange());
+        return true;
+      }
     }
   }
   
