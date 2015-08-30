@@ -43,7 +43,7 @@ PASS(COWArrayOpts, "cowarray-opt",
 PASS(CSE, "cse",
      "Constant subexpression elimination")
 PASS(CapturePromotion, "capture-promotion",
-     "Promote closure variables from the heap to the stack")
+     "Promote captures from by-reference to by-value")
 PASS(CapturePropagation, "capture-prop",
      "Captured Constant Propagation")
 PASS(ClosureSpecializer, "closure-specialize",
