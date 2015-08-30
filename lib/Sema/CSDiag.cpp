@@ -2429,7 +2429,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       isUnresolvedOrTypeVarType(toType) ||
       // FIXME: Why reject unbound generic types here?
       fromType->is<UnboundGenericType>())
-
+    return false;
+  
   // Try to simplify irrelevant details of function types.  For example, if
   // someone passes a "() -> Float" function to a "() throws -> Int"
   // parameter, then uttering the "throws" may confuse them into thinking that
