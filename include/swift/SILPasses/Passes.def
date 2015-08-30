@@ -42,26 +42,20 @@ PASS(COWArrayOpts, "cowarray-opt",
      "COW Array optimizations")
 PASS(CSE, "cse",
      "Constant subexpression elimination")
-PASS(HighLevelCSE, "high-level-cse",
-     "Constant subexpression elimination on High-level SIL")
 PASS(CapturePromotion, "capture-promotion",
      "Promote closure variables from the heap to the stack")
 PASS(CapturePropagation, "capture-prop",
      "Captured Constant Propagation")
 PASS(ClosureSpecializer, "closure-specialize",
      "Specialize functions passed a closure to call the closure directly")
-PASS(EarlyCodeMotion, "early-codemotion",
-     "Code motion without release hoisting")
-PASS(LateCodeMotion, "late-codemotion",
-     "Code motion with release hoisting")
 PASS(CopyForwarding, "copy-forwarding",
      "Eliminate redundant copies")
+PASS(CropOverflowChecks, "crop-overflow-checks",
+     "Removes redundant overflow checks")
 PASS(DCE, "dce",
      "Eliminate dead code")
 PASS(DeadFunctionElimination, "sil-deadfuncelim",
      "Remove unused functions")
-PASS(ExternalFunctionDefinitionsElimination, "external-func-definition-elim",
-     "Eliminate external function definitions")
 PASS(DeadObjectElimination, "deadobject-elim",
      "Eliminate unused objects that do not have destructors with side effects")
 PASS(DefiniteInitialization, "definite-init",
@@ -70,10 +64,16 @@ PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
      "Propagate constants and emit diagnostics")
+PASS(EarlyCodeMotion, "early-codemotion",
+     "Code motion without release hoisting")
 PASS(EarlyInliner, "early-inline",
      "Inline functions that are not marked as having special semantics")
 PASS(EmitDFDiagnostics, "dataflow-diagnostics",
      "Emit SIL Diagnostics")
+PASS(ExternalDefsToDecls, "external-defs-to-decls",
+     "Convert external definitions to decls")
+PASS(ExternalFunctionDefinitionsElimination, "external-func-definition-elim",
+     "Eliminate external function definitions")
 PASS(FunctionSignatureOpts, "function-signature-opts",
      "Optimize Function Signatures")
 PASS(GlobalARCOpts, "global-arc-opts",
@@ -84,18 +84,22 @@ PASS(GlobalOpt, "global-opt",
      "Global variable optimizations")
 PASS(GlobalPropertyOpt, "global-property-opt",
      "Optimize properties")
+PASS(HighLevelCSE, "high-level-cse",
+     "Constant subexpression elimination on High-level SIL")
+PASS(HighLevelLICM, "high-level-licm",
+     "High Level Loop invariant code motion")
 PASS(IVInfoPrinter, "iv-info-printer",
      "Display induction variable information")
 PASS(InOutDeshadowing, "inout-deshadow",
      "Remove inout argument shadow variables")
-PASS(SpeculativeDevirtualization, "specdevirt",
-     "Speculate targets of virtual calls")
 PASS(InstCount, "inst-count",
      "Count all instructions in the module using llvm Statistics")
+PASS(JumpThreadSimplifyCFG, "simplify-cfg",
+     "Clean up the CFG of SIL functions")
 PASS(LICM, "licm",
      "Loop invariant code motion")
-PASS(HighLevelLICM, "high-level-licm",
-     "High Level Loop invariant code motion")
+PASS(LateCodeMotion, "late-codemotion",
+     "Code motion with release hoisting")
 PASS(LateInliner, "late-inline",
      "Run the late inliner")
 PASS(LoopInfoPrinter, "loop-info-printer",
@@ -110,8 +114,6 @@ PASS(Mem2Reg, "mem2reg",
      "Promote stack allocations to SSA values")
 PASS(MergeCondFails, "merge-cond_fails",
      "Remove redundant overflow checks")
-PASS(CropOverflowChecks, "crop-overflow-checks",
-     "Removes redundant overflow checks")
 PASS(NoReturnFolding, "noreturn-folding",
      "Add 'unreachable' after noreturn calls")
 // TODO: It makes no sense to have early inliner, late inliner, and
@@ -132,26 +134,24 @@ PASS(SILLinker, "linker",
      "Link in all of the serialized SIL referenced in the module")
 PASS(SROA, "sroa",
      "SIL scalar replacement of aggregates")
+PASS(SimplifyBBArgs, "simplify-bb-args",
+     "Simplify basic block arguments")
 // TODO: What should this be called. We are just following what was previously in SILOpt.
 PASS(SimplifyCFG, "normal-simplify-cfg",
      "Clean up the CFG of SIL functions")
-PASS(JumpThreadSimplifyCFG, "simplify-cfg",
-     "Clean up the CFG of SIL functions")
+PASS(SpeculativeDevirtualization, "specdevirt",
+     "Speculate targets of virtual calls")
 PASS(SplitAllCriticalEdges, "split-critical-edges",
      "Split all critical edges")
 PASS(SplitNonCondBrCriticalEdges, "split-non-cond_br-critical-edges",
      "Split all critical edges that do not involve cond_br")
-PASS(SimplifyBBArgs, "simplify-bb-args",
-     "Simplify basic block arguments")
 PASS(StripDebugInfo, "strip-debug-info",
      "Strip debug info")
 PASS(SwiftArrayOpts, "array-specialize",
      "Specialize arrays")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use pre-specialized functions")
-PASS(ExternalDefsToDecls, "external-defs-to-decls",
-     "Convert external definitions to decls")
-PASS_RANGE(AllPasses, AADumper, ExternalDefsToDecls)
+PASS_RANGE(AllPasses, AADumper, UsePrespecialized)
 
 #undef PASS
 #undef PASS_RANGE
