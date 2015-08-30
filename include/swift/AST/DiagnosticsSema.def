@@ -57,9 +57,9 @@ NOTE(while_converting_subscript_index,sema,none,
 ERROR(ambiguous_member_overload_set,sema,none,
       "ambiguous reference to member '%0'", (StringRef))
 
-ERROR(cannot_find_appropriate_overload,sema,none,
-      "could not find an overload for '%0' that accepts the supplied "
-      "arguments", (StringRef))
+ERROR(ambiguous_subscript,sema,none,
+      "ambiguous subscript with base type %0 and index type %1",
+      (Type, Type))
 
 ERROR(could_not_find_tuple_member,sema,none,
       "value of tuple type %0 has no member %1", (Type, DeclName))

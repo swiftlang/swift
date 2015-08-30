@@ -233,11 +233,11 @@ struct SubscriptTest1 {
 }
 
 func testSubscript1(s1 : SubscriptTest1) {
-  let _ : Int = s1["hello"]  // expected-error {{ambiguous reference to member 'subscript'}}
+  let _ : Int = s1["hello"]  // expected-error {{ambiguous subscript with base type 'SubscriptTest1' and index type 'String'}}
   
-  // FIXME: This is a sema bug, it should not be ambiguous due to its contextual type. 
+  // FIXME: This is a sema bug, it should not be ambiguous due to its contextual boolean type. 
   // rdar://18741539
-  if s1["hello"] {}  // expected-error {{ambiguous reference to member 'subscript'}}
+  if s1["hello"] {}  // expected-error {{ambiguous subscript with base type 'SubscriptTest1' and index type 'String'}}
   
   
   let _ = s1["hello"]  // expected-error {{ambiguous use of 'subscript'}}

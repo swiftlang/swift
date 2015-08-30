@@ -2329,89 +2329,27 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
     call = expr->getParentMap()[call];
   }
   
-  // Do some sanity checking based on the call: e.g. make sure we're invoking
-  // the overloaded decl, not using it as an argument.
-  Expr *argExpr = nullptr;
-  SourceLoc fnLoc;
-  if (auto *AE = dyn_cast_or_null<ApplyExpr>(call)) {
-    if (AE->getFn()->getSemanticsProvidingExpr() == anchor) {
-      // Type check the argument list independently to try to get a concrete
-      // type (ignoring context).
-      argExpr = typeCheckArbitrarySubExprIndependently(AE->getArg());
-      if (!argExpr) return true;
-    }
+  // FIXME: This is only needed because binops don't respect contextual types.
+  if (isa<ApplyExpr>(call))
+    return false;
 
-    fnLoc = AE->getFn()->getLoc();
-  }
-
+  // This happens, for example, with ambiguous OverloadedDeclRefExprs. We should
+  // just implement visitOverloadedDeclRefExprs and nuke this.
+  
   // If we couldn't resolve an argument, then produce a generic "ambiguity"
   // diagnostic.
-  if (!argExpr || argExpr->getType()->is<TypeVariableType>()) {
-    if (constraint->getKind() != ConstraintKind::Disjunction) {
-      diagnose(anchor->getLoc(), diag::cannot_find_appropriate_overload,
-               overloadName)
-        .highlight(anchor->getSourceRange());
-      diagnose(overloadChoice.getDecl(), diag::found_candidate);
-      return true;
-    }
+  diagnose(anchor->getLoc(), diag::ambiguous_member_overload_set,
+           overloadName)
+    .highlight(anchor->getSourceRange());
 
-    diagnose(anchor->getLoc(), diag::ambiguous_member_overload_set,
-             overloadName)
-      .highlight(anchor->getSourceRange());
-
+  if (constraint->getKind() == ConstraintKind::Disjunction) {
     for (auto elt : constraint->getNestedConstraints()) {
       if (elt->getKind() != ConstraintKind::BindOverload) continue;
       auto candidate = elt->getOverloadChoice().getDecl();
       diagnose(candidate, diag::found_candidate);
     }
-
-    return true;
   }
 
-  Type argType = argExpr->getType();
-
-  // Otherwise, we have a good grasp on what is going on: we have a call of an
-  // unresolve overload set.  Try to dig out the candidates.
-  auto apply = cast<ApplyExpr>(call);
-  CalleeCandidateInfo calleeInfo(apply->getFn(), CS);
-  calleeInfo.filterList(argType);
-
-  // Otherwise, whatever the result type of the call happened to be must not
-  // have been what we were looking for - diagnose this as a conversion
-  // failure.
-  if (calleeInfo.closeness == CC_ExactMatch)
-    return false;
-
-  // A common error is to apply an operator that only has an inout LHS (e.g. +=)
-  // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
-  // case.
-  if (calleeInfo.closeness == CC_NonLValueInOut) {
-    Expr *firstArg = argExpr;
-    if (auto *tuple = dyn_cast<TupleExpr>(firstArg))
-      if (tuple->getNumElements())
-        firstArg = tuple->getElement(0);
-    
-    diagnoseSubElementFailure(firstArg, call->getLoc(), *CS,
-                              diag::cannot_apply_lvalue_binop_to_subelement,
-                              diag::cannot_apply_lvalue_binop_to_rvalue);
-    return true;
-  }
-
-  // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
-  // then diagnose with some specificity about the arguments.
-  if (isa<TupleExpr>(argExpr) &&
-      cast<TupleExpr>(argExpr)->getNumElements() == 0) {
-    // Emit diagnostics that say "no arguments".
-    diagnose(fnLoc, diag::cannot_call_with_no_params,
-             overloadName, /*isInitializer*/false)
-      .highlight(call->getSourceRange());
-  } else {
-    diagnose(fnLoc, diag::cannot_call_with_params,
-             overloadName, getTypeListString(argType), /*isInitializer*/false)
-      .highlight(call->getSourceRange());
-  }
-
-  calleeInfo.suggestPotentialOverloads(overloadName, call->getLoc());
   return true;
 }
 
@@ -3435,7 +3373,19 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     // Otherwise, whatever the result type of the call happened to be must not
     // have been what we were looking for.  Lets diagnose it as a conversion
     // or ambiguity failure.
-    return false;
+    if (calleeInfo.size() == 1)
+      return false;
+
+    diagnose(SE->getLoc(), diag::ambiguous_subscript, baseType, indexType)
+      .highlight(indexExpr->getSourceRange())
+      .highlight(baseExpr->getSourceRange());
+    
+    // FIXME: suggestPotentialOverloads should do this.
+    //calleeInfo.suggestPotentialOverloads("subscript", SE->getLoc());
+    for (auto candidate : calleeInfo.candidates)
+      diagnose(candidate.decl, diag::found_candidate);
+
+    return true;
   }
 
   // If the closes matches all mismatch on self, we either have something that
