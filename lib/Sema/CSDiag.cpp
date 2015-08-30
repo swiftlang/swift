@@ -1362,9 +1362,6 @@ namespace {
       collectCalleeCandidates(Fn);
     }
 
-    /// Analyze a locator for a SubscriptExpr for its candidate set.
-    CalleeCandidateInfo(ConstraintLocator *locator, ConstraintSystem *CS);
-
     CalleeCandidateInfo(ArrayRef<OverloadChoice> candidates,
                         unsigned UncurryLevel, ConstraintSystem *CS);
 
@@ -1707,29 +1704,6 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
 
   return filterList(ArgElts);
 
-}
-
-
-CalleeCandidateInfo::CalleeCandidateInfo(ConstraintLocator *locator,
-                                         ConstraintSystem *CS) : CS(CS) {
-  if (auto decl = findResolvedMemberRef(locator, *CS)) {
-    // If the decl is fully resolved, add it.
-    candidates.push_back({ decl, 0 });
-  } else {
-    // Otherwise, look for a disjunction between different candidates.
-    for (auto &constraint : CS->getConstraints()) {
-      if (constraint.getLocator() != locator) continue;
-      
-      // Okay, we found our constraint.  Check to see if it is a disjunction.
-      if (constraint.getKind() != ConstraintKind::Disjunction) continue;
-      
-      for (auto *bindOverload : constraint.getNestedConstraints()) {
-        auto c = bindOverload->getOverloadChoice();
-        if (c.isDecl())
-          candidates.push_back({ c.getDecl(), 0 });
-      }
-    }
-  }
 }
 
 CalleeCandidateInfo::CalleeCandidateInfo(ArrayRef<OverloadChoice> overloads,
@@ -2223,14 +2197,18 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
   // If we found no results at all, mention that fact.
   if (result.UnviableCandidates.empty()) {
     // TODO: This should handle tuple member lookups, like x.1231 as well.
-    if (auto MTT = baseObjTy->getAs<MetatypeType>())
+    if (memberName.isSimpleName("subscript")) {
+      diagnose(loc, diag::type_not_subscriptable, baseObjTy)
+        .highlight(baseRange);
+    } else if (auto MTT = baseObjTy->getAs<MetatypeType>()) {
       diagnose(loc, diag::could_not_find_type_member,
                MTT->getInstanceType(), memberName)
         .highlight(baseRange).highlight(nameLoc);
-    else
+    } else {
       diagnose(loc, diag::could_not_find_value_member,
                baseObjTy, memberName)
         .highlight(baseRange).highlight(nameLoc);
+    }
     return;
   }
   
@@ -3331,20 +3309,49 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
 }
 
 bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
-  // See if the subscript got resolved.
+  auto baseExpr = typeCheckChildIndependently(SE->getBase());
+  if (!baseExpr) return true;
+  auto baseType = baseExpr->getType();
+  
   auto locator =
     CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-  CalleeCandidateInfo calleeInfo(locator, CS);
+
+  auto subscriptName = CS->getASTContext().Id_subscript;
+  
+  MemberLookupResult result =
+    CS->performMemberLookup(ConstraintKind::ValueMember, subscriptName,
+                            baseType, locator);
+
+  
+  switch (result.OverallResult) {
+  case MemberLookupResult::Unsolved:
+    llvm_unreachable("base expr type should be resolved at this point");
+  case MemberLookupResult::ErrorAlreadyDiagnosed:
+    // If an error was already emitted, then we're done, don't emit anything
+    // redundant.
+    return true;
+  case MemberLookupResult::HasResults:
+    break;    // Interesting case. :-)
+  }
+  
+  // If we have unviable candidates (e.g. because of access control or some
+  // other problem) we should diagnose the problem.
+  if (result.ViableCandidates.empty()) {
+    diagnoseUnviableLookupResults(result, baseType, /*no base expr*/nullptr,
+                                  subscriptName, SE->getLoc(),
+                                  SE->getLoc());
+    return true;
+  }
+
+  
+  
+  CalleeCandidateInfo calleeInfo(result.ViableCandidates, 0, CS);
 
   auto indexExpr = typeCheckArgumentChildIndependently(SE->getIndex(),
                                                        Type(), calleeInfo);
   if (!indexExpr) return true;
 
-  auto baseExpr = typeCheckChildIndependently(SE->getBase());
-  if (!baseExpr) return true;
-
   auto indexType = indexExpr->getType();
-  auto baseType = baseExpr->getType();
 
   auto decomposedIndexType = decomposeArgumentType(indexType);
   calleeInfo.filterList([&](UncurriedCandidate cand) -> CandidateCloseness

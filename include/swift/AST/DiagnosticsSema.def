@@ -60,6 +60,9 @@ ERROR(ambiguous_member_overload_set,sema,none,
 ERROR(ambiguous_subscript,sema,none,
       "ambiguous subscript with base type %0 and index type %1",
       (Type, Type))
+ERROR(type_not_subscriptable,sema,none,
+      "type %0 has no subscript members",
+      (Type))
 
 ERROR(could_not_find_tuple_member,sema,none,
       "value of tuple type %0 has no member %1", (Type, DeclName))

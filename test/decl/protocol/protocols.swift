@@ -284,8 +284,7 @@ struct DictionaryIntInt {
 
 func testSubscripting(iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has Self or associated type requirements}}
   var i: Int = iis[17] 
-  // FIXME: Crummy diagnostics.
-  var i2 = i_s[17] // expected-error{{cannot subscript a value of type 'IntSubscriptable' with an index of type 'Int'}}
+  var i2 = i_s[17] // expected-error{{member 'subscript' cannot be used on value of protocol type 'IntSubscriptable'; use a generic constraint instead}}
 }
 
 //===----------------------------------------------------------------------===//

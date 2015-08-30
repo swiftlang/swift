@@ -229,7 +229,7 @@ class ThisDerived1 : ThisBase1 {
     self.baseFunc1(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'ThisBase1'}}
     self.baseFunc1(ThisBase1())(42) // expected-error {{'(ThisBase1) -> _' is not convertible to 'ThisDerived1 -> (Int) -> ()'}}
     self.baseFunc1(ThisDerived1())(42)
-    self[0] = 42.0 // expected-error {{cannot subscript a value of type 'ThisDerived1.Type' with an index of type 'Int'}}
+    self[0] = 42.0 // expected-error {{instance member 'subscript' cannot be used on type 'ThisDerived1'}}
     self.baseStaticVar = 42
     self.baseStaticProp = 42
     self.baseStaticFunc0()
@@ -295,7 +295,7 @@ class ThisDerived1 : ThisBase1 {
     super.baseFunc0(ThisBase1())()
     super.baseFunc1(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'ThisBase1'}}
     super.baseFunc1(ThisBase1())(42)
-    super[0] = 42.0 // expected-error {{cannot subscript a value of type 'ThisBase1.Type' with an index of type 'Int'}}
+    super[0] = 42.0 // expected-error {{instance member 'subscript' cannot be used on type 'ThisBase1'}}
     super.baseStaticVar = 42
     super.baseStaticProp = 42
     super.baseStaticFunc0()

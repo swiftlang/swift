@@ -235,8 +235,7 @@ func overridingTest(srs: SuperRefsSub) {
 }
 
 func almostSubscriptableValueMismatch(as1: AlmostSubscriptable, a: A) {
-  // FIXME: Crummy diagnostic.
-  as1[a] // expected-error{{cannot subscript a value of type 'AlmostSubscriptable' with an index of type 'A'}}
+  as1[a] // expected-error{{type 'AlmostSubscriptable' has no subscript members}}
 }
 
 func almostSubscriptableKeyMismatch(bc: BadCollection, key: NSString) {
