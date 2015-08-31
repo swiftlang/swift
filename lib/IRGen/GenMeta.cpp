@@ -1673,16 +1673,6 @@ namespace {
   };
 }
 
-/// Does the metatype for the given type have a trivial representation?
-bool IRGenModule::isTrivialMetatype(CanMetatypeType metaTy) {
-  // FIXME: We still need to handle unlowered metatypes from the AST for
-  // IRGen protocol witnesses. This can go away (with the HasTrivialMetatype
-  // visitor) when we enable SIL witnesses.
-  if (!metaTy->hasRepresentation())
-    return HasTrivialMetatype().visit(metaTy.getInstanceType());
-  return metaTy->getRepresentation() == MetatypeRepresentation::Thin;
-}
-
 /// Emit a metatype value for a known type.
 void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
                             Explosion &explosion) {

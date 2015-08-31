@@ -464,7 +464,6 @@ public:
   unsigned getExplosionSize(SILType T);
   llvm::PointerType *isSingleIndirectValue(SILType T);
   llvm::PointerType *requiresIndirectResult(SILType T);
-  bool isTrivialMetatype(CanMetatypeType type);
   bool isPOD(SILType type, ResilienceScope scope);
   ObjectSize classifyTypeSize(SILType type, ResilienceScope scope);
   clang::CanQual<clang::Type> getClangType(CanType type);
