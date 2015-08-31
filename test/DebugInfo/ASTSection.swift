@@ -3,21 +3,12 @@
 // RUN: %target-build-swift -emit-executable %s -g -o %t/ASTSection -emit-module
 // RUN: %lldb-moduleimport-test %t/ASTSection | FileCheck %s
 
-// RUN: cp %S/Inputs/serialized-objc-header.h %t
-// RUN: %target-build-swift -emit-executable %s -g -o %t/ASTSection-with-ObjC -import-objc-header %t/serialized-objc-header.h -DOBJC -module-name ASTSection -emit-module
-// RUN: %lldb-moduleimport-test %t/ASTSection-with-ObjC | FileCheck %s
-
-// RUN: rm %t/serialized-objc-header.h
-// RUN: %lldb-moduleimport-test %t/ASTSection-with-ObjC | FileCheck %s
-
-// RUN: %target-build-swift -emit-executable %s -gline-tables-only -o %t/ASTSection -emit-module
-// RUN: %lldb-moduleimport-test %t/ASTSection | FileCheck %s --allow-empty --check-prefix=LINETABLE-CHECK
 // REQUIRES: executable_test
-
 // UNSUPPORTED: OS=linux-gnu
 
-// Test ASTSection_linker.swift builds this code 
-// with separate compile and link steps.
+// The test ASTSection_linker.swift builds this code with separate
+// compile and link steps.
+// The test ASTSection_ObjC.swift builds this code with -DOBJC.
 
 // A type that should be serialized.
 class Foo {
