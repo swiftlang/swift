@@ -215,25 +215,25 @@ private:
   }
 
   /// Add an edge representing a call site within this function.
-  void addCalleeEdge(CallGraphEdge *CallSite) {
-    CalleeEdges.insert(CallSite);
+  void addCalleeEdge(CallGraphEdge *Edge) {
+    CalleeEdges.insert(Edge);
   }
 
   /// Remove an edge representing a call site within this function.
-  void removeCalleeEdge(CallGraphEdge *CallSite) {
-    assert(CalleeEdges.count(CallSite) && "Expected edge to be in set!");
-    CalleeEdges.erase(CallSite);
+  void removeCalleeEdge(CallGraphEdge *Edge) {
+    assert(CalleeEdges.count(Edge) && "Expected edge to be in set!");
+    CalleeEdges.erase(Edge);
   }
 
   /// Add an edge representing a call site that calls into this function.
-  void addCallerEdge(CallGraphEdge *CallerCallSite) {
-    CallerEdges.insert(CallerCallSite);
+  void addCallerEdge(CallGraphEdge *Edge) {
+    CallerEdges.insert(Edge);
   }
 
   /// Remove an edge representing a call site that calls into this function.
-  void removeCallerEdge(CallGraphEdge *CallerCallSite) {
-    assert(CallerEdges.count(CallerCallSite) && "Expected edge to be in set!");
-    CallerEdges.erase(CallerCallSite);
+  void removeCallerEdge(CallGraphEdge *Edge) {
+    assert(CallerEdges.count(Edge) && "Expected edge to be in set!");
+    CallerEdges.erase(Edge);
   }
 };
 
