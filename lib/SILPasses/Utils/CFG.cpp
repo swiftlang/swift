@@ -773,3 +773,17 @@ bool swift::mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
 
   return true;
 }
+
+/// Splits the critical edges between from and to. This code assumes there is
+/// only one edge between the two basic blocks.
+SILBasicBlock *swift::splitIfCriticalEdge(SILBasicBlock *From,
+                                          SILBasicBlock *To,
+                                          DominanceInfo *DT,
+                                          SILLoopInfo *LI) {
+  auto *T = From->getTerminator();
+  for (unsigned i = 0, e = T->getSuccessors().size(); i != e; ++i) {
+    if (T->getSuccessors()[i] == To)
+      return splitCriticalEdge(T, i, DT, LI);
+  }
+  llvm_unreachable("Destination block not found");
+}

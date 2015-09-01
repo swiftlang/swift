@@ -8,5 +8,6 @@ add_swift_library(swiftSILPassesUtils
   Generics.cpp
   Devirtualize.cpp
   CheckedCastBrJumpThreading.cpp
+  LoopUtils.cpp
   LINK_LIBRARIES swiftSIL swiftSILAnalysis)
 

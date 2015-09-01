@@ -74,6 +74,16 @@ SILBasicBlock *splitCriticalEdge(TermInst *T, unsigned EdgeIdx,
                                  DominanceInfo *DT = nullptr,
                                  SILLoopInfo *LI = nullptr);
 
+/// Splits the critical edges between from and to. This code assumes there is
+/// exactly one edge between the two basic blocks. It will return the wrong
+/// result if there are multiple edges and will assert if there are no edges in
+/// between the two blocks.
+///
+/// Updates dominance information and loop information if not null.
+SILBasicBlock *splitIfCriticalEdge(SILBasicBlock *From, SILBasicBlock *To,
+                                   DominanceInfo *DT = nullptr,
+                                   SILLoopInfo *LI = nullptr);
+
 /// \brief Splits the edge from terminator.
 ///
 /// Updates dominance information and loop information if not null.
