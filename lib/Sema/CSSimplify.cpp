@@ -914,6 +914,31 @@ static bool isFunctionTypeAcceptingNoArguments(Type type) {
   return true;
 }
 
+// Returns 'false' (i.e. no error) if it is legal to match functions with the
+// corresponding SIL function type representations and the given match kind.
+static bool matchFunctionSILRepresentations(SILFunctionTypeRepresentation rep1,
+                                            SILFunctionTypeRepresentation rep2,
+                                            TypeMatchKind kind) {
+  switch (kind) {
+  case TypeMatchKind::BindType:
+  case TypeMatchKind::BindToPointerType:
+  case TypeMatchKind::SameType:
+    return rep1 != rep2;
+
+  case TypeMatchKind::ConformsTo:
+    llvm_unreachable("Not sure if we can end up here");
+
+  case TypeMatchKind::Subtype:
+  case TypeMatchKind::Conversion:
+  case TypeMatchKind::ExplicitConversion:
+  case TypeMatchKind::ArgumentConversion:
+  case TypeMatchKind::ArgumentTupleConversion:
+  case TypeMatchKind::OperatorArgumentTupleConversion:
+  case TypeMatchKind::OperatorArgumentConversion:
+    return false;
+  }
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      TypeMatchKind kind, unsigned flags,
@@ -982,6 +1007,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
       return SolutionKind::Error;
     }
+  }
+
+  if (matchFunctionSILRepresentations(
+        func1->getExtInfo().getSILRepresentation(),
+        func2->getExtInfo().getSILRepresentation(), kind)) {
+    return SolutionKind::Error;
   }
 
   // Determine how we match up the input/result types.

@@ -42,4 +42,11 @@ if true {
   let k: @convention(c) () -> Int = S.staticMethod // expected-error{{}}
   let m: @convention(c) () -> Int = C.staticMethod // expected-error{{}}
   let n: @convention(c) () -> Int = C.classMethod // expected-error{{}}
+
+  // <rdar://problem/22181714> Crash when typing "signal"
+  let iuo_global: (() -> Int)! = global
+  let p: (@convention(c) () -> Int)! = iuo_global // expected-error{{a C function pointer can only be formed from a reference to a 'func' or a literal closure}}
+
+  func handler(callback: (@convention(c) () -> Int)!) {}
+  handler(iuo_global) // expected-error{{a C function pointer can only be formed from a reference to a 'func' or a literal closure}}
 }
