@@ -604,12 +604,6 @@ extension ${Self} : _ArrayType {
     (_buffer.firstElementAddress + oldCount).initialize(newElement)
   }
 
-  @_semantics("array.mutate_unknown")
-  internal mutating func _appendSlowPath(newElement: Element) {
-    _arrayAppendSlowPath(&_buffer,
-                         initializePointer: _InitializePointer(newElement))
-  }
-
   /// Append `newElement` to the ${Self}.
   ///
   /// - Complexity: Amortized ${O1}.
@@ -618,22 +612,6 @@ extension ${Self} : _ArrayType {
     let oldCount = _getCount()
     _reserveCapacityAssumingUniqueBuffer(oldCount)
     _appendElementAssumeUniqueAndCapacity(oldCount, newElement: newElement)
-  }
-
-  @inline(never)
-  internal func _arrayAppendSlowPath<
-    _Buffer: _ArrayBufferType where _Buffer.Index == Int
-  >(
-    inout buffer: _Buffer, initializePointer: _InitializePointer<_Buffer.Element>
-  ) {
-    let oldCount = buffer.count
-    var newBuffer = Optional(
-                      _forceCreateUniqueMutableBuffer(
-                        &buffer,
-                        oldCount + 1,
-                        oldCount + 1))
-    _arrayOutOfPlaceUpdate(
-      &buffer, &newBuffer, oldCount, 1, initializePointer)
   }
 
   /// Append the elements of `newElements` to `self`.
