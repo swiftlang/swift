@@ -6019,8 +6019,12 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     case ConstantConvertKind::Construction:
     case ConstantConvertKind::ConstructionWithUnwrap: {
       auto typeRef = TypeExpr::createImplicit(type, context);
-      expr = new (context) ParenExpr(SourceLoc(), expr, SourceLoc(),
-                                     /*Implicit=*/true);
+      
+      // make a "(rawValue: <subexpr>)" tuple.
+      expr = TupleExpr::create(context, SourceLoc(), expr,
+                               context.Id_rawValue, SourceLoc(),
+                               SourceLoc(), /*trailingClosure*/false,
+                               /*implicit*/true);
       expr = new (context) CallExpr(typeRef, expr, /*Implicit=*/true);
       if (convertKind == ConstantConvertKind::ConstructionWithUnwrap)
         expr = new (context) ForceValueExpr(expr, SourceLoc());
