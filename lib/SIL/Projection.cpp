@@ -490,7 +490,7 @@ ProjectionPath::
 computeSubSeqRelation(const ProjectionPath &RHS) const {
   // If either path is empty, we can not prove anything, return Unrelated.
   if (empty() || RHS.empty())
-    return SubSeqRelation_t::Unrelated;
+    return SubSeqRelation_t::Unknown;
 
   // We reverse the projection path to scan from the common object.
   auto LHSReverseIter = rbegin();
@@ -513,7 +513,7 @@ computeSubSeqRelation(const ProjectionPath &RHS) const {
     // can not remember why I had the special check in the
     // hasNonEmptySymmetricDifference code.
     if (LHSProj != RHSProj)
-      return SubSeqRelation_t::Unrelated;
+      return SubSeqRelation_t::Unknown;
 
     // Otherwise increment reverse iterators.
     LHSReverseIter++;
