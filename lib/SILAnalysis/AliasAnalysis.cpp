@@ -124,8 +124,32 @@ static bool isIdentifiableObject(SILValue V) {
     return true;
   if (isNoAliasArgument(V))
     return true;
-  if (isa<GlobalAddrInst>(V))
+  return false;
+}
+
+bool areDistinctIdentifyableObjects(SILValue V1, SILValue V2) {
+  // Do both values refer to the same global variable?
+  if (auto *GA1 = dyn_cast<GlobalAddrInst>(V1)) {
+    if (auto *GA2 = dyn_cast<GlobalAddrInst>(V2)) {
+      return GA1->getReferencedGlobal() != GA2->getReferencedGlobal();
+    }
+  }
+  if (isIdentifiableObject(V1) && isIdentifiableObject(V2))
+    return V1 != V2;
+  return false;
+}
+
+/// Returns true if both values are equal or yield the address of the same
+/// global variable.
+static bool isSameValueOrGlobal(SILValue V1, SILValue V2) {
+  if (V1 == V2)
     return true;
+  // Do both values refer to the same global variable?
+  if (auto *GA1 = dyn_cast<GlobalAddrInst>(V1)) {
+    if (auto *GA2 = dyn_cast<GlobalAddrInst>(V2)) {
+      return GA1->getReferencedGlobal() == GA2->getReferencedGlobal();
+    }
+  }
   return false;
 }
 
@@ -197,7 +221,7 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 
   // If O1 and O2 do not equal and they are both values that can be statically
   // and uniquely identified, they can not alias.
-  if (isIdentifiableObject(O1) && isIdentifiableObject(O2)) {
+  if (areDistinctIdentifyableObjects(O1, O2)) {
     DEBUG(llvm::dbgs() << "            Found two unequal identified "
           "objects.\n");
     return true;
@@ -303,7 +327,7 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
     // aliases O1. If so, then we know that V2 must partially alias V1 via a
     // must alias relation on O1. This ensures that given an alloc_stack and a
     // gep from that alloc_stack, we say that they partially alias.
-    if (O1 == V2.stripCasts())
+    if (isSameValueOrGlobal(O1, V2.stripCasts()))
       return AliasAnalysis::AliasResult::PartialAlias;
   }
 
@@ -477,7 +501,7 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
 #endif
 
   // If the two values equal, quickly return must alias.
-  if (V1 == V2)
+  if (isSameValueOrGlobal(V1, V2))
     return AliasResult::MustAlias;
 
   DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1.getDef()

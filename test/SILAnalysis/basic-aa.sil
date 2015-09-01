@@ -410,6 +410,8 @@ sil @projections_from_the_same_source_with_the_same_projection_path_mustalias : 
 sil_global public @sil_global1 : $Builtin.Int32
 sil_global public @sil_global2 : $Builtin.Int32
 
+class X { }
+
 // CHECK-LABEL: @globals_dont_alias
 // CHECK: PAIR #0.
 // CHECK-NEXT: (0):   %0 = global_addr @sil_global1 : $*Builtin.Int32
@@ -422,6 +424,42 @@ sil_global public @sil_global2 : $Builtin.Int32
 sil @globals_dont_alias : $@convention(thin) () -> () {
   %0 = global_addr @sil_global1 : $*Builtin.Int32
   %1 = global_addr @sil_global2 : $*Builtin.Int32
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: @globals_and_allocs_dont_alias
+// CHECK: PAIR #1.
+// CHECK-NEXT: (0):   %0 = global_addr @sil_global1 : $*Builtin.Int32
+// CHECK-NEXT: (0):   %1 = alloc_ref $X
+// CHECK-NEXT: NoAlias
+sil @globals_and_allocs_dont_alias : $@convention(thin) () -> () {
+  %0 = global_addr @sil_global1 : $*Builtin.Int32
+  %1 = alloc_ref $X
+  %4 = tuple()
+  return %4 : $()
+}
+
+
+sil_global @sil_global3 : $Int32
+
+// CHECK-LABEL: @globals_alias
+// CHECK: PAIR #0.
+// CHECK-NEXT: (0):   %0 = global_addr @sil_global3 : $*Int32
+// CHECK-NEXT: (0):   %0 = global_addr @sil_global3 : $*Int32
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #1.
+// CHECK-NEXT: (0):   %0 = global_addr @sil_global3 : $*Int32
+// CHECK-NEXT: (0):   %1 = global_addr @sil_global3 : $*Int32
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #2.
+// CHECK-NEXT: (0):   %0 = global_addr @sil_global3 : $*Int32
+// CHECK-NEXT: (0):   %2 = struct_element_addr %1 : $*Int32, #Int32.value
+// CHECK-NEXT: PartialAlias
+sil @globals_alias : $@convention(thin) () -> () {
+  %0 = global_addr @sil_global3 : $*Int32
+  %1 = global_addr @sil_global3 : $*Int32
+  %2 = struct_element_addr %1 : $*Int32, #Int32.value
   %4 = tuple()
   return %4 : $()
 }
