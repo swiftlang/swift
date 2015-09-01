@@ -829,12 +829,18 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
     if (auto tuple = dyn_cast_or_null<TupleExpr>(anchor)) {
       unsigned firstIdx = failure.getValue();
       auto name = tuple->getElementName(firstIdx);
-      if (name.empty())
+      Expr *arg = tuple->getElement(firstIdx);
+      
+      if (firstIdx == tuple->getNumElements()-1 &&
+          tuple->hasTrailingClosure())
+        tc.diagnose(arg->getLoc(), diag::extra_trailing_closure_in_call)
+          .highlight(arg->getSourceRange());
+      else if (name.empty())
         tc.diagnose(loc, diag::extra_argument_positional)
-          .highlight(tuple->getElement(firstIdx)->getSourceRange());
+          .highlight(arg->getSourceRange());
       else
         tc.diagnose(loc, diag::extra_argument_named, name)
-          .highlight(tuple->getElement(firstIdx)->getSourceRange());        
+          .highlight(arg->getSourceRange());
       return true;
     }
 

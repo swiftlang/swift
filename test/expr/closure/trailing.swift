@@ -102,3 +102,11 @@ func rdar17965209_test() {
     rdar17965209_f(1)
   }
 }
+
+
+// <rdar://problem/22298549> QoI: Unwanted trailing closure produces weird error
+func limitXY(xy:Int, toGamut gamut: [Int]) {}
+let someInt = 0
+let intArray = [someInt]
+limitXY(someInt, toGamut: intArray) {}  // expected-error {{extra trailing closure passed in call}}
+

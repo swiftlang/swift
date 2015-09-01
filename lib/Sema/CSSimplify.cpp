@@ -304,7 +304,9 @@ matchCallArguments(ArrayRef<CallArgParam> args,
   };
 
   // If we have a trailing closure, it maps to the last parameter.
-  if (hasTrailingClosure && numParams > 0) {
+  if (hasTrailingClosure && numParams > 0 &&
+      params.back().Ty->lookThroughAllAnyOptionalTypes()
+        ->is<AnyFunctionType>()) {
     claimedArgs[numArgs-1] = true;
     ++numClaimedArgs;
     parameterBindings[numParams-1].push_back(numArgs-1);
