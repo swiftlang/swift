@@ -418,4 +418,10 @@ func r18776073(a : Int?) {
   }
 }
 
+// <rdar://problem/22491782> unhelpful error message from "throw nil"
+func testThrowNil() throws {
+  throw nil  // expected-error {{cannot infer concrete ErrorType for thrown 'nil' value}}
+}
+
+
 

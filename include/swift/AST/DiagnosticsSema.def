@@ -229,6 +229,10 @@ ERROR(cannot_convert_to_return_type_nil,sema,none,
 
 ERROR(cannot_convert_thrown_type,sema,none,
       "thrown expression type %0 does not conform to 'ErrorType'", (Type))
+ERROR(cannot_throw_nil,sema,none,
+      "cannot infer concrete ErrorType for thrown 'nil' value", ())
+
+
 ERROR(cannot_convert_raw_initializer_value,sema,none,
       "cannot convert value of type %0 to raw type %1", (Type,Type))
 ERROR(cannot_convert_raw_initializer_value_nil,sema,none,

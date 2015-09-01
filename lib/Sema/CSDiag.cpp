@@ -2909,7 +2909,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     nilDiag = diag::cannot_convert_to_return_type_nil;
     break;
   case CTP_ThrowStmt:
-    // TODO: Better diagnostic for 'throw nil'.
+    if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
+      diagnose(expr->getLoc(), diag::cannot_throw_nil);
+      return true;
+    }
 
     if (exprType->is<UnresolvedType>() || exprType->hasTypeVariable())
       return false;
