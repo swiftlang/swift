@@ -1972,19 +1972,15 @@ namespace {
 
         // Add delayed implicit members to the type.
         auto &Impl = this->Impl;
-        DelayedDecl delayedMembers[] = {
-          [=, &Impl](SmallVectorImpl<Decl *> &NewDecls) {
-            auto rawGetter = makeRawValueTrivialGetter(Impl, structDecl, var);
-            NewDecls.push_back(rawGetter);
-            auto rawSetter = makeRawValueTrivialSetter(Impl, structDecl, var);
-            NewDecls.push_back(rawSetter);
-            // FIXME: MaterializeForSet?
-            var->addTrivialAccessors(rawGetter, rawSetter, nullptr);
-          }
-        };
-
         structDecl->setDelayedMemberDecls(
-            Impl.SwiftContext.AllocateCopy(delayedMembers));
+            [=, &Impl](SmallVectorImpl<Decl *> &NewDecls) {
+              auto rawGetter = makeRawValueTrivialGetter(Impl, structDecl, var);
+              NewDecls.push_back(rawGetter);
+              auto rawSetter = makeRawValueTrivialSetter(Impl, structDecl, var);
+              NewDecls.push_back(rawSetter);
+              // FIXME: MaterializeForSet?
+              var->addTrivialAccessors(rawGetter, rawSetter, nullptr);
+            });
 
         // Set the members of the struct.
         structDecl->addMember(valueConstructor);

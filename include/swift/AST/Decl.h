@@ -2831,14 +2831,12 @@ typedef std::function<void(SmallVectorImpl<Decl *> &)> DelayedDecl;
 class NominalTypeDecl : public TypeDecl, public DeclContext,
                         public IterableDeclContext {
   SourceRange Braces;
-  
-  /// \brief The sets of implicit members and protocols added to imported enum
+
+  /// \brief The set of implicit members and protocols added to imported enum
   /// types.  These members and protocols are added to the NominalDecl only if
   /// the nominal type is directly or indirectly referenced.
-  ///
-  /// FIXME: These should be side-table-allocated.
-  ArrayRef<DelayedDecl> DelayedMembers;
-  
+  std::unique_ptr<DelayedDecl> DelayedMembers;
+
   GenericParamList *GenericParams;
 
   /// \brief The generic signature of this type.
@@ -3156,16 +3154,11 @@ public:
   StoredPropertyRange getStoredProperties() const {
     return StoredPropertyRange(getMembers(), ToStoredProperty());
   }
-  
-  bool hasDelayedMemberDecls() {
-    return DelayedMembers.size() != 0;
-  }
-  
-  void setDelayedMemberDecls(ArrayRef<DelayedDecl> delayedMembers) {
-    DelayedMembers = delayedMembers;
-    setHasDelayedMembers();
-  }
-  
+
+  bool hasDelayedMemberDecls() { return DelayedMembers.get(); }
+
+  void setDelayedMemberDecls(const DelayedDecl &delayedMembers);
+
   /// Force delayed implicit member and protocol declarations to be added to the
   /// type declaration.
   void forceDelayed() {

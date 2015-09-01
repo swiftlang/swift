@@ -848,17 +848,26 @@ void NominalTypeDecl::forceDelayedMemberDecls() {
     return;
 
   // Grab the delayed members and then empty the list so we don't recurse.
-  auto OldDelayedMembers = DelayedMembers;
-  DelayedMembers = {};
+  std::unique_ptr<DelayedDecl> DelayedDeclCreator;
+  DelayedMembers.swap(DelayedDeclCreator);
 
   SmallVector<Decl *, 4> NewDecls;
-  for (auto DelayedDeclCreator : OldDelayedMembers) {
-    DelayedDeclCreator(NewDecls);
-    for (auto *D : NewDecls) {
-      addMember(D);
-    }
-    NewDecls.clear();
+  (*DelayedDeclCreator)(NewDecls);
+  for (auto *D : NewDecls) {
+    addMember(D);
   }
+}
+
+void NominalTypeDecl::setDelayedMemberDecls(const DelayedDecl &delayedMembers) {
+  // FIXME: This method should only be called once so that we only register one
+  // destructor cleanup, but the assert doesn't catch all cases of that.
+  assert(!hasDelayedMemberDecls());
+
+  // Make sure the std::unique_ptr gets destroyed properly so we don't leak.
+  getASTContext().addDestructorCleanup(DelayedMembers);
+
+  DelayedMembers = llvm::make_unique<DelayedDecl>(delayedMembers);
+  setHasDelayedMembers();
 }
 
 void NominalTypeDecl::addedMember(Decl *member) {
