@@ -127,7 +127,9 @@ static bool isIdentifiableObject(SILValue V) {
   return false;
 }
 
-bool areDistinctIdentifyableObjects(SILValue V1, SILValue V2) {
+/// Return true if V1 and V2 are distinct objects that can be uniquely
+/// identified at compile time.
+static bool areDistinctIdentifyableObjects(SILValue V1, SILValue V2) {
   // Do both values refer to the same global variable?
   if (auto *GA1 = dyn_cast<GlobalAddrInst>(V1)) {
     if (auto *GA2 = dyn_cast<GlobalAddrInst>(V2)) {
