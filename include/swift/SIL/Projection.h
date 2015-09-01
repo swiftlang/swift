@@ -35,6 +35,27 @@ class SILBuilder;
 class ProjectionPath;
 using ProjectionPathList = llvm::SmallVector<Optional<ProjectionPath>, 8>;
 
+enum class SubSeqRelation_t : uint8_t {
+  Unknown,
+  LHSStrictSubSeqOfRHS,
+  RHSStrictSubSeqOfLHS,
+  Equal,
+};
+
+/// Returns true if Seq is either LHSStrictSubSeqOfRHS or
+/// RHSStrictSubSeqOfLHS. Returns false if Seq is one of either Equal or
+/// Unrelated.
+inline bool isStrictSubSeqRelation(SubSeqRelation_t Seq) {
+  switch (Seq) {
+  case SubSeqRelation_t::Unknown:
+  case SubSeqRelation_t::Equal:
+    return false;
+  case SubSeqRelation_t::LHSStrictSubSeqOfRHS:
+  case SubSeqRelation_t::RHSStrictSubSeqOfLHS:
+    return true;
+  }
+}
+
 /// Extract an integer index from a SILValue.
 ///
 /// Return true if IndexVal is a constant index representable as unsigned
@@ -342,27 +363,6 @@ private:
   explicit Projection(TupleExtractInst *TEI);
   explicit Projection(UncheckedEnumDataInst *UEDAI);
 };
-
-enum class SubSeqRelation_t : uint8_t {
-  Unrelated = 0,
-  LHSStrictSubSeqOfRHS = 1,
-  RHSStrictSubSeqOfLHS = 2,
-  Equal = 3
-};
-
-/// Returns true if Seq is either LHSStrictSubSeqOfRHS or
-/// RHSStrictSubSeqOfLHS. Returns false if Seq is one of either Equal or
-/// Unrelated.
-inline bool isStrictSubSeqRelation(SubSeqRelation_t Seq) {
-  switch (Seq) {
-  case SubSeqRelation_t::Unrelated:
-  case SubSeqRelation_t::Equal:
-    return false;
-  case SubSeqRelation_t::LHSStrictSubSeqOfRHS:
-  case SubSeqRelation_t::RHSStrictSubSeqOfLHS:
-    return true;
-  }
-}
 
 /// A "path" of projections abstracting either value or aggregate projections
 /// upon a value.
