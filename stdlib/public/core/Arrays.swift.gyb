@@ -563,17 +563,20 @@ extension ${Self} : _ArrayType {
     _sanityCheck(capacity >= minimumCapacity)
   }
 
-  @_semantics("array.make_mutable")
-  internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
-    if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      let oldCount = _buffer.count
-
+  @inline(never)
+  internal mutating func _copyToNewGrownBuffer(oldCount: Int) {
       var newBuffer =
         Optional(_forceCreateUniqueMutableBufferForceGrow(&_buffer,
                                                           oldCount,
                                                           oldCount + 1))
       _arrayOutOfPlaceUpdate(&_buffer, &newBuffer, oldCount, 0,
                              _IgnorePointer())
+  }
+
+  @_semantics("array.make_mutable")
+  internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
+    if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
+      _copyToNewGrownBuffer(_buffer.count)
     }
   }
 
@@ -582,13 +585,7 @@ extension ${Self} : _ArrayType {
     _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
 
     if _slowPath(oldCount + 1 > _buffer.capacity) {
-      var newBuffer =
-        Optional(_forceCreateUniqueMutableBufferForceGrow(&_buffer,
-                                                          oldCount,
-                                                          oldCount + 1))
-      _arrayOutOfPlaceUpdate(&_buffer, &newBuffer, oldCount, 0,
-                             _IgnorePointer())
-
+      _copyToNewGrownBuffer(oldCount)
     }
   }
 
@@ -1006,6 +1003,7 @@ internal protocol _PointerFunctionType {
 ///
 /// As an optimization, may move elements out of source rather than
 /// copying when it isUniquelyReferenced.
+@inline(never)
 internal func _arrayOutOfPlaceUpdate<
   _Buffer : _ArrayBufferType, Initializer : _PointerFunctionType
   where Initializer.Element == _Buffer.Element,
