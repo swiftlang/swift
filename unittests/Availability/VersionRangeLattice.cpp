@@ -21,6 +21,11 @@ public:
     return A;
   }
 
+  VersionRange join(VersionRange A, VersionRange B) {
+    A.joinWith(B);
+    return A;
+  }
+
   bool equals(VersionRange A, VersionRange B) {
     return A.isContainedIn(B) && B.isContainedIn(A);
   }
@@ -30,6 +35,13 @@ public:
     VersionRange BMeetA = meet(A, B);
 
     return equals(AMeetB, Expected) && equals(BMeetA, Expected);
+  }
+
+  bool joinEquals(VersionRange A, VersionRange B, VersionRange Expected) {
+    VersionRange AJoinB = join(A, B);
+    VersionRange BJoinA = join(A, B);
+
+    return equals(AJoinB, Expected) && equals(BJoinA, Expected);
   }
 };
 
@@ -75,11 +87,26 @@ TEST_F(VersionRangeLattice, MeetWithAll) {
   EXPECT_TRUE(meetEquals(Empty, All, Empty));
 }
 
+// Test that All acts like the top element in the lattice with respect to
+// join.
+TEST_F(VersionRangeLattice, JoinWithAll) {
+  EXPECT_TRUE(joinEquals(All, All, All));
+  EXPECT_TRUE(joinEquals(GreaterThanEqual10_10, All, All));
+  EXPECT_TRUE(joinEquals(Empty, All, All));
+}
+
 // Test that Empty acts like the bottom element in the lattice with respect to
 // meet.
 TEST_F(VersionRangeLattice, MeetWithEmpty) {
   EXPECT_TRUE(meetEquals(GreaterThanEqual10_10, Empty, Empty));
   EXPECT_TRUE(meetEquals(Empty, Empty, Empty));
+}
+
+// Test that Empty acts like the bottom element in the lattice with respect to
+// join.
+TEST_F(VersionRangeLattice, JoinWithEmpty) {
+  EXPECT_TRUE(joinEquals(GreaterThanEqual10_10, Empty, GreaterThanEqual10_10));
+  EXPECT_TRUE(joinEquals(Empty, Empty, Empty));
 }
 
 // Test meet for ranges with lower end points.
@@ -88,4 +115,12 @@ TEST_F(VersionRangeLattice, MeetWithClosedEndedPositiveInfinity) {
                          GreaterThanEqual10_10));
   EXPECT_TRUE(meetEquals(GreaterThanEqual10_10, GreaterThanEqual10_9,
                          GreaterThanEqual10_10));
+}
+
+// Test join for ranges with lower end points.
+TEST_F(VersionRangeLattice, JoinWithClosedEndedPositiveInfinity) {
+  EXPECT_TRUE(joinEquals(GreaterThanEqual10_10, GreaterThanEqual10_10,
+                         GreaterThanEqual10_10));
+  EXPECT_TRUE(joinEquals(GreaterThanEqual10_10, GreaterThanEqual10_9,
+                         GreaterThanEqual10_9));
 }

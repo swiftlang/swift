@@ -110,6 +110,23 @@ public:
     setLowerEndpoint(maxVersion);
   }
 
+  /// Mutates this range to be the least upper bound of itself and Other.
+  void joinWith(const VersionRange &Other) {
+    if (isAll() || Other.isEmpty())
+      return;
+
+    if (isEmpty() || Other.isAll()) {
+      *this = Other;
+      return;
+    }
+
+    // The l.u.b of [v1, +Inf), [v2, +Inf) is [min(v1,v2), +Inf)
+    const clang::VersionTuple minVersion =
+        std::min(this->getLowerEndpoint(), Other.getLowerEndpoint());
+
+    setLowerEndpoint(minVersion);
+  }
+
   /// Mutates this range to be a best effort over-approximation of the
   /// intersection of the concretizations of this version range and Other.
   void constrainWith(const VersionRange &Other) {
