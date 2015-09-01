@@ -615,9 +615,9 @@ extension ${Self} : _ArrayType {
   /// - Complexity: Amortized ${O1}.
   public mutating func append(newElement: Element) {
     _makeUniqueAndReserveCapacityIfNotUnique()
-      let oldCount = _getCount()
-      _reserveCapacityAssumingUniqueBuffer(oldCount)
-      _appendElementAssumeUniqueAndCapacity(oldCount, newElement: newElement)
+    let oldCount = _getCount()
+    _reserveCapacityAssumingUniqueBuffer(oldCount)
+    _appendElementAssumeUniqueAndCapacity(oldCount, newElement: newElement)
   }
 
   @inline(never)
