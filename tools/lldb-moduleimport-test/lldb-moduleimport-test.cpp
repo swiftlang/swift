@@ -127,43 +127,40 @@ int main(int argc, char **argv) {
       llvm::outs() << name << " is not an object file.\n";
       exit(1);
     }
-    auto Obj = llvm::dyn_cast<llvm::object::MachOObjectFile>(OF->getBinary());
-    if (!Obj) {
-      llvm::outs() << name << " is not a Mach-O file.\n";
-      exit(1);
-    }
+    auto *Obj = OF->getBinary();
+    auto *MachO = llvm::dyn_cast<llvm::object::MachOObjectFile>(Obj);
+    if (MachO) {
+      for (auto &Symbol : Obj->symbols()) {
+        auto RawSym = Symbol.getRawDataRefImpl();
+        llvm::MachO::nlist nlist = MachO->getSymbolTableEntry(RawSym);
+        if (nlist.n_type == N_AST) {
+          llvm::StringRef Path;
+          if (MachO->getSymbolName(RawSym, Path)) {
+            llvm::outs() << "Cannot get symbol name\n;";
+            exit(1);
+          }
 
-    for (auto &Symbol : Obj->symbols()) {
-      auto RawSym = Symbol.getRawDataRefImpl();
-      llvm::MachO::nlist nlist = Obj->getSymbolTableEntry(RawSym);
-      if (nlist.n_type == N_AST) {
-        llvm::StringRef Path;
-        if (Obj->getSymbolName(RawSym, Path)) {
-          llvm::outs() << "Cannot get symbol name\n;";
-          exit(1);
+          auto fileBuf = llvm::MemoryBuffer::getFile(Path);
+          if (!fileBuf) {
+            llvm::outs() << "Cannot read from '" << Path
+                         << "': " << fileBuf.getError().message();
+            exit(1);
+          }
+
+          if (!parseASTSection(CI.getSerializedModuleLoader(),
+                               fileBuf.get()->getBuffer(), modules)) {
+            exit(1);
+          }
+
+          for (auto path : modules)
+            llvm::outs() << "Loaded module " << path << " from " << name
+                         << "\n";
+          printValidationInfo(fileBuf.get()->getBuffer());
+
+          // Deliberately leak the llvm::MemoryBuffer. We can't delete it
+          // while it's in use anyway.
+          fileBuf.get().release();
         }
-
-        auto fileBuf = llvm::MemoryBuffer::getFile(Path);
-        if (!fileBuf) {
-          llvm::outs() << "Cannot read from '" << Path << "': "
-                       << fileBuf.getError().message();
-          exit(1);
-        }
-
-        if (!parseASTSection(CI.getSerializedModuleLoader(),
-                             fileBuf.get()->getBuffer(),
-                             modules)) {
-          exit(1);
-        }
-
-        for (auto path : modules)
-          llvm::outs() << "Loaded module " << path << " from " << name
-                       << "\n";
-        printValidationInfo(fileBuf.get()->getBuffer());
-
-        // Deliberately leak the llvm::MemoryBuffer. We can't delete it
-        // while it's in use anyway.
-        fileBuf.get().release();
       }
     }
     for (auto &Section : Obj->sections()) {
