@@ -7,6 +7,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG7 | FileCheck %s -check-prefix=ARG-NAME1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG8 | FileCheck %s -check-prefix=EXPECT_STRING
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD1 | FileCheck %s -check-prefix=OVERLOAD1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD2 | FileCheck %s -check-prefix=OVERLOAD2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD3 | FileCheck %s -check-prefix=OVERLOAD3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD4 | FileCheck %s -check-prefix=OVERLOAD4
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -108,3 +113,41 @@ class C2 {
 // EXPECT_STRING-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: s2[#String#]; name=s2
 // EXPECT_STRING-DAG: Decl[GlobalVar]/CurrModule:         os1[#String?#]; name=os1
 // EXPECT_STRING-DAG: Decl[GlobalVar]/CurrModule:         os2[#String?#]; name=os2
+
+func foo2(a : C1, b1 : C2) {}
+func foo2(a : C2, b2 : C1) {}
+
+class C3 {
+  var C1I = C1()
+  var C2I = C2()
+  func f1() {
+    foo2(C1I, #^OVERLOAD1^#)
+  }
+  func f2() {
+    foo2(C2I, #^OVERLOAD2^#)
+  }
+  func f2() {
+    foo2(C1I, b1: #^OVERLOAD3^#)
+  }
+  func f2() {
+    foo2(C2I, b2: #^OVERLOAD4^#)
+  }
+}
+
+// OVERLOAD1: Begin completions, 1 items
+// OVERLOAD1-NEXT: Keyword/ExprSpecific:               b1: [#Argument name#]; name=b1:
+// OVERLOAD1-NEXT: End completions
+
+// OVERLOAD2: Begin completions, 1 items
+// OVERLOAD2-NEXT: Keyword/ExprSpecific:               b2: [#Argument name#]; name=b2:
+// OVERLOAD2-NEXT: End completions
+
+// OVERLOAD3: Begin completions
+// OVERLOAD3-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C2I[#C2#]; name=C2I
+// OVERLOAD3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
+// OVERLOAD3-DAG: Decl[InstanceVar]/CurrNominal:      C1I[#C1#]; name=C1I
+
+// OVERLOAD4: Begin completions
+// OVERLOAD4-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
+// OVERLOAD4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
+// OVERLOAD4-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I

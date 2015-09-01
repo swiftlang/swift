@@ -2312,11 +2312,13 @@ public:
 
   static bool getPositionInTupleExpr(DeclContext &DC, Expr *Target,
                                      TupleExpr *Tuple, unsigned &Pos,
-                                     bool &HasName) {
+                                     bool &HasName,
+                                     llvm::SmallVectorImpl<Type> &TupleEleTypes) {
     auto &SM = DC.getASTContext().SourceMgr;
     Pos = 0;
     for (auto E : Tuple->getElements()) {
       if (SM.isBeforeInBuffer(E->getEndLoc(), Target->getStartLoc())) {
+        TupleEleTypes.push_back(E->getType());
         Pos ++;
         continue;
       }
@@ -2364,6 +2366,43 @@ public:
     return true;
   }
 
+  static bool isPotentialSignatureMatch(ArrayRef<Type> TupleEles,
+                                        ArrayRef<Type> ExprTypes,
+                                        DeclContext *DC) {
+    // Not likely to be a mactch if users provide more arguments than expected.
+    if (ExprTypes.size() >= TupleEles.size())
+      return false;
+    for (unsigned I = 0; I < ExprTypes.size(); ++ I) {
+      auto Ty = ExprTypes[I];
+      if (Ty && !Ty->is<ErrorType>()) {
+        if (!isConvertibleTo(Ty, TupleEles[I], DC)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  static void removeUnlikelyOverloads(SmallVectorImpl<Type> &PossibleArgTypes,
+                                      ArrayRef<Type> TupleEleTypes,
+                                      DeclContext *DC) {
+    for (auto It = PossibleArgTypes.begin(); It != PossibleArgTypes.end(); ) {
+      llvm::SmallVector<Type, 3> ExpectedTypes;
+      if ((*It)->getKind() == TypeKind::Tuple) {
+        auto Elements = (*It)->getAs<TupleType>()->getElements();
+        for (auto Ele : Elements)
+          ExpectedTypes.push_back(Ele.getType());
+      } else {
+        ExpectedTypes.push_back(*It);
+      }
+      if (isPotentialSignatureMatch(ExpectedTypes, TupleEleTypes, DC)) {
+        ++ It;
+      } else {
+        PossibleArgTypes.erase(It);
+      }
+    }
+  }
+
   bool getCallArgCompletions(DeclContext &DC, CallExpr *CallE, ErrorExpr *CCExpr) {
     SmallVector<Type, 2> PossibleTypes;
     if (auto Ty = CallE->getFn()->getType()) {
@@ -2376,11 +2415,14 @@ public:
       return false;
     unsigned Position;
     bool HasName;
-    if (!getPositionInTupleExpr(DC, CCExpr, TAG, Position, HasName))
+    llvm::SmallVector<Type, 3> TupleEleTypesBeforeTarget;
+    if (!getPositionInTupleExpr(DC, CCExpr, TAG, Position, HasName,
+                                TupleEleTypesBeforeTarget))
       return false;
     if (PossibleTypes.empty() &&
         !typeCheckUnresolvedExpr(DC, CallE->getArg(), CallE, PossibleTypes))
       return false;
+    removeUnlikelyOverloads(PossibleTypes, TupleEleTypesBeforeTarget, &DC);
     return lookupArgCompletionsAtPosition(Position, HasName, PossibleTypes,
                                           CCExpr->getStartLoc());
   }
@@ -2844,6 +2886,7 @@ void CodeCompletionCallbacksImpl::completeCallArg(CallExpr *E) {
   CurDeclContext = P.CurDeclContext;
   Kind = CompletionKind::CallArg;
   FuncCallExpr = E;
+  ParsedExpr = E;
 }
 
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
@@ -3028,7 +3071,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   Optional<Type> ExprType;
   if (ParsedExpr) {
     ExprType = getTypeOfParsedExpr();
-    if (!ExprType && Kind != CompletionKind::PostfixExprParen)
+    if (!ExprType && Kind != CompletionKind::PostfixExprParen &&
+        Kind != CompletionKind::CallArg)
       return;
   }
 
