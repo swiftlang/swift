@@ -665,4 +665,16 @@ enum Rank: Int {
   case Two = 2.1  // expected-error {{cannot convert value of type 'Double' to raw type 'Int'}}
 }
 
+// rdar://22240342 - Crash in diagRecursivePropertyAccess
+class r22240342 {
+  lazy var xx: Int = {
+    foo {  // expected-error {{use of unresolved identifier 'foo'}}
+      let issueView = 42
+      issueView.delegate = 12
+      
+    }
+    return 42
+    }()
+}
+
 

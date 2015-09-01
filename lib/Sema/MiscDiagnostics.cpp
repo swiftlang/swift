@@ -646,6 +646,11 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
 
       if (auto *AE = dyn_cast<AssignExpr>(E)) {
         subExpr = AE->getDest();
+        
+        // If we couldn't flatten this expression, don't explode.
+        if (!subExpr)
+          return { true, E };
+
         isStore = true;
       } else if (auto *IOE = dyn_cast<InOutExpr>(E)) {
         subExpr = IOE->getSubExpr();
