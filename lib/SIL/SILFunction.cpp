@@ -263,14 +263,14 @@ SILBasicBlock *SILFunction::createBasicBlock() {
 
 #ifndef NDEBUG
 
-llvm::cl::opt<unsigned>
+static llvm::cl::opt<unsigned>
 MaxColumns("view-cfg-max-columns", llvm::cl::init(80),
            llvm::cl::desc("Maximum width of a printed node"));
 
 namespace {
 enum class LongLineBehavior { None, Truncate, Wrap };
 } // end anonymous namespace
-llvm::cl::opt<LongLineBehavior>
+static llvm::cl::opt<LongLineBehavior>
 LLBehavior("view-cfg-long-line-behavior",
            llvm::cl::init(LongLineBehavior::Truncate),
            llvm::cl::desc("Behavior when line width is greater than the "
@@ -283,7 +283,7 @@ LLBehavior("view-cfg-long-line-behavior",
                clEnumValN(LongLineBehavior::Wrap, "wrap", "Wrap long lines"),
                clEnumValEnd));
 
-llvm::cl::opt<bool>
+static llvm::cl::opt<bool>
 RemoveUseListComments("view-cfg-remove-use-list-comments",
                       llvm::cl::init(false),
                       llvm::cl::desc("Should use list comments be removed"));
@@ -433,7 +433,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
 #endif
 
 #ifndef NDEBUG
-llvm::cl::opt<std::string>
+static llvm::cl::opt<std::string>
 TargetFunction("view-cfg-only-for-function", llvm::cl::init(""),
                llvm::cl::desc("Only print out the cfg for this function"));
 #endif
