@@ -588,6 +588,20 @@ private:
 
 } // anonymous namespace
 
+// This is a separate function so that it shows up in stack traces.
+LLVM_ATTRIBUTE_NOINLINE
+static void debugFailWithAssertion() {
+  // This assertion should always fail, per the user's request, and should
+  // not be converted to llvm_unreachable.
+  assert(0 && "This is an assertion!");
+}
+
+// This is a separate function so that it shows up in stack traces.
+LLVM_ATTRIBUTE_NOINLINE
+static void debugFailWithCrash() {
+  LLVM_BUILTIN_TRAP;
+}
+
 /// Performs the compile requested by the user.
 /// \returns true on error
 static bool performCompile(CompilerInstance &Instance,
@@ -650,11 +664,9 @@ static bool performCompile(CompilerInstance &Instance,
 
   FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
   if (CrashMode == FrontendOptions::DebugCrashMode::AssertAfterParse)
-    // This assertion should always fail, per the user's request, and should
-    // not be converted to llvm_unreachable.
-    assert(0 && "This is an assertion!");
+    debugFailWithAssertion();
   else if (CrashMode == FrontendOptions::DebugCrashMode::CrashAfterParse)
-    LLVM_BUILTIN_TRAP;
+    debugFailWithCrash();
 
   ASTContext &Context = Instance.getASTContext();
 
