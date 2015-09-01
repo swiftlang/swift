@@ -1247,8 +1247,10 @@ class VarDeclUsageChecker : public ASTWalker {
   
   // Keep track of some information about a variable.
   enum {
-    RK_Read    = 1,      ///< Whether it was ever read.
-    RK_Written = 2,      ///< Whether it was ever written or passed inout.
+    RK_Read        = 1,      ///< Whether it was ever read.
+    RK_Written     = 2,      ///< Whether it was ever written or passed inout.
+    
+    RK_CaptureList = 4       ///< Var is an entry in a capture list.
   };
   
   /// These are all of the variables that we are tracking.  VarDecls get added
@@ -1261,6 +1263,9 @@ class VarDeclUsageChecker : public ASTWalker {
   llvm::SmallDenseMap<OpaqueValueExpr*, Expr*> OpaqueValueMap;
   bool sawError = false;
   
+  VarDeclUsageChecker(const VarDeclUsageChecker &) = delete;
+  void operator=(const VarDeclUsageChecker &) = delete;
+
 public:
   VarDeclUsageChecker(TypeChecker &TC, AbstractFunctionDecl *AFD) : TC(TC) {
     // Track the parameters of the function.
@@ -1334,8 +1339,14 @@ public:
       
     // If this is a VarDecl, then add it to our list of things to track.
     if (auto *vd = dyn_cast<VarDecl>(D))
-      if (shouldTrackVarDecl(vd))
-        VarDecls[vd] = 0;
+      if (shouldTrackVarDecl(vd)) {
+        unsigned defaultFlags = 0;
+        // If this VarDecl is nested inside of a CaptureListExpr, remember that
+        // fact for better diagnostics.
+        if (dyn_cast_or_null<CaptureListExpr>(Parent.getAsExpr()))
+          defaultFlags = RK_CaptureList;
+        VarDecls[vd] |= defaultFlags;
+      }
 
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
       // If this is a nested function with a capture list, mark any captured
@@ -1419,7 +1430,16 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     // Diagnose variables that were never used (other than their
     // initialization).
     //
-    if (access == 0) {
+    if ((access & (RK_Read|RK_Written)) == 0) {
+      // If this is a member in a capture list, just say it is unused.  We could
+      // produce a fixit hint with a parent map, but this is a lot of effort for
+      // a narrow case.
+      if (access & RK_CaptureList) {
+        TC.diagnose(var->getLoc(), diag::capture_never_used,
+                    var->getName());
+        continue;
+      }
+      
       // If the source of the VarDecl is a trivial PatternBinding with only a
       // single binding, rewrite the whole thing into an assignment.
       //    let x = foo()
@@ -1628,7 +1648,6 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue.
   if (auto *oee = dyn_cast<OpenExistentialExpr>(E))
     OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
-
   
   // If we saw an ErrorExpr, take note of this.
   if (isa<ErrorExpr>(E))

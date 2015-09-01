@@ -2586,6 +2586,9 @@ WARNING(pbd_never_used, sema_varusage, none,
         "initialization of %select{variable|immutable value}1 %0 was never used"
         "; consider replacing with assignment to '_' or removing it",
         (Identifier, unsigned))
+WARNING(capture_never_used, sema_varusage, none,
+        "capture %0 was never used",
+        (Identifier))
 
 WARNING(variable_never_used, sema_varusage, none,
         "%select{variable|immutable value}1 %0 was never used; "

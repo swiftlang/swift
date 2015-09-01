@@ -146,12 +146,11 @@ class ExplicitSelfRequiredTest {
 
     // <rdar://problem/18877391> "self." shouldn't be required in the initializer expression in a capture list
     // This should not produce an error, "x" isn't being captured by the closure.
-    // expected-warning @+1 {{initialization of immutable value 'myX' was never used}} {{16-19=_}}
-    doStuff({ [myX = x] in 4 })
+    doStuff({ [myX = x] in myX })
 
     // This should produce an error, since x is used within the inner closure.
-    // expected-warning @+1 {{initialization of immutable value 'myX' was never used}} {{16-19=_}}
     doStuff({ [myX = {x}] in 4 })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{23-23=self.}}
+    // expected-warning @-1 {{capture 'myX' was never used}}
 
     return 42
   }
@@ -293,3 +292,16 @@ func genericOne<T>(a: () -> T) {}
 func genericTwo<T>(a: () -> T, _ b: () -> T) {}
 genericOne {}
 genericTwo({}, {})
+
+
+// <rdar://problem/22344208> QoI: Warning for unused capture list variable should be customized
+class r22344208 {
+  func f() {
+    let q = 42
+    let _: () -> Int = {
+      [unowned self,  // expected-warning {{capture 'self' was never used}}
+       q] in       // expected-warning {{capture 'q' was never used}}
+      1 }
+  }
+}
+
