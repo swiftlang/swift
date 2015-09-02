@@ -118,6 +118,9 @@ public:
     Load,
     /// The candidate witness during protocol conformance checking.
     Witness,
+    /// This is refering to a type produced by opening a generic type at the
+    /// base of the locator.
+    OpenedGeneric,
   };
 
   /// \brief Determine the number of numeric values used for the given path
@@ -148,6 +151,7 @@ public:
     case ScalarToTuple:
     case Load:
     case Witness:
+    case OpenedGeneric:
       return 0;
 
     case GenericArgument:
@@ -198,6 +202,7 @@ public:
     case SubscriptIndex:
     case SubscriptMember:
     case SubscriptResult:
+    case OpenedGeneric:
       return 0;
 
     case FunctionArgument:

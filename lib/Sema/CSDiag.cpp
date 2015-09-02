@@ -2337,15 +2337,19 @@ static bool isUnresolvedOrTypeVarType(Type ty) {
 
 bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   auto anchor = expr;
+  bool resolvedAnchorToExpr = false;
+  
   if (auto locator = constraint->getLocator()) {
     anchor = simplifyLocatorToAnchor(*CS, locator);
-    if (!anchor)
-      anchor = locator->getAnchor();
+    if (anchor)
+      resolvedAnchorToExpr = true;
+    else
+      anchor = locator->getAnchor();    
   }
 
   Type fromType = CS->simplifyType(constraint->getFirstType());
   
-  if (fromType->is<TypeVariableType>()) {
+  if (fromType->is<TypeVariableType>() && resolvedAnchorToExpr) {
     TCCOptions options;
     
     // If we know we're removing a contextual constraint, then we can force a

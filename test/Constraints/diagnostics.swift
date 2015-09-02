@@ -589,5 +589,7 @@ extension Array {
   }
 }
 
-
+// <rdar://problem/22519983> QoI: Weird error when failing to infer archetype
+func safeAssign<T: RawRepresentable>(inout lhs: T) -> Bool {}  // expected-note {{in call to function 'safeAssign'}}
+let a = safeAssign // expected-error {{argument for generic parameter 'T' could not be inferred}}
 

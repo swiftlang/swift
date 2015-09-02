@@ -5783,8 +5783,19 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
 
   // If we didn't manage to resolve directly to an expression, we don't
   // have a great diagnostic to give, so bail.
-  if (!resolved || !resolved->getAnchor() || !resolved->getPath().empty())
+  if (!resolved || !resolved->getAnchor())
     return false;
+  
+  if (!resolved->getPath().empty()) {
+    // We allow OptionalToBoolean fixes with an opened type to refer to the
+    // BooleanType conformance.
+    if (fix.first.getKind() == FixKind::OptionalToBoolean &&
+        resolved->getPath().size() == 1 &&
+        resolved->getPath()[0].getKind() == ConstraintLocator::OpenedGeneric)
+      ; /* ok */
+    else
+      return false;
+  }
 
   Expr *affected = resolved->getAnchor();
 
@@ -5807,9 +5818,8 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     if (auto optTy = type->getAnyOptionalObjectType())
       type = optTy;
 
-    if (type->is<AnyFunctionType>()) {
+    if (type->is<AnyFunctionType>())
       type = type->castTo<AnyFunctionType>()->getResult();
-    }
     
     TC.diagnose(affected->getLoc(), diag::missing_nullary_call, type)
       .fixItInsertAfter(affected->getEndLoc(), "()");

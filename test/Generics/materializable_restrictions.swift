@@ -16,11 +16,10 @@ func test20807269() {
 func test15921530() {
     struct X {}
 
-    func makef<T>() -> (T)->() {
+    func makef<T>() -> (T)->() { // expected-note {{in call to function 'makef'}}
       return {
         x in ()
       }
     }
-    // FIXME: poor error message.
-    var _: (inout X)->() = makef() // expected-error{{'() -> (_) -> ()' is not a subtype of '()'}}
+    var _: (inout X)->() = makef() // expected-error{{argument for generic parameter 'T' could not be inferred}}
 }

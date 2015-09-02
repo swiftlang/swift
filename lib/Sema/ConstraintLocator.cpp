@@ -71,6 +71,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case NamedTupleElement:
     case TupleElement:
     case ApplyArgToParam:
+    case OpenedGeneric:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -223,6 +224,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     case Witness:
       out << "witness ";
       elt.getWitness()->dumpRef(out);
+      break;
+        
+    case OpenedGeneric:
+      out << "opened generic";
       break;
     }
   }
