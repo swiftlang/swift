@@ -343,19 +343,6 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
     return name;
   }
 
-  // If the word preceding the match is "With", and it isn't the first
-  // word, we can drop it as well.
-  auto nextNameWordRevIter = nameWordRevIter;
-  ++nextNameWordRevIter;
-  if (*nameWordRevIter == "With") {
-    ++nameWordRevIter;
-
-    // If we hit the beginning of the word, step back to keep the
-    // "with". This will only actually happen if the name isn't
-    // following the camel-casing rules correctly.
-    if (nameWordRevIter == nameWordRevIterEnd) --nameWordRevIter;
-  }
-
   // Go back to the last matching word and chop off the name at that
   // point.
   StringRef newName = name.substr(0, nameWordRevIter.base().getPosition());

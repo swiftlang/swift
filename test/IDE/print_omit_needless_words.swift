@@ -30,8 +30,8 @@
 // Note: Class -> "Class"
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
 
-// Note: Pointer-to-struct name matching, dropping of "With".
-// CHECK-FOUNDATION: func copy(zone: NSZone) -> AnyObject!
+// Note: Pointer-to-struct name matching; don't drop "With".
+// CHECK-FOUNDATION: func copyWith(zone: NSZone) -> AnyObject!
 
 // Note: Objective-C type parameter names.
 // CHECK-FOUNDATION: func objectFor(aKey: NSCopying) -> AnyObject?
@@ -43,17 +43,17 @@
 // Note: Don't drop the name of the first parameter in an initializer entirely.
 // CHECK-FOUNDATION: init(array: [AnyObject])
 
-// Note: struct name matching, dropping of "With"
-// CHECK-FOUNDATION: class func value(range: NSRange) -> NSValue
+// Note: struct name matching; don't drop "With".
+// CHECK-FOUNDATION: class func valueWith(range: NSRange) -> NSValue
 
 // Note: built-in types.
 // CHECK-FOUNDATION: func add(value: Double) -> NSNumber
 
-// Note: multi-word enum name matching, dropping of "With"
-// CHECK-FOUNDATION: func someMethod(options: NSDeprecatedOptions)
+// Note: multi-word enum name matching; don't drop "With".
+// CHECK-FOUNDATION: func someMethodWith(options: NSDeprecatedOptions)
 
-// Note: class name matching, dropping of "With"
-// CHECK-FOUNDATION: class func request(URLString: String!) -> Self!
+// Note: class name matching; don't drop "With".
+// CHECK-FOUNDATION: class func requestWith(URLString: String!) -> Self!
 
 // Note: property name stripping property type.
 // CHECK-FOUNDATION: var uppercase: String
