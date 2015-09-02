@@ -3040,9 +3040,8 @@ namespace {
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       // Determine whether we performed a coercion or downcast.
-      auto locator =
-        cs.getConstraintLocator(expr, ConstraintLocator::CheckedCastOperand);
       if (cs.shouldAttemptFixes()) {
+        auto locator = cs.getConstraintLocator(expr);
         unsigned choice = solution.getDisjunctionChoice(locator);
         (void) choice;
         assert(choice == 0 &&

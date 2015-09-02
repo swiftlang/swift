@@ -96,8 +96,6 @@ public:
     InterpolationArgument,
     /// \brief The lookup for a constructor member.
     ConstructorMember,
-    /// \brief Address of subexpression.
-    AddressOf,
     /// \brief Rvalue adjustment.
     RvalueAdjustment,
     /// \brief The result of a closure.
@@ -118,8 +116,6 @@ public:
     ScalarToTuple,
     /// \brief The load of an lvalue.
     Load,
-    /// \brief The operand of a checked cast.
-    CheckedCastOperand,
     /// The candidate witness during protocol conformance checking.
     Witness,
   };
@@ -141,7 +137,6 @@ public:
     case SubscriptMember:
     case SubscriptResult:
     case ConstructorMember:
-    case AddressOf:
     case RvalueAdjustment:
     case ClosureResult:
     case ParentType:
@@ -152,7 +147,6 @@ public:
     case LvalueObjectType:
     case ScalarToTuple:
     case Load:
-    case CheckedCastOperand:
     case Witness:
       return 0;
 
@@ -184,14 +178,12 @@ public:
 
   static unsigned getSummaryFlagsForPathElement(PathElementKind kind) {
     switch (kind) {
-    case AddressOf:
     case ApplyArgument:
     case ApplyFunction:
     case ApplyArgToParam:
     case SequenceGeneratorType:
     case GeneratorElementType:
     case ArrayElementType:
-    case CheckedCastOperand:
     case ClosureResult:
     case ConstructorMember:
     case InstanceType:

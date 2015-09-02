@@ -56,7 +56,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case SubscriptMember:
     case SubscriptResult:
     case ConstructorMember:
-    case AddressOf:
     case RvalueAdjustment:
     case ClosureResult:
     case ParentType:
@@ -67,7 +66,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case LvalueObjectType:
     case ScalarToTuple:
     case Load:
-    case CheckedCastOperand:
     case GenericArgument:
     case InterpolationArgument:
     case NamedTupleElement:
@@ -108,10 +106,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
   for (auto elt : getPath()) {
     out << " -> ";
     switch (elt.getKind()) {
-    case AddressOf:
-      out << "address of";
-      break;
-
     case ArrayElementType:
       out << "array element";
       break;
@@ -138,10 +132,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
           << " to parameter #" << llvm::utostr(elt.getValue2());
       break;
         
-    case CheckedCastOperand:
-      out << "checked cast operand";
-      break;
-
     case ClosureResult:
       out << "closure result";
       break;

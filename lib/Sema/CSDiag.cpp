@@ -379,16 +379,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
-    case ConstraintLocator::CheckedCastOperand:
-      if (auto castExpr = dyn_cast<ExplicitCastExpr>(anchor)) {
-        targetAnchor = nullptr;
-        targetPath.clear();
-        anchor = castExpr->getSubExpr();
-        path = path.slice(1);
-        continue;
-      }
-      break;
-
     case ConstraintLocator::ClosureResult:
       if (auto CE = dyn_cast<ClosureExpr>(anchor)) {
         if (CE->hasSingleExpressionBody()) {
@@ -2474,8 +2464,12 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   // Check to see if this constraint came from a cast instruction. If so,
   // and if this conversion constraint is different than the types being cast,
   // produce a note that talks about the overall expression.
-  if (constraint->getLocator() && constraint->getLocator()->getAnchor() ==expr){
-    if (auto ECE = dyn_cast<ExplicitCastExpr>(expr))
+  //
+  // TODO: Using parentMap would be more general, rather than requiring the
+  // issue to be related to the root of the expr under study.
+  if (auto ECE = dyn_cast<ExplicitCastExpr>(expr))
+    if (constraint->getLocator() &&
+        constraint->getLocator()->getAnchor() == ECE->getSubExpr()) {
       if (!toType->isEqual(ECE->getCastTypeLoc().getType()))
         diagnose(expr->getLoc(), diag::in_cast_expr_types,
                  ECE->getSubExpr()->getType()->getRValueType(),

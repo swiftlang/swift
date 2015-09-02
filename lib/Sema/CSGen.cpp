@@ -2057,8 +2057,7 @@ namespace {
       auto result = InOutType::get(lvalue);
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSubExpr()->getType(), bound,
-                       CS.getConstraintLocator(expr,
-                                               ConstraintLocator::AddressOf));
+                       CS.getConstraintLocator(expr->getSubExpr()));
       return result;
     }
 
@@ -2267,14 +2266,12 @@ namespace {
         return nullptr;
 
       // Open the type we're casting to.
-      // FIXME: Locator for the cast type?
       auto toType = CS.openType(expr->getCastTypeLoc().getType(),
                                 CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto fromType = expr->getSubExpr()->getType();
-      auto locator = CS.getConstraintLocator(expr,
-                                     ConstraintLocator::CheckedCastOperand);
+      auto locator = CS.getConstraintLocator(expr->getSubExpr());
 
       // The source type can be checked-cast to the destination type.
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType, locator);
@@ -2292,14 +2289,12 @@ namespace {
         return nullptr;
 
       // Open the type we're casting to.
-      // FIXME: Locator for the cast type?
       auto toType = CS.openType(expr->getCastTypeLoc().getType(),
                                 CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto fromType = expr->getSubExpr()->getType();
-      auto locator = CS.getConstraintLocator(expr,
-                                     ConstraintLocator::CheckedCastOperand);
+      auto locator = CS.getConstraintLocator(expr);
 
       if (CS.shouldAttemptFixes()) {
         Constraint *coerceConstraint =
@@ -2333,14 +2328,12 @@ namespace {
         return nullptr;
 
       // Open the type we're casting to.
-      // FIXME: Locator for the cast type?
       auto toType = CS.openType(expr->getCastTypeLoc().getType(),
                                 CS.getConstraintLocator(expr));
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       auto fromType = expr->getSubExpr()->getType();
-      auto locator = CS.getConstraintLocator(
-                       expr, ConstraintLocator::CheckedCastOperand);
+      auto locator = CS.getConstraintLocator(expr->getSubExpr());
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType, locator);
       return OptionalType::get(toType);
     }
