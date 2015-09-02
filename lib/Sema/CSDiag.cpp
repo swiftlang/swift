@@ -401,25 +401,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
         
-    case ConstraintLocator::IfThen:
-      if (auto ITE = dyn_cast<IfExpr>(anchor)) {
-        targetAnchor = nullptr;
-        targetPath.clear();
-        anchor = ITE->getThenExpr();
-        path = path.slice(1);
-        continue;
-      }
-      break;
-    case ConstraintLocator::IfElse:
-      if (auto ITE = dyn_cast<IfExpr>(anchor)) {
-        targetAnchor = nullptr;
-        targetPath.clear();
-        anchor = ITE->getElseExpr();
-        path = path.slice(1);
-        continue;
-      }
-      break;
-        
     default:
       // FIXME: Lots of other cases to handle.
       break;

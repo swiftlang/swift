@@ -2246,12 +2246,10 @@ namespace {
                                             TVO_PrefersSubtypeBinding);
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getThenExpr()->getType(), resultTy,
-                       CS.getConstraintLocator(expr,
-                                               ConstraintLocator::IfThen));
+                       CS.getConstraintLocator(expr->getThenExpr()));
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getElseExpr()->getType(), resultTy,
-                       CS.getConstraintLocator(expr,
-                                               ConstraintLocator::IfElse));
+                       CS.getConstraintLocator(expr->getElseExpr()));
       return resultTy;
     }
     

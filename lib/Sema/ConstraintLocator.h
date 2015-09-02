@@ -118,10 +118,6 @@ public:
     ScalarToTuple,
     /// \brief The load of an lvalue.
     Load,
-    /// \brief The 'then' branch of a ternary expression.
-    IfThen,
-    /// \brief The 'else' branch of a ternary expression.
-    IfElse,
     /// \brief The operand of a checked cast.
     CheckedCastOperand,
     /// The candidate witness during protocol conformance checking.
@@ -156,8 +152,6 @@ public:
     case LvalueObjectType:
     case ScalarToTuple:
     case Load:
-    case IfThen:
-    case IfElse:
     case CheckedCastOperand:
     case Witness:
       return 0;
@@ -212,8 +206,6 @@ public:
     case SubscriptIndex:
     case SubscriptMember:
     case SubscriptResult:
-    case IfThen:
-    case IfElse:
       return 0;
 
     case FunctionArgument:

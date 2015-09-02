@@ -2808,15 +2808,9 @@ namespace {
 
       // Coerce the then/else branches to the common type.
       expr->setThenExpr(coerceToType(expr->getThenExpr(), resultTy,
-                                     ConstraintLocatorBuilder(
-                                       cs.getConstraintLocator(expr))
-                                     .withPathElement(
-                                       ConstraintLocator::IfThen)));
+                               cs.getConstraintLocator(expr->getThenExpr())));
       expr->setElseExpr(coerceToType(expr->getElseExpr(), resultTy,
-                                     ConstraintLocatorBuilder(
-                                       cs.getConstraintLocator(expr))
-                                     .withPathElement(
-                                       ConstraintLocator::IfElse)));
+                                 cs.getConstraintLocator(expr->getElseExpr())));
 
       return expr;
     }

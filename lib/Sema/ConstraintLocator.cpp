@@ -67,8 +67,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case LvalueObjectType:
     case ScalarToTuple:
     case Load:
-    case IfThen:
-    case IfElse:
     case CheckedCastOperand:
     case GenericArgument:
     case InterpolationArgument:
@@ -166,14 +164,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case GenericArgument:
       out << "generic argument #" << llvm::utostr(elt.getValue());
-      break;
-
-    case IfElse:
-      out << "'else' branch of ternary" ;
-      break;
-
-    case IfThen:
-      out << "'then' branch of ternary" ;
       break;
 
     case InstanceType:
