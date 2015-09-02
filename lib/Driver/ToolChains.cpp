@@ -559,6 +559,33 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
 }
 
 std::pair<const char *, llvm::opt::ArgStringList>
+ToolChain::constructInvocation(const ModuleWrapJobAction &job,
+                               const JobContext &context) const {
+  ArgStringList Arguments;
+
+  Arguments.push_back("-modulewrap");
+
+  addInputsOfType(Arguments, context.Inputs, types::TY_SwiftModuleFile);
+  addInputsOfType(Arguments, context.InputActions, types::TY_SwiftModuleFile);
+  assert(Arguments.size() == 2 &&
+         "ModuleWrap expects exactly one merged swiftmodule as input");
+
+  assert(context.Output.getPrimaryOutputType() == types::TY_Object &&
+         "The -modulewrap mode only produces object files");
+
+  Arguments.push_back("-o");
+  Arguments.push_back(
+      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+
+  auto program = SWIFT_EXECUTABLE_NAME;
+  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
+    program = SWIFT_UPDATE_NAME;
+
+  return std::make_pair(program, Arguments);
+}
+
+
+std::pair<const char *, llvm::opt::ArgStringList>
 ToolChain::constructInvocation(const REPLJobAction &job,
                                const JobContext &context) const {
   assert(context.Inputs.empty());

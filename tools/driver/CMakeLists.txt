@@ -2,6 +2,7 @@ add_swift_executable(swift
   driver.cpp
   autolink_extract_main.cpp
   frontend_main.cpp
+  modulewrap_main.cpp
   LINK_LIBRARIES
     swiftIDE
     swiftDriver swiftIRGen swiftSIL swiftSILGen swiftSILPasses

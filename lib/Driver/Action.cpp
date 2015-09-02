@@ -30,6 +30,7 @@ const char *Action::getClassName(ActionClass AC) {
     case CompileJob: return "compile";
     case BackendJob: return "backend";
     case MergeModuleJob: return "merge-module";
+    case ModuleWrapJob: return "modulewrap";
     case AutolinkExtractJob: return "swift-autolink-extract";
     case REPLJob: return "repl";
     case LinkJob: return "link";
@@ -48,6 +49,8 @@ void CompileJobAction::anchor() {}
 void BackendJobAction::anchor() {}
 
 void MergeModuleJobAction::anchor() {}
+
+void ModuleWrapJobAction::anchor() {}
 
 void AutolinkExtractJobAction::anchor() {}
 

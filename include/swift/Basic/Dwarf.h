@@ -22,6 +22,8 @@
 namespace swift {
   static const char MachOASTSegmentName[] = "__SWIFT";
   static const char MachOASTSectionName[] = "__ast";
+  static const char ELFASTSectionName[] = ".swift_ast";
+  static const char COFFASTSectionName[] = "swiftast";
 }
 
 #endif

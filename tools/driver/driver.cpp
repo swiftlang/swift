@@ -52,6 +52,9 @@ extern int frontend_main(ArrayRef<const char *> Args, const char *Argv0,
 extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
                                  void *MainAddr);
 
+extern int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
+                           void *MainAddr);
+
 int main(int argc_, const char **argv_) {
   // Print a stack trace if we signal out.
   llvm::sys::PrintStackTraceOnErrorSignal();
@@ -76,6 +79,11 @@ int main(int argc_, const char **argv_) {
       return frontend_main(llvm::makeArrayRef(argv.data()+2,
                                               argv.data()+argv.size()),
                            argv[0], (void *)(intptr_t)getExecutablePath);
+    }
+    if (FirstArg == "-modulewrap") {
+      return modulewrap_main(llvm::makeArrayRef(argv.data()+2,
+                                                argv.data()+argv.size()),
+                             argv[0], (void *)(intptr_t)getExecutablePath);
     }
   }
 

@@ -21,6 +21,7 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Basic/Dwarf.h"
+#include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/CommandLine.h"
@@ -129,6 +130,7 @@ int main(int argc, char **argv) {
     }
     auto *Obj = OF->getBinary();
     auto *MachO = llvm::dyn_cast<llvm::object::MachOObjectFile>(Obj);
+    auto *ELF   = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Obj);
     if (MachO) {
       for (auto &Symbol : Obj->symbols()) {
         auto RawSym = Symbol.getRawDataRefImpl();
@@ -166,7 +168,8 @@ int main(int argc, char **argv) {
     for (auto &Section : Obj->sections()) {
       llvm::StringRef Name;
       Section.getName(Name);
-      if (Name == swift::MachOASTSectionName) {
+      if ((MachO && Name == swift::MachOASTSectionName) ||
+          (ELF   && Name == swift::ELFASTSectionName)) {
         llvm::StringRef Buf;
         Section.getContents(Buf);
         if (!parseASTSection(CI.getSerializedModuleLoader(), Buf, modules))

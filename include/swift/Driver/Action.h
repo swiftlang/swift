@@ -40,6 +40,7 @@ public:
     CompileJob,
     BackendJob,
     MergeModuleJob,
+    ModuleWrapJob,
     AutolinkExtractJob,
     REPLJob,
     LinkJob,
@@ -213,6 +214,17 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::MergeModuleJob;
+  }
+};
+
+class ModuleWrapJobAction : public JobAction {
+  virtual void anchor();
+public:
+  ModuleWrapJobAction(ArrayRef<Action *> Inputs)
+      : JobAction(Action::ModuleWrapJob, Inputs, types::TY_Object) {}
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::ModuleWrapJob;
   }
 };
 

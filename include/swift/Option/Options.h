@@ -31,7 +31,8 @@ namespace options {
     NoInteractiveOption = (1 << 6),
     NoBatchOption = (1 << 7),
     DoesNotAffectIncrementalBuild = (1 << 8),
-    AutolinkExtractOption = (1 << 9)
+    AutolinkExtractOption = (1 << 9),
+    ModuleWrapOption = (1 << 10)
   };
 
   enum ID {

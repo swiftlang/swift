@@ -244,6 +244,10 @@ namespace swift {
                                                  llvm::LLVMContext &LLVMContext,
                                                     unsigned StartElem = 0);
 
+  /// Wrap a serialized module inside a swift ast section in an object file.
+  void createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
+                                   StringRef OutputPath);
+
   /// Turn the given LLVM module into native code and return true on error.
   bool performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
                    llvm::Module *Module);

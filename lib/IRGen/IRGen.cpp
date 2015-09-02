@@ -21,6 +21,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/LLVMPasses/PassesFwd.h"
@@ -675,6 +676,49 @@ performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
   return ::performIRGeneration(Opts, SF.getParentModule(), SILMod, ModuleName,
                                LLVMContext, &SF, StartElem);
 }
+
+void
+swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
+																	 StringRef OutputPath) {
+	LLVMContext *VMContext = new LLVMContext();
+
+	auto &Ctx = SILMod.getASTContext();
+  assert(!Ctx.hadError());
+
+  IRGenOptions Opts;
+	Opts.OutputKind = IRGenOutputKind::ObjectFile;
+  llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
+  if (!TargetMachine)
+    return;
+
+  const auto *DataLayout = TargetMachine->getDataLayout();
+  assert(DataLayout && "target machine didn't set DataLayout?");
+
+	IRGenModuleDispatcher dispatcher;
+  const llvm::Triple &Triple = Ctx.LangOpts.Target;
+  IRGenModule IGM(dispatcher, nullptr, Ctx, *VMContext, Opts, OutputPath,
+                  *DataLayout, Triple,
+                  TargetMachine, &SILMod, Opts.getSingleOutputFilename());
+  initLLVMModule(IGM);
+	auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
+	auto *Data = llvm::ConstantDataArray::
+    getString(*VMContext, Buffer, /*AddNull=*/false);
+	auto *ASTSym = new llvm::GlobalVariable(
+		*IGM.getModule(), Ty, /*constant*/ true,
+		llvm::GlobalVariable::InternalLinkage, Data, "__Swift_AST");
+	ASTSym->setAlignment(8);
+	if (Triple.isOSBinFormatMachO())
+    ASTSym->setSection(std::string(MachOASTSegmentName) +
+                       "," + MachOASTSectionName);
+  else if (Triple.isOSBinFormatCOFF())
+    ASTSym->setSection(COFFASTSectionName);
+	else
+		ASTSym->setSection(ELFASTSectionName);
+
+  ::performLLVM(Opts, Ctx.Diags, nullptr, IGM.getModule(), TargetMachine,
+								OutputPath);
+}
+
 
 bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
                         llvm::Module *Module) {

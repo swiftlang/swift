@@ -67,6 +67,9 @@ protected:
   virtual std::pair<const char *, llvm::opt::ArgStringList>
   constructInvocation(const MergeModuleJobAction &job,
                       const JobContext &context) const;
+  virtual std::pair<const char *, llvm::opt::ArgStringList>
+  constructInvocation(const ModuleWrapJobAction &job,
+                      const JobContext &context) const;
 
   virtual std::pair<const char *, llvm::opt::ArgStringList>
   constructInvocation(const REPLJobAction &job,

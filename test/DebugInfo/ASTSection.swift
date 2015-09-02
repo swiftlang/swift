@@ -4,7 +4,6 @@
 // RUN: %lldb-moduleimport-test %t/ASTSection | FileCheck %s
 
 // REQUIRES: executable_test
-// UNSUPPORTED: OS=linux-gnu
 
 // The test ASTSection_linker.swift builds this code with separate
 // compile and link steps.

@@ -52,6 +52,7 @@ ToolChain::constructJob(const JobAction &JA,
   CASE(CompileJob)
   CASE(BackendJob)
   CASE(MergeModuleJob)
+  CASE(ModuleWrapJob)
   CASE(LinkJob)
   CASE(GenerateDSYMJob)
   CASE(AutolinkExtractJob)

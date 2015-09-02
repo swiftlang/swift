@@ -26,6 +26,9 @@ def FrontendOption : OptionFlag;
 // The option should be accepted by swift-autolink-extract
 def AutolinkExtractOption : OptionFlag;
 
+// The option should be accepted by swift -modulewrap
+def ModuleWrapOption : OptionFlag;
+
 // The option should not be accepted by the driver.
 def NoDriverOption : OptionFlag;
 
@@ -94,7 +97,7 @@ def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 
 def help : Flag<["-", "--"], "help">,
-  Flags<[FrontendOption, AutolinkExtractOption]>,
+  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
@@ -115,7 +118,8 @@ def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>;
 
 def o : JoinedOrSeparate<["-"], "o">,
-  Flags<[FrontendOption, AutolinkExtractOption, NoInteractiveOption]>,
+  Flags<[FrontendOption, AutolinkExtractOption, ModuleWrapOption,
+         NoInteractiveOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,

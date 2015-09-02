@@ -7,7 +7,7 @@
 // CHECK: -sdk {{.*}}/Inputs/clang-importer-sdk
 // CHECK-NEXT: bin/swift
 // CHECK: -sdk {{.*}}/Inputs/clang-importer-sdk
-// CHECK-NEXT: bin/{{.+}} {{.*}}.o{{[ "]}}
+// CHECK: bin/{{.+}} {{.*}}.o{{[ "]}}
 // CHECK: {{-syslibroot|--sysroot}} {{.*}}/Inputs/clang-importer-sdk
 
 // RUN: %swift_driver -driver-print-jobs -repl -sdk %S/Inputs/nonexistent-sdk 2>&1 | FileCheck %s --check-prefix=SDKWARNING

@@ -1301,9 +1301,14 @@ void Driver::buildActions(const ToolChain &TC,
     }
 
     if (MergeModuleAction) {
-      if (OI.DebugInfoKind == IRGenDebugInfoKind::Normal)
-        LinkAction->addInput(MergeModuleAction.release());
-      else
+      if (OI.DebugInfoKind == IRGenDebugInfoKind::Normal) {
+        if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {
+          Action *ModuleWrapAction =
+              new ModuleWrapJobAction(MergeModuleAction.release());
+          LinkAction->addInput(ModuleWrapAction);
+        } else
+          LinkAction->addInput(MergeModuleAction.release());
+      } else
         Actions.push_back(MergeModuleAction.release());
     }
     Actions.push_back(LinkAction);
