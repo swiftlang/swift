@@ -532,7 +532,10 @@ public:
     return begin()->getBBArg(i);
   }
 
-  ArrayRef<SILArgument *> getArguments() const { return begin()->getBBArgs(); }
+  ArrayRef<SILArgument *> getArguments() const {
+    assert(!empty() && "Can not get arguments of a function without a body");
+    return begin()->getBBArgs();
+  }
 
   const SILArgument *getSelfArgument() const {
     assert(hasSelfParam() && "This method can only be called if the "
