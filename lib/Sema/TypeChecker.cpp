@@ -1005,26 +1005,43 @@ private:
   /// There is no need for the caller to explicitly traverse the children
   /// of this node.
   void buildIfStmtRefinementContext(IfStmt *IS) {
-    Optional<VersionRange> RefinedRange =
-      buildStmtConditionRefinementContext(IS->getCond());
+    Optional<VersionRange> ThenRange;
+    Optional<VersionRange> ElseRange;
+    std::tie(ThenRange, ElseRange) =
+        buildStmtConditionRefinementContext(IS->getCond());
 
-    if (RefinedRange.hasValue()) {
+    if (ThenRange.hasValue()) {
       // Create a new context for the Then branch and traverse it in that new
       // context.
       auto *ThenTRC =
           TypeRefinementContext::createForIfStmtThen(TC.Context, IS,
                                                      getCurrentTRC(),
-                                                     RefinedRange.getValue());
+                                                     ThenRange.getValue());
       TypeRefinementContextBuilder(ThenTRC, TC).build(IS->getThenStmt());
     } else {
       build(IS->getThenStmt());
     }
 
-    if (IS->getElseStmt()) {
-      // For now, we imprecisely do not refine the context for the Else branch
-      // and instead traverse it in the current context.
-      // Once we add a more precise version range lattice (i.e., one that can
-      // support "<") we should create a TRC for the Else branch.
+    Stmt *ElseStmt = IS->getElseStmt();
+    if (!ElseStmt)
+      return;
+
+    // Refine the else branch if we're given a version range for that branch.
+    // For now, if present, this will only be the empty range, indicating
+    // that the branch is dead. We use it to suppress potential unavailability
+    // and deprecation diagnostics on code that definitely will not run with
+    // the current platform and minimum deployment target.
+    // If we add a more precise version range lattice (i.e., one that can
+    // support "<") we should create non-empty contexts for the Else branch.
+    if (ElseRange.hasValue()) {
+      // Create a new context for the Then branch and traverse it in that new
+      // context.
+      auto *ElseTRC =
+          TypeRefinementContext::createForIfStmtElse(TC.Context, IS,
+                                                     getCurrentTRC(),
+                                                     ElseRange.getValue());
+      TypeRefinementContextBuilder(ElseTRC, TC).build(ElseStmt);
+    } else {
       build(IS->getElseStmt());
     }
   }
@@ -1034,15 +1051,15 @@ private:
   /// There is no need for the caller to explicitly traverse the children
   /// of this node.
   void buildWhileStmtRefinementContext(WhileStmt *WS) {
-    Optional<VersionRange> RefinedRange =
-      buildStmtConditionRefinementContext(WS->getCond());
+    Optional<VersionRange> BodyRange =
+        buildStmtConditionRefinementContext(WS->getCond()).first;
 
-    if (RefinedRange.hasValue()) {
-      // Create a new context for the branch and traverse it in the new
+    if (BodyRange.hasValue()) {
+      // Create a new context for the body and traverse it in the new
       // context.
-      auto *ThenTRC = TypeRefinementContext::createForWhileStmtBody(
-          TC.Context, WS, getCurrentTRC(), RefinedRange.getValue());
-      TypeRefinementContextBuilder(ThenTRC, TC).build(WS->getBody());
+      auto *BodyTRC = TypeRefinementContext::createForWhileStmtBody(
+          TC.Context, WS, getCurrentTRC(), BodyRange.getValue());
+      TypeRefinementContextBuilder(BodyTRC, TC).build(WS->getBody());
     } else {
       build(WS->getBody());
     }
@@ -1064,31 +1081,41 @@ private:
     // This is slightly tricky because, unlike our other control constructs,
     // the refined region is not lexically contained inside the construct
     // introducing the refinement context.
-    Optional<VersionRange> RefinedRange =
-      buildStmtConditionRefinementContext(GS->getCond());
+    Optional<VersionRange> FallthroughRange;
+    Optional<VersionRange> ElseRange;
+    std::tie(FallthroughRange, ElseRange) =
+        buildStmtConditionRefinementContext(GS->getCond());
 
-    if (Stmt *Body = GS->getBody())
-      build(Body);
+    if (Stmt *ElseBody = GS->getBody()) {
+      if (ElseRange.hasValue()) {
+        auto *TrueTRC = TypeRefinementContext::createForGuardStmtElse(
+            TC.Context, GS, getCurrentTRC(), ElseRange.getValue());
+
+        TypeRefinementContextBuilder(TrueTRC, TC).build(ElseBody);
+      } else {
+        build(ElseBody);
+      }
+    }
 
     BraceStmt *ParentBrace = dyn_cast<BraceStmt>(Parent.getAsStmt());
     assert(ParentBrace && "Expected parent of GuardStmt to be BraceStmt");
-    if (!RefinedRange.hasValue())
+    if (!FallthroughRange.hasValue())
       return;
 
     // Create a new context for the fallthrough.
 
     auto *FallthroughTRC =
           TypeRefinementContext::createForGuardStmtFallthrough(TC.Context, GS,
-              ParentBrace, getCurrentTRC(), RefinedRange.getValue());
+              ParentBrace, getCurrentTRC(), FallthroughRange.getValue());
 
     pushContext(FallthroughTRC, ParentBrace);
   }
 
-  /// Build the type refinement context for a StmtCondition and return the
-  /// refined range for the true-branch if the statement condition contains
-  /// any availability queries. Returns None if the guard condition does not
-  /// refine availability.
-  Optional<VersionRange>
+  /// Build the type refinement context for a StmtCondition and return a pair
+  /// of optional version ranges, the first for the true branch and the second
+  /// for the false branch. A value of None for a given branch indicates that
+  /// the branch does not introduce a new refinement.
+  std::pair<Optional<VersionRange>, Optional<VersionRange>>
   buildStmtConditionRefinementContext(StmtCondition Cond) {
 
     // Any refinement contexts introduced in the statement condition
@@ -1099,9 +1126,25 @@ private:
     // the context stack so we can pop them when we're done building the
     // context for the StmtCondition.
     unsigned NestedCount = 0;
+
+    // Tracks the potential version range when the condition is false.
+    VersionRange FalseFlow = VersionRange::empty();
+
+    TypeRefinementContext *StartingTRC = getCurrentTRC();
+
     for (StmtConditionElement Element : Cond) {
+      TypeRefinementContext *CurrentTRC = getCurrentTRC();
+      const VersionRange CurrentRange = CurrentTRC->getPotentialVersions();
+
       // If the element is not a condition, walk it in the current TRC.
       if (Element.getKind() != StmtConditionElement::CK_Availability) {
+
+        // Assume any condition element that is not a #available() can
+        // potentially be false, so conservatively combine the version
+        // range of the current context with the accumulated false flow
+        // of all other conjuncts.
+        FalseFlow.joinWith(CurrentRange);
+
         Element.walk(*this);
         continue;
       }
@@ -1130,15 +1173,23 @@ private:
 
       VersionRange Range = rangeForSpec(Spec);
       Query->setAvailableRange(Range);
-      TypeRefinementContext *CurTRC = getCurrentTRC();
+
+      if (Spec->getKind() == AvailabilitySpecKind::OtherPlatform) {
+        // The wildcard spec '*' represents the minimum deployment target, so
+        // there is no need to create a refinement context for this query.
+        // Further, we won't diagnose for useless #available() conditions
+        // where * matched on this platform -- presumably those conditions are
+        // needed for some other platform.
+        continue;
+      }
+
 
       // If the version range for the current TRC is completely contained in
       // the range for the spec, then a version query can never be false, so the
       // spec is useless. If so, report this.
-      if (Spec->getKind() == AvailabilitySpecKind::VersionConstraint &&
-          CurTRC->getPotentialVersions().isContainedIn(Range)) {
+      if (CurrentRange.isContainedIn(Range)) {
         DiagnosticEngine &Diags = TC.Diags;
-        if (CurTRC->getReason() == TypeRefinementContext::Reason::Root) {
+        if (CurrentTRC->getReason() == TypeRefinementContext::Reason::Root) {
           // Diagnose for checks that are useless because the minimum deployment
           // target ensures they will never be false. We suppress this warning
           // when compiling for playgrounds because the developer cannot
@@ -1154,26 +1205,54 @@ private:
           Diags.diagnose(Query->getLoc(),
                          diag::availability_query_useless_enclosing_scope,
                          platformString(targetPlatform(TC.getLangOpts())));
-          Diags.diagnose(CurTRC->getIntroductionLoc(),
+          Diags.diagnose(CurrentTRC->getIntroductionLoc(),
                          diag::availability_query_useless_enclosing_scope_here);
         }
+
+        // No need to actually create the refinement context if we know it is
+        // useless.
+        continue;
       }
 
+      // If the #available() is not useless then there is potential false flow,
+      // so join the false flow with the potential versions of the current
+      // context.
+      // We could be more precise here if we enriched the lattice to include
+      // ranges of the form [x, y).
+      FalseFlow.joinWith(CurrentRange);
+
       auto *TRC = TypeRefinementContext::createForConditionFollowingQuery(
-          TC.Context, Query, LastElement, getCurrentTRC(), Range);
+          TC.Context, Query, LastElement, CurrentTRC, Range);
 
       pushContext(TRC, ParentTy());
       NestedCount++;
     }
 
+
+    Optional<VersionRange> FalseRefinement = None;
+    // The version range for the false branch should never have any versions
+    // that weren't possible when the condition started evaluating.
+    assert(FalseFlow.isContainedIn(StartingTRC->getPotentialVersions()));
+
+    // If the starting version range is not completely contained in the
+    // false flow version range then it must be the case that false flow range
+    // is strictly smaller than the the starting range (because the false flow
+    // range *is* contained in the starting range), so we should introduce a
+    // new refinement for the false flow.
+    if (!StartingTRC->getPotentialVersions().isContainedIn(FalseFlow)) {
+      FalseRefinement = FalseFlow;
+    }
+
     if (NestedCount == 0)
-      return None;
+      return std::make_pair(None, FalseRefinement);
 
     TypeRefinementContext *NestedTRC = getCurrentTRC();
     while (NestedCount-- > 0)
       ContextStack.pop_back();
-    
-    return NestedTRC->getPotentialVersions();
+
+    assert(getCurrentTRC() == StartingTRC);
+
+    return std::make_pair(NestedTRC->getPotentialVersions(), FalseRefinement);
   }
 
   /// Return the best active spec for the target platform or nullptr if no
@@ -2095,6 +2174,17 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
   // targets.
   if (isInsideDeprecatedDeclaration(ReferenceRange, ReferenceDC, *this)) {
     return;
+  }
+
+  if (!Context.LangOpts.DisableAvailabilityChecking) {
+    VersionRange RunningOSVersions =
+    overApproximateOSVersionsAtLocation(ReferenceRange.Start, ReferenceDC);
+    if (RunningOSVersions.isEmpty()) {
+      // Suppress a deprecation warning if the availability checking machinery
+      // thinks the reference program location will not execute on any
+      // deployment target for the current platform.
+      return;
+    }
   }
 
   StringRef Platform = Attr->prettyPlatformString();

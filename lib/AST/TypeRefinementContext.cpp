@@ -64,8 +64,20 @@ TypeRefinementContext::createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
                                            const VersionRange &Versions) {
   assert(S);
   assert(Parent);
-  return new (Ctx) TypeRefinementContext(
-      Ctx, S, Parent, S->getThenStmt()->getSourceRange(), Versions);
+  return new (Ctx)
+      TypeRefinementContext(Ctx, IntroNode(S, /*IsThen=*/true), Parent,
+                            S->getThenStmt()->getSourceRange(), Versions);
+}
+
+TypeRefinementContext *
+TypeRefinementContext::createForIfStmtElse(ASTContext &Ctx, IfStmt *S,
+                                           TypeRefinementContext *Parent,
+                                           const VersionRange &Versions) {
+  assert(S);
+  assert(Parent);
+  return new (Ctx)
+      TypeRefinementContext(Ctx, IntroNode(S, /*IsThen=*/false), Parent,
+                            S->getElseStmt()->getSourceRange(), Versions);
 }
 
 TypeRefinementContext *
@@ -91,7 +103,20 @@ TypeRefinementContext::createForGuardStmtFallthrough(ASTContext &Ctx,
   assert(ContainingBraceStmt);
   assert(Parent);
   SourceRange Range(RS->getEndLoc(), ContainingBraceStmt->getEndLoc());
-  return new (Ctx) TypeRefinementContext(Ctx, RS, Parent, Range, Versions);
+  return new (Ctx) TypeRefinementContext(Ctx,
+                                         IntroNode(RS, /*IsFallthrough=*/true),
+                                         Parent, Range, Versions);
+}
+
+TypeRefinementContext *
+TypeRefinementContext::createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
+                                              TypeRefinementContext *Parent,
+                                              const VersionRange &Versions) {
+  assert(RS);
+  assert(Parent);
+  return new (Ctx)
+      TypeRefinementContext(Ctx, IntroNode(RS, /*IsFallthrough=*/false), Parent,
+                            RS->getBody()->getSourceRange(), Versions);
 }
 
 TypeRefinementContext *
@@ -147,13 +172,16 @@ SourceLoc TypeRefinementContext::getIntroductionLoc() const {
     return Node.getAsDecl()->getLoc();
 
   case Reason::IfStmtThenBranch:
+  case Reason::IfStmtElseBranch:
     return Node.getAsIfStmt()->getIfLoc();
 
   case Reason::ConditionFollowingAvailabilityQuery:
     return Node.getAsPoundAvailableInfo()->getStartLoc();
 
   case Reason::GuardStmtFallthrough:
+  case Reason::GuardStmtElseBranch:
     return Node.getAsGuardStmt()->getGuardLoc();
+
 
   case Reason::WhileStmtBody:
     return Node.getAsWhileStmt()->getStartLoc();
@@ -209,11 +237,17 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
   case Reason::IfStmtThenBranch:
     return "if_then";
 
+  case Reason::IfStmtElseBranch:
+    return "if_else";
+
   case Reason::ConditionFollowingAvailabilityQuery:
     return "condition_following_availability";
 
   case Reason::GuardStmtFallthrough:
     return "guard_fallthrough";
+
+  case Reason::GuardStmtElseBranch:
+    return "guard_else";
 
   case Reason::WhileStmtBody:
     return "while_body";

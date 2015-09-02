@@ -1,4 +1,4 @@
-// RUN: %swift -parse -parse-as-library -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules - %s -verify
+// RUN: %swift -parse -parse-as-library -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules %s -verify
 // RUN: %swift -parse -parse-as-library -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 //
 // This test requires a target of OS X 10.10 or later to test deprecation
@@ -147,4 +147,23 @@ func callMethodInDeprecatedExtension() {
   let o = ClassDeprecatedIn10_10() // expected-warning {{'ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
 
   o.methodInExtensionOfClassDeprecatedIn10_10() // expected-warning {{'methodInExtensionOfClassDeprecatedIn10_10()' was deprecated in OS X 10.10}}
+}
+
+func functionWithDeprecatedMethodInDeadElseBranch() {
+  if #available(iOS 8.0, *) {
+  } else {
+    // This branch is dead on OSX, so we shouldn't emit a deprecation warning in it.
+    let _ = ClassDeprecatedIn10_9()  // no-warning
+  }
+
+  if #available(OSX 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
+  } else {
+    // This branch is dead because our minimum deployment target is 10.10.
+    let _ = ClassDeprecatedIn10_9()  // no-warning
+  }
+
+  guard #available(iOS 8.0, *) else {
+    // This branch is dead because our platform is OSX, so the wildcard always matches.
+    let _ = ClassDeprecatedIn10_9()  // no-warning
+  }
 }

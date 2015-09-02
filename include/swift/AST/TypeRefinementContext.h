@@ -60,6 +60,9 @@ public:
     /// The context was introduced for the Then branch of an IfStmt.
     IfStmtThenBranch,
 
+    /// The context was introduced for the Else branch of an IfStmt.
+    IfStmtElseBranch,
+
     /// The context was introduced for the remaining StmtConditionElements
     /// following an #available(...) query in a StmtCondition.
     /// For example, in the IfStmt below, the optional binding let x = expr()
@@ -73,6 +76,10 @@ public:
     /// The context was introduced for the fallthrough flow of a guard
     /// statement.
     GuardStmtFallthrough,
+
+    /// The context was introduced for the else flow of a guard
+    /// statement.
+    GuardStmtElseBranch,
 
     // The context was introduced for the body of a while statement.
     WhileStmtBody
@@ -95,11 +102,15 @@ private:
   public:
     IntroNode(SourceFile *SF) : IntroReason(Reason::Root), SF(SF) {}
     IntroNode(Decl *D) : IntroReason(Reason::Decl), D(D) {}
-    IntroNode(IfStmt *IS) : IntroReason(Reason::IfStmtThenBranch), IS(IS) {}
+    IntroNode(IfStmt *IS, bool IsThen) :
+    IntroReason(IsThen ? Reason::IfStmtThenBranch : Reason::IfStmtElseBranch),
+                IS(IS) {}
     IntroNode(PoundAvailableInfo *PAI)
         : IntroReason(Reason::ConditionFollowingAvailabilityQuery), PAI(PAI) {}
-    IntroNode(GuardStmt *GS)
-        : IntroReason(Reason::GuardStmtFallthrough), GS(GS) {}
+    IntroNode(GuardStmt *GS, bool IsFallthrough)
+        : IntroReason(IsFallthrough ? Reason::GuardStmtFallthrough
+                                    : Reason::GuardStmtElseBranch),
+          GS(GS) {}
     IntroNode(WhileStmt *WS) : IntroReason(Reason::WhileStmtBody), WS(WS) {}
 
     Reason getReason() const { return IntroReason; }
@@ -115,7 +126,8 @@ private:
     }
 
     IfStmt *getAsIfStmt() const {
-      assert(IntroReason == Reason::IfStmtThenBranch);
+      assert(IntroReason == Reason::IfStmtThenBranch ||
+             IntroReason == Reason::IfStmtElseBranch);
       return IS;
     }
 
@@ -125,7 +137,8 @@ private:
     }
 
     GuardStmt *getAsGuardStmt() const {
-      assert(IntroReason == Reason::GuardStmtFallthrough);
+      assert(IntroReason == Reason::GuardStmtFallthrough ||
+             IntroReason == Reason::GuardStmtElseBranch);
       return GS;
     }
 
@@ -165,6 +178,11 @@ public:
   createForIfStmtThen(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
                       const VersionRange &Versions);
 
+  /// Create a refinement context for the Else branch of the given IfStmt.
+  static TypeRefinementContext *
+  createForIfStmtElse(ASTContext &Ctx, IfStmt *S, TypeRefinementContext *Parent,
+                      const VersionRange &Versions);
+
   /// Create a refinement context for the true-branch control flow to
   /// further StmtConditionElements following a #available() query in
   /// a StmtCondition.
@@ -180,6 +198,12 @@ public:
                                   BraceStmt *ContainingBraceStmt,
                                   TypeRefinementContext *Parent,
                                   const VersionRange &Versions);
+
+  /// Create a refinement context for the else branch of a GuardStmt.
+  static TypeRefinementContext *
+  createForGuardStmtElse(ASTContext &Ctx, GuardStmt *RS,
+                         TypeRefinementContext *Parent,
+                         const VersionRange &Versions);
 
   /// Create a refinement context for the body of a WhileStmt.
   static TypeRefinementContext *

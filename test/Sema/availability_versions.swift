@@ -1008,7 +1008,7 @@ func useUnavailableExtension() {
 
 // Useless #available(...) checks
 
-func functionWithDefaultAvailabilityAndUselessCheck() {
+func functionWithDefaultAvailabilityAndUselessCheck(p: Bool) {
 // Default availability reflects minimum deployment: 10.9 and up
 
   if #available(OSX 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
@@ -1023,6 +1023,22 @@ func functionWithDefaultAvailabilityAndUselessCheck() {
     }
   }
 
+  if #available(OSX 10.9, *) { // expected-note {{enclosing scope here}} expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
+  } else {
+    // Make sure we generate a warning about an unnecessary check even if the else branch of if is dead.
+    if #available(OSX 10.10, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
+    }
+  }
+
+  // This 'if' is strictly to limit the scope of the guard fallthrough
+  if p {
+    guard #available(OSX 10.9, *) else { // expected-note {{enclosing scope here}} expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
+      // Make sure we generate a warning about an unnecessary check even if the else branch of guard is dead.
+      if #available(OSX 10.10, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
+      }
+    }
+  }
+
   // We don't want * generate a warn about useless checks; the check may be required on
   // another platform
   if #available(iOS 8.0, *) {
@@ -1032,6 +1048,36 @@ func functionWithDefaultAvailabilityAndUselessCheck() {
     // Similarly do not want '*' to generate a warning in a refined TRC.
     if #available(iOS 8.0, *) {
     }
+  }
+}
+
+@available(OSX, unavailable)
+func explicitlyUnavailable() { } // expected-note 2{{'explicitlyUnavailable()' has been explicitly marked unavailable here}}
+
+func functionWithUnavailableInDeadBranch() {
+
+  if #available(iOS 8.0, *) {
+  } else {
+    // This branch is dead on OSX, so we shouldn't a warning about use of potentially unavailable APIs in it.
+    globalFuncAvailableOn10_10() // no-warning
+
+    @available(OSX 10.10, *)
+    func localFuncAvailableOn10_10() {
+      globalFuncAvailableOn10_11() // no-warning
+    }
+
+    localFuncAvailableOn10_10() // no-warning
+
+    // We still want to error on references to explicitly unavailable symbols
+    // CHECK:error: 'explicitlyUnavailable()' is unavailable
+    explicitlyUnavailable() // expected-error {{'explicitlyUnavailable()' is unavailable}}
+  }
+
+  guard #available(iOS 8.0, *) else {
+    globalFuncAvailableOn10_10() // no-warning
+
+    // CHECK:error: 'explicitlyUnavailable()' is unavailable
+    explicitlyUnavailable() // expected-error {{'explicitlyUnavailable()' is unavailable}}
   }
 }
 

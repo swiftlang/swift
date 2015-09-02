@@ -94,7 +94,90 @@ func functionWithStmtCondition() {
       @available(OSX 10.13, *)
       func funcInInnerIfElse() { }
     }
-  }  
+  }
+}
+
+// CHECK-NEXT: {{^}}  (decl versions=[10.10,+Inf) decl=functionWithUnnecessaryStmtCondition
+// CHECK-NEXT: {{^}}    (condition_following_availability versions=[10.12,+Inf)
+// CHECK-NEXT: {{^}}    (if_then versions=[10.12,+Inf)
+// CHECK-NEXT: {{^}}    (condition_following_availability versions=[10.13,+Inf)
+// CHECK-NEXT: {{^}}    (if_then versions=[10.13,+Inf)
+
+@available(OSX 10.10, *)
+func functionWithUnnecessaryStmtCondition() {
+  // Shouldn't introduce refinement context for then branch when unnecessary
+  if #available(OSX 10.10, *) {
+  }
+
+  if #available(OSX 10.9, *) {
+  }
+
+  // Nested in conjunctive statement condition
+  if #available(OSX 10.12, *),
+     let x = (nil as Int?),
+     #available(OSX 10.11, *) {
+  }
+
+  if #available(OSX 10.13, *),
+     #available(OSX 10.13, *) {
+  }
+
+  // Wildcard is same as minimum deployment target
+  if #available(iOS 7.0, *) {
+  }
+}
+
+// CHECK-NEXT: {{^}}  (decl versions=[10.10,+Inf) decl=functionWithUnnecessaryStmtConditionsHavingElseBranch
+// CHECK-NEXT: {{^}}    (if_else versions=empty
+// CHECK-NEXT: {{^}}      (decl versions=empty decl=funcInInnerIfElse()
+// CHECK-NEXT: {{^}}    (if_else versions=empty
+// CHECK-NEXT: {{^}}    (guard_else versions=empty
+// CHECK-NEXT: {{^}}    (guard_else versions=empty
+// CHECK-NEXT: {{^}}    (if_else versions=empty
+
+@available(OSX 10.10, *)
+func functionWithUnnecessaryStmtConditionsHavingElseBranch(p: Int?) {
+  // Else branch context version is bottom when check is unnecessary
+  if #available(OSX 10.10, *) {
+  } else {
+    if #available(OSX 10.11, *) {
+    }
+
+    @available(OSX 10.11, *)
+    func funcInInnerIfElse() { }
+
+    if #available(iOS 7.0, *) {
+    } else {
+    }
+  }
+
+  if #available(iOS 7.0, *) {
+  } else {
+  }
+
+  guard #available(iOS 8.0, *) else { }
+
+  // Else branch will execute if p is nil, so it is not dead.
+  if #available(iOS 7.0, *),
+     let x = p {
+  } else {
+  }
+
+  if #available(iOS 7.0, *),
+     let x = p,
+     #available(iOS 7.0, *) {
+  } else {
+  }
+
+  // Else branch is dead
+  guard #available(iOS 7.0, *),
+        #available(iOS 8.0, *) else { }
+
+  if #available(OSX 10.10, *),
+     #available(OSX 10.10, *) {
+  } else {
+  }
+
 }
 
 // CHECK-NEXT: {{^}}  (decl versions=[10.10,+Inf) decl=functionWithWhile()
