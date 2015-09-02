@@ -634,9 +634,8 @@ public:
       auto OtherSignature = OtherVD->getOverloadSignature();
       if (OtherSignature.InterfaceType && shouldSubst) {
         auto subs = BaseTy->getMemberSubstitutions(OtherVD->getDeclContext());
-        OtherSignature.InterfaceType =
-            OtherSignature.InterfaceType.subst(M, subs, None)
-                ->getCanonicalType();
+        if (auto CT = OtherSignature.InterfaceType.subst(M, subs, None))
+          OtherSignature.InterfaceType = CT->getCanonicalType();
       }
 
       if (relaxedConflicting(FoundSignature, OtherSignature)) {

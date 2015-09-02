@@ -34,6 +34,8 @@
 // RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_6 < %t.members6.txt
 // RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members6.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURNS_ANY_SEQUENCE | FileCheck %s -check-prefix=RETURNS_ANY_SEQUENCE
+
 // NO_STDLIB_PRIVATE: Begin completions
 // NO_STDLIB_PRIVATE-NOT: Decl[{{.*}}]{{[^:]*}}: _
 // NO_STDLIB_PRIVATE: End completions
@@ -123,3 +125,9 @@ func testArchetypeReplacement2<BAR : Equatable>(a: [BAR]) {
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         reverse()[#ReverseCollection<[BAR]>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         reverse()[#ReverseRandomAccessCollection<[BAR]>#]{{; name=.+}}
 // PRIVATE_NOMINAL_MEMBERS_6-DAG: Decl[InstanceMethod]/Super:         flatMap({#(transform): ([BAR]) throws -> S##([BAR]) throws -> S#})[' rethrows'][#[S.Generator.Element]#]{{; name=.+}}
+
+// rdar://problem/22334700
+struct Test1000 : SequenceType {
+  func #^RETURNS_ANY_SEQUENCE^#
+}
+// RETURNS_ANY_SEQUENCE: Decl[InstanceMethod]/Super:         dropFirst(n: Int)
