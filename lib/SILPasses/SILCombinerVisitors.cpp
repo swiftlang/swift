@@ -3139,54 +3139,30 @@ SILInstruction *SILCombiner::visitEnumInst(EnumInst *EI) {
   return nullptr;
 }
 
+/// Replace a convert_function that only has refcounting uses with its
+/// operand.
 SILInstruction *SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *CFI) {
-  // If the only uses of this instruction are retains/releases
-  for (auto Use : CFI->getUses()) {
-    if (!isa<RefCountingInst>(Use->getUser()))
-      return nullptr;
-  }
+  auto anyNonRefCountUse =
+    std::any_of(CFI->use_begin(),
+                CFI->use_end(),
+                [](Operand *Use) {
+                  return !isa<RefCountingInst>(Use->getUser());
+                });
 
+  if (anyNonRefCountUse)
+    return nullptr;
+
+  // Replace all retain/releases on convert_function by retain/releases on
+  // its argument. This is required to preserve the lifetime of its argument,
+  // which could be e.g. a partial_apply instruction capturing some further
+  // arguments.
   auto Converted = CFI->getConverted();
-  if (!isa<FunctionRefInst>(Converted)) {
-    // Replace all retain/releases on convert_function by retain/releases on
-    // its argument. This is required to preserve the lifetime of its argument,
-    // which could be e.g. a partial_apply instruction capturing some further
-    // arguments.
-    SILBuilderWithScope<1> B(CFI);
-    for (auto Use : CFI->getUses()) {
-      auto User = Use->getUser();
-      B.setInsertionPoint(User);
-      switch (User->getKind()) {
-      default:
-        llvm_unreachable("Unknown RC instruction");
-        break;
-      case ValueKind::StrongRetainInst:
-        B.createStrongRetain(User->getLoc(), Converted);
-        break;
-      case ValueKind::StrongReleaseInst:
-        B.createStrongRelease(User->getLoc(), Converted);
-        break;
-      case ValueKind::RetainValueInst:
-        B.createRetainValue(User->getLoc(), Converted);
-        break;
-      case ValueKind::ReleaseValueInst:
-        B.createReleaseValue(User->getLoc(), Converted);
-        break;
-      case ValueKind::UnownedRetainInst:
-        B.createUnownedRetain(User->getLoc(), Converted);
-        break;
-      case ValueKind::UnownedReleaseInst:
-        B.createUnownedRelease(User->getLoc(), Converted);
-        break;
-      }
-    }
+  while (!CFI->use_empty()) {
+    auto *Use = *(CFI->use_begin());
+    assert(!Use->getUser()->hasValue() && "Did not expect user with a result!");
+    Use->set(Converted);
   }
 
-  // Now remove the convert_function instruction and its uses.
-  eraseUsesOfInstruction(CFI,
-                         [this](SILInstruction *I){
-                           Worklist.remove(I);
-                         });
   eraseInstFromFunction(*CFI);
   return nullptr;
 }
