@@ -406,9 +406,6 @@ public:
     : NextDFSNum(0), TheSCCs(TheSCCs), BPA(BPA) {}
 
   void DFS(CallGraphNode *Node) {
-    assert(Node->getFunction()->isDefinition() &&
-           "Only function definitions can be part of an SCC!");
-
     // Set the DFSNum for this node if we haven't already, and if we
     // have, which indicates it's already been visited, return.
     if (!DFSNum.insert(std::make_pair(Node, NextDFSNum)).second)
@@ -430,10 +427,6 @@ public:
       orderCallees(ApplyEdge->getPartialCalleeSet(), OrderedNodes);
 
       for (auto *CalleeNode : OrderedNodes) {
-        // Only function definitions are part of an SCC.
-        if (CalleeNode->getFunction()->isExternalDeclaration())
-          continue;
-
         if (DFSNum.find(CalleeNode) == DFSNum.end()) {
           DFS(CalleeNode);
           MinDFSNum[Node] = std::min(MinDFSNum[Node], MinDFSNum[CalleeNode]);
@@ -451,8 +444,6 @@ public:
       CallGraphNode *Popped;
       do {
         Popped = DFSStack.pop_back_val();
-        assert(Popped->getFunction()->isDefinition() &&
-               "Any function in an SCC should be a definition!");
         SCC->SCCNodes.push_back(Popped);
       } while (Popped != Node);
 

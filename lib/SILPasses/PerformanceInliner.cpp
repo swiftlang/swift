@@ -1348,7 +1348,8 @@ public:
     // FIXME: std::reverse_copy would be better, but it crashes.
     for (auto I = BottomUpFunctions.rbegin(), E = BottomUpFunctions.rend();
          I != E; ++I)
-      WorkList.push_back(*I);
+      if ((*I)->isDefinition())
+        WorkList.push_back(*I);
 
     // Inline functions bottom up from the leafs.
     while (!WorkList.empty()) {
