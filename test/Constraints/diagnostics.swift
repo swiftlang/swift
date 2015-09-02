@@ -130,8 +130,8 @@ func rdar21080030() {
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
 func r21248136<T>() -> T { preconditionFailure() } // expected-note 2 {{in call to function 'r21248136'}}
 
-r21248136()            // expected-error {{argument for generic parameter 'T' could not be inferred}}
-let _ = r21248136()    // expected-error {{argument for generic parameter 'T' could not be inferred}}
+r21248136()            // expected-error {{generic parameter 'T' could not be inferred}}
+let _ = r21248136()    // expected-error {{generic parameter 'T' could not be inferred}}
 
 
 // <rdar://problem/16375647> QoI: Uncallable funcs should be compile time errors
@@ -591,5 +591,5 @@ extension Array {
 
 // <rdar://problem/22519983> QoI: Weird error when failing to infer archetype
 func safeAssign<T: RawRepresentable>(inout lhs: T) -> Bool {}  // expected-note {{in call to function 'safeAssign'}}
-let a = safeAssign // expected-error {{argument for generic parameter 'T' could not be inferred}}
+let a = safeAssign // expected-error {{generic parameter 'T' could not be inferred}}
 

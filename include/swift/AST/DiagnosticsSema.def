@@ -612,7 +612,7 @@ ERROR(no_accessible_initializers,sema_tcc,none,
       "%0 cannot be constructed because it has no accessible initializers",
       (Type))
 ERROR(unbound_generic_parameter,sema_tcc,none,
-      "argument for generic parameter %0 could not be inferred", (Type))
+      "generic parameter %0 could not be inferred", (Type))
 ERROR(cannot_bind_generic_parameter_to_type,sema_tcc,none,
       "cannot bind generic parameter to type %0",
       (Type))

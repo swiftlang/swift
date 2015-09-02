@@ -6,8 +6,8 @@ struct MyCollection<Element> {
   }
 }
 
-MyCollection.map // expected-error{{argument for generic parameter 'Element' could not be inferred}}
+MyCollection.map // expected-error{{generic parameter 'Element' could not be inferred}}
 
 let a = MyCollection<Int>()
-a.map // expected-error{{argument for generic parameter 'T' could not be inferred}}
+a.map // expected-error{{generic parameter 'T' could not be inferred}}
 

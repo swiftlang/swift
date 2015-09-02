@@ -21,5 +21,5 @@ func test15921530() {
         x in ()
       }
     }
-    var _: (inout X)->() = makef() // expected-error{{argument for generic parameter 'T' could not be inferred}}
+    var _: (inout X)->() = makef() // expected-error{{generic parameter 'T' could not be inferred}}
 }
