@@ -40,14 +40,14 @@
 // Note: Allow argument labels that are keywords.
 // CHECK-FOUNDATION: func setObject(anObject: AnyObject, `for` aKey: NSCopying)
 
-// Note: Dropping the name of the first parameter in an initializer entirely.
-// CHECK-FOUNDATION: init(_ array: [AnyObject])
+// Note: Don't drop the name of the first parameter in an initializer entirely.
+// CHECK-FOUNDATION: init(array: [AnyObject])
 
 // Note: struct name matching, dropping of "With"
 // CHECK-FOUNDATION: class func value(range: NSRange) -> NSValue
 
 // Note: built-in types.
-// CHECK-FOUNDATION: init!(_ value: Double)
+// CHECK-FOUNDATION: func add(value: Double) -> NSNumber
 
 // Note: multi-word enum name matching, dropping of "With"
 // CHECK-FOUNDATION: func someMethod(options: NSDeprecatedOptions)

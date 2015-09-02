@@ -339,11 +339,7 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
 
   // Handle complete name matches.
   if (nameWordRevIter == nameWordRevIterEnd) {
-    // If this is the first parameter, it's okay to drop the name
-    // entirely.
-    if (role == NameRole::FirstParameter) return "";
-
-    // Otherwise, leave the name alone.
+    // Leave the name alone.
     return name;
   }
 
