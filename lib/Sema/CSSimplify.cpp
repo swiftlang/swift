@@ -2420,9 +2420,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   }
   
   if (!type->getAnyOptionalObjectType().isNull() &&
-      (protocol == TC.getProtocol(SourceLoc(),
-                                 KnownProtocolKind::BooleanType))) {
-    
+      protocol->isSpecificProtocol(KnownProtocolKind::BooleanType)) {
     Fixes.push_back({FixKind::OptionalToBoolean,
       getConstraintLocator(locator)});
     
