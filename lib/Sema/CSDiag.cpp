@@ -271,28 +271,34 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::TupleElement:
       // Extract tuple element.
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
-        // Append this extraction to the target locator path.
-        if (targetAnchor) {
-          targetPath.push_back(path[0]);
-        }
+        unsigned index = path[0].getValue();
+        if (index < tupleExpr->getNumElements()) {
+          // Append this extraction to the target locator path.
+          if (targetAnchor) {
+            targetPath.push_back(path[0]);
+          }
 
-        anchor = tupleExpr->getElement(path[0].getValue());
-        path = path.slice(1);
-        continue;
+          anchor = tupleExpr->getElement(index);
+          path = path.slice(1);
+          continue;
+        }
       }
       break;
 
     case ConstraintLocator::ApplyArgToParam:
       // Extract tuple element.
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
-        // Append this extraction to the target locator path.
-        if (targetAnchor) {
-          targetPath.push_back(path[0]);
-        }
+        unsigned index = path[0].getValue();
+        if (index < tupleExpr->getNumElements()) {
+          // Append this extraction to the target locator path.
+          if (targetAnchor) {
+            targetPath.push_back(path[0]);
+          }
 
-        anchor = tupleExpr->getElement(path[0].getValue());
-        path = path.slice(1);
-        continue;
+          anchor = tupleExpr->getElement(index);
+          path = path.slice(1);
+          continue;
+        }
       }
 
       // Extract subexpression in parentheses.
@@ -348,14 +354,17 @@ void constraints::simplifyLocator(Expr *&anchor,
 
     case ConstraintLocator::InterpolationArgument:
       if (auto interp = dyn_cast<InterpolatedStringLiteralExpr>(anchor)) {
-        // No additional target locator information.
-        // FIXME: Dig out the constructor we're trying to call?
-        targetAnchor = nullptr;
-        targetPath.clear();
+        unsigned index = path[0].getValue();
+        if (index < interp->getSegments().size()) {
+          // No additional target locator information.
+          // FIXME: Dig out the constructor we're trying to call?
+          targetAnchor = nullptr;
+          targetPath.clear();
 
-        anchor = interp->getSegments()[path[0].getValue()];
-        path = path.slice(1);
-        continue;
+          anchor = interp->getSegments()[index];
+          path = path.slice(1);
+          continue;
+        }
       }
       break;
 
@@ -554,10 +563,12 @@ ResolvedLocator constraints::resolveLocatorToDecl(
         unsigned index = path[0].getValue();
         if (auto tuple = dyn_cast<TuplePattern>(
                            parameterPattern->getSemanticsProvidingPattern())) {
-          parameterPattern = tuple->getElement(index).getPattern();
-          impliesFullPattern = false;
-          path = path.slice(1);
-          continue;
+          if (index < tuple->getNumElements()) {
+            parameterPattern = tuple->getElement(index).getPattern();
+            impliesFullPattern = false;
+            path = path.slice(1);
+            continue;
+          }
         }
         parameterPattern = nullptr;
       }
@@ -568,10 +579,12 @@ ResolvedLocator constraints::resolveLocatorToDecl(
         unsigned index = path[0].getValue2();
         if (auto tuple = dyn_cast<TuplePattern>(
                            parameterPattern->getSemanticsProvidingPattern())) {
-          parameterPattern = tuple->getElement(index).getPattern();
-          impliesFullPattern = false;
-          path = path.slice(1);
-          continue;
+          if (index < tuple->getNumElements()) {
+            parameterPattern = tuple->getElement(index).getPattern();
+            impliesFullPattern = false;
+            path = path.slice(1);
+            continue;
+          }
         }
         parameterPattern = nullptr;
       }

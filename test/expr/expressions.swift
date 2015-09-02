@@ -129,6 +129,9 @@ func errorRecovery() {
   var d: (Int,Int,Int) = (1,2) // expected-error {{different number of elements}}
   var e: (Int,Int) = (1, 2, 3) // expected-error {{different number of elements}}
   var f: (Int,Int) = (1, 2, f : 3) // expected-error {{different number of elements}}
+  
+  // <rdar://problem/22426860> CrashTracer: [USER] swift at …mous_namespace::ConstraintGenerator::getTypeForPattern + 698
+  var (g1, g2, g3) = (1, 2) // expected-error {{different number of elements}}
 }
 
 func acceptsInt(x: Int) {}
