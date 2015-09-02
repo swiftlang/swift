@@ -110,8 +110,6 @@ public:
     GeneratorElementType,
     /// \brief The element of an array type.
     ArrayElementType,
-    /// \brief The object type of an lvalue type.
-    LvalueObjectType,
     /// \brief The scalar type of a tuple type.
     ScalarToTuple,
     /// \brief The load of an lvalue.
@@ -147,7 +145,6 @@ public:
     case SequenceGeneratorType:
     case GeneratorElementType:
     case ArrayElementType:
-    case LvalueObjectType:
     case ScalarToTuple:
     case Load:
     case Witness:
@@ -192,7 +189,6 @@ public:
     case ConstructorMember:
     case InstanceType:
     case Load:
-    case LvalueObjectType:
     case Member:
     case MemberRefBase:
     case UnresolvedMember:

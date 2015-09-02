@@ -63,7 +63,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case SequenceGeneratorType:
     case GeneratorElementType:
     case ArrayElementType:
-    case LvalueObjectType:
     case ScalarToTuple:
     case Load:
     case GenericArgument:
@@ -167,10 +166,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case Load:
       out << "load";
-      break;
-
-    case LvalueObjectType:
-      out << "lvalue object type";
       break;
 
     case Member:
