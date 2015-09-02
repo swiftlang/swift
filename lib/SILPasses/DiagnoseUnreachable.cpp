@@ -703,7 +703,7 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
     NumInstructionsRemoved++;
   }
 
-  // Delete dead instrcutions and everything that could become dead after
+  // Delete dead instructions and everything that could become dead after
   // their deletion.
   llvm::SmallVector<SILInstruction*, 32> ToBeDeleted;
   for (auto BI = F.begin(), BE = F.end(); BI != BE; ++BI)
