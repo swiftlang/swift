@@ -115,3 +115,11 @@ public extension AnyGenerator {
       return AnySequence(xs)
     }
 }
+
+// rdar://problem/22012123
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22012123
+protocol Fooable {
+  protocol FooableZingable : Fooable {
+    #^RDAR_22012123^#
+  }
+}
