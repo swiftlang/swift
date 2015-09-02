@@ -2781,6 +2781,8 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
 
 Type swift::checkMemberType(DeclContext &DC, Type BaseTy,
                             ArrayRef<Identifier> Names) {
+  if (Names.empty())
+    return BaseTy;
   ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
   auto *TypeChecker = static_cast<class TypeChecker*>(DC.getASTContext().
                                                       getLazyResolver());

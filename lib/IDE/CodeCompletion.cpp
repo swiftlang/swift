@@ -947,13 +947,14 @@ void CodeCompletionCallbacksImpl::completeExpr() {
 }
 
 namespace {
-class ArcheTypeTransformer {
+class ArchetypeTransformer {
   DeclContext *DC;
   Type BaseTy;
   llvm::DenseMap<TypeBase *, Type> Cache;
 
 public:
-  ArcheTypeTransformer(DeclContext *DC, Type BaseTy) : DC(DC), BaseTy(BaseTy){}
+  ArchetypeTransformer(DeclContext *DC, Type BaseTy) : DC(DC),
+                                                       BaseTy(BaseTy->getRValueType()){}
 
   std::function<Type(Type)> getTransformerFunc() {
     return [&](Type Ty) {
@@ -964,13 +965,15 @@ public:
         llvm::SmallVector<Identifier, 1> Names;
         for(auto *AT = cast<ArchetypeType>(Ty.getPointer()); AT;
             AT = AT->getParent()) {
-          Names.insert(Names.begin(), AT->getName());
+          if (!AT->isSelfDerived())
+            Names.insert(Names.begin(), AT->getName());
         }
-        if(auto Result = checkMemberType(*DC, BaseTy, Names)) {
+        if (auto Result = checkMemberType(*DC, BaseTy, Names)) {
           Cache[Ty.getPointer()] = Result;
           return Result;
         }
         Cache[Ty.getPointer()] = Ty;
+        return Ty;
       }
       return Ty;
     };
@@ -1035,7 +1038,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
 
   Optional<SemanticContextKind> ForcedSemanticContext = None;
 
-  std::unique_ptr<ArcheTypeTransformer> TransformerPt = nullptr;
+  std::unique_ptr<ArchetypeTransformer> TransformerPt = nullptr;
 
 public:
   bool FoundFunctionCalls = false;
@@ -1122,7 +1125,7 @@ public:
   }
 
   void initializeArchetypeTransformer(DeclContext *DC, Type BaseTy) {
-    TransformerPt = llvm::make_unique<ArcheTypeTransformer>(DC, BaseTy);
+    TransformerPt = llvm::make_unique<ArchetypeTransformer>(DC, BaseTy);
   }
 
   void setIsStaticMetatype(bool value) {

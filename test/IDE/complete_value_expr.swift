@@ -1668,7 +1668,7 @@ extension P4 where Self.T == WillConformP1 {
 }
 // PROTOCOL_EXT_P4_T_DOT_1: Begin completions
 // PROTOCOL_EXT_P4_T_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   reqP1({#self: WillConformP1#})[#() -> Void#]{{; name=.+$}}
-// PROTOCOL_EXT_P4_T_DOT_1-DAG: Decl[InstanceMethod]/Super:   extP1({#self: Self#})[#() -> Void#]{{; name=.+$}}
+// PROTOCOL_EXT_P4_T_DOT_1-DAG: Decl[InstanceMethod]/Super:   extP1({#self: WillConformP1.Type#})[#() -> Void#]{{; name=.+$}}
 // PROTOCOL_EXT_P4_T_DOT_1: End completions
 
 protocol PWithT {
@@ -1689,7 +1689,7 @@ func testUnusableProtExt(x: PWithT) {
 }
 // PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Begin completions
 // PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   foo({#(x): `Self`.T#})[#`Self`.T#]{{; name=.+}}
-// PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   bar({#(x): Self.T#})[#Self.T#]{{; name=.+}}
+// PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   bar({#(x): PWithT#})[#PWithT#]{{; name=.+}}
 // PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: End completions
 
 protocol dedupP {

@@ -97,7 +97,7 @@ func testQualified1() {
   L.#^L_QUALIFIED_0^#
 }
 // L_QUALIFIED_0: Begin completions
-// L_QUALIFIED_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#Self#]{{; name=.+}}
+// L_QUALIFIED_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#L<τ_0_0>.Type#]{{; name=.+}}
 // L_QUALIFIED_0-DAG-NOT: X({#x: A#})
 // L_QUALIFIED_0: End completions
 
