@@ -359,17 +359,6 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
-    case ConstraintLocator::AssignSource:
-      if (auto assign = dyn_cast<AssignExpr>(anchor)) {
-        targetAnchor = assign->getDest();
-        targetPath.clear();
-
-        anchor = assign->getSrc();
-        path = path.slice(1);
-        continue;
-      }
-      break;
-
     case ConstraintLocator::SubscriptIndex:
       if (auto subscript = dyn_cast<SubscriptExpr>(anchor)) {
         targetAnchor = subscript->getBase();
@@ -2384,6 +2373,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   }
 
   Type fromType = CS->simplifyType(constraint->getFirstType());
+  
   if (fromType->is<TypeVariableType>()) {
     TCCOptions options;
     

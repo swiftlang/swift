@@ -1638,10 +1638,8 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   // @lvalue T, where T is a fresh type variable that will be the object type of
   // this particular expression type.
   if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
-    auto objectTv = createTypeVariable(
-                      getConstraintLocator(dest,
-                                           ConstraintLocator::AssignDest),
-                      /*options=*/0);
+    auto objectTv = createTypeVariable(getConstraintLocator(dest),
+                                       /*options=*/0);
     auto refTv = LValueType::get(objectTv);
     addConstraint(ConstraintKind::Bind, typeVar, refTv,
                   getConstraintLocator(dest));

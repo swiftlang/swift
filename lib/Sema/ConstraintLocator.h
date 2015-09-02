@@ -122,10 +122,6 @@ public:
     IfThen,
     /// \brief The 'else' branch of a ternary expression.
     IfElse,
-    /// \brief The source of an assignment.
-    AssignSource,
-    /// \brief The destination of an assignment
-    AssignDest,
     /// \brief The operand of a checked cast.
     CheckedCastOperand,
     /// The candidate witness during protocol conformance checking.
@@ -162,8 +158,6 @@ public:
     case Load:
     case IfThen:
     case IfElse:
-    case AssignSource:
-    case AssignDest:
     case CheckedCastOperand:
     case Witness:
       return 0;
@@ -220,8 +214,6 @@ public:
     case SubscriptResult:
     case IfThen:
     case IfElse:
-    case AssignSource:
-    case AssignDest:
       return 0;
 
     case FunctionArgument:

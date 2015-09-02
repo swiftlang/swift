@@ -69,8 +69,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case Load:
     case IfThen:
     case IfElse:
-    case AssignSource:
-    case AssignDest:
     case CheckedCastOperand:
     case GenericArgument:
     case InterpolationArgument:
@@ -140,14 +138,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     case ApplyArgToParam:
       out << "comparing call argument #" << llvm::utostr(elt.getValue())
           << " to parameter #" << llvm::utostr(elt.getValue2());
-      break;
-
-    case AssignDest:
-      out << "assignment destination";
-      break;
-
-    case AssignSource:
-      out << "assignment source";
       break;
         
     case CheckedCastOperand:

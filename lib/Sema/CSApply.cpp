@@ -3213,10 +3213,6 @@ namespace {
     }
 
     Expr *visitAssignExpr(AssignExpr *expr) {
-      llvm_unreachable("Handled by ExprWalker");
-    }
-
-    Expr *visitAssignExpr(AssignExpr *expr, ConstraintLocator *srcLocator) {
       // Compute the type to which the source must be converted to allow
       // assignment to the destination.
       //
@@ -3226,12 +3222,12 @@ namespace {
         return nullptr;
 
       // Convert the source to the simplified destination type.
-      Expr *src = coerceToType(expr->getSrc(), destTy, srcLocator);
+      auto locator =
+        ConstraintLocatorBuilder(cs.getConstraintLocator(expr->getSrc()));
+      Expr *src = coerceToType(expr->getSrc(), destTy, locator);
       if (!src)
         return nullptr;
-      
       expr->setSrc(src);
-      
       return expr;
     }
     
@@ -5744,27 +5740,6 @@ namespace {
         return { false, closure };
       }
 
-      // Track whether we're in the left-hand side of an assignment...
-      if (auto assign = dyn_cast<AssignExpr>(expr)) {
-        if (auto dest = assign->getDest()->walk(*this))
-          assign->setDest(dest);
-        else
-          return { false, nullptr };
-
-        auto &cs = Rewriter.getConstraintSystem();
-        auto srcLocator = cs.getConstraintLocator(
-                            assign,
-                            ConstraintLocator::AssignSource);
-
-        if (auto src = assign->getSrc()->walk(*this))
-          assign->setSrc(src);
-        else
-          return { false, nullptr };
-        
-        expr = Rewriter.visitAssignExpr(assign, srcLocator);
-        return { false, expr };
-      }
-        
       Rewriter.walkToExprPre(expr);
       return { true, expr };
     }

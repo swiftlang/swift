@@ -2372,9 +2372,7 @@ namespace {
     }
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
-      // '_' is only allowed in assignments, so give it an AssignDest locator.
-      auto locator = CS.getConstraintLocator(expr, 
-                                             ConstraintLocator::AssignDest);
+      auto locator = CS.getConstraintLocator(expr);
       auto typeVar = CS.createTypeVariable(locator, /*options=*/0);
       return LValueType::get(typeVar);
     }
@@ -2391,11 +2389,9 @@ namespace {
         return Type();
       
       // The source must be convertible to the destination.
-      auto assignLocator = CS.getConstraintLocator(expr,
-                                               ConstraintLocator::AssignSource);
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSrc()->getType(), destTy,
-                       assignLocator);
+                       CS.getConstraintLocator(expr->getSrc()));
       
       expr->setType(TupleType::getEmpty(CS.getASTContext()));
       return expr->getType();
