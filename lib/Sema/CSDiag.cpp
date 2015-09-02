@@ -2292,7 +2292,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   if (auto locator = bindOverload->getLocator()) {
     anchor = simplifyLocatorToAnchor(*CS, locator);
     if (!anchor)
-      anchor = locator->getAnchor();
+      return false;
   }
 
   // The anchor for the constraint is almost always an OverloadedDeclRefExpr or
