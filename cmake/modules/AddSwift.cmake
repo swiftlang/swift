@@ -766,7 +766,8 @@ function(_add_swift_library_single target name)
     list(GET split_path -1 dir)
     file(GLOB_RECURSE SWIFTLIB_SINGLE_HEADERS
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.h
-      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.def)
+      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.def
+      ${CMAKE_CURRENT_SOURCE_DIR}/*.def)
 
     file(GLOB_RECURSE SWIFTLIB_SINGLE_TDS
       ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.td)
