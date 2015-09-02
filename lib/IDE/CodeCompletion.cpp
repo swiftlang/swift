@@ -947,6 +947,36 @@ void CodeCompletionCallbacksImpl::completeExpr() {
 }
 
 namespace {
+class ArcheTypeTransformer {
+  DeclContext *DC;
+  Type BaseTy;
+  llvm::DenseMap<TypeBase *, Type> Cache;
+
+public:
+  ArcheTypeTransformer(DeclContext *DC, Type BaseTy) : DC(DC), BaseTy(BaseTy){}
+
+  std::function<Type(Type)> getTransformerFunc() {
+    return [&](Type Ty) {
+      if (Ty->getKind() == TypeKind::Archetype) {
+        if (Cache.count(Ty.getPointer()) > 0) {
+          return Cache[Ty.getPointer()];
+        }
+        llvm::SmallVector<Identifier, 1> Names;
+        for(auto *AT = cast<ArchetypeType>(Ty.getPointer()); AT;
+            AT = AT->getParent()) {
+          Names.insert(Names.begin(), AT->getName());
+        }
+        if(auto Result = checkMemberType(*DC, BaseTy, Names)) {
+          Cache[Ty.getPointer()] = Result;
+          return Result;
+        }
+        Cache[Ty.getPointer()] = Ty;
+      }
+      return Ty;
+    };
+  }
+};
+
 /// Build completions by doing visible decl lookup from a context.
 class CompletionLookup final : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
@@ -1004,6 +1034,8 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
       DeducedAssociatedTypeCache;
 
   Optional<SemanticContextKind> ForcedSemanticContext = None;
+
+  std::unique_ptr<ArcheTypeTransformer> TransformerPt = nullptr;
 
 public:
   bool FoundFunctionCalls = false;
@@ -1087,6 +1119,10 @@ public:
   void setHaveDot(SourceLoc DotLoc) {
     HaveDot = true;
     this->DotLoc = DotLoc;
+  }
+
+  void initializeArchetypeTransformer(DeclContext *DC, Type BaseTy) {
+    TransformerPt = llvm::make_unique<ArcheTypeTransformer>(DC, BaseTy);
   }
 
   void setIsStaticMetatype(bool value) {
@@ -1229,12 +1265,13 @@ public:
             !isBoringBoundGenericType(MaybeNominalType)) {
           if (Type T = MaybeNominalType->getTypeOfMember(
               CurrDeclContext->getParentModule(), VD, TypeResolver.get()))
-            return T;
+            return TransformerPt ? T.transform(TransformerPt->getTransformerFunc()) :
+                                   T;
         }
       }
     }
-
-    return VD->getType();
+    return TransformerPt ? VD->getType().transform(TransformerPt->getTransformerFunc()) :
+                           VD->getType();
   }
 
   const DeducedAssociatedTypes &
@@ -1564,7 +1601,6 @@ public:
       FirstIndex = 1;
     Type FunctionType = getTypeOfMember(FD);
     assert(FunctionType);
-
     if (FirstIndex != 0 && !FunctionType->is<ErrorType>())
       FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
 
@@ -3116,6 +3152,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     if (isDynamicLookup(ExprType))
       Lookup.setIsDynamicLookup();
+    Lookup.initializeArchetypeTransformer(CurDeclContext, ExprType);
     Lookup.getValueExprCompletions(ExprType);
     break;
   }

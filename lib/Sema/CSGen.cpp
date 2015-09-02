@@ -2778,3 +2778,30 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
   }
   return !PossibleTypes.empty();
 }
+
+Type swift::checkMemberType(DeclContext &DC, Type BaseTy,
+                            ArrayRef<Identifier> Names) {
+  ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
+  auto *TypeChecker = static_cast<class TypeChecker*>(DC.getASTContext().
+                                                      getLazyResolver());
+  ConstraintSystem CS(*TypeChecker, &DC, Options);
+  auto Loc = CS.getConstraintLocator(nullptr);
+
+  Type Ty = BaseTy;
+  for (auto Id : Names) {
+    auto TV = CS.createTypeVariable(CS.getConstraintLocator(nullptr),
+                                    TypeVariableOptions::TVO_CanBindToLValue);
+    CS.addConstraint(Constraint::createDisjunction(CS, {
+      Constraint::create(CS, ConstraintKind::TypeMember, Ty,
+                         TV, DeclName(Id), Loc),
+      Constraint::create(CS, ConstraintKind::ValueMember, Ty,
+                         TV, DeclName(Id), Loc)
+    }, Loc));
+    Ty = TV;
+  }
+  assert(Ty->getKind() == TypeKind::TypeVariable && "Type is not variable");
+  if (auto OS = CS.solveSingle()) {
+    return OS.getValue().typeBindings[Ty->getAs<TypeVariableType>()];
+  }
+  return Type();
+}
