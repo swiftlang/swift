@@ -292,6 +292,11 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     if (!ClangType->isFloatingType())
       return std::make_pair(Type(), "");
     break;
+
+  case MappedCTypeKind::Block:
+    if (!ClangType->isBlockPointerType())
+      return std::make_pair(Type(), "");
+    break;
   }
 
   Module *M;

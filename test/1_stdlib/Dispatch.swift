@@ -29,3 +29,47 @@ DispatchAPI.test("OS_OBJECT support") {
   expectNotEmpty(mainQueue as? dispatch_queue_t)
 }
 
+DispatchAPI.test("dispatch_block_t conversions") {
+  var counter = 0
+  let closure = { () -> Void in
+    counter++
+  }
+
+  let block = closure as dispatch_block_t
+  block()
+  expectEqual(1, counter)
+
+  let closureAgain = block as () -> Void
+  closureAgain()
+  expectEqual(2, counter)
+}
+
+if #available(OSX 10.10, iOS 8.0, *) {
+  DispatchAPI.test("dispatch_block_t identity") {
+    let block = dispatch_block_create(DISPATCH_BLOCK_INHERIT_QOS_CLASS) {
+      _ = 1
+    }
+
+    dispatch_async(dispatch_get_main_queue(), block)
+    // This will trap if the block's pointer identity is not preserved.
+    dispatch_block_cancel(block)
+  }
+
+  DispatchAPI.test("dispatch_block_t conversions with dispatch_block_create") {
+    var counter = 0
+
+    let block = dispatch_block_create(dispatch_block_flags_t(0)) {
+      counter++
+    }
+    block()
+    expectEqual(1, counter)
+
+    let closure = block as () -> Void
+    closure()
+    expectEqual(2, counter)
+
+    let blockAgain = closure as dispatch_block_t
+    blockAgain()
+    expectEqual(3, counter)
+  }
+}

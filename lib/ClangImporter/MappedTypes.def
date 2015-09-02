@@ -133,6 +133,10 @@ MAP_STDLIB_TYPE("va_list", VaList, 0, "CVaListPointer", All, false, DoNothing)
 MAP_STDLIB_TYPE("UInt", UnsignedInt, 32, "CUnsignedInt", All, false, DoNothing)
 MAP_STDLIB_TYPE("SInt", SignedInt, 32, "CInt", All, false, DoNothing)
 
+// Dispatch types.
+MAP_TYPE("dispatch_block_t", Block, 0, "Dispatch", "dispatch_block_t", All,
+         true, DoNothing)
+
 // Objective-C types.
 MAP_TYPE("BOOL", ObjCBool, 8, "ObjectiveC", "ObjCBool", ObjC1, false,
          DoNothing)

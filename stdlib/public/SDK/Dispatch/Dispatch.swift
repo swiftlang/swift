@@ -12,6 +12,15 @@
 
 @exported import Dispatch
 
+/// The type of blocks submitted to dispatch queues, which take no arguments
+/// and have no return value.
+///
+/// The dispatch_block_t typealias is different from usual closures in that it
+/// uses @convention(block). This is to avoid unnecessary bridging between
+/// C blocks and Swift closures, which interferes with Grand Central Dispatch
+/// APIs that depend on the referential identity of a block.
+public typealias dispatch_block_t = @convention(block) () -> Void
+
 //===----------------------------------------------------------------------===//
 // Macros
 // FIXME: rdar://16851050 update API so these import better
