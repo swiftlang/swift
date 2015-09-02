@@ -364,8 +364,8 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
   // point.
   StringRef newName = name.substr(0, nameWordRevIter.base().getPosition());
 
-  // If we ended up with a keyword or a name like "get" or "set", do nothing.
-  if (isKeyword(newName) || newName == "get" || newName == "set")
+  // If we ended up with a name like "get" or "set", do nothing.
+  if (newName == "get" || newName == "set")
     return name;
 
   // We're done.

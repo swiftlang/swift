@@ -37,8 +37,8 @@
 // CHECK-FOUNDATION: func objectFor(aKey: NSCopying) -> AnyObject?
 // CHECK-FOUNDATION: func removeObjectFor(aKey: NSCopying)
 
-// Note: Don't strip down to names that are (possibly contextual) keywords.
-// CHECK-FOUNDATION: func setObject(anObject: AnyObject, forKey aKey: NSCopying)
+// Note: Allow argument labels that are keywords.
+// CHECK-FOUNDATION: func setObject(anObject: AnyObject, `for` aKey: NSCopying)
 
 // Note: Dropping the name of the first parameter in an initializer entirely.
 // CHECK-FOUNDATION: init(_ array: [AnyObject])
