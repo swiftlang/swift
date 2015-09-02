@@ -55,8 +55,7 @@ inline ValueUserRange makeUserRange(iterator_range<SILValue::use_iterator> R) {
 bool
 recursivelyDeleteTriviallyDeadInstructions(
   ArrayRef<SILInstruction*> I, bool Force = false,
-  std::function<void(SILInstruction *)> C = [](SILInstruction *){},
-  bool DeleteDebug = false);
+  std::function<void(SILInstruction *)> C = [](SILInstruction *){});
 
 /// \brief If the given instruction is dead, delete it along with its dead
 /// operands.
@@ -70,25 +69,23 @@ bool
 recursivelyDeleteTriviallyDeadInstructions(
   SILInstruction *I,
   bool Force = false,
-  std::function<void(SILInstruction *)> C = [](SILInstruction *){},
-  bool DeleteDebug = false);
+  std::function<void(SILInstruction *)> C = [](SILInstruction *){});
 
 /// \brief Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
-bool isInstructionTriviallyDead(SILInstruction *I, bool DeleteDebug=false);
+bool isInstructionTriviallyDead(SILInstruction *I);
 
 /// \brief Recursively erase all of the uses of the instruction (but not the
 /// instruction itself) and delete instructions that will become trivially
 /// dead when this instruction is removed.
 void eraseUsesOfInstruction(
     SILInstruction *Inst,
-    std::function<void(SILInstruction *)> C = [](SILInstruction *){},
-    bool DeleteDebug=false);
+    std::function<void(SILInstruction *)> C = [](SILInstruction *){});
 
 /// \brief Recursively erase all of the uses of the value (but not the
 /// value itself)
-void eraseUsesOfValue(SILValue V, bool DeleteDebug=false);
+void eraseUsesOfValue(SILValue V);
 
 FullApplySite findApplyFromDevirtualizedResult(SILInstruction *I);
 

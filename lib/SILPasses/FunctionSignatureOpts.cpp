@@ -354,7 +354,7 @@ updateOptimizedBBArgs(SILBuilder &Builder, SILBasicBlock *BB,
     // We should be able to recursively delete all of the remaining
     // instructions.
     SILArgument *Arg = BB->getBBArg(ArgOffset);
-    eraseUsesOfValue(Arg, true);
+    eraseUsesOfValue(Arg);
     BB->eraseBBArg(ArgOffset);
     return ArgOffset;
   }

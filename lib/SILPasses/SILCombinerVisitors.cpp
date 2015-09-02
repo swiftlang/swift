@@ -3186,8 +3186,7 @@ SILInstruction *SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *CFI) 
   eraseUsesOfInstruction(CFI,
                          [this](SILInstruction *I){
                            Worklist.remove(I);
-                         },
-                         true);
+                         });
   eraseInstFromFunction(*CFI);
   return nullptr;
 }
