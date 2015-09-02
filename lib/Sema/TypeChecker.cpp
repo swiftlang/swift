@@ -899,7 +899,7 @@ private:
     // of its lexical context.
     VersionRange DeclVersionRange =
         swift::AvailabilityInference::availableRange(D, TC.Context);
-    DeclVersionRange.meetWith(getCurrentTRC()->getPotentialVersions());
+    DeclVersionRange.intersectWith(getCurrentTRC()->getPotentialVersions());
     
     TypeRefinementContext *NewTRC =
         TypeRefinementContext::createForDecl(TC.Context, D, getCurrentTRC(),
@@ -1143,7 +1143,7 @@ private:
         // potentially be false, so conservatively combine the version
         // range of the current context with the accumulated false flow
         // of all other conjuncts.
-        FalseFlow.joinWith(CurrentRange);
+        FalseFlow.unionWith(CurrentRange);
 
         Element.walk(*this);
         continue;
@@ -1219,7 +1219,7 @@ private:
       // context.
       // We could be more precise here if we enriched the lattice to include
       // ranges of the form [x, y).
-      FalseFlow.joinWith(CurrentRange);
+      FalseFlow.unionWith(CurrentRange);
 
       auto *TRC = TypeRefinementContext::createForConditionFollowingQuery(
           TC.Context, Query, LastElement, CurrentTRC, Range);

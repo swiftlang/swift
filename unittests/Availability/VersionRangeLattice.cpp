@@ -16,13 +16,13 @@ public:
 
   VersionRange Empty = VersionRange::empty();
 
-  VersionRange meet(VersionRange A, VersionRange B) {
-    A.meetWith(B);
+  VersionRange intersectRanges(VersionRange A, VersionRange B) {
+    A.intersectWith(B);
     return A;
   }
 
-  VersionRange join(VersionRange A, VersionRange B) {
-    A.joinWith(B);
+  VersionRange unionRanges(VersionRange A, VersionRange B) {
+    A.unionWith(B);
     return A;
   }
 
@@ -30,16 +30,16 @@ public:
     return A.isContainedIn(B) && B.isContainedIn(A);
   }
 
-  bool meetEquals(VersionRange A, VersionRange B, VersionRange Expected) {
-    VersionRange AMeetB = meet(A, B);
-    VersionRange BMeetA = meet(A, B);
+  bool intersectEquals(VersionRange A, VersionRange B, VersionRange Expected) {
+    VersionRange AMeetB = intersectRanges(A, B);
+    VersionRange BMeetA = intersectRanges(A, B);
 
     return equals(AMeetB, Expected) && equals(BMeetA, Expected);
   }
 
-  bool joinEquals(VersionRange A, VersionRange B, VersionRange Expected) {
-    VersionRange AJoinB = join(A, B);
-    VersionRange BJoinA = join(A, B);
+  bool unionEquals(VersionRange A, VersionRange B, VersionRange Expected) {
+    VersionRange AJoinB = unionRanges(A, B);
+    VersionRange BJoinA = unionRanges(A, B);
 
     return equals(AJoinB, Expected) && equals(BJoinA, Expected);
   }
@@ -80,47 +80,48 @@ TEST_F(VersionRangeLattice, ContainmentClosedEndedPositiveInfinity) {
 }
 
 // Test that All acts like the top element in the lattice with respect to
-// meet.
+// intersection.
 TEST_F(VersionRangeLattice, MeetWithAll) {
-  EXPECT_TRUE(meetEquals(All, All, All));
-  EXPECT_TRUE(meetEquals(GreaterThanEqual10_10, All, GreaterThanEqual10_10));
-  EXPECT_TRUE(meetEquals(Empty, All, Empty));
+  EXPECT_TRUE(intersectEquals(All, All, All));
+  EXPECT_TRUE(intersectEquals(GreaterThanEqual10_10, All,
+                              GreaterThanEqual10_10));
+  EXPECT_TRUE(intersectEquals(Empty, All, Empty));
 }
 
 // Test that All acts like the top element in the lattice with respect to
-// join.
+// union.
 TEST_F(VersionRangeLattice, JoinWithAll) {
-  EXPECT_TRUE(joinEquals(All, All, All));
-  EXPECT_TRUE(joinEquals(GreaterThanEqual10_10, All, All));
-  EXPECT_TRUE(joinEquals(Empty, All, All));
+  EXPECT_TRUE(unionEquals(All, All, All));
+  EXPECT_TRUE(unionEquals(GreaterThanEqual10_10, All, All));
+  EXPECT_TRUE(unionEquals(Empty, All, All));
 }
 
 // Test that Empty acts like the bottom element in the lattice with respect to
-// meet.
+// intersection.
 TEST_F(VersionRangeLattice, MeetWithEmpty) {
-  EXPECT_TRUE(meetEquals(GreaterThanEqual10_10, Empty, Empty));
-  EXPECT_TRUE(meetEquals(Empty, Empty, Empty));
+  EXPECT_TRUE(intersectEquals(GreaterThanEqual10_10, Empty, Empty));
+  EXPECT_TRUE(intersectEquals(Empty, Empty, Empty));
 }
 
 // Test that Empty acts like the bottom element in the lattice with respect to
-// join.
+// union.
 TEST_F(VersionRangeLattice, JoinWithEmpty) {
-  EXPECT_TRUE(joinEquals(GreaterThanEqual10_10, Empty, GreaterThanEqual10_10));
-  EXPECT_TRUE(joinEquals(Empty, Empty, Empty));
+  EXPECT_TRUE(unionEquals(GreaterThanEqual10_10, Empty, GreaterThanEqual10_10));
+  EXPECT_TRUE(unionEquals(Empty, Empty, Empty));
 }
 
-// Test meet for ranges with lower end points.
+// Test intersection for ranges with lower end points.
 TEST_F(VersionRangeLattice, MeetWithClosedEndedPositiveInfinity) {
-  EXPECT_TRUE(meetEquals(GreaterThanEqual10_10, GreaterThanEqual10_10,
-                         GreaterThanEqual10_10));
-  EXPECT_TRUE(meetEquals(GreaterThanEqual10_10, GreaterThanEqual10_9,
-                         GreaterThanEqual10_10));
+  EXPECT_TRUE(intersectEquals(GreaterThanEqual10_10, GreaterThanEqual10_10,
+                              GreaterThanEqual10_10));
+  EXPECT_TRUE(intersectEquals(GreaterThanEqual10_10, GreaterThanEqual10_9,
+                              GreaterThanEqual10_10));
 }
 
-// Test join for ranges with lower end points.
+// Test union for ranges with lower end points.
 TEST_F(VersionRangeLattice, JoinWithClosedEndedPositiveInfinity) {
-  EXPECT_TRUE(joinEquals(GreaterThanEqual10_10, GreaterThanEqual10_10,
-                         GreaterThanEqual10_10));
-  EXPECT_TRUE(joinEquals(GreaterThanEqual10_10, GreaterThanEqual10_9,
-                         GreaterThanEqual10_9));
+  EXPECT_TRUE(unionEquals(GreaterThanEqual10_10, GreaterThanEqual10_10,
+                          GreaterThanEqual10_10));
+  EXPECT_TRUE(unionEquals(GreaterThanEqual10_10, GreaterThanEqual10_9,
+                          GreaterThanEqual10_9));
 }

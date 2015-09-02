@@ -140,7 +140,7 @@ AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
     // in the future or emit a diagnostic.
 
     if (AnnotatedRange.hasValue()) {
-      AnnotatedRange.getValue().meetWith(AttrRange);
+      AnnotatedRange.getValue().intersectWith(AttrRange);
     } else {
       AnnotatedRange = AttrRange;
     }
@@ -187,7 +187,7 @@ public:
 
   virtual Action walkToTypePre(Type ty) {
     if (auto *nominalDecl = ty.getCanonicalTypeOrNull().getAnyNominal()) {
-      AvailableRange.meetWith(
+      AvailableRange.intersectWith(
           AvailabilityInference::availableRange(nominalDecl, AC));
     }
 

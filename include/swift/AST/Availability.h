@@ -93,8 +93,14 @@ public:
     return getLowerEndpoint() >= Other.getLowerEndpoint();
   }
 
-  /// Mutates this range to be the greatest lower bound of itself and Other.
-  void meetWith(const VersionRange &Other) {
+  /// Mutates this range to be a best-effort underapproximation of
+  /// the intersection of itself and Other. This is the
+  /// meet operation (greatest lower bound) in the version range lattice.
+  void intersectWith(const VersionRange &Other) {
+    // With the existing lattice this operation is precise. If the lattice
+    // is ever extended it is important that this operation be an
+    // underapproximation of intersection.
+
     if (isEmpty() || Other.isAll())
       return;
 
@@ -110,8 +116,12 @@ public:
     setLowerEndpoint(maxVersion);
   }
 
-  /// Mutates this range to be the least upper bound of itself and Other.
-  void joinWith(const VersionRange &Other) {
+  /// Mutates this range to be the union of itself and Other. This is the
+  /// join operator (least upper bound) in the veresion range lattice.
+  void unionWith(const VersionRange &Other) {
+    // With the existing lattice this operation is precise. If the lattice
+    // is ever extended it is important that this operation be an
+    // overapproximation of union.
     if (isAll() || Other.isEmpty())
       return;
 
@@ -130,12 +140,12 @@ public:
   /// Mutates this range to be a best effort over-approximation of the
   /// intersection of the concretizations of this version range and Other.
   void constrainWith(const VersionRange &Other) {
-    // We can use the meet for this because the lattice is multiplicative
+    // We can use intersection for this because the lattice is multiplicative
     // with respect to concretization--that is, the concretization
     // of Range1 meet Range2 is equal to the intersection of the
     // concretization of Range1 and the concretization of Range2.
     // This will change if we add (-Inf, v) to our version range lattice.
-    meetWith(Other);
+    intersectWith(Other);
   }
 
   /// Returns a version range representing all versions.
