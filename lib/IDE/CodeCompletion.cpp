@@ -958,24 +958,29 @@ public:
 
   std::function<Type(Type)> getTransformerFunc() {
     return [&](Type Ty) {
-      if (Ty->getKind() == TypeKind::Archetype) {
-        if (Cache.count(Ty.getPointer()) > 0) {
-          return Cache[Ty.getPointer()];
-        }
-        llvm::SmallVector<Identifier, 1> Names;
-        for(auto *AT = cast<ArchetypeType>(Ty.getPointer()); AT;
-            AT = AT->getParent()) {
-          if(!AT->getSelfProtocol())
-            Names.insert(Names.begin(), AT->getName());
-        }
-        if (auto Result = checkMemberType(*DC, BaseTy, Names)) {
-          Cache[Ty.getPointer()] = Result;
-          return Result;
-        }
-        Cache[Ty.getPointer()] = Ty;
+      if (Ty->getDesugaredType()->getKind() != TypeKind::Archetype)
         return Ty;
+      if (Cache.count(Ty.getPointer()) > 0) {
+        return Cache[Ty.getPointer()];
       }
-      return Ty;
+      Type Result = Ty->getDesugaredType();
+      llvm::SmallVector<Identifier, 1> Names;
+      bool SelfDerived = false;
+      for(auto *AT = cast<ArchetypeType>(Result.getPointer()); AT;
+          AT = AT->getParent()) {
+        if(!AT->getSelfProtocol())
+          Names.insert(Names.begin(), AT->getName());
+        else
+          SelfDerived = true;
+      }
+      if (SelfDerived) {
+        if(auto MT = checkMemberType(*DC, BaseTy, Names)) {
+          Result = MT->getKind() == TypeKind::NameAlias ?
+                   MT->getDesugaredType() : MT;
+        }
+      }
+      Cache[Ty.getPointer()] = Result;
+      return Result;
     };
   }
 };
