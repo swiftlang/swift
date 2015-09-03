@@ -1316,3 +1316,11 @@ extension ProtocolInitTest {
   }                // expected-error {{protocol extension initializer never chained to 'self.init'}}
 }
 
+// <rdar://problem/22436880> Function accepting UnsafeMutablePointer is able to change value of immutable value
+func bug22436880(x: UnsafeMutablePointer<Int>) {}
+func test22436880() {
+  let x: Int
+  x = 1
+  bug22436880(&x) // expected-error {{immutable value 'x' may not be passed inout}}
+}
+

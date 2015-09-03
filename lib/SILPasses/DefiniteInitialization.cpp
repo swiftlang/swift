@@ -806,7 +806,12 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
   // inout uses are generally straight-forward: the memory must be initialized
   // before the "address" is passed as an l-value.
   if (!isInitializedAtUse(Use)) {
-    diagnoseInitError(Use, diag::variable_inout_before_initialized);
+    auto diagID = diag::variable_inout_before_initialized;
+    
+    if (isa<AddressToPointerInst>(Use.Inst))
+      diagID = diag::variable_addrtaken_before_initialized;
+
+    diagnoseInitError(Use, diagID);
     return;
   }
 
@@ -934,8 +939,6 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
   Diag<StringRef> DiagMessage;
   if (isa<MarkFunctionEscapeInst>(Inst))
     DiagMessage = diag::global_variable_function_use_uninit;
-  else if (isa<AddressToPointerInst>(Inst))
-    DiagMessage = diag::variable_addrtaken_before_initialized;
   else
     DiagMessage = diag::variable_escape_before_initialized;
 

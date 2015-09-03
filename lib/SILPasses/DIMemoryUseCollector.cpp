@@ -721,6 +721,13 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       }
       llvm_unreachable("bad parameter convention");
     }
+    
+    if (isa<AddressToPointerInst>(User)) {
+      // address_to_pointer is a mutable escape, which we model as an inout use.
+      addElementUses(BaseEltNo, PointeeType, User, DIUseKind::InOutUse);
+      continue;
+    }
+    
 
     // init_enum_data_addr is treated like a tuple_element_addr or other instruction
     // that is looking into the memory object (i.e., the memory object needs to
