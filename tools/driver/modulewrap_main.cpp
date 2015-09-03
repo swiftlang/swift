@@ -33,7 +33,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 
-
 using namespace llvm::opt;
 using namespace swift;
 
@@ -48,16 +47,11 @@ public:
     MainExecutablePath = Path;
   }
 
-  const std::string &getOutputFilename() {
-    return OutputFilename;
-  }
+  const std::string &getOutputFilename() { return OutputFilename; }
 
-  const std::vector<std::string> &getInputFilenames() {
-    return InputFilenames;
-  }
+  const std::vector<std::string> &getInputFilenames() { return InputFilenames; }
 
-  int parseArgs(llvm::ArrayRef<const char *> Args,
-                DiagnosticEngine &Diags) {
+  int parseArgs(llvm::ArrayRef<const char *> Args, DiagnosticEngine &Diags) {
     using namespace options;
 
     // Parse frontend command line options using Swift's option table.
@@ -66,8 +60,7 @@ public:
     unsigned MissingIndex;
     unsigned MissingCount;
     ParsedArgs.reset(
-        Table->ParseArgs(Args, MissingIndex, MissingCount,
-                         ModuleWrapOption));
+        Table->ParseArgs(Args, MissingIndex, MissingCount, ModuleWrapOption));
     if (MissingCount) {
       Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
                      ParsedArgs->getArgString(MissingIndex), MissingCount);
@@ -86,8 +79,7 @@ public:
     if (ParsedArgs->getLastArg(OPT_help)) {
       std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
-                       "Swift Module Wrapper", options::ModuleWrapOption,
-                       0);
+                       "Swift Module Wrapper", options::ModuleWrapOption, 0);
       return 1;
     }
 
@@ -108,7 +100,6 @@ public:
     return 0;
   }
 };
-
 
 int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
                     void *MainAddr) {
@@ -146,13 +137,12 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   }
 
   // Superficially verify that the input is a swift module file.
-  llvm::BitstreamReader Reader((unsigned char*)(*ErrOrBuf)->getBufferStart(),
-                               (unsigned char*)(*ErrOrBuf)->getBufferEnd());
+  llvm::BitstreamReader Reader((unsigned char *)(*ErrOrBuf)->getBufferStart(),
+                               (unsigned char *)(*ErrOrBuf)->getBufferEnd());
   llvm::BitstreamCursor Cursor(Reader);
   for (unsigned char Byte : serialization::MODULE_SIGNATURE)
     if (Cursor.AtEndOfStream() || Cursor.Read(8) != Byte) {
-      Instance.getDiags().diagnose(SourceLoc(),
-                                   diag::error_parse_input_file,
+      Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,
                                    Filename, "signature mismatch");
       return 1;
     }
