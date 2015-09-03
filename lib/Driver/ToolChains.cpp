@@ -577,13 +577,8 @@ ToolChain::constructInvocation(const ModuleWrapJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  auto program = SWIFT_EXECUTABLE_NAME;
-  if (context.OI.CompilerMode == OutputInfo::Mode::UpdateCode)
-    program = SWIFT_UPDATE_NAME;
-
-  return std::make_pair(program, Arguments);
+  return std::make_pair(SWIFT_EXECUTABLE_NAME, Arguments);
 }
-
 
 std::pair<const char *, llvm::opt::ArgStringList>
 ToolChain::constructInvocation(const REPLJobAction &job,
