@@ -66,6 +66,9 @@
 // CHECK-FOUNDATION: func startSoothing(bee: Bee)
 // CHECK-FOUNDATION: func startShopping(bee: Bee)
 
+// Note: Removing plural forms when working with collections
+// CHECK-FOUNDATION: func add(objects: [AnyObject])
+
 // Note: class method name stripping result type.
 // CHECK-APPKIT: class func red() -> NSColor
 

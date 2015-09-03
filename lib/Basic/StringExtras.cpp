@@ -314,13 +314,13 @@ static Optional<StringRef> skipTypeSuffix(StringRef typeName) {
   return None;
 }
 
-StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
+StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
                                    NameRole role) {
   if (name.empty() || typeName.empty()) return name;
 
   // Get the camel-case words in the name and type name.
   auto nameWords = camel_case::getWords(name);
-  auto typeWords = camel_case::getWords(typeName);
+  auto typeWords = camel_case::getWords(typeName.Name);
 
   // Match the last words in the type name to the last words in the
   // name.
@@ -333,8 +333,8 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
   while (nameWordRevIter != nameWordRevIterEnd &&
          typeWordRevIter != typeWordRevIterEnd) {
     // If the names match, continue.
-    if (camel_case::sameWordIgnoreFirstCase(*nameWordRevIter,
-                                            *typeWordRevIter)) {
+    auto nameWord = *nameWordRevIter;
+    if (camel_case::sameWordIgnoreFirstCase(nameWord, *typeWordRevIter)) {
       anyMatches = true;
       ++nameWordRevIter;
       ++typeWordRevIter;
@@ -343,8 +343,8 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
 
     // Special case: "Indexes" and "Indices" in the name match
     // "IndexSet" in the type.
-    if ((camel_case::sameWordIgnoreFirstCase(*nameWordRevIter, "Indexes") ||
-         camel_case::sameWordIgnoreFirstCase(*nameWordRevIter, "Indices")) &&
+    if ((camel_case::sameWordIgnoreFirstCase(nameWord, "Indexes") ||
+         camel_case::sameWordIgnoreFirstCase(nameWord, "Indices")) &&
         *typeWordRevIter == "Set") {
       auto nextTypeWordRevIter = typeWordRevIter;
       ++nextTypeWordRevIter;
@@ -360,11 +360,30 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
 
     // If this is a skippable suffix, skip it and keep looking.
     if (nameWordRevIter == nameWordRevIterBegin) {
-      if (auto withoutSuffix = skipTypeSuffix(typeName)) {
-        typeName = *withoutSuffix;
-        typeWords = camel_case::getWords(typeName);
+      if (auto withoutSuffix = skipTypeSuffix(typeName.Name)) {
+        typeName.Name = *withoutSuffix;
+        typeWords = camel_case::getWords(typeName.Name);
         typeWordRevIter = typeWords.rbegin();
         typeWordRevIterEnd = typeWords.rend();
+        continue;
+      }
+    }
+
+    // Special case: if the word in the name ends in 's', and we have
+    // a collection element type, see if this is a plural.
+    if (!typeName.CollectionElement.empty() && nameWord.size() > 2 &&
+        nameWord.back() == 's') {
+      // Check <element name>s.
+      auto shortenedNameWord
+        = name.substr(0, nameWordRevIter.base().getPosition()-1);
+      auto newShortenedNameWord
+        = omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
+                            NameRole::Partial);
+      if (shortenedNameWord != newShortenedNameWord) {
+        anyMatches = true;
+        unsigned targetSize = newShortenedNameWord.size();
+        while (nameWordRevIter.base().getPosition() > targetSize)
+          ++nameWordRevIter;
         continue;
       }
     }
@@ -377,6 +396,9 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
 
   // Handle complete name matches.
   if (nameWordRevIter == nameWordRevIterEnd) {
+    // If we're doing a partial match, return the empty string.
+    if (role == NameRole::Partial) return "";
+
     // Leave the name alone.
     return name;
   }
@@ -417,6 +439,7 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
 
   case NameRole::FirstParameter:
   case NameRole::SubsequentParameter:
+  case NameRole::Partial:
     break;
   }
 
@@ -426,16 +449,16 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
 
 bool swift::omitNeedlessWords(StringRef &baseName,
                               MutableArrayRef<StringRef> argNames,
-                              StringRef resultType,
-                              StringRef contextType,
-                              ArrayRef<StringRef> paramTypes,
+                              OmissionTypeName resultType,
+                              OmissionTypeName contextType,
+                              ArrayRef<OmissionTypeName> paramTypes,
                               bool returnsSelf) {
   // For zero-parameter methods that return 'Self' or a result type
   // that matches the declaration context, omit needless words from
   // the base name.
   if (paramTypes.empty()) {
     if (returnsSelf || (resultType == contextType)) {
-      StringRef typeName = returnsSelf ? contextType : resultType;
+      OmissionTypeName typeName = returnsSelf ? contextType : resultType;
       if (typeName.empty())
         return false;
 

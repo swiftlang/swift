@@ -1758,7 +1758,7 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
 
 /// Retrieve the type name to be used for determining whether we can
 /// omit needless words.
-static StringRef getTypeNameForOmission(Type type) {
+static OmissionTypeName getTypeNameForOmission(Type type) {
   if (!type)
     return "";
 
@@ -1798,8 +1798,21 @@ static StringRef getTypeNameForOmission(Type type) {
   } while (true);
 
   // Nominal types.
-  if (auto nominal = type->getAnyNominal())
+  if (auto nominal = type->getAnyNominal()) {
+    // If we have a collection, get the element type.
+    if (auto bound = type->getAs<BoundGenericType>()) {
+      ASTContext &ctx = nominal->getASTContext();
+      auto args = bound->getGenericArgs();
+      if (!args.empty() &&
+          bound->getDecl() == ctx.getArrayDecl() ||
+          bound->getDecl() == ctx.getSetDecl()) {
+        return OmissionTypeName(nominal->getName().str(),
+                                getTypeNameForOmission(args[0]).Name);
+      }
+    }
+
     return nominal->getName().str();
+  }
 
   // Generic type parameters.
   if (auto genericParamTy = type->getAs<GenericTypeParamType>()) {
@@ -1843,7 +1856,7 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   }
 
   // String'ify the parameter types.
-  SmallVector<StringRef, 4> paramTypeStrs;
+  SmallVector<OmissionTypeName, 4> paramTypes;
   Type functionType = afd->getInterfaceType();
   Type argumentType;
   for (unsigned i = 0, n = afd->getNaturalArgumentCount()-1; i != n; ++i)
@@ -1852,12 +1865,12 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   if (auto tupleTy = argumentType->getAs<TupleType>()) {
     if (tupleTy->getNumElements() == argNameStrs.size()) {
       for (auto argType : tupleTy->getElementTypes())
-        paramTypeStrs.push_back(getTypeNameForOmission(argType));
+        paramTypes.push_back(getTypeNameForOmission(argType));
     }
   }
 
-  if (argNameStrs.size() == 1 && paramTypeStrs.empty())
-    paramTypeStrs.push_back(getTypeNameForOmission(argumentType));
+  if (argNameStrs.size() == 1 && paramTypes.empty())
+    paramTypes.push_back(getTypeNameForOmission(argumentType));
 
   // Handle contextual type, result type, and returnsSelf.
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
@@ -1875,7 +1888,7 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   if (!swift::omitNeedlessWords(baseNameStr, argNameStrs,
                                 getTypeNameForOmission(resultType),
                                 getTypeNameForOmission(contextType),
-                                paramTypeStrs,
+                                paramTypes,
                                 returnsSelf))
     return None;
 

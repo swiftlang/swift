@@ -267,6 +267,45 @@ enum class NameRole {
 
   // The name of a property.
   Property,
+
+  // A partial name; used internally.
+  Partial,
+};
+
+/// Describes the name of a type as is used for omitting needless
+/// words.
+struct OmissionTypeName {
+  /// The name of the type.
+  StringRef Name;
+
+  /// For a collection type, the name of the element type.
+  StringRef CollectionElement;
+
+  /// Construct a type name.
+  OmissionTypeName(StringRef name = StringRef(),
+                   StringRef collectionElement = StringRef())
+    : Name(name), CollectionElement(collectionElement) { }
+
+  /// Construct a type name.
+  OmissionTypeName(const char * name,
+                   StringRef collectionElement = StringRef())
+    : Name(name), CollectionElement(collectionElement) { }
+
+  /// Determine whether the type name is empty.
+  bool empty() const { return Name.empty(); }
+
+  friend bool operator==(const OmissionTypeName &lhs,
+                         const OmissionTypeName &rhs) {
+    return lhs.Name == rhs.Name &&
+      (lhs.CollectionElement.empty() ||
+       rhs.CollectionElement.empty() ||
+       lhs.CollectionElement == rhs.CollectionElement);
+  }
+
+  friend bool operator!=(const OmissionTypeName &lhs,
+                         const OmissionTypeName &rhs) {
+    return !(lhs == rhs);
+  }
 };
 
 /// Attempt to omit needless words from the given name based on the
@@ -281,7 +320,8 @@ enum class NameRole {
 /// name, base name of a function, etc.
 ///
 /// \returns the updated name.
-StringRef omitNeedlessWords(StringRef name, StringRef typeName, NameRole role);
+StringRef omitNeedlessWords(StringRef name, OmissionTypeName typeName,
+                            NameRole role);
 
 /// Omit needless words for a function, method, or initializer.
 ///
@@ -305,9 +345,9 @@ StringRef omitNeedlessWords(StringRef name, StringRef typeName, NameRole role);
 /// \returns true if any words were omitted, false otherwise.
 bool omitNeedlessWords(StringRef &baseName,
                        MutableArrayRef<StringRef> argNames,
-                       StringRef resultType,
-                       StringRef contextType,
-                       ArrayRef<StringRef> paramTypes,
+                       OmissionTypeName resultType,
+                       OmissionTypeName contextType,
+                       ArrayRef<OmissionTypeName> paramTypes,
                        bool returnsSelf);
 }
 

@@ -692,7 +692,7 @@ public:
 
   /// Retrieve the type name of a Clang type for the purposes of
   /// omitting unneeded words.
-  StringRef getClangTypeNameForOmission(clang::QualType type);
+  OmissionTypeName getClangTypeNameForOmission(clang::QualType type);
 
   /// Omit needless words in a function name.
   DeclName omitNeedlessWordsInFunctionName(

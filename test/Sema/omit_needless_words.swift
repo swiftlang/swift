@@ -16,3 +16,11 @@ func callSites(s: String) {
   _ = String.randomString // expected-warning{{'randomString' could be named 'random'}}{{14-26=random}}
   _ = s.wonkycasedString // expected-warning{{'wonkycasedString' could be named 'wonkycased'}}{{9-25=wonkycased}}
 }
+
+struct MagicNameString { }
+
+extension String {
+  func appendStrings(strings: [String]) { } // expected-warning{{'appendStrings' could be named 'append'}}{{8-21=append}}
+  func appendObjects(objects: [AnyObject]) { } // expected-warning{{'appendObjects' could be named 'append'}}{{8-21=append}}
+  func appendMagicNameStrings(strings: [MagicNameString]) { } // expected-warning{{'appendMagicNameStrings' could be named 'append'}}{{8-30=append}}
+}

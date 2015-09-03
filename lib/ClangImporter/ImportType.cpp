@@ -1796,12 +1796,19 @@ considerErrorImport(ClangImporter::Implementation &importer,
   return None;
 }
 
+/// Determine whether this is the name of an Objective-C collection
+/// with a single element type.
+static bool isObjCCollectionName(StringRef typeName) {
+  auto lastWord = camel_case::getLastWord(typeName);
+  return lastWord == "Array" || lastWord == "Set";
+}
+
 /// Retrieve the name of the given Clang type for use when omitting
 /// needless words.
-StringRef ClangImporter::Implementation::getClangTypeNameForOmission(
-            clang::QualType type) {
+OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
+                   clang::QualType type) {
   if (type.isNull())
-    return "";
+    return OmissionTypeName();
 
   auto &ctx = getClangASTContext();
 
@@ -1859,7 +1866,19 @@ StringRef ClangImporter::Implementation::getClangTypeNameForOmission(
   // Objective-C object pointers.
   if (auto objcObjectPtr = type->getAs<clang::ObjCObjectPointerType>()) {
     if (auto objcClass = objcObjectPtr->getInterfaceDecl()) {
-      return objcClass->getName();
+      // If this isn't the name of an Objective-C collection, we're done.
+      auto className = objcClass->getName();
+      if (!isObjCCollectionName(className))
+        return className;
+
+      // If we don't have type arguments, the collection element type
+      // is "Object".
+      auto typeArgs = objcObjectPtr->getTypeArgs();
+      if (typeArgs.empty())
+        return OmissionTypeName(className, "Object");
+
+      return OmissionTypeName(className,
+                              getClangTypeNameForOmission(typeArgs[0]).Name);
     }
 
     // Objective-C "id" type.
@@ -1929,7 +1948,7 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
   }
 
   // Collect the parameter type names.
-  SmallVector<StringRef, 4> paramTypes;
+  SmallVector<OmissionTypeName, 4> paramTypes;
   for (auto param : params) {
     paramTypes.push_back(getClangTypeNameForOmission(param->getType()));
   }

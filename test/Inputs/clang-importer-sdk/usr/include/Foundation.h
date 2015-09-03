@@ -874,3 +874,7 @@ __attribute__((availability(macosx,introduced=10.11)))
 - (void)startSoothingBee:(nonnull Bee *)bee;
 - (void)startShoppingBee:(nonnull Bee *)bee;
 @end
+
+@interface NSMutableArray<ObjectType> : NSArray
+- (void)addObjects:(nonnull NSArray<ObjectType> *)objects;
+@end
