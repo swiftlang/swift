@@ -58,6 +58,9 @@
 // Note: property name stripping property type.
 // CHECK-FOUNDATION: var uppercase: String
 
+// Note: don't map base name down to a keyword.
+// CHECK-FOUNDATION: func doSelector(selector: Selector)
+
 // Note: class method name stripping result type.
 // CHECK-APPKIT: class func red() -> NSColor
 

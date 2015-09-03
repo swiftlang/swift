@@ -380,6 +380,20 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
   if (newName == "get" || newName == "set")
     return name;
 
+  // If we ended up with a keyword for a property name or base name,
+  // do nothing.
+  switch (role) {
+  case NameRole::BaseName:
+  case NameRole::Property:
+    if (isKeyword(newName))
+      return name;
+    break;
+
+  case NameRole::FirstParameter:
+  case NameRole::SubsequentParameter:
+    break;
+  }
+
   // We're done.
   return newName;
 }

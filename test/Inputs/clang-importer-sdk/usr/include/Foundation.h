@@ -865,3 +865,6 @@ __attribute__((availability(macosx,introduced=10.11)))
 -(NSInteger)producesResult __attribute__((warn_unused_result));
 @end
 
+@interface NSObject (Silly)
+-(void)doSelector:(SEL)selector;
+@end
