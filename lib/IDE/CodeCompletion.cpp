@@ -981,6 +981,19 @@ public:
             Result =  MT;
           }
         }
+      } else {
+        auto ATT = Result->castTo<ArchetypeType>();
+        auto Conformances = ATT->getConformsTo();
+        if (Conformances.size() == 1) {
+          Result = Conformances[0]->getDeclaredType();
+        } else if (!Conformances.empty()) {
+          llvm::SmallVector<Type, 3> ConformedTypes;
+          for (auto PD : Conformances) {
+            ConformedTypes.push_back(PD->getDeclaredType());
+          }
+          Result = ProtocolCompositionType::get(DC->getASTContext(),
+                                                ConformedTypes);
+        }
       }
       Cache[Ty.getPointer()] = Result;
       return Result;
