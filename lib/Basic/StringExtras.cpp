@@ -358,15 +358,14 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
       }
     }
 
-    // If this is a skippable suffix, skip it and keep looking.
-    if (nameWordRevIter == nameWordRevIterBegin) {
-      if (auto withoutSuffix = skipTypeSuffix(typeName.Name)) {
-        typeName.Name = *withoutSuffix;
-        typeWords = camel_case::getWords(typeName.Name);
-        typeWordRevIter = typeWords.rbegin();
-        typeWordRevIterEnd = typeWords.rend();
-        continue;
-      }
+    // Special case: "Index" in the name matches "Int" or "Integer" in the type.
+    if (camel_case::sameWordIgnoreFirstCase(nameWord, "Index") &&
+        (camel_case::sameWordIgnoreFirstCase(*typeWordRevIter, "Int") ||
+         camel_case::sameWordIgnoreFirstCase(*typeWordRevIter, "Integer"))) {
+      anyMatches = true;
+      ++nameWordRevIter;
+      ++typeWordRevIter;
+      continue;
     }
 
     // Special case: if the word in the name ends in 's', and we have
@@ -384,6 +383,17 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
         unsigned targetSize = newShortenedNameWord.size();
         while (nameWordRevIter.base().getPosition() > targetSize)
           ++nameWordRevIter;
+        continue;
+      }
+    }
+
+    // If this is a skippable suffix, skip it and keep looking.
+    if (nameWordRevIter == nameWordRevIterBegin) {
+      if (auto withoutSuffix = skipTypeSuffix(typeName.Name)) {
+        typeName.Name = *withoutSuffix;
+        typeWords = camel_case::getWords(typeName.Name);
+        typeWordRevIter = typeWords.rbegin();
+        typeWordRevIterEnd = typeWords.rend();
         continue;
       }
     }

@@ -69,6 +69,9 @@
 // Note: Removing plural forms when working with collections
 // CHECK-FOUNDATION: func add(objects: [AnyObject])
 
+// Note: Int and Index match.
+// CHECK-FOUNDATION: func sliceFrom(fromIndex: Int, to toIndex: Int) -> String
+
 // Note: class method name stripping result type.
 // CHECK-APPKIT: class func red() -> NSColor
 

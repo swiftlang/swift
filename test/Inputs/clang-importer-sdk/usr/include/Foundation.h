@@ -878,3 +878,7 @@ __attribute__((availability(macosx,introduced=10.11)))
 @interface NSMutableArray<ObjectType> : NSArray
 - (void)addObjects:(nonnull NSArray<ObjectType> *)objects;
 @end
+
+@interface NSString (Slicing)
+- (nonnull NSString *)sliceFromIndex:(NSInteger)fromIndex toIndex:(NSInteger)toIndex;
+@end
