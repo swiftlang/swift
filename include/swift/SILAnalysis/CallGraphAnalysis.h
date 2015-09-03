@@ -341,6 +341,7 @@ public:
   void markCallerEdgesOfCalleesIncomplete(FullApplySite AI);
 
   void dump();
+  void dumpStats();
 
   /// This function is meant for use from the debugger.  You can just say 'call
   /// CG->viewCG()' and a dot graph viewer window should pop up from the

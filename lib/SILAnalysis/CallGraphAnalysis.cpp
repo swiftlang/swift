@@ -36,6 +36,9 @@ STATISTIC(NumCallGraphsBuilt, "# of times the call graph is built");
 llvm::cl::opt<bool> DumpCallGraph("sil-dump-call-graph",
                                   llvm::cl::init(false), llvm::cl::Hidden);
 
+llvm::cl::opt<bool> DumpCallGraphStats("sil-dump-call-graph-stats",
+                                       llvm::cl::init(false), llvm::cl::Hidden);
+
 CallGraph::CallGraph(SILModule *Mod, bool completeModule)
   : M(*Mod), NodeOrdinal(0), EdgeOrdinal(0) {
   ++NumCallGraphsBuilt;
@@ -63,6 +66,9 @@ CallGraph::CallGraph(SILModule *Mod, bool completeModule)
 
   if (DumpCallGraph)
     dump();
+
+  if (DumpCallGraphStats)
+    dumpStats();
 }
 
 CallGraph::~CallGraph() {
@@ -381,6 +387,67 @@ void CallGraph::dump() {
       llvm::errs() << "!!! Missing node for " << F->getName() << "!!!";
     llvm::errs() << "\n";
   }
+#endif
+}
+
+void CallGraph::dumpStats() {
+#ifndef NDEBUG
+#define NUM_BUCKETS 256
+  unsigned edgesPerNode[NUM_BUCKETS];
+  unsigned calleesPerEdge[NUM_BUCKETS];
+  unsigned countNodes = 0;
+  unsigned countEdges = 0;
+
+  for (auto i = 0; i < NUM_BUCKETS; ++i) edgesPerNode[i] = 0;
+  for (auto i = 0; i < NUM_BUCKETS; ++i) calleesPerEdge[i] = 0;
+
+  auto const &Funcs = getBottomUpFunctionOrder();
+  for (auto *F : Funcs) {
+    ++countNodes;
+    auto *Node = getCallGraphNode(F);
+    if (Node) {
+      auto &calleeEdges = Node->getCalleeEdges();
+      auto edgesInNode = calleeEdges.size();
+      countEdges += edgesInNode;
+      if (edgesInNode >= NUM_BUCKETS)
+        edgesPerNode[NUM_BUCKETS-1]++;
+      else
+        edgesPerNode[edgesInNode]++;
+
+      for (auto *edge : calleeEdges) {
+        auto countCallees = edge->getPartialCalleeSet().size();
+        if (countCallees >= NUM_BUCKETS)
+          calleesPerEdge[NUM_BUCKETS-1]++;
+        else
+          calleesPerEdge[countCallees]++;
+      }
+    } else {
+      llvm::errs() << "!!! Missing node for " << F->getName() << "!!!";
+    }
+  }
+
+  llvm::errs() << "*** Call Graph Statistics ***\n";
+
+  llvm::errs() << "Number of call graph nodes: " << countNodes << "\n";
+  llvm::errs() << "Number of call graph edges: " << countEdges << "\n";
+
+  llvm::errs() << "Histogram of edges per node:\n";
+  for (auto i = 0; i < (NUM_BUCKETS-1); ++i)
+    if (edgesPerNode[i])
+      llvm::errs() << i << ": " << edgesPerNode[i] << "\n";
+  if (edgesPerNode[NUM_BUCKETS-1])
+    llvm::errs() << (NUM_BUCKETS-1) << "+: " <<
+      edgesPerNode[NUM_BUCKETS-1] << "\n";
+  llvm::errs() << "\n";
+
+  llvm::errs() << "Histogram of callees per edge:\n";
+  for (auto i = 0; i < (NUM_BUCKETS-1); ++i)
+    if (calleesPerEdge[i])
+      llvm::errs() << i << ": " << calleesPerEdge[i] << "\n";
+  if (calleesPerEdge[NUM_BUCKETS-1])
+    llvm::errs() << (NUM_BUCKETS-1) << "+: " <<
+      calleesPerEdge[NUM_BUCKETS-1] << "\n";
+  llvm::errs() << "\n";
 #endif
 }
 
