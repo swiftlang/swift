@@ -40,6 +40,7 @@ class ModuleWrapInvocation {
 private:
   std::string MainExecutablePath;
   std::string OutputFilename = "-";
+  llvm::Triple TargetTriple;
   std::vector<std::string> InputFilenames;
 
 public:
@@ -50,6 +51,7 @@ public:
   const std::string &getOutputFilename() { return OutputFilename; }
 
   const std::vector<std::string> &getInputFilenames() { return InputFilenames; }
+  llvm::Triple &getTargetTriple() { return TargetTriple; }
 
   int parseArgs(llvm::ArrayRef<const char *> Args, DiagnosticEngine &Diags) {
     using namespace options;
@@ -66,6 +68,11 @@ public:
                      ParsedArgs->getArgString(MissingIndex), MissingCount);
       return 1;
     }
+
+    if (const Arg *A = ParsedArgs->getLastArg(options::OPT_target))
+      TargetTriple = llvm::Triple(llvm::Triple::normalize(A->getValue()));
+    else
+      TargetTriple = llvm::Triple(llvm::sys::getDefaultTargetTriple());
 
     if (ParsedArgs->hasArg(OPT_UNKNOWN)) {
       for (const Arg *A : make_range(ParsedArgs->filtered_begin(OPT_UNKNOWN),
@@ -151,8 +158,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   SourceManager SrcMgr;
   LangOptions LangOpts;
   SearchPathOptions SearchPathOpts;
-  // FIXME: Using the default triple won't work for cross-compiling.
-  LangOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
+  LangOpts.Target = Invocation.getTargetTriple();
   ASTContext ASTCtx(LangOpts, SearchPathOpts, SrcMgr, Instance.getDiags());
   ClangImporterOptions ClangImporterOpts;
   ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ClangImporterOpts),

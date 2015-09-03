@@ -405,7 +405,8 @@ def resource_dir : Separate<["-"], "resource-dir">,
   MetaVarName<"</usr/lib/swift>">,
   HelpText<"The directory that holds the compiler resource files">;
 
-def target : Separate<["-"], "target">, Flags<[FrontendOption]>,
+def target : Separate<["-"], "target">,
+  Flags<[FrontendOption, ModuleWrapOption]>,
   HelpText<"Generate code for the given target">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
