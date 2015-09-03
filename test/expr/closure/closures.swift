@@ -131,6 +131,7 @@ func anonymousClosureArgsInClosureWithArgs() {
 }
 
 func doStuff(fn : () -> Int) {}
+func doVoidStuff(fn : () -> ()) {}
 
 // <rdar://problem/16193162> Require specifying self for locations in code where strong reference cycles are likely
 class ExplicitSelfRequiredTest {
@@ -139,9 +140,11 @@ class ExplicitSelfRequiredTest {
     // explicit closure requires an explicit "self." base.
     doStuff({ ++self.x })
     doStuff({ ++x })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{17-17=self.}}
+    doVoidStuff({ ++x })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{21-21=self.}}
 
     // Methods follow the same rules as properties, uses of 'self' must be marked with "self."
     doStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit 'self.' to make capture semantics explicit}} {{15-15=self.}}
+    doVoidStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit 'self.' to make capture semantics explicit}} {{19-19=self.}}
     doStuff { self.method() }
 
     // <rdar://problem/18877391> "self." shouldn't be required in the initializer expression in a capture list

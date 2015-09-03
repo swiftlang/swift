@@ -4394,7 +4394,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
   
   closureExpr->setImplicit();
   closureExpr->setIsVoidConversionClosure();
-  closureExpr->setBody(braceStmt, false);
+  closureExpr->setBody(braceStmt, /*isSingleExpression*/true);
 
   auto fnType = closureExpr->getType()->getAs<FunctionType>();
   Type inputType = fnType->getInput();

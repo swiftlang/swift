@@ -131,6 +131,7 @@ public:
   unsigned getNumElements() const { return NumElements; }
 
   ASTNode getElement(unsigned i) const { return getElements()[i]; }
+  void setElement(unsigned i, ASTNode node) { getElements()[i] = node; }
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {

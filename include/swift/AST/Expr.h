@@ -2896,7 +2896,7 @@ public:
   
   /// \brief Determine if this closure was created to satisfy a contextual
   /// conversion to a void function type.
-  bool isVoidConversionClosure() {
+  bool isVoidConversionClosure() const {
     return ClosureExprBits.IsVoidConversionClosure;
   }
   
@@ -2953,7 +2953,8 @@ public:
   ///   { x, y in x > y }
   /// \endcode
   ///
-  /// But not for empty closures nor 
+  /// ... even if the closure has been coerced to return Void by the type
+  /// checker. This function does not return true for empty closures.
   bool hasSingleExpressionBody() const {
     return Body.getInt();
   }

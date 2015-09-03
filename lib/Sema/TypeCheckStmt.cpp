@@ -104,10 +104,10 @@ namespace {
           }
         }
 
-        // If the closure has (or used to have) a single expression body, we
-        // need to walk into it with a new sequence.  Otherwise, it'll have
-        // been separately type-checked.
-        if (CE->hasSingleExpressionBody() || CE->isVoidConversionClosure())
+        // If the closure has a single expression body, we need to walk into it
+        // with a new sequence.  Otherwise, it'll have been separately
+        // type-checked.
+        if (CE->hasSingleExpressionBody())
           CE->getBody()->walk(ContextualizeClosures(CE));
 
         // In neither case do we need to continue the *current* walk.
