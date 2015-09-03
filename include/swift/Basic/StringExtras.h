@@ -36,6 +36,16 @@ namespace swift {
   /// ignoring case.
   PrepositionKind getPrepositionKind(StringRef word);
 
+  /// Describes the part of speech of a particular word.
+  enum class PartOfSpeech {
+    Unknown,
+    Preposition,
+    Verb
+  };
+
+  /// Determine the part of speech for the given word.
+  PartOfSpeech getPartOfSpeech(StringRef word);
+
   namespace camel_case {
     class WordIterator;
 
@@ -252,7 +262,7 @@ enum class NameRole {
   FirstParameter,
 
   // Subsequent parameters in a function or method.
-    SubsequentParameter,
+  SubsequentParameter,
 
   // The name of a property.
   Property,

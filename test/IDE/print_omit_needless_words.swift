@@ -67,5 +67,8 @@
 // Note: Skipping over "3D"
 // CHECK-APPKIT: func drawInAirAt(point: Point3D)
 
+// Note: Don't strip names that aren't preceded by a verb or preposition.
+// CHECK-APPKIT: func setTextColor(color: NSColor)
+
 // Note: Skipping over "Ref"
 // CHECK-CORECOOLING: func replace(powerSupply: CCPowerSupply!)

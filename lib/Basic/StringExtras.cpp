@@ -33,9 +33,22 @@ PrepositionKind swift::getPrepositionKind(StringRef word) {
 #define PREPOSITION(Word)                       \
   if (word.equals_lower(#Word))                 \
     return PK_Nondirectional;
-#include "Prepositions.def"
+#include "PartsOfSpeech.def"
 
   return PK_None;
+}
+
+PartOfSpeech swift::getPartOfSpeech(StringRef word) {
+  // FIXME: This implementation is woefully inefficient.
+#define PREPOSITION(Word)                       \
+  if (word.equals_lower(#Word))                 \
+    return PartOfSpeech::Preposition;
+#define VERB(Word)                              \
+  if (word.equals_lower(#Word))                 \
+    return PartOfSpeech::Verb;
+#include "PartsOfSpeech.def"
+
+  return PartOfSpeech::Unknown;
 }
 
 void WordIterator::computeNextPosition() const {
@@ -343,6 +356,22 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
     return name;
   }
 
+  if (role != NameRole::Property) {
+    // Classify the part of speech of the word before the type
+    // information we would strip off.
+    switch (getPartOfSpeech(*nameWordRevIter)) {
+    case PartOfSpeech::Preposition:
+    case PartOfSpeech::Verb:
+      // Okay to strip off the part of the name that is redundant with
+      // type information.
+      break;
+
+    case PartOfSpeech::Unknown:
+      // Assume it's a noun or adjective; don't strip anything.
+      return name;
+    }
+  }
+
   // Go back to the last matching word and chop off the name at that
   // point.
   StringRef newName = name.substr(0, nameWordRevIter.base().getPosition());
@@ -371,7 +400,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
         return false;
 
       StringRef oldBaseName = baseName;
-      baseName = omitNeedlessWords(baseName, typeName, NameRole::BaseName);
+      baseName = omitNeedlessWords(baseName, typeName, NameRole::Property);
       return baseName != oldBaseName;
     }
 
