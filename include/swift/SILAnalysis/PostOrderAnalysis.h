@@ -27,10 +27,10 @@ namespace swift {
 class SILBasicBlock;
 class SILFunction;
 
-struct PostOrderInfo {
+struct PostOrderFunctionInfo {
   std::vector<SILBasicBlock *> PostOrder;
 
-  PostOrderInfo(SILFunction *F) {
+  PostOrderFunctionInfo(SILFunction *F) {
     std::copy(po_begin(F), po_end(F), std::back_inserter(PostOrder));
   }
 };
@@ -38,10 +38,10 @@ struct PostOrderInfo {
 /// This class is a simple wrapper around the POT iterator provided by LLVM. It
 /// lazily re-evaluates the post order when it is invalidated so that we do not
 /// reform the post order over and over again (it can be expensive).
-class PostOrderAnalysis : public FunctionAnalysisBase<PostOrderInfo> {
+class PostOrderAnalysis : public FunctionAnalysisBase<PostOrderFunctionInfo> {
 protected:
-  virtual PostOrderInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new PostOrderInfo(F);
+  virtual PostOrderFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
+    return new PostOrderFunctionInfo(F);
   }
 
   virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
@@ -50,7 +50,7 @@ protected:
 
 public:
   PostOrderAnalysis()
-      : FunctionAnalysisBase<PostOrderInfo>(AnalysisKind::PostOrder) {}
+      : FunctionAnalysisBase<PostOrderFunctionInfo>(AnalysisKind::PostOrder) {}
 
   // This is a cache and shouldn't be copied around.
   PostOrderAnalysis(const PostOrderAnalysis &) = delete;
