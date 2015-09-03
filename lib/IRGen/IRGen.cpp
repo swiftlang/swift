@@ -677,16 +677,15 @@ performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
                                LLVMContext, &SF, StartElem);
 }
 
-void
-swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
-																	 StringRef OutputPath) {
-	LLVMContext *VMContext = new LLVMContext();
+void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
+                                        StringRef OutputPath) {
+  LLVMContext *VMContext = new LLVMContext();
 
-	auto &Ctx = SILMod.getASTContext();
+  auto &Ctx = SILMod.getASTContext();
   assert(!Ctx.hadError());
 
   IRGenOptions Opts;
-	Opts.OutputKind = IRGenOutputKind::ObjectFile;
+  Opts.OutputKind = IRGenOutputKind::ObjectFile;
   llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
   if (!TargetMachine)
     return;
@@ -694,31 +693,32 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   const auto *DataLayout = TargetMachine->getDataLayout();
   assert(DataLayout && "target machine didn't set DataLayout?");
 
-	IRGenModuleDispatcher dispatcher;
   const llvm::Triple &Triple = Ctx.LangOpts.Target;
+  IRGenModuleDispatcher dispatcher;
   IRGenModule IGM(dispatcher, nullptr, Ctx, *VMContext, Opts, OutputPath,
-                  *DataLayout, Triple,
-                  TargetMachine, &SILMod, Opts.getSingleOutputFilename());
+                  *DataLayout, Triple, TargetMachine, &SILMod,
+                  Opts.getSingleOutputFilename());
   initLLVMModule(IGM);
-	auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
-	auto *Data = llvm::ConstantDataArray::
-    getString(*VMContext, Buffer, /*AddNull=*/false);
-	auto *ASTSym = new llvm::GlobalVariable(
-		*IGM.getModule(), Ty, /*constant*/ true,
-		llvm::GlobalVariable::InternalLinkage, Data, "__Swift_AST");
-	ASTSym->setAlignment(8);
-	if (Triple.isOSBinFormatMachO())
-    ASTSym->setSection(std::string(MachOASTSegmentName) +
-                       "," + MachOASTSectionName);
+  auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
+  auto *Data =
+      llvm::ConstantDataArray::getString(*VMContext, Buffer, /*AddNull=*/false);
+  auto &M = *IGM.getModule();
+  auto *ASTSym = new llvm::GlobalVariable(M, Ty, /*constant*/ true,
+                                          llvm::GlobalVariable::InternalLinkage,
+                                          Data, "__Swift_AST");
+  std::string Section;
+  if (Triple.isOSBinFormatMachO())
+    Section = std::string(MachOASTSegmentName) + "," + MachOASTSectionName;
   else if (Triple.isOSBinFormatCOFF())
-    ASTSym->setSection(COFFASTSectionName);
-	else
-		ASTSym->setSection(ELFASTSectionName);
+    Section = COFFASTSectionName;
+  else
+    Section = ELFASTSectionName;
 
+  ASTSym->setSection(Section);
+  ASTSym->setAlignment(8);
   ::performLLVM(Opts, Ctx.Diags, nullptr, IGM.getModule(), TargetMachine,
-								OutputPath);
+                OutputPath);
 }
-
 
 bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
                         llvm::Module *Module) {
