@@ -965,7 +965,7 @@ public:
         llvm::SmallVector<Identifier, 1> Names;
         for(auto *AT = cast<ArchetypeType>(Ty.getPointer()); AT;
             AT = AT->getParent()) {
-          if (!AT->isSelfDerived())
+          if(!AT->getSelfProtocol())
             Names.insert(Names.begin(), AT->getName());
         }
         if (auto Result = checkMemberType(*DC, BaseTy, Names)) {
