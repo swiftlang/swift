@@ -40,7 +40,8 @@ namespace swift {
   enum class PartOfSpeech {
     Unknown,
     Preposition,
-    Verb
+    Verb,
+    Gerund,
   };
 
   /// Determine the part of speech for the given word.

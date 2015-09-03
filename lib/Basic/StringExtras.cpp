@@ -48,6 +48,31 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
     return PartOfSpeech::Verb;
 #include "PartsOfSpeech.def"
 
+  // Identify gerunds, which always end in "ing".
+  if (word.endswith("ing") && word.size() > 4) {
+    StringRef possibleVerb = word.substr(0, word.size()-3);
+
+    // If what remains is a verb, we have a gerund.
+    if (getPartOfSpeech(possibleVerb) == PartOfSpeech::Verb)
+      return PartOfSpeech::Gerund;
+
+    // Try adding an "e" and look for that as a verb.
+    if (possibleVerb.back() != 'e') {
+      SmallString<16> possibleVerbWithE;
+      possibleVerbWithE += possibleVerb;
+      possibleVerbWithE += 'e';
+      if (getPartOfSpeech(possibleVerbWithE) == PartOfSpeech::Verb)
+        return PartOfSpeech::Gerund;
+    }
+
+    // If there is a repeated letter at the back, drop that second
+    // instance of that letter and try again.
+    unsigned count = possibleVerb.size();
+    if (possibleVerb[count-1] == possibleVerb[count-2] &&
+        getPartOfSpeech(possibleVerb.substr(0, count-1)) == PartOfSpeech::Verb)
+      return PartOfSpeech::Gerund;
+  }
+
   return PartOfSpeech::Unknown;
 }
 
@@ -362,6 +387,7 @@ StringRef swift::omitNeedlessWords(StringRef name, StringRef typeName,
     switch (getPartOfSpeech(*nameWordRevIter)) {
     case PartOfSpeech::Preposition:
     case PartOfSpeech::Verb:
+    case PartOfSpeech::Gerund:
       // Okay to strip off the part of the name that is redundant with
       // type information.
       break;

@@ -61,6 +61,11 @@
 // Note: don't map base name down to a keyword.
 // CHECK-FOUNDATION: func doSelector(selector: Selector)
 
+// Note: Strip names preceded by a gerund.
+// CHECK-FOUNDATION: func startSquashing(bee: Bee)
+// CHECK-FOUNDATION: func startSoothing(bee: Bee)
+// CHECK-FOUNDATION: func startShopping(bee: Bee)
+
 // Note: class method name stripping result type.
 // CHECK-APPKIT: class func red() -> NSColor
 

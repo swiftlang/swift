@@ -868,3 +868,9 @@ __attribute__((availability(macosx,introduced=10.11)))
 @interface NSObject (Silly)
 -(void)doSelector:(SEL)selector;
 @end
+
+@interface Bee (Gerunds)
+- (void)startSquashingBee:(nonnull Bee *)bee;
+- (void)startSoothingBee:(nonnull Bee *)bee;
+- (void)startShoppingBee:(nonnull Bee *)bee;
+@end
