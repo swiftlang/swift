@@ -974,9 +974,12 @@ public:
           SelfDerived = true;
       }
       if (SelfDerived) {
-        if(auto MT = checkMemberType(*DC, BaseTy, Names)) {
-          Result = MT->getKind() == TypeKind::NameAlias ?
-                   MT->getDesugaredType() : MT;
+        if (auto MT = checkMemberType(*DC, BaseTy, Names)) {
+          if (auto NAT = dyn_cast<NameAliasType>(MT.getPointer())) {
+            Result = NAT->getSinglyDesugaredType();
+          } else {
+            Result =  MT;
+          }
         }
       }
       Cache[Ty.getPointer()] = Result;

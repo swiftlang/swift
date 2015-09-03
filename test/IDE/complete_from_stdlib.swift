@@ -41,6 +41,10 @@
 // RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_8 < %t.members8.txt
 // RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members8.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_9 > %t.members9.txt
+// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_9 < %t.members9.txt
+// RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members9.txt
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURNS_ANY_SEQUENCE | FileCheck %s -check-prefix=RETURNS_ANY_SEQUENCE
 
 // NO_STDLIB_PRIVATE: Begin completions
@@ -148,22 +152,37 @@ func testArchetypeReplacement3 (a : [Int]) {
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         prefix({#(maxLength): Int#})[#AnySequence<Int>#]
 // PRIVATE_NOMINAL_MEMBERS_7-DAG: Decl[InstanceMethod]/Super:         elementsEqual({#(other): OtherSequence#}, {#isEquivalent: (Int, Int) throws -> Bool##(Int, Int) throws -> Bool#})[' rethrows'][#Bool#]
 
-func testArchetypeReplacement4 (a : String) {
-  a.characters.#^PRIVATE_NOMINAL_MEMBERS_8^#
+
+protocol P2 {
+  typealias MyElement
 }
 
+extension P2 {
+  func foo(x: MyElement) {}
+}
+
+typealias MyInt = Int
+
+class MyClass1 : P2 {
+  typealias MyElement = MyInt
+}
+
+class MyClass2 : P2 {
+  typealias MyElement = Int
+}
+
+func testArchetypeReplacement4(a : MyClass1) {
+  a.#^PRIVATE_NOMINAL_MEMBERS_8^#
+}
 // PRIVATE_NOMINAL_MEMBERS_8: Begin completions
-// PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceMethod]/CurrNominal:   append({#(c): Character#})[#Void#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceMethod]/CurrNominal:   appendContentsOf({#(newElements): S#})[#Void#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceMethod]/Super:         generate()[#IndexingGenerator<String.CharacterView>#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceMethod]/Super:         popFirst()[#Character?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceMethod]/Super:         popLast()[#Character?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceVar]/Super:            isEmpty[#Bool#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceVar]/Super:            first[#Character?#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceMethod]/Super:         split({#(separator): Character#})[#[String.CharacterView]#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceMethod]/Super:         split({#(separator): Character#}, {#maxSplit: Int#}, {#allowEmptySlices: Bool#})[#[String.CharacterView]#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceMethod]/Super:         removeFirst()[#Character#]{{; name=.+}}
-// PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceVar]/Super:            last[#Character?#]{{; name=.+}}
+// PRIVATE_NOMINAL_MEMBERS_8-DAG: Decl[InstanceMethod]/Super: foo({#(x): MyInt#})[#Void#]{{; name=.+}}
+
+func testArchetypeReplacement5(a : MyClass2) {
+  a.#^PRIVATE_NOMINAL_MEMBERS_9^#
+}
+
+// PRIVATE_NOMINAL_MEMBERS_9: Begin completions
+// PRIVATE_NOMINAL_MEMBERS_9-DAG: Decl[InstanceMethod]/Super: foo({#(x): Int#})[#Void#]{{; name=.+}}
 
 // rdar://problem/22334700
 struct Test1000 : SequenceType {
