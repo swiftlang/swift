@@ -15,16 +15,6 @@ config.targets_to_build = "@TARGETS_TO_BUILD@"
 config.variant_triple = "@VARIANT_TRIPLE@"
 config.variant_sdk = "@VARIANT_SDK@"
 
-# Support substitution of the tools and libs dirs with user parameters. This is
-# used when we can't determine the tool dir at configuration time.
-try:
-    config.llvm_tools_dir = config.llvm_tools_dir % lit_config.params
-    config.llvm_libs_dir = config.llvm_libs_dir % lit_config.params
-except KeyError:
-    e = sys.exc_info()[1]
-    key, = e.args
-    lit_config.fatal("unable to find %r parameter, use '--param=%s=VALUE'" % (key,key))
-
 if "@SWIFT_ASAN_BUILD@" == "TRUE":
     config.available_features.add("asan")
 
