@@ -19,6 +19,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/ADT/DenseMap.h"
 #include <vector>
 
@@ -27,11 +28,55 @@ namespace swift {
 class SILBasicBlock;
 class SILFunction;
 
-struct PostOrderFunctionInfo {
+class PostOrderFunctionInfo {
   std::vector<SILBasicBlock *> PostOrder;
+  llvm::DenseMap<SILBasicBlock *, unsigned> BBToPOMap;
 
+public:
   PostOrderFunctionInfo(SILFunction *F) {
-    std::copy(po_begin(F), po_end(F), std::back_inserter(PostOrder));
+    for (auto *BB : make_range(po_begin(F), po_end(F))) {
+      BBToPOMap[BB] = PostOrder.size();
+      PostOrder.push_back(BB);
+    }
+  }
+
+  using iterator = decltype(PostOrder)::iterator;
+  using const_iterator = decltype(PostOrder)::const_iterator;
+  using reverse_iterator = decltype(PostOrder)::reverse_iterator;
+  using const_reverse_iterator = decltype(PostOrder)::const_reverse_iterator;
+
+  using range = iterator_range<iterator>;
+  using const_range = iterator_range<const_iterator>;
+  using reverse_range = iterator_range<reverse_iterator>;
+  using const_reverse_range = iterator_range<const_reverse_iterator>;
+
+  range getPostOrder() {
+    return make_range(PostOrder.begin(), PostOrder.end());
+  }
+  const_range getPostOrder() const {
+    return make_range(PostOrder.begin(), PostOrder.end());
+  }
+  reverse_range getReversePostOrder() {
+    return make_range(PostOrder.rbegin(), PostOrder.rend());
+  }
+  const_reverse_range getReversePostOrder() const {
+    return make_range(PostOrder.rbegin(), PostOrder.rend());
+  }
+
+  unsigned size() const { return PostOrder.size(); }
+
+  Optional<unsigned> getPONum(SILBasicBlock *BB) const {
+    auto Iter = BBToPOMap.find(BB);
+    if (Iter != BBToPOMap.end())
+      return Iter->second;
+    return None;
+  }
+
+  Optional<unsigned> getRPONum(SILBasicBlock *BB) const {
+    auto Iter = BBToPOMap.find(BB);
+    if (Iter != BBToPOMap.end())
+      return PostOrder.size() - Iter->second - 1;
+    return None;
   }
 };
 
@@ -56,27 +101,21 @@ public:
   PostOrderAnalysis(const PostOrderAnalysis &) = delete;
   PostOrderAnalysis &operator=(const PostOrderAnalysis &) = delete;
 
-  using iterator = std::vector<SILBasicBlock *>::iterator;
-  using reverse_iterator = std::vector<SILBasicBlock *>::reverse_iterator;
+  using iterator = PostOrderFunctionInfo::iterator;
+  using reverse_iterator = PostOrderFunctionInfo::reverse_iterator;
 
-  using range = iterator_range<iterator>;
-  using reverse_range = iterator_range<reverse_iterator>;
+  using range = PostOrderFunctionInfo::range;
+  using reverse_range = PostOrderFunctionInfo::reverse_range;
 
-  iterator_range<iterator> getPostOrder(SILFunction *F) {
-    auto *Info = get(F);
-    return make_range(Info->PostOrder.begin(), Info->PostOrder.end());
-  }
+  range getPostOrder(SILFunction *F) { return get(F)->getPostOrder(); }
 
-  iterator_range<reverse_iterator> getReversePostOrder(SILFunction *F) {
-    auto *Info = get(F);
-    return reversed(Info->PostOrder);
+  reverse_range getReversePostOrder(SILFunction *F) {
+    return get(F)->getReversePostOrder();
   }
 
   // Return the size of the post order for \p F.
   unsigned size(SILFunction *F) const {
-    auto R = const_cast<PostOrderAnalysis *>(this)->getPostOrder(F);
-    // This is cheap since we know that we are using vector iterators.
-    return std::distance(R.begin(), R.end());
+    return const_cast<PostOrderAnalysis *>(this)->get(F)->size();
   }
 
   static bool classof(const SILAnalysis *S) {
