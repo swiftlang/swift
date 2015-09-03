@@ -101,23 +101,6 @@ public:
   PostOrderAnalysis(const PostOrderAnalysis &) = delete;
   PostOrderAnalysis &operator=(const PostOrderAnalysis &) = delete;
 
-  using iterator = PostOrderFunctionInfo::iterator;
-  using reverse_iterator = PostOrderFunctionInfo::reverse_iterator;
-
-  using range = PostOrderFunctionInfo::range;
-  using reverse_range = PostOrderFunctionInfo::reverse_range;
-
-  range getPostOrder(SILFunction *F) { return get(F)->getPostOrder(); }
-
-  reverse_range getReversePostOrder(SILFunction *F) {
-    return get(F)->getReversePostOrder();
-  }
-
-  // Return the size of the post order for \p F.
-  unsigned size(SILFunction *F) const {
-    return const_cast<PostOrderAnalysis *>(this)->get(F)->size();
-  }
-
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::PostOrder;
   }

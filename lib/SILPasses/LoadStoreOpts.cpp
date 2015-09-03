@@ -595,7 +595,7 @@ class LSContext {
 
   /// The range that we use to iterate over the reverse post order of the given
   /// function.
-  PostOrderAnalysis::reverse_range ReversePostOrder;
+  PostOrderFunctionInfo::reverse_range ReversePostOrder;
 
   /// A map from each BasicBlock to its index in the BBIDToForwarderMap.
   ///
@@ -608,7 +608,7 @@ class LSContext {
 
 public:
   LSContext(AliasAnalysis *AA, PostDominanceInfo *PDI,
-            PostOrderAnalysis::reverse_range RPOT);
+            PostOrderFunctionInfo::reverse_range RPOT);
 
   LSContext(const LSContext &) = delete;
   LSContext(LSContext &&) = default;
@@ -1598,7 +1598,8 @@ void LSBBForwarder::verify(LSContext &Ctx, CoveredStoreMap &StoreMap) {
 //                          LSContext Implementation
 //===----------------------------------------------------------------------===//
 
-static inline unsigned roundPostOrderSize(PostOrderAnalysis::reverse_range R) {
+static inline unsigned
+roundPostOrderSize(PostOrderFunctionInfo::reverse_range R) {
   unsigned PostOrderSize = std::distance(R.begin(), R.end());
 
   // NextPowerOf2 operates on uint64_t, so we can not overflow since our input
@@ -1612,10 +1613,10 @@ static inline unsigned roundPostOrderSize(PostOrderAnalysis::reverse_range R) {
 }
 
 LSContext::LSContext(AliasAnalysis *AA, PostDominanceInfo *PDI,
-                     PostOrderAnalysis::reverse_range RPOT)
-  : AA(AA), PDI(PDI), ReversePostOrder(RPOT),
-    BBToBBIDMap(roundPostOrderSize(RPOT)),
-    BBIDToForwarderMap(roundPostOrderSize(RPOT)) {
+                     PostOrderFunctionInfo::reverse_range RPOT)
+    : AA(AA), PDI(PDI), ReversePostOrder(RPOT),
+      BBToBBIDMap(roundPostOrderSize(RPOT)),
+      BBIDToForwarderMap(roundPostOrderSize(RPOT)) {
   for (SILBasicBlock *BB : ReversePostOrder) {
     unsigned count = BBToBBIDMap.size();
     BBToBBIDMap[BB] = count;
@@ -1707,11 +1708,10 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
           << F->getName() << " *****\n");
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
-    auto *POTA = PM->getAnalysis<PostOrderAnalysis>();
-    auto *PDA = PM->getAnalysis<PostDominanceAnalysis>();
-    auto *PDI = PDA->get(F);
+    auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
+    auto *PDT = PM->getAnalysis<PostDominanceAnalysis>()->get(F);
 
-    LSContext Ctx(AA, PDI, POTA->getReversePostOrder(F));
+    LSContext Ctx(AA, PDT, PO->getReversePostOrder());
 
     bool Changed = false;
     while (Ctx.runIteration())

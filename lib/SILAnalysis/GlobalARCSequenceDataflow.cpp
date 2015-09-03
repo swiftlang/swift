@@ -200,7 +200,7 @@ bool ARCSequenceDataflowEvaluator::processTopDown() {
   DEBUG(llvm::dbgs() << "<<<< Processing Top Down! >>>>\n");
 
   // For each BB in our reverse post order...
-  for (auto *BB : POA->getReversePostOrder(&F)) {
+  for (auto *BB : POA->get(&F)->getReversePostOrder()) {
     // We should always have a value here.
     auto BBDataHandle = getTopDownBBState(BB).getValue();
 
@@ -375,7 +375,7 @@ bool ARCSequenceDataflowEvaluator::processBottomUp(
   DEBUG(llvm::dbgs() << "<<<< Processing Bottom Up! >>>>\n");
 
   // For each BB in our post order...
-  for (auto *BB : POA->getPostOrder(&F)) {
+  for (auto *BB : POA->get(&F)->getPostOrder()) {
     // Grab the BBState associated with it and set it to be the current BB.
     auto BBDataHandle = *getBottomUpBBState(BB);
 

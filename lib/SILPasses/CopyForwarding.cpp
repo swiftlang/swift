@@ -895,7 +895,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   // Propagate dead-in blocks upward via PostOrder traversal.
   // TODO: We could easily handle hoisting above loops if LoopInfo is available.
   //
-  for (auto *BB : PostOrder->getPostOrder(F)) {
+  for (auto *BB : PostOrder->get(F)->getPostOrder()) {
     SmallVector<unsigned, 4> DeadInSuccs;
     ArrayRef<SILSuccessor> Succs = BB->getSuccessors();
     if (Succs.size() == 0)

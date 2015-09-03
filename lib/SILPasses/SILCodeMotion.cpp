@@ -950,18 +950,14 @@ public:
 
 /// Map all blocks to BBEnumTagDataflowState in RPO order.
 class BBToDataflowStateMap {
-  llvm::DenseMap<SILBasicBlock *, unsigned> BBToRPOMap;
+  PostOrderFunctionInfo *PO;
   std::vector<BBEnumTagDataflowState> BBToStateVec;
 public:
-  BBToDataflowStateMap(PostOrderAnalysis *POTA, SILFunction *F) {
-    auto ReversePostOrder = POTA->getReversePostOrder(F);
-    int PostOrderSize = std::distance(ReversePostOrder.begin(),
-                                      ReversePostOrder.end());
-    BBToStateVec.resize(PostOrderSize);
+  BBToDataflowStateMap(PostOrderFunctionInfo *PO) : PO(PO), BBToStateVec() {
+    BBToStateVec.resize(PO->size());
     unsigned RPOIdx = 0;
-    for (SILBasicBlock *BB : ReversePostOrder) {
+    for (SILBasicBlock *BB : PO->getReversePostOrder()) {
       BBToStateVec[RPOIdx].init(BB);
-      BBToRPOMap[BB] = RPOIdx;
       ++RPOIdx;
     }
   }
@@ -973,10 +969,10 @@ public:
   }
   /// \return BBEnumTagDataflowState or NULL for unreachable blocks.
   BBEnumTagDataflowState *getBBState(SILBasicBlock *BB) {
-    auto Iter = BBToRPOMap.find(BB);
-    if (Iter == BBToRPOMap.end())
-        return nullptr;
-    return &getRPOState(Iter->second);
+    if (auto ID = PO->getRPONum(BB)) {
+      return &getRPOState(*ID);
+    }
+    return nullptr;
   }
 };
 
@@ -1502,13 +1498,12 @@ sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
 //===----------------------------------------------------------------------===//
 
 static bool processFunction(SILFunction *F, AliasAnalysis *AA,
-                            PostOrderAnalysis *POTA,
-                            RCIdentityFunctionInfo *RCIA,
-                            bool HoistReleases) {
+                            PostOrderFunctionInfo *PO,
+                            RCIdentityFunctionInfo *RCIA, bool HoistReleases) {
 
   bool Changed = false;
 
-  BBToDataflowStateMap BBToStateMap(POTA, F);
+  BBToDataflowStateMap BBToStateMap(PO);
   for (unsigned RPOIdx = 0, RPOEnd = BBToStateMap.size(); RPOIdx < RPOEnd;
        ++RPOIdx) {
 
@@ -1576,13 +1571,13 @@ public:
   void run() override {
     auto *F = getFunction();
     auto *AA = getAnalysis<AliasAnalysis>();
-    auto *POTA = getAnalysis<PostOrderAnalysis>();
+    auto *PO = getAnalysis<PostOrderAnalysis>()->get(F);
     auto *RCIA = getAnalysis<RCIdentityAnalysis>()->get(getFunction());
 
     DEBUG(llvm::dbgs() << "***** CodeMotion on function: " << F->getName() <<
           " *****\n");
 
-    if (processFunction(F, AA, POTA, RCIA, HoistReleases))
+    if (processFunction(F, AA, PO, RCIA, HoistReleases))
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 

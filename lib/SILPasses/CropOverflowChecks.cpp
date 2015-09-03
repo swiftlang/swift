@@ -121,11 +121,11 @@ public:
 
   void run() override {
     DT = PM->getAnalysis<DominanceAnalysis>()->get(getFunction());
+    auto *PO = getAnalysis<PostOrderAnalysis>()->get(getFunction());
     Constraints.clear();
     ToRemove.clear();
 
-    auto *POTA = getAnalysis<PostOrderAnalysis>();
-    auto ReversePostOrder = POTA->getReversePostOrder(getFunction());
+    auto ReversePostOrder = PO->getReversePostOrder();
 
     // Perform a forward scan and use control flow and previously detected
     // overflow checks to remove the overflow checks.

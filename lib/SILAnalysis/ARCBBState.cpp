@@ -148,13 +148,13 @@ using ARCBBStateInfoHandle = ARCSequenceDataflowEvaluator::ARCBBStateInfoHandle;
 } // end anonymous namespace
 
 ARCBBStateInfo::ARCBBStateInfo(SILFunction *F, PostOrderAnalysis *POA)
-    : BBToBBIDMap(), BBIDToBottomUpBBStateMap(POA->size(F)),
-      BBIDToTopDownBBStateMap(POA->size(F)), BackedgeMap() {
+    : BBToBBIDMap(), BBIDToBottomUpBBStateMap(POA->get(F)->size()),
+      BBIDToTopDownBBStateMap(POA->get(F)->size()), BackedgeMap() {
 
   // Initialize state for each one of our BB's in the RPOT. *NOTE* This means
   // that unreachable predecessors will not have any BBState associated with
   // them.
-  for (SILBasicBlock *BB : POA->getReversePostOrder(F)) {
+  for (SILBasicBlock *BB : POA->get(F)->getReversePostOrder()) {
     unsigned BBID = BBToBBIDMap.size();
     BBToBBIDMap[BB] = BBID;
 
