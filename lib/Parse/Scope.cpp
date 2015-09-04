@@ -75,7 +75,7 @@ Scope::Scope(Parser *P, SavedScope &&SS):
     HTScope(std::move(SS.HTDetachedScope)),
     PrevScope(SI.CurScope),
     PrevResolvableDepth(SI.ResolvableDepth),
-    Depth(SI.CurScope ? SI.CurScope->Depth + 1 : 0),
+    Depth(SS.Depth),
     Kind(SS.Kind), IsInactiveConfigBlock(SS.IsInactiveConfigBlock) {
     
     SI.CurScope = this;

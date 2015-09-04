@@ -40,6 +40,15 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_17 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_18 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_19 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INHERITANCE_IN_CLOSURE_0 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_INHERITANCE_IN_CLOSURE_0 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARGUMENT_TYPE_IN_CLOSURE_0 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INHERITANCE_IN_CLOSURE_1 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_INHERITANCE_IN_CLOSURE_1 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARGUMENT_TYPE_IN_CLOSURE_1 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INHERITANCE_IN_CLOSURE_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_INHERITANCE_IN_CLOSURE_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARGUMENT_TYPE_IN_CLOSURE_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -258,4 +267,45 @@ func testAcceptsTrailingClosureInt4() {
       #^IN_TRAILING_CLOSURE_19^#
     }
   }
+}
+
+func testTypeInClosure1() {
+  acceptsTrailingClosureFooVoid {
+    struct S : #^STRUCT_INHERITANCE_IN_CLOSURE_0^#
+  }
+}
+func testTypeInClosure2() {
+  acceptsTrailingClosureFooVoid {
+    class S : #^CLASS_INHERITANCE_IN_CLOSURE_0^#
+  }
+}
+func testTypeInClosure3() {
+  acceptsTrailingClosureFooVoid {
+    func test(x: #^ARGUMENT_TYPE_IN_CLOSURE_0^#
+  }
+}
+acceptsTrailingClosureFooVoid {
+  struct S : #^STRUCT_INHERITANCE_IN_CLOSURE_1^#
+}
+acceptsTrailingClosureFooVoid {
+  class S : #^CLASS_INHERITANCE_IN_CLOSURE_1^#
+}
+acceptsTrailingClosureFooVoid {
+  func test(x: #^ARGUMENT_TYPE_IN_CLOSURE_1^#
+}
+
+struct LazyVar1 {
+  lazy var x: Int = {
+    struct S : #^STRUCT_INHERITANCE_IN_CLOSURE_2^#
+  }()
+}
+struct LazyVar2 {
+  lazy var x: Int = {
+    class S : #^CLASS_INHERITANCE_IN_CLOSURE_2^#
+  }()
+}
+struct LazyVar3 {
+  lazy var x: Int = {
+    func test(x: #^ARGUMENT_TYPE_IN_CLOSURE_2^#
+  }()
 }
