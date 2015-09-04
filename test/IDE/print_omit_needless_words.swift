@@ -75,8 +75,15 @@
 // Note: <result type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: func appending(string: String) -> String
 
+
+// Note: <property><preposition> rule doesn't apply unless context type matches.
+// CHECK-FOUNDATION: func URLWithAddedString(string: String) -> NSURL?
+
 // Note: <property type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: var deletingLastPathComponent: NSURL? { get }
+
+// Note: <property type><preposition> --> <preposition>.
+// CHECK-FOUNDATION: var withHTTPS: NSURL { get }
 
 // Note: class method name stripping result type.
 // CHECK-APPKIT: class func red() -> NSColor
