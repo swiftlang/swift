@@ -45,7 +45,7 @@ The rules for bridging types in ``@c`` function signatures are a subset
 of ``@objc``.
 
 Bridgeable types are now partitioned into two broad categories, "POD"
-and "non-PID". POD types include:
+and "non-POD". POD types include:
 
 - integers
 - @c enums
@@ -78,7 +78,7 @@ Exporting functions to C
 Applying ``@c`` to a function is like a combination of ``@convention(c)``
 and ``@asmname(func_name)``.
 
-The types in the function signature are bridged as described below, and a
+The types in the function signature are bridged as described above, and a
 foreign entry point is generated with the C calling convention and given
 asmname.
 
