@@ -2236,7 +2236,7 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
   if (auto D = ClangNode.getAsDecl()) {
     // Handle redeclared decls.
     if (isa<clang::FunctionDecl>(D) || isa<clang::VarDecl>(D) ||
-        isa<clang::TypedefNameDecl>(D)) {
+        isa<clang::TypedefNameDecl>(D) || isa<clang::RecordDecl>(D)) {
       for (auto Redeclaration : D->redecls()) {
         if (Redeclaration == D)
           continue;
