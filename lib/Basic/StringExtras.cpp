@@ -14,6 +14,7 @@
 // names.
 //
 //===----------------------------------------------------------------------===//
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -526,13 +527,23 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
       // information we would strip off.
       switch (getPartOfSpeech(*nameWordRevIter)) {
       case PartOfSpeech::Preposition:
+        if (role == NameRole::BaseName) {
+          // Strip off the part of the name that is redundant with
+          // type information, so long as there's something preceding the
+          // preposition.
+          if (std::next(nameWordRevIter) != nameWordRevIterEnd)
+            name = name.substr(0, nameWordRevIter.base().getPosition());
+          break;
+        }
+
+      SWIFT_FALLTHROUGH;
+
       case PartOfSpeech::Verb:
-      case PartOfSpeech::Gerund: {
+      case PartOfSpeech::Gerund:
         // Strip off the part of the name that is redundant with
         // type information.
         name = name.substr(0, nameWordRevIter.base().getPosition());
         break;
-      }
 
       case PartOfSpeech::Unknown:
         // Assume it's a noun or adjective; don't strip anything.
@@ -594,8 +605,17 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     return false;
   }
 
-  // Omit needless words based on parameter types.
+  // Omit needless words in the base name based on the result type.
   bool anyChanges = false;
+  StringRef newBaseName
+    = omitNeedlessWordsForResultType(baseName, resultType,
+                                     resultTypeMatchesContext, scratch);
+  if (newBaseName != baseName) {
+    baseName = newBaseName;
+    anyChanges = true;
+  }
+
+  // Omit needless words based on parameter types.
   for (unsigned i = 0, n = argNames.size(); i != n; ++i) {
     // If there is no corresponding parameter, there is nothing to
     // omit.
@@ -619,15 +639,6 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     } else {
       argNames[i] = newName;
     }
-  }
-
-  // Omit needless words in the base name based on the result type.
-  StringRef newBaseName
-    = omitNeedlessWordsForResultType(baseName, resultType,
-                                     resultTypeMatchesContext, scratch);
-  if (newBaseName != baseName) {
-    baseName = newBaseName;
-    anyChanges = true;
   }
 
   return anyChanges;

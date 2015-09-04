@@ -44,7 +44,7 @@
 // CHECK-FOUNDATION: init(array: [AnyObject])
 
 // Note: struct name matching; don't drop "With".
-// CHECK-FOUNDATION: class func valueWith(range: NSRange) -> NSValue
+// CHECK-FOUNDATION: class func withRange(range: NSRange) -> NSValue
 
 // Note: built-in types.
 // CHECK-FOUNDATION: func add(value: Double) -> NSNumber
@@ -75,6 +75,8 @@
 // Note: <result type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: func appending(string: String) -> String
 
+// Note: <result type>By<gerund> --> <gerund>.
+// CHECK-FOUNDATION: func withString(string: String) -> String
 
 // Note: <property><preposition> rule doesn't apply unless context type matches.
 // CHECK-FOUNDATION: func URLWithAddedString(string: String) -> NSURL?

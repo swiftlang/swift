@@ -885,6 +885,7 @@ __attribute__((availability(macosx,introduced=10.11)))
 
 @interface NSString (Appending)
 - (nonnull NSString *)stringByAppendingString:(nonnull NSString *)string;
+- (nonnull NSString *)stringWithString:(nonnull NSString *)string;
 - (nullable NSURL *)URLWithAddedString:(nonnull NSString *)string;
 @end
 
