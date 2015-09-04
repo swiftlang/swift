@@ -109,11 +109,7 @@ struct LLInt${bits} : LowLevelInt {
 
   % for sz in 'sign', 'zero':
   var ${sz}Extended : Extended {
-    % if bits != extendedBits:
-    return Extended(Builtin.${sz[0]}ext_Int${bits}_Int${extendedBits}(storage))
-    % else:
-    return self
-    % end
+    return Extended(Builtin.${sz[0]}extOrBitCast_Int${bits}_Int${extendedBits}(storage))
   }
   % end
 }
