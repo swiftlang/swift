@@ -20,6 +20,10 @@
 using namespace swift;
 using namespace constraints;
 
+static bool isUnresolvedOrTypeVarType(Type ty) {
+  return ty->is<TypeVariableType>() || ty->is<UnresolvedType>();
+}
+
 void Failure::dump(SourceManager *sm) const {
   dump(sm, llvm::errs());
 }
@@ -2344,10 +2348,6 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   return true;
 }
 
-static bool isUnresolvedOrTypeVarType(Type ty) {
-  return ty->is<TypeVariableType>() || ty->is<UnresolvedType>();
-}
-
 bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   auto anchor = expr;
   bool resolvedAnchorToExpr = false;
@@ -2906,7 +2906,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
       return true;
     }
 
-    if (exprType->is<UnresolvedType>() || exprType->hasTypeVariable())
+    if (isUnresolvedOrTypeVarType(exprType))
       return false;
       
     // The conversion destination of throw is always ErrorType (at the moment)
@@ -2973,7 +2973,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   
   // If we don't have a type for the expression, then we cannot use it in
   // conversion constraint diagnostic generation.
-  if (exprType->is<UnresolvedType>() || exprType->hasTypeVariable()) {
+  if (isUnresolvedOrTypeVarType(exprType)) {
     // We can't do anything smart.
     return false;
   }
@@ -3241,7 +3241,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   // If this is a comparison against nil, then we should produce a specific
   // diagnostic.
   if (isa<NilLiteralExpr>(rhsExpr->getValueProvidingExpr()) &&
-      !lhsType->hasTypeVariable() && !lhsType->is<UnresolvedType>()) {
+      !isUnresolvedOrTypeVarType(lhsType)) {
     if (overloadName == "=="  || overloadName == "!=" ||
         overloadName == "===" || overloadName == "!==" ||
         overloadName == "<"   || overloadName == ">" ||
@@ -3369,7 +3369,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   
   switch (result.OverallResult) {
   case MemberLookupResult::Unsolved:
-    llvm_unreachable("base expr type should be resolved at this point");
+    return false;
   case MemberLookupResult::ErrorAlreadyDiagnosed:
     // If an error was already emitted, then we're done, don't emit anything
     // redundant.
@@ -3409,8 +3409,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     auto selfConstraint = CC_ExactMatch;
     auto instanceTy =
       SD->getGetter()->getImplicitSelfDecl()->getType()->getInOutObjectType();
-    if (!baseType->hasTypeVariable() &&
-        !baseType->hasUnresolvedType() &&
+    if (!isUnresolvedOrTypeVarType(baseType) &&
         !CS->TC.isConvertibleTo(baseType, instanceTy, CS->DC)) {
       selfConstraint = CC_SelfMismatch;
     }
@@ -3739,7 +3738,7 @@ bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
 
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
-  if (!argType->is<TypeVariableType>() && !argType->is<UnresolvedType>() &&
+  if (!isUnresolvedOrTypeVarType(argType) &&
       argType->getAnyOptionalObjectType().isNull()) {
     diagnose(FVE->getLoc(), diag::invalid_force_unwrap, argType)
       .fixItRemove(FVE->getExclaimLoc())
@@ -3757,7 +3756,7 @@ bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
 
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
-  if (!argType->is<TypeVariableType>() && !argType->is<UnresolvedType>() &&
+  if (!isUnresolvedOrTypeVarType(argType) &&
       argType->getAnyOptionalObjectType().isNull()) {
     diagnose(BOE->getQuestionLoc(), diag::invalid_optional_chain, argType)
       .highlight(BOE->getSourceRange())
@@ -4438,8 +4437,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     // If this is a multi-statement closure with no explicit result type, emit
     // a note to clue the developer in.
     if (!CE->hasExplicitResultType() && CFTy &&
-        (CFTy->getResult()->hasTypeVariable() ||
-         CFTy->getResult()->is<UnresolvedType>())) {
+        isUnresolvedOrTypeVarType(CFTy->getResult())) {
       diagnose(CE->getLoc(), diag::cannot_infer_closure_result_type);
       return;
     }
@@ -4467,7 +4465,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   // If we were able to find something more specific than "unknown" (perhaps
   // something like "[_:_]" for a dictionary literal), include it in the
   // diagnostic.
-  if (!exprType->is<UnresolvedType>() && !exprType->is<TypeVariableType>()) {
+  if (!isUnresolvedOrTypeVarType(exprType)) {
     diagnose(E->getLoc(), diag::specific_type_of_expression_is_ambiguous,
              exprType)
       .highlight(E->getSourceRange());
