@@ -4,3 +4,9 @@ typedef struct CGPoint CGPoint;
 
 typedef CGPoint NSPoint;
 NSString *NSStringToNSString(NSString *str);
+
+struct FooStruct1 {
+  int x;
+  double y;
+};
+enum Tribool;

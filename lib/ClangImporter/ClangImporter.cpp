@@ -2246,6 +2246,18 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
         if (OwningClangModule == ModuleFilter->getClangModule())
           return true;
       }
+    } else if (isa<clang::TagDecl>(D)) {
+      for (auto Redeclaration : D->redecls()) {
+        if (Redeclaration == D)
+          continue;
+        if (!cast<clang::TagDecl>(Redeclaration)->isCompleteDefinition())
+          continue;
+        auto OwningClangModule = getClangOwningModule(Redeclaration,
+                                                      ClangASTContext);
+
+        if (OwningClangModule == ModuleFilter->getClangModule())
+          return true;
+      }
     }
   }
 
