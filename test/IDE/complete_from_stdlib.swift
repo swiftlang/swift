@@ -45,6 +45,10 @@
 // RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_9 < %t.members9.txt
 // RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members9.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_10 > %t.members10.txt
+// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_10 < %t.members10.txt
+// RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members10.txt
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURNS_ANY_SEQUENCE | FileCheck %s -check-prefix=RETURNS_ANY_SEQUENCE
 
 // NO_STDLIB_PRIVATE: Begin completions
@@ -171,6 +175,12 @@ class MyClass2 : P2 {
   typealias MyElement = Int
 }
 
+protocol P1{}
+
+class MyClass3 {
+  func foo<T: protocol<P1, P2>>(t : T) {}
+}
+
 func testArchetypeReplacement4(a : MyClass1) {
   a.#^PRIVATE_NOMINAL_MEMBERS_8^#
 }
@@ -183,6 +193,14 @@ func testArchetypeReplacement5(a : MyClass2) {
 
 // PRIVATE_NOMINAL_MEMBERS_9: Begin completions
 // PRIVATE_NOMINAL_MEMBERS_9-DAG: Decl[InstanceMethod]/Super: foo({#(x): Int#})[#Void#]{{; name=.+}}
+
+func testArchetypeReplacement6() {
+  var a = MyClass3()
+  a.#^PRIVATE_NOMINAL_MEMBERS_10^#
+}
+
+// PRIVATE_NOMINAL_MEMBERS_10: Begin completions
+// PRIVATE_NOMINAL_MEMBERS_10-DAG: Decl[InstanceMethod]/CurrNominal:   foo({#(t): protocol<P1, P2>#})[#Void#]{{; name=.+}}
 
 // rdar://problem/22334700
 struct Test1000 : SequenceType {
