@@ -2471,7 +2471,11 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       return false;
     return true;
   }
-  
+
+  // If simplification has turned this into the same types, then this isn't the
+  // broken constraint that we're looking for.
+  if (fromType->isEqual(toType))
+    return false;
 
   diagnose(anchor->getLoc(), diag::types_not_convertible,
            constraint->getKind() == ConstraintKind::Subtype,
@@ -3897,6 +3901,15 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   return false;
 }
 
+static bool isDictionaryLiteralCompatible(Type ty, ConstraintSystem *CS,
+                                          SourceLoc loc) {
+  auto DLC = CS->TC.getProtocol(loc,
+                              KnownProtocolKind::DictionaryLiteralConvertible);
+  if (!DLC) return false;
+  return CS->TC.conformsToProtocol(ty, DLC, CS->DC,
+                                   ConformanceCheckFlags::InExpression);
+}
+
 bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
   Type contextualElementType;
   auto elementTypePurpose = CTP_Unused;
@@ -3906,19 +3919,38 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
   // If we had a contextual type, then it either conforms to
   // ArrayLiteralConvertible or it is an invalid contextual type.
   if (auto contextualType = CS->getContextualType()) {
+    // If our contextual type is an optional, look through them, because we're
+    // surely initializing whatever is inside.
+    contextualType = contextualType->lookThroughAllAnyOptionalTypes();
+
+    // Validate that the contextual type conforms to ArrayLiteralConvertible and
+    // figure out what the contextual element type is in place.
     auto ALC = CS->TC.getProtocol(E->getLoc(),
                                   KnownProtocolKind::ArrayLiteralConvertible);
-    
-    // Validate that the contextual type conforms to ArrayLiteralConvertible and
-    // figure out what the contextual Key/Value types are in place.  If this
-    // doesn't conform, then it is a contextual error that we'll emit later with
-    // a good message.
     ProtocolConformance *Conformance = nullptr;
-    if (!ALC || !CS->TC.conformsToProtocol(contextualType, ALC, CS->DC,
-                                           ConformanceCheckFlags::InExpression,
-                                           &Conformance))
+    if (!ALC)
       return visitExpr(E);
-    
+
+    if (!CS->TC.conformsToProtocol(contextualType, ALC, CS->DC,
+                                   ConformanceCheckFlags::InExpression,
+                                   &Conformance)) {
+      diagnose(E->getStartLoc(), diag::type_is_not_array, contextualType)
+        .highlight(E->getSourceRange());
+
+      // If the contextual type conforms to DicitonaryLiteralConvertible, then
+      // they wrote "x = [1,2]" but probably meant "x = [1:2]".
+      if ((E->getElements().size() & 1) == 0 && !E->getElements().empty() &&
+          isDictionaryLiteralCompatible(contextualType, CS, E->getLoc())) {
+        auto diag = diagnose(E->getStartLoc(), diag::meant_dictionary_lit);
+
+        // Change every other comma into a colon.
+        for (unsigned i = 0, e = E->getElements().size()/2; i != e; ++i)
+          diag.fixItReplace(E->getCommaLocs()[i*2], ":");
+      }
+
+      return true;
+    }
+
     Conformance->forEachTypeWitness(&CS->TC,
                                     [&](AssociatedTypeDecl *ATD,
                           const Substitution &subst, TypeDecl *d)->bool
@@ -3956,18 +3988,24 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
   // If we had a contextual type, then it either conforms to
   // DictionaryLiteralConvertible or it is an invalid contextual type.
   if (auto contextualType = CS->getContextualType()) {
+    // If our contextual type is an optional, look through them, because we're
+    // surely initializing whatever is inside.
+    contextualType = contextualType->lookThroughAllAnyOptionalTypes();
+
     auto DLC = CS->TC.getProtocol(E->getLoc(),
                             KnownProtocolKind::DictionaryLiteralConvertible);
-    
+    if (!DLC) return visitExpr(E);
+
     // Validate the contextual type conforms to DictionaryLiteralConvertible
-    // and figure out what the contextual Key/Value types are in place.  If this
-    // doesn't conform, then it is a contextual error that we'll emit later with
-    // a good message.
+    // and figure out what the contextual Key/Value types are in place.
     ProtocolConformance *Conformance = nullptr;
-    if (!DLC || !CS->TC.conformsToProtocol(contextualType, DLC, CS->DC,
-                                           ConformanceCheckFlags::InExpression,
-                                           &Conformance, E->getLoc()))
-      return visitExpr(E);
+    if (!CS->TC.conformsToProtocol(contextualType, DLC, CS->DC,
+                                   ConformanceCheckFlags::InExpression,
+                                   &Conformance)) {
+      diagnose(E->getStartLoc(), diag::type_is_not_dictionary, contextualType)
+        .highlight(E->getSourceRange());
+      return true;
+    }
 
     Conformance->forEachTypeWitness(&CS->TC,
                                     [&](AssociatedTypeDecl *ATD,

@@ -1785,10 +1785,17 @@ ERROR(bool_type_broken,sema_tce,none,
 // Array literals
 ERROR(array_protocol_broken,sema_tce,none,
       "ArrayLiteralConvertible protocol definition is broken", ())
+ERROR(type_is_not_array,sema_tce,none,
+      "contextual type %0 cannot be used with array literal", (Type))
+NOTE(meant_dictionary_lit, sema_tce,none,
+     "did you mean to use a dictionary literal instead?", ())
 
 // Dictionary literals
 ERROR(dictionary_protocol_broken,sema_tce,none,
       "DictionaryLiteralConvertible protocol definition is broken", ())
+ERROR(type_is_not_dictionary,sema_tce,none,
+      "contextual type %0 cannot be used with dictionary literal", (Type))
+
 
 // Generic specializations
 ERROR(cannot_explicitly_specialize_generic_function,tce_sema,none,

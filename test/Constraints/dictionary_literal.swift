@@ -38,3 +38,24 @@ var a3 = ["Hello" : 1]
 var b = [ 1 : 2, 1.5 : 2.5 ]
 var b2 : Dictionary<Double, Double> = b
 var b3 = [1 : 2.5]
+
+
+// <rdar://problem/22584076> QoI: Using array literal init with dictionary produces bogus error
+
+// expected-note @+1 {{did you mean to use a dictionary literal instead?}}
+var _: Dictionary<String, (Int) -> Int>? = [  // expected-error {{contextual type 'Dictionary<String, (Int) -> Int>' (aka 'Dictionary<String, Int -> Int>') cannot be used with array literal}}
+  "closure_1" as String, {(Int) -> Int in 0},
+  "closure_2", {(Int) -> Int in 0}]
+
+
+var _: Dictionary<String, Int>? = ["foo", 1]  // expected-error {{contextual type 'Dictionary<String, Int>' cannot be used with array literal}}
+// expected-note @-1 {{did you mean to use a dictionary literal instead?}} {{41-42=:}}
+
+var _: Dictionary<String, Int>? = ["foo", 1, "bar", 42]  // expected-error {{contextual type 'Dictionary<String, Int>' cannot be used with array literal}}
+// expected-note @-1 {{did you mean to use a dictionary literal instead?}} {{41-42=:}} {{51-52=:}}
+
+var _: Dictionary<String, Int>? = ["foo", 1.0, 2]  // expected-error {{contextual type 'Dictionary<String, Int>' cannot be used with array literal}}
+
+var _: Dictionary<String, Int>? = ["foo" : 1.0]  // expected-error {{cannot convert value of type 'Double' to expected dictionary value type 'Int'}}
+
+
