@@ -59,8 +59,8 @@ extension B {
 
   // Initializing the whole struct at once.
   init(k : Int, x : Bool, y : Bool, z : Bool) {
-    let b : B     // expected-note {{variable defined here}}
-    self = b      // expected-error {{variable 'b' used before being initialized}}
+    let b : B     // expected-note {{constant defined here}}
+    self = b      // expected-error {{constant 'b' used before being initialized}}
   }
 }
 

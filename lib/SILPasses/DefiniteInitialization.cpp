@@ -424,7 +424,8 @@ namespace {
     bool shouldEmitError(SILInstruction *Inst);
     std::string getUninitElementName(const DIMemoryUse &Use);
     void noteUninitializedMembers(const DIMemoryUse &Use);
-    void diagnoseInitError(const DIMemoryUse &Use, Diag<StringRef> DiagMessage);
+    void diagnoseInitError(const DIMemoryUse &Use,
+                           Diag<StringRef, bool> DiagMessage);
     
     bool isBlockIsReachableFromEntry(SILBasicBlock *BB);
   };
@@ -596,7 +597,7 @@ std::string LifetimeChecker::getUninitElementName(const DIMemoryUse &Use) {
 }
 
 void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
-                                        Diag<StringRef> DiagMessage) {
+                                        Diag<StringRef, bool> DiagMessage) {
   auto *Inst = Use.Inst;
   if (!shouldEmitError(Inst))
     return;
@@ -611,7 +612,12 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   if (DiagLoc.isNull() || DiagLoc.getSourceLoc().isInvalid())
     DiagLoc = Inst->getFunction()->getLocation();
 
-  diagnose(Module, DiagLoc, DiagMessage, Name);
+  // Determine whether the field we're touching is a let property.
+  bool isLet = true;
+  for (unsigned i = 0, e = Use.NumElements; i != e; ++i)
+    isLet &= TheMemory.isElementLetProperty(i);
+
+  diagnose(Module, DiagLoc, DiagMessage, Name, isLet);
 
   // As a debugging hack, print the instruction itself if there is no location
   // information.  This should never happen.
@@ -624,7 +630,7 @@ void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
   // We could give some path information where the use was uninitialized, like
   // the static analyzer.
   if (!TheMemory.isAnyInitSelf())
-    diagnose(Module, TheMemory.getLoc(), diag::variable_defined_here);
+    diagnose(Module, TheMemory.getLoc(), diag::variable_defined_here, isLet);
 }
 
 void LifetimeChecker::doIt() {
@@ -936,7 +942,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
     return;
   }
 
-  Diag<StringRef> DiagMessage;
+  Diag<StringRef, bool> DiagMessage;
   if (isa<MarkFunctionEscapeInst>(Inst))
     DiagMessage = diag::global_variable_function_use_uninit;
   else

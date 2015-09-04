@@ -251,8 +251,9 @@ struct EmptyStruct {}
 func useEmptyStruct(a: EmptyStruct) {}
 
 func emptyStructTest() {
-  let a : EmptyStruct  // expected-note {{variable defined here}}
-  useEmptyStruct(a)    // expected-error {{variable 'a' used before being initialized}}
+  // <rdar://problem/20065892> Diagnostic for an uninitialized constant calls it a variable
+  let a : EmptyStruct  // expected-note {{constant defined here}}
+  useEmptyStruct(a)    // expected-error {{constant 'a' used before being initialized}}
 
   var (b,c,d) : (EmptyStruct,EmptyStruct,EmptyStruct) // expected-note 2 {{variable defined here}}
   

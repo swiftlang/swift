@@ -87,29 +87,28 @@ ERROR(recursive_enum_not_indirect,sil_gen,none,
 
 // Definite initialization diagnostics.
 NOTE(variable_defined_here,sil_analysis,none,
-     "variable defined here", ())
+     "%select{variable|constant}0 defined here", (bool))
 ERROR(variable_used_before_initialized,sil_analysis,none,
-      "variable '%0' used before being initialized", (StringRef))
+      "%select{variable|constant}1 '%0' used before being initialized",
+      (StringRef, bool))
 ERROR(variable_inout_before_initialized,sil_analysis,none,
-      "variable '%0' passed by reference before being initialized", (StringRef))
+      "%select{variable|constant}1 '%0' passed by reference before being"
+      " initialized", (StringRef, bool))
 ERROR(variable_escape_before_initialized,sil_analysis,none,
-      "variable '%0' captured by a closure before being initialized",
-      (StringRef))
+      "%select{variable|constant}1 '%0' captured by a closure before being"
+      " initialized", (StringRef, bool))
 ERROR(self_use_before_init_in_delegatinginit,sil_analysis,none,
       "use of '%0' in delegating initializer before self.init is called",
-      (StringRef))
+      (StringRef, bool))
 
 ERROR(variable_addrtaken_before_initialized,sil_analysis,none,
-      "address of variable '%0' taken before it is initialized",
-      (StringRef))
+      "address of %select{variable|constant}1 '%0' taken before it is"
+      " initialized", (StringRef, bool))
 ERROR(ivar_not_initialized_at_superinit,sil_analysis,none,
-      "property '%0' not initialized at super.init call", (StringRef))
+      "property '%0' not initialized at super.init call", (StringRef, bool))
 ERROR(ivar_not_initialized_at_implicit_superinit,sil_analysis,none,
       "property '%0' not initialized at implicitly generated super.init call",
-      (StringRef))
-ERROR(ivar_not_initialized_at_selfinit,sil_analysis,none,
-      "property '%0' not initialized at self.init call",
-      (StringRef))
+      (StringRef, bool))
 
 ERROR(self_use_before_fully_init,sil_analysis,none,
       "use of 'self' in %select{method call|property access}1 %0 before "
@@ -144,11 +143,12 @@ ERROR(return_from_init_without_self_init,sil_analysis,none,
       "self.init isn't called on all paths in delegating initializer", ())
 
 ERROR(global_variable_function_use_uninit,sil_analysis,none,
-      "variable '%0' used by function definition before being initialized",
-      (StringRef))
+      "%select{variable|constant}1 '%0' used by function definition before"
+      " being initialized",
+      (StringRef, bool))
 ERROR(struct_not_fully_initialized,sil_analysis,none,
       "struct '%0' must be completely initialized before a member is stored to",
-      (StringRef))
+      (StringRef, bool))
 ERROR(immutable_property_already_initialized,sil_analysis,none,
       "immutable value '%0' may only be initialized once",
       (StringRef))
