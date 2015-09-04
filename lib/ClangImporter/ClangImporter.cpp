@@ -1326,29 +1326,6 @@ ClangImporter::Implementation::importName(const clang::NamedDecl *D,
   return result;
 }
 
-/// Split the given selector piece at the given index, updating
-/// capitalization as required.
-///
-/// \param selector The selector piece.
-/// \param index The index at which to split.
-/// \param buffer Buffer used for scratch space.
-///
-/// \returns a pair of strings \c (before,after), where \c after has
-/// has its capitalization adjusted if necessary.
-static std::pair<StringRef, StringRef>
-splitSelectorPieceAt(StringRef selector, unsigned index,
-                     SmallVectorImpl<char> &buffer) {
-  // If the split point is at the end of the selector, the solution is
-  // trivial.
-  if (selector.size() == index) {
-    return { selector, "" };
-  }
-
-  // Split at the index and lowercase the parameter name.
-  return { selector.substr(0, index),
-           camel_case::toLowercaseWord(selector.substr(index), buffer) };
-}
-
 /// Import an argument name.
 static Identifier importArgName(ASTContext &ctx, StringRef name,
                                 bool dropWith, bool isSwiftPrivate) {
@@ -1606,73 +1583,19 @@ DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
     ObjCSelector selector,
     StringRef className,
     bool isSwiftPrivate) {
+  // See if we can match the class name to the beginning of the first selector
+  // piece.
   auto firstPiece = selector.getSelectorPieces()[0];
-  if (firstPiece.empty())
+  StringRef firstArgLabel = matchLeadingTypeName(firstPiece.str(), className);
+  if (firstArgLabel.size() == firstPiece.str().size())
     return DeclName();
 
-  // If the first selector piece starts with an acronym, and that acronym
-  // matches the end of the first word of the class name, pretend the class
-  // name starts at the beginning of that acronym. This effectively
-  // adjusts the class name "NSURL" to "URL" when mapping a selector
-  // starting with "URL".
-  auto firstPieceStr = firstPiece.str();
-  if (firstPieceStr.size() > 1 &&
-      clang::isUppercase(firstPieceStr[0]) &&
-      clang::isUppercase(firstPieceStr[1])) {
-    auto selectorAcronym = camel_case::getFirstWord(firstPieceStr);
-    auto classNameStart = camel_case::getFirstWord(className);
-    if (classNameStart.endswith(selectorAcronym)) {
-      className = className.substr(
-                    classNameStart.size() - selectorAcronym.size());
-    }
-  }
-
-  // Match the camelCase beginning of the first selector piece to the
-  // ending of the class name.
-  auto methodWords = camel_case::getWords(firstPieceStr);
-  auto classWords = camel_case::getWords(className);
-  auto methodWordIter = methodWords.begin(),
-    methodWordIterEnd = methodWords.end();
-  auto classWordRevIter = classWords.rbegin(),
-    classWordRevIterEnd = classWords.rend();
-
-  // Find the last instance of the first word in the method's name within
-  // the words in the class name.
-  while (classWordRevIter != classWordRevIterEnd &&
-         !camel_case::sameWordIgnoreFirstCase(*methodWordIter,
-                                              *classWordRevIter)) {
-    ++classWordRevIter;
-  }
-
-  // If we didn't find the first word in the method's name at all, we're
-  // done.
-  if (classWordRevIter == classWordRevIterEnd)
-    return DeclName();
-
-  // Now, match from the first word up until the end of the class.
-  auto classWordIter = classWordRevIter.base(),
-  classWordIterEnd = classWords.end();
-  ++methodWordIter;
-  while (classWordIter != classWordIterEnd &&
-         methodWordIter != methodWordIterEnd &&
-         camel_case::sameWordIgnoreFirstCase(*classWordIter,
-                                             *methodWordIter)) {
-    ++classWordIter;
-    ++methodWordIter;
-  }
-
-  // If we didn't reach the end of the class name, don't match.
-  if (classWordIter != classWordIterEnd)
-    return DeclName();
-
-  // We found the chopping point. Form the first argument name.
+  // Form the first argument label.
   llvm::SmallString<32> scratch;
   SmallVector<Identifier, 4> argumentNames;
   argumentNames.push_back(
     importArgName(SwiftContext,
-                  splitSelectorPieceAt(firstPieceStr,
-                                       methodWordIter.getPosition(),
-                                       scratch).second,
+                  camel_case::toLowercaseWord(firstArgLabel, scratch),
                   /*dropWith=*/true,
                   isSwiftPrivate));
 

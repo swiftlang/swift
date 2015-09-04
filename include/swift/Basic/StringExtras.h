@@ -308,6 +308,13 @@ struct OmissionTypeName {
   }
 };
 
+/// Match the given type name at the beginning of the given name,
+/// returning the remainder of the name.
+///
+/// For example, matching "stringByAppendingString" to the type "NSString"
+/// would produce "ByAppendingString".
+StringRef matchLeadingTypeName(StringRef name, OmissionTypeName typeName);
+
 /// Attempt to omit needless words from the given name based on the
 /// name of the type associated with the name.
 ///

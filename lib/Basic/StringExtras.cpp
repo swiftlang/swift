@@ -314,6 +314,66 @@ static Optional<StringRef> skipTypeSuffix(StringRef typeName) {
   return None;
 }
 
+/// Match the beginning of the name to the given type name.
+StringRef swift::matchLeadingTypeName(StringRef name,
+                                      OmissionTypeName typeName) {
+  // If the name starts with an acronym, and that acronym
+  // matches the end of the first word of the type name, pretend the type
+  // name starts at the beginning of that acronym. This effectively
+  // adjusts the name "NSURL" to "URL" when mapping a type
+  // starting with "URL".
+  if (name.size() > 1 &&
+      clang::isUppercase(name[0]) &&
+      clang::isUppercase(name[1])) {
+    auto nameAcronym = camel_case::getFirstWord(name);
+    auto typeNameStart = camel_case::getFirstWord(typeName.Name);
+    if (typeNameStart.endswith(nameAcronym)) {
+      typeName.Name = typeName.Name.substr(
+                        typeNameStart.size() - nameAcronym.size());
+    }
+  }
+
+  // Match the camelCase beginning of the name to the
+  // ending of the type name.
+  auto nameWords = camel_case::getWords(name);
+  auto typeWords = camel_case::getWords(typeName.Name);
+  auto nameWordIter = nameWords.begin(),
+    nameWordIterEnd = nameWords.end();
+  auto typeWordRevIter = typeWords.rbegin(),
+    typeWordRevIterEnd = typeWords.rend();
+
+  // Find the last instance of the first word in the name within
+  // the words in the type name.
+  while (typeWordRevIter != typeWordRevIterEnd &&
+         !camel_case::sameWordIgnoreFirstCase(*nameWordIter,
+                                              *typeWordRevIter)) {
+    ++typeWordRevIter;
+  }
+
+  // If we didn't find the first word in the name at all, we're
+  // done.
+  if (typeWordRevIter == typeWordRevIterEnd)
+    return name;
+
+  // Now, match from the first word up until the end of the type name.
+  auto typeWordIter = typeWordRevIter.base(),
+    typeWordIterEnd = typeWords.end();
+  ++nameWordIter;
+  while (typeWordIter != typeWordIterEnd &&
+         nameWordIter != nameWordIterEnd &&
+         camel_case::sameWordIgnoreFirstCase(*typeWordIter, *nameWordIter)) {
+    ++typeWordIter;
+    ++nameWordIter;
+  }
+
+  // If we didn't reach the end of the type name, don't match.
+  if (typeWordIter != typeWordIterEnd)
+    return name;
+
+  // Chop of the beginning of the name.
+  return name.substr(nameWordIter.getPosition());
+}
+
 StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
                                    NameRole role) {
   if (name.empty() || typeName.empty()) return name;
