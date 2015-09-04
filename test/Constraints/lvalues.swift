@@ -168,7 +168,7 @@ var ir2 = ((&i)) // expected-error{{type 'inout Int' of variable is not material
 // <rdar://problem/17133089>
 func takeArrayRef(inout x:Array<String>) { }
 
-// FIXME rdar://22308291 Poor diagnostic.
+// rdar://22308291
 takeArrayRef(["asdf", "1234"]) // expected-error{{contextual type 'inout Array<String>' cannot be used with array literal}}
 
 // <rdar://problem/19835413> Reference to value from array changed
