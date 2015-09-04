@@ -848,11 +848,13 @@ TupleExpr *TupleExpr::createImplicit(ASTContext &ctx, ArrayRef<Expr *> SubExprs,
 
 
 ArrayExpr *ArrayExpr::create(ASTContext &C, SourceLoc LBracketLoc,
-                             ArrayRef<Expr*> Elements, SourceLoc RBracketLoc,
-                             Type Ty) {
+                             ArrayRef<Expr*> Elements,
+                             ArrayRef<SourceLoc> CommaLocs,
+                             SourceLoc RBracketLoc, Type Ty) {
   // Copy the element list into the ASTContext.
   auto NewElements = C.AllocateCopy(Elements);
-  return new (C) ArrayExpr(LBracketLoc, NewElements, RBracketLoc, Ty);
+  auto NewCommas = C.AllocateCopy(CommaLocs);
+  return new (C) ArrayExpr(LBracketLoc, NewElements, NewCommas, RBracketLoc,Ty);
 }
 
 DictionaryExpr *DictionaryExpr::create(ASTContext &C, SourceLoc LBracketLoc,

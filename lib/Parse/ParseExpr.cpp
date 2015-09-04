@@ -2152,7 +2152,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
   if (Tok.is(tok::r_square)) {
     SourceLoc RSquareLoc = consumeToken(tok::r_square);
     return makeParserResult(
-                    ArrayExpr::create(Context, LSquareLoc, {}, RSquareLoc));
+                    ArrayExpr::create(Context, LSquareLoc, {}, {}, RSquareLoc));
   }
 
   // [:] is always an empty dictionary.
@@ -2195,26 +2195,34 @@ ParserResult<Expr> Parser::parseExprCollection() {
 ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
                                           Expr *FirstExpr) {
   SmallVector<Expr *, 8> SubExprs;
+  SmallVector<SourceLoc, 8> CommaLocs;
   SubExprs.push_back(FirstExpr);
 
-  SourceLoc RSquareLoc;
+  SourceLoc CommaLoc, RSquareLoc;
   ParserStatus Status;
 
-  if (Tok.isNot(tok::r_square) && !consumeIf(tok::comma)) {
+  if (Tok.isNot(tok::r_square) && !consumeIf(tok::comma, CommaLoc)) {
     diagnose(Tok, diag::expected_separator, ",")
         .fixItInsertAfter(PreviousLoc, ",");
     Status.setIsParseError();
   }
 
+  CommaLocs.push_back(CommaLoc);
+
   Status |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
                       tok::comma, /*OptionalSep=*/false,
                       /*AllowSepAfterLast=*/true,
                       diag::expected_rsquare_array_expr,
-                      [&] () -> ParserStatus {
+                      [&] () -> ParserStatus
+  {
     ParserResult<Expr> Element
       = parseExpr(diag::expected_expr_in_collection_literal);
     if (Element.isNonNull())
       SubExprs.push_back(Element.get());
+
+    if (Tok.is(tok::comma))
+      CommaLocs.push_back(Tok.getLoc());
+
     return Element;
   });
 
@@ -2223,7 +2231,8 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
 
   assert(SubExprs.size() >= 1);
   return makeParserResult(Status,
-          ArrayExpr::create(Context, LSquareLoc, SubExprs, RSquareLoc));
+          ArrayExpr::create(Context, LSquareLoc, SubExprs, CommaLocs,
+                            RSquareLoc));
 }
 
 /// parseExprDictionary - Parse a dictionary literal expression.

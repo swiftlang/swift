@@ -1737,13 +1737,26 @@ public:
  
 /// \brief An array literal expression [a, b, c].
 class ArrayExpr : public CollectionExpr {
+  /// ASTContext allocated list of comma locations, there is one less entry here
+  /// than the number of elements.
+  MutableArrayRef<SourceLoc> CommaLocs;
+
   ArrayExpr(SourceLoc LBracketLoc, MutableArrayRef<Expr*> Elements,
+            MutableArrayRef<SourceLoc> CommaLocs,
             SourceLoc RBracketLoc, Type Ty)
-  : CollectionExpr(ExprKind::Array, LBracketLoc, Elements, RBracketLoc, Ty) {}
+  : CollectionExpr(ExprKind::Array, LBracketLoc, Elements, RBracketLoc, Ty),
+    CommaLocs(CommaLocs) {}
 public:
   static ArrayExpr *create(ASTContext &C, SourceLoc LBracketLoc,
-                           ArrayRef<Expr*> Elements, SourceLoc RBracketLoc,
+                           ArrayRef<Expr*> Elements,
+                           ArrayRef<SourceLoc> CommaLocs,
+                           SourceLoc RBracketLoc,
                            Type Ty = Type());
+
+  /// ASTContext allocated list of comma locations, there is one less entry here
+  /// than the number of elements.
+  MutableArrayRef<SourceLoc> getCommaLocs() { return CommaLocs; }
+  ArrayRef<SourceLoc> getCommaLocs() const { return CommaLocs; }
 
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Array;
