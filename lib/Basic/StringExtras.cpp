@@ -374,8 +374,35 @@ StringRef swift::matchLeadingTypeName(StringRef name,
   return name.substr(nameWordIter.getPosition());
 }
 
+/// Omit needless words for the result type of a name, which come at the
+/// beginning of the name.
+static StringRef omitNeedlessWordsForResultType(StringRef name,
+                                                OmissionTypeName resultType,
+                                                SmallVectorImpl<char> &scratch){
+  if (resultType.empty())
+    return name;
+
+  // Match the result type to the beginning of the name.
+  StringRef newName = matchLeadingTypeName(name, resultType);
+  if (newName == name)
+    return name;
+
+  // If we have "By" followed by a gerund, chop of the "By" as well and
+  // use the lowercased gerund.
+  if (newName.startswith("By")) {
+    newName = newName.substr(2);
+    if (getPartOfSpeech(camel_case::getFirstWord(newName))
+          == PartOfSpeech::Gerund) {
+      return camel_case::toLowercaseWord(newName, scratch);
+    }
+  }
+
+  return name;
+}
+
 StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
-                                   NameRole role) {
+                                   NameRole role,
+                                   SmallVectorImpl<char> &scratch) {
   if (name.empty() || typeName.empty()) return name;
 
   // Get the camel-case words in the name and type name.
@@ -437,7 +464,7 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
         = name.substr(0, nameWordRevIter.base().getPosition()-1);
       auto newShortenedNameWord
         = omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
-                            NameRole::Partial);
+                            NameRole::Partial, scratch);
       if (shortenedNameWord != newShortenedNameWord) {
         anyMatches = true;
         unsigned targetSize = newShortenedNameWord.size();
@@ -461,50 +488,63 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
     break;
   }
 
-  // If nothing matched, there is nothing to omit.
-  if (!anyMatches) return name;
+  StringRef origName = name;
 
-  // Handle complete name matches.
-  if (nameWordRevIter == nameWordRevIterEnd) {
-    // If we're doing a partial match, return the empty string.
-    if (role == NameRole::Partial) return "";
+  // If we matched anything above, update the name appropriately.
+  if (anyMatches) {
+    // Handle complete name matches.
+    if (nameWordRevIter == nameWordRevIterEnd) {
+      // If we're doing a partial match, return the empty string.
+      if (role == NameRole::Partial) return "";
 
-    // Leave the name alone.
-    return name;
-  }
-
-  if (role != NameRole::Property) {
-    // Classify the part of speech of the word before the type
-    // information we would strip off.
-    switch (getPartOfSpeech(*nameWordRevIter)) {
-    case PartOfSpeech::Preposition:
-    case PartOfSpeech::Verb:
-    case PartOfSpeech::Gerund:
-      // Okay to strip off the part of the name that is redundant with
-      // type information.
-      break;
-
-    case PartOfSpeech::Unknown:
-      // Assume it's a noun or adjective; don't strip anything.
+      // Leave the name alone.
       return name;
     }
+
+    switch (role) {
+    case NameRole::Property:
+      // Always strip off type information.
+      name = name.substr(0, nameWordRevIter.base().getPosition());
+      break;
+
+    case NameRole::BaseName:
+    case NameRole::FirstParameter:
+    case NameRole::Partial:
+    case NameRole::SubsequentParameter:
+      // Classify the part of speech of the word before the type
+      // information we would strip off.
+      switch (getPartOfSpeech(*nameWordRevIter)) {
+      case PartOfSpeech::Preposition:
+      case PartOfSpeech::Verb:
+      case PartOfSpeech::Gerund: {
+        // Strip off the part of the name that is redundant with
+        // type information.
+        name = name.substr(0, nameWordRevIter.base().getPosition());
+        break;
+      }
+
+      case PartOfSpeech::Unknown:
+        // Assume it's a noun or adjective; don't strip anything.
+        break;
+      }
+      break;
+    }
+  } else if (role == NameRole::Property) {
+    // For a property, check whether type information is at the beginning.
+    name = omitNeedlessWordsForResultType(name, typeName, scratch);
   }
 
-  // Go back to the last matching word and chop off the name at that
-  // point.
-  StringRef newName = name.substr(0, nameWordRevIter.base().getPosition());
-
   // If we ended up with a name like "get" or "set", do nothing.
-  if (newName == "get" || newName == "set")
-    return name;
+  if (name == "get" || name == "set")
+    return origName;
 
   // If we ended up with a keyword for a property name or base name,
   // do nothing.
   switch (role) {
   case NameRole::BaseName:
   case NameRole::Property:
-    if (isKeyword(newName))
-      return name;
+    if (isKeyword(name))
+      return origName;
     break;
 
   case NameRole::FirstParameter:
@@ -514,7 +554,7 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
   }
 
   // We're done.
-  return newName;
+  return name;
 }
 
 bool swift::omitNeedlessWords(StringRef &baseName,
@@ -522,7 +562,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                               OmissionTypeName resultType,
                               OmissionTypeName contextType,
                               ArrayRef<OmissionTypeName> paramTypes,
-                              bool returnsSelf) {
+                              bool returnsSelf,
+                              SmallVectorImpl<char> &scratch) {
   // For zero-parameter methods that return 'Self' or a result type
   // that matches the declaration context, omit needless words from
   // the base name.
@@ -533,7 +574,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
         return false;
 
       StringRef oldBaseName = baseName;
-      baseName = omitNeedlessWords(baseName, typeName, NameRole::Property);
+      baseName = omitNeedlessWords(baseName, typeName, NameRole::Property,
+                                   scratch);
       return baseName != oldBaseName;
     }
 
@@ -553,7 +595,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       : NameRole::FirstParameter;
 
     StringRef name = role == NameRole::BaseName ? baseName : argNames[i];
-    StringRef newName = omitNeedlessWords(name, paramTypes[i], role);
+    StringRef newName = omitNeedlessWords(name, paramTypes[i], role, scratch);
 
     if (name == newName) continue;
 
@@ -565,6 +607,14 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     } else {
       argNames[i] = newName;
     }
+  }
+
+  // Omit needless words in the base name based on the result type.
+  StringRef newBaseName = omitNeedlessWordsForResultType(baseName, resultType,
+                                                         scratch);
+  if (newBaseName != baseName) {
+    baseName = newBaseName;
+    anyChanges = true;
   }
 
   return anyChanges;

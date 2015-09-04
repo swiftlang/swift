@@ -326,9 +326,12 @@ StringRef matchLeadingTypeName(StringRef name, OmissionTypeName typeName);
 /// \param role The role of the name, e.g., a parameter name, property
 /// name, base name of a function, etc.
 ///
+/// \param scratch Scratch space that will be used for modifications beyond
+/// just chopping names.
+///
 /// \returns the updated name.
 StringRef omitNeedlessWords(StringRef name, OmissionTypeName typeName,
-                            NameRole role);
+                            NameRole role, SmallVectorImpl<char> &scratch);
 
 /// Omit needless words for a function, method, or initializer.
 ///
@@ -349,13 +352,17 @@ StringRef omitNeedlessWords(StringRef name, OmissionTypeName typeName,
 /// \param returnsSelf Whether the result of the function is 'Self'
 /// (in Swift) or 'instancetype' (in Objective-C).
 ///
+/// \param scratch Scratch space that will be used for modifications beyond
+/// just chopping names.
+///
 /// \returns true if any words were omitted, false otherwise.
 bool omitNeedlessWords(StringRef &baseName,
                        MutableArrayRef<StringRef> argNames,
                        OmissionTypeName resultType,
                        OmissionTypeName contextType,
                        ArrayRef<OmissionTypeName> paramTypes,
-                       bool returnsSelf);
+                       bool returnsSelf,
+                       SmallVectorImpl<char> &scratch);
 }
 
 #endif // LLVM_SWIFT_BASIC_STRINGEXTRAS_HPP

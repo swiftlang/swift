@@ -1804,8 +1804,8 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
       ASTContext &ctx = nominal->getASTContext();
       auto args = bound->getGenericArgs();
       if (!args.empty() &&
-          bound->getDecl() == ctx.getArrayDecl() ||
-          bound->getDecl() == ctx.getSetDecl()) {
+          (bound->getDecl() == ctx.getArrayDecl() ||
+           bound->getDecl() == ctx.getSetDecl())) {
         return OmissionTypeName(nominal->getName().str(),
                                 getTypeNameForOmission(args[0]).Name);
       }
@@ -1885,11 +1885,11 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
     returnsSelf = true;
   }
 
+  SmallString<32> scratch;
   if (!swift::omitNeedlessWords(baseNameStr, argNameStrs,
                                 getTypeNameForOmission(resultType),
                                 getTypeNameForOmission(contextType),
-                                paramTypes,
-                                returnsSelf))
+                                paramTypes, returnsSelf, scratch))
     return None;
 
   /// Retrieve a replacement identifier.
@@ -1943,10 +1943,11 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
     return None;
 
   // Omit needless words.
+  SmallString<32> scratch;
   StringRef newName
     = swift::omitNeedlessWords(name.str(),
                                getTypeNameForOmission(var->getType()),
-                               NameRole::Property);
+                               NameRole::Property, scratch);
 
   if (newName == name.str())
     return None;

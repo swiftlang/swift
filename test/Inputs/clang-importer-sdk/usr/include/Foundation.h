@@ -882,3 +882,11 @@ __attribute__((availability(macosx,introduced=10.11)))
 @interface NSString (Slicing)
 - (nonnull NSString *)sliceFromIndex:(NSInteger)fromIndex toIndex:(NSInteger)toIndex;
 @end
+
+@interface NSString (Appending)
+- (nonnull NSString *)stringByAppendingString:(nonnull NSString *)string;
+@end
+
+@interface NSURL (Properties)
+@property (readonly, nullable) NSURL *URLByDeletingLastPathComponent;
+@end

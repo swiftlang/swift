@@ -72,6 +72,12 @@
 // Note: Int and Index match.
 // CHECK-FOUNDATION: func sliceFrom(fromIndex: Int, to toIndex: Int) -> String
 
+// Note: <result type>By<gerund> --> <gerund>.
+// CHECK-FOUNDATION: func appending(string: String) -> String
+
+// Note: <property type>By<gerund> --> <gerund>.
+// CHECK-FOUNDATION: var deletingLastPathComponent: NSURL? { get }
+
 // Note: class method name stripping result type.
 // CHECK-APPKIT: class func red() -> NSColor
 

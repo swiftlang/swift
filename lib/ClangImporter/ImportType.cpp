@@ -1955,11 +1955,12 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
 
   // Omit needless words.
   StringRef baseName = name.getBaseName().str();
+  SmallString<32> scratch;
   if (!omitNeedlessWords(baseName, argNames,
                          getClangTypeNameForOmission(resultType),
                          getClangTypeNameForOmission(
                            getClangDeclContextType(dc)),
-                         paramTypes, returnsSelf))
+                         paramTypes, returnsSelf, scratch))
     return name;
 
   /// Retrieve a replacement identifier.
