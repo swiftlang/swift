@@ -4,5 +4,3 @@ typedef struct CGPoint CGPoint;
 
 typedef CGPoint NSPoint;
 NSString *NSStringToNSString(NSString *str);
-
-struct Point3D { double x, y, z; };
