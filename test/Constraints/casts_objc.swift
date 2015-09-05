@@ -39,3 +39,9 @@ func test(a : CFString!, b : CFString) {
 
   dict[b] = object // expected-error {{argument type 'CFString' does not conform to expected type 'NSCopying'}}
 }
+
+
+// <rdar://problem/22507759> QoI: poor error message for invalid unsafeDowncast()
+let r22507759: NSObject! = "test"
+let _: NSString! = unsafeDowncast(r22507759)  // expected-error {{generic parameter 'T' could not be inferred}}
+
