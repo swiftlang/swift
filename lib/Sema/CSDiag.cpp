@@ -3722,12 +3722,36 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
 
     auto fnType = CS->getContextualType()->castTo<AnyFunctionType>();
     Pattern *params = CE->getParams();
+    Type inferredArgType = fnType->getInput();
+    
+    // It is very common for a contextual type to disagree with the argument
+    // list built into the closure expr.  This can be because the closure expr
+    // had an explicitly specified pattern, ala:
+    //    { a,b in ... }
+    // or could be because the closure has an implicitly generated one:
+    //    { $0 + $1 }
+    // in either case, we want to produce nice and clear diagnostics.
+    unsigned actualArgCount = 1;
+    if (auto *TP = dyn_cast<TuplePattern>(params))
+      actualArgCount = TP->getNumElements();
+    unsigned inferredArgCount = 1;
+    if (auto *argTupleTy = inferredArgType->getAs<TupleType>())
+      inferredArgCount = argTupleTy->getNumElements();
+    
+    // If the actual argument count is 1, it can match a tuple as a whole.
+    if (actualArgCount != 1 && actualArgCount != inferredArgCount) {
+      diagnose(params->getStartLoc(), diag::closure_argument_list_tuple,
+               inferredArgCount, actualArgCount);
+      
+      return true;
+    }
+    
     TypeResolutionOptions TROptions;
     TROptions |= TR_OverrideType;
     TROptions |= TR_FromNonInferredPattern;
     TROptions |= TR_InExpression;
     TROptions |= TR_ImmediateFunctionInput;
-    if (CS->TC.coercePatternToType(params, CE, fnType->getInput(), TROptions))
+    if (CS->TC.coercePatternToType(params, CE, inferredArgType, TROptions))
       return true;
     CE->setParams(params);
 
