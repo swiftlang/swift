@@ -63,6 +63,7 @@ set(SWIFTLIB_ESSENTIAL
   LazyCollection.swift
   LazySequence.swift
   LifetimeManager.swift
+  LowLevelInt.swift.gyb
   ManagedBuffer.swift
   Map.swift
   Mirrors.swift.gyb
