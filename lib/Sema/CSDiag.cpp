@@ -3913,8 +3913,6 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
   Type contextualElementType;
   auto elementTypePurpose = CTP_Unused;
 
-  // FIXME: This isn't handling Array -> pointer impl conversions yet.
-
   // If we had a contextual type, then it either conforms to
   // ArrayLiteralConvertible or it is an invalid contextual type.
   if (auto contextualType = CS->getContextualType()) {
@@ -3930,9 +3928,30 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     if (!ALC)
       return visitExpr(E);
 
-    if (!CS->TC.conformsToProtocol(contextualType, ALC, CS->DC,
-                                   ConformanceCheckFlags::InExpression,
-                                   &Conformance)) {
+    // Check to see if the contextual type conforms.
+    bool foundConformance =
+      CS->TC.conformsToProtocol(contextualType, ALC, CS->DC,
+                                ConformanceCheckFlags::InExpression,
+                                &Conformance);
+    
+    // If not, we may have an implicit conversion going on.  If the contextual
+    // type is an UnsafePointer or UnsafeMutablePointer, then that is probably
+    // what is happening.
+    if (!foundConformance) {
+      // TODO: Not handling various string conversions or void conversions.
+      auto cBGT = contextualType->getAs<BoundGenericType>();
+      if (cBGT && cBGT->getDecl() == CS->TC.Context.getUnsafePointerDecl()) {
+        auto arrayTy = ArraySliceType::get(cBGT->getGenericArgs()[0]);
+        foundConformance =
+          CS->TC.conformsToProtocol(arrayTy, ALC, CS->DC,
+                                    ConformanceCheckFlags::InExpression,
+                                    &Conformance);
+        if (foundConformance)
+          contextualType = arrayTy;
+      }
+    }
+    
+    if (!foundConformance) {
       diagnose(E->getStartLoc(), diag::type_is_not_array, contextualType)
         .highlight(E->getSourceRange());
 

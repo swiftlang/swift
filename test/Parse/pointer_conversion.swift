@@ -94,8 +94,8 @@ func constPointerArguments(p: UnsafeMutablePointer<Int>,
   takesConstPointer(ii)
   takesConstPointer(ff) // expected-error{{cannot convert value of type '[Float]' to expected argument type 'UnsafePointer<Int>'}}
   takesConstPointer([0, 1, 2])
-  // FIXME: improve QoI: rdar://22308330
-  takesConstPointer([0.0, 1.0, 2.0]) // expected-error{{contextual type 'UnsafePointer<Int>' cannot be used with array literal}}
+  // <rdar://problem/22308330> QoI: CSDiags doesn't handle array -> pointer impl conversions well
+  takesConstPointer([0.0, 1.0, 2.0]) // expected-error{{cannot convert value of type 'Double' to expected element type 'Int'}}
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafePointer<Int> = &i // expected-error{{'&' used with non-inout argument of type 'UnsafePointer<Int>'}}
@@ -128,8 +128,8 @@ func constVoidPointerArguments(p: UnsafeMutablePointer<Int>,
   takesConstVoidPointer(&ff)
   takesConstVoidPointer(ii)
   takesConstVoidPointer(ff)
-  takesConstVoidPointer([0, 1, 2]) // expected-error {{contextual type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>') cannot be used with array literal}}
-takesConstVoidPointer([0.0, 1.0, 2.0])  // expected-error {{contextual type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>') cannot be used with array literal}}
+  takesConstVoidPointer([0, 1, 2]) // expected-error {{cannot convert value of type 'Int' to expected element type '()'}}
+takesConstVoidPointer([0.0, 1.0, 2.0])  // expected-error {{cannot convert value of type 'Double' to expected element type '()'}}
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafePointer<Void> = &i // expected-error{{'&' used with non-inout argument of type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
