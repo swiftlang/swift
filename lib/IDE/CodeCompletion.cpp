@@ -969,12 +969,12 @@ public:
 
   std::function<Type(Type)> getTransformerFunc() {
     return [&](Type Ty) {
-      if (Ty->getDesugaredType()->getKind() != TypeKind::Archetype)
+      if (Ty->getKind() != TypeKind::Archetype)
         return Ty;
       if (Cache.count(Ty.getPointer()) > 0) {
         return Cache[Ty.getPointer()];
       }
-      Type Result = Ty->getDesugaredType();
+      Type Result = Ty;
       auto *RootArc = cast<ArchetypeType>(Result.getPointer());
       llvm::SmallVector<Identifier, 1> Names;
       bool SelfDerived = false;
@@ -995,8 +995,10 @@ public:
       } else if (TypeParams.count(RootArc->getName()) != 0 &&
                  !RootArc->getParent()) {
         Result = TypeParams[RootArc->getName()];
-      } else {
-        auto ATT = Result->castTo<ArchetypeType>();
+      }
+
+      auto ATT = dyn_cast<ArchetypeType>(Result.getPointer());
+      if (ATT && !ATT->getParent()) {
         auto Conformances = ATT->getConformsTo();
         if (Conformances.size() == 1) {
           Result = Conformances[0]->getDeclaredType();
@@ -1009,6 +1011,8 @@ public:
                                                 ConformedTypes);
         }
       }
+      if (Result->getKind() != TypeKind::Archetype)
+        Result = Result.transform(getTransformerFunc());
       Cache[Ty.getPointer()] = Result;
       return Result;
     };
