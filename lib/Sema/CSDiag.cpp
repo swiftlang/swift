@@ -3740,9 +3740,36 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
     
     // If the actual argument count is 1, it can match a tuple as a whole.
     if (actualArgCount != 1 && actualArgCount != inferredArgCount) {
+      // If the closure didn't specify any arguments and it is in a context that
+      // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
+      if (actualArgCount == 0 && CE->getInLoc().isInvalid()) {
+        auto diag =
+          diagnose(CE->getStartLoc(), diag::closure_argument_list_missing,
+                   inferredArgCount);
+        StringRef fixText;  // We only handle the most common cases.
+        if (inferredArgCount == 1)
+          fixText = " _ in ";
+        else if (inferredArgCount == 2)
+          fixText = " _,_ in ";
+        else if (inferredArgCount == 3)
+          fixText = " _,_,_ in ";
+        
+        if (!fixText.empty()) {
+          // Determine if there is already a space after the { in the closure to
+          // make sure we introduce the right whitespace.
+          auto afterBrace = CE->getStartLoc().getAdvancedLoc(1);
+          auto text = CS->TC.Context.SourceMgr.extractText({afterBrace, 1});
+          if (text.size() == 1 && text == " ")
+            fixText = fixText.drop_back();
+          else
+            fixText = fixText.drop_front();
+          diag.fixItInsertAfter(CE->getStartLoc(), fixText);
+        }
+        return true;
+      }
+      
       diagnose(params->getStartLoc(), diag::closure_argument_list_tuple,
                inferredArgCount, actualArgCount);
-      
       return true;
     }
     

@@ -9,9 +9,9 @@ func func6c(f: (Int, Int) -> Int, _ n: Int = 0) {} // expected-warning{{prior to
 // Expressions can be auto-closurified, so that they can be evaluated separately
 // from their definition.
 var closure1 : () -> Int = {4}  // Function producing 4 whenever it is called.
-var closure2 : (Int,Int) -> Int = { 4 } // expected-error{{contextual type for closure argument list expects 2 arguments, but 0 were specified}}
+var closure2 : (Int,Int) -> Int = { 4 } // expected-error{{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}} {{36-36= _,_ in}}
 var closure3a : ()->()->(Int,Int) = {{ (4, 2) }} // multi-level closing.
-var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // expected-error{{contextual type for closure argument list expects 2 arguments, but 0 were specified}}
+var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // expected-error{{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}}  {{48-48=_,_ in }}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int = {
        $0 + 1.0  // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}
@@ -28,7 +28,7 @@ func funcdecl4(a: ((Int)->Int), _ b: Int) {}
 
 func funcdecl5(a: Int, _ y: Int) {
   // Pass in a closure containing the call to funcdecl3.
-  funcdecl4({ funcdecl3() }, 12)  // expected-error {{contextual type for closure argument list expects 1 argument, but 0 were specified}}
+  funcdecl4({ funcdecl3() }, 12)  // expected-error {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{14-14= _ in}}
   
   
   func6(fn: {$0 + $1})       // Closure with two named anonymous arguments

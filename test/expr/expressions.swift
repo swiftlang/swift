@@ -139,7 +139,7 @@ acceptsInt(unknown_var) // expected-error {{use of unresolved identifier 'unknow
 
 
 
-var test1a: (Int) -> (Int) -> Int = { { $0 } } // expected-error{{contextual type for closure argument list expects 1 argument, but 0 were specified}}
+var test1a: (Int) -> (Int) -> Int = { { $0 } } // expected-error{{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{38-38= _ in}}
 var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
