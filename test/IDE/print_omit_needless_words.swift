@@ -55,6 +55,9 @@
 // Note: class name matching; don't drop "With".
 // CHECK-FOUNDATION: class func requestWith(URLString: String!) -> Self!
 
+// Note: Make sure NSURL works in various places
+// CHECK-FOUNDATION: open(URL: NSURL!, completionHandler: ((Bool) -> Void)!)
+
 // Note: property name stripping property type.
 // CHECK-FOUNDATION: var uppercase: String
 

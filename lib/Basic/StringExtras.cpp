@@ -315,25 +315,33 @@ static Optional<StringRef> skipTypeSuffix(StringRef typeName) {
   return None;
 }
 
+/// Match a word within a name to a word within a type.
+static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
+  // If the name word is longer, there's no match.
+  if (nameWord.size() > typeWord.size()) return false;
+
+  // If the name word is shorter, we can match the suffix of the type so long
+  // as everything preceding the match is neither a lowercase letter nor a '_'.
+  if (nameWord.size() < typeWord.size()) {
+    // Check for a name match at the end of the type.
+    if (!typeWord.endswith(nameWord)) return false;
+
+    // Check that everything preceding the match is neither a lowercase letter
+    // nor a '_'.
+    for (unsigned i = 0, n = nameWord.size(); i != n; ++i) {
+      if (clang::isLowercase(typeWord[i]) || typeWord[i] == '_') return false;
+    }
+
+    return true;
+  }
+
+  // Check for an exact match.
+  return camel_case::sameWordIgnoreFirstCase(nameWord, typeWord);
+}
+
 /// Match the beginning of the name to the given type name.
 StringRef swift::matchLeadingTypeName(StringRef name,
                                       OmissionTypeName typeName) {
-  // If the name starts with an acronym, and that acronym
-  // matches the end of the first word of the type name, pretend the type
-  // name starts at the beginning of that acronym. This effectively
-  // adjusts the name "NSURL" to "URL" when mapping a type
-  // starting with "URL".
-  if (name.size() > 1 &&
-      clang::isUppercase(name[0]) &&
-      clang::isUppercase(name[1])) {
-    auto nameAcronym = camel_case::getFirstWord(name);
-    auto typeNameStart = camel_case::getFirstWord(typeName.Name);
-    if (typeNameStart.endswith(nameAcronym)) {
-      typeName.Name = typeName.Name.substr(
-                        typeNameStart.size() - nameAcronym.size());
-    }
-  }
-
   // Match the camelCase beginning of the name to the
   // ending of the type name.
   auto nameWords = camel_case::getWords(name);
@@ -346,8 +354,7 @@ StringRef swift::matchLeadingTypeName(StringRef name,
   // Find the last instance of the first word in the name within
   // the words in the type name.
   while (typeWordRevIter != typeWordRevIterEnd &&
-         !camel_case::sameWordIgnoreFirstCase(*nameWordIter,
-                                              *typeWordRevIter)) {
+         !matchNameWordToTypeWord(*nameWordIter, *typeWordRevIter)) {
     ++typeWordRevIter;
   }
 
@@ -362,7 +369,7 @@ StringRef swift::matchLeadingTypeName(StringRef name,
   ++nameWordIter;
   while (typeWordIter != typeWordIterEnd &&
          nameWordIter != nameWordIterEnd &&
-         camel_case::sameWordIgnoreFirstCase(*typeWordIter, *nameWordIter)) {
+         matchNameWordToTypeWord(*nameWordIter, *typeWordIter)) {
     ++typeWordIter;
     ++nameWordIter;
   }
@@ -433,7 +440,7 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
          typeWordRevIter != typeWordRevIterEnd) {
     // If the names match, continue.
     auto nameWord = *nameWordRevIter;
-    if (camel_case::sameWordIgnoreFirstCase(nameWord, *typeWordRevIter)) {
+    if (matchNameWordToTypeWord(nameWord, *typeWordRevIter)) {
       anyMatches = true;
       ++nameWordRevIter;
       ++typeWordRevIter;
@@ -442,13 +449,13 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
 
     // Special case: "Indexes" and "Indices" in the name match
     // "IndexSet" in the type.
-    if ((camel_case::sameWordIgnoreFirstCase(nameWord, "Indexes") ||
-         camel_case::sameWordIgnoreFirstCase(nameWord, "Indices")) &&
+    if ((matchNameWordToTypeWord(nameWord, "Indexes") ||
+         matchNameWordToTypeWord(nameWord, "Indices")) &&
         *typeWordRevIter == "Set") {
       auto nextTypeWordRevIter = typeWordRevIter;
       ++nextTypeWordRevIter;
       if (nextTypeWordRevIter != typeWordRevIterEnd &&
-          camel_case::sameWordIgnoreFirstCase(*nextTypeWordRevIter, "Index")) {
+          matchNameWordToTypeWord("Index", *nextTypeWordRevIter)) {
         anyMatches = true;
         ++nameWordRevIter;
         typeWordRevIter = nextTypeWordRevIter;
@@ -458,9 +465,9 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
     }
 
     // Special case: "Index" in the name matches "Int" or "Integer" in the type.
-    if (camel_case::sameWordIgnoreFirstCase(nameWord, "Index") &&
-        (camel_case::sameWordIgnoreFirstCase(*typeWordRevIter, "Int") ||
-         camel_case::sameWordIgnoreFirstCase(*typeWordRevIter, "Integer"))) {
+    if (matchNameWordToTypeWord(nameWord, "Index") &&
+        (matchNameWordToTypeWord("Int", *typeWordRevIter) ||
+         matchNameWordToTypeWord("Integer", *typeWordRevIter))) {
       anyMatches = true;
       ++nameWordRevIter;
       ++typeWordRevIter;
