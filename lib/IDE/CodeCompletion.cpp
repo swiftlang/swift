@@ -951,10 +951,21 @@ class ArchetypeTransformer {
   DeclContext *DC;
   Type BaseTy;
   llvm::DenseMap<TypeBase *, Type> Cache;
+  llvm::DenseMap<Identifier, Type> TypeParams;
 
 public:
-  ArchetypeTransformer(DeclContext *DC, Type BaseTy) : DC(DC),
-                                                       BaseTy(BaseTy->getRValueType()){}
+  ArchetypeTransformer(DeclContext *DC, Type Ty) : DC(DC),
+                                                   BaseTy(Ty->getRValueType()){
+    if (!BaseTy->getNominalOrBoundGenericNominal())
+      return;
+    SmallVector<swift::Substitution, 3> Scrach;
+    for (auto Sub : BaseTy->getDesugaredType()->gatherAllSubstitutions(
+                      DC->getParentModule(), Scrach,
+                      DC->getASTContext().getLazyResolver())) {
+      if (Sub.getReplacement()->isCanonical())
+        TypeParams[Sub.getArchetype()->getName()] = Sub.getReplacement();
+    }
+  }
 
   std::function<Type(Type)> getTransformerFunc() {
     return [&](Type Ty) {
@@ -964,10 +975,10 @@ public:
         return Cache[Ty.getPointer()];
       }
       Type Result = Ty->getDesugaredType();
+      auto *RootArc = cast<ArchetypeType>(Result.getPointer());
       llvm::SmallVector<Identifier, 1> Names;
       bool SelfDerived = false;
-      for(auto *AT = cast<ArchetypeType>(Result.getPointer()); AT;
-          AT = AT->getParent()) {
+      for(auto *AT = RootArc; AT; AT = AT->getParent()) {
         if(!AT->getSelfProtocol())
           Names.insert(Names.begin(), AT->getName());
         else
@@ -981,6 +992,9 @@ public:
             Result =  MT;
           }
         }
+      } else if (TypeParams.count(RootArc->getName()) != 0 &&
+                 !RootArc->getParent()) {
+        Result = TypeParams[RootArc->getName()];
       } else {
         auto ATT = Result->castTo<ArchetypeType>();
         auto Conformances = ATT->getConformsTo();
