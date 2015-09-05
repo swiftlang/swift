@@ -104,6 +104,9 @@ protocol LowLevelInt : Equatable {
   ///
   /// - Requires: the high bit is not set.
   var assumingNonNegative : Self { get }
+
+  /// Returns `self`, trapping if the high bit is set
+  func checkingNonNegative() -> Self
   
 #if false
   var maxUnsetBit : Swift.Int { get }
@@ -135,11 +138,11 @@ extension Bool {
 % for bits in fixedBitWidths:
 %   # Until we have BitInt, the widest Int sign-extends into itself.
 %   extendedBits = bits * 2 if bits != maxFixedBits else bits
-%   truncatedBits = bits / 2 if bits != minFixedBits else bits
+%   narrowedBits = bits / 2 if bits != minFixedBits else bits
 struct LLInt${bits} : LowLevelInt {
   typealias Self_ = LLInt${bits}
   typealias Extended = LLInt${extendedBits}
-  typealias Truncated = LLInt${truncatedBits}
+  typealias Narrowed = LLInt${narrowedBits}
   typealias Storage = Builtin.Int${bits}
 
   init() {
@@ -177,20 +180,37 @@ struct LLInt${bits} : LowLevelInt {
   }
 % end
 
-% for signed in 'Signed', 'Unsigned':
-  func isLessThan${signed}(rhs: Self_) -> Bool {
+% for (srcSigned, srcS) in ((x, x[0].lower()) for x in ['Signed', 'Unsigned']):
+  func isLessThan${srcSigned}(rhs: Self_) -> Bool {
     return Bool(
-      Builtin.cmp_${signed[0].lower()}lt_Int${bits}(self.storage, rhs.storage))
+      Builtin.cmp_${srcS}lt_Int${bits}(
+        self.storage, rhs.storage))
   }
+  
+  % for (dstSigned, dstS) in ((x, x[0].lower()) for x in ['Signed', 'Unsigned']):
+  func checkingNarrow${srcSigned}To${dstSigned}() -> Narrowed {
+    let (result, error) 
+      = Builtin.${srcS}_to_${dstS}_checked_trunc_Int${bits}_Int${narrowedBits}(
+          storage)
+    Builtin.condfail(error)
+    return Narrowed(result)
+  }
+  % end
 % end
   
   var assumingNonNegative : Self_ {
     return Self_(Builtin.assumeNonNegative_Int${bits}(storage))
   }
   
-  var truncated: Truncated {
-    return Truncated(
-      Builtin.truncOrBitCast_Int${bits}_Int${truncatedBits}(storage)
+  func checkingNonNegative() -> Self_ {
+    let (result, error) = Builtin.s_to_u_checked_conversion_Int${bits}(storage)
+    Builtin.condfail(error)
+    return Self_(result)
+  }
+
+  var truncated: Narrowed {
+    return Narrowed(
+      Builtin.truncOrBitCast_Int${bits}_Int${narrowedBits}(storage)
     )
   }
 }
