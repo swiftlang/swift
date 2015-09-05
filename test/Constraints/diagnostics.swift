@@ -413,7 +413,7 @@ func f20371273() {
 func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{tuple pattern cannot match values of the non-tuple type '[String : String]'}}
+  bar = foo.map { ($0, $1) }  // expected-error {{contextual type for closure argument list expects 1 argument, but 2 were specified}}
 }
 
 

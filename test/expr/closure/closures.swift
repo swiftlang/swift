@@ -28,8 +28,7 @@ func funcdecl4(a: ((Int)->Int), _ b: Int) {}
 
 func funcdecl5(a: Int, _ y: Int) {
   // Pass in a closure containing the call to funcdecl3.
-  // FIXME: this diagnostic should be better: rdar://22128342
-  funcdecl4({ funcdecl3() }, 12)  // expected-error {{tuple pattern cannot match values of the non-tuple type 'Int'}}
+  funcdecl4({ funcdecl3() }, 12)  // expected-error {{contextual type for closure argument list expects 1 argument, but 0 were specified}}
   
   
   func6(fn: {$0 + $1})       // Closure with two named anonymous arguments

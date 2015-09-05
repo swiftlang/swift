@@ -1063,8 +1063,14 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     if (!tupleTy && !hadError) {
       if (canDecayToParen)
         return decayToParen();
-      diagnose(TP->getLParenLoc(), diag::tuple_pattern_in_non_tuple_context,
-               type);
+      
+      // If this is a closure argument list, produce a tailored diagnostic.
+      if (options.contains(TR_ImmediateFunctionInput))
+        diagnose(TP->getStartLoc(), diag::closure_argument_list_tuple,
+                 1, TP->getNumElements());
+      else
+        diagnose(TP->getStartLoc(), diag::tuple_pattern_in_non_tuple_context,
+                 type);
       hadError = true;
     }
 
@@ -1073,7 +1079,13 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     if (!hadError && tupleTy->getNumElements() != TP->getNumElements()) {
       if (canDecayToParen)
         return decayToParen();
-      diagnose(TP->getLParenLoc(), diag::tuple_pattern_length_mismatch, type);
+      
+      // If this is a closure argument list, produce a tailored diagnostic.
+      if (options.contains(TR_ImmediateFunctionInput))
+        diagnose(TP->getStartLoc(), diag::closure_argument_list_tuple,
+                 TP->getNumElements(), tupleTy->getNumElements());
+      else
+        diagnose(TP->getStartLoc(), diag::tuple_pattern_length_mismatch, type);
       hadError = true;
     }
 

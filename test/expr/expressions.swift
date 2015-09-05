@@ -137,12 +137,9 @@ func errorRecovery() {
 func acceptsInt(x: Int) {}
 acceptsInt(unknown_var) // expected-error {{use of unresolved identifier 'unknown_var'}}
 
-// TODO: Result can be named as well, but is writeonly.  Need to model lvalues
-// and support the '=' operator.
 
 
-// FIXME rdar://22333281: Poor error message.
-var test1a: (Int) -> (Int) -> Int = { { $0 } } // expected-error{{tuple pattern cannot match values of the non-tuple type 'Int'}}
+var test1a: (Int) -> (Int) -> Int = { { $0 } } // expected-error{{contextual type for closure argument list expects 1 argument, but 0 were specified}}
 var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
