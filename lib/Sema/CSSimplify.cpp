@@ -707,48 +707,18 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
       // If the names don't match, we may have a conflict.
       if (elt1.getName() != elt2.getName()) {
         // Same-type requirements require exact name matches.
-        if (kind == TypeMatchKind::SameType) {
-          // Record this failure.
-          if (shouldRecordFailures()) {
-            recordFailure(getConstraintLocator(
-                            locator.withPathElement(
-                              LocatorPathElt::getNamedTupleElement(i))),
-                          Failure::TupleNameMismatch, tuple1, tuple2);
-          }
-
+        if (kind == TypeMatchKind::SameType)
           return SolutionKind::Error;
-        }
 
         // For subtyping constraints, just make sure that this name isn't
         // used at some other position.
-        if (elt2.hasName()) {
-          int matched = tuple1->getNamedElementId(elt2.getName());
-          if (matched != -1) {
-            // Record this failure.
-            if (shouldRecordFailures()) {
-              recordFailure(getConstraintLocator(
-                              locator.withPathElement(
-                                LocatorPathElt::getNamedTupleElement(i))),
-                            Failure::TupleNamePositionMismatch, tuple1, tuple2);
-            }
-
-            return SolutionKind::Error;
-          }
-        }
+        if (elt2.hasName() && tuple1->getNamedElementId(elt2.getName()) != -1)
+          return SolutionKind::Error;
       }
 
       // Variadic bit must match.
-      if (elt1.isVararg() != elt2.isVararg()) {
-        // Record this failure.
-        if (shouldRecordFailures()) {
-          recordFailure(getConstraintLocator(
-                          locator.withPathElement(
-                            LocatorPathElt::getNamedTupleElement(i))),
-                        Failure::TupleVariadicMismatch, tuple1, tuple2);
-        }
-        
+      if (elt1.isVararg() != elt2.isVararg())
         return SolutionKind::Error;
-      }
 
       // Compare the element types.
       switch (matchTypes(elt1.getType(), elt2.getType(), kind, subFlags,

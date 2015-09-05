@@ -96,11 +96,7 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
     out << getFirstType().getString() << "is not an optional type";
     break;
 
-  case TupleNameMismatch:
-  case TupleNamePositionMismatch:
   case TupleSizeMismatch:
-  case TupleVariadicMismatch:
-  case TupleUnused:
     out << "mismatched tuple types " << getFirstType().getString() << " and "
         << getSecondType().getString();
     break;
@@ -733,12 +729,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
     return true;
   }
 
-  case Failure::TupleUnused:
-    tc.diagnose(loc, diag::invalid_tuple_element_unused,
-                failure.getFirstType(), failure.getSecondType())
-      .highlight(range);
-    return true;
-
   case Failure::TypesNotConvertible:
   case Failure::TypesNotEqual:
   case Failure::TypesNotSubtypes:
@@ -877,9 +867,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
   case Failure::IsNotClass:
   case Failure::IsNotDynamicLookup:
   case Failure::IsNotMetatype:
-  case Failure::TupleNameMismatch:
-  case Failure::TupleNamePositionMismatch:
-  case Failure::TupleVariadicMismatch:
     return false;
   }
 

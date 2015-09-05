@@ -363,14 +363,6 @@ public:
   enum FailureKind {
     /// \brief Tuple types with different numbers of elements.
     TupleSizeMismatch,
-    /// \brief Tuple element names mismatch when they need to match.
-    TupleNameMismatch,
-    /// \brief Tuple element name matched, but at a different position.
-    TupleNamePositionMismatch,
-    /// \brief One tuple type is variadic, the other is not.
-    TupleVariadicMismatch,
-    /// \brief Unused element in tuple.
-    TupleUnused,
     /// \brief Autoclosure function type mismatch.
     FunctionAutoclosureMismatch,
     /// \brief Noreturn attribute function type mismatch.
@@ -487,11 +479,7 @@ public:
     case FunctionNoReturnMismatch:
     case FunctionNoEscapeMismatch:
     case FunctionThrowsMismatch:
-    case TupleNameMismatch:
-    case TupleNamePositionMismatch:
     case TupleSizeMismatch:
-    case TupleUnused:
-    case TupleVariadicMismatch:
     case TypesNotConstructible:
     case TypesNotConvertible:
     case TypesNotEqual:

@@ -496,9 +496,6 @@ ERROR(if_expr_cases_mismatch,sema_tcc,none,
 ERROR(invalid_tuple_size,sema_tcc,none,
       "tuple types %0 and %1 have a different number of elements (%2 vs. %3)",
       (Type, Type, unsigned, unsigned))
-ERROR(invalid_tuple_element_unused,sema_tcc,none,
-      "tuple element of type %0 unused when converting tuple to %1",
-      (Type, Type))
 ERROR(did_not_call_function_value,sema_tcc,none,
       "function value was used as a property; add () to call it",
       ())
