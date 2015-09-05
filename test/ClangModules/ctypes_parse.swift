@@ -1,14 +1,6 @@
 // RUN: %target-parse-verify-swift %clang-importer-sdk
 
-// FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// XFAIL: linux
-
 import ctypes
-import CoreGraphics
-import Foundation
-import CoreFoundation
-
-var cgPointVar: CGPoint
 
 func checkRawRepresentable<T: RawRepresentable>(_: T) {}
 func checkEquatable<T: Equatable>(_: T) -> Bool {}
@@ -66,34 +58,10 @@ func testAnonStructs() {
   a_s.c = 7.5
 }
 
-func testBitfieldMembers() -> StructWithBitfields {
-  return StructWithBitfields()
-  // TODO: Expose the bitfields as properties.
-}
-
-// FIXME: Import arrays as real array-looking things.
-
-func testArrays() {
-  let fes: NSFastEnumerationState
-  var ulong: CUnsignedLong
-  var pulong: UnsafeMutablePointer<CUnsignedLong>
-
-  ulong = fes.state
-  pulong = fes.mutationsPtr
-  ulong = fes.extra.0
-  ulong = fes.extra.1
-  ulong = fes.extra.2
-  ulong = fes.extra.3
-  ulong = fes.extra.4
-  _ = ulong; _ = pulong
-}
-
 // FIXME: Import pointers to opaque types as unique types.
 
 func testPointers() {
   _ = nil as HWND
-  let cfstr: CFString? = nil
-  _ = cfstr as CFTypeRef?
 }
 
 // Ensure that imported structs can be extended, even if typedef'ed on the C
@@ -114,25 +82,6 @@ extension AnonStructs {
   }
 }
 
-extension NSFastEnumerationState {
-  func reset() {}
-}
-
-extension CGRectTy {
-  init(x: Double, y: Double, w: Double, h: Double) {
-    origin.x = CGFloat(x)
-    origin.y = CGFloat(y)
-    size.width = CGFloat(w)
-    size.height = CGFloat(h)
-  }
-}
-
-extension CGRect {
-  func printAsX11Geometry() {
-    print("\(size.width)x\(size.height)+\(origin.x)+\(origin.y)", terminator: "")
-  }
-}
-
 func testFuncStructDisambiguation() {
   let a : funcOrStruct
   var i = funcOrStruct()
@@ -146,22 +95,6 @@ func testFuncStructDisambiguation() {
 func testVoid() {
   var x: MyVoid // expected-error{{use of undeclared type 'MyVoid'}}
   returnsMyVoid()
-}
-
-func testImportMacTypes() {
-  // Test that we import integer and floating-point types as swift stdlib
-  // types.
-  var a : UInt32 = UInt32_test
-  a = a + 1
-
-  var b : Float64 = Float64_test
-  b = b + 1
-
-  var t9_unqual : Float32 = Float32_test
-  var t10_unqual : Float64 = Float64_test
-
-  var t9_qual : ctypes.Float32 = 0.0  // expected-error {{no type named 'Float32' in module 'ctypes'}}
-  var t10_qual : ctypes.Float64 = 0.0 // expected-error {{no type named 'Float64' in module 'ctypes'}}
 }
 
 var word: Int = 0
@@ -198,22 +131,12 @@ func testImportSysTypesTypes() {
   _ = t1_unqual as ctypes.ssize_t
 }
 
-func testImportCFTypes() {
-  let t1_unqual: Int = CFIndex_test
-  _ = t1_unqual as CoreFoundation.CFIndex
-}
-
 func testImportOSTypesTypes() {
   var t1_unqual: CInt = SInt_test
   var t2_unqual: CUnsignedInt = UInt_test
 
   var t1_qual: ctypes.SInt = t1_unqual // expected-error {{no type named 'SInt' in module 'ctypes'}}
   var t2_qual: ctypes.UInt = t2_unqual // expected-error {{no type named 'UInt' in module 'ctypes'}}
-}
-
-func testImportSEL() {
-  var t1 : SEL // expected-error {{use of undeclared type 'SEL'}} {{12-15=Selector}}
-  var t2 : ctypes.SEL // expected-error {{no type named 'SEL' in module 'ctypes'}}
 }
 
 func testImportTagDeclsAndTypedefs() {
@@ -270,10 +193,8 @@ func testFunctionPointers() {
 }
 
 func testStructDefaultInit() {
-  let a_s = AnonStructs()
-  let modrm = ModRM()
-  let union = AnonUnion()
-  let v4 = GLKVector4()
-
-  let nonNilable = NonNilableReferences() // expected-error{{missing argument}}
+  let _ = AnonStructs()
+  let _ = ModRM()
+  let _ = AnonUnion()
+  let _ = GLKVector4()
 }

@@ -34,12 +34,6 @@ typedef struct {
 
 typedef void const *HWND;
 
-struct StructWithBitfields {
-  unsigned First;
-  unsigned Second : 17;
-  unsigned Third : 5;
-};
-
 typedef struct {
   unsigned a;
   unsigned b[];
@@ -207,6 +201,13 @@ typedef struct AnonUnion {
 //===---
 // Bitfields
 //===---
+
+struct StructWithBitfields {
+  unsigned First;
+  unsigned Second : 17;
+  unsigned Third : 5;
+  unsigned : 11;
+};
 
 typedef struct ModRM {
   unsigned rm: 3;
