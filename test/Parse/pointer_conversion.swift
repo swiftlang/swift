@@ -128,8 +128,8 @@ func constVoidPointerArguments(p: UnsafeMutablePointer<Int>,
   takesConstVoidPointer(&ff)
   takesConstVoidPointer(ii)
   takesConstVoidPointer(ff)
-  // TODO: takesConstVoidPointer([0, 1, 2])
-  // TODO: takesConstVoidPointer([0.0, 1.0, 2.0])
+  takesConstVoidPointer([0, 1, 2]) // expected-error {{contextual type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>') cannot be used with array literal}}
+takesConstVoidPointer([0.0, 1.0, 2.0])  // expected-error {{contextual type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>') cannot be used with array literal}}
 
   // We don't allow these conversions outside of function arguments.
   var x: UnsafePointer<Void> = &i // expected-error{{'&' used with non-inout argument of type 'UnsafePointer<Void>' (aka 'UnsafePointer<()>')}}
@@ -201,11 +201,11 @@ func pointerInClosure(f: UnsafeMutablePointer<Int> -> Int) -> Int {
 
 struct NotEquatable {}
 
-func arrayComparison(x: [NotEquatable], y: [NotEquatable], p: UnsafeMutablePointer<NotEquatable>) {
+func arrayComparison(var x: [NotEquatable], y: [NotEquatable], p: UnsafeMutablePointer<NotEquatable>) {
   // Don't allow implicit array-to-pointer conversions in operators.
   let a: Bool = x == y // expected-error{{binary operator '==' cannot be applied to two '[NotEquatable]' operands}}
-  // FIXME: Should be allowed.
-  // let b: Bool = p == &x
+
+  let _: Bool = p == &x  // Allowed!
 }
 
 func addressConversion(p: UnsafeMutablePointer<Int>, var x: Int) {
