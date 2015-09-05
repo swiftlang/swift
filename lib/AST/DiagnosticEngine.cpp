@@ -227,7 +227,11 @@ static void formatDiagnosticText(StringRef InText,
                                  ArrayRef<DiagnosticArgument> Args,
                                  llvm::raw_ostream &Out);
 
-/// \brief Format a selection argument and write it to the given stream.
+/// Handle the integer 'select' modifier.  This is used like this:
+/// %select{foo|bar|baz}2.  This means that the integer argument "%2" has a
+/// value from 0-2.  If the value is 0, the diagnostic prints 'foo'.
+/// If the value is 1, it prints 'bar'.  If it has the value 2, it prints 'baz'.
+/// This is very useful for certain classes of variant diagnostics.
 static void formatSelectionArgument(StringRef ModifierArguments,
                                     ArrayRef<DiagnosticArgument> Args,
                                     unsigned SelectedIndex,
@@ -257,6 +261,9 @@ static void formatDiagnosticArgument(StringRef Modifier,
       assert(Arg.getAsInteger() >= 0 && "Negative selection index");
       formatSelectionArgument(ModifierArguments, Args, Arg.getAsInteger(), 
                               Out);
+    } else if (Modifier == "s") {
+      if (Arg.getAsInteger() != 1)
+        Out << 's';
     } else {
       assert(Modifier.empty() && "Improper modifier for integer argument");
       Out << Arg.getAsInteger();
@@ -267,6 +274,9 @@ static void formatDiagnosticArgument(StringRef Modifier,
     if (Modifier == "select") {
       formatSelectionArgument(ModifierArguments, Args, Arg.getAsUnsigned(), 
                               Out);
+    } else if (Modifier == "s") {
+      if (Arg.getAsUnsigned() != 1)
+        Out << 's';
     } else {
       assert(Modifier.empty() && "Improper modifier for unsigned argument");
       Out << Arg.getAsUnsigned();
