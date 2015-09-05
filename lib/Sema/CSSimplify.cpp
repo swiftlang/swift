@@ -913,13 +913,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         return simplifyFixConstraint(FixKind::NullaryCall, func1, func2, kind,
                                      subFlags, locator);
       }
-
-      // Record this failure.
-      if (shouldRecordFailures()) {
-        recordFailure(getConstraintLocator(locator),
-                      Failure::FunctionAutoclosureMismatch, func1, func2);
-      }
-
       return SolutionKind::Error;
     }
   }
@@ -927,44 +920,21 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // A non-throwing function can be a subtype of a throwing function.
   if (func1->throws() != func2->throws()) {
     // Cannot drop 'throws'.
-    if (func1->throws() ||
-        (func2->throws() && kind < TypeMatchKind::Subtype)) {
-      if (shouldRecordFailures()) {
-        recordFailure(getConstraintLocator(locator),
-                      Failure::FunctionThrowsMismatch, func1, func2);
-      }
-
+    if (func1->throws() || (func2->throws() && kind < TypeMatchKind::Subtype))
       return SolutionKind::Error;
-    }
   }
 
   // A @noreturn function type can be a subtype of a non-@noreturn function
   // type.
-  if (func1->isNoReturn() != func2->isNoReturn()) {
-    if (func2->isNoReturn() || kind < TypeMatchKind::SameType) {
-      // Record this failure.
-      if (shouldRecordFailures()) {
-        recordFailure(getConstraintLocator(locator),
-                      Failure::FunctionNoReturnMismatch, func1, func2);
-      }
-
-      return SolutionKind::Error;
-    }
-  }
+  if (func1->isNoReturn() != func2->isNoReturn() &&
+      (func2->isNoReturn() || kind < TypeMatchKind::SameType))
+    return SolutionKind::Error;
 
   // A non-@noescape function type can be a subtype of a @noescape function
   // type.
-  if (func1->isNoEscape() != func2->isNoEscape()) {
-    if (func1->isNoEscape() || kind < TypeMatchKind::Subtype) {
-      // Record this failure.
-      if (shouldRecordFailures()) {
-        recordFailure(getConstraintLocator(locator),
-                      Failure::FunctionNoEscapeMismatch, func1, func2);
-      }
-
-      return SolutionKind::Error;
-    }
-  }
+  if (func1->isNoEscape() != func2->isNoEscape() &&
+      (func1->isNoEscape() || kind < TypeMatchKind::Subtype))
+    return SolutionKind::Error;
 
   if (matchFunctionRepresentations(func1->getExtInfo().getRepresentation(),
                                    func2->getExtInfo().getRepresentation(),
@@ -1025,30 +995,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   return result;
 }
 
-/// \brief Map a failed type-matching kind to a failure kind, generically.
-static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
-  switch (kind) {
-  case TypeMatchKind::BindType:
-  case TypeMatchKind::BindToPointerType:
-  case TypeMatchKind::SameType:
-    return Failure::TypesNotEqual;
-  case TypeMatchKind::ConformsTo:
-    return Failure::DoesNotConformToProtocol;
-  case TypeMatchKind::Subtype:
-    return Failure::TypesNotSubtypes;
-
-  case TypeMatchKind::Conversion:
-  case TypeMatchKind::ExplicitConversion:
-  case TypeMatchKind::ArgumentConversion:
-  case TypeMatchKind::OperatorArgumentConversion:
-  case TypeMatchKind::ArgumentTupleConversion:
-  case TypeMatchKind::OperatorArgumentTupleConversion:
-    return Failure::TypesNotConvertible;
-  }
-
-  llvm_unreachable("unhandled type matching kind");
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
                                        TypeMatchKind kind, unsigned flags,
@@ -1063,13 +1009,6 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
 
     return matchTypes(super1, type2, TypeMatchKind::SameType,
                       TMF_GenerateConstraints, locator);
-  }
-
-  // Record this failure.
-  // FIXME: Specialize diagnostic.
-  if (shouldRecordFailures()) {
-    recordFailure(getConstraintLocator(locator),
-                  getRelationalFailureKind(kind), type1, type2);
   }
 
   return SolutionKind::Error;
@@ -1509,12 +1448,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::Module:
       if (desugar1 == desugar2) {
         return SolutionKind::Solved;
-      }
-
-      // Record this failure.
-      if (shouldRecordFailures()) {
-        recordFailure(getConstraintLocator(locator),
-                      getRelationalFailureKind(kind), type1, type2);
       }
 
       return SolutionKind::Error;
@@ -2125,12 +2058,6 @@ commit_to_conversions:
     if (typeVar1 || typeVar2)
       return SolutionKind::Unsolved;
 
-    // If we are supposed to record failures, do so.
-    if (shouldRecordFailures()) {
-      recordFailure(getConstraintLocator(locator),
-                    getRelationalFailureKind(kind), type1, type2);
-    }
-
     return SolutionKind::Error;
   }
 
@@ -2279,12 +2206,6 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::Module:
-    // If we are supposed to record failures, do so.
-    if (shouldRecordFailures()) {
-      recordFailure(locator, Failure::TypesNotConstructible,
-                    valueType, argType);
-    }
-    
     return SolutionKind::Error;
   }
 
@@ -2383,11 +2304,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   }
   
   // There's nothing more we can do; fail.
-  if (shouldRecordFailures()) {
-    recordFailure(getConstraintLocator(locator),
-                  Failure::DoesNotConformToProtocol, type,
-                  protocol->getDeclaredType());
-  }
   return SolutionKind::Error;
 }
 
@@ -3240,11 +3156,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   
   
   // If we found some unviable results, then fail, but without recovery.
-  if (!result.UnviableCandidates.empty()) {
-    recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
-                  baseObjTy, name);
+  if (!result.UnviableCandidates.empty())
     return SolutionKind::Error;
-  }
   
 
   // If the lookup found no hits at all (either viable or unviable), diagnose it
@@ -3268,11 +3181,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                                        constraint.getLocator()));
       return SolutionKind::Solved;
     }
-    
-    // FIXME: Customize diagnostic to mention types.
-    recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
-                  baseObjTy, name);
-    
     return SolutionKind::Error;
   }
   
@@ -3364,9 +3272,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                              constraint.getLocator());
     return SolutionKind::Solved;
   }
-  
-  recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
-                baseObjTy, name);
   return SolutionKind::Error;
 }
 
@@ -3384,12 +3289,9 @@ ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
     baseTy = fixed->getRValueType();
   }
 
-  if (baseTy->is<ArchetypeType>()) {
+  if (baseTy->is<ArchetypeType>())
     return SolutionKind::Solved;
-  }
 
-  // Record this failure.
-  recordFailure(constraint.getLocator(), Failure::IsNotArchetype, baseTy);
   return SolutionKind::Error;
 }
 
@@ -3425,9 +3327,6 @@ ConstraintSystem::simplifyClassConstraint(const Constraint &constraint){
     if (archetype->requiresClass())
       return SolutionKind::Solved;
   }
-
-  // Record this failure.
-  recordFailure(constraint.getLocator(), Failure::IsNotClass, baseTy);
   return SolutionKind::Error;
 }
 
@@ -3509,7 +3408,6 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) 
   // If it's definitely not either kind of metatype, then we can
   // report failure right away.
   } else if (!typeVar1) {
-    recordFailure(constraint.getLocator(), Failure::IsNotMetatype, type1);
     return SolutionKind::Error;
   }
 
@@ -3639,13 +3537,6 @@ retry:
                       flags | TMF_ApplyingFix | TMF_GenerateConstraints,
                       locator.withPathElement(
                         ConstraintLocator::FunctionResult));
-  }
-
-  // If we are supposed to record failures, do so.
-  if (shouldRecordFailures()) {
-    recordFailure(getConstraintLocator(locator),
-                  Failure::FunctionTypesMismatch,
-                  type1, type2);
   }
 
   return SolutionKind::Error;

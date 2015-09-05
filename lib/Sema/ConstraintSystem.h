@@ -361,43 +361,12 @@ class Failure : public llvm::FoldingSetNode {
 public:
   /// \brief The various kinds of failures that can occur 
   enum FailureKind {
-    /// \brief Autoclosure function type mismatch.
-    FunctionAutoclosureMismatch,
-    /// \brief Noreturn attribute function type mismatch.
-    FunctionNoReturnMismatch,
-    /// \brief NoEscape attribute function type mismatch.
-    FunctionNoEscapeMismatch,
-    /// \brief Thorws function type mismatch.
-    FunctionThrowsMismatch,
-    /// \brief Types are not the same.
-    TypesNotEqual,
-    /// \brief Types are not subtypes.
-    TypesNotSubtypes,
-    /// \brief Types are not convertible.
-    TypesNotConvertible,
-    /// \brief Types are not constructible.
-    TypesNotConstructible,
-    /// \brief Function types mismatch.
-    FunctionTypesMismatch,
-    /// \brief The first type doesn't conform to a protocol in the second
-    /// type.
-    DoesNotConformToProtocol,
-    /// \brief The first type does not have a member with the given name.
-    DoesNotHaveMember,
-    /// \brief The type is not an archetype.
-    IsNotArchetype,
-    /// \brief The type is not a class.
-    IsNotClass,
     /// \brief The type is not bridged to an Objective-C type.
     IsNotBridgedToObjectiveC,
-    /// \brief The type is not a dynamic lookup value.
-    IsNotDynamicLookup,
     /// \brief The type is not an optional type.
     IsNotOptional,
     /// \brief The type is not allowed to be an l-value.
     IsForbiddenLValue,
-    /// \brief The type is not a metatype.
-    IsNotMetatype,
     /// Out-of-order arguments.
     OutOfOrderArgument,
     /// Missing argument in a call.
@@ -433,7 +402,6 @@ private:
   /// member name, etc.).
   union {
     TypeBase *type;
-    void *name;
   } second;
 
 public:
@@ -458,11 +426,6 @@ public:
     return second.type;
   }
 
-  /// \brief Retrieve the name.
-  DeclName getName() const {
-    return DeclName::getFromOpaqueValue(second.name);
-  }
-
   /// \brief Retrieve the value.
   unsigned getValue() const { return value; }
 
@@ -472,30 +435,12 @@ public:
   /// \brief Profile the given failure.
   void Profile(llvm::FoldingSetNodeID &id) {
     switch (kind) {
-    case FunctionTypesMismatch:
-    case FunctionAutoclosureMismatch:
-    case FunctionNoReturnMismatch:
-    case FunctionNoEscapeMismatch:
-    case FunctionThrowsMismatch:
-    case TypesNotConstructible:
-    case TypesNotConvertible:
-    case TypesNotEqual:
-    case TypesNotSubtypes:
-    case DoesNotConformToProtocol:
     case IsForbiddenLValue:
-    case IsNotMetatype:
     case IsNotMaterializable:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                      getSecondType());
 
-    case DoesNotHaveMember:
-      return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
-                     getName());
-
-    case IsNotArchetype:
-    case IsNotClass:
     case IsNotBridgedToObjectiveC:
-    case IsNotDynamicLookup:
     case IsNotOptional:
     case MissingArgument:
     case NoPublicInitializers:
@@ -538,16 +483,6 @@ private:
       resolvedOverloadSets(resolvedOverloadSets), first(type1)
   {
     second.type = type2.getPointer();
-  }
-
-  /// \brief Construct a failure involving a type and a name.
-  Failure(ConstraintLocator *locator, FailureKind kind,
-          ResolvedOverloadSetListItem *resolvedOverloadSets,
-          Type type, DeclName name)
-    : kind(kind), value(0), value2(0), locator(locator),
-      resolvedOverloadSets(resolvedOverloadSets), first(type)
-  {
-    second.name = name.getOpaqueValue();
   }
 
   /// \brief Construct a failure involving two values.

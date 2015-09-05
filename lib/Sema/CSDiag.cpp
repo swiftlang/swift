@@ -37,83 +37,12 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
   }
 
   switch (getKind()) {
-  case DoesNotConformToProtocol:
-    out << getFirstType().getString() << " does not conform to "
-        << getSecondType().getString();
-    break;
-
-  case DoesNotHaveMember:
-    out << getFirstType().getString() << " does not have a member named '"
-        << getName() << "'";
-    break;
-    
-  case FunctionTypesMismatch:
-    out << "function type " << getFirstType().getString() << " is not equal to "
-    << getSecondType().getString();
-    break;
-
-  case FunctionAutoclosureMismatch:
-    out << "autoclosure mismatch " << getFirstType().getString() << " vs. "
-        << getSecondType().getString();
-    break;
-
-  case FunctionNoReturnMismatch:
-    out << "noreturn attribute mismatch " << getFirstType().getString()
-    << " vs. " << getSecondType().getString();
-    break;
-
-  case FunctionNoEscapeMismatch:
-    out << "noescape attribute mismatch " << getFirstType().getString()
-        << " vs. " << getSecondType().getString();
-    break;
-
-  case FunctionThrowsMismatch:
-    out << "function throws mismatch " << getFirstType().getString() << " vs. "
-        << getSecondType().getString();
-    break;
-
-  case IsNotMetatype:
-    out << getFirstType().getString() << " is not a metatype";
-    break;
-
-  case IsNotArchetype:
-    out << getFirstType().getString() << " is not an archetype";
-    break;
-
-  case IsNotClass:
-    out << getFirstType().getString() << " is not a class";
-    break;
-      
   case IsNotBridgedToObjectiveC:
     out << getFirstType().getString() << "is not bridged to Objective-C";
-    break;
-
-  case IsNotDynamicLookup:
-    out << getFirstType().getString() << " is not a dynamic lookup value";
     break;
       
   case IsNotOptional:
     out << getFirstType().getString() << "is not an optional type";
-    break;
-
-  case TypesNotConstructible:
-    out << getFirstType().getString() << " is not a constructible argument for "
-        << getSecondType().getString();
-    break;
-
-  case TypesNotConvertible:
-    out << getFirstType().getString() << " is not convertible to "
-        << getSecondType().getString();
-    break;
-
-  case TypesNotSubtypes:
-    out << getFirstType().getString() << " is not a subtype of "
-        << getSecondType().getString();
-    break;
-
-  case TypesNotEqual:
-    out << getFirstType().getString() << " is not equal to "
-        << getSecondType().getString();
     break;
 
   case IsForbiddenLValue:
@@ -715,24 +644,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
   auto anchor = locator->getAnchor();
   auto loc = anchor->getLoc();
   switch (failure.getKind()) {
-  case Failure::TypesNotConvertible:
-  case Failure::TypesNotEqual:
-  case Failure::TypesNotSubtypes:
-  case Failure::TypesNotConstructible:
-  case Failure::FunctionTypesMismatch:
-  case Failure::DoesNotHaveMember:
-  case Failure::DoesNotConformToProtocol:
-  case Failure::FunctionNoEscapeMismatch:
-  case Failure::FunctionThrowsMismatch:
-  case Failure::FunctionAutoclosureMismatch:
-  case Failure::FunctionNoReturnMismatch:
-  case Failure::IsNotArchetype:
-  case Failure::IsNotClass:
-  case Failure::IsNotDynamicLookup:
-  case Failure::IsNotMetatype:
-    // The Expr path handling these constraints does a good job.
-    return false;
-
   case Failure::IsNotBridgedToObjectiveC:
     tc.diagnose(loc, diag::type_not_bridged, failure.getFirstType());
     if (targetLocator)
