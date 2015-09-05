@@ -1456,7 +1456,9 @@ namespace {
     }
     
     Type visitSequenceExpr(SequenceExpr *expr) {
-      llvm_unreachable("Didn't even parse?");
+      // If a SequenceExpr survived until CSGen, then there was an upstream
+      // error that was already reported.
+      return Type();
     }
 
     Type visitIdentityExpr(IdentityExpr *expr) {
