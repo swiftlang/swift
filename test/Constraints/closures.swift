@@ -102,13 +102,13 @@ var _: ()-> Int = {0}
 // expected-error @+1 {{contextual type for closure argument list expects 1 argument, but 0 were specified}}
 var _: (Int)-> Int = {0}
 
-// expected-error @+1 {{tuple types '(Int, Int)' and '()' have a different number of elements (2 vs. 0)}}
+// expected-error @+1 {{contextual type for closure argument list expects 2 arguments, but 0 were specified}}
 var _: (Int, Int)-> Int = {0}
 
-// expected-error @+1 {{tuple types '(Int, Int)' and '(_, _, _)' have a different number of elements (2 vs. 3)}}
+// expected-error @+1 {{contextual type for closure argument list expects 2 arguments, but 3 were specified}}
 var _: (Int,Int)-> Int = {$0+$1+$2}
 
-// expected-error @+1 {{tuple types '(Int, Int, Int)' and '(_, _)' have a different number of elements (3 vs. 2)}}
+// expected-error @+1 {{contextual type for closure argument list expects 3 arguments, but 2 were specified}}
 var _: (Int, Int, Int)-> Int = {$0+$1}
 
 
@@ -122,7 +122,7 @@ var _: (Int)-> Int = {a,b,c in 0}
 
 var _: (Int, Int)-> Int = {a in 0}
 
-// expected-error @+1 {{tuple types '(Int, Int, Int)' and '(_, _)' have a different number of elements (3 vs. 2)}}
+// expected-error @+1 {{contextual type for closure argument list expects 3 arguments, but 2 were specified}}
 var _: (Int, Int, Int)-> Int = {a, b in a+b}
 
 

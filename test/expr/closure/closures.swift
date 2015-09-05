@@ -9,9 +9,9 @@ func func6c(f: (Int, Int) -> Int, _ n: Int = 0) {} // expected-warning{{prior to
 // Expressions can be auto-closurified, so that they can be evaluated separately
 // from their definition.
 var closure1 : () -> Int = {4}  // Function producing 4 whenever it is called.
-var closure2 : (Int,Int) -> Int = { 4 } // FIXME: expected-error{{tuple types '(Int, Int)' and '()' have a different number of elements (2 vs. 0)}}
+var closure2 : (Int,Int) -> Int = { 4 } // expected-error{{contextual type for closure argument list expects 2 arguments, but 0 were specified}}
 var closure3a : ()->()->(Int,Int) = {{ (4, 2) }} // multi-level closing.
-var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // expected-error{{tuple types '(Int, Int)' and '()' have a different number of elements (2 vs. 0)}}
+var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // expected-error{{contextual type for closure argument list expects 2 arguments, but 0 were specified}}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int = {
        $0 + 1.0  // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}

@@ -690,15 +690,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   // Equality and subtyping have fairly strict requirements on tuple matching,
   // requiring element names to either match up or be disjoint.
   if (kind < TypeMatchKind::Conversion) {
-    if (tuple1->getNumElements() != tuple2->getNumElements()) {
-      // Record this failure.
-      if (shouldRecordFailures()) {
-        recordFailure(getConstraintLocator(locator),
-                      Failure::TupleSizeMismatch, tuple1, tuple2);
-      }
-
+    if (tuple1->getNumElements() != tuple2->getNumElements())
       return SolutionKind::Error;
-    }
 
     for (unsigned i = 0, n = tuple1->getNumElements(); i != n; ++i) {
       const auto &elt1 = tuple1->getElement(i);
@@ -764,16 +757,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   // Compute the element shuffles for conversions.
   SmallVector<int, 16> sources;
   SmallVector<unsigned, 4> variadicArguments;
-  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments)) {
-    // FIXME: Record why the tuple shuffle couldn't be computed.
-    if (shouldRecordFailures()) {
-      if (tuple1->getNumElements() != tuple2->getNumElements()) {
-        recordFailure(getConstraintLocator(locator),
-                      Failure::TupleSizeMismatch, tuple1, tuple2);
-      }
-    }
+  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments))
     return SolutionKind::Error;
-  }
 
   // Check each of the elements.
   bool hasVariadic = false;

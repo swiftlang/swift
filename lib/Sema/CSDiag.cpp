@@ -96,11 +96,6 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
     out << getFirstType().getString() << "is not an optional type";
     break;
 
-  case TupleSizeMismatch:
-    out << "mismatched tuple types " << getFirstType().getString() << " and "
-        << getSecondType().getString();
-    break;
-
   case TypesNotConstructible:
     out << getFirstType().getString() << " is not a constructible argument for "
         << getSecondType().getString();
@@ -720,15 +715,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
   auto anchor = locator->getAnchor();
   auto loc = anchor->getLoc();
   switch (failure.getKind()) {
-  case Failure::TupleSizeMismatch: {
-    auto tuple1 = failure.getFirstType()->castTo<TupleType>();
-    auto tuple2 = failure.getSecondType()->castTo<TupleType>();
-    tc.diagnose(loc, diag::invalid_tuple_size, tuple1, tuple2,
-                tuple1->getNumElements(), tuple2->getNumElements())
-      .highlight(range);
-    return true;
-  }
-
   case Failure::TypesNotConvertible:
   case Failure::TypesNotEqual:
   case Failure::TypesNotSubtypes:
@@ -738,6 +724,12 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
   case Failure::DoesNotConformToProtocol:
   case Failure::FunctionNoEscapeMismatch:
   case Failure::FunctionThrowsMismatch:
+  case Failure::FunctionAutoclosureMismatch:
+  case Failure::FunctionNoReturnMismatch:
+  case Failure::IsNotArchetype:
+  case Failure::IsNotClass:
+  case Failure::IsNotDynamicLookup:
+  case Failure::IsNotMetatype:
     // The Expr path handling these constraints does a good job.
     return false;
 
@@ -860,14 +852,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
       noteTargetOfDiagnostic(cs, &failure, locator);
     break;
   }
-
-  case Failure::FunctionAutoclosureMismatch:
-  case Failure::FunctionNoReturnMismatch:
-  case Failure::IsNotArchetype:
-  case Failure::IsNotClass:
-  case Failure::IsNotDynamicLookup:
-  case Failure::IsNotMetatype:
-    return false;
   }
 
   return true;
@@ -2464,6 +2448,18 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   if (fromType->isEqual(toType))
     return false;
 
+  
+  // If we have two tuples with mismatching types, produce a tailored
+  // diagnostic.
+  if (auto fromTT = fromType->getAs<TupleType>())
+    if (auto toTT = toType->getAs<TupleType>())
+      if (fromTT->getNumElements() != toTT->getNumElements()) {
+        diagnose(anchor->getLoc(), diag::tuple_types_not_convertible,
+                 fromTT, toTT)
+          .highlight(anchor->getSourceRange());
+        return true;
+      }
+  
   diagnose(anchor->getLoc(), diag::types_not_convertible,
            constraint->getKind() == ConstraintKind::Subtype,
            fromType, toType)

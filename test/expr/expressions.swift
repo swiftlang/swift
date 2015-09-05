@@ -126,9 +126,9 @@ func errorRecovery() {
   var a: Int = .hello // expected-error {{type 'Int' has no member 'hello'}}
   var b: union1 = .bar // ok
   var c: union1 = .xyz  // expected-error {{type 'union1' has no member 'xyz'}}
-  var d: (Int,Int,Int) = (1,2) // expected-error {{different number of elements}}
-  var e: (Int,Int) = (1, 2, 3) // expected-error {{different number of elements}}
-  var f: (Int,Int) = (1, 2, f : 3) // expected-error {{different number of elements}}
+  var d: (Int,Int,Int) = (1,2) // expected-error {{cannot convert value of type '(Int, Int)' to specified type '(Int, Int, Int)'}}
+  var e: (Int,Int) = (1, 2, 3) // expected-error {{cannot convert value of type '(Int, Int, Int)' to specified type '(Int, Int)'}}
+  var f: (Int,Int) = (1, 2, f : 3) // expected-error {{cannot convert value of type '(Int, Int, f: Int)' to specified type '(Int, Int)'}}
   
   // <rdar://problem/22426860> CrashTracer: [USER] swift at …mous_namespace::ConstraintGenerator::getTypeForPattern + 698
   var (g1, g2, g3) = (1, 2) // expected-error {{different number of elements}}

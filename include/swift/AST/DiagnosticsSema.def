@@ -484,6 +484,10 @@ NOTE(in_cast_expr_types,sema_tcc,none,
       "in cast from type %0 to %1",
       (Type, Type))
 
+ERROR(tuple_types_not_convertible,sema_tcc,none,
+      "%0 is not convertible to %1, "
+      "tuples have a different number of elements", (Type, Type))
+
 ERROR(invalid_force_unwrap,sema_tcc,none,
       "cannot force unwrap value of non-optional type %0", (Type))
 ERROR(invalid_optional_chain,sema_tcc,none,
@@ -493,9 +497,6 @@ ERROR(if_expr_cases_mismatch,sema_tcc,none,
       "result values in '? :' expression have mismatching types %0 and %1",
       (Type, Type))
 
-ERROR(invalid_tuple_size,sema_tcc,none,
-      "tuple types %0 and %1 have a different number of elements (%2 vs. %3)",
-      (Type, Type, unsigned, unsigned))
 ERROR(did_not_call_function_value,sema_tcc,none,
       "function value was used as a property; add () to call it",
       ())

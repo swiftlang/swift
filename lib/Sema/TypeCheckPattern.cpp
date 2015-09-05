@@ -1083,7 +1083,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       // If this is a closure argument list, produce a tailored diagnostic.
       if (options.contains(TR_ImmediateFunctionInput))
         diagnose(TP->getStartLoc(), diag::closure_argument_list_tuple,
-                 TP->getNumElements(), tupleTy->getNumElements());
+                 tupleTy->getNumElements(), TP->getNumElements());
       else
         diagnose(TP->getStartLoc(), diag::tuple_pattern_length_mismatch, type);
       hadError = true;

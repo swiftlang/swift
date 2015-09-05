@@ -361,8 +361,6 @@ class Failure : public llvm::FoldingSetNode {
 public:
   /// \brief The various kinds of failures that can occur 
   enum FailureKind {
-    /// \brief Tuple types with different numbers of elements.
-    TupleSizeMismatch,
     /// \brief Autoclosure function type mismatch.
     FunctionAutoclosureMismatch,
     /// \brief Noreturn attribute function type mismatch.
@@ -479,7 +477,6 @@ public:
     case FunctionNoReturnMismatch:
     case FunctionNoEscapeMismatch:
     case FunctionThrowsMismatch:
-    case TupleSizeMismatch:
     case TypesNotConstructible:
     case TypesNotConvertible:
     case TypesNotEqual:
