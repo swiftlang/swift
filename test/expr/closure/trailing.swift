@@ -108,5 +108,5 @@ func rdar17965209_test() {
 func limitXY(xy:Int, toGamut gamut: [Int]) {}
 let someInt = 0
 let intArray = [someInt]
-limitXY(someInt, toGamut: intArray) {}  // expected-error {{extra trailing closure passed in call}}
+limitXY(someInt, toGamut: intArray) {}  // expected-error {{extra argument 'toGamut' in call}}
 
