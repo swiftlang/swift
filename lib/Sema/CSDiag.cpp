@@ -3001,7 +3001,8 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
       ArgElts.push_back({ voidTy, TE->getElementName(i) });
     SmallVector<int, 4> sources;
     SmallVector<unsigned, 4> variadicArgs;
-    if (!computeTupleShuffle(ArgElts, argTypeTT, sources, variadicArgs)) {
+    if (!computeTupleShuffle(ArgElts, argTypeTT->getElements(),
+                             sources, variadicArgs)) {
       SmallVector<Expr*, 4> resultElts(TE->getNumElements(), nullptr);
       SmallVector<TupleTypeElt, 4> resultEltTys(TE->getNumElements(), voidTy);
 
@@ -4217,7 +4218,7 @@ bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
   // it specifically here, but the general logic does a fine job so we let it
   // do it.
   if (computeTupleShuffle(TEType->castTo<TupleType>()->getElements(),
-                          contextualTT, sources, variadicArgs))
+                          contextualTT->getElements(), sources, variadicArgs))
     return visitExpr(TE);
 
   // If we got a correct shuffle, we can perform the analysis of all of

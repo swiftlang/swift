@@ -112,7 +112,7 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 }
 
 bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
-                                      TupleType *toTuple,
+                                      ArrayRef<TupleTypeElt> toTuple,
                                       SmallVectorImpl<int> &sources,
                                       SmallVectorImpl<unsigned> &variadicArgs) {
   const int unassigned = -3;
@@ -120,11 +120,11 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
   SmallVector<bool, 4> consumed(fromTuple.size(), false);
   sources.clear();
   variadicArgs.clear();
-  sources.assign(toTuple->getNumElements(), unassigned);
+  sources.assign(toTuple.size(), unassigned);
 
   // Match up any named elements.
-  for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
-    const auto &toElt = toTuple->getElement(i);
+  for (unsigned i = 0, n = toTuple.size(); i != n; ++i) {
+    const auto &toElt = toTuple[i];
 
     // Skip unnamed elements.
     if (!toElt.hasName())
@@ -158,12 +158,12 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
   };
   skipToNextAvailableInput();
 
-  for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
+  for (unsigned i = 0, n = toTuple.size(); i != n; ++i) {
     // Check whether we already found a value for this element.
     if (sources[i] != unassigned)
       continue;
 
-    const auto &elt2 = toTuple->getElement(i);
+    const auto &elt2 = toTuple[i];
 
     // Variadic tuple elements match the rest of the input elements.
     if (elt2.isVararg()) {

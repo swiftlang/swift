@@ -2434,7 +2434,8 @@ public:
 /// \param fromTuple The tuple type we're converting from, as represented by its
 /// TupleTypeElt members.
 ///
-/// \param toTuple The tuple type we're converting to.
+/// \param toTuple The tuple type we're converting to, as represented by its
+/// TupleTypeElt members.
 ///
 /// \param sources Will be populated with information about the source of each
 /// of the elements for the result tuple. The indices into this array are the
@@ -2448,9 +2449,18 @@ public:
 /// are indices into the source tuple.
 ///
 /// \returns true if no tuple conversion is possible, false otherwise.
-bool computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple, TupleType *toTuple,
+bool computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
+                         ArrayRef<TupleTypeElt> toTuple,
                          SmallVectorImpl<int> &sources,
                          SmallVectorImpl<unsigned> &variadicArgs);
+static inline bool computeTupleShuffle(TupleType *fromTuple,
+                                       TupleType *toTuple,
+                                       SmallVectorImpl<int> &sources,
+                                       SmallVectorImpl<unsigned> &variadicArgs){
+  return computeTupleShuffle(fromTuple->getElements(), toTuple->getElements(),
+                             sources, variadicArgs);
+}
+
 
 /// \brief Return whether the function argument indicated by `locator` has a
 /// trailing closure.
