@@ -1389,3 +1389,41 @@ bb3(%12 : $URefd):
   return %12 : $URefd
 }
 
+class X { func ping() {} }
+// CHECK-LABEL: sil @canonicalize_releases
+
+sil @canonicalize_releases : $@convention(thin) (@owned Optional<X>) -> () {
+bb0(%0 : $Optional<X>):
+  debug_value %0 : $Optional<X>  // let x         // id: %1
+  switch_enum %0 : $Optional<X>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb3 // id: %2
+
+bb1:                                              // Preds: bb0
+  %3 = unchecked_enum_data %0 : $Optional<X>, #Optional.Some!enumelt.1 // users: %4, %13, %14, %15
+  checked_cast_br [exact] %3 : $X to $X, bb4, bb5 // id: %4
+
+// Make sure we were able to sink the release.
+// CHECK: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT return
+
+bb2:                                              // Preds: bb4 bb5
+  %5 = tuple ()                                   // user: %6
+  return %5 : $()                                 // id: %6
+
+bb3:                                              // Preds: bb0
+  %7 = integer_literal $Builtin.Int1, -1          // user: %8
+  cond_fail %7 : $Builtin.Int1                    // id: %8
+  unreachable                                     // id: %9
+
+ // Canonicalize the re
+bb4(%10 : $X):                                    // Preds: bb1
+  strong_release %10 : $X                         // id: %11
+  br bb2                                          // id: %12
+
+bb5:                                              // Preds: bb1
+  %13 = class_method %3 : $X, #X.ping!1 : X -> () -> () , $@convention(method) (@guaranteed X) -> () // user: %14
+  %14 = apply %13(%3) : $@convention(method) (@guaranteed X) -> ()
+  strong_release %3 : $X                          // id: %15
+  br bb2                                          // id: %16
+}
+
