@@ -2431,7 +2431,8 @@ public:
 /// \brief Compute the shuffle required to map from a given tuple type to
 /// another tuple type.
 ///
-/// \param fromTuple The tuple type we're converting from.
+/// \param fromTuple The tuple type we're converting from, as represented by its
+/// TupleTypeElt members.
 ///
 /// \param toTuple The tuple type we're converting to.
 ///
@@ -2447,7 +2448,7 @@ public:
 /// are indices into the source tuple.
 ///
 /// \returns true if no tuple conversion is possible, false otherwise.
-bool computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
+bool computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple, TupleType *toTuple,
                          SmallVectorImpl<int> &sources,
                          SmallVectorImpl<unsigned> &variadicArgs);
 

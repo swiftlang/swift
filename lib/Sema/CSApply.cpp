@@ -4567,8 +4567,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto toTuple = toType->castTo<TupleType>();
       SmallVector<int, 4> sources;
       SmallVector<unsigned, 4> variadicArgs;
-      bool failed = computeTupleShuffle(fromTuple, toTuple, sources,
-                                        variadicArgs);
+      bool failed = computeTupleShuffle(fromTuple->getElements(), toTuple,
+                                        sources, variadicArgs);
       assert(!failed && "Couldn't convert tuple to tuple?");
       (void)failed;
       return coerceTupleToTuple(expr, fromTuple, toTuple, locator, sources,
@@ -4858,7 +4858,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (auto fromTuple = fromType->getAs<TupleType>()) {
       SmallVector<int, 4> sources;
       SmallVector<unsigned, 4> variadicArgs;
-      if (!computeTupleShuffle(fromTuple, toTuple, sources, variadicArgs)) {
+      if (!computeTupleShuffle(fromTuple->getElements(), toTuple,
+                               sources, variadicArgs)) {
         return coerceTupleToTuple(expr, fromTuple, toTuple,
                                   locator, sources, variadicArgs);
       }

@@ -2999,84 +2999,80 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     
     for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i)
       ArgElts.push_back({ voidTy, TE->getElementName(i) });
-    auto actualArgType = TupleType::get(ArgElts, CS->getASTContext());
-    if (auto *actualArgTypeTT = actualArgType->getAs<TupleType>()) {
-      SmallVector<int, 4> sources;
-      SmallVector<unsigned, 4> variadicArgs;
-      if (!computeTupleShuffle(actualArgTypeTT, argTypeTT,
-                               sources, variadicArgs)) {
-        SmallVector<Expr*, 4> resultElts(TE->getNumElements(), nullptr);
-        SmallVector<TupleTypeElt, 4> resultEltTys(TE->getNumElements(), voidTy);
+    SmallVector<int, 4> sources;
+    SmallVector<unsigned, 4> variadicArgs;
+    if (!computeTupleShuffle(ArgElts, argTypeTT, sources, variadicArgs)) {
+      SmallVector<Expr*, 4> resultElts(TE->getNumElements(), nullptr);
+      SmallVector<TupleTypeElt, 4> resultEltTys(TE->getNumElements(), voidTy);
 
-        // If we got a correct shuffle, we can perform the analysis of all of
-        // the input elements, with their expected types.
-        for (unsigned i = 0, e = sources.size(); i != e; ++i) {
-          // If the value is taken from a default argument, ignore it.
-          if (sources[i] == TupleShuffleExpr::DefaultInitialize ||
-              sources[i] == TupleShuffleExpr::Variadic ||
-              sources[i] == TupleShuffleExpr::CallerDefaultInitialize)
-            continue;
-          
-          assert(sources[i] >= 0 && "Unknown sources index");
-          
-          // Otherwise, it must match the corresponding expected argument type.
-          unsigned inArgNo = sources[i];
-          auto actualType = argTypeTT->getElementType(i);
+      // If we got a correct shuffle, we can perform the analysis of all of
+      // the input elements, with their expected types.
+      for (unsigned i = 0, e = sources.size(); i != e; ++i) {
+        // If the value is taken from a default argument, ignore it.
+        if (sources[i] == TupleShuffleExpr::DefaultInitialize ||
+            sources[i] == TupleShuffleExpr::Variadic ||
+            sources[i] == TupleShuffleExpr::CallerDefaultInitialize)
+          continue;
+        
+        assert(sources[i] >= 0 && "Unknown sources index");
+        
+        // Otherwise, it must match the corresponding expected argument type.
+        unsigned inArgNo = sources[i];
+        auto actualType = argTypeTT->getElementType(i);
 
-          TCCOptions options;
-          if (actualType->is<InOutType>())
-            options |= TCC_AllowLValue;
+        TCCOptions options;
+        if (actualType->is<InOutType>())
+          options |= TCC_AllowLValue;
 
-          auto exprResult =
-            typeCheckChildIndependently(TE->getElement(inArgNo), actualType,
-                                        CTP_CallArgument, options);
-          // If there was an error type checking this argument, then we're done.
-          if (!exprResult)
+        auto exprResult =
+          typeCheckChildIndependently(TE->getElement(inArgNo), actualType,
+                                      CTP_CallArgument, options);
+        // If there was an error type checking this argument, then we're done.
+        if (!exprResult)
+          return nullptr;
+
+        // If the caller expected something inout, but we didn't have
+        // something of inout type, diagnose it.
+        if (auto IOE =
+              dyn_cast<InOutExpr>(exprResult->getSemanticsProvidingExpr())) {
+          if (!actualType->is<InOutType>()) {
+            diagnose(exprResult->getLoc(), diag::extra_address_of,
+                     exprResult->getType()->getInOutObjectType())
+              .highlight(exprResult->getSourceRange())
+              .fixItRemove(IOE->getStartLoc());
             return nullptr;
-
-          // If the caller expected something inout, but we didn't have
-          // something of inout type, diagnose it.
-          if (auto IOE =
-                dyn_cast<InOutExpr>(exprResult->getSemanticsProvidingExpr())) {
-            if (!actualType->is<InOutType>()) {
-              diagnose(exprResult->getLoc(), diag::extra_address_of,
-                       exprResult->getType()->getInOutObjectType())
-                .highlight(exprResult->getSourceRange())
-                .fixItRemove(IOE->getStartLoc());
-              return nullptr;
-            }
-          }
-          
-          resultElts[inArgNo] = exprResult;
-          resultEltTys[inArgNo] = {
-            exprResult->getType(),
-            TE->getElementName(inArgNo)
-          };
-        }
-        
-        if (!variadicArgs.empty()) {
-          auto varargsTy = argTypeTT->getVarArgsBaseType();
-          for (unsigned i = 0, e = variadicArgs.size(); i != e; ++i) {
-            unsigned inArgNo = variadicArgs[i];
-            
-            auto expr =
-              typeCheckChildIndependently(TE->getElement(inArgNo), varargsTy,
-                                          CTP_CallArgument);
-            // If there was an error type checking this argument, then we're done.
-            if (!expr)
-              return nullptr;
-            resultElts[inArgNo] = expr;
-            resultEltTys[inArgNo] = { expr->getType() };
           }
         }
         
-        auto TT = TupleType::get(resultEltTys, CS->getASTContext());
-        return TupleExpr::create(CS->getASTContext(), TE->getLParenLoc(),
-                                 resultElts, TE->getElementNames(),
-                                 TE->getElementNameLocs(),
-                                 TE->getRParenLoc(), TE->hasTrailingClosure(),
-                                 TE->isImplicit(), TT);
+        resultElts[inArgNo] = exprResult;
+        resultEltTys[inArgNo] = {
+          exprResult->getType(),
+          TE->getElementName(inArgNo)
+        };
       }
+      
+      if (!variadicArgs.empty()) {
+        auto varargsTy = argTypeTT->getVarArgsBaseType();
+        for (unsigned i = 0, e = variadicArgs.size(); i != e; ++i) {
+          unsigned inArgNo = variadicArgs[i];
+          
+          auto expr =
+            typeCheckChildIndependently(TE->getElement(inArgNo), varargsTy,
+                                        CTP_CallArgument);
+          // If there was an error type checking this argument, then we're done.
+          if (!expr)
+            return nullptr;
+          resultElts[inArgNo] = expr;
+          resultEltTys[inArgNo] = { expr->getType() };
+        }
+      }
+      
+      auto TT = TupleType::get(resultEltTys, CS->getASTContext());
+      return TupleExpr::create(CS->getASTContext(), TE->getLParenLoc(),
+                               resultElts, TE->getElementNames(),
+                               TE->getElementNameLocs(),
+                               TE->getRParenLoc(), TE->hasTrailingClosure(),
+                               TE->isImplicit(), TT);
     }
   }
   
@@ -4220,8 +4216,8 @@ bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
   // If the shuffle is invalid, then there is a type error.  We could diagnose
   // it specifically here, but the general logic does a fine job so we let it
   // do it.
-  if (computeTupleShuffle(TEType->castTo<TupleType>(), contextualTT,
-                          sources, variadicArgs))
+  if (computeTupleShuffle(TEType->castTo<TupleType>()->getElements(),
+                          contextualTT, sources, variadicArgs))
     return visitExpr(TE);
 
   // If we got a correct shuffle, we can perform the analysis of all of

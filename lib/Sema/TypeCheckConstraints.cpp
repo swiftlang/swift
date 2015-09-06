@@ -111,12 +111,13 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
   return cs.getAllocator().Allocate(bytes, alignment);
 }
 
-bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
+bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
+                                      TupleType *toTuple,
                                       SmallVectorImpl<int> &sources,
                                       SmallVectorImpl<unsigned> &variadicArgs) {
   const int unassigned = -3;
   
-  SmallVector<bool, 4> consumed(fromTuple->getNumElements(), false);
+  SmallVector<bool, 4> consumed(fromTuple.size(), false);
   sources.clear();
   variadicArgs.clear();
   sources.assign(toTuple->getNumElements(), unassigned);
@@ -133,7 +134,7 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
     int matched = -1;
     {
       int index = 0;
-      for (auto field : fromTuple->getElements()) {
+      for (auto field : fromTuple) {
         if (field.getName() == toElt.getName() && !consumed[index]) {
           matched = index;
           break;
@@ -150,7 +151,7 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
   }  
 
   // Resolve any unmatched elements.
-  unsigned fromNext = 0, fromLast = fromTuple->getNumElements();
+  unsigned fromNext = 0, fromLast = fromTuple.size();
   auto skipToNextAvailableInput = [&] {
     while (fromNext != fromLast && consumed[fromNext])
       ++fromNext;
@@ -171,9 +172,8 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
         // Labeled elements can't be adopted into varargs even if
         // they're non-mandatory.  There isn't a really strong reason
         // for this, though.
-        if (fromTuple->getElement(fromNext).hasName()) {
+        if (fromTuple[fromNext].hasName())
           return true;
-        }
 
         variadicArgs.push_back(fromNext);
         consumed[fromNext] = true;
@@ -197,7 +197,7 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
 
     // Fail if the input element is named and we're trying to match it with
     // something with a different label.
-    if (fromTuple->getElement(fromNext).hasName() && elt2.hasName())
+    if (fromTuple[fromNext].hasName() && elt2.hasName())
       return true;
 
     sources[i] = fromNext;
