@@ -2308,16 +2308,6 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   if (CS->getContextualTypePurpose() == CTP_CalleeResult) {
     if (auto destFT = toType->getAs<FunctionType>()) {
       auto srcFT = fromType->getAs<FunctionType>();
-      
-      // If the constraint failure is from "T" to "_ -> C" where T isn't a
-      // function type at all, then there is a more basic error here.
-      if (!srcFT) {
-        diagnose(expr->getLoc(), diag::cannot_call_non_function_value,
-                 fromType)
-          .highlight(expr->getSourceRange());
-        return true;
-      }
-      
       if (!isUnresolvedOrTypeVarType(srcFT->getResult())) {
         // Otherwise, the error is that the result types mismatch.
         diagnose(expr->getLoc(), diag::invalid_callee_result_type,
@@ -3407,19 +3397,33 @@ namespace {
 
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
-  // If we have a contextual type, we use it to inform the result type of the
-  // function.
-  CalleeListener listener(CS->getContextualType());
-  auto fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
-                                            CTP_CalleeResult, TCCOptions(),
-                                            &listener);
+  auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
   if (!fnExpr) return true;
+  
+  // If we have a contextual type, and if we have an ambiguously typed function
+  // result from our previous check, we re-type-check it using this contextual
+  // type to inform the result type of the callee.
+  //
+  // We only do this as a second pass because the first pass we just did may
+  // return something of obviously non-function-type.  If this happens, we
+  // produce better diagnostics below by diagnosing this here rather than trying
+  // to peel apart the failed conversion to function type.
+  if (CS->getContextualType() &&
+      (isUnresolvedOrTypeVarType(fnExpr->getType()) ||
+       (fnExpr->getType()->is<AnyFunctionType>() &&
+        fnExpr->getType()->hasUnresolvedType()))) {
+    CalleeListener listener(CS->getContextualType());
+    fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
+                                         CTP_CalleeResult, TCC_ForceRecheck,
+                                         &listener);
+    if (!fnExpr) return true;
+  }
   
   auto fnType = fnExpr->getType()->getRValueType();
 
   // If we resolved a concrete expression for the callee, and it has
   // non-function/non-metatype type, then we cannot call it!
-  if (!fnType->hasUnresolvedType() && !fnType->hasTypeVariable() &&
+  if (!isUnresolvedOrTypeVarType(fnType) &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
     
     // If the argument is a trailing ClosureExpr (i.e. {....}) and it is on a

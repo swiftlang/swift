@@ -65,17 +65,22 @@ func test13811882() {
 func r21544303() {
   var inSubcall = true
   {   // expected-error {{expected 'do' keyword to designate a block of statements}} {{3-3=do }}
-      print("Hello")
   }
   inSubcall = false
 
   // This is a problem, but isn't clear what was intended.
   var somethingElse = true { // expected-error {{cannot call value of non-function type 'Bool'}}
-      print("Hello")
   }
   inSubcall = false
 
+  var v2 : Bool = false
+  v2 = true
+  {  // expected-error {{expected 'do' keyword to designate a block of statements}}
+  }
 }
+
+
+
 
 // <rdar://problem/22162441> Crash from failing to diagnose nonexistent method access inside closure
 func r22162441(lines: [String]) {

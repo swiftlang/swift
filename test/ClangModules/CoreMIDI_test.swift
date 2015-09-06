@@ -5,6 +5,6 @@
 import CoreMIDI
 
 func test() -> String {
-  let s: String = MIDIGetNumberOfDevices() // expected-error {{cannot convert call result type 'Int' to expected type 'String'}}
+  let s: String = MIDIGetNumberOfDevices() // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
   return s
 }

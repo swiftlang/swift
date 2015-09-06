@@ -82,7 +82,7 @@ f5(i)  // expected-error {{cannot invoke 'f5' with an argument list of type '(In
 // <rdar://problem/20598568>
 func pancakes(p: P2) {
   f4(p.wonka) // expected-error{{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
-  f4(p.wonka()) // expected-error{{cannot convert call result type '()' to expected type 'Int'}}
+  f4(p.wonka()) // expected-error{{cannot convert value of type '()' to expected argument type 'Int'}}
 }
 
 protocol Shoes {
@@ -91,7 +91,7 @@ protocol Shoes {
 
 // Here the opaque value has type (metatype_type (archetype_type ... ))
 func f(x: Shoes, asType t: Shoes.Type) {
-  return t.select(x) // expected-error{{cannot convert call result type 'Shoes' to expected type '()'}}
+  return t.select(x) // expected-error{{unexpected non-void return value in void function}}
 }
 
 infix operator **** {
@@ -378,7 +378,7 @@ var afterMessageCount : Int? = nil
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(a : () -> ()) {}
 takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot convert call result type 'UInt' to expected type 'Int?'}}
+  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}}
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
@@ -572,7 +572,7 @@ class r22470302Class {
 }
 
 func r22470302(c: r22470302Class) {
-  print((c.f)(c))  // expected-error {{cannot convert call result type '()' to expected type '[Any]'}}
+  print((c.f)(c))  // expected-error {{cannot convert value of type 'r22470302Class' to expected argument type '()'}}
 }
 
 
@@ -585,7 +585,11 @@ extension String {
 }
 extension Array {
   func g() -> String {
-    return "foo".unavail([1])  // expected-error {{'unavail' is unavailable: calling this is unwise}}
+    return "foo".unavail([""])  // expected-error {{'unavail' is unavailable: calling this is unwise}}
+  }
+  
+  func h() -> String {
+    return "foo".unavail([0])  // expected-error {{value of type 'String' has no member 'Element'}}
   }
 }
 
