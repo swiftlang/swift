@@ -225,10 +225,6 @@ enum class FixKind : uint8_t {
   /// of this constraint should not attempt fixes.
   None,
 
-  /// Introduce a call with no arguments, i.e., (), on the first type before
-  /// applying the constraint to the second type.
-  NullaryCall,
-
   /// Introduce a '!' to force an optional unwrap.
   ForceOptional,
 
