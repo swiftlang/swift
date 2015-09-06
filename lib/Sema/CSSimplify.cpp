@@ -843,33 +843,6 @@ ConstraintSystem::matchTupleToScalarTypes(TupleType *tuple1, Type type2,
                       LocatorPathElt::getTupleElement(0)));
 }
 
-/// Determine whether this is a function type accepting no arguments as input.
-static bool isFunctionTypeAcceptingNoArguments(Type type) {
-  // The type must be a function type.
-  auto fnType = type->getAs<AnyFunctionType>();
-  if (!fnType)
-    return false;
-
-  // Only tuple arguments make sense.
-  auto tupleTy = fnType->getInput()->getAs<TupleType>();
-  if (!tupleTy) return false;
-
-  // Look for any non-defaulted, non-variadic elements.
-  for (const auto &elt : tupleTy->getElements()) {
-    // Defaulted arguments are okay.
-    if (elt.getDefaultArgKind() != DefaultArgumentKind::None)
-      continue;
-
-    // Variadic arguments are okay.
-    if (elt.isVararg())
-      continue;
-
-    return false;
-  }
-
-  return true;
-}
-
 // Returns 'false' (i.e. no error) if it is legal to match functions with the
 // corresponding function type representations and the given match kind.
 static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
