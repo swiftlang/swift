@@ -5803,29 +5803,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   case FixKind::None:
     llvm_unreachable("no-fix marker should never make it into solution");
 
-  case FixKind::NullaryCall: {
-    // Dig for the function we want to call.
-    auto type = solution.simplifyType(TC, affected->getType())
-                  ->getRValueType();
-    if (auto tupleTy = type->getAs<TupleType>()) {
-      if (tupleTy->getElementTypes().size()) {
-        if (auto tuple = dyn_cast<TupleExpr>(affected))
-          affected = tuple->getElement(0);
-        type = tupleTy->getElement(0).getType()->getRValueType();
-      }
-    }
-
-    if (auto optTy = type->getAnyOptionalObjectType())
-      type = optTy;
-
-    if (type->is<AnyFunctionType>())
-      type = type->castTo<AnyFunctionType>()->getResult();
-    
-    TC.diagnose(affected->getLoc(), diag::missing_nullary_call, type)
-      .fixItInsertAfter(affected->getEndLoc(), "()");
-    return true;
-  }
-
   case FixKind::RemoveNullaryCall:
     if (auto apply = dyn_cast<ApplyExpr>(affected)) {
       auto type = solution.simplifyType(TC, apply->getFn()->getType())

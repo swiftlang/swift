@@ -435,8 +435,6 @@ StringRef Fix::getName(FixKind kind) {
   switch (kind) {
   case FixKind::None:
     return "prevent fixes";
-  case FixKind::NullaryCall:
-    return "fix: add nullary call";
   case FixKind::ForceOptional:
     return "fix: force optional";
   case FixKind::ForceDowncast:

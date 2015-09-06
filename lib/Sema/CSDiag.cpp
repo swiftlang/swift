@@ -2862,6 +2862,18 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
     return false;
   }
   
+  // If we're trying to convert something of type "() -> T" to T, then we
+  // probably meant to call the value.
+  if (auto srcFT = exprType->getAs<AnyFunctionType>()) {
+    if (srcFT->getInput()->isVoid() &&
+        CS->TC.isConvertibleTo(srcFT->getResult(), contextualType, CS->DC)) {
+      diagnose(expr->getLoc(), diag::missing_nullary_call, srcFT->getResult())
+        .highlight(expr->getSourceRange())
+        .fixItInsertAfter(expr->getEndLoc(), "()");
+      return true;
+    }
+  }
+  
   // When complaining about conversion to a protocol type, complain about
   // conformance instead of "conversion".
   if (contextualType->is<ProtocolType>() ||

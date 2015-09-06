@@ -455,8 +455,7 @@ let _ : Color = .rainbow(42)  // expected-error {{cannot convert value of type '
 
 let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type 'Double' to specified type 'Int'}}
 
-// FIXME: Why two errors?
-let _ : Color = .rainbow  // expected-error 2 {{function produces expected type 'Color'; did you mean to call it with '()'?}}
+let _ : Color = .rainbow  // expected-error {{contextual member 'rainbow' expects argument of type '()'}}
 
 let _: Color = .overload(a : 1.0)  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .overload(1.0)  // expected-error {{ambiguous reference to member 'overload'}}
@@ -596,4 +595,13 @@ extension Array {
 // <rdar://problem/22519983> QoI: Weird error when failing to infer archetype
 func safeAssign<T: RawRepresentable>(inout lhs: T) -> Bool {}  // expected-note {{in call to function 'safeAssign'}}
 let a = safeAssign // expected-error {{generic parameter 'T' could not be inferred}}
+
+
+// <rdar://problem/21692808> QoI: Incorrect 'add ()' fixit with trailing closure
+func foo() -> [Int] {
+  return Array <Int> (count: 1) {
+    return 1
+  }
+}
+
 

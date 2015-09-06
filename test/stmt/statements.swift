@@ -402,9 +402,8 @@ func test_is_as_patterns() {
 // <rdar://problem/21387308> Fuzzing SourceKit: crash in Parser::parseStmtForEach(...)
 func matching_pattern_recursion() {
   switch 42 {
-  // FIXME: this is a terrible diagnostic
-  case {  // expected-error {{function produces expected type 'Range<Int>'; did you mean to call it with '()'?}} {{4-4=()}}
-      for i in zs {
+  case {  // expected-error {{expression pattern of type '() -> ()' cannot match values of type 'Int'}}
+      for i in zs {  // expected-error {{use of unresolved identifier 'zs'}}
       }
   }: break
   }

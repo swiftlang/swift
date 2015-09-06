@@ -900,20 +900,9 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintLocatorBuilder locator) {
   // An @autoclosure function type can be a subtype of a
   // non-@autoclosure function type.
-  if (func1->isAutoClosure() != func2->isAutoClosure()) {
-    if (func2->isAutoClosure() || kind < TypeMatchKind::Subtype) {
-      // If the second type is an autoclosure and the first type appears to
-      // accept no arguments, try to add the ().
-      if (func2->isAutoClosure() && shouldAttemptFixes() &&
-          kind >= TypeMatchKind::Conversion &&
-          isFunctionTypeAcceptingNoArguments(func1)) {
-        unsigned subFlags = (flags | TMF_GenerateConstraints) & ~TMF_ApplyingFix;
-        return simplifyFixConstraint(FixKind::NullaryCall, func1, func2, kind,
-                                     subFlags, locator);
-      }
-      return SolutionKind::Error;
-    }
-  }
+  if (func1->isAutoClosure() != func2->isAutoClosure() &&
+      (func2->isAutoClosure() || kind < TypeMatchKind::Subtype))
+    return SolutionKind::Error;
   
   // A non-throwing function can be a subtype of a throwing function.
   if (func1->throws() != func2->throws()) {
@@ -2013,12 +2002,6 @@ commit_to_conversions:
   if (shouldAttemptFixes() && !typeVar1 && !typeVar2 &&
       !(flags & TMF_ApplyingFix) && kind >= TypeMatchKind::Conversion) {
     Type objectType1 = type1->getRValueObjectType();
-
-    // If the source type is a function type that could be applied with (),
-    // try it.
-    if (isFunctionTypeAcceptingNoArguments(objectType1)) {
-      conversionsOrFixes.push_back(FixKind::NullaryCall);
-    }
 
     // If we have an optional type, try to force-unwrap it.
     // FIXME: Should we also try '?'?
@@ -4283,29 +4266,6 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
   switch (fix.getKind()) {
   case FixKind::None:
     return matchTypes(type1, type2, matchKind, subFlags, locator);
-
-  case FixKind::NullaryCall: {
-    // Assume that '()' was applied to the first type.
-
-    // If the function was actually in a tuple, tuple'ify the
-    // FIXME: This is yet another awful hack due to one-element tuples.
-    auto funcTy = type1->getRValueType();
-    Identifier nameToAdd;
-    if (auto tupleTy = funcTy->getAs<TupleType>()) {
-      int scalarIdx = tupleTy->getElementForScalarInit();
-      nameToAdd = tupleTy->getElement(scalarIdx).getName();
-      funcTy = tupleTy->getElementType(scalarIdx);
-    }
-
-    if (auto optObjectTy = funcTy->getAnyOptionalObjectType())
-      funcTy = optObjectTy;
-
-    auto resultTy = funcTy->castTo<AnyFunctionType>()->getResult();
-    if (!nameToAdd.empty())
-      resultTy = TupleType::get(TupleTypeElt(resultTy, nameToAdd),
-                                  getASTContext());
-    return matchTypes(resultTy, type2, matchKind, subFlags, locator);
-  }
 
   case FixKind::RemoveNullaryCall:
     llvm_unreachable("Always applied directly");
