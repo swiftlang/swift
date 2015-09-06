@@ -137,6 +137,51 @@ enum OperandRelation {
   EqualAfterMove
 };
 
+/// \brief Find a root value for operand \p In. This function inspects a sil
+/// value and strips trivial conversions such as values that are passed
+/// as arguments to basic blocks with a single predecessor or type casts.
+/// This is a shallow one-spet search and not a deep recursive search.
+///
+/// For example, in the SIL code below, the root of %10 is %3, because it is
+/// the only possible incoming value.
+///
+/// bb1:
+///  %3 = unchecked_enum_data %0 : $Optional<X>, #Optional.Some!enumelt.1
+///  checked_cast_br [exact] %3 : $X to $X, bb4, bb5 // id: %4
+///
+/// bb4(%10 : $X):                                    // Preds: bb1
+///  strong_release %10 : $X
+///  br bb2
+///
+static SILValue findValueShallowRoot(const SILValue &In) {
+  // If this is a basic block argument with a single caller
+  // then we know exactly which value is passed to the argument.
+  if (SILArgument *Arg = dyn_cast<SILArgument>(In)) {
+    SILBasicBlock *Parent = Arg->getParent();
+    SILBasicBlock *Pred = Parent->getSinglePredecessor();
+    if (!Pred) return In;
+
+    // If the terminator is a cast instruction then use the pre-cast value.
+    if (auto CCBI = dyn_cast<CheckedCastBranchInst>(Pred->getTerminator())) {
+      assert(CCBI->getSuccessBB() == Parent && "Inspecting the wrong block");
+
+      // At the moment we only support [exact] casts.
+      // TODO: add support for upcast and downcasts.
+      if (CCBI->isExact())
+        return CCBI->getOperand();
+    }
+
+    // If the single predecessor terminator is a BranchInst then the root is
+    //  the argument then the root is simply the argument to the terminator.
+    if (auto BI = dyn_cast<BranchInst>(Pred->getTerminator())) {
+      assert(BI->getDestBB() == Pred && "Invalid terminator");
+      unsigned Idx = Arg->getIndex();
+      return BI->getArg(Idx);
+    }
+  }
+  return In;
+}
+
 /// \brief Search for an instruction that is identical to \p Iden by scanning
 /// \p BB starting at the end of the block, stopping on sink barriers.
 /// The \p opRelation must be consistent for all operand comparisons.
@@ -386,6 +431,27 @@ static bool sinkArgumentsFromPredecessors(SILBasicBlock *BB) {
   for (int i = 0, e = BB->getNumBBArg(); i < e; ++i)
     Changed |= sinkArgument(BB, i);
 
+  return Changed;
+}
+
+/// \brief canonicalize strong_release instructions and make them amenable to
+/// sinking by selecting canonical pointers. We reduce the number of possible
+/// inputs by replacing values that are unlikely to be a canonical values.
+/// Reducing the search space increases the chances of matching release
+/// instructions to one another and the chance of sinking them. We replace
+/// values that come from basic block arguments with the caller values and
+/// strip casts.
+static bool canonicalizeReleases(SILBasicBlock *BB) {
+ bool Changed = false;
+ for (auto I = BB->begin(), E = BB->end(); I != E; ++I) {
+      auto *SR = dyn_cast<StrongReleaseInst>(I);
+      if (!SR) continue;
+      SILValue Root = findValueShallowRoot(SR->getOperand());
+      if (SR->getOperand() != Root) {
+        SR->setOperand(Root);
+        Changed = true;
+      }
+  }
   return Changed;
 }
 
@@ -1540,6 +1606,7 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     // code from predecessors. We will never sink the hoisted releases from
     // predecessors since the hoisted releases will be on the enum payload
     // instead of the enum itself.
+    Changed |= canonicalizeReleases(State.getBB());
     Changed |= sinkCodeFromPredecessors(State.getBB());
     Changed |= sinkArgumentsFromPredecessors(State.getBB());
 
