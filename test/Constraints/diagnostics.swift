@@ -599,9 +599,18 @@ let a = safeAssign // expected-error {{generic parameter 'T' could not be inferr
 
 // <rdar://problem/21692808> QoI: Incorrect 'add ()' fixit with trailing closure
 func foo() -> [Int] {
-  return Array <Int> (count: 1) {
+  return Array <Int> (count: 1) { // expected-error {{cannot invoke initializer for type 'Array<Int>' with an argument list of type '(count: Int, () -> Int)'}}
+    // expected-note @-1 {{expected an argument list of type '(count: Int, repeatedValue: Element)'}}
     return 1
   }
 }
 
+
+
+// <rdar://problem/17557899> - This shouldn't suggest calling with ().
+func someOtherFunction() {}
+func someFunction() -> () {
+  // Producing an error suggesting that this
+  return someOtherFunction  // expected-error {{unexpected non-void return value in void function}}
+}
 
