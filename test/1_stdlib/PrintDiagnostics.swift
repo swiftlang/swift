@@ -7,6 +7,6 @@ debugPrint(3, appendNewline: false) // expected-error {{'debugPrint(_:appendNewl
 
 print(3, &stream)
 debugPrint(3, &stream)
-print(3, &stream, appendNewline: false) // expected-error {{cannot pass immutable value of type 'OutputStreamType' as inout argument}}
-debugPrint(3, &stream, appendNewline: false) // expected-error {{cannot pass immutable value of type 'OutputStreamType' as inout argument}} 
+print(3, &stream, appendNewline: false) // expected-error {{cannot pass immutable value as inout argument: implicit conversion from 'String' to 'OutputStreamType' requires a temporary}}
+debugPrint(3, &stream, appendNewline: false) // expected-error {{cannot pass immutable value as inout argument: implicit conversion from 'String' to 'OutputStreamType' requires a temporary}} 
 print(4, quack: 5) // expected-error {{'print' is unavailable: Please wrap your tuple argument in parentheses: 'print((...))'}}

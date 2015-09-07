@@ -1138,6 +1138,16 @@ static void diagnoseSubElementFailure(Expr *destExpr,
       .highlight(AE->getSourceRange());
     return;
   }
+  
+  if (auto *ICE = dyn_cast<ImplicitConversionExpr>(immInfo.first))
+    if (isa<LoadExpr>(ICE->getSubExpr())) {
+      TC.diagnose(loc, diagID, "implicit conversion from '" +
+                  ICE->getSubExpr()->getType()->getString() + "' to '" +
+                  ICE->getType()->getString() + "' requires a temporary")
+        .highlight(ICE->getSourceRange());
+      return;
+    }
+  
 
   TC.diagnose(loc, unknownDiagID, destExpr->getType())
     .highlight(immInfo.first->getSourceRange());
