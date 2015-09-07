@@ -3418,7 +3418,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     
     assert(!overloadName.empty());
     diagnose(argExpr->getLoc(), diag::cannot_apply_unop_to_arg, overloadName,
-             argType);
+             argExpr->getType());
     
     calleeInfo.suggestPotentialOverloads(overloadName, argExpr->getLoc());
     return true;
