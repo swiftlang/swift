@@ -899,11 +899,6 @@ public:
   /// \brief Retrieve the fixed type for the given type variable.
   Type getFixedType(TypeVariableType *typeVar) const;
 
-  /// \brief Return true if this solution isn't fully resolved.  This happens
-  /// when type checking is using the FreeTypeVariableBinding::Allow family of
-  /// flags.
-  bool hasUnresolvedTypeVars() const;
-
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
