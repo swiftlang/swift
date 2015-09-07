@@ -2911,7 +2911,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
         diagID = diag::noescape_functiontype_mismatch;
     }
   
-  diagnose(expr->getLoc(), diagID, exprType, contextualType)
+  diagnose(expr->getLoc(), diagID, exprType->getRValueType(), contextualType)
     .highlight(expr->getSourceRange());
   return true;
 }

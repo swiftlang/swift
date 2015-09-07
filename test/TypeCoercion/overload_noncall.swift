@@ -53,7 +53,7 @@ func test_inout() {
 
   x = xy;
   x = &xy; // expected-error{{'&' used with non-inout argument of type 'X'}}
-  accept_Z(&xy); // expected-error{{cannot convert value of type '@lvalue X' to expected argument type 'Z'}}
+  accept_Z(&xy); // expected-error{{cannot convert value of type 'X' to expected argument type 'Z'}}
 }
 
 func lvalue_or_rvalue(inout x: X) -> X { }
