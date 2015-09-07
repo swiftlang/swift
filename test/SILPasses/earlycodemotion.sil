@@ -1390,6 +1390,7 @@ bb3(%12 : $URefd):
 }
 
 class X { func ping() {} }
+class Y : X { }
 // CHECK-LABEL: sil @canonicalize_releases
 
 sil @canonicalize_releases : $@convention(thin) (@owned Optional<X>) -> () {
@@ -1426,4 +1427,63 @@ bb5:                                              // Preds: bb1
   strong_release %3 : $X                          // id: %15
   br bb2                                          // id: %16
 }
+
+
+// The input swift code:
+// func foo(x : X) -> Int {
+//    if let z = x as? Y {
+//       z.ping()
+//       z.ping()
+//    }
+//   return 0
+// }
+
+//CHECK-LABEL: sil @canonicalize_casts
+// Make sure we are replacing all uses of %3 with %0.
+sil @canonicalize_casts: $@convention(thin) (@owned X) -> Int {
+bb0(%0 : $X):
+  debug_value %0 : $X  // let x                   // id: %1
+  checked_cast_br %0 : $X to $Y, bb1, bb3         // id: %2
+
+bb1(%3 : $Y):                                     // Preds: bb0
+  debug_value %3 : $Y  // let z                   // id: %4
+  %5 = upcast %3 : $Y to $X                       // users: %6, %7, %21, %23
+  %6 = class_method %5 : $X, #X.ping!1 : X -> () -> () , $@convention(method) (@guaranteed X) -> () // users: %21, %23
+  checked_cast_br [exact] %5 : $X to $Y, bb5, bb6 // id: %7
+
+bb2:                                              // Preds: bb5 bb6
+  //CHECK: strong_release %0
+  //CHECK-NEXT: strong_release %0
+  strong_release %0 : $X                          // id: %8
+  strong_release %3 : $Y                          // id: %9
+  br bb4                                          // id: %10
+
+bb3:                                              // Preds: bb0
+  br bb4                                          // id: %11
+
+bb4:                                              // Preds: bb2 bb3
+  %12 = integer_literal $Builtin.Int64, 0         // user: %13
+  %13 = struct $Int (%12 : $Builtin.Int64)        // user: %15
+  strong_release %0 : $X                          // id: %14
+  return %13 : $Int                               // id: %15
+
+bb5(%16 : $Y):                                    // Preds: bb1
+  //CHECK: strong_retain %0
+  //CHECK-NEXT: strong_retain %0
+  strong_retain %0 : $X                           // id: %17
+  strong_retain %3 : $Y                           // id: %18
+  br bb2                                          // id: %19
+
+bb6:                                              // Preds: bb1
+  //CHECK: strong_retain %0
+  //CHECK-NEXT: apply
+  //CHECK-NEXT: strong_retain %0
+  //CHECK-NEXT: apply
+  strong_retain %3 : $Y                           // id: %20
+  %21 = apply %6(%5) : $@convention(method) (@guaranteed X) -> ()
+  strong_retain %0 : $X                           // id: %22
+  %23 = apply %6(%5) : $@convention(method) (@guaranteed X) -> ()
+  br bb2                                          // id: %24
+}
+
 

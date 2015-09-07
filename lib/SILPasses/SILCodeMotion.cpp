@@ -165,10 +165,13 @@ static SILValue findValueShallowRoot(const SILValue &In) {
     if (auto CCBI = dyn_cast<CheckedCastBranchInst>(Pred->getTerminator())) {
       assert(CCBI->getSuccessBB() == Parent && "Inspecting the wrong block");
 
-      // At the moment we only support [exact] casts.
-      // TODO: add support for upcast and downcasts.
-      if (CCBI->isExact())
-        return CCBI->getOperand();
+      // In swift it is legal to cast non reference-counted references into
+      // object references. For example: func f(x : C.Type) -> Any {return x}
+      // Here we check that the uncasted reference is reference counted.
+      SILValue V = CCBI->getOperand();
+      if (V.getType().isReferenceCounted(Pred->getParent()->getModule())) {
+        return V;
+      }
     }
 
     // If the single predecessor terminator is a BranchInst then the root is
@@ -434,25 +437,28 @@ static bool sinkArgumentsFromPredecessors(SILBasicBlock *BB) {
   return Changed;
 }
 
-/// \brief canonicalize strong_release instructions and make them amenable to
+/// \brief canonicalize retain/release instructions and make them amenable to
 /// sinking by selecting canonical pointers. We reduce the number of possible
 /// inputs by replacing values that are unlikely to be a canonical values.
-/// Reducing the search space increases the chances of matching release
+/// Reducing the search space increases the chances of matching ref count
 /// instructions to one another and the chance of sinking them. We replace
 /// values that come from basic block arguments with the caller values and
 /// strip casts.
-static bool canonicalizeReleases(SILBasicBlock *BB) {
+static bool canonicalizeRefCountInstrs(SILBasicBlock *BB) {
  bool Changed = false;
  for (auto I = BB->begin(), E = BB->end(); I != E; ++I) {
-      auto *SR = dyn_cast<StrongReleaseInst>(I);
-      if (!SR) continue;
-      SILValue Root = findValueShallowRoot(SR->getOperand());
-      if (SR->getOperand() != Root) {
-        SR->setOperand(Root);
-        Changed = true;
-      }
-  }
-  return Changed;
+   if (!isa<StrongReleaseInst>(I) && !isa<StrongRetainInst>(I))
+     continue;
+
+   SILValue Ref = I->getOperand(0);
+   SILValue Root = findValueShallowRoot(Ref);
+   if (Ref != Root) {
+     I->setOperand(0, Root);
+     Changed = true;
+   }
+ }
+
+ return Changed;
 }
 
 static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
@@ -1606,7 +1612,7 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     // code from predecessors. We will never sink the hoisted releases from
     // predecessors since the hoisted releases will be on the enum payload
     // instead of the enum itself.
-    Changed |= canonicalizeReleases(State.getBB());
+    Changed |= canonicalizeRefCountInstrs(State.getBB());
     Changed |= sinkCodeFromPredecessors(State.getBB());
     Changed |= sinkArgumentsFromPredecessors(State.getBB());
 
