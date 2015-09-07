@@ -115,7 +115,7 @@ i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argum
 // make sure that it doesn't crash.
 func rdar20142523() {
   map(0..<10, { x in // expected-error{{cannot invoke 'map' with an argument list of type '(Range<Int>, (_) -> _)'}}
-    // expected-note @-1 {{expected an argument list of type '(C, (C.Generator.Element) -> T)'}}
+    // expected-note @-1 {{overloads for 'map' exist with these partially matching parameter lists: (C, (C.Generator.Element) -> T), (T?, @noescape (T) -> U)}}
     ()
     return x  // expected-error {{type of expression is ambiguous without more context}}
   })

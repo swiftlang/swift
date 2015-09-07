@@ -4,9 +4,9 @@ struct X { }
 struct Y { }
 struct Z { }
 
-func f0(x1: X, x2: X) -> X {}
-func f0(y1: Y, y2: Y) -> Y {}
-var f0 : X // expected-note{{'f0' previously declared here}}
+func f0(x1: X, x2: X) -> X {} // expected-note{{found this candidate}}
+func f0(y1: Y, y2: Y) -> Y {} // expected-note{{found this candidate}}
+var f0 : X // expected-note {{found this candidate}} expected-note {{'f0' previously declared here}}
 func f0_init(x: X, y: Y) -> X {}
 var f0 : (x : X, y : Y) -> X = f0_init // expected-error{{invalid redeclaration}}
 func f1(x: X) -> X {}
@@ -16,7 +16,7 @@ func f2(g: (x: X) -> X) -> ((y: Y) -> Y) { }
 func test_conv() {
   var _ : (x1 : X, x2 : X) -> X = f0
   var _ : (X, X) -> X = f0
-  var _ : (Y, X) -> X = f0 // expected-error{{cannot convert value of type 'X' to specified type '(Y, X) -> X'}}
+  var _ : (Y, X) -> X = f0 // expected-error{{ambiguous reference to member 'f0'}}
   var _ : (X) -> X = f1
   var a7 : (X) -> (X) = f1
   var a8 : (x2 : X) -> (X) = f1
@@ -53,7 +53,7 @@ func test_inout() {
 
   x = xy;
   x = &xy; // expected-error{{'&' used with non-inout argument of type 'X'}}
-  accept_Z(&xy); // expected-error{{cannot convert value of type 'X' to expected argument type 'Z'}}
+  accept_Z(&xy); // expected-error{{cannot convert value of type '@lvalue X' to expected argument type 'Z'}}
 }
 
 func lvalue_or_rvalue(inout x: X) -> X { }

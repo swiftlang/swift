@@ -2636,6 +2636,18 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
     }
   }
 
+  
+  // If we have no contextual type information and the subexpr is obviously a
+  // overload set, don't recursively simplify this.  The recursive solver will
+  // sometimes pick one based on arbitrary ranking behavior behavior (e.g. like
+  // which is the most specialized) even then all the constraints are being
+  // fulfilled by UnresolvedType, which doesn't tell us anything.
+  if (convertTypePurpose == CTP_Unused &&
+      (isa<OverloadedDeclRefExpr>(subExpr->getValueProvidingExpr()) ||
+       isa<OverloadedMemberRefExpr>(subExpr->getValueProvidingExpr()))) {
+    return subExpr;
+  }
+
   ExprTypeSaver SavedTypeData;
   SavedTypeData.save(subExpr);
   
