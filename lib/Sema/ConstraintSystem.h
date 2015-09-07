@@ -2339,7 +2339,7 @@ private:
                                     = FreeTypeVariableBinding::Disallow);
 
 private:
-  // \brief Compare two solutions to the same set of constraints.
+  /// \brief Compare two solutions to the same set of constraints.
   ///
   /// \param cs The constraint system.
   /// \param solutions All of the solutions to the system.
@@ -2349,8 +2349,7 @@ private:
   static SolutionCompareResult compareSolutions(ConstraintSystem &cs,
                                                 ArrayRef<Solution> solutions,
                                                 const SolutionDiff &diff,
-                                                unsigned idx1,
-                                                unsigned idx2);
+                                                unsigned idx1, unsigned idx2);
 
 public:
   /// Increase the score of the given kind for the current (partial) solution

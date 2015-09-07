@@ -704,7 +704,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
              ? SolutionCompareResult::Better
              : SolutionCompareResult::Worse;
   }
-
+  
   // Compute relative score.
   unsigned score1 = 0;
   unsigned score2 = 0;
@@ -790,152 +790,150 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     auto &tc = cs.getTypeChecker();
     switch (choice1.getKind()) {
     case OverloadChoiceKind::TupleIndex:
-      break;
+    case OverloadChoiceKind::TypeDecl:
+      continue;
 
     case OverloadChoiceKind::BaseType:
       llvm_unreachable("Never considered different");
-
-    case OverloadChoiceKind::TypeDecl:
-      break;
 
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
-      // Determine whether one declaration is more specialized than the other.
-      bool firstAsSpecializedAs = false;
-      bool secondAsSpecializedAs = false;
-      if (isDeclAsSpecializedAs(tc, cs.DC, decl1, decl2)) {
-        ++score1;
-        firstAsSpecializedAs = true;
-      }
-      if (isDeclAsSpecializedAs(tc, cs.DC, decl2, decl1)) {
-        ++score2;
-        secondAsSpecializedAs = true;
-      }
+      break;
+    }
+    
+    // Determine whether one declaration is more specialized than the other.
+    bool firstAsSpecializedAs = false;
+    bool secondAsSpecializedAs = false;
+    if (isDeclAsSpecializedAs(tc, cs.DC, decl1, decl2)) {
+      ++score1;
+      firstAsSpecializedAs = true;
+    }
+    if (isDeclAsSpecializedAs(tc, cs.DC, decl2, decl1)) {
+      ++score2;
+      secondAsSpecializedAs = true;
+    }
 
-      // If each is as specialized as the other, and both are constructors,
-      // check the constructor kind.
-      if (firstAsSpecializedAs && secondAsSpecializedAs) {
-        if (auto ctor1 = dyn_cast<ConstructorDecl>(decl1)) {
-          if (auto ctor2 = dyn_cast<ConstructorDecl>(decl2)) {
-            if (ctor1->getInitKind() != ctor2->getInitKind()) {
-              if (ctor1->getInitKind() < ctor2->getInitKind())
+    // If each is as specialized as the other, and both are constructors,
+    // check the constructor kind.
+    if (firstAsSpecializedAs && secondAsSpecializedAs) {
+      if (auto ctor1 = dyn_cast<ConstructorDecl>(decl1)) {
+        if (auto ctor2 = dyn_cast<ConstructorDecl>(decl2)) {
+          if (ctor1->getInitKind() != ctor2->getInitKind()) {
+            if (ctor1->getInitKind() < ctor2->getInitKind())
+              ++score1;
+            else
+              ++score2;
+          } else if (ctor1->getInitKind() ==
+                     CtorInitializerKind::Convenience) {
+            
+            // If both are convenience initializers, and the instance type of
+            // one is a subtype of the other's, favor the subtype constructor.
+            auto resType1 = ctor1->getResultType();
+            auto resType2 = ctor2->getResultType();
+            
+            if (!resType1->isEqual(resType2)) {
+              if (tc.isSubtypeOf(resType1, resType2, cs.DC)) {
                 ++score1;
-              else
+              } else if (tc.isSubtypeOf(resType2, resType1, cs.DC)) {
                 ++score2;
-            } else if (ctor1->getInitKind() ==
-                       CtorInitializerKind::Convenience) {
-              
-              // If both are convenience initializers, and the instance type of
-              // one is a subtype of the other's, favor the subtype constructor.
-              auto resType1 = ctor1->getResultType();
-              auto resType2 = ctor2->getResultType();
-              
-              if (!resType1->isEqual(resType2)) {
-                if (tc.isSubtypeOf(resType1, resType2, cs.DC)) {
-                  ++score1;
-                } else if (tc.isSubtypeOf(resType2, resType1, cs.DC)) {
-                  ++score2;
-                }
               }
             }
           }
         }
       }
+    }
 
-      // If both declarations come from Clang, and one is a type and the other
-      // is a function, prefer the function.
-      if (decl1->hasClangNode() &&
-          decl2->hasClangNode() &&
-          ((isa<TypeDecl>(decl1) &&
-            isa<AbstractFunctionDecl>(decl2)) ||
-           (isa<AbstractFunctionDecl>(decl1) &&
-            isa<TypeDecl>(decl2)))) {
-        if (isa<TypeDecl>(decl1))
-          ++score2;
-        else
-          ++score1;
+    // If both declarations come from Clang, and one is a type and the other
+    // is a function, prefer the function.
+    if (decl1->hasClangNode() &&
+        decl2->hasClangNode() &&
+        ((isa<TypeDecl>(decl1) &&
+          isa<AbstractFunctionDecl>(decl2)) ||
+         (isa<AbstractFunctionDecl>(decl1) &&
+          isa<TypeDecl>(decl2)))) {
+      if (isa<TypeDecl>(decl1))
+        ++score2;
+      else
+        ++score1;
+    }
+
+    // A class member is always better than a curried instance member.
+    // If the members agree on instance-ness, a property is better than a
+    // method (because a method is usually immediately invoked).
+    if (!decl1->isInstanceMember() && decl2->isInstanceMember())
+      ++score1;
+    else if (!decl2->isInstanceMember() && decl1->isInstanceMember())
+      ++score2;
+    else if (isa<VarDecl>(decl1) && isa<FuncDecl>(decl2))
+      ++score1;
+    else if (isa<VarDecl>(decl2) && isa<FuncDecl>(decl1))
+      ++score2;
+    
+    // If we haven't found a refinement, record whether one overload is in
+    // any way more constrained than another. We'll only utilize this
+    // information in the case of a potential ambiguity.
+    if (!(foundRefinement1 && foundRefinement2)) {
+      if (isDeclMoreConstrainedThan(decl1, decl2)) {
+        foundRefinement1 = true;
       }
-
-      // A class member is always better than a curried instance member.
-      // If the members agree on instance-ness, a property is better than a
-      // method (because a method is usually immediately invoked).
-      if (!decl1->isInstanceMember() && decl2->isInstanceMember())
-        ++score1;
-      else if (!decl2->isInstanceMember() && decl1->isInstanceMember())
-        ++score2;
-      else if (isa<VarDecl>(decl1) && isa<FuncDecl>(decl2))
-        ++score1;
-      else if (isa<VarDecl>(decl2) && isa<FuncDecl>(decl1))
-        ++score2;
       
-      // If we haven't found a refinement, record whether one overload is in
-      // any way more constrained than another. We'll only utilize this
-      // information in the case of a potential ambiguity.
-      if (!(foundRefinement1 && foundRefinement2)) {
-        if (isDeclMoreConstrainedThan(decl1, decl2)) {
-          foundRefinement1 = true;
-        }
-        
-        if (isDeclMoreConstrainedThan(decl2, decl1)) {
-          foundRefinement2 = true;
-        }
+      if (isDeclMoreConstrainedThan(decl2, decl1)) {
+        foundRefinement2 = true;
       }
-       
-      // If we still haven't found a refinement, check if there's a parameter-
-      // wise comparison between an empty existential collection and a non-
-      // existential type.
-      if (!(foundRefinement1 && foundRefinement2)) {
-        if (hasEmptyExistenialParameterMismatch(decl1, decl2)) {
-          foundRefinement1 = true;
-        }
-        
-        if (hasEmptyExistenialParameterMismatch(decl2, decl1)) {
-          foundRefinement2 = true;
-        }
+    }
+     
+    // If we still haven't found a refinement, check if there's a parameter-
+    // wise comparison between an empty existential collection and a non-
+    // existential type.
+    if (!(foundRefinement1 && foundRefinement2)) {
+      if (hasEmptyExistenialParameterMismatch(decl1, decl2)) {
+        foundRefinement1 = true;
       }
-
-      // FIXME: The rest of the hack for restating requirements.
-      if (!(foundRefinement1 && foundRefinement2)) {
-        if (identical && decl1InSubprotocol != decl2InSubprotocol) {
-          foundRefinement1 = decl1InSubprotocol;
-          foundRefinement2 = decl2InSubprotocol;
-        }
+      
+      if (hasEmptyExistenialParameterMismatch(decl2, decl1)) {
+        foundRefinement2 = true;
       }
+    }
 
-      // FIXME: Lousy hack for ?? to prefer the catamorphism (flattening)
-      // over the mplus (non-flattening) overload if all else is equal.
-      if (decl1->getName().str() == "??") {
-        assert(decl2->getName().str() == "??");
-
-        auto check = [](const ValueDecl *VD) -> bool {
-          if (!VD->getModuleContext()->isStdlibModule())
-            return false;
-          auto fnTy = VD->getType()->castTo<AnyFunctionType>();
-          if (!fnTy->getResult()->getAnyOptionalObjectType())
-            return false;
-
-          // Check that the standard library hasn't added another overload of
-          // the ?? operator.
-          auto inputTupleTy = fnTy->getInput()->castTo<TupleType>();
-          auto inputTypes = inputTupleTy->getElementTypes();
-          assert(inputTypes.size() == 2);
-          assert(inputTypes[0]->getAnyOptionalObjectType());
-          auto autoclosure = inputTypes[1]->castTo<AnyFunctionType>();
-          assert(autoclosure->isAutoClosure());
-          auto secondParamTy = autoclosure->getResult();
-          assert(secondParamTy->getAnyOptionalObjectType());
-          (void)secondParamTy;
-
-          return true;
-        };
-
-        isStdlibOptionalMPlusOperator1 = check(decl1);
-        isStdlibOptionalMPlusOperator2 = check(decl2);
+    // FIXME: The rest of the hack for restating requirements.
+    if (!(foundRefinement1 && foundRefinement2)) {
+      if (identical && decl1InSubprotocol != decl2InSubprotocol) {
+        foundRefinement1 = decl1InSubprotocol;
+        foundRefinement2 = decl2InSubprotocol;
       }
+    }
 
-      break;
+    // FIXME: Lousy hack for ?? to prefer the catamorphism (flattening)
+    // over the mplus (non-flattening) overload if all else is equal.
+    if (decl1->getName().str() == "??") {
+      assert(decl2->getName().str() == "??");
+
+      auto check = [](const ValueDecl *VD) -> bool {
+        if (!VD->getModuleContext()->isStdlibModule())
+          return false;
+        auto fnTy = VD->getType()->castTo<AnyFunctionType>();
+        if (!fnTy->getResult()->getAnyOptionalObjectType())
+          return false;
+
+        // Check that the standard library hasn't added another overload of
+        // the ?? operator.
+        auto inputTupleTy = fnTy->getInput()->castTo<TupleType>();
+        auto inputTypes = inputTupleTy->getElementTypes();
+        assert(inputTypes.size() == 2);
+        assert(inputTypes[0]->getAnyOptionalObjectType());
+        auto autoclosure = inputTypes[1]->castTo<AnyFunctionType>();
+        assert(autoclosure->isAutoClosure());
+        auto secondParamTy = autoclosure->getResult();
+        assert(secondParamTy->getAnyOptionalObjectType());
+        (void)secondParamTy;
+
+        return true;
+      };
+
+      isStdlibOptionalMPlusOperator1 = check(decl1);
+      isStdlibOptionalMPlusOperator2 = check(decl2);
     }
   }
 
