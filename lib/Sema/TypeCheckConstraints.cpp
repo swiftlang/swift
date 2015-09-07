@@ -1141,9 +1141,10 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   assert((!convertType || convertTypePurpose != CTP_Unused) &&
          "Purpose for conversion type was not specified");
 
-  // If we're asked to convert to an UnresolvedType, then ignore the request.
-  // This happens when CSDiags nukes a type.
+  // Take a look at the conversion type to check to make sure it is sensible.
   if (convertType) {
+    // If we're asked to convert to an UnresolvedType, then ignore the request.
+    // This happens when CSDiags nukes a type.
     if (convertType->is<UnresolvedType>() ||
         (convertType->is<MetatypeType>() && convertType->hasUnresolvedType())) {
       convertType = Type();

@@ -900,7 +900,7 @@ public:
   Type getFixedType(TypeVariableType *typeVar) const;
 
   /// \brief Return true if this solution isn't fully resolved.  This happens
-  /// when type checking useing the FreeTypeVariableBinding::Allow family of
+  /// when type checking is using the FreeTypeVariableBinding::Allow family of
   /// flags.
   bool hasUnresolvedTypeVars() const;
 

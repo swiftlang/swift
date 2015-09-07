@@ -690,12 +690,11 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
   return decl1Better? Comparison::Better : Comparison::Worse;
 }
 
-SolutionCompareResult ConstraintSystem::compareSolutions(
-                        ConstraintSystem &cs,
-                        ArrayRef<Solution> solutions,
-                        const SolutionDiff &diff,
-                        unsigned idx1,
-                        unsigned idx2) {
+SolutionCompareResult
+ConstraintSystem::compareSolutions(ConstraintSystem &cs,
+                                   ArrayRef<Solution> solutions,
+                                   const SolutionDiff &diff,
+                                   unsigned idx1, unsigned idx2) {
   // Whether the solutions are identical.
   bool identical = true;
 
@@ -1119,7 +1118,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
     case SolutionCompareResult::Incomparable:
-        break;
+      break;
 
     case SolutionCompareResult::Worse:
       losers[i] = true;

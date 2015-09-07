@@ -80,7 +80,7 @@ static bool isOpenedAnyObject(Type type) {
 /// flags.
 bool Solution::hasUnresolvedTypeVars() const {
   for (auto type : typeBindings)
-    if (type.first->isEqual(type.second))
+    if (type.second->hasUnresolvedType())
       return true;
 
   return false;
