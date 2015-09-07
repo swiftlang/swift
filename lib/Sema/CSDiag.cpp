@@ -1768,17 +1768,8 @@ private:
   bool visitForceValueExpr(ForceValueExpr *FVE);
   bool visitBindOptionalExpr(BindOptionalExpr *BOE);
 
-  bool visitBinaryExpr(BinaryExpr *BE);
-  bool visitUnaryExpr(ApplyExpr *AE);
-  bool visitPrefixUnaryExpr(PrefixUnaryExpr *PUE) {
-    return visitUnaryExpr(PUE);
-  }
-  bool visitPostfixUnaryExpr(PostfixUnaryExpr *PUE) {
-    return visitUnaryExpr(PUE);
-  }
-  
   bool visitSubscriptExpr(SubscriptExpr *SE);
-  bool visitCallExpr(CallExpr *CE);
+  bool visitApplyExpr(ApplyExpr *AE);
   bool visitAssignExpr(AssignExpr *AE);
   bool visitInOutExpr(InOutExpr *IOE);
   bool visitCoerceExpr(CoerceExpr *CE);
@@ -2625,6 +2616,12 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
   // If we have a conversion type, but it has type variables (from the current
   // ConstraintSystem), then we can't use it.
   if (convertType) {
+    // If we're asked to convert to an autoclosure, then we really want to
+    // convert to the result of it.
+    if (auto *FT = convertType->getAs<AnyFunctionType>())
+      if (FT->isAutoClosure())
+        convertType = FT->getResult();
+
     if (convertType->hasTypeVariable() || convertType->hasArchetype())
       convertType = replaceArchetypesAndTypeVarsWithUnresolved(convertType);
     
@@ -2647,7 +2644,7 @@ typeCheckChildIndependently(Expr *subExpr, Type convertType,
        isa<OverloadedMemberRefExpr>(subExpr->getValueProvidingExpr()))) {
     return subExpr;
   }
-
+  
   ExprTypeSaver SavedTypeData;
   SavedTypeData.save(subExpr);
   
@@ -3118,143 +3115,6 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
                            TE->isImplicit(), TT);
 }
 
-bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
-  CalleeCandidateInfo calleeInfo(binop->getFn(), CS);
-  assert(!calleeInfo.candidates.empty() && "unrecognized binop function kind");
-
-  auto checkedArgExpr = typeCheckArgumentChildIndependently(binop->getArg(),
-                                                            Type(),
-                                                            calleeInfo);
-  if (!checkedArgExpr) return true;
-
-  // Pre-checking can turn (T,U) into a TypeExpr.  That's an artifact
-  // of independent type-checking; just use the standard diagnostics
-  // paths.
-  auto argExpr = dyn_cast<TupleExpr>(checkedArgExpr);
-  if (!argExpr) return visitExpr(binop);
-
-  auto argTupleType = argExpr->getType()->castTo<TupleType>();
-  calleeInfo.filterList(argTupleType);
-
-  std::string overloadName = calleeInfo[0].decl->getNameStr();
-  assert(!overloadName.empty());
-
-  auto lhsExpr = argExpr->getElement(0), rhsExpr = argExpr->getElement(1);
-  auto lhsType = lhsExpr->getType()->getRValueType();
-  auto rhsType = rhsExpr->getType()->getRValueType();
-
-  // If this is a comparison against nil, then we should produce a specific
-  // diagnostic.
-  if (isa<NilLiteralExpr>(rhsExpr->getValueProvidingExpr()) &&
-      !isUnresolvedOrTypeVarType(lhsType)) {
-    if (overloadName == "=="  || overloadName == "!=" ||
-        overloadName == "===" || overloadName == "!==" ||
-        overloadName == "<"   || overloadName == ">" ||
-        overloadName == "<="  || overloadName == ">=") {
-      diagnose(binop->getLoc(), diag::comparison_with_nil_illegal, lhsType)
-      .highlight(lhsExpr->getSourceRange());
-      return true;
-    }
-  }
-
-  // Otherwise, whatever the result type of the call happened to be must not
-  // have been what we were looking for - diagnose this as a conversion
-  // failure.
-  if (calleeInfo.closeness == CC_ExactMatch)
-    return false;
-  
-  if (calleeInfo.closeness == CC_Unavailable) {
-    if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
-                                              binop->getLoc(), CS->DC, nullptr))
-      return true;
-    return false;
-  }
-  
-  // A common error is to apply an operator that only has an inout LHS (e.g. +=)
-  // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
-  // case.
-  if (calleeInfo.closeness == CC_NonLValueInOut) {
-    diagnoseSubElementFailure(argExpr->getElement(0), binop->getLoc(), *CS,
-                              diag::cannot_apply_lvalue_binop_to_subelement,
-                              diag::cannot_apply_lvalue_binop_to_rvalue);
-    return true;
-  }
-
-  if (binop->isImplicit() && overloadName == "~=") {
-    // This binop was synthesized when typechecking an expression pattern.
-    diagnose(lhsExpr->getLoc(),
-             diag::cannot_match_expr_pattern_with_value, lhsType, rhsType)
-      .highlight(lhsExpr->getSourceRange())
-      .highlight(rhsExpr->getSourceRange());
-    return true;
-  }
-  
-  if (!lhsType->isEqual(rhsType)) {
-    diagnose(binop->getLoc(), diag::cannot_apply_binop_to_args,
-             overloadName, lhsType, rhsType)
-      .highlight(lhsExpr->getSourceRange())
-      .highlight(rhsExpr->getSourceRange());
-  } else {
-    diagnose(binop->getLoc(), diag::cannot_apply_binop_to_same_args,
-             overloadName, lhsType)
-      .highlight(lhsExpr->getSourceRange())
-      .highlight(rhsExpr->getSourceRange());
-  }
-  
-  calleeInfo.suggestPotentialOverloads(overloadName, binop->getLoc());
-  return true;
-}
-
-
-bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
-  assert(expr->getKind() == ExprKind::PostfixUnary ||
-         expr->getKind() == ExprKind::PrefixUnary);
-
-  CalleeCandidateInfo calleeInfo(applyExpr->getFn(), CS);
-  assert(!calleeInfo.candidates.empty() && "unrecognized unop function kind");
-
-  auto argExpr = typeCheckArgumentChildIndependently(applyExpr->getArg(),
-                                                     Type(), calleeInfo);
-  if (!argExpr) return true;
-
-  Type argType = argExpr->getType();
-  calleeInfo.filterList(argType);
-
-  if (calleeInfo.closeness == CC_ExactMatch) {
-    // Otherwise, whatever the result type of the call happened to be must not
-    // have been what we were looking for.  Lets diagnose it as a conversion
-    // or ambiguity failure.
-    return false;
-  }
-  
-  if (calleeInfo.closeness == CC_Unavailable) {
-    if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
-                                              applyExpr->getLoc(),
-                                              CS->DC, nullptr))
-      return true;
-    return false;
-  }
-
-  // A common error is to apply an operator that only has inout forms (e.g. ++)
-  // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
-  // case.
-  if (calleeInfo.closeness == CC_NonLValueInOut) {
-    // Diagnose the case when the failure.
-    diagnoseSubElementFailure(argExpr, applyExpr->getFn()->getLoc(), *CS,
-                              diag::cannot_apply_lvalue_unop_to_subelement,
-                              diag::cannot_apply_lvalue_unop_to_rvalue);
-    return true;
-  }
-
-  std::string overloadName = calleeInfo[0].decl->getNameStr();
-  assert(!overloadName.empty());
-  diagnose(argExpr->getLoc(), diag::cannot_apply_unop_to_arg, overloadName,
-           argType);
-  
-  calleeInfo.suggestPotentialOverloads(overloadName, argExpr->getLoc());
-  return true;
-}
-
 bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   // FIXME: Why isn't this passing TCC_AllowLValue?  It seems that this could
   // cause problems with subscripts that have mutating getters.
@@ -3416,7 +3276,7 @@ namespace {
   };
 }
 
-bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
+bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
   auto fnExpr = typeCheckChildIndependently(callExpr->getFn());
   if (!fnExpr) return true;
@@ -3429,7 +3289,9 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // return something of obviously non-function-type.  If this happens, we
   // produce better diagnostics below by diagnosing this here rather than trying
   // to peel apart the failed conversion to function type.
-  if (CS->getContextualType() &&
+  if (!isa<BinaryExpr>(callExpr) &&   // FIXME, binops too!
+      
+      CS->getContextualType() &&
       (isUnresolvedOrTypeVarType(fnExpr->getType()) ||
        (fnExpr->getType()->is<AnyFunctionType>() &&
         fnExpr->getType()->hasUnresolvedType()))) {
@@ -3497,12 +3359,6 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 
   calleeInfo.filterList(argExpr->getType());
 
-  // If we found an exact match, this must be a problem with a conversion from
-  // the result of the call to the expected type.  Diagnose this as a conversion
-  // failure.
-  if (calleeInfo.closeness == CC_ExactMatch)
-    return false;
-
   if (calleeInfo.closeness == CC_Unavailable) {
     if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
                                               callExpr->getLoc(),
@@ -3511,8 +3367,113 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     return false;
   }
   
-  bool isInitializer = isa<TypeExpr>(fnExpr);
+  // A common error is to apply an operator that only has inout forms (e.g. ++)
+  // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
+  // case.
+  if (calleeInfo.closeness == CC_NonLValueInOut) {
+    Diag<StringRef> subElementDiagID;
+    Diag<Type> rvalueDiagID;
+    
+    Expr *diagExpr = nullptr;
+    
+    if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
+      subElementDiagID = diag::cannot_apply_lvalue_unop_to_subelement;
+      rvalueDiagID = diag::cannot_apply_lvalue_unop_to_rvalue;
+      diagExpr = argExpr;
+    } else if (isa<BinaryExpr>(callExpr)) {
+      subElementDiagID = diag::cannot_apply_lvalue_binop_to_subelement;
+      rvalueDiagID = diag::cannot_apply_lvalue_binop_to_rvalue;
+      
+      if (auto argTuple = dyn_cast<TupleExpr>(argExpr))
+        diagExpr = argTuple->getElement(0);
+    }
+    
+    if (diagExpr) {
+      diagnoseSubElementFailure(diagExpr, callExpr->getFn()->getLoc(), *CS,
+                                subElementDiagID, rvalueDiagID);
+      return true;
+    }
+  }
+  
+  // Otherwise, we have a generic failure.  Diagnose it with a generic error
+  // message now.
   auto overloadName = calleeInfo.declName;
+  
+  if (isa<PrefixUnaryExpr>(callExpr) || isa<PostfixUnaryExpr>(callExpr)) {
+    // If we found an exact match, this must be a problem with a conversion from
+    // the result of the call to the expected type.  Diagnose this as a
+    // conversion failure.
+    if (calleeInfo.closeness == CC_ExactMatch)
+      return false;
+    
+    assert(!overloadName.empty());
+    diagnose(argExpr->getLoc(), diag::cannot_apply_unop_to_arg, overloadName,
+             argType);
+    
+    calleeInfo.suggestPotentialOverloads(overloadName, argExpr->getLoc());
+    return true;
+  }
+  
+  if (isa<BinaryExpr>(callExpr) && isa<TupleExpr>(argExpr)) {
+    auto argTuple = cast<TupleExpr>(argExpr);
+    auto lhsExpr = argTuple->getElement(0), rhsExpr = argTuple->getElement(1);
+    auto lhsType = lhsExpr->getType()->getRValueType();
+    auto rhsType = rhsExpr->getType()->getRValueType();
+    
+    // If this is a comparison against nil, then we should produce a specific
+    // diagnostic.
+    if (isa<NilLiteralExpr>(rhsExpr->getValueProvidingExpr()) &&
+        !isUnresolvedOrTypeVarType(lhsType)) {
+      if (overloadName == "=="  || overloadName == "!=" ||
+          overloadName == "===" || overloadName == "!==" ||
+          overloadName == "<"   || overloadName == ">" ||
+          overloadName == "<="  || overloadName == ">=") {
+        diagnose(callExpr->getLoc(), diag::comparison_with_nil_illegal, lhsType)
+          .highlight(lhsExpr->getSourceRange());
+        return true;
+      }
+    }
+
+    if (callExpr->isImplicit() && overloadName == "~=") {
+      // This binop was synthesized when typechecking an expression pattern.
+      diagnose(lhsExpr->getLoc(),
+               diag::cannot_match_expr_pattern_with_value, lhsType, rhsType)
+        .highlight(lhsExpr->getSourceRange())
+        .highlight(rhsExpr->getSourceRange());
+      return true;
+    }
+    
+    // If we found an exact match, this must be a problem with a conversion from
+    // the result of the call to the expected type.  Diagnose this as a
+    // conversion failure.
+    if (calleeInfo.closeness == CC_ExactMatch)
+      return false;
+    
+    if (!lhsType->isEqual(rhsType)) {
+      diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_args,
+               overloadName, lhsType, rhsType)
+      .highlight(lhsExpr->getSourceRange())
+      .highlight(rhsExpr->getSourceRange());
+    } else {
+      diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_same_args,
+               overloadName, lhsType)
+      .highlight(lhsExpr->getSourceRange())
+      .highlight(rhsExpr->getSourceRange());
+    }
+    
+    calleeInfo.suggestPotentialOverloads(overloadName, callExpr->getLoc());
+    return true;
+  }
+  
+  
+  // If we found an exact match, this must be a problem with a conversion from
+  // the result of the call to the expected type.  Diagnose this as a
+  // conversion failure.
+  if (calleeInfo.closeness == CC_ExactMatch)
+    return false;
+
+  
+  bool isInitializer = isa<TypeExpr>(fnExpr);
 
   std::string argString = getTypeListString(argExpr->getType());
 
