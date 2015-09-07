@@ -174,13 +174,18 @@ static SILValue findValueShallowRoot(const SILValue &In) {
       }
     }
 
-    // If the single predecessor terminator is a BranchInst then the root is
-    //  the argument then the root is simply the argument to the terminator.
+    // If the single predecessor terminator is a branch then the root is
+    // the argument to the terminator.
     if (auto BI = dyn_cast<BranchInst>(Pred->getTerminator())) {
-      assert(BI->getDestBB() == Pred && "Invalid terminator");
+      assert(BI->getDestBB() == Parent && "Invalid terminator");
       unsigned Idx = Arg->getIndex();
       return BI->getArg(Idx);
     }
+
+    if (auto CBI = dyn_cast<CondBranchInst>(Pred->getTerminator())) {
+      return CBI->getArgForDestBB(Parent, Arg);
+    }
+
   }
   return In;
 }

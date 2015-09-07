@@ -1487,3 +1487,32 @@ bb6:                                              // Preds: bb1
 }
 
 
+// Make sure we are not crashing on this one:
+sil @direct_branch0: $@convention(thin) (@owned X) -> Int {
+bb0(%0 : $X):
+  br bb1(%0 : $X)
+
+bb1(%1 : $X):
+  strong_release %1 : $X
+  br bb2(%1 : $X)
+
+bb2(%4 : $X):
+  strong_release %4 : $X
+  br bb2(%4 : $X)
+}
+
+//CHECK-LABEL: @cond_branch0
+sil @cond_branch0: $@convention(thin) (@owned X) -> Int {
+bb0(%0 : $X):
+  cond_br undef, bb1(%0 : $X), bb2(%0 : $X)
+
+bb1(%1 : $X):
+  //CHECK: strong_release %0
+  strong_release %1 : $X
+  br bb2(%1 : $X)
+
+bb2(%5 : $X):
+  //CHECK: strong_release %5
+  strong_release %5 : $X
+  br bb2(%5 : $X)
+}
