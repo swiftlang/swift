@@ -1440,7 +1440,7 @@ bb5:                                              // Preds: bb1
 
 //CHECK-LABEL: sil @canonicalize_casts
 // Make sure we are replacing all uses of %3 with %0.
-sil @canonicalize_casts: $@convention(thin) (@owned X) -> Int {
+sil @canonicalize_casts: $@convention(thin) (@owned X) -> Int32 {
 bb0(%0 : $X):
   debug_value %0 : $X  // let x                   // id: %1
   checked_cast_br %0 : $X to $Y, bb1, bb3         // id: %2
@@ -1462,10 +1462,10 @@ bb3:                                              // Preds: bb0
   br bb4                                          // id: %11
 
 bb4:                                              // Preds: bb2 bb3
-  %12 = integer_literal $Builtin.Int64, 0         // user: %13
-  %13 = struct $Int (%12 : $Builtin.Int64)        // user: %15
+  %12 = integer_literal $Builtin.Int32, 0         // user: %13
+  %13 = struct $Int32 (%12 : $Builtin.Int32)        // user: %15
   strong_release %0 : $X                          // id: %14
-  return %13 : $Int                               // id: %15
+  return %13 : $Int32                               // id: %15
 
 bb5(%16 : $Y):                                    // Preds: bb1
   //CHECK: strong_retain %0
