@@ -231,7 +231,9 @@ void CallGraph::addEdgesForApply(FullApplySite AI, CallGraphNode *CallerNode) {
   CallerNode->MayBindDynamicSelf |= hasDynamicSelfTypes(AI.getSubstitutions());
 
   if (tryGetCalleeSet(AI.getCallee(), CalleeSet, Complete)) {
-    auto *Edge = new (Allocator) CallGraphEdge(AI, CalleeSet, Complete,
+    assert(CalleeSet.size() == 1 && Complete &&
+           "Expected a singleton set known to be complete!");
+    auto *Edge = new (Allocator) CallGraphEdge(AI, *CalleeSet.begin(),
                                                EdgeOrdinal++);
     assert(!ApplyToEdgeMap.count(AI) &&
            "Added apply that already has an edge node!\n");
@@ -255,7 +257,7 @@ void CallGraph::addEdgesForApply(FullApplySite AI, CallGraphNode *CallerNode) {
 
 void CallGraph::removeEdge(CallGraphEdge *Edge) {
   // Remove the edge from all the potential callee call graph nodes.
-  auto &CalleeSet = Edge->getPartialCalleeSet();
+  auto CalleeSet = Edge->getPartialCalleeSet();
   for (auto *CalleeNode : CalleeSet)
     CalleeNode->removeCallerEdge(Edge);
 
@@ -326,7 +328,7 @@ void CallGraph::addEdges(SILFunction *F) {
 
 void CallGraphEdge::dump() {
 #ifndef NDEBUG
-  auto &CalleeSet = getPartialCalleeSet();
+  auto CalleeSet = getPartialCalleeSet();
   llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
   orderCallees(CalleeSet, OrderedNodes);
 

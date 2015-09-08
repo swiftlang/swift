@@ -40,47 +40,49 @@ class CallGraphNode;
 
 class CallGraphEdge {
 public:
-  // SmallSize = 1, because direct calls only need a single entry in the set and
-  // currently we don't handle method calls.
   // TODO: Consider increasing SmallSize when we handle method calls.
-  typedef llvm::SmallPtrSet<CallGraphNode *, 1> CalleeSetType;
+  typedef llvm::SmallPtrSet<CallGraphNode *, 2> CalleeSetType;
 
 private:
   // The call site represented by this call graph edge.
   FullApplySite TheApply;
 
+  typedef llvm::PointerUnion<CallGraphNode *,
+                             CalleeSetType *> CalleeSetImplType;
+
   // The set of functions potentially called from this call site. This
   // might include functions that are not actually callable based on
   // dynamic types. If the int bit is non-zero, the set is complete in
   // the sense that no function outside the set could be called.
-  //
-  // This is currently owned by the CallGraphEdge.
-  llvm::PointerIntPair<CalleeSetType *, 1> CalleeSet;
+  llvm::PointerIntPair<CalleeSetImplType, 1> CalleeSet;
 
   // A unique identifier for this edge based on the order in which it
   // was created relative to other edges.
   unsigned Ordinal;
 
 public:
+  /// Create a call graph edge for a call site with a single known
+  /// callee.
+  CallGraphEdge(FullApplySite TheApply, CallGraphNode *Node, unsigned Ordinal)
+    : TheApply(TheApply),
+      CalleeSet(Node, true),
+      Ordinal(Ordinal) {
+    assert(Node != nullptr && "Expected non-null callee node!");
+  }
+
   /// Create a call graph edge for a call site where we will fill in
   /// the set of potentially called functions later.
-  CallGraphEdge(FullApplySite TheApply, CalleeSetType &KnownCallees,
+  CallGraphEdge(FullApplySite TheApply, CalleeSetType * const KnownCallees,
                 bool Complete, unsigned Ordinal)
     : TheApply(TheApply),
-      // FIXME: Do not allocate memory for the singleton callee case.
-      CalleeSet(new CalleeSetType, Complete),
+      CalleeSet(KnownCallees, Complete),
       Ordinal(Ordinal) {
-
-    // TODO: We will probably have many call sites that can share a
-    //       callee set so we should optimize allocation and
-    //       deallocation of these accordingly.
-    CalleeSet.getPointer()->insert(KnownCallees.begin(), KnownCallees.end());
-    assert((!CalleeSet.getPointer()->empty() || !Complete) &&
-           "Did not expect a call set that is both empty and complete!");
+    assert(!KnownCallees->empty() && "Expected at least one known callee!");
   }
 
   ~CallGraphEdge() {
-    delete CalleeSet.getPointer();
+    if (CalleeSet.getPointer().is<CalleeSetType *>())
+      delete CalleeSet.getPointer().get<CalleeSetType *>();
   }
 
   const FullApplySite getApply() const { return TheApply; }
@@ -88,14 +90,26 @@ public:
   FullApplySite getApply() { return TheApply; }
 
   /// Return a callee set that is known to be complete.
-  const CalleeSetType &getCompleteCalleeSet() const {
+  CalleeSetType getCompleteCalleeSet() const {
     assert(isCalleeSetComplete() && "Attempt to get an incomplete call set!");
-    return *CalleeSet.getPointer();
+    if (CalleeSet.getPointer().is<CalleeSetType *>())
+      return *CalleeSet.getPointer().get<CalleeSetType *>();
+
+    CalleeSetType Result;
+    Result.insert(CalleeSet.getPointer().get<CallGraphNode *>());
+
+    return Result;
   }
 
   /// Return a callee set that is not known to be complete.
-  const CalleeSetType &getPartialCalleeSet() {
-    return *CalleeSet.getPointer();
+  CalleeSetType getPartialCalleeSet() const {
+    if (CalleeSet.getPointer().is<CalleeSetType *>())
+      return *CalleeSet.getPointer().get<CalleeSetType *>();
+
+    CalleeSetType Result;
+    Result.insert(CalleeSet.getPointer().get<CallGraphNode *>());
+
+    return Result;
   }
 
   /// Add the given function to the set of functions that we could
@@ -103,7 +117,7 @@ public:
   void addCallee(CallGraphNode *Node) {
     assert(!isCalleeSetComplete() &&
            "Attempting to add another callee to a complete call set!");
-    CalleeSet.getPointer()->insert(Node);
+    CalleeSet.getPointer().get<CalleeSetType *>()->insert(Node);
   }
 
   /// Return whether the call set is known to be complete.
@@ -121,7 +135,9 @@ public:
   /// other words we can replace its callee with a function_ref
   /// regardless of what kind of instruction the callee is now.
   bool hasSingleCallee() const {
-    return isCalleeSetComplete() && CalleeSet.getPointer()->size() == 1;
+    return isCalleeSetComplete() &&
+      (CalleeSet.getPointer().is<CallGraphNode *>() ||
+       CalleeSet.getPointer().get<CalleeSetType *>()->size() == 1);
   }
 
   unsigned getOrdinal() const {
