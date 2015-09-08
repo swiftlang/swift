@@ -39,7 +39,7 @@ def maskBits(n):
     """Return an n-bit mask in hex"""
     return hexify((1 << n) - 1)
 
-fixedBitWidths = [2**x for x in range(3, 8)]
+fixedBitWidths = [2**x for x in range(3, 8) if 2**x <= 2 * word_bits]
 maxFixedBits = fixedBitWidths[-1]
 }%
 
