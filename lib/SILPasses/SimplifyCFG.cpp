@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-simplify-cfg"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
@@ -29,6 +30,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/Commandline.h"
 using namespace swift;
 
 STATISTIC(NumBlocksDeleted,  "Number of unreachable blocks removed");
@@ -36,6 +38,8 @@ STATISTIC(NumBlocksMerged,   "Number of blocks merged together");
 STATISTIC(NumJumpThreads,    "Number of jumps threaded");
 STATISTIC(NumConstantFolded, "Number of terminators constant folded");
 STATISTIC(NumDeadArguments,  "Number of unused arguments removed");
+STATISTIC(NumSROAArguments, "Number of aggregate argument levels split by "
+                            "SROA ");
 
 //===----------------------------------------------------------------------===//
 //                             CFG Simplification
@@ -2292,6 +2296,272 @@ static void removeArgument(SILBasicBlock *BB, unsigned i) {
   for (auto *Pred : PredBBs)
     removeArgumentFromTerminator(Pred, BB, i);
 }
+
+namespace {
+
+class ArgumentSplitter {
+  /// The argument we are splitting.
+  SILArgument *Arg;
+
+  /// The worklist of arguments that we still ned to visit. We simplify each
+  /// argument recursively one step at a time.
+  std::vector<SILArgument *> &Worklist;
+
+  /// The values incoming into Arg.
+  llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> IncomingValues;
+
+  /// The list of first level projections that Arg can be split into.
+  llvm::SmallVector<Projection, 4> Projections;
+
+  llvm::Optional<int> FirstNewArgIndex;
+
+public:
+  ArgumentSplitter(SILArgument *A, std::vector<SILArgument *> &W)
+      : Arg(A), Worklist(W), IncomingValues() {}
+  bool split();
+
+private:
+  bool createNewArguments();
+  void replaceIncomingArgs(SILBuilder &B, BranchInst *BI,
+                           llvm::SmallVectorImpl<SILValue> &NewIncomingValues);
+  void replaceIncomingArgs(SILBuilder &B, CondBranchInst *CBI,
+                           llvm::SmallVectorImpl<SILValue> &NewIncomingValues);
+};
+}
+
+void ArgumentSplitter::replaceIncomingArgs(
+    SILBuilder &B, BranchInst *BI,
+    llvm::SmallVectorImpl<SILValue> &NewIncomingValues) {
+  unsigned ArgIndex = Arg->getIndex();
+
+  for (unsigned i : reversed(indices(BI->getAllOperands()))) {
+    // Skip this argument.
+    if (i == ArgIndex)
+      continue;
+    NewIncomingValues.push_back(BI->getArg(i));
+  }
+  std::reverse(NewIncomingValues.begin(), NewIncomingValues.end());
+  B.createBranch(BI->getLoc(), BI->getDestBB(), NewIncomingValues);
+}
+
+void ArgumentSplitter::replaceIncomingArgs(
+    SILBuilder &B, CondBranchInst *CBI,
+    llvm::SmallVectorImpl<SILValue> &NewIncomingValues) {
+  llvm::SmallVector<SILValue, 4> OldIncomingValues;
+  ArrayRef<SILValue> NewTrueValues, NewFalseValues;
+
+  unsigned ArgIndex = Arg->getIndex();
+  if (Arg->getParent() == CBI->getTrueBB()) {
+    ArrayRef<Operand> TrueArgs = CBI->getTrueOperands();
+    for (unsigned i : reversed(indices(TrueArgs))) {
+      // Skip this argument.
+      if (i == ArgIndex)
+        continue;
+      NewIncomingValues.push_back(TrueArgs[i].get());
+    }
+    std::reverse(NewIncomingValues.begin(), NewIncomingValues.end());
+    for (SILValue V : CBI->getFalseArgs())
+      OldIncomingValues.push_back(V);
+    NewTrueValues = NewIncomingValues;
+    NewFalseValues = OldIncomingValues;
+  } else {
+    ArrayRef<Operand> FalseArgs = CBI->getFalseOperands();
+    for (unsigned i : reversed(indices(FalseArgs))) {
+      // Skip this argument.
+      if (i == ArgIndex)
+        continue;
+      NewIncomingValues.push_back(FalseArgs[i].get());
+    }
+    std::reverse(NewIncomingValues.begin(), NewIncomingValues.end());
+    for (SILValue V : CBI->getTrueArgs())
+      OldIncomingValues.push_back(V);
+    NewTrueValues = OldIncomingValues;
+    NewFalseValues = NewIncomingValues;
+  }
+
+  B.createCondBranch(CBI->getLoc(), CBI->getCondition(), CBI->getTrueBB(),
+                     NewTrueValues, CBI->getFalseBB(), NewFalseValues);
+}
+
+bool ArgumentSplitter::createNewArguments() {
+  SILModule &Mod = Arg->getModule();
+  SILBasicBlock *ParentBB = Arg->getParent();
+
+  // Grab the incoming values. Return false if we can't find them.
+  if (!Arg->getIncomingValues(IncomingValues))
+    return false;
+
+  if (!Projection::getFirstLevelProjections(Arg, Mod, Projections))
+    return false;
+
+  // We do not want to split arguments with less than 2 projections.
+  if (Projections.size() < 2)
+    return false;
+
+  // We do not want to split arguments that have less than 2 non-trivial
+  // projections.
+  if (std::count_if(Projections.begin(), Projections.end(),
+                    [&](const Projection &P) {
+                      return !P.getType().isTrivial(Mod);
+                    }) < 2)
+    return false;
+
+  // We subtract one since this will be the number of the first new argument
+  // *AFTER* we remove the old argument.
+  FirstNewArgIndex = ParentBB->getNumBBArg() - 1;
+
+  // For now for simplicity, we put all new arguments on the end and delete the
+  // old one.
+  llvm::SmallVector<SILValue, 4> NewArgumentValues;
+  for (auto &P : Projections) {
+    auto *NewArg = ParentBB->createBBArg(P.getType(), nullptr);
+    // This is unfortunate, but it feels wrong to put in an API into SILBuilder
+    // that only takes in arguments.
+    //
+    // TODO: We really need some sort of entry point that is more flexible in
+    // these apis than a ArrayRef<SILValue>.
+    NewArgumentValues.push_back(NewArg);
+  }
+
+  SILBuilderWithScope<> B(ParentBB->begin(), nullptr);
+
+  // Reform the original structure
+  //
+  // TODO: What is the right location to use here.
+  auto Loc = RegularLocation::getAutoGeneratedLocation();
+  SILInstruction *Agg = Projection::createAggFromFirstLevelProjections(
+                            B, Loc, Arg->getType(), NewArgumentValues)
+                            .get();
+  assert(Agg->getNumTypes() == 1 && "Expected only one result");
+  SILValue(Arg).replaceAllUsesWith(SILValue(Agg));
+
+  // Look at all users of agg and see if we can simplify any of them. This will
+  // eliminate struct_extracts/tuple_extracts from the newly created aggregate
+  // and have them point directly at the argument.
+  simplifyUsers(Agg);
+
+  // If we only had such users of Agg and Agg is dead now (ignoring debug
+  // instructions), remove it.
+  if (hasNoUsesExceptDebug(Agg))
+    eraseFromParentWithDebugInsts(Agg);
+
+  return true;
+}
+
+static llvm::cl::opt<bool>
+RemoveDeadArgsWhenSplitting("sroa-args-remove-dead-args-after",
+                            llvm::cl::init(true));
+
+bool ArgumentSplitter::split() {
+  SILModule &Mod = Arg->getModule();
+  SILBasicBlock *ParentBB = Arg->getParent();
+
+  if (!createNewArguments())
+    return false;
+
+  unsigned ArgIndex = Arg->getIndex();
+  llvm::SmallVector<SILValue, 4> NewIncomingValues;
+  // Then for each incoming value, fixup the branch, cond_branch instructions.
+  for (auto P : IncomingValues) {
+    SILBasicBlock *Pred = P.first;
+    SILValue Base = P.second;
+    auto *OldTerm = Pred->getTerminator();
+    SILBuilderWithScope<> B(OldTerm);
+
+    assert(NewIncomingValues.empty() && "NewIncomingValues was not cleared?");
+    for (auto &P : reversed(Projections)) {
+      auto *ProjInst = P.createProjection(B, OldTerm->getLoc(), Base).get();
+      NewIncomingValues.push_back(ProjInst);
+    }
+
+    if (auto *Br = dyn_cast<BranchInst>(OldTerm)) {
+      replaceIncomingArgs(B, Br, NewIncomingValues);
+    } else {
+      auto *CondBr = cast<CondBranchInst>(OldTerm);
+      replaceIncomingArgs(B, CondBr, NewIncomingValues);
+    }
+
+    OldTerm->eraseFromParent();
+    NewIncomingValues.clear();
+  }
+
+  // Delete the old argument. We need to do this before trying to remove any
+  // dead arguments that we added since otherwise the number of incoming values
+  // to the phi nodes will differ from the number of values coming
+  ParentBB->eraseBBArg(ArgIndex);
+  ++NumSROAArguments;
+
+  // This is here for testing purposes via sil-opt
+  if (!RemoveDeadArgsWhenSplitting)
+    return true;
+
+  // Perform some cleanups such as:
+  //
+  // 1. Removing any newly inserted arguments that are actually dead.
+  // 2. As a result of removing these arguments, remove any newly dead object
+  // projections.
+
+  // Do a quick pass over the new arguments to see if any of them are dead. We
+  // can do this unconditionally in a safe way since we are only dealing with
+  // cond_br, br.
+  for (int i = ParentBB->getNumBBArg() - 1, e = *FirstNewArgIndex; i >= e;
+       --i) {
+    SILArgument *A = ParentBB->getBBArg(i);
+    if (!A->use_empty()) {
+      // We know that the argument is not dead, so add it to the worklist for
+      // recursive processing.
+      Worklist.push_back(A);
+      continue;
+    }
+    removeArgument(ParentBB, i);
+  }
+
+  return true;
+}
+
+/// This currently invalidates the CFG since parts of PHI nodes are stored in
+/// branch instructions and we replace the branch instructions as part of this
+/// operation. If/when PHI nodes can be updated without invalidating the CFG,
+/// this should be moved to the SROA pass.
+static bool splitBBArguments(SILFunction &Fn) {
+  bool Changed = false;
+  std::vector<SILArgument *> Worklist;
+
+  // We know that we have atleast one BB, so this is safe since in such a case
+  // std::next(Fn->begin()) == Fn->end(), the exit case of iteration on a range.
+  for (auto &BB : make_range(std::next(Fn.begin()), Fn.end())) {
+    for (auto *Arg : BB.getBBArgs()) {
+      SILType ArgTy = Arg->getType();
+
+      if (!ArgTy.isObject() ||
+          (!ArgTy.is<TupleType>() && !ArgTy.getStructOrBoundGenericStruct())) {
+        continue;
+      }
+
+      // Make sure that all predecessors of our BB have either a br or cond_br
+      // terminator. We only handle those cases.
+      if (std::any_of(BB.pred_begin(), BB.pred_end(),
+                      [](SILBasicBlock *Pred) -> bool {
+                        auto *TI = Pred->getTerminator();
+                        return !isa<BranchInst>(TI) && !isa<CondBranchInst>(TI);
+                      })) {
+        continue;
+      }
+
+      Worklist.push_back(Arg);
+    }
+  }
+
+  while (!Worklist.empty()) {
+    SILArgument *Arg = Worklist.back();
+    Worklist.pop_back();
+
+    Changed |= ArgumentSplitter(Arg, Worklist).split();
+  }
+
+  return Changed;
+}
+
 bool SimplifyCFG::run() {
   RemoveUnreachable RU(Fn);
 
@@ -2305,7 +2575,10 @@ bool SimplifyCFG::run() {
   PDT = nullptr;
   auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
   CG = CGA->getCallGraphOrNull();
-  
+
+  // Perform SROA on BB arguments.
+  Changed |= splitBBArguments(Fn);
+
   if (simplifyBlocks()) {
     // Simplifying other blocks might have resulted in unreachable
     // loops.
@@ -3114,7 +3387,19 @@ public:
   StringRef getName() override { return "Simplify Block Args"; }
 };
 
-  
+// Used to test splitBBArguments with sil-opt
+class SROABBArgs : public SILFunctionTransform {
+public:
+  SROABBArgs() {}
+
+  void run() override {
+    if (splitBBArguments(*getFunction()))
+      invalidateAnalysis(SILAnalysis::PreserveKind::Calls);
+  }
+
+  StringRef getName() override { return "SROA BB Arguments"; }
+};
+
 } // End anonymous namespace.
 
 /// Splits all critical edges in a function.
@@ -3126,6 +3411,9 @@ SILTransform *swift::createSplitAllCriticalEdges() {
 SILTransform *swift::createSplitNonCondBrCriticalEdges() {
   return new SplitCriticalEdges(true);
 }
+
+// Simplifies basic block arguments.
+SILTransform *swift::createSROABBArgs() { return new SROABBArgs(); }
 
 // Simplifies basic block arguments.
 SILTransform *swift::createSimplifyBBArgs() {

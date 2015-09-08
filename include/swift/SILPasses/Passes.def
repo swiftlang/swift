@@ -134,6 +134,8 @@ PASS(SILLinker, "linker",
      "Link in all of the serialized SIL referenced in the module")
 PASS(SROA, "sroa",
      "SIL scalar replacement of aggregates")
+PASS(SROABBArgs, "sroa-bb-args",
+     "SIL scalar replacement of aggregates of bb arguments")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "Simplify basic block arguments")
 // TODO: What should this be called. We are just following what was previously in SILOpt.

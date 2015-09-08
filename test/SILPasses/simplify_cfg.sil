@@ -24,6 +24,7 @@ bb2:
 }
 
 // CHECK-LABEL: @test_single_pred_block
+// CHECK: bb3([[ARG:%[0-9]+]] : $Builtin.Int64):
 // CHECK: struct $Int64
 // CHECK-NEXT: return
 sil @test_single_pred_block : $@convention(thin) (Builtin.Int1) -> Int64 {
@@ -285,7 +286,8 @@ bb2:
 }
 
 // CHECK-LABEL: @elim_trampoline
-// CHECK:  cond_br %0, bb1, bb2
+// CHECK: bb0
+// CHECK:  cond_br {{.*}}, bb1, bb2
 // CHECK:bb1:
 // CHECK:  br bb3(%1
 // CHECK:bb2:
