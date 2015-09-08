@@ -3341,9 +3341,6 @@ DeclName::DeclName(ASTContext &C, Identifier baseName,
 Optional<Type>
 ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
                              LazyResolver *resolver) const {
-  if (!LangOpts.EnableObjCInterop)
-    return None;
-
   if (type->isBridgeableObjectType())
     return type;
 
