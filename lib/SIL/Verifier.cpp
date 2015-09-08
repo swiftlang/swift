@@ -2947,15 +2947,20 @@ public:
     verifySILFunctionType(FTy);
 
     if (F->isExternalDeclaration()) {
+      if (F->hasForeignBody())
+        return;
+
       assert(F->isAvailableExternally() &&
              "external declaration of internal SILFunction not allowed");
       assert(!hasSharedVisibility(F->getLinkage()) &&
-             "external declarations of SILFunctions with shared visiblity is not "
+             "external declarations of SILFunctions with shared visibility is not "
              "allowed");
       // If F is an external declaration, there is nothing further to do,
       // return.
       return;
     }
+
+    assert(!F->hasForeignBody());
 
     // Make sure that our SILFunction only has context generic params if our
     // SILFunctionType is non-polymorphic.

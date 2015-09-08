@@ -89,6 +89,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     InlineStrategy(inlineStrategy),
     Linkage(unsigned(Linkage)),
     KeepAsPublic(false),
+    ForeignBody(false),
     EK(E) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);

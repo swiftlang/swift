@@ -4,8 +4,14 @@
 - (Ansible*)initWithBellsOn:(id)theBells;
 @end
 
-Ansible *NSAnse(Ansible *x) {
+static Ansible *NSAnse(Ansible *x) {
+  return x;
+}
+
+Ansible *NSAnseExternal(Ansible *x) {
   return x;
 }
 
 void hasNoPrototype();
+
+static void staticForwardDeclaration(void);

@@ -215,6 +215,9 @@ bool SILDeclRef::isClangImported() const {
   DeclContext *moduleContext = d->getDeclContext()->getModuleScopeContext();
 
   if (isa<ClangModuleUnit>(moduleContext)) {
+    if (isClangGenerated())
+      return true;
+
     if (isa<ConstructorDecl>(d) || isa<EnumElementDecl>(d))
       return true;
 
@@ -223,6 +226,21 @@ bool SILDeclRef::isClangImported() const {
           isa<NominalTypeDecl>(d->getDeclContext()))
         return true;
   }
+  return false;
+}
+
+bool SILDeclRef::isClangGenerated() const {
+  if (!hasDecl())
+    return false;
+
+  if (auto *FD = dyn_cast<FuncDecl>(getDecl())) {
+    auto clangNode = FD->getClangNode().getAsDecl();
+    if (auto fd = dyn_cast_or_null<clang::FunctionDecl>(clangNode)) {
+      if (fd->hasBody())
+        return true;
+    }
+  }
+
   return false;
 }
 
