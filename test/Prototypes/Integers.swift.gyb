@@ -40,7 +40,27 @@ def maskBits(n):
     return hexify((1 << n) - 1)
 
 fixedBitWidths = [2**x for x in range(3, 8) if 2**x <= 2 * word_bits]
+minFixedBits = fixedBitWidths[0]
 maxFixedBits = fixedBitWidths[-1]
+
+# Enumerate all the builtin operations that apply to integers
+builtinBinaryOperations = [
+  'add',  'and',  'ashr',  'lshr',  'or',  'mul',  'sdiv',  'sdiv_exact',
+  'shl', 'srem',  'sub',  'udiv',  'udiv_exact',  'urem',  'xor']
+
+builtinBinaryOperationsWithOverflow = [
+  'sadd_with_overflow', 'uadd_with_overflow',  'ssub_with_overflow',
+  'usub_with_overflow',  'smul_with_overflow', 'umul_with_overflow']
+  
+builtinUnaryOperations = ['assumeNonNegative']
+  
+builtinBinaryPredicates = [
+  'cmp_eq',  'cmp_ne',  'cmp_sle',  'cmp_slt',  'cmp_sge',  'cmp_sgt',
+  'cmp_ule',  'cmp_ult',  'cmp_uge',  'cmp_ugt']
+
+builtinSILOperations = ['gep']
+
+builtinMiscOperations = ['atomicrmw']  
 }%
 
 /// A low-level 2's complement integer.
@@ -50,11 +70,12 @@ protocol LowLevelInt
   /// any instance of `Self`.
   typealias Extended
 
+  /// A LowLevelInt type that accomodates fewer bits of precision than
+  /// any instance of `Self`.
+  typealias Truncated
+  
   /// A Builtin type used as `Self`'s representation
   typealias Storage
-
-  /// Creates a representation of 0
-  init()
 
   /// Creates an instance with the given storage representation
   init(_: Storage)
@@ -65,17 +86,26 @@ protocol LowLevelInt
   /// The entire storage of `self`'s value.  
   var storage: Storage { get set }
 
+% for operation in builtinBinaryOperations:
+  func ${operation}(rhs: Self) -> Self
+% end
+
+% for operation in builtinBinaryOperationsWithOverflow:
+  func ${operation}(rhs: Self, overflowIsError: Bool) -> (Self, Bool)
+% end
+
 #if false
   var maxUnsetBit : Swift.Int { get }
   var maxSetBit : Swift.Int { get }
 #endif
   var signExtended : Extended { get }
   var zeroExtended : Extended { get }
+  var truncated : Truncated { get }
 }
 
 extension LowLevelInt {
   init(_ other: Self) {
-    self.init()
+    self = 0
     self.storage = other.storage
   }
   
@@ -88,11 +118,21 @@ extension LowLevelInt {
   }
 }
 
+// Only needed outside the stdlib
+extension Bool {
+  var value : Builtin.Int1 {
+    return Builtin.trunc_Int${word_bits}_Int1((self ? 1 : 0).value)
+  }
+}
+
 % for bits in fixedBitWidths:
 %   # Until we have BitInt, the widest Int sign-extends into itself.
 %   extendedBits = bits * 2 if bits != maxFixedBits else bits
+%   truncatedBits = bits / 2 if bits != minFixedBits else bits
 struct LLInt${bits} : LowLevelInt {
+  typealias Self_ = LLInt${bits}
   typealias Extended = LLInt${extendedBits}
+  typealias Truncated = LLInt${truncatedBits}
   typealias Storage = Builtin.Int${bits}
   
   init(_builtinIntegerLiteral x: Builtin.Int${builtinIntLiteralBits}) {
@@ -106,12 +146,34 @@ struct LLInt${bits} : LowLevelInt {
   var storage: Storage
   
   static var bitWidth : Swift.Int { return ${word_bits} }
-
-  % for sz in 'sign', 'zero':
-  var ${sz}Extended : Extended {
-    return Extended(Builtin.${sz[0]}extOrBitCast_Int${bits}_Int${extendedBits}(storage))
+  
+% for operation in builtinBinaryOperations:
+  func ${operation}(rhs: Self_) -> Self_ {
+    return Self_(Builtin.${operation}_Int${bits}(storage, rhs.storage))
   }
-  % end
+% end
+
+% for operation in builtinBinaryOperationsWithOverflow:
+  func ${operation}(rhs: Self_, overflowIsError: Bool) -> (Self_, Bool) {
+    let r = Builtin.${operation}_Int${bits}(
+      storage, rhs.storage, overflowIsError.value)
+    return (Self_(r.0), Bool(_builtinBooleanLiteral: r.1))
+  }
+% end
+  
+% for sz in 'sign', 'zero':
+  var ${sz}Extended: Extended {
+    return Extended(
+      Builtin.${sz[0]}extOrBitCast_Int${bits}_Int${extendedBits}(storage)
+    )
+  }
+% end
+
+  var truncated: Truncated {
+    return Truncated(
+      Builtin.truncOrBitCast_Int${bits}_Int${truncatedBits}(storage)
+    )
+  }
 }
 % end
 
