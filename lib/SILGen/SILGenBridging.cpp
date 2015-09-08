@@ -1045,10 +1045,12 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
       case ParameterConvention::Direct_Deallocating:
         param = ManagedValue::forUnmanaged(paramValue);
         break;
+      case ParameterConvention::Indirect_Inout:
+        param = ManagedValue::forUnmanaged(paramValue);
+        break;
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Out:
-      case ParameterConvention::Indirect_Inout:
         llvm_unreachable("indirect args in foreign thunked method not implemented");
       }
 

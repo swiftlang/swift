@@ -1209,7 +1209,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
     // ObjC methods take their 'self' argument first, followed by an
     // implicit _cmd argument.
     auto &self = params.back();
-    auto clangTy = IGM.getClangType(self.getSILType());
+    auto clangTy = IGM.getClangType(self);
     paramTys.push_back(clangTy);
     paramTys.push_back(clangCtx.VoidPtrTy);
     params = params.slice(0, params.size() - 1);
@@ -1218,7 +1218,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
 
   // Convert each parameter to a Clang type.
   for (auto param : params) {
-    auto clangTy = IGM.getClangType(param.getSILType());
+    auto clangTy = IGM.getClangType(param);
     paramTys.push_back(clangTy);
   }
 
@@ -2700,7 +2700,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   // and '_cmd'.
   if (callee.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod) {
     auto &self = params.back();
-    auto clangTy = IGF.IGM.getClangType(self.getSILType());
+    auto clangTy = IGF.IGM.getClangType(self);
     paramTys.push_back(clangTy);
     paramTys.push_back(clangCtx.VoidPtrTy);
     params = params.slice(0, params.size() - 1);
@@ -2711,7 +2711,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   }
 
   for (auto param : params) {
-    auto clangTy = IGF.IGM.getClangType(param.getSILType());
+    auto clangTy = IGF.IGM.getClangType(param);
     paramTys.push_back(clangTy);
   }
 
@@ -2782,9 +2782,24 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       (void) signExt;
       SWIFT_FALLTHROUGH;
     }
-    case clang::CodeGen::ABIArgInfo::Direct:
-      emitDirectExternalArgument(IGF, paramType, AI.getCoerceToType(), in, out);
+    case clang::CodeGen::ABIArgInfo::Direct: {
+      auto toTy = AI.getCoerceToType();
+
+      // inout parameters are bridged as Clang pointer types. For now, this
+      // only ever comes up with Clang-generated accessors.
+      if (params[i - firstParam].isIndirectInOut()) {
+        assert(paramType.isAddress() && "SIL type is not an address?");
+
+        auto addr = in.claimNext();
+        if (addr->getType() != toTy)
+          addr = IGF.coerceValue(addr, toTy, IGF.IGM.DataLayout);
+        out.add(addr);
+        break;
+      }
+
+      emitDirectExternalArgument(IGF, paramType, toTy, in, out);
       break;
+    }
     case clang::CodeGen::ABIArgInfo::Indirect: {
       auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
       Address addr = ti.allocateStack(IGF, paramType,

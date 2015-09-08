@@ -468,6 +468,7 @@ public:
   ObjectSize classifyTypeSize(SILType type, ResilienceScope scope);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
+  clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
   
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&

@@ -710,12 +710,23 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
   return result;
 }
 
+clang::CanQualType IRGenModule::getClangType(CanType type) {
+  return ClangTypes->convert(*this, type);
+}
+
 clang::CanQualType IRGenModule::getClangType(SILType type) {
   return getClangType(type.getSwiftRValueType());
 }
 
-clang::CanQualType IRGenModule::getClangType(CanType type) {
-  return ClangTypes->convert(*this, type);
+clang::CanQualType IRGenModule::getClangType(SILParameterInfo params) {
+  auto clangType = getClangType(params.getSILType());
+  // @block_storage types must be wrapped in an @inout and have special
+  // lowering
+  if (params.isIndirectInOut() &&
+      !params.getSILType().is<SILBlockStorageType>()) {
+    return getClangASTContext().getPointerType(clangType);
+  }
+  return clangType;
 }
 
 void IRGenModule::initClangTypeConverter() {
