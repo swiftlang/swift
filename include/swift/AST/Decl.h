@@ -4858,11 +4858,11 @@ public:
   }
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
-  bool isMutating() const {
-    return FuncDeclBits.Mutating;
-  }
   void setStatic(bool IsStatic = true) {
     FuncDeclBits.IsStatic = IsStatic;
+  }
+  bool isMutating() const {
+    return FuncDeclBits.Mutating;
   }
   void setMutating(bool Mutating = true) {
     FuncDeclBits.Mutating = Mutating;

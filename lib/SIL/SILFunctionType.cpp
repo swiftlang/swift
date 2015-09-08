@@ -2076,6 +2076,14 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   llvm_unreachable("bad SILDeclRef kind");
 }
 
+static CanType createProductType(CanType type1, CanType type2,
+                                 ASTContext &Context) {
+  if (auto tupleType = dyn_cast<TupleType>(type1))
+    if (tupleType->getNumElements() == 0)
+      return type2;
+  return CanType(TupleType::get({type1, type2}, Context));
+}
+
 CanAnyFunctionType
 TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
                                          unsigned uncurryLevel,
@@ -2086,8 +2094,34 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
   auto bridgingFnPattern = AbstractionPattern::getOpaque();
   if (constant && constant->isForeign) {
     auto bridgedFn = getBridgedFunction(*constant);
+
     const clang::Decl *clangDecl;
     if (bridgedFn && (clangDecl = bridgedFn->getClangDecl())) {
+
+      // Clang-generated accessors are "uncurried" here and not in the
+      // below loop because ClangType AbstractionPatterns don't support
+      // currying.
+      if (uncurryLevel == 1 &&
+          isa<FuncDecl>(bridgedFn) &&
+          cast<FuncDecl>(bridgedFn)->isAccessor() &&
+          extInfo.getSILRepresentation() == SILFunctionTypeRepresentation::CFunctionPointer) {
+
+        // Can't be polymorphic
+        assert(isa<FunctionType>(fnType));
+        auto resultFnType = cast<FunctionType>(fnType.getResult());
+
+        CanType inputType = createProductType(resultFnType.getInput(),
+                                              fnType.getInput(),
+                                              Context);
+        CanType resultType = resultFnType.getResult();
+
+        // Rebuild the uncurried accessor type.
+        fnType = CanFunctionType::get(inputType, resultType, extInfo);
+
+        // Hit the fast path below.
+        uncurryLevel = 0;
+      }
+
       // Don't implicitly turn non-optional results to optional if
       // we're going to apply a foreign error convention that checks
       // for nil results.
@@ -2165,17 +2199,6 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
     // Native functions don't need bridging.
     break;
 
-  case SILFunctionTypeRepresentation::CFunctionPointer:
-  case SILFunctionTypeRepresentation::Block:
-    assert(inputs.size() == 1);
-    for (auto &input : inputs)
-      input = input.getWithType(getBridgedInputType(rep,
-                                   bridgingFnPattern.getFunctionInputType(),
-                                   CanType(input.getType())));
-    resultType = getBridgedResultType(rep,
-                                   bridgingFnPattern.getFunctionResultType(),
-                                   resultType, suppressOptionalResult);
-    break;
   case SILFunctionTypeRepresentation::ObjCMethod: {
     assert(inputs.size() == 2);
     // The "self" parameter should not get bridged unless it's a metatype.
@@ -2195,6 +2218,10 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
                                    resultType, suppressOptionalResult);
     break;
   }
+
+  case SILFunctionTypeRepresentation::CFunctionPointer:
+  case SILFunctionTypeRepresentation::Block:
+    llvm_unreachable("Cannot uncurry native representation");
   }
 
   // Put the inputs in the order expected by the calling convention.
