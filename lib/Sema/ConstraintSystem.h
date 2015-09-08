@@ -2469,10 +2469,10 @@ struct LLVM_LIBRARY_VISIBILITY CallArgParam {
   // The label associated with the argument or parameter, if any.
   Identifier Label;
 
-  /// Whether the parameter has a default argument. Not valid for parameters.
+  /// Whether the parameter has a default argument.  Not valid for arguments.
   bool HasDefaultArgument = false;
 
-  /// Whether the parameter is variadic. Not valid for parameters.
+  /// Whether the parameter is variadic. Not valid for arguments.
   bool Variadic = false;
 
   /// Whether the argument or parameter has a label.
