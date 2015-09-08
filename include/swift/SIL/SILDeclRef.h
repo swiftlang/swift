@@ -348,13 +348,9 @@ struct SILDeclRef {
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;
 
-  /// True if the referenced entity is emitted by Swift on behalf of the Clang
+  /// True if the referenced entity is generated on behalf of the Clang
   /// importer.
   bool isClangImported() const;
-
-  /// True if the referenced entity is emitted by Clang on behalf of the Clang
-  /// importer.
-  bool isClangGenerated() const;
 
   bool isImplicit() const {
     if (hasDecl())

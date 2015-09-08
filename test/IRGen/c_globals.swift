@@ -6,7 +6,7 @@ import c_layout
 func blackHole<T>(t: T) { }
 
 // CHECK: @staticFloat = internal global float 1.700000e+01, align 4
-// CHECK: define internal void @doubleTrouble() [[CLANG_FUNC_ATTR:#[0-9]+]] {
+// CHECK: define {{.*}}void @doubleTrouble() [[CLANG_FUNC_ATTR:#[0-9]+]] {
 
 public func testStaticGlobal() {
   blackHole(c_layout.staticFloat)
