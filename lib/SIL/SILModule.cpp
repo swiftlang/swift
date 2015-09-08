@@ -359,10 +359,14 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     F->setDebugScope(new (*this) SILDebugScope(loc, *F));
 
   F->setGlobalInit(constant.isGlobal());
-  if (constant.hasDecl())
+  if (constant.hasDecl()) {
+    if (constant.isForeign && constant.isClangGenerated())
+      F->setForeignBody(HasForeignBody);
+
     if (auto SemanticsA =
         constant.getDecl()->getAttrs().getAttribute<SemanticsAttr>())
       F->setSemanticsAttr(SemanticsA->Value);
+  }
 
   F->setDeclContext(constant.hasDecl() ? constant.getDecl() : nullptr);
 
