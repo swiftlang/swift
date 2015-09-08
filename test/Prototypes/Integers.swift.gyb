@@ -70,7 +70,8 @@ builtinMiscOperations = ['atomicrmw']
 /// A low-level 2's complement integer.
 public protocol _LowLevelInteger
   : Equatable,
-    IntegerLiteralConvertible, _BuiltinIntegerLiteralConvertible 
+    IntegerLiteralConvertible, _BuiltinIntegerLiteralConvertible, 
+    CustomStringConvertible
 {
   /// A _LowLevelInt type that accomodates more bits of precision than
   /// any instance of `Self`.
@@ -111,6 +112,8 @@ public protocol _LowLevelInteger
   var zeroExtended : Extended { get }
   
   var truncated : Truncated { get }
+
+  var lowByte: UInt8 { get }
 }
 
 extension _LowLevelInteger {
@@ -131,6 +134,25 @@ protocol _FixedWidthInteger : _LowLevelInteger {
   
   /// The entire storage of `self`'s value.  
   var storage: Storage { get set }
+}
+
+extension _LowLevelInteger {
+  public var description: String {
+    if self == 0 {
+      return "0"
+    }
+    let chars: [Character] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+    var buf: [Character] = []
+
+    var x = self
+    repeat {
+      let r = x.urem(10)
+      x = x.udiv(10)
+      buf.append(chars[Int(r.lowByte)])
+    }
+    while x != 0
+    return String(buf.reverse())
+  }
 }
 
 // Only needed outside the stdlib
@@ -236,14 +258,140 @@ public func == (lhs: _LowLevelInt${bits}, rhs: _LowLevelInt${bits}) -> Bool {
   return Bool(Builtin.cmp_eq_Int${bits}(lhs.storage, rhs.storage))
 }
 
+
+extension _LowLevelInt${bits} {
+  public var lowByte: UInt8 {
+    return UInt8(Builtin.truncOrBitCast_Int${bits}_Int8(self.storage))
+  }
+}
+
 % end
+
+typealias _LowLevelWord = _LowLevelInt${word_bits}
+typealias _LowLevelDoubleWord = _LowLevelInt${word_bits * 2}
+
+//===--- Low-level BigInt -------------------------------------------------===//
+// A basic array-of-words implementation of LowLevelInteger
+public struct _LowLevelBigInt : _LowLevelInteger {
+  /// A _LowLevelInt type that accomodates more bits of precision than
+  /// any instance of `Self`.
+  public typealias Extended = _LowLevelBigInt
+
+  /// A _LowLevelInt type that accomodates fewer bits of precision than
+  /// any instance of `Self`.
+  public typealias Truncated = _LowLevelBigInt
+
+  public typealias Self_ = _LowLevelBigInt
+  
+  /// Creates an instance with value 0
+  public init() {
+    fatalError("implement me")
+  }
+
+  public init(_builtinIntegerLiteral x: Builtin.Int${builtinIntLiteralBits}) {
+    fatalError("implement me")
+  }
+
+  /// Create an instance initialized to `value`.
+  public init(integerLiteral value: Self_) {
+    self = value
+  }
+  
+% for operation in builtinBinaryOperations:
+  public func ${operation}(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+% end
+
+% for operation in builtinBinaryOperationsWithOverflow:
+  public func ${operation}(rhs: Self_, overflowIsError: Bool) -> (Self_, Bool) {
+    fatalError("implement me")
+  }
+% end
+
+  public func isLessThanSigned(rhs: Self_) -> Bool {
+    fatalError("implement me")
+  }
+  public func isLessThanUnsigned(rhs: Self_) -> Bool {
+    fatalError("implement me")
+  }
+  
+  /// Returns `self` while informing the optimizer that the high bit
+  /// is not set.
+  ///
+  /// - Requires: the high bit is not set.
+  public var assumingNonNegative : Self_ {
+    fatalError("implement me")
+  }
+
+  /// Returns `self`, trapping if the high bit is set
+  public func checkingNonNegative() -> Self_  {
+    fatalError("implement me")
+  }
+  
+#if false
+  public var maxUnsetBit : Swift.Int {
+    fatalError("implement me")
+  }
+  public var maxSetBit : Swift.Int  {
+    fatalError("implement me")
+  }
+#endif
+  public var signExtended : Extended { return self }
+  public var zeroExtended : Extended { return self }
+  
+  public var truncated : Truncated { return self }
+  
+  internal var words: ContiguousArray<_LowLevelWord>
+
+  public var lowByte: UInt8 {
+    fatalError("implement me")
+  }
+}
+
+public func == (lhs: _LowLevelBigInt, rhs: _LowLevelBigInt) -> Bool {
+  fatalError("implement me")
+}
 
 //===--- tests ------------------------------------------------------------===//
 import StdlibUnittest
 var tests = TestSuite("Integers")
 
+tests.test("Basics") {
+  typealias I8 = _LowLevelInt8
+  typealias W = _LowLevelInt${word_bits}
+  typealias W2 = _LowLevelInt${word_bits * 2}
 
-tests.test("Dummy") {
+  expectEqual(sizeof(W.self), sizeof(Int.self))
+  expectEqual(sizeof(W2.self), 2 * sizeof(Int.self))
+
+  let b8: I8 = 0b1_0_11_0_111
+  expectEqual(b8, 0b1_0_11_0_111)
+  expectEqual(b8, 183)
+  expectNotEqual(b8, I8())
+  expectEqual(I8(), 0)
+  expectEqual(8, I8.bitWidth)
+
+  /// Create a fibonacci sequence
+  var a: [I8] = []
+  var prior: I8 = 0
+  var current: I8 = 1
+  while true {
+    let next = I8((UInt8(prior.storage) &+ UInt8(current.storage)).value)
+    
+    expectEqual(next, current.add(prior))
+    expectEqual(next, prior.add(current))
+
+    expectEqual(String(next), String(UInt8(next.storage)))
+    
+    if UInt8(next.storage) <= UInt8(prior.storage) { break }
+    
+    a.append(next)
+    prior = current
+    current = next
+  }
+  checkEquatable(a, oracle: { $0 == $1})
+  
   let x = _LowLevelInt${word_bits}()
   let y = _LowLevelInt${word_bits * 2}()
   let z = _LowLevelInt16()
