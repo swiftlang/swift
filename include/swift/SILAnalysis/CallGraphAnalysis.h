@@ -112,8 +112,8 @@ public:
   }
 
   /// Return true if this edge represents a call to potentially any
-  /// function with an appropriate signature.
-  bool canCallAnyFunction() const {
+  /// arbitrary function with an appropriate signature.
+  bool canCallArbitraryFunction() const {
     return !isCalleeSetComplete();
   }
 
