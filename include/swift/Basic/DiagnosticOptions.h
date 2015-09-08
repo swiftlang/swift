@@ -31,6 +31,10 @@ public:
 
   /// Keep emitting subsequent diagnostics after a fatal error.
   bool ShowDiagnosticsAfterFatalError = false;
+
+  /// When emitting fixits as code edits, apply all fixits from diagnostics
+  /// without any filtering.
+  bool FixitCodeForAllDiagnostics = false;
 };
 
 }

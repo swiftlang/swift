@@ -521,10 +521,13 @@ namespace {
 /// format.
 class JSONFixitWriter : public DiagnosticConsumer {
   std::unique_ptr<llvm::raw_ostream> OSPtr;
+  bool FixitAll;
 
 public:
-  explicit JSONFixitWriter(std::unique_ptr<llvm::raw_ostream> OS)
-    : OSPtr(std::move(OS)) {
+  JSONFixitWriter(std::unique_ptr<llvm::raw_ostream> OS,
+                  const DiagnosticOptions &DiagOpts)
+    : OSPtr(std::move(OS)),
+      FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {
     *OSPtr << "[\n";
   }
   ~JSONFixitWriter() {
@@ -543,6 +546,9 @@ private:
   }
 
   bool shouldFix(DiagnosticKind Kind, const DiagnosticInfo &Info) {
+    if (FixitAll)
+      return true;
+
     // Err on the side of caution and don't automatically add bang, which may
     // lead to crashes.
     if (Info.ID == diag::missing_unwrap_optional.ID)
@@ -1008,7 +1014,8 @@ int frontend_main(ArrayRef<const char *>Args,
         return 1;
       }
 
-      FixitsConsumer.reset(new JSONFixitWriter(std::move(OS)));
+      FixitsConsumer.reset(new JSONFixitWriter(std::move(OS),
+                                            Invocation.getDiagnosticOptions()));
       Instance.addDiagnosticConsumer(FixitsConsumer.get());
     }
   }

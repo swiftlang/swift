@@ -50,3 +50,8 @@ Swift.print("", appendNewline: false)
 print("", appendNewline: true)
 print("", false, appendNewline: false)
 print("", false)
+
+func ftest1() {
+  // Don't replace the variable name with '_'
+  let myvar = 0
+}

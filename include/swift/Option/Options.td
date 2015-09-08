@@ -341,6 +341,9 @@ def update_code : Flag<["-"], "update-code">,
 def fixit_code : Flag<["-"], "fixit-code">,
   HelpText<"Get compiler fixits as code edits">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def fixit_all : Flag<["-"], "fixit-all">,
+  HelpText<"Apply all fixits from diagnostics without any filtering">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 // No Output Modes
 def parse : Flag<["-"], "parse">,

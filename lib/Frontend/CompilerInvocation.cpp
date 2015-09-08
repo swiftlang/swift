@@ -865,6 +865,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
   Opts.UseColor |= Args.hasArg(OPT_color_diagnostics);
+  Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
 
   return false;
 }
