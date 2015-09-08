@@ -30,7 +30,7 @@ def hexify(n):
     return '0x' + '_'.join(r)
 
 # Number of bits in the Builtin.Word type
-word_bits = int(WORD_BITS)
+word_bits = int(WORD_BITS) # int(CMAKE_SIZEOF_VOID_P) * 8
 
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
@@ -64,12 +64,12 @@ builtinMiscOperations = ['atomicrmw']
 }%
 
 /// A low-level 2's complement integer.
-protocol LowLevelInt : Equatable {
-  /// A LowLevelInt type that accomodates more bits of precision than
+public protocol _LowLevelInteger : Equatable {
+  /// A _LowLevelInt type that accomodates more bits of precision than
   /// any instance of `Self`.
   typealias Extended
 
-  /// A LowLevelInt type that accomodates fewer bits of precision than
+  /// A _LowLevelInt type that accomodates fewer bits of precision than
   /// any instance of `Self`.
   typealias Truncated
   
@@ -118,8 +118,8 @@ protocol LowLevelInt : Equatable {
   var truncated : Truncated { get }
 }
 
-extension LowLevelInt {
-  init(_ other: Self) {
+extension _LowLevelInteger {
+  public init(_ other: Self) {
     self.init()
     self.storage = other.storage
   }
@@ -139,33 +139,33 @@ extension Bool {
 %   # Until we have BitInt, the widest Int sign-extends into itself.
 %   extendedBits = bits * 2 if bits != maxFixedBits else bits
 %   narrowedBits = bits / 2 if bits != minFixedBits else bits
-struct LLInt${bits} : LowLevelInt {
-  typealias Self_ = LLInt${bits}
-  typealias Extended = LLInt${extendedBits}
-  typealias Narrowed = LLInt${narrowedBits}
-  typealias Storage = Builtin.Int${bits}
+public struct _LowLevelInt${bits} : _LowLevelInteger {
+  public typealias Self_ = _LowLevelInt${bits}
+  public typealias Extended = _LowLevelInt${extendedBits}
+  public typealias Narrowed = _LowLevelInt${narrowedBits}
+  public typealias Storage = Builtin.Int${bits}
 
-  init() {
+  public init() {
     let zero: Builtin.Int${bits} = Builtin.zeroInitializer()
     self.storage = zero
   }
 
-  init(_ storage: Storage) {
+  public init(_ storage: Storage) {
     self.storage = storage
   }
   
-  var storage: Storage
+  public var storage: Storage
   
-  static var bitWidth : Swift.Int { return ${word_bits} }
+  public static var bitWidth : Swift.Int { return ${word_bits} }
   
 % for operation in builtinBinaryOperations:
-  func ${operation}(rhs: Self_) -> Self_ {
+  public func ${operation}(rhs: Self_) -> Self_ {
     return Self_(Builtin.${operation}_Int${bits}(storage, rhs.storage))
   }
 % end
 
 % for operation in builtinBinaryOperationsWithOverflow:
-  func ${operation}(rhs: Self_, overflowIsError: Bool) -> (Self_, Bool) {
+  public func ${operation}(rhs: Self_, overflowIsError: Bool) -> (Self_, Bool) {
     let r = Builtin.${operation}_Int${bits}(
       storage, rhs.storage, overflowIsError.value)
     return (Self_(r.0), Bool(r.1))
@@ -173,7 +173,7 @@ struct LLInt${bits} : LowLevelInt {
 % end
   
 % for sz in 'sign', 'zero':
-  var ${sz}Extended: Extended {
+  public var ${sz}Extended: Extended {
     return Extended(
       Builtin.${sz[0]}extOrBitCast_Int${bits}_Int${extendedBits}(storage)
     )
@@ -181,14 +181,14 @@ struct LLInt${bits} : LowLevelInt {
 % end
 
 % for (srcSigned, srcS) in ((x, x[0].lower()) for x in ['Signed', 'Unsigned']):
-  func isLessThan${srcSigned}(rhs: Self_) -> Bool {
+  public func isLessThan${srcSigned}(rhs: Self_) -> Bool {
     return Bool(
       Builtin.cmp_${srcS}lt_Int${bits}(
         self.storage, rhs.storage))
   }
   
   % for (dstSigned, dstS) in ((x, x[0].lower()) for x in ['Signed', 'Unsigned']):
-  func checkingNarrow${srcSigned}To${dstSigned}() -> Narrowed {
+  public func checkingNarrow${srcSigned}To${dstSigned}() -> Narrowed {
     let (result, error) 
       = Builtin.${srcS}_to_${dstS}_checked_trunc_Int${bits}_Int${narrowedBits}(
           storage)
@@ -198,24 +198,24 @@ struct LLInt${bits} : LowLevelInt {
   % end
 % end
   
-  var assumingNonNegative : Self_ {
+  public var assumingNonNegative : Self_ {
     return Self_(Builtin.assumeNonNegative_Int${bits}(storage))
   }
   
-  func checkingNonNegative() -> Self_ {
+  public func checkingNonNegative() -> Self_ {
     let (result, error) = Builtin.s_to_u_checked_conversion_Int${bits}(storage)
     Builtin.condfail(error)
     return Self_(result)
   }
 
-  var truncated: Narrowed {
+  public var truncated: Narrowed {
     return Narrowed(
       Builtin.truncOrBitCast_Int${bits}_Int${narrowedBits}(storage)
     )
   }
 }
 
-func == (lhs: LLInt${bits}, rhs: LLInt${bits}) -> Bool {
+public func == (lhs: _LowLevelInt${bits}, rhs: _LowLevelInt${bits}) -> Bool {
   return Bool(Builtin.cmp_eq_Int${bits}(lhs.storage, rhs.storage))
 }
 
@@ -223,14 +223,13 @@ func == (lhs: LLInt${bits}, rhs: LLInt${bits}) -> Bool {
 
 //===--- tests ------------------------------------------------------------===//
 import StdlibUnittest
-var tests = TestSuite("DiscriminatedBridgeObject")
-
+var tests = TestSuite("Integers")
 
 
 tests.test("Dummy") {
-  let x = LLInt64()
-  let y = LLInt128()
-  let z = LLInt16()
+  let x = _LowLevelInt${word_bits}()
+  let y = _LowLevelInt${word_bits * 2}()
+  let z = _LowLevelInt16()
 }
 
 runAllTests()
