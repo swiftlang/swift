@@ -75,6 +75,8 @@ public:
     //       callee set so we should optimize allocation and
     //       deallocation of these accordingly.
     CalleeSet.getPointer()->insert(KnownCallees.begin(), KnownCallees.end());
+    assert((!CalleeSet.getPointer()->empty() || !Complete) &&
+           "Did not expect a call set that is both empty and complete!");
   }
 
   ~CallGraphEdge() {
@@ -107,6 +109,12 @@ public:
   /// Return whether the call set is known to be complete.
   bool isCalleeSetComplete() const {
     return CalleeSet.getInt();
+  }
+
+  /// Return true if this edge represents a call to potentially any
+  /// function with an appropriate signature.
+  bool canCallAnyFunction() const {
+    return !isCalleeSetComplete();
   }
 
   /// The apply has a complete callee set, and it's of size one. In
