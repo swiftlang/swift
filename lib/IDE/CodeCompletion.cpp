@@ -2959,12 +2959,13 @@ void CodeCompletionCallbacksImpl::completeAssignmentRHS(AssignExpr *E) {
 }
 
 void CodeCompletionCallbacksImpl::completeCallArg(CallExpr *E) {
-  if (Kind == CompletionKind::PostfixExprParen)
-    return;
-  CurDeclContext = P.CurDeclContext;
-  Kind = CompletionKind::CallArg;
-  FuncCallExpr = E;
-  ParsedExpr = E;
+  if (Kind == CompletionKind::PostfixExprBeginning ||
+      Kind == CompletionKind::None) {
+    CurDeclContext = P.CurDeclContext;
+    Kind = CompletionKind::CallArg;
+    FuncCallExpr = E;
+    ParsedExpr = E;
+  }
 }
 
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
@@ -3329,8 +3330,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::CallArg : {
-    if (!Lookup.getCallArgCompletions(*CurDeclContext, FuncCallExpr,
-                                      CodeCompleteTokenExpr))
+    if (!CodeCompleteTokenExpr || !Lookup.getCallArgCompletions(*CurDeclContext,
+                                                                FuncCallExpr,
+                                                                CodeCompleteTokenExpr))
       DoPostfixExprBeginning();
     break;
   }
