@@ -30,7 +30,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/Commandline.h"
+#include "llvm/Support/CommandLine.h"
 using namespace swift;
 
 STATISTIC(NumBlocksDeleted,  "Number of unreachable blocks removed");
