@@ -118,7 +118,7 @@ func checkInitWithCoder(coder: NSCoder) {
   NSTableViewController(coder: coder) // expected-warning{{unused}}
   MyViewController(coder: coder) // expected-warning{{unused}}
   MyTableViewController(coder: coder) // expected-warning{{unused}}
-  MyOtherTableViewController(coder: coder) // expected-error{{cannot invoke initializer for type 'MyOtherTableViewController' with an argument list of type '(coder: NSCoder)'}} expected-note{{expected an argument list of type '(int: Int)'}}
+  MyOtherTableViewController(coder: coder) // expected-error{{incorrect argument label in call (have 'coder:', expected 'int:')}}
   MyThirdTableViewController(coder: coder) // expected-warning{{unused}}
 }
 

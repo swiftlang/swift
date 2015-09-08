@@ -69,8 +69,7 @@ func test_static_method_value_coerce(a: A) {
 func test_mixed_overload(a: A, x: X, y: Y) {
   var x1 = a.mixed(x: x)
   x1 = x
-  var y1 = a.mixed(y: y) // expected-error{{cannot invoke 'mixed' with an argument list of type '(y: Y)'}}
-  // expected-note @-1 {{expected an argument list of type '(x: X)'}}
+  var y1 = a.mixed(y: y) // expected-error{{incorrect argument label in call (have 'y:', expected 'x:')}}
   
   A.mixed(x) // expected-error{{cannot convert value of type 'X' to expected argument type 'Y'}}
   var x2 = A.mixed(a)(x: x)

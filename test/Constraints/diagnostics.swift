@@ -327,8 +327,7 @@ _ = c.method2(1)
 _ = c.method2(1.0)   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 c.method2(1)(b: 2)
 c.method2(1)(c: 2)   // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}} {{14-15=b}}
-c.method2(1)(c: 2.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(c: Double)'}}
-// expected-note @-1 {{expected an argument list of type '(b: Int)'}}
+c.method2(1)(c: 2.0) // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
 c.method2(1)(b: 2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 c.method2(1.0)(b: 2) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 c.method2(1.0)(b: 2.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
@@ -344,8 +343,7 @@ _ = CurriedClass.method2(c)(32)
 _ = CurriedClass.method2(1,2)      // expected-error {{extra argument in call}}
 CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(c: Double)'}}
-// expected-note @-1 {{expected an argument list of type '(b: Int)'}}
+CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
 
 CurriedClass.method3(c)(32, b: 1)
 _ = CurriedClass.method3(c)

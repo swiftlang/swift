@@ -68,5 +68,11 @@ class A {
   func a(text:String, something:Int?=nil) {
   }
 }
-A().a(text:"sometext") // expected-error {{cannot invoke 'a' with an argument list of type '(text: String)'}}
+A().a(text:"sometext") // expected-error {{argument labels do not match any available overloads}}
 // expected-note @-1 {{overloads for 'a' exist with these partially matching parameter lists: (String), (String, something: Int?)}}
+
+
+// <rdar://problem/22451001> QoI: incorrect diagnostic when argument to print has the wrong type
+func r22451001() -> AnyObject {}
+print(r22451001(5))  // expected-error {{cannot convert value of type 'Int' to expected argument type '()'}}
+

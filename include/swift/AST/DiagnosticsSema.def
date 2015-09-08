@@ -177,6 +177,10 @@ ERROR(expected_do_in_statement,sema,none,
 ERROR(cannot_call_non_function_value,sema,none,
       "cannot call value of non-function type %0", (Type))
 
+ERROR(wrong_argument_labels_overload,sema,none,
+      "argument labels '%0' do not match any available overloads", (StringRef))
+
+
 ERROR(invalid_callee_result_type,sema,none,
       "cannot convert call result type %0 to expected type %1",
       (Type, Type))

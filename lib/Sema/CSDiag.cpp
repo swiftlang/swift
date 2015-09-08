@@ -3494,6 +3494,57 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (calleeInfo.closeness == CC_ExactMatch)
     return false;
 
+  if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
+    // If we have multiple candidates that we fail to match, just say we have
+    // the wrong labels and list the candidates out.
+    if (calleeInfo.size() != 1) {
+      // TODO: It would be nice to use an analog of getTypeListString that
+      // doesn't include the argument types.
+      diagnose(callExpr->getLoc(), diag::wrong_argument_labels_overload,
+               getTypeListString(argExpr->getType()))
+        .highlight(argExpr->getSourceRange());
+
+      // Did the user intend on invoking a different overload?
+      calleeInfo.suggestPotentialOverloads(overloadName, fnExpr->getLoc(),
+                                           /*isCallExpr*/true);
+      return true;
+    }
+
+
+    SmallVector<Identifier, 4> correctNames;
+
+    // If we have a single candidate that failed to match the argument list,
+    // attempt to use matchCallArguments to diagnose the problem.
+    struct OurListener : public MatchCallArgumentListener {
+      SmallVectorImpl<Identifier> &correctNames;
+    public:
+      OurListener(SmallVectorImpl<Identifier> &correctNames)
+        : correctNames(correctNames) {}
+      void extraArgument(unsigned argIdx) override {}
+      void missingArgument(unsigned paramIdx) override {}
+      void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {}
+      bool relabelArguments(ArrayRef<Identifier> newNames) override {
+        correctNames.append(newNames.begin(), newNames.end());
+        return true;
+      }
+    } listener(correctNames);
+
+    // Use matchCallArguments to determine how close the argument list is (in
+    // shape) to the specified candidates parameters.  This ignores the concrete
+    // types of the arguments, looking only at the argument labels etc.
+    SmallVector<ParamBinding, 4> paramBindings;
+    auto args = decomposeArgParamType(argExpr->getType());
+    auto params = decomposeArgParamType(calleeInfo[0].getArgumentType());
+    if (matchCallArguments(args, params, hasTrailingClosure,/*allowFixes:*/true,
+                           listener, paramBindings) &&
+        !correctNames.empty() &&
+        CS->diagnoseArgumentLabelError(argExpr, correctNames,
+                                       /*isSubscript=*/false)) {
+      return true;
+
+    }
+  }
+
   
   bool isInitializer = isa<TypeExpr>(fnExpr);
 

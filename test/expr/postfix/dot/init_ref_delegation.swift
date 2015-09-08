@@ -318,7 +318,7 @@ class TestOverloadSets {
   }
   
   convenience init(a : Z0) {
-    self.init(42 as Int8) // expected-error{{cannot invoke 'TestOverloadSets.init' with an argument list of type '(Int8)'}}
+    self.init(42 as Int8) // expected-error{{argument labels '(Int8)' do not match any available overloads}}
     // expected-note @-1 {{overloads for 'TestOverloadSets.init' exist with these partially matching parameter lists: (a: Z0), (value: Int), (value: Double)}}
   }
   

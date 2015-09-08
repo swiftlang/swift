@@ -16,7 +16,7 @@ func test0(a : A!) {
   a.do_b(1)
   a.do_b(5.0)
 
-  a.do_c(1) // expected-error {{cannot invoke 'do_c' with an argument list of type '(Int)'}}
+  a.do_c(1) // expected-error {{argument labels do not match any available overloads}}
   // expected-note @-1 {{overloads for 'do_c' exist with these partially matching parameter lists: (x: Int), (y: Int)}}
   a.do_c(x: 1)
 }
@@ -27,7 +27,7 @@ func test1(a : A!) {
   a?.do_b(1)
   a?.do_b(5.0)
 
-  a?.do_c(1) // expected-error {{cannot invoke 'do_c' with an argument list of type '(Int)'}}
+  a?.do_c(1) // expected-error {{argument labels do not match any available overloads}}
   // expected-note @-1 {{overloads for 'do_c' exist with these partially matching parameter lists: (x: Int), (y: Int)}}
   a?.do_c(x: 1)
 }
