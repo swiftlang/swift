@@ -1,36 +1,48 @@
 // RUN: rm -rf %t  &&  mkdir %t
 // RUN: %target-build-swift -I %S/../Inputs/clang-importer-sdk/platform/any/usr/include %s -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run %t/a.out
 // REQUIRES: executable_test
+
+import StdlibUnittest
 
 import ctypes
 
-var u = IntOrFloat()
-print(u.i) // CHECK: 0
-print(u.f) // CHECK: 0.0
+var UnionTestSuite = TestSuite("Unions")
 
-u.i = 444
-print(u.i) // CHECK: 444
-u.f = 555.0
-print(u.f) // CHECK: 555.0
-print(u.i) // CHECK-NOT: 444
+UnionTestSuite.test("Simple") {
+  var u = IntOrFloat()
+  expectEqual(0, u.i)
+  expectEqual(0.0, u.f)
 
-u = IntOrFloat(i: 777)
-print(u.i) // CHECK: 777
-print(u.f) // CHECK-NOT: 555.0
+  u.i = 444
+  expectEqual(444, u.i)
+  u.f = 555.0
+  expectEqual(555.0, u.f)
+  expectNotEqual(444, u.i)
+}
 
-var s = StructWithNamedUnion()
-print(s.a) // CHECK: 0
-print(s.b) // CHECK: 0
-print(s.intfloat.i) // CHECK: 0
-print(s.intfloat.f) // CHECK: 0.0
+UnionTestSuite.test("Initializer") {
+  var u = IntOrFloat(i: 777)
+  expectEqual(777, u.i)
+  expectNotEqual(555.0, u.f)
+}
 
-s.a = 111
-s.b = 222
-s.intfloat = IntOrFloat(i: 333)
-print(s.a) // CHECK: 111
-print(s.b) // CHECK: 222
-print(s.intfloat.i) // CHECK: 333
-s.intfloat = IntOrFloat(f: 444.0)
-print(s.intfloat.f) // CHECK: 444.0
-print(s.intfloat.i) // CHECK-NOT: 333
+UnionTestSuite.test("StructWithUnion") {
+  var s = StructWithNamedUnion()
+  expectEqual(0, s.a)
+  expectEqual(0, s.b)
+  expectEqual(0, s.intfloat.i)
+  expectEqual(0, s.intfloat.f)
+
+  s.a = 111
+  s.b = 222
+  s.intfloat = IntOrFloat(i: 333)
+  expectEqual(111, s.a)
+  expectEqual(222, s.b)
+  expectEqual(333, s.intfloat.i)
+  s.intfloat = IntOrFloat(f: 444.0)
+  expectEqual(444.0, s.intfloat.f)
+  expectNotEqual(333, s.intfloat.i)
+}
+
+runAllTests()
