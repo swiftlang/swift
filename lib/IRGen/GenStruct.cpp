@@ -615,7 +615,9 @@ private:
   /// Place the next struct field at its appropriate offset.
   void addStructField(const clang::FieldDecl *clangField,
                       VarDecl *swiftField) {
-    Size offset(ClangLayout.getFieldOffset(clangField->getFieldIndex()) / 8);
+    unsigned fieldOffset = ClangLayout.getFieldOffset(clangField->getFieldIndex());
+    assert(!clangField->isBitField());
+    Size offset(fieldOffset / 8);
 
     // If we have a Swift import of this type, use our lowered information.
     if (swiftField) {

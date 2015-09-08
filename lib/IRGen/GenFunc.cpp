@@ -1121,6 +1121,7 @@ namespace {
                           const clang::ASTRecordLayout &layout,
                           Address structAddr) {
       auto fieldIndex = field->getFieldIndex();
+      assert(!field->isBitField());
       auto fieldOffset = Size(layout.getFieldOffset(fieldIndex) / 8);
       asImpl().visit(Ctx.getCanonicalType(field->getType()),
                      createGEPAtOffset(structAddr, fieldOffset));

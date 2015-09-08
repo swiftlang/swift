@@ -792,14 +792,19 @@ static FuncDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
 static std::pair<FuncDecl *, FuncDecl *>
 makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
                         StructDecl *importedUnionDecl,
-                        VarDecl *fieldDecl) {
+                        VarDecl *importedFieldDecl) {
   auto &C = Impl.SwiftContext;
 
-  auto getterDecl = makeFieldGetterDecl(Impl, importedUnionDecl, fieldDecl);
-  auto setterDecl = makeFieldSetterDecl(Impl, importedUnionDecl, fieldDecl);
+  auto getterDecl = makeFieldGetterDecl(Impl,
+                                        importedUnionDecl,
+                                        importedFieldDecl);
 
-  fieldDecl->makeComputed(SourceLoc(), getterDecl, setterDecl, nullptr,
-                          SourceLoc());
+  auto setterDecl = makeFieldSetterDecl(Impl,
+                                        importedUnionDecl,
+                                        importedFieldDecl);
+
+  importedFieldDecl->makeComputed(SourceLoc(), getterDecl, setterDecl, nullptr,
+                                  SourceLoc());
 
   // Don't bother synthesizing the body if we've already finished type-checking.
   if (Impl.hasFinishedTypeChecking())
@@ -855,6 +860,203 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
                                   /*implicit*/ true);
     setterDecl->setBody(body);
     C.addedExternalDecl(setterDecl);
+  }
+
+  return { getterDecl, setterDecl };
+}
+
+static clang::DeclarationName
+getAccessorDeclarationName(clang::ASTContext &Ctx,
+                           clang::RecordDecl *structDecl,
+                           clang::FieldDecl *fieldDecl,
+                           const char *suffix) {
+  std::string id;
+  llvm::raw_string_ostream IdStream(id);
+  IdStream << "$" << structDecl->getName()
+           << "$" << fieldDecl->getName()
+           << "$" << suffix;
+
+  return clang::DeclarationName(&Ctx.Idents.get(IdStream.str()));
+}
+
+/// Build the bitfield getter and setter using Clang.
+///
+/// \code
+/// static inline int get(RecordType self) {
+///   return self.field;
+/// }
+/// static inline void set(int newValue, RecordType *self) {
+///   self->field = newValue;
+/// }
+/// \endcode
+///
+/// \returns a pair of the getter and setter function decls.
+static std::pair<FuncDecl *, FuncDecl *>
+makeBitFieldAccessors(ClangImporter::Implementation &Impl,
+                      clang::RecordDecl *structDecl,
+                      StructDecl *importedStructDecl,
+                      clang::FieldDecl *fieldDecl,
+                      VarDecl *importedFieldDecl) {
+  clang::ASTContext &Ctx = Impl.getClangASTContext();
+
+  // Getter: static inline FieldType get(RecordType self);
+  auto recordType = Ctx.getRecordType(structDecl);
+  auto recordPointerType = Ctx.getPointerType(recordType);
+  auto fieldType = fieldDecl->getType();
+  auto fieldNameInfo = clang::DeclarationNameInfo(fieldDecl->getDeclName(),
+                                                  clang::SourceLocation());
+
+  auto cGetterName = getAccessorDeclarationName(Ctx, structDecl, fieldDecl,
+                                                "getter");
+  auto cGetterType = Ctx.getFunctionType(fieldDecl->getType(),
+                                         recordType,
+                                         clang::FunctionProtoType::ExtProtoInfo());
+  auto cGetterTypeInfo = Ctx.getTrivialTypeSourceInfo(cGetterType);
+  auto cGetterDecl = clang::FunctionDecl::Create(Ctx,
+                                                 structDecl->getDeclContext(),
+                                                 clang::SourceLocation(),
+                                                 clang::SourceLocation(),
+                                                 cGetterName,
+                                                 cGetterType,
+                                                 cGetterTypeInfo,
+                                                 clang::SC_Static);
+  cGetterDecl->setImplicitlyInline();
+  assert(!cGetterDecl->isExternallyVisible());
+
+  auto getterDecl = makeFieldGetterDecl(Impl,
+                                        importedStructDecl,
+                                        importedFieldDecl,
+                                        cGetterDecl);
+
+  // Setter: static inline void set(FieldType newValue, RecordType *self);
+  SmallVector<clang::QualType, 8> cSetterParamTypes;
+  cSetterParamTypes.push_back(fieldType);
+  cSetterParamTypes.push_back(recordPointerType);
+
+  auto cSetterName = getAccessorDeclarationName(Ctx, structDecl, fieldDecl,
+                                                "setter");
+  auto cSetterType = Ctx.getFunctionType(Ctx.VoidTy,
+                                         cSetterParamTypes,
+                                         clang::FunctionProtoType::ExtProtoInfo());
+  auto cSetterTypeInfo = Ctx.getTrivialTypeSourceInfo(cSetterType);
+  
+  auto cSetterDecl = clang::FunctionDecl::Create(Ctx,
+                                                 structDecl->getDeclContext(),
+                                                 clang::SourceLocation(),
+                                                 clang::SourceLocation(),
+                                                 cSetterName,
+                                                 cSetterType,
+                                                 cSetterTypeInfo,
+                                                 clang::SC_Static);
+  cSetterDecl->setImplicitlyInline();
+  assert(!cSetterDecl->isExternallyVisible());
+
+  auto setterDecl = makeFieldSetterDecl(Impl,
+                                        importedStructDecl,
+                                        importedFieldDecl,
+                                        cSetterDecl);
+
+  importedFieldDecl->makeComputed(SourceLoc(),
+                                  getterDecl,
+                                  setterDecl,
+                                  nullptr,
+                                  SourceLoc());
+
+  // Don't bother synthesizing the body if we've already finished type-checking.
+  if (Impl.hasFinishedTypeChecking())
+    return { getterDecl, setterDecl };
+  
+  // Synthesize the getter body
+  {
+    auto cGetterSelfId = nullptr;
+    auto recordTypeInfo = Ctx.getTrivialTypeSourceInfo(recordType);
+    auto cGetterSelf = clang::ParmVarDecl::Create(Ctx, cGetterDecl,
+                                                  clang::SourceLocation(),
+                                                  clang::SourceLocation(),
+                                                  cGetterSelfId,
+                                                  recordType,
+                                                  recordTypeInfo,
+                                                  clang::SC_None,
+                                                  nullptr);
+    cGetterDecl->setParams(cGetterSelf);
+    
+    auto cGetterSelfExpr = new (Ctx) clang::DeclRefExpr(cGetterSelf, false,
+                                                        recordType,
+                                                        clang::VK_RValue,
+                                                        clang::SourceLocation());
+    auto cGetterExpr = new (Ctx) clang::MemberExpr(cGetterSelfExpr,
+                                                   /*isarrow=*/ false,
+                                                   clang::SourceLocation(),
+                                                   fieldDecl,
+                                                   fieldNameInfo,
+                                                   fieldType,
+                                                   clang::VK_RValue,
+                                                   clang::OK_BitField);
+    
+    auto cGetterBody = new (Ctx) clang::ReturnStmt(clang::SourceLocation(),
+                                                   cGetterExpr,
+                                                   nullptr);
+    cGetterDecl->setBody(cGetterBody);
+
+    Impl.registerExternalDecl(getterDecl);
+  }
+
+  // Synthesize the setter body
+  {
+    SmallVector<clang::ParmVarDecl *, 2> cSetterParams;
+    auto fieldTypeInfo = Ctx.getTrivialTypeSourceInfo(fieldType);
+    auto cSetterValue = clang::ParmVarDecl::Create(Ctx, cSetterDecl,
+                                                   clang::SourceLocation(),
+                                                   clang::SourceLocation(),
+                                                   /* nameID? */ nullptr,
+                                                   fieldType,
+                                                   fieldTypeInfo,
+                                                   clang::SC_None,
+                                                   nullptr);
+    cSetterParams.push_back(cSetterValue);
+    auto recordPointerTypeInfo = Ctx.getTrivialTypeSourceInfo(recordPointerType);
+    auto cSetterSelf = clang::ParmVarDecl::Create(Ctx, cSetterDecl,
+                                                  clang::SourceLocation(),
+                                                  clang::SourceLocation(),
+                                                  /* nameID? */ nullptr,
+                                                  recordPointerType,
+                                                  recordPointerTypeInfo,
+                                                  clang::SC_None,
+                                                  nullptr);
+    cSetterParams.push_back(cSetterSelf);
+    cSetterDecl->setParams(cSetterParams);
+    
+    auto cSetterSelfExpr = new (Ctx) clang::DeclRefExpr(cSetterSelf, false,
+                                                        recordPointerType,
+                                                        clang::VK_RValue,
+                                                        clang::SourceLocation());
+    
+    auto cSetterMemberExpr = new (Ctx) clang::MemberExpr(cSetterSelfExpr,
+                                                         /*isarrow=*/ true,
+                                                         clang::SourceLocation(),
+                                                         fieldDecl,
+                                                         fieldNameInfo,
+                                                         fieldType,
+                                                         clang::VK_LValue,
+                                                         clang::OK_BitField);
+    
+    auto cSetterValueExpr = new (Ctx) clang::DeclRefExpr(cSetterValue, false,
+                                                         fieldType,
+                                                         clang::VK_RValue,
+                                                         clang::SourceLocation());
+    
+    auto cSetterExpr = new (Ctx) clang::BinaryOperator(cSetterMemberExpr,
+                                                       cSetterValueExpr,
+                                                       clang::BO_Assign,
+                                                       fieldType,
+                                                       clang::VK_RValue,
+                                                       clang::OK_Ordinary,
+                                                       clang::SourceLocation(),
+                                                       /*fpContractable=*/ false);
+    
+    cSetterDecl->setBody(cSetterExpr);
+
+    Impl.registerExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -1530,22 +1732,28 @@ namespace {
       if (wantBody) {
         // Assign all of the member variables appropriately.
         SmallVector<ASTNode, 4> stmts;
-        unsigned paramIdx = 0;
-        for (auto var : members) {
-          // Construct left-hand side.
-          Expr *lhs = new (context) DeclRefExpr(selfDecl, SourceLoc(),
-                                                /*Implicit=*/true);
-          lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, SourceLoc(),
-                                            /*Implicit=*/true);
 
-          // Construct right-hand side.
-          auto param = params[paramIdx++];
-          auto rhs = new (context) DeclRefExpr(param, SourceLoc(),
-                                               /*Implicit=*/true);
+        // To keep DI happy, initialize stored properties before computed.
+        for (unsigned pass = 0; pass < 2; pass++) {
+          for (unsigned i = 0, e = members.size(); i < e; i++) {
+            auto var = members[i];
+            if (var->hasStorage() == (pass != 0))
+              continue;
 
-          // Add assignment.
-          stmts.push_back(new (context) AssignExpr(lhs, SourceLoc(), rhs,
-                                                   /*Implicit=*/true));
+            // Construct left-hand side.
+            Expr *lhs = new (context) DeclRefExpr(selfDecl, SourceLoc(),
+                                                  /*Implicit=*/true);
+            lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, SourceLoc(),
+                                              /*Implicit=*/true);
+
+            // Construct right-hand side.
+            auto rhs = new (context) DeclRefExpr(params[i], SourceLoc(),
+                                                 /*Implicit=*/true);
+
+            // Add assignment.
+            stmts.push_back(new (context) AssignExpr(lhs, SourceLoc(), rhs,
+                                                     /*Implicit=*/true));
+          }
         }
 
         // Create the function body.
@@ -2094,15 +2302,24 @@ namespace {
 
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
       // Track whether this record contains fields we can't reference in Swift
-      // yet.
+      // as stored properties.
       bool hasUnreferenceableStorage = false;
       
       // Track whether this record contains fields that can't be zero-
       // initialized.
       bool hasZeroInitializableStorage = true;
 
-      if (decl->isUnion())
+      // Track whether all fields in this record can be referenced in Swift,
+      // either as stored or computed properties, in which case the record type
+      // gets a memberwise initializer.
+      bool hasMemberwiseInitializer = true;
+
+      if (decl->isUnion()) {
         hasUnreferenceableStorage = true;
+
+        // We generate initializers specially for unions below.
+        hasMemberwiseInitializer = false;
+      }
 
       // FIXME: Skip Microsoft __interfaces.
       if (decl->isInterface())
@@ -2134,14 +2351,6 @@ namespace {
       if (!dc)
         return nullptr;
 
-      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
-           m != mEnd; ++m) {
-        if (auto FD = dyn_cast<clang::FieldDecl>(*m))
-          if (FD->isBitField())
-            // We don't make bitfields accessible in Swift yet.
-            hasUnreferenceableStorage = true;
-      }
-
       // Create the struct declaration and record it.
       auto result = Impl.createDeclWithClangNode<StructDecl>(decl,
                                  Impl.importSourceLoc(decl->getLocStart()),
@@ -2168,6 +2377,7 @@ namespace {
           if (!nd) {
             // We couldn't import the member, so we can't reference it in Swift.
             hasUnreferenceableStorage = true;
+            hasMemberwiseInitializer = false;
             continue;
           }
 
@@ -2176,17 +2386,24 @@ namespace {
           if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
             if (field->isAnonymousStructOrUnion())
               continue;
+
             // Non-nullable pointers can't be zero-initialized.
             if (auto nullability = field->getType()
                   ->getNullability(Impl.getClangASTContext())) {
               if (*nullability == clang::NullabilityKind::NonNull)
                 hasZeroInitializableStorage = false;
             }
-
             // TODO: If we had the notion of a closed enum with no private
             // cases or resilience concerns, then complete NS_ENUMs with
             // no case corresponding to zero would also not be zero-
             // initializable.
+
+            // Unnamed bitfields are just for padding and should not
+            // inhibit creation of a memberwise initializer.
+            if (field->isUnnamedBitfield()) {
+              hasUnreferenceableStorage = true;
+              continue;
+            }
           }
 
           auto member = Impl.importDecl(nd);
@@ -2200,10 +2417,30 @@ namespace {
             // Otherwise, we don't know what this field is. Assume it may be
             // important in C.
             hasUnreferenceableStorage = true;
+            hasMemberwiseInitializer = false;
             continue;
           }
           
           auto VD = cast<VarDecl>(member);
+
+          // Bitfields are imported as computed properties with Clang-generated
+          // accessors.
+          if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
+            if (field->isUnnamedBitfield())
+              continue;
+
+            if (field->isBitField()) {
+              // We can't represent this struct completely in SIL anymore,
+              // but we're still able to define a memberwise initializer.
+              hasUnreferenceableStorage = true;
+
+              makeBitFieldAccessors(Impl,
+                                    const_cast<clang::RecordDecl *>(decl),
+                                    result,
+                                    const_cast<clang::FieldDecl *>(field),
+                                    VD);
+            }
+          }
 
           if (decl->isUnion()) {
             // Union fields should only be available indirectly via a computed
@@ -2215,9 +2452,13 @@ namespace {
             if (isa<clang::IndirectFieldDecl>(nd))
               continue;
 
+            auto field = cast<clang::FieldDecl>(nd);
+
             VD->setLet(false);
             Decl *getter, *setter;
-            std::tie(getter, setter) = makeUnionFieldAccessors(Impl, result, VD);
+            std::tie(getter, setter) = makeUnionFieldAccessors(Impl,
+                                                               result,
+                                                               VD);
             members.push_back(VD);
 
             // Create labeled inititializers for unions that take one of the
@@ -2238,15 +2479,21 @@ namespace {
       if (hasZeroInitializableStorage) {
         // Add constructors for the struct.
         ctors.push_back(createDefaultConstructor(result));
-        if (!decl->isUnion() && hasReferenceableFields && !hasUnreferenceableStorage) {
+        if (hasReferenceableFields && hasMemberwiseInitializer) {
           // The default zero initializer suppresses the implicit value
           // constructor that would normally be formed, so we have to add that
-          // explicitly as well. We leave the body implicit in order to match
-          // the behavior of the implicit constructor native structs receive.
+          // explicitly as well.
+          //
+          // If we can completely represent the struct in SIL, leave the body
+          // implicit, otherwise synthesize one to call property setters.
+          bool wantBody = (hasUnreferenceableStorage &&
+                           !Impl.hasFinishedTypeChecking());
           auto valueCtor = createValueConstructor(result, members,
                                                   /*want param names*/true,
-                                                  /*want body*/false);
-          valueCtor->setIsMemberwiseInitializer();
+                                                  /*want body*/wantBody);
+          if (!hasUnreferenceableStorage)
+            valueCtor->setIsMemberwiseInitializer();
+
           ctors.push_back(valueCtor);
         }
       }
@@ -2480,11 +2727,6 @@ namespace {
     }
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
-      // We don't import bitfields because we can not layout them correctly in
-      // IRGen.
-      if (decl->isBitField())
-        return nullptr;
-
       // Fields are imported as variables.
       auto name = Impl.importName(decl);
       if (name.empty())
