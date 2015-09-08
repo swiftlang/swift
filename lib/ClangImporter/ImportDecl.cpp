@@ -2452,8 +2452,6 @@ namespace {
             if (isa<clang::IndirectFieldDecl>(nd))
               continue;
 
-            auto field = cast<clang::FieldDecl>(nd);
-
             VD->setLet(false);
             Decl *getter, *setter;
             std::tie(getter, setter) = makeUnionFieldAccessors(Impl,
