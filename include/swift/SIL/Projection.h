@@ -298,6 +298,23 @@ public:
   /// not a matching aggregate instruction.
   SILValue getOperandForAggregate(SILInstruction *I) const;
 
+  /// Given a specific SILValue, return all first level projections if it is an
+  /// aggregate. Returns true if this was successful, false otherwise.
+  static bool getFirstLevelProjections(SILValue V, SILModule &Mod,
+                                       llvm::SmallVectorImpl<Projection> &Out);
+
+  /// Form an aggregate of type BaseType using the SILValue Values. Returns the
+  /// aggregate on success if this is a case we handle or an empty SILValue
+  /// otherwise.
+  ///
+  /// This can be used with getFirstLevelProjections to project out/reform
+  /// values. We do not need to use the original projections here since to build
+  /// aggregate instructions the order is the only important thing.
+  static NullablePtr<SILInstruction>
+  createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
+                                     SILType BaseType,
+                                     llvm::SmallVectorImpl<SILValue> &Values);
+
 private:
   Projection(ProjectionKind Kind, SILType Type, ValueDecl *Decl, unsigned Index)
       : Type(Type), Decl(Decl), Index(Index), Kind(unsigned(Kind)) {}

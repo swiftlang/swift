@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-projection"
 #include "swift/SIL/Projection.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/DebugUtils.h"
 #include "llvm/ADT/None.h"
@@ -312,6 +313,44 @@ SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
       break;
   }
   return SILValue();
+}
+
+bool Projection::getFirstLevelProjections(
+    SILValue V, SILModule &Mod, llvm::SmallVectorImpl<Projection> &Out) {
+  SILType Ty = V.getType();
+  if (auto *S = Ty.getStructOrBoundGenericStruct()) {
+    for (auto *V : S->getStoredProperties()) {
+      Out.push_back(Projection(ProjectionKind::Struct, Ty.getFieldType(V, Mod),
+                               V, getIndexForValueDecl(V)));
+    }
+    return true;
+  }
+
+  if (auto TT = Ty.getAs<TupleType>()) {
+    for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
+      Out.push_back(Projection(ProjectionKind::Tuple, Ty.getTupleElementType(i),
+                               nullptr, i));
+    }
+    return true;
+  }
+
+  return false;
+}
+
+NullablePtr<SILInstruction>
+Projection::
+createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
+                                   SILType BaseType,
+                                   llvm::SmallVectorImpl<SILValue> &Values) {
+  if (BaseType.getStructOrBoundGenericStruct()) {
+    return B.createStruct(Loc, BaseType, Values);
+  }
+
+  if (BaseType.is<TupleType>()) {
+    return B.createTuple(Loc, BaseType, Values);
+  }
+
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//
