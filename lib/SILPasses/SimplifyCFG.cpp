@@ -2213,6 +2213,85 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
   return Changed;
 }
 
+static void
+deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> TermOperands,
+                                          unsigned DeadArgIndex, SILModule &M) {
+  Operand &Op = TermOperands[DeadArgIndex];
+  auto *I = dyn_cast<SILInstruction>(Op.get());
+  if (!I)
+    return;
+  Op.set(SILUndef::get(Op.get().getType(), M));
+  recursivelyDeleteTriviallyDeadInstructions(I);
+}
+
+static void removeArgumentFromTerminator(SILBasicBlock *BB, SILBasicBlock *Dest,
+                                         int idx) {
+  TermInst *Branch = BB->getTerminator();
+  SILBuilderWithScope<2> Builder(Branch);
+
+  if (auto *CBI = dyn_cast<CondBranchInst>(Branch)) {
+    DEBUG(llvm::dbgs() << "*** Fixing CondBranchInst.\n");
+
+    SmallVector<SILValue, 8> TrueArgs;
+    SmallVector<SILValue, 8> FalseArgs;
+
+    for (auto A : CBI->getTrueArgs())
+      TrueArgs.push_back(A);
+
+    for (auto A : CBI->getFalseArgs())
+      FalseArgs.push_back(A);
+
+    if (Dest == CBI->getTrueBB()) {
+      deleteTriviallyDeadOperandsOfDeadArgument(CBI->getTrueOperands(), idx,
+                                                BB->getModule());
+      TrueArgs.erase(TrueArgs.begin() + idx);
+    }
+
+    if (Dest == CBI->getFalseBB()) {
+      deleteTriviallyDeadOperandsOfDeadArgument(CBI->getFalseOperands(), idx,
+                                                BB->getModule());
+      FalseArgs.erase(FalseArgs.begin() + idx);
+    }
+
+    Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
+                             CBI->getTrueBB(), TrueArgs, CBI->getFalseBB(),
+                             FalseArgs);
+    Branch->eraseFromParent();
+    return;
+  }
+
+  if (auto *BI = dyn_cast<BranchInst>(Branch)) {
+    DEBUG(llvm::dbgs() << "*** Fixing BranchInst.\n");
+    SmallVector<SILValue, 8> Args;
+
+    for (auto A : BI->getArgs())
+      Args.push_back(A);
+
+    deleteTriviallyDeadOperandsOfDeadArgument(BI->getAllOperands(), idx,
+                                              BB->getModule());
+    Args.erase(Args.begin() + idx);
+    Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
+    Branch->eraseFromParent();
+    return;
+  }
+  llvm_unreachable("unsupported terminator");
+}
+
+static void removeArgument(SILBasicBlock *BB, unsigned i) {
+  DEBUG(llvm::dbgs() << "*** Erasing " << i << "th BB argument.\n");
+  NumDeadArguments++;
+  BB->eraseBBArg(i);
+
+  // Determine the set of predecessors in case any predecessor has
+  // two edges to this block (e.g. a conditional branch where both
+  // sides reach this block).
+  llvm::SmallPtrSet<SILBasicBlock *, 4> PredBBs;
+  for (auto *Pred : BB->getPreds())
+    PredBBs.insert(Pred);
+
+  for (auto *Pred : PredBBs)
+    removeArgumentFromTerminator(Pred, BB, i);
+}
 bool SimplifyCFG::run() {
   RemoveUnreachable RU(Fn);
 
@@ -2270,51 +2349,6 @@ bool SimplifyCFG::run() {
   Changed |= canonicalizeSwitchEnums();
   
   return Changed;
-}
-
-static void
-removeArgumentFromTerminator(SILBasicBlock *BB, SILBasicBlock *Dest, int idx) {
-  TermInst *Branch = BB->getTerminator();
-  SILBuilderWithScope<2> Builder(Branch);
-
-  if (CondBranchInst *CBI = dyn_cast<CondBranchInst>(Branch)) {
-    DEBUG(llvm::dbgs() << "*** Fixing CondBranchInst.\n");
-
-    SmallVector<SILValue, 8> TrueArgs;
-    SmallVector<SILValue, 8> FalseArgs;
-
-    for (auto A : CBI->getTrueArgs())
-      TrueArgs.push_back(A);
-
-    for (auto A : CBI->getFalseArgs())
-      FalseArgs.push_back(A);
-
-    if (Dest == CBI->getTrueBB())
-      TrueArgs.erase(TrueArgs.begin() + idx);
-
-    if (Dest == CBI->getFalseBB())
-      FalseArgs.erase(FalseArgs.begin() + idx);
-
-    Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
-                             CBI->getTrueBB(), TrueArgs,
-                             CBI->getFalseBB(), FalseArgs);
-    Branch->eraseFromParent();
-    return;
-  }
-
-  if (BranchInst *BI = dyn_cast<BranchInst>(Branch)) {
-    DEBUG(llvm::dbgs() << "*** Fixing BranchInst.\n");
-    SmallVector<SILValue, 8> Args;
-
-    for (auto A : BI->getArgs())
-      Args.push_back(A);
-
-    Args.erase(Args.begin() + idx);
-    Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
-    Branch->eraseFromParent();
-    return;
-  }
-  llvm_unreachable("unsupported terminator");
 }
 
 /// Is an argument from this terminator considered mandatory?
@@ -3001,20 +3035,8 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
       continue;
     }
 
-    DEBUG(llvm::dbgs() << "*** Erasing " << i <<"th BB argument.\n");
-    NumDeadArguments++;
+    removeArgument(BB, i);
     Changed = true;
-    BB->eraseBBArg(i);
-
-    // Determine the set of predecessors in case any predecessor has
-    // two edges to this block (e.g. a conditional branch where both
-    // sides reach this block).
-    llvm::SmallPtrSet<SILBasicBlock *, 4> PredBBs;
-    for (auto *Pred : BB->getPreds())
-      PredBBs.insert(Pred);
-
-    for (auto *Pred : PredBBs)
-      removeArgumentFromTerminator(Pred, BB, i);
   }
 
   return Changed;

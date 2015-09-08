@@ -12,7 +12,7 @@ sil_global private @globalinit_token120 : $Builtin.Word
 
 sil @globalinit_func11 :  $@convention(thin) () -> ()
 
-//CHECK: sil @a_method_to_simplify
+// CHECK: sil @a_method_to_simplify
 sil @a_method_to_simplify : $@convention(thin) (Builtin.RawPointer, @owned Builtin.NativeObject, Builtin.Int32) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Int32):
   %4 = struct $UnsafeMutablePointer<UInt8> (%0 : $Builtin.RawPointer) // user: %37
@@ -30,7 +30,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Int32):
   %18 = integer_literal $Builtin.Int32, -1         // user: %20
   %20 = builtin "xor_Int32"(%17 : $Builtin.Int32, %18 : $Builtin.Int32) : $Builtin.Int32 // user: %22
   %22 = builtin "and_Int32"(%2 : $Builtin.Int32, %20 : $Builtin.Int32) : $Builtin.Int32 // users: %30, %23
-//CHECK-NOT: cond_br
+// CHECK-NOT: cond_br
   cond_br %8, bb1, bb2(%22 : $Builtin.Int32)       // id: %23
 
 bb1:                                              // Preds: bb0
@@ -43,7 +43,7 @@ bb1:                                              // Preds: bb0
   br bb2(%30 : $Builtin.Int32)                    // id: %31
 
 bb2(%32 : $Builtin.Int32):                        // Preds: bb0 bb1
-//CHECK-NEXT: tuple ()
+// CHECK-NOT: tuple
   %33 = tuple ()                                  // user: %34
   br bb3(%33 : $())                               // id: %34
 
@@ -78,13 +78,15 @@ bb1:
   %9 = struct $Bool (%8 : $Builtin.Int1)
   br bb2(%9 : $Bool)
 
+bb3:                                              // Preds: bb0
+  %13 = tuple()
+  br bb2(%5 : $Bool)                              // id: %14
+
 // Remove this ARG.
 bb2(%11 : $Bool):                                 // Preds: bb1 bb3
   %12 = tuple ()                                  // user: %13
   return %12 : $()                                // id: %13
 
-bb3:                                              // Preds: bb0
-  br bb2(%5 : $Bool)                              // id: %14
 }
 
 class A {}
