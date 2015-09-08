@@ -15,6 +15,10 @@
 // REQUIRES: executable_test
 import Swift
 
+//===--- Low-level integers -----------------------------------------------===//
+// Nominal types that expose the LLVM integer builtins in a uniform manner,
+// with a protocol conformance.
+
 %{
 #
 # Utility code for later in this template
@@ -73,20 +77,8 @@ public protocol _LowLevelInteger : Equatable {
   /// any instance of `Self`.
   typealias Truncated
   
-  /// A Builtin type used as `Self`'s representation
-  typealias Storage
-
   /// Creates an instance with value 0
   init()
-  
-  /// Creates an instance with the given storage representation
-  init(_: Storage)
-
-  /// The number of bits `Self` can store
-  static var bitWidth : Swift.Int { get }
-  
-  /// The entire storage of `self`'s value.  
-  var storage: Storage { get set }
 
 % for operation in builtinBinaryOperations:
   func ${operation}(rhs: Self) -> Self
@@ -120,9 +112,22 @@ public protocol _LowLevelInteger : Equatable {
 
 extension _LowLevelInteger {
   public init(_ other: Self) {
-    self.init()
-    self.storage = other.storage
+    self = other
   }
+}
+
+protocol _FixedWidthInteger : _LowLevelInteger {
+  /// A type used as `Self`'s representation
+  typealias Storage
+
+  /// Creates an instance with the given storage representation
+  init(_: Storage)
+
+  /// The number of bits `Self` can store
+  static var bitWidth : Swift.Int { get }
+  
+  /// The entire storage of `self`'s value.  
+  var storage: Storage { get set }
 }
 
 // Only needed outside the stdlib
@@ -139,7 +144,7 @@ extension Bool {
 %   # Until we have BitInt, the widest Int sign-extends into itself.
 %   extendedBits = bits * 2 if bits != maxFixedBits else bits
 %   narrowedBits = bits / 2 if bits != minFixedBits else bits
-public struct _LowLevelInt${bits} : _LowLevelInteger {
+public struct _LowLevelInt${bits} : _FixedWidthInteger {
   public typealias Self_ = _LowLevelInt${bits}
   public typealias Extended = _LowLevelInt${extendedBits}
   public typealias Narrowed = _LowLevelInt${narrowedBits}
