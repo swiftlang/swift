@@ -257,64 +257,7 @@ static VarDecl *findNamedPropertyWitness(TypeChecker &tc, DeclContext *dc,
   return findNamedWitnessImpl<VarDecl>(tc, dc, type, proto, name, diag);
 }
 
-/// Adjust the given type to become the self type when referring to
-/// the given member.
-static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
-                                    AccessSemantics semantics,
-                                    DeclContext *UseDC) {
-  auto baseObjectTy = baseTy->getLValueOrInOutObjectType();
-  if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-    // If 'self' is an inout type, turn the base type into an lvalue
-    // type with the same qualifiers.
-    auto selfTy = func->getType()->getAs<AnyFunctionType>()->getInput();
-    if (selfTy->is<InOutType>()) {
-      // Unless we're looking at a nonmutating existential member.  In which
-      // case, the member will be modeled as an inout but ExistentialMemberRef
-      // and ArchetypeMemberRef want to take the base as an rvalue.
-      if (auto *fd = dyn_cast<FuncDecl>(func))
-        if (!fd->isMutating() &&
-            baseObjectTy->hasDependentProtocolConformances())
-          return baseObjectTy;
-      
-      return InOutType::get(baseObjectTy);
-    }
-
-    // Otherwise, return the rvalue type.
-    return baseObjectTy;
-  }
-
-  // If the base of the access is mutable, then we may be invoking a getter or
-  // setter that requires the base to be mutable.
-  if (auto *SD = dyn_cast<AbstractStorageDecl>(member)) {
-    bool isSettableFromHere = SD->isSettable(UseDC)
-      && (!UseDC->getASTContext().LangOpts.EnableAccessControl
-          || SD->isSetterAccessibleFrom(UseDC));
-
-    // If neither the property's getter nor its setter are mutating, the base
-    // can be an rvalue.
-    if (!SD->isGetterMutating()
-        && (!isSettableFromHere || SD->isSetterNonMutating()))
-      return baseObjectTy;
-
-    // If we're calling an accessor, keep the base as an inout type, because the
-    // getter may be mutating.
-    if (SD->hasAccessorFunctions() && baseTy->is<InOutType>() &&
-        semantics != AccessSemantics::DirectToStorage)
-      return InOutType::get(baseObjectTy);
-  }
-
-  // Accesses to non-function members in value types are done through an @lvalue
-  // type.
-  if (baseTy->is<InOutType>())
-    return LValueType::get(baseObjectTy);
-  
-  // Accesses to members in values of reference type (classes, metatypes) are
-  // always done through a the reference to self.  Accesses to value types with
-  // a non-mutable self are also done through the base type.
-  return baseTy;
-}
-
-/// Return the implicit access kind for a MemberReferenceExpr with the
+/// Return the implicit access kind for a MemberRefExpr with the
 /// specified base and member in the specified DeclContext.
 static AccessSemantics
 getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
@@ -4975,6 +4918,63 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return new (tc.Context) UnresolvedTypeConversionExpr(expr, toType);
 
   llvm_unreachable("Unhandled coercion");
+}
+
+/// Adjust the given type to become the self type when referring to
+/// the given member.
+static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
+                                    AccessSemantics semantics,
+                                    DeclContext *UseDC) {
+  auto baseObjectTy = baseTy->getLValueOrInOutObjectType();
+  if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+    // If 'self' is an inout type, turn the base type into an lvalue
+    // type with the same qualifiers.
+    auto selfTy = func->getType()->getAs<AnyFunctionType>()->getInput();
+    if (selfTy->is<InOutType>()) {
+      // Unless we're looking at a nonmutating existential member.  In which
+      // case, the member will be modeled as an inout but ExistentialMemberRef
+      // and ArchetypeMemberRef want to take the base as an rvalue.
+      if (auto *fd = dyn_cast<FuncDecl>(func))
+        if (!fd->isMutating() &&
+            baseObjectTy->hasDependentProtocolConformances())
+          return baseObjectTy;
+      
+      return InOutType::get(baseObjectTy);
+    }
+
+    // Otherwise, return the rvalue type.
+    return baseObjectTy;
+  }
+
+  // If the base of the access is mutable, then we may be invoking a getter or
+  // setter that requires the base to be mutable.
+  if (auto *SD = dyn_cast<AbstractStorageDecl>(member)) {
+    bool isSettableFromHere = SD->isSettable(UseDC)
+      && (!UseDC->getASTContext().LangOpts.EnableAccessControl
+          || SD->isSetterAccessibleFrom(UseDC));
+
+    // If neither the property's getter nor its setter are mutating, the base
+    // can be an rvalue.
+    if (!SD->isGetterMutating()
+        && (!isSettableFromHere || SD->isSetterNonMutating()))
+      return baseObjectTy;
+
+    // If we're calling an accessor, keep the base as an inout type, because the
+    // getter may be mutating.
+    if (SD->hasAccessorFunctions() && baseTy->is<InOutType>() &&
+        semantics != AccessSemantics::DirectToStorage)
+      return InOutType::get(baseObjectTy);
+  }
+
+  // Accesses to non-function members in value types are done through an @lvalue
+  // type.
+  if (baseTy->is<InOutType>())
+    return LValueType::get(baseObjectTy);
+  
+  // Accesses to members in values of reference type (classes, metatypes) are
+  // always done through a the reference to self.  Accesses to value types with
+  // a non-mutable self are also done through the base type.
+  return baseTy;
 }
 
 Expr *
