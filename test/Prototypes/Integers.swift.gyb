@@ -68,7 +68,10 @@ builtinMiscOperations = ['atomicrmw']
 }%
 
 /// A low-level 2's complement integer.
-public protocol _LowLevelInteger : Equatable {
+public protocol _LowLevelInteger
+  : Equatable,
+    IntegerLiteralConvertible, _BuiltinIntegerLiteralConvertible 
+{
   /// A _LowLevelInt type that accomodates more bits of precision than
   /// any instance of `Self`.
   typealias Extended
@@ -155,13 +158,22 @@ public struct _LowLevelInt${bits} : _FixedWidthInteger {
     self.storage = zero
   }
 
+  public init(_builtinIntegerLiteral x: Builtin.Int${builtinIntLiteralBits}) {
+    storage = Builtin.truncOrBitCast_Int${builtinIntLiteralBits}_Int${bits}(x)
+  }
+
+  /// Create an instance initialized to `value`.
+  public init(integerLiteral value: Self_) {
+    self = value
+  }
+  
   public init(_ storage: Storage) {
     self.storage = storage
   }
   
   public var storage: Storage
   
-  public static var bitWidth : Swift.Int { return ${word_bits} }
+  public static var bitWidth : Swift.Int { return ${bits} }
   
 % for operation in builtinBinaryOperations:
   public func ${operation}(rhs: Self_) -> Self_ {
