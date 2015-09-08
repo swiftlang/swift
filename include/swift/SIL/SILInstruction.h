@@ -3239,8 +3239,8 @@ protected:
   TermInst(ValueKind K, SILLocation Loc) : SILInstruction(K, Loc) {}
 public:
 
-  typedef ArrayRef<SILSuccessor> ConstSuccessorListTy;
-  typedef MutableArrayRef<SILSuccessor> SuccessorListTy;
+  using ConstSuccessorListTy = ArrayRef<SILSuccessor>;
+  using SuccessorListTy = MutableArrayRef<SILSuccessor>;
 
   /// The successor basic blocks of this terminator.
   SuccessorListTy getSuccessors();
@@ -3352,7 +3352,7 @@ class BranchInst : public TermInst {
   BranchInst(SILLocation Loc,
              SILBasicBlock *DestBB, ArrayRef<SILValue> Args);
 public:
-  typedef ArrayRef<SILValue> ArgsTy;
+  using ArgsTy = ArrayRef<SILValue>;
 
   /// Construct a BranchInst that will branch to the specified block.
   /// The destination block must take no parameters.
@@ -4104,7 +4104,7 @@ namespace llvm {
 template <>
 struct ilist_traits<::swift::SILInstruction> :
   public ilist_default_traits<::swift::SILInstruction> {
-  typedef ::swift::SILInstruction SILInstruction;
+  using SILInstruction = ::swift::SILInstruction;
 
 private:
   mutable ilist_half_node<SILInstruction> Sentinel;
@@ -4136,7 +4136,7 @@ private:
 
 // An ApplySite casts like a SILInstruction*.
 template<> struct simplify_type<const ::swift::ApplySite> {
-  typedef ::swift::SILInstruction *SimpleType;
+  using SimpleType = ::swift::SILInstruction *;
   static SimpleType getSimplifiedValue(const ::swift::ApplySite &Val) {
     return Val.getInstruction();
   }

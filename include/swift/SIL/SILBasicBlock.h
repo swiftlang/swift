@@ -31,7 +31,7 @@ class SILBasicBlock :
 public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
   friend class SILSuccessor;
 public:
-  typedef llvm::iplist<SILInstruction> InstListType;
+  using InstListType = llvm::iplist<SILInstruction>;
 private:
   /// A backreference to the containing SILFunction.
   SILFunction *Parent;
@@ -85,10 +85,10 @@ public:
   InstListType &getInstList() { return InstList; }
   const InstListType &getInstList() const { return InstList; }
 
-  typedef InstListType::iterator iterator;
-  typedef InstListType::const_iterator const_iterator;
-  typedef InstListType::reverse_iterator reverse_iterator;
-  typedef InstListType::const_reverse_iterator const_reverse_iterator;
+  using iterator = InstListType::iterator;
+  using const_iterator = InstListType::const_iterator;
+  using reverse_iterator = InstListType::reverse_iterator;
+  using const_reverse_iterator = InstListType::const_reverse_iterator;
 
   bool empty() const { return InstList.empty(); }
   iterator begin() { return InstList.begin(); }
@@ -131,8 +131,8 @@ public:
   // SILBasicBlock Argument List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
 
-  typedef std::vector<SILArgument*>::iterator bbarg_iterator;
-  typedef std::vector<SILArgument*>::const_iterator const_bbarg_iterator;
+  using bbarg_iterator = std::vector<SILArgument *>::iterator;
+  using const_bbarg_iterator = std::vector<SILArgument *>::const_iterator;
 
   bool bbarg_empty() const { return BBArgList.empty(); }
   size_t bbarg_size() const { return BBArgList.size(); }
@@ -183,9 +183,8 @@ public:
   // Predecessors and Successors
   //===--------------------------------------------------------------------===//
 
-  typedef TermInst::SuccessorListTy SuccessorListTy;
-  typedef TermInst::ConstSuccessorListTy ConstSuccessorListTy;
-  
+  using SuccessorListTy = TermInst::SuccessorListTy;
+  using ConstSuccessorListTy = TermInst::ConstSuccessorListTy;
   
   /// The successors of a SILBasicBlock are defined either explicitly as
   /// a single successor as the branch targets of the terminator instruction.
@@ -196,8 +195,8 @@ public:
     return getTerminator()->getSuccessors();
   }
 
-  typedef ConstSuccessorListTy::const_iterator const_succ_iterator;
-  typedef SuccessorListTy::iterator succ_iterator;
+  using const_succ_iterator = ConstSuccessorListTy::const_iterator;
+  using succ_iterator = SuccessorListTy::iterator;
 
   bool succ_empty() const { return getSuccessors().empty(); }
   succ_iterator succ_begin() { return getSuccessors().begin(); }
@@ -217,7 +216,7 @@ public:
     return *succ_begin();
   }
 
-  typedef SILSuccessorIterator pred_iterator;
+  using pred_iterator = SILSuccessorIterator;
 
   bool pred_empty() const { return PredList == nullptr; }
   pred_iterator pred_begin() const { return pred_iterator(PredList); }
@@ -275,10 +274,10 @@ namespace llvm {
 template <>
 struct ilist_traits<::swift::SILBasicBlock> :
 public ilist_default_traits<::swift::SILBasicBlock> {
-  typedef ilist_traits<::swift::SILBasicBlock> SelfTy;
-  typedef ::swift::SILBasicBlock SILBasicBlock;
-  typedef ::swift::SILFunction SILFunction;
-  typedef ::swift::NullablePtr<SILFunction> FunctionPtrTy;
+  using SelfTy = ilist_traits<::swift::SILBasicBlock>;
+  using SILBasicBlock = ::swift::SILBasicBlock;
+  using SILFunction = ::swift::SILFunction;
+  using FunctionPtrTy = ::swift::NullablePtr<SILFunction>;
 
 private:
   friend class ::swift::SILFunction;
