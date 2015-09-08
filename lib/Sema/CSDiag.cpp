@@ -912,21 +912,6 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
   return false;
 }
 
-static SmallVector<TupleTypeElt, 4> decomposeArgumentType(Type ty) {
-  SmallVector<TupleTypeElt, 4> result;
-
-  // Assemble the parameter type list.
-  if (auto parenType = dyn_cast<ParenType>(ty.getPointer())) {
-    result.push_back(parenType->getUnderlyingType());
-  } else if (auto tupleType = ty->getAs<TupleType>()) {
-    result.append(tupleType->getElements().begin(),
-                  tupleType->getElements().end());
-  } else {
-    result.push_back(ty);
-  }
-  return result;
-}
-
 static std::string getTypeListString(Type type) {
   // Assemble the parameter type list.
   auto tupleType = type->getAs<TupleType>();
@@ -1247,9 +1232,11 @@ namespace {
     /// After the candidate list is formed, it can be filtered down to discard
     /// obviously mismatching candidates and compute a "closeness" for the
     /// resultant set.
-    void filterList(ArrayRef<TupleTypeElt> actualArgs);
-    void filterList(Type actualArgsType) {
-      return filterList(decomposeArgumentType(actualArgsType));
+    void filterList(ArrayRef<CallArgParam> actualArgs,
+                    bool argsHaveTrailingClosure);
+    void filterList(Type actualArgsType, bool argsHaveTrailingClosure) {
+      return filterList(decomposeArgParamType(actualArgsType),
+                        argsHaveTrailingClosure);
     }
     void filterList(ClosenessPredicate predicate);
     void filterContextualMemberList(Expr *argExpr);
@@ -1319,71 +1306,82 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
 /// Determine how close an argument list is to an already decomposed argument
 /// list.
 static CandidateCloseness
-evaluateCloseness(Type candArgListType, ArrayRef<TupleTypeElt> actualArgs) {
-  auto candArgs = decomposeArgumentType(candArgListType);
+evaluateCloseness(Type candArgListType, ArrayRef<CallArgParam> actualArgs,
+                  bool argsHaveTrailingClosure) {
+  auto candArgs = decomposeArgParamType(candArgListType);
 
-  // FIXME: This isn't handling varargs, and isn't handling default values
-  // either.
-  if (actualArgs.size() != candArgs.size()) {
-    // If the candidate is varargs, and if there are more arguments specified
-    // than required, consider this a general mismatch.
-    // TODO: we could catalog the remaining entries if they *do* match up.
-    if (auto *TT = candArgListType->getAs<TupleType>()) {
-      if (!TT->getElements().empty()) {
-        if (TT->getElements().back().isVararg() &&
-            actualArgs.size() >= TT->getElements().size()-1)
-          return CC_GeneralMismatch;
-      }
+  struct OurListener : public MatchCallArgumentListener {
+    CandidateCloseness result = CC_ExactMatch;
+  public:
+    CandidateCloseness getResult() const {
+      return result;
     }
-    
-    return CC_ArgumentCountMismatch;
-  }
+    void extraArgument(unsigned argIdx) override {
+      result = CC_ArgumentCountMismatch;
+    }
+    void missingArgument(unsigned paramIdx) override {
+      result = CC_ArgumentCountMismatch;
+    }
+    void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
+      result = CC_ArgumentLabelMismatch;
+    }
+    bool relabelArguments(ArrayRef<Identifier> newNames) override {
+      result = CC_ArgumentLabelMismatch;
+      return true;
+    }
+  } listener;
   
-  // Count the number of mismatched arguments.
+  // Use matchCallArguments to determine how close the argument list is (in
+  // shape) to the specified candidates parameters.  This ignores the concrete
+  // types of the arguments, looking only at the argument labels etc.
+  SmallVector<ParamBinding, 4> paramBindings;
+  if (matchCallArguments(actualArgs, candArgs, argsHaveTrailingClosure,
+                         /*allowFixes:*/ true,
+                         listener, paramBindings))
+    // On error, get our closeness from whatever problem the listener saw.
+    return listener.getResult();
+
+  // If we found a mapping, check to see if the matched up arguments agree in
+  // their type and count the number of mismatched arguments.
   unsigned mismatchingArgs = 0;
-  for (unsigned i = 0, e = actualArgs.size(); i != e; ++i) {
-    // Check to see if the keyword arguments line up.  If not, this is a bad
-    // issue, which is considered to be more severe than a type mismatch: if
-    // the labels are wrong, the user may be passing a value to the wrong
-    // argument entirely - a type mismatch would be the wrong thing to report.
-    if (actualArgs[i].getName() != candArgs[i].getName())
-      return CC_ArgumentLabelMismatch;
-
-    auto argType = actualArgs[i].getType();
-
-    // If the argument has an unresolved type, then we're not actually matching
-    // against it.
-    if (argType->is<UnresolvedType>())
-      continue;
-    if (auto *LVT = argType->getAs<LValueType>())
-      if (LVT->getObjectType()->is<UnresolvedType>())
-        continue;
+  for (unsigned i = 0, e = paramBindings.size(); i != e; ++i) {
+    // bindings specifify the arguments that source the parameter.  The only
+    // case in which this returns a non-singular value is when there are varargs
+    // in play.
+    auto &bindings = paramBindings[i];
+    auto paramType = candArgs[i].Ty;
     
-    // FIXME: Right now, a "matching" overload is one with a parameter whose
-    // type is identical to one of the argument types. We can obviously do
-    // something more sophisticated with this.
-    // FIXME: We definitely need to handle archetypes for same-type constraints.
-    if (!argType->getRValueType()->isEqual(candArgs[i].getType()))
-      ++mismatchingArgs;
+    for (auto argNo : bindings) {
+      auto argType = actualArgs[argNo].Ty;
+      
+      // If the argument has an unresolved type, then we're not actually
+      // matching against it.
+      if (argType->getRValueType()->is<UnresolvedType>())
+        continue;
+      
+      // FIXME: Right now, a "matching" overload is one with a parameter whose
+      // type is identical to one of the argument types. We can obviously do
+      // something more sophisticated with this.
+      // FIXME: We definitely need to handle archetypes for same-type constraints.
+      // FIXME: Use TC.isConvertibleTo?
+      if (!argType->getRValueType()->isEqual(paramType))
+        ++mismatchingArgs;
+    }
   }
-
   
-  // If the arguments match up exactly, then we have an exact match.  This
-  // handles the no-argument cases as well.
   if (mismatchingArgs == 0)
     return CC_ExactMatch;
   
   // Check to see if the first argument expects an inout argument, but is not
   // an lvalue.
-  if (candArgs[0].getType()->is<InOutType>() &&
-      !actualArgs[0].getType()->isLValueType())
+  if (candArgs[0].Ty->is<InOutType>() && !actualArgs[0].Ty->isLValueType())
     return CC_NonLValueInOut;
-
+  
   // If we have exactly one argument mismatching, classify it specially, so that
   // close matches are prioritized against obviously wrong ones.
   if (mismatchingArgs == 1)
     return actualArgs.size() != 1 ? CC_OneArgumentMismatch :CC_ArgumentMismatch;
-
+  
   return CC_GeneralMismatch;
 }
 
@@ -1529,7 +1527,8 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
 /// After the candidate list is formed, it can be filtered down to discard
 /// obviously mismatching candidates and compute a "closeness" for the
 /// resultant set.
-void CalleeCandidateInfo::filterList(ArrayRef<TupleTypeElt> actualArgs) {
+void CalleeCandidateInfo::filterList(ArrayRef<CallArgParam> actualArgs,
+                                     bool isTrailingClosure) {
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
   filterList([&](UncurriedCandidate candidate) -> CandidateCloseness {
@@ -1537,7 +1536,7 @@ void CalleeCandidateInfo::filterList(ArrayRef<TupleTypeElt> actualArgs) {
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
     if (!inputType) return CC_GeneralMismatch;
-    return evaluateCloseness(inputType, actualArgs);
+    return evaluateCloseness(inputType, actualArgs, isTrailingClosure);
   });
 }
 
@@ -1563,32 +1562,38 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
   // the ParenExpr goes missing.
   auto *argTuple = dyn_cast<TupleExpr>(argExpr);
   if (!argTuple) {
+    bool isTrailingClosure = false;
     // If we have a single argument, look through the paren expr.
-    if (auto *PE = dyn_cast<ParenExpr>(argExpr))
+    if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
       argExpr = PE->getSubExpr();
+      isTrailingClosure = PE->hasTrailingClosure();
+    }
     
     Type argType = URT;
     // If the argument has an & specified, then we expect an lvalue.
     if (isa<InOutExpr>(argExpr))
       argType = LValueType::get(argType);
     
-    return filterList(TupleTypeElt(argType));
+    CallArgParam param;
+    param.Ty = argType;
+    return filterList(param, isTrailingClosure);
   }
   
   // If we have a tuple expression, form a tuple type.
-  SmallVector<TupleTypeElt, 4> ArgElts;
+  SmallVector<CallArgParam, 4> ArgElts;
   for (unsigned i = 0, e = argTuple->getNumElements(); i != e; ++i) {
     // If the argument has an & specified, then we expect an lvalue.
     Type argType = URT;
     if (isa<InOutExpr>(argTuple->getElement(i)))
       argType = LValueType::get(argType);
 
-    
-    ArgElts.push_back({ argType, argTuple->getElementName(i) });
+    CallArgParam param;
+    param.Ty = argType;
+    param.Label = argTuple->getElementName(i);
+    ArgElts.push_back(param);
   }
 
-  return filterList(ArgElts);
-
+  return filterList(ArgElts, argTuple->hasTrailingClosure());
 }
 
 CalleeCandidateInfo::CalleeCandidateInfo(ArrayRef<OverloadChoice> overloads,
@@ -3172,7 +3177,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
   auto indexType = indexExpr->getType();
 
-  auto decomposedIndexType = decomposeArgumentType(indexType);
+  auto decomposedIndexType = decomposeArgParamType(indexType);
   calleeInfo.filterList([&](UncurriedCandidate cand) -> CandidateCloseness
   {
     // Classify how close this match is.  Non-subscript decls don't match.
@@ -3190,7 +3195,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     }
 
     // Explode out multi-index subscripts to find the best match.
-    return std::max(evaluateCloseness(SD->getIndicesType(),decomposedIndexType),
+    return std::max(evaluateCloseness(SD->getIndicesType(),decomposedIndexType,
+                              /*FIXME: Subscript trailing closures*/false),
                     selfConstraint);
   });
 
@@ -3367,7 +3373,13 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (!argExpr)
     return true; // already diagnosed.
 
-  calleeInfo.filterList(argExpr->getType());
+  bool hasTrailingClosure = false;
+  if (auto *PE = dyn_cast<ParenExpr>(callExpr->getArg()))
+    hasTrailingClosure = PE->hasTrailingClosure();
+  else if (auto *TE = dyn_cast<TupleExpr>(callExpr->getArg()))
+    hasTrailingClosure = TE->hasTrailingClosure();
+  
+  calleeInfo.filterList(argExpr->getType(), hasTrailingClosure);
 
   if (calleeInfo.closeness == CC_Unavailable) {
     if (CS->TC.diagnoseExplicitUnavailability(calleeInfo[0].decl,
@@ -4130,13 +4142,13 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     // expected.
     assert(argumentTy &&
            "Candidate must expect an argument to have a label mismatch");
-    auto arguments = decomposeArgumentType(argumentTy);
+    auto arguments = decomposeArgParamType(argumentTy);
     
     // TODO: This is probably wrong for varargs, e.g. calling "print" with the
     // wrong label.
     SmallVector<Identifier, 4> expectedNames;
     for (auto &arg : arguments)
-      expectedNames.push_back(arg.getName());
+      expectedNames.push_back(arg.Label);
 
     return CS->diagnoseArgumentLabelError(argExpr, expectedNames,
                                           /*isSubscript*/false);
