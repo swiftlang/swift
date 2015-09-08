@@ -45,3 +45,28 @@ func rejectsAssertStringLiteral() {
   precondition("foo") // expected-error {{cannot convert value of type 'String' to expected argument type 'Bool'}}
 }
 
+
+
+// <rdar://problem/22243469> QoI: Poor error message with throws, default arguments, & overloads
+func process(line: UInt = __LINE__, _ fn: () -> Void) {}
+func process(line: UInt = __LINE__) -> Int { return 0 }
+func dangerous() throws {}
+
+func test() {
+  process {         // expected-error {{cannot invoke 'process' with an argument list of type '(() throws -> ())'}}
+    // expected-note @-1 {{overloads for 'process' exist with these partially matching parameter lists: (UInt, () -> Void), (UInt)}}
+    try dangerous()
+    test()
+  }
+}
+
+
+// <rdar://problem/19962010> QoI: argument label mismatches produce not-great diagnostic
+class A {
+  func a(text:String) {
+  }
+  func a(text:String, something:Int?=nil) {
+  }
+}
+A().a(text:"sometext") // expected-error {{cannot invoke 'a' with an argument list of type '(text: String)'}}
+// expected-note @-1 {{overloads for 'a' exist with these partially matching parameter lists: (String), (String, something: Int?)}}
