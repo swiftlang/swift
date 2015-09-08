@@ -2042,3 +2042,18 @@ optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst)
   return nullptr;
 }
 
+bool swift::simplifyUsers(SILInstruction *I) {
+  bool Changed = false;
+
+  for (SILInstruction *User : makeUserRange(I->getUses())) {
+    if (User->getNumTypes() != 1)
+      continue;
+    SILValue S = simplifyInstruction(User);
+    if (!S)
+      continue;
+    SILValue(User).replaceAllUsesWith(S);
+    User->eraseFromParent();
+    Changed = true;
+  }
+  return Changed;
+}

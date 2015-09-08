@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILPASSES_UTILS_LOCAL_H
 #define SWIFT_SILPASSES_UTILS_LOCAL_H
 
+#include "swift/SILAnalysis/SimplifyInstruction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
@@ -586,6 +587,17 @@ ignore_expect_uses(ValueBase *V) {
   return make_range(IgnoreExpectUseIterator(V),
                     IgnoreExpectUseIterator());
 }
+
+/// Run simplifyInstruction() on all of the instruction I's users if they only
+/// have one result (since simplifyInstruction assumes that). Replace all uses
+/// of the user with its simplification of we succeed. Returns true if we
+/// succeed and false otherwise.
+///
+/// An example of how this is useful is in cases where one is splitting up an
+/// aggregate and reforming it, the reformed aggregate may have extract
+/// operations from it. These can be simplified and removed.
+bool simplifyUsers(SILInstruction *I);
+
 } // end namespace swift
 
 #endif
