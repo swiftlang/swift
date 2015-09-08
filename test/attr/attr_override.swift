@@ -5,7 +5,7 @@ func virtualAttributeCanNotBeUsedInSource() {}
 
 class MixedKeywordsAndAttributes {
   // expected-error@+1 {{expected declaration}} expected-error@+1 {{consecutive declarations on a line must be separated by ';'}} {{11-11=;}}
-  override @objc func f1() {}
+  override @inline(never) func f1() {}
 }
 
 class DuplicateOverrideBase {
@@ -22,8 +22,6 @@ class DuplicateOverrideDerived : DuplicateOverrideBase {
   class override override func cf3() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
   override class override func cf4() {} // expected-error {{duplicate modifier}} expected-note {{modifier already specified here}}
 }
-
-@objc class ObjCClass {}
 
 class A {
   func f0() { }
@@ -66,10 +64,6 @@ class A {
   subscript (i: Int16) -> A { // expected-note{{attempt to override subscript here}}
     get { return self }
     set { }
-  }
-
-  @objc subscript (a: ObjCClass) -> String { // expected-note{{overridden declaration here has type '(ObjCClass) -> String'}}
-    get { return "hello" }
   }
 
   func overriddenInExtension() {} // expected-note {{overridden declaration is here}}
@@ -136,11 +130,6 @@ class B : A {
   override subscript (i: Int16) -> B { // expected-error{{cannot override mutable subscript of type '(Int16) -> B' with covariant type '(Int16) -> A'}}
     get { return self }
     set { }
-  }
-
-  // Objective-C
-  @objc subscript (a: ObjCClass) -> Int { // expected-error{{overriding keyed subscript with incompatible type '(ObjCClass) -> Int'}}
-    get { return 5 }
   }
 
   override init() { }
