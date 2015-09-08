@@ -301,26 +301,34 @@ void CallGraph::addEdges(SILFunction *F) {
       if (auto AI = FullApplySite::isa(&I))
         addEdgesForApply(AI, CallerNode);
 
-      if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
-        auto *CalleeFn = FRI->getReferencedFunction();
+      auto *FRI = dyn_cast<FunctionRefInst>(&I);
+      if (!FRI)
+        continue;
 
-        if (CalleeFn->isExternalDeclaration())
-          M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
-                         CallGraphLinkerEditor(*this).getCallback());
+      auto *CalleeFn = FRI->getReferencedFunction();
 
-        if (!CalleeFn->isPossiblyUsedExternally()) {
-          bool hasAllApplyUsers = std::none_of(FRI->use_begin(), FRI->use_end(),
-            [](Operand *Op) {
-              return !FullApplySite::isa(Op->getUser());
-            });
+      if (CalleeFn->isExternalDeclaration())
+        M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
+                       CallGraphLinkerEditor(*this).getCallback());
 
-          // If we have a non-apply user of this function, mark its caller set
-          // as being incomplete.
-          if (!hasAllApplyUsers) {
-            auto *CalleeNode = getOrAddCallGraphNode(CalleeFn);
-            CalleeNode->markCallerEdgesIncomplete();
-          }
-        }
+      if (CalleeFn->isPossiblyUsedExternally()) {
+        auto *CalleeNode = tryGetCallGraphNode(CalleeFn);
+        assert((!CalleeNode || !CalleeNode->isCallerEdgesComplete()) &&
+               "Expected function to have incomplete set of caller edges!");
+        (void) CalleeNode;
+        continue;
+      }
+
+      bool hasAllApplyUsers = std::none_of(FRI->use_begin(), FRI->use_end(),
+                                           [](Operand *Op) {
+                                             return !FullApplySite::isa(Op->getUser());
+                                           });
+
+      // If we have a non-apply user of this function, mark its caller set
+      // as being incomplete.
+      if (!hasAllApplyUsers) {
+        auto *CalleeNode = getOrAddCallGraphNode(CalleeFn);
+        CalleeNode->markCallerEdgesIncomplete();
       }
     }
   }
