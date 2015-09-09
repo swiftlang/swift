@@ -137,15 +137,15 @@ int main(int argc, char **argv) {
         auto RawSym = Symbol.getRawDataRefImpl();
         llvm::MachO::nlist nlist = MachO->getSymbolTableEntry(RawSym);
         if (nlist.n_type == N_AST) {
-          llvm::StringRef Path;
-          if (MachO->getSymbolName(RawSym, Path)) {
+          auto Path = MachO->getSymbolName(RawSym);
+          if (Path.getError()) {
             llvm::outs() << "Cannot get symbol name\n;";
             exit(1);
           }
 
-          auto fileBuf = llvm::MemoryBuffer::getFile(Path);
+          auto fileBuf = llvm::MemoryBuffer::getFile(*Path);
           if (!fileBuf) {
-            llvm::outs() << "Cannot read from '" << Path
+            llvm::outs() << "Cannot read from '" << *Path
                          << "': " << fileBuf.getError().message();
             exit(1);
           }
