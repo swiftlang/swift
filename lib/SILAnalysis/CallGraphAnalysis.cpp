@@ -319,10 +319,11 @@ void CallGraph::addEdges(SILFunction *F) {
         continue;
       }
 
-      bool hasAllApplyUsers = std::none_of(FRI->use_begin(), FRI->use_end(),
-                                           [](Operand *Op) {
-                                             return !FullApplySite::isa(Op->getUser());
-                                           });
+      bool hasAllApplyUsers =
+        std::none_of(FRI->use_begin(), FRI->use_end(),
+                     [](Operand *Op) {
+                       return !FullApplySite::isa(Op->getUser());
+                     });
 
       // If we have a non-apply user of this function, mark its caller set
       // as being incomplete.
