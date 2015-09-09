@@ -108,12 +108,8 @@ CallGraphNode *CallGraph::addCallGraphNode(SILFunction *F) {
   return Node;
 }
 
-bool CallGraph::tryGetCalleeSet(SILValue Callee,
-                                CallGraphEdge::CalleeSetType &CalleeSet,
-                                bool &Complete) {
-
-  assert(CalleeSet.empty() && "Expected empty callee set!");
-
+CallGraphEdge *CallGraph::tryMakeCallGraphEdgeForCallee(FullApplySite Apply,
+                                                        SILValue Callee) {
   switch (Callee->getKind()) {
   case ValueKind::ThinToThickFunctionInst:
     Callee = cast<ThinToThickFunctionInst>(Callee)->getOperand();
@@ -125,44 +121,43 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
                      CallGraphLinkerEditor(*this).getCallback());
 
     auto *CalleeNode = getOrAddCallGraphNode(CalleeFn);
-    CalleeSet.insert(CalleeNode);
-    Complete = true;
-    return true;
+    return new (Allocator) CallGraphEdge(Apply, CalleeNode, EdgeOrdinal++);
   }
 
-  case ValueKind::PartialApplyInst:
-    return tryGetCalleeSet(cast<PartialApplyInst>(Callee)->getCallee(),
-                           CalleeSet, Complete);
+  case ValueKind::PartialApplyInst: {
+    Callee = cast<PartialApplyInst>(Callee)->getCallee();
+    return tryMakeCallGraphEdgeForCallee(Apply, Callee);
+  }
 
   case ValueKind::DynamicMethodInst:
     // TODO: Decide how to handle these in graph construction and
     //       analysis passes. We might just leave them out of the
     //       graph.
-    return false;
+    return nullptr;
 
   case ValueKind::SILArgument:
     // First-pass call-graph construction will not do anything with
     // these, but a second pass can potentially statically determine
     // the called function in some cases.
-    return false;
+    return nullptr;
 
   case ValueKind::ApplyInst:
   case ValueKind::TryApplyInst:
     // TODO: Probably not worth iterating invocation- then
     //       reverse-invocation order to catch this.
-    return false;
+    return nullptr;
 
   case ValueKind::TupleExtractInst:
     // TODO: It would be good to tunnel through extracts so that we
     //       can build a more accurate call graph prior to any
     //       optimizations.
-    return false;
+    return nullptr;
 
   case ValueKind::StructExtractInst:
     // TODO: It would be good to tunnel through extracts so that we
     //       can build a more accurate call graph prior to any
     //       optimizations.
-    return false;
+    return nullptr;
 
   case ValueKind::WitnessMethodInst: {
     auto *WMI = cast<WitnessMethodInst>(Callee);
@@ -175,22 +170,20 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
                                                     WMI->getMember());
 
     if (!CalleeFn)
-      return false;
+      return nullptr;
 
     if (CalleeFn->isExternalDeclaration())
       M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
                      CallGraphLinkerEditor(*this).getCallback());
 
     auto *CalleeNode = getOrAddCallGraphNode(CalleeFn);
-    CalleeSet.insert(CalleeNode);
-    Complete = true;
-    return true;
+    return new (Allocator) CallGraphEdge(Apply, CalleeNode, EdgeOrdinal++);
   }
 
   case ValueKind::ClassMethodInst:
   case ValueKind::SuperMethodInst:
     // TODO: Each of these requires specific handling.
-    return false;
+    return nullptr;
 
   default:
     assert(!isa<MethodInst>(Callee)
@@ -198,7 +191,7 @@ bool CallGraph::tryGetCalleeSet(SILValue Callee,
 
     // There are cases where we will be very hard pressed to determine
     // what we are calling.
-    return false;
+    return nullptr;
   }
 }
 
@@ -224,24 +217,19 @@ static void orderCallees(const CallGraphEdge::CalleeSetType &Callees,
             });
 }
 
-void CallGraph::addEdgesForApply(FullApplySite AI, CallGraphNode *CallerNode) {
-  CallGraphEdge::CalleeSetType CalleeSet;
-  bool Complete = false;
+void CallGraph::addEdgesForApply(FullApplySite Apply,
+                                 CallGraphNode *CallerNode) {
+  CallerNode->MayBindDynamicSelf |=
+    hasDynamicSelfTypes(Apply.getSubstitutions());
 
-  CallerNode->MayBindDynamicSelf |= hasDynamicSelfTypes(AI.getSubstitutions());
-
-  if (tryGetCalleeSet(AI.getCallee(), CalleeSet, Complete)) {
-    assert(CalleeSet.size() == 1 && Complete &&
-           "Expected a singleton set known to be complete!");
-    auto *Edge = new (Allocator) CallGraphEdge(AI, *CalleeSet.begin(),
-                                               EdgeOrdinal++);
-    assert(!ApplyToEdgeMap.count(AI) &&
+  if (auto *Edge = tryMakeCallGraphEdgeForCallee(Apply, Apply.getCallee())) {
+    assert(!ApplyToEdgeMap.count(Apply) &&
            "Added apply that already has an edge node!\n");
-    ApplyToEdgeMap[AI] = Edge;
+    ApplyToEdgeMap[Apply] = Edge;
     CallerNode->addCalleeEdge(Edge);
 
     llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
-    orderCallees(CalleeSet, OrderedNodes);
+    orderCallees(Edge->getPartialCalleeSet(), OrderedNodes);
 
     for (auto *CalleeNode : OrderedNodes)
       CalleeNode->addCallerEdge(Edge);

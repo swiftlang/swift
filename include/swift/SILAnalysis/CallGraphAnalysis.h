@@ -396,8 +396,8 @@ private:
   }
   CallGraphNode *addCallGraphNode(SILFunction *F);
   void addEdges(SILFunction *F);
-  bool tryGetCalleeSet(SILValue Callee, CallGraphEdge::CalleeSetType &CalleeSet,
-                       bool &Complete);
+  CallGraphEdge *tryMakeCallGraphEdgeForCallee(FullApplySite Apply,
+                                               SILValue Callee);
   void addEdgesForApply(FullApplySite AI, CallGraphNode *CallerNode);
   void computeBottomUpSCCOrder();
   void computeBottomUpFunctionOrder();
