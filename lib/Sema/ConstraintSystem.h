@@ -2484,6 +2484,10 @@ struct LLVM_LIBRARY_VISIBILITY CallArgParam {
 /// \param type The type to decompose.
 SmallVector<CallArgParam, 4> decomposeArgParamType(Type type);
 
+/// Turn a param list into a symbolic and printable representation that does not
+/// include the types, something like (: , b:, c:)
+std::string getParamListAsString(ArrayRef<CallArgParam> parameters);
+
 /// Describes the arguments to which a parameter binds.
 /// FIXME: This is an awful data structure. We want the equivalent of a
 /// TinyPtrVector for unsigned values.

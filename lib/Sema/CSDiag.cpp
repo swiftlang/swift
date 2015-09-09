@@ -2897,7 +2897,16 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
       return true;
     }
   }
-  
+
+  // If this is a conversion from T to () in a call argument context, it is
+  // almost certainly an extra argument being passed in.
+  if (CS->getContextualTypePurpose() == CTP_CallArgument &&
+      contextualType->isVoid()) {
+    diagnose(expr->getLoc(), diag::extra_argument_to_nullary_call)
+      .highlight(expr->getSourceRange());
+    return true;
+  }
+
   // When complaining about conversion to a protocol type, complain about
   // conformance instead of "conversion".
   if (contextualType->is<ProtocolType>() ||
@@ -2925,7 +2934,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
       else if (srcFT->isNoEscape() && !destFT->isNoEscape())
         diagID = diag::noescape_functiontype_mismatch;
     }
-  
+
   diagnose(expr->getLoc(), diagID, exprType->getRValueType(), contextualType)
     .highlight(expr->getSourceRange());
   return true;
@@ -3495,13 +3504,15 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     return false;
 
   if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
+    auto args = decomposeArgParamType(argExpr->getType());
+
     // If we have multiple candidates that we fail to match, just say we have
     // the wrong labels and list the candidates out.
     if (calleeInfo.size() != 1) {
       // TODO: It would be nice to use an analog of getTypeListString that
       // doesn't include the argument types.
       diagnose(callExpr->getLoc(), diag::wrong_argument_labels_overload,
-               getTypeListString(argExpr->getType()))
+               getParamListAsString(args))
         .highlight(argExpr->getSourceRange());
 
       // Did the user intend on invoking a different overload?
@@ -3509,7 +3520,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                                            /*isCallExpr*/true);
       return true;
     }
-
 
     SmallVector<Identifier, 4> correctNames;
 
@@ -3533,7 +3543,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // shape) to the specified candidates parameters.  This ignores the concrete
     // types of the arguments, looking only at the argument labels etc.
     SmallVector<ParamBinding, 4> paramBindings;
-    auto args = decomposeArgParamType(argExpr->getType());
     auto params = decomposeArgParamType(calleeInfo[0].getArgumentType());
     if (matchCallArguments(args, params, hasTrailingClosure,/*allowFixes:*/true,
                            listener, paramBindings) &&

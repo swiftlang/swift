@@ -35,7 +35,7 @@ func testInstanceTypeFactoryMethodInherited() {
   _ = NSObjectFactorySub(double: 314159)
   // FIXME: Awful diagnostic
   _ = NSObjectFactorySub(float: 314159) // expected-error{{incorrect argument label in call (have 'float:', expected 'integer:')}} {{26-31=integer}}
-  let a = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{argument labels '(buildingWidgets: ())' do not match any available overloads}}
+  let a = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{argument labels '(buildingWidgets:)' do not match any available overloads}}
   // expected-note @-1 {{overloads for 'NSObjectFactorySub' exist with these partially matching parameter lists: (integer: Int), (double: Double)}}
   _ = a
 }
@@ -45,7 +45,7 @@ func testNSErrorFactoryMethod(path: String) throws {
 }
 
 func testNonInstanceTypeFactoryMethod(s: String) {
-  _ = NSObjectFactory(string: s) // expected-error{{argument labels '(string: String)' do not match any available overloads}}
+  _ = NSObjectFactory(string: s) // expected-error{{argument labels '(string:)' do not match any available overloads}}
   // expected-note @-1 {{overloads for 'NSObjectFactory' exist with these partially matching parameter lists: (integer: Int), (double: Double), (float: Float)}}
 }
 

@@ -6,7 +6,7 @@ import cfuncs
 
 func test_cfunc1(i: Int) {
   cfunc1() // okay
-  cfunc1(i) // expected-error{{cannot convert value of type 'Int' to expected argument type '()'}}
+  cfunc1(i) // expected-error{{argument passed to call that takes no arguments}}
 }
 
 func test_cfunc2(i: Int) {

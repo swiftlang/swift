@@ -5483,8 +5483,6 @@ diagnoseArgumentLabelError(Expr *expr, ArrayRef<Identifier> newNames,
     diag.fixItReplace(tuple->getElementNameLocs()[i], newStr);
   }
 
-  // FIXME: Fix AST.
-
   return true;
 }
 

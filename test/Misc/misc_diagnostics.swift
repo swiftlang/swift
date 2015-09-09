@@ -41,7 +41,7 @@ func takesInt(i: Int) {}
 func noParams() -> Int { return 0 }
 func takesAndReturnsInt(i: Int) -> Int { return 0 }
 
-takesInt(noParams(1)) // expected-error{{cannot convert value of type 'Int' to expected argument type '()'}}
+takesInt(noParams(1)) // expected-error{{argument passed to call that takes no arguments}}
 
 takesInt(takesAndReturnsInt("")) // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
 

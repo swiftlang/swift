@@ -50,7 +50,7 @@ private( // expected-error{{expected 'set' as subject of 'private' modifier}}
 var unterminatedEmptySubject = 0
 
 // Check that the parser made it here.
-duplicateAttr(1) // expected-error{{cannot convert value of type 'Int' to expected argument type '()'}}
+duplicateAttr(1) // expected-error{{argument passed to call that takes no arguments}}
 
 // CHECK ALLOWED DECLS
 private import Swift // expected-error {{'private' modifier cannot be applied to this declaration}} {{1-9=}}

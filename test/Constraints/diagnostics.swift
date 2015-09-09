@@ -322,7 +322,7 @@ class CurriedClass {
 
 let c = CurriedClass()
 _ = c.method1
-c.method1(1)         // expected-error {{cannot convert value of type 'Int' to expected argument type '()'}}
+c.method1(1)         // expected-error {{argument passed to call that takes no arguments}}
 _ = c.method2(1)
 _ = c.method2(1.0)   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 c.method2(1)(b: 2)
@@ -334,7 +334,7 @@ c.method2(1.0)(b: 2.0) // expected-error {{cannot convert value of type 'Double'
 
 CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
-CurriedClass.method1(c)(1)         // expected-error {{cannot convert value of type 'Int' to expected argument type '()'}}
+CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
 CurriedClass.method1(2.0)(1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'CurriedClass'}}
 
 CurriedClass.method2(c)(32)(b: 1)
@@ -449,7 +449,7 @@ let _: Int -> (Int, Color) = { ($0, .Unknown("")) } // expected-error {{missing 
 let _: Color = .Unknown("") // expected-error {{missing argument label 'description:' in call}} {{25-25=description: }}
 let _: Color = .Unknown // expected-error {{contextual member 'Unknown' expects argument of type '(description: String)'}}
 let _: Color = .Unknown(42) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
-let _ : Color = .rainbow(42)  // expected-error {{cannot convert value of type 'Int' to expected argument type '()'}}
+let _ : Color = .rainbow(42)  // expected-error {{argument passed to call that takes no arguments}}
 
 let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type 'Double' to specified type 'Int'}}
 
@@ -569,7 +569,7 @@ class r22470302Class {
 }
 
 func r22470302(c: r22470302Class) {
-  print((c.f)(c))  // expected-error {{cannot convert value of type 'r22470302Class' to expected argument type '()'}}
+  print((c.f)(c))  // expected-error {{argument passed to call that takes no arguments}}
 }
 
 

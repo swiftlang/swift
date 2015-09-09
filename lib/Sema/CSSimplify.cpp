@@ -115,6 +115,32 @@ SmallVector<CallArgParam, 4> constraints::decomposeArgParamType(Type type) {
   return result;
 }
 
+/// Turn a param list into a symbolic and printable representation that does not
+/// include the types, something like (_:, b:, c:)
+std::string constraints::getParamListAsString(ArrayRef<CallArgParam> params){
+  std::string result = "(";
+
+  bool isFirst = true;
+  for (auto &param : params) {
+    if (isFirst)
+      isFirst = false;
+    else
+      result += ", ";
+
+    if (param.hasLabel())
+      result += param.Label.str();
+    else
+      result += "_";
+    result += ":";
+  }
+
+
+  result += ')';
+  return result;
+}
+
+
+
 bool constraints::
 matchCallArguments(ArrayRef<CallArgParam> args,
                    ArrayRef<CallArgParam> params,

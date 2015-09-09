@@ -608,6 +608,8 @@ ERROR(extra_argument_named,sema_tcc,none,
       "extra argument %0 in call", (Identifier))
 ERROR(extra_argument_positional,sema_tcc,none,
       "extra argument in call", ())
+ERROR(extra_argument_to_nullary_call,sema_tcc,none,
+      "argument passed to call that takes no arguments", ())
 ERROR(extra_trailing_closure_in_call,sema_tcc,none,
       "extra trailing closure passed in call", ())
 ERROR(no_accessible_initializers,sema_tcc,none,

@@ -495,7 +495,7 @@ func conversionTest(inout a: Double, inout b: Int) {
 
   var pi_f1 = Float(pi_f)
   var pi_d1 = Double(pi_d)
-  var pi_s1 = SpecialPi(pi_s) // expected-error {{cannot convert value of type 'SpecialPi' to expected argument type '()'}}
+  var pi_s1 = SpecialPi(pi_s) // expected-error {{argument passed to call that takes no arguments}}
 
   var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi()'}}

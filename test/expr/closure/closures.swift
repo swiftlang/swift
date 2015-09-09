@@ -258,7 +258,7 @@ takesVoidFunc(returnsInt) // expected-error {{cannot convert value of type '() -
 takesVoidFunc({()->Int in 0}) // expected-error {{declared closure result 'Int' is incompatible with contextual type '()'}} {{20-23=()}}
   
 // These used to crash the compiler, but were fixed to support the implemenation of rdar://problem/17228969
-Void(0) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Void' (aka '()')}}
+Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
 
 // <rdar://problem/22086634> "multi-statement closures require an explicit return type" should be an error not a note
