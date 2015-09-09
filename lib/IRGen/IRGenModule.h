@@ -299,7 +299,7 @@ public:
   std::unique_ptr<clang::CodeGenerator> ClangCodeGen;
   llvm::Module &Module;
   llvm::LLVMContext &LLVMContext;
-  const llvm::DataLayout &DataLayout;
+  const llvm::DataLayout DataLayout;
   const llvm::Triple &Triple;
   llvm::TargetMachine *TargetMachine;
   SILModule *SILMod;
