@@ -2453,7 +2453,6 @@ RemoveDeadArgsWhenSplitting("sroa-args-remove-dead-args-after",
                             llvm::cl::init(true));
 
 bool ArgumentSplitter::split() {
-  SILModule &Mod = Arg->getModule();
   SILBasicBlock *ParentBB = Arg->getParent();
 
   if (!createNewArguments())
