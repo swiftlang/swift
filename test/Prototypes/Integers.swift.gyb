@@ -35,9 +35,11 @@ def hexify(n):
 
 # Number of bits in the Builtin.Word type
 word_bits = int(WORD_BITS) # int(CMAKE_SIZEOF_VOID_P) * 8
-
+IntWord = 'Int%s' % word_bits
+  
 # Number of bits in integer literals.
 builtinIntLiteralBits = 2048
+IntLiteral = 'Int%s' % builtinIntLiteralBits
 
 def maskBits(n):
     """Return an n-bit mask in hex"""
@@ -161,7 +163,7 @@ extension Bool {
     self.init(_builtinBooleanLiteral: value)
   }
   var value : Builtin.Int1 {
-    return Builtin.trunc_Int${word_bits}_Int1((self ? 1 : 0).value)
+    return Builtin.trunc_${IntWord}_Int1((self ? 1 : 0).value)
   }
 }
 
@@ -180,8 +182,8 @@ public struct _LowLevelInt${bits} : _FixedWidthInteger {
     self.storage = zero
   }
 
-  public init(_builtinIntegerLiteral x: Builtin.Int${builtinIntLiteralBits}) {
-    storage = Builtin.truncOrBitCast_Int${builtinIntLiteralBits}_Int${bits}(x)
+  public init(_builtinIntegerLiteral x: Builtin.${IntLiteral}) {
+    storage = Builtin.truncOrBitCast_${IntLiteral}_Int${bits}(x)
   }
 
   /// Create an instance initialized to `value`.
@@ -285,11 +287,61 @@ public struct _LowLevelBigInt : _LowLevelInteger {
   
   /// Creates an instance with value 0
   public init() {
-    fatalError("implement me")
+    words = []
   }
 
-  public init(_builtinIntegerLiteral x: Builtin.Int${builtinIntLiteralBits}) {
-    fatalError("implement me")
+  public init(_builtinIntegerLiteral x: Builtin.${IntLiteral}) {
+   let isNegative = Bool(
+      Builtin.cmp_slt_${IntLiteral}(
+        x, Builtin.zext_${IntWord}_${IntLiteral}(0.value)))
+    
+    if !isNegative {
+      self.init(_nonNegativeIntegerLiteral: x)
+    }
+    else {
+      self.init(_negativeIntegerLiteral: x)
+    }
+  }
+  
+  internal init(_nonNegativeIntegerLiteral x: Builtin.${IntLiteral}) {
+    words = []
+    
+    let mask = Builtin.zext_${IntWord}_${IntLiteral}(Int(-1).value)
+    let wordBits = Builtin.zext_${IntWord}_${IntLiteral}(${word_bits}.value)
+    let zero = Builtin.zext_${IntWord}_${IntLiteral}(0.value)
+
+    var rest = x
+    var digit: _LowLevelWord = 0
+    while (
+      digit.isLessThanSigned(0)
+      || !Bool(Builtin.cmp_eq_${IntLiteral}(zero, rest))
+    ) {
+      digit = _LowLevelWord(
+        Builtin.trunc_${IntLiteral}_${IntWord}(Builtin.and_${IntLiteral}(rest, mask)))
+      words.append(digit)
+      rest = Builtin.lshr_${IntLiteral}(rest, wordBits)
+    }
+  }
+  
+  internal init(_negativeIntegerLiteral x: Builtin.${IntLiteral}) {
+    words = []
+
+    let mask = Builtin.zext_${IntWord}_${IntLiteral}(Int(-1).value)
+    let wordBits = Builtin.zext_${IntWord}_${IntLiteral}(${word_bits}.value)
+    let target = Builtin.sext_${IntWord}_${IntLiteral}(Int(-1).value)
+
+    var rest = x
+    var digit: _LowLevelWord
+    repeat {
+      digit = _LowLevelWord(
+        Builtin.trunc_${IntLiteral}_${IntWord}(
+          Builtin.and_${IntLiteral}(rest, mask)))
+      words.append(digit)
+      rest = Builtin.ashr_${IntLiteral}(rest, wordBits)
+    }
+    while (
+      !digit.isLessThanSigned(0)
+      || !Bool(Builtin.cmp_eq_${IntLiteral}(target, rest)))
   }
 
   /// Create an instance initialized to `value`.
@@ -356,6 +408,28 @@ public func == (lhs: _LowLevelBigInt, rhs: _LowLevelBigInt) -> Bool {
 //===--- tests ------------------------------------------------------------===//
 import StdlibUnittest
 var tests = TestSuite("Integers")
+
+func expectBigInt(
+  expected: [_LowLevelWord], _ actual: _LowLevelBigInt,
+  @autoclosure _ message: ()->String = "",
+  file: String = __FILE__, line: UInt = __LINE__
+) {
+  expectEqualSequence(
+    expected, actual.words.reverse(), message(), file: file, line: line)
+}
+
+tests.test("LowLevelBigInt.Literals") {
+  expectBigInt([], 0)
+  expectBigInt([1], 1)
+  expectBigInt([-1], -1)
+  expectBigInt([${(1 << (word_bits-1)) - 1}], ${(1 << (word_bits-1)) - 1})
+  expectBigInt([0, ${1 << (word_bits-1)}], ${(1 << (word_bits-1))})
+  expectBigInt([1, 0], ${1 << word_bits})
+  expectBigInt([${-1 << (word_bits - 1)}], ${-1 << (word_bits - 1)})
+  expectBigInt([-1, 0], ${-1 << word_bits})
+  expectBigInt([-1, 1], ${(-1 << word_bits) + 1})
+  expectBigInt([-2, -1], ${(-1 << word_bits) - 1})
+}
 
 tests.test("Basics") {
   typealias I8 = _LowLevelInt8
