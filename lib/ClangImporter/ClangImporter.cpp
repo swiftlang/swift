@@ -134,7 +134,7 @@ namespace {
     bool needsInputFileVisitation() override { return true; }
 
     bool visitInputFile(StringRef file, bool isSystem,
-                        bool isOverridden) override {
+                        bool isOverridden, bool isExplicitModule) override {
       if (!isOverridden)
         Importer.addDependency(file);
       return true;
