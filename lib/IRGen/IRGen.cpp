@@ -675,8 +675,9 @@ performIRGeneration(IRGenOptions &Opts, SourceFile &SF, SILModule *SILMod,
                                LLVMContext, &SF, StartElem);
 }
 
-void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
-                                        StringRef OutputPath) {
+void
+swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
+                                   StringRef OutputPath) {
   LLVMContext *VMContext = new LLVMContext();
 
   auto &Ctx = SILMod.getASTContext();
@@ -688,14 +689,13 @@ void swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   if (!TargetMachine)
     return;
 
-  const auto *DataLayout = TargetMachine->getDataLayout();
-  assert(DataLayout && "target machine didn't set DataLayout?");
+  const auto DataLayout = TargetMachine->createDataLayout();
 
   const llvm::Triple &Triple = Ctx.LangOpts.Target;
   IRGenModuleDispatcher dispatcher;
   IRGenModule IGM(dispatcher, nullptr, Ctx, *VMContext, Opts, OutputPath,
-                  *DataLayout, Triple, TargetMachine, &SILMod,
-                  Opts.getSingleOutputFilename());
+                  DataLayout, Triple,
+                  TargetMachine, &SILMod, Opts.getSingleOutputFilename());
   initLLVMModule(IGM);
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =
