@@ -59,29 +59,27 @@ public:
     using namespace options;
 
     // Parse frontend command line options using Swift's option table.
-    std::unique_ptr<llvm::opt::InputArgList> ParsedArgs;
     std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
     unsigned MissingIndex;
     unsigned MissingCount;
-    ParsedArgs.reset(
-        Table->ParseArgs(Args, MissingIndex, MissingCount,
-                         AutolinkExtractOption));
+    llvm::opt::InputArgList ParsedArgs =
+      Table->ParseArgs(Args, MissingIndex, MissingCount, AutolinkExtractOption);
     if (MissingCount) {
       Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
-                     ParsedArgs->getArgString(MissingIndex), MissingCount);
+                     ParsedArgs.getArgString(MissingIndex), MissingCount);
       return 1;
     }
 
-    if (ParsedArgs->hasArg(OPT_UNKNOWN)) {
-      for (const Arg *A : make_range(ParsedArgs->filtered_begin(OPT_UNKNOWN),
-                                     ParsedArgs->filtered_end())) {
+    if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
+      for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_UNKNOWN),
+                                     ParsedArgs.filtered_end())) {
         Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
-                       A->getAsString(*ParsedArgs));
+                       A->getAsString(ParsedArgs));
       }
       return true;
     }
 
-    if (ParsedArgs->getLastArg(OPT_help)) {
+    if (ParsedArgs.getLastArg(OPT_help)) {
       std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
                        "Swift Autolink Extract", options::AutolinkExtractOption,
@@ -89,8 +87,8 @@ public:
       return 1;
     }
 
-    for (const Arg *A : make_range(ParsedArgs->filtered_begin(OPT_INPUT),
-                                   ParsedArgs->filtered_end())) {
+    for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_INPUT),
+                                   ParsedArgs.filtered_end())) {
       InputFilenames.push_back(A->getValue());
     }
 
@@ -99,7 +97,7 @@ public:
       return 1;
     }
 
-    if (const Arg *A = ParsedArgs->getLastArg(OPT_o)) {
+    if (const Arg *A = ParsedArgs.getLastArg(OPT_o)) {
       OutputFilename = A->getValue();
     }
 
