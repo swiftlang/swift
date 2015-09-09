@@ -340,7 +340,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
 
-  Optional<InputArgList> ArgList = parseArgStrings(Args.slice(1));
+  std::unique_ptr<InputArgList> ArgList(parseArgStrings(Args.slice(1)));
   if (Diags.hadAnyError())
     return nullptr;
 
@@ -489,7 +489,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   }
 
   std::unique_ptr<Compilation> C(new Compilation(*this, *TC, Diags, Level,
-                                                 std::move(ArgList.getValue()),
+                                                 std::move(ArgList),
                                                  std::move(TranslatedArgList),
                                                  ArgsHash, StartTime,
                                                  NumberOfParallelCommands,
@@ -549,16 +549,17 @@ static Arg *makeInputArg(const DerivedArgList &Args, OptTable &Opts,
 
 typedef std::function<void(InputArgList &, unsigned)> RemainingArgsHandler;
 
-static InputArgList parseArgsUntil(const llvm::opt::OptTable& Opts,
-                                   const char *const *ArgBegin,
-                                   const char *const *ArgEnd,
-                                   unsigned &MissingArgIndex,
-                                   unsigned &MissingArgCount,
-                                   unsigned FlagsToInclude,
-                                   unsigned FlagsToExclude,
-                                   llvm::opt::OptSpecifier UntilOption,
-                                   RemainingArgsHandler RemainingHandler) {
-  InputArgList Args{ArgBegin, ArgEnd};
+std::unique_ptr<InputArgList>
+parseArgsUntil(const llvm::opt::OptTable& Opts,
+               const char *const *ArgBegin,
+               const char *const *ArgEnd,
+               unsigned &MissingArgIndex,
+               unsigned &MissingArgCount,
+               unsigned FlagsToInclude,
+               unsigned FlagsToExclude,
+               llvm::opt::OptSpecifier UntilOption,
+               RemainingArgsHandler RemainingHandler) {
+  auto Args = llvm::make_unique<InputArgList>(ArgBegin, ArgEnd);
 
   // FIXME: Handle '@' args (or at least error on them).
 
@@ -567,14 +568,14 @@ static InputArgList parseArgsUntil(const llvm::opt::OptTable& Opts,
   unsigned Index = 0, End = ArgEnd - ArgBegin;
   while (Index < End) {
     // Ignore empty arguments (other things may still take them as arguments).
-    StringRef Str = Args.getArgString(Index);
+    StringRef Str = Args->getArgString(Index);
     if (Str == "") {
       ++Index;
       continue;
     }
 
     unsigned Prev = Index;
-    Arg *A = Opts.ParseOneArg(Args, Index, FlagsToInclude, FlagsToExclude);
+    Arg *A = Opts.ParseOneArg(*Args, Index, FlagsToInclude, FlagsToExclude);
     assert(Index > Prev && "Parser failed to consume argument.");
 
     // Check for missing argument error.
@@ -586,11 +587,11 @@ static InputArgList parseArgsUntil(const llvm::opt::OptTable& Opts,
       break;
     }
 
-    Args.append(A);
+    Args->append(A);
 
     if (CheckUntil && A->getOption().matches(UntilOption)) {
       if (Index < End)
-        RemainingHandler(Args, Index);
+        RemainingHandler(*Args, Index);
       return Args;
     }
   }
@@ -600,7 +601,7 @@ static InputArgList parseArgsUntil(const llvm::opt::OptTable& Opts,
 
 // Parse all args until we see an input, and then collect the remaining
 // arguments into a synthesized "--" option.
-static InputArgList
+static std::unique_ptr<InputArgList>
 parseArgStringsForInteractiveDriver(const llvm::opt::OptTable& Opts,
                                     ArrayRef<const char *> Args,
                                     unsigned &MissingArgIndex,
@@ -623,36 +624,38 @@ parseArgStringsForInteractiveDriver(const llvm::opt::OptTable& Opts,
   });
 }
 
-Optional<InputArgList> Driver::parseArgStrings(ArrayRef<const char *> Args) {
+std::unique_ptr<InputArgList>
+Driver::parseArgStrings(ArrayRef<const char *> Args) {
   unsigned IncludedFlagsBitmask = 0;
   unsigned ExcludedFlagsBitmask = options::NoDriverOption;
   unsigned MissingArgIndex, MissingArgCount;
-  InputArgList ArgList = [&]() -> InputArgList {
-    if (driverKind == DriverKind::Interactive) {
-      return parseArgStringsForInteractiveDriver(getOpts(), Args,
-          MissingArgIndex, MissingArgCount, IncludedFlagsBitmask,
-          ExcludedFlagsBitmask);
+  std::unique_ptr<InputArgList> ArgList;
 
-    } else {
-      return getOpts().ParseArgs(Args,
-                                 MissingArgIndex, MissingArgCount,
-                                 IncludedFlagsBitmask,
-                                 ExcludedFlagsBitmask);
-    }
-  }();
+  if (driverKind == DriverKind::Interactive) {
+    ArgList = parseArgStringsForInteractiveDriver(getOpts(), Args,
+        MissingArgIndex, MissingArgCount, IncludedFlagsBitmask,
+        ExcludedFlagsBitmask);
+
+  } else {
+    ArgList = llvm::make_unique<InputArgList>(
+        getOpts().ParseArgs(Args, MissingArgIndex, MissingArgCount,
+                            IncludedFlagsBitmask, ExcludedFlagsBitmask));
+  }
+
+  assert(ArgList && "no argument list");
 
   // Check for missing argument error.
   if (MissingArgCount) {
     Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
-                   ArgList.getArgString(MissingArgIndex), MissingArgCount);
-    return None;
+                   ArgList->getArgString(MissingArgIndex), MissingArgCount);
+    return nullptr;
   }
 
   // Check for unknown arguments.
-  for (const Arg *A : make_range(ArgList.filtered_begin(options::OPT_UNKNOWN),
-       ArgList.filtered_end())) {
+  for (const Arg *A : make_range(ArgList->filtered_begin(options::OPT_UNKNOWN),
+       ArgList->filtered_end())) {
     Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
-                   A->getAsString(ArgList));
+                   A->getAsString(*ArgList));
   }
 
   // Check for unsupported options
@@ -663,13 +666,13 @@ Optional<InputArgList> Driver::parseArgStrings(ArrayRef<const char *> Args) {
     UnsupportedFlag = options::NoBatchOption;
 
   if (UnsupportedFlag)
-    for (const Arg *A : ArgList)
+    for (const Arg *A : *ArgList)
       if (A->getOption().hasFlag(UnsupportedFlag))
         Diags.diagnose(SourceLoc(), diag::error_unsupported_option,
-            ArgList.getArgString(A->getIndex()), Name,
+            ArgList->getArgString(A->getIndex()), Name,
             UnsupportedFlag == options::NoBatchOption ? "swift" : "swiftc");
 
-  return std::move(ArgList);
+  return ArgList;
 }
 
 DerivedArgList *Driver::translateInputArgs(const InputArgList &ArgList) const {

@@ -22,7 +22,6 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Option/ArgList.h"
 #include "llvm/Support/TimeValue.h"
 
 #include <memory>
@@ -30,6 +29,7 @@
 
 namespace llvm {
 namespace opt {
+  class InputArgList;
   class DerivedArgList;
 }
 }
@@ -72,7 +72,7 @@ private:
   SmallVector<std::unique_ptr<const Job>, 32> Jobs;
 
   /// The original (untranslated) input argument list.
-  llvm::opt::InputArgList InputArgs;
+  std::unique_ptr<llvm::opt::InputArgList> InputArgs;
 
   /// The translated input arg list.
   std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs;
@@ -134,7 +134,7 @@ private:
 public:
   Compilation(const Driver &D, const ToolChain &DefaultToolChain,
               DiagnosticEngine &Diags, OutputLevel Level,
-              llvm::opt::InputArgList InputArgs,
+              std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               StringRef ArgsHash, llvm::sys::TimeValue StartTime,
               unsigned NumberOfParallelCommands = 1,
@@ -162,6 +162,8 @@ public:
     return std::find(TempFilePaths.begin(), TempFilePaths.end(), file) !=
              TempFilePaths.end();
   }
+
+  const llvm::opt::InputArgList &getInputArgs() const { return *InputArgs; }
 
   const llvm::opt::DerivedArgList &getArgs() const { return *TranslatedArgs; }
 

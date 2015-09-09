@@ -191,7 +191,7 @@ public:
   std::unique_ptr<Compilation> buildCompilation(ArrayRef<const char *> Args);
 
   /// Parse the given list of strings into an InputArgList.
-  Optional<llvm::opt::InputArgList>
+  std::unique_ptr<llvm::opt::InputArgList>
   parseArgStrings(ArrayRef<const char *> Args);
 
   /// Translate the input arguments into a DerivedArgList.
