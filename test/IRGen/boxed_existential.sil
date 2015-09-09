@@ -84,7 +84,7 @@ entry(%b : $ErrorType):
   // CHECK: [[WITNESS:%.*]] = load {{.*}} [[OUT_WITNESS]]
   %m = existential_metatype $@thick ErrorType.Type, %b : $ErrorType
 
-  // CHECK: call void @swift_errorRelease(%swift.error* %0) #1
+  // CHECK: call void @swift_errorRelease(%swift.error* %0)
   strong_release %b : $ErrorType
 
   // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* [[DYNAMIC_TYPE]], 0
