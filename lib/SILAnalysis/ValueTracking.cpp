@@ -341,7 +341,7 @@ bool swift::isNonEscapingLocalObject(SILValue V) {
 IsZeroKind swift::isZeroValue(SILValue Value) {
   // Inspect integer literals.
   if (auto *L = dyn_cast<IntegerLiteralInst>(Value.getDef())) {
-    if (L->getValue().getZExtValue() == 0)
+    if (!L->getValue())
       return IsZeroKind::Zero;
     return IsZeroKind::NotZero;
   }

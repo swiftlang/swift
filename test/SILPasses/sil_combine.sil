@@ -2718,3 +2718,19 @@ bb0(%0 : $*B, %1 : $B, %2 : $Builtin.Int1):
   %7 = tuple()
   return %7 : $()
 }
+
+// Make sure that we do not crash when determining if a value is not zero and
+// has a value that can not be stored in a UInt64. The specific issue is that we
+// were using getZExtValue before which assumes that an APInt can be stored in a
+// UInt64.
+//
+// CHECK-LABEL: sil @large_int_zero_comparison : $@convention(thin) () -> (Builtin.Int1) {
+// CHECK: [[CMP_RESULT:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK: return [[CMP_RESULT]]
+sil @large_int_zero_comparison : $@convention(thin) () -> (Builtin.Int1) {
+bb0:
+  %0 = integer_literal $Builtin.Int1024, 0
+  %1 = integer_literal $Builtin.Int1024, 0xFFFFFFFFFFFFFFFFFFFF
+  %2 = builtin "cmp_eq_Int1024"(%0 : $Builtin.Int1024, %1 : $Builtin.Int1024) : $Builtin.Int1
+  return %2 : $Builtin.Int1
+}
