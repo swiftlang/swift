@@ -376,14 +376,13 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   if (!TargetMachine)
     return nullptr;
 
-  const llvm::DataLayout *DataLayout = TargetMachine->getDataLayout();
-  assert(DataLayout && "target machine didn't set DataLayout?");
+  const llvm::DataLayout DataLayout = TargetMachine->createDataLayout();
 
   // Create the IR emitter.
   IRGenModuleDispatcher dispatcher;
   const llvm::Triple &Triple = Ctx.LangOpts.Target;
   IRGenModule IGM(dispatcher, nullptr, Ctx, LLVMContext, Opts, ModuleName,
-                  *DataLayout, Triple,
+                  DataLayout, Triple,
                   TargetMachine, SILMod, Opts.getSingleOutputFilename());
 
   initLLVMModule(IGM);
@@ -505,8 +504,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     // Create a target machine.
     llvm::TargetMachine *TargetMachine = createTargetMachine(Opts, Ctx);
     
-    const llvm::DataLayout *DataLayout = TargetMachine->getDataLayout();
-    assert(DataLayout && "target machine didn't set DataLayout?");
+    const llvm::DataLayout DataLayout = TargetMachine->createDataLayout();
     
     LLVMContext *Context = new LLVMContext();
     const llvm::Triple &Triple = Ctx.LangOpts.Target;
@@ -521,7 +519,7 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   
     // Create the IR emitter.
     IRGenModule *IGM = new IRGenModule(dispatcher, nextSF, Ctx, *Context,
-                                       Opts, ModuleName, *DataLayout, Triple,
+                                       Opts, ModuleName, DataLayout, Triple,
                                        TargetMachine, SILMod, *OutputIter++);
     IGMcreated = true;
 

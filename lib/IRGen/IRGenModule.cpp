@@ -308,7 +308,7 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
 
-  ABITypes = new CodeGenABITypes(clangASTContext, Module, DataLayout);
+  ABITypes = new CodeGenABITypes(clangASTContext, Module);
 
   if (Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
     DebugInfo = new IRGenDebugInfo(Opts, *CI, *this, Module, SF);
