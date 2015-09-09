@@ -288,9 +288,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                              const ClangImporterOptions &importerOpts) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
-  bool detailedPPRecord = std::find("-detailed-preprocessing-record",
-                                    invocationArgStrs.begin(),
-                                    invocationArgStrs.end());
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
@@ -420,15 +417,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back("-fmodules-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
   }
-
-  // The -detailed-preprocessing-record flag is only used by clients
-  // like SourceKit that don't care about debug info and the resulting
-  // modules will not be used by a normal compilation.
-  if (detailedPPRecord)
-    invocationArgStrs.push_back("-fmodule-format=raw");
-  else
-    invocationArgStrs.push_back("-fmodule-format=obj");
-
 }
 
 static void
