@@ -195,11 +195,10 @@ public:
 
   /// Emit a dbg.declare instrinsic at the current insertion point and
   /// the Builder's current debug location.
-  /// \param Tag The DWARF tag that should be used.
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, SILDebugScope *DS,
-                               StringRef Name, unsigned Tag, unsigned ArgNo = 0,
+                               StringRef Name, unsigned ArgNo = 0,
                                IndirectionKind = DirectValue,
                                ArtificialKind = RealValue);
 

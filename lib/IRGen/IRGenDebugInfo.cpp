@@ -855,7 +855,7 @@ void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF,
                       (Size)CI.getTargetInfo().getPointerWidth(0),
                       (Alignment)CI.getTargetInfo().getPointerAlign(0));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          TName, llvm::dwarf::DW_TAG_auto_variable, 0,
+                          TName, 0,
                           // swift.type is a already pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
@@ -865,8 +865,7 @@ void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF,
 void IRGenDebugInfo::emitStackVariableDeclaration(
     IRBuilder &B, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
     SILDebugScope *DS, StringRef Name, IndirectionKind Indirection) {
-  emitVariableDeclaration(B, Storage, DbgTy, DS, Name,
-                          llvm::dwarf::DW_TAG_auto_variable, 0, Indirection,
+  emitVariableDeclaration(B, Storage, DbgTy, DS, Name, 0, Indirection,
                           RealValue);
 }
 
@@ -876,12 +875,10 @@ void IRGenDebugInfo::emitArgVariableDeclaration(
     IndirectionKind Indirection, ArtificialKind IsArtificial) {
   assert(ArgNo > 0);
   if (Name == IGM.Context.Id_self.str())
-    emitVariableDeclaration(Builder, Storage, DbgTy, DS, Name,
-                            llvm::dwarf::DW_TAG_arg_variable, ArgNo,
+    emitVariableDeclaration(Builder, Storage, DbgTy, DS, Name, ArgNo,
                             DirectValue, ArtificialValue);
   else
-    emitVariableDeclaration(Builder, Storage, DbgTy, DS, Name,
-                            llvm::dwarf::DW_TAG_arg_variable, ArgNo,
+    emitVariableDeclaration(Builder, Storage, DbgTy, DS, Name, ArgNo,
                             Indirection, IsArtificial);
 }
 
@@ -985,10 +982,10 @@ getStorageSize(const llvm::DataLayout &DL, ArrayRef<llvm::Value *> Storage) {
 
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    SILDebugScope *DS, StringRef Name, unsigned Tag, unsigned ArgNo,
+    SILDebugScope *DS, StringRef Name, unsigned ArgNo,
     IndirectionKind Indirection, ArtificialKind Artificial) {
   // FIXME: Make this an assertion.
-  //assert(DS && "variable has no scope");
+  // assert(DS && "variable has no scope");
   if (!DS)
     return;
 
@@ -1028,10 +1025,13 @@ void IRGenDebugInfo::emitVariableDeclaration(
     Expr = DBuilder.createExpression(Addr);
     // FIXME: assert(Flags == 0 && "Complex variables cannot have flags");
   }
-  Var = DBuilder.createLocalVariable(
-    Tag, Scope, Name, Unit, Line, DITy,
-    false /* could be Opts.Optimize if we also unique DIVariables here */,
-    Flags, ArgNo);
+  /// This could be Opts.Optimize if we would also unique DIVariables here.
+  bool Optimized = false;
+  Var = (ArgNo > 0)
+    ? DBuilder.createParameterVariable(Scope, Name, ArgNo, Unit, Line, DITy,
+                                       Optimized, Flags)
+    : DBuilder.createAutoVariable(Scope, Name, Unit, Line, DITy,
+                                  Optimized, Flags);
 
   // Insert a debug intrinsic into the current block.
   unsigned OffsetInBits = 0;
