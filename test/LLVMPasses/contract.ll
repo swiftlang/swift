@@ -310,5 +310,5 @@ bb3:
 !0 = !DILocation(line: 0, scope: !3)
 !1 = distinct !DICompileUnit(language: DW_LANG_Swift, file: !2)
 !2 = !DIFile(filename: "contract.swift", directory: "")
-!3 = !DISubprogram(name: "_", scope: !1, file: !2, type: !DISubroutineType(types: !{}))
+!3 = distinct !DISubprogram(name: "_", scope: !1, file: !2, type: !DISubroutineType(types: !{}))
 !4 = !{i32 1, !"Debug Info Version", i32 3}
