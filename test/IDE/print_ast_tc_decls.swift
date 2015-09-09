@@ -5,8 +5,6 @@
 //
 // FIXME: BEGIN -enable-source-import hackaround
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
 // FIXME: END -enable-source-import hackaround
 //
 // This file should not have any syntax or type checker errors.
@@ -63,11 +61,11 @@
 // XFAIL: linux
 
 import Bar
-import Foundation
+import ObjectiveC
 import class Foo.FooClassBase
+import struct Foo.FooStruct1
 import func Foo.fooFunc1
 @exported import FooHelper
-import struct ctypes.FooStruct1
 import foo_swift_module
 
 // FIXME: enum tests
@@ -75,9 +73,9 @@ import foo_swift_module
 
 // PASS_COMMON: {{^}}import Bar{{$}}
 // PASS_COMMON: {{^}}import class Foo.FooClassBase{{$}}
+// PASS_COMMON: {{^}}import struct Foo.FooStruct1{{$}}
 // PASS_COMMON: {{^}}import func Foo.fooFunc1{{$}}
 // PASS_COMMON: {{^}}@exported import FooHelper{{$}}
-// PASS_COMMON: {{^}}import struct ctypes.FooStruct1{{$}}
 // PASS_COMMON: {{^}}import foo_swift_module{{$}}
 
 //===---
