@@ -14,6 +14,7 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/CFG.h"
 #include "llvm/Analysis/LoopInfoImpl.h"
 #include "llvm/Support/Debug.h"
 
@@ -31,7 +32,7 @@ void SILLoop::dump() const {
 }
 
 SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) {
-  LI.Analyze(*DT);
+  LI.analyze(*DT);
 }
 
 

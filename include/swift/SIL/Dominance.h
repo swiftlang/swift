@@ -27,7 +27,7 @@ extern template class llvm::DomTreeNodeBase<swift::SILBasicBlock>;
 
 namespace swift {
 
-typedef llvm::DomTreeNodeBase<SILBasicBlock> DominanceInfoNode;
+using DominanceInfoNode = llvm::DomTreeNodeBase<SILBasicBlock>;
 
 /// A class for computing basic dominance information.
 class DominanceInfo : public llvm::DominatorTreeBase<SILBasicBlock> {
@@ -158,8 +158,19 @@ namespace llvm {
 /// DominatorTree GraphTraits specialization so the DominatorTree can be
 /// iterable by generic graph iterators.
 template <> struct GraphTraits<swift::DominanceInfoNode *> {
-  typedef swift::DominanceInfoNode NodeType;
-  typedef NodeType::iterator ChildIteratorType;
+  using NodeType = swift::DominanceInfoNode;
+  using ChildIteratorType = NodeType::iterator;
+
+  static NodeType *getEntryNode(NodeType *N) { return N; }
+  static inline ChildIteratorType child_begin(NodeType *N) {
+    return N->begin();
+  }
+  static inline ChildIteratorType child_end(NodeType *N) { return N->end(); }
+};
+
+template <> struct GraphTraits<const swift::DominanceInfoNode *> {
+  using NodeType = const swift::DominanceInfoNode;
+  using ChildIteratorType = NodeType::const_iterator;
 
   static NodeType *getEntryNode(NodeType *N) { return N; }
   static inline ChildIteratorType child_begin(NodeType *N) {
