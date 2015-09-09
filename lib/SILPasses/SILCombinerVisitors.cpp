@@ -215,12 +215,14 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 
   bool LegalUsers = true;
   InitExistentialAddrInst *IEI = nullptr;
+  OpenExistentialAddrInst *OEI = nullptr;
   bool HaveSeenCopyInto = false;
   // Scan all of the uses of the AllocStack and check if it is not used for
-  // anything other than the init_existential_addr container.
+  // anything other than the init_existential_addr/open_existential_addr container.
   for (Operand *Op: getNonDebugUses(*AS)) {
     // Destroy and dealloc are both fine.
     if (isa<DestroyAddrInst>(Op->getUser()) ||
+        isa<DeinitExistentialAddrInst>(Op->getUser()) ||
         isa<DeallocStackInst>(Op->getUser()))
       continue;
 
@@ -231,6 +233,28 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
         break;
       }
       IEI = I;
+      continue;
+    }
+
+    // Make sure there is exactly one open_existential_addr.
+    if (auto *I = dyn_cast<OpenExistentialAddrInst>(Op->getUser())) {
+      if (OEI) {
+        LegalUsers = false;
+        break;
+      }
+
+      // This open_existential should not have any uses except destroy_addr.
+      for (auto Use: getNonDebugUses(*I)) {
+        if (!isa<DestroyAddrInst>(Use->getUser())) {
+          LegalUsers = false;
+          break;
+        }
+      }
+
+      if (!LegalUsers)
+        break;
+
+      OEI = I;
       continue;
     }
 
@@ -260,7 +284,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   // If the only users of the alloc_stack are alloc, destroy and
   // init_existential_addr then we can promote the allocation of the init
   // existential.
-  if (LegalUsers && IEI) {
+  if (LegalUsers && IEI && !OEI) {
     auto *ConcAlloc = Builder->createAllocStack(AS->getLoc(),
                                                 IEI->getLoweredConcreteType());
     ConcAlloc->setDebugScope(AS->getDebugScope());
@@ -290,7 +314,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   }
 
   // Remove a dead live range that is only copied into.
-  if (LegalUsers && HaveSeenCopyInto) {
+  if (LegalUsers && HaveSeenCopyInto && !IEI) {
     SmallPtrSet<SILInstruction *, 16> ToDelete;
 
     for (auto *Op : AS->getUses()) {
@@ -304,16 +328,27 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
               ->setDebugScope(CopyAddr->getDebugScope());
         }
       }
+      if (auto *OEAI = dyn_cast<OpenExistentialAddrInst>(Op->getUser())) {
+        for (auto *Op : OEAI->getUses()) {
+          assert(isa<DestroyAddrInst>(Op->getUser()) ||
+                 isDebugInst(Op->getUser()) && "Unexpected instruction");
+          ToDelete.insert(Op->getUser());
+        }
+      }
       assert(isa<CopyAddrInst>(Op->getUser()) ||
+             isa<OpenExistentialAddrInst>(Op->getUser()) ||
              isa<DestroyAddrInst>(Op->getUser()) ||
              isa<DeallocStackInst>(Op->getUser()) ||
+             isa<DeinitExistentialAddrInst>(Op->getUser()) ||
              isDebugInst(Op->getUser()) && "Unexpected instruction");
       ToDelete.insert(Op->getUser());
     }
 
     // Erase the 'live-range'
-    for (auto *Inst : ToDelete)
+    for (auto *Inst : ToDelete) {
+      Inst->replaceAllUsesWithUndef();
       eraseInstFromFunction(*Inst);
+    }
     eraseInstFromFunction(*AS);
 
     // Restore the insertion point.
@@ -1412,6 +1447,68 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
   return nullptr;
 }
 
+/// Find an init_open_existential_addr or open_existential_addr, which
+/// is used to initialize a given alloc_stack value.
+static SILValue getInitOrOpenExistential(AllocStackInst *ASI, SILValue &Src) {
+  CopyAddrInst *FoundCAI = nullptr;
+  InitExistentialAddrInst *FoundIEAI = nullptr;
+  bool isLegal = true;
+  // Check that this alloc_stack is initialized only once.
+  for (auto Use : ASI->getUses()) {
+    auto *User = Use->getUser();
+    if (isa<DeallocStackInst>(User) ||
+        isa<DestroyAddrInst>(User) || isa<WitnessMethodInst>(User) ||
+        isa<DeinitExistentialAddrInst>(User) || isa<OpenExistentialAddrInst>(User) ||
+        isa<ApplyInst>(User))
+      continue;
+    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
+      if (!FoundCAI && !FoundIEAI) {
+        if (CAI->getDest().getDef() == ASI)
+          FoundCAI = CAI;
+      }
+      continue;
+    }
+    else if (auto *IEAI = dyn_cast<InitExistentialAddrInst>(User)) {
+      if (!FoundIEAI && !FoundCAI) {
+        FoundIEAI = IEAI;
+        continue;
+      }
+    }
+    isLegal = false;
+    break;
+  }
+
+  SILValue SrcValue;
+
+  if (isLegal && FoundCAI) {
+    // Try to derive the type from the copy_addr that was used to
+    // initialize the alloc_stack.
+    SrcValue = FoundCAI->getSrc();
+    if (auto *ASI = dyn_cast<AllocStackInst>(SrcValue)) {
+      SILValue Tmp;
+      SrcValue = getInitOrOpenExistential(ASI, Tmp);
+    }
+  }
+
+  if (isLegal && FoundIEAI) {
+    SrcValue = FoundIEAI;
+  }
+
+  if (!SrcValue)
+    return SILValue();
+
+  if (auto *OEAI = dyn_cast<OpenExistentialAddrInst>(SrcValue)) {
+    Src = OEAI->getOperand();
+    return OEAI;
+  }
+  if (auto *IEAI = dyn_cast<InitExistentialAddrInst>(SrcValue)) {
+    Src = IEAI->getOperand();
+    return IEAI;
+  }
+
+  return SrcValue;
+}
+
 /// Propagate information about a concrete type from init_existential_addr
 /// or init_existential_ref into witness_method conformances and into
 /// apply instructions.
@@ -1422,10 +1519,65 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                     WitnessMethodInst *WMI,
                                                     SILValue InitExistential,
                                                     SILType InstanceType) {
+  if (WMI->getConformance())
+    return nullptr;
+
+  auto LastArg = AI.getArguments().back();
+
+  if (auto *Instance = dyn_cast<AllocStackInst>(LastArg)) {
+    SILValue Src;
+    auto Existential = getInitOrOpenExistential(Instance, Src);
+    if (Existential)
+      LastArg = Existential;
+  }
+
+  if (auto *Instance = dyn_cast<OpenExistentialAddrInst>(LastArg)) {
+    auto Op = Instance->getOperand();
+    if (auto *ASI = dyn_cast<AllocStackInst>(Op)) {
+      SILValue Src;
+      if (auto Existential = getInitOrOpenExistential(ASI, Src)) {
+        if (Src)
+          Op = Src;
+      }
+    }
+
+    for (auto Use : Op.getUses()) {
+      SILValue User = Use->getUser();
+
+      if (auto *IE = dyn_cast<InitExistentialAddrInst>(User)) {
+        // IE should dominate Instance.
+        // Without a DomTree we want to be very defensive
+        // and only allow this optimization when it is used
+        // inside the same BB.
+        if (IE->getParent() != AI.getParent())
+          continue;
+
+        InstanceType = Instance->getType();
+        InitExistential = IE;
+      }
+    }
+  }
+
+  if (auto *Instance = dyn_cast<OpenExistentialRefInst>(LastArg)) {
+    if (auto *IE = dyn_cast<InitExistentialRefInst>(Instance->getOperand())) {
+      // IE should dominate Instance.
+      // Without a DomTree we want to be very defensive
+      // and only allow this optimization when it is used
+      // inside the same BB.
+      if (IE->getParent() != AI.getParent())
+        return nullptr;
+      InstanceType = Instance->getType();
+      InitExistential = IE;
+    }
+  }
+
+  if (!InitExistential)
+    return nullptr;
+
   // Replace this witness_method by a more concrete one
   ArrayRef<ProtocolConformance*> Conformances;
   CanType ConcreteType;
-  SILValue LastArg;
+  LastArg = SILValue();
 
   if (auto IE = dyn_cast<InitExistentialAddrInst>(InitExistential)) {
     Conformances = IE->getConformances();
@@ -1926,69 +2078,9 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   // (apply (witness_method)) -> propagate information about
   // a concrete type from init_existential_addr or init_existential_ref.
-  if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
-    if (WMI->getConformance())
-      return nullptr;
-    auto LastArg = AI->getArguments().back();
-    // Try to derive conformances from the apply_inst
-
-    if (auto *Instance = dyn_cast<AllocStackInst>(LastArg)) {
-      CopyAddrInst *FoundCAI = nullptr;
-      bool isLegal = true;
-      // Check that this alloc_stack is initalized only once
-      // and then used in apply or dealloc/destroy_addr insns.
-      for (auto Use : Instance->getUses()) {
-        auto *User = Use->getUser();
-        if (isa<DeallocStackInst>(User) || isa<DestroyAddrInst>(User) ||
-            isa<ApplyInst>(User))
-          continue;
-        if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
-          if (!FoundCAI) {
-            FoundCAI = CAI;
-            continue;
-          }
-        }
-        isLegal = false;
-        break;
-      }
-
-      if (isLegal && FoundCAI) {
-        // Try to derive the type from the copy_addr that was used to
-        // initialize the alloc_stack.
-        if (auto *OEAI = dyn_cast<OpenExistentialAddrInst>(FoundCAI->getSrc())) {
-          LastArg = OEAI;
-        }
-      }
-    }
-
-    if (auto *Instance = dyn_cast<OpenExistentialAddrInst>(LastArg)) {
-      auto Op = Instance->getOperand();
-      for (auto Use : Op.getUses()) {
-        if (auto *IE = dyn_cast<InitExistentialAddrInst>(Use->getUser())) {
-          // IE should dominate Instance.
-          // Without a DomTree we want to be very defensive
-          // and only allow this optimization when it is used
-          // inside the same BB.
-          if (IE->getParent() != AI->getParent())
-            continue;
-          return propagateConcreteTypeOfInitExistential(AI, WMI, IE,
-                                                        Instance->getType());
-        }
-      }
-    }
-
-    if (auto *Instance = dyn_cast<OpenExistentialRefInst>(LastArg)) {
-      if (auto *IE = dyn_cast<InitExistentialRefInst>(Instance->getOperand())) {
-        // IE should dominate Instance.
-        // Without a DomTree we want to be very defensive
-        // and only allow this optimization when it is used
-        // inside the same BB.
-        if (IE->getParent() == AI->getParent())
-          return propagateConcreteTypeOfInitExistential(AI, WMI, IE,
-                                                        Instance->getType());
-      }
-    }
-  }
+  if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee()))
+    return propagateConcreteTypeOfInitExistential(AI, WMI, SILValue(),
+                                                  SILType());
 
   // Optimize f_inverse(f(x)) -> x.
   if (optimizeIdentityCastComposition(AI, "convertFromObjectiveC",
@@ -2059,69 +2151,9 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
 
   // (apply (witness_method)) -> propagate information about
   // a concrete type from init_existential_addr or init_existential_ref.
-  if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
-    if (WMI->getConformance())
-      return nullptr;
-    auto LastArg = AI->getArguments().back();
-    // Try to derive conformances from the apply_inst
-
-    if (auto *Instance = dyn_cast<AllocStackInst>(LastArg)) {
-      CopyAddrInst *FoundCAI = nullptr;
-      bool isLegal = true;
-      // Check that this alloc_stack is initalized only once
-      // and then used in apply or dealloc/destroy_addr insns.
-      for (auto Use : Instance->getUses()) {
-        auto *User = Use->getUser();
-        if (isa<DeallocStackInst>(User) || isa<DestroyAddrInst>(User) ||
-            isa<ApplyInst>(User))
-          continue;
-        if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
-          if (!FoundCAI) {
-            FoundCAI = CAI;
-            continue;
-          }
-        }
-        isLegal = false;
-        break;
-      }
-
-      if (isLegal && FoundCAI) {
-        // Try to derive the type from the copy_addr that was used to
-        // initialize the alloc_stack.
-        if (auto *OEAI = dyn_cast<OpenExistentialAddrInst>(FoundCAI->getSrc())) {
-          LastArg = OEAI;
-        }
-      }
-    }
-
-    if (auto *Instance = dyn_cast<OpenExistentialAddrInst>(LastArg)) {
-      auto Op = Instance->getOperand();
-      for (auto Use : Op.getUses()) {
-        if (auto *IE = dyn_cast<InitExistentialAddrInst>(Use->getUser())) {
-          // IE should dominate Instance.
-          // Without a DomTree we want to be very defensive
-          // and only allow this optimization when it is used
-          // inside the same BB.
-          if (IE->getParent() != AI->getParent())
-            continue;
-          return propagateConcreteTypeOfInitExistential(AI, WMI, IE,
-                                                        Instance->getType());
-        }
-      }
-    }
-
-    if (auto *Instance = dyn_cast<OpenExistentialRefInst>(LastArg)) {
-      if (auto *IE = dyn_cast<InitExistentialRefInst>(Instance->getOperand())) {
-        // IE should dominate Instance.
-        // Without a DomTree we want to be very defensive
-        // and only allow this optimization when it is used
-        // inside the same BB.
-        if (IE->getParent() == AI->getParent())
-          return propagateConcreteTypeOfInitExistential(AI, WMI, IE,
-                                                        Instance->getType());
-      }
-    }
-  }
+  if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee()))
+    return propagateConcreteTypeOfInitExistential(AI, WMI, SILValue(),
+                                                  SILType());
 
   return nullptr;
 }
