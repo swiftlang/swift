@@ -40,7 +40,7 @@ using namespace llvm::opt;
 
 Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
                          DiagnosticEngine &Diags, OutputLevel Level,
-                         std::unique_ptr<InputArgList> InputArgs,
+                         InputArgList InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          StringRef ArgsHash, llvm::sys::TimeValue StartTime,
                          unsigned NumberOfParallelCommands,

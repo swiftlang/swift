@@ -1136,56 +1136,55 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return false;
 
   // Parse frontend command line options using Swift's option table.
-  std::unique_ptr<llvm::opt::InputArgList> ParsedArgs;
-  std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
   unsigned MissingIndex;
   unsigned MissingCount;
-  ParsedArgs.reset(
-      Table->ParseArgs(Args, MissingIndex, MissingCount, FrontendOption));
+  std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
+  llvm::opt::InputArgList ParsedArgs =
+      Table->ParseArgs(Args, MissingIndex, MissingCount, FrontendOption);
   if (MissingCount) {
     Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
-                   ParsedArgs->getArgString(MissingIndex), MissingCount);
+                   ParsedArgs.getArgString(MissingIndex), MissingCount);
     return true;
   }
 
-  if (ParsedArgs->hasArg(OPT_UNKNOWN)) {
-    for (const Arg *A : make_range(ParsedArgs->filtered_begin(OPT_UNKNOWN),
-                                   ParsedArgs->filtered_end())) {
+  if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
+    for (const Arg *A : make_range(ParsedArgs.filtered_begin(OPT_UNKNOWN),
+                                   ParsedArgs.filtered_end())) {
       Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
-                     A->getAsString(*ParsedArgs));
+                     A->getAsString(ParsedArgs));
     }
     return true;
   }
 
-  if (ParseFrontendArgs(FrontendOpts, *ParsedArgs, Diags)) {
+  if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags)) {
     return true;
   }
 
-  if (ParseLangArgs(LangOpts, *ParsedArgs, Diags,
+  if (ParseLangArgs(LangOpts, ParsedArgs, Diags,
                     FrontendOpts.actionIsImmediate())) {
     return true;
   }
 
-  if (ParseClangImporterArgs(ClangImporterOpts, *ParsedArgs, Diags,
+  if (ParseClangImporterArgs(ClangImporterOpts, ParsedArgs, Diags,
                              workingDirectory)) {
     return true;
   }
 
-  if (ParseSearchPathArgs(SearchPathOpts, *ParsedArgs, Diags,
+  if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags,
                           workingDirectory)) {
     return true;
   }
 
-  if (ParseSILArgs(SILOpts, *ParsedArgs, IRGenOpts, FrontendOpts, Diags)) {
+  if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts, Diags)) {
     return true;
   }
 
-  if (ParseIRGenArgs(IRGenOpts, *ParsedArgs, Diags, FrontendOpts,
+  if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts,
                      getSDKPath(), SearchPathOpts.RuntimeResourcePath)) {
     return true;
   }
 
-  if (ParseDiagnosticArgs(DiagnosticOpts, *ParsedArgs, Diags)) {
+  if (ParseDiagnosticArgs(DiagnosticOpts, ParsedArgs, Diags)) {
     return true;
   }
 
