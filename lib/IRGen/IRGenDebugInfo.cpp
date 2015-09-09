@@ -788,7 +788,6 @@ IRGenDebugInfo::getOrCreateModule(ModuleDecl::ImportedModule M) {
     if (++I > 1)
       OS << '.';
     OS << Component;
-    OS.flush();
     Scope = getOrCreateModule(AccessPath, Scope, Component, Path);
   }
   return cast<llvm::DIModule>(Scope);

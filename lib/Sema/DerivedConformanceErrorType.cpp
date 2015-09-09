@@ -66,7 +66,6 @@ static void deriveBodyErrorType_enum_code(AbstractFunctionDecl *codeDecl) {
       strBuf.clear();
       llvm::raw_svector_ostream os(strBuf);
       os << code;
-      os.flush();
     }
     
     auto codeStr = C.AllocateCopy(StringRef(strBuf));

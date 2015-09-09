@@ -180,7 +180,6 @@ static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
   SmallString<256> BriefStr("");
   llvm::raw_svector_ostream OS(BriefStr);
   llvm::markup::printInlinesUnder(Brief.getValue(), OS);
-  OS.flush();
   if (OS.str().empty())
     return StringRef();
 

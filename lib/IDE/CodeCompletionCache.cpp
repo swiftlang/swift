@@ -377,7 +377,6 @@ static std::string getName(StringRef cacheDirectory,
   llvm::APInt(64, uint64_t(hash)).toStringUnsigned(hashStr, /*Radix*/ 36);
   OSS << "-" << hashStr << ".completions";
 
-  OSS.flush();
   return name.str();
 }
 

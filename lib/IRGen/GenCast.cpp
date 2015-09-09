@@ -294,7 +294,6 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
       os << "_conditional";
       break;
     }
-    os.flush();
   }
   
   // See if we already defined this function.

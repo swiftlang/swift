@@ -1573,7 +1573,6 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
         {
           llvm::raw_svector_ostream names(disambiguatedNameBuf);
           names << param->getName() << disambiguatedNameCounter++;
-          names.flush();
         }
         name = getASTContext().getIdentifier(disambiguatedNameBuf);
       }

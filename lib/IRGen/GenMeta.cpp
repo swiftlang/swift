@@ -2100,8 +2100,6 @@ namespace {
         ++numFields;
       }
       // The final null terminator is provided by getAddrOfGlobalString.
-      
-      os.flush();
     }
     return numFields;
   }

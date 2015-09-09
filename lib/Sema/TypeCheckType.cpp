@@ -1467,7 +1467,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           {
             llvm::raw_svector_ostream os(fixitString);
             os << "convention(" << newName << ")";
-            os.flush();
           }
           
           TC.diagnose(start, diag::deprecated_convention_attribute,

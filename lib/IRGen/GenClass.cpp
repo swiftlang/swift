@@ -942,8 +942,6 @@ namespace {
       unsigned categoryCount = CategoryCounts[{getClass(), TheModule}]++;
       if (categoryCount > 0)
         os << categoryCount;
-        
-      os.flush();
     }
     
   public:
@@ -1582,8 +1580,6 @@ namespace {
       // If the property has storage, emit the ivar name last.
       if (prop->hasStorage())
         outs << ",V" << prop->getName();
-      
-      outs.flush();
     }
 
     /// struct property_t {

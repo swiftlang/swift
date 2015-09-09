@@ -457,7 +457,6 @@ namespace {
         }
         
         names << type->getNumElements();
-        names.flush();
       }
       
       return Impl.getNamedSwiftType(SIMD, name);

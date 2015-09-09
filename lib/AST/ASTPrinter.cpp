@@ -2316,7 +2316,6 @@ public:
       {
         llvm::raw_svector_ostream UnderlyingOS(UnderlyingStrVec);
         T->getElementType().print(UnderlyingOS);
-        UnderlyingOS.flush();
       }
       if (UnderlyingStrVec.startswith("Builtin."))
         UnderlyingStr = UnderlyingStrVec.substr(8);

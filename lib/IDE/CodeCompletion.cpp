@@ -3442,7 +3442,6 @@ void PrintingCodeCompletionConsumer::handleResults(
     llvm::SmallString<64> Name;
     llvm::raw_svector_ostream NameOs(Name);
     Result->getCompletionString()->getName(NameOs);
-    NameOs.flush();
     OS << "; name=" << Name;
 
     OS << "\n";

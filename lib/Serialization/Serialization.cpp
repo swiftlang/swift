@@ -2599,7 +2599,6 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx,
   llvm::SmallString<32> FullName;
   llvm::raw_svector_ostream OS(FullName);
   Bt->print(OS);
-  OS.flush();
   assert(FullName.startswith("Builtin."));
   StringRef TypeName = FullName.substr(8);
 
@@ -3635,7 +3634,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       Mangle::Mangler DebugMangler(Stream, false);
       DebugMangler.mangleType(TD->getDeclaredType(),
                               ResilienceExpansion::Minimal, 0);
-      Stream.flush();
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {
         addDeclRef(TD), TD->getLocalDiscriminator()

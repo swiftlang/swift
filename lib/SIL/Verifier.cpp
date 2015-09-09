@@ -3041,7 +3041,6 @@ void SILVTable::verify(const SILModule &M) const {
     {
       llvm::raw_svector_ostream os(baseName);
       entry.first.print(os);
-      os.flush();
     }
     
     SILVerifier(*entry.second)
