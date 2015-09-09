@@ -16,6 +16,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/FrontendUtil.h"
@@ -56,12 +57,7 @@ extern int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
                            void *MainAddr);
 
 int main(int argc_, const char **argv_) {
-  // Print a stack trace if we signal out.
-  llvm::sys::PrintStackTraceOnErrorSignal();
-  llvm::PrettyStackTraceProgram X(argc_, argv_);
-
-  // Set up an object which will call llvm::llvm_shutdown() on exit.
-  llvm::llvm_shutdown_obj Y;
+  INITIALIZE_LLVM(argc_, argv_);
 
   llvm::SmallVector<const char *, 256> argv;
   llvm::SpecificBumpPtrAllocator<char> ArgAllocator;
@@ -104,8 +100,6 @@ int main(int argc_, const char **argv_) {
   default:
     break;
   }
-
-  llvm::InitializeAllTargets();
 
   std::unique_ptr<Compilation> C = TheDriver.buildCompilation(argv);
 

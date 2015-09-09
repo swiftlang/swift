@@ -19,6 +19,7 @@
 
 #include "swift/Subsystems.h"
 #include "swift/Basic/Demangle.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -135,14 +136,9 @@ removeUnwantedFunctions(SILModule *M, llvm::StringRef Name) {
 }
 
 int main(int argc, char **argv) {
-  // Print a stack trace if we signal out.
-  llvm::sys::PrintStackTraceOnErrorSignal();
-  llvm::PrettyStackTraceProgram X(argc, argv);
+  INITIALIZE_LLVM(argc, argv);
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL Extractor\n");
-
-  // Call llvm_shutdown() on exit to print stats and free memory.
-  llvm::llvm_shutdown_obj Y;
 
   CompilerInvocation Invocation;
 

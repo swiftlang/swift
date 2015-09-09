@@ -27,6 +27,7 @@
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -53,6 +54,7 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ManagedStatic.h"
 #include <system_error>
 
 #include <string>
@@ -2321,10 +2323,7 @@ static int doTestCompilerInvocationFromModule(StringRef ModuleFilePath) {
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char *argv[]) {
-  // Print a stack trace if we signal out.
-  llvm::sys::PrintStackTraceOnErrorSignal();
-  llvm::PrettyStackTraceProgram X(argc, argv);
-  llvm::InitializeAllTargets();
+  INITIALIZE_LLVM(argc, argv);
 
   if (argc > 1) {
     // Handle integrated test tools which do not use

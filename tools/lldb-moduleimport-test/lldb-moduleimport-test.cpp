@@ -22,6 +22,7 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Basic/Dwarf.h"
 #include "llvm/Object/ELFObjectFile.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/CommandLine.h"
@@ -32,6 +33,7 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ManagedStatic.h"
 #include <fstream>
 #include <sstream>
 
@@ -58,8 +60,7 @@ static void printValidationInfo(llvm::StringRef data) {
 }
 
 int main(int argc, char **argv) {
-  llvm::sys::PrintStackTraceOnErrorSignal();
-  llvm::PrettyStackTraceProgram ST(argc, argv);
+  INITIALIZE_LLVM(argc, argv);
 
   // Command line handling.
   llvm::cl::list<std::string> InputNames(

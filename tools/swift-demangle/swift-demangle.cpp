@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/DemangleWrappers.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -96,8 +97,8 @@ static llvm::StringRef substrAfter(llvm::StringRef whole,
 }
 
 int main(int argc, char **argv) {
-  llvm::sys::PrintStackTraceOnErrorSignal();
-  llvm::PrettyStackTraceProgram X(argc, argv);
+  INITIALIZE_LLVM(argc, argv);
+
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
   swift::Demangle::DemangleOptions options;

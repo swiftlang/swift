@@ -19,6 +19,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -35,6 +36,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/TargetSelect.h"
 using namespace swift;
 
 namespace {
@@ -168,14 +170,9 @@ static void runCommandLineSelectedPasses(SILModule *Module) {
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char **argv) {
-  // Print a stack trace if we signal out.
-  llvm::sys::PrintStackTraceOnErrorSignal();
-  llvm::PrettyStackTraceProgram X(argc, argv);
+  INITIALIZE_LLVM(argc, argv);
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
-
-  // Call llvm_shutdown() on exit to print stats and free memory.
-  llvm::llvm_shutdown_obj Y;
 
   if (PrintStats)
     llvm::EnableStatistics();
