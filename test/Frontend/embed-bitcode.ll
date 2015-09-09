@@ -10,6 +10,7 @@
 ; RUN: llvm-objdump -m -section __LLVM,__swift_cmdline %t3.o | FileCheck -check-prefix=MARKER-CMD %s
 
 target triple = "x86_64-apple-darwin10"
+target datalayout = "e-m:o-i64:64-f80:128-n8:16:32:64-S128"
 
 ; CHECK: Contents of (__LLVM,__bitcode) section
 ; CHECK-CMD: Contents of (__LLVM,__swift_cmdline) section
