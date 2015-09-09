@@ -15,7 +15,7 @@ class SomeImplementor : IGiveOutInts {
 }
 
 func printSomeNumbers(var gen: IGiveOutInts) {
-  // CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "gen",
+  // CHECK: !DILocalVariable(name: "gen", arg: 1
   // CHECK-SAME:             line: [[@LINE-2]]
   // CHECK-SAME:             type: ![[PT]]
   markUsed(gen.callMe())

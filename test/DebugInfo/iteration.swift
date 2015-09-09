@@ -4,8 +4,8 @@
 func markUsed<T>(t: T) {}
 
 var puzzleOutput: [String] = []
-// CHECK-NOT: !DILocalVariable(tag: DW_TAG_auto_variable, name: "$letter$generator"
-// CHECK: !DILocalVariable(tag: DW_TAG_auto_variable, name: "letter",
+// CHECK-NOT: !DILocalVariable(name: "$letter$generator"
+// CHECK: !DILocalVariable(name: "letter",
 // CHECK-SAME:             line: [[@LINE+1]]
 for letter in [ "g", "r", "e", "a", "t" ] {
   switch letter {
@@ -19,8 +19,8 @@ markUsed(puzzleOutput)
 
 
 func count() {
-// CHECK-NOT: !DILocalVariable(tag: DW_TAG_auto_variable, name: "$i$generator"
-// CHECK: !DILocalVariable(tag: DW_TAG_auto_variable, name: "i",
+// CHECK-NOT: !DILocalVariable(name: "$i$generator"
+// CHECK: !DILocalVariable(name: "i",
 // CHECK-SAME:             line: [[@LINE+1]]
   for i in 0...100 {
     markUsed(i)

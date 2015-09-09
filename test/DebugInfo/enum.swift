@@ -65,6 +65,6 @@ public enum List<T> {
        indirect case Tail(List, T)
        case End
 
-// CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "self", arg: 1, {{.*}} line: [[@LINE+1]], type: !"_TtGO4enum4ListQq_S0__", flags: DIFlagArtificial)
+// CHECK: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+1]], type: !"_TtGO4enum4ListQq_S0__", flags: DIFlagArtificial)
        func fooMyList() {}
 }

@@ -3,8 +3,8 @@
 func markUsed<T>(t: T) {}
 
 class C<A> {
-// CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "x", {{.*}}line: [[@LINE+2]],{{.*}}type: !"_TtQq_C11archetypes21C"
-// CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "y", {{.*}}line: [[@LINE+1]],{{.*}}type: !"_TtQq_FC11archetypes21C3foo
+// CHECK-DAG: !DILocalVariable(name: "x", arg: 1,{{.*}}line: [[@LINE+2]],{{.*}}type: !"_TtQq_C11archetypes21C"
+// CHECK-DAG: !DILocalVariable(name: "y", arg: 2,{{.*}}line: [[@LINE+1]],{{.*}}type: !"_TtQq_FC11archetypes21C3foo
   func foo <B> ( x : A,  y : B) {
     markUsed("hello world")
   }

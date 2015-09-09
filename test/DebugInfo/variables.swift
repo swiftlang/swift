@@ -46,9 +46,9 @@ var unused: Int32 = -1
 // Stack variables.
 func foo(dt: Float) -> Float {
   // CHECK-DAG: call void @llvm.dbg.declare
-  // CHECK-DAG: !DILocalVariable(tag: DW_TAG_auto_variable, name: "f"
+  // CHECK-DAG: !DILocalVariable(name: "f"
   var f: Float = 9.78;
-  // CHECK-DAG: !DILocalVariable(tag: DW_TAG_auto_variable, name: "r"
+  // CHECK-DAG: !DILocalVariable(name: "r"
   var r: Float = f*dt;
   return r;
 }

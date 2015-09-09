@@ -8,10 +8,10 @@ class DWARF {
 }
 
 func main () {
-  // CHECK-DAG: !DILocalVariable(tag: DW_TAG_auto_variable, name: "a",{{.*}} type: ![[DIEOFFSET]]
+  // CHECK-DAG: !DILocalVariable(name: "a",{{.*}} type: ![[DIEOFFSET]]
     var a : DWARF.DIEOffset = 123
     markUsed("a is \(a)")
-  // CHECK-DAG: !DILocalVariable(tag: DW_TAG_auto_variable, name: "b",{{.*}} type: ![[DIEOFFSET]]
+  // CHECK-DAG: !DILocalVariable(name: "b",{{.*}} type: ![[DIEOFFSET]]
     var b = DWARF.DIEOffset(456) as DWARF.DIEOffset
     markUsed("b is \(b)")
 }

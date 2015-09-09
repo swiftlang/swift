@@ -88,7 +88,7 @@ func useOptions(var opt: NSURLBookmarkCreationOptions)
   return [opt, opt]
 }
 
-// LOC-CHECK: ![[THUNK:.*]] = !DISubprogram({{.*}}linkageName: "_TToFC4main8MyObjectg5MyArrCSo7NSArray"
+// LOC-CHECK: ![[THUNK:.*]] = distinct !DISubprogram({{.*}}linkageName: "_TToFC4main8MyObjectg5MyArrCSo7NSArray"
 // LOC-CHECK-NOT:                           line:
 // LOC-CHECK-SAME:                          isDefinition: true
 // LOC-CHECK: ![[DBG]] = !DILocation(line: 0, scope: ![[THUNK]])

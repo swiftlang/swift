@@ -10,7 +10,7 @@ class AClass : AProtocol {
 // CHECK: define hidden void @{{.*}}aFunction
 // CHECK:  call void @llvm.dbg.declare(metadata %swift.type** %{{.*}}, metadata ![[TYPEARG:.*]], metadata !{{[0-9]+}}),
 // CHECK: ![[VOIDPTR:[0-9]+]] = !DIDerivedType(tag: DW_TAG_pointer_type, name: "_TtBp", baseType: null
-// CHECK: ![[TYPEARG]] = !DILocalVariable(tag: DW_TAG_auto_variable, name: "$swift.type.T"
+// CHECK: ![[TYPEARG]] = !DILocalVariable(name: "$swift.type.T"
 // CHECK-SAME:                            type: ![[SWIFTMETATYPE:[^,)]+]]
 // CHECK-SAME:                            flags: DIFlagArtificial
 // CHECK: ![[SWIFTMETATYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$swift.type",
@@ -27,8 +27,8 @@ class Foo<Bar> {
       }
 
       func two<Baz>(x: Baz) {
-    // CHECK: !DILocalVariable(tag: DW_TAG_auto_variable, name: "$swift.type.Bar"
-    // CHECK: !DILocalVariable(tag: DW_TAG_auto_variable, name: "$swift.type.Baz"
+    // CHECK: !DILocalVariable(name: "$swift.type.Bar"
+    // CHECK: !DILocalVariable(name: "$swift.type.Baz"
       }
 }
 

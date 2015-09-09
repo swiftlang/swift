@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
 // Don't crash when emitting debug info for anonymous variables.
-// CHECK: !DILocalVariable({{.*}} name: "_"
+// CHECK: !DILocalVariable(name: "_"
 
 func markUsed<T>(t: T) {}
 

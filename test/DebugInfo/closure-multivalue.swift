@@ -10,8 +10,8 @@ import StdlibUnittest
 // CHECK: call void @llvm.dbg.value(metadata i8*{{.*}}, metadata ![[B:.*]], metadata ![[P1]])
 // CHECK: call void @llvm.dbg.value(metadata i{{[0-9]+}} {{.*}}, metadata ![[B]], metadata ![[P2]])
 // CHECK: call void @llvm.dbg.value(metadata i{{[0-9]+}} {{.*}}, metadata ![[B]], metadata ![[P3]])
-// CHECK-DAG: ![[A]] = !DILocalVariable({{.*}} name: "a",{{.*}} line: 18
-// CHECK-DAG: ![[B]] = !DILocalVariable({{.*}} name: "b",{{.*}} line: 18
+// CHECK-DAG: ![[A]] = !DILocalVariable(name: "a",{{.*}} line: 18
+// CHECK-DAG: ![[B]] = !DILocalVariable(name: "b",{{.*}} line: 18
 // CHECK-DAG: ![[P1]] = !DIExpression(DW_OP_bit_piece, 0, {{(32|64)}})
 // CHECK-DAG: ![[P2]] = !DIExpression(DW_OP_bit_piece, {{(32, 32|64, 64)}})
 // CHECK-DAG: ![[P3]] = !DIExpression(DW_OP_bit_piece, {{(64, 32|128, 64)}})
@@ -37,7 +37,7 @@ demo()
 // CHECK-O0-NOT: DW_OP_bit_piece
 // CHECK-O0: !DISubprogram(linkageName: "_TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, type: !{{[0-9]+}},
 // CHECK-O0-NOT: DW_OP_bit_piece
-// CHECK-O0: !DILocalVariable(tag: DW_TAG_arg_variable, name: "a",{{.*}} line: 18,
+// CHECK-O0: !DILocalVariable(name: "a", arg: 1{{.*}} line: 18,
 // CHECK-O0-NOT: DW_OP_bit_piece
-// CHECK-O0: !DILocalVariable(tag: DW_TAG_arg_variable, name: "b",{{.*}} line: 18,
+// CHECK-O0: !DILocalVariable(name: "b", arg: 2{{.*}} line: 18,
 // CHECK-O0-NOT: DW_OP_bit_piece

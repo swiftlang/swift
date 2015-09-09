@@ -26,5 +26,5 @@ struct B {
   var c : C
 }
 
-// CHECK: [[X_DBG]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "x",
+// CHECK: [[X_DBG]] = !DILocalVariable(name: "x", arg: 1
 // CHECK-SAME:                         type: ![[A_DI]]

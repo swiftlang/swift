@@ -22,7 +22,7 @@
 //
 // CHECK: foo
 // CHECK-DAG: ret{{.*}}, !dbg ![[RET:[0-9]+]]
-// CHECK-DAG: ![[FOO:[0-9]+]] = !DISubprogram(name: "foo",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[FOOTYPE:[0-9]+]]
+// CHECK-DAG: ![[FOO:[0-9]+]] = distinct !DISubprogram(name: "foo",{{.*}} line: [[@LINE+2]],{{.*}} type: ![[FOOTYPE:[0-9]+]]
 public
 func foo(var a: Int64, var _ b: Int64) -> Int64 {
      // CHECK-DAG: !DILexicalBlock(scope: ![[FOO]],{{.*}} line: [[@LINE-1]], column: 49)
@@ -34,8 +34,8 @@ func foo(var a: Int64, var _ b: Int64) -> Int64 {
      // CHECK-DAG: [[BVAL]] = getelementptr inbounds {{.*}}, [[BMEM:.*]], i32 0, i32 0
      // CHECK-DAG: call void @llvm.dbg.declare(metadata [[AMEM]], metadata ![[AARG:.*]], metadata !{{[0-9]+}}), !dbg ![[ASCOPE]]
      // CHECK-DAG: call void @llvm.dbg.declare(metadata [[BMEM]], metadata ![[BARG:.*]], metadata !{{[0-9]+}})
-     // CHECK-DAG: ![[AARG]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "a"
-     // CHECK-DAG: ![[BARG]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "b"
+     // CHECK-DAG: ![[AARG]] = !DILocalVariable(name: "a", arg: 1
+     // CHECK-DAG: ![[BARG]] = !DILocalVariable(name: "b", arg: 2
      if b != 0 {
        // CHECK-DAG: !DILexicalBlock({{.*}} line: [[@LINE-1]]
        // Transparent inlined multiply:

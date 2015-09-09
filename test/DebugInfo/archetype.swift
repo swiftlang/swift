@@ -17,7 +17,7 @@ protocol RandomAccessIndexType : IntegerArithmeticType {
 // CHECK-SAME:          isDefinition: true
 func ExistentialTuple<T: RandomAccessIndexType>(x: T, y: T) -> T.Distance {
   // (B, Swift.Bool)
-  // CHECK: !DILocalVariable(tag: DW_TAG_auto_variable, name: "tmp"
+  // CHECK: !DILocalVariable(name: "tmp"
   // CHECK-SAME:             line: [[@LINE+2]]
   // CHECK-SAME:             type: ![[TT]]
   var tmp : (T.Distance, Bool) = T.uncheckedSubtract(x, rhs: y)

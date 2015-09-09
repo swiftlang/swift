@@ -8,8 +8,6 @@
 // CHECK: define i32 @main
 // CHECK: tail call { i64, i1 } @llvm.smul.with.overflow.i64(i64 %[[C:.*]], i64 %[[C]]), !dbg ![[MULSCOPE:.*]]
 // CHECK-DAG: ![[TOPLEVEL:.*]] = !DIFile(filename: "inlinescopes.swift"
-// CHECK-DAG: ![[MAIN:.*]] = !DISubprogram(name: "main"
-// CHECK-DAG: ![[INLINED_TOPLEVEL:.*]] = !DILocation(line: 0, scope: ![[MAIN:.*]])
 
 import FooBar
 
@@ -25,7 +23,6 @@ func square(x: Int64) -> Int64 {
   return res
 }
 let c = Int64(x)
-// CHECK-DAG ![[INLINED]] = !DILocation(i32 [[@LINE+1]], column: {{.*}}, scope: !{{.*}}, inlinedAt: ![[INLINED_TOPLEVEL:.*]])
 // CHECK-DAG: !DIGlobalVariable(name: "y",{{.*}} file: ![[TOPLEVEL]],{{.*}} line: [[@LINE+1]]
 let y = square(c)
 markUsed(y)

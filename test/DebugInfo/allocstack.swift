@@ -7,10 +7,10 @@ import StdlibUnittest
 
 func main() {
   // CHECK-SIL-DAG: debug_value {{.*}}let x
-  // CHECK-DAG: DILocalVariable(tag: DW_TAG_auto_variable, name: "x"
+  // CHECK-DAG: DILocalVariable(name: "x"
   let x = 10
   // CHECK-SIL-DAG: alloc_stack {{.*}}var y
-  // CHECK-DAG: DILocalVariable(tag: DW_TAG_auto_variable, name: "y"
+  // CHECK-DAG: DILocalVariable(name: "y"
   var y = 10
   // The expression x+y may become constant folded.
   _blackHole(x+y)

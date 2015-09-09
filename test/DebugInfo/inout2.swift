@@ -24,13 +24,13 @@ struct Struct {
 }
 
 func foo(inout x: Class) {
-// CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "x",{{.*}} line: [[@LINE-1]]
+// CHECK: !DILocalVariable(name: "x", arg: 1{{.*}} line: [[@LINE-1]]
   markUsed(x.ivar)
   x.ivar++ // Set breakpoint here
 }
 
 func foo(inout x: Struct) {
-// CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "x",{{.*}} line: [[@LINE-1]]
+// CHECK: !DILocalVariable(name: "x", arg: 1{{.*}} line: [[@LINE-1]]
   markUsed(x.ivar)
   x.ivar++ // Set breakpoint here
 }

@@ -16,7 +16,7 @@ class AClass : AProtocol {
 // CHECK-NEXT: %[[X:.*]] = alloca %P17ProtocolContainer9AProtocol_, align {{(4|8)}}
 // CHECK:      call void @llvm.dbg.declare(metadata %P17ProtocolContainer9AProtocol_* %[[X]], metadata ![[XMD:.*]], metadata !{{[0-9]+}})
 // CHECK-NOT: !DILocalVariable({{.*}} name: "x"
-// CHECK: ![[XMD]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "x", {{.*}}line: [[@LINE+2]]
+// CHECK: ![[XMD]] = !DILocalVariable(name: "x", arg: 1,{{.*}}line: [[@LINE+2]]
 // CHECK-NOT: !DILocalVariable({{.*}} name: "x"
 func foo (var x : AProtocol) {
 	x.print() // Set breakpoint here

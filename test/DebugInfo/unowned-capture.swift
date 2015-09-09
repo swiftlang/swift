@@ -7,9 +7,9 @@ class Foo
     // Verify that we only emit the implicit argument,
     // and not the unowned local copy of self.
     //
-    // CHECK-NOT: !DILocalVariable(tag: DW_TAG_auto_variable, name: "self"
-    // CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "self"
-    // CHECK-NOT: !DILocalVariable(tag: DW_TAG_auto_variable, name: "self"
+    // CHECK-NOT: !DILocalVariable(name: "self", scope
+    // CHECK: !DILocalVariable(name: "self", arg: 2
+    // CHECK-NOT: !DILocalVariable(name: "self", scope
     return { [unowned self] in
              var tmp_string = a_string
              return tmp_string
