@@ -61,8 +61,10 @@ public:
     std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
     unsigned MissingIndex;
     unsigned MissingCount;
-    ParsedArgs.reset(
-        Table->ParseArgs(Args, MissingIndex, MissingCount, ModuleWrapOption));
+    llvm::opt::InputArgList ArgList =
+      Table->ParseArgs(Args, MissingIndex, MissingCount,
+                       ModuleWrapOption);
+    ParsedArgs.reset(&ArgList);
     if (MissingCount) {
       Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
                      ParsedArgs->getArgString(MissingIndex), MissingCount);
