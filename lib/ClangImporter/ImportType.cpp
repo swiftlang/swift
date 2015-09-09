@@ -282,6 +282,10 @@ namespace {
       case clang::BuiltinType::OCLEvent:
       case clang::BuiltinType::OCLSampler:
         return Type();
+
+      // OpenMP types that don't have Swift equivalents.
+      case clang::BuiltinType::OMPArraySection:
+        return Type();
       }
     }
 
