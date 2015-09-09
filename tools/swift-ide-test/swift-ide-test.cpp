@@ -2263,10 +2263,8 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
 
-  // FIXME: Arggh, we need to get rid of this thing.
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
-  ImporterOpts.ExtraArgs.push_back("-Xclang");
-  ImporterOpts.ExtraArgs.push_back("-detailed-preprocessing-record");
+  ImporterOpts.DetailedPreprocessingRecord = true;
 
   CompilerInstance CI;
   // Display diagnostics to stderr.

@@ -47,6 +47,12 @@ public:
   /// Controls how Clang is initially set up.
   Modes Mode = Modes::Normal;
 
+  /// When set, preserves more information during import.
+  ///
+  /// Also \em disables some information that is only needed for object file
+  /// generation.
+  bool DetailedPreprocessingRecord = false;
+
   /// If true, matched getter-like and setter-like methods will be imported as
   /// properties.
   bool InferImplicitProperties = false;

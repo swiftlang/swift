@@ -417,6 +417,17 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back("-fmodules-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
   }
+  
+  if (importerOpts.DetailedPreprocessingRecord) {
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-Xclang", "-detailed-preprocessing-record",
+      "-Xclang", "-fmodule-format=raw",
+    });
+  } else {
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+      "-Xclang", "-fmodule-format=obj",
+    });
+  }
 }
 
 static void

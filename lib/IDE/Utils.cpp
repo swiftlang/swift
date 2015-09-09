@@ -328,8 +328,7 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
   }
 
   if (PPOpts.DetailedRecord) {
-    CCArgs.push_back("-Xclang");
-    CCArgs.push_back("-detailed-preprocessing-record");
+    Invok.getClangImporterOptions().DetailedPreprocessingRecord = true;
   }
 
   if (!ClangInvok->getFrontendOpts().Inputs.empty()) {
