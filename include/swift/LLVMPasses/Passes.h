@@ -41,8 +41,8 @@ namespace swift {
       AliasAnalysis::getAnalysisUsage(AU);
     }
     
-    virtual ModRefResult getModRefInfo(llvm::ImmutableCallSite CS,
-                                       const llvm::MemoryLocation &Loc) override;
+    virtual llvm::ModRefInfo getModRefInfo(llvm::ImmutableCallSite CS,
+                                     const llvm::MemoryLocation &Loc) override;
   };
 
   class SwiftARCOpt : public llvm::FunctionPass {

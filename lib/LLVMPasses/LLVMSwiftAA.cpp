@@ -27,7 +27,7 @@ bool SwiftAliasAnalysis::doInitialization(Module &M) {
   return true;
 }
 
-AliasAnalysis::ModRefResult
+llvm::ModRefInfo
 SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS,
                                   const llvm::MemoryLocation &Loc) {
   // We know the mod-ref behavior of various runtime functions.
@@ -43,7 +43,7 @@ SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS,
   case RT_UnknownRetain:
   case RT_FixLifetime:
     // These entrypoints don't modify any compiler-visible state.
-    return NoModRef;
+    return MRI_NoModRef;
   case RT_Release:
   case RT_ObjCRelease:
   case RT_BridgeRelease:
