@@ -295,11 +295,10 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
     clang::FileSystemOptions FileSysOpts;
     clang::FileManager FileMgr(FileSysOpts);
     auto PCHContainerOperations =
-      std::make_shared<clang::ObjectFilePCHContainerOperations>();
-    std::string HeaderFile =
-      clang::ASTReader::getOriginalSourceFile(PPOpts.ImplicitPCHInclude,
-                                              FileMgr, *PCHContainerOperations,
-                                              *ClangDiags);
+        std::make_shared<clang::PCHContainerOperations>();
+    std::string HeaderFile = clang::ASTReader::getOriginalSourceFile(
+        PPOpts.ImplicitPCHInclude, FileMgr,
+        PCHContainerOperations->getRawReader(), *ClangDiags);
     if (!HeaderFile.empty()) {
       CCArgs.push_back("-include");
       CCArgs.push_back(std::move(HeaderFile));
