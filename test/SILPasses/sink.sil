@@ -63,12 +63,15 @@ bb0(%0 : $Y):
 bb1:
   %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
   strong_release %0 : $Y
-  return %5 : $Int
+  br bb3
 
 bb2:
   %9 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
   strong_release %0 : $Y
-  return %5 : $Int
+  br bb3
+
+bb3:
+  return undef : $Int
 }
 
 //CHECK-LABEL: sil @cf_sink
@@ -89,11 +92,14 @@ bb0(%0 : $Y):
 bb1:
   %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
   strong_release %0 : $Y
-  return %5 : $Int
+  br bb3
 
 bb2:
   strong_release %0 : $Y
-  return %5 : $Int
+  br bb3
+
+bb3:
+  return undef : $Int
 }
 
 
