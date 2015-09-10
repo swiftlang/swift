@@ -70,6 +70,14 @@ public:
     assert(Node != nullptr && "Expected non-null callee node!");
   }
 
+  /// Create a call graph edge for a call site for which we are not
+  /// currently able to determine the callees.
+  CallGraphEdge(FullApplySite TheApply, unsigned Ordinal)
+    : TheApply(TheApply),
+      CalleeSet((CallGraphNode *) nullptr, false),
+      Ordinal(Ordinal) {
+  }
+
   /// Create a call graph edge for a call site where we will fill in
   /// the set of potentially called functions later.
   CallGraphEdge(FullApplySite TheApply, CalleeSetType * const KnownCallees,
@@ -96,7 +104,8 @@ public:
       return *CalleeSet.getPointer().get<CalleeSetType *>();
 
     CalleeSetType Result;
-    Result.insert(CalleeSet.getPointer().get<CallGraphNode *>());
+    if (auto *Node = CalleeSet.getPointer().get<CallGraphNode *>())
+      Result.insert(Node);
 
     return Result;
   }
@@ -107,7 +116,8 @@ public:
       return *CalleeSet.getPointer().get<CalleeSetType *>();
 
     CalleeSetType Result;
-    Result.insert(CalleeSet.getPointer().get<CallGraphNode *>());
+    if (auto *Node = CalleeSet.getPointer().get<CallGraphNode *>())
+      Result.insert(Node);
 
     return Result;
   }
@@ -135,9 +145,13 @@ public:
   /// other words we can replace its callee with a function_ref
   /// regardless of what kind of instruction the callee is now.
   bool hasSingleCallee() const {
-    return isCalleeSetComplete() &&
-      (CalleeSet.getPointer().is<CallGraphNode *>() ||
-       CalleeSet.getPointer().get<CalleeSetType *>()->size() == 1);
+    if (!isCalleeSetComplete())
+      return false;
+
+    if (CalleeSet.getPointer().is<CallGraphNode *>())
+      return CalleeSet.getPointer().get<CallGraphNode *>() != nullptr;
+
+    return CalleeSet.getPointer().get<CalleeSetType *>()->size() == 1;
   }
 
   unsigned getOrdinal() const {
@@ -396,8 +410,8 @@ private:
   }
   CallGraphNode *addCallGraphNode(SILFunction *F);
   void addEdges(SILFunction *F);
-  CallGraphEdge *tryMakeCallGraphEdgeForCallee(FullApplySite Apply,
-                                               SILValue Callee);
+  CallGraphEdge *makeCallGraphEdgeForCallee(FullApplySite Apply,
+                                            SILValue Callee);
   void addEdgesForApply(FullApplySite AI, CallGraphNode *CallerNode);
   void computeBottomUpSCCOrder();
   void computeBottomUpFunctionOrder();
