@@ -98,6 +98,10 @@ __attribute__((availability(ios,introduced=8.0)))
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector withObject:(nullable ObjectType)anObject;
 @end
 
+@interface NSArray (AddingObject)
+- (NSInteger)indexOfObject:(nonnull id)object;
+@end
+
 @interface DummyClass : NSObject
 - (nonnull id)objectAtIndexedSubscript:(NSUInteger)idx;
 - description;

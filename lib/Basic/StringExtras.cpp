@@ -559,7 +559,20 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
           break;
         }
 
-      SWIFT_FALLTHROUGH;
+        // If removing the type information would leave us with a
+        // parameter named "with", lowercase the type information and
+        // keep that instead.
+        if ((role == NameRole::FirstParameter ||
+             role == NameRole::SubsequentParameter) &&
+            *nameWordRevIter == "with" &&
+            std::next(nameWordRevIter) == nameWordRevIterEnd) {
+          name = toLowercaseWord(
+                   name.substr(nameWordRevIter.base().getPosition()),
+                   scratch);
+          break;
+        }
+
+        SWIFT_FALLTHROUGH;
 
       case PartOfSpeech::Verb:
       case PartOfSpeech::Gerund:
@@ -574,6 +587,7 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
       }
       break;
     }
+
   } else if (role == NameRole::Property) {
     // For a property, check whether type information is at the beginning.
     name = omitNeedlessWordsForResultType(name, typeName, true, scratch);
@@ -583,11 +597,11 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
   if (name == "get" || name == "set")
     return origName;
 
-  // If we ended up with a keyword for a property name or base name,
-  // do nothing.
   switch (role) {
   case NameRole::BaseName:
   case NameRole::Property:
+    // If we ended up with a keyword for a property name or base name,
+    // do nothing.
     if (isKeyword(name))
       return origName;
     break;

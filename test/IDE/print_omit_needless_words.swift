@@ -24,8 +24,11 @@
 // Note: SEL -> "Selector"
 // CHECK-FOUNDATION: func makeObjectsPerform(aSelector: Selector)
 
-// Note: id -> "Object", leaving "with"
-// CHECK-FOUNDATION: func makeObjectsPerform(aSelector: Selector, with anObject: AnyObject?)
+// Note: "with" parameters drop the "with".
+// CHECK-FOUNDATION: func makeObjectsPerform(aSelector: Selector, object anObject: AnyObject?)
+
+// Note: id -> "Object".
+// CHECK-FOUNDATION: func indexOf(object: AnyObject) -> Int
 
 // Note: Class -> "Class"
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
