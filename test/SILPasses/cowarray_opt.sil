@@ -117,6 +117,36 @@ bb2:
   return %7 : $()
 }
 
+// CHECK-LABEL: sil @hoist_blocked_by_unpaired_retain_release_2
+// CHECK: bb0(
+// CHECK-NOT: apply
+// CHECK: bb1:
+// CHECK: retain_value
+// CHECK: [[MM:%.*]] = function_ref @array_make_mutable
+// CHECK: apply [[MM]]
+// CHECK:  cond_br {{.*}}, bb1
+sil @hoist_blocked_by_unpaired_retain_release_2 : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {
+bb0(%0 : $*MyArray<MyStruct>, %1 : $*Builtin.Int1):
+  br bb1
+
+bb1:
+  %10 = load %0 : $*MyArray<MyStruct>
+  %11 = load %0 : $*MyArray<MyStruct>
+  %8 = struct_extract  %10 : $MyArray<MyStruct>, #MyArray.buffer
+  %9 = struct_extract  %11 : $MyArray<MyStruct>, #MyArray.buffer
+  retain_value %8 : $ArrayIntBuffer
+  retain_value %9 : $ArrayIntBuffer
+  release_value %9 : $ArrayIntBuffer
+  %3 = load %1 : $*Builtin.Int1
+  %4 = load %0 : $*MyArray<MyStruct>
+  %5 = function_ref @array_make_mutable : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  %6 = apply %5(%0) : $@convention(method) (@inout MyArray<MyStruct>) -> ()
+  cond_br %3, bb1, bb2
+
+bb2:
+  %7 = tuple()
+  return %7 : $()
+}
 
 // CHECK-LABEL: sil @hoist_not_blocked_by_unpaired_release
 // CHECK: bb0(

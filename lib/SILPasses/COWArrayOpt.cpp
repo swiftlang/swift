@@ -658,11 +658,13 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
     /// instruction is safe only if all of its users are safe. Check this
     /// recursively.
     if (isTransitiveSafeUser(UseInst)) {
-      return std::all_of(UseInst->use_begin(), UseInst->use_end(),
-                         [this](Operand *Op) -> bool {
-                           return checkSafeArrayElementUse(Op->getUser(),
-                                                           Op->get());
-                         });
+      if (std::all_of(UseInst->use_begin(), UseInst->use_end(),
+                      [this](Operand *Op) -> bool {
+                        return checkSafeArrayElementUse(Op->getUser(),
+                                                        Op->get());
+                      }))
+        continue;
+      return false;
     }
 
     if (isa<RetainValueInst>(UseInst)) {
