@@ -198,7 +198,7 @@ public protocol StringInterpolationConvertible {
 
 #if SWIFT_ENABLE_OBJECT_LITERALS
 /// Conforming types can be initialized with color literals (e.g.
-/// `[#Color(colorLiteralRed: 1, blue: 0, green: 0, alpha: 1)#]`).
+/// `[#Color(colorLiteralRed: 1, green: 0, blue: 0, alpha: 1)#]`).
 public protocol _ColorLiteralConvertible {
   init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)
 }
