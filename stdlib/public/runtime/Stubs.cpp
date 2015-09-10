@@ -219,9 +219,14 @@ extern "C" long double _swift_fmodl(long double lhs, long double rhs) {
 }
 
 
-#if __arm64__
-
+// Although this builtin is provided by clang rt builtins,
+// it isn't provided by libgcc, which is the default
+// runtime library on Linux, even when compiling with clang.
+// This implementation is copied here to avoid a new dependency
+// on compiler-rt on Linux.
 // FIXME: rdar://14883575 Libcompiler_rt omits muloti4
+#if __arm64__ || !defined(__APPLE__)
+
 typedef int      ti_int __attribute__ ((mode (TI)));
 extern "C"
 ti_int
