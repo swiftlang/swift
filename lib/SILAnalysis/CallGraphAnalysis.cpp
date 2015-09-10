@@ -447,6 +447,8 @@ void CallGraph::dumpStats() {
     llvm::errs() << (NUM_BUCKETS-1) << "+: " <<
       calleesPerEdge[NUM_BUCKETS-1] << "\n";
   llvm::errs() << "\n";
+
+  Allocator.PrintStats();
 #endif
 }
 
