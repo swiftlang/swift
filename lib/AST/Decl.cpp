@@ -427,7 +427,10 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
   }
 
   if (auto PD = dyn_cast<ProtocolDecl>(D)) {
-    if (PD->getNameStr().startswith("_Builtin"))
+    StringRef NameStr = PD->getNameStr();
+    if (NameStr.startswith("_Builtin"))
+      return true;
+    if (NameStr.startswith("_") && NameStr.endswith("LiteralConvertible"))
       return true;
     if (whitelistProtocols)
       return false;
