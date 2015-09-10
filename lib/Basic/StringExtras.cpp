@@ -672,6 +672,47 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     StringRef name = role == NameRole::BaseName ? baseName : argNames[i];
     StringRef newName = omitNeedlessWords(name, paramTypes[i], role, scratch);
 
+    // Split the base name on the preposition "with", if it's available.
+    if (role == NameRole::BaseName) {
+      // Scan backwards for the preposition "With".
+      auto nameWords = camel_case::getWords(newName);
+      auto nameWordRevIter = nameWords.rbegin(),
+        nameWordRevIterBegin = nameWordRevIter,
+        nameWordRevIterEnd = nameWords.rend();
+      while (nameWordRevIter != nameWordRevIterEnd &&
+             !(*nameWordRevIter == "With")) {
+        ++nameWordRevIter;
+      }
+
+      // If we found "With" somewhere...
+      if (nameWordRevIter != nameWordRevIterEnd) {
+        // That isn't at the end...
+        unsigned afterWithPos = nameWordRevIter.base().getPosition();
+        if (afterWithPos > 4) {
+          // Find the text that follows "with". If there is nothing
+          // following "With" in the new name, use the original name.
+          StringRef remainingName;
+          if (afterWithPos == newName.size())
+            remainingName = name.substr(afterWithPos);
+          else
+            remainingName = newName.substr(afterWithPos);
+
+          // The first argument name is either "body" (for
+          // "WithBlock") or the lowercased text that followed "with".
+          if (remainingName == "Block")
+            argNames[0] = "body";
+          else
+            argNames[0] = toLowercaseWord(remainingName, scratch);
+
+          // The base name is everything up to (but not including) the "with".
+          baseName = name.substr(0, afterWithPos-4);
+
+          anyChanges = true;
+          continue;
+        }
+      }
+    }
+
     if (name == newName) continue;
 
     anyChanges = true;
@@ -679,23 +720,11 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     // Record this change.
     if (role == NameRole::BaseName) {
       // If, after dropping type information, the last word of the
-      // base name is "With", drop the "With" from the base name and
-      // use the (redundant) type information as a label for the first
-      // parameter.
+      // base name is "Using", drop the "Using" from the base name and
+      // use "body" as a label for the first parameter.
       StringRef remainingName = name.substr(newName.size());
-      if (camel_case::getLastWord(newName) == "With") {
-        // If the redundant type information was simply "Block", use
-        // the argument label "body".
-        if (remainingName == "Block")
-          argNames[0] = "body";
-        else
-          argNames[0] = toLowercaseWord(remainingName, scratch);
-        baseName = newName.substr(0, newName.size() - 4);
-      } else if (camel_case::getLastWord(newName) == "Using" &&
-                 remainingName == "Block") {
-        // If the preposition was "Using" and the remaining name was
-        // "Block", strip off the "Using" from the base name and use
-        // "body" for the first argument label.
+      if (camel_case::getLastWord(newName) == "Using" &&
+          remainingName == "Block") {
         argNames[0] = "body";
         baseName = newName.substr(0, newName.size() - 5);
       } else {
