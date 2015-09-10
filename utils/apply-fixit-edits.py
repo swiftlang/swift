@@ -62,7 +62,7 @@ def apply_edits(path):
             offset = ed[0]
             length = ed[1]
             text = ed[2]
-            file_data = file_data[:offset] + text + file_data[offset+length:]
+            file_data = file_data[:offset] + str(text) + file_data[offset+length:]
         open(fname, 'w').write(file_data)
     return 0
 
