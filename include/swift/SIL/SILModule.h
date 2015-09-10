@@ -232,8 +232,9 @@ public:
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule> createEmptyModule(Module *M,
-                                                      SILOptions &Options) {
-    return std::unique_ptr<SILModule>(new SILModule(M, Options, M, false));
+                                                      SILOptions &Options,
+                                                      bool WholeModule = false) {
+    return std::unique_ptr<SILModule>(new SILModule(M, Options, M, WholeModule));
   }
 
   /// Get the Swift module associated with this SIL module.
