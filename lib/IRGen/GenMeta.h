@@ -248,7 +248,7 @@ namespace irgen {
     };
   }
 
-  enum class TypeMetadataAccessStrategy {
+  enum class MetadataAccessStrategy {
     /// There is a unique public accessor function for the given type metadata.
     PublicUniqueAccessor,
 
@@ -267,7 +267,7 @@ namespace irgen {
   };
 
   /// Determine how the given type metadata should be accessed.
-  TypeMetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
+  MetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
   
   /// Get the runtime identifier for a special protocol, if any.
   SpecialProtocol getSpecialProtocolID(ProtocolDecl *P);

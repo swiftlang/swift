@@ -416,7 +416,7 @@ bool irgen::hasKnownVTableEntry(IRGenModule &IGM,
 
 /// Return the standard access strategy for getting a non-dependent
 /// type metadata object.
-TypeMetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
+MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
   assert(!type->hasArchetype());
 
   // Non-generic structs, enums, and classes are special cases.
@@ -426,43 +426,43 @@ TypeMetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
 
     // Struct and enum metadata can be accessed directly.
     if (!isa<ClassType>(nominal))
-      return TypeMetadataAccessStrategy::Direct;
+      return MetadataAccessStrategy::Direct;
 
     // Classes require accessors.
     switch (getDeclLinkage(nominal->getDecl())) {
     case FormalLinkage::PublicUnique:
-      return TypeMetadataAccessStrategy::PublicUniqueAccessor;
+      return MetadataAccessStrategy::PublicUniqueAccessor;
     case FormalLinkage::HiddenUnique:
-      return TypeMetadataAccessStrategy::HiddenUniqueAccessor;
+      return MetadataAccessStrategy::HiddenUniqueAccessor;
     case FormalLinkage::Private:
-      return TypeMetadataAccessStrategy::PrivateAccessor;
+      return MetadataAccessStrategy::PrivateAccessor;
 
     case FormalLinkage::PublicNonUnique:
     case FormalLinkage::HiddenNonUnique:
-      return TypeMetadataAccessStrategy::NonUniqueAccessor;
+      return MetadataAccessStrategy::NonUniqueAccessor;
     }
     llvm_unreachable("bad formal linkage");
   }
 
   // Builtin types are assumed to be implemented with metadata in the runtime.
   if (isa<BuiltinType>(type))
-    return TypeMetadataAccessStrategy::Direct;
+    return MetadataAccessStrategy::Direct;
 
   // DynamicSelfType is actually local.
   if (type->hasDynamicSelfType())
-    return TypeMetadataAccessStrategy::Direct;
+    return MetadataAccessStrategy::Direct;
 
   // The zero-element tuple has special metadata in the runtime.
   if (auto tuple = dyn_cast<TupleType>(type))
     if (tuple->getNumElements() == 0)
-      return TypeMetadataAccessStrategy::Direct;
+      return MetadataAccessStrategy::Direct;
 
   // SIL box types are opaque to the runtime; NativeObject stands in for them.
   if (isa<SILBoxType>(type))
-    return TypeMetadataAccessStrategy::Direct;
+    return MetadataAccessStrategy::Direct;
 
   // Everything else requires a shared accessor function.
-  return TypeMetadataAccessStrategy::NonUniqueAccessor;
+  return MetadataAccessStrategy::NonUniqueAccessor;
 }
 
 /// Emit a string encoding the labels in the given tuple type.
@@ -1127,13 +1127,13 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
 llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
   if (!type->hasArchetype()) {
     switch (getTypeMetadataAccessStrategy(type)) {
-    case TypeMetadataAccessStrategy::Direct:
+    case MetadataAccessStrategy::Direct:
       return emitDirectTypeMetadataRef(*this, type);
-    case TypeMetadataAccessStrategy::PublicUniqueAccessor:
-    case TypeMetadataAccessStrategy::HiddenUniqueAccessor:
-    case TypeMetadataAccessStrategy::PrivateAccessor:
+    case MetadataAccessStrategy::PublicUniqueAccessor:
+    case MetadataAccessStrategy::HiddenUniqueAccessor:
+    case MetadataAccessStrategy::PrivateAccessor:
       return emitCallToTypeMetadataAccessFunction(*this, type, NotForDefinition);
-    case TypeMetadataAccessStrategy::NonUniqueAccessor:
+    case MetadataAccessStrategy::NonUniqueAccessor:
       return emitCallToTypeMetadataAccessFunction(*this, type, ForDefinition);
     }
     llvm_unreachable("bad type metadata access strategy");

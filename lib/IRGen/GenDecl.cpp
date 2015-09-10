@@ -974,15 +974,15 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
     switch (getTypeMetadataAccessStrategy(getType())) {
-    case TypeMetadataAccessStrategy::PublicUniqueAccessor:
+    case MetadataAccessStrategy::PublicUniqueAccessor:
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
-    case TypeMetadataAccessStrategy::HiddenUniqueAccessor:
+    case MetadataAccessStrategy::HiddenUniqueAccessor:
       return getSILLinkage(FormalLinkage::HiddenUnique, forDefinition);
-    case TypeMetadataAccessStrategy::PrivateAccessor:
+    case MetadataAccessStrategy::PrivateAccessor:
       return getSILLinkage(FormalLinkage::Private, forDefinition);
-    case TypeMetadataAccessStrategy::NonUniqueAccessor:
+    case MetadataAccessStrategy::NonUniqueAccessor:
       return SILLinkage::Shared;
-    case TypeMetadataAccessStrategy::Direct:
+    case MetadataAccessStrategy::Direct:
       llvm_unreachable("metadata accessor for type with direct access?");
     }
     llvm_unreachable("bad metadata access kind");
