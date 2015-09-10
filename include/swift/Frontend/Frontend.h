@@ -315,7 +315,7 @@ class CompilerInstance {
 
   SourceFile *PrimarySourceFile = nullptr;
 
-  void createSILModule(bool WholeModule = false);
+  void createSILModule();
   void setPrimarySourceFile(SourceFile *SF);
 
 public:

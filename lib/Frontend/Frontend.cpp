@@ -34,11 +34,10 @@
 
 using namespace swift;
 
-void CompilerInstance::createSILModule(bool WholeModule) {
+void CompilerInstance::createSILModule() {
   assert(MainModule && "main module not created yet");
   TheSILModule = SILModule::createEmptyModule(getMainModule(),
-                                              Invocation.getSILOptions(),
-                                              WholeModule);
+                                              Invocation.getSILOptions());
 }
 
 void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
@@ -234,8 +233,7 @@ void CompilerInstance::performSema() {
   if (Kind == InputFileKind::IFK_SIL) {
     assert(BufferIDs.size() == 1);
     assert(MainBufferID != NO_SUCH_BUFFER);
-    // Assume WMO, if a -primary-file option was not provided.
-    createSILModule(!options.PrimaryInput.hasValue());
+    createSILModule();
     modImpKind = SourceFile::ImplicitModuleImportKind::None;
   } else if (Invocation.getParseStdlib()) {
     modImpKind = SourceFile::ImplicitModuleImportKind::Builtin;

@@ -150,9 +150,6 @@ static llvm::cl::opt<unsigned>
 ASTVerifierProcessId("ast-verifier-process-id", llvm::cl::Hidden,
                      llvm::cl::init(1));
 
-static llvm::cl::opt<bool>
-PerformWMO("wmo", llvm::cl::desc("Enable whole-module optimizations"));
-
 static void runCommandLineSelectedPasses(SILModule *Module) {
   SILPassManager PM(Module);
 
@@ -256,20 +253,8 @@ int main(int argc, char **argv) {
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
 
-  if (!PerformWMO) {
-    auto &FrontendOpts = Invocation.getFrontendOptions();
-    if (!InputFilename.empty() && InputFilename != "-") {
-      FrontendOpts.PrimaryInput = SelectedInput(
-          FrontendOpts.InputFilenames.size());
-    } else {
-      FrontendOpts.PrimaryInput = SelectedInput(
-          FrontendOpts.InputBuffers.size(), SelectedInput::InputKind::Buffer);
-    }
-  }
-
   if (CI.setup(Invocation))
     return 1;
-
   CI.performSema();
 
   // If parsing produced an error, don't run any passes.

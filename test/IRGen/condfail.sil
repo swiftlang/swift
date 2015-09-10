@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -g -emit-ir  | FileCheck %s
+// RUN: %target-swift-frontend -g -emit-ir %s | FileCheck %s
 
 import Builtin
 import Swift
