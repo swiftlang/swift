@@ -380,37 +380,52 @@ void CallGraph::dump() {
 #endif
 }
 
-void CallGraph::dumpStats() {
 #ifndef NDEBUG
-#define NUM_BUCKETS 256
-  unsigned edgesPerNode[NUM_BUCKETS];
-  unsigned calleesPerEdge[NUM_BUCKETS];
-  unsigned countNodes = 0;
-  unsigned countEdges = 0;
+template<int NumBuckets>
+struct Histogram {
+  unsigned Data[NumBuckets];
 
-  for (auto i = 0; i < NUM_BUCKETS; ++i) edgesPerNode[i] = 0;
-  for (auto i = 0; i < NUM_BUCKETS; ++i) calleesPerEdge[i] = 0;
+  Histogram() {
+    for (auto i = 0; i < NumBuckets; ++i) {
+      Data[i] = 0;
+    }
+  }
+
+  void Increment(unsigned Bucket) {
+    Bucket = Bucket < NumBuckets ? Bucket : NumBuckets - 1;
+    Data[Bucket]++;
+  }
+
+  void Print() {
+    auto Last = NumBuckets - 1;
+    for (auto i = 0; i < NumBuckets - 1; ++i) {
+      auto *Seperator = Last == i ? "+: " : ": ";
+      if (Data[i])
+        llvm::errs() << i << Seperator << Data[i] << "\n";
+    }
+    llvm::errs() << "\n";
+  }
+};
+
+void CallGraph::dumpStats() {
+  Histogram<256> CallSitesPerFunction;
+  Histogram<256> CallersPerFunction;
+  Histogram<256> CalleesPerCallSite;
+  unsigned CountNodes = 0;
+  unsigned CountCallSites = 0;
 
   auto const &Funcs = getBottomUpFunctionOrder();
   for (auto *F : Funcs) {
-    ++countNodes;
+    ++CountNodes;
     auto *Node = getCallGraphNode(F);
     if (Node) {
-      auto &calleeEdges = Node->getCalleeEdges();
-      auto edgesInNode = calleeEdges.size();
-      countEdges += edgesInNode;
-      if (edgesInNode >= NUM_BUCKETS)
-        edgesPerNode[NUM_BUCKETS-1]++;
-      else
-        edgesPerNode[edgesInNode]++;
+      CallSitesPerFunction.Increment(Node->getCalleeEdges().size());
+      CallersPerFunction.Increment(Node->getPartialCallerEdges().size());
 
-      for (auto *edge : calleeEdges) {
-        auto countCallees = edge->getPartialCalleeSet().size();
-        if (countCallees >= NUM_BUCKETS)
-          calleesPerEdge[NUM_BUCKETS-1]++;
-        else
-          calleesPerEdge[countCallees]++;
-      }
+      CountCallSites += Node->getCalleeEdges().size();
+
+      for (auto *Edge : Node->getCalleeEdges())
+        CalleesPerCallSite.Increment(Edge->getPartialCalleeSet().size());
     } else {
       llvm::errs() << "!!! Missing node for " << F->getName() << "!!!";
     }
@@ -418,30 +433,22 @@ void CallGraph::dumpStats() {
 
   llvm::errs() << "*** Call Graph Statistics ***\n";
 
-  llvm::errs() << "Number of call graph nodes: " << countNodes << "\n";
-  llvm::errs() << "Number of call graph edges: " << countEdges << "\n";
+  llvm::errs() << "Number of call graph nodes: " << CountNodes << "\n";
+  llvm::errs() << "Number of call graph edges: " << CountCallSites << "\n";
 
-  llvm::errs() << "Histogram of edges per node:\n";
-  for (auto i = 0; i < (NUM_BUCKETS-1); ++i)
-    if (edgesPerNode[i])
-      llvm::errs() << i << ": " << edgesPerNode[i] << "\n";
-  if (edgesPerNode[NUM_BUCKETS-1])
-    llvm::errs() << (NUM_BUCKETS-1) << "+: " <<
-      edgesPerNode[NUM_BUCKETS-1] << "\n";
-  llvm::errs() << "\n";
+  llvm::errs() << "Histogram of number of call sites per function:\n";
+  CallSitesPerFunction.Print();
 
-  llvm::errs() << "Histogram of callees per edge:\n";
-  for (auto i = 0; i < (NUM_BUCKETS-1); ++i)
-    if (calleesPerEdge[i])
-      llvm::errs() << i << ": " << calleesPerEdge[i] << "\n";
-  if (calleesPerEdge[NUM_BUCKETS-1])
-    llvm::errs() << (NUM_BUCKETS-1) << "+: " <<
-      calleesPerEdge[NUM_BUCKETS-1] << "\n";
-  llvm::errs() << "\n";
+  llvm::errs() << "Histogram of number of callees per call site:\n";
+  CalleesPerCallSite.Print();
 
+  llvm::errs() << "Histogram of number of callers per function:\n";
+  CallersPerFunction.Print();
+
+  llvm::errs() << "Bump pointer allocator statistics:\n";
   Allocator.PrintStats();
-#endif
 }
+#endif
 
 /// Finds SCCs in the call graph. Our call graph has an unconventional
 /// form where each edge of the graph is really a multi-edge that can
