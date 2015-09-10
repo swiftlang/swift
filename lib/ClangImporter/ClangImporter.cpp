@@ -1317,7 +1317,7 @@ ClangImporter::Implementation::importName(const clang::NamedDecl *D,
         auto propertyTypeName = getClangTypeNameForOmission(
                                   objcProperty->getType());
         if (contextTypeName == propertyTypeName) {
-          SmallString<32> scratch;
+          StringScratchSpace scratch;
           StringRef newName = omitNeedlessWords(result.str(),
                                                 propertyTypeName,
                                                 NameRole::Property,

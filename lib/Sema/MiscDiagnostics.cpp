@@ -1886,7 +1886,7 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
     returnsSelf = true;
   }
 
-  SmallString<32> scratch;
+  StringScratchSpace scratch;
   if (!swift::omitNeedlessWords(baseNameStr, argNameStrs,
                                 getTypeNameForOmission(resultType),
                                 getTypeNameForOmission(contextType),
@@ -1944,7 +1944,7 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
     return None;
 
   // Omit needless words.
-  SmallString<32> scratch;
+  StringScratchSpace scratch;
   StringRef newName
     = swift::omitNeedlessWords(name.str(),
                                getTypeNameForOmission(var->getType()),

@@ -1958,7 +1958,7 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
 
   // Omit needless words.
   StringRef baseName = name.getBaseName().str();
-  SmallString<32> scratch;
+  StringScratchSpace scratch;
   if (!omitNeedlessWords(baseName, argNames,
                          getClangTypeNameForOmission(resultType),
                          getClangTypeNameForOmission(

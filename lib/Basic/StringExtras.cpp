@@ -382,12 +382,28 @@ StringRef swift::matchLeadingTypeName(StringRef name,
   return name.substr(nameWordIter.getPosition());
 }
 
+StringRef StringScratchSpace::copyString(StringRef string) {
+  void *memory = Allocator.Allocate(string.size(), alignof(char));
+  memcpy(memory, string.data(), string.size());
+  return StringRef(static_cast<char *>(memory), string.size());
+}
+
+/// Wrapper for camel_case::toLowercaseWord that uses string scratch space.
+static StringRef toLowercaseWord(StringRef string, StringScratchSpace &scratch){
+  llvm::SmallString<32> scratchStr;
+  StringRef result = camel_case::toLowercaseWord(string, scratchStr);
+  if (string == result)
+    return string;
+
+  return scratch.copyString(result);
+}
+
 /// Omit needless words for the result type of a name, which come at the
 /// beginning of the name.
 static StringRef omitNeedlessWordsForResultType(StringRef name,
                                                 OmissionTypeName resultType,
                                                 bool resultTypeMatchesContext,
-                                                SmallVectorImpl<char> &scratch){
+                                                StringScratchSpace &scratch){
   if (resultType.empty())
     return name;
 
@@ -403,7 +419,7 @@ static StringRef omitNeedlessWordsForResultType(StringRef name,
   if (firstWord == "By") {
     if (getPartOfSpeech(camel_case::getFirstWord(newName.substr(2)))
           == PartOfSpeech::Gerund) {
-      return camel_case::toLowercaseWord(newName.substr(2), scratch);
+      return toLowercaseWord(newName.substr(2), scratch);
     }
   }
 
@@ -413,7 +429,7 @@ static StringRef omitNeedlessWordsForResultType(StringRef name,
   if (resultTypeMatchesContext &&
       getPartOfSpeech(firstWord) == PartOfSpeech::Preposition &&
       newName.size() > firstWord.size()) {
-    return camel_case::toLowercaseWord(newName, scratch);
+    return toLowercaseWord(newName, scratch);
   }
 
   return name;
@@ -421,7 +437,7 @@ static StringRef omitNeedlessWordsForResultType(StringRef name,
 
 StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
                                    NameRole role,
-                                   SmallVectorImpl<char> &scratch) {
+                                   StringScratchSpace &scratch) {
   if (name.empty() || typeName.empty()) return name;
 
   // Get the camel-case words in the name and type name.
@@ -592,7 +608,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                               OmissionTypeName contextType,
                               ArrayRef<OmissionTypeName> paramTypes,
                               bool returnsSelf,
-                              SmallVectorImpl<char> &scratch) {
+                              StringScratchSpace &scratch) {
   // For zero-parameter methods that return 'Self' or a result type
   // that matches the declaration context, omit needless words from
   // the base name.

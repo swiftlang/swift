@@ -21,6 +21,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Allocator.h"
 #include <iterator>
 #include <string>
 
@@ -315,6 +316,14 @@ struct OmissionTypeName {
 /// would produce "ByAppendingString".
 StringRef matchLeadingTypeName(StringRef name, OmissionTypeName typeName);
 
+/// Scratch space used for returning a set of StringRefs.
+class StringScratchSpace {
+  llvm::BumpPtrAllocator Allocator;
+
+public:
+  StringRef copyString(StringRef string);
+};
+
 /// Attempt to omit needless words from the given name based on the
 /// name of the type associated with the name.
 ///
@@ -331,7 +340,7 @@ StringRef matchLeadingTypeName(StringRef name, OmissionTypeName typeName);
 ///
 /// \returns the updated name.
 StringRef omitNeedlessWords(StringRef name, OmissionTypeName typeName,
-                            NameRole role, SmallVectorImpl<char> &scratch);
+                            NameRole role, StringScratchSpace &scratch);
 
 /// Omit needless words for a function, method, or initializer.
 ///
@@ -362,7 +371,7 @@ bool omitNeedlessWords(StringRef &baseName,
                        OmissionTypeName contextType,
                        ArrayRef<OmissionTypeName> paramTypes,
                        bool returnsSelf,
-                       SmallVectorImpl<char> &scratch);
+                       StringScratchSpace &scratch);
 }
 
 #endif // LLVM_SWIFT_BASIC_STRINGEXTRAS_HPP
