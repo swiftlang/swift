@@ -16,19 +16,19 @@ import SwiftShims
 
 public protocol ReaderWriterType {
   init()
-  func read(index: Int) -> Int
-  mutating func write(index: Int, value: Int)
+  func read(index: Int32) -> Int32
+  mutating func write(index: Int32, value: Int32)
 }
 
 public final class ArrayClassReaderWriter : ReaderWriterType {
-  @sil_stored private final var elements: [Int] { get set }
+  @sil_stored private final var elements: [Int32] { get set }
   @inline(never) public init()
-  @inline(never) public final func read(index: Int) -> Int
-  public final func write(index: Int, value: Int)
+  @inline(never) public final func read(index: Int32) -> Int32
+  public final func write(index: Int32, value: Int32)
    deinit 
 }
 
-@inline(never) public func readValues() -> Int
+@inline(never) public func readValues() -> Int32
 
 
 sil_global [fragile] @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
@@ -36,20 +36,20 @@ sil_global [fragile] @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 
 sil [noinline] @_TFC28existential_type_propagation22ArrayClassReaderWritercfMS0_FT_S0_ : $@convention(method) (@owned ArrayClassReaderWriter) -> @owned ArrayClassReaderWriter
 sil [noinline] @_TFC28existential_type_propagation22ArrayClassReaderWriterCfMS0_FT_S0_ : $@convention(thin) (@thick ArrayClassReaderWriter.Type) -> @owned ArrayClassReaderWriter
-sil [noinline] @_TFC28existential_type_propagation22ArrayClassReaderWriter4readfS0_FSiSi : $@convention(method) (Int, @guaranteed ArrayClassReaderWriter) -> Int
+sil [noinline] @_TFC28existential_type_propagation22ArrayClassReaderWriter4readfS0_FSiSi : $@convention(method) (Int32, @guaranteed ArrayClassReaderWriter) -> Int32
 sil [transparent] [thunk] @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_CuRq_S1__fMq_FT_q_ : $@convention(witness_method) (@out ArrayClassReaderWriter, @thick ArrayClassReaderWriter.Type) -> ()
-sil [transparent] [thunk] @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_4readuRq_S1__fq_FSiSi : $@convention(witness_method) (Int, @in_guaranteed ArrayClassReaderWriter) -> Int
-sil [transparent] [thunk] @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_5writeuRq_S1__fRq_FTSi5valueSi_T_ : $@convention(witness_method) (Int, Int, @inout ArrayClassReaderWriter) -> ()
+sil [transparent] [thunk] @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_4readuRq_S1__fq_FSiSi : $@convention(witness_method) (Int32, @in_guaranteed ArrayClassReaderWriter) -> Int32
+sil [transparent] [thunk] @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_5writeuRq_S1__fRq_FTSi5valueSi_T_ : $@convention(witness_method) (Int32, Int32, @inout ArrayClassReaderWriter) -> ()
 
-// CHECK: sil [noinline] @test_existential_type_propagation : $@convention(thin) () -> Int
+// CHECK: sil [noinline] @test_existential_type_propagation : $@convention(thin) () -> Int32
 // CHECK-NOT: init_existential_addr
 // CHECK-NOT: open_existential_addr
 // CHECK-NOT: witness_method
-// CHECK: function_ref @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_4readuRq_S1__fq_FSiSi : $@convention(witness_method) (Int, @in_guaranteed ArrayClassReaderWriter) -> Int
+// CHECK: function_ref @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_4readuRq_S1__fq_FSiSi : $@convention(witness_method) (Int32, @in_guaranteed ArrayClassReaderWriter) -> Int32
 // CHECK: return
-sil [noinline] @test_existential_type_propagation : $@convention(thin) () -> Int {
+sil [noinline] @test_existential_type_propagation : $@convention(thin) () -> Int32 {
 bb0:
-  %0 = alloc_stack $Int
+  %0 = alloc_stack $Int32
   %1 = alloc_stack $ReaderWriterType
   // Here we set the concrete type information.  
   %2 = init_existential_addr %1#1 : $*ReaderWriterType, $ArrayClassReaderWriter
@@ -59,29 +59,29 @@ bb0:
   store %5 to %2 : $*ArrayClassReaderWriter
   %7 = open_existential_addr %1#1 : $*ReaderWriterType to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType
   // Check that the type information reaches the witness_method instruction and allows for divirtualization.
-  %8 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType, #ReaderWriterType.read!1, %7 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType : $@convention(witness_method) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int, @in_guaranteed τ_0_0) -> Int
-  %9 = integer_literal $Builtin.Int64, 0
-  %10 = struct $Int (%9 : $Builtin.Int64)
-  %11 = apply %8<@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType>(%10, %7) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int, @in_guaranteed τ_0_0) -> Int
-  %12 = integer_literal $Builtin.Int64, 0
-  %13 = struct $Int (%12 : $Builtin.Int64)
-  store %13 to %0#1 : $*Int
+  %8 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType, #ReaderWriterType.read!1, %7 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType : $@convention(witness_method) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
+  %9 = integer_literal $Builtin.Int32, 0
+  %10 = struct $Int32 (%9 : $Builtin.Int32)
+  %11 = apply %8<@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType>(%10, %7) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
+  %12 = integer_literal $Builtin.Int32, 0
+  %13 = struct $Int32 (%12 : $Builtin.Int32)
+  store %13 to %0#1 : $*Int32
   destroy_addr %1#1 : $*ReaderWriterType
   dealloc_stack %1#0 : $*@local_storage ReaderWriterType
-  dealloc_stack %0#0 : $*@local_storage Int
-  return %13 : $Int
+  dealloc_stack %0#0 : $*@local_storage Int32
+  return %13 : $Int32
 }
 
-// CHECK: sil [noinline] @test_existential_type_propagation_via_copy_addr : $@convention(thin) () -> Int
+// CHECK: sil [noinline] @test_existential_type_propagation_via_copy_addr : $@convention(thin) () -> Int32
 // CHECK-NOT: init_existential_addr
 // CHECK-NOT: copy_addr
 // CHECK-NOT: open_existential_addr
 // CHECK-NOT: witness_method
-// CHECK: function_ref @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_4readuRq_S1__fq_FSiSi : $@convention(witness_method) (Int, @in_guaranteed ArrayClassReaderWriter) -> Int
+// CHECK: function_ref @_TTWC28existential_type_propagation22ArrayClassReaderWriterS_16ReaderWriterTypeS_FS1_4readuRq_S1__fq_FSiSi : $@convention(witness_method) (Int32, @in_guaranteed ArrayClassReaderWriter) -> Int32
 // CHECK: return
-sil [noinline] @test_existential_type_propagation_via_copy_addr : $@convention(thin) () -> Int {
+sil [noinline] @test_existential_type_propagation_via_copy_addr : $@convention(thin) () -> Int32 {
 bb0:
-  %0 = alloc_stack $Int
+  %0 = alloc_stack $Int32
   %1 = alloc_stack $ReaderWriterType
   %2 = alloc_stack $ReaderWriterType
   // Here we set the concrete type information.
@@ -94,19 +94,19 @@ bb0:
   copy_addr %1#1 to [initialization] %2#1 : $*ReaderWriterType
   %9 = open_existential_addr %2#1 : $*ReaderWriterType to $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType
   // Check that the type information reaches the witness_method instruction and allows for divirtualization.
-  %10 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType, #ReaderWriterType.read!1, %9 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType : $@convention(witness_method) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int, @in_guaranteed τ_0_0) -> Int
-  %11 = integer_literal $Builtin.Int64, 0
-  %12 = struct $Int (%11 : $Builtin.Int64)
-  %13 = apply %10<@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType>(%12, %9) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int, @in_guaranteed τ_0_0) -> Int
-  %14 = integer_literal $Builtin.Int64, 0
-  %15 = struct $Int (%14 : $Builtin.Int64)
-  store %15 to %0#1 : $*Int
+  %10 = witness_method $@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType, #ReaderWriterType.read!1, %9 : $*@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType : $@convention(witness_method) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
+  %11 = integer_literal $Builtin.Int32, 0
+  %12 = struct $Int32 (%11 : $Builtin.Int32)
+  %13 = apply %10<@opened("3305E696-5685-11E5-9393-B8E856428C60") ReaderWriterType>(%12, %9) : $@convention(witness_method) <τ_0_0 where τ_0_0 : ReaderWriterType> (Int32, @in_guaranteed τ_0_0) -> Int32
+  %14 = integer_literal $Builtin.Int32, 0
+  %15 = struct $Int32 (%14 : $Builtin.Int32)
+  store %15 to %0#1 : $*Int32
   destroy_addr %2#1 : $*ReaderWriterType
   dealloc_stack %2#0 : $*@local_storage ReaderWriterType
   destroy_addr %1#1 : $*ReaderWriterType
   dealloc_stack %1#0 : $*@local_storage ReaderWriterType
-  dealloc_stack %0#0 : $*@local_storage Int
-  return %15 : $Int
+  dealloc_stack %0#0 : $*@local_storage Int32
+  return %15 : $Int32
 }
 
 sil_vtable ArrayClassReaderWriter {
