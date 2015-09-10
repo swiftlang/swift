@@ -33,8 +33,8 @@
 // Note: Class -> "Class"
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
 
-// Note: Pointer-to-struct name matching; don't drop "With".
-// CHECK-FOUNDATION: func copyWith(zone: NSZone) -> AnyObject!
+// Note: Pointer-to-struct name matching; "with" splits the first piece.
+// CHECK-FOUNDATION: func copy(zone zone: NSZone) -> AnyObject!
 
 // Note: Objective-C type parameter names.
 // CHECK-FOUNDATION: func objectFor(aKey: NSCopying) -> AnyObject?
@@ -52,11 +52,11 @@
 // Note: built-in types.
 // CHECK-FOUNDATION: func add(value: Double) -> NSNumber
 
-// Note: multi-word enum name matching; don't drop "With".
-// CHECK-FOUNDATION: func someMethodWith(options: NSDeprecatedOptions)
+// Note: multi-word enum name matching; "with" splits the first piece.
+// CHECK-FOUNDATION: func someMethod(deprecatedOptions options: NSDeprecatedOptions)
 
 // Note: class name matching; don't drop "With".
-// CHECK-FOUNDATION: class func requestWith(URLString: String!) -> Self!
+// CHECK-FOUNDATION: class func request(string URLString: String!) -> Self!
 
 // Note: Make sure NSURL works in various places
 // CHECK-FOUNDATION: open(URL: NSURL!, completionHandler: ((Bool) -> Void)!)

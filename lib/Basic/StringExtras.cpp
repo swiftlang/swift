@@ -672,7 +672,17 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
     // Record this change.
     if (role == NameRole::BaseName) {
-      baseName = newName;
+      // If, after dropping type information, the last word of the
+      // base name is "With", drop the "With" from the base name and
+      // use the (redundant) type information as a label for the first
+      // parameter.
+      if (camel_case::getLastWord(newName) == "With") {
+        argNames[0] = toLowercaseWord(name.substr(newName.size()), scratch);
+        baseName = newName.substr(0, newName.size() - 4);
+      } else {
+        // Otherwise, adopt the new base name.
+        baseName = newName;
+      }
     } else {
       argNames[i] = newName;
     }

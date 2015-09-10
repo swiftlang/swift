@@ -2017,8 +2017,6 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
   if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg))
     arg = shuffle->getSubExpr()->getSemanticsProvidingExpr();
   TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
-  if (argNamesChanged && !argTuple)
-    return;
 
   InFlightDiagnostic diag = diagnose(fnRef->getLoc(),
                                      diag::omit_needless_words,
@@ -2033,23 +2031,31 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
   if (argNamesChanged) {
     auto oldArgNames = name.getArgumentNames();
     auto newArgNames = newName->getArgumentNames();
-    for (unsigned i = 0, n = newArgNames.size(); i != n; ++i) {
-      auto newArgName = newArgNames[i];
-      if (oldArgNames[i] == newArgName) continue;
+    if (argTuple) {
+      for (unsigned i = 0, n = newArgNames.size(); i != n; ++i) {
+        auto newArgName = newArgNames[i];
+        if (oldArgNames[i] == newArgName) continue;
 
-      if (i > argTuple->getNumElements()) break;
-      if (argTuple->getElementName(i) != oldArgNames[i]) continue;
+        if (i > argTuple->getNumElements()) break;
+        if (argTuple->getElementName(i) != oldArgNames[i]) continue;
 
-      auto nameLoc = argTuple->getElementNameLoc(i);
-      if (nameLoc.isInvalid()) continue;
-
-      if (newArgName.empty()) {
-        // Delete the argument label.
-        diag.fixItRemoveChars(nameLoc, argTuple->getElement(i)->getStartLoc());
-      } else {
-        // Fix the argument label.
-        diag.fixItReplace(nameLoc, newArgName.str());
+        auto nameLoc = argTuple->getElementNameLoc(i);
+        if (nameLoc.isInvalid()) {
+          // Add the argument label.
+          diag.fixItInsert(argTuple->getElement(i)->getStartLoc(),
+                           (newArgName.str() + ": ").str());
+        } else if (newArgName.empty()) {
+          // Delete the argument label.
+          diag.fixItRemoveChars(nameLoc, argTuple->getElement(i)->getStartLoc());
+        } else {
+          // Fix the argument label.
+          diag.fixItReplace(nameLoc, newArgName.str());
+        }
       }
+    } else if (newArgNames.size() > 0 && !newArgNames[0].empty()) {
+      // Add the argument label.
+      auto newArgName = newArgNames[0];
+      diag.fixItInsert(arg->getStartLoc(), (newArgName.str() + ": ").str());
     }
   }
 }
