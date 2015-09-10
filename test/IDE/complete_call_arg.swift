@@ -12,6 +12,14 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD3 | FileCheck %s -check-prefix=OVERLOAD3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD4 | FileCheck %s -check-prefix=OVERLOAD4
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | FileCheck %s -check-prefix=MEMBER1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER2 | FileCheck %s -check-prefix=MEMBER2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER3 | FileCheck %s -check-prefix=MEMBER3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER4 | FileCheck %s -check-prefix=MEMBER4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER5 | FileCheck %s -check-prefix=MEMBER2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER6 | FileCheck %s -check-prefix=MEMBER4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER7 | FileCheck %s -check-prefix=MEMBER7
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -32,6 +40,15 @@ func foo1(a : Int, b : Int) {}
 func bar(a : String, b : String?) {}
 func bar1(a : String, b1 : String) {}
 func bar1(a : String, b2 : String) {}
+
+class Gen {
+  func IntGen() -> Int { return 0 }
+  func IntOpGen() -> Int? {return 0 }
+  func StringGen() -> String { return "" }
+  func StringOpGen() -> String? {return ""}
+  func IntTaker(i1 : Int, i2 : Int) {}
+  func StringTaker(s1: String, s2 : String) {}
+}
 
 class C1 {
   func f1() {
@@ -151,3 +168,71 @@ class C3 {
 // OVERLOAD4-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: C1I[#C1#]; name=C1I
 // OVERLOAD4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
 // OVERLOAD4-DAG: Decl[InstanceVar]/CurrNominal:      C2I[#C2#]; name=C2I
+
+class C4 {
+  func f1(G : Gen) {
+    foo(1, b1: G.#^MEMBER1^#
+  }
+
+  func f2(G : Gen) {
+    foo1(2, b : G.#^MEMBER2^#
+  }
+
+  func f3(G : Gen) {
+    bar("", b1 : G.#^MEMBER3^#
+  }
+
+  func f4(G : Gen) {
+    bar1("", b1 : G.#^MEMBER4^#
+  }
+
+  func f5(G1 : Gen, G2 : Gen) {
+    G1.IntTaker(1, i1 : G2.#^MEMBER5^#
+  }
+
+  func f6(G1 : Gen, G2 : Gen) {
+    G1.StringTaker("", s2: G2.#^MEMBER6^#
+  }
+
+  func f7(GA : [Gen]) {
+    foo(1, b1 : GA.#^MEMBER7^#
+  }
+}
+
+// MEMBER1: Begin completions
+// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntGen()[#Int#]; name=IntGen()
+// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntOpGen()[#Int?#]; name=IntOpGen()
+// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal:   StringGen()[#String#]; name=StringGen()
+// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]; name=StringOpGen()
+// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
+// MEMBER1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+
+// MEMBER2: Begin completions
+// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntGen()[#Int#]; name=IntGen()
+// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]; name=IntOpGen()
+// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal:   StringGen()[#String#]; name=StringGen()
+// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]; name=StringOpGen()
+// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
+// MEMBER2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+
+// MEMBER3: Begin completions
+// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]; name=IntGen()
+// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]; name=IntOpGen()
+// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: StringGen()[#String#]; name=StringGen()
+// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: StringOpGen()[#String?#]; name=StringOpGen()
+// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
+// MEMBER3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+
+// MEMBER4: Begin completions
+// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]; name=IntGen()
+// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]; name=IntOpGen()
+// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: StringGen()[#String#]; name=StringGen()
+// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal:   StringOpGen()[#String?#]; name=StringOpGen()
+// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: IntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=IntTaker(i1: Int, i2: Int)
+// MEMBER4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: StringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=StringTaker(s1: String, s2: String)
+
+// MEMBER7: Begin completions
+// MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: removeAll()[#Void#]; name=removeAll()
+// MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: removeAll({#keepCapacity: Bool#})[#Void#]; name=removeAll(keepCapacity: Bool)
+// MEMBER7-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: count[#Int#]; name=count
+// MEMBER7-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: capacity[#Int#]; name=capacity

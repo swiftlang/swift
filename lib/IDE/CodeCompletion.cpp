@@ -2417,10 +2417,10 @@ public:
     }
   }
 
-  bool lookupArgCompletionsAtPosition(unsigned Position, bool HasName,
-                                      ArrayRef<Type> Types, SourceLoc Loc) {
-    std::vector<Type> ExpectedTypes;
-    std::vector<StringRef> ExpectedNames;
+  static void collectArgumentExpection(unsigned Position, bool HasName,
+                                       ArrayRef<Type> Types, SourceLoc Loc,
+                                       std::vector<Type> &ExpectedTypes,
+                                       std::vector<StringRef> &ExpectedNames) {
     for (auto Type : Types) {
       if (auto TT = Type->getAs<TupleType>()) {
         if (Position >= TT->getElements().size()) {
@@ -2434,12 +2434,20 @@ public:
         }
       }
     }
+  }
+
+  bool lookupArgCompletionsAtPosition(unsigned Position, bool HasName,
+                                      ArrayRef<Type> Types, SourceLoc Loc) {
+    std::vector<Type> ExpectedTypes;
+    std::vector<StringRef> ExpectedNames;
+    collectArgumentExpection(Position, HasName, Types, Loc, ExpectedTypes,
+                             ExpectedNames);
     addArgNameCompletionResults(ExpectedNames);
     if (!ExpectedTypes.empty()) {
       setExpectedTypes(ExpectedTypes);
       getValueCompletionsInDeclContext(Loc, DefaultFilter,
-                                      /*IncludeTopLevel*/true,
-                                      /*RequestCache*/false);
+                                       /*IncludeTopLevel*/true,
+                                       /*RequestCache*/false);
     }
     return true;
   }
@@ -2481,8 +2489,10 @@ public:
     }
   }
 
-  bool getCallArgCompletions(DeclContext &DC, CallExpr *CallE, ErrorExpr *CCExpr) {
-    SmallVector<Type, 2> PossibleTypes;
+  static bool collectPossibleArgTypes(DeclContext &DC, CallExpr *CallE, Expr *CCExpr,
+                                      SmallVectorImpl<Type> &PossibleTypes,
+                                      unsigned &Position, bool &HasName,
+                                      bool RemoveUnlikelyOverloads) {
     if (auto Ty = CallE->getFn()->getType()) {
       if (auto FT = Ty->getAs<FunctionType>()) {
         PossibleTypes.push_back(FT->getInput());
@@ -2491,8 +2501,6 @@ public:
     auto TAG = dyn_cast<TupleExpr>(CallE->getArg());
     if (!TAG)
       return false;
-    unsigned Position;
-    bool HasName;
     llvm::SmallVector<Type, 3> TupleEleTypesBeforeTarget;
     if (!getPositionInTupleExpr(DC, CCExpr, TAG, Position, HasName,
                                 TupleEleTypesBeforeTarget))
@@ -2500,8 +2508,34 @@ public:
     if (PossibleTypes.empty() &&
         !typeCheckUnresolvedExpr(DC, CallE->getArg(), CallE, PossibleTypes))
       return false;
-    removeUnlikelyOverloads(PossibleTypes, TupleEleTypesBeforeTarget, &DC);
-    return lookupArgCompletionsAtPosition(Position, HasName, PossibleTypes,
+    if (RemoveUnlikelyOverloads)
+      removeUnlikelyOverloads(PossibleTypes, TupleEleTypesBeforeTarget, &DC);
+    return true;
+  }
+
+  static bool collectArgumentExpectatation(DeclContext &DC, CallExpr *CallE,
+                                           Expr *CCExpr,
+                                           std::vector<Type> &ExpectedTypes) {
+    SmallVector<Type, 2> PossibleTypes;
+    unsigned Position;
+    bool HasName;
+    std::vector<StringRef> ExpectedNames;
+    if (collectPossibleArgTypes(DC, CallE, CCExpr, PossibleTypes, Position,
+                                HasName, true)) {
+      collectArgumentExpection(Position, HasName, PossibleTypes,
+                               CCExpr->getStartLoc(), ExpectedTypes, ExpectedNames);
+      return !ExpectedTypes.empty();
+    }
+    return false;
+  }
+
+  bool getCallArgCompletions(DeclContext &DC, CallExpr *CallE, Expr *CCExpr) {
+    SmallVector<Type, 2> PossibleTypes;
+    unsigned Position;
+    bool HasName;
+    return collectPossibleArgTypes(DC, CallE, CCExpr, PossibleTypes, Position,
+                                   HasName, true) &&
+           lookupArgCompletionsAtPosition(Position, HasName, PossibleTypes,
                                           CCExpr->getStartLoc());
   }
 
@@ -3130,6 +3164,47 @@ namespace  {
   };
 }
 
+class DotExpressionTypeContextAnalyzer {
+  DeclContext *DC;
+  Expr *ParsedExpr;
+  ExprParentFinder Finder;
+
+public:
+  DotExpressionTypeContextAnalyzer(DeclContext *DC, Expr *ParsedExpr) : DC(DC),
+    ParsedExpr(ParsedExpr),
+    Finder(DC->getASTContext().SourceMgr, ParsedExpr, [](Expr *E) {
+      switch(E->getKind()) {
+        case ExprKind::Call:
+          return true;
+        default:
+          return false;
+      }
+  }) {}
+
+  bool Analyze(llvm::SmallVectorImpl<Type> &PossibleTypes) {
+    DC->walkContext(Finder);
+    auto Parent = Finder.ParentExprClosest;
+    std::vector<Type> PotentialTypes;
+    if (!Parent)
+      return false;
+    switch (Parent->getKind()) {
+      case ExprKind::Call: {
+        CompletionLookup::collectArgumentExpectatation(*DC, cast<CallExpr>(Parent),
+                                                      ParsedExpr, PotentialTypes);
+        break;
+      }
+      default:
+        llvm_unreachable("Unhandled expression kinds.");
+    }
+    for (auto Ty : PotentialTypes) {
+      if (Ty && Ty->getKind() != TypeKind::Error) {
+        PossibleTypes.push_back(Ty->getRValueType());
+      }
+    }
+    return !PossibleTypes.empty();
+  }
+};
+
 void CodeCompletionCallbacksImpl::doneParsing() {
   if (Kind == CompletionKind::None) {
     return;
@@ -3196,6 +3271,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isDynamicLookup(ExprType))
       Lookup.setIsDynamicLookup();
     Lookup.initializeArchetypeTransformer(CurDeclContext, ExprType);
+
+    DotExpressionTypeContextAnalyzer TypeAnalyzer(CurDeclContext, ParsedExpr);
+    llvm::SmallVector<Type, 2> PossibleTypes;
+    if (TypeAnalyzer.Analyze(PossibleTypes)) {
+      Lookup.setExpectedTypes(PossibleTypes);
+    }
     Lookup.getValueExprCompletions(ExprType);
     break;
   }
