@@ -1145,7 +1145,7 @@ struct HeapMetadata : Metadata {
 
 /// Header for a generic parameter descriptor. This is a variable-sized
 /// structure that describes how to find and parse a generic parameter vector
-/// within
+/// within the type metadata for an instance of a nominal type.
 struct GenericParameterDescriptor {
   /// The offset of the descriptor in the metadata record. If NumParams is zero,
   /// this value is meaningless.
