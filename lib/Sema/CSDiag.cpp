@@ -1071,7 +1071,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
       message += " is immutable";
     else if (VD->isLet())
       message += " is a 'let' constant";
-    else if (VD->hasAccessorFunctions() && !VD->getSetter())
+    else if (!VD->isSettable(CS.DC))
       message += " is a get-only property";
     else if (!VD->isSetterAccessibleFrom(CS.DC))
       message += " setter is inaccessible";
@@ -1090,7 +1090,7 @@ static void diagnoseSubElementFailure(Expr *destExpr,
   // If the underlying expression was a read-only subscript, diagnose that.
   if (auto *SD = dyn_cast_or_null<SubscriptDecl>(immInfo.second)) {
     StringRef message;
-    if (!SD->getSetter())
+    if (!SD->isSettable())
       message = "subscript is get-only";
     else if (!SD->isSetterAccessibleFrom(CS.DC))
       message = "subscript setter is inaccessible";
