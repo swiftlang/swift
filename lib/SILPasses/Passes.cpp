@@ -325,6 +325,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();
+  PM.addCodeSinking();
 
   PM.setStageName("LateLoopOpt");
   PM.addLICM();

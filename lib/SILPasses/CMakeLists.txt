@@ -46,6 +46,7 @@ add_swift_library(swiftSILPasses
   ClosureSpecializer.cpp
   RemovePin.cpp
   SILCombinerVisitors.cpp
+  Sink.cpp
   ExternalDefsToDecls.cpp
   MergeCondFail.cpp
   PrettyStackTrace.cpp

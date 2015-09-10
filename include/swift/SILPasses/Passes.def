@@ -151,6 +151,8 @@ PASS(StripDebugInfo, "strip-debug-info",
      "Strip debug info")
 PASS(SwiftArrayOpts, "array-specialize",
      "Specialize arrays")
+PASS(CodeSinking, "code-sinking",
+     "Sinks code closer to users")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use pre-specialized functions")
 PASS_RANGE(AllPasses, AADumper, UsePrespecialized)
