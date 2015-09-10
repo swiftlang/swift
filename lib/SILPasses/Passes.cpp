@@ -64,6 +64,10 @@ static void registerAnalysisPasses(SILPassManager &PM) {
 }
 
 bool swift::runSILDiagnosticPasses(SILModule &Module) {
+  // Verify the module, if required.
+  if (Module.getOptions().VerifyAll)
+    Module.verify();
+
   // If we parsed a .sil file that is already in canonical form, don't rerun
   // the diagnostic passes.
   if (Module.getStage() == SILStage::Canonical)
@@ -112,6 +116,13 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
     PM.resetAndRemoveTransformations();
     PM.addCFGPrinter();
     PM.runOneIteration();
+  }
+
+  // Verify the module, if required.
+  if (Module.getOptions().VerifyAll)
+    Module.verify();
+  else {
+    DEBUG(Module.verify());
   }
 
   // If errors were produced during SIL analysis, return true.
@@ -214,6 +225,10 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
 
 
 void swift::runSILOptimizationPasses(SILModule &Module) {
+  // Verify the module, if required.
+  if (Module.getOptions().VerifyAll)
+    Module.verify();
+
   if (Module.getOptions().DebugSerialization) {
     SILPassManager PM(&Module);
     registerAnalysisPasses(PM);
@@ -332,10 +347,19 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
     PM.runOneIteration();
   }
 
-  DEBUG(Module.verify());
+  // Verify the module, if required.
+  if (Module.getOptions().VerifyAll)
+    Module.verify();
+  else {
+    DEBUG(Module.verify());
+  }
 }
 
 void swift::runSILPassesForOnone(SILModule &Module) {
+  // Verify the module, if required.
+  if (Module.getOptions().VerifyAll)
+    Module.verify();
+
   SILPassManager PM(&Module, "Onone");
   registerAnalysisPasses(PM);
 
@@ -354,6 +378,13 @@ void swift::runSILPassesForOnone(SILModule &Module) {
   PM.addExternalDefsToDecls();
 
   PM.runOneIteration();
+
+  // Verify the module, if required.
+  if (Module.getOptions().VerifyAll)
+    Module.verify();
+  else {
+    DEBUG(Module.verify());
+  }
 }
 
 #ifndef NDEBUG
