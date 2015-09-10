@@ -1197,7 +1197,9 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
 
   while (!WorkList.empty()) {
     llvm::SmallVector<ApplySite, 4> WorkItemApplies;
-    collectAllAppliesInFunction(WorkList.back(), WorkItemApplies);
+    SILFunction *CurrentCaller = WorkList.back();
+    if (CurrentCaller->shouldOptimize())
+      collectAllAppliesInFunction(CurrentCaller, WorkItemApplies);
 
     // Devirtualize and specialize any applies we've collected,
     // and collect new functions we should inline into as we do
