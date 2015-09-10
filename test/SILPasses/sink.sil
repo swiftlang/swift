@@ -133,6 +133,59 @@ bb4:
   return %5 : $Int
 }
 
+
+//CHECK-LABEL: sil @sink_loop
+//CHECK: bb1:
+//CHECK-NEXT: apply
+//CHECK-NEXT: br bb1
+//CHECK: return
+sil @sink_loop : $@convention(thin) (@owned Y) -> Int {
+bb0(%0 : $Y):
+  debug_value %0 : $Y
+  strong_retain %0 : $Y
+  %3 = upcast %0 : $Y to $X
+  %4 = class_method %3 : $X, #X.ping!1 : X -> () -> Int , $@convention(method) (@guaranteed X) -> Int
+  br bb1
+
+// This is a loop!
+bb1:
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
+  br bb1
+
+bb2:
+  strong_release %0 : $Y
+  return undef : $Int
+}
+
+
+//CHECK-LABEL: sil @sink_nested_loop
+//CHECK: bb0
+//CHECK-NEXT: upcast
+//CHECK-NEXT: class_method
+//CHECK-NEXT: br bb1
+//CHECK: return
+sil @sink_nested_loop : $@convention(thin) (@owned Y) -> Int {
+bb0(%0 : $Y):
+  %3 = upcast %0 : $Y to $X
+  %4 = class_method %3 : $X, #X.ping!1 : X -> () -> Int , $@convention(method) (@guaranteed X) -> Int
+  br bb1
+
+bb1:
+  br bb2
+
+// This is a loop!
+bb2:
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
+  cond_br undef, bb2, bb3
+
+bb3:
+  cond_br undef, bb3, bb1
+
+bb4:
+  strong_release %0 : $Y
+  return undef : $Int
+}
+
 sil_vtable X {
   #X.ping!1: _TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
   #X.init!initializer.1: _TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X

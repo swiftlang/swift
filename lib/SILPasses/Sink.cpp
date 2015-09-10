@@ -19,7 +19,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
-#include "swift/SILAnalysis/Analysis.h"
+#include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILValue.h"
@@ -43,6 +43,7 @@ public:
 
   DominanceInfo *DT;
   PostOrderFunctionInfo *PO;
+  SILLoopInfo *LoopInfo;
 
   /// \brief returns True if were able to sink the instruction \p II
   /// closer to it's users.
@@ -61,6 +62,7 @@ public:
 
     SILBasicBlock *CurrentBlock = II->getParent();
     SILBasicBlock *Dest = nullptr;
+    unsigned InitialLoopDepth = LoopInfo->getLoopDepth(CurrentBlock);
 
     // TODO: We may want to delete debug instructions to allow us to sink more
     // instructions.
@@ -70,6 +72,8 @@ public:
       // Check if the instruction is already in the user's block.
       if (User->getParent() == CurrentBlock) return false;
 
+      // Record the block of the first user and move on to
+      // other users.
       if (!Dest) {
         Dest = User->getParent();
         continue;
@@ -78,11 +82,25 @@ public:
       // Find a location that dominates all users. If we did not find such
       // a block or if it is the current block then bail out.
       Dest = DT->findNearestCommonDominator(Dest, User->getParent());
+
       if (!Dest || Dest == CurrentBlock)
         return false;
     }
 
     if (!Dest) return false;
+
+    // We don't want to sink instructions into loops. Walk up the dom tree
+    // until we reach the same loop nest level.
+    while (LoopInfo->getLoopDepth(Dest) != InitialLoopDepth) {
+      auto Node = DT->getNode(Dest);
+      assert(Node && "Invalid dom tree");
+      auto IDom = Node->getIDom();
+      assert(IDom && "Can't find the idom");
+      Dest = IDom->getBlock();
+
+      if (!Dest || Dest == CurrentBlock)
+        return false;
+    }
 
     II->moveBefore(Dest->begin());
     NumInstrSunk++;
@@ -93,6 +111,8 @@ public:
     bool Changed = false;
     DT = PM->getAnalysis<DominanceAnalysis>()->get(getFunction());
     PO = getAnalysis<PostOrderAnalysis>()->get(getFunction());
+    SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
+    LoopInfo = LA->getLoopInfo(getFunction());
 
     auto postOrder = PO->getPostOrder();
 
