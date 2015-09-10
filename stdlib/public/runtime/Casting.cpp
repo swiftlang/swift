@@ -1338,11 +1338,23 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
 }
 
 /// Do a dynamic cast to the target class.
-static bool _dynamicCastUnknownClass(OpaqueValue *dest,
-                                     void *object,
-                                     const Metadata *targetType,
-                                     DynamicCastFlags flags) {
-  void **destSlot = reinterpret_cast<void **>(dest);
+static void *_dynamicCastUnknownClass(void *object,
+                                      const Metadata *targetType,
+                                      bool unconditional) {
+  // The unconditional path avoids some failure logic.
+  if (unconditional) {
+    return const_cast<void*>(
+          swift_dynamicCastUnknownClassUnconditional(object, targetType));
+  }
+
+  return const_cast<void*>(swift_dynamicCastUnknownClass(object, targetType));
+}
+
+static bool _dynamicCastUnknownClassIndirect(OpaqueValue *dest,
+                                             void *object,
+                                             const Metadata *targetType,
+                                             DynamicCastFlags flags) {
+    void **destSlot = reinterpret_cast<void **>(dest);
 
   // The unconditional path avoids some failure logic.
   if (flags & DynamicCastFlags::Unconditional) {
@@ -1411,7 +1423,7 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
                                targetType, flags);
     }
 #endif
-    return _dynamicCastUnknownClass(dest, obj, targetType, flags);
+    return _dynamicCastUnknownClassIndirect(dest, obj, targetType, flags);
   }
   case ExistentialTypeRepresentation::Opaque: {
     auto opaqueContainer =
@@ -1894,8 +1906,8 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     case MetadataKind::ForeignClass: {
       // Do a dynamic cast on the instance pointer.
       void *object = *reinterpret_cast<void * const *>(src);
-      return _dynamicCastUnknownClass(dest, object,
-                                      targetType, flags);
+      return _dynamicCastUnknownClassIndirect(dest, object,
+                                              targetType, flags);
     }
 
     case MetadataKind::Existential: {
@@ -2722,13 +2734,15 @@ static bool _dynamicCastValueToClassViaObjCBridgeable(
   // Bridge the source value to an object.
   auto srcBridgedObject = srcBridgeWitness->bridgeToObjectiveC(src, srcType);
 
-  // Dynamic cast the object to the resulting class type. The
-  // additional flags essneitally make this call act as taking the
-  // source object at +1.
-  DynamicCastFlags classCastFlags = flags | DynamicCastFlags::TakeOnSuccess
-                                  | DynamicCastFlags::DestroyOnFailure;
-  bool success = _dynamicCastUnknownClass(dest, srcBridgedObject, targetType,
-                                          classCastFlags);
+  // Dynamic cast the object to the resulting class type.
+  bool success;
+  if (auto cast = _dynamicCastUnknownClass(srcBridgedObject, targetType,
+                               flags & DynamicCastFlags::Unconditional)) {
+    *reinterpret_cast<void **>(dest) = cast;
+    success = true;
+  } else {
+    success = false;
+  }
 
   // Clean up the source if we're supposed to.
   if (shouldDeallocateSource(success, flags)) {
@@ -2804,11 +2818,9 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   // type is bridged. If we succeed, we can bridge from there; if we fail,
   // there's nothing more to do.
   void *srcObject = *reinterpret_cast<void * const *>(src);
-  DynamicCastFlags classCastFlags = flags;
-  void *srcBridgedObject = nullptr;
-  if (!_dynamicCastUnknownClass(
-         reinterpret_cast<OpaqueValue *>(&srcBridgedObject), srcObject,
-         targetBridgedClass, classCastFlags)) {
+  if (!_dynamicCastUnknownClass(srcObject,
+                                targetBridgedClass,
+                                flags & DynamicCastFlags::Unconditional)) {
     return false;
   }
 
@@ -2817,7 +2829,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   bool alwaysConsumeSrc = (flags & DynamicCastFlags::TakeOnSuccess) &&
                           (flags & DynamicCastFlags::DestroyOnFailure);
   if (!alwaysConsumeSrc) {
-    swift_unknownRetain(srcBridgedObject);
+    swift_unknownRetain(srcObject);
   }
 
   // Object that frees a buffer when it goes out of scope.
@@ -2849,13 +2861,13 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   if (flags & DynamicCastFlags::Unconditional) {
     // For an unconditional dynamic cast, use forceBridgeFromObjectiveC.
     targetBridgeWitness->forceBridgeFromObjectiveC(
-      (HeapObject *)srcBridgedObject, (OpaqueValue *)optDestBuffer, 
+      (HeapObject *)srcObject, (OpaqueValue *)optDestBuffer,
       targetType, targetType);
     success = true;
   } else {
     // For a conditional dynamic cast, use conditionallyBridgeFromObjectiveC.
     success = targetBridgeWitness->conditionallyBridgeFromObjectiveC(
-                (HeapObject *)srcBridgedObject, (OpaqueValue *)optDestBuffer,
+                (HeapObject *)srcObject, (OpaqueValue *)optDestBuffer,
                 targetType, targetType);
   }
 
@@ -2868,7 +2880,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   // Unless we're always supposed to consume the input, release the
   // input if we need to now.
   if (!alwaysConsumeSrc && shouldDeallocateSource(success, flags)) {
-    swift_unknownRelease(srcBridgedObject);
+    swift_unknownRelease(srcObject);
   }
 
   return success;

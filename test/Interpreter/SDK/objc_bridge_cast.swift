@@ -223,3 +223,31 @@ func testConditionalObjectToValueBridging() {
 }
 // CHECK: Done
 testConditionalObjectToValueBridging()
+
+// rdar://problem/22587077
+class Canary: NSObject {
+  deinit {
+    print("died")
+  }
+}
+var CanaryAssocObjectHandle = 0
+
+func testValueToObjectBridgingInSwitch() {
+  autoreleasepool {
+    let string = "hello"
+    let nsString = string as NSString
+    objc_setAssociatedObject(nsString, &CanaryAssocObjectHandle, Canary(),
+      .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    
+    switch nsString as AnyObject {
+    case let s as String:
+      print("Got string \(s)")
+    default:
+      print("Not a string")
+    }
+  }
+  print("Done")
+}
+// CHECK: died
+// CHECK: Done
+testValueToObjectBridgingInSwitch()
