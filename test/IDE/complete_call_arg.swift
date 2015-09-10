@@ -19,6 +19,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER5 | FileCheck %s -check-prefix=MEMBER2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER6 | FileCheck %s -check-prefix=MEMBER4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER7 | FileCheck %s -check-prefix=MEMBER7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER8 | FileCheck %s -check-prefix=MEMBER8
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER9 | FileCheck %s -check-prefix=MEMBER1
 
 var i1 = 1
 var i2 = 2
@@ -41,7 +43,17 @@ func bar(a : String, b : String?) {}
 func bar1(a : String, b1 : String) {}
 func bar1(a : String, b2 : String) {}
 
+class InternalGen {
+  func InternalIntGen() -> Int { return 0 }
+  func InternalIntOpGen() -> Int? {return 0 }
+  func InternalStringGen() -> String { return "" }
+  func InternalStringOpGen() -> String? {return ""}
+  func InternalIntTaker(i1 : Int, i2 : Int) {}
+  func InternalStringTaker(s1: String, s2 : String) {}
+}
+
 class Gen {
+  var IG = InternalGen()
   func IntGen() -> Int { return 0 }
   func IntOpGen() -> Int? {return 0 }
   func StringGen() -> String { return "" }
@@ -49,6 +61,8 @@ class Gen {
   func IntTaker(i1 : Int, i2 : Int) {}
   func StringTaker(s1: String, s2 : String) {}
 }
+
+func GenGenerator(i : Int) -> Gen { return Gen() }
 
 class C1 {
   func f1() {
@@ -197,6 +211,14 @@ class C4 {
   func f7(GA : [Gen]) {
     foo(1, b1 : GA.#^MEMBER7^#
   }
+
+  func f8(GA : Gen) {
+    foo(1, b1 : GA.IG.#^MEMBER8^#
+  }
+
+  func f9() {
+    foo(1, b1 : GenGenerator(1).#^MEMBER9^#
+  }
 }
 
 // MEMBER1: Begin completions
@@ -236,3 +258,11 @@ class C4 {
 // MEMBER7-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: removeAll({#keepCapacity: Bool#})[#Void#]; name=removeAll(keepCapacity: Bool)
 // MEMBER7-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: count[#Int#]; name=count
 // MEMBER7-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: capacity[#Int#]; name=capacity
+
+// MEMBER8: Begin completions
+// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: InternalIntGen()[#Int#]; name=InternalIntGen()
+// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: InternalIntOpGen()[#Int?#]; name=InternalIntOpGen()
+// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringGen()[#String#]; name=InternalStringGen()
+// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringOpGen()[#String?#]; name=InternalStringOpGen()
+// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=InternalIntTaker(i1: Int, i2: Int)
+// MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=InternalStringTaker(s1: String, s2: String)
