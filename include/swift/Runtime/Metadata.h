@@ -2085,7 +2085,7 @@ public:
 
 private:
   /// The protocol being conformed to.
-  RelativePointer<ProtocolDescriptor> Protocol;
+  RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
   
   // Some description of the type that conforms to the protocol.
   union {
@@ -2093,26 +2093,28 @@ private:
     ///
     /// Depending on the conformance kind, this may not be usable
     /// metadata without being first processed by the runtime.
-    RelativePointer<Metadata> DirectType;
+    RelativeIndirectablePointer<Metadata> DirectType;
     
     /// An indirect reference to the metadata.
-    RelativePointer<const ClassMetadata *> IndirectClass;
+    RelativeIndirectablePointer<const ClassMetadata *> IndirectClass;
     
     /// The generic metadata pattern for a generic type which has instances that
     /// conform to the protocol.
-    RelativePointer<GenericMetadata> GenericPattern;
+    RelativeIndirectablePointer<GenericMetadata> GenericPattern;
   };
   
   
   // The conformance, or a generator function for the conformance.
   union {
     /// A direct reference to the witness table for the conformance.
-    RelativePointer<WitnessTable> WitnessTable;
+    /// TODO: This currently needs to be indirectable for JIT support, since
+    /// MCJIT can't yet handle subtractor relocations. rdar://problem/22467267
+    RelativeIndirectablePointer<WitnessTable> WitnessTable;
     
     /// A function that produces the witness table given an instance of the
     /// type. The function may return null if a specific instance does not
     /// conform to the protocol.
-    RelativeFunctionPointer<WitnessTableAccessorFn> WitnessTableAccessor;
+    RelativeDirectPointer<WitnessTableAccessorFn> WitnessTableAccessor;
   };
   
   /// Flags describing the protocol conformance.

@@ -23,11 +23,11 @@
 
 namespace swift {
 
-/// A double-indirect relative reference to an address stored in memory,
-/// intended to reference GOT entries in the current executable or dynamic
-/// library image from position-independent constant data.
+/// A relative reference to an object stored in memory. The reference may be
+/// direct or indirect, and uses the low bit of the (assumed at least
+/// 2-byte-aligned) pointer to differentiate.
 template<typename ValueTy>
-class RelativePointer {
+class RelativeIndirectablePointer {
 private:
   /// The relative offset of the pointer's memory from the `this` pointer.
   /// If the low bit is clear, this is a direct reference; otherwise, it is
@@ -36,11 +36,13 @@ private:
 
   /// RelativePointers should appear in statically-generated metadata. They
   /// shouldn't be constructed or copied.
-  RelativePointer() = delete;
-  RelativePointer(RelativePointer &&) = delete;
-  RelativePointer(const RelativePointer &) = delete;
-  RelativePointer &operator=(RelativePointer &&) = delete;
-  RelativePointer &operator=(const RelativePointer &) = delete;
+  RelativeIndirectablePointer() = delete;
+  RelativeIndirectablePointer(RelativeIndirectablePointer &&) = delete;
+  RelativeIndirectablePointer(const RelativeIndirectablePointer &) = delete;
+  RelativeIndirectablePointer &operator=(RelativeIndirectablePointer &&)
+    = delete;
+  RelativeIndirectablePointer &operator=(const RelativeIndirectablePointer &)
+    = delete;
 
   const ValueTy *get() const & {
     // The pointer is offset relative to `this`.
@@ -73,38 +75,69 @@ public:
 /// A relative reference to a function, intended to reference private metadata
 /// functions for the current executable or dynamic library image from
 /// position-independent constant data.
-template<typename FnTy>
-class RelativeFunctionPointer;
-
-template<typename RetTy, typename...ArgTy>
-class RelativeFunctionPointer<RetTy (ArgTy...)> {
+template<typename T>
+class RelativeDirectPointerImpl {
 private:
   /// The relative offset of the function's entry point from *this.
   int32_t RelativeOffset;
 
   /// RelativePointers should appear in statically-generated metadata. They
   /// shouldn't be constructed or copied.
-  RelativeFunctionPointer() = delete;
-  RelativeFunctionPointer(RelativeFunctionPointer &&) = delete;
-  RelativeFunctionPointer(const RelativeFunctionPointer &) = delete;
-  RelativeFunctionPointer &operator=(RelativeFunctionPointer &&) = delete;
-  RelativeFunctionPointer &operator=(const RelativeFunctionPointer &) = delete;
+  RelativeDirectPointerImpl() = delete;
+  RelativeDirectPointerImpl(RelativeDirectPointerImpl &&) = delete;
+  RelativeDirectPointerImpl(const RelativeDirectPointerImpl &) = delete;
+  RelativeDirectPointerImpl &operator=(RelativeDirectPointerImpl &&)
+    = delete;
+  RelativeDirectPointerImpl &operator=(const RelativeDirectPointerImpl&)
+    = delete;
 
-  using FunctionPointerTy = RetTy (*)(ArgTy...);
+public:
+  using ValueTy = T;
+  using PointerTy = T*;
 
-  FunctionPointerTy get() const & {
+  PointerTy get() const & {
     // The function entry point is addressed relative to `this`.
     auto base = reinterpret_cast<uintptr_t>(this);
     uintptr_t entryPoint = base + RelativeOffset;
-    return *reinterpret_cast<FunctionPointerTy>(entryPoint);
+    return *reinterpret_cast<PointerTy>(entryPoint);
   }
+
+};
+
+/// A direct relative reference to an object.
+template<typename T>
+class RelativeDirectPointer :
+  private RelativeDirectPointerImpl<T>
+{
+  using super = RelativeDirectPointerImpl<T>;
 public:
-  operator FunctionPointerTy() const & {
-    return get();
+  operator typename super::PointerTy() const & {
+    return this->get();
+  }
+
+  const typename super::ValueTy &operator*() const & {
+    return *this->get();
+  }
+
+  const typename super::ValueTy *operator->() const & {
+    return this->get();
+  }
+};
+
+/// A specialization of RelativeDirectPointer for function pointers,
+/// allowing for calls.
+template<typename RetTy, typename...ArgTy>
+class RelativeDirectPointer<RetTy (ArgTy...)> :
+  private RelativeDirectPointerImpl<RetTy (ArgTy...)>
+{
+  using super = RelativeDirectPointerImpl<RetTy (ArgTy...)>;
+public:
+  operator typename super::PointerTy() const & {
+    return this->get();
   }
 
   RetTy operator()(ArgTy...arg) {
-    return get()(std::forward<ArgTy>(arg)...);
+    return this->get()(std::forward<ArgTy>(arg)...);
   }
 };
 
