@@ -93,6 +93,13 @@
 // Note: <property type><preposition> --> <preposition>.
 // CHECK-FOUNDATION: var withHTTPS: NSURL { get }
 
+// Note: usingBlock -> body
+// CHECK-FOUNDATION: func enumerateObjects(body block: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(options opts: NSEnumerationOptions, body block: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+
+// Note: WithBlock -> body
+// CHECK-FOUNDATION: func enumerateObjectsRandomly(body block: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+
 // Note: class method name stripping result type.
 // CHECK-APPKIT: class func red() -> NSColor
 

@@ -440,6 +440,12 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
                                    StringScratchSpace &scratch) {
   if (name.empty() || typeName.empty()) return name;
 
+  // "usingBlock" -> "body" for block parameters.
+  if ((role == NameRole::FirstParameter ||
+       role == NameRole::SubsequentParameter) &&
+      name == "usingBlock" && typeName.Name == "Block")
+    return "body";
+
   // Get the camel-case words in the name and type name.
   auto nameWords = camel_case::getWords(name);
   auto typeWords = camel_case::getWords(typeName.Name);
@@ -676,9 +682,22 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       // base name is "With", drop the "With" from the base name and
       // use the (redundant) type information as a label for the first
       // parameter.
+      StringRef remainingName = name.substr(newName.size());
       if (camel_case::getLastWord(newName) == "With") {
-        argNames[0] = toLowercaseWord(name.substr(newName.size()), scratch);
+        // If the redundant type information was simply "Block", use
+        // the argument label "body".
+        if (remainingName == "Block")
+          argNames[0] = "body";
+        else
+          argNames[0] = toLowercaseWord(remainingName, scratch);
         baseName = newName.substr(0, newName.size() - 4);
+      } else if (camel_case::getLastWord(newName) == "Using" &&
+                 remainingName == "Block") {
+        // If the preposition was "Using" and the remaining name was
+        // "Block", strip off the "Using" from the base name and use
+        // "body" for the first argument label.
+        argNames[0] = "body";
+        baseName = newName.substr(0, newName.size() - 5);
       } else {
         // Otherwise, adopt the new base name.
         baseName = newName;

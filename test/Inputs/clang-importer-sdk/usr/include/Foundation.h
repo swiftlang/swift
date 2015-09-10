@@ -897,3 +897,21 @@ __attribute__((availability(macosx,introduced=10.11)))
 @property (readonly, nullable) NSURL *URLByDeletingLastPathComponent;
 @property (readonly, nonnull) NSURL *URLWithHTTPS;
 @end
+
+typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
+   NSEnumerationConcurrent = (1UL << 0),
+   NSEnumerationReverse = (1UL << 1),
+};
+
+@interface NSArray (Enumeration)
+- (void)enumerateObjectsUsingBlock:(void (^)(id obj,
+                                             NSUInteger idx,
+                                             BOOL *stop))block;
+
+- (void)enumerateObjectsWithOptions:(NSEnumerationOptions)opts
+                         usingBlock:(void (^)(id obj, NSUInteger idx,
+                                              BOOL *stop))block;
+
+- (void)enumerateObjectsRandomlyWithBlock:(void (^)(id obj, NSUInteger idx,
+                                                    BOOL *stop))block;
+@end
