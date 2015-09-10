@@ -415,8 +415,9 @@ public:
   /// the expected type at the code completion position.
   enum ExpectedTypeRelation {
 
-    /// Cannot determine the relationship.
-    Undetermined,
+    /// The relationship of the result's type to the expected type is not
+    /// invalid, not convertible, and not identical.
+    Unrelated,
 
     /// The result's type is invalid at the expected position.
     Invalid,
@@ -462,7 +463,7 @@ public:
         CompletionString(CompletionString) {
     assert(Kind != Declaration && "use the other constructor");
     assert(CompletionString);
-    TypeDistance = ExpectedTypeRelation::Undetermined;
+    TypeDistance = ExpectedTypeRelation::Unrelated;
   }
 
   /// Constructs a \c Declaration result.
@@ -502,7 +503,7 @@ public:
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs) {
     AssociatedDeclKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
-    TypeDistance = ExpectedTypeRelation::Undetermined;
+    TypeDistance = ExpectedTypeRelation::Unrelated;
   }
 
   ResultKind getKind() const { return static_cast<ResultKind>(Kind); }

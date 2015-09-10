@@ -397,7 +397,7 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     case ExpectedTypeRelation::Convertible:
       Prefix.append("/TypeRelation[Convertible]");
       break;
-    case ExpectedTypeRelation::Undetermined:
+    case ExpectedTypeRelation::Unrelated:
       break;
   }
   Prefix.append(": ");
@@ -502,7 +502,7 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
                                                                 DeclContext *DC) {
   if (Ty.isNull() || ExpectedTy.isNull() ||
       Ty->is<ErrorType>() || ExpectedTy->is<ErrorType>())
-    return CodeCompletionResult::ExpectedTypeRelation::Undetermined;
+    return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   if (Ty.getCanonicalTypeOrNull() == ExpectedTy.getCanonicalTypeOrNull())
     return CodeCompletionResult::ExpectedTypeRelation::Identical;
   if (isConvertibleTo(Ty, ExpectedTy, DC))
@@ -511,9 +511,9 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
     if (FT->getResult()->isVoid())
       return CodeCompletionResult::ExpectedTypeRelation::Invalid;
     return std::max(calculateTypeRelation(FT->getResult(), ExpectedTy, DC),
-                    CodeCompletionResult::ExpectedTypeRelation::Undetermined);
+                    CodeCompletionResult::ExpectedTypeRelation::Unrelated);
   }
-  return CodeCompletionResult::ExpectedTypeRelation::Undetermined;
+  return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
 }
 
 static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelationForDecl (
@@ -522,7 +522,7 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelationForDecl (
   auto VD = dyn_cast<ValueDecl>(D);
   auto DC = D->getDeclContext();
   if (!VD)
-    return CodeCompletionResult::ExpectedTypeRelation::Undetermined;
+    return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   if (auto FD = dyn_cast<FuncDecl>(VD)) {
     return std::max(calculateTypeRelation(FD->getType(), ExpectedType, DC),
                     calculateTypeRelation(FD->getResultType(), ExpectedType, DC));
@@ -537,7 +537,7 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelationForDecl (
 static CodeCompletionResult::ExpectedTypeRelation calculateMaxTypeRelationForDecl (
                                                 const Decl *D,
                                                 ArrayRef<Type> ExpectedTypes) {
-  auto Result = CodeCompletionResult::ExpectedTypeRelation::Undetermined;
+  auto Result = CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   for (auto Type : ExpectedTypes) {
     Result = std::max(Result, calculateTypeRelationForDecl(D, Type));
   }
@@ -584,7 +584,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
         /*NotRecommended=*/false, copyString(*Sink.Allocator, BriefComment),
         copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
         ExpectedTypes.empty() ?
-          CodeCompletionResult::ExpectedTypeRelation::Undetermined :
+          CodeCompletionResult::ExpectedTypeRelation::Unrelated :
           calculateMaxTypeRelationForDecl(AssociatedDecl, ExpectedTypes));
   }
 
