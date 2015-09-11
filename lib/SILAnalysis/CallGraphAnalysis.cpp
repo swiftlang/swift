@@ -398,7 +398,7 @@ struct Histogram {
 
   void Print() {
     auto Last = NumBuckets - 1;
-    for (auto i = 0; i < NumBuckets - 1; ++i) {
+    for (auto i = 0; i < NumBuckets; ++i) {
       auto *Seperator = Last == i ? "+: " : ": ";
       if (Data[i])
         llvm::errs() << i << Seperator << Data[i] << "\n";
