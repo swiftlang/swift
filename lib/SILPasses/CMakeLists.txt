@@ -52,4 +52,5 @@ add_swift_library(swiftSILPasses
   PrettyStackTrace.cpp
   CropOverflowChecks.cpp
   UsePrespecialized.cpp
+  LetPropertiesOpts.cpp
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)

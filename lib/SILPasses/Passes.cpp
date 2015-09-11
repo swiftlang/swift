@@ -180,6 +180,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
 
   // Perform classsic SSA optimizations.
   PM.addGlobalOpt();
+  PM.addLetPropertiesOpt();
   PM.addPerformanceConstantPropagation();
   PM.addDCE();
   PM.addCSE();
@@ -279,6 +280,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Hoist globals out of loops.
   // Global-init functions should not be inlined GlobalOpt is done.
   PM.addGlobalOpt();
+  PM.addLetPropertiesOpt();
 
   // Propagate constants into closures and convert to static dispatch.  This
   // should run after specialization and inlining because we don't want to

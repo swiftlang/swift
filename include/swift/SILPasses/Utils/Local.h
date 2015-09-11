@@ -598,6 +598,27 @@ ignore_expect_uses(ValueBase *V) {
 /// operations from it. These can be simplified and removed.
 bool simplifyUsers(SILInstruction *I);
 
+/// Check if a given type is a simple type, i.e. a builtin
+/// integer or floating point type or a struct/tuple whose members
+/// are of simple types.
+bool isSimpleType(SILType SILTy, SILModule& Module);
+
+/// Check if the value of V is computed by means of a simple initialization.
+/// Store the actual SILValue into \p Val and the reversed list of instructions
+/// initializing it in \p Insns.
+/// The check is performed by recursively walking the computation of the
+/// SIL value being analyzed.
+bool analyzeStaticInitializer(SILValue V,
+                              SmallVectorImpl<SILInstruction *> &Insns);
+
+/// Replace load sequence which may contain
+/// a chain of struct_element_addr followed by a load.
+/// The sequence is traversed inside out, i.e.
+/// starting with the innermost struct_element_addr
+void replaceLoadSequence(SILInstruction *I,
+                         SILInstruction *Value,
+                         SILBuilder &B);
+
 } // end namespace swift
 
 #endif
