@@ -1980,18 +1980,20 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
       
       // Check that argument counts and convention match. "throws" can vary.
       if (srcFn->Flags.withThrows(false) != targetFn->Flags.withThrows(false))
-        break;
+        goto failed_function_cast;
       
       // If the target type can't throw, neither can the source.
       if (srcFn->throws() && !targetFn->throws())
-        break;
+        goto failed_function_cast;
       
       // The result and argument types must match.
       if (srcFn->ResultType != targetFn->ResultType)
-        break;
+        goto failed_function_cast;
+      if (srcFn->getNumArguments() != targetFn->getNumArguments())
+        goto failed_function_cast;
       for (unsigned i = 0, e = srcFn->getNumArguments(); i < e; ++i)
         if (srcFn->getArguments()[i] != targetFn->getArguments()[i])
-          break;
+          goto failed_function_cast;
       
       return succeed();
     }
@@ -2015,6 +2017,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     case MetadataKind::Tuple:
       break;
     }
+  failed_function_cast:
     return _fail(src, srcType, targetType, flags);
   }
 
