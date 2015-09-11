@@ -2765,7 +2765,7 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
       }
   }
   if (!contextualResultType)
-    return nullptr;
+    return false;
 
   // Retypecheck the callee expression without a contextual type to resolve
   // whatever we can in it.
