@@ -4,6 +4,8 @@ import Foundation
 
 // REQUIRES: objc_interop
 
+// ==== Metatype to object conversions
+
 // CHECK-LABEL: sil hidden @_TF24function_conversion_objc20convMetatypeToObjectFFCSo8NSObjectMS0_T_
 func convMetatypeToObject(f: NSObject -> NSObject.Type) {
 // CHECK:         function_ref @_TTRXFo_oCSo8NSObject_dXMTS__XFo_oS__oPSs9AnyObject__
@@ -44,3 +46,39 @@ func convProtocolMetatypeToObject(f: () -> NSBurrito.Protocol) {
 // CHECK:         objc_protocol #NSBurrito : $Protocol
 // CHECK:         strong_retain
 // CHECK:         return
+
+// ==== Representation conversions
+
+// CHECK-LABEL: sil hidden @_TF24function_conversion_objc11funcToBlockFFT_T_bT_T_ : $@convention(thin) (@owned @callee_owned () -> ()) -> @owned @convention(block) () -> ()
+// CHECK:         [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage
+// CHECK:         [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]]
+// CHECK:         [[COPY:%.*]] = copy_block [[BLOCK]] : $@convention(block) () -> ()
+// CHECK:         return [[COPY]]
+func funcToBlock(x: () -> ()) -> @convention(block) () -> () {
+  return x
+}
+
+// CHECK-LABEL: sil hidden @_TF24function_conversion_objc11blockToFuncFbT_T_FT_T_ : $@convention(thin) (@owned @convention(block) () -> ()) -> @owned @callee_owned () -> ()
+// CHECK:         [[COPIED:%.*]] = copy_block %0
+// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb__dT__XFo__dT__
+// CHECK:         [[FUNC:%.*]] = partial_apply [[THUNK]]([[COPIED]])
+// CHECK:         return [[FUNC]]
+func blockToFunc(x: @convention(block) () -> ()) -> () -> () {
+  return x
+}
+
+// ==== Representation change + function type conversion
+
+// CHECK-LABEL: sil hidden @_TF24function_conversion_objc22blockToFuncExistentialFbT_SiFT_P_ : $@convention(thin) (@owned @convention(block) () -> Int) -> @owned @callee_owned (@out protocol<>) -> ()
+// CHECK:         function_ref @_TTRXFdCb__dSi_XFo__dSi_
+// CHECK:         partial_apply
+// CHECK:         function_ref @_TTRXFo__dSi_XFo__iP__
+// CHECK:         partial_apply
+// CHECK:         return
+func blockToFuncExistential(x: @convention(block) () -> Int) -> () -> Any {
+  return x
+}
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFdCb__dSi_XFo__dSi_ : $@convention(thin) (@owned @convention(block) () -> Int) -> Int
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSi_XFo__iP__ : $@convention(thin) (@out protocol<>, @owned @callee_owned () -> Int) -> ()

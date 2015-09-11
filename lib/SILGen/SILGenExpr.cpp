@@ -1164,6 +1164,97 @@ static RValue emitCFunctionPointer(SILGenFunction &gen,
   return RValue(gen, conversionExpr, ManagedValue::forUnmanaged(cRef));
 }
 
+// Transform the AST-level types in the function signature without an
+// abstraction or representation change.
+static ManagedValue convertFunctionSignature(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             ManagedValue original,
+                                             CanAnyFunctionType srcTy,
+                                             CanAnyFunctionType destTy) {
+  AbstractionPattern abstractionPattern(destTy);
+  ManagedValue result = SGF.emitOrigToSubstValue(loc, original,
+                                                 abstractionPattern,
+                                                 srcTy, destTy);
+
+  SILType resultType = result.getType();
+  assert(resultType == SGF.getLoweredType(destTy));
+
+  return result;
+}
+
+// Change the representation without changing the signature or
+// abstraction level.
+static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
+                                                  SILLocation loc,
+                                                  ManagedValue result,
+                                                  CanAnyFunctionType srcTy,
+                                                  CanAnyFunctionType destTy) {
+  auto resultFTy = result.getType().castTo<SILFunctionType>();
+
+  // Note that conversions to and from block require a thunk
+  switch (destTy->getRepresentation()) {
+
+  // Convert thin, c, block => thick
+  case AnyFunctionType::Representation::Swift: {
+    switch (resultFTy->getRepresentation()) {
+    case SILFunctionType::Representation::Thin: {
+      auto v = SGF.B.createThinToThickFunction(loc, result.getValue(),
+        SILType::getPrimitiveObjectType(
+         adjustFunctionType(resultFTy, SILFunctionType::Representation::Thick)));
+      result = ManagedValue(v, result.getCleanup());
+      break;
+    }
+    case SILFunctionType::Representation::Thick:
+      llvm_unreachable("should not try thick-to-thick repr change");
+    case SILFunctionType::Representation::CFunctionPointer:
+    case SILFunctionType::Representation::Block:
+      result = SGF.emitBlockToFunc(loc, result,
+                       SGF.getLoweredType(destTy).castTo<SILFunctionType>());
+      break;
+    case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::ObjCMethod:
+    case SILFunctionType::Representation::WitnessMethod:
+      llvm_unreachable("should not do function conversion from method rep");
+    }
+    break;
+  }
+
+  // Convert thin, thick, c => block
+  case AnyFunctionType::Representation::Block:
+    switch (resultFTy->getRepresentation()) {
+    case SILFunctionType::Representation::Thin: {
+      // Make thick first.
+      auto v = SGF.B.createThinToThickFunction(loc, result.getValue(),
+        SILType::getPrimitiveObjectType(
+         adjustFunctionType(resultFTy, SILFunctionType::Representation::Thick)));
+      result = ManagedValue(v, result.getCleanup());
+      SWIFT_FALLTHROUGH;
+    }
+    case SILFunctionType::Representation::Thick:
+    case SILFunctionType::Representation::CFunctionPointer:
+      // Convert to a block.
+      result = SGF.emitFuncToBlock(loc, result,
+                     SGF.getLoweredType(destTy).castTo<SILFunctionType>());
+      break;
+    case SILFunctionType::Representation::Block:
+      llvm_unreachable("should not try block-to-block repr change");
+    case SILFunctionType::Representation::Method:
+    case SILFunctionType::Representation::ObjCMethod:
+    case SILFunctionType::Representation::WitnessMethod:
+      llvm_unreachable("should not do function conversion from method rep");
+    }
+    break;
+
+  // Unsupported
+  case AnyFunctionType::Representation::Thin:
+    llvm_unreachable("should not do function conversion to thin");
+  case AnyFunctionType::Representation::CFunctionPointer:
+    llvm_unreachable("should not do C function pointer conversion here");
+  }
+
+  return result;
+}
+
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
                                                   SGFContext C)
 {
@@ -1173,122 +1264,47 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
         == AnyFunctionType::Representation::CFunctionPointer)
     return emitCFunctionPointer(SGF, e);
 
-  ManagedValue original = SGF.emitRValueAsSingleValue(e->getSubExpr());
+  // Break the conversion into three stages:
+  // 1) changing the representation from foreign to native
+  // 2) changing the signature within the representation
+  // 3) changing the representation from native to foreign
+  //
+  // We only do one of 1) or 3), but we have to do them in the right order
+  // with respect to 2).
   
-  // Break the conversion into two stages:
-  // - changing the signature within the representation
-  // - changing the representation
-  
-  // First, the signature:
-  
-  CanAnyFunctionType srcTy =
+  CanAnyFunctionType srcRepTy =
       cast<FunctionType>(e->getSubExpr()->getType()->getCanonicalType());
   CanAnyFunctionType destRepTy =
       cast<FunctionType>(e->getType()->getCanonicalType());
-  CanAnyFunctionType destTy = CanFunctionType::get(
-      destRepTy.getInput(), destRepTy.getResult(),
-      destRepTy->getExtInfo().withRepresentation(srcTy->getRepresentation()));
-  
-  // Retain the thinness of the original function type.
-  auto origRep = original.getType().castTo<SILFunctionType>()->getRepresentation();
-  AnyFunctionType::Representation astRep;
-  switch (origRep) {
-  case SILFunctionType::Representation::Thin:
-  case SILFunctionType::Representation::Method:
-  case SILFunctionType::Representation::WitnessMethod:
-  case SILFunctionType::Representation::ObjCMethod:
-    astRep = AnyFunctionType::Representation::Thin;
+
+  CanAnyFunctionType srcTy = srcRepTy;
+  CanAnyFunctionType destTy = destRepTy;
+
+  switch(srcRepTy->getRepresentation()) {
+  case AnyFunctionType::Representation::Swift:
+  case AnyFunctionType::Representation::Thin:
+    // Source is native, so we can convert signature first.
+    destTy = adjustFunctionType(destRepTy,
+                                srcTy->getRepresentation());
     break;
-  case SILFunctionType::Representation::Thick:
-    astRep = AnyFunctionType::Representation::Swift;
-    break;
-  case SILFunctionType::Representation::Block:
-    astRep = AnyFunctionType::Representation::Block;
-    break;
-  case SILFunctionType::Representation::CFunctionPointer:
-    astRep = AnyFunctionType::Representation::CFunctionPointer;
-    break;
-  }
-  if (astRep != destTy->getRepresentation()) {
-    destTy = adjustFunctionType(destTy, astRep);
+  case AnyFunctionType::Representation::Block:
+  case AnyFunctionType::Representation::CFunctionPointer:
+    // Source is foreign, so do the representation change first.
+    srcTy = adjustFunctionType(srcRepTy,
+                               destRepTy->getRepresentation());
   }
 
-  // Transform the AST-level types in the function signature without an
-  // abstraction or representation change.
-  AbstractionPattern abstractionPattern(destTy);
-  ManagedValue result = SGF.emitOrigToSubstValue(e, original,
-                                                 abstractionPattern,
-                                                 srcTy, destTy);
+  auto result = SGF.emitRValueAsSingleValue(e->getSubExpr());
 
-  SILType resultType = result.getType();
-  assert(resultType == SGF.getLoweredType(destTy));
+  if (srcRepTy != srcTy)
+    result = convertFunctionRepresentation(SGF, e, result, srcRepTy, srcTy);
 
-  auto resultFTy = resultType.castTo<SILFunctionType>();
-  
-  // Now, change the representation:
-  if (destRepTy != destTy) {
-    // Note that conversions to and from block require a thunk
-    switch (destRepTy->getRepresentation()) {
+  if (srcTy != destTy)
+    result = convertFunctionSignature(SGF, e, result, srcTy, destTy);
 
-    // Convert thin, c, block => thick
-    case AnyFunctionType::Representation::Swift: {
-      switch (resultFTy->getRepresentation()) {
-      case SILFunctionType::Representation::Thin: {
-        auto v = SGF.B.createThinToThickFunction(e, result.getValue(),
-          SILType::getPrimitiveObjectType(
-           adjustFunctionType(resultFTy, SILFunctionType::Representation::Thick)));
-        result = ManagedValue(v, result.getCleanup());
-        break;
-      }
-      case SILFunctionType::Representation::Thick:
-        llvm_unreachable("should not try thick-to-thick repr change");
-      case SILFunctionType::Representation::CFunctionPointer:
-      case SILFunctionType::Representation::Block:
-        result = SGF.emitBlockToFunc(e, result,
-                         SGF.getLoweredType(destRepTy).castTo<SILFunctionType>());
-        break;
-      case SILFunctionType::Representation::Method:
-      case SILFunctionType::Representation::ObjCMethod:
-      case SILFunctionType::Representation::WitnessMethod:
-        llvm_unreachable("should not do function conversion from method rep");
-      }
-      break;
-    }
+  if (destTy != destRepTy)
+    result = convertFunctionRepresentation(SGF, e, result, destTy, destRepTy);
 
-    // Convert thin, thick, c => block
-    case AnyFunctionType::Representation::Block:
-      switch (resultFTy->getRepresentation()) {
-      case SILFunctionType::Representation::Thin: {
-        // Make thick first.
-        auto v = SGF.B.createThinToThickFunction(e, result.getValue(),
-          SILType::getPrimitiveObjectType(
-           adjustFunctionType(resultFTy, SILFunctionType::Representation::Thick)));
-        result = ManagedValue(v, result.getCleanup());
-        SWIFT_FALLTHROUGH;
-      }
-      case SILFunctionType::Representation::Thick:
-      case SILFunctionType::Representation::CFunctionPointer:
-        // Convert to a block.
-        result = SGF.emitFuncToBlock(e, result,
-                       SGF.getLoweredType(destRepTy).castTo<SILFunctionType>());
-        break;
-      case SILFunctionType::Representation::Block:
-        llvm_unreachable("should not try block-to-block repr change");
-      case SILFunctionType::Representation::Method:
-      case SILFunctionType::Representation::ObjCMethod:
-      case SILFunctionType::Representation::WitnessMethod:
-        llvm_unreachable("should not do function conversion from method rep");
-      }
-      break;
-
-    // Unsupported
-    case AnyFunctionType::Representation::Thin:
-      llvm_unreachable("should not do function conversion to thin");
-    case AnyFunctionType::Representation::CFunctionPointer:
-      llvm_unreachable("should not do C function pointer conversion here");
-    }
-  }
-  
   return RValue(SGF, e, result);
 }
 
