@@ -9,13 +9,13 @@ protocol FooProtocol {}
 func garbage() -> () {
   var a : Int
   ] this line is invalid, but we will stop at the keyword below... // expected-error{{expected expression}}
-  return a + "a" // expected-error{{no '+' candidates produce the expected contextual result type '()'}} expected-note {{overloads for '+' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double, Float80, String, T, C, RRC1, UnsafeMutablePointer<Memory>, UnsafePointer<Memory>, Self}}
+  return a + "a" // expected-error{{no '+' candidates produce the expected contextual result type '()'}} expected-note {{overloads for '+' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double}}
 }
 
 func moreGarbage() -> () {
   ) this line is invalid, but we will stop at the declaration... // expected-error{{expected expression}}
   func a() -> Int { return 4 }
-  return a() + "a" // expected-error{{no '+' candidates produce the expected contextual result type '()'}} expected-note {{overloads for '+' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double, Float80, String, T, C, RRC1, UnsafeMutablePointer<Memory>, UnsafePointer<Memory>, Self}}
+  return a() + "a" // expected-error{{no '+' candidates produce the expected contextual result type '()'}} expected-note {{overloads for '+' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double}}
 }
 
 

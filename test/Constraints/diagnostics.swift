@@ -140,7 +140,7 @@ func perform<T>() {}  // expected-error {{generic parameter 'T' is not used in f
 // <rdar://problem/17080659> Error Message QOI - wrong return type in an overload
 func recArea(h: Int, w : Int) {
   return h * w  // expected-error {{no '*' candidates produce the expected contextual result type '()'}}
-  // expected-note @-1 {{overloads for '*' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double, Float80, T, Self}}
+  // expected-note @-1 {{overloads for '*' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double}}
 }
 
 // <rdar://problem/17224804> QoI: Error In Ternary Condition is Wrong

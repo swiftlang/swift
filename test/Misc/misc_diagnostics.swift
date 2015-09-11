@@ -34,7 +34,7 @@ var dd: Double = f1 - f2 // expected-error{{cannot convert value of type 'Float'
 
 func f() -> Bool {
   return 1 + 1 // expected-error{{no '+' candidates produce the expected contextual result type 'Bool'}}
-  // expected-note @-1 {{overloads for '+' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double, Float80, String, CGFloat, T, C, RRC1, UnsafeMutablePointer<Memory>, UnsafePointer<Memory>, Self}}
+  // expected-note @-1 {{overloads for '+' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double}}
 }
 
 // Test that nested diagnostics are properly surfaced.
