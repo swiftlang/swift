@@ -1535,7 +1535,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
     auto Op = Instance->getOperand();
     if (auto *ASI = dyn_cast<AllocStackInst>(Op)) {
       SILValue Src;
-      if (auto Existential = getInitOrOpenExistential(ASI, Src)) {
+      if (getInitOrOpenExistential(ASI, Src)) {
         if (Src)
           Op = Src;
       }
