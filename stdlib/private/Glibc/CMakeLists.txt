@@ -23,7 +23,7 @@ add_custom_command_target(unused_var
     DEPENDS "${sources}"
     COMMENT "Copying Glibc module to ${output_dir}")
 
-swift_install_in_component(stdlib-experimental
+swift_install_in_component(stdlib
     FILES ${sources}
     DESTINATION "lib/swift/glibc")
 
