@@ -185,9 +185,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
     // If the parameter is a block, we need to copy it to ensure it lives on
     // the heap. The adapted closure value might outlive the block's original
     // scope.
-    if (isa<SILFunctionType>(param.getType())
-        && cast<SILFunctionType>(param.getType())->getRepresentation()
-             == SILFunctionTypeRepresentation::Block) {
+    if (param.getSILType().isBlockPointerCompatible()) {
       // We still need to consume the original block if it was owned.
       switch (param.getConvention()) {
       case ParameterConvention::Direct_Owned:

@@ -3,6 +3,7 @@
 // REQUIRES: objc_interop
 
 import gizmo
+import ansible
 
 class Hoozit : Gizmo {
   func typical(x: Int, y: Gizmo) -> Gizmo { return y }
@@ -389,3 +390,24 @@ class DesignatedOverrides : Gizmo {
   // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $DesignatedOverrides, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo! , $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK: return
 }
+
+// Make sure we copy blocks passed in as IUOs - <rdar://problem/22471309>
+
+func registerAnsible() {
+  // CHECK: function_ref @_TFF11objc_thunks15registerAnsibleFT_T_U_FGSQFT_T__T_
+  // CHECK: function_ref @_TTRXFo_oGSQFT_T___dT__XFdCb_dGSQbT_T___dT__
+  Ansible.anseAsync({ completion in completion() })
+}
+
+// FIXME: would be nice if we didn't need to re-abstract as much here.
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSQFT_T___dT__XFdCb_dGSQbT_T___dT__ : $@convention(c) (@inout @block_storage @callee_owned (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> (), ImplicitlyUnwrappedOptional<@convention(block) () -> ()>) -> ()
+// CHECK: [[HEAP_BLOCK_IUO:%.*]] = copy_block %1
+// CHECK: select_enum [[HEAP_BLOCK_IUO]]
+// CHECK: bb1:
+// CHECK: [[HEAP_BLOCK:%.*]] = unchecked_enum_data [[HEAP_BLOCK_IUO]]
+// CHECK: [[BLOCK_THUNK:%.*]] = function_ref @_TTRXFdCb__dT__XFo__dT__
+// CHECK: [[BRIDGED_BLOCK:%.*]] = partial_apply [[BLOCK_THUNK]]([[HEAP_BLOCK]])
+// CHECK: [[REABS_THUNK:%.*]] = function_ref @_TTRXFo__dT__XFo_iT__iT__
+// CHECK: [[REABS_BLOCK:%.*]] = partial_apply [[REABS_THUNK]]([[BRIDGED_BLOCK]])
+// CHECK: [[REABS_BLOCK_IUO:%.*]] = enum $ImplicitlyUnwrappedOptional<() -> ()>, {{.*}} [[REABS_BLOCK]]
