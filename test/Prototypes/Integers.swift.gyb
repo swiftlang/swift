@@ -117,30 +117,19 @@ public protocol _LowLevelInteger
   
   var truncated : Truncated { get }
 
+  
   var lowWord: _LowLevelWord { get }
+  var countWords: _LowLevelWord { get }
+  func nthWord(n: _LowLevelWord) -> _LowLevelWord
+  
+  init(truncating: _LowLevelWord)
 }
 
 extension _LowLevelInteger {
   public init(_ other: Self) {
     self = other
   }
-}
 
-protocol _FixedWidthInteger : _LowLevelInteger {
-  /// A type used as `Self`'s representation
-  typealias Storage
-
-  /// Creates an instance with the given storage representation
-  init(_: Storage)
-
-  /// The number of bits `Self` can store
-  static var bitWidth : _LowLevelWord { get }
-  
-  /// The entire storage of `self`'s value.  
-  var storage: Storage { get set }
-}
-
-extension _LowLevelInteger {
   public var description: String {
     if self == 0 {
       return "0"
@@ -159,6 +148,30 @@ extension _LowLevelInteger {
   }
 }
 
+public protocol _FixedWidthInteger : _LowLevelInteger {
+  /// A type used as `Self`'s representation
+  typealias Storage
+
+  /// Creates an instance with the given storage representation
+  init(_: Storage)
+
+  /// The number of bits `Self` can store
+  static var bitWidth : _LowLevelWord { get }
+  
+  /// The entire storage of `self`'s value.  
+  var storage: Storage { get set }
+}
+
+extension _FixedWidthInteger {
+  public var countWords: _LowLevelWord {
+    return Self.bitWidth.add(
+      _LowLevelWord(${word_bits}).sub(1)).udiv(${word_bits})
+  }
+  public func nthWord(n: _LowLevelWord) -> _LowLevelWord {
+    return self.lshr(Self(truncating: n).mul(${word_bits})).lowWord
+  }
+}
+
 // Only needed outside the stdlib
 extension Bool {
   init(_ value: Builtin.Int1) {
@@ -174,6 +187,7 @@ extension Bool {
 %   extendedBits = bits * 2 if bits != maxFixedBits else bits
 %   narrowedBits = bits / 2 if bits != minFixedBits else bits
 %   toWord = 'trunc' if word_bits < bits else 'zext'
+%   fromWord = 'trunc' if word_bits > bits else 'zext'
 public struct _LowLevelInt${bits} : _FixedWidthInteger {
   public typealias Self_ = _LowLevelInt${bits}
   public typealias Extended = _LowLevelInt${extendedBits}
@@ -268,6 +282,11 @@ public struct _LowLevelInt${bits} : _FixedWidthInteger {
       Builtin.truncOrBitCast_Int${bits}_Int${narrowedBits}(storage)
     )
   }
+
+  public init(truncating other: _LowLevelWord) {
+    self.init(
+      Builtin.${fromWord}OrBitCast_${IntWord}_Int${bits}(other.storage))
+  }
 }
 
 public func == (lhs: _LowLevelInt${bits}, rhs: _LowLevelInt${bits}) -> Bool {
@@ -285,7 +304,6 @@ extension _LowLevelInt${bits} {
 % end
 
 public typealias _LowLevelWord = _LowLevelInt${word_bits}
-public typealias _LowLevelDoubleWord = _LowLevelInt${word_bits * 2}
 
 //===--- Low-level BigInt -------------------------------------------------===//
 // A basic array-of-words implementation of LowLevelInteger
@@ -462,14 +480,6 @@ public struct _LowLevelBigInt : _LowLevelInteger {
     fatalError("implement me")
   }
   
-#if false
-  public var maxUnsetBit : Swift.Int {
-    fatalError("implement me")
-  }
-  public var maxSetBit : Swift.Int  {
-    fatalError("implement me")
-  }
-#endif
   public var signExtended : Extended { return self }
   public var zeroExtended : Extended { return self }
   
@@ -479,6 +489,18 @@ public struct _LowLevelBigInt : _LowLevelInteger {
 
   public var lowWord: _LowLevelWord {
     fatalError("implement me")
+  }
+
+  public var countWords: _LowLevelWord {
+    return _LowLevelWord(words.count.value)
+  }
+  
+  public func nthWord(n: _LowLevelWord) -> _LowLevelWord {
+    return _LowLevelWord(words[Int(n.storage)])
+  }
+
+  public init(truncating other: _LowLevelWord) {
+    words = [other]
   }
 }
 
