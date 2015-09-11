@@ -1,8 +1,0 @@
-#!/bin/bash
-#
-# This is a wrapper for running the leaks detector tool on a binary.
-#
-
-set -e
-DYLD_INSERT_LIBRARIES="@LEAKS_DETECTOR_LIBRARY_PATH@" "$@"
-
