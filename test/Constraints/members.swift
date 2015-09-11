@@ -519,5 +519,18 @@ let _ : [UnavailMember] = [.XYZ] // expected-error {{'XYZ' is unavailable}}
 let _ : [UnavailMember] = [.ABC] // expected-error {{type 'UnavailMember' has no member 'ABC'}}
 
 
+// <rdar://problem/22490787> QoI: Poor error message iterating over property with non-sequence type that defines a Generator type alias
+struct S22490787 {
+  typealias Generator = AnyGenerator<Int>
+}
+
+func f22490787() {
+  var path: S22490787 = S22490787()
+  
+  for p in path {  // expected-error {{type 'S22490787' does not conform to protocol 'SequenceType'}}
+  }
+}
+
+
 
 

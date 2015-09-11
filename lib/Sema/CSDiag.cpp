@@ -1891,6 +1891,19 @@ bool FailureDiagnosis::diagnoseConstraintFailure() {
 
       if (Orig && AllOthersHaveFixes)
         return classifyConstraint(Orig);
+      
+      // If we got all the way down to a truly ambiguous disjunction constraint
+      // with a conversion in it, the problem could be that none of the options
+      // in the disjunction worked.
+      //
+      // We don't have a lot of great options here, so (if all else fails),
+      // we'll attempt to diagnose the issue as though the first option was the
+      // problem.
+      rankedConstraints.push_back({
+        C->getNestedConstraints()[0],
+        CR_OtherConstraint
+      });
+      return;
     }
 
     return rankedConstraints.push_back({C, CR_OtherConstraint});
