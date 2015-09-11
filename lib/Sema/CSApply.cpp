@@ -1470,6 +1470,11 @@ namespace {
       return expr;
     }
 
+    Expr *visitCodeCompletionExpr(CodeCompletionExpr *expr) {
+      // Do nothing with code completion expressions.
+      return expr;
+    }
+
     Expr *handleIntegerLiteralExpr(LiteralExpr *expr) {
       // If the literal has been assigned a builtin integer type,
       // don't mess with it.

@@ -327,6 +327,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   } while(false)
 
   Expr *visitErrorExpr(ErrorExpr *E) { return E; }
+  Expr *visitCodeCompletionExpr(CodeCompletionExpr *E) { return E; }
   Expr *visitLiteralExpr(LiteralExpr *E) { return E; }
   Expr *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) { return E; }
   Expr *visitTypeExpr(TypeExpr *E) {

@@ -333,6 +333,7 @@ bool Expr::isSuperExpr() const {
 bool Expr::canAppendCallParentheses() const {
   switch (getKind()) {
   case ExprKind::Error:
+  case ExprKind::CodeCompletion:
     return false;
 
   case ExprKind::NilLiteral:

@@ -955,11 +955,11 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   }
 
   case tok::code_complete:
-    Result = makeParserResult(new (Context) ErrorExpr(SourceRange(Tok.getRange().
-      getStart(), Tok.getRange().getEnd())));
+    Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getRange()));
     Result.setHasCodeCompletion();
     if (CodeCompletion)
-      CodeCompletion->completePostfixExprBeginning(dyn_cast<ErrorExpr>(Result.get()));
+      CodeCompletion->completePostfixExprBeginning(dyn_cast<CodeCompletionExpr>(
+        Result.get()));
     consumeToken(tok::code_complete);
     break;
 
@@ -2115,9 +2115,11 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn,
   if (peekToken().is(tok::code_complete) && CodeCompletion) {
     consumeToken(tok::l_paren);
     CodeCompletion->completePostfixExprParen(fn.get());
+    auto Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getRange()));
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
-    return makeParserCodeCompletionResult<Expr>();
+    Result.setHasCodeCompletion();
+    return Result;
   }
 
   ParserResult<Expr> firstArg = parseExprList(Tok.getKind(), tok::r_paren);

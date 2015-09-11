@@ -98,7 +98,7 @@ public:
 
   /// \brief Complete the beginning of expr-postfix -- no tokens provided
   /// by user.
-  virtual void completePostfixExprBeginning(ErrorExpr *E) = 0;
+  virtual void completePostfixExprBeginning(CodeCompletionExpr *E) = 0;
 
   /// \brief Complete a given expr-postfix.
   virtual void completePostfixExpr(Expr *E) = 0;

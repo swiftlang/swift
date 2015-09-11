@@ -499,6 +499,26 @@ public:
   }
 };
 
+/// CodeCompletionExpr - Represents the code completion token in the AST, this
+/// can help us preserve the context of the code completion position.
+class CodeCompletionExpr : public Expr {
+  SourceRange Range;
+public:
+  CodeCompletionExpr(SourceRange Range, Type Ty = Type()) :
+      Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
+      Range(Range) {}
+
+  CodeCompletionExpr(CharSourceRange Range, Type Ty = Type()) :
+      Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
+      Range(SourceRange(Range.getStart(), Range.getEnd())) {}
+
+  SourceRange getSourceRange() const { return Range; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::CodeCompletion;
+  }
+};
+
 /// LiteralExpr - Common base class between the literals.
 class LiteralExpr : public Expr {
 public:

@@ -996,6 +996,10 @@ namespace {
       return nullptr;
     }
 
+    virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
+      return nullptr;
+    }
+
     Type visitLiteralExpr(LiteralExpr *expr) {
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType() && !expr->getType()->hasTypeVariable())
@@ -2752,6 +2756,10 @@ public:
   }
 
   Type visitErrorExpr(ErrorExpr *Expr) override {
+    return createFreeTypeVariableType(Expr);
+  }
+
+  Type visitCodeCompletionExpr(CodeCompletionExpr *Expr) override {
     return createFreeTypeVariableType(Expr);
   }
 

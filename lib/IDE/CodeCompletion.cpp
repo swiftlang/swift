@@ -764,7 +764,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     CallArg,
   };
 
-  ErrorExpr *CodeCompleteTokenExpr;
+  CodeCompletionExpr *CodeCompleteTokenExpr;
   AssignExpr *AssignmentExpr;
   CallExpr *FuncCallExpr;
   UnresolvedMemberExpr *UnresolvedExpr;
@@ -902,7 +902,7 @@ public:
 
   void completeExpr() override;
   void completeDotExpr(Expr *E, SourceLoc DotLoc) override;
-  void completePostfixExprBeginning(ErrorExpr *E) override;
+  void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completePostfixExpr(Expr *E) override;
   void completePostfixExprParen(Expr *E) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
@@ -2847,7 +2847,7 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completePostfixExprBeginning(ErrorExpr *E) {
+void CodeCompletionCallbacksImpl::completePostfixExprBeginning(CodeCompletionExpr *E) {
   assert(P.Tok.is(tok::code_complete));
 
   // Don't produce any results in an enum element.

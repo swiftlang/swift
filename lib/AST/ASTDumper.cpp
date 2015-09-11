@@ -1387,7 +1387,11 @@ public:
   void visitErrorExpr(ErrorExpr *E) {
     printCommon(E, "error_expr") << ')';
   }
-  
+
+  void visitCodeCompletionExpr(CodeCompletionExpr *E) {
+    printCommon(E, "code_completion_expr") << ')';
+  }
+
   void visitNilLiteralExpr(NilLiteralExpr *E) {
     printCommon(E, "nil_literal_expr") << ')';
   }
