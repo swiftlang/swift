@@ -46,12 +46,12 @@ private:
 
   const ValueTy *get() const & {
     // The pointer is offset relative to `this`.
-    auto base = reinterpret_cast<uintptr_t>(this);
-    uintptr_t address = base + (RelativeOffset & ~1u);
+    auto base = reinterpret_cast<intptr_t>(this);
+    intptr_t address = base + (RelativeOffset & ~1);
 
     // If the low bit is set, then this is an indirect address. Otherwise,
     // it's direct.
-    if (RelativeOffset & 1u) {
+    if (RelativeOffset & 1) {
       return *reinterpret_cast<const ValueTy * const *>(address);
     } else {
       return reinterpret_cast<const ValueTy *>(address);
@@ -97,9 +97,9 @@ public:
 
   PointerTy get() const & {
     // The function entry point is addressed relative to `this`.
-    auto base = reinterpret_cast<uintptr_t>(this);
-    uintptr_t entryPoint = base + RelativeOffset;
-    return *reinterpret_cast<PointerTy>(entryPoint);
+    auto base = reinterpret_cast<intptr_t>(this);
+    intptr_t absolute = base + RelativeOffset;
+    return reinterpret_cast<PointerTy>(absolute);
   }
 
 };
