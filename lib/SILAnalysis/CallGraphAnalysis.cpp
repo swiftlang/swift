@@ -406,8 +406,10 @@ struct Histogram {
     llvm::errs() << "\n";
   }
 };
+#endif
 
 void CallGraph::dumpStats() {
+#ifndef NDEBUG
   Histogram<256> CallSitesPerFunction;
   Histogram<256> CallersPerFunction;
   Histogram<256> CalleesPerCallSite;
@@ -447,8 +449,8 @@ void CallGraph::dumpStats() {
 
   llvm::errs() << "Bump pointer allocator statistics:\n";
   Allocator.PrintStats();
-}
 #endif
+}
 
 /// Finds SCCs in the call graph. Our call graph has an unconventional
 /// form where each edge of the graph is really a multi-edge that can
