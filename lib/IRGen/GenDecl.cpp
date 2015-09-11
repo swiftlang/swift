@@ -1602,29 +1602,6 @@ getAddrOfVariableOrGOTEquivalent(IRGenModule &IGM,
   if (entity.isForeignTypeMetadataCandidate()) {
     auto foreignCandidate
       = IGM.getAddrOfForeignTypeMetadataCandidate(entity.getType());
-
-    // FIXME: MCJIT doesn't support direct relative references with SUBTRACTOR
-    // relocations, so fake a "GOT" indirect entry for the JIT. Foreign metadata
-    // candidates wouldn't normally require this because they're always emitted
-    // locally. We need this open-coded path because we don't normally generate
-    // an address point symbol for foreign metadata.
-    // rdar://problem/22467267
-    if (IGM.Opts.UseJIT) {
-      llvm::SmallString<64> name;
-      entity.mangle(name);
-
-      auto &entry = gotEquivalents[entity];
-      if (!entry) {
-        auto addrPointAlias = llvm::GlobalAlias::create(
-                          cast<llvm::PointerType>(foreignCandidate->getType()),
-                          llvm::GlobalValue::InternalLinkage,
-                          "addrpoint." + name, foreignCandidate,
-                          &IGM.Module);
-        auto gotEquivalent = createGOTEquivalent(IGM, addrPointAlias, name);
-        entry = gotEquivalent;
-      }
-      return {entry, DirectOrGOT::GOT};
-    }
   } else {
     getAddrOfLLVMVariable(IGM, globals, gotEquivalents, entity,
                           /*definitionType*/ nullptr,
@@ -1655,21 +1632,15 @@ getAddrOfVariableOrGOTEquivalent(IRGenModule &IGM,
   // into the same image as us could use direct
   // relative references too, to avoid producing unnecessary GOT entries in
   // the final image.
-  //
-  // FIXME: MCJIT doesn't support direct relative references with SUBTRACTOR
-  // relocations, so always emit a "GOT" entry for the JIT.
-  // rdar://problem/22467267
-  if (!IGM.Opts.UseJIT) {
-    auto entry = globals[entity];
-    if (!hasPublicVisibility(entity.getLinkage(NotForDefinition))
-        || isDefinition(entry)) {
-      // FIXME: Relative references to aliases break MC on 32-bit Mach-O
-      // platforms (rdar://problem/22450593 ), so substitute an alias with its
-      // aliasee to work around that.
-      if (auto alias = dyn_cast<llvm::GlobalAlias>(entry))
-        entry = alias->getAliasee();
-      return {entry, DirectOrGOT::Direct};
-    }
+  auto entry = globals[entity];
+  if (!hasPublicVisibility(entity.getLinkage(NotForDefinition))
+      || isDefinition(entry)) {
+    // FIXME: Relative references to aliases break MC on 32-bit Mach-O
+    // platforms (rdar://problem/22450593 ), so substitute an alias with its
+    // aliasee to work around that.
+    if (auto alias = dyn_cast<llvm::GlobalAlias>(entry))
+      entry = alias->getAliasee();
+    return {entry, DirectOrGOT::Direct};
   }
 
   auto &gotEntry = gotEquivalents[entity];
@@ -1859,19 +1830,9 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
     // if the witness table requires lazy initialization, instantiation, or
     // conditional conformance checking.
     std::pair<llvm::Constant*, DirectOrGOT> witnessTableRef;
-    // FIXME: MCJIT doesn't support direct relative references with SUBTRACTOR
-    // relocations, so always emit a "GOT" entry for the JIT.
-    // rdar://problem/22467267
-    if (Opts.UseJIT) {
-      witnessTableRef = getAddrOfVariableOrGOTEquivalent(*this,
-         GlobalVars, GlobalGOTEquivalents,
-         LinkEntity::forDirectProtocolWitnessTable(conformance, *this),
-         WitnessTableTy, WitnessTablePtrTy);
-    } else {
-      auto witnessTableVar = getAddrOfWitnessTable(conformance);
-      witnessTableRef = std::make_pair(witnessTableVar,
-                                       DirectOrGOT::Direct);
-    }
+    auto witnessTableVar = getAddrOfWitnessTable(conformance);
+    witnessTableRef = std::make_pair(witnessTableVar,
+                                     DirectOrGOT::Direct);
 
     auto typeRef = getAddrOfVariableOrGOTEquivalent(*this,
       GlobalVars, GlobalGOTEquivalents,

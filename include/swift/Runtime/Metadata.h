@@ -2107,9 +2107,7 @@ private:
   // The conformance, or a generator function for the conformance.
   union {
     /// A direct reference to the witness table for the conformance.
-    /// TODO: This currently needs to be indirectable for JIT support, since
-    /// MCJIT can't yet handle subtractor relocations. rdar://problem/22467267
-    RelativeIndirectablePointer<WitnessTable> WitnessTable;
+    RelativeDirectPointer<WitnessTable> WitnessTable;
     
     /// A function that produces the witness table given an instance of the
     /// type. The function may return null if a specific instance does not
