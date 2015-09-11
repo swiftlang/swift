@@ -1363,6 +1363,9 @@ void PrintAST::printOneParameter(const Pattern *BodyPattern,
     switch (Options.ArgAndParamPrinting) {
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
       Printer.printName(ArgName);
+
+      if (!ArgNameIsAPIByDefault && !ArgName.empty())
+        Printer << " _";
       break;
     case PrintOptions::ArgAndParamPrintingMode::MatchSource:
       if (ArgName == BodyName && ArgNameIsAPIByDefault) {
