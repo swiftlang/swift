@@ -17,6 +17,7 @@
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
 #include "Leaks.h"
+#include "Lazy.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #import <objc/objc.h>
@@ -42,10 +43,10 @@ void swift_leaks_startTrackingObjCObject(id obj);
 //===----------------------------------------------------------------------===//
 
 /// A set of allocated swift only objects that we are tracking for leaks.
-static std::set<HeapObject *> TrackedSwiftObjects;
+static Lazy<std::set<HeapObject *>> TrackedSwiftObjects;
 
 /// A set of allocated objc objects that we are tracking for leaks.
-static std::set<id> TrackedObjCObjects;
+static Lazy<std::set<id>> TrackedObjCObjects;
 
 /// Whether or not we should be collecting objects.
 static bool ShouldTrackObjects = false;
@@ -83,8 +84,8 @@ extern "C" void swift_leaks_startTrackingObjects(const char *name) {
   pthread_mutex_lock(&LeaksMutex);
 
   // First clear our tracked objects set.
-  TrackedSwiftObjects.clear();
-  TrackedObjCObjects.clear();
+  TrackedSwiftObjects->clear();
+  TrackedObjCObjects->clear();
 
   // Set that we should track objects.
   ShouldTrackObjects = true;
@@ -112,7 +113,7 @@ extern "C" void swift_leaks_startTrackingObjects(const char *name) {
 /// This assumes that the LeaksMutex is already being held.
 static void dumpSwiftHeapObjects() {
   const char *comma = "";
-  for (HeapObject *Obj : TrackedSwiftObjects) {
+  for (HeapObject *Obj : *TrackedSwiftObjects) {
     const HeapMetadata *Metadata = Obj->metadata;
 
     fprintf(stderr, "%s", comma);
@@ -151,7 +152,7 @@ static void dumpSwiftHeapObjects() {
 /// This assumes that the LeaksMutex is already being held.
 static void dumpObjCHeapObjects() {
   const char *comma = "";
-  for (id Obj : TrackedObjCObjects) {
+  for (id Obj : *TrackedObjCObjects) {
     // Just print out the class of Obj.
     fprintf(stderr, "%s\"%s\"", comma, object_getClassName(Obj));
     comma = ",";
@@ -160,20 +161,20 @@ static void dumpObjCHeapObjects() {
 
 extern "C" int swift_leaks_stopTrackingObjects(const char *name) {
   pthread_mutex_lock(&LeaksMutex);
-  unsigned Result = TrackedSwiftObjects.size() + TrackedObjCObjects.size();
+  unsigned Result = TrackedSwiftObjects->size() + TrackedObjCObjects->size();
 
   fprintf(stderr, "{\"name\":\"%s\", \"swift_count\": %u, \"objc_count\": %u, "
                   "\"swift_objects\": [",
-          name, unsigned(TrackedSwiftObjects.size()),
-          unsigned(TrackedObjCObjects.size()));
+          name, unsigned(TrackedSwiftObjects->size()),
+          unsigned(TrackedObjCObjects->size()));
   dumpSwiftHeapObjects();
   fprintf(stderr, "], \"objc_objects\": [");
   dumpObjCHeapObjects();
   fprintf(stderr, "]}\n");
 
   fflush(stderr);
-  TrackedSwiftObjects.clear();
-  TrackedObjCObjects.clear();
+  TrackedSwiftObjects->clear();
+  TrackedObjCObjects->clear();
   ShouldTrackObjects = false;
 
   // Undo our swizzling.
@@ -198,28 +199,28 @@ extern "C" int swift_leaks_stopTrackingObjects(const char *name) {
 extern "C" void swift_leaks_startTrackingObject(HeapObject *Object) {
   pthread_mutex_lock(&LeaksMutex);
   if (ShouldTrackObjects) {
-    TrackedSwiftObjects.insert(Object);
+    TrackedSwiftObjects->insert(Object);
   }
   pthread_mutex_unlock(&LeaksMutex);
 }
 
 extern "C" void swift_leaks_stopTrackingObject(HeapObject *Object) {
   pthread_mutex_lock(&LeaksMutex);
-  TrackedSwiftObjects.erase(Object);
+  TrackedSwiftObjects->erase(Object);
   pthread_mutex_unlock(&LeaksMutex);
 }
 
 void swift_leaks_startTrackingObjCObject(id Object) {
   pthread_mutex_lock(&LeaksMutex);
   if (ShouldTrackObjects) {
-    TrackedObjCObjects.insert(Object);
+    TrackedObjCObjects->insert(Object);
   }
   pthread_mutex_unlock(&LeaksMutex);
 }
 
 void swift_leaks_stopTrackingObjCObject(id Object) {
   pthread_mutex_lock(&LeaksMutex);
-  TrackedObjCObjects.erase(Object);
+  TrackedObjCObjects->erase(Object);
   pthread_mutex_unlock(&LeaksMutex);
 }
 

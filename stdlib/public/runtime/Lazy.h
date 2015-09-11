@@ -44,6 +44,9 @@ public:
   
   constexpr Lazy() = default;
 
+  T *operator->() { return &get(); }
+  T &operator*() { return get(); }
+
 private:
   static void lazyInitCallback(void *Argument) {
     auto self = reinterpret_cast<Lazy *>(Argument);
