@@ -750,6 +750,45 @@ copyOrInitValueInto(ManagedValue value, bool isInit,
 }
 
 namespace {
+class BoolPatternInitialization : public RefutablePatternInitialization {
+  BoolPattern *pattern;
+public:
+  BoolPatternInitialization(BoolPattern *pattern,
+                            JumpDest patternFailDest)
+    : RefutablePatternInitialization(patternFailDest), pattern(pattern) {}
+
+  void copyOrInitValueInto(ManagedValue explodedElement, bool isInit,
+                           SILLocation loc, SILGenFunction &SGF) override;
+};
+} // end anonymous namespace
+
+void BoolPatternInitialization::
+copyOrInitValueInto(ManagedValue value, bool isInit,
+                    SILLocation loc, SILGenFunction &SGF) {
+  assert(isInit && "Only initialization is supported for refutable patterns");
+
+  // Extract the i1 from the Bool struct.
+  StructDecl *BoolStruct = cast<StructDecl>(SGF.getASTContext().getBoolDecl());
+  auto Members = BoolStruct->lookupDirect(SGF.getASTContext().Id_value);
+  assert(Members.size() == 1 &&
+         "Bool should have only one property with name 'value'");
+  auto Member = dyn_cast<VarDecl>(Members[0]);
+  assert(Member &&"Bool should have a property with name 'value' of type Int1");
+  auto *i1Val = SGF.B.createStructExtract(loc, value.forward(SGF), Member);
+
+  // Branch on the boolean based on whether we're testing for true or false.
+  SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
+  auto contBB = trueBB;
+  auto falseBB = SGF.Cleanups.emitBlockForCleanups(getFailureDest(), loc);
+
+  if (!pattern->getValue())
+    std::swap(trueBB, falseBB);
+  SGF.B.createCondBranch(loc, i1Val, trueBB, falseBB);
+  SGF.B.setInsertionPoint(contBB);
+}
+
+
+namespace {
 
 /// InitializationForPattern - A visitor for traversing a pattern, generating
 /// SIL code to allocate the declared variables, and generating an
@@ -828,7 +867,7 @@ struct InitializationForPattern
                                                          patternFailDest));
   }
   InitializationPtr visitBoolPattern(BoolPattern *P) {
-    llvm_unreachable("bools not supported in let/else yet");
+    return InitializationPtr(new BoolPatternInitialization(P, patternFailDest));
   }
   InitializationPtr visitExprPattern(ExprPattern *P) {
     return InitializationPtr(new ExprPatternInitialization(P, patternFailDest));

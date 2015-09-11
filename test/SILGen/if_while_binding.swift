@@ -311,3 +311,35 @@ func testAsPatternInIfLet(a : BaseClass?) {
 
   }
 }
+
+// <rdar://problem/22312114> if case crashes swift - bools not supported in let/else yet
+// CHECK-LABEL: sil hidden @_TF16if_while_binding12testCaseBoolFGSqSb_T_
+func testCaseBool(value : Bool?) {
+  // CHECK-NEXT: bb0(%0 : $Optional<Bool>):
+  // CHECK: switch_enum %0 : $Optional<Bool>, case #Optional.Some!enumelt.1: bb1, default bb3
+  // CHECK: bb1(%3 : $Bool):
+  // CHECK: [[ISTRUE:%[0-9]+]] = struct_extract %3 : $Bool, #Bool.value
+  // CHECK: cond_br [[ISTRUE]], bb2, bb3
+  // CHECK: bb2:
+  // CHECK: function_ref @_TF16if_while_binding8marker_1FT_T_
+  // CHECK: br bb3                                          // id: %8
+  if case true? = value {
+    marker_1()
+  }
+
+  // CHECK:   bb3:                                              // Preds: bb0 bb1 bb2
+  // CHECK:   switch_enum %0 : $Optional<Bool>, case #Optional.Some!enumelt.1: bb4, default bb6
+
+  // CHECK:   bb4(
+  // CHECK:   [[ISTRUE:%[0-9]+]] = struct_extract %10 : $Bool, #Bool.value   // user: %12
+  // CHECK:   cond_br [[ISTRUE]], bb6, bb5
+
+  // CHECK: bb5:
+  // CHECK: function_ref @_TF16if_while_binding8marker_2FT_T_
+  // CHECK: br bb6                                          // id: %15
+
+  // CHECK: bb6:                                              // Preds: bb3 bb4 bb5
+  if case false? = value {
+    marker_2()
+  }
+}
