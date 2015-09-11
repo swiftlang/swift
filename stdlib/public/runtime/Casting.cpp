@@ -2821,7 +2821,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   if (!_dynamicCastUnknownClass(srcObject,
                                 targetBridgedClass,
                                 flags & DynamicCastFlags::Unconditional)) {
-    return false;
+    return _fail(src, srcType, targetType, flags);
   }
 
   // Unless we're always supposed to consume the input, retain the
