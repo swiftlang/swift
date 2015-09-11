@@ -62,4 +62,4 @@ class C {}
 class D: C {}
 
 let c = C()
-let d = (c as! D)! // expected-error{{forced downcast already produces a non-optional value}} {{18-19=}}
+let d = (c as! D)! // expected-error{{cannot force unwrap value of non-optional type 'D'}} {{18-19=}}

@@ -205,7 +205,8 @@ obj.dynamicType.foo!(obj)(5) // expected-error{{instance member 'foo' cannot be 
 
 // Checked casts to AnyObject
 var p: P = Y()
-var obj3 : AnyObject = (p as! AnyObject)! // expected-error{{extraneous postfix '!'}} {{41-42=}}
+// expected-warning @+1 {{forced cast from 'P' to 'AnyObject' always succeeds; did you mean to use 'as'?}}
+var obj3 : AnyObject = (p as! AnyObject)! // expected-error{{cannot force unwrap value of non-optional type 'AnyObject'}} {{41-42=}}
 
 // Implicit force of an implicitly unwrapped optional
 let uopt : AnyObject! = nil

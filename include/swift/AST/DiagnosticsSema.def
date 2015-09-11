@@ -1685,10 +1685,6 @@ ERROR(binding_explicit_downcast,sema_tce,none,
       "operand of postfix '?' is a forced downcast to type %0; use 'as?' to "
       "perform a conditional downcast", (Type))
 
-ERROR(forcing_explicit_downcast,sema_tce,none,
-      "extraneous postfix '!'; forced downcast already produces a non-optional "
-      "value of type %0", (Type))
-
 WARNING(inject_forced_downcast,sema_tce,none,
         "treating a forced downcast to %0 as optional will never produce 'nil'",
         (Type))

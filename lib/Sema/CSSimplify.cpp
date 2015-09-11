@@ -2570,16 +2570,12 @@ ConstraintSystem::simplifyOptionalObjectConstraint(const Constraint &constraint)
   
   // If the base type is not optional, the constraint fails.
   Type objectTy = optTy->getAnyOptionalObjectType();
-  if (!objectTy) {
-    recordFailure(constraint.getLocator(), Failure::IsNotOptional,
-                  optTy);
+  if (!objectTy)
     return SolutionKind::Error;
-  }
   
   // The object type is an lvalue if the optional was.
-  if (optLValueTy->is<LValueType>()) {
+  if (optLValueTy->is<LValueType>())
     objectTy = LValueType::get(objectTy);
-  }
 
   // Equate it to the other type in the constraint.
   addConstraint(ConstraintKind::Bind, objectTy, constraint.getSecondType(),

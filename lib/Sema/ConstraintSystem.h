@@ -363,8 +363,6 @@ public:
   enum FailureKind {
     /// \brief The type is not bridged to an Objective-C type.
     IsNotBridgedToObjectiveC,
-    /// \brief The type is not an optional type.
-    IsNotOptional,
     /// \brief The type is not allowed to be an l-value.
     IsForbiddenLValue,
     /// Out-of-order arguments.
@@ -441,7 +439,6 @@ public:
                      getSecondType());
 
     case IsNotBridgedToObjectiveC:
-    case IsNotOptional:
     case MissingArgument:
     case NoPublicInitializers:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),

@@ -40,10 +40,6 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
   case IsNotBridgedToObjectiveC:
     out << getFirstType().getString() << "is not bridged to Objective-C";
     break;
-      
-  case IsNotOptional:
-    out << getFirstType().getString() << "is not an optional type";
-    break;
 
   case IsForbiddenLValue:
     out << "disallowed l-value binding of " << getFirstType().getString()
@@ -660,7 +656,7 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
     // FIXME: diagnose other cases
     return false;
 
-  case Failure::OutOfOrderArgument: 
+  case Failure::OutOfOrderArgument:
     if (auto tuple = dyn_cast_or_null<TupleExpr>(anchor)) {
       unsigned firstIdx = failure.getValue();
       Identifier first = tuple->getElementName(firstIdx);
@@ -717,36 +713,6 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure,
     return false;
   }
       
-  case Failure::IsNotOptional: {
-    if (auto force = dyn_cast_or_null<ForceValueExpr>(anchor)) {
-      // If there was an 'as' cast in the subexpression, note it.
-      if (auto *cast = findForcedDowncast(tc.Context, force->getSubExpr())) {
-        tc.diagnose(force->getLoc(), diag::forcing_explicit_downcast,
-                    failure.getFirstType())
-          .highlight(cast->getLoc())
-          .fixItRemove(force->getLoc());
-        return true;
-      }
-      
-      tc.diagnose(loc, diag::invalid_force_unwrap,
-                  failure.getFirstType())
-        .highlight(force->getSourceRange())
-        .fixItRemove(force->getExclaimLoc());
-      
-      return true;
-    }
-    
-    if (auto bind = dyn_cast_or_null<BindOptionalExpr>(anchor)) {
-      tc.diagnose(loc, diag::invalid_optional_chain,
-                  failure.getFirstType())
-        .highlight(bind->getSourceRange())
-        .fixItRemove(bind->getQuestionLoc());
-      
-      return true;      
-    }
-    return false;
-  }
-
   case Failure::NoPublicInitializers: {
     tc.diagnose(loc, diag::no_accessible_initializers, failure.getFirstType())
       .highlight(range);
