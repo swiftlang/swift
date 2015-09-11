@@ -677,7 +677,6 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       // Scan backwards for the preposition "With".
       auto nameWords = camel_case::getWords(newName);
       auto nameWordRevIter = nameWords.rbegin(),
-        nameWordRevIterBegin = nameWordRevIter,
         nameWordRevIterEnd = nameWords.rend();
       while (nameWordRevIter != nameWordRevIterEnd &&
              !(*nameWordRevIter == "With")) {
