@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -O %s -disable-llvm-optzns -emit-ir -g -o - | FileCheck %s
 
+// REQUIRES: rdar22654702
+
 import StdlibUnittest
 
 // CHECK: define {{.*}}4main4demo
