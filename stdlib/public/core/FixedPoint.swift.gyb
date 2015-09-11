@@ -642,6 +642,15 @@ public func _assumeNonNegative(x: ${Self}) -> ${Self} {
 % end
 
 % end
+
+% fixedBitWidths = [2**x for x in range(3, 8) if 2**x <= 2 * word_bits]
+% for bits in fixedBitWidths:
+@transparent
+public func _leadingZeros(x: Builtin.Int${bits}) -> Builtin.Int${bits} {
+  return Builtin.int_ctlz_Int${bits}(x, true.value)
+}
+% end
+
 //===--- End loop over all integer types ----------------------------------===//
 
 @available(*, unavailable, renamed="Int")

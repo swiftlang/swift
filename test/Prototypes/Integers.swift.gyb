@@ -94,6 +94,12 @@ public protocol _LowLevelInteger
   func ${operation}(rhs: Self, overflowIsError: Bool) -> (Self, Bool)
 % end
 
+  /// The most significant bit that is set, or -1 if self == 0
+  var mostSignificant1Bit: _LowLevelWord {get}
+  
+  /// The most significant bit that is not set, or -1 if self == -1
+  var mostSignificant0Bit: _LowLevelWord {get}
+
   func isLessThanSigned(rhs: Self) -> Bool
   func isLessThanUnsigned(rhs: Self) -> Bool
   
@@ -106,16 +112,12 @@ public protocol _LowLevelInteger
   /// Returns `self`, trapping if the high bit is set
   func checkingNonNegative() -> Self
   
-#if false
-  var maxUnsetBit : Swift.Int { get }
-  var maxSetBit : Swift.Int { get }
-#endif
   var signExtended : Extended { get }
   var zeroExtended : Extended { get }
   
   var truncated : Truncated { get }
 
-  var lowByte: UInt8 { get }
+  var lowWord: _LowLevelWord { get }
 }
 
 extension _LowLevelInteger {
@@ -132,7 +134,7 @@ protocol _FixedWidthInteger : _LowLevelInteger {
   init(_: Storage)
 
   /// The number of bits `Self` can store
-  static var bitWidth : Swift.Int { get }
+  static var bitWidth : _LowLevelWord { get }
   
   /// The entire storage of `self`'s value.  
   var storage: Storage { get set }
@@ -150,7 +152,7 @@ extension _LowLevelInteger {
     repeat {
       let r = x.urem(10)
       x = x.udiv(10)
-      buf.append(chars[Int(r.lowByte)])
+      buf.append(chars[Int(r.lowWord.storage)])
     }
     while x != 0
     return String(buf.reverse())
@@ -171,6 +173,7 @@ extension Bool {
 %   # Until we have BitInt, the widest Int sign-extends into itself.
 %   extendedBits = bits * 2 if bits != maxFixedBits else bits
 %   narrowedBits = bits / 2 if bits != minFixedBits else bits
+%   toWord = 'trunc' if word_bits < bits else 'zext'
 public struct _LowLevelInt${bits} : _FixedWidthInteger {
   public typealias Self_ = _LowLevelInt${bits}
   public typealias Extended = _LowLevelInt${extendedBits}
@@ -197,7 +200,7 @@ public struct _LowLevelInt${bits} : _FixedWidthInteger {
   
   public var storage: Storage
   
-  public static var bitWidth : Swift.Int { return ${bits} }
+  public static var bitWidth : _LowLevelWord { return ${bits} }
   
 % for operation in builtinBinaryOperations:
   public func ${operation}(rhs: Self_) -> Self_ {
@@ -212,7 +215,18 @@ public struct _LowLevelInt${bits} : _FixedWidthInteger {
     return (Self_(r.0), Bool(r.1))
   }
 % end
+
+  /// The most significant bit that is set, or -1 if self == 0
+  public var mostSignificant1Bit: _LowLevelWord {
+    let leadingZeros = Self_(_leadingZeros(storage)).lowWord
+    return Self_.bitWidth.sub(leadingZeros).sub(1)
+  }
   
+  /// The most significant bit that is unset, or -1 if self == -1
+  public var mostSignificant0Bit: _LowLevelWord {
+    return self.xor(-1).mostSignificant1Bit
+  }
+    
 % for sz in 'sign', 'zero':
   public var ${sz}Extended: Extended {
     return Extended(
@@ -262,15 +276,16 @@ public func == (lhs: _LowLevelInt${bits}, rhs: _LowLevelInt${bits}) -> Bool {
 
 
 extension _LowLevelInt${bits} {
-  public var lowByte: UInt8 {
-    return UInt8(Builtin.truncOrBitCast_Int${bits}_Int8(self.storage))
+  public var lowWord: _LowLevelWord {
+    return _LowLevelWord(
+      Builtin.${toWord}OrBitCast_Int${bits}_${IntWord}(self.storage))
   }
 }
 
 % end
 
-typealias _LowLevelWord = _LowLevelInt${word_bits}
-typealias _LowLevelDoubleWord = _LowLevelInt${word_bits * 2}
+public typealias _LowLevelWord = _LowLevelInt${word_bits}
+public typealias _LowLevelDoubleWord = _LowLevelInt${word_bits * 2}
 
 //===--- Low-level BigInt -------------------------------------------------===//
 // A basic array-of-words implementation of LowLevelInteger
@@ -361,6 +376,16 @@ public struct _LowLevelBigInt : _LowLevelInteger {
   }
 % end
 
+  /// The most significant bit that is set, or -1 if self == 0
+  public var mostSignificant1Bit: _LowLevelWord {
+    fatalError("implement me")
+  }
+  
+  /// The most significant bit that is not set, or -1 if self == -1
+  public var mostSignificant0Bit: _LowLevelWord {
+    fatalError("implement me")
+  }
+  
   public func isLessThanSigned(rhs: Self_) -> Bool {
     fatalError("implement me")
   }
@@ -396,7 +421,7 @@ public struct _LowLevelBigInt : _LowLevelInteger {
   
   internal var words: ContiguousArray<_LowLevelWord>
 
-  public var lowByte: UInt8 {
+  public var lowWord: _LowLevelWord {
     fatalError("implement me")
   }
 }
@@ -472,3 +497,4 @@ tests.test("Basics") {
 }
 
 runAllTests()
+
