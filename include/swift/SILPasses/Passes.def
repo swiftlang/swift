@@ -96,8 +96,6 @@ PASS(InstCount, "inst-count",
      "Count all instructions in the module using llvm Statistics")
 PASS(JumpThreadSimplifyCFG, "simplify-cfg",
      "Clean up the CFG of SIL functions")
-PASS(LetPropertiesOpt, "let-properties-opt",
-     "SIL let properties optimization")
 PASS(LICM, "licm",
      "Loop invariant code motion")
 PASS(LateCodeMotion, "late-codemotion",
