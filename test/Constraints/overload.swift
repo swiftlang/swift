@@ -123,3 +123,12 @@ func doAvailTest(x: Int) {
 func test20886179(handlers: [(Int) -> Void], buttonIndex: Int) {
     handlers[buttonIndex](buttonIndex)
 }
+
+// The problem here is that the call has a contextual result type incompatible
+// with *all* overload set candidates.  This is not an ambiguity.
+func overloaded_identity(a : Int) -> Int {}  // expected-note {{found this candidate}}
+func overloaded_identity(b : Float) -> Float {}  // expected-note {{found this candidate}}
+
+func test_contextual_result() {
+  return overloaded_identity()  // expected-error {{ambiguous reference to member 'overloaded_identity'}}
+}
