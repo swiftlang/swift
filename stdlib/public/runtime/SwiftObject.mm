@@ -566,18 +566,36 @@ static bool usesNativeSwiftReferenceCounting_unowned(const void *object) {
   return usesNativeSwiftReferenceCounting_allocated(object);
 }
 
+void *swift::swift_unknownRetain_n(void *object, int n) {
+  void *objc_ret = nullptr;
+  if (isObjCTaggedPointerOrNull(object)) return object;
+  if (usesNativeSwiftReferenceCounting_allocated(object))
+    return swift_retain_n(static_cast<HeapObject *>(object), n);
+  for (int i = 0; i < n; ++i)
+    objc_ret = objc_retain(static_cast<id>(object));
+  return objc_ret;
+}
+
+void swift::swift_unknownRelease_n(void *object, int n) {
+  if (isObjCTaggedPointerOrNull(object)) return;
+  if (usesNativeSwiftReferenceCounting_allocated(object))
+    return swift_release_n(static_cast<HeapObject *>(object), n);
+  for (int i = 0; i < n; ++i)
+    objc_release(static_cast<id>(object));
+}
+
 void *swift::swift_unknownRetain(void *object) {
   if (isObjCTaggedPointerOrNull(object)) return object;
   if (usesNativeSwiftReferenceCounting_allocated(object))
-    return swift_retain((HeapObject*) object);
-  return objc_retain((id) object);
+    return swift_retain(static_cast<HeapObject *>(object));
+  return objc_retain(static_cast<id>(object));
 }
 
 void swift::swift_unknownRelease(void *object) {
   if (isObjCTaggedPointerOrNull(object)) return;
   if (usesNativeSwiftReferenceCounting_allocated(object))
-    return swift_release((HeapObject*) object);
-  return objc_release((id) object);
+    return swift_release(static_cast<HeapObject *>(object));
+  return objc_release(static_cast<id>(object));
 }
 
 /// Return true iff the given BridgeObject is not known to use native

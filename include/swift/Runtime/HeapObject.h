@@ -430,11 +430,18 @@ extern "C" void *swift_bridgeObjectRetain(void *value);
 /// Increment the strong retain count of an object which might not be a native
 /// Swift object.
 extern "C" void *swift_unknownRetain(void *value);
+/// Increment the strong retain count of an object which might not be a native
+/// Swift object by n.
+extern "C" void *swift_unknownRetain_n(void *value, int n);
 
 #else
 
 static inline void swift_unknownRetain(void *value) {
   swift_retain(static_cast<HeapObject *>(value));
+}
+
+static inline void swift_unknownRetain_n(void *value, int n) {
+  swift_retain_n(static_cast<HeapObject *>(value), n);
 }
 
 #endif /* SWIFT_OBJC_INTEROP */
@@ -446,11 +453,18 @@ extern "C" void swift_bridgeObjectRelease(void *value);
 /// Decrement the strong retain count of an object which might not be a native
 /// Swift object.
 extern "C" void swift_unknownRelease(void *value);
+/// Decrement the strong retain count of an object which might not be a native
+/// Swift object by n.
+extern "C" void swift_unknownRelease_n(void *value, int n);
 
 #else
 
 static inline void swift_unknownRelease(void *value) {
   swift_release(static_cast<HeapObject *>(value));
+}
+
+static inline void swift_unknownRelease_n(void *value, int n) {
+  swift_release_n(static_cast<HeapObject *>(value), n);
 }
 
 #endif /* SWIFT_OBJC_INTEROP */

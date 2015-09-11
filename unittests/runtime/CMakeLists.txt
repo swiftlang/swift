@@ -7,6 +7,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     find_library(FOUNDATION_LIBRARY Foundation)
     list(APPEND PLATFORM_SOURCES
       weak.mm
+      Refcounting.mm
       )
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
       ${FOUNDATION_LIBRARY}
@@ -17,7 +18,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
   add_swift_unittest(SwiftRuntimeTests
     Metadata.cpp
     Enum.cpp
-    Refcounting.cpp
     ${PLATFORM_SOURCES}
     )
 
