@@ -76,7 +76,13 @@ class Token {
   
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
-  
+
+  StringRef trimComment() const {
+    assert(hasComment() && "Has no comment to trim.");
+    StringRef Raw(Text.begin() - CommentLength, CommentLength);
+    return Raw.trim();
+  }
+
 public:
   Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false), CommentLength(0),
             EscapedIdentifier(false) {}
@@ -225,16 +231,20 @@ public:
   }
 
   CharSourceRange getCommentRange() const {
+    if (CommentLength == 0)
+      return CharSourceRange(SourceLoc(llvm::SMLoc::getFromPointer(Text.begin())),
+                             0);
+    auto TrimedComment = trimComment();
     return CharSourceRange(
-        SourceLoc(llvm::SMLoc::getFromPointer(Text.begin() - CommentLength)),
-        CommentLength);
+      SourceLoc(llvm::SMLoc::getFromPointer(TrimedComment.begin())),
+      TrimedComment.size());
   }
   
   SourceLoc getCommentStart() const {
     if (CommentLength == 0) return SourceLoc();
-    return SourceLoc(llvm::SMLoc::getFromPointer(Text.begin() - CommentLength));
+    return SourceLoc(llvm::SMLoc::getFromPointer(trimComment().begin()));
   }
-  
+
 
   StringRef getText() const {
     if (EscapedIdentifier) {
