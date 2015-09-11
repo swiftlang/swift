@@ -364,11 +364,67 @@ public struct _LowLevelBigInt : _LowLevelInteger {
     self = value
   }
   
-% for operation in builtinBinaryOperations:
-  public func ${operation}(rhs: Self_) -> Self_ {
+  public func add(rhs: Self_) -> Self_ {
+    var r = Self_()
+    r.words.reserveCapacity(max(self.words.capacity, rhs.words.capacity))
     fatalError("implement me")
   }
-% end
+
+  public func and(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func ashr(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func lshr(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func or(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func mul(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func sdiv(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func sdiv_exact(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func shl(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func srem(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func sub(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func udiv(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func udiv_exact(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func urem(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
+
+  public func xor(rhs: Self_) -> Self_ {
+    fatalError("implement me")
+  }
 
 % for operation in builtinBinaryOperationsWithOverflow:
   public func ${operation}(rhs: Self_, overflowIsError: Bool) -> (Self_, Bool) {
