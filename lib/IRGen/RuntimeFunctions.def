@@ -143,9 +143,9 @@ FUNCTION(FixLifetime, swift_fixLifetime, RuntimeCC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_unknownRetain(void *ptr);
+// void *swift_unknownRetain(void *ptr);
 FUNCTION(UnknownRetain, swift_unknownRetain, RuntimeCC,
-         RETURNS(VoidTy),
+         RETURNS(RefCountedPtrTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
