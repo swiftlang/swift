@@ -181,81 +181,6 @@ void SILGlobalOpt::collectGlobalLoad(LoadInst *LI, SILGlobalVariable *SILG) {
   GlobalLoadMap[SILG].push_back(LI);
 }
 
-/// Check if a given type is a simple type, i.e. a builtin
-/// integer or floating point type or a struct/tuple whose members
-/// are of simple types.
-/// TODO: Cache the "simple" flag for types to avoid repeating checks.
-static bool isSimpleType(SILType SILTy, SILModule& Module) {
-  // Classes can never be initialized statically at compile-time.
-  if (SILTy.getClassOrBoundGenericClass()) {
-    return false;
-  }
-
-  if (!SILTy.isTrivial(Module))
-    return false;
-
-  return true;
-}
-
-/// Check if the value of V is computed by means of a simple initialization.
-/// Store the actual SILValue into Val and the reversed list of instructions
-/// initializing it in Insns.
-/// The check is performed by recursively walking the computation of the
-/// SIL value being analyzed.
-static bool analyzeStaticInitializer(SILValue V,
-                                     SmallVectorImpl<SILInstruction *> &Insns) {
-  auto I = dyn_cast<SILInstruction>(V);
-  if (!I)
-    return false;
-
-  while (true) {
-    Insns.push_back(I);
-    if (auto *SI = dyn_cast<StructInst>(I)) {
-      // If it is not a struct which is a simple type, bail.
-      if (!isSimpleType(SI->getType(), I->getModule()))
-        return false;
-      for (auto &Op: SI->getAllOperands()) {
-        // If one of the struct instruction operands is not
-        // a simple initializer, bail.
-        if (!analyzeStaticInitializer(Op.get(), Insns))
-          return false;
-      }
-      return true;
-    } if (auto *TI = dyn_cast<TupleInst>(I)) {
-      // If it is not a tuple which is a simple type, bail.
-      if (!isSimpleType(TI->getType(), I->getModule()))
-        return false;
-      for (auto &Op: TI->getAllOperands()) {
-        // If one of the struct instruction operands is not
-        // a simple initializer, bail.
-        if (!analyzeStaticInitializer(Op.get(), Insns))
-          return false;
-      }
-      return true;
-    } else {
-      if (auto *bi = dyn_cast<BuiltinInst>(I)) {
-        switch (bi->getBuiltinInfo().ID) {
-        case BuiltinValueKind::FPTrunc:
-          if (auto *LI = dyn_cast<LiteralInst>(bi->getArguments()[0])) {
-            I = LI;
-            continue;
-          }
-          break;
-        default:
-          return false;
-        }
-      }
-
-      if (I->getKind() == ValueKind::IntegerLiteralInst
-          || I->getKind() == ValueKind::FloatLiteralInst
-          || I->getKind() == ValueKind::StringLiteralInst)
-        return true;
-      return false;
-    }
-  }
-  return false;
-}
-
 /// Remove an unused global token used by once calls.
 static void removeToken(SILValue Op) {
   if (auto *ATPI = dyn_cast<AddressToPointerInst>(Op)) {
@@ -646,38 +571,6 @@ static bool isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG) {
   // we can treat it as if it is a let.
   // If this global is internal or private, it should be
   return false;
-}
-
-/// Replace load sequence which may contian
-/// a chain of struct_element_addr followed by a load.
-/// The sequence is travered inside out, i.e.
-/// starting with the innermost struct_element_addr
-static void replaceLoadSequence(SILInstruction *I,
-                                SILInstruction *Value,
-                                SILBuilder &B) {
-  if (auto *LI = dyn_cast<LoadInst>(I)) {
-    LI->replaceAllUsesWith(Value);
-    return;
-  }
-
-  // It is a series of struct_element_addr followed by load.
-  if (auto *SEAI = dyn_cast<StructElementAddrInst>(I)) {
-    auto *SEI = B.createStructExtract(SEAI->getLoc(), Value, SEAI->getField());
-    for (auto SEAIUse : SEAI->getUses()) {
-      replaceLoadSequence(SEAIUse->getUser(), SEI, B);
-    }
-    return;
-  }
-
-  if (auto *TEAI = dyn_cast<TupleElementAddrInst>(I)) {
-    auto *TEI = B.createTupleExtract(TEAI->getLoc(), Value, TEAI->getFieldNo());
-    for (auto TEAIUse : TEAI->getUses()) {
-      replaceLoadSequence(TEAIUse->getUser(), TEI, B);
-    }
-    return;
-  }
-
-  llvm_unreachable("Unknown instruction sequence for reading from a global");
 }
 
 /// Replace load sequence which may contian

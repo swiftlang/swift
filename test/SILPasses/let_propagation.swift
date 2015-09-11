@@ -11,8 +11,13 @@ func action() {
 }
 
 final public class A0 {
- let x: Int32 = 3
- let y: Int32 = 1
+ let x: Int32
+ let y: Int32
+ 
+ init(_ x: Int32, _ y: Int32) {
+   self.x = x
+   self.y = y
+ }
  
  @inline(never)
  func sum1() -> Int32 {
@@ -61,7 +66,7 @@ final public class A0 {
 // CHECK-NEXT: return
 @inline(never)
 public func testAllocAndUseLet() -> Int32 {
-  var a = A0()
+  let a = A0(3, 1)
   var counter: Int32
   // a.x and a.y should be loaded only once.
   counter = a.sum2() + a.sum2()
@@ -158,8 +163,7 @@ public func testUseGlobalLet() -> Int32 {
 struct A1 {
   let x: Int32
   
-  // TODO: If VarDecl would have a field for initializers like this,
-  // we could propagate the value of the initializer into all instructions
+  // Propagate the value of the initializer into all instructions
   // that use it, which in turn would allow for better constant
   // propagation.
   let y: Int32 = 100
@@ -171,6 +175,7 @@ struct A1 {
       x = -1
     }
   }
+
   // CHECK-LABEL: sil hidden @_TFV15let_propagation2A12f1fS0_FT_VSs5Int32
   // CHECK: bb0
   // CHECK: struct_extract {{.*}}#A1.x
@@ -188,14 +193,9 @@ struct A1 {
 
   // CHECK-LABEL: sil hidden @_TFV15let_propagation2A12f2fS0_FT_VSs5Int32
   // CHECK: bb0
-  // CHECK: struct_extract {{.*}}#A1.y
-  // CHECK: struct_extract {{.*}}#Int32.value
-  // CHECK-NOT: load
-  // CHECK-NOT: struct_extract
-  // CHECK-NOT: struct_element_addr
-  // CHECK-NOT: ref_element_addr
-  // CHECK-NOT: bb1
-  // CHECK: return
+  // CHECK: integer_literal $Builtin.Int32, 200
+  // CHECK-NEXT: struct $Int32
+  // CHECK-NEXT: return
   func f2() -> Int32 {
     // load y only once.
     return y + y

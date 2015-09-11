@@ -200,7 +200,10 @@ final class PolarBear: Bear {
 }
 
 public class D {
-  let v: Int32 = 0
+  let v: Int32
+  init(_ n: Int32) {
+    v = n
+  }
 }
 
 public class D1 : D {
@@ -214,7 +217,7 @@ public class D1 : D {
   }
 }
 
-let sD = D()
+let sD = D(0)
 
 public class D2: D1 {
    // Override base method, but return a non-optional result
