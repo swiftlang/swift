@@ -666,7 +666,8 @@ ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
   // followed by a '}', ';', statement or decl start keyword sequence.
-  if (Tok.isNot(tok::r_brace, tok::semi, tok::eof) &&
+  if (Tok.isNot(tok::r_brace, tok::semi, tok::eof, tok::pound_if,
+                tok::pound_endif, tok::pound_else, tok::pound_elseif) &&
       !isStartOfStmt() && !isStartOfDecl()) {
     SourceLoc ExprLoc = Tok.getLoc();
 
