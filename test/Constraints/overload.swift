@@ -126,9 +126,10 @@ func test20886179(handlers: [(Int) -> Void], buttonIndex: Int) {
 
 // The problem here is that the call has a contextual result type incompatible
 // with *all* overload set candidates.  This is not an ambiguity.
-func overloaded_identity(a : Int) -> Int {}  // expected-note {{found this candidate}}
-func overloaded_identity(b : Float) -> Float {}  // expected-note {{found this candidate}}
+func overloaded_identity(a : Int) -> Int {}
+func overloaded_identity(b : Float) -> Float {}
 
 func test_contextual_result() {
-  return overloaded_identity()  // expected-error {{ambiguous reference to member 'overloaded_identity'}}
+  return overloaded_identity()  // expected-error {{no 'overloaded_identity' candidates produce the expected contextual result type '()'}}
+  // expected-note @-1 {{overloads for 'overloaded_identity' exist with these result types: Int, Float}}
 }

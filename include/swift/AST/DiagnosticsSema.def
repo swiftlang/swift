@@ -180,6 +180,15 @@ ERROR(cannot_call_non_function_value,sema,none,
 ERROR(wrong_argument_labels_overload,sema,none,
       "argument labels '%0' do not match any available overloads", (StringRef))
 
+ERROR(no_candidates_match_result_type,sema,none,
+      "no '%0' candidates produce the expected contextual result type %1",
+      (StringRef, Type))
+
+ERROR(candidates_no_match_result_type,sema,none,
+      "'%0' produces %1, not the expected contextual result type %2",
+      (StringRef, Type, Type))
+
+
 
 ERROR(invalid_callee_result_type,sema,none,
       "cannot convert call result type %0 to expected type %1",
@@ -210,11 +219,13 @@ ERROR(cannot_call_value_of_function_type,sema,none,
       (Type, StringRef))
 
 NOTE(suggest_expected_match,sema,none,
-     "expected an argument list of type '%0'", (StringRef))
+     "%select{expected an argument list|produces result}0 of type '%1'",
+     (bool, StringRef))
 
 NOTE(suggest_partial_overloads,sema,none,
-      "overloads for '%0' exist with these partially matching parameter "
-      "lists: %1", (StringRef, StringRef))
+      "overloads for '%1' exist with these %select{"
+      "partially matching parameter lists|result types}0: %2",
+      (bool, StringRef, StringRef))
 
 ERROR(cannot_convert_initializer_value,sema,none,
       "cannot convert value of type %0 to specified type %1", (Type,Type))

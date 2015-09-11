@@ -50,8 +50,8 @@ useDoubleList([1.0,2,3])
 useDoubleList([1.0,2.0,3.0])
 
 useIntDict(["Niners" => 31, "Ravens" => 34])
-// FIXME: rdar://22333090 improve diagnostic.
-useIntDict(["Niners" => 31, "Ravens" => 34.0]) // expected-error{{binary operator '=>' cannot be applied to operands of type 'String' and 'Double'}}
+useIntDict(["Niners" => 31, "Ravens" => 34.0]) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Int'}}
+// <rdar://problem/22333090> QoI: Propagate contextual information in a call to operands
 useDoubleDict(["Niners" => 31, "Ravens" => 34.0])
 useDoubleDict(["Niners" => 31.0, "Ravens" => 34])
 useDoubleDict(["Niners" => 31.0, "Ravens" => 34.0])

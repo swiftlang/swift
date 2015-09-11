@@ -139,7 +139,8 @@ func perform<T>() {}  // expected-error {{generic parameter 'T' is not used in f
 
 // <rdar://problem/17080659> Error Message QOI - wrong return type in an overload
 func recArea(h: Int, w : Int) {
-  return h * w  // expected-error {{unexpected non-void return value in void function}}
+  return h * w  // expected-error {{no '*' candidates produce the expected contextual result type '()'}}
+  // expected-note @-1 {{overloads for '*' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double, Float80, T, Self}}
 }
 
 // <rdar://problem/17224804> QoI: Error In Ternary Condition is Wrong
@@ -441,7 +442,7 @@ enum Color {
   
   static func frob(a : Int, inout b : Int) -> Color {}
 }
-let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{cannot convert call result type '[_]' to expected type '(Int, Color)'}}
+let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{'map' produces '[T]', not the expected contextual result type '(Int, Color)'}}
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}} {{51-51=description: }}
 let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{missing argument label 'description:' in call}} {{44-44=description: }}
 
@@ -519,7 +520,7 @@ func r21684487() {
   var closures = Array<MyClosure>()
   let testClosure = {(list: [Int]) -> Bool in return true}
   
-  let closureIndex = closures.indexOf{$0 === testClosure} // expected-error {{binary operator '===' cannot be applied to two 'MyClosure' (aka 'Array<Int> -> Bool') operands}}
+  let closureIndex = closures.indexOf{$0 === testClosure} // expected-error {{cannot convert value of type 'MyClosure' (aka 'Array<Int> -> Bool') to expected argument type 'AnyObject?'}}
 }
 
 // <rdar://problem/18397777> QoI: special case comparisons with nil

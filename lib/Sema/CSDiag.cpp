@@ -1181,7 +1181,7 @@ namespace {
     SmallVector<UncurriedCandidate, 4> candidates;
 
     /// This tracks how close the match is.
-    CandidateCloseness closeness;
+    CandidateCloseness closeness = CC_GeneralMismatch;
     
     /// Analyze a function expr and break it into a candidate set.  On failure,
     /// this leaves the candidate list empty.
@@ -1216,8 +1216,8 @@ namespace {
     /// Given a set of parameter lists from an overload group, and a list of
     /// arguments, emit a diagnostic indicating any partially matching
     /// overloads.
-    void suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
-                                   bool isCallExpr = false);
+    void suggestPotentialOverloads(SourceLoc loc, bool isCallExpr = false,
+                                   bool isResult = false);
 
   private:
     void collectCalleeCandidates(Expr *fnExpr);
@@ -1569,14 +1569,16 @@ CalleeCandidateInfo::CalleeCandidateInfo(ArrayRef<OverloadChoice> overloads,
     if (cand.isDecl())
       candidates.push_back({ cand.getDecl(), uncurryLevel });
   }
+  
+  if (!candidates.empty())
+    declName = candidates[0].decl->getNameStr().str();
 }
 
 
 /// Given a set of parameter lists from an overload group, and a list of
 /// arguments, emit a diagnostic indicating any partially matching overloads.
 void CalleeCandidateInfo::
-suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
-                          bool isCallExpr) {
+suggestPotentialOverloads(SourceLoc loc, bool isCallExpr, bool isResult) {
   
   // If the candidate list is has no near matches to the actual types, don't
   // print out a candidate list, it will just be noise.
@@ -1593,19 +1595,20 @@ suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
   // FIXME2: For (T,T) & (Self, Self), emit this as two candidates, one using
   // the LHS and one using the RHS type for T's.
   for (auto cand : candidates) {
-    Type paramListType;
+    Type type;
 
     if (auto *SD = dyn_cast<SubscriptDecl>(cand.decl)) {
-      paramListType = SD->getIndicesType();
+      type = isResult ? SD->getElementType() : SD->getIndicesType();
     } else {
-      paramListType = cand.getArgumentType();
+      type = isResult ? cand.getResultType() : cand.getArgumentType();
     }
-    if (paramListType.isNull())
+    
+    if (type.isNull())
       continue;
     
     // If we've already seen this (e.g. decls overridden on the result type),
     // ignore this one.
-    auto name = getTypeListString(paramListType);
+    auto name = isResult ? type->getString() : getTypeListString(type);
     if (!dupes.insert(name).second)
       continue;
     
@@ -1618,9 +1621,10 @@ suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
     return;
   
   if (dupes.size() == 1) {
-    CS->TC.diagnose(loc, diag::suggest_expected_match, suggestionText);
+    CS->TC.diagnose(loc, diag::suggest_expected_match, isResult,
+                    suggestionText);
   } else {
-    CS->TC.diagnose(loc, diag::suggest_partial_overloads, functionName,
+    CS->TC.diagnose(loc, diag::suggest_partial_overloads, isResult, declName,
                     suggestionText);
   }
 }
@@ -1716,6 +1720,9 @@ public:
   /// type and its assumed contextual type.
   bool diagnoseContextualConversionError();
 
+  /// For an expression being type checked with a CTP_CalleeResult contextual
+  /// type, try to diagnose a problem.
+  bool diagnoseCalleeResultContextualConversionError();
 
 private:
     
@@ -1809,8 +1816,8 @@ bool FailureDiagnosis::diagnoseConstraintFailure() {
   // priority) than things lower in the list.
   enum ConstraintRanking {
     CR_MemberConstraint,
-    CR_OverloadConstraint,
     CR_ConversionConstraint,
+    CR_OverloadConstraint,
     CR_OtherConstraint
   };
 
@@ -1905,11 +1912,12 @@ bool FailureDiagnosis::diagnoseConstraintFailure() {
     if (isMemberConstraint(C) && diagnoseGeneralMemberFailure(C))
       return true;
 
-    if (isOverloadConstraint(C) && diagnoseGeneralOverloadFailure(C))
-      return true;
-
     if (isConversionConstraint(C) && diagnoseGeneralConversionFailure(C))
       return true;
+
+    if (isOverloadConstraint(C) && diagnoseGeneralOverloadFailure(C))
+      return true;
+    
 
     // TODO: There can be constraints that aren't handled here!  When this
     // happens, we end up diagnosing them as ambiguities that don't make sense.
@@ -2735,13 +2743,68 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
   return typeCheckChildIndependently(subExpr, options);
 }
 
+/// For an expression being type checked with a CTP_CalleeResult contextual
+/// type, try to diagnose a problem.
+bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
+  // Try to dig out the conversion constraint in question to find the contextual
+  // result type being specified.
+  Type contextualResultType;
+  for (auto &c : CS->getConstraints()) {
+    if (!isConversionConstraint(&c) || !c.getLocator() ||
+        c.getLocator()->getAnchor() != expr)
+      continue;
+    
+    // If we found our contextual type, then we know we have a conversion to
+    // some function type, and that the result type is concrete.  If not,
+    // ignore it.
+    auto toType = CS->simplifyType(c.getSecondType());
+    if (auto *FT = toType->getAs<AnyFunctionType>())
+      if (!isUnresolvedOrTypeVarType(FT->getResult())) {
+        contextualResultType = FT->getResult();
+        break;
+      }
+  }
+  if (!contextualResultType)
+    return nullptr;
+
+  // Retypecheck the callee expression without a contextual type to resolve
+  // whatever we can in it.
+  auto callee = typeCheckChildIndependently(expr, TCC_ForceRecheck);
+  if (!callee)
+    return true;
+  
+  // Based on that, compute an overload set.
+  CalleeCandidateInfo calleeInfo(callee, CS);
+
+  switch (calleeInfo.size()) {
+  case 0:
+    // If we found no overloads, then there is something else going on here.
+    return false;
+      
+  case 1:
+    diagnose(expr->getLoc(), diag::candidates_no_match_result_type,
+             calleeInfo.declName, calleeInfo[0].getResultType(),
+             contextualResultType);
+    return true;
+  default:
+    diagnose(expr->getLoc(), diag::no_candidates_match_result_type,
+             calleeInfo.declName, contextualResultType);
+    calleeInfo.suggestPotentialOverloads(expr->getLoc(), true, true);
+    return true;
+  }
+}
 
 bool FailureDiagnosis::diagnoseContextualConversionError() {
   // If the constraint system has a contextual type, then we can test to see if
   // this is the problem that prevents us from solving the system.
   Type contextualType = CS->getContextualType();
-  if (!contextualType)
+  if (!contextualType) {
+    // This contextual conversion constraint doesn't install an actual type.
+    if (CS->getContextualTypePurpose() == CTP_CalleeResult)
+      return diagnoseCalleeResultContextualConversionError();
+ 
     return false;
+  }
 
   // Try re-type-checking the expression without the contextual type to see if
   // it can work without it.  If so, the contextual type is the problem.  We
@@ -2749,7 +2812,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
   // contextual constraint that we know we are relaxing.
   auto exprType = getTypeOfTypeCheckedChildIndependently(expr,TCC_ForceRecheck);
   
-  // If it failed an diagnosed something, then we're done.
+  // If it failed and diagnosed something, then we're done.
   if (!exprType) return true;
 
   // Try to find the contextual type in a variety of ways.  If the constraint
@@ -3202,7 +3265,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
       .highlight(baseExpr->getSourceRange());
     
     // FIXME: suggestPotentialOverloads should do this.
-    //calleeInfo.suggestPotentialOverloads("subscript", SE->getLoc());
+    //calleeInfo.suggestPotentialOverloads(SE->getLoc());
     for (auto candidate : calleeInfo.candidates)
       diagnose(candidate.decl, diag::found_candidate);
 
@@ -3224,14 +3287,14 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
       .highlight(SE->getBase()->getSourceRange());
     // FIXME: Should suggest overload set, but we're not ready for that until
     // it points to candidates and identifies the self type in the diagnostic.
-    //calleeInfo.suggestPotentialOverloads("subscript", SE->getLoc());
+    //calleeInfo.suggestPotentialOverloads(SE->getLoc());
     return true;
   }
 
   diagnose(SE->getLoc(), diag::cannot_subscript_with_index,
            baseType, indexType);
 
-  calleeInfo.suggestPotentialOverloads("subscript", SE->getLoc());
+  calleeInfo.suggestPotentialOverloads(SE->getLoc());
   return true;
 }
 
@@ -3293,9 +3356,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // return something of obviously non-function-type.  If this happens, we
   // produce better diagnostics below by diagnosing this here rather than trying
   // to peel apart the failed conversion to function type.
-  if (!isa<BinaryExpr>(callExpr) &&   // FIXME, binops too!
-      
-      CS->getContextualType() &&
+  if (CS->getContextualType() &&
       (isUnresolvedOrTypeVarType(fnExpr->getType()) ||
        (fnExpr->getType()->is<AnyFunctionType>() &&
         fnExpr->getType()->hasUnresolvedType()))) {
@@ -3420,7 +3481,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     diagnose(argExpr->getLoc(), diag::cannot_apply_unop_to_arg, overloadName,
              argExpr->getType());
     
-    calleeInfo.suggestPotentialOverloads(overloadName, argExpr->getLoc());
+    calleeInfo.suggestPotentialOverloads(argExpr->getLoc());
     return true;
   }
   
@@ -3471,7 +3532,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       .highlight(rhsExpr->getSourceRange());
     }
     
-    calleeInfo.suggestPotentialOverloads(overloadName, callExpr->getLoc());
+    calleeInfo.suggestPotentialOverloads(callExpr->getLoc());
     return true;
   }
   
@@ -3495,7 +3556,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         .highlight(argExpr->getSourceRange());
 
       // Did the user intend on invoking a different overload?
-      calleeInfo.suggestPotentialOverloads(overloadName, fnExpr->getLoc(),
+      calleeInfo.suggestPotentialOverloads(fnExpr->getLoc(),
                                            /*isCallExpr*/true);
       return true;
     }
@@ -3587,8 +3648,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   }
   
   // Did the user intend on invoking a different overload?
-  calleeInfo.suggestPotentialOverloads(overloadName, fnExpr->getLoc(),
-                                       /*isCallExpr*/true);
+  calleeInfo.suggestPotentialOverloads(fnExpr->getLoc(), /*isCallExpr*/true);
   return true;
 }
 
@@ -4134,7 +4194,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
     diagnose(E->getNameLoc(), diag::ambiguous_member_overload_set,
              E->getName().str())
       .highlight(argRange);
-    candidateInfo.suggestPotentialOverloads(E->getName().str(),E->getNameLoc());
+    candidateInfo.suggestPotentialOverloads(E->getNameLoc());
     return true;
   }
   
@@ -4470,7 +4530,7 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
 
   // Attempt to re-type-check the entire expression, while allowing ambiguity.
   auto exprType = getTypeOfTypeCheckedChildIndependently(expr);
-  // If it failed an diagnosed something, then we're done.
+  // If it failed and diagnosed something, then we're done.
   if (!exprType) return;
 
   // If we were able to find something more specific than "unknown" (perhaps

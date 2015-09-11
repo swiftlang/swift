@@ -13,7 +13,7 @@ if let realRoomName = roomName as! NSString { // expected-error {{initializer fo
 
 var pi = 3.14159265358979
 var d: CGFloat = 2.0
-var dpi:CGFloat = d*pi // expected-error{{binary operator '*' cannot be applied to operands of type 'CGFloat' and 'Double'}} expected-note{{overloads for '*' exist with these partially matching parameter lists: (Double, Double), (CGFloat, CGFloat)}}
+var dpi:CGFloat = d*pi // expected-error{{cannot convert value of type 'Double' to expected argument type 'CGFloat'}}
 
 let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'Float' to specified type 'CGFloat'}}
 
@@ -30,10 +30,11 @@ var b: Int = [1, 2, 3] // expected-error{{contextual type 'Int' cannot be used w
 var f1: Float = 2.0
 var f2: Float = 3.0
 
-var dd: Double = f1 - f2 // expected-error{{cannot convert value of type 'Float' to specified type 'Double'}}
+var dd: Double = f1 - f2 // expected-error{{cannot convert value of type 'Float' to expected argument type 'Double'}}
 
 func f() -> Bool {
-  return 1 + 1 // expected-error{{cannot convert return expression of type 'Int' to return type 'Bool'}}
+  return 1 + 1 // expected-error{{no '+' candidates produce the expected contextual result type 'Bool'}}
+  // expected-note @-1 {{overloads for '+' exist with these result types: UInt8, Int8, UInt16, Int16, UInt32, Int32, UInt64, Int64, UInt, Int, Float, Double, Float80, String, CGFloat, T, C, RRC1, UnsafeMutablePointer<Memory>, UnsafePointer<Memory>, Self}}
 }
 
 // Test that nested diagnostics are properly surfaced.
@@ -50,7 +51,8 @@ struct MyArray<Element> {}
 class A {
     var a: MyArray<Int>
     init() {
-        a = MyArray<Int // expected-error{{binary operator '<' cannot be applied to operands of type 'MyArray<_>.Type' and 'Int.Type'}}
+        a = MyArray<Int // expected-error{{no '<' candidates produce the expected contextual result type 'MyArray<Int>'}}
+      // expected-note @-1 {{produces result of type 'Bool'}}
     }
 }
 
@@ -59,7 +61,7 @@ func retV() { return true } // expected-error {{unexpected non-void return value
 func retAI() -> Int {
     let a = [""]
     let b = [""]
-    return (a + b) // expected-error {{binary operator '+' cannot be applied to two '[String]' operands}}
+    return (a + b) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
 }
 
 func bad_return1() {
@@ -72,7 +74,8 @@ func bad_return2() -> (Int, Int) {
 
 // <rdar://problem/14096697> QoI: Diagnostics for trying to return values from void functions
 func bad_return3(lhs:Int, rhs:Int) {
-  return lhs != 0  // expected-error {{unexpected non-void return value in void function}}
+  return lhs != 0  // expected-error {{no '!=' candidates produce the expected contextual result type '()'}}
+  // expected-note @-1 {{produces result of type 'Bool'}}
 }
 
 class MyBadReturnClass {
@@ -80,7 +83,7 @@ class MyBadReturnClass {
 }
 
 func ==(lhs:MyBadReturnClass, rhs:MyBadReturnClass) {
-  return MyBadReturnClass.intProperty == MyBadReturnClass.intProperty  // expected-error {{unexpected non-void return value in void function}}
+  return MyBadReturnClass.intProperty == MyBadReturnClass.intProperty  // expected-error {{cannot convert value of type 'Int' to expected argument type 'MyBadReturnClass'}}
 }
 
 
