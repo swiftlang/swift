@@ -904,7 +904,7 @@ public:
   void completeDotExpr(Expr *E, SourceLoc DotLoc) override;
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completePostfixExpr(Expr *E) override;
-  void completePostfixExprParen(Expr *E, Expr *CCE) override;
+  void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
 
@@ -2873,7 +2873,8 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E, Expr *CCE) {
+void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E,
+                                                           Expr *CodeCompletionE) {
   assert(P.Tok.is(tok::code_complete));
 
   // Don't produce any results in an enum element.
@@ -2883,7 +2884,7 @@ void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E, Expr *CCE) {
   Kind = CompletionKind::PostfixExprParen;
   ParsedExpr = E;
   CurDeclContext = P.CurDeclContext;
-  CodeCompleteTokenExpr = static_cast<CodeCompletionExpr*>(CCE);
+  CodeCompleteTokenExpr = static_cast<CodeCompletionExpr*>(CodeCompletionE);
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
