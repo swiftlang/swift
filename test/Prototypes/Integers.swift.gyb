@@ -69,7 +69,7 @@ builtinMiscOperations = ['atomicrmw']
 }%
 
 /// A low-level 2's complement integer.
-public protocol LLVMInteger
+public protocol LLVMIntegerType
   : Equatable,
     IntegerLiteralConvertible, _BuiltinIntegerLiteralConvertible, 
     CustomStringConvertible
@@ -126,13 +126,13 @@ public protocol LLVMInteger
   init(truncatingSigned: LLVMWord)
   init(truncatingUnsigned: LLVMWord)
   
-  init<Other: LLVMInteger>(truncatingSigned source: Other)
-  init<Other: LLVMInteger>(truncatingUnsigned source: Other)
-  init<Other: LLVMInteger>(signed source: Other)
-  init<Other: LLVMInteger>(unsigned source: Other)
+  init<Other: LLVMIntegerType>(truncatingSigned source: Other)
+  init<Other: LLVMIntegerType>(truncatingUnsigned source: Other)
+  init<Other: LLVMIntegerType>(signed source: Other)
+  init<Other: LLVMIntegerType>(unsigned source: Other)
 }
 
-extension LLVMInteger {
+extension LLVMIntegerType {
   @transparent
   public init(_ other: Self) {
     self = other
@@ -183,7 +183,7 @@ extension LLVMInteger {
 % end
 }
 
-public protocol LLVMFixedWidthInteger : LLVMInteger {
+public protocol LLVMFixedWidthIntegerType : LLVMIntegerType {
   /// A type used as `Self`'s representation
   typealias Storage
 
@@ -197,23 +197,23 @@ public protocol LLVMFixedWidthInteger : LLVMInteger {
   var storage: Storage { get set }
 }
 
-extension LLVMFixedWidthInteger {
+extension LLVMFixedWidthIntegerType {
   @transparent
   public var countWords: LLVMWord {
     return Self.bitWidth.add(
       LLVMWord(${word_bits}).sub(1)).udiv(${word_bits})
   }
   
-  /// Generalized truncating construction from another LLVMInteger
+  /// Generalized truncating construction from another LLVMIntegerType
   @inline(__always)
-  public init<Other: LLVMInteger>(truncatingUnsigned source: Other) {
+  public init<Other: LLVMIntegerType>(truncatingUnsigned source: Other) {
     self = 0
     self._replaceLow(self._minWordCount(source), unsignedWordsWith: source)
   }
 
-  /// Generalized truncating construction from another LLVMInteger
+  /// Generalized truncating construction from another LLVMIntegerType
   @inline(__always)
-  public init<Other: LLVMInteger>(truncatingSigned source: Other) {
+  public init<Other: LLVMIntegerType>(truncatingSigned source: Other) {
     if !LLVMWord(${word_bits}).isLessThanUnsigned(Self.bitWidth) {
       self.init(truncatingSigned: source.signedWord(0))
     }
@@ -224,13 +224,13 @@ extension LLVMFixedWidthInteger {
   }
 
   @inline(__always)
-  internal func _minWordCount<Other: LLVMInteger>(source: Other) -> LLVMWord {
+  internal func _minWordCount<Other: LLVMIntegerType>(source: Other) -> LLVMWord {
     let n = source.countWords
     return countWords.isLessThanUnsigned(n) ? countWords : n
   }
 
   @inline(__always)
-  internal mutating func _replaceLow<Other: LLVMInteger>(
+  internal mutating func _replaceLow<Other: LLVMIntegerType>(
     var n: LLVMWord, unsignedWordsWith source: Other
   ) {
     while n != 0 {
@@ -240,19 +240,19 @@ extension LLVMFixedWidthInteger {
     }
   }
   
-  /// Generalized construction from an unsigned LLVMInteger, trapping
+  /// Generalized construction from an unsigned LLVMIntegerType, trapping
   /// on overflow.
   @inline(__always)
-  public init<Other: LLVMInteger>(unsigned source: Other) {
+  public init<Other: LLVMIntegerType>(unsigned source: Other) {
     self.init(truncatingUnsigned: source)
     Builtin.condfail(
       Self.bitWidth.isLessThanSigned(source.mostSignificant1Bit).value)
   }
 
-  /// Generalized construction from a signed LLVMInteger, trapping on
+  /// Generalized construction from a signed LLVMIntegerType, trapping on
   /// overflow.
   @inline(__always)
-  public init<Other: LLVMInteger>(signed source: Other) {
+  public init<Other: LLVMIntegerType>(signed source: Other) {
     self.init(truncatingSigned: source)
     Builtin.condfail(
       (Other(truncatingSigned: self) != source).value
@@ -289,7 +289,7 @@ else:
   fromUnsignedWord = fromSignedWord = 'trunc'
 }%
 
-public struct LLVMInt${bits} : LLVMFixedWidthInteger {
+public struct LLVMInt${bits} : LLVMFixedWidthIntegerType {
   public typealias Self_ = LLVMInt${bits}
   public typealias Extended = LLVMInt${extendedBits}
   public typealias Narrowed = LLVMInt${narrowedBits}
@@ -454,8 +454,8 @@ public func == (lhs: LLVMInt${bits}, rhs: LLVMInt${bits}) -> Bool {
 public typealias LLVMWord = LLVMInt${word_bits}
 
 //===--- Low-level BigInt -------------------------------------------------===//
-// A basic array-of-words implementation of LLVMInteger
-public struct LLVMBigInt : LLVMInteger {
+// A basic array-of-words implementation of LLVMIntegerType
+public struct LLVMBigInt : LLVMIntegerType {
   /// A LLVMInt type that accomodates more bits of precision than
   /// any instance of `Self`.
   public typealias Extended = LLVMBigInt
@@ -535,9 +535,7 @@ public struct LLVMBigInt : LLVMInteger {
   
   @inline(__always)
   public mutating func add_InPlace(rhs: Self_) {
-    var r = Self_()
-    r.words.reserveCapacity(max(self.words.capacity, rhs.words.capacity))
-    fatalError("implement me")
+    words.reserveCapacity(rhs.words.capacity)
   }
 
   @inline(__always)
@@ -694,11 +692,11 @@ public struct LLVMBigInt : LLVMInteger {
     words = [other]
   }
 
-  /// Generalized truncating construction from another LLVMInteger
+  /// Generalized truncating construction from another LLVMIntegerType
   ///
   /// This implementation never truncates
   @inline(__always)
-  public init<Other: LLVMInteger>(truncatingUnsigned source: Other) {
+  public init<Other: LLVMIntegerType>(truncatingUnsigned source: Other) {
     let countWords = source.countWords
     words = []
     words.reserveCapacity(Int(countWords.storage))
@@ -708,7 +706,7 @@ public struct LLVMBigInt : LLVMInteger {
   }
   
   @inline(__always)
-  public init<Other: LLVMInteger>(truncatingSigned source: Other) {
+  public init<Other: LLVMIntegerType>(truncatingSigned source: Other) {
     let countWords = source.countWords
     words = []
     words.reserveCapacity(Int(countWords.storage))
@@ -717,21 +715,21 @@ public struct LLVMBigInt : LLVMInteger {
     }
   }
   
-  /// Generalized construction from an unsigned LLVMInteger, trapping
+  /// Generalized construction from an unsigned LLVMIntegerType, trapping
   /// on overflow.
   ///
   /// This implementation never traps
   @inline(__always)
-  public init<Other: LLVMInteger>(unsigned source: Other) {
+  public init<Other: LLVMIntegerType>(unsigned source: Other) {
     self.init(truncatingUnsigned: source)
   }
 
-  /// Generalized construction from a signed LLVMInteger, trapping on
+  /// Generalized construction from a signed LLVMIntegerType, trapping on
   /// overflow.
   ///
   /// This implementation never traps
   @inline(__always)
-  public init<Other: LLVMInteger>(signed source: Other) {
+  public init<Other: LLVMIntegerType>(signed source: Other) {
     self.init(truncatingSigned: source)
   }
 
