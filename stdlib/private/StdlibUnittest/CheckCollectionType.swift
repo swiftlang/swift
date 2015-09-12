@@ -949,6 +949,7 @@ self.test("\(testNamePrefix).removeFirst/slice/semantics") {
   for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
     let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
     var slice = c[c.startIndex..<c.endIndex]
+    let survivingIndices = Array(slice.startIndex.successor()..<slice.endIndex)
     let removedElement = slice.removeFirst()
     expectEqual(test.collection.first, extractValue(removedElement).value)
     expectEqualSequence(
@@ -957,8 +958,15 @@ self.test("\(testNamePrefix).removeFirst/slice/semantics") {
       stackTrace: SourceLocStack().with(test.loc)
     )
     expectEqualSequence(
+      test.expected,
+      survivingIndices.map { extractValue(slice[$0]).value },
+      "removeFirst() shouldn't invalidate indices",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
       test.collection,
       c.map { extractValue($0).value },
+      "removeFirst() shouldn't mutate the original collection",
       stackTrace: SourceLocStack().with(test.loc))
   }
 }

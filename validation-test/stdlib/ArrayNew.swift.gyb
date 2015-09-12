@@ -319,6 +319,39 @@ ArrayTestSuite.test("${Kind}/popLast") {
 }
 % end
 
+// Check how removeFirst() affects indices.
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/removeFirst") {
+  if true {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1 ].map(OpaqueValue.init))
+    a.removeFirst()
+    expectEqual(0, a.startIndex)
+  }
+  if true {
+    var a: ${Kind}<OpaqueValue<Int>> = ${Kind}([ 1, 2 ].map(OpaqueValue.init))
+    a.removeFirst()
+    expectEqual(0, a.startIndex)
+  }
+}
+% end
+
+ArrayTestSuite.test("ArraySlice/removeFirst") {
+  if true {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 99 ].map(OpaqueValue.init)
+    var s = a[1..<2]
+    expectEqual(1, s.startIndex)
+    s.removeFirst()
+    expectEqual(2, s.startIndex)
+  }
+  if true {
+    let a: [OpaqueValue<Int>] = [ 99, 1010, 2020, 99 ].map(OpaqueValue.init)
+    var s = a[1..<2]
+    expectEqual(1, s.startIndex)
+    s.removeFirst()
+    expectEqual(2, s.startIndex)
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // _withUnsafeMutableBufferPointerIfSupported()
 //===----------------------------------------------------------------------===//

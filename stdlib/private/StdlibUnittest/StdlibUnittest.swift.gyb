@@ -3836,6 +3836,85 @@ public struct Defaulted${traversal}RangeReplaceableCollection<Element>
   }
 }
 
+public struct Defaulted${traversal}RangeReplaceableSlice<Element>
+  : RangeReplaceableCollectionType {
+
+  public typealias Self_ = Defaulted${traversal}RangeReplaceableSlice<Element>
+  public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>
+  public typealias Generator = MinimalGenerator<Element>
+  public typealias Index = Minimal${traversal}Index
+
+  public var base: Base
+  public var startIndex: Index
+  public var endIndex: Index
+
+  public init() {
+    expectSliceType(Self_.self)
+
+    self.base = Base()
+    self.startIndex = base.startIndex
+    self.endIndex = base.endIndex
+  }
+
+  public init(base: Base) {
+    self.base = base
+    self.startIndex = base.startIndex
+    self.endIndex = base.endIndex
+  }
+
+  public init(base: Base, bounds: Range<Index>) {
+    self.base = base
+    self.startIndex = bounds.startIndex
+    self.endIndex = bounds.endIndex
+  }
+
+  public init(_ array: [Element]) {
+    self = Defaulted${traversal}RangeReplaceableSlice(
+      base: Base(elements: array))
+  }
+
+  public init(elements: [Element]) {
+    self = Defaulted${traversal}RangeReplaceableSlice(
+      base: Base(elements: elements))
+  }
+
+  public func generate() -> MinimalGenerator<Element> {
+    return MinimalGenerator(Array(self))
+  }
+
+  public subscript(index: Index) -> Element {
+    Index._failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
+    return base[index]
+  }
+
+  public subscript(bounds: Range<Index>) -> Self_ {
+    Index._failEarlyRangeCheck2(
+      bounds.startIndex, rangeEnd: bounds.endIndex,
+      boundsStart: startIndex, boundsEnd: endIndex)
+    return Defaulted${traversal}RangeReplaceableSlice(
+      base: base, bounds: bounds)
+  }
+
+  public mutating func replaceRange<
+    C : CollectionType where C.Generator.Element == Element
+  >(
+    subRange: Range<Index>,
+    with newElements: C
+  ) {
+    let startOffset = startIndex.position
+    let endOffset =
+      endIndex.position
+      - subRange.count
+      + numericCast(newElements.count) as Int
+    Index._failEarlyRangeCheck2(
+      subRange.startIndex, rangeEnd: subRange.endIndex,
+      boundsStart: startIndex, boundsEnd: endIndex)
+    base.replaceRange(subRange, with: newElements)
+    startIndex = base.startIndex.advancedBy(startOffset)
+    endIndex = base.startIndex.advancedBy(endOffset)
+  }
+}
+
 % end
 
 // ${'Local Variables'}:

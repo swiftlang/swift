@@ -91,12 +91,16 @@ func identityEq(element: MinimalEquatableValue) -> MinimalEquatableValue {
 % collections = [
 %   ('{}{}RangeReplaceableCollection'.format(base_kind, traversal), traversal)
 %     for base_kind, traversal in product(base_kinds, traversals)
+% ] + [
+%   ('Defaulted{}RangeReplaceableSlice'.format(traversal), traversal)
+%     for traversal in traversals
 % ]
 % other_array_types = [ 'Array', 'ArraySlice', 'ContiguousArray' ]
 % collections += [(array, 'RandomAccess') for array in other_array_types]
 
 % for Base, traversal in collections:
 %     oob_behavior = '.None' if Base in other_array_types else '.ExpectationFailure' 
+%     collection_or_slice = 'Slice' if 'Slice' in Base else 'Collection'
 if true {
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
   // `Array`, `ArraySlice`, and `ContiguousArrayBuffer` have no expectation of
@@ -104,7 +108,7 @@ if true {
   // `Int`.
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = ${oob_behavior}
 
-  RangeReplaceableTestSuite.add${traversal}RangeReplaceableCollectionTests(
+  RangeReplaceableTestSuite.add${traversal}RangeReplaceable${collection_or_slice}Tests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
 %     if Base in other_array_types:
       return ${Base}(elements)
@@ -125,7 +129,7 @@ if true {
     extractValueFromEquatable: identityEq,
     resiliencyChecks: resiliencyChecks)
 
-  RangeReplaceableTestSuite.add${traversal}RangeReplaceableCollectionTests(
+  RangeReplaceableTestSuite.add${traversal}RangeReplaceable${collection_or_slice}Tests(
     makeCollection: { (elements: [LifetimeTracked]) in
 %     if Base in other_array_types:
       return ${Base}(elements)

@@ -226,6 +226,19 @@ extension RangeReplaceableCollectionType {
   public mutating func reserveCapacity(n: Index.Distance) {}
 }
 
+extension RangeReplaceableCollectionType where SubSequence == Self {
+  /// Remove the first `n` elements.
+  ///
+  /// - Complexity: O(`self.count`)
+  /// - Requires: `self.count >= n`.
+  public mutating func removeFirst() -> Generator.Element {
+    _precondition(!isEmpty, "can't remove items from an empty collection")
+    let element = first!
+    self = self[startIndex.successor()..<endIndex]
+    return element
+  }
+}
+
 extension RangeReplaceableCollectionType {
   @warn_unused_result
   public mutating func _customRemoveLast() -> Generator.Element? {
