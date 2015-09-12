@@ -4023,39 +4023,41 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
 
 void IRGenSILFunction::visitCheckedCastBranchInst(
                                               swift::CheckedCastBranchInst *i) {
-  Explosion ex;
   SILType destTy = i->getCastType();
+  FailableCastResult castResult;
+  Explosion ex;
   if (i->isExact()) {
     auto operand = i->getOperand();
     Explosion source = getLoweredExplosion(operand);
-    llvm::Value *result =
-      emitClassIdenticalCast(*this, source.claimNext(), operand.getType(),
-                             destTy, CheckedCastMode::Conditional);
-    ex.add(result);
+    castResult = emitClassIdenticalCast(*this, source.claimNext(),
+                                        operand.getType(), destTy);
   } else {
     emitValueCheckedCast(*this, i->getOperand(), i->getCastType(),
                          CheckedCastMode::Conditional, ex);
+    auto val = ex.claimNext();
+    castResult.casted = val;
+    llvm::Value *nil =
+    llvm::ConstantPointerNull::get(cast<llvm::PointerType>(val->getType()));
+    castResult.succeeded = Builder.CreateICmpNE(val, nil);
   }
   
   // Branch on the success of the cast.
   // All cast operations currently return null on failure.
-  auto val = ex.claimNext();
-  llvm::Value *isNonnull = Builder.CreateICmpNE(val,
-     llvm::ConstantPointerNull::get(cast<llvm::PointerType>(val->getType())));
+
 
   auto &successBB = getLoweredBB(i->getSuccessBB());
   llvm::Type *toTy = IGM.getTypeInfo(destTy).StorageType;
   if (toTy->isPointerTy())
-    val = Builder.CreateBitCast(val, toTy);
+    castResult.casted = Builder.CreateBitCast(castResult.casted, toTy);
 
-  Builder.CreateCondBr(isNonnull,
+  Builder.CreateCondBr(castResult.succeeded,
                        successBB.bb,
                        getLoweredBB(i->getFailureBB()).bb);
   
   // Feed the cast result into the nonnull branch.
   unsigned phiIndex = 0;
   Explosion ex2;
-  ex2.add(val);
+  ex2.add(castResult.casted);
   ex2.add(ex.claimAll());
   addIncomingExplosionToPHINodes(*this, successBB, phiIndex, ex2);
 }

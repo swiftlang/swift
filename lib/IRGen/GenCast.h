@@ -56,10 +56,19 @@ namespace irgen {
                                  SILType toType,
                                  CheckedCastMode mode);
 
+  /// A result of a cast generation function.
+  struct FailableCastResult {
+    /// An i1 value that's set to True if the cast succeeded.
+    llvm::Value *succeeded;
+    /// On success, this value stores the result of the cast operation.
+    llvm::Value *casted;
+  };
+
   /// \brief Convert the given value to the the exact destination type.
-  llvm::Value *emitClassIdenticalCast(IRGenFunction &IGF, llvm::Value *from,
-                                      SILType fromType, SILType toType,
-                                      CheckedCastMode mode);
+  FailableCastResult emitClassIdenticalCast(IRGenFunction &IGF,
+                                                  llvm::Value *from,
+                                                  SILType fromType,
+                                                  SILType toType);
 
   /// Emit a checked cast of a metatype.
   void emitMetatypeDowncast(IRGenFunction &IGF,

@@ -81,11 +81,10 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
   return call;
 }
 
-llvm::Value *irgen::emitClassIdenticalCast(IRGenFunction &IGF,
-                                           llvm::Value *from,
-                                           SILType fromType,
-                                           SILType toType,
-                                           CheckedCastMode mode) {
+FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
+                                                 llvm::Value *from,
+                                                 SILType fromType,
+                                                 SILType toType) {
   // Check metatype objects directly. Don't try to find their meta-metatype.
   bool isMetatype = isa<MetatypeType>(fromType.getSwiftRValueType());
   if (isMetatype) {
@@ -124,12 +123,10 @@ llvm::Value *irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   llvm::Value *objectMetadata = isMetatype ? from :
     emitHeapMetadataRefForHeapObject(IGF, from, fromType);
 
-  objectMetadata = IGF.Builder.CreateBitCast(objectMetadata, targetMetadata->getType());
+  objectMetadata = IGF.Builder.CreateBitCast(objectMetadata,
+                                             targetMetadata->getType());
   llvm::Value *cond = IGF.Builder.CreateICmpEQ(objectMetadata, targetMetadata);
-  llvm::Value *nil =
-    llvm::ConstantPointerNull::get(cast<llvm::PointerType>(from->getType()));
-  llvm::Value *result = IGF.Builder.CreateSelect(cond, from, nil);
-  return result;
+  return {cond, from};
 }
 
 /// Emit a checked unconditional downcast of a class value.
