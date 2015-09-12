@@ -55,8 +55,7 @@ builtinBinaryOperations = [
   'shl', 'srem',  'sub',  'udiv',  'udiv_exact',  'urem',  'xor']
 
 builtinBinaryOperationsWithOverflow = [
-  'sadd_with_overflow', 'uadd_with_overflow',  'ssub_with_overflow',
-  'usub_with_overflow',  'smul_with_overflow', 'umul_with_overflow']
+  'sadd', 'uadd',  'ssub', 'usub',  'smul', 'umul']
   
 builtinUnaryOperations = ['assumeNonNegative']
   
@@ -87,11 +86,12 @@ public protocol LLVMInteger
   init()
 
 % for operation in builtinBinaryOperations:
-  func ${operation}(rhs: Self) -> Self
+  mutating func ${operation}_InPlace(rhs: Self)
 % end
 
 % for operation in builtinBinaryOperationsWithOverflow:
-  func ${operation}(rhs: Self, overflowIsError: Bool) -> (Self, Bool)
+  mutating func ${operation}_InPlaceReturningOverflow(
+    rhs: Self, trapOverflow: Bool) -> Bool
 % end
 
   /// The most significant bit that is set, or -1 if self == 0
@@ -126,6 +126,7 @@ public protocol LLVMInteger
 }
 
 extension LLVMInteger {
+  @transparent
   public init(_ other: Self) {
     self = other
   }
@@ -146,6 +147,35 @@ extension LLVMInteger {
     while x != 0
     return String(buf.reverse())
   }
+
+% for operation in builtinBinaryOperations:
+  @transparent
+  public func ${operation}(rhs: Self) -> Self {
+    var result = self
+    result.${operation}_InPlace(rhs)
+    return result
+  }
+% end
+
+% for operation in builtinBinaryOperationsWithOverflow:
+  @transparent
+  public func ${operation}(rhs: Self) -> Self? {
+    var result = self
+    let overflow = result.${operation}_InPlaceReturningOverflow(
+      rhs, trapOverflow: false)
+    if _fastPath(!overflow) { return result }
+    return nil
+  }
+
+  @transparent
+  public func ${operation}TrappingOverflow(rhs: Self) -> Self {
+    var result = self
+    _ = result.${operation}_InPlaceReturningOverflow(rhs, trapOverflow: true)
+    return result
+  }
+% end
+
+
 }
 
 public protocol LLVMFixedWidthInteger : LLVMInteger {
@@ -174,10 +204,13 @@ extension LLVMFixedWidthInteger {
 
 // Only needed outside the stdlib
 extension Bool {
-  init(_ value: Builtin.Int1) {
+  @transparent
+  public init(_ value: Builtin.Int1) {
     self.init(_builtinBooleanLiteral: value)
   }
-  var value : Builtin.Int1 {
+  
+  @transparent
+  public var value : Builtin.Int1 {
     return Builtin.trunc_${IntWord}_Int1((self ? 1 : 0).value)
   }
 }
@@ -217,16 +250,22 @@ public struct LLVMInt${bits} : LLVMFixedWidthInteger {
   public static var bitWidth : LLVMWord { return ${bits} }
   
 % for operation in builtinBinaryOperations:
-  public func ${operation}(rhs: Self_) -> Self_ {
-    return Self_(Builtin.${operation}_Int${bits}(storage, rhs.storage))
+  public mutating func ${operation}_InPlace(rhs: Self_) {
+    storage = Builtin.${operation}_Int${bits}(storage, rhs.storage)
   }
 % end
 
 % for operation in builtinBinaryOperationsWithOverflow:
-  public func ${operation}(rhs: Self_, overflowIsError: Bool) -> (Self_, Bool) {
-    let r = Builtin.${operation}_Int${bits}(
-      storage, rhs.storage, overflowIsError.value)
-    return (Self_(r.0), Bool(r.1))
+  public mutating func ${operation}_InPlaceReturningOverflow(
+    rhs: Self_, trapOverflow: Bool
+  ) -> Bool {
+    let (newStorage, overflow) = Builtin.${operation}_with_overflow_Int${bits}(
+      storage, rhs.storage, trapOverflow.value)
+    if trapOverflow {
+      Builtin.condfail(overflow)
+    }
+    storage = newStorage
+    return Bool(overflow)
   }
 % end
 
@@ -382,70 +421,87 @@ public struct LLVMBigInt : LLVMInteger {
     self = value
   }
   
-  public func add(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func add_InPlace(rhs: Self_) {
     var r = Self_()
     r.words.reserveCapacity(max(self.words.capacity, rhs.words.capacity))
     fatalError("implement me")
   }
 
-  public func and(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func and_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func ashr(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func ashr_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func lshr(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func lshr_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func or(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func or_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func mul(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func mul_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func sdiv(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func sdiv_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func sdiv_exact(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func sdiv_exact_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func shl(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func shl_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func srem(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func srem_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func sub(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func sub_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func udiv(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func udiv_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func udiv_exact(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func udiv_exact_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func urem(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func urem_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
-  public func xor(rhs: Self_) -> Self_ {
+  @inline(__always)
+  public mutating func xor_InPlace(rhs: Self_) {
     fatalError("implement me")
   }
 
 % for operation in builtinBinaryOperationsWithOverflow:
-  public func ${operation}(rhs: Self_, overflowIsError: Bool) -> (Self_, Bool) {
+  @inline(__always)
+  public mutating func ${operation}_InPlaceReturningOverflow(
+    rhs: Self_, trapOverflow: Bool) -> Bool {
     fatalError("implement me")
   }
 % end
