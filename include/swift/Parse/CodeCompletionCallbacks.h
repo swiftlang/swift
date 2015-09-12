@@ -105,7 +105,7 @@ public:
 
   /// \brief Complete a given expr-postfix, given that there is a following
   /// left parenthesis.
-  virtual void completePostfixExprParen(Expr *E) = 0;
+  virtual void completePostfixExprParen(Expr *E, Expr *CCE) = 0;
 
   /// \brief Complete expr-super after we have consumed the 'super' keyword.
   virtual void completeExprSuper(SuperRefExpr *SRE) = 0;

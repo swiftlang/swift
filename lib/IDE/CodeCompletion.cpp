@@ -904,7 +904,7 @@ public:
   void completeDotExpr(Expr *E, SourceLoc DotLoc) override;
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completePostfixExpr(Expr *E) override;
-  void completePostfixExprParen(Expr *E) override;
+  void completePostfixExprParen(Expr *E, Expr *CCE) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
 
@@ -2873,7 +2873,7 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E) {
+void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E, Expr *CCE) {
   assert(P.Tok.is(tok::code_complete));
 
   // Don't produce any results in an enum element.
@@ -2883,6 +2883,7 @@ void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E) {
   Kind = CompletionKind::PostfixExprParen;
   ParsedExpr = E;
   CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = static_cast<CodeCompletionExpr*>(CCE);
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
@@ -3145,15 +3146,10 @@ namespace  {
           ParentExprClosest = Ancestors.back();
           ParentExprFarthest = Ancestors.front();
         }
-        return { false, nullptr };
       }
-      if (SM.rangeContains(E->getSourceRange(), ChildExpr->getSourceRange())) {
-        if (Predicate(E)) {
-          Ancestors.push_back(E);
-        }
-        return { true, E };
-      }
-      return { false, E };
+      if (Predicate(E))
+        Ancestors.push_back(E);
+      return { true, E };
     }
 
     Expr *walkToExprPost(Expr *E) override {
@@ -3300,9 +3296,14 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn()))
         VD = DRE->getDecl();
     }
+    DotExpressionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
+                                                  CodeCompleteTokenExpr);
+    llvm::SmallVector<Type, 2> PossibleTypes;
+    if (TypeAnalyzer.Analyze(PossibleTypes)) {
+      Lookup.setExpectedTypes(PossibleTypes);
+    }
     if (ExprType)
       Lookup.getValueExprCompletions(*ExprType, VD);
-
     if (!Lookup.FoundFunctionCalls ||
         (Lookup.FoundFunctionCalls &&
          Lookup.FoundFunctionsWithoutFirstKeyword)) {

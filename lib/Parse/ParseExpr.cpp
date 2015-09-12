@@ -1139,11 +1139,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     if (Tok.isFollowingLParen()) {
       if (peekToken().is(tok::code_complete)) {
         consumeToken(tok::l_paren);
+        auto SubResult = makeParserResult(new (Context) CodeCompletionExpr(Tok.
+          getRange()));
+        SubResult.setHasCodeCompletion();
         if (CodeCompletion && Result.isNonNull())
-          CodeCompletion->completePostfixExprParen(Result.get());
+          CodeCompletion->completePostfixExprParen(Result.get(), SubResult.get());
         // Eat the code completion token because we handled it.
         consumeToken(tok::code_complete);
-        return makeParserCodeCompletionResult<Expr>();
+        return SubResult;
       }
       ParserResult<Expr> Arg = parseExprList(tok::l_paren, tok::r_paren);
       Result = makeParserResult(new (Context) CallExpr(Result.get(), Arg.get(),
@@ -2114,8 +2117,12 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn,
   // callback.
   if (peekToken().is(tok::code_complete) && CodeCompletion) {
     consumeToken(tok::l_paren);
-    CodeCompletion->completePostfixExprParen(fn.get());
-    auto Result = makeParserResult(new (Context) CodeCompletionExpr(Tok.getRange()));
+    auto CCE = new (Context) CodeCompletionExpr(Tok.getRange());
+    auto Result = makeParserResult(new (Context) CallExpr(fn.get(),
+      new (Context) ParenExpr(SourceLoc(), CCE, SourceLoc(),
+                              /*hasTrailingClosure=*/false),
+                              /*Implicit=*/false));
+    CodeCompletion->completePostfixExprParen(fn.get(), CCE);
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
     Result.setHasCodeCompletion();
