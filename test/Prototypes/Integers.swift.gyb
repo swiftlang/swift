@@ -193,10 +193,13 @@ public protocol LLVMFixedWidthInteger : LLVMInteger {
 }
 
 extension LLVMFixedWidthInteger {
+  @transparent
   public var countWords: LLVMWord {
     return Self.bitWidth.add(
       LLVMWord(${word_bits}).sub(1)).udiv(${word_bits})
   }
+  
+  @transparent
   public func nthWord(n: LLVMWord) -> LLVMWord {
     return self.lshr(Self(truncating: n).mul(${word_bits})).lowWord
   }
@@ -227,35 +230,42 @@ public struct LLVMInt${bits} : LLVMFixedWidthInteger {
   public typealias Narrowed = LLVMInt${narrowedBits}
   public typealias Storage = Builtin.Int${bits}
 
+  @transparent
   public init() {
     let zero: Builtin.Int${bits} = Builtin.zeroInitializer()
     self.storage = zero
   }
 
+  @transparent
   public init(_builtinIntegerLiteral x: Builtin.${IntLiteral}) {
     storage = Builtin.truncOrBitCast_${IntLiteral}_Int${bits}(x)
   }
 
   /// Create an instance initialized to `value`.
+  @transparent
   public init(integerLiteral value: Self_) {
     self = value
   }
   
+  @transparent
   public init(_ storage: Storage) {
     self.storage = storage
   }
   
   public var storage: Storage
   
+  @transparent
   public static var bitWidth : LLVMWord { return ${bits} }
   
 % for operation in builtinBinaryOperations:
+  @transparent
   public mutating func ${operation}_InPlace(rhs: Self_) {
     storage = Builtin.${operation}_Int${bits}(storage, rhs.storage)
   }
 % end
 
 % for operation in builtinBinaryOperationsWithOverflow:
+  @transparent
   public mutating func ${operation}_InPlaceReturningOverflow(
     rhs: Self_, trapOverflow: Bool
   ) -> Bool {
@@ -270,17 +280,20 @@ public struct LLVMInt${bits} : LLVMFixedWidthInteger {
 % end
 
   /// The most significant bit that is set, or -1 if self == 0
+  @transparent
   public var mostSignificant1Bit: LLVMWord {
     let leadingZeros = Self_(_leadingZeros(storage)).lowWord
     return Self_.bitWidth.sub(leadingZeros).sub(1)
   }
   
   /// The most significant bit that is unset, or -1 if self == -1
+  @transparent
   public var mostSignificant0Bit: LLVMWord {
     return self.xor(-1).mostSignificant1Bit
   }
     
 % for sz in 'sign', 'zero':
+  @transparent
   public var ${sz}Extended: Extended {
     return Extended(
       Builtin.${sz[0]}extOrBitCast_Int${bits}_Int${extendedBits}(storage)
@@ -289,6 +302,7 @@ public struct LLVMInt${bits} : LLVMFixedWidthInteger {
 % end
 
 % for (srcSigned, srcS) in ((x, x[0].lower()) for x in ['Signed', 'Unsigned']):
+  @transparent
   public func isLessThan${srcSigned}(rhs: Self_) -> Bool {
     return Bool(
       Builtin.cmp_${srcS}lt_Int${bits}(
@@ -296,6 +310,7 @@ public struct LLVMInt${bits} : LLVMFixedWidthInteger {
   }
   
   % for (dstSigned, dstS) in ((x, x[0].lower()) for x in ['Signed', 'Unsigned']):
+  @transparent
   public func checkingNarrow${srcSigned}To${dstSigned}() -> Narrowed {
     let (result, error) 
       = Builtin.${srcS}_to_${dstS}_checked_trunc_Int${bits}_Int${narrowedBits}(
@@ -306,22 +321,26 @@ public struct LLVMInt${bits} : LLVMFixedWidthInteger {
   % end
 % end
   
+  @transparent
   public var assumingNonNegative : Self_ {
     return Self_(Builtin.assumeNonNegative_Int${bits}(storage))
   }
   
+  @transparent
   public func checkingNonNegative() -> Self_ {
     let (result, error) = Builtin.s_to_u_checked_conversion_Int${bits}(storage)
     Builtin.condfail(error)
     return Self_(result)
   }
 
+  @transparent
   public var truncated: Narrowed {
     return Narrowed(
       Builtin.truncOrBitCast_Int${bits}_Int${narrowedBits}(storage)
     )
   }
 
+  @transparent
   public init(truncating other: LLVMWord) {
     self.init(
       Builtin.${fromWord}OrBitCast_${IntWord}_Int${bits}(other.storage))
@@ -334,6 +353,7 @@ public func == (lhs: LLVMInt${bits}, rhs: LLVMInt${bits}) -> Bool {
 
 
 extension LLVMInt${bits} {
+  @transparent
   public var lowWord: LLVMWord {
     return LLVMWord(
       Builtin.${toWord}OrBitCast_Int${bits}_${IntWord}(self.storage))
@@ -358,10 +378,12 @@ public struct LLVMBigInt : LLVMInteger {
   public typealias Self_ = LLVMBigInt
   
   /// Creates an instance with value 0
+  @inline(__always)
   public init() {
     words = []
   }
 
+  @inline(__always)
   public init(_builtinIntegerLiteral x: Builtin.${IntLiteral}) {
    let isNegative = Bool(
       Builtin.cmp_slt_${IntLiteral}(
@@ -417,6 +439,7 @@ public struct LLVMBigInt : LLVMInteger {
   }
 
   /// Create an instance initialized to `value`.
+  @inline(__always)
   public init(integerLiteral value: Self_) {
     self = value
   }
@@ -507,18 +530,22 @@ public struct LLVMBigInt : LLVMInteger {
 % end
 
   /// The most significant bit that is set, or -1 if self == 0
+  @transparent // FIXME: should be @inline(__always)
   public var mostSignificant1Bit: LLVMWord {
     fatalError("implement me")
   }
   
   /// The most significant bit that is not set, or -1 if self == -1
+  @transparent // FIXME: should be @inline(__always)
   public var mostSignificant0Bit: LLVMWord {
     fatalError("implement me")
   }
   
+  @inline(__always)
   public func isLessThanSigned(rhs: Self_) -> Bool {
     fatalError("implement me")
   }
+  @inline(__always)
   public func isLessThanUnsigned(rhs: Self_) -> Bool {
     fatalError("implement me")
   }
@@ -527,34 +554,43 @@ public struct LLVMBigInt : LLVMInteger {
   /// is not set.
   ///
   /// - Requires: the high bit is not set.
+  @transparent // FIXME: should be @inline(__always)
   public var assumingNonNegative : Self_ {
     fatalError("implement me")
   }
 
   /// Returns `self`, trapping if the high bit is set
+  @inline(__always)
   public func checkingNonNegative() -> Self_  {
     fatalError("implement me")
   }
   
+  @transparent // FIXME: should be @inline(__always)
   public var signExtended : Extended { return self }
+  @transparent // FIXME: should be @inline(__always)
   public var zeroExtended : Extended { return self }
   
+  @transparent // FIXME: should be @inline(__always)
   public var truncated : Truncated { return self }
   
   internal var words: ContiguousArray<LLVMWord>
 
+  @transparent // FIXME: should be @inline(__always)
   public var lowWord: LLVMWord {
     fatalError("implement me")
   }
 
+  @transparent // FIXME: should be @inline(__always)
   public var countWords: LLVMWord {
     return LLVMWord(words.count.value)
   }
   
+  @inline(__always)
   public func nthWord(n: LLVMWord) -> LLVMWord {
     return LLVMWord(words[Int(n.storage)])
   }
 
+  @inline(__always)
   public init(truncating other: LLVMWord) {
     words = [other]
   }
