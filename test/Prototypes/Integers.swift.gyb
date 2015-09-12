@@ -118,11 +118,18 @@ public protocol LLVMInteger
   var truncated : Truncated { get }
 
   
-  var lowWord: LLVMWord { get }
   var countWords: LLVMWord { get }
-  func nthWord(n: LLVMWord) -> LLVMWord
+  func signedWord(n: LLVMWord) -> LLVMWord
+  func unsignedWord(n: LLVMWord) -> LLVMWord
+  mutating func sext_WordInPlace(n: LLVMWord)
   
-  init(truncating: LLVMWord)
+  init(truncatingSigned: LLVMWord)
+  init(truncatingUnsigned: LLVMWord)
+  
+  init<Other: LLVMInteger>(truncatingSigned source: Other)
+  init<Other: LLVMInteger>(truncatingUnsigned source: Other)
+  init<Other: LLVMInteger>(signed source: Other)
+  init<Other: LLVMInteger>(unsigned source: Other)
 }
 
 extension LLVMInteger {
@@ -142,7 +149,7 @@ extension LLVMInteger {
     repeat {
       let r = x.urem(10)
       x = x.udiv(10)
-      buf.append(chars[Int(r.lowWord.storage)])
+      buf.append(chars[Int(r.unsignedWord(0).storage)])
     }
     while x != 0
     return String(buf.reverse())
@@ -174,8 +181,6 @@ extension LLVMInteger {
     return result
   }
 % end
-
-
 }
 
 public protocol LLVMFixedWidthInteger : LLVMInteger {
@@ -199,9 +204,59 @@ extension LLVMFixedWidthInteger {
       LLVMWord(${word_bits}).sub(1)).udiv(${word_bits})
   }
   
-  @transparent
-  public func nthWord(n: LLVMWord) -> LLVMWord {
-    return self.lshr(Self(truncating: n).mul(${word_bits})).lowWord
+  /// Generalized truncating construction from another LLVMInteger
+  @inline(__always)
+  public init<Other: LLVMInteger>(truncatingUnsigned source: Other) {
+    self = 0
+    self._replaceLow(self._minWordCount(source), unsignedWordsWith: source)
+  }
+
+  /// Generalized truncating construction from another LLVMInteger
+  @inline(__always)
+  public init<Other: LLVMInteger>(truncatingSigned source: Other) {
+    if !LLVMWord(${word_bits}).isLessThanUnsigned(Self.bitWidth) {
+      self.init(truncatingSigned: source.signedWord(0))
+    }
+    else {
+      self.init(truncatingUnsigned: source)
+      self.self.sext_WordInPlace(self._minWordCount(source))
+    }
+  }
+
+  @inline(__always)
+  internal func _minWordCount<Other: LLVMInteger>(source: Other) -> LLVMWord {
+    let n = source.countWords
+    return countWords.isLessThanUnsigned(n) ? countWords : n
+  }
+
+  @inline(__always)
+  internal mutating func _replaceLow<Other: LLVMInteger>(
+    var n: LLVMWord, unsignedWordsWith source: Other
+  ) {
+    while n != 0 {
+      n.sub_InPlace(1)
+      self.shl_InPlace(${word_bits})
+      self.or_InPlace(Self(truncatingUnsigned: source.unsignedWord(n)))
+    }
+  }
+  
+  /// Generalized construction from an unsigned LLVMInteger, trapping
+  /// on overflow.
+  @inline(__always)
+  public init<Other: LLVMInteger>(unsigned source: Other) {
+    self.init(truncatingUnsigned: source)
+    Builtin.condfail(
+      Self.bitWidth.isLessThanSigned(source.mostSignificant1Bit).value)
+  }
+
+  /// Generalized construction from a signed LLVMInteger, trapping on
+  /// overflow.
+  @inline(__always)
+  public init<Other: LLVMInteger>(signed source: Other) {
+    self.init(truncatingSigned: source)
+    Builtin.condfail(
+      (Other(truncatingSigned: self) != source).value
+    )
   }
 }
 
@@ -219,11 +274,21 @@ extension Bool {
 }
 
 % for bits in fixedBitWidths:
-%   # Until we have BitInt, the widest Int sign-extends into itself.
-%   extendedBits = bits * 2 if bits != maxFixedBits else bits
-%   narrowedBits = bits / 2 if bits != minFixedBits else bits
-%   toWord = 'trunc' if word_bits < bits else 'zext'
-%   fromWord = 'trunc' if word_bits > bits else 'zext'
+
+%{
+# Until we have BigInt, the widest Int sign-extends into itself.
+extendedBits = bits * 2 if bits != maxFixedBits else bits
+narrowedBits = bits / 2 if bits != minFixedBits else bits
+if word_bits < bits:
+  toUnsignedWord = toSignedWord = 'trunc'
+  fromUnsignedWord = 'zext'
+  fromSignedWord = 'sext'
+else:
+  toUnsignedWord = 'zext'
+  toSignedWord = 'sext'
+  fromUnsignedWord = fromSignedWord = 'trunc'
+}%
+
 public struct LLVMInt${bits} : LLVMFixedWidthInteger {
   public typealias Self_ = LLVMInt${bits}
   public typealias Extended = LLVMInt${extendedBits}
@@ -282,7 +347,7 @@ public struct LLVMInt${bits} : LLVMFixedWidthInteger {
   /// The most significant bit that is set, or -1 if self == 0
   @transparent
   public var mostSignificant1Bit: LLVMWord {
-    let leadingZeros = Self_(_leadingZeros(storage)).lowWord
+    let leadingZeros = Self_(_leadingZeros(storage)).unsignedWord(0)
     return Self_.bitWidth.sub(leadingZeros).sub(1)
   }
   
@@ -341,9 +406,41 @@ public struct LLVMInt${bits} : LLVMFixedWidthInteger {
   }
 
   @transparent
-  public init(truncating other: LLVMWord) {
+  public init(truncatingUnsigned other: LLVMWord) {
     self.init(
-      Builtin.${fromWord}OrBitCast_${IntWord}_Int${bits}(other.storage))
+      Builtin.${fromUnsignedWord}OrBitCast_${IntWord}_Int${bits}(other.storage))
+  }
+
+  @transparent
+  public init(truncatingSigned other: LLVMWord) {
+    self.init(
+      Builtin.${fromSignedWord}OrBitCast_${IntWord}_Int${bits}(other.storage))
+  }
+
+  @transparent
+  public func signedWord(n: LLVMWord) -> LLVMWord {
+    return LLVMWord(
+      Builtin.${toSignedWord}OrBitCast_Int${bits}_${IntWord}(
+        self.ashr(Self_(truncatingUnsigned: n).mul(${word_bits})).storage)
+    )
+  }
+  
+  @transparent
+  public func unsignedWord(n: LLVMWord) -> LLVMWord {
+    return LLVMWord(
+      Builtin.${toUnsignedWord}OrBitCast_Int${bits}_${IntWord}(
+        self.lshr(Self_(truncatingUnsigned: n).mul(${word_bits})).storage)
+    )
+  }
+
+  @transparent
+  public mutating func sext_WordInPlace(n: LLVMWord) {
+    % if bits > word_bits:
+    self.or_InPlace(Self_(
+      Builtin.sext_${IntWord}_Int${bits}(self.unsignedWord(n).storage)
+    ).ashr(${word_bits}).shl(
+        Self_(truncatingUnsigned: n).add(1).mul(${word_bits})))
+    % end
   }
 }
 
@@ -351,14 +448,6 @@ public func == (lhs: LLVMInt${bits}, rhs: LLVMInt${bits}) -> Bool {
   return Bool(Builtin.cmp_eq_Int${bits}(lhs.storage, rhs.storage))
 }
 
-
-extension LLVMInt${bits} {
-  @transparent
-  public var lowWord: LLVMWord {
-    return LLVMWord(
-      Builtin.${toWord}OrBitCast_Int${bits}_${IntWord}(self.storage))
-  }
-}
 
 % end
 
@@ -586,13 +675,72 @@ public struct LLVMBigInt : LLVMInteger {
   }
   
   @inline(__always)
-  public func nthWord(n: LLVMWord) -> LLVMWord {
+  public func unsignedWord(n: LLVMWord) -> LLVMWord {
     return LLVMWord(words[Int(n.storage)])
   }
 
   @inline(__always)
-  public init(truncating other: LLVMWord) {
+  public func signedWord(n: LLVMWord) -> LLVMWord {
+    return LLVMWord(words[Int(n.storage)])
+  }
+
+  @inline(__always)
+  public init(truncatingSigned other: LLVMWord) {
     words = [other]
+  }
+
+  @inline(__always)
+  public init(truncatingUnsigned other: LLVMWord) {
+    words = [other]
+  }
+
+  /// Generalized truncating construction from another LLVMInteger
+  ///
+  /// This implementation never truncates
+  @inline(__always)
+  public init<Other: LLVMInteger>(truncatingUnsigned source: Other) {
+    let countWords = source.countWords
+    words = []
+    words.reserveCapacity(Int(countWords.storage))
+    for var i: LLVMWord = 0; i != countWords; i.add_InPlace(1) {
+      words.append(source.unsignedWord(i))
+    }
+  }
+  
+  @inline(__always)
+  public init<Other: LLVMInteger>(truncatingSigned source: Other) {
+    let countWords = source.countWords
+    words = []
+    words.reserveCapacity(Int(countWords.storage))
+    for var i: LLVMWord = 0; i != countWords; i.add_InPlace(1) {
+      words.append(source.signedWord(i))
+    }
+  }
+  
+  /// Generalized construction from an unsigned LLVMInteger, trapping
+  /// on overflow.
+  ///
+  /// This implementation never traps
+  @inline(__always)
+  public init<Other: LLVMInteger>(unsigned source: Other) {
+    self.init(truncatingUnsigned: source)
+  }
+
+  /// Generalized construction from a signed LLVMInteger, trapping on
+  /// overflow.
+  ///
+  /// This implementation never traps
+  @inline(__always)
+  public init<Other: LLVMInteger>(signed source: Other) {
+    self.init(truncatingSigned: source)
+  }
+
+  @transparent
+  public mutating func sext_WordInPlace(n: LLVMWord) {
+    if !signedWord(n).isLessThanSigned(0) { return }
+    for i in Int(n.add(1).storage)..<words.count {
+      words[i] = -1
+    }
   }
 }
 
@@ -613,6 +761,25 @@ func expectBigInt(
     expected, actual.words.reverse(), message(), file: file, line: line)
 }
 
+tests.test("LLVMInt.countWords") {
+  expectEqual(1, LLVMInt8(0).countWords)
+  expectEqual(1, LLVMInt16(0).countWords)
+  expectEqual(1, LLVMInt32(0).countWords)
+  expectEqual(1, LLVMInt${word_bits}(0).countWords)
+  expectEqual(2, LLVMInt${word_bits*2}(0).countWords)
+}
+
+tests.test("LLVMInt._minWordCount") {
+  expectEqual(1, LLVMInt8(0)._minWordCount(LLVMInt16(0xBEEF)))
+  expectEqual(1, LLVMInt16(0)._minWordCount(LLVMInt8(0xBEEF)))
+  expectEqual(1, LLVMInt16(0)._minWordCount(LLVMInt16(0xBEEF)))
+  expectEqual(1, LLVMInt16(0)._minWordCount(LLVMInt16(0xBEEF)))
+  expectEqual(1, LLVMInt${word_bits}(0)._minWordCount(LLVMInt${word_bits*2}(0)))
+  expectEqual(1, LLVMInt${word_bits*2}(0)._minWordCount(LLVMInt${word_bits}(0)))
+  expectEqual(
+    2, LLVMInt${word_bits*2}(0)._minWordCount(LLVMInt${word_bits*2}(0)))
+}
+
 tests.test("LLVMBigInt.Literals") {
   expectBigInt([], 0)
   expectBigInt([1], 1)
@@ -624,6 +791,64 @@ tests.test("LLVMBigInt.Literals") {
   expectBigInt([-1, 0], ${-1 << word_bits})
   expectBigInt([-1, 1], ${(-1 << word_bits) + 1})
   expectBigInt([-2, -1], ${(-1 << word_bits) - 1})
+}
+
+tests.test("signedWord") {
+  expectEqual(-1, LLVMInt8(0xFF).signedWord(0))
+  expectEqual(-2, LLVMInt8(0xFE).signedWord(0))
+  expectEqual(-3, LLVMInt8(0xFD).signedWord(0))
+  
+  expectEqual(-256, LLVMInt16(0xFF00).signedWord(0))
+  expectEqual(-255, LLVMInt16(0xFF01).signedWord(0))
+  expectEqual(-512, LLVMInt16(0xFE00).signedWord(0))
+  expectEqual(-511, LLVMInt16(0xFE01).signedWord(0))
+  expectEqual(-1024, LLVMInt16(0xFC00).signedWord(0))
+  expectEqual(-1023, LLVMInt16(0xFC01).signedWord(0))
+
+}
+
+tests.test("Truncating.16to8") {
+  expectEqual(-1, LLVMInt8(truncatingSigned: LLVMInt16(-1)))
+  expectEqual(-1, LLVMInt8(truncatingUnsigned: LLVMInt16(-1)))
+  expectEqual(1, LLVMInt8(truncatingSigned: LLVMInt16(1)))
+  expectEqual(1, LLVMInt8(truncatingUnsigned: LLVMInt16(1)))
+  
+  expectEqual(0xEF, LLVMInt8(truncatingSigned: LLVMInt16(0xBEEF)))
+  expectEqual(0xEF, LLVMInt8(truncatingUnsigned: LLVMInt16(0xBEEF)))
+  expectEqual(0xEF, LLVMInt8(truncatingSigned: LLVMInt16(0x0DEF)))
+  expectEqual(0xEF, LLVMInt8(truncatingUnsigned: LLVMInt16(0x0DEF)))
+}
+
+tests.test("Truncating.16to16") {
+  expectEqual(-1, LLVMInt16(truncatingSigned: LLVMInt16(-1)))
+  expectEqual(-1, LLVMInt16(truncatingUnsigned: LLVMInt16(-1)))
+  expectEqual(1, LLVMInt16(truncatingSigned: LLVMInt16(1)))
+  expectEqual(1, LLVMInt16(truncatingUnsigned: LLVMInt16(1)))
+  expectEqual(0xBEEF, LLVMInt16(truncatingSigned: LLVMInt16(0xBEEF)))
+  expectEqual(0xBEEF, LLVMInt16(truncatingUnsigned: LLVMInt16(0xBEEF)))
+  expectEqual(0x0DEF, LLVMInt16(truncatingSigned: LLVMInt16(0x0DEF)))
+  expectEqual(0x0DEF, LLVMInt16(truncatingUnsigned: LLVMInt16(0x0DEF)))
+}
+
+tests.test("Truncating.8to16") {
+  expectEqual(-1, LLVMInt16(truncatingSigned: LLVMInt8(-1)))
+  expectEqual(0xFF, LLVMInt16(truncatingUnsigned: LLVMInt8(-1)))
+  expectEqual(1, LLVMInt16(truncatingSigned: LLVMInt8(1)))
+  expectEqual(1, LLVMInt16(truncatingUnsigned: LLVMInt8(1)))
+}
+
+tests.test("Truncating.DoubleWordToWord") {
+  typealias LLVMDoubleWord = LLVMInt${word_bits*2}
+  expectEqual(-1, LLVMWord(truncatingSigned: LLVMDoubleWord(-1)))
+  expectEqual(-1, LLVMWord(truncatingUnsigned: LLVMDoubleWord(-1)))
+}
+
+tests.test("Truncating.WordToDoubleWord") {
+  typealias LLVMDoubleWord = LLVMInt${word_bits*2}
+  expectEqual(-1, LLVMDoubleWord(truncatingSigned: LLVMWord(-1)))
+  expectEqual(
+    LLVMDoubleWord(-1).lshr(${word_bits}),
+    LLVMDoubleWord(truncatingUnsigned: LLVMWord(-1)))
 }
 
 tests.test("Basics") {
@@ -640,6 +865,8 @@ tests.test("Basics") {
   expectNotEqual(b8, I8())
   expectEqual(I8(), 0)
   expectEqual(8, I8.bitWidth)
+  expectEqual(16, LLVMInt16.bitWidth)
+  expectEqual(32, LLVMInt32.bitWidth)
 
   /// Create a fibonacci sequence
   var a: [I8] = []
