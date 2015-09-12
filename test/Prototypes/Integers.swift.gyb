@@ -70,16 +70,16 @@ builtinMiscOperations = ['atomicrmw']
 }%
 
 /// A low-level 2's complement integer.
-public protocol _LowLevelInteger
+public protocol LLVMInteger
   : Equatable,
     IntegerLiteralConvertible, _BuiltinIntegerLiteralConvertible, 
     CustomStringConvertible
 {
-  /// A _LowLevelInt type that accomodates more bits of precision than
+  /// A LLVMInt type that accomodates more bits of precision than
   /// any instance of `Self`.
   typealias Extended
 
-  /// A _LowLevelInt type that accomodates fewer bits of precision than
+  /// A LLVMInt type that accomodates fewer bits of precision than
   /// any instance of `Self`.
   typealias Truncated
   
@@ -95,10 +95,10 @@ public protocol _LowLevelInteger
 % end
 
   /// The most significant bit that is set, or -1 if self == 0
-  var mostSignificant1Bit: _LowLevelWord {get}
+  var mostSignificant1Bit: LLVMWord {get}
   
   /// The most significant bit that is not set, or -1 if self == -1
-  var mostSignificant0Bit: _LowLevelWord {get}
+  var mostSignificant0Bit: LLVMWord {get}
 
   func isLessThanSigned(rhs: Self) -> Bool
   func isLessThanUnsigned(rhs: Self) -> Bool
@@ -118,14 +118,14 @@ public protocol _LowLevelInteger
   var truncated : Truncated { get }
 
   
-  var lowWord: _LowLevelWord { get }
-  var countWords: _LowLevelWord { get }
-  func nthWord(n: _LowLevelWord) -> _LowLevelWord
+  var lowWord: LLVMWord { get }
+  var countWords: LLVMWord { get }
+  func nthWord(n: LLVMWord) -> LLVMWord
   
-  init(truncating: _LowLevelWord)
+  init(truncating: LLVMWord)
 }
 
-extension _LowLevelInteger {
+extension LLVMInteger {
   public init(_ other: Self) {
     self = other
   }
@@ -148,7 +148,7 @@ extension _LowLevelInteger {
   }
 }
 
-public protocol _FixedWidthInteger : _LowLevelInteger {
+public protocol LLVMFixedWidthInteger : LLVMInteger {
   /// A type used as `Self`'s representation
   typealias Storage
 
@@ -156,18 +156,18 @@ public protocol _FixedWidthInteger : _LowLevelInteger {
   init(_: Storage)
 
   /// The number of bits `Self` can store
-  static var bitWidth : _LowLevelWord { get }
+  static var bitWidth : LLVMWord { get }
   
   /// The entire storage of `self`'s value.  
   var storage: Storage { get set }
 }
 
-extension _FixedWidthInteger {
-  public var countWords: _LowLevelWord {
+extension LLVMFixedWidthInteger {
+  public var countWords: LLVMWord {
     return Self.bitWidth.add(
-      _LowLevelWord(${word_bits}).sub(1)).udiv(${word_bits})
+      LLVMWord(${word_bits}).sub(1)).udiv(${word_bits})
   }
-  public func nthWord(n: _LowLevelWord) -> _LowLevelWord {
+  public func nthWord(n: LLVMWord) -> LLVMWord {
     return self.lshr(Self(truncating: n).mul(${word_bits})).lowWord
   }
 }
@@ -188,10 +188,10 @@ extension Bool {
 %   narrowedBits = bits / 2 if bits != minFixedBits else bits
 %   toWord = 'trunc' if word_bits < bits else 'zext'
 %   fromWord = 'trunc' if word_bits > bits else 'zext'
-public struct _LowLevelInt${bits} : _FixedWidthInteger {
-  public typealias Self_ = _LowLevelInt${bits}
-  public typealias Extended = _LowLevelInt${extendedBits}
-  public typealias Narrowed = _LowLevelInt${narrowedBits}
+public struct LLVMInt${bits} : LLVMFixedWidthInteger {
+  public typealias Self_ = LLVMInt${bits}
+  public typealias Extended = LLVMInt${extendedBits}
+  public typealias Narrowed = LLVMInt${narrowedBits}
   public typealias Storage = Builtin.Int${bits}
 
   public init() {
@@ -214,7 +214,7 @@ public struct _LowLevelInt${bits} : _FixedWidthInteger {
   
   public var storage: Storage
   
-  public static var bitWidth : _LowLevelWord { return ${bits} }
+  public static var bitWidth : LLVMWord { return ${bits} }
   
 % for operation in builtinBinaryOperations:
   public func ${operation}(rhs: Self_) -> Self_ {
@@ -231,13 +231,13 @@ public struct _LowLevelInt${bits} : _FixedWidthInteger {
 % end
 
   /// The most significant bit that is set, or -1 if self == 0
-  public var mostSignificant1Bit: _LowLevelWord {
+  public var mostSignificant1Bit: LLVMWord {
     let leadingZeros = Self_(_leadingZeros(storage)).lowWord
     return Self_.bitWidth.sub(leadingZeros).sub(1)
   }
   
   /// The most significant bit that is unset, or -1 if self == -1
-  public var mostSignificant0Bit: _LowLevelWord {
+  public var mostSignificant0Bit: LLVMWord {
     return self.xor(-1).mostSignificant1Bit
   }
     
@@ -283,40 +283,40 @@ public struct _LowLevelInt${bits} : _FixedWidthInteger {
     )
   }
 
-  public init(truncating other: _LowLevelWord) {
+  public init(truncating other: LLVMWord) {
     self.init(
       Builtin.${fromWord}OrBitCast_${IntWord}_Int${bits}(other.storage))
   }
 }
 
-public func == (lhs: _LowLevelInt${bits}, rhs: _LowLevelInt${bits}) -> Bool {
+public func == (lhs: LLVMInt${bits}, rhs: LLVMInt${bits}) -> Bool {
   return Bool(Builtin.cmp_eq_Int${bits}(lhs.storage, rhs.storage))
 }
 
 
-extension _LowLevelInt${bits} {
-  public var lowWord: _LowLevelWord {
-    return _LowLevelWord(
+extension LLVMInt${bits} {
+  public var lowWord: LLVMWord {
+    return LLVMWord(
       Builtin.${toWord}OrBitCast_Int${bits}_${IntWord}(self.storage))
   }
 }
 
 % end
 
-public typealias _LowLevelWord = _LowLevelInt${word_bits}
+public typealias LLVMWord = LLVMInt${word_bits}
 
 //===--- Low-level BigInt -------------------------------------------------===//
-// A basic array-of-words implementation of LowLevelInteger
-public struct _LowLevelBigInt : _LowLevelInteger {
-  /// A _LowLevelInt type that accomodates more bits of precision than
+// A basic array-of-words implementation of LLVMInteger
+public struct LLVMBigInt : LLVMInteger {
+  /// A LLVMInt type that accomodates more bits of precision than
   /// any instance of `Self`.
-  public typealias Extended = _LowLevelBigInt
+  public typealias Extended = LLVMBigInt
 
-  /// A _LowLevelInt type that accomodates fewer bits of precision than
+  /// A LLVMInt type that accomodates fewer bits of precision than
   /// any instance of `Self`.
-  public typealias Truncated = _LowLevelBigInt
+  public typealias Truncated = LLVMBigInt
 
-  public typealias Self_ = _LowLevelBigInt
+  public typealias Self_ = LLVMBigInt
   
   /// Creates an instance with value 0
   public init() {
@@ -344,12 +344,12 @@ public struct _LowLevelBigInt : _LowLevelInteger {
     let zero = Builtin.zext_${IntWord}_${IntLiteral}(0.value)
 
     var rest = x
-    var digit: _LowLevelWord = 0
+    var digit: LLVMWord = 0
     while (
       digit.isLessThanSigned(0)
       || !Bool(Builtin.cmp_eq_${IntLiteral}(zero, rest))
     ) {
-      digit = _LowLevelWord(
+      digit = LLVMWord(
         Builtin.trunc_${IntLiteral}_${IntWord}(Builtin.and_${IntLiteral}(rest, mask)))
       words.append(digit)
       rest = Builtin.lshr_${IntLiteral}(rest, wordBits)
@@ -364,9 +364,9 @@ public struct _LowLevelBigInt : _LowLevelInteger {
     let target = Builtin.sext_${IntWord}_${IntLiteral}(Int(-1).value)
 
     var rest = x
-    var digit: _LowLevelWord
+    var digit: LLVMWord
     repeat {
-      digit = _LowLevelWord(
+      digit = LLVMWord(
         Builtin.trunc_${IntLiteral}_${IntWord}(
           Builtin.and_${IntLiteral}(rest, mask)))
       words.append(digit)
@@ -451,12 +451,12 @@ public struct _LowLevelBigInt : _LowLevelInteger {
 % end
 
   /// The most significant bit that is set, or -1 if self == 0
-  public var mostSignificant1Bit: _LowLevelWord {
+  public var mostSignificant1Bit: LLVMWord {
     fatalError("implement me")
   }
   
   /// The most significant bit that is not set, or -1 if self == -1
-  public var mostSignificant0Bit: _LowLevelWord {
+  public var mostSignificant0Bit: LLVMWord {
     fatalError("implement me")
   }
   
@@ -485,26 +485,26 @@ public struct _LowLevelBigInt : _LowLevelInteger {
   
   public var truncated : Truncated { return self }
   
-  internal var words: ContiguousArray<_LowLevelWord>
+  internal var words: ContiguousArray<LLVMWord>
 
-  public var lowWord: _LowLevelWord {
+  public var lowWord: LLVMWord {
     fatalError("implement me")
   }
 
-  public var countWords: _LowLevelWord {
-    return _LowLevelWord(words.count.value)
+  public var countWords: LLVMWord {
+    return LLVMWord(words.count.value)
   }
   
-  public func nthWord(n: _LowLevelWord) -> _LowLevelWord {
-    return _LowLevelWord(words[Int(n.storage)])
+  public func nthWord(n: LLVMWord) -> LLVMWord {
+    return LLVMWord(words[Int(n.storage)])
   }
 
-  public init(truncating other: _LowLevelWord) {
+  public init(truncating other: LLVMWord) {
     words = [other]
   }
 }
 
-public func == (lhs: _LowLevelBigInt, rhs: _LowLevelBigInt) -> Bool {
+public func == (lhs: LLVMBigInt, rhs: LLVMBigInt) -> Bool {
   fatalError("implement me")
 }
 
@@ -513,7 +513,7 @@ import StdlibUnittest
 var tests = TestSuite("Integers")
 
 func expectBigInt(
-  expected: [_LowLevelWord], _ actual: _LowLevelBigInt,
+  expected: [LLVMWord], _ actual: LLVMBigInt,
   @autoclosure _ message: ()->String = "",
   file: String = __FILE__, line: UInt = __LINE__
 ) {
@@ -521,7 +521,7 @@ func expectBigInt(
     expected, actual.words.reverse(), message(), file: file, line: line)
 }
 
-tests.test("LowLevelBigInt.Literals") {
+tests.test("LLVMBigInt.Literals") {
   expectBigInt([], 0)
   expectBigInt([1], 1)
   expectBigInt([-1], -1)
@@ -535,9 +535,9 @@ tests.test("LowLevelBigInt.Literals") {
 }
 
 tests.test("Basics") {
-  typealias I8 = _LowLevelInt8
-  typealias W = _LowLevelInt${word_bits}
-  typealias W2 = _LowLevelInt${word_bits * 2}
+  typealias I8 = LLVMInt8
+  typealias W = LLVMInt${word_bits}
+  typealias W2 = LLVMInt${word_bits * 2}
 
   expectEqual(sizeof(W.self), sizeof(Int.self))
   expectEqual(sizeof(W2.self), 2 * sizeof(Int.self))
@@ -569,9 +569,9 @@ tests.test("Basics") {
   }
   checkEquatable(a, oracle: { $0 == $1})
   
-  let x = _LowLevelInt${word_bits}()
-  let y = _LowLevelInt${word_bits * 2}()
-  let z = _LowLevelInt16()
+  let x = LLVMInt${word_bits}()
+  let y = LLVMInt${word_bits * 2}()
+  let z = LLVMInt16()
 }
 
 runAllTests()
