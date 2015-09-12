@@ -748,6 +748,8 @@ public func == (lhs: LLVMBigInt, rhs: LLVMBigInt) -> Bool {
   fatalError("implement me")
 }
 
+typealias LLVMDoubleWord = LLVMInt${word_bits*2}
+
 //===--- tests ------------------------------------------------------------===//
 import StdlibUnittest
 var tests = TestSuite("Integers")
@@ -791,6 +793,15 @@ tests.test("LLVMBigInt.Literals") {
   expectBigInt([-1, 0], ${-1 << word_bits})
   expectBigInt([-1, 1], ${(-1 << word_bits) + 1})
   expectBigInt([-2, -1], ${(-1 << word_bits) - 1})
+}
+
+tests.test("Truncating.ToLLVMBigInt") {
+  expectBigInt([-1], LLVMBigInt(truncatingSigned: LLVMWord(-1)))
+  expectBigInt([-1], LLVMBigInt(truncatingUnsigned: LLVMWord(-1)))
+  expectBigInt([-1], LLVMBigInt(truncatingSigned: LLVMInt8(-1)))
+  expectBigInt([0xFF], LLVMBigInt(truncatingUnsigned: LLVMInt8(-1)))
+  expectBigInt([-1, -1], LLVMBigInt(truncatingSigned: LLVMDoubleWord(-1)))
+  expectBigInt([-1, -1], LLVMBigInt(truncatingUnsigned: LLVMDoubleWord(-1)))
 }
 
 tests.test("signedWord") {
@@ -838,13 +849,11 @@ tests.test("Truncating.8to16") {
 }
 
 tests.test("Truncating.DoubleWordToWord") {
-  typealias LLVMDoubleWord = LLVMInt${word_bits*2}
   expectEqual(-1, LLVMWord(truncatingSigned: LLVMDoubleWord(-1)))
   expectEqual(-1, LLVMWord(truncatingUnsigned: LLVMDoubleWord(-1)))
 }
 
 tests.test("Truncating.WordToDoubleWord") {
-  typealias LLVMDoubleWord = LLVMInt${word_bits*2}
   expectEqual(-1, LLVMDoubleWord(truncatingSigned: LLVMWord(-1)))
   expectEqual(
     LLVMDoubleWord(-1).lshr(${word_bits}),
