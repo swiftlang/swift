@@ -22,6 +22,14 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER8 | FileCheck %s -check-prefix=MEMBER8
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER9 | FileCheck %s -check-prefix=MEMBER1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG1 | FileCheck %s -check-prefix=EXPECT_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG2 | FileCheck %s -check-prefix=EXPECT_STRING
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG3 | FileCheck %s -check-prefix=MEMBER2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG4 | FileCheck %s -check-prefix=MEMBER4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG5 | FileCheck %s -check-prefix=MEMBER2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG6 | FileCheck %s -check-prefix=FARG6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG7 | FileCheck %s -check-prefix=EXPECT_OINT
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -42,6 +50,7 @@ func foo1(a : Int, b : Int) {}
 func bar(a : String, b : String?) {}
 func bar1(a : String, b1 : String) {}
 func bar1(a : String, b2 : String) {}
+func foo3(a: Int?) {}
 
 class InternalGen {
   func InternalIntGen() -> Int { return 0 }
@@ -76,6 +85,18 @@ class C1 {
   }
   func f4() {
     foo1(2, b : #^ARG4^#
+  }
+
+  func f5() {
+    foo(#^FARG1^#, b1 : 2)
+  }
+
+  func f6() {
+    bar(#^FARG2^#
+  }
+
+  func f7() {
+    foo3(#^FARG7^#)
   }
 }
 
@@ -219,6 +240,22 @@ class C4 {
   func f9() {
     foo(1, b1 : GenGenerator(1).#^MEMBER9^#
   }
+
+  func f10(G: Gen) {
+    foo(G.#^FARG3^#
+  }
+
+  func f11(G: Gen) {
+    bar(G.#^FARG4^#
+  }
+
+  func f12(G1 : Gen, G2 : Gen) {
+    G1.IntTaker(G2.#^FARG5^#
+  }
+
+  func f13(G : Gen) {
+    G.IntTaker(G.IG.#^FARG6^#
+  }
 }
 
 // MEMBER1: Begin completions
@@ -266,3 +303,11 @@ class C4 {
 // MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringOpGen()[#String?#]; name=InternalStringOpGen()
 // MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]; name=InternalIntTaker(i1: Int, i2: Int)
 // MEMBER8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]; name=InternalStringTaker(s1: String, s2: String)
+
+// FARG6: Begin completions
+// FARG6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: InternalIntGen()[#Int#]
+// FARG6-DAG: Decl[InstanceMethod]/CurrNominal:   InternalIntOpGen()[#Int?#]
+// FARG6-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringGen()[#String#]
+// FARG6-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringOpGen()[#String?#]
+// FARG6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]
+// FARG6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]

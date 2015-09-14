@@ -1489,7 +1489,7 @@ namespace {
       return optTy;
     }
 
-    Type visitParenExpr(ParenExpr *expr) {
+    virtual Type visitParenExpr(ParenExpr *expr) {
       auto &ctx = CS.getASTContext();
       expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
       
@@ -2739,6 +2739,16 @@ public:
     if (Target != Expr) {
       // If expr is not the target, do the default constraint generation.
       return ConstraintGenerator::visitUnresolvedMemberExpr(Expr);
+    }
+    // Otherwise, create a type variable saying we know nothing about this expr.
+    assert(!VT && "cannot reassign type viriable.");
+    return VT = createFreeTypeVariableType(Expr);
+  }
+
+  Type visitParenExpr(ParenExpr *Expr) override {
+    if (Target != Expr) {
+      // If expr is not the target, do the default constraint generation.
+      return ConstraintGenerator::visitParenExpr(Expr);
     }
     // Otherwise, create a type variable saying we know nothing about this expr.
     assert(!VT && "cannot reassign type viriable.");

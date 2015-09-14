@@ -501,7 +501,8 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
                                                                 Type ExpectedTy,
                                                                 DeclContext *DC) {
   if (Ty.isNull() || ExpectedTy.isNull() ||
-      Ty->is<ErrorType>() || ExpectedTy->is<ErrorType>())
+      Ty->getKind() == TypeKind::Error ||
+      ExpectedTy->getKind() == TypeKind::Error)
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   if (Ty.getCanonicalTypeOrNull() == ExpectedTy.getCanonicalTypeOrNull())
     return CodeCompletionResult::ExpectedTypeRelation::Identical;
@@ -790,9 +791,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     // Type check the function that contains the expression.
     if (DC->getContextKind() == DeclContextKind::AbstractClosureExpr ||
         DC->getContextKind() == DeclContextKind::AbstractFunctionDecl) {
-      SourceLoc EndTypeCheckLoc =
-          ParsedExpr ? ParsedExpr->getStartLoc()
-                     : P.Context.SourceMgr.getCodeCompletionLoc();
+      SourceLoc EndTypeCheckLoc = P.Context.SourceMgr.getCodeCompletionLoc();
       // Find the nearest containing function or nominal decl.
       DeclContext *DCToTypeCheck = DC;
       while (!DCToTypeCheck->isModuleContext() &&
@@ -1024,7 +1023,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   Type BaseType;
 
   /// Expected types of the code completion expression.
-  ArrayRef<Type> ExpectedTypes;
+  std::vector<Type> ExpectedTypes;
 
   bool HaveDot = false;
   SourceLoc DotLoc;
@@ -2408,6 +2407,9 @@ public:
         } else {
           ExpectedTypes.push_back(Ele.getType());
         }
+      } else if (Position == 0 && !HasName && Type) {
+        // The only param.
+        ExpectedTypes.push_back(Type->getDesugaredType());
       }
     }
   }
@@ -2474,18 +2476,24 @@ public:
         PossibleTypes.push_back(FT->getInput());
       }
     }
-    auto TAG = dyn_cast<TupleExpr>(CallE->getArg());
-    if (!TAG)
+    if (auto TAG = dyn_cast<TupleExpr>(CallE->getArg())) {
+      llvm::SmallVector<Type, 3> TupleEleTypesBeforeTarget;
+      if (!getPositionInTupleExpr(DC, CCExpr, TAG, Position, HasName,
+                                  TupleEleTypesBeforeTarget))
+        return false;
+      if (PossibleTypes.empty() &&
+          !typeCheckUnresolvedExpr(DC, CallE->getArg(), CallE, PossibleTypes))
+        return false;
+      if (RemoveUnlikelyOverloads)
+        removeUnlikelyOverloads(PossibleTypes, TupleEleTypesBeforeTarget, &DC);
+    } else if (CallE->getArg()->getKind() == ExprKind::Paren) {
+      Position = 0;
+      HasName = false;
+      if (PossibleTypes.empty() &&
+          !typeCheckUnresolvedExpr(DC, CallE->getArg(), CallE, PossibleTypes))
+        return false;
+    } else
       return false;
-    llvm::SmallVector<Type, 3> TupleEleTypesBeforeTarget;
-    if (!getPositionInTupleExpr(DC, CCExpr, TAG, Position, HasName,
-                                TupleEleTypesBeforeTarget))
-      return false;
-    if (PossibleTypes.empty() &&
-        !typeCheckUnresolvedExpr(DC, CallE->getArg(), CallE, PossibleTypes))
-      return false;
-    if (RemoveUnlikelyOverloads)
-      removeUnlikelyOverloads(PossibleTypes, TupleEleTypesBeforeTarget, &DC);
     return true;
   }
 
@@ -3137,13 +3145,15 @@ namespace  {
   };
 }
 
-class DotExpressionTypeContextAnalyzer {
+/// Given an expression and its context, the analyzer tries to figure out the
+/// expected type of the expression by analyzing its context.
+class CodeCompletionTypeContextAnalyzer {
   DeclContext *DC;
   Expr *ParsedExpr;
   ExprParentFinder Finder;
 
 public:
-  DotExpressionTypeContextAnalyzer(DeclContext *DC, Expr *ParsedExpr) : DC(DC),
+  CodeCompletionTypeContextAnalyzer(DeclContext *DC, Expr *ParsedExpr) : DC(DC),
     ParsedExpr(ParsedExpr),
     Finder(DC->getASTContext().SourceMgr, ParsedExpr, [](Expr *E) {
       switch(E->getKind()) {
@@ -3247,7 +3257,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setIsDynamicLookup();
     Lookup.initializeArchetypeTransformer(CurDeclContext, ExprType);
 
-    DotExpressionTypeContextAnalyzer TypeAnalyzer(CurDeclContext, ParsedExpr);
+    CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext, ParsedExpr);
     llvm::SmallVector<Type, 2> PossibleTypes;
     if (TypeAnalyzer.Analyze(PossibleTypes)) {
       Lookup.setExpectedTypes(PossibleTypes);
@@ -3275,8 +3285,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn()))
         VD = DRE->getDecl();
     }
-    DotExpressionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
-                                                  CodeCompleteTokenExpr);
+    CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
+                                                   CodeCompleteTokenExpr);
     llvm::SmallVector<Type, 2> PossibleTypes;
     if (TypeAnalyzer.Analyze(PossibleTypes)) {
       Lookup.setExpectedTypes(PossibleTypes);
