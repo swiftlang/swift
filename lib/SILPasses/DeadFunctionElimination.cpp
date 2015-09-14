@@ -268,19 +268,21 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     for (SILWitnessTable &WT : Module->getWitnessTableList()) {
       bool tableIsAlive = isVisibleExternally(WT.getConformance()->getProtocol());
       for (const SILWitnessTable::Entry &entry : WT.getEntries()) {
-        if (entry.getKind() == SILWitnessTable::Method) {
-          auto methodWitness = entry.getMethodWitness();
-          auto *fd = cast<AbstractFunctionDecl>(methodWitness.Requirement.
-                                                    getDecl());
-          assert(fd == getBase(fd) && "key in witness table is overridden");
-          SILFunction *F = methodWitness.Witness;
-          if (F) {
-            MethodInfo *mi = getMethodInfo(fd);
-            addImplementingFunction(mi, F);
-            if (tableIsAlive || !F->isDefinition())
-              ensureAlive(mi);
-          }
-        }
+        if (entry.getKind() != SILWitnessTable::Method)
+          continue;
+
+        auto methodWitness = entry.getMethodWitness();
+        auto *fd = cast<AbstractFunctionDecl>(methodWitness.Requirement.
+                                              getDecl());
+        assert(fd == getBase(fd) && "key in witness table is overridden");
+        SILFunction *F = methodWitness.Witness;
+        if (!F)
+          continue;
+
+        MethodInfo *mi = getMethodInfo(fd);
+        addImplementingFunction(mi, F);
+        if (tableIsAlive || !F->isDefinition())
+          ensureAlive(mi);
       }
     }
   }
