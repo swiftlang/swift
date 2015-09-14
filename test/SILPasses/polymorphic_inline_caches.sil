@@ -38,31 +38,31 @@ bb0(%0 : $A, %1 : $Builtin.Int32):
   %5 = class_method %0 : $A, #A.ping!1 : A -> (Builtin.Int32) -> Builtin.Int32 , $@convention(method) (Builtin.Int32, @guaranteed A) -> Builtin.Int32
   // CHECK-NOT: apply
   %6 = apply %5(%1, %0) : $@convention(method) (Builtin.Int32, @guaranteed A) -> Builtin.Int32
-  // CHECK: checked_cast_br [exact] %0 : $A to $B, bb2, bb3
+  // CHECK: checked_cast_br [exact] %0 : $A to $A, bb2, bb3
   // CHECK: bb1
   strong_release %0 : $A
   // CHECK: return
   return %6 : $Builtin.Int32
   // CHECK: bb2
-  // CHECK: [[BPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_
-  // CHECK: apply [[BPING]]
-  // CHECK: strong_release %5 : $B
+  // CHECK: [[APING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_
+  // CHECK: apply [[APING]]
+  // CHECK: strong_release %{{[0-9]+}} : $A
   // CHECK: bb3
-  // CHECK: checked_cast_br [exact] %0 : $A to $C, bb5, bb6
+  // CHECK: checked_cast_br [exact] %0 : $A to $B, bb5, bb6
   // CHECK: bb4
   // CHECK: br bb1
   // CHECK: bb5
-  // CHECK: [[CPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_
-  // CHECK: apply [[CPING]]
-  // CHECK: strong_release %14 : $C
+  // CHECK: [[BPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_
+  // CHECK: apply [[BPING]]
+  // CHECK: strong_release %{{[0-9]+}} : $B
   // CHECK: bb6
-  // CHECK: checked_cast_br [exact] %0 : $A to $A, bb8, bb9
+  // CHECK: checked_cast_br [exact] %0 : $A to $C, bb8, bb9
   // CHECK: bb7
   // CHECK: br bb4
   // CHECK: bb8
-  // CHECK: [[APING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_
-  // CHECK: apply [[APING]]
-  // CHECK: strong_release %23 : $A
+  // CHECK: [[CPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_
+  // CHECK: apply [[CPING]]
+  // CHECK: strong_release %{{[0-9]+}} : $C
   // CHECK: bb9
   // CHECK: [[PING:%.*]] = class_method %0 : $A, #A.ping!1
   // CHECK: apply [[PING]]
@@ -83,28 +83,28 @@ bb0(%0 : $A, %1 : $Builtin.Int32):
   // CHECK-NOT: apply
   %6 = apply %4(%0) : $@convention(thin) (A) -> Builtin.Int32
   %7 = apply %5(%1, %0) : $@convention(method) (Builtin.Int32, @guaranteed A) -> Builtin.Int32
-  // CHECK: checked_cast_br [exact] %0 : $A to $B, bb2, bb3
+  // CHECK: checked_cast_br [exact] %0 : $A to $A, bb2, bb3
   // CHECK: bb1
   strong_release %0 : $A
   // CHECK: return
   return %6 : $Builtin.Int32
   // CHECK: bb2
-  // CHECK: [[BPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_
-  // CHECK: apply [[BPING]]
+  // CHECK: [[APING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_
+  // CHECK: apply [[APING]]
   // CHECK: bb3
-  // CHECK: checked_cast_br [exact] %0 : $A to $C, bb5, bb6
+  // CHECK: checked_cast_br [exact] %0 : $A to $B, bb5, bb6
   // CHECK: bb4
   // CHECK: br bb1
   // CHECK: bb5
-  // CHECK: [[CPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_
-  // CHECK: apply [[CPING]]
+  // CHECK: [[BPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_
+  // CHECK: apply [[BPING]]
   // CHECK: bb6
-  // CHECK: checked_cast_br [exact] %0 : $A to $A, bb8, bb9
+  // CHECK: checked_cast_br [exact] %0 : $A to $C, bb8, bb9
   // CHECK: bb7
   // CHECK: br bb4
   // CHECK: bb8
-  // CHECK: [[APING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_
-  // CHECK: apply [[APING]]
+  // CHECK: [[CPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_
+  // CHECK: apply [[CPING]]
   // CHECK: bb9
   // CHECK: [[PING:%.*]] = class_method %0 : $A, #A.ping!1
   // CHECK: apply [[PING]]
@@ -166,25 +166,25 @@ bb0(%0 : $Builtin.NativeObject):
   strong_release %0 : $Builtin.NativeObject
   %7 = tuple ()
   return %7 : $()
-  // CHECK: checked_cast_br [exact] [[CAST]] : $E to $F, bb2, bb3
+  // CHECK: checked_cast_br [exact] [[CAST]] : $E to $E, bb2, bb3
   // CHECK: bb1
   // CHECK: return
   // CHECK: bb2
-  // CHECK: [[FFOO:%.*]] = function_ref @_TFC5casts1F3foofS0_FT_T_
-  // CHECK: apply [[FFOO]]
+  // CHECK: [[EFOO:%.*]] = function_ref @_TFC5casts1E3foofS0_FT_T_
+  // CHECK: apply [[EFOO]]
   // CHECK: bb3
-  // CHECK: checked_cast_br [exact] [[CAST]] : $E to $G, bb5, bb6
+  // CHECK: checked_cast_br [exact] [[CAST]] : $E to $F, bb5, bb6
   // CHECK: bb4
   // CHECK: br bb1
   // CHECK: bb5
-  // CHECK: [[GFOO:%.*]] = function_ref @_TFC5casts1G3foofS0_FT_T_
-  // CHECK: apply [[GFOO]]
+  // CHECK: [[FFOO:%.*]] = function_ref @_TFC5casts1F3foofS0_FT_T_
+  // CHECK: apply [[FFOO]]
   // CHECK: bb6
-  // CHECK: checked_cast_br [exact] [[CAST]] : $E to $E, bb8, bb9
+  // CHECK: checked_cast_br [exact] [[CAST]] : $E to $G, bb8, bb9
   // CHECK: bb7
   // CHECK: bb8
-  // CHECK: [[EFOO:%.*]] = function_ref @_TFC5casts1E3foofS0_FT_T_
-  // CHECK: apply [[EFOO]]
+  // CHECK: [[GFOO:%.*]] = function_ref @_TFC5casts1G3foofS0_FT_T_
+  // CHECK: apply [[GFOO]]
   // CHECK: bb9
   // CHECK: [[DYNAMIC:%.*]] = class_method [[CAST]] : $E, #E.foo!1
   // CHECK: apply [[DYNAMIC]]

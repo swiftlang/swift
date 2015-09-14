@@ -139,7 +139,9 @@ static StrongRetainInst *findClassInstanceRetainForSinking(SILBasicBlock *BB,
 /// Insert monomorphic inline caches for a specific class or metatype
 /// type \p SubClassTy.
 static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
-                                             SILType SubType) {
+                                                SILType SubType,
+                                                CheckedCastBranchInst *&CCBI) {
+  CCBI = nullptr;
   // Bail if this class_method cannot be devirtualized.
   if (!canDevirtualizeClassMethod(AI, SubType))
     return FullApplySite();
@@ -166,9 +168,10 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
 
   ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
 
-  It = Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
+  CCBI = Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
                                        CMI->getOperand(), SubType, Iden,
                                        Virt);
+  It = CCBI;
 
   SILBuilder VirtBuilder(Virt);
   SILBuilder IdenBuilder(Iden);
@@ -389,6 +392,8 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   if (SubType.is<MetatypeType>())
     ClassType = SubType.getMetatypeInstanceType(M);
 
+  CheckedCastBranchInst *LastCCBI = nullptr;
+
   ClassDecl *CD = ClassType.getClassOrBoundGenericClass();
   assert(CD && "Expected decl for class type!");
 
@@ -405,11 +410,14 @@ static bool tryToSpeculateTarget(FullApplySite AI,
 
     DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for class " <<
           CD->getName() << "\n");
-    return !!speculateMonomorphicTarget(AI, SubType);
+    return !!speculateMonomorphicTarget(AI, SubType, LastCCBI);
   }
 
   // Collect the direct subclasses for the class.
   auto &Subs = CHA->getDirectSubClasses(CD);
+  // True if any instructions were changed or generated.
+  bool Changed = false;
+
 
   if (isa<BoundGenericClassType>(ClassType.getSwiftRValueType())) {
     // Filter out any subclassses that do not inherit from this
@@ -440,6 +448,14 @@ static bool tryToSpeculateTarget(FullApplySite AI,
 
   DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
         "Inserting polymorphic speculative call.\n");
+
+  // Try to devirtualize the static class of instance
+  // if it is possible.
+  auto FirstAI = speculateMonomorphicTarget(AI, SubType, LastCCBI);
+  if (FirstAI) {
+    Changed = true;
+    AI = FirstAI;
+  }
 
   // Perform a speculative devirtualization of a method invocation.
   // It replaces an indirect class_method-based call by a code to perform
@@ -480,8 +496,6 @@ static bool tryToSpeculateTarget(FullApplySite AI,
 
   // Number of subclasses which cannot be handled by checked_cast_br checks.
   int NotHandledSubsNum = 0;
-  // True if any instructions were changed or generated.
-  bool Changed = false;
 
   for (auto S : Subs) {
     DEBUG(llvm::dbgs() << "Inserting a speculative call for class "
@@ -505,7 +519,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     }
 
     // Pass the metatype of the subclass.
-    auto NewAI = speculateMonomorphicTarget(AI, ClassOrMetatypeType);
+    auto NewAI = speculateMonomorphicTarget(AI, ClassOrMetatypeType, LastCCBI);
     if (!NewAI) {
       NotHandledSubsNum++;
       continue;
@@ -522,15 +536,23 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     // needs to be handled here. Thus, an indirect call through
     // the class_method cannot be eliminated completely.
     //
-    // But we can still try to devirtualize the static class of instance
-    // if it is possible.
-    return bool(speculateMonomorphicTarget(AI, SubType)) | Changed;
+    return Changed;
   }
 
   // At this point it is known that there is only one remaining method
   // implementation which is not covered by checked_cast_br checks yet.
   // So, it is safe to replace a class_method invocation by
   // a direct call of this remaining implementation.
+  if (LastCCBI && SubTypeValue == LastCCBI->getOperand()) {
+    // Remove last checked_cast_br, because it will always succeed.
+    SILBuilderWithScope<1> B(LastCCBI);
+    auto CastedValue = B.createUncheckedRefBitCast(LastCCBI->getLoc(),
+                                                   LastCCBI->getOperand(),
+                                                   LastCCBI->getCastType());
+    B.createBranch(LastCCBI->getLoc(), LastCCBI->getSuccessBB(), {CastedValue});
+    LastCCBI->eraseFromParent();
+    return true;
+  }
   auto *NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue);
   assert(NewInst && "Expected to be able to devirtualize apply!");
   replaceDeadApply(AI, NewInst);

@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt %s -specdevirt | FileCheck %s
+// RUN: %target-sil-opt %s -specdevirt -wmo | FileCheck --check-prefix=CHECK-WMO %s
 
 sil_stage canonical
 
@@ -27,8 +28,17 @@ bb0(%0 : $Foo):
 
 
 //CHECK-LABEL: @_TF8testcase7my_mainFCS_3FooT_
-//CHECK-NOT: checked_cast_br [exact] %0 : $Foo to $Foo
+//CHECK: checked_cast_br [exact] %0 : $Foo to $Foo
 //CHECK: return
+//CHECK: checked_cast_br [exact] %0 : $Foo to $Bar
+//CHECK: class_method
+
+//CHECK-WMO-LABEL: @_TF8testcase7my_mainFCS_3FooT_
+//CHECK-WMO: checked_cast_br [exact] %0 : $Foo to $Foo
+//CHECK-WMO: return
+//CHECK-WMO: unchecked_ref_bit_cast %0 : $Foo to $Bar
+//CHECK-WMO: class_method
+
 sil @_TF8testcase7my_mainFCS_3FooT_ : $@convention(thin) (@owned Foo) -> () {
 bb0(%0 : $Foo):
   %1 = class_method %0 : $Foo, #Foo.ping!1 : Foo -> () -> () , $@convention(method) (@guaranteed Foo) -> () // user: %2
