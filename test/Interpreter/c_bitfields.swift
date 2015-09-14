@@ -22,6 +22,19 @@ BitfieldTestSuite.test("Simple") {
   expectEqual(44, new.opcode)
 }
 
+BitfieldTestSuite.test("Anonymous Struct") {
+  var new = AnonStructWithBitfields()
+  new.left.first = 1
+  new.left.second = -1
+  new.right.first = -1
+  new.right.second = 1
+
+  expectEqual(1, new.left.first)
+  expectEqual(-1, new.left.second)
+  expectEqual(-1, new.right.first)
+  expectEqual(1, new.right.second)
+}
+
 BitfieldTestSuite.test("Initializer") {
   let new = ModRM(rm: 6, reg: 4, mod: 2, opcode: 33)
 

@@ -6,3 +6,13 @@ typedef struct ModRM {
   unsigned opcode;
 } ModRM;
 
+struct AnonStructWithBitfields {
+  struct {
+    int first: 2;
+    int second: 2;
+  } left;
+  struct {
+    int first: 2;
+    int second: 2;
+  } right;
+};

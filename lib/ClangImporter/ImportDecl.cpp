@@ -867,8 +867,8 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
 
 static clang::DeclarationName
 getAccessorDeclarationName(clang::ASTContext &Ctx,
-                           clang::RecordDecl *structDecl,
-                           clang::FieldDecl *fieldDecl,
+                           StructDecl *structDecl,
+                           VarDecl *fieldDecl,
                            const char *suffix) {
   std::string id;
   llvm::raw_string_ostream IdStream(id);
@@ -906,8 +906,8 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
   auto fieldNameInfo = clang::DeclarationNameInfo(fieldDecl->getDeclName(),
                                                   clang::SourceLocation());
 
-  auto cGetterName = getAccessorDeclarationName(Ctx, structDecl, fieldDecl,
-                                                "getter");
+  auto cGetterName = getAccessorDeclarationName(Ctx, importedStructDecl,
+                                                importedFieldDecl, "getter");
   auto cGetterType = Ctx.getFunctionType(fieldDecl->getType(),
                                          recordType,
                                          clang::FunctionProtoType::ExtProtoInfo());
@@ -933,8 +933,8 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
   cSetterParamTypes.push_back(fieldType);
   cSetterParamTypes.push_back(recordPointerType);
 
-  auto cSetterName = getAccessorDeclarationName(Ctx, structDecl, fieldDecl,
-                                                "setter");
+  auto cSetterName = getAccessorDeclarationName(Ctx, importedStructDecl,
+                                                importedFieldDecl, "setter");
   auto cSetterType = Ctx.getFunctionType(Ctx.VoidTy,
                                          cSetterParamTypes,
                                          clang::FunctionProtoType::ExtProtoInfo());
@@ -1060,6 +1060,62 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
   }
 
   return { getterDecl, setterDecl };
+}
+
+// Fake a declaration name for anonymous enums, unions and structs.
+static Identifier getClangDeclName(ClangImporter::Implementation &Impl,
+                                   const clang::TagDecl *decl) {
+  Identifier name;
+  if (decl->getDeclName())
+    name = Impl.importName(decl);
+  else if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
+    name = Impl.importName(typedefForAnon);
+
+  // If the type has no name and no structure name, but is not anonymous,
+  // generate a name for it. Specifically this is for cases like:
+  //   struct a {
+  //     struct {} z;
+  //   }
+  // Where the member z is an unnamed struct, but does have a member-name
+  // and is accessible as a member of struct a.
+  if (name.empty() && decl->isRecord()) {
+    auto dc = decl->getParent();
+    if (!dc->isRecord())
+      return name;
+
+    auto recordDecl = cast<clang::RecordDecl>(dc);
+
+    for (auto m : recordDecl->decls()) {
+      auto field = dyn_cast<clang::FieldDecl>(m);
+      if (!field)
+        continue;
+
+      if (auto recordType = dyn_cast<clang::RecordType>(field->getType().getCanonicalType())) {
+        if (recordType->getDecl() == decl) {
+          // We found the field. It better not be anonymous.
+          assert(!field->isAnonymousStructOrUnion());
+
+          // Create a name for the structure from the field name.
+          std::string Id;
+          llvm::raw_string_ostream IdStream(Id);
+
+          const char *kind;
+          if (decl->isStruct())
+            kind = "struct";
+          else if (decl->isUnion())
+            kind = "union";
+          else
+            assert(false && "unknown decl kind");
+
+          IdStream << "__Unnamed_" << kind
+                   << "_" << field->getName();
+          return Impl.SwiftContext.getIdentifier(IdStream.str());
+        }
+      }
+    }
+  }
+
+  return name;
 }
 
 namespace {
@@ -2078,12 +2134,7 @@ namespace {
         return nullptr;
       }
       
-      Identifier name;
-      if (decl->getDeclName())
-        name = Impl.importName(decl);
-      else if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
-        name = Impl.importName(typedefForAnon);
-
+      auto name = getClangDeclName(Impl, decl);
       if (name.empty())
         return nullptr;
 
@@ -2338,12 +2389,7 @@ namespace {
         return nullptr;
       }
 
-      Identifier name;
-      if (decl->getDeclName())
-        name = Impl.importName(decl);
-      else if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
-        name = Impl.importName(typedefForAnon);
-
+      auto name = getClangDeclName(Impl, decl);
       if (name.empty())
         return nullptr;
 
@@ -2370,105 +2416,108 @@ namespace {
 
       // FIXME: Import anonymous union fields and support field access when
       // it is nested in a struct.
-      if (!(decl->isUnion() && decl->isAnonymousStructOrUnion())) {
-        for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
-             m != mEnd; ++m) {
-          auto nd = dyn_cast<clang::NamedDecl>(*m);
-          if (!nd) {
-            // We couldn't import the member, so we can't reference it in Swift.
-            hasUnreferenceableStorage = true;
-            hasMemberwiseInitializer = false;
-            continue;
-          }
 
+      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
+           m != mEnd; ++m) {
+        auto nd = dyn_cast<clang::NamedDecl>(*m);
+        if (!nd) {
+          // We couldn't import the member, so we can't reference it in Swift.
+          hasUnreferenceableStorage = true;
+          hasMemberwiseInitializer = false;
+          continue;
+        }
+
+        if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
           // Skip anonymous structs or unions; they'll be dealt with via the
           // IndirectFieldDecls.
-          if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
-            if (field->isAnonymousStructOrUnion())
-              continue;
+          if (field->isAnonymousStructOrUnion())
+            continue;
 
-            // Non-nullable pointers can't be zero-initialized.
-            if (auto nullability = field->getType()
-                  ->getNullability(Impl.getClangASTContext())) {
-              if (*nullability == clang::NullabilityKind::NonNull)
-                hasZeroInitializableStorage = false;
-            }
-            // TODO: If we had the notion of a closed enum with no private
-            // cases or resilience concerns, then complete NS_ENUMs with
-            // no case corresponding to zero would also not be zero-
-            // initializable.
-
-            // Unnamed bitfields are just for padding and should not
-            // inhibit creation of a memberwise initializer.
-            if (field->isUnnamedBitfield()) {
-              hasUnreferenceableStorage = true;
-              continue;
-            }
+          // Non-nullable pointers can't be zero-initialized.
+          if (auto nullability = field->getType()
+                ->getNullability(Impl.getClangASTContext())) {
+            if (*nullability == clang::NullabilityKind::NonNull)
+              hasZeroInitializableStorage = false;
           }
+          // TODO: If we had the notion of a closed enum with no private
+          // cases or resilience concerns, then complete NS_ENUMs with
+          // no case corresponding to zero would also not be zero-
+          // initializable.
 
-          auto member = Impl.importDecl(nd);
-          if (!member || !isa<VarDecl>(member)) {
-            // We don't import nested struct decls from C as nested structs,
-            // which wouldn't match C or ObjC semantics. It's OK to skip these.
-            // TODO: For C++ types we *would* want to preserve the nesting.
-            if (dyn_cast_or_null<TypeDecl>(member))
-              continue;
-
-            // Otherwise, we don't know what this field is. Assume it may be
-            // important in C.
+          // Unnamed bitfields are just for padding and should not
+          // inhibit creation of a memberwise initializer.
+          if (field->isUnnamedBitfield()) {
             hasUnreferenceableStorage = true;
-            hasMemberwiseInitializer = false;
             continue;
           }
-          
-          auto VD = cast<VarDecl>(member);
+        }
 
-          // Bitfields are imported as computed properties with Clang-generated
-          // accessors.
-          if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
-            if (field->isUnnamedBitfield())
-              continue;
+        auto member = Impl.importDecl(nd);
+        if (!member) {
+          // We don't know what this field is. Assume it may be important in C.
+          hasUnreferenceableStorage = true;
+          hasMemberwiseInitializer = false;
+          continue;
+        }
 
-            if (field->isBitField()) {
-              // We can't represent this struct completely in SIL anymore,
-              // but we're still able to define a memberwise initializer.
-              hasUnreferenceableStorage = true;
+        if (isa<TypeDecl>(member)) {
+          // A struct nested inside another struct will either be logically
+          // a sibling of the outer struct, or contained inside of it, depending
+          // on if it has a declaration name or not.
+          //
+          // struct foo { struct bar { ... } baz; } // sibling
+          // struct foo { struct { ... } baz; } // child
+          //
+          // In the latter case, we add the imported type as a nested type
+          // of the parent.
+          //
+          // TODO: C++ types have different rules.
+          if (auto nominalDecl = dyn_cast<NominalTypeDecl>(member->getDeclContext()))
+            nominalDecl->addMember(member);
+          continue;
+        }
 
-              makeBitFieldAccessors(Impl,
-                                    const_cast<clang::RecordDecl *>(decl),
-                                    result,
-                                    const_cast<clang::FieldDecl *>(field),
-                                    VD);
-            }
+        auto VD = cast<VarDecl>(member);
+
+        // Bitfields are imported as computed properties with Clang-generated
+        // accessors.
+        if (auto field = dyn_cast<clang::FieldDecl>(nd)) {
+          if (field->isBitField()) {
+            // We can't represent this struct completely in SIL anymore,
+            // but we're still able to define a memberwise initializer.
+            hasUnreferenceableStorage = true;
+
+            makeBitFieldAccessors(Impl,
+                                  const_cast<clang::RecordDecl *>(decl),
+                                  result,
+                                  const_cast<clang::FieldDecl *>(field),
+                                  VD);
           }
+        }
 
-          if (decl->isUnion()) {
-            // Union fields should only be available indirectly via a computed
-            // property. Since the union is made of all of the fields at once,
-            // this is a trivial accessor that casts self to the correct
-            // field type.
+        if (decl->isUnion()) {
+          // Union fields should only be available indirectly via a computed
+          // property. Since the union is made of all of the fields at once,
+          // this is a trivial accessor that casts self to the correct
+          // field type.
 
-            // FIXME: Allow indirect field access of anonymous structs.
-            if (isa<clang::IndirectFieldDecl>(nd))
-              continue;
+          // FIXME: Allow indirect field access of anonymous structs.
+          if (isa<clang::IndirectFieldDecl>(nd))
+            continue;
 
-            VD->setLet(false);
-            Decl *getter, *setter;
-            std::tie(getter, setter) = makeUnionFieldAccessors(Impl,
-                                                               result,
-                                                               VD);
-            members.push_back(VD);
+          Decl *getter, *setter;
+          std::tie(getter, setter) = makeUnionFieldAccessors(Impl, result, VD);
+          members.push_back(VD);
 
-            // Create labeled inititializers for unions that take one of the
-            // fields, which only initializes the data for that field.
-            auto valueCtor =
-                createValueConstructor(result, VD,
-                                       /*want param names*/true,
-                                       /*wantBody=*/!Impl.hasFinishedTypeChecking());
-            ctors.push_back(valueCtor);
-          } else {
-            members.push_back(VD);
-          }
+          // Create labeled inititializers for unions that take one of the
+          // fields, which only initializes the data for that field.
+          auto valueCtor =
+              createValueConstructor(result, VD,
+                                     /*want param names*/true,
+                                     /*wantBody=*/!Impl.hasFinishedTypeChecking());
+          ctors.push_back(valueCtor);
+        } else {
+          members.push_back(VD);
         }
       }
 

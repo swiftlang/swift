@@ -58,6 +58,21 @@ func testAnonStructs() {
   a_s.c = 7.5
 }
 
+func testUnnamedStructs() {
+  var u_s: UnnamedStructs
+  u_s.x.a = 1
+  u_s.x.b = 3.14
+  u_s.x.c = "error" // expected-error{{value of type 'UnnamedStructs.__Unnamed_struct_x' has no member 'c'}}
+  u_s.y.a = 3.14
+  u_s.y.b = 2
+  u_s.y.c = "error" // expected-error{{value of type 'UnnamedStructs.__Unnamed_struct_y' has no member 'c'}}
+  u_s.y.z.c = 3
+  u_s.y.z.d = "error" // expected-error{{value of type 'UnnamedStructs.__Unnamed_struct_y.__Unnamed_struct_z' has no member 'd'}}
+
+  let _ = u_s.x
+  let _: UnnamedStructs.__Unnamed_struct_x = u_s.x
+}
+
 // FIXME: Import pointers to opaque types as unique types.
 
 func testPointers() {

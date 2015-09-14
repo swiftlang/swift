@@ -32,6 +32,20 @@ typedef struct {
   };
 } AnonStructs;
 
+typedef struct {
+  struct {
+    int a;
+    float b;
+  } x;
+  struct {
+    float a;
+    int b;
+    struct {
+      int c;
+    } z;
+  } y;
+} UnnamedStructs;
+
 typedef void const *HWND;
 
 typedef struct {
