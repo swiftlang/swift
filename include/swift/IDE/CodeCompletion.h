@@ -400,6 +400,29 @@ enum class CodeCompletionDeclKind {
   GlobalVar,
 };
 
+enum class CompletionKind {
+  None,
+  Import,
+  UnresolvedMember,
+  DotExpr,
+  PostfixExprBeginning,
+  PostfixExpr,
+  PostfixExprParen,
+  SuperExpr,
+  SuperExprDot,
+  TypeSimpleBeginning,
+  TypeIdentifierWithDot,
+  TypeIdentifierWithoutDot,
+  CaseStmtBeginning,
+  CaseStmtDotPrefix,
+  NominalMemberBeginning,
+  AttributeBegin,
+  AttributeDeclParen,
+  PoundAvailablePlatform,
+  AssignmentRHS,
+  CallArg,
+};
+
 /// \brief A single code completion result.
 class CodeCompletionResult {
   friend class CodeCompletionResultBuilder;
@@ -580,6 +603,7 @@ class CodeCompletionContext {
 
 public:
   CodeCompletionCache &Cache;
+  CompletionKind CodeCompletionKind = CompletionKind::None;
 
   CodeCompletionContext(CodeCompletionCache &Cache)
       : Cache(Cache) {}

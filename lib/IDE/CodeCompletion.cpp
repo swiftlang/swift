@@ -740,30 +740,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CodeCompletionContext &CompletionContext;
   std::vector<RequestedCachedModule> RequestedModules;
   CodeCompletionConsumer &Consumer;
-
-  enum class CompletionKind {
-    None,
-    Import,
-    UnresolvedMember,
-    DotExpr,
-    PostfixExprBeginning,
-    PostfixExpr,
-    PostfixExprParen,
-    SuperExpr,
-    SuperExprDot,
-    TypeSimpleBeginning,
-    TypeIdentifierWithDot,
-    TypeIdentifierWithoutDot,
-    CaseStmtBeginning,
-    CaseStmtDotPrefix,
-    NominalMemberBeginning,
-    AttributeBegin,
-    AttributeDeclParen,
-    PoundAvailablePlatform,
-    AssignmentRHS,
-    CallArg,
-  };
-
   CodeCompletionExpr *CodeCompleteTokenExpr;
   AssignExpr *AssignmentExpr;
   CallExpr *FuncCallExpr;
@@ -3203,6 +3179,8 @@ public:
 };
 
 void CodeCompletionCallbacksImpl::doneParsing() {
+  CompletionContext.CodeCompletionKind = Kind;
+
   if (Kind == CompletionKind::None) {
     return;
   }
