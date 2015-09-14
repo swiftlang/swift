@@ -172,7 +172,13 @@ public struct ${Self}<Element>
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 
+%if Self == 'ArraySlice':
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// In an empty collection, `startIndex == endIndex`.
+%else:
   /// Always zero, which is the index of the first element when non-empty.
+%end
   public var startIndex: Int {
 %if Self == 'ArraySlice':
     return _buffer.startIndex
