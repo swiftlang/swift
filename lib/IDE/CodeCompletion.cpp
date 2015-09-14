@@ -3112,7 +3112,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
 
 namespace  {
   class ExprParentFinder : public ASTWalker {
-    SourceManager &SM;
     Expr *ChildExpr;
     llvm::function_ref<bool(Expr*)> Predicate;
 
@@ -3120,10 +3119,9 @@ namespace  {
     llvm::SmallVector<Expr*, 5> Ancestors;
     Expr *ParentExprClosest = nullptr;
     Expr *ParentExprFarthest = nullptr;
-    ExprParentFinder(SourceManager &SM,
-                     Expr* ChildExpr,
+    ExprParentFinder(Expr* ChildExpr,
                      llvm::function_ref<bool(Expr*)> Predicate) :
-                       SM(SM), ChildExpr(ChildExpr), Predicate(Predicate){}
+                       ChildExpr(ChildExpr), Predicate(Predicate){}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (E == ChildExpr) {
@@ -3155,7 +3153,7 @@ class CodeCompletionTypeContextAnalyzer {
 public:
   CodeCompletionTypeContextAnalyzer(DeclContext *DC, Expr *ParsedExpr) : DC(DC),
     ParsedExpr(ParsedExpr),
-    Finder(DC->getASTContext().SourceMgr, ParsedExpr, [](Expr *E) {
+    Finder(ParsedExpr, [](Expr *E) {
       switch(E->getKind()) {
         case ExprKind::Call:
           return true;
@@ -3244,8 +3242,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     // If there is no nominal type in the expr, try to find nominal types
     // in the ancestors of the expr.
     if (!OriginalType->getAnyNominal()) {
-      ExprParentFinder Walker(CurDeclContext->getASTContext().SourceMgr,
-                              ParsedExpr, [&](Expr* E) {
+      ExprParentFinder Walker(ParsedExpr, [&](Expr* E) {
         return E->getType() && E->getType()->getAnyNominal();
       });
       CurDeclContext->walkContext(Walker);
@@ -3373,8 +3370,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::UnresolvedMember : {
     Lookup.setHaveDot(SourceLoc());
     SmallVector<Type, 1> PossibleTypes;
-    ExprParentFinder Walker(CurDeclContext->getASTContext().SourceMgr,
-                            UnresolvedExpr, [&](Expr* E) { return true; });
+    ExprParentFinder Walker(UnresolvedExpr, [&](Expr* E) { return true; });
     CurDeclContext->walkContext(Walker);
     bool Success = false;
     if(Walker.ParentExprFarthest) {

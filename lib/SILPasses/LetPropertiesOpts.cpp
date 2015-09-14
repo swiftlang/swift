@@ -165,7 +165,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
 
   for (auto Load: Loads) {
     // Look for any instructions accessing let properties.
-    if (auto *REAI = dyn_cast<RefElementAddrInst>(Load)) {
+    if (isa<RefElementAddrInst>(Load)) {
       // Copy the initializer into the function
       // Replace the access to a let property by the value
       // computed by this initializer.
@@ -185,7 +185,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
         ++NumReplaced;
       }
       HasChanged = true;
-    } else if (auto *SEI = dyn_cast<StructExtractInst>(Load)) {
+    } else if (isa<StructExtractInst>(Load)) {
       // Copy the initializer into the function
       // Replace the access to a let property by the value
       // computed by this initializer.
@@ -196,7 +196,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       Load->eraseFromParent();
       ++NumReplaced;
       HasChanged = true;
-    }  else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Load)) {
+    }  else if (isa<StructElementAddrInst>(Load)) {
       // Copy the initializer into the function
       // Replace the access to a let property by the value
       // computed by this initializer.
