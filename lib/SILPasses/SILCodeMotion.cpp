@@ -1046,7 +1046,7 @@ public:
   }
   /// \return BBEnumTagDataflowState or NULL for unreachable blocks.
   BBEnumTagDataflowState *getBBState(SILBasicBlock *BB) {
-    if (auto ID = PO->getRPONum(BB)) {
+    if (auto ID = PO->getRPONumber(BB)) {
       return &getRPOState(*ID);
     }
     return nullptr;

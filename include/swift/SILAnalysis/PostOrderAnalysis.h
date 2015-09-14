@@ -65,14 +65,14 @@ public:
 
   unsigned size() const { return PostOrder.size(); }
 
-  Optional<unsigned> getPONum(SILBasicBlock *BB) const {
+  Optional<unsigned> getPONumber(SILBasicBlock *BB) const {
     auto Iter = BBToPOMap.find(BB);
     if (Iter != BBToPOMap.end())
       return Iter->second;
     return None;
   }
 
-  Optional<unsigned> getRPONum(SILBasicBlock *BB) const {
+  Optional<unsigned> getRPONumber(SILBasicBlock *BB) const {
     auto Iter = BBToPOMap.find(BB);
     if (Iter != BBToPOMap.end())
       return PostOrder.size() - Iter->second - 1;
