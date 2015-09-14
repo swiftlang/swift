@@ -156,6 +156,9 @@ private:
     // need to walk anything within.
   }
   void visitWhileStmt(WhileStmt *S) {
+    if (!isReferencePointInRange(S->getSourceRange()))
+      return;
+
     checkStmtCondition(S->getCond());
     visit(S->getBody());
   }

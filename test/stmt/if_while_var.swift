@@ -116,3 +116,11 @@ func testShadowing(a: Int?, b: Int?, c: Int?, d: Int?) {
     _ = d
   }
 }
+
+func useInt(x: Int) {}
+
+func testWhileScoping(a: Int?) {
+  while let x = a { }
+  useInt(x) // expected-error{{use of unresolved identifier 'x'}}
+}
+

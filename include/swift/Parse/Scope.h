@@ -76,8 +76,8 @@ enum class ScopeKind {
   ForeachVars,
   CaseVars,
   CatchVars,
-  IfVars,
   WhileVars,
+  IfVars,
   ActiveConfigBlock,
 
   ClosureParams,
