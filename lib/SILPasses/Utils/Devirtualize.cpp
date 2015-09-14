@@ -33,13 +33,42 @@ STATISTIC(NumWitnessDevirt, "Number of witness_method applies devirtualized");
 //                         Class Method Optimization
 //===----------------------------------------------------------------------===//
 
-// Attempt to get the constructor for S, returning a null SILValue()
-// if we cannot find it.
-static SILValue getConstructor(SILValue S) {
-  S = S.stripCasts();
+// Attempt to get the instance for S, whose static type is the same as
+// its exact dynamic type, returning a null SILValue() if we cannot find it.
+// The information that a static type is the same as the exact dynamic,
+// can be derived e.g.:
+// - from a constructor or
+// - from a successful outcome of a checked_cast_br [exact] instruction.
+static SILValue getInstanceWithExactDynamicType(SILValue S) {
 
-  if (isa<AllocRefInst>(S) || isa<MetatypeInst>(S))
-    return S;
+  while (S) {
+    S = S.stripCasts();
+    if (isa<AllocRefInst>(S) || isa<MetatypeInst>(S))
+      return S;
+
+    if (auto Arg = dyn_cast<SILArgument>(S)) {
+      auto *SinglePred = Arg->getParent()->getSinglePredecessor();
+      if (SinglePred) {
+        // If it is a BB argument received on a success branch
+        // of a checked_cast_br, then we know its exact type.
+        auto *CCBI = dyn_cast<CheckedCastBranchInst>(
+            SinglePred->getTerminator());
+        if (CCBI) {
+          if (CCBI->isExact() && CCBI->getSuccessBB() == Arg->getParent())
+            return S;
+          return SILValue();
+        }
+
+        // Traverse the chain of predecessors.
+        if(isa<BranchInst>(SinglePred->getTerminator()) ||
+           isa<CondBranchInst>(SinglePred->getTerminator())) {
+          S = Arg->getIncomingValue(SinglePred);
+          continue;
+        }
+      }
+    }
+    return SILValue();
+  }
 
   return SILValue();
 }
@@ -667,9 +696,10 @@ SILInstruction *swift::tryDevirtualizeApply(FullApplySite AI) {
     if (isKnownFinal(CMI->getModule(), CMI->getMember()))
       return tryDevirtualizeClassMethod(AI, CMI->getOperand());
 
-    // Try to search for the point of construction.
-    if (auto Constructor = getConstructor(CMI->getOperand()))
-      return tryDevirtualizeClassMethod(AI, Constructor);
+    // Try to check if the exact dynamic type of the instance is statically
+    // known.
+    if (auto Instance = getInstanceWithExactDynamicType(CMI->getOperand()))
+      return tryDevirtualizeClassMethod(AI, Instance);
   }
 
   return nullptr;
