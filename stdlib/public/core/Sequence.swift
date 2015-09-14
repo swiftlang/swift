@@ -48,13 +48,13 @@ public protocol GeneratorType {
 /// As a consequence, it is not possible to run multiple `for` loops
 /// on a sequence to "resume" iteration:
 ///
-///   for element in sequence {
-///     if ... some condition { break }
-///   }
+///     for element in sequence {
+///       if ... some condition { break }
+///     }
 ///
-///   for element in sequence {
-///     // Not guaranteed to continue from the next element.
-///   }
+///     for element in sequence {
+///       // Not guaranteed to continue from the next element.
+///     }
 ///
 /// `SequenceType` makes no requirement about the behavior in that
 /// case.  It is not correct to assume that a sequence will either be
