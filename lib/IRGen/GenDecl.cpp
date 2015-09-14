@@ -1602,6 +1602,7 @@ getAddrOfVariableOrGOTEquivalent(IRGenModule &IGM,
   if (entity.isForeignTypeMetadataCandidate()) {
     auto foreignCandidate
       = IGM.getAddrOfForeignTypeMetadataCandidate(entity.getType());
+    (void)foreignCandidate;
   } else {
     getAddrOfLLVMVariable(IGM, globals, gotEquivalents, entity,
                           /*definitionType*/ nullptr,
