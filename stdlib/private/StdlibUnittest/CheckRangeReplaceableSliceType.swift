@@ -34,6 +34,7 @@ extension TestSuite {
     outOfBoundsIndexOffset: Int = 1
   ) {
 
+    // Don't run the same tests twice.
     if checksAdded.value.contains(__FUNCTION__) {
       return
     }
@@ -120,6 +121,7 @@ extension TestSuite {
     outOfBoundsIndexOffset: Int = 1
   ) {
 
+    // Don't run the same tests twice.
     if checksAdded.value.contains(__FUNCTION__) {
       return
     }
@@ -182,6 +184,7 @@ extension TestSuite {
     outOfBoundsIndexOffset: Int = 1
   ) {
 
+    // Don't run the same tests twice.
     if checksAdded.value.contains(__FUNCTION__) {
       return
     }
