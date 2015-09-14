@@ -46,28 +46,29 @@ static SILValue getInstanceWithExactDynamicType(SILValue S) {
     if (isa<AllocRefInst>(S) || isa<MetatypeInst>(S))
       return S;
 
-    if (auto Arg = dyn_cast<SILArgument>(S)) {
-      auto *SinglePred = Arg->getParent()->getSinglePredecessor();
-      if (SinglePred) {
-        // If it is a BB argument received on a success branch
-        // of a checked_cast_br, then we know its exact type.
-        auto *CCBI = dyn_cast<CheckedCastBranchInst>(
-            SinglePred->getTerminator());
-        if (CCBI) {
-          if (CCBI->isExact() && CCBI->getSuccessBB() == Arg->getParent())
-            return S;
-          return SILValue();
-        }
+    auto *Arg = dyn_cast<SILArgument>(S);
+    if (!Arg)
+      break;
 
-        // Traverse the chain of predecessors.
-        if(isa<BranchInst>(SinglePred->getTerminator()) ||
-           isa<CondBranchInst>(SinglePred->getTerminator())) {
-          S = Arg->getIncomingValue(SinglePred);
-          continue;
-        }
-      }
+    auto *SinglePred = Arg->getParent()->getSinglePredecessor();
+    if (!SinglePred)
+      break;
+
+    // Traverse the chain of predecessors.
+    if (isa<BranchInst>(SinglePred->getTerminator()) ||
+        isa<CondBranchInst>(SinglePred->getTerminator())) {
+      S = Arg->getIncomingValue(SinglePred);
+      continue;
     }
-    return SILValue();
+
+    // If it is a BB argument received on a success branch
+    // of a checked_cast_br, then we know its exact type.
+    auto *CCBI = dyn_cast<CheckedCastBranchInst>(SinglePred->getTerminator());
+    if (!CCBI)
+      break;
+    if (!CCBI->isExact() || CCBI->getSuccessBB() != Arg->getParent())
+      break;
+    return S;
   }
 
   return SILValue();
