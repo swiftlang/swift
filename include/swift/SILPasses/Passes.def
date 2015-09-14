@@ -48,6 +48,8 @@ PASS(CapturePropagation, "capture-prop",
      "Captured Constant Propagation")
 PASS(ClosureSpecializer, "closure-specialize",
      "Specialize functions passed a closure to call the closure directly")
+PASS(CodeSinking, "code-sinking",
+     "Sinks code closer to users")
 PASS(CopyForwarding, "copy-forwarding",
      "Eliminate redundant copies")
 PASS(CropOverflowChecks, "crop-overflow-checks",
@@ -153,8 +155,6 @@ PASS(StripDebugInfo, "strip-debug-info",
      "Strip debug info")
 PASS(SwiftArrayOpts, "array-specialize",
      "Specialize arrays")
-PASS(CodeSinking, "code-sinking",
-     "Sinks code closer to users")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use pre-specialized functions")
 PASS_RANGE(AllPasses, AADumper, UsePrespecialized)
