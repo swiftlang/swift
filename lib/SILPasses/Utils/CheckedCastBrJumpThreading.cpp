@@ -603,11 +603,11 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
       continue;
 
     // We need to verify that the result type is the same in the
-    // dominating checked_cast_br.
+    // dominating checked_cast_br, but only for non-exact casts.
+    // For exact casts, we are interested only in the
+    // fact that the source operand is the same for
+    // both instructions.
     if (!CCBI->isExact() && !DomCCBI->isExact()) {
-      // For exact casts, we are interested only in the
-      // fact that the source operand is the same for
-      // both instructions.
       if (DomCCBI->getCastType() != CCBI->getCastType())
         continue;
     }
