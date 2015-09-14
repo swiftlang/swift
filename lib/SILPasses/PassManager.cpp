@@ -144,6 +144,14 @@ static void printModule(SILModule *Mod) {
   }
 }
 
+SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
+  Mod(M), StageName(Stage) {
+  
+#define ANALYSIS(NAME) \
+  Analysis.push_back(create##NAME##Analysis(Mod, this));
+#include "swift/SILAnalysis/Analysis.def"
+}
+
 bool SILPassManager::
 runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
   const SILOptions &Options = getOptions();

@@ -156,9 +156,6 @@ PerformWMO("wmo", llvm::cl::desc("Enable whole-module optimizations"));
 static void runCommandLineSelectedPasses(SILModule *Module) {
   SILPassManager PM(Module);
 
-#define ANALYSIS(NAME) PM.registerAnalysis(create##NAME##Analysis(Module, &PM));
-#include "swift/SILAnalysis/Analysis.def"
-
   for (auto Pass : Passes) {
     PM.addPass(Pass);
   }

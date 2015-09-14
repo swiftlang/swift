@@ -130,7 +130,6 @@ removeUnwantedFunctions(SILModule *M, llvm::StringRef Name) {
 
   // Remove dead functions.
   SILPassManager PM(M);
-  PM.registerAnalysis(createCallGraphAnalysis(M, &PM));
   PM.addDeadFunctionElimination();
   PM.run();
 }

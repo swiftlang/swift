@@ -57,12 +57,6 @@ enum OptimizationLevelKind {
   HighLevel,
 };
 
-static void registerAnalysisPasses(SILPassManager &PM) {
-  SILModule *Mod = PM.getModule();
-#define ANALYSIS(NAME) PM.registerAnalysis(create##NAME##Analysis(Mod, &PM));
-#include "swift/SILAnalysis/Analysis.def"
-}
-
 bool swift::runSILDiagnosticPasses(SILModule &Module) {
   // Verify the module, if required.
   if (Module.getOptions().VerifyAll)
@@ -76,7 +70,6 @@ bool swift::runSILDiagnosticPasses(SILModule &Module) {
   auto &Ctx = Module.getASTContext();
 
   SILPassManager PM(&Module);
-  registerAnalysisPasses(PM);
 
   if (SILViewSILGenCFG) {
     PM.resetAndRemoveTransformations();
@@ -232,14 +225,12 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
 
   if (Module.getOptions().DebugSerialization) {
     SILPassManager PM(&Module);
-    registerAnalysisPasses(PM);
     PM.addSILLinker();
     PM.run();
     return;
   }
 
   SILPassManager PM(&Module, "PreSpecialize");
-  registerAnalysisPasses(PM);
 
   // Start by cloning functions from stdlib.
   PM.addSILLinker();
@@ -364,7 +355,6 @@ void swift::runSILPassesForOnone(SILModule &Module) {
     Module.verify();
 
   SILPassManager PM(&Module, "Onone");
-  registerAnalysisPasses(PM);
 
   // Enable the pre-specialized mode by default
   Module.getOptions().UsePrespecialized = true;
@@ -491,7 +481,6 @@ void swift::runSILOptimizationPassesWithFileSpecification(SILModule &Module,
   for (auto &Desc : Descriptors) {
     DEBUG(llvm::dbgs() << "Creating PM: " << Desc.Id << "\n");
     SILPassManager PM(&Module, Desc.Id);
-    registerAnalysisPasses(PM);
 
     for (auto &P : Desc.Passes) {
       DEBUG(llvm::dbgs() << "  Adding Pass: " << P << "\n");

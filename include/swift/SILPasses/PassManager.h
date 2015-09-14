@@ -61,10 +61,9 @@ class SILPassManager {
   bool currentPassHasInvalidated = false;
   
   public:
-  /// C'tor
-  SILPassManager(SILModule *M, llvm::StringRef Stage = "") :
-    Mod(M), StageName(Stage) {
-  }
+  /// C'tor. It creates and registers all analysis passes, which are defined
+  /// in Analysis.def.
+  SILPassManager(SILModule *M, llvm::StringRef Stage = "");
 
   const SILOptions &getOptions() const;
 
@@ -81,10 +80,6 @@ class SILPassManager {
 
   /// \returns the module that the pass manager owns.
   SILModule *getModule() { return Mod; }
-
-  /// \brief  Register another analysis. This transfers the ownership of the
-  /// analysis to the pass manager that will delete it when done.
-  void registerAnalysis(SILAnalysis *A) { Analysis.push_back(A); }
 
   /// \brief Run the transformations on the module.
   void run();
