@@ -789,3 +789,25 @@ bool SILInstruction::mayTrap() const {
     return false;
   }
 }
+
+//===----------------------------------------------------------------------===//
+//                                 Utilities
+//===----------------------------------------------------------------------===//
+
+#ifndef NDEBUG
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
+                                     SILInstruction::MemoryBehavior B) {
+  switch (B) {
+    case SILInstruction::MemoryBehavior::None:
+      return OS << "None";
+    case SILInstruction::MemoryBehavior::MayRead:
+      return OS << "MayRead";
+    case SILInstruction::MemoryBehavior::MayWrite:
+      return OS << "MayWrite";
+    case SILInstruction::MemoryBehavior::MayReadWrite:
+      return OS << "MayReadWrite";
+    case SILInstruction::MemoryBehavior::MayHaveSideEffects:
+      return OS << "MayHaveSideEffects";
+  }
+}
+#endif

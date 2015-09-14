@@ -245,6 +245,12 @@ public:
   bool isTriviallyDuplicatable() const;
 };
 
+#ifndef NDEBUG
+/// Pretty-print the MemoryBehavior.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                              SILInstruction::MemoryBehavior B);
+#endif
+
 /// A template base class for instructions that take a single SILValue operand
 /// and has no result or a single value result.
 template<ValueKind KIND, typename BASE = SILInstruction, bool HAS_RESULT = true>
