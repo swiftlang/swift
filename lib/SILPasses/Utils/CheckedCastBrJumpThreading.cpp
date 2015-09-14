@@ -604,8 +604,13 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
 
     // We need to verify that the result type is the same in the
     // dominating checked_cast_br.
-    if (DomCCBI->getCastType() != CCBI->getCastType())
-      continue;
+    if (!CCBI->isExact() && !DomCCBI->isExact()) {
+      // For exact casts, we are interested only in the
+      // fact that the source operand is the same for
+      // both instructions.
+      if (DomCCBI->getCastType() != CCBI->getCastType())
+        continue;
+    }
 
 
     // Conservatively check that both checked_cast_br instructions
@@ -679,6 +684,22 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
         return false;
     }
 
+    bool InvertSuccess = false;
+    if (DomCCBI->isExact() && CCBI->isExact() &&
+        DomCCBI->getCastType() != CCBI->getCastType()) {
+      if (TotalPreds == SuccessPreds.size()) {
+        // The dominating exact cast was successful, but it casted to a
+        // different type. Therefore, the current cast fails for sure.
+        // Since we are going to change the BB,
+        // add its successors and predecessors
+        // for re-processing.
+        InvertSuccess = true;
+      } else {
+        // Otherwise, we don't know if the current cast will succeed or
+        // fail.
+        return false;
+      }
+    }
     // If we have predecessors, where it is not known if they are reached over
     // success or failure path, we cannot eliminate a checked_cast_br.
     // We have to generate new dedicated BBs as landing BBs for all
@@ -699,10 +720,18 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     // for all FailurePreds.
     modifyCFGForFailurePreds();
 
-    // Create a copy of the BB or reuse BB as
-    // a landing basic block for all SuccessPreds.
-    modifyCFGForSuccessPreds();
-
+    if (InvertSuccess) {
+      auto *InsertedBI = BranchInst::create(CCBI->getLoc(), FailureBB,
+                                            *BB->getParent());
+      CCBI->eraseFromParent();
+      auto &InsnList = BB->getInstList();
+      InsnList.insert(InsnList.end(), InsertedBI);
+      SuccessPreds.clear();
+    } else {
+      // Create a copy of the BB or reuse BB as
+      // a landing basic block for all SuccessPreds.
+      modifyCFGForSuccessPreds();
+    }
     // Handle unknown preds.
     modifyCFGForUnknownPreds();
 
