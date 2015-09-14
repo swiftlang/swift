@@ -849,6 +849,6 @@ AliasAnalysis::AliasResult AliasAnalysis::cacheValue(AliasCacheKey Key,
   return AliasCache[Key] = Result;
 }
 
-SILAnalysis *swift::createAliasAnalysis(SILModule *M, SILPassManager *) {
+SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
   return new AliasAnalysis(M);
 }

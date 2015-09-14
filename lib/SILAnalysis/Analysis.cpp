@@ -27,28 +27,26 @@
 
 using namespace swift;
 
-SILAnalysis *swift::createCallGraphAnalysis(SILModule *M, SILPassManager *) {
+SILAnalysis *swift::createCallGraphAnalysis(SILModule *M) {
   return new CallGraphAnalysis(M);
 }
 
-SILAnalysis *swift::createDominanceAnalysis(SILModule *, SILPassManager *) {
+SILAnalysis *swift::createDominanceAnalysis(SILModule *) {
   return new DominanceAnalysis();
 }
 
-SILAnalysis *swift::createPostDominanceAnalysis(SILModule *, SILPassManager *) {
+SILAnalysis *swift::createPostDominanceAnalysis(SILModule *) {
   return new PostDominanceAnalysis();
 }
 
-SILAnalysis *swift::createInductionVariableAnalysis(SILModule *M,
-                                                    SILPassManager *) {
+SILAnalysis *swift::createInductionVariableAnalysis(SILModule *M) {
   return new IVAnalysis(M);
 }
 
-SILAnalysis *swift::createPostOrderAnalysis(SILModule *M, SILPassManager *) {
+SILAnalysis *swift::createPostOrderAnalysis(SILModule *M) {
   return new PostOrderAnalysis();
 }
 
-SILAnalysis *swift::createClassHierarchyAnalysis(SILModule *M,
-                                                 SILPassManager *) {
+SILAnalysis *swift::createClassHierarchyAnalysis(SILModule *M) {
   return new ClassHierarchyAnalysis(M);
 }

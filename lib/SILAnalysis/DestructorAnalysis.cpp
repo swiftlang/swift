@@ -111,6 +111,6 @@ ASTContext &DestructorAnalysis::getASTContext() {
   return Mod->getASTContext();
 }
 
-SILAnalysis *swift::createDestructorAnalysis(SILModule *M, SILPassManager *) {
+SILAnalysis *swift::createDestructorAnalysis(SILModule *M) {
   return new DestructorAnalysis(M);
 }

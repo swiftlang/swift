@@ -64,9 +64,9 @@ class RCIdentityAnalysis : public FunctionAnalysisBase<RCIdentityFunctionInfo> {
   DominanceAnalysis *DA;
 
 public:
-  RCIdentityAnalysis(SILModule *, SILPassManager *PM)
+  RCIdentityAnalysis(SILModule *)
     : FunctionAnalysisBase<RCIdentityFunctionInfo>(AnalysisKind::RCIdentity),
-      DA(PM->getAnalysis<DominanceAnalysis>()) {}
+      DA(nullptr) {}
 
   RCIdentityAnalysis(const RCIdentityAnalysis &) = delete;
   RCIdentityAnalysis &operator=(const RCIdentityAnalysis &) = delete;
@@ -75,6 +75,8 @@ public:
     return S->getKind() == AnalysisKind::RCIdentity;
   }
 
+  virtual void initialize(SILPassManager *PM);
+  
   RCIdentityFunctionInfo *newFunctionAnalysis(SILFunction *F) {
     return new RCIdentityFunctionInfo(DA);
   }

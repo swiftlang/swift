@@ -20,7 +20,6 @@ using namespace swift;
 
 SILLoopInfo *SILLoopAnalysis::getLoopInfo(SILFunction *F) {
   if (!LoopInfos.count(F)) {
-    DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     assert(DA != nullptr && "Expect a valid dominance analysis");
     DominanceInfo *DT = DA->get(F);
     assert(DT != nullptr && "Expect a valid dominance information");
@@ -29,6 +28,10 @@ SILLoopInfo *SILLoopAnalysis::getLoopInfo(SILFunction *F) {
   return LoopInfos[F];
 }
 
-SILAnalysis *swift::createLoopAnalysis(SILModule *M, SILPassManager *PM) {
-  return new SILLoopAnalysis(M, PM);
+void SILLoopAnalysis::initialize(SILPassManager *PM) {
+  DA = PM->getAnalysis<DominanceAnalysis>();
+}
+
+SILAnalysis *swift::createLoopAnalysis(SILModule *M) {
+  return new SILLoopAnalysis(M);
 }

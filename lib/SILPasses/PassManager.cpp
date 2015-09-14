@@ -148,8 +148,12 @@ SILPassManager::SILPassManager(SILModule *M, llvm::StringRef Stage) :
   Mod(M), StageName(Stage) {
   
 #define ANALYSIS(NAME) \
-  Analysis.push_back(create##NAME##Analysis(Mod, this));
+  Analysis.push_back(create##NAME##Analysis(Mod));
 #include "swift/SILAnalysis/Analysis.def"
+
+  for (SILAnalysis *A : Analysis) {
+    A->initialize(this);
+  }
 }
 
 bool SILPassManager::

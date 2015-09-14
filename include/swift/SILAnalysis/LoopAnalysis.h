@@ -22,7 +22,7 @@
 namespace swift {
   class DominanceInfo;
   class SILLoop;
-  class SILPassManager;
+  class DominanceAnalysis;
 }
 
 namespace swift {
@@ -32,10 +32,10 @@ class SILLoopAnalysis : public SILAnalysis {
   using LoopInfoMap = llvm::DenseMap<SILFunction *, SILLoopInfo *>;
 
   LoopInfoMap LoopInfos;
-  SILPassManager *PM;
+  DominanceAnalysis *DA;
 public:
-  SILLoopAnalysis(SILModule *, SILPassManager *PM)
-      : SILAnalysis(AnalysisKind::Loop), PM(PM) {}
+  SILLoopAnalysis(SILModule *)
+      : SILAnalysis(AnalysisKind::Loop), DA(nullptr) {}
 
   virtual ~SILLoopAnalysis() {
     for (auto LI : LoopInfos)
@@ -46,6 +46,8 @@ public:
     return S->getKind() == AnalysisKind::Loop;
   }
 
+  virtual void initialize(SILPassManager *PM);
+  
   virtual void invalidate(SILAnalysis::PreserveKind K) {
     if (K & PreserveKind::Branches) return;
 

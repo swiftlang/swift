@@ -103,6 +103,10 @@ namespace swift {
 
     /// D'tor.
     virtual ~SILAnalysis() {}
+    
+    /// Can be used to retrieve other analysis passes from \p PM, which this
+    /// analysis depends on.
+    virtual void initialize(SILPassManager *PM) { }
 
     /// Lock the analysis. This means that invalidation messages are ignored.
     void lockInvalidation() {invalidationLock = true; }
@@ -214,7 +218,7 @@ namespace swift {
   };
 
 #define ANALYSIS(NAME)                                                         \
-  SILAnalysis *create##NAME##Analysis(SILModule *, SILPassManager *);
+  SILAnalysis *create##NAME##Analysis(SILModule *);
 #include "Analysis.def"
 
   /// A builder struct that can be used by passes to manage the building of a

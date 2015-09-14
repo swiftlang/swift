@@ -502,6 +502,10 @@ SILValue RCIdentityFunctionInfo::getRCIdentityRoot(SILValue V) {
   return Root;
 }
 
-SILAnalysis *swift::createRCIdentityAnalysis(SILModule *M, SILPassManager *PM) {
-  return new RCIdentityAnalysis(M, PM);
+void RCIdentityAnalysis::initialize(SILPassManager *PM) {
+  DA = PM->getAnalysis<DominanceAnalysis>();
+}
+
+SILAnalysis *swift::createRCIdentityAnalysis(SILModule *M) {
+  return new RCIdentityAnalysis(M);
 }
