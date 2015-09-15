@@ -43,19 +43,40 @@ void ClassHierarchyAnalysis::init() {
 /// \p Current class, whose direct and indirect subclasses are
 ///    to be collected.
 /// \p IndirectSubs placeholder for collected results
-void ClassHierarchyAnalysis::getIndirectSubClasses(ClassDecl *Base,
-                                                   ClassDecl *Current,
-                                                   ClassList& IndirectSubs) {
-  // Get direct subclasses
-  if (!hasKnownDirectSubclasses(Current))
+void ClassHierarchyAnalysis::getIndirectSubClasses(ClassDecl *Cur,
+                                                   ClassList &IndirectSubs) {
+  unsigned Idx = IndirectSubs.size();
+
+  if (!hasKnownDirectSubclasses(Cur))
     return;
-  ClassList &Subs = getDirectSubClasses(Current);
-  for (auto S : Subs) {
-    // Remember this subclass
-    if (Base != Current)
+
+  // Produce a set of all indirect subclasses in a
+  // breadth-first order;
+
+  // First add subclasses of direct subclasses.
+  for (auto C : getDirectSubClasses(Cur)) {
+    // Get direct subclasses
+    if (!hasKnownDirectSubclasses(C))
+      continue;
+    auto &DirectSubclasses = getDirectSubClasses(C);
+    // Remember all direct subclasses of the current one.
+    for (auto S : DirectSubclasses) {
       IndirectSubs.push_back(S);
-    // Collect subclasses of a given subclass
-    getIndirectSubClasses(Base, S, IndirectSubs);
+    }
+  }
+
+  // Then recursively add direct subclasses of already
+  // added subclasses.
+  while (Idx != IndirectSubs.size()) {
+    auto C = IndirectSubs[Idx++];
+    // Get direct subclasses
+    if (!hasKnownDirectSubclasses(C))
+      continue;
+    auto &DirectSubclasses = getDirectSubClasses(C);
+    // Remember all direct subclasses of the current one.
+    for (auto S : DirectSubclasses) {
+      IndirectSubs.push_back(S);
+    }
   }
 }
 

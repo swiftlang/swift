@@ -48,17 +48,17 @@ public:
 
   /// Returns a list of the known direct subclasses of a class \p C in
   /// the current module.
-  ClassList &getDirectSubClasses(ClassDecl *C) {
+  const ClassList &getDirectSubClasses(ClassDecl *C) {
     return DirectSubclassesCache[C];
   }
 
   /// Returns a list of the known indirect subclasses of a class \p C in
   /// the current module.
-  ClassList &getIndirectSubClasses(ClassDecl *C) {
+  const ClassList &getIndirectSubClasses(ClassDecl *C) {
     if (!IndirectSubclassesCache.count(C)) {
       // Lazy initialization
       auto &K = IndirectSubclassesCache[C];
-      getIndirectSubClasses(C, C, K);
+      getIndirectSubClasses(C, K);
     }
     return IndirectSubclassesCache[C];
   }
@@ -83,7 +83,6 @@ private:
   /// Compute inheritance properties.
   void init();
   void getIndirectSubClasses(ClassDecl *Base,
-                             ClassDecl *Current,
                              ClassList &IndirectSubs);
   /// The module
   SILModule *M;
