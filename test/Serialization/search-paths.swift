@@ -33,9 +33,10 @@ numeric(42) // expected-error {{use of unresolved identifier 'numeric'}}
 // CHECK: <INPUT_BLOCK
 // CHECK-NOT: /secret'
 // CHECK-NOT: /Frameworks'
-// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=0/> blob data = '{{.+}}/secret'
-// CHECK-NOT: /secret'
 // CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=1/> blob data = '{{.+}}/Frameworks'
+// CHECK-NOT: /secret'
+// CHECK-NOT: /Frameworks'
+// CHECK: <SEARCH_PATH abbrevid={{[0-9]+}} op0=0/> blob data = '{{.+}}/secret'
 // CHECK-NOT: /secret'
 // CHECK-NOT: /Frameworks'
 // CHECK: </INPUT_BLOCK>

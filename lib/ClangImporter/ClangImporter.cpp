@@ -400,16 +400,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.push_back(searchPathOpts.SDKPath);
   }
 
-  for (auto path : searchPathOpts.ImportSearchPaths) {
-    invocationArgStrs.push_back("-I");
-    invocationArgStrs.push_back(path);
-  }
-
-  for (auto path : searchPathOpts.FrameworkSearchPaths) {
-    invocationArgStrs.push_back("-F");
-    invocationArgStrs.push_back(path);
-  }
-
   const std::string &moduleCachePath = importerOpts.ModuleCachePath;
 
   // Set the module cache path.
@@ -635,6 +625,16 @@ ClangImporter::create(ASTContext &ctx,
 
   clangPP.EnterMainSourceFile();
   importer->Impl.Parser->Initialize();
+
+  // Prefer frameworks over plain headers.
+  // We add search paths here instead of when building the initial invocation
+  // so that (a) we use the same code as search paths for imported modules,
+  // and (b) search paths are always added after -Xcc options.
+  SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
+  for (auto path : searchPathOpts.FrameworkSearchPaths)
+    importer->addSearchPath(path, /*isFramework*/true);
+  for (auto path : searchPathOpts.ImportSearchPaths)
+    importer->addSearchPath(path, /*isFramework*/false);
 
   clang::Parser::DeclGroupPtrTy parsed;
   while (!importer->Impl.Parser->ParseTopLevelDecl(parsed)) {

@@ -674,10 +674,12 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
 
   if (options.SerializeOptionsForDebugging) {
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
-    for (auto &path : searchPathOpts.ImportSearchPaths)
-      SearchPath.emit(ScratchRecord, /*framework=*/false, path);
+    // Put the framework search paths first so that they'll be preferred upon
+    // deserialization.
     for (auto &path : searchPathOpts.FrameworkSearchPaths)
       SearchPath.emit(ScratchRecord, /*framework=*/true, path);
+    for (auto &path : searchPathOpts.ImportSearchPaths)
+      SearchPath.emit(ScratchRecord, /*framework=*/false, path);
   }
 
   // FIXME: Having to deal with private imports as a superset of public imports
