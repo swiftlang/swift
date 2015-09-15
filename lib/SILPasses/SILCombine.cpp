@@ -328,7 +328,7 @@ SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
   // If we have a call graph and we've removing an apply, remove the
   // associated edges from the call graph.
   if (CG)
-    if (auto *AI = dyn_cast<ApplyInst>(&I))
+    if (auto AI = FullApplySite::isa(&I))
       if (auto *Edge = CG->getCallGraphEdge(AI))
         CG->removeEdge(Edge);
 
