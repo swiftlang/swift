@@ -22,6 +22,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/SideEffectAnalysis.h"
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/Support/Debug.h"
@@ -51,6 +52,7 @@ static bool gatherValues(SILFunction &Fn, std::vector<SILValue> &Values) {
 
 namespace {
 
+/// Dumps the alias relations between all instructions of a function.
 class SILAADumper : public SILFunctionTransform {
 
   void run() override {
@@ -97,6 +99,61 @@ class SILAADumper : public SILFunctionTransform {
   StringRef getName() override { return "AA Dumper"; }
 };
 
+/// Dumps the memory behavior of instructions in a function.
+class MemBehaviorDumper : public SILFunctionTransform {
+  
+  // To reduce the amount of output, we only dump the memory behavior of
+  // selected types of instructions.
+  static bool shouldTestInstruction(SILInstruction *I) {
+    // Only consider function calls.
+    if (FullApplySite::isa(I))
+      return true;
+    
+    return false;
+  }
+  
+  void run() override {
+    SILFunction &Fn = *getFunction();
+    llvm::outs() << "@" << Fn.getName() << "\n";
+    // Gather up all Values in Fn.
+    std::vector<SILValue> Values;
+    if (!gatherValues(Fn, Values))
+      return;
+    
+    AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
+    SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
+    SEA->recompute();
+    
+    unsigned PairCount = 0;
+    for (auto &BB : Fn) {
+      for (auto &I : BB) {
+        if (shouldTestInstruction(&I)) {
+          
+          // Print the memory behavior in relation to all other values in the
+          // function.
+          for (auto &V : Values) {
+            bool Read = AA->mayReadFromMemory(&I, V);
+            bool Write = AA->mayWriteToMemory(&I, V);
+            bool SideEffects = AA->mayHaveSideEffects(&I, V);
+            llvm::outs() <<
+              "PAIR #" << PairCount++ << ".\n" <<
+              "  " << SILValue(&I) <<
+              "  " << V <<
+              "  r=" << Read << ",w=" << Write << ",se=" << SideEffects << "\n";
+          }
+        }
+      }
+    }
+    llvm::outs() << "\n";
+  }
+  
+  StringRef getName() override { return "Memory Behavior Dumper"; }
+};
+        
 } // end anonymous namespace
 
 SILTransform *swift::createAADumper() { return new SILAADumper(); }
+
+SILTransform *swift::createMemBehaviorDumper() {
+  return new MemBehaviorDumper();
+}
