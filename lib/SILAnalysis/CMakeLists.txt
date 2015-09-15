@@ -16,6 +16,7 @@ add_swift_library(swiftSILAnalysis
   CFG.cpp
   ArraySemantic.cpp
   RefCountState.cpp
+  SideEffectAnalysis.cpp
   ARCBBState.cpp
   RCStateTransition.cpp
   RCStateTransitionVisitors.cpp

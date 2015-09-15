@@ -26,6 +26,7 @@
 ANALYSIS(CallGraph)
 ANALYSIS(Dominance)
 ANALYSIS(PostDominance)
+ANALYSIS(SideEffect)
 ANALYSIS(Alias)
 ANALYSIS(Loop)
 ANALYSIS(InductionVariable)
