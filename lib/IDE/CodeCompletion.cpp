@@ -2270,6 +2270,20 @@ public:
                        /*IncludeTopLevel=*/IncludeTopLevel, Loc);
     if (RequestCache)
       RequestedCachedResults = RequestedResultsTy::toplevelResults();
+
+    // Manually add any expected nominal types from imported modules so that
+    // they get their expected type relation.
+    // FIXME: this creates duplicate results.
+    for (auto T : ExpectedTypes) {
+      if (auto NT = T->getAs<NominalType>()) {
+        if (auto NTD = NT->getDecl()) {
+          if (NTD->getModuleContext() != CurrDeclContext->getParentModule()) {
+            addNominalTypeRef(NT->getDecl(),
+                              DeclVisibilityKind::VisibleAtTopLevel);
+          }
+        }
+      }
+    }
   }
 
   struct LookupByName : public swift::VisibleDeclConsumer {
@@ -2396,6 +2410,9 @@ public:
                                        ArrayRef<Type> Types, SourceLoc Loc,
                                        std::vector<Type> &ExpectedTypes,
                                        std::vector<StringRef> &ExpectedNames) {
+    SmallPtrSet<TypeBase *, 4> seenTypes;
+    SmallPtrSet<const char *, 4> seenNames;
+
     for (auto Type : Types) {
       if (auto TT = Type->getAs<TupleType>()) {
         if (Position >= TT->getElements().size()) {
@@ -2403,13 +2420,17 @@ public:
         }
         auto Ele = TT->getElement(Position);
         if (Ele.hasName() && !HasName) {
-          ExpectedNames.push_back(Ele.getName().str());
+          if (seenNames.insert(Ele.getName().get()).second)
+            ExpectedNames.push_back(Ele.getName().str());
         } else {
-          ExpectedTypes.push_back(Ele.getType());
+          if (seenTypes.insert(Ele.getType().getPointer()).second)
+            ExpectedTypes.push_back(Ele.getType());
         }
       } else if (Position == 0 && !HasName) {
         // The only param.
-        ExpectedTypes.push_back(Type->getDesugaredType());
+        TypeBase *T = Type->getDesugaredType();
+        if (seenTypes.insert(T).second)
+          ExpectedTypes.push_back(T);
       }
     }
   }
