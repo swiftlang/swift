@@ -85,12 +85,9 @@ public:
     : TheApply(TheApply),
       CalleeSet(KnownCallees, Complete),
       Ordinal(Ordinal) {
-    assert(!KnownCallees->empty() && "Expected at least one known callee!");
   }
 
   ~CallGraphEdge() {
-    if (CalleeSet.getPointer().is<CalleeSetType *>())
-      delete CalleeSet.getPointer().get<CalleeSetType *>();
   }
 
   const FullApplySite getApply() const { return TheApply; }
@@ -306,6 +303,11 @@ class CallGraph {
   /// A vector of functions in bottom up function order.
   llvm::SmallVector<SILFunction *, 32> BottomUpFunctionOrder;
 
+  /// Map from function decls for methods to sets of CallGraphNodes
+  /// representing functions that can be reached via that decl.
+  llvm::DenseMap<AbstractFunctionDecl *,
+                 CallGraphEdge::CalleeSetType *> CalleeSets;
+
   /// An allocator used by the callgraph.
   llvm::BumpPtrAllocator Allocator;
 
@@ -350,6 +352,12 @@ public:
   CallGraphEdge *getCallGraphEdge(FullApplySite AI) const {
     return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
   }
+
+  std::pair<CallGraphEdge::CalleeSetType *, bool>
+  tryGetCalleeSetForClassMethod(SILDeclRef decl);
+
+  std::pair<CallGraphEdge::CalleeSetType *, bool>
+  getOrCreateCalleeSetForClassMethod(AbstractFunctionDecl *decl);
 
   // Functions for getting bottom-up lists of SCCs or functions in the
   // call graph.
@@ -408,6 +416,9 @@ private:
       return CGN;
     return addCallGraphNode(F);
   }
+
+  void computeClassMethodCallees();
+  void computeClassMethodCalleesForVTable(const SILVTable &VTable);
   CallGraphNode *addCallGraphNode(SILFunction *F);
   void addEdges(SILFunction *F);
   CallGraphEdge *makeCallGraphEdgeForCallee(FullApplySite Apply,

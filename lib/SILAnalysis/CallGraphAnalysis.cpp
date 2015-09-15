@@ -45,12 +45,15 @@ CallGraph::CallGraph(SILModule *Mod, bool completeModule)
   // each to a worklist of functions to process.
   std::vector<SILFunction *> Workitems;
   for (auto &F : M) {
-
     addCallGraphNode(&F);
 
     if (F.isDefinition())
       Workitems.push_back(&F);
   }
+
+  // Now compute the sets of call graph nodes any given class method
+  // decl could target.
+  computeClassMethodCallees();
 
   // Add edges for each function in the worklist. We capture the
   // initial functions in the module up-front into this worklist
@@ -86,6 +89,32 @@ CallGraph::~CallGraph() {
   }
 }
 
+void CallGraph::computeClassMethodCalleesForVTable(const SILVTable &VTable) {
+  for (auto &Entry : VTable.getEntries()) {
+    auto *AFD = cast<AbstractFunctionDecl>(Entry.first.getDecl());
+    assert(AFD && "Expected abstract function decl!");
+
+    SILFunction *CalledFn = Entry.second;
+    auto *Node = getCallGraphNode(CalledFn);
+    assert(Node && "Expected call graph node for callee function!");
+    do {
+      CallGraphEdge::CalleeSetType *CalleeSet;
+      bool Complete;
+
+      std::tie(CalleeSet, Complete) = getOrCreateCalleeSetForClassMethod(AFD);
+      assert(CalleeSet && "Unexpected null callee set!");
+
+      CalleeSet->insert(Node);
+      AFD = AFD->getOverriddenDecl();
+    } while (AFD);
+  }
+}
+
+void CallGraph::computeClassMethodCallees() {
+  for (auto &VTable : M.getVTableList())
+    computeClassMethodCalleesForVTable(VTable);
+}
+
 CallGraphNode *CallGraph::addCallGraphNode(SILFunction *F) {
   // TODO: Compute this from the call graph itself after stripping
   //       unreachable nodes from graph.
@@ -105,6 +134,33 @@ CallGraphNode *CallGraph::addCallGraphNode(SILFunction *F) {
 
   return Node;
 }
+
+std::pair<CallGraphEdge::CalleeSetType *, bool>
+CallGraph::tryGetCalleeSetForClassMethod(SILDeclRef Decl) {
+  auto *AFD = Decl.getAbstractFunctionDecl();
+  assert(AFD && "Expected abstract function decl!");
+
+  auto Found = CalleeSets.find(AFD);
+  if (Found == CalleeSets.end())
+    return std::make_pair(nullptr, false);
+
+  // FIXME: Determine whether the set is complete.
+  return std::make_pair(Found->second, false);
+}
+
+std::pair<CallGraphEdge::CalleeSetType *, bool>
+CallGraph::getOrCreateCalleeSetForClassMethod(AbstractFunctionDecl *Decl) {
+  auto Found = CalleeSets.find(Decl);
+  if (Found != CalleeSets.end())
+    return std::make_pair(Found->second, false);
+
+  auto *CalleeSet = new (Allocator) CallGraphEdge::CalleeSetType;
+  CalleeSets.insert(std::make_pair(Decl, CalleeSet));
+
+  // FIXME: Determine whether the set is complete.
+  return std::make_pair(CalleeSet, false);
+}
+
 
 CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
                                                      SILValue Callee) {
@@ -178,7 +234,24 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
     return new (Allocator) CallGraphEdge(Apply, CalleeNode, EdgeOrdinal++);
   }
 
-  case ValueKind::ClassMethodInst:
+  case ValueKind::ClassMethodInst: {
+    auto *CMI = cast<ClassMethodInst>(Callee);
+
+    CallGraphEdge::CalleeSetType *CalleeSet;
+    bool Complete;
+
+    std::tie(CalleeSet, Complete) =
+      tryGetCalleeSetForClassMethod(CMI->getMember());
+
+    // FIXME: Review the cases where we are not currently generating
+    //        callee sets.
+    if (!CalleeSet)
+      return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
+
+    return new (Allocator) CallGraphEdge(Apply, CalleeSet, Complete,
+                                         EdgeOrdinal++);
+  }
+
   case ValueKind::SuperMethodInst:
     return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
 
