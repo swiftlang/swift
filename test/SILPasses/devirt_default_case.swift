@@ -237,3 +237,85 @@ public func externalEntryPoint() {
   callIt(Base3(), Base4(), Base5())
 }
 
+public class M {
+  func foo() -> Int32 {
+    return 0
+  }
+}
+
+
+public class M1: M {
+  @inline(never)
+  override func foo()->Int32 {
+    return 1
+  }
+}
+
+internal class M2: M1 {
+  @inline(never)
+  override func foo() -> Int32 {
+    return 2
+  }
+}
+
+internal class M3: M1 {
+  @inline(never)
+  override func foo() -> Int32 {
+    return 3
+  }
+}
+
+internal class M22: M2 {
+  @inline(never)
+  override func foo() -> Int32 {
+    return 22
+  }
+}
+
+internal class M222: M22 {
+  @inline(never)
+  override func foo() -> Int32 {
+    return 222
+  }
+}
+
+internal class M33: M3 {
+  @inline(never)
+  override func foo() -> Int32 {
+    return 33
+  }
+}
+
+
+// Check that speculative devirtualization tries to devirtualize the first N
+// alternatives, if it has too many.
+// The alternatives should be taken in a breadth-first order, starting with
+// the static type of the instance.
+
+// CHECK: sil [noinline] @_TF19devirt_default_case54testSpeculativeDevirtualizationWithTooManyAlternativesFCS_2M1VSs5Int32
+// CHECK: checked_cast_br [exact] %0 : $M1 to $M1
+// CHECK: function_ref @_TFC19devirt_default_case2M13foofS0_FT_VSs5Int32 
+// CHECK: br bb1
+// CHECK: checked_cast_br [exact] %0 : $M1 to $M2
+// CHECK: function_ref @_TFC19devirt_default_case2M23foofS0_FT_VSs5Int32 
+// CHECK: br bb1
+// CHECK: checked_cast_br [exact] %0 : $M1 to $M3
+// CHECK: function_ref @_TFC19devirt_default_case2M33foofS0_FT_VSs5Int32 
+// CHECK: br bb1
+// CHECK: checked_cast_br [exact] %0 : $M1 to $M22
+// CHECK: function_ref @_TFC19devirt_default_case3M223foofS0_FT_VSs5Int32 
+// CHECK: br bb1
+// CHECK: checked_cast_br [exact] %0 : $M1 to $M33
+// CHECK: function_ref @_TFC19devirt_default_case3M333foofS0_FT_VSs5Int32 
+// CHECK: br bb1
+// CHECK: checked_cast_br [exact] %0 : $M1 to $M222
+// CHECK: function_ref @_TFC19devirt_default_case4M2223foofS0_FT_VSs5Int32 
+// CHECK: br bb1
+// CHECK-NOT: checked_cast_br
+// CHECK: class_method
+// CHECK: apply
+// CHECK: br bb1
+@inline(never)
+public func testSpeculativeDevirtualizationWithTooManyAlternatives(c:M1) -> Int32{
+  return c.foo()
+}

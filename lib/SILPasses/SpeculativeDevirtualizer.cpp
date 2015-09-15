@@ -413,11 +413,20 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     return !!speculateMonomorphicTarget(AI, SubType, LastCCBI);
   }
 
-  // Collect the direct subclasses for the class.
-  auto &Subs = CHA->getDirectSubClasses(CD);
   // True if any instructions were changed or generated.
   bool Changed = false;
 
+  // Collect the direct and indirect subclasses for the class.
+  // Sort these subclasses in the order they should be tested by the
+  // speculative devirtualization. Different strategies could be used,
+  // E.g. breadth-first, depth-first, etc.
+  // Currently, let's use the breadth-first strategy.
+  // The exact static type of the instance should be tested first.
+  auto &DirectSubs = CHA->getDirectSubClasses(CD);
+  auto &IndirectSubs = CHA->getIndirectSubClasses(CD);
+
+  SmallVector<ClassDecl *, 8> Subs(DirectSubs);
+  Subs.append(IndirectSubs.begin(), IndirectSubs.end());
 
   if (isa<BoundGenericClassType>(ClassType.getSwiftRValueType())) {
     // Filter out any subclassses that do not inherit from this
@@ -441,9 +450,12 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   }
 
   if (Subs.size() > MaxNumSpeculativeTargets) {
-    DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many (" <<
-          Subs.size() << ") subclasses. Not speculating.\n");
-    return false;
+    DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many ("
+                       << Subs.size() << ") subclasses. Performing speculative "
+                         "devirtualization only for the first "
+                       << MaxNumSpeculativeTargets << " of them.\n");
+
+    Subs.erase(&Subs[MaxNumSpeculativeTargets], Subs.end());
   }
 
   DEBUG(llvm::dbgs() << "Class " << CD->getName() << " is a superclass. "
