@@ -437,6 +437,27 @@ func stringliterals(d: [String: Int]) {
   ; // expected-error {{expected expression in list of expressions}}
 } // expected-error {{expected ')' in expression list}}
 
+func testSingleQuoteStringLiterals() {
+  'abc' // expected-error{{single-quoted string literal found, use '"'}}{{3-8="abc"}}
+  _ = 'abc' + "def" // expected-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}}
+
+  'ab\nc' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab\\nc"}}
+
+  "abc\('def')" // expected-error{{single-quoted string literal found, use '"'}}{{9-14="def"}}
+
+  "abc' // expected-error{{unterminated string literal}}
+  'abc" // expected-error{{unterminated string literal}}
+  "a'c"
+
+  // FIXME: <rdar://problem/22709931> QoI: Single-quote => double-quote string literal fixit should escape quote chars
+  // FIXME: The suggested replacement should un-escape the single quote
+  // character.
+  'ab\'c' // expected-error{{single-quoted string literal found, use '"'}}{{3-10="ab\\'c"}}
+
+  // FIXME: The suggested replacement should escape the double-quote character.
+  'ab"c' // expected-error{{single-quoted string literal found, use '"'}}{{3-9="ab"c"}}
+}
+
 // <rdar://problem/17128913>
 var s = ""
 s.appendContentsOf(["x"])

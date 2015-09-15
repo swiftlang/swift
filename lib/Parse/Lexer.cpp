@@ -914,13 +914,14 @@ unsigned Lexer::lexUnicodeEscape(const char *&CurPtr, Lexer *Diags) {
 
 
 /// lexCharacter - Read a character and return its UTF32 code.  If this is the
-/// end of enclosing string/character sequence, this returns ~0U.  If this is a
-/// malformed character sequence, it emits a diagnostic (when EmitDiagnostics is
-/// true) and returns ~1U.
+/// end of enclosing string/character sequence (i.e. the character is equal to
+/// 'StopQuote'), this returns ~0U and leaves 'CurPtr' pointing to the terminal
+/// quote.  If this is a malformed character sequence, it emits a diagnostic
+/// (when EmitDiagnostics is true) and returns ~1U.
 /// 
 ///   character_escape  ::= [\][\] | [\]t | [\]n | [\]r | [\]" | [\]' | [\]0
 ///   character_escape  ::= unicode_character_escape
-unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
+unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
                              bool EmitDiagnostics) {
   const char *CharStart = CurPtr;
 
@@ -941,19 +942,13 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
     return ~1U;
   }
   case '"':
-    // If we found the closing " character, we're done.
-    if (StopAtDoubleQuote) {
+  case '\'':
+    // If we found a closing quote character, we're done.
+    if (CurPtr[-1] == StopQuote) {
       --CurPtr;
       return ~0U;
     }
-    // In a single quoted string, this is just a character.
-    return CurPtr[-1];
-  case '\'':
-    if (!StopAtDoubleQuote) {
-      --CurPtr;  
-      return ~0U;
-    }
-    // In a double quoted string, this is just a character.
+    // Otherwise, this is just a character.
     return CurPtr[-1];
       
   case 0:
@@ -1033,7 +1028,8 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
                                                      DiagnosticEngine *Diags) {
   llvm::SmallVector<char, 4> OpenDelimiters;
   auto inStringLiteral = [&]() {
-    return !OpenDelimiters.empty() && OpenDelimiters.back() == '"';
+    return !OpenDelimiters.empty() &&
+           (OpenDelimiters.back() == '"' || OpenDelimiters.back() == '\'');
   };
   while (true) {
     // This is a simple scanner, capable of recognizing nested parentheses and
@@ -1053,10 +1049,15 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
       return CurPtr-1;
 
     case '"':
+    case '\'':
       if (inStringLiteral()) {
-        OpenDelimiters.pop_back();
+        // Is it the closing quote?
+        if (OpenDelimiters.back() == CurPtr[-1]) {
+          OpenDelimiters.pop_back();
+        }
+        // Otherwise it's an ordinary character; treat it normally.
       } else {
-        OpenDelimiters.push_back('"');
+        OpenDelimiters.push_back(CurPtr[-1]);
       }
       continue;
     case '\\':
@@ -1115,7 +1116,9 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
 void Lexer::lexStringLiteral() {
   const char *TokStart = CurPtr-1;
-  assert(*TokStart == '"' && "Unexpected start");
+  assert((*TokStart == '"' || *TokStart == '\'') && "Unexpected start");
+  // NOTE: We only allow single-quote string literals so we can emit useful
+  // diagnostics about changing them to double quotes.
 
   bool wasErroneous = false;
   
@@ -1142,7 +1145,7 @@ void Lexer::lexStringLiteral() {
       return formToken(tok::unknown, TokStart);
     }
     
-    unsigned CharValue = lexCharacter(CurPtr, true, true);
+    unsigned CharValue = lexCharacter(CurPtr, *TokStart, true);
     wasErroneous |= CharValue == ~1U;
 
     // If this is the end of string, we are done.  If it is a normal character
@@ -1151,6 +1154,20 @@ void Lexer::lexStringLiteral() {
       CurPtr++;
       if (wasErroneous)
         return formToken(tok::unknown, TokStart);
+
+      if (*TokStart == '\'') {
+        // Complain about single-quote string and suggest replacement with
+        // double-quoted equivalent.
+        // FIXME: Fixit should replace ['"'] with ["\""] (radar 22709931)
+        StringRef orig(TokStart, CurPtr - TokStart);
+        llvm::SmallString<32> replacement;
+        replacement += '"';
+        replacement += orig.slice(1, orig.size() - 1);
+        replacement += '"';
+        diagnose(TokStart, diag::lex_single_quote_string)
+          .fixItReplaceChars(getSourceLoc(TokStart), getSourceLoc(CurPtr),
+                             replacement);
+      }
       return formToken(tok::string_literal, TokStart);
     }
   }
@@ -1175,7 +1192,7 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body) {
 
     // Get the next character.
     const char *CharStart = Body;
-    unsigned CharValue = lexCharacter(Body, false, false);
+    unsigned CharValue = lexCharacter(Body, '\0', false);
     // If the character was incorrectly encoded, give up.
     if (CharValue == ~1U) return nullptr;
     
@@ -1613,6 +1630,7 @@ Restart:
     return lexNumber();
 
   case '"':
+  case '\'':
     return lexStringLiteral();
       
   case '`':

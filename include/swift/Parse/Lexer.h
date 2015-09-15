@@ -406,7 +406,7 @@ private:
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,
-                        bool StopAtDoubleQuote, bool EmitDiagnostics);
+                        char StopQuote, bool EmitDiagnostics);
   void lexStringLiteral();
   void lexEscapedIdentifier();
 
