@@ -6,12 +6,12 @@
 import StdlibUnittest
 import GameplayKit
 
-// GameplayKit is only available on iOS 9.0 and above and on OS X 10.11
-// and above.
+// GameplayKit is only available on iOS 9.0 and above, OS X 10.11 and above, and
+// tvOS 9.0 and above.
 
 var GamePlayKitTests = TestSuite("GameplayKit")
 
-if #available(OSX 10.11, iOS 9.0, *) {
+if #available(OSX 10.11, iOS 9.0, tvOS 9.0, *) {
 
 class TestComponent : GKComponent {}
 class OtherTestComponent : GKComponent {}
@@ -85,7 +85,7 @@ GamePlayKitTests.test("GKStateMachine.stateForClass()") {
   }
 }
 
-} // if #available(OSX 10.11, iOS 9.0, *)
+} // if #available(OSX 10.11, iOS 9.0, tvOS 9.0, *)
 
 runAllTests()
 

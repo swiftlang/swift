@@ -20,6 +20,7 @@ internal func GK_Swift_GKEntity_componentForClass(
 
 @available(iOS, introduced=9.0)
 @available(OSX, introduced=10.11)
+@available(tvOS, introduced=9.0)
 extension GKEntity {
   /// Returns the component instance of the indicated class contained by the
   /// entity. Returns nil if entity does not have this component.
@@ -39,6 +40,7 @@ internal func GK_Swift_GKStateMachine_stateForClass(
 
 @available(iOS, introduced=9.0)
 @available(OSX, introduced=10.11)
+@available(tvOS, introduced=9.0)
 extension GKStateMachine {
   /// Returns the state instance of the indicated class contained by the state
   /// machine. Returns nil if state machine does not have this state.
