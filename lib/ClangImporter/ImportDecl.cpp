@@ -1062,14 +1062,24 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
   return { getterDecl, setterDecl };
 }
 
-// Fake a declaration name for anonymous enums, unions and structs.
+/// \brief Create a declaration name for anonymous enums, unions and structs.
+///
+/// Since Swift does not natively support these features, we fake them by
+/// importing them as declarations with generated names. The generated name
+/// is derived from the name of the field in the outer type. Since the
+/// anonymous type is imported as a nested type of the outer type, this
+/// generated name will most likely be unique.
 static Identifier getClangDeclName(ClangImporter::Implementation &Impl,
                                    const clang::TagDecl *decl) {
-  Identifier name;
   if (decl->getDeclName())
-    name = Impl.importName(decl);
+    return Impl.importName(decl);
   else if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
-    name = Impl.importName(typedefForAnon);
+    return Impl.importName(typedefForAnon);
+
+  Identifier name;
+
+  if (!decl->isRecord())
+    return name;
 
   // If the type has no name and no structure name, but is not anonymous,
   // generate a name for it. Specifically this is for cases like:
@@ -1078,39 +1088,28 @@ static Identifier getClangDeclName(ClangImporter::Implementation &Impl,
   //   }
   // Where the member z is an unnamed struct, but does have a member-name
   // and is accessible as a member of struct a.
-  if (name.empty() && decl->isRecord()) {
-    auto dc = decl->getParent();
-    if (!dc->isRecord())
-      return name;
+  if (auto recordDecl = dyn_cast<clang::RecordDecl>(decl->getLexicalDeclContext())) {
+    for (auto field : recordDecl->fields()) {
+      if (field->getType()->getAsTagDecl() == decl) {
+        // We found the field. The field should not be anonymous, since we are
+        // using its name to derive the generated declaration name.
+        assert(!field->isAnonymousStructOrUnion());
 
-    auto recordDecl = cast<clang::RecordDecl>(dc);
+        // Create a name for the declaration from the field name.
+        std::string Id;
+        llvm::raw_string_ostream IdStream(Id);
 
-    for (auto m : recordDecl->decls()) {
-      auto field = dyn_cast<clang::FieldDecl>(m);
-      if (!field)
-        continue;
+        const char *kind;
+        if (decl->isStruct())
+          kind = "struct";
+        else if (decl->isUnion())
+          kind = "union";
+        else
+          llvm_unreachable("unknown decl kind");
 
-      if (auto recordType = dyn_cast<clang::RecordType>(field->getType().getCanonicalType())) {
-        if (recordType->getDecl() == decl) {
-          // We found the field. It better not be anonymous.
-          assert(!field->isAnonymousStructOrUnion());
-
-          // Create a name for the structure from the field name.
-          std::string Id;
-          llvm::raw_string_ostream IdStream(Id);
-
-          const char *kind;
-          if (decl->isStruct())
-            kind = "struct";
-          else if (decl->isUnion())
-            kind = "union";
-          else
-            assert(false && "unknown decl kind");
-
-          IdStream << "__Unnamed_" << kind
-                   << "_" << field->getName();
-          return Impl.SwiftContext.getIdentifier(IdStream.str());
-        }
+        IdStream << "__Unnamed_" << kind
+                 << "_" << field->getName();
+        return Impl.SwiftContext.getIdentifier(IdStream.str());
       }
     }
   }
@@ -2417,9 +2416,8 @@ namespace {
       // FIXME: Import anonymous union fields and support field access when
       // it is nested in a struct.
 
-      for (auto m = decl->decls_begin(), mEnd = decl->decls_end();
-           m != mEnd; ++m) {
-        auto nd = dyn_cast<clang::NamedDecl>(*m);
+      for (auto m : decl->decls()) {
+        auto nd = dyn_cast<clang::NamedDecl>(m);
         if (!nd) {
           // We couldn't import the member, so we can't reference it in Swift.
           hasUnreferenceableStorage = true;
@@ -2472,8 +2470,10 @@ namespace {
           // of the parent.
           //
           // TODO: C++ types have different rules.
-          if (auto nominalDecl = dyn_cast<NominalTypeDecl>(member->getDeclContext()))
+          if (auto nominalDecl = dyn_cast<NominalTypeDecl>(member->getDeclContext())) {
+            assert(nominalDecl == result && "interesting nesting of C types?");
             nominalDecl->addMember(member);
+          }
           continue;
         }
 

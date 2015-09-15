@@ -9,3 +9,9 @@ typedef struct StructWithNamedUnion {
   IntOrFloat intfloat;
 } NamedUnion;
 
+struct StructWithUnnamedUnion {
+  union {
+    int i;
+    float f;
+  } intfloat;
+};

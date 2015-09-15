@@ -45,4 +45,18 @@ UnionTestSuite.test("StructWithUnion") {
   expectNotEqual(333, s.intfloat.i)
 }
 
+UnionTestSuite.test("StructWithUnnamedUnion") {
+  var s = StructWithUnnamedUnion()
+  expectEqual(0, s.intfloat.i)
+  expectEqual(0, s.intfloat.f)
+
+  s.intfloat.i = 100
+  expectEqual(100, s.intfloat.i)
+  expectNotEqual(100.0, s.intfloat.f)
+
+  s.intfloat.f = 1.0
+  expectEqual(1.0, s.intfloat.f)
+  expectNotEqual(100, s.intfloat.i)
+}
+
 runAllTests()

@@ -56,3 +56,8 @@ func useStructWithAnonymousUnion(u: AnonUnion) -> AnonUnion {
   let x: CInt = u.x
   return u
 }
+
+func useStructWithUnnamedUnion(var u: UnnamedUnion) -> UnnamedUnion {
+  u.u.i = 100
+  u.u.f = 1.0
+}

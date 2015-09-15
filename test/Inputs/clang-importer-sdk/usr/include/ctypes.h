@@ -212,6 +212,13 @@ typedef struct AnonUnion {
   int x;
 } AnonUnion;
 
+struct UnnamedUnion {
+  union {
+    int i;
+    float f;
+  } u;
+};
+
 //===---
 // Bitfields
 //===---
