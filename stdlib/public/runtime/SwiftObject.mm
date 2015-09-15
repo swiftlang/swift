@@ -628,10 +628,10 @@ void *swift::swift_bridgeObjectRetain(void *object) {
 
 #if SWIFT_OBJC_INTEROP
   if (!isNonNative_unTagged_bridgeObject(object))
-    return swift_retain((HeapObject*) objectRef);
-  return objc_retain((id) objectRef);
+    return swift_retain(static_cast<HeapObject *>(objectRef));
+  return objc_retain(static_cast<id>(objectRef));
 #else
-  return swift_retain((HeapObject*) objectRef);
+  return swift_retain(static_cast<HeapObject *>(objectRef));
 #endif
 }
 
@@ -645,12 +645,51 @@ void swift::swift_bridgeObjectRelease(void *object) {
 
 #if SWIFT_OBJC_INTEROP
   if (!isNonNative_unTagged_bridgeObject(object))
-    return swift_release((HeapObject*) objectRef);
-  return objc_release((id) objectRef);
+    return swift_release(static_cast<HeapObject *>(objectRef));
+  return objc_release(static_cast<id>(objectRef));
 #else
-  swift_release((HeapObject*) objectRef);
+  swift_release(static_cast<HeapObject *>(objectRef));
 #endif
 }
+
+void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
+#if SWIFT_OBJC_INTEROP
+  if (isObjCTaggedPointer(object))
+    return object;
+#endif
+
+  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
+
+#if SWIFT_OBJC_INTEROP
+  void *objc_ret = nullptr;
+  if (!isNonNative_unTagged_bridgeObject(object))
+    return swift_retain_n(static_cast<HeapObject *>(objectRef), n);
+  for (int i = 0;i < n; ++i)
+    objc_ret = objc_retain(static_cast<id>(objectRef));
+  return objc_ret;
+#else
+  return swift_retain_n(static_cast<HeapObject *>(objectRef), n);
+#endif
+}
+
+void swift::swift_bridgeObjectRelease_n(void *object, int n) {
+#if SWIFT_OBJC_INTEROP
+  if (isObjCTaggedPointer(object))
+    return;
+#endif
+
+  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
+
+#if SWIFT_OBJC_INTEROP
+  if (!isNonNative_unTagged_bridgeObject(object))
+    return swift_release_n(static_cast<HeapObject *>(objectRef), n);
+  for (int i = 0; i < n; ++i)
+    objc_release(static_cast<id>(objectRef));
+#else
+  swift_release_n(static_cast<HeapObject *>(objectRef), n);
+#endif
+}
+
 
 #if SWIFT_OBJC_INTEROP
 void swift::swift_unknownRetainUnowned(void *object) {

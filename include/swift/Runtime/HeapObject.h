@@ -424,6 +424,8 @@ extern "C" void swift_weakCopyAssign(WeakReference *dest, WeakReference *src);
 extern "C" void swift_weakTakeAssign(WeakReference *dest, WeakReference *src);
 
 extern "C" void *swift_bridgeObjectRetain(void *value);
+/// Increment the strong retain count of a bridged object by n.
+extern "C" void *swift_bridgeObjectRetain_n(void *value, int n);
 
 #if SWIFT_OBJC_INTEROP
 
@@ -447,6 +449,8 @@ static inline void swift_unknownRetain_n(void *value, int n) {
 #endif /* SWIFT_OBJC_INTEROP */
 
 extern "C" void swift_bridgeObjectRelease(void *value);
+/// Decrement the strong retain count of a bridged object by n.
+extern "C" void swift_bridgeObjectRelease_n(void *value, int n);
 
 #if SWIFT_OBJC_INTEROP
 
