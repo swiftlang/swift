@@ -26,6 +26,7 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
+#include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/SimplifyInstruction.h"
 #include "llvm/ADT/Hashing.h"
@@ -490,7 +491,12 @@ public:
   /// their lookup.
   ScopedHTType *AvailableValues;
 
-  CSE(bool RunsOnHighLevelSil) : RunsOnHighLevelSil(RunsOnHighLevelSil) {}
+  /// The call graph - We are removing apply instructions. The call graph needs
+  /// to be updated.
+  CallGraph *CG;
+
+  CSE(bool RunsOnHighLevelSil, CallGraph *CG)
+      : RunsOnHighLevelSil(RunsOnHighLevelSil), CG(CG) {}
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
 
@@ -551,6 +557,9 @@ private:
   };
 
   bool processNode(DominanceInfoNode *Node);
+
+  /// Remove the instruction from the call graph if it is an apply.
+  void removeFromCallGraph(SILInstruction *I);
 };
 }  // end anonymous namespace
 
@@ -614,6 +623,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     // Dead instructions should just be removed.
     if (isInstructionTriviallyDead(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE DCE: " << *Inst << '\n');
+      removeFromCallGraph(Inst);
       eraseFromParentWithDebugInsts(Inst, I);
       Changed = true;
       ++NumSimplify;
@@ -626,6 +636,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
       DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
             << '\n');
       SILValue(Inst, 0).replaceAllUsesWith(V);
+      removeFromCallGraph(Inst);
       Inst->eraseFromParent();
       Changed = true;
       ++NumSimplify;
@@ -647,6 +658,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (ValueBase *V = AvailableValues->lookup(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE CSE: " << *Inst << "  to: " << *V << '\n');
       Inst->replaceAllUsesWith(V);
+      removeFromCallGraph(Inst);
       Inst->eraseFromParent();
       Changed = true;
       ++NumCSE;
@@ -661,6 +673,16 @@ bool CSE::processNode(DominanceInfoNode *Node) {
 
   return Changed;
 }
+
+void CSE::removeFromCallGraph(SILInstruction *I) {
+  // If we have a call graph and we've removing an apply, remove the
+  // associated edges from the call graph.
+  if (CG)
+    if (auto AI = FullApplySite::isa(I))
+      if (auto *Edge = CG->getCallGraphEdge(AI))
+        CG->removeEdge(Edge);
+}
+
 
 namespace {
 class SILCSE : public SILFunctionTransform {
@@ -677,7 +699,10 @@ class SILCSE : public SILFunctionTransform {
 
     DominanceAnalysis* DA = getAnalysis<DominanceAnalysis>();
 
-    CSE C(RunsOnHighLevelSil);
+    // Call Graph Analysis in case we need to perform Call Graph updates.
+    auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
+
+    CSE C(RunsOnHighLevelSil, CGA->getCallGraphOrNull());
     if (C.processFunction(*getFunction(), DA->get(getFunction())))
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
