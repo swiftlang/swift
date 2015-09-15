@@ -227,10 +227,10 @@ extension RangeReplaceableCollectionType {
 }
 
 extension RangeReplaceableCollectionType where SubSequence == Self {
-  /// Remove the first `n` elements.
+  /// Remove the element at `startIndex` and return it.
   ///
-  /// - Complexity: O(`self.count`)
-  /// - Requires: `self.count >= n`.
+  /// - Complexity: O(1)
+  /// - Requires: `!self.isEmpty`.
   public mutating func removeFirst() -> Generator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
