@@ -1475,10 +1475,10 @@ namespace swift {
     // For optional types, the default is "nil".
     if (type->getOptionalObjectType()) return StringRef("nil");
 
-    // For option sets, the default is "[]".
     if (auto structType = type->getAs<StructType>()) {
       auto structDecl = structType->getDecl();
       if (structDecl->getClangDecl()) {
+        // For option sets, the default is "[]".
         for (auto attr : structDecl->getAttrs()) {
           if (auto synthesizedProto = dyn_cast<SynthesizedProtocolAttr>(attr)) {
             if (synthesizedProto->getProtocolKind()

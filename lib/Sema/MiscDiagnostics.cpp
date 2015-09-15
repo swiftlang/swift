@@ -1977,6 +1977,217 @@ void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
     .fixItReplace(var->getLoc(), newName->str());
 }
 
+namespace swift {
+// FIXME: Hackily defined in AST/ASTPrinter.cpp
+  Optional<StringRef> getFakeDefaultArgForType(Type type);
+}
+
+/// Determine the "fake" default argument provided by the given expression.
+static Optional<StringRef> getFakeDefaultArgForExpr(Expr *expr) {
+  // Empty array literals, [].
+  if (auto arrayExpr = dyn_cast<ArrayExpr>(expr)) {
+    if (arrayExpr->getElements().empty())
+      return StringRef("[]");
+
+    return None;
+  }
+
+  // nil.
+  if (auto call = dyn_cast<CallExpr>(expr)) {
+    if (auto ctorRefCall = dyn_cast<ConstructorRefCallExpr>(call->getFn())) {
+      if (auto ctorRef = dyn_cast<DeclRefExpr>(ctorRefCall->getFn())) {
+        if (auto ctor = dyn_cast<ConstructorDecl>(ctorRef->getDecl())) {
+          if (ctor->getFullName().getArgumentNames().size() == 1 &&
+              ctor->getFullName().getArgumentNames()[0]
+                == ctor->getASTContext().Id_nilLiteral)
+            return StringRef("nil");
+        }
+      }
+    }
+  }
+
+  return None;
+}
+
+namespace {
+  struct CallEdit {
+    enum {
+      RemoveDefaultArg,
+      Rename,
+    } Kind;
+
+    // The source range affected by this change.
+    SourceRange Range;
+
+    // The replacement text, for a rename.
+    std::string Name;
+  };
+
+}
+
+/// Find the source ranges of extraneous default arguments within a
+/// call to the given function.
+static bool hasExtraneousDefaultArguments(
+              AbstractFunctionDecl *afd,
+              Expr *arg,
+              DeclName name,
+              SmallVectorImpl<SourceRange> &ranges,
+              SmallVectorImpl<unsigned> &removedArgs) {
+  if (!afd->getClangDecl())
+    return false;
+
+  if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg))
+    arg = shuffle->getSubExpr()->getSemanticsProvidingExpr();
+    
+  TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
+  ParenExpr *argParen = dyn_cast<ParenExpr>(arg);
+
+  ArrayRef<Pattern *> bodyPatterns = afd->getBodyParamPatterns();
+
+  // Skip over the implicit 'self'.
+  if (afd->getImplicitSelfDecl()) {
+    bodyPatterns = bodyPatterns.slice(1);
+  }
+    
+  ASTContext &ctx = afd->getASTContext();
+  Pattern *bodyPattern = bodyPatterns[0];
+  if (auto *tuple = dyn_cast<TuplePattern>(bodyPattern)) {
+    Optional<unsigned> firstRemoved;
+    Optional<unsigned> lastRemoved;
+    unsigned numElementsInParens;
+    if (argTuple) {
+      numElementsInParens = (argTuple->getNumElements() -
+                             argTuple->hasTrailingClosure());
+    } else if (argParen) {
+      numElementsInParens = 1 - argParen->hasTrailingClosure();
+    } else {
+      numElementsInParens = 0;
+    }
+
+    for (unsigned i = 0; i != numElementsInParens; ++i) {
+      auto &elt = tuple->getElements()[i];
+      auto defaultArg = getFakeDefaultArgForType(elt.getPattern()->getType());
+      if (!defaultArg)
+        continue;
+
+      // Never consider removing the first argument for a "set" method
+      // with an unnamed first argument.
+      if (i == 0 &&
+          !name.getBaseName().empty() &&
+          camel_case::getFirstWord(name.getBaseName().str()) == "set" &&
+          name.getArgumentNames().size() > 0 &&
+          name.getArgumentNames()[0].empty())
+        continue;
+
+      SourceRange removalRange;
+      if (argTuple && i < argTuple->getNumElements()) {
+        // Check whether we have a default argument.
+        auto exprArg = getFakeDefaultArgForExpr(argTuple->getElement(i));
+        if (!exprArg || *defaultArg != *exprArg)
+          continue;
+
+        // Figure out where to start removing this argument.
+        if (i == 0) {
+          // Start removing right after the opening parenthesis.
+          removalRange.Start = argTuple->getLParenLoc();
+        } else {
+          // Start removing right after the preceding argument, so we
+          // consume the comma as well.
+          removalRange.Start = argTuple->getElement(i-1)->getEndLoc();
+        }
+
+        // Adjust to the end of the starting token.
+        removalRange.Start
+          = Lexer::getLocForEndOfToken(ctx.SourceMgr, removalRange.Start);
+
+        // Figure out where to finish removing this element.
+        if (i == 0 && i < numElementsInParens - 1) {
+          // We're the first of several arguments; consume the
+          // following comma as well.
+          removalRange.End = argTuple->getElementNameLoc(i+1);
+          if (removalRange.End.isInvalid())
+            removalRange.End = argTuple->getElement(i+1)->getStartLoc();
+        } else if (i < numElementsInParens - 1) {
+          // We're in the middle; consume through the end of this
+          // element.
+          removalRange.End
+            = Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                         argTuple->getElement(i)->getEndLoc());
+        } else {
+          // We're at the end; consume up to the closing parentheses.
+          removalRange.End = argTuple->getRParenLoc();
+        }
+      } else if (argParen) {
+        // Check whether we have a default argument.
+        auto exprArg = getFakeDefaultArgForExpr(argParen->getSubExpr());
+        if (!exprArg || *defaultArg != *exprArg)
+          continue;
+
+        removalRange = SourceRange(argParen->getSubExpr()->getStartLoc(),
+                                   argParen->getRParenLoc());
+      } else {
+        continue;
+      }
+
+      if (removalRange.isInvalid())
+        continue;
+
+      // Note that we're removing this argument.
+      removedArgs.push_back(i);
+
+      // If we hadn't removed anything before, this is the first
+      // removal.
+      if (!firstRemoved) {
+        ranges.push_back(removalRange);
+        firstRemoved = i;
+        lastRemoved = i;
+        continue;
+      }
+
+      // If the previous removal range was the previous argument,
+      // combine the ranges.
+      if (*lastRemoved == i - 1) {
+        ranges.back().End = removalRange.End;
+        lastRemoved = i;
+        continue;
+      }
+
+      // Otherwise, add this new removal range.
+      ranges.push_back(removalRange);
+      lastRemoved = i;
+    }
+
+    // If there is a single removal range that covers everything but
+    // the trailing closure at the end, also zap the parentheses.
+    if (ranges.size() == 1 &&
+        *firstRemoved == 0 && *lastRemoved == tuple->getNumElements() - 2 &&
+        argTuple && argTuple->hasTrailingClosure()) {
+      ranges.front().Start = argTuple->getLParenLoc();
+      ranges.front().End
+        = Lexer::getLocForEndOfToken(ctx.SourceMgr, argTuple->getRParenLoc());
+    }
+  } else if (argParen) {
+    // Parameter must have a default argument.
+    auto defaultArg = getFakeDefaultArgForType(bodyPattern->getType());
+    if (!defaultArg)
+      return false;
+
+    // Argument must be a default value.
+    auto argExpr = getFakeDefaultArgForExpr(argParen->getSubExpr());
+    if (!argExpr || *argExpr != *defaultArg)
+      return false;
+    
+    SourceRange removalRange(argParen->getSubExpr()->getStartLoc(),
+                             argParen->getRParenLoc());
+    if (!removalRange.isInvalid()) {
+      ranges.push_back(removalRange);
+      removedArgs.push_back(0);
+    }
+  }
+
+  return !ranges.empty();
+}
+
 void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
   if (!Context.LangOpts.WarnOmitNeedlessWords)
     return;
@@ -1989,6 +2200,8 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
     innermostApply = fnApply;
     ++numApplications;
   }
+  if (numApplications != 1)
+    return;
 
   DeclRefExpr *fnRef
     = dyn_cast<DeclRefExpr>(innermostApply->getFn()->getValueProvidingExpr());
@@ -2001,26 +2214,45 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
 
   // Determine whether the callee has any needless words in it.
   auto newName = ::omitNeedlessWords(afd);
-  if (!newName)
+
+  bool renamed;
+  if (!newName) {
+    newName = afd->getFullName();
+    renamed = false;
+  } else {
+    renamed = true;
+  }
+
+  // Determine whether there are any extraneous default arguments to be zapped.
+  SmallVector<SourceRange, 2> removedDefaultArgRanges;
+  SmallVector<unsigned, 2> removedArgs;
+  bool anyExtraneousDefaultArgs
+    = hasExtraneousDefaultArguments(afd, apply->getArg(), *newName,
+                                    removedDefaultArgRanges,
+                                    removedArgs);
+
+  if (!renamed && !anyExtraneousDefaultArgs)
     return;
 
   // Make sure to apply the fix at the right application level.
   auto name = afd->getFullName();
   bool argNamesChanged = newName->getArgumentNames() != name.getArgumentNames();
-  if (argNamesChanged && numApplications != 1)
-    return;
-  else if (!argNamesChanged && numApplications != 0)
-    return;
 
   // Dig out the argument tuple.
-  Expr *arg = apply->getArg()->getSemanticsProvidingExpr();
+  Expr *arg = apply->getArg();
   if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg))
     arg = shuffle->getSubExpr()->getSemanticsProvidingExpr();
   TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
+  ParenExpr *argParen = dyn_cast<ParenExpr>(arg);
 
-  InFlightDiagnostic diag = diagnose(fnRef->getLoc(),
-                                     diag::omit_needless_words,
-                                     name, *newName);
+  if (argParen && !argTuple)
+    arg = argParen->getSubExpr();
+
+  InFlightDiagnostic diag
+    = renamed ? diagnose(fnRef->getLoc(), diag::omit_needless_words,
+                         name, *newName)
+              : diagnose(fnRef->getLoc(), diag::extraneous_default_args_in_call,
+                         name);
 
   // Fix the base name.
   if (newName->getBaseName() != name.getBaseName()) {
@@ -2028,35 +2260,50 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
   }
 
   // Fix the argument names.
-  if (argNamesChanged) {
-    auto oldArgNames = name.getArgumentNames();
-    auto newArgNames = newName->getArgumentNames();
-    if (argTuple) {
-      for (unsigned i = 0, n = newArgNames.size(); i != n; ++i) {
-        auto newArgName = newArgNames[i];
-        if (oldArgNames[i] == newArgName) continue;
-
-        if (i > argTuple->getNumElements()) break;
-        if (argTuple->getElementName(i) != oldArgNames[i]) continue;
-
-        auto nameLoc = argTuple->getElementNameLoc(i);
-        if (nameLoc.isInvalid()) {
-          // Add the argument label.
-          diag.fixItInsert(argTuple->getElement(i)->getStartLoc(),
-                           (newArgName.str() + ": ").str());
-        } else if (newArgName.empty()) {
-          // Delete the argument label.
-          diag.fixItRemoveChars(nameLoc, argTuple->getElement(i)->getStartLoc());
-        } else {
-          // Fix the argument label.
-          diag.fixItReplace(nameLoc, newArgName.str());
-        }
+  auto oldArgNames = name.getArgumentNames();
+  auto newArgNames = newName->getArgumentNames();
+  unsigned currentRemovedArg = 0;
+  if (argTuple) {
+    for (unsigned i = 0, n = newArgNames.size(); i != n; ++i) {
+      // If this argument was completely removed, don't emit any
+      // Fix-Its for it.
+      if (currentRemovedArg < removedArgs.size() &&
+          removedArgs[currentRemovedArg] == i) {
+        ++currentRemovedArg;
+        continue;
       }
-    } else if (newArgNames.size() > 0 && !newArgNames[0].empty()) {
-      // Add the argument label.
-      auto newArgName = newArgNames[0];
-      diag.fixItInsert(arg->getStartLoc(), (newArgName.str() + ": ").str());
+
+      // Check whether the name changed.
+      auto newArgName = newArgNames[i];
+      if (oldArgNames[i] == newArgName) continue;
+
+      if (i >= argTuple->getNumElements()) break;
+      if (argTuple->getElementName(i) != oldArgNames[i]) continue;
+
+      auto nameLoc = argTuple->getElementNameLoc(i);
+      if (nameLoc.isInvalid()) {
+        // Add the argument label.
+        diag.fixItInsert(argTuple->getElement(i)->getStartLoc(),
+                         (newArgName.str() + ": ").str());
+      } else if (newArgName.empty()) {
+        // Delete the argument label.
+        diag.fixItRemoveChars(nameLoc, argTuple->getElement(i)->getStartLoc());
+      } else {
+        // Fix the argument label.
+        diag.fixItReplace(nameLoc, newArgName.str());
+      }
     }
+  } else if (newArgNames.size() > 0 && !newArgNames[0].empty() &&
+             (!argParen || !argParen->hasTrailingClosure()) &&
+             removedArgs.empty()) {
+    // Add the argument label.
+    auto newArgName = newArgNames[0];
+    diag.fixItInsert(arg->getStartLoc(), (newArgName.str() + ": ").str());
+  }
+
+  // Remove all of the defaulted arguments.
+  for (auto extraneous : removedDefaultArgRanges) {
+    diag.fixItRemoveChars(extraneous.Start, extraneous.End);
   }
 }
 

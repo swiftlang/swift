@@ -2633,6 +2633,10 @@ WARNING(variable_never_read, sema_varusage, none,
 WARNING(omit_needless_words, sema_tcd, none,
         "%0 could be named %1 [-Womit-needless-words]", (DeclName, DeclName))
 
+WARNING(extraneous_default_args_in_call, sema_tcd, none,
+        "call to %0 has extraneous arguments that could use defaults", 
+        (DeclName))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

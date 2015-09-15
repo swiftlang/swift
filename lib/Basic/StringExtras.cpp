@@ -444,8 +444,9 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
   if ((role == NameRole::FirstParameter ||
        role == NameRole::SubsequentParameter) &&
       (name == "usingBlock" || name == "withBlock") &&
-      typeName.Name == "Block")
+      typeName.Name == "Block") {
     return "body";
+  }
 
   // Get the camel-case words in the name and type name.
   auto nameWords = camel_case::getWords(name);

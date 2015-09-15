@@ -98,7 +98,7 @@
 // CHECK-FOUNDATION: func enumerateObjects(with _: NSEnumerationOptions = [], body: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
 
 // Note: WithBlock -> body
-// CHECK-FOUNDATION: func enumerateObjectsRandomly(body _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjectsRandomly(body _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
 
 // Note: class method name stripping result type.
 // CHECK-APPKIT: class func red() -> NSColor
@@ -110,7 +110,7 @@
 // CHECK-APPKIT: func drawInAir(at _: Point3D)
 
 // Note: Don't strip names that aren't preceded by a verb or preposition.
-// CHECK-APPKIT: func setTextColor(_: NSColor)
+// CHECK-APPKIT: func setTextColor(_: NSColor?)
 
 // Note: Skipping over "Ref"
 // CHECK-CORECOOLING: func replace(_: CCPowerSupply!)

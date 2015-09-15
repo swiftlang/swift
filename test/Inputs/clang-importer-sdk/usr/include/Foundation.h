@@ -96,6 +96,7 @@ __attribute__((availability(ios,introduced=8.0)))
 + (instancetype)arrayWithObjects:(const ObjectType __nonnull [__nullable])objects count:(NSUInteger)count;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector withObject:(nullable ObjectType)anObject;
+- (void)makeObjectsPerformSelector:(nonnull SEL)aSelector withObject:(nullable ObjectType)anObject withObject:(nullable ObjectType)anotherObject;
 @end
 
 @interface NSArray (AddingObject)
@@ -912,6 +913,21 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
                          usingBlock:(void (^)(id obj, NSUInteger idx,
                                               BOOL *stop))block;
 
-- (void)enumerateObjectsRandomlyWithBlock:(void (^)(id obj, NSUInteger idx,
-                                                    BOOL *stop))block;
+- (void)enumerateObjectsRandomlyWithBlock:(void (^ __nullable)(
+                                                  id obj,
+                                                  NSUInteger idx,
+                                                  BOOL *stop))block;
+
+- (void)enumerateObjectsHaphazardly:(void (^ __nullable)(id obj,
+                                                         NSUInteger idx,
+                                                         BOOL *stop))block;
+
+- (void)optionallyEnumerateObjects:(NSEnumerationOptions)opts
+                        usingBlock:(void (^)(id obj, NSUInteger idx,
+                                             BOOL *stop))block;
+
+- (void)enumerateObjectsWhileOrderingPizza:(BOOL)pizza
+                         withOptions:(NSEnumerationOptions)opts
+                         usingBlock:(void (^)(id obj, NSUInteger idx,
+                                              BOOL *stop))block;
 @end

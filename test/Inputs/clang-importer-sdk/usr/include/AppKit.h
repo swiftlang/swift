@@ -249,5 +249,5 @@ extern NSString *NSViewFocusDidChangeNotification;
 struct Point3D { double x, y, z; };
 @interface NSString (Drawing)
 -(void)drawInAirAtPoint:(struct Point3D)point;
--(void)setTextColor:(nonnull NSColor *)color;
+-(void)setTextColor:(nullable NSColor *)color;
 @end
