@@ -3110,3 +3110,6 @@ extern "C" const Metadata *_swift_getSuperclass_nonNull(
   return nullptr;
 }
 
+extern "C" bool swift_isClassType(const Metadata *type) {
+  return Metadata::isAnyKindOfClass(type->getKind());
+}

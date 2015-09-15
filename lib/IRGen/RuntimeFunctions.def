@@ -785,6 +785,13 @@ FUNCTION(ConformsToProtocol,
          ARGS(TypeMetadataPtrTy, ProtocolDescriptorPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+// bool swift_isClassType(type*);
+FUNCTION(IsClassType,
+         swift_isClassType, RuntimeCC,
+         RETURNS(Int1Ty),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // void swift_once(swift_once_t *predicate,
 //                 void (*function_code)(RefCounted*));
 FUNCTION(Once, swift_once, RuntimeCC,

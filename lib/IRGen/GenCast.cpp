@@ -276,13 +276,16 @@ llvm::Value *irgen::emitReferenceToObjCProtocol(IRGenFunction &IGF,
 /// The value is NULL if the cast failed.
 static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
                                                    unsigned numProtocols,
-                                                   CheckedCastMode mode) {
+                                                   CheckedCastMode mode,
+                                                   bool checkClassConstraint) {
   // Build the function name.
   llvm::SmallString<32> name;
   {
     llvm::raw_svector_ostream os(name);
     os << "dynamic_cast_existential_";
     os << numProtocols;
+    if (checkClassConstraint)
+      os << "_class";
     switch (mode) {
     case CheckedCastMode::Unconditional:
       os << "_unconditional";
@@ -328,6 +331,14 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
   Explosion rets;
   rets.add(value);
 
+  // Check the class constraint if necessary.
+  if (checkClassConstraint) {
+    auto isClass = IGF.Builder.CreateCall(IGM.getIsClassTypeFn(), ref);
+    auto contBB = IGF.createBasicBlock("cont");
+    IGF.Builder.CreateCondBr(isClass, contBB, failBB);
+    IGF.Builder.emitBlock(contBB);
+  }
+
   // Look up each protocol conformance we want.
   for (unsigned i = 0; i < numProtocols; ++i) {
     auto proto = args.claimNext();
@@ -344,7 +355,7 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
   // If we succeeded, return the witnesses.
   IGF.emitScalarReturn(returnTy, rets);
   
-  // If we failed, return nil.
+  // If we failed, return nil or trap.
   IGF.Builder.emitBlock(failBB);
   switch (mode) {
   case CheckedCastMode::Conditional: {
@@ -444,7 +455,25 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   SmallVector<llvm::Value*, 4> objcProtos;
   SmallVector<llvm::Value*, 4> witnessTableProtos;
 
+  bool hasClassConstraint = false;
+  bool hasClassConstraintByProtocol = false;
+
   for (auto proto : allProtos) {
+    // If the protocol introduces a class constraint, track whether we need
+    // to check for it independent of protocol witnesses.
+    if (proto->requiresClass()) {
+      hasClassConstraint = true;
+      if (proto->getKnownProtocolKind()
+          && *proto->getKnownProtocolKind() == KnownProtocolKind::AnyObject) {
+        // AnyObject only requires that the type be a class.
+        continue;
+      }
+      
+      // If this protocol is class-constrained but not AnyObject, checking its
+      // conformance will check the class constraint too.
+      hasClassConstraintByProtocol = true;
+    }
+
     if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto)) {
       auto descriptor = emitProtocolDescriptorRef(IGF, proto);
       witnessTableProtos.push_back(descriptor);
@@ -452,12 +481,6 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
 
     if (!proto->isObjC())
       continue;
-
-    if (proto->getKnownProtocolKind()
-        && *proto->getKnownProtocolKind() == KnownProtocolKind::AnyObject) {
-      // Casting an object to AnyObject trivially succeeds.
-      continue;
-    }
 
     objcProtos.push_back(emitReferenceToObjCProtocol(IGF, proto));
   }
@@ -478,17 +501,21 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     auto schema = IGF.getTypeInfo(destType).getSchema();
     resultType = schema[0].getScalarType();
   }
-  
+  // We only need to check the class constraint for metatype casts where
+  // no protocol conformance indirectly requires the constraint for us.
+  bool checkClassConstraint =
+    (bool)metatypeKind && hasClassConstraint && !hasClassConstraintByProtocol;
+
   llvm::Value *resultValue = value;
 
-  // If we don't have any protocols we really need to check, then trivially
-  // succeed.
-  if (objcProtos.empty() && witnessTableProtos.empty()) {
+  // If we don't have anything we really need to check, then trivially succeed.
+  if (objcProtos.empty() && witnessTableProtos.empty() &&
+      !checkClassConstraint) {
     resultValue = IGF.Builder.CreateBitCast(value, resultType);
     ex.add(resultValue);
     return;
   }
-  
+
   // Check the ObjC protocol conformances if there were any.
   llvm::Value *objcCast = nullptr;
   if (!objcProtos.empty()) {
@@ -559,7 +586,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   }
 
   // If we don't need to look up any witness tables, we're done.
-  if (witnessTableProtos.empty()) {
+  if (witnessTableProtos.empty() && !checkClassConstraint) {
     ex.add(resultValue);
     return;
   }
@@ -605,7 +632,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
 
   // Look up witness tables for the protocols that need them.
   auto fn = emitExistentialScalarCastFn(IGF.IGM, witnessTableProtos.size(),
-                                        mode);
+                                        mode, checkClassConstraint);
 
   llvm::SmallVector<llvm::Value *, 4> args;
 

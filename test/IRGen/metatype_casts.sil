@@ -88,8 +88,12 @@ end:
 }
 
 // CHECK-LABEL: define %swift.type* @checked_cast_to_anyobject_type
-// CHECK:         [[METATYPE:%.*]] = call %swift.type* @_TMaC14metatype_casts9SomeClass() #3
-// CHECK:         ret %swift.type* [[METATYPE]]
+// CHECK:         [[METATYPE:%.*]] = call %swift.type* @_TMaC14metatype_casts9SomeClass()
+// CHECK:         [[T0:%.*]] = bitcast %swift.type* [[METATYPE]] to i8*
+// CHECK:         [[CAST:%.*]] = call { i8* } @dynamic_cast_existential_0_class_unconditional(i8* [[T0]], %swift.type* [[METATYPE]])
+// CHECK:         [[RESULT0:%.*]] = extractvalue { i8* } [[CAST]], 0
+// CHECK:         [[RESULT:%.*]] = bitcast i8* [[RESULT0]] to %swift.type*
+// CHECK:         ret %swift.type* [[RESULT]]
 sil @checked_cast_to_anyobject_type : $@convention(thin) () -> @thick AnyObject.Type {
 entry:
   %1 = metatype $@thick SomeClass.Type
