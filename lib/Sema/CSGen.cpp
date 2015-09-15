@@ -2773,8 +2773,11 @@ public:
     return createFreeTypeVariableType(Expr);
   }
 
-  Type getResolvedType(Solution &S) {
-    return S.typeBindings[VT];
+  void collectResolvedType(Solution &S, SmallVectorImpl<Type> &PossibleTypes) {
+    if (auto Bind = S.typeBindings[VT]) {
+      if (Bind->getKind() != TypeKind::TypeVariable)
+        PossibleTypes.push_back(Bind);
+    }
   }
 };
 
@@ -2793,8 +2796,7 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
     return false;
   }
   for (auto &S : solutions) {
-    if (auto Bind = MCG.getResolvedType(S))
-      PossibleTypes.push_back(Bind);
+    MCG.collectResolvedType(S, PossibleTypes);
   }
   return !PossibleTypes.empty();
 }

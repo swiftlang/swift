@@ -2407,7 +2407,7 @@ public:
         } else {
           ExpectedTypes.push_back(Ele.getType());
         }
-      } else if (Position == 0 && !HasName && Type) {
+      } else if (Position == 0 && !HasName) {
         // The only param.
         ExpectedTypes.push_back(Type->getDesugaredType());
       }
