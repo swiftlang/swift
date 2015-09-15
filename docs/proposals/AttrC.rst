@@ -32,7 +32,9 @@ name is the unmangled, unqualified name of the function or nominal type.
 
 There is the question of how to gracefully handle name conflicts inside
 a module. Since C does not have real modules or qualified names, we
-probably can't catch name conflicts until link time.
+probably can't catch name conflicts until link time. At the very least,
+we will prohibit overloading ``@c`` functions (unless we use Clang-style
+mangling and ``__attribute__((overloadable))``).
 
 However, we might want to prefix the default @asmname of a @c symbol
 with the Swift module name followed by an underscore, instead of using
@@ -48,9 +50,11 @@ Bridgeable types are now partitioned into two broad categories, "POD"
 and "non-POD". POD types include:
 
 - integers
+- floating point numbers
 - @c enums
-- fixed size arrays (really, homogeneous tuples of POD types)
-- @c structs, whose fields must all be POD types
+- fixed size arrays (currently presented as homogeneous tuples of POD types)
+- @c structs (whose fields must all be POD types)
+- pointers to C types
 - @convention(c) function types
 
 On Linux, we can't have reference counted pointers here at all, and
@@ -69,8 +73,8 @@ SILFunctionType.cpp looks relevant.
 Bridging header output
 ======================
 
-We can reuse most of ``PrintAsObjC`` to allow generating pure-C
-bridging headers for Swift modules which use @c but not @objc.
+We can reuse most of ``PrintAsObjC`` to allow generating pure-C headers
+for Swift modules which use @c but not @objc.
 
 Exporting functions to C
 ========================
@@ -97,36 +101,47 @@ changing some tests.
 As stated above, all the fields of a ``@c`` struct must themselves be POD.
 
 Structs declared as ``@c`` need to be laid out with C size and alignment
-conventions. We already do that for structs imported from C, so the
-changes should not be major.
+conventions. We already do that for Swift structs imported from Clang by
+asking Clang to do the layout on Clang AST, so perhaps for ``@c`` structs
+declared in Swift, we can go in the other direction by constructing Clang
+AST for the struct.
 
 Accessibility and linkage for @c declarations
 =============================================
 
-Only public enums and structs should appear in bridging headers; for private
-types, ``@c`` only affects layout and restrictions on the field types.
+Only public enums and structs should appear in generated headers; for
+private types, ``@c`` only affects layout and restrictions on the field
+types.
 
 For functions, it is not clear if private together with ``@c`` is useful,
-but for completeness it could be implemented by giving the foreign entry
-point the correct linkage.
+but it could be implemented for completeness. We could either give the
+foreign entry point private linkage, or intentionally give it incorrect
+linkage allowing it to be found with ``dlsym()``.
 
 inout parameters in @c and @objc functions
 ==========================================
 
 Right now we don't allow ``inout`` parameters for ``@objc`` methods.
-What are the issues here, could we export them as pointers? This would be
-particularly useful for pure C.
+We could export them as nonnull pointers, using ``__attribute__((nonnull(N)))``
+rather than ``_Nonnull``.
+
+If we ever get as far as implementing C++ interoperability, we could also
+export inouts as references rather than pointers.
 
 Diagnostics
 ===========
 
 Right now all diagnostics for type bridging in Sema talk about Objective-C,
 leading to funny phrasing when using invalid types in a ``@convention(c)``
-function, for instance. All diagnostics need to be audited to take the
-language as a parameter, and either say ``cannot be represented in C``
-or ``cannot be represented in Objective-C``. A Linux user should never see
-diagnostics talking about Objective-C, except maybe if they explicitly mention
-``@objc`` in their code.
+function, for instance.
+
+All diagnostics need to be audited to take the language as a parameter, and
+either say ``cannot be represented in C`` or ``cannot be represented in
+Objective-C``. A Linux user should never see diagnostics talking about
+Objective-C, except maybe if they explicitly mention ``@objc`` in their code.
+
+On the plus side, it is okay if we conservatively talk about ``C`` in
+Objective-C diagnostics on Darwin.
 
 Cleanups
 ========
