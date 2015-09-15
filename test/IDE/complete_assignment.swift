@@ -9,6 +9,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_8 | FileCheck %s -check-prefix=ASSIGN_8
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_9 | FileCheck %s -check-prefix=ASSIGN_9
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_10 | FileCheck %s -check-prefix=ASSIGN_10
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_11 | FileCheck %s -check-prefix=ASSIGN_11
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_12 | FileCheck %s -check-prefix=ASSIGN_12
+
 class C1 {
 var I1 = 1
 var I2 = 3
@@ -53,6 +56,8 @@ class C2 {
   func VoidGen() {}
   var InternalC2 = C2()
 }
+
+func C2Gen() -> C2 { return C2() }
 
 func f1() {
 	var I3 : Int
@@ -177,4 +182,29 @@ func f2() {
 // ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
 // ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: VoidGen()[#Void#]
 // ASSIGN_10-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+
+  func f11(C: C2) {
+    d = C.#^ASSIGN_11^#
+  }
+
+// ASSIGN_11: Begin completions
+// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
+// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
+// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#C1.D1#]
+// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   VoidGen()[#Void#]
+// ASSIGN_11-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+
+  func f12() {
+    var i : Int
+    i = C2Gen().#^ASSIGN_12^#
+  }
+
+// ASSIGN_12: Begin completions
+// ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntGen()[#Int#]
+// ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
+// ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#C1.D1#]
+// ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: VoidGen()[#Void#]
+// ASSIGN_12-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
 }
