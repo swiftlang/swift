@@ -3443,6 +3443,13 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   setLoweredAddress(SILValue(i, 1), addr.getAddress());
 
   if (IGM.DebugInfo && Decl) {
+    // FIXME: This is a workaround to not produce local variables for
+    // capture list arguments like "[weak self]". The better solution
+    // would be to require all variables to be described with a
+    // SILDebugValue(Addr) and then not describe capture list
+    // arguments.
+    if (Name == IGM.Context.Id_self.str())
+      return;
     auto Indirection = IndirectValue;
     // LValues are implicitly indirect because of their type.
     if (Decl->getType()->getKind() == TypeKind::LValue)
