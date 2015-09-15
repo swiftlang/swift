@@ -2444,9 +2444,7 @@ public:
     addArgNameCompletionResults(ExpectedNames);
     if (!ExpectedTypes.empty()) {
       setExpectedTypes(ExpectedTypes);
-      getValueCompletionsInDeclContext(Loc, DefaultFilter,
-                                       /*IncludeTopLevel*/true,
-                                       /*RequestCache*/false);
+      getValueCompletionsInDeclContext(Loc, DefaultFilter);
     }
     return true;
   }
@@ -3412,9 +3410,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::AssignmentRHS : {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
     Lookup.setExpectedTypes(AssignmentExpr->getDest()->getType()->getRValueType());
-    Lookup.getValueCompletionsInDeclContext(Loc, DefaultFilter,
-                                            /*IncludeTopLevel*/true,
-                                            /*RequestCache*/false);
+    Lookup.getValueCompletionsInDeclContext(Loc, DefaultFilter);
     break;
   }
   case CompletionKind::CallArg : {
