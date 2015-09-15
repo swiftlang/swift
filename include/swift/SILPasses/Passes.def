@@ -116,8 +116,6 @@ PASS(MandatoryInlining, "mandatory-inlining",
      "Inline transparent functions")
 PASS(Mem2Reg, "mem2reg",
      "Promote stack allocations to SSA values")
-PASS(MemBehaviorDumper, "mem-behavior-dump",
-     "Dump MemBehavior results from alias analysis for all instruction pairs")
 PASS(MergeCondFails, "merge-cond_fails",
      "Remove redundant overflow checks")
 PASS(NoReturnFolding, "noreturn-folding",

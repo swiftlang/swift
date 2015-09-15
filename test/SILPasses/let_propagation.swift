@@ -8,7 +8,6 @@
 // It is calle just to trigger flushing of all known stored in LoadStore optimizations.
 @inline(never)
 func action() {
-    print("")
 }
 
 final public class A0 {

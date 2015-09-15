@@ -13,9 +13,7 @@
 #define DEBUG_TYPE "sil-aa"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/ValueTracking.h"
-#include "swift/SILAnalysis/SideEffectAnalysis.h"
 #include "swift/SILPasses/Utils/Local.h"
-#include "swift/SILPasses/PassManager.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
@@ -658,9 +656,6 @@ public:
        return Behavior;
      }
   }
-  
-  /// Get the memory behavior from function side-effects.
-  MemBehavior getMemBehavior(const SideEffectAnalysis::Effects &E);
 
   MemBehavior visitLoadInst(LoadInst *LI);
   MemBehavior visitStoreInst(StoreInst *SI);
@@ -828,59 +823,13 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
   return MemBehavior::MayHaveSideEffects;
 }
 
-MemBehavior MemoryBehaviorVisitor::getMemBehavior(
-                                   const SideEffectAnalysis::Effects &E) {
-  if (E.mayRelease())
-    return MemBehavior::MayHaveSideEffects;
-
-  if (!IgnoreRefCountIncrements && E.mayRetain())
-    return MemBehavior::MayHaveSideEffects;
-
-  if (E.mayWrite())
-      return E.mayRead() ? MemBehavior::MayReadWrite : MemBehavior::MayWrite;
-
-  if (E.mayRead())
+MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
+  if (isLetPointer(V))
     return MemBehavior::MayRead;
 
-  return MemBehavior::None;
-}
-
-MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
-  
-  SideEffectAnalysis::FunctionEffects ApplyEffects;
-  AA.getSideEffectAnalysis()->getEffects(ApplyEffects, AI);
-
-  MemBehavior Behavior = MemBehavior::None;
-
-  // We can ignore mayTrap().
-  if (ApplyEffects.mayReadRC() ||
-      (!IgnoreRefCountIncrements && ApplyEffects.mayAllocObjects())) {
-    Behavior = MemBehavior::MayHaveSideEffects;
-  } else {
-    auto &GlobalEffects = ApplyEffects.getGlobalEffects();
-    Behavior = getMemBehavior(GlobalEffects);
-
-    // Check all parameter effects.
-    for (unsigned Idx = 0, End = AI->getNumArguments();
-         Idx < End && Behavior < MemBehavior::MayHaveSideEffects;
-         ++Idx) {
-      auto &ArgEffect = ApplyEffects.getParameterEffects()[Idx];
-      auto ArgBehavior = getMemBehavior(ArgEffect);
-      if (ArgBehavior > Behavior) {
-        SILValue Arg = AI->getArgument(Idx);
-        // We only consider the argument effects if the argument aliases V.
-        if (!Arg.getType().isAddress() ||
-            !AA.isNoAlias(Arg, V, Arg.getType(), findTypedAccessType(V))) {
-          Behavior = ArgBehavior;
-        }
-      }
-    }
-  }
-  if (Behavior > MemBehavior::MayRead && isLetPointer(V))
-    Behavior = MemBehavior::MayRead;
-
-  DEBUG(llvm::dbgs() << "  Found apply, returning " << Behavior << '\n');
-  return Behavior;
+  DEBUG(llvm::dbgs() << "  Found apply we don't understand returning "
+                          "MHSF.\n");
+  return MemBehavior::MayHaveSideEffects;
 }
 
 SILInstruction::MemoryBehavior
@@ -898,10 +847,6 @@ AliasAnalysis::AliasResult AliasAnalysis::cacheValue(AliasCacheKey Key,
   DEBUG(llvm::dbgs() << "Caching Alias Result: " << Result << "\n" << Key.first
                      << Key.second << "\n");
   return AliasCache[Key] = Result;
-}
-
-void AliasAnalysis::initialize(SILPassManager *PM) {
-  SEA = PM->getAnalysis<SideEffectAnalysis>();
 }
 
 SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
