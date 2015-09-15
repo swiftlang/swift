@@ -149,6 +149,12 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
                            bool respectAccessControl,
                            ArrayRef<Module::ImportedModule> extraImports,
                            CallbackTy callback) {
+  assert(module);
+  assert(std::none_of(extraImports.begin(), extraImports.end(),
+                      [](Module::ImportedModule import) -> bool {
+    return !import.second;
+  }));
+
   ModuleLookupCache::iterator iter;
   bool isNew;
   std::tie(iter, isNew) = cache.insert({{accessPath, module}, {}});
@@ -192,6 +198,10 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
       resolutionKind == ResolutionKind::Overloadable) {
     SmallVector<Module::ImportedModule, 8> reexports;
     module->getImportedModulesForLookup(reexports);
+    assert(std::none_of(reexports.begin(), reexports.end(),
+                        [](Module::ImportedModule import) -> bool {
+      return !import.second;
+    }));
     reexports.append(extraImports.begin(), extraImports.end());
 
     // Prefer scoped imports (import func Swift.max) to whole-module imports.
