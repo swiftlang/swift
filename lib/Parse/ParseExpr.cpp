@@ -197,6 +197,7 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
                                              bool isConfigCondition) {
   SmallVector<Expr*, 8> SequencedExprs;
   SourceLoc startLoc = Tok.getLoc();
+  bool HasCodeCompletion = false;
 
   while (true) {
     if (isConfigCondition && Tok.isAtStartOfLine())
@@ -205,10 +206,10 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
     // Parse a unary expression.
     ParserResult<Expr> Primary =
       parseExprSequenceElement(Message, isExprBasic);
-    if (Primary.hasCodeCompletion())
-      return Primary;
-    if (Primary.isNull())
-      return nullptr;
+    HasCodeCompletion |= Primary.hasCodeCompletion();
+    if (Primary.isNull()) {
+      return Primary.hasCodeCompletion() ? Primary : nullptr;
+    }
     SequencedExprs.push_back(Primary.get());
     
 parse_operator:
@@ -341,10 +342,17 @@ done:
   }
 
   // If we saw no operators, don't build a sequence.
-  if (SequencedExprs.size() == 1)
-    return makeParserResult(SequencedExprs[0]);
+  if (SequencedExprs.size() == 1) {
+    auto Result = makeParserResult(SequencedExprs[0]);
+    if (HasCodeCompletion)
+      Result.setHasCodeCompletion();
+    return Result;
+  }
 
-  return makeParserResult(SequenceExpr::create(Context, SequencedExprs));
+  auto Result = makeParserResult(SequenceExpr::create(Context, SequencedExprs));
+  if (HasCodeCompletion)
+    Result.setHasCodeCompletion();
+  return Result;
 }
 
 /// parseExprSequenceElement

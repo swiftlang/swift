@@ -5,6 +5,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_5 | FileCheck %s -check-prefix=ASSIGN_5
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_6 | FileCheck %s -check-prefix=ASSIGN_6
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_7 | FileCheck %s -check-prefix=ASSIGN_7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_8 | FileCheck %s -check-prefix=ASSIGN_8
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_9 | FileCheck %s -check-prefix=ASSIGN_9
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_10 | FileCheck %s -check-prefix=ASSIGN_10
 class C1 {
 var I1 = 1
 var I2 = 3
@@ -40,6 +44,15 @@ func StringOpGenerator() -> String? {
 }
 
 func VoidGen() {}
+
+class C2 {
+  func IntGen() -> Int { return 1 }
+  func IntOpGen() -> Int? { return 1 }
+  func D1Gen() -> D1 { return D1.case1 }
+  func D2Gen() -> D2 { return D2.case3 }
+  func VoidGen() {}
+  var InternalC2 = C2()
+}
 
 func f1() {
 	var I3 : Int
@@ -113,4 +126,55 @@ func f2() {
 // ASSIGN_6-DAG: Decl[EnumElement]/ExprSpecific:     case3[#C1.D2#]; name=case3
 // ASSIGN_6-DAG:Decl[EnumElement]/ExprSpecific:     case4[#C1.D2#]; name=case4
 
+  func f7 (C : C2) {
+    var i : Int
+    i = C.#^ASSIGN_7^#
+  }
+
+// ASSIGN_7: Begin completions
+// ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntGen()[#Int#]
+// ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
+// ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#C1.D1#]
+// ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: VoidGen()[#Void#]
+// ASSIGN_7-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+
+  func f8 (C : C2) {
+    var i : Int?
+    i = C.#^ASSIGN_8^#
+  }
+
+// ASSIGN_8: Begin completions
+// ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntGen()[#Int#]
+// ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: IntOpGen()[#Int?#]
+// ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#C1.D1#]
+// ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: VoidGen()[#Void#]
+// ASSIGN_8-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+
+  func f9 (C : C2) {
+    var d : D1
+    d = C.#^ASSIGN_9^#
+  }
+
+// ASSIGN_9: Begin completions
+// ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
+// ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
+// ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: D1Gen()[#C1.D1#]
+// ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: VoidGen()[#Void#]
+// ASSIGN_9-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
+
+  func f10 (C : C2) {
+    var d : D1
+    d = C.InternalC2.#^ASSIGN_10^#
+  }
+
+// ASSIGN_10: Begin completions
+// ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
+// ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
+// ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Identical]: D1Gen()[#C1.D1#]
+// ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal:   D2Gen()[#C1.D2#]
+// ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: VoidGen()[#Void#]
+// ASSIGN_10-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
 }

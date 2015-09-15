@@ -3175,6 +3175,7 @@ public:
     Finder(ParsedExpr, [](Expr *E) {
       switch(E->getKind()) {
         case ExprKind::Call:
+        case ExprKind::Assign:
           return true;
         default:
           return false;
@@ -3191,6 +3192,18 @@ public:
       case ExprKind::Call: {
         CompletionLookup::collectArgumentExpectatation(*DC, cast<CallExpr>(Parent),
                                                       ParsedExpr, PotentialTypes);
+        break;
+      }
+      case ExprKind::Assign: {
+        auto &SM = DC->getASTContext().SourceMgr;
+        auto *AE = cast<AssignExpr>(Parent);
+
+        // Make sure code completion is on the right hand side.
+        if (SM.isBeforeInBuffer(AE->getEqualLoc(), ParsedExpr->getStartLoc())) {
+
+          // The destination is of the expected type.
+          PotentialTypes.push_back(AE->getDest()->getType());
+        }
         break;
       }
       default:
