@@ -551,6 +551,9 @@ namespace {
     /// Whether this type variable has literal bindings.
     LiteralBindingKind LiteralBinding = LiteralBindingKind::None;
 
+    /// Whether this type variable is only bound above by existential types.
+    bool SubtypeOfExistentialType = false;
+
     /// Determine whether the set of bindings is non-empty.
     explicit operator bool() const {
       return !Bindings.empty();
@@ -561,10 +564,12 @@ namespace {
     friend bool operator<(const PotentialBindings &x, 
                           const PotentialBindings &y) {
       return std::make_tuple(x.FullyBound,
+                             x.SubtypeOfExistentialType,
                              static_cast<unsigned char>(x.LiteralBinding),
                              x.InvolvesTypeVariables,
                              -x.Bindings.size())
         < std::make_tuple(y.FullyBound,
+                          y.SubtypeOfExistentialType,
                           static_cast<unsigned char>(y.LiteralBinding),
                           y.InvolvesTypeVariables,
                           -y.Bindings.size());
@@ -949,6 +954,16 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
                                  None});
     }
   }
+
+  // Determine if the bindings only constrain the type variable from above with
+  // an existential type; such a binding is not very helpful because it's
+  // impossible to enumerate the existential type's subtypes.
+  result.SubtypeOfExistentialType =
+    std::all_of(result.Bindings.begin(), result.Bindings.end(),
+                [](const PotentialBinding &binding) {
+                  return binding.BindingType->isExistentialType() &&
+                         binding.Kind == AllowedBindingKind::Subtypes;
+                });
 
   return result;
 }

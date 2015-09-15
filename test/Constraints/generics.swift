@@ -152,4 +152,21 @@ class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
   }
 }
 
+// <rdar://problem/22459135> error: 'print' is unavailable: Please wrap your tuple argument in parentheses: 'print((...))'
+func r22459135() {
+  func h<S: SequenceType where S.Generator.Element: IntegerType>
+    (sequence: S) -> S.Generator.Element {
+    return 0
+  }
 
+  func g(x: Any) {}
+  func f(x: Int) {
+    g(h([3]))
+  }
+
+  func f2<TargetType: AnyObject>(target: TargetType, handler: TargetType -> ()) {
+    let _: AnyObject -> () = { internalTarget in
+      handler(internalTarget as! TargetType)
+    }
+  }
+}
