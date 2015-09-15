@@ -51,6 +51,10 @@ struct PrintOptions {
   /// \brief Whether to print a placeholder for default parameters.
   bool PrintDefaultParameterPlaceholder = true;
 
+  /// \brief Whether to print "fake" default arguments for
+  /// Objective-C-imported parameters.
+  bool PrintFakeImportedDefaultArguments = false;
+
   /// \brief Whether to prefer printing TypeReprs instead of Types,
   /// if a TypeRepr is available.  This allows us to print the original
   /// spelling of the type name.

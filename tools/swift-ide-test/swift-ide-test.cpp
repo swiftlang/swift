@@ -246,6 +246,11 @@ SkipParameterNames("skip-parameter-names",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+FakeImportedDefaultArgs("fake-imported-default-args",
+                        llvm::cl::desc("Whether to print default args for imported parameters"),
+                        llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 DisableAccessControl("disable-access-control",
     llvm::cl::desc("Disables access control, like a debugger"));
 
@@ -2494,6 +2499,8 @@ int main(int argc, char *argv[]) {
       PrintOpts.ArgAndParamPrinting
         = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
     }
+    PrintOpts.PrintFakeImportedDefaultArguments
+      = options::FakeImportedDefaultArgs;
   }
 
   if (PrintOpts.PrintDocumentationComments) {

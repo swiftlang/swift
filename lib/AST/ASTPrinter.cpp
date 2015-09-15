@@ -1466,6 +1466,33 @@ void PrintAST::printOneParameter(const Pattern *BodyPattern,
     RemoveFunc(DAK_AutoClosure);
 }
 
+namespace swift {
+  /// Return a faked default argument 
+  /// FIXME: This is an experimental hack.
+  Optional<StringRef> getFakeDefaultArgForType(Type type) {
+    if (!type) return None;
+
+    // For optional types, the default is "nil".
+    if (type->getOptionalObjectType()) return StringRef("nil");
+
+    // For option sets, the default is "[]".
+    if (auto structType = type->getAs<StructType>()) {
+      auto structDecl = structType->getDecl();
+      if (structDecl->getClangDecl()) {
+        for (auto attr : structDecl->getAttrs()) {
+          if (auto synthesizedProto = dyn_cast<SynthesizedProtocolAttr>(attr)) {
+            if (synthesizedProto->getProtocolKind()
+                  == KnownProtocolKind::OptionSetType)
+              return StringRef("[]");
+          }
+        }
+      }
+    }
+    
+    return None;
+  }
+}
+
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   ArrayRef<Pattern *> BodyPatterns = AFD->getBodyParamPatterns();
 
@@ -1494,8 +1521,18 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
           Printer << "...";
         if (Options.PrintDefaultParameterPlaceholder &&
             BodyTuple->getElement(i).getDefaultArgKind() !=
-                DefaultArgumentKind::None)
+              DefaultArgumentKind::None) {
           Printer << " = default";
+        } else if (Options.PrintFakeImportedDefaultArguments &&
+                   AFD->getClangDecl() &&
+                   !BodyTuple->getElement(i).getPattern()->getBoundName()
+                      .empty()) {
+          if (auto defaultArg = getFakeDefaultArgForType(
+                                  BodyTuple->getElement(i).getPattern()
+                                    ->getType())) {
+            Printer << " = " << *defaultArg;
+          }
+        }
       }
       Printer << ")";
       continue;
@@ -1508,6 +1545,15 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
                       ArgNameIsAPIByDefault,
                       /*StripOuterSliceType=*/false,
                       /*Curried=*/CurrPattern > 0);
+
+    if (Options.PrintFakeImportedDefaultArguments &&
+        AFD->getClangDecl() &&
+        !BodyParen->getSubPattern()->getBoundName().empty()) {
+          if (auto defaultArg = getFakeDefaultArgForType(
+                                  BodyParen->getSubPattern()->getType())) {
+            Printer << " = " << *defaultArg;
+          }
+        }
     Printer << ")";
   }
 
