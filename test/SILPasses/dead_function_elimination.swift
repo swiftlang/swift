@@ -40,6 +40,7 @@ class Derived : Base {
 }
 
 @inline(never)
+@_semantics("optimize.sil.never") // avoid devirtualization
 func testClasses(b: Base) {
 	b.aliveMethod()
 }
@@ -70,11 +71,13 @@ struct Adopt : Prot {
 }
 
 @inline(never)
+@_semantics("optimize.sil.never") // avoid devirtualization
 func testProtocols(p: Prot) {
 	p.aliveWitness()
 }
 
 
+@_semantics("optimize.sil.never") // avoid devirtualization
 public func callTest() {
 	testClasses(Base())
 	testClasses(Derived())
@@ -94,19 +97,22 @@ public func callTest() {
 // CHECK-TESTING: sil {{.*}}deadWitness
 
 // CHECK-LABEL: sil_vtable Base
+// CHECK: aliveMethod
 // CHECK-NOT: deadMethod
 
 // CHECK-TESTING-LABEL: sil_vtable Base
 // CHECK-TESTING: deadMethod
 
 // CHECK-LABEL: sil_vtable Derived
+// CHECK: aliveMethod
 // CHECK-NOT: deadMethod
 
 // CHECK-TESTING-LABEL: sil_vtable Derived
 // CHECK-TESTING: deadMethod
 
 // CHECK-LABEL: sil_witness_table hidden Adopt: Prot
-// CHECK: deadWitness{{.*}} nil
+// CHECK: aliveWitness!1: @{{.*}}aliveWitness
+// CHECK: deadWitness!1: nil
 
 // CHECK-TESTING-LABEL: sil_witness_table Adopt: Prot
 // CHECK-TESTING: deadWitness{{.*}}: @{{.*}}deadWitness
