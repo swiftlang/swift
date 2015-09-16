@@ -426,7 +426,7 @@ void StmtEmitter::visitIfConfigStmt(IfConfigStmt *S) {
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {
-  Scope condBufferScope(SGF.Cleanups, S);
+  LexicalScope condBufferScope(SGF.Cleanups, SGF, S);
   
   // Create a new basic block and jump into it.
   JumpDest loopDest = createJumpDest(S->getBody());
