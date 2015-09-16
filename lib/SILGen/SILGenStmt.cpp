@@ -681,7 +681,7 @@ void StmtEmitter::visitForStmt(ForStmt *S) {
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'generator' variable that we'll be using for iteration.
-  Scope OuterForScope(SGF.Cleanups, CleanupLocation(S));
+  LexicalScope OuterForScope(SGF.Cleanups, SGF, CleanupLocation(S));
   SGF.visitPatternBindingDecl(S->getGenerator());
   
   // If we ever reach an unreachable point, stop emitting statements.
