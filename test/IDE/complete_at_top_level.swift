@@ -22,6 +22,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | FileCheck %s -check-prefix=NEGATIVE
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CLOSURE_1 | FileCheck %s -check-prefix=TOP_LEVEL_CLOSURE_1
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_1 > %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.txt
 // RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.txt
@@ -154,7 +156,8 @@ func resyncParser6a() {}
 var topLevelVar1 = #^TOP_LEVEL_VAR_INIT_1^#
 // TOP_LEVEL_VAR_INIT_1: Begin completions
 // TOP_LEVEL_VAR_INIT_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
-// TOP_LEVEL_VAR_INIT_1-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_1-DAG: Decl[FreeFunction]/CurrModule: fooFunc1()[#Void#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_1-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_1: End completions
 
 // Check that the variable itself does not show up.
@@ -174,7 +177,7 @@ func resyncParser8() {}
 #^PLAIN_TOP_LEVEL_1^#
 // PLAIN_TOP_LEVEL: Begin completions
 // PLAIN_TOP_LEVEL-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
-// PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
+// PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#]{{; name=.+$}}
 // PLAIN_TOP_LEVEL: End completions
 
 // PLAIN_TOP_LEVEL_NO_DUPLICATES: Begin completions
@@ -192,6 +195,17 @@ func _tmpFuncWithSyntaxError() { if return }
 #^PLAIN_TOP_LEVEL_2^#
 
 func resyncParser10() {}
+
+_ = {
+  #^TOP_LEVEL_CLOSURE_1^#
+}()
+// TOP_LEVEL_CLOSURE_1: Begin completions
+// TOP_LEVEL_CLOSURE_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
+// TOP_LEVEL_CLOSURE_1-DAG: Decl[FreeFunction]/CurrModule: fooFunc1()[#Void#]{{; name=.+$}}
+// TOP_LEVEL_CLOSURE_1-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#]{{; name=.+$}}
+// TOP_LEVEL_CLOSURE_1: End completions
+
+func resyncParser11() {}
 
 //===--- Test code completions of types.
 

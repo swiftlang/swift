@@ -994,6 +994,20 @@ public:
   }
 };
 
+static bool isTopLevelContext(const DeclContext *DC) {
+  for (; DC && DC->isLocalContext(); DC = DC->getParent()) {
+    switch (DC->getContextKind()) {
+    case DeclContextKind::TopLevelCodeDecl:
+      return true;
+    case DeclContextKind::AbstractFunctionDecl:
+      return false;
+    default:
+      continue;
+    }
+  }
+  return false;
+}
+
 /// Build completions by doing visible decl lookup from a context.
 class CompletionLookup final : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
@@ -1227,10 +1241,19 @@ public:
 
     case DeclVisibilityKind::VisibleAtTopLevel:
       if (CurrDeclContext &&
-          D->getModuleContext() == CurrDeclContext->getParentModule())
-        return SemanticContextKind::CurrentModule;
-      else
+          D->getModuleContext() == CurrDeclContext->getParentModule()) {
+        // Treat global variables from the same source file as local when
+        // completing at top-level.
+        if (isa<VarDecl>(D) && isTopLevelContext(CurrDeclContext) &&
+            D->getDeclContext()->getParentSourceFile() ==
+                CurrDeclContext->getParentSourceFile()) {
+          return SemanticContextKind::Local;
+        } else {
+          return SemanticContextKind::CurrentModule;
+        }
+      } else {
         return SemanticContextKind::OtherModule;
+      }
 
     case DeclVisibilityKind::DynamicLookup:
       // AnyObject results can come from different modules, including the

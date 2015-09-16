@@ -45,6 +45,8 @@ enum MyQuickLookObject {
   case Rectangle(Float64, Float64, Float64, Float64)
 }
 
+var globalVar: Int
+
 func hiddenImport()
 
 func overlayedFoo()

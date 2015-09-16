@@ -12,6 +12,8 @@ public func hiddenImport() {}
 
 public func overlayedFoo() {}
 
+public var globalVar: Int = 0
+
 /// FooSwiftStruct Aaa.
 /**
  * Bbb.
