@@ -70,7 +70,7 @@ struct CustomGenericCollection<Key> : DictionaryLiteralConvertible {
 // rdar://problem/21796881
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21796881
 extension NilLiteralConvertible {
-   var nil: Self { #^RDAR_21796881^#
+   var nil: Self { #^RDAR_21796881^# }
 }
 
 // rdar://problem/21436558
@@ -88,7 +88,7 @@ private protocol RoundRobin : Sendable, Receivable {
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_21435993
 class C<T> {
   func test() {
-    do {} catch { #^RDAR_21435993^#
+    do {} catch { #^RDAR_21435993^# }
   }
   func accidentallyNested<U>(x: U) {}
 }
@@ -114,6 +114,7 @@ public extension AnyGenerator {
       #^RDAR_22036358^#
       return AnySequence(xs)
     }
+  }
 }
 
 // rdar://problem/22012123
@@ -123,3 +124,12 @@ protocol Fooable {
     #^RDAR_22012123^#
   }
 }
+
+// rdar://problem/22688199
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22688199 | FileCheck %s -check-prefix=FLIP_CURRIED
+func curried(a: Int)(b1: Int, b2: Int) { }
+func flip<A, B, C>(f: A -> B -> C) -> B -> A -> C { }
+func rdar22688199() {
+  let f = flip(curried)(#^RDAR_22688199^#
+}
+// FLIP_CURRIED: Pattern/ExprSpecific: ['(']{#b1: Int#}, {#b2: Int#})[#Int -> ()#]

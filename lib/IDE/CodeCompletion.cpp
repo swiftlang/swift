@@ -3332,11 +3332,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::PostfixExprParen: {
     Lookup.setHaveLParen(true);
-    ValueDecl *VD = nullptr;
-    if (auto *AE = dyn_cast<ApplyExpr>(ParsedExpr)) {
-      if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn()))
-        VD = DRE->getDecl();
-    }
     CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
                                                    CodeCompleteTokenExpr);
     llvm::SmallVector<Type, 2> PossibleTypes;
@@ -3344,7 +3339,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setExpectedTypes(PossibleTypes);
     }
     if (ExprType)
-      Lookup.getValueExprCompletions(*ExprType, VD);
+      Lookup.getValueExprCompletions(*ExprType);
     if (!Lookup.FoundFunctionCalls ||
         (Lookup.FoundFunctionCalls &&
          Lookup.FoundFunctionsWithoutFirstKeyword)) {
