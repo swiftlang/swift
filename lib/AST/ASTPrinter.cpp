@@ -616,6 +616,15 @@ void PrintAST::printPatternType(const Pattern *P) {
 }
 
 bool PrintAST::shouldPrint(const Decl *D) {
+  if (!Options.PrintUnresolvedExtensions) {
+    if (auto ED = dyn_cast<ExtensionDecl>(D)) {
+      if (ED->getExtendedType().isNull() ||
+          !ED->getExtendedType()->getAnyNominal()) {
+        return false;
+      }
+    }
+  }
+
   if (Options.SkipDeinit && isa<DestructorDecl>(D)) {
     return false;
   }
