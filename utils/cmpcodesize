@@ -84,7 +84,13 @@ Prefixes = {
     "__TTo" : "Swift @objc Func",
 }
 
+Infixes = {
+  #Swift
+  "q_" : "Generic Function"
+}
+
 SortedPrefixes = sorted(Prefixes)
+SortedInfixes = sorted(Infixes)
 
 def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
     if not function or startAddr == None or endAddr == None:
@@ -93,8 +99,12 @@ def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
     size = endAddr - startAddr
 
     if groupByPrefix:
+        for infix in SortedInfixes:
+	    if infix in function:
+               sizes[Infixes[infix]] += size
+               return
         for prefix in SortedPrefixes:
-            if function.startswith(prefix):
+	    if function.startswith(prefix):
                 # Special handling for function signature specializations
                 # of generic specializations.
                 if prefix == "__TTSf" and "__TTSg" in function:
@@ -206,7 +216,7 @@ def compareSizesOfFile(oldFiles, newFiles, allSections, listCategories):
     compareSizes(oldSizes, newSizes, "__text", title)
     if listCategories:
         prev = None
-        for categoryName in sorted(Prefixes.values()) + ["Unknown"]:
+        for categoryName in sorted(Prefixes.values()) + sorted(Infixes.values())+ ["Unknown"]:
             if categoryName != prev:
                 compareSizes(oldSizes, newSizes, categoryName, "")
             prev = categoryName
