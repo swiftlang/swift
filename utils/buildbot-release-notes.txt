@@ -1,5 +1,15 @@
-Latest
-------
+
+
+
+
+
+*** Time warp: Changes between Xcode 6.1 (Swift 1.1) through Xcode 7.1
+(Swift 2.1) have been lost.  Contributions to rectify this would be
+welcome.
+
+
+2014-10-09 [Roughly Xcode 6.1, and Swift 1.1]
+----------
 
 * 'HeapBuffer<Value,Element>', 'HeapBufferStorage<Value,Element>', and
   'OnHeap<Value>' were never really useful, because their APIs were
