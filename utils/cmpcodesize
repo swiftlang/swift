@@ -67,8 +67,8 @@ Prefixes = {
     "__swift" : "CPP",
 
     # Objective-C
-    "+[" : "CPP",
-    "-[" : "CPP",
+    "+[" : "ObjC",
+    "-[" : "ObjC",
 
     # Swift
     "__TP"  : "Partial Apply",
