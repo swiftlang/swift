@@ -1183,6 +1183,27 @@ class infer_instanceVar1 {
   
   // <rdar://problem/20918869> Confusing diagnostic for @convention(c) throws
   var var_CFunctionPointer_invalid_3 : @convention(c) (Int) throws -> Int // expected-error {{'(Int) throws -> Int' is not representable in Objective-C, so it cannot be used with '@convention(c)'}}
+
+  weak var var_Weak1: Class_ObjC1?
+  weak var var_Weak2: Protocol_ObjC1?
+  // <rdar://problem/16473062> weak and unowned variables of metatypes are rejected
+  //weak var var_Weak3: Class_ObjC1.Type?
+  //weak var var_Weak4: Protocol_ObjC1.Type?
+  weak var var_Weak5: AnyObject?
+  //weak var var_Weak6: AnyObject.Type?
+  weak var var_Weak7: protocol<Protocol_ObjC1>?
+  weak var var_Weak8: protocol<Protocol_ObjC1, Protocol_ObjC2>?
+
+// CHECK-LABEL: @objc weak var var_Weak1: @sil_weak Class_ObjC1
+// CHECK-LABEL: @objc weak var var_Weak2: @sil_weak Protocol_ObjC1
+// CHECK-LABEL: @objc weak var var_Weak5: @sil_weak AnyObject
+// CHECK-LABEL: @objc weak var var_Weak7: @sil_weak Protocol_ObjC1
+// CHECK-LABEL: @objc weak var var_Weak8: @sil_weak protocol<Protocol_ObjC1, Protocol_ObjC2>
+
+  weak var var_Weak_fail1: PlainClass?
+  weak var var_Weak_bad2: PlainStruct?
+  // expected-error@-1 {{'weak' cannot be applied to non-class type 'PlainStruct'}}
+
   weak var var_Weak_bad3: PlainEnum?
   // expected-error@-1 {{'weak' cannot be applied to non-class type 'PlainEnum'}}
   weak var var_Weak_bad4: String?
