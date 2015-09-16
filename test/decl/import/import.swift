@@ -56,4 +56,4 @@ var _ : Int = foo()
 import français
 import func français.phoûx
 
-import main // expected-error {{cannot import module being compiled}}
+import main // expected-warning {{file 'import.swift' is part of module 'main'; ignoring import}}

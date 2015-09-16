@@ -150,8 +150,15 @@ void NameBinder::addImport(
   if (ID->getModulePath().front().first == SF.getParentModule()->getName() &&
       ID->getModulePath().size() == 1 && !shouldImportSelfImportClang(ID, SF)) {
     // If the imported module name is the same as the current module,
-    // produce an error.
-    Context.Diags.diagnose(ID, diag::sema_import_current_module);
+    // produce a diagnostic.
+    StringRef filename = llvm::sys::path::filename(SF.getFilename());
+    if (filename.empty())
+      Context.Diags.diagnose(ID, diag::sema_import_current_module,
+                             ID->getModulePath().front().first);
+    else
+      Context.Diags.diagnose(ID, diag::sema_import_current_module_with_file,
+                             filename, ID->getModulePath().front().first);
+    ID->setModule(SF.getParentModule());
     return;
   }
 
