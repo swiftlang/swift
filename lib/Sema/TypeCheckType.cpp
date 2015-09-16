@@ -1591,9 +1591,13 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   case AnyFunctionType::Representation::Block:
   case AnyFunctionType::Representation::CFunctionPointer:
     if (!TC.isRepresentableInObjC(DC, fnTy)) {
+      StringRef strName =
+        rep == AnyFunctionType::Representation::Block ? "block" : "c";
+      auto extInfo2 =
+        extInfo.withRepresentation(AnyFunctionType::Representation::Swift);
+      auto simpleFnTy = FunctionType::get(inputTy, outputTy, extInfo2);
       TC.diagnose(repr->getStartLoc(), diag::objc_convention_invalid,
-                  rep == AnyFunctionType::Representation::Block
-                    ? StringRef("block") : StringRef("c"));
+                  simpleFnTy, strName);
     }
     break;
 
