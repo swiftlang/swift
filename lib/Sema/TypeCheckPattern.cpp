@@ -569,17 +569,22 @@ public:
     
     // Otherwise, see whether we had an enum type as the penultimate component,
     // and look up an element inside it.
-    auto compoundR = cast<CompoundIdentTypeRepr>(repr);
-    if (!compoundR->Components.end()[-2]->isBoundType())
-      return nullptr;
-    
-    Type enumTy = compoundR->Components.end()[-2]->getBoundType();
+    auto *prefixRepr = IdentTypeRepr::create(
+                         TC.Context,
+                         llvm::makeArrayRef(components.data(),
+                                            components.size() - 1));
+
+    // See first if the entire repr resolves to a type.
+    Type enumTy = TC.resolveIdentifierType(DC, prefixRepr,
+                                           TR_AllowUnboundGenerics,
+                                           /*diagnoseErrors*/false, &resolver);
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
     if (!enumDecl)
       return nullptr;
-    
+
+    auto compoundR = cast<CompoundIdentTypeRepr>(repr);
     auto tailComponent = compoundR->Components.back();
-    
+
     EnumElementDecl *referencedElement
       = lookupEnumMemberElement(TC, DC, enumTy, tailComponent->getIdentifier());
     if (!referencedElement)
