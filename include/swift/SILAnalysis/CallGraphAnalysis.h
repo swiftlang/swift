@@ -155,7 +155,7 @@ public:
     return Ordinal;
   }
 
-  void dump();
+  void dump(int Indent);
 };
 
 class CallGraphNode {

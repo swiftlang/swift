@@ -387,52 +387,73 @@ void CallGraph::addEdges(SILFunction *F) {
   }
 }
 
-void CallGraphEdge::dump() {
+static void indent(int Indent) {
 #ifndef NDEBUG
+  std::string Blanks(Indent, ' ');
+  llvm::errs() << Blanks;
+#endif
+}
+
+static void dumpFlag(const char *Description, bool Value, int Indent =0) {
+#ifndef NDEBUG
+  indent(Indent);
+  llvm::errs() << Description << ": " << (Value ? "yes\n" : "no\n");
+#endif
+}
+
+void CallGraphEdge::dump(int Indent) {
+#ifndef NDEBUG
+  indent(Indent);
+  llvm::errs() << "Call site #" << Ordinal << ": ";
+  getApply().getInstruction()->dump();
+
+  dumpFlag("All callees known", isCalleeSetComplete(), Indent);
+
   auto CalleeSet = getPartialCalleeSet();
+  if (CalleeSet.empty())
+    return;
+
   llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
   orderCallees(CalleeSet, OrderedNodes);
 
-  llvm::errs() << Ordinal;
-  llvm::errs() << (!CalleeSet.empty() && isCalleeSetComplete() ?
-                   " (all callees known): " : ": ");
-  getApply().getInstruction()->dump();
-
-  if (hasSingleCallee()) {
-    llvm::errs() << "Callee: " << OrderedNodes[0]->getFunction()->getName();
-    llvm::errs() << "\n";
-  } else {
-    llvm::errs() << "Callees:\n";
-    for (auto *Callee : OrderedNodes)
-      llvm::errs() << Callee->getFunction()->getName() << "\n";
+  bool First = true;
+  indent(Indent);
+  llvm::errs() << "Known callees:\n";
+  for (auto *Callee : OrderedNodes) {
+    if (!First)
+      llvm::errs() << "\n";
+    First = false;
+    auto Name = Callee->getFunction()->getName();
+    indent(Indent + 2);
+    llvm::errs() << "Name: " << Name << "\n";
+    indent(Indent + 2);
+    llvm::errs() << "Demangled: " <<
+      demangle_wrappers::demangleSymbolAsString(Name) << "\n";
   }
 #endif
 }
 
 void CallGraphNode::dump() {
 #ifndef NDEBUG
+  llvm::errs() << "Function #" << Ordinal << ": " <<
+    getFunction()->getName() << "\n";
+  llvm::errs() << "Demangled: " <<
+    demangle_wrappers::demangleSymbolAsString(getFunction()->getName()) << "\n";
+  dumpFlag("Trivially dead", isDead());
+  dumpFlag("All callers known", isCallerEdgesComplete());
+  dumpFlag("Binds self", mayBindDynamicSelf());
+
   auto &Edges = getCalleeEdges();
-  llvm::SmallVector<CallGraphEdge *, 8> OrderedEdges;
-  orderEdges(Edges, OrderedEdges);
-
-  llvm::errs() << Ordinal;
-  if (isDead())
-    llvm::errs() << " [dead]";
-  else {
-    if (isCallerEdgesComplete())
-      llvm::errs() << " (all callers known)";
-    if (mayBindDynamicSelf())
-      llvm::errs() << " (binds Self)";
-  }
-  llvm::errs() << ": ";
-
-  llvm::errs() << getFunction()->getName() << "\n";
   if (Edges.empty())
     return;
 
-  llvm::errs() << "Applies:\n";
-  for (auto *Edge : OrderedEdges)
-    Edge->dump();
+  llvm::SmallVector<CallGraphEdge *, 8> OrderedEdges;
+  orderEdges(Edges, OrderedEdges);
+
+  for (auto *Edge : OrderedEdges) {
+    llvm::errs() << "\n";
+    Edge->dump(/* Indent= */ 2);
+  }
   llvm::errs() << "\n";
 #endif
 }
