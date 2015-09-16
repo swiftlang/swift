@@ -158,8 +158,6 @@ TEST(RefcountingTest, unowned_retain_release_n) {
   EXPECT_EQ(2u, swift_weakRetainCount(object));
   swift_weakRelease_n(object, 1);
   EXPECT_EQ(1u, swift_weakRetainCount(object));
-  swift_weakRelease(object);
-  EXPECT_EQ(0u, swift_weakRetainCount(object));
   swift_release(object);
   EXPECT_EQ(1u, value);
 }
