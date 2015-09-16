@@ -404,8 +404,12 @@ void SideEffectAnalysis::recompute() {
 }
 
 void SideEffectAnalysis::getEffects(FunctionEffects &FE, FullApplySite FAS) {
-  CallGraph &CG = CGA->getOrBuildCallGraph();
-  getEffectsOfApply(FE, FAS, CG, false);
+  CallGraph *CG = CGA->getCallGraphOrNull();
+  if (CG) {
+    getEffectsOfApply(FE, FAS, *CG, false);
+    return;
+  }
+  FE.setWorstEffects();
 }
 
 SILAnalysis *swift::createSideEffectAnalysis(SILModule *M) {
