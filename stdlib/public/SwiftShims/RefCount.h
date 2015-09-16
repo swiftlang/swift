@@ -315,6 +315,13 @@ class WeakRefCount {
     (void)newval;
   }
 
+  /// Increment the weak reference count by n.
+  void increment(uint32_t n) {
+    uint32_t addval = (n << RC_FLAGS_COUNT);
+    uint32_t newval = __atomic_fetch_add(&refCount, addval, __ATOMIC_RELAXED);
+    assert(newval >= addval  &&  "weak refcount overflow");
+    (void)newval;
+  }
 
   // Decrement the weak reference count.
   // Return true if the caller should deallocate the object.
@@ -326,6 +333,16 @@ class WeakRefCount {
     return (oldval & RC_COUNT_MASK) == RC_ONE;
   }
 
+  /// Decrement the weak reference count.
+  /// Return true if the caller should deallocate the object.
+  bool decrementShouldDeallocateN(uint32_t n) {
+    uint32_t subval = (n << RC_FLAGS_COUNT);
+    uint32_t oldval = __atomic_fetch_sub(&refCount, subval, __ATOMIC_RELAXED);
+    assert(oldval >= subval  &&  "weak refcount underflow");
+
+    // Should dealloc if count was 1 before decrementing (i.e. it is zero now)
+    return (oldval & RC_COUNT_MASK) == subval;
+  }
 
   // Return weak reference count.
   // Note that this is not equal to the number of outstanding weak pointers.

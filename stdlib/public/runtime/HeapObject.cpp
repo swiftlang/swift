@@ -328,6 +328,10 @@ size_t swift::swift_retainCount(HeapObject *object) {
   return object->refCount.getCount();
 }
 
+size_t swift::swift_weakRetainCount(HeapObject *object) {
+  return object->weakRefCount.getCount();
+}
+
 void swift::swift_weakRetain(HeapObject *object) {
   if (!object) return;
 
@@ -338,6 +342,26 @@ void swift::swift_weakRelease(HeapObject *object) {
   if (!object) return;
 
   if (object->weakRefCount.decrementShouldDeallocate()) {
+    // Only class objects can be weak-retained and weak-released.
+    auto metadata = object->metadata;
+    assert(metadata->isClassObject());
+    auto classMetadata = static_cast<const ClassMetadata*>(metadata);
+    assert(classMetadata->isTypeMetadata());
+    swift_slowDealloc(object, classMetadata->getInstanceSize(),
+                      classMetadata->getInstanceAlignMask());
+  }
+}
+
+void swift::swift_weakRetain_n(HeapObject *object, int n) {
+  if (!object) return;
+
+  object->weakRefCount.increment(n);
+}
+
+void swift::swift_weakRelease_n(HeapObject *object, int n) {
+  if (!object) return;
+
+  if (object->weakRefCount.decrementShouldDeallocateN(n)) {
     // Only class objects can be weak-retained and weak-released.
     auto metadata = object->metadata;
     assert(metadata->isClassObject());
