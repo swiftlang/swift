@@ -36,7 +36,7 @@ void ClassHierarchyAnalysis::init() {
   }
 }
 
-/// \brief Get all subclasses subclasses of a given class.
+/// \brief Get all subclasses of a given class.
 /// Does not include any direct subclasses of given base class.
 ///
 /// \p Base base class, whose direct subclasses are to be excluded
