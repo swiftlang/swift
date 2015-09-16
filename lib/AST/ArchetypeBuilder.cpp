@@ -1152,17 +1152,7 @@ bool ArchetypeBuilder::visitInherited(
 
   // Visit all of the inherited types.
   for (auto inherited : inheritedTypes) {
-    inherited.getTypeRepr()->visitTopLevelTypeReprs([&](IdentTypeRepr *ident) {
-      auto *component = ident->getComponentRange().back();
-      if (component->isBoundType()) {
-        visitInherited(component->getBoundType(), component->getIdLoc());
-      } else if (component->isBoundDecl()) {
-        if (auto typeDecl = dyn_cast<TypeDecl>(component->getBoundDecl())) {
-          visitInherited(typeDecl->getDeclaredInterfaceType(),
-                         component->getIdLoc());
-        }
-      }
-    });
+    visitInherited(inherited.getType(), inherited.getLoc());
   }
 
   return isInvalid;

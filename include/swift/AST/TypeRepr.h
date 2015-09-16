@@ -47,11 +47,16 @@ class alignas(8) TypeRepr {
   /// \brief The subclass of TypeRepr that this is.
   const TypeReprKind Kind;
 
+  SourceLoc getLocImpl() const { return getStartLoc(); }
+
 protected:
   TypeRepr(TypeReprKind K) : Kind(K) {}
 
 public:
   TypeReprKind getKind() const { return Kind; }
+
+  /// Get the representative location for pointing at this type.
+  SourceLoc getLoc() const;
 
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
@@ -148,6 +153,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Attrs.AtLoc; }
   SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
+  SourceLoc getLocImpl() const { return Ty->getLoc(); }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -228,6 +234,9 @@ public:
 
 protected:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+
+  SourceLoc getLocImpl() const { return Loc; }
+  friend class TypeRepr;
 };
 
 /// \brief A simple identifier type like "Int".
@@ -301,6 +310,8 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Components.front()->getStartLoc();}
   SourceLoc getEndLocImpl() const { return Components.back()->getEndLoc(); }
+  SourceLoc getLocImpl() const { return Components.back()->getLoc(); }
+
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -372,6 +383,8 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return ArgsTy->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return RetTy->getEndLoc(); }
+  SourceLoc getLocImpl() const { return ArrowLoc; }
+
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -479,6 +492,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return QuestionLoc; }
+  SourceLoc getLocImpl() const { return QuestionLoc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -507,6 +521,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return ExclamationLoc; }
+  SourceLoc getLocImpl() const { return ExclamationLoc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -654,6 +669,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return MetaLoc; }
+  SourceLoc getLocImpl() const { return MetaLoc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -682,6 +698,7 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return ProtocolLoc; }
+  SourceLoc getLocImpl() const { return ProtocolLoc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };

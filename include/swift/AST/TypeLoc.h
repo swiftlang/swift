@@ -52,6 +52,13 @@ public:
     return TypeLoc(T, nullptr);
   }
 
+  /// Get the representative location of this type, for diagnostic
+  /// purposes.
+  SourceLoc getLoc() const {
+    if (TyR) return TyR->getLoc();
+    return SourceLoc();
+  }
+
   SourceRange getSourceRange() const;
 
   bool hasLocation() const { return TyR != nullptr; }

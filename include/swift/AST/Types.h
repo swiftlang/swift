@@ -799,7 +799,10 @@ public:
   /// conformance as a null ProtocolConformance* pointer, because there is no
   /// static conformance associated with the conforming type.
   bool hasDependentProtocolConformances();
-  
+
+  /// Retrieve the type declaration directly referenced by this type, if any.
+  TypeDecl *getDirectlyReferencedTypeDecl() const;
+
 private:
   // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;

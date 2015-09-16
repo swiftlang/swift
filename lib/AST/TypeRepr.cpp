@@ -27,6 +27,16 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
+SourceLoc TypeRepr::getLoc() const {
+  switch (getKind()) {
+#define TYPEREPR(CLASS, PARENT) \
+case TypeReprKind::CLASS: \
+return static_cast<const CLASS##TypeRepr*>(this)->getLocImpl();
+#include "swift/AST/TypeReprNodes.def"
+  }
+  llvm_unreachable("unknown kind!");
+}
+
 SourceLoc TypeRepr::getStartLoc() const {
   switch (getKind()) {
 #define TYPEREPR(CLASS, PARENT) \
@@ -284,13 +294,20 @@ static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
 
 void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
                                        const PrintOptions &Opts) const {
-  if (Type Ty = getBoundType()) {
-    if (auto ModuleTy = dyn_cast<ModuleType>(Ty.getPointer()))
-      Printer.printModuleRef(ModuleTy->getModule(), getIdentifier());
-    else if (auto NTD = Ty->getAnyNominal())
-      Printer.printTypeRef(NTD, getIdentifier());
+  if (TypeDecl *TD = dyn_cast_or_null<TypeDecl>(getBoundDecl())) {
+    if (auto MD = dyn_cast<ModuleDecl>(TD))
+      Printer.printModuleRef(MD, getIdentifier());
     else
+      Printer.printTypeRef(TD, getIdentifier());
+  } else if (Type Ty = getBoundType()) {
+    if (TypeDecl *TD = Ty->getDirectlyReferencedTypeDecl()) {
+      if (auto MD = dyn_cast<ModuleDecl>(TD))
+        Printer.printModuleRef(MD, getIdentifier());
+      else
+        Printer.printTypeRef(TD, getIdentifier());
+    } else {
       Printer << getIdentifier().str();
+    }
   } else {
     Printer << getIdentifier().str();
   }

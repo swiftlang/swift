@@ -408,6 +408,8 @@ namespace {
   /// uttered at the given location.
   template<typename AddProtocolFunc>
   void visitProtocols(Type type, SourceLoc loc, AddProtocolFunc addProtocol) {
+    if (!type) return;
+
     // Protocol types.
     if (auto protocol = type->getAs<ProtocolType>()) {
       addProtocol(protocol->getDecl(), loc);
@@ -418,51 +420,6 @@ namespace {
     if (auto composition = type->getAs<ProtocolCompositionType>()) {
       for (auto protocol : composition->getProtocols())
         visitProtocols(protocol, loc, addProtocol);
-      return;
-    }
-  }
-
-  /// Visit the protocols referenced by the given type representation.
-  /// Each protocol is provided to the callback along with the source
-  /// location where that protocol was named.
-  template<typename AddProtocolFunc>
-  void visitProtocols(TypeRepr *typeRepr, LazyResolver *resolver,
-                      AddProtocolFunc addProtocol) {
-    // Look through attributed type representations.
-    while (auto attr = dyn_cast<AttributedTypeRepr>(typeRepr))
-      typeRepr = attr->getTypeRepr();
-
-    // Handle identifier type representations.
-    if (auto ident = dyn_cast<IdentTypeRepr>(typeRepr)) {
-      ComponentIdentTypeRepr *component = ident->getComponentRange().back();
-
-      // If the last component refers to a type, visit the protocols
-      // in that type.
-      if (component->isBoundType()) {
-        visitProtocols(component->getBoundType(), component->getIdLoc(),
-                       addProtocol);
-        return;
-      }
-
-      // If the last component refers to a type declaration, visit the
-      // protocols in that type.
-      if (component->isBoundDecl()) {
-        if (auto typeDecl = dyn_cast<TypeDecl>(component->getBoundDecl())) {
-          if (resolver)
-            resolver->resolveDeclSignature(typeDecl);
-
-          visitProtocols(typeDecl->getDeclaredType(), component->getIdLoc(),
-                         addProtocol);
-        }
-      }
-
-      return;
-    }
-
-    // Recurse into protocol compositions.
-    if (auto composition = dyn_cast<ProtocolCompositionTypeRepr>(typeRepr)) {
-      for (auto ident : composition->getProtocols())
-        visitProtocols(ident, resolver, addProtocol);
       return;
     }
   }
@@ -520,17 +477,10 @@ void ConformanceLookupTable::addProtocols(NominalTypeDecl *nominal,
   // Visit each of the types in the inheritance list to find
   // protocols.
   for (const auto &entry : inherited) {
-    if (auto typeRepr = entry.getTypeRepr()) {
-      visitProtocols(typeRepr, resolver,
-                     [&](ProtocolDecl *protocol, SourceLoc loc) {
-                       addProtocol(nominal, protocol, loc, source);
-                     });
-    } else {
-      visitProtocols(entry.getType(), SourceLoc(),
-                     [&](ProtocolDecl *protocol, SourceLoc loc) {
-                       addProtocol(nominal, protocol, loc, source);
-                     });
-    }
+    visitProtocols(entry.getType(), entry.getLoc(),
+                   [&](ProtocolDecl *protocol, SourceLoc loc) {
+                     addProtocol(nominal, protocol, loc, source);
+                   });
   }
 }
 

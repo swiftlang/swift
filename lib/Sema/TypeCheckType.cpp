@@ -522,10 +522,10 @@ static NominalTypeDecl *getEnclosingNominalContext(DeclContext *dc) {
 /// \param components The components that refer to the type, where the last
 /// component refers to the type that could not be found.
 ///
-/// \returns true if we could not fix the type reference, false if
-/// typo correction (or some other mechanism) was able to fix the
-/// reference.
-static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
+/// \returns either the corrected type, if possible, or an error type to
+/// that correction failed.
+static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
+                                Type parentType,
                                 ArrayRef<ComponentIdentTypeRepr *> components,
                                 TypeResolutionOptions options,
                                 GenericTypeResolver *resolver) {
@@ -544,14 +544,14 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       auto type = resolveTypeDecl(tc, nominal, comp->getIdLoc(), dc, { },
                                   options, resolver);
       if (type->is<ErrorType>())
-        return true;
+        return type;
 
       // Produce a Fix-It replacing 'Self' with the nominal type name.
       tc.diagnose(comp->getIdLoc(), diag::self_in_nominal, nominal->getName())
         .fixItReplace(comp->getIdLoc(), nominal->getName().str());
       comp->overwriteIdentifier(nominal->getName());
       comp->setValue(type);
-      return false;
+      return type;
     }
     
     // Fallback.
@@ -579,23 +579,24 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
         tc.diagnose(L, diag::note_remapped_type, "UInt")
           .fixItReplace(R, "UInt");
       }
-    }
-    else {
-      tc.diagnose(L, diag::use_undeclared_type,
-                  comp->getIdentifier())
-      .highlight(R);
+
+      return I->second;
     }
 
-    return true;
+    tc.diagnose(L, diag::use_undeclared_type,
+                comp->getIdentifier())
+      .highlight(R);
+
+    return ErrorType::get(tc.Context);
   }
 
   // Qualified lookup case.
+  // FIXME: Typo correction!
   auto parentComponents = components.slice(0, components.size()-1);
   auto parentRange = SourceRange(parentComponents.front()->getStartLoc(),
                                  parentComponents.back()->getEndLoc());
 
   // Lookup into a type.
-  auto parentType = parentComponents.back()->getBoundType();
   if (auto moduleType = parentType->getAs<ModuleType>()) {
     tc.diagnose(comp->getIdLoc(), diag::no_module_type,
                 comp->getIdentifier(), moduleType->getModule()->getName());
@@ -605,7 +606,7 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       .highlight(parentRange);
   }
 
-  return true;
+  return ErrorType::get(tc.Context);
 }
 
 static void
@@ -691,12 +692,15 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   if (current.isNull()) {
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
-    if (!diagnoseErrors ||
-        diagnoseUnknownType(TC, DC, comp, options, resolver)) {                 
+    if (!diagnoseErrors) {
       Type ty = ErrorType::get(TC.Context);
       comp->setValue(ty);
       return;
     }
+
+    comp->setValue(diagnoseUnknownType(TC, DC, nullptr, comp, options,
+                                       resolver));
+    return;
   }
 }
 
@@ -847,17 +851,27 @@ static Type resolveIdentTypeComponent(
 
       // If we didn't find anything, complain.
       bool recovered = false;
+      Type memberType;
       if (!memberTypes) {
         // If we're not allowed to complain or we couldn't fix the
         // source, bail out.
-        if (!diagnoseErrors || 
-            diagnoseUnknownType(TC, DC, components, options, resolver)) {
+        if (!diagnoseErrors) {
           Type ty = ErrorType::get(TC.Context);
           comp->setValue(ty);
           return ty;
         }
 
+        Type ty = diagnoseUnknownType(TC, DC, parentTy, components, options,
+                                      resolver);
+        if (ty->is<ErrorType>()) {
+          comp->setValue(ty);
+          return ty;
+        }
+
         recovered = true;
+        memberType = ty;
+      } else {
+        memberType = memberTypes.back().second;
       }
 
       if (parentTy->isExistentialType()) {
@@ -867,9 +881,6 @@ static Type resolveIdentTypeComponent(
         comp->setValue(ty);
         return ty;
       }
-
-      auto memberType = recovered? comp->getBoundType() 
-                                 : memberTypes.back().second;
 
       // If there are generic arguments, apply them now.
       if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
@@ -3244,9 +3255,12 @@ class UnsupportedProtocolVisitor
   : public TypeReprVisitor<UnsupportedProtocolVisitor>, public ASTWalker
 {
   TypeChecker &TC;
+  SmallPtrSet<ProtocolDecl *, 4> Diagnosed;
 
 public:
   UnsupportedProtocolVisitor(TypeChecker &tc) : TC(tc) { }
+
+  SmallPtrSet<ProtocolDecl *, 4> &getDiagnosedProtocols() { return Diagnosed; }
 
   bool walkToTypeReprPre(TypeRepr *T) {
     visit(T);
@@ -3254,19 +3268,28 @@ public:
   }
 
   void visitIdentTypeRepr(IdentTypeRepr *T) {
-    auto type = T->getComponentRange().back()->getBoundType();
-    if (type) {
-      SmallVector<ProtocolDecl*, 2> protocols;
-      if (type->isExistentialType(protocols)) {
-        for (auto *proto : protocols) {
-          if (proto->existentialTypeSupported(&TC))
-            continue;
+    auto comp = T->getComponentRange().back();
+    if (auto proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
+      if (!proto->existentialTypeSupported(&TC)) {
+        TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
+                    proto->getName());
+        Diagnosed.insert(proto);
+      }
 
-          TC.diagnose(T->getComponentRange().back()->getIdLoc(),
-                      diag::unsupported_existential_type,
+      return;
+    }
+
+    if (auto ty = comp->getBoundType()) {
+      if (auto proto = dyn_cast_or_null<ProtocolDecl>(
+                         ty->getDirectlyReferencedTypeDecl())) {
+        if (!proto->existentialTypeSupported(&TC)) {
+          TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
                       proto->getName());
+          Diagnosed.insert(proto);
         }
       }
+
+      return;
     }
   }
 };
@@ -3292,6 +3315,27 @@ void TypeChecker::checkUnsupportedProtocolType(Decl *decl) {
 
   UnsupportedProtocolVisitor visitor(*this);
   decl->walk(visitor);
+  if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
+    if (auto type = valueDecl->getType()) {
+      type.findIf([&](Type type) -> bool {
+        SmallVector<ProtocolDecl*, 2> protocols;
+        if (type->isExistentialType(protocols)) {
+          for (auto *proto : protocols) {
+            if (proto->existentialTypeSupported(this))
+              continue;
+
+            if (visitor.getDiagnosedProtocols().insert(proto).second) {
+              diagnose(valueDecl->getLoc(),
+                       diag::unsupported_existential_type,
+                       proto->getName());
+            }
+          }
+        }
+
+        return false;
+      });
+    }
+  }
 }
 
 void TypeChecker::checkUnsupportedProtocolType(Stmt *stmt) {

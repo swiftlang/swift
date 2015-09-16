@@ -68,8 +68,6 @@ private:
 
   bool passCallArgNames(Expr *Fn, TupleExpr *TupleE);
 
-  TypeDecl *getTypeDecl(Type Ty);
-
   bool shouldIgnore(Decl *D, bool &ShouldVisitChildren);
 
   ValueDecl *extractDecl(Expr *Fn) const {
@@ -267,14 +265,22 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
     return false;
 
   if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
-    if (ValueDecl *VD = IdT->getBoundDecl())
-      return passReference(VD, IdT->getIdLoc());
-    if (TypeDecl *TyD = getTypeDecl(IdT->getBoundType())) {
-      if (ModuleDecl *ModD = dyn_cast<ModuleDecl>(TyD))
+    if (ValueDecl *VD = IdT->getBoundDecl()) {
+      if (ModuleDecl *ModD = dyn_cast<ModuleDecl>(VD))
         return passReference(ModD, std::make_pair(IdT->getIdentifier(),
                                                   IdT->getIdLoc()));
 
-      return passReference(TyD, IdT->getIdLoc());
+      return passReference(VD, IdT->getIdLoc());
+    }
+
+    if (Type Ty = IdT->getBoundType()) {
+      if (TypeDecl *TyD = Ty->getDirectlyReferencedTypeDecl()) {
+        if (ModuleDecl *ModD = dyn_cast<ModuleDecl>(TyD))
+          return passReference(ModD, std::make_pair(IdT->getIdentifier(),
+                                                    IdT->getIdLoc()));
+
+        return passReference(TyD, IdT->getIdLoc());
+      }
     }
   }
   return true;
@@ -414,18 +420,6 @@ bool SemaAnnotator::passCallArgNames(Expr *Fn, TupleExpr *TupleE) {
   }
 
   return true;
-}
-
-TypeDecl *SemaAnnotator::getTypeDecl(Type Ty) {
-  if (Ty.isNull())
-    return nullptr;
-
-  if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
-    return NAT->getDecl();
-  if (ModuleType *MT = dyn_cast<ModuleType>(Ty.getPointer()))
-    return MT->getModule();
-
-  return Ty->getAnyNominal();
 }
 
 bool SemaAnnotator::shouldIgnore(Decl *D, bool &ShouldVisitChildren) {

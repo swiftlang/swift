@@ -1760,12 +1760,9 @@ public:
   static const ValueDecl *getValueDecl(const ComponentIdentTypeRepr *TR) {
     if (const ValueDecl *VD = TR->getBoundDecl())
       return VD;
-    Type ty = TR->getBoundType();
-    if (auto alias = dyn_cast<NameAliasType>(ty.getPointer()))
-      return alias->getDecl();
-    if (auto module = dyn_cast<ModuleType>(ty.getPointer()))
-      return module->getModule();
-    return ty->getAnyNominal();
+    if (auto Ty = TR->getBoundType())
+      return Ty->getDirectlyReferencedTypeDecl();
+    return nullptr;
   }
 
   static const TypeRepr *findMinAccessibleType(TypeRepr *TR) {
