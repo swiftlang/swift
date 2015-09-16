@@ -3329,7 +3329,7 @@ public:
                       NTD->getName(),
                       DC->getDeclaredTypeOfContext());
         return true;
-      } else if (DC->isLocalContext()) {
+      } else if (DC->isLocalContext() && DC->isGenericContext()) {
         // A local generic context is a generic function.
         if (auto AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
           TC.diagnose(NTD->getLoc(),
