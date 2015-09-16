@@ -81,6 +81,7 @@
 + (instancetype)colorWithDeviceRed:(double)red green:(double)green blue:(double)blue alpha:(double)alpha;
 + (NSColor*)redColor;
 - (instancetype)sameColor;
+- (void)getRGBAComponents:(char *)components;
 @end
 
 @protocol NSAnimatablePropertyContainer

@@ -1475,8 +1475,7 @@ namespace swift {
     // For optional types, the default is "nil".
     if (type->getOptionalObjectType()) return StringRef("nil");
 
-    if (auto structType = type->getAs<StructType>()) {
-      auto structDecl = structType->getDecl();
+    if (auto structDecl = type->getStructOrBoundGenericStruct()) {
       if (structDecl->getClangDecl()) {
         // For option sets, the default is "[]".
         for (auto attr : structDecl->getAttrs()) {
@@ -1487,6 +1486,13 @@ namespace swift {
           }
         }
       }
+
+      // For (Unsafe)MutablePointer and Selector, the default is "nil".
+      auto name = structDecl->getName().str();
+      if (name == "UnsafeMutablePointer" ||
+          name == "UnsafePointer" ||
+          name == "Selector")
+        return StringRef("nil");
     }
     
     return None;
@@ -1525,8 +1531,9 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
           Printer << " = default";
         } else if (Options.PrintFakeImportedDefaultArguments &&
                    AFD->getClangDecl() &&
-                   !BodyTuple->getElement(i).getPattern()->getBoundName()
-                      .empty()) {
+                   (i == 0 ||
+                    !BodyTuple->getElement(i).getPattern()->getBoundName()
+                      .empty())) {
           if (auto defaultArg = getFakeDefaultArgForType(
                                   BodyTuple->getElement(i).getPattern()
                                     ->getType())) {
@@ -1547,13 +1554,12 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
                       /*Curried=*/CurrPattern > 0);
 
     if (Options.PrintFakeImportedDefaultArguments &&
-        AFD->getClangDecl() &&
-        !BodyParen->getSubPattern()->getBoundName().empty()) {
-          if (auto defaultArg = getFakeDefaultArgForType(
-                                  BodyParen->getSubPattern()->getType())) {
-            Printer << " = " << *defaultArg;
-          }
-        }
+        AFD->getClangDecl()) {
+      if (auto defaultArg = getFakeDefaultArgForType(
+            BodyParen->getSubPattern()->getType())) {
+        Printer << " = " << *defaultArg;
+      }
+    }
     Printer << ")";
   }
 

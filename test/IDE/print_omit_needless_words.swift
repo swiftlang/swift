@@ -25,10 +25,10 @@
 // CHECK-OBJECTIVEC: func isKind(of aClass: AnyClass) -> Bool
 
 // Note: SEL -> "Selector"
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector = nil)
 
 // Note: "with" parameters drop the "with".
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject? = nil)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector = nil, with: AnyObject? = nil)
 
 // Note: id -> "Object".
 // CHECK-FOUNDATION: func index(of _: AnyObject) -> Int
@@ -65,7 +65,7 @@
 // CHECK-FOUNDATION: var uppercase: String
 
 // Note: don't map base name down to a keyword.
-// CHECK-FOUNDATION: func doSelector(_: Selector)
+// CHECK-FOUNDATION: func doSelector(_: Selector = nil)
 
 // Note: Strip names preceded by a gerund.
 // CHECK-FOUNDATION: func startSquashing(_: Bee)
@@ -106,11 +106,14 @@
 // Note: instance method name stripping result type.
 // CHECK-APPKIT: func same() -> Self
 
+// Note: Unsafe(Mutable)Pointers get defaulted to 'nil'
+// CHECK-APPKIT: func getRGBAComponents(_: UnsafeMutablePointer<Int8> = nil)
+
 // Note: Skipping over "3D"
 // CHECK-APPKIT: func drawInAir(at _: Point3D)
 
 // Note: Don't strip names that aren't preceded by a verb or preposition.
-// CHECK-APPKIT: func setTextColor(_: NSColor?)
+// CHECK-APPKIT: func setTextColor(_: NSColor? = nil)
 
 // Note: Skipping over "Ref"
 // CHECK-CORECOOLING: func replace(_: CCPowerSupply!)
