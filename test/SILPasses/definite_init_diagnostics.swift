@@ -1325,3 +1325,18 @@ func test22436880() {
   bug22436880(&x) // expected-error {{immutable value 'x' may not be passed inout}}
 }
 
+// <rdar://problem/19267795> failable initializers that call noreturn function produces bogus diagnostics
+class FailableInitThatFailsReallyHard {
+  init?() {   // no diagnostics generated.
+    fatalError("bad")
+  }
+}
+
+
+class BaseClass {}
+final class DerivedClass : BaseClass {
+  init(x : ()) {
+    fatalError("bad")  // no diagnostics.
+  }
+}
+

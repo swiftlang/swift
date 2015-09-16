@@ -117,23 +117,3 @@ public func callTest() {
 // CHECK-TESTING-LABEL: sil_witness_table Adopt: Prot
 // CHECK-TESTING: deadWitness{{.*}}: @{{.*}}deadWitness
 
-
-
-// <rdar://problem/19267795> failable initializers that call noreturn function produces bogus diagnostics
-class FailableInitThatFailsReallyHard {
-  init?() {   // no diagnostics generated.
-    fatalError("bad")
-  }
-}
-
-
-class BaseClass {}
-final class DerivedClass : BaseClass {
-  init(x : ()) {
-    fatalError("bad")  // no diagnostics.
-  }
-}
-
-
-
-
