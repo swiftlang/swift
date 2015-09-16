@@ -616,7 +616,7 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 
 void StmtEmitter::visitForStmt(ForStmt *S) {
   // Enter a new scope.
-  Scope ForScope(SGF.Cleanups, CleanupLocation(S));
+  LexicalScope ForScope(SGF.Cleanups, SGF, CleanupLocation(S));
   
   // Emit any local 'var' variables declared in the initializer.
   for (auto D : S->getInitializerVarDecls()) {
