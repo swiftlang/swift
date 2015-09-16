@@ -34,7 +34,7 @@
 // CHECK-FOUNDATION: func index(of _: AnyObject) -> Int
 
 // Note: Pointer-to-struct name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func copy(with _: NSZone) -> AnyObject!
+// CHECK-FOUNDATION: func copy(with _: NSZone = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
 // CHECK-FOUNDATION: func object(`for` _: NSCopying) -> AnyObject?

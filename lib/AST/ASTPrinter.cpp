@@ -1500,7 +1500,10 @@ namespace swift {
       auto name = structDecl->getName().str();
       if (name == "UnsafeMutablePointer" ||
           name == "UnsafePointer" ||
-          name == "Selector")
+          name == "Selector" ||
+          name == "COpaquePointer" ||
+          name == "AutoreleasingUnsafeMutablePointer" ||
+          name == "NSZone")
         return StringRef("nil");
     }
     
