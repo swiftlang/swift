@@ -89,6 +89,8 @@ Infixes = {
   "q_" : "Generic Function"
 }
 
+GenericFunctionPrefix = "__TTSg"
+
 SortedPrefixes = sorted(Prefixes)
 SortedInfixes = sorted(Infixes)
 
@@ -101,13 +103,14 @@ def addFunction(sizes, function, startAddr, endAddr, groupByPrefix):
     if groupByPrefix:
         for infix in SortedInfixes:
 	    if infix in function:
-               sizes[Infixes[infix]] += size
-               return
+               if not GenericFunctionPrefix in function:
+	           sizes[Infixes[infix]] += size
+                   return
         for prefix in SortedPrefixes:
 	    if function.startswith(prefix):
                 # Special handling for function signature specializations
                 # of generic specializations.
-                if prefix == "__TTSf" and "__TTSg" in function:
+                if prefix == "__TTSf" and GenericFunctionPrefix in function:
                     prefix = "__TTSGF"
                 sizes[Prefixes[prefix]] += size
                 return
