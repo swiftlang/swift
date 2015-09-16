@@ -417,7 +417,8 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       SN.NameRange = NR;
       SN.BodyRange = charSourceRangeFromSourceRange(SM, E->getSourceRange());
       if (NR.isValid())
-        SN.Range = CharSourceRange(SM, NR.getStart(), E->getEndLoc());
+        SN.Range = charSourceRangeFromSourceRange(SM, SourceRange(NR.getStart(),
+                                                                  E->getEndLoc()));
       else
         SN.Range = SN.BodyRange;
 

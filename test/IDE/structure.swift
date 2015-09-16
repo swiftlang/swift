@@ -12,7 +12,7 @@ class MyCls : OtherClass {
   // CHECK:   <ifunc>func <name>foo(<param>arg1</param>: Int, <param><name>name</name></param>: String, <param><name>param</name> par</param>: String)</name> {
   // CHECK:     var abc
   // CHECK:     <if>if <elem-condexpr>1</elem-condexpr> <brace>{
-  // CHECK:       <call><name>foo</name>(<param>1</param>, <param><name>name</name>:</param>"test", <param><name>param</name>:</param>"test2")</call>
+  // CHECK:       <call><name>foo</name>(<param>1</param>, <param><name>name</name>:"test"</param>, <param><name>param</name>:"test2"</param>)</call>
   // CHECK:     }</brace>
   // CHECK:   }</ifunc>
   func foo(arg1: Int, name: String, param par: String) {
@@ -178,3 +178,9 @@ class NestedPoundIf{
 }
 // CHECK: <ifunc>func <name>foo2()</name> {}</ifunc>
 // CHECK: <ifunc>func <name>foo3()</name> {}</ifunc>
+
+class A {
+  func foo(i : Int, animations: () -> ()) {}
+  func perform() {foo(5, animations: {})}
+// CHECK: <ifunc>func <name>perform()</name> {<call><name>foo</name>(<param>5</param>, <param><name>animations</name>: <brace>{}</brace></param>)</call>}</ifunc>
+}
