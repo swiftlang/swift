@@ -204,7 +204,6 @@ extern "C" void swift_release_n(HeapObject *object, uint32_t n);
 
 /// ObjC compatibility. Never call this.
 extern "C" size_t swift_retainCount(HeapObject *object);
-extern "C" size_t swift_weakRetainCount(HeapObject *object);
 
 /// Is this pointer a non-null unique reference to an object
 /// that uses Swift reference counting?
@@ -355,12 +354,6 @@ extern "C" void swift_weakRetain(HeapObject *value);
 
 /// Decrement the weak retain count.
 extern "C" void swift_weakRelease(HeapObject *value);
-
-/// Increment the weak retain count by n.
-extern "C" void swift_weakRetain_n(HeapObject *value, int n);
-
-/// Decrement the weak retain count by n.
-extern "C" void swift_weakRelease_n(HeapObject *value, int n);
 
 /// Increment the strong retain count of an object which may have been
 /// deallocated.
