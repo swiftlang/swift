@@ -126,10 +126,8 @@ TEST(RefcountingTest, unknown_retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  auto retainResult = swift_unknownRetain_n(object, 32);
-  EXPECT_EQ(object, retainResult);
-  retainResult = swift_unknownRetain(object);
-  EXPECT_EQ(object, retainResult);
+  swift_unknownRetain_n(object, 32);
+  swift_unknownRetain(object);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(34u, swift_retainCount(object));
   swift_unknownRelease_n(object, 31);
