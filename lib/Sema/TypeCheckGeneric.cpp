@@ -564,8 +564,11 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   if (auto fn = dyn_cast<FuncDecl>(func)) {
     if (!fn->getBodyResultTypeLoc().isNull()) {
       // Check the result type of the function.
-      if (tc.validateType(fn->getBodyResultTypeLoc(), fn, TR_FunctionResult,
-                          &resolver)) {
+      TypeResolutionOptions options = TR_FunctionResult;
+      if (fn->hasDynamicSelf())
+        options |= TR_DynamicSelfResult;
+
+      if (tc.validateType(fn->getBodyResultTypeLoc(), fn, options, &resolver)) {
         badType = true;
       }
 
@@ -580,8 +583,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   return badType;
 }
 
-static Type getResultType(TypeChecker &TC, FuncDecl *fn,
-                                   Type resultType) {
+static Type getResultType(TypeChecker &TC, FuncDecl *fn, Type resultType) {
   // Look through optional types.
   OptionalTypeKind optKind;
   if (auto origValueType = resultType->getAnyOptionalObjectType(optKind)) {

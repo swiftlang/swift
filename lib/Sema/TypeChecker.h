@@ -312,17 +312,21 @@ enum TypeResolutionFlags {
   /// tuple type.  This is not set for multi-level tuple arguments.
   TR_FunctionInput = 0x20,
   
-  /// Whether this is the immediate input type to a function,
+  /// Whether this is the immediate input type to a function type,
   TR_ImmediateFunctionInput = 0x40,
 
-  /// Whether we are in the result type of a function.
+  /// Whether we are in the result type of a function type.
   TR_FunctionResult = 0x80,
+
+  /// Whether we are in the result type of a function body that is
+  /// known to produce dynamic Self.
+  TR_DynamicSelfResult = 0x100,
   
   /// Whether this is a resolution based on a non-inferred type pattern.
-  TR_FromNonInferredPattern = 0x100,
+  TR_FromNonInferredPattern = 0x200,
   
   /// Whether we are the variable type in a for/in statement.
-  TR_EnumerationVariable = 0x200,
+  TR_EnumerationVariable = 0x400,
   
   /// Whether we are looking only in the generic signature of the context
   /// we're searching, rather than the entire context.

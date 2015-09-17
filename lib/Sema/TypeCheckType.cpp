@@ -621,6 +621,17 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   if (options.contains(TR_GenericSignature))
     lookupDC = DC->getParent();
 
+  // Dynamic 'Self' in the result type of a function body.
+  if (options.contains(TR_DynamicSelfResult) &&
+      comp->getIdentifier() == TC.Context.Id_Self) {
+    auto func = cast<FuncDecl>(DC);
+    assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
+
+    auto dynamicSelfType = func->getDynamicSelf();
+    comp->setValue(dynamicSelfType);
+    return;
+  }
+
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::OnlyTypes;
   if (options.contains(TR_KnownNonCascadingDependency))
@@ -1184,8 +1195,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
     options -= TR_ImmediateFunctionInput;
     options -= TR_FunctionInput;
   }
-  
-  
+
   switch (repr->getKind()) {
   case TypeReprKind::Error:
     return ErrorType::get(Context);

@@ -3719,7 +3719,10 @@ public:
 
     bool badType = false;
     if (!FD->getBodyResultTypeLoc().isNull()) {
-      if (TC.validateType(FD->getBodyResultTypeLoc(), FD, TR_FunctionResult,
+      TypeResolutionOptions options = TR_FunctionResult;
+      if (FD->hasDynamicSelf())
+        options |= TR_DynamicSelfResult;
+      if (TC.validateType(FD->getBodyResultTypeLoc(), FD, options,
                           resolver)) {
         badType = true;
       }
@@ -3999,8 +4002,6 @@ public:
     // Note that the function has a dynamic Self return type and set
     // the return type component to the dynamic self type.
     func->setDynamicSelf(true);
-    auto dynamicSelfType = func->getDynamicSelf();
-    simpleRepr->setValue(dynamicSelfType);
     return false;
   }
 

@@ -557,7 +557,8 @@ public:
   }
 
   bool isParenType() const {
-    return Elements.size() == 1 && !isa<NamedTypeRepr>(Elements[0]);
+    return Elements.size() == 1 && !isa<NamedTypeRepr>(Elements[0]) &&
+           !hasEllipsis();
   }
 
   static TupleTypeRepr *create(ASTContext &C, ArrayRef<TypeRepr *> Elements,
