@@ -125,6 +125,10 @@ public:
   /// specified character locations.
   CharSourceRange(const SourceManager &SM, SourceLoc Start, SourceLoc End);
 
+  CharSourceRange(const SourceManager &SM, SourceRange Range) {
+    assert(false && "Use Lexer::getCharSourceRangeFromSourceRange() instead.");
+  }
+
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return Start.isInvalid(); }
 
