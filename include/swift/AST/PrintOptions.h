@@ -154,9 +154,6 @@ struct PrintOptions {
   /// Whether to use an empty line to separate two members in a single decl.
   bool EmptyLineBetweenMembers = false;
 
-  /// Whether to print extension decls whose extended types are unresolved.
-  bool PrintUnresolvedExtensions = true;
-
   enum class ArgAndParamPrintingMode {
     ArgumentOnly,
     MatchSource,
@@ -232,7 +229,6 @@ struct PrintOptions {
     PrintOptions result = printInterface();
     result.AccessibilityFilter = Accessibility::Internal;
     result.EmptyLineBetweenMembers = true;
-    result.PrintUnresolvedExtensions = false;
     return result;
   }
 
