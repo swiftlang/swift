@@ -13,9 +13,23 @@ public protocol FloatingPointRepresentationType : UnsignedIntegerType {
   init(_ value: UInt)
 }
 
-import Darwin
-extension UInt64 : FloatingPointRepresentationType { public var leadingZeros: UInt { return 64 - UInt(flsll(Int64(bitPattern: self))) } }
-extension UInt32 : FloatingPointRepresentationType { public var leadingZeros: UInt { return 32 - UInt(fls(Int32(bitPattern: self))) } }
+extension UInt64 : FloatingPointRepresentationType {
+  public var leadingZeros: UInt {
+    return UInt(_countLeadingZeros(Int64(bitPattern: self)))
+  }
+}
+extension UInt32 : FloatingPointRepresentationType {
+  public var leadingZeros: UInt {
+    return UInt64(self).leadingZeros - 32
+  }
+}
+
+//  Ewwww? <rdar://problem/20060017>
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+  import Darwin
+#elseif os(Linux)
+  import Glibc
+#endif
 
 public protocol FloatingPointType : Comparable, SignedNumberType,
   IntegerLiteralConvertible,
