@@ -16,7 +16,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  add_subdirectory(Glibc)
   add_subdirectory(StdlibUnittest)
   add_subdirectory(SwiftPrivateDarwinExtras)
   add_subdirectory(SwiftPrivatePthreadExtras)
