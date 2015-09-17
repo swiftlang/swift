@@ -22,16 +22,18 @@ using namespace swift;
 #define DEBUG_TYPE "call-graph-printer"
 
 namespace {
-  class CallGraphPrinterPass : public SILModuleTransform {
-    /// The entry point to the transformation.
-    void run() override {
-      auto *CGA = getAnalysis<CallGraphAnalysis>();
-      CallGraph &CG = CGA->getOrBuildCallGraph();
-      CG.print(llvm::outs());
-      CG.printStats(llvm::outs());
-    }
-    StringRef getName() override { return "Call Graph Printer"; }
-  };
+
+class CallGraphPrinterPass : public SILModuleTransform {
+  /// The entry point to the transformation.
+  void run() override {
+    auto *CGA = getAnalysis<CallGraphAnalysis>();
+    CallGraph &CG = CGA->getOrBuildCallGraph();
+    CG.print(llvm::outs());
+    CG.printStats(llvm::outs());
+  }
+  StringRef getName() override { return "Call Graph Printer"; }
+};
+
 } // end anonymous namespace
 
 SILTransform *swift::createCallGraphPrinter() {
