@@ -487,7 +487,6 @@ void CallGraphNode::dump() {
 }
 
 void CallGraph::print(llvm::raw_ostream &OS) {
-#ifndef NDEBUG
   OS << "*** Call Graph ***\n";
 
   auto const &Funcs = getBottomUpFunctionOrder();
@@ -499,7 +498,6 @@ void CallGraph::print(llvm::raw_ostream &OS) {
       OS << "!!! Missing node for " << F->getName() << "!!!";
     OS << "\n";
   }
-#endif
 }
 
 void CallGraph::dump() {
