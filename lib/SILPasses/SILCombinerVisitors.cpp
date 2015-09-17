@@ -1515,22 +1515,37 @@ static SILValue getInitOrOpenExistential(AllocStackInst *ASI, SILValue &Src) {
 /// class_method instructions and then devirtualize.
 SILInstruction *
 SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
-                                                    WitnessMethodInst *WMI,
-                                                    SILValue InitExistential,
-                                                    SILType InstanceType) {
-  if (WMI->getConformance())
+    std::function<bool()> PreCondition,
+    std::function<ProtocolDecl *()> GetProtocol,
+    std::function<bool(SILValue)> CheckArg,
+    std::function<void(CanType ConcreteType, ProtocolConformance *Conformance)> PropagateIntoOperand) {
+
+  if (!PreCondition())
     return nullptr;
 
-  auto LastArg = AI.getArguments().back();
+  SILValue Self;
+  if (auto *Apply = dyn_cast<ApplyInst>(AI)) {
+    if (Apply->hasSelfArgument())
+      Self = Apply->getSelfArgument();
+  } else if (auto *Apply = dyn_cast<TryApplyInst>(AI)) {
+    if (Apply->hasSelfArgument())
+      Self = Apply->getSelfArgument();
+  }
 
-  if (auto *Instance = dyn_cast<AllocStackInst>(LastArg)) {
+  if (!Self)
+    return nullptr;
+
+  SILType InstanceType;
+  SILInstruction *InitExistential = nullptr;
+
+  if (auto *Instance = dyn_cast<AllocStackInst>(Self)) {
     SILValue Src;
     auto Existential = getInitOrOpenExistential(Instance, Src);
     if (Existential)
-      LastArg = Existential;
+      Self = Existential;
   }
 
-  if (auto *Instance = dyn_cast<OpenExistentialAddrInst>(LastArg)) {
+  if (auto *Instance = dyn_cast<OpenExistentialAddrInst>(Self)) {
     auto Op = Instance->getOperand();
     if (auto *ASI = dyn_cast<AllocStackInst>(Op)) {
       SILValue Src;
@@ -1557,7 +1572,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
     }
   }
 
-  if (auto *Instance = dyn_cast<OpenExistentialRefInst>(LastArg)) {
+  if (auto *Instance = dyn_cast<OpenExistentialRefInst>(Self)) {
     if (auto *IE = dyn_cast<InitExistentialRefInst>(Instance->getOperand())) {
       // IE should dominate Instance.
       // Without a DomTree we want to be very defensive
@@ -1576,16 +1591,16 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   // Replace this witness_method by a more concrete one
   ArrayRef<ProtocolConformance*> Conformances;
   CanType ConcreteType;
-  LastArg = SILValue();
+  auto NewSelf = SILValue();
 
   if (auto IE = dyn_cast<InitExistentialAddrInst>(InitExistential)) {
     Conformances = IE->getConformances();
     ConcreteType = IE->getFormalConcreteType();
-    LastArg = IE;
+    NewSelf = IE;
   } else if (auto IER = dyn_cast<InitExistentialRefInst>(InitExistential)) {
     Conformances = IER->getConformances();
     ConcreteType = IER->getFormalConcreteType();
-    LastArg = IER->getOperand();
+    NewSelf = IER->getOperand();
   }
   // If ConcreteType depends on any archetypes, then propagating it does not
   // help resolve witness table lookups. Catch these cases before calling
@@ -1609,57 +1624,46 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
 
   ProtocolConformance *Conformance = nullptr;
 
+  ProtocolDecl *Protocol = GetProtocol();
+
   // Find the conformance related to witness_method
   for (auto Con : Conformances) {
-    if (Con->getProtocol() == WMI->getLookupProtocol()) {
+    if (Con->getProtocol() == Protocol) {
       Conformance = Con;
       break;
     }
   }
-  if (!Conformance)
-    return nullptr;
 
-  // Don't specialize Apply instructions that return the Self type. Notice that
-  // it is sufficient to compare the return type to the substituted type because
-  // types that depend on the Self type are not allowed (for example [Self] is
-  // not allowed).
-  if (AI.getType().getSwiftType().getLValueOrInOutObjectType() ==
-      WMI->getLookupType())
+  if (!Conformance)
     return nullptr;
 
   SmallVector<SILValue, 8> Args;
   for (auto Arg : AI.getArgumentsWithoutSelf()) {
     Args.push_back(Arg);
 
-    // Below we have special handling for the 'LastArg', which is the self
-    // parameter. However, we also need to handle the Self return type.
-    // In here we find arguments that are not the 'self' argument and if
-    // they are of the Self type then we abort the optimization.
-    if (Arg.getType().getSwiftType().getLValueOrInOutObjectType() ==
-        WMI->getLookupType())
+    // Check any additional conditions for this argument,
+    // e.g. if it is they have of a Self-type.
+    if (!CheckArg(Arg))
       return nullptr;
   }
 
-  Args.push_back(LastArg);
+  Args.push_back(NewSelf);
 
-  SILValue OptionalExistential =
-  WMI->hasOperand() ? WMI->getOperand() : SILValue();
-  auto *NewWMI = Builder->createWitnessMethod(WMI->getLoc(),
-                                              ConcreteType,
-                                              Conformance, WMI->getMember(),
-                                              WMI->getType(),
-                                              OptionalExistential,
-                                              WMI->isVolatile());
-  replaceInstUsesWith(*WMI, NewWMI, 0);
-  eraseInstFromFunction(*WMI);
+  // Propagate the concrete type into operand if required.
+  PropagateIntoOperand(ConcreteType, Conformance);
 
+  // Form a new set of substitutions where Self is
+  // replaced by a concrete type.
   SmallVector<Substitution, 8> Substitutions;
   for (auto Subst : AI.getSubstitutions()) {
     if (Subst.getReplacement().getCanonicalTypeOrNull() ==
-        WMI->getSelfSubstitution().getReplacement().getCanonicalTypeOrNull()) {
+        Self.getType().getSwiftRValueType()) {
+      auto Conformances = AI.getModule().getASTContext()
+                            .Allocate<ProtocolConformance*>(1);
+      Conformances[0] = Conformance;
       Substitution NewSubst(Subst.getArchetype(),
-                            NewWMI->getSelfSubstitution().getReplacement(),
-                            NewWMI->getSelfSubstitution().getConformances());
+                            ConcreteType,
+                            Conformances);
       Substitutions.push_back(NewSubst);
     } else
       Substitutions.push_back(Subst);
@@ -1705,9 +1709,95 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
     replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction(), 0);
   eraseInstFromFunction(*AI.getInstruction());
 
-  CallGraphEditor(CG).addEdgesForApply(NewAI);
+  if (CG)
+    CG->addEdgesForApply(NewAI);
 
-  return nullptr;
+  return NewAI.getInstruction();
+}
+
+SILInstruction *
+SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
+                                                    WitnessMethodInst *WMI) {
+  auto PreCondition = [&AI, &WMI] () -> bool {
+    if (WMI->getConformance())
+      return false;
+    // Don't specialize Apply instructions that return the Self type.
+    // Notice that it is sufficient to compare the return type to the
+    // substituted type because types that depend on the Self type are
+    // not allowed (for example [Self] is not allowed).
+    if (AI.getType().getSwiftType().getLValueOrInOutObjectType() ==
+        WMI->getLookupType())
+      return false;
+
+    return true;
+  };
+
+  auto GetProtocol = [&WMI] () -> ProtocolDecl * {
+    return WMI->getLookupProtocol();
+  };
+
+  auto CheckArg = [&WMI] (SILValue Arg) -> bool {
+    // Below we have special handling for the 'NewSelf', which is the self
+    // parameter. However, we also need to handle the Self return type.
+    // In here we find arguments that are not the 'self' argument and if
+    // they are of the Self type then we abort the optimization.
+    return Arg.getType().getSwiftType().getLValueOrInOutObjectType() !=
+           WMI->getLookupType();
+  };
+
+  auto PropagateIntoOperand = [this, &WMI] (CanType ConcreteType,
+                                            ProtocolConformance *Conformance) {
+    SILValue OptionalExistential =
+    WMI->hasOperand() ? WMI->getOperand() : SILValue();
+    auto *NewWMI = Builder->createWitnessMethod(WMI->getLoc(),
+                                                ConcreteType,
+                                                Conformance, WMI->getMember(),
+                                                WMI->getType(),
+                                                OptionalExistential,
+                                                WMI->isVolatile());
+    replaceInstUsesWith(*WMI, NewWMI, 0);
+    eraseInstFromFunction(*WMI);
+  };
+
+  return propagateConcreteTypeOfInitExistential(AI, PreCondition,
+                                                GetProtocol,
+                                                CheckArg,
+                                                PropagateIntoOperand);
+}
+
+
+SILInstruction *
+SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
+
+  auto PreCondition = [&AI] () -> bool {
+    return isa<FunctionRefInst>(AI.getCallee());
+  };
+
+  auto GetProtocol = [&AI] () -> ProtocolDecl * {
+    auto *FRI = cast<FunctionRefInst>(AI.getCallee());
+    auto *Callee = FRI->getReferencedFunction();
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(Callee->getDeclContext());
+    if (!AFD)
+      return nullptr;
+    return AFD->getDeclContext()->isProtocolOrProtocolExtensionContext();
+  };
+
+  auto CheckArg = [&AI] (SILValue Arg) -> bool {
+    // Below we have special handling for the 'NewSelf', which is the self
+    // parameter. However, we also need to handle the Self return type.
+    // In here we find arguments that are not the 'self' argument and if
+    // they are of the Self type then we abort the optimization.
+    return Arg.getType().getSwiftType().getLValueOrInOutObjectType() !=
+           AI.getArguments().back().getType().getSwiftRValueType();
+  };
+
+  auto PropagateIntoOperand = [] (CanType ConcreteType,
+                                  ProtocolConformance *Conformance) {};
+
+  return propagateConcreteTypeOfInitExistential(AI, PreCondition,
+                                                GetProtocol,
+                                                CheckArg,
+                                                PropagateIntoOperand);
 }
 
 /// Optimize thin_func_to_ptr->ptr_to_thin_func casts into a type substituted
@@ -2075,9 +2165,19 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
 
   // (apply (witness_method)) -> propagate information about
   // a concrete type from init_existential_addr or init_existential_ref.
-  if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee()))
-    return propagateConcreteTypeOfInitExistential(AI, WMI, SILValue(),
-                                                  SILType());
+  if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
+    propagateConcreteTypeOfInitExistential(AI, WMI);
+    return nullptr;
+  }
+
+  // (apply (function_ref method_from_protocol_extension)) ->
+  // propagate information about a concrete type from init_existential_addr or
+  // init_existential_ref.
+  if (isa<FunctionRefInst>(AI->getCallee())) {
+    if (propagateConcreteTypeOfInitExistential(AI)) {
+      return nullptr;
+    }
+  }
 
   // Optimize f_inverse(f(x)) -> x.
   if (optimizeIdentityCastComposition(AI, "convertFromObjectiveC",
@@ -2148,9 +2248,19 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
 
   // (apply (witness_method)) -> propagate information about
   // a concrete type from init_existential_addr or init_existential_ref.
-  if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee()))
-    return propagateConcreteTypeOfInitExistential(AI, WMI, SILValue(),
-                                                  SILType());
+  if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
+    propagateConcreteTypeOfInitExistential(AI, WMI);
+    return nullptr;
+  }
+
+  // (apply (function_ref method_from_protocol_extension)) ->
+  // propagate information about a concrete type from init_existential_addr or
+  // init_existential_ref.
+  if (isa<FunctionRefInst>(AI->getCallee())) {
+    if (propagateConcreteTypeOfInitExistential(AI)) {
+      return nullptr;
+    }
+  }
 
   return nullptr;
 }

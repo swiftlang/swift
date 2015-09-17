@@ -272,10 +272,17 @@ public:
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);
+  SILInstruction *
+  propagateConcreteTypeOfInitExistential(FullApplySite AI,
+                                         std::function<bool()> PreCondition,
+                                         std::function<ProtocolDecl *()> GetProtocol,
+                                         std::function<bool(SILValue)> CheckArg,
+                                         std::function<void (CanType ConcreteType, ProtocolConformance *Conformance)> PropagateIntoOperand);
+
   SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI,
-                                                         WitnessMethodInst *WMI,
-                                                         SILValue IE,
-                                                         SILType InstanceType);
+                                                         WitnessMethodInst *WMI);
+  SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI);
+
   // Optimize an application of f_inverse(f(x)) -> x.
   bool optimizeIdentityCastComposition(ApplyInst *FInverse,
                                        StringRef FInverseName, StringRef FName);
