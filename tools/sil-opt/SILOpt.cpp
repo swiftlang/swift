@@ -323,15 +323,21 @@ int main(int argc, char **argv) {
   } else {
     const StringRef OutputFile = OutputFilename.size() ?
                                    StringRef(OutputFilename) : "-";
-    std::error_code EC;
-    llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
-    if (EC) {
-      llvm::errs() << "while opening '" << OutputFile << "': "
-                   << EC.message() << '\n';
-      return 1;
+
+    if (OutputFile == "-") {
+      CI.getSILModule()->print(llvm::outs(), EmitVerboseSIL, CI.getMainModule(),
+                               EnableSILSortOutput, !DisableASTDump);
+    } else {
+      std::error_code EC;
+      llvm::raw_fd_ostream OS(OutputFile, EC, llvm::sys::fs::F_None);
+      if (EC) {
+        llvm::errs() << "while opening '" << OutputFile << "': "
+                     << EC.message() << '\n';
+        return 1;
+      }
+      CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
+                               EnableSILSortOutput, !DisableASTDump);
     }
-    CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
-                             EnableSILSortOutput, !DisableASTDump);
   }
 
   bool HadError = CI.getASTContext().hadError();
