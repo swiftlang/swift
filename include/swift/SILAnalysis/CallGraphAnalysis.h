@@ -236,7 +236,7 @@ public:
 
   /// Is this call graph node for a function that we can trivially
   /// know is dead?
-  bool isDead() const {
+  bool isTriviallyDead() const {
     return isCallerEdgesComplete() && getCompleteCallerEdges().empty();
   }
 

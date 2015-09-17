@@ -462,7 +462,7 @@ void CallGraphNode::print(llvm::raw_ostream &OS) {
     getFunction()->getName() << "\n";
   OS << "Demangled: " <<
     demangle_wrappers::demangleSymbolAsString(getFunction()->getName()) << "\n";
-  printFlag(OS, "Trivially dead", isDead());
+  printFlag(OS, "Trivially dead", isTriviallyDead());
   printFlag(OS, "All callers known", isCallerEdgesComplete());
   printFlag(OS, "Binds self", mayBindDynamicSelf());
 
