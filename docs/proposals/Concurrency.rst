@@ -43,7 +43,7 @@ ensure that the reference count field is not corrupted by data races.  However,
 using atomic operations is not enough to ensure thread safety. Consider the
 multi-threaded program below.
 
-.. code-block:: Swift
+.. code-block:: swift
 
     import Foundation
 
@@ -205,7 +205,7 @@ In the example program below the method `fly` may access the global variable
 because it is marked with the attribute `unsafe`. The compile won't allow this
 method to be executed from a worker-thread.
 
-.. code-block:: Swift
+.. code-block:: swift
 
   var glob : Int = 1
 
@@ -220,7 +220,7 @@ the code as safe.
 The function ``logger`` is still considered by the compiler as reentrant and can
 be called by worker-threads.
 
-.. code-block:: Swift
+.. code-block:: swift
 
     func logger(x : Int) {
 
@@ -249,7 +249,7 @@ local mutable variables.
 Library developers who implement high-level concurrency libraries can use the
 gateway annotation to mark the functions that launch new threads.
 
-.. code-block:: Swift
+.. code-block:: swift
 
   @_semantics("swift.concurrent.launch")
   public func createTask<ArgsTy>(args : ArgsTy, callback : (ArgsTy) -> Void) {
@@ -321,7 +321,7 @@ Usage Example
 -------------
 This is an example of a tiny concurrent program that uses Tasks and Streams.
 
-.. code-block:: Swift
+.. code-block:: swift
 
     let input  = Stream<String>()
     let output = Stream<String>()
@@ -349,7 +349,7 @@ In the example below the type declaration of the endpoint helps the type checker
 to deduct the type of the stream arguments and allows the developer to omit the
 declaration of the streams in the closure.
 
-.. code-block:: Swift
+.. code-block:: swift
 
      let comm : _Endpoint<String, Int> = createTask({var counter = 0
                                                      while true {
@@ -396,7 +396,7 @@ Example
 -------
 Example of a concurrent program using Futures in Swift.
 
-.. code-block:: Swift
+.. code-block:: swift
 
     func merge_sort<T : Comparable>(array: ArraySlice<T>) -> [T] {
 
@@ -421,7 +421,7 @@ threads in a safe manner without copying data.
 
 Here is another example of async calls using trailing closures and enums.
 
-.. code-block:: Swift
+.. code-block:: swift
 
      enum Shape {
        case Circle, Oval, Square, Triangle
@@ -473,7 +473,7 @@ that does all the work in a separate thread (and is verified by the thread
 safety checker), and the second closure is executed by the UI main loop and is
 free to make unsafe calls capture locals and access globals.
 
-.. code-block:: Swift
+.. code-block:: swift
 
   @IBAction func onClick(sender: AnyObject) {
 
@@ -514,7 +514,7 @@ The `async` call is actually a wrapper around unsafeAsync, except that it
 contains the annotation that tells the verifier to verify that the code is
 thread-safe (explained in the previous section). For example:
 
-.. code-block:: Swift
+.. code-block:: swift
 
     @_semantics("swift.concurrent.async")
     // This annotation tells the compiler to verify the closure and the passed arguments at the call site.
@@ -535,7 +535,7 @@ critical section itself is not enough to ensure thread safety because the
 critical section could be accessing memory that is shared between threads that
 are not synchronized on the same lock.
 
-.. code-block:: Swift
+.. code-block:: swift
 
   final class PrimesCache : Sync, CopyableType {
     var cache : [Int : Bool] = [:]
@@ -573,7 +573,7 @@ async and futures. The slices of the matrix are not copied when they are moved
 between the threads because ContiguousArray has value semantics and the parallel
 code runs significantly faster.
 
-.. code-block:: Swift
+.. code-block:: swift
 
   func ParallelMatMul(A : Matrix,_ B : Matrix) -> Matrix {
     assert(A.size == B.size, "size mismatch!")
@@ -648,7 +648,7 @@ The code below depicts the famous prime numbers sieve program using actors. The
 sieve is made of a long chain of actors that pass messages to one another.
 Finally, a collector actor saves all of the messages into an array. 
 
-.. code-block:: Swift
+.. code-block:: swift
 
   // Simply collect incoming numbers.
   class Collector : Actor<Int> {
