@@ -8,7 +8,8 @@ Swift Thread Safety
 
 This document describes the Swift thread-safety layer. It includes the
 motivation for allowing users to write thread-safe code and a concrete proposal
-for changes in the language and the standard library.
+for changes in the language and the standard library. This is a proposal and
+not a plan of record.
 
 The low-level thread-safety layer allows third-party developers to build
 different kinds of high-level safe concurrency solutions (such as Actors,
