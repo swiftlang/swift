@@ -406,9 +406,7 @@ void swift::ArraySemanticsCall::removeCall(CallGraph *CG) {
         .createReleaseValue(SemanticsCall->getLoc(), getSelf());
 
   // Invalidate any information in the callgraph.
-  if (CG)
-    if (auto *Edge = CG->getCallGraphEdge(SemanticsCall))
-      CG->removeEdge(Edge);
+  CallGraphEditor(CG).removeEdgeIfPresent(SemanticsCall);
 
   SemanticsCall->eraseFromParent();
   SemanticsCall = nullptr;

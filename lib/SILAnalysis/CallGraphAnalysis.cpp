@@ -188,7 +188,7 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
     auto *CalleeFn = cast<FunctionRefInst>(Callee)->getReferencedFunction();
     if (CalleeFn->isExternalDeclaration())
       M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
-                     CallGraphLinkerEditor(*this).getCallback());
+                     CallGraphLinkerEditor(this).getCallback());
 
     auto *CalleeNode = getOrAddCallGraphNode(CalleeFn);
     return new (Allocator) CallGraphEdge(Apply, CalleeNode, EdgeOrdinal++);
@@ -244,7 +244,7 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
 
     if (CalleeFn->isExternalDeclaration())
       M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
-                     CallGraphLinkerEditor(*this).getCallback());
+                     CallGraphLinkerEditor(this).getCallback());
 
     auto *CalleeNode = getOrAddCallGraphNode(CalleeFn);
     return new (Allocator) CallGraphEdge(Apply, CalleeNode, EdgeOrdinal++);
@@ -377,7 +377,7 @@ void CallGraph::addEdges(SILFunction *F) {
 
       if (CalleeFn->isExternalDeclaration())
         M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
-                       CallGraphLinkerEditor(*this).getCallback());
+                       CallGraphLinkerEditor(this).getCallback());
 
       if (CalleeFn->isPossiblyUsedExternally()) {
         auto *CalleeNode = tryGetCallGraphNode(CalleeFn);
@@ -738,19 +738,25 @@ void CallGraph::verify() const {
 
 void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
                                           FullApplySite New) {
-  if (auto *Edge = CG.getCallGraphEdge(Old))
-    CG.removeEdge(Edge);
+  if (!CG)
+    return;
 
-  CG.addEdgesForApply(New);
+  if (auto *Edge = CG->getCallGraphEdge(Old))
+    CG->removeEdge(Edge);
+
+  CG->addEdgesForApply(New);
 }
 
 void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
                              llvm::SmallVectorImpl<FullApplySite> &NewApplies) {
-  if (auto *Edge = CG.getCallGraphEdge(Old))
-    CG.removeEdge(Edge);
+  if (!CG)
+    return;
+  
+  if (auto *Edge = CG->getCallGraphEdge(Old))
+    CG->removeEdge(Edge);
 
   for (auto NewApply : NewApplies)
-    CG.addEdgesForApply(NewApply);
+    CG->addEdgesForApply(NewApply);
 }
 
 void CallGraphAnalysis::verify() const {

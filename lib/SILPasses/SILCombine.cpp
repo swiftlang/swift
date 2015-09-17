@@ -327,10 +327,7 @@ SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
 
   // If we have a call graph and we've removing an apply, remove the
   // associated edges from the call graph.
-  if (CG)
-    if (auto AI = FullApplySite::isa(&I))
-      if (auto *Edge = CG->getCallGraphEdge(AI))
-        CG->removeEdge(Edge);
+  CallGraphEditor(CG).removeEdgeIfPresent(&I);
 
   for (Operand *DU : getDebugUses(I))
     Worklist.remove(DU->getUser());

@@ -906,7 +906,7 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
     return ApplySite();
 
   // Add the specialization to the call graph.
-  CallGraphEditor Editor(CG);
+  CallGraphEditor Editor(&CG);
   if (SpecializedFunction)
     Editor.addCallGraphNode(SpecializedFunction);
 
@@ -1162,7 +1162,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
       }
     }
 
-    CallGraphEditor Editor(CG);
+    CallGraphEditor Editor(&CG);
     Editor.replaceApplyWithNew(AI, AppliesFromInlinee);
 
     RemovedApplies.insert(AI);

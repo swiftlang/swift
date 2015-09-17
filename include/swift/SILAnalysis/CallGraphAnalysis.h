@@ -435,28 +435,51 @@ private:
 };
 
 class CallGraphEditor {
-  CallGraph &CG;
+  CallGraph *CG;
 public:
-  CallGraphEditor(CallGraph &CG) : CG(CG) {}
+  CallGraphEditor(CallGraph *CG) : CG(CG) {}
 
   void replaceApplyWithNew(FullApplySite Old, FullApplySite New);
   void replaceApplyWithNew(FullApplySite Old,
                            llvm::SmallVectorImpl<FullApplySite> &NewApplies);
-  void addCallGraphNode(SILFunction *F) { CG.addCallGraphNode(F); }
-  void removeEdgesForApply(FullApplySite AI) { CG.removeEdgesForApply(AI); }
-  void addEdgesForApply(FullApplySite AI) { CG.addEdgesForApply(AI); }
-  void addEdgesForFunction(SILFunction *F) { CG.addEdges(F); }
+  void addCallGraphNode(SILFunction *F) {
+    if (CG)
+      CG->addCallGraphNode(F);
+  }
+
+  void removeEdgesForApply(FullApplySite AI) {
+    if (CG)
+      CG->removeEdgesForApply(AI);
+  }
+
+  void addEdgesForApply(FullApplySite AI) {
+    if (CG)
+      CG->addEdgesForApply(AI);
+  }
+
+  void addEdgesForFunction(SILFunction *F) {
+    if (CG)
+      CG->addEdges(F);
+  }
+  
+  void removeEdgeIfPresent(SILInstruction *I) {
+    if (CG) {
+      if (auto AI = FullApplySite::isa(I))
+        if (auto *Edge = CG->getCallGraphEdge(AI))
+          CG->removeEdge(Edge);
+    }
+  }
 };
 
 class CallGraphLinkerEditor {
-  CallGraph &CG;
+  CallGraph *CG;
 
   void callback(SILFunction *F) {
     CallGraphEditor(CG).addEdgesForFunction(F);
   }
 
 public:
-  CallGraphLinkerEditor(CallGraph &CG) : CG(CG) {}
+  CallGraphLinkerEditor(CallGraph *CG) : CG(CG) {}
 
   std::function<void(SILFunction *)> getCallback() {
     return std::bind(&CallGraphLinkerEditor::callback, this,

@@ -1873,9 +1873,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
                                            TAI->getSubstitutions(),
                                            Args, CalleeFnTy->hasErrorResult());
 
-    if (CG) {
-      CG->addEdgesForApply(NewAI);
-    }
+    CallGraphEditor(CG).replaceApplyWithNew(TAI, NewAI);
 
     auto Loc = TAI->getLoc();
     auto *NormalBB = TAI->getNormalBB();
