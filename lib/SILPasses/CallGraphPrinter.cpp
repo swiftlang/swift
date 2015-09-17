@@ -16,7 +16,6 @@
 
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
-#include "swift/Basic/DemangleWrappers.h"
 
 using namespace swift;
 
