@@ -466,18 +466,43 @@ void CallGraphNode::print(llvm::raw_ostream &OS) {
   printFlag(OS, "All callers known", isCallerEdgesComplete());
   printFlag(OS, "Binds self", mayBindDynamicSelf());
 
-  auto &Edges = getCalleeEdges();
-  if (Edges.empty())
-    return;
+  auto &CalleeEdges = getCalleeEdges();
+  if (!CalleeEdges.empty()) {
+    OS << "Call sites:\n";
 
-  llvm::SmallVector<CallGraphEdge *, 8> OrderedEdges;
-  orderEdges(Edges, OrderedEdges);
+    llvm::SmallVector<CallGraphEdge *, 8> OrderedCalleeEdges;
+    orderEdges(CalleeEdges, OrderedCalleeEdges);
 
-  for (auto *Edge : OrderedEdges) {
+    for (auto *Edge : OrderedCalleeEdges) {
+      OS << "\n";
+      Edge->print(OS, /* Indent= */ 2);
+    }
     OS << "\n";
-    Edge->print(OS, /* Indent= */ 2);
   }
-  OS << "\n";
+
+  auto &CallerEdges = getPartialCallerEdges();
+  if (!CallerEdges.empty()) {
+    OS << (!isCallerEdgesComplete() ? "Known " : "");
+    OS << "Callers:\n";
+
+    llvm::SmallVector<CallGraphEdge *, 8> OrderedCallerEdges;
+    orderEdges(CallerEdges, OrderedCallerEdges);
+
+    llvm::SetVector<SILFunction *> Callers;
+
+    for (auto *Edge : OrderedCallerEdges)
+      Callers.insert(Edge->getApply().getFunction());
+
+    for (auto *Caller : Callers) {
+      OS << "\n";
+      indent(OS, 2);
+      OS << "Name: " << Caller->getName() << "\n";
+      indent(OS, 2);
+      OS << "Demangled: " <<
+        demangle_wrappers::demangleSymbolAsString(Caller->getName()) << "\n";
+    }
+    OS << "\n";
+  }
 }
 
 void CallGraphNode::dump() {
