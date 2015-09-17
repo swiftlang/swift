@@ -249,7 +249,7 @@ public:
   /// \param Loc The source location of the beginning of a token.
   static SourceLoc getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc);
 
-  /// \brief Convert a SourceRange to the equivalent CharSourceRance
+  /// \brief Convert a SourceRange to the equivalent CharSourceRange
   ///
   /// \param SM The source manager in which the given source range
   /// resides.
