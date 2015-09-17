@@ -40,6 +40,11 @@ module SwiftGlibc [system] {
       header "/usr/include/string.h"
       export *
     }
+
+    module math {
+      header "/usr/include/math.h"
+      export *
+    }
   }
 
   // POSIX
