@@ -54,4 +54,5 @@ add_swift_library(swiftSILPasses
   CropOverflowChecks.cpp
   UsePrespecialized.cpp
   LetPropertiesOpts.cpp
+  CallGraphPrinter.cpp
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)

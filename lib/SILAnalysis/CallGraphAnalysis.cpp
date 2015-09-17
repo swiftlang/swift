@@ -20,6 +20,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <utility>
 
@@ -402,27 +403,23 @@ void CallGraph::addEdges(SILFunction *F) {
   }
 }
 
-static void indent(int Indent) {
-#ifndef NDEBUG
+static void indent(llvm::raw_ostream &OS, int Indent) {
   std::string Blanks(Indent, ' ');
-  llvm::errs() << Blanks;
-#endif
+  OS << Blanks;
 }
 
-static void dumpFlag(const char *Description, bool Value, int Indent =0) {
-#ifndef NDEBUG
-  indent(Indent);
-  llvm::errs() << Description << ": " << (Value ? "yes\n" : "no\n");
-#endif
+static void printFlag(llvm::raw_ostream &OS,
+                      const char *Description, bool Value, int Indent =0) {
+  indent(OS, Indent);
+  OS << Description << ": " << (Value ? "yes\n" : "no\n");
 }
 
-void CallGraphEdge::dump(int Indent) {
-#ifndef NDEBUG
-  indent(Indent);
-  llvm::errs() << "Call site #" << Ordinal << ": ";
-  getApply().getInstruction()->dump();
+void CallGraphEdge::print(llvm::raw_ostream &OS, int Indent) {
+  indent(OS, Indent);
+  OS << "Call site #" << Ordinal << ": ";
+  OS << *getApply().getInstruction();
 
-  dumpFlag("All callees known", isCalleeSetComplete(), Indent);
+  printFlag(OS, "All callees known", isCalleeSetComplete(), Indent);
 
   auto CalleeSet = getPartialCalleeSet();
   if (CalleeSet.empty())
@@ -432,31 +429,42 @@ void CallGraphEdge::dump(int Indent) {
   orderCallees(CalleeSet, OrderedNodes);
 
   bool First = true;
-  indent(Indent);
-  llvm::errs() << "Known callees:\n";
+  indent(OS, Indent);
+  OS << "Known callees:\n";
   for (auto *Callee : OrderedNodes) {
     if (!First)
-      llvm::errs() << "\n";
+      OS << "\n";
     First = false;
     auto Name = Callee->getFunction()->getName();
-    indent(Indent + 2);
-    llvm::errs() << "Name: " << Name << "\n";
-    indent(Indent + 2);
-    llvm::errs() << "Demangled: " <<
+    indent(OS, Indent + 2);
+    OS << "Name: " << Name << "\n";
+    indent(OS, Indent + 2);
+    OS << "Demangled: " <<
       demangle_wrappers::demangleSymbolAsString(Name) << "\n";
   }
+}
+
+void CallGraphEdge::dump(int Indent) {
+#ifndef NDEBUG
+  print(llvm::errs(), Indent);
 #endif
 }
 
-void CallGraphNode::dump() {
+void CallGraphEdge::dump() {
 #ifndef NDEBUG
-  llvm::errs() << "Function #" << Ordinal << ": " <<
+  dump(0);
+#endif
+}
+
+
+void CallGraphNode::print(llvm::raw_ostream &OS) {
+  OS << "Function #" << Ordinal << ": " <<
     getFunction()->getName() << "\n";
-  llvm::errs() << "Demangled: " <<
+  OS << "Demangled: " <<
     demangle_wrappers::demangleSymbolAsString(getFunction()->getName()) << "\n";
-  dumpFlag("Trivially dead", isDead());
-  dumpFlag("All callers known", isCallerEdgesComplete());
-  dumpFlag("Binds self", mayBindDynamicSelf());
+  printFlag(OS, "Trivially dead", isDead());
+  printFlag(OS, "All callers known", isCallerEdgesComplete());
+  printFlag(OS, "Binds self", mayBindDynamicSelf());
 
   auto &Edges = getCalleeEdges();
   if (Edges.empty())
@@ -466,30 +474,40 @@ void CallGraphNode::dump() {
   orderEdges(Edges, OrderedEdges);
 
   for (auto *Edge : OrderedEdges) {
-    llvm::errs() << "\n";
-    Edge->dump(/* Indent= */ 2);
+    OS << "\n";
+    Edge->print(OS, /* Indent= */ 2);
   }
-  llvm::errs() << "\n";
+  OS << "\n";
+}
+
+void CallGraphNode::dump() {
+#ifndef NDEBUG
+  print(llvm::errs());
 #endif
 }
 
-void CallGraph::dump() {
+void CallGraph::print(llvm::raw_ostream &OS) {
 #ifndef NDEBUG
-  llvm::errs() << "*** Call Graph ***\n";
+  OS << "*** Call Graph ***\n";
 
   auto const &Funcs = getBottomUpFunctionOrder();
   for (auto *F : Funcs) {
     auto *Node = getCallGraphNode(F);
     if (Node)
-      Node->dump();
+      Node->print(OS);
     else
-      llvm::errs() << "!!! Missing node for " << F->getName() << "!!!";
-    llvm::errs() << "\n";
+      OS << "!!! Missing node for " << F->getName() << "!!!";
+    OS << "\n";
   }
 #endif
 }
 
+void CallGraph::dump() {
 #ifndef NDEBUG
+  print(llvm::errs());
+#endif
+}
+
 template<int NumBuckets>
 struct Histogram {
   unsigned Data[NumBuckets];
@@ -500,25 +518,23 @@ struct Histogram {
     }
   }
 
-  void Increment(unsigned Bucket) {
+  void increment(unsigned Bucket) {
     Bucket = Bucket < NumBuckets ? Bucket : NumBuckets - 1;
     Data[Bucket]++;
   }
 
-  void Print() {
+  void print(llvm::raw_ostream &OS) {
     auto Last = NumBuckets - 1;
     for (auto i = 0; i < NumBuckets; ++i) {
       auto *Seperator = Last == i ? "+: " : ": ";
       if (Data[i])
-        llvm::errs() << i << Seperator << Data[i] << "\n";
+        OS << i << Seperator << Data[i] << "\n";
     }
-    llvm::errs() << "\n";
+    OS << "\n";
   }
 };
-#endif
 
-void CallGraph::dumpStats() {
-#ifndef NDEBUG
+void CallGraph::printStats(llvm::raw_ostream &OS) {
   Histogram<256> CallSitesPerFunction;
   Histogram<256> CallersPerFunction;
   Histogram<256> CalleesPerCallSite;
@@ -530,34 +546,39 @@ void CallGraph::dumpStats() {
     ++CountNodes;
     auto *Node = getCallGraphNode(F);
     if (Node) {
-      CallSitesPerFunction.Increment(Node->getCalleeEdges().size());
-      CallersPerFunction.Increment(Node->getPartialCallerEdges().size());
+      CallSitesPerFunction.increment(Node->getCalleeEdges().size());
+      CallersPerFunction.increment(Node->getPartialCallerEdges().size());
 
       CountCallSites += Node->getCalleeEdges().size();
 
       for (auto *Edge : Node->getCalleeEdges())
-        CalleesPerCallSite.Increment(Edge->getPartialCalleeSet().size());
+        CalleesPerCallSite.increment(Edge->getPartialCalleeSet().size());
     } else {
-      llvm::errs() << "!!! Missing node for " << F->getName() << "!!!";
+      OS << "!!! Missing node for " << F->getName() << "!!!";
     }
   }
 
-  llvm::errs() << "*** Call Graph Statistics ***\n";
+  OS << "*** Call Graph Statistics ***\n";
 
-  llvm::errs() << "Number of call graph nodes: " << CountNodes << "\n";
-  llvm::errs() << "Number of call graph edges: " << CountCallSites << "\n";
+  OS << "Number of call graph nodes: " << CountNodes << "\n";
+  OS << "Number of call graph edges: " << CountCallSites << "\n";
 
-  llvm::errs() << "Histogram of number of call sites per function:\n";
-  CallSitesPerFunction.Print();
+  OS << "Histogram of number of call sites per function:\n";
+  CallSitesPerFunction.print(OS);
 
-  llvm::errs() << "Histogram of number of callees per call site:\n";
-  CalleesPerCallSite.Print();
+  OS << "Histogram of number of callees per call site:\n";
+  CalleesPerCallSite.print(OS);
 
-  llvm::errs() << "Histogram of number of callers per function:\n";
-  CallersPerFunction.Print();
+  OS << "Histogram of number of callers per function:\n";
+  CallersPerFunction.print(OS);
 
-  llvm::errs() << "Bump pointer allocator statistics:\n";
-  Allocator.PrintStats();
+  OS << "Bump pointer allocated memory (bytes): " <<
+    Allocator.getTotalMemory() << "\n";
+}
+
+void CallGraph::dumpStats() {
+#ifndef NDEBUG
+  printStats(llvm::errs());
 #endif
 }
 

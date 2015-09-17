@@ -21,6 +21,7 @@
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 
@@ -155,7 +156,9 @@ public:
     return Ordinal;
   }
 
+  void print(llvm::raw_ostream &OS, int Indent);
   void dump(int Indent);
+  void dump();
 };
 
 class CallGraphNode {
@@ -241,6 +244,7 @@ public:
     return Ordinal;
   }
 
+  void print(llvm::raw_ostream &OS);
   void dump();
 
 private:
@@ -386,6 +390,8 @@ public:
 
   void markCallerEdgesOfCalleesIncomplete(FullApplySite AI);
 
+  void print(llvm::raw_ostream &OS);
+  void printStats(llvm::raw_ostream &OS);
   void dump();
   void dumpStats();
 
