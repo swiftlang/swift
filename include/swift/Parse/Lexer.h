@@ -249,6 +249,17 @@ public:
   /// \param Loc The source location of the beginning of a token.
   static SourceLoc getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc);
 
+  /// \brief Convert a SourceRange to the equivalent CharSourceRance
+  ///
+  /// \param SM The source manager in which the given source range
+  /// resides.
+  ///
+  /// \param SR The source range
+  static CharSourceRange getCharSourceRangeFromSourceRange(const SourceManager &SM,
+                                                           const SourceRange &SR) {
+    return CharSourceRange(SM, SR.Start, getLocForEndOfToken(SM, SR.End));
+  }
+
   /// Return the start location of the token that the offset in the given buffer
   /// points to.
   ///

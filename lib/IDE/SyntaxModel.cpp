@@ -344,8 +344,7 @@ SyntaxStructureKind syntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N) {
 
 CharSourceRange charSourceRangeFromSourceRange(const SourceManager &SM,
                                                const SourceRange &SR) {
-  SourceLoc SRE = Lexer::getLocForEndOfToken(SM, SR.End);
-  return CharSourceRange(SM, SR.Start, SRE);
+  return Lexer::getCharSourceRangeFromSourceRange(SM, SR);
 }
 
 CharSourceRange innerCharSourceRangeFromSourceRange(const SourceManager &SM,

@@ -125,11 +125,6 @@ public:
   /// specified character locations.
   CharSourceRange(const SourceManager &SM, SourceLoc Start, SourceLoc End);
 
-  /// \brief Constructs a character range corresponding to a given
-  /// token range.
-  CharSourceRange(const SourceManager &SM, SourceRange Range)
-      : CharSourceRange(SM, Range.Start, Range.End) {}
-
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return Start.isInvalid(); }
 

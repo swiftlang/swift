@@ -237,7 +237,7 @@ void SourceLoc::dump(const SourceManager &SM) const {
 
 void SourceRange::print(raw_ostream &OS, const SourceManager &SM,
                         unsigned &LastBufferID, bool PrintText) const {
-  CharSourceRange(SM, *this).print(OS, SM, LastBufferID, PrintText);
+  CharSourceRange(SM, Start, End).print(OS, SM, LastBufferID, PrintText);
 }
 
 void SourceRange::dump(const SourceManager &SM) const {
