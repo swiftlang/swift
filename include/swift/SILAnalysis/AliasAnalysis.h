@@ -21,6 +21,7 @@ namespace swift {
 
 class SILValue;
 class SILInstruction;
+class SideEffectAnalysis;
 
 /// This class is a simple wrapper around an alias analysis cache. This is
 /// needed since we do not have an "analysis" infrastructure.
@@ -43,17 +44,23 @@ private:
   using AliasCacheKey = std::pair<SILValue, SILValue>;
   llvm::DenseMap<AliasCacheKey, AliasResult> AliasCache;
   SILModule *Mod;
+  SideEffectAnalysis *SEA;
 
   using MemoryBehavior = SILInstruction::MemoryBehavior;
 
   AliasResult cacheValue(AliasCacheKey Key, AliasResult Result);
 
 public:
-  AliasAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Alias), Mod(M) {}
+  AliasAnalysis(SILModule *M) :
+    SILAnalysis(AnalysisKind::Alias), Mod(M), SEA(nullptr) {}
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::Alias;
   }
+  
+  virtual void initialize(SILPassManager *PM);
+  
+  SideEffectAnalysis *getSideEffectAnalysis() const { return SEA; }
 
   /// Perform an alias query to see if V1, V2 refer to the same values.
   AliasResult alias(SILValue V1, SILValue V2, SILType TBAAType1 = SILType(),
