@@ -508,6 +508,8 @@ void CallGraph::dump() {
 #endif
 }
 
+namespace {
+
 template<int NumBuckets>
 struct Histogram {
   unsigned Data[NumBuckets];
@@ -533,6 +535,8 @@ struct Histogram {
     OS << "\n";
   }
 };
+
+} // end anonymous namespace
 
 void CallGraph::printStats(llvm::raw_ostream &OS) {
   Histogram<256> CallSitesPerFunction;
