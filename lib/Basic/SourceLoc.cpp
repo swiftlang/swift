@@ -237,6 +237,11 @@ void SourceLoc::dump(const SourceManager &SM) const {
 
 void SourceRange::print(raw_ostream &OS, const SourceManager &SM,
                         unsigned &LastBufferID, bool PrintText) const {
+  // FIXME: CharSourceRange is a half-open character-based range, while
+  // SourceRange is a closed token-based range, so this conversion omits the
+  // last token in the range. Unfortunately, we can't actually get to the end
+  // of the token without using the Lex library, which would be a layering
+  // violation. This is still better than nothing.
   CharSourceRange(SM, Start, End).print(OS, SM, LastBufferID, PrintText);
 }
 
