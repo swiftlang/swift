@@ -354,10 +354,10 @@ public:
   }
 
   std::pair<CallGraphEdge::CalleeSetType *, bool>
-  tryGetCalleeSetForClassMethod(SILDeclRef decl);
+  tryGetCalleeSetForClassMethod(SILDeclRef Decl);
 
   std::pair<CallGraphEdge::CalleeSetType *, bool>
-  getOrCreateCalleeSetForClassMethod(AbstractFunctionDecl *decl);
+  getOrCreateCalleeSetForClassMethod(SILDeclRef Decl);
 
   // Functions for getting bottom-up lists of SCCs or functions in the
   // call graph.
@@ -418,7 +418,7 @@ private:
   }
 
   void computeClassMethodCallees();
-  void computeClassMethodCalleesForVTable(const SILVTable &VTable);
+  void computeClassMethodCalleesForClass(ClassDecl *CD);
   CallGraphNode *addCallGraphNode(SILFunction *F);
   void addEdges(SILFunction *F);
   CallGraphEdge *makeCallGraphEdgeForCallee(FullApplySite Apply,

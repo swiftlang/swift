@@ -89,30 +89,44 @@ CallGraph::~CallGraph() {
   }
 }
 
-void CallGraph::computeClassMethodCalleesForVTable(const SILVTable &VTable) {
-  for (auto &Entry : VTable.getEntries()) {
-    auto *AFD = cast<AbstractFunctionDecl>(Entry.first.getDecl());
-    assert(AFD && "Expected abstract function decl!");
+/// Update the callee set for each method of a given class, along with
+/// all the overridden methods from superclasses.
+void CallGraph::computeClassMethodCalleesForClass(ClassDecl *CD) {
+  for (auto *Member : CD->getMembers()) {
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(Member);
+    if (!AFD)
+      continue;
 
-    SILFunction *CalledFn = Entry.second;
-    auto *Node = getCallGraphNode(CalledFn);
-    assert(Node && "Expected call graph node for callee function!");
+    auto Method = SILDeclRef(AFD);
+    auto *CalledFn = M.lookUpFunctionInVTable(CD, Method);
+    if (!CalledFn)
+      continue;
+
+    // FIXME: Link in external declarations, at least for complete call sets.
+
+    auto *Node = getOrAddCallGraphNode(CalledFn);
+
+    // Update the callee sets for this method and all the methods it
+    // overrides by inserting the call graph node for the function
+    // that this method invokes.
     do {
       CallGraphEdge::CalleeSetType *CalleeSet;
       bool Complete;
 
-      std::tie(CalleeSet, Complete) = getOrCreateCalleeSetForClassMethod(AFD);
+      std::tie(CalleeSet, Complete) = getOrCreateCalleeSetForClassMethod(Method);
       assert(CalleeSet && "Unexpected null callee set!");
 
       CalleeSet->insert(Node);
-      AFD = AFD->getOverriddenDecl();
-    } while (AFD);
+      Method = Method.getOverriddenVTableEntry();
+    } while (Method);
   }
 }
 
+/// Incrementally compute the callees for each method of each class
+/// that we have a VTable for.
 void CallGraph::computeClassMethodCallees() {
   for (auto &VTable : M.getVTableList())
-    computeClassMethodCalleesForVTable(VTable);
+    computeClassMethodCalleesForClass(VTable.getClass());
 }
 
 CallGraphNode *CallGraph::addCallGraphNode(SILFunction *F) {
@@ -149,13 +163,14 @@ CallGraph::tryGetCalleeSetForClassMethod(SILDeclRef Decl) {
 }
 
 std::pair<CallGraphEdge::CalleeSetType *, bool>
-CallGraph::getOrCreateCalleeSetForClassMethod(AbstractFunctionDecl *Decl) {
-  auto Found = CalleeSets.find(Decl);
+CallGraph::getOrCreateCalleeSetForClassMethod(SILDeclRef Decl) {
+  auto *AFD = cast<AbstractFunctionDecl>(Decl.getDecl());
+  auto Found = CalleeSets.find(AFD);
   if (Found != CalleeSets.end())
     return std::make_pair(Found->second, false);
 
   auto *CalleeSet = new (Allocator) CallGraphEdge::CalleeSetType;
-  CalleeSets.insert(std::make_pair(Decl, CalleeSet));
+  CalleeSets.insert(std::make_pair(AFD, CalleeSet));
 
   // FIXME: Determine whether the set is complete.
   return std::make_pair(CalleeSet, false);
