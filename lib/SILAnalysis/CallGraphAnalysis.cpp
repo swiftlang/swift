@@ -526,9 +526,9 @@ struct Histogram {
   void print(llvm::raw_ostream &OS) {
     auto Last = NumBuckets - 1;
     for (auto i = 0; i < NumBuckets; ++i) {
-      auto *Seperator = Last == i ? "+: " : ": ";
+      auto *Separator = Last == i ? "+: " : ": ";
       if (Data[i])
-        OS << i << Seperator << Data[i] << "\n";
+        OS << i << Separator << Data[i] << "\n";
     }
     OS << "\n";
   }
