@@ -286,15 +286,6 @@ class CallGraph {
   /// The module that this call graph belongs to.
   SILModule &M;
 
-  /// The root nodes of the call graph. This consists of functions that are
-  /// definitions in our module currently. It can be expanded to only include
-  /// functions clearly visible from outside our compilation scope (i.e. ignore
-  /// private functions that don't escape).
-  ///
-  /// These are allocated via Allocator so are owned by the CallGraph. Thus the
-  /// callgraph calls the CallGraphNode's destructors in its destructor.
-  llvm::SmallVector<CallGraphNode *, 16> CallGraphRoots;
-
   /// A map from a function to the function's node in the call graph.
   llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
 
@@ -327,12 +318,7 @@ public:
   CallGraph(SILModule *M, bool completeModule);
   ~CallGraph();
 
-  // Query funtions for getting roots, nodes, and edges from the call
-  // graph.
-
-  ArrayRef<CallGraphNode *> getCallGraphRoots() {
-    return CallGraphRoots;
-  }
+  // Query funtions for getting nodes and edges from the call graph.
 
   CallGraphNode *getCallGraphNode(SILFunction *F) const {
     return const_cast<CallGraph *>(this)->getCallGraphNode(F);

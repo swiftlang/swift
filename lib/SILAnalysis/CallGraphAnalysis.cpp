@@ -142,11 +142,6 @@ CallGraphNode *CallGraph::addCallGraphNode(SILFunction *F) {
 
   FunctionToNodeMap[F] = Node;
 
-  // TODO: Only add functions clearly visible from outside our
-  //       compilation scope as roots.
-  if (F->isDefinition())
-    CallGraphRoots.push_back(Node);
-
   return Node;
 }
 
@@ -685,8 +680,12 @@ void CallGraph::computeBottomUpSCCOrder() {
   }
 
   CallGraphSCCFinder SCCFinder(BottomUpSCCOrder, Allocator);
-  for (auto *Node : getCallGraphRoots())
-    SCCFinder.DFS(Node);
+  for (auto &F : M) {
+    if (F.isDefinition()) {
+      auto *Node = getCallGraphNode(&F);
+      SCCFinder.DFS(Node);
+    }
+  }
 }
 
 void CallGraph::computeBottomUpFunctionOrder() {
