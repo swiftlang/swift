@@ -1703,6 +1703,8 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
 
   if (!consumeIf(tok::kw_while, whileLoc)) {
     diagnose(whileLoc, diag::expected_while_after_repeat_body);
+    if (body.isNonNull())
+      return body;
     return makeParserError();
   }
 
