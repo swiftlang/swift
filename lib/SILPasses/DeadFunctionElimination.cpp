@@ -48,6 +48,7 @@ protected:
   };
 
   SILModule *Module;
+  CallGraphAnalysis *CGA;
 
   llvm::DenseMap<AbstractFunctionDecl *, MethodInfo *> MethodInfos;
   llvm::SpecificBumpPtrAllocator<MethodInfo> MethodInfoAllocator;
@@ -200,7 +201,8 @@ protected:
   }
 
 public:
-  FunctionLivenessComputation(SILModule *module) : Module(module) {}
+  FunctionLivenessComputation(SILModule *module, CallGraphAnalysis *CGA) :
+    Module(module), CGA(CGA) {}
 
   /// The main entry point of the optimization.
   bool findAliveFunctions() {
@@ -315,8 +317,8 @@ class DeadFunctionElimination : FunctionLivenessComputation {
   }
 
 public:
-  DeadFunctionElimination(SILModule *module)
-      : FunctionLivenessComputation(module) {}
+  DeadFunctionElimination(SILModule *module, CallGraphAnalysis *CGA)
+      : FunctionLivenessComputation(module, CGA) {}
 
   /// The main entry point of the optimization.
   void eliminateFunctions(SILModuleTransform *DFEPass) {
@@ -324,14 +326,15 @@ public:
     DEBUG(llvm::dbgs() << "running dead function elimination\n");
     findAliveFunctions();
 
-    bool CallGraphChanged = false;
-
     removeDeadEntriesFromTables();
+
+    CallGraph *CG = CGA->getCallGraphOrNull();
 
     // First drop all references so that we don't get problems with non-null
     // reference counts of dead functions.
     for (SILFunction &F : *Module) {
       if (!isAlive(&F)) {
+        CallGraphEditor(CG).removeAllCalleeEdgesFrom(&F);
         F.dropAllReferences();
       }
     }
@@ -342,9 +345,11 @@ public:
       if (!isAlive(F)) {
         DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
         NumDeadFunc++;
+        CallGraphEditor(CG).removeCallGraphNode(F);
         Module->eraseFunction(F);
-        CallGraphChanged = true;
+        CGA->lockInvalidation();
         DFEPass->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
+        CGA->unlockInvalidation();
       }
     }
   }
@@ -415,20 +420,24 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
 
     DEBUG(llvm::dbgs() << "  removed external function " << F->getName()
           << "\n");
+    CallGraph *CG = CGA->getCallGraphOrNull();
+    CallGraphEditor(CG).removeAllCalleeEdgesFrom(F);
     F->dropAllReferences();
     auto &Blocks = F->getBlocks();
     Blocks.clear();
     assert(F->isExternalDeclaration() &&
            "Function should be an external declaration");
-    if (F->getRefCount() == 0)
+    if (F->getRefCount() == 0) {
       Module->eraseFunction(F);
+      CallGraphEditor(CG).removeCallGraphNode(F);
+    }
     NumEliminatedExternalDefs++;
     return true;
   }
 
 public:
-  ExternalFunctionDefinitionsElimination(SILModule *module)
-      : FunctionLivenessComputation(module) {}
+  ExternalFunctionDefinitionsElimination(SILModule *module, CallGraphAnalysis *CGA)
+      : FunctionLivenessComputation(module, CGA) {}
 
   /// Eliminate bodies of external functions which are not alive.
   ///
@@ -444,7 +453,9 @@ public:
       // Do not remove bodies of any functions that are alive.
       if (!isAlive(F)) {
         if (tryToConvertExternalDefinitionIntoDeclaration(F)) {
+          CGA->lockInvalidation();
           DFEPass->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
+          CGA->unlockInvalidation();
         }
       }
     }
@@ -461,13 +472,14 @@ namespace {
 
 class SILDeadFuncElimination : public SILModuleTransform {
   void run() override {
+    auto *CGA = getAnalysis<CallGraphAnalysis>();
 
     DEBUG(llvm::dbgs() << "Running DeadFuncElimination\n");
 
     // Avoid that Deserializers keep references to functions in their caches.
     getModule()->invalidateSILLoaderCaches();
 
-    DeadFunctionElimination deadFunctionElimination(getModule());
+    DeadFunctionElimination deadFunctionElimination(getModule(), CGA);
     deadFunctionElimination.eliminateFunctions(this);
   }
   
@@ -476,13 +488,14 @@ class SILDeadFuncElimination : public SILModuleTransform {
 
 class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
   void run() override {
+    auto *CGA = getAnalysis<CallGraphAnalysis>();
 
     DEBUG(llvm::dbgs() << "Running ExternalFunctionDefinitionsElimination\n");
 
     // Avoid that Deserializers keep references to functions in their caches.
     getModule()->invalidateSILLoaderCaches();
 
-    ExternalFunctionDefinitionsElimination EFDFE(getModule());
+    ExternalFunctionDefinitionsElimination EFDFE(getModule(), CGA);
     EFDFE.eliminateFunctions(this);
  }
 
