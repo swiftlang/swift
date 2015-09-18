@@ -273,7 +273,8 @@ template <class Impl, class T> struct RetainableBoxBase {
 struct SwiftRetainableBox :
     RetainableBoxBase<SwiftRetainableBox, HeapObject*> {
   static HeapObject *retain(HeapObject *obj) {
-    return swift_retain(obj);
+    swift_retain(obj);
+    return obj;
   }
 
   static void release(HeapObject *obj) {

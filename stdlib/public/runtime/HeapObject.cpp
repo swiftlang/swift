@@ -281,24 +281,23 @@ swift::swift_retain_noresult(HeapObject *object) {
   swift_retain(object);
 }
 
-HeapObject *swift::swift_retain(HeapObject *object) {
+void swift::swift_retain(HeapObject *object) {
   SWIFT_RETAIN();
-  return _swift_retain(object);
+  _swift_retain(object);
 }
-static HeapObject *_swift_retain_(HeapObject *object) {
-  return _swift_retain_inlined(object);
+static void _swift_retain_(HeapObject *object) {
+  _swift_retain_inlined(object);
 }
 auto swift::_swift_retain = _swift_retain_;
 
-HeapObject *swift::swift_retain_n(HeapObject *object, uint32_t n) {
+void swift::swift_retain_n(HeapObject *object, uint32_t n) {
   SWIFT_RETAIN();
-  return _swift_retain_n(object, n);
+  _swift_retain_n(object, n);
 }
-static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n) {
+static void _swift_retain_n_(HeapObject *object, uint32_t n) {
   if (object) {
     object->refCount.increment(n);
   }
-  return object;
 }
 auto swift::_swift_retain_n = _swift_retain_n_;
 

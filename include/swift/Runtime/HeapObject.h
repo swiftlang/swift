@@ -137,7 +137,6 @@ extern "C" void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask);
 /// Atomically increments the retain count of an object.
 ///
 /// \param object - may be null, in which case this is a no-op
-/// \return its argument value exactly
 ///
 /// POSSIBILITIES: We may end up wanting a bunch of different variants:
 ///  - the general version which correctly handles null values, swift
@@ -147,16 +146,15 @@ extern "C" void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask);
 ///      - maybe a variant that can assume a non-null object
 /// It may also prove worthwhile to have this use a custom CC
 /// which preserves a larger set of registers.
-extern "C" HeapObject *swift_retain(HeapObject *object);
+extern "C" void swift_retain(HeapObject *object);
 extern "C" void swift_retain_noresult(HeapObject *object);
 
-extern "C" HeapObject *swift_retain_n(HeapObject *object, uint32_t n);
+extern "C" void swift_retain_n(HeapObject *object, uint32_t n);
 
-static inline HeapObject *_swift_retain_inlined(HeapObject *object) {
+static inline void _swift_retain_inlined(HeapObject *object) {
   if (object) {
     object->refCount.increment();
   }
-  return object;
 }
 
 /// Atomically increments the reference count of an object, unless it has
@@ -327,7 +325,9 @@ public:
       swift_release(object);
   }
 
-  SwiftRAII(const SwiftRAII &other) : object(swift_retain(*other)) {
+  SwiftRAII(const SwiftRAII &other) {
+    swift_retain(*other);
+    object = *other;
     ;
   }
   SwiftRAII(SwiftRAII &&other) : object(*other) {
@@ -336,7 +336,8 @@ public:
   SwiftRAII &operator=(const SwiftRAII &other) {
     if (object)
       swift_release(object);
-    object = swift_retain(*other);
+    swift_retain(*other);
+    object = *other;
     return *this;
   }
   SwiftRAII &operator=(SwiftRAII &&other) {

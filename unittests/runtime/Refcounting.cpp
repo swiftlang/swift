@@ -59,8 +59,7 @@ TEST(RefcountingTest, retain_release) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  auto retainResult = swift_retain(object);
-  EXPECT_EQ(object, retainResult);
+  swift_retain(object);
   EXPECT_EQ(0u, value);
   swift_release(object);
   EXPECT_EQ(0u, value);
@@ -103,10 +102,8 @@ TEST(RefcountingTest, retain_release_n) {
   size_t value = 0;
   auto object = allocTestObject(&value, 1);
   EXPECT_EQ(0u, value);
-  auto retainResult = swift_retain_n(object, 32);
-  EXPECT_EQ(object, retainResult);
-  retainResult = swift_retain(object);
-  EXPECT_EQ(object, retainResult);
+  swift_retain_n(object, 32);
+  swift_retain(object);
   EXPECT_EQ(0u, value);
   EXPECT_EQ(34u, swift_retainCount(object));
   swift_release_n(object, 31);
