@@ -569,10 +569,8 @@ static bool usesNativeSwiftReferenceCounting_unowned(const void *object) {
 void *swift::swift_unknownRetain_n(void *object, int n) {
   void *objc_ret = nullptr;
   if (isObjCTaggedPointerOrNull(object)) return object;
-  if (usesNativeSwiftReferenceCounting_allocated(object)) {
-    swift_retain_n(static_cast<HeapObject *>(object), n);
-    return static_cast<HeapObject *>(object);
-  }
+  if (usesNativeSwiftReferenceCounting_allocated(object))
+    return swift_retain_n(static_cast<HeapObject *>(object), n);
   for (int i = 0; i < n; ++i)
     objc_ret = objc_retain(static_cast<id>(object));
   return objc_ret;
@@ -588,10 +586,8 @@ void swift::swift_unknownRelease_n(void *object, int n) {
 
 void *swift::swift_unknownRetain(void *object) {
   if (isObjCTaggedPointerOrNull(object)) return object;
-  if (usesNativeSwiftReferenceCounting_allocated(object)) {
-    swift_retain(static_cast<HeapObject *>(object));
-    return static_cast<HeapObject *>(object);
-  }
+  if (usesNativeSwiftReferenceCounting_allocated(object))
+    return swift_retain(static_cast<HeapObject *>(object));
   return objc_retain(static_cast<id>(object));
 }
 
@@ -631,14 +627,11 @@ void *swift::swift_bridgeObjectRetain(void *object) {
   auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
 
 #if SWIFT_OBJC_INTEROP
-  if (!isNonNative_unTagged_bridgeObject(object)) {
-    swift_retain(static_cast<HeapObject *>(objectRef));
-    return static_cast<HeapObject *>(objectRef);
-  }
+  if (!isNonNative_unTagged_bridgeObject(object))
+    return swift_retain(static_cast<HeapObject *>(objectRef));
   return objc_retain(static_cast<id>(objectRef));
 #else
-  swift_retain(static_cast<HeapObject *>(objectRef));
-  return static_cast<HeapObject *>(objectRef);
+  return swift_retain(static_cast<HeapObject *>(objectRef));
 #endif
 }
 
@@ -669,16 +662,13 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
 
 #if SWIFT_OBJC_INTEROP
   void *objc_ret = nullptr;
-  if (!isNonNative_unTagged_bridgeObject(object)) {
-    swift_retain_n(static_cast<HeapObject *>(objectRef), n);
-    return static_cast<HeapObject *>(objectRef);
-  }
+  if (!isNonNative_unTagged_bridgeObject(object))
+    return swift_retain_n(static_cast<HeapObject *>(objectRef), n);
   for (int i = 0;i < n; ++i)
     objc_ret = objc_retain(static_cast<id>(objectRef));
   return objc_ret;
 #else
-  swift_retain_n(static_cast<HeapObject *>(objectRef), n);
-  return static_cast<HeapObject *>(objectRef);
+  return swift_retain_n(static_cast<HeapObject *>(objectRef), n);
 #endif
 }
 

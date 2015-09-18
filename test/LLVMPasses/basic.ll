@@ -14,7 +14,8 @@ declare %objc_object* @objc_retain(%objc_object*)
 declare void @objc_release(%objc_object*)
 declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
 declare void @swift_release(%swift.refcounted* nocapture)
-declare void @swift_retain(%swift.refcounted* ) nounwind
+declare %swift.refcounted* @swift_retain(%swift.refcounted* ) nounwind
+declare void @swift_retain_noresult(%swift.refcounted* nocapture) nounwind
 declare void @swift_fixLifetime(%swift.refcounted* ) nounwind
 declare %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge*)
 declare void @swift_bridgeObjectRelease(%swift.bridge*)
@@ -30,7 +31,7 @@ declare void @unknown_func()
 
 define void @trivial_retain_release(%swift.refcounted* %P, %objc_object* %O, %swift.bridge * %B) {
 entry:
-  tail call void @swift_retain(%swift.refcounted* %P)
+  tail call void @swift_retain_noresult(%swift.refcounted* %P)
   tail call void @swift_release(%swift.refcounted* %P) nounwind
   %0 = tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %P)
   tail call void @swift_unknownRelease(%swift.refcounted* %P)
@@ -52,7 +53,7 @@ entry:
 
 
 define void @retain_motion1(%swift.refcounted* %A) {
-  tail call void @swift_retain(%swift.refcounted* %A)
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
   %B = bitcast %swift.refcounted* %A to i32*
   store i32 42, i32* %B
   tail call void @swift_release(%swift.refcounted* %A) nounwind
@@ -97,11 +98,11 @@ define void @objc_retain_release_opt(%objc_object* %P, i32* %IP) {
 }
 
 ; CHECK-LABEL: define void @swift_fixLifetimeTest
-; CHECK: swift_retain
+; CHECK: swift_retain_noresult
 ; CHECK: swift_fixLifetime
 ; CHECK: swift_release
 define void @swift_fixLifetimeTest(%swift.refcounted* %A) {
-  tail call void @swift_retain(%swift.refcounted* %A)
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
   call void @user(%swift.refcounted* %A) nounwind
   call void @swift_fixLifetime(%swift.refcounted* %A)
   tail call void @swift_release(%swift.refcounted* %A) nounwind
@@ -114,7 +115,7 @@ define void @swift_fixLifetimeTest(%swift.refcounted* %A) {
 ; CHECK-NOT: swift_release
 ; CHECK: ret
 define void @move_retain_across_unknown_retain(%swift.refcounted* %A, %swift.refcounted* %B) {
-  tail call void @swift_retain(%swift.refcounted* %A)
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
   tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %B)
   tail call void @swift_release(%swift.refcounted* %A) nounwind
   ret void
@@ -126,7 +127,7 @@ define void @move_retain_across_unknown_retain(%swift.refcounted* %A, %swift.ref
 ; CHECK-NOT: swift_release
 ; CHECK: ret
 define void @move_retain_across_objc_retain(%swift.refcounted* %A, %objc_object* %B) {
-  tail call void @swift_retain(%swift.refcounted* %A)
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
   tail call %objc_object* @objc_retain(%objc_object* %B)
   tail call void @swift_release(%swift.refcounted* %A) nounwind
   ret void
@@ -137,7 +138,7 @@ define void @move_retain_across_objc_retain(%swift.refcounted* %A, %objc_object*
 ; CHECK-NOT: swift_release
 ; CHECK: ret
 define i32 @move_retain_across_load(%swift.refcounted* %A, i32* %ptr) {
-  tail call void @swift_retain(%swift.refcounted* %A)
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
   %val = load i32, i32* %ptr
   tail call void @swift_release(%swift.refcounted* %A) nounwind
   ret i32 %val
@@ -145,13 +146,13 @@ define i32 @move_retain_across_load(%swift.refcounted* %A, i32* %ptr) {
 
 ; CHECK-LABEL: @move_retain_but_not_release_across_objc_fix_lifetime
 ; CHECK: call void @swift_fixLifetime
-; CHECK-NEXT: tail call void @swift_retain
+; CHECK-NEXT: tail call void @swift_retain_noresult
 ; CHECK-NEXT: call void @user
 ; CHECK-NEXT: call void @swift_fixLifetime
 ; CHECK-NEXT: call void @swift_release
 ; CHECK-NEXT: ret
 define void @move_retain_but_not_release_across_objc_fix_lifetime(%swift.refcounted* %A) {
-  tail call void @swift_retain(%swift.refcounted* %A)
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
   call void @swift_fixLifetime(%swift.refcounted* %A) nounwind
   call void @user(%swift.refcounted* %A) nounwind
   call void @swift_fixLifetime(%swift.refcounted* %A) nounwind
@@ -230,14 +231,14 @@ define void @dont_optimize_retain_unowned3(%swift.refcounted* %A) {
 
 ; CHECK-LABEL: @dont_optimize_retain_unowned4
 ; CHECK-NEXT: call void @swift_retainUnowned
-; CHECK-NEXT: call void @swift_retain
+; CHECK-NEXT: call void @swift_retain_noresult
 ; CHECK-NEXT: call void @swift_release
 ; CHECK-NEXT: ret
 define void @dont_optimize_retain_unowned4(%swift.refcounted* %A, %swift.refcounted* %B) {
   tail call void @swift_retainUnowned(%swift.refcounted* %A)
 
   ; retain of an unknown reference (%B could be equal to %A)
-  tail call void @swift_retain(%swift.refcounted* %B)
+  tail call void @swift_retain_noresult(%swift.refcounted* %B)
 
   tail call void @swift_release(%swift.refcounted* %A)
   ret void

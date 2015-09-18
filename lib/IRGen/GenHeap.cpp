@@ -791,7 +791,7 @@ static void emitStoreWeakLikeCall(IRGenFunction &IGF,
   call->setDoesNotThrow();
 }
 
-/// Emit a call to swift_retain.  In general, you should not be using
+/// Emit a call to swift_retain_noresult.  In general, you should not be using
 /// this routine; instead you should use emitRetain, which properly
 /// balances the retain.
 void IRGenFunction::emitRetainCall(llvm::Value *value) {
@@ -800,7 +800,7 @@ void IRGenFunction::emitRetainCall(llvm::Value *value) {
     value = Builder.CreateBitCast(value, IGM.RefCountedPtrTy);
   
   // Emit the call.
-  llvm::CallInst *call = Builder.CreateCall(IGM.getRetainFn(), value);
+  llvm::CallInst *call = Builder.CreateCall(IGM.getRetainNoResultFn(), value);
   call->setCallingConv(IGM.RuntimeCC);
   call->setDoesNotThrow();
 }

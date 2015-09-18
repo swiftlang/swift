@@ -41,6 +41,7 @@ class ARCEntryPointBuilder {
 
   // The constant cache.
   NullablePtr<Constant> Retain;
+  NullablePtr<Constant> RetainNoResult;
   NullablePtr<Constant> CheckUnowned;
   NullablePtr<Constant> RetainN;
   NullablePtr<Constant> ReleaseN;
@@ -49,7 +50,8 @@ class ARCEntryPointBuilder {
   NullablePtr<Type> ObjectPtrTy;
 
 public:
-  ARCEntryPointBuilder(Function &F) : B(F.begin()), Retain(), ObjectPtrTy() {}
+  ARCEntryPointBuilder(Function &F) : B(F.begin()), Retain(), RetainNoResult(),
+                                      ObjectPtrTy() {}
   ~ARCEntryPointBuilder() = default;
   ARCEntryPointBuilder(ARCEntryPointBuilder &&) = delete;
   ARCEntryPointBuilder(const ARCEntryPointBuilder &) = delete;
@@ -59,6 +61,11 @@ public:
 
   void setInsertPoint(Instruction *I) {
     B.SetInsertPoint(I);
+  }
+
+  CallInst *createRetainNoResult(Value *V) {
+    V = B.CreatePointerCast(V, getObjectPtrTy());
+    return B.CreateCall(getRetainNoResult(), V);
   }
 
   Value *createInsertValue(Value *V1, Value *V2, unsigned Idx) {
@@ -122,12 +129,26 @@ private:
     auto &M = getModule();
     auto AttrList = AttributeSet::get(
         M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    Retain = M.getOrInsertFunction("swift_retain", AttrList,
-                                   Type::getVoidTy(M.getContext()),
+    Retain = M.getOrInsertFunction("swift_retain", AttrList, ObjectPtrTy,
                                    ObjectPtrTy, nullptr);
     return Retain.get();
   }
 
+  /// getRetainNoResult - Return a callable function for swift_retain_noresult.
+  Constant *getRetainNoResult() {
+    if (RetainNoResult)
+      return RetainNoResult.get();
+    auto *ObjectPtrTy = getObjectPtrTy();
+    auto &M = getModule();
+    auto AttrList = AttributeSet::get(M.getContext(), 1, Attribute::NoCapture);
+    AttrList = AttrList.addAttribute(
+        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
+    RetainNoResult = M.getOrInsertFunction(
+        "swift_retain_noresult", AttrList,
+        Type::getVoidTy(M.getContext()), ObjectPtrTy, nullptr);
+    return RetainNoResult.get();
+  }
+  
   Constant *getCheckUnowned() {
     if (CheckUnowned)
       return CheckUnowned.get();
@@ -153,8 +174,7 @@ private:
     auto *Int32Ty = Type::getInt32Ty(M.getContext());
     auto AttrList = AttributeSet::get(
         M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    RetainN = M.getOrInsertFunction("swift_retain_n", AttrList,
-                                    Type::getVoidTy(M.getContext()),
+    RetainN = M.getOrInsertFunction("swift_retain_n", AttrList, ObjectPtrTy,
                                     ObjectPtrTy, Int32Ty, nullptr);
     return RetainN.get();
   }

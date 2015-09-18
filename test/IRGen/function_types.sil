@@ -23,7 +23,7 @@ entry(%x : $@convention(thin) () -> ()):
 
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @thick_func_value(i8*, %swift.refcounted*) {{.*}} {
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    call void @swift_retain(%swift.refcounted* %1) {{#[0-9]+}}
+// CHECK-NEXT:    call void @swift_retain_noresult(%swift.refcounted* %1) {{#[0-9]+}}
 // CHECK-NEXT:    call void @swift_release(%swift.refcounted* %1) {{#[0-9]+}}
 // CHECK-NEXT:    %2 = insertvalue { i8*, %swift.refcounted* } undef, i8* %0, 0
 // CHECK-NEXT:    %3 = insertvalue { i8*, %swift.refcounted* } %2, %swift.refcounted* %1, 1

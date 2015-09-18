@@ -11,20 +11,21 @@ declare %objc_object* @objc_retain(%objc_object*)
 declare void @objc_release(%objc_object*)
 declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
 declare void @swift_release(%swift.refcounted* nocapture)
-declare void @swift_retain(%swift.refcounted* ) nounwind
+declare %swift.refcounted* @swift_retain(%swift.refcounted* ) nounwind
+declare void @swift_retain_noresult(%swift.refcounted* nocapture) nounwind
 declare { i64, i64, i64 } @swift_retainAndReturnThree(%swift.refcounted* , i64, i64 , i64 )
 
 ; rdar://11542743
 define i64 @max_test(i64 %x) nounwind {
 entry:
   %0 = tail call noalias %swift.refcounted* @swift_allocObject(%swift.heapmetadata* null, i64 24, i64 8) nounwind
-  tail call void @swift_retain(%swift.refcounted* %0) nounwind
+  %1 = tail call %swift.refcounted* @swift_retain(%swift.refcounted* %0) nounwind
   tail call void @swift_release(%swift.refcounted* %0) nounwind
-  %1 = icmp sgt i64 %x, 0
-  %x.y.i = select i1 %1, i64 %x, i64 0
-  tail call void @swift_retain(%swift.refcounted* %0) nounwind
-  tail call void @swift_release(%swift.refcounted* %0) nounwind
-  tail call void @swift_release(%swift.refcounted* %0) nounwind
+  %2 = icmp sgt i64 %x, 0
+  %x.y.i = select i1 %2, i64 %x, i64 0
+  %3 = tail call %swift.refcounted* @swift_retain(%swift.refcounted* %1) nounwind
+  tail call void @swift_release(%swift.refcounted* %3) nounwind
+  tail call void @swift_release(%swift.refcounted* %1) nounwind
   ret i64 %x.y.i
 }
 ; CHECK: @max_test
@@ -67,7 +68,7 @@ define internal i64 @trivial_dtor2(%swift.refcounted* nocapture %this) nounwind 
 entry:
   %0 = getelementptr inbounds %swift.refcounted, %swift.refcounted* %this, i64 1, i32 0
   store %swift.heapmetadata* inttoptr (i64 4 to %swift.heapmetadata*), %swift.heapmetadata** %0, align 8
-  tail call void @swift_retain(%swift.refcounted* %this)
+  tail call %swift.refcounted* @swift_retain(%swift.refcounted* %this)
   ret i64 48
 }
 define void @trivial_alloc_eliminate2(i64 %x) nounwind {

@@ -70,7 +70,7 @@ DisableARCOpts("disable-llvm-arc-opts", llvm::cl::init(false));
 /// argument as a low-level performance optimization.  This makes it difficult
 /// to reason about pointer equality though, so undo it as an initial
 /// canonicalization step.  After this step, all swift_retain's have been
-/// replaced with swift_retain.
+/// replaced with swift_retain_noresult.
 ///
 /// This also does some trivial peep-hole optimizations as we go.
 static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
@@ -88,11 +88,41 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
     case RT_RetainUnowned:
     case RT_CheckUnowned:
       break;
-    case RT_Retain:
+    case RT_RetainNoResult: {
+      CallInst &CI = cast<CallInst>(Inst);
+      Value *ArgVal = CI.getArgOperand(0);
+      // retain_noresult(null) is a no-op.
+      if (isa<ConstantPointerNull>(ArgVal)) {
+        CI.eraseFromParent();
+        Changed = true;
+        ++NumNoopDeleted;
+        continue;
+      }
+      break;
+    }
+    case RT_Retain: {
+      // If any x = swift_retain(y)'s got here, canonicalize them into:
+      //   x = y; swift_retain_noresult(y).
+      // This is important even though the front-end doesn't generate them,
+      // because inlined functions can be ARC optimized, and thus may contain
+      // swift_retain calls.
+      CallInst &CI = cast<CallInst>(Inst);
+      Value *ArgVal = CI.getArgOperand(0);
+
+      // Rewrite uses of the result to use the argument.
+      if (!CI.use_empty())
+        Inst.replaceAllUsesWith(ArgVal);
+
+      B.setInsertPoint(&CI);
+      I = B.createRetainNoResult(ArgVal);
+      CI.eraseFromParent();
+      Changed = true;
+      break;
+    }
     case RT_Release:
     case RT_UnknownRelease: {
       CallInst &CI = cast<CallInst>(Inst);
-      // swift_retain(null), swift_release(null) is a noop, zap it.
+      // swift_release(null) is a noop, zap it.
       Value *ArgVal = CI.getArgOperand(0);
       if (isa<ConstantPointerNull>(ArgVal)) {
         CI.eraseFromParent();
@@ -173,6 +203,8 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     }
 
     switch (classifyInstruction(*BBI)) {
+    case RT_Retain: // Canonicalized away, shouldn't exist.
+      llvm_unreachable("these entrypoints should be canonicalized away");
     case RT_NoMemoryAccessed:
       // Skip over random instructions that don't touch memory.  They don't need
       // protection by retain/release.
@@ -202,7 +234,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     case RT_UnknownRetain:
     case RT_BridgeRetain:
     case RT_ObjCRetain:
-    case RT_Retain: {  // swift_retain(obj)
+    case RT_RetainNoResult: {  // swift_retain_noresult(obj)
       CallInst &Retain = cast<CallInst>(*BBI);
       Value *RetainedObject = Retain.getArgOperand(0);
 
@@ -289,7 +321,7 @@ OutOfLoop:
 /// later in the function if possible, over instructions that provably can't
 /// release the object.  If we get to a release of the object, zap both.
 ///
-/// NOTE: this handles both objc_retain and swift_retain.
+/// NOTE: this handles both objc_retain and swift_retain_noresult.
 ///
 static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
   // FIXME: Call classifier should identify the object for us.  Too bad C++
@@ -310,6 +342,8 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
     // can be skipped and is interesting, and a "continue" when it is a retain
     // of the same pointer.
     switch (classifyInstruction(CurInst)) {
+    case RT_Retain: // Canonicalized away, shouldn't exist.
+      llvm_unreachable("these entrypoints should be canonicalized away");
     case RT_NoMemoryAccessed:
     case RT_AllocObject:
     case RT_CheckUnowned:
@@ -320,11 +354,11 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
     case RT_FixLifetime: // This only stops release motion. Retains can move over it.
       break;
 
-    case RT_Retain:
+    case RT_RetainNoResult:
     case RT_UnknownRetain:
     case RT_BridgeRetain:
     case RT_RetainUnowned:
-    case RT_ObjCRetain: {  // swift_retain(obj)
+    case RT_ObjCRetain: {  // swift_retain_noresult(obj)
       //CallInst &ThisRetain = cast<CallInst>(CurInst);
       //Value *ThisRetainedObject = ThisRetain.getArgOperand(0);
 
@@ -456,9 +490,10 @@ static DtorKind analyzeDestructor(Value *P) {
         // Skip over random instructions that don't touch memory in the caller.
         continue;
 
+      case RT_Retain:                // x = swift_retain(y)
       case RT_RetainUnowned:
       case RT_BridgeRetain:          // x = swift_bridgeRetain(y)
-      case RT_Retain: {      // swift_retain(obj)
+      case RT_RetainNoResult: {      // swift_retain_noresult(obj)
 
         // Ignore retains of the "self" object, no ressurection is possible.
         Value *ThisRetainedObject = cast<CallInst>(I).getArgOperand(0);
@@ -552,6 +587,9 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
 
     // Okay, this is the first time we've seen this instruction, proceed.
     switch (classifyInstruction(*I)) {
+    case RT_Retain:
+      llvm_unreachable("These should be canonicalized away");
+
     case RT_AllocObject:
       // If this is a different swift_allocObject than we started with, then
       // there is some computation feeding into a size or alignment computation
@@ -570,7 +608,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       break;
 
     case RT_Release:
-    case RT_Retain:
+    case RT_RetainNoResult:
     case RT_FixLifetime:
     case RT_CheckUnowned:
       // It is perfectly fine to eliminate various retains and releases of this
@@ -723,7 +761,7 @@ static void performRedundantCheckUnownedRemoval(BasicBlock &BB) {
       case RT_NoMemoryAccessed:
       case RT_AllocObject:
       case RT_FixLifetime:
-      case RT_Retain:
+      case RT_RetainNoResult:
       case RT_UnknownRetain:
       case RT_BridgeRetain:
       case RT_RetainUnowned:
@@ -783,7 +821,7 @@ static bool performGeneralOptimizations(Function &F, ARCEntryPointBuilder &B) {
         Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB);
         break;
       case RT_BridgeRetain:
-      case RT_Retain:
+      case RT_RetainNoResult:
       case RT_UnknownRetain:
       case RT_ObjCRetain: {
         // Retain motion is a forward pass over the block.  Make sure we don't

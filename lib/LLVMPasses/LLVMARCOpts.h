@@ -31,6 +31,9 @@ enum RT_Kind {
   /// void swift_checkUnowned(HeapObject *object)
   RT_CheckUnowned,
   
+  // void swift_retain_noresult(SwiftHeapObject *object)
+  RT_RetainNoResult,
+
   /// void swift_release(SwiftHeapObject *object)
   RT_Release,
 
@@ -78,6 +81,7 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
 
   return llvm::StringSwitch<RT_Kind>(F->getName())
     .Case("swift_retain", RT_Retain)
+    .Case("swift_retain_noresult", RT_RetainNoResult)
     .Case("swift_release", RT_Release)
     .Case("swift_allocObject", RT_AllocObject)
     .Case("objc_release", RT_ObjCRelease)

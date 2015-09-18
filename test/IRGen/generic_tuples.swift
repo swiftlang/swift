@@ -63,7 +63,7 @@ func dupC<T : C>(let x: T) -> (T, T) { return (x, x) }
 // CHECK-LABEL: define hidden { %C14generic_tuples1C*, %C14generic_tuples1C* } @_TF14generic_tuples4dupCuRdq_CS_1C_Fq_Tq_q__(%C14generic_tuples1C*, %swift.type* %T)
 // CHECK-NEXT: entry:
 // CHECK:      [[REF:%.*]] = bitcast %C14generic_tuples1C* %0 to %swift.refcounted*
-// CHECK-NEXT: call void @swift_retain(%swift.refcounted* [[REF]])
+// CHECK-NEXT: call void @swift_retain_noresult(%swift.refcounted* [[REF]])
 // CHECK-NEXT: [[TUP1:%.*]] = insertvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } undef, %C14generic_tuples1C* %0, 0
 // CHECK-NEXT: [[TUP2:%.*]] = insertvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUP1:%.*]], %C14generic_tuples1C* %0, 1
 // CHECK-NEXT: ret { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUP2]]
@@ -72,7 +72,7 @@ func callDupC(let c: C) { _ = dupC(c) }
 // CHECK-LABEL: define hidden void @_TF14generic_tuples8callDupCFCS_1CT_(%C14generic_tuples1C*)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[REF:%.*]] = bitcast %C14generic_tuples1C* %0 to %swift.refcounted*
-// CHECK-NEXT: call void @swift_retain(%swift.refcounted* [[REF]])
+// CHECK-NEXT: call void @swift_retain_noresult(%swift.refcounted* [[REF]])
 // CHECK-NEXT: [[METATYPE:%.*]] = call %swift.type* @_TMaC14generic_tuples1C()
 // CHECK-NEXT: [[TUPLE:%.*]] = call { %C14generic_tuples1C*, %C14generic_tuples1C* } @_TF14generic_tuples4dupCuRdq_CS_1C_Fq_Tq_q__(%C14generic_tuples1C* %0, %swift.type* [[METATYPE]])
 // CHECK-NEXT: [[LEFT:%.*]] = extractvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUPLE]], 0
