@@ -25,6 +25,7 @@
 namespace swift {
 
 class DominanceInfo;
+class CallGraph;
 
 /// Transform a Use Range (Operand*) into a User Range (SILInstruction*)
 using UserTransform = std::function<SILInstruction *(Operand *)>;
@@ -380,6 +381,9 @@ void updateSSAAfterCloning(BaseThreadingCloner &Cloner, SILBasicBlock *SrcBB,
 
 /// \brief This is a helper class used to optimize casts.
 class CastOptimizer {
+  // Will be updated if not null.
+  CallGraph *CG;
+
   // Callback to be called when uses of an instruction should be replaced.
   std::function<void (SILInstruction *I, ValueBase *V)> ReplaceInstUsesAction;
 
@@ -423,11 +427,13 @@ class CastOptimizer {
       SILBasicBlock *FailureBB);
 
 public:
-  CastOptimizer(std::function<void (SILInstruction *I, ValueBase *V)> ReplaceInstUsesAction,
+  CastOptimizer(CallGraph *CG,
+                std::function<void (SILInstruction *I, ValueBase *V)> ReplaceInstUsesAction,
                 std::function<void (SILInstruction *)> EraseAction = [](SILInstruction*){},
                 std::function<void ()> WillSucceedAction = [](){},
                 std::function<void ()> WillFailAction = [](){})
-    : ReplaceInstUsesAction(ReplaceInstUsesAction),
+    : CG(CG),
+      ReplaceInstUsesAction(ReplaceInstUsesAction),
       EraseInstAction(EraseAction),
       WillSucceedAction(WillSucceedAction),
       WillFailAction(WillFailAction) {}

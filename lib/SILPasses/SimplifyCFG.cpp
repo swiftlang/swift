@@ -1725,7 +1725,7 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
   auto ThisBB = CCBI->getParent();
 
   bool MadeChange = false;
-  CastOptimizer CastOpt(
+  CastOptimizer CastOpt(CG,
       [&MadeChange](SILInstruction *I,
                     ValueBase *V) {  /* ReplaceInstUsesAction */
         MadeChange = true;
@@ -1755,7 +1755,7 @@ simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
   auto ThisBB = CCABI->getParent();
 
   bool MadeChange = false;
-  CastOptimizer CastOpt(
+  CastOptimizer CastOpt(CG,
       [&MadeChange](SILInstruction *I, ValueBase *V) {
         MadeChange = true;
       }, /* ReplaceInstUsesAction */

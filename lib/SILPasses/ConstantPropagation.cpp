@@ -858,7 +858,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
   initializeWorklist(F, InstantiateAssertConfiguration, WorkList);
 
   llvm::SetVector<SILInstruction *> FoldedUsers;
-  CastOptimizer CastOpt(
+  CastOptimizer CastOpt(nullptr, /* We invalidate the CG anyway */
       [&](SILInstruction *I, ValueBase *V) { /* ReplaceInstUsesAction */
         PKBuilder.invalidateInstructions();
         SILValue(I).replaceAllUsesWith(V);

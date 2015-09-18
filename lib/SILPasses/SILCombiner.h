@@ -151,7 +151,8 @@ public:
   SILCombiner(AliasAnalysis *AA, CallGraph *CG, bool removeCondFails)
       : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
         Iteration(0), Builder(0), TrackingList(), DeletedInstSet(128),
-        CastOpt(/* ReplaceInstUsesAction */
+        CastOpt(CG,
+                /* ReplaceInstUsesAction */
                 [&](SILInstruction *I, ValueBase * V) {
                   replaceInstUsesWith(*I, V);
                 },

@@ -432,7 +432,7 @@ public:
   /// Creates a new node for function \p F and adds callee edges for all
   /// full apply sites in the function.
   void addNewFunction(SILFunction *F) {
-    if (CG) {
+    if (CG && !CG->tryGetCallGraphNode(F)) {
       CG->addCallGraphNode(F);
       CG->addEdges(F);
     }

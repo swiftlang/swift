@@ -176,6 +176,10 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
         // Insert the new instruction into the basic block.
         I->getParent()->getInstList().insert(I, Result);
 
+        if (auto FAS = FullApplySite::isa(Result)) {
+          CallGraphEditor(CG).addEdgesForApply(FAS);
+        }
+
         DEBUG(llvm::dbgs() << "SC: Old = " << *I << '\n'
                            << "    New = " << *Result << '\n');
 
