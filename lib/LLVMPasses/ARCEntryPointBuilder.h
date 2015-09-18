@@ -44,6 +44,8 @@ class ARCEntryPointBuilder {
   NullablePtr<Constant> CheckUnowned;
   NullablePtr<Constant> RetainN;
   NullablePtr<Constant> ReleaseN;
+  NullablePtr<Constant> UnknownRetainN;
+  NullablePtr<Constant> UnknownReleaseN;
 
   // The type cache.
   NullablePtr<Type> ObjectPtrTy;
@@ -107,6 +109,23 @@ public:
     CI->setTailCall(true);
     return CI;
   }
+
+  CallInst *createUnknownRetainN(Value *V, uint32_t n) {
+    // Cast just to make sure that we have the right object type.
+    V = B.CreatePointerCast(V, getObjectPtrTy());
+    CallInst *CI = B.CreateCall(getUnknownRetainN(), {V, getIntConstant(n)});
+    CI->setTailCall(true);
+    return CI;
+  }
+
+  CallInst *createUnknownReleaseN(Value *V, uint32_t n) {
+    // Cast just to make sure we have the right object type.
+    V = B.CreatePointerCast(V, getObjectPtrTy());
+    CallInst *CI = B.CreateCall(getUnknownReleaseN(), {V, getIntConstant(n)});
+    CI->setTailCall(true);
+    return CI;
+  }
+
 
 private:
   Module &getModule() {
@@ -174,6 +193,39 @@ private:
                                      ObjectPtrTy, Int32Ty, nullptr);
     return ReleaseN.get();
   }
+
+  /// getUnknownRetainN - Return a callable function for swift_unknownRetain_n.
+  Constant *getUnknownRetainN() {
+    if (UnknownRetainN)
+      return UnknownRetainN.get();
+    auto *ObjectPtrTy = getObjectPtrTy();
+    auto &M = getModule();
+
+    auto *Int32Ty = Type::getInt32Ty(M.getContext());
+    auto AttrList = AttributeSet::get(
+        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
+    UnknownRetainN = M.getOrInsertFunction("swift_unknownRetain_n", AttrList,
+                                           Type::getVoidTy(M.getContext()),
+                                           ObjectPtrTy, Int32Ty, nullptr);
+    return UnknownRetainN.get();
+  }
+
+  /// Return a callable function for swift_unknownRelease_n.
+  Constant *getUnknownReleaseN() {
+    if (UnknownReleaseN)
+      return UnknownReleaseN.get();
+    auto *ObjectPtrTy = getObjectPtrTy();
+    auto &M = getModule();
+
+    auto *Int32Ty = Type::getInt32Ty(M.getContext());
+    auto AttrList = AttributeSet::get(
+        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
+    UnknownReleaseN = M.getOrInsertFunction("swift_unknownRelease_n", AttrList,
+                                            Type::getVoidTy(M.getContext()),
+                                            ObjectPtrTy, Int32Ty, nullptr);
+    return UnknownReleaseN.get();
+  }
+
 
   Type *getObjectPtrTy() {
     if (ObjectPtrTy)
