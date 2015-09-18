@@ -674,19 +674,24 @@ static bool isSupportedCallee(SILValue Callee) {
 /// callsites to call the new function.
 static void
 rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
-                      const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallSites) {
-  for (const CallGraphEdge *Edge : CallSites) {
+                                  CallGraph &CG,
+                      const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallEdges) {
+  // The second loop can modify the call graph edges. Therefore we store the
+  // edges in a temporary vector in the first loop.
+  llvm::SmallVector<FullApplySite, 8> CallSites;
+  for (const CallGraphEdge *Edge : CallEdges) {
     if (!Edge->hasSingleCallee()) continue;
 
-    // Don't optimize functions that are marked with the opt.never attribute.
-    if (!Edge->getApply().getFunction()->shouldOptimize())
-      continue;
-
     const FullApplySite FAS = Edge->getApply();
+
+    // Don't optimize functions that are marked with the opt.never attribute.
+    if (FAS.getFunction()->shouldOptimize() &&
+        isSupportedCallee(FAS.getCallee())) {
+      CallSites.push_back(FAS);
+    }
+  }
+  for (auto FAS : CallSites) {
     auto *AI = FAS.getInstruction();
-    
-    if (!isSupportedCallee(FAS.getCallee()))
-        continue;
 
     SILBuilderWithScope<16> Builder(AI);
 
@@ -730,6 +735,7 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
       // Also insert release_value in the normal block (done below).
       Builder.setInsertionPoint(TAI->getNormalBB(), TAI->getNormalBB()->begin());
     }
+    CallGraphEditor(&CG).replaceApplyWithNew(FAS, FullApplySite(NewAI));
 
     // If we have any arguments that were consumed but are now guaranteed,
     // insert a release_value.
@@ -812,7 +818,7 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
 }
 
 static SILFunction *
-moveFunctionBodyToNewFunctionWithName(SILFunction *F,
+moveFunctionBodyToNewFunctionWithName(SILFunction *F, CallGraph &CG,
                                       llvm::SmallString<64> &NewFName,
                                       FunctionAnalyzer &Analyzer) {
   // First we create an empty function (i.e. no BB) whose function signature has
@@ -826,6 +832,8 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   // Then we transfer the body of F to NewF. At this point, the arguments of the
   // first BB will not match.
   NewF->spliceBody(F);
+  // Do the same with the call graph.
+  CallGraphEditor(&CG).moveNodeToNewFunction(F, NewF);
 
   // Then perform any updates to the arguments of NewF.
   SILBasicBlock *NewFEntryBB = &*NewF->begin();
@@ -866,6 +874,7 @@ static bool
 optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
                           RCIdentityFunctionInfo *RCIA,
                           SILFunction *F,
+                          CallGraph &CG,
                           CallGraphNode *FNode,
                         const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallSites,
                           bool CallerSetIsComplete,
@@ -913,7 +922,7 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   // Otherwise, move F over to NewF.
   SILFunction *NewF =
-    moveFunctionBodyToNewFunctionWithName(F, NewFName, Analyzer);
+    moveFunctionBodyToNewFunctionWithName(F, CG, NewFName, Analyzer);
 
   // And remove all Callee releases that we found and made redundant via owned
   // to guaranteed conversion.
@@ -930,7 +939,7 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
 
   // Rewrite all apply insts calling F to call NewF. Update each call site as
   // appropriate given the form of function signature optimization performed.
-  rewriteApplyInstToCallNewFunction(Analyzer, NewF, CallSites);
+  rewriteApplyInstToCallNewFunction(Analyzer, NewF, CG, CallSites);
 
   // Now that we have rewritten all apply insts that referenced the old
   // function, if the caller set was complete, delete the old function.
@@ -1055,8 +1064,9 @@ public:
         bool CallerSetIsComplete = FNode->isCallerEdgesComplete();
 
         // Otherwise, try to optimize the function signature of F.
-        Changed |= optimizeFunctionSignature(Allocator, RCIA->get(F), F, FNode,
-                                             CallSites, CallerSetIsComplete,
+        Changed |= optimizeFunctionSignature(Allocator, RCIA->get(F), F, CG,
+                                             FNode, CallSites,
+                                             CallerSetIsComplete,
                                              DeadFunctions);
       }
     }
