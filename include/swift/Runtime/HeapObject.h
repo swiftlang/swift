@@ -147,8 +147,6 @@ extern "C" void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask);
 /// It may also prove worthwhile to have this use a custom CC
 /// which preserves a larger set of registers.
 extern "C" void swift_retain(HeapObject *object);
-extern "C" void swift_retain_noresult(HeapObject *object);
-
 extern "C" void swift_retain_n(HeapObject *object, uint32_t n);
 
 static inline void _swift_retain_inlined(HeapObject *object) {

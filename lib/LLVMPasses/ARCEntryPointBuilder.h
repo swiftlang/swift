@@ -41,7 +41,6 @@ class ARCEntryPointBuilder {
 
   // The constant cache.
   NullablePtr<Constant> Retain;
-  NullablePtr<Constant> RetainNoResult;
   NullablePtr<Constant> CheckUnowned;
   NullablePtr<Constant> RetainN;
   NullablePtr<Constant> ReleaseN;
@@ -50,8 +49,7 @@ class ARCEntryPointBuilder {
   NullablePtr<Type> ObjectPtrTy;
 
 public:
-  ARCEntryPointBuilder(Function &F) : B(F.begin()), Retain(), RetainNoResult(),
-                                      ObjectPtrTy() {}
+  ARCEntryPointBuilder(Function &F) : B(F.begin()), Retain(), ObjectPtrTy() {}
   ~ARCEntryPointBuilder() = default;
   ARCEntryPointBuilder(ARCEntryPointBuilder &&) = delete;
   ARCEntryPointBuilder(const ARCEntryPointBuilder &) = delete;
@@ -61,11 +59,6 @@ public:
 
   void setInsertPoint(Instruction *I) {
     B.SetInsertPoint(I);
-  }
-
-  CallInst *createRetainNoResult(Value *V) {
-    V = B.CreatePointerCast(V, getObjectPtrTy());
-    return B.CreateCall(getRetainNoResult(), V);
   }
 
   Value *createInsertValue(Value *V1, Value *V2, unsigned Idx) {
@@ -135,21 +128,6 @@ private:
     return Retain.get();
   }
 
-  /// getRetainNoResult - Return a callable function for swift_retain_noresult.
-  Constant *getRetainNoResult() {
-    if (RetainNoResult)
-      return RetainNoResult.get();
-    auto *ObjectPtrTy = getObjectPtrTy();
-    auto &M = getModule();
-    auto AttrList = AttributeSet::get(M.getContext(), 1, Attribute::NoCapture);
-    AttrList = AttrList.addAttribute(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    RetainNoResult = M.getOrInsertFunction(
-        "swift_retain_noresult", AttrList,
-        Type::getVoidTy(M.getContext()), ObjectPtrTy, nullptr);
-    return RetainNoResult.get();
-  }
-  
   Constant *getCheckUnowned() {
     if (CheckUnowned)
       return CheckUnowned.get();

@@ -143,7 +143,7 @@ func assign_test(value: Builtin.Int64, ptr: Builtin.RawPointer) {
 // CHECK: define hidden %swift.refcounted* @_TF8builtins16load_object_test
 func load_object_test(ptr: Builtin.RawPointer) -> Builtin.NativeObject {
   // CHECK: [[T0:%.*]] = load [[REFCOUNT]]*, [[REFCOUNT]]**
-  // CHECK: call void @swift_retain_noresult([[REFCOUNT]]* [[T0]])
+  // CHECK: call void @swift_retain([[REFCOUNT]]* [[T0]])
   // CHECK: ret [[REFCOUNT]]* [[T0]]
   return Builtin.load(ptr)
 }
@@ -453,7 +453,7 @@ func copyPODArray(dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Buil
 // CHECK-LABEL: define hidden void @_TF8builtins11copyBTArray{{.*}}(i8*, i8*, i64) {{.*}} {
 // CHECK:       iter:
 // CHECK:       loop:
-// CHECK:         call {{.*}} @swift_retain_noresult
+// CHECK:         call {{.*}} @swift_retain
 // CHECK:         br label %iter
 // CHECK:         mul nuw i64 8, %2
 // CHECK:         call void @llvm.memmove.p0i8.p0i8.i64(i8* {{.*}}, i8* {{.*}}, i64 {{.*}}, i32 8, i1 false)
