@@ -826,7 +826,12 @@ class AllocBoxToStack : public SILFunctionTransform {
     if (!Promotable.empty()) {
       auto Count = rewritePromotedBoxes(Promotable, ElidedOperands, Returns);
       NumStackPromoted += Count;
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+      
+      // TODO: Update the call graph instead of invalidating it.
+      // Currently we need it invalidate it because we clone functions and
+      // replace partial_apply instructions which may be used by apply
+      // instructions.
+      invalidateAnalysis(SILAnalysis::PreserveKind::Branches);
     }
   }
 
