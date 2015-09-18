@@ -442,7 +442,8 @@ struct ObjCWeakRetainableBox :
 struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {
   static void *retain(void *obj) {
 #if SWIFT_OBJC_INTEROP
-    return swift_unknownRetain(obj);
+    swift_unknownRetain(obj);
+    return obj;
 #else
     swift_retain(static_cast<HeapObject *>(obj));
     return static_cast<HeapObject *>(obj);

@@ -8,7 +8,7 @@ target triple = "x86_64-apple-macosx10.9"
 %objc_object = type opaque
 %swift.bridge = type opaque
 
-declare %swift.refcounted* @swift_unknownRetain(%swift.refcounted*)
+declare void @swift_unknownRetain(%swift.refcounted*)
 declare void @swift_unknownRelease(%swift.refcounted*)
 declare %objc_object* @objc_retain(%objc_object*)
 declare void @objc_release(%objc_object*)
@@ -32,13 +32,13 @@ define void @trivial_retain_release(%swift.refcounted* %P, %objc_object* %O, %sw
 entry:
   tail call void @swift_retain(%swift.refcounted* %P)
   tail call void @swift_release(%swift.refcounted* %P) nounwind
-  %0 = tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %P)
+  tail call void @swift_unknownRetain(%swift.refcounted* %P)
   tail call void @swift_unknownRelease(%swift.refcounted* %P)
   tail call %objc_object* @objc_retain(%objc_object* %O)
   tail call void @objc_release(%objc_object* %O)
   %v = tail call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %B)
   tail call void @swift_bridgeObjectRelease(%swift.bridge* %v)
-  call void @user(%swift.refcounted* %0) nounwind
+  call void @user(%swift.refcounted* %P) nounwind
   ret void
 }
 
@@ -79,7 +79,7 @@ entry:
 define void @swiftunknown_retain_release_null() {
 entry:
   tail call void @swift_unknownRelease(%swift.refcounted* null)
-  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* null) nounwind
+  tail call void @swift_unknownRetain(%swift.refcounted* null) nounwind
   ret void
 }
 
@@ -115,7 +115,7 @@ define void @swift_fixLifetimeTest(%swift.refcounted* %A) {
 ; CHECK: ret
 define void @move_retain_across_unknown_retain(%swift.refcounted* %A, %swift.refcounted* %B) {
   tail call void @swift_retain(%swift.refcounted* %A)
-  tail call %swift.refcounted* @swift_unknownRetain(%swift.refcounted* %B)
+  tail call void @swift_unknownRetain(%swift.refcounted* %B)
   tail call void @swift_release(%swift.refcounted* %A) nounwind
   ret void
 }

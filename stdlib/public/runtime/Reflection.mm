@@ -291,7 +291,8 @@ AnyReturn swift_MagicMirrorData_objcValue(HeapObject *owner,
   void *object = *reinterpret_cast<void * const *>(value);
   auto isa = _swift_getClass(object);
   result.Type = swift_getObjCClassMetadata(isa);
-  *reinterpret_cast<void **>(&result.Buffer) = swift_unknownRetain(object);
+  swift_unknownRetain(object);
+  *reinterpret_cast<void **>(&result.Buffer) = object;
   return AnyReturn(result);
 }
 #endif

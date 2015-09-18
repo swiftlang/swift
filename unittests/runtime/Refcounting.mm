@@ -33,10 +33,8 @@ static HeapObject *make_objc_object() {
 
 TEST(RefcountingTest, objc_unknown_retain_release_n) {
   auto object = make_objc_object();
-  auto retainResult = swift_unknownRetain_n(object, 32);
-  EXPECT_EQ(object, retainResult);
-  retainResult = swift_unknownRetain(object);
-  EXPECT_EQ(object, retainResult);
+  swift_unknownRetain_n(object, 32);
+  swift_unknownRetain(object);
   swift_unknownRelease_n(object, 31);
   swift_unknownRelease(object);
   swift_unknownRelease_n(object, 1);

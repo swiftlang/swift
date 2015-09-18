@@ -437,10 +437,10 @@ extern "C" void *swift_bridgeObjectRetain_n(void *value, int n);
 
 /// Increment the strong retain count of an object which might not be a native
 /// Swift object.
-extern "C" void *swift_unknownRetain(void *value);
+extern "C" void swift_unknownRetain(void *value);
 /// Increment the strong retain count of an object which might not be a native
 /// Swift object by n.
-extern "C" void *swift_unknownRetain_n(void *value, int n);
+extern "C" void swift_unknownRetain_n(void *value, int n);
 
 #else
 
