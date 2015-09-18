@@ -113,8 +113,8 @@ FUNCTION(CopyPOD,        swift_copyPOD,       RuntimeCC,
          ARGS(OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
-// void swift_retain_noresult(void *ptr);
-FUNCTION(RetainNoResult, swift_retain_noresult, RuntimeCC,
+// void swift_retain(void *ptr);
+FUNCTION(Retain, swift_retain, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))

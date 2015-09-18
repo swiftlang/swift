@@ -941,7 +941,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
     destExistential->Value = object;
     if (!canTake || !(flags & DynamicCastFlags::TakeOnSuccess)) {
-      swift_retain_noresult(object);
+      swift_retain(object);
     }
     maybeDeallocateSourceAfterSuccess();
     return true;

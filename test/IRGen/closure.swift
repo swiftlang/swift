@@ -40,7 +40,7 @@ func b<T : Ordinable>(var seq seq: T) -> (Int) -> Int {
 // CHECK:   [[WITNESS:%.*]] = load i8**, i8*** [[WITNESSADDR]], align 8
 // CHECK:   [[BOXADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>, <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 2
 // CHECK:   [[BOX:%.*]] = load %swift.refcounted*, %swift.refcounted** [[BOXADDR]], align 8
-// CHECK:   call void @swift_retain_noresult(%swift.refcounted* [[BOX]])
+// CHECK:   call void @swift_retain(%swift.refcounted* [[BOX]])
 // CHECK:   [[ADDRADDR:%.*]] = getelementptr inbounds <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>, <{ %swift.refcounted, [16 x i8], %swift.refcounted*, %swift.opaque* }>* [[CONTEXT]], i32 0, i32 3
 // CHECK:   [[ADDR:%.*]] = load %swift.opaque*, %swift.opaque** [[ADDRADDR]], align 8
 // CHECK:   call void @swift_release(%swift.refcounted* %1)

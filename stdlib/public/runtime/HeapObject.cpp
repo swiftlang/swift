@@ -276,11 +276,6 @@ extern "C" LLVM_LIBRARY_VISIBILITY
 void _swift_release_dealloc(HeapObject *object)
   __attribute__((noinline,used));
 
-void
-swift::swift_retain_noresult(HeapObject *object) {
-  swift_retain(object);
-}
-
 void swift::swift_retain(HeapObject *object) {
   SWIFT_RETAIN();
   _swift_retain(object);

@@ -134,9 +134,7 @@ bool SwiftARCContractImpl::run() {
         Inst.eraseFromParent();
         ++NumNoopDeleted;
         continue;
-      case RT_Retain:
-        llvm_unreachable("This should be canonicalized away!");
-      case RT_RetainNoResult: {
+      case RT_Retain: {
         auto *CI = cast<CallInst>(&Inst);
         auto *ArgVal = CI->getArgOperand(0);
 
