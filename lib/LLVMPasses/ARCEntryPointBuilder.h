@@ -129,7 +129,8 @@ private:
     auto &M = getModule();
     auto AttrList = AttributeSet::get(
         M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    Retain = M.getOrInsertFunction("swift_retain", AttrList, ObjectPtrTy,
+    Retain = M.getOrInsertFunction("swift_retain", AttrList,
+                                   Type::getVoidTy(M.getContext()),
                                    ObjectPtrTy, nullptr);
     return Retain.get();
   }
@@ -174,7 +175,8 @@ private:
     auto *Int32Ty = Type::getInt32Ty(M.getContext());
     auto AttrList = AttributeSet::get(
         M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    RetainN = M.getOrInsertFunction("swift_retain_n", AttrList, ObjectPtrTy,
+    RetainN = M.getOrInsertFunction("swift_retain_n", AttrList,
+                                    Type::getVoidTy(M.getContext()),
                                     ObjectPtrTy, Int32Ty, nullptr);
     return RetainN.get();
   }
