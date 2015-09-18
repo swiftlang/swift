@@ -82,10 +82,10 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
   // A map of old to new available values.
   SmallVector<std::pair<ValueBase *, SILValue>, 16> AvailVals;
 
-  InstructionsCloner(SILFunction &F,
-                     ArrayRef<SILInstruction *> Insns,
+  InstructionsCloner(SILFunction &F, ArrayRef<SILInstruction *> Insns,
                      SILInstruction *Dest = nullptr)
-    : SILClonerWithScopes(F), Insns(Insns), FromBB(nullptr), Dest(Dest) {}
+      : SILClonerWithScopes(Dest ? *Dest->getFunction() : F), Insns(Insns),
+        FromBB(nullptr), Dest(Dest) {}
 
   void process(SILInstruction *I) { visit(I); }
 
