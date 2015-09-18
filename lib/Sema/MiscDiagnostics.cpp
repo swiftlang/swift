@@ -2216,7 +2216,6 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
 
   // Make sure to apply the fix at the right application level.
   auto name = afd->getFullName();
-  bool argNamesChanged = newName->getArgumentNames() != name.getArgumentNames();
 
   // Dig out the argument tuple.
   Expr *arg = apply->getArg();
