@@ -21,27 +21,27 @@
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/../ClangModules/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=CoreCooling -function-definitions=false -prefer-type-repr=true -enable-omit-needless-words -skip-parameter-names -enable-infer-default-arguments > %t.CoreCooling.txt
 // RUN: FileCheck %s -check-prefix=CHECK-CORECOOLING -strict-whitespace < %t.CoreCooling.txt
 
-// Note: Class -> "Class"
-// CHECK-OBJECTIVEC: func isKind(of aClass: AnyClass) -> Bool
-
 // Note: SEL -> "Selector"
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector)
 
 // Note: "with" parameters.
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject? = nil)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, object: AnyObject? = nil)
 
 // Note: "with" parameters drop the "with".
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject? = nil, with: AnyObject? = nil)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, object: AnyObject? = nil, object: AnyObject? = nil)
 
 // Note: id -> "Object".
-// CHECK-FOUNDATION: func index(of _: AnyObject) -> Int
+// CHECK-FOUNDATION: func indexOf(_: AnyObject) -> Int
+
+// Note: Class -> "Class"
+// CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
 
 // Note: Pointer-to-struct name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func copy(with _: NSZone = nil) -> AnyObject!
+// CHECK-FOUNDATION: func copy(zone _: NSZone = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
-// CHECK-FOUNDATION: func object(`for` _: NSCopying) -> AnyObject?
-// CHECK-FOUNDATION: func removeObject(`for` _: NSCopying)
+// CHECK-FOUNDATION: func objectFor(_: NSCopying) -> AnyObject?
+// CHECK-FOUNDATION: func removeObjectFor(_: NSCopying)
 
 // Note: Allow argument labels that are keywords.
 // CHECK-FOUNDATION: func setObject(_: AnyObject, `for`: NSCopying)
@@ -56,10 +56,10 @@
 // CHECK-FOUNDATION: func add(_: Double) -> NSNumber
 
 // Note: multi-word enum name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func someMethod(with _: NSDeprecatedOptions = [])
+// CHECK-FOUNDATION: func someMethod(deprecatedOptions _: NSDeprecatedOptions = [])
 
-// Note: class name matching; split at "with".
-// CHECK-FOUNDATION: class func request(with _: String!) -> Self!
+// Note: class name matching; don't drop "With".
+// CHECK-FOUNDATION: class func request(string _: String!) -> Self!
 
 // Note: Make sure NSURL works in various places
 // CHECK-FOUNDATION: open(_: NSURL!, completionHandler: ((Bool) -> Void)!)
@@ -79,7 +79,7 @@
 // CHECK-FOUNDATION: func add(_: [AnyObject])
 
 // Note: Int and Index match.
-// CHECK-FOUNDATION: func slice(from _: Int, to: Int) -> String
+// CHECK-FOUNDATION: func sliceFrom(_: Int, to: Int) -> String
 
 // Note: <result type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: func appending(_: String) -> String
@@ -88,7 +88,7 @@
 // CHECK-FOUNDATION: func withString(_: String) -> String
 
 // Note: Splitting on "With".
-// CHECK-FOUNDATION: func URL(withAddedString _: String) -> NSURL?
+// CHECK-FOUNDATION: func URL(addedString _: String) -> NSURL?
 
 // Note: <property type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: var deletingLastPathComponent: NSURL? { get }
@@ -98,7 +98,7 @@
 
 // Note: usingBlock -> body
 // CHECK-FOUNDATION: func enumerateObjects(body _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(with _: NSEnumerationOptions = [], body: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(options _: NSEnumerationOptions = [], body: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
 
 // Note: WithBlock -> body
 // CHECK-FOUNDATION: func enumerateObjectsRandomly(body _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
@@ -113,7 +113,7 @@
 // CHECK-APPKIT: func getRGBAComponents(_: UnsafeMutablePointer<Int8> = nil)
 
 // Note: Skipping over "3D"
-// CHECK-APPKIT: func drawInAir(at _: Point3D)
+// CHECK-APPKIT: func drawInAirAt(_: Point3D)
 
 // Note: Don't strip names that aren't preceded by a verb or preposition.
 // CHECK-APPKIT: func setTextColor(_: NSColor? = nil)
