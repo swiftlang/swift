@@ -1496,13 +1496,13 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
                           BodyTuple->getElement(i).hasEllipsis(),
                           /*Curried=*/CurrPattern > 0);
         auto &CurrElt = BodyTuple->getElement(i);
-        auto CurrType = CurrElt.getPattern()->getType();
         if (CurrElt.hasEllipsis())
           Printer << "...";
         if (Options.PrintDefaultParameterPlaceholder &&
             CurrElt.getDefaultArgKind() != DefaultArgumentKind::None) {
-          if (AFD->getClangDecl()) {
+          if (AFD->getClangDecl() && CurrElt.getPattern()->hasType()) {
             // For Clang declarations, figure out the default we're using.
+            auto CurrType = CurrElt.getPattern()->getType();
             Printer << " = " << CurrType->getInferredDefaultArgString();
           } else {
             // Use placeholder anywhere else.
