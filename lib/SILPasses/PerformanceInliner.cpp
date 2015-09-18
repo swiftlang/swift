@@ -850,10 +850,9 @@ FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
   if (!NewInst)
     return FullApplySite();
 
-  if (auto *Edge = CG.getCallGraphEdge(Apply))
-    CG.removeEdge(Edge);
-
   auto NewAI = findApplyFromDevirtualizedResult(NewInst);
+  CallGraphEditor(&CG).replaceApplyWithNew(Apply, NewAI);
+
   // In cases where devirtualization results in having to
   // insert code to match the result type of the original
   // function, we need to find the original apply. It's
@@ -868,16 +867,6 @@ FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
     OriginMap[NewAI] = OriginMap[Apply];
   RemovedApplies.insert(Apply);
   replaceDeadApply(Apply, NewInst);
-
-  auto *F = getReferencedFunction(NewAI);
-  assert(F && "Expected direct function referenced!");
-
-  // If we devirtualized to a function declaration, we cannot add
-  // edges.
-  if (F->isExternalDeclaration())
-    return NewAI;
-
-  CG.addEdgesForApply(NewAI);
 
   return NewAI;
 }
@@ -922,6 +911,7 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
 
     // Replace the old apply with the new and delete the old.
     replaceDeadApply(Apply, Specialized.getInstruction());
+    Editor.updatePartialApplyUses(Specialized);
 
     return ApplySite(Specialized);
   }
