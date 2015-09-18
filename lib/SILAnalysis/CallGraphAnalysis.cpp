@@ -338,6 +338,25 @@ void CallGraph::removeEdge(CallGraphEdge *Edge) {
   Edge->~CallGraphEdge();
 }
 
+void CallGraph::removeNode(CallGraphNode *Node) {
+  assert(Node->getPartialCallerEdges().size() == 0 &&
+         "Node to delete must not have any caller edges");
+  assert(Node->getCalleeEdges().size() == 0 &&
+         "Node to delete must not have any callee edges");
+
+  // Avoid keeping a dangling node pointers in the vectors.
+  // Next time they will be computed from scratch.
+  BottomUpFunctionOrder.clear();
+  clearBottomUpSCCOrder();
+
+  FunctionToNodeMap.erase(Node->getFunction());
+  
+  // Call the destructor for the node. The memory will be reclaimed
+  // when the call graph is deleted by virtue of the bump pointer
+  // allocator.
+  Node->~CallGraphNode();
+}
+
 // Remove the call graph edges associated with an apply, where the
 // apply is known to the call graph.
 void CallGraph::removeEdgesForApply(FullApplySite AI) {
@@ -672,11 +691,15 @@ public:
   }
 };
 
+void CallGraph::clearBottomUpSCCOrder() {
+  for (auto *SCC : BottomUpSCCOrder)
+    SCC->~CallGraphSCC();
+  BottomUpSCCOrder.clear();
+}
+
 void CallGraph::computeBottomUpSCCOrder() {
   if (!BottomUpSCCOrder.empty()) {
-    for (auto *SCC : BottomUpSCCOrder)
-      SCC->~CallGraphSCC();
-    BottomUpSCCOrder.clear();
+    clearBottomUpSCCOrder();
   }
 
   CallGraphSCCFinder SCCFinder(BottomUpSCCOrder, Allocator);
@@ -697,6 +720,65 @@ void CallGraph::computeBottomUpFunctionOrder() {
   for (auto *SCC : BottomUpSCCOrder)
     for (auto *Node : SCC->SCCNodes)
       BottomUpFunctionOrder.push_back(Node->getFunction());
+}
+
+//===----------------------------------------------------------------------===//
+//                           CallGraphEditor
+//===----------------------------------------------------------------------===//
+
+void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
+                                          FullApplySite New) {
+  if (!CG)
+    return;
+  
+  if (auto *Edge = CG->getCallGraphEdge(Old))
+    CG->removeEdge(Edge);
+  
+  CG->addEdgesForApply(New);
+}
+
+void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
+                             llvm::SmallVectorImpl<FullApplySite> &NewApplies) {
+  if (!CG)
+    return;
+  
+  if (auto *Edge = CG->getCallGraphEdge(Old))
+    CG->removeEdge(Edge);
+  
+  for (auto NewApply : NewApplies)
+    CG->addEdgesForApply(NewApply);
+}
+
+void CallGraphEditor::moveNodeToNewFunction(SILFunction *Old, SILFunction *New) {
+  if (!CG)
+    return;
+
+  auto Iter = CG->FunctionToNodeMap.find(Old);
+  assert(Iter != CG->FunctionToNodeMap.end());
+  auto *Node = Iter->second;
+  CG->FunctionToNodeMap.erase(Iter);
+  CG->FunctionToNodeMap[New] = Node;
+}
+
+void CallGraphEditor::removeAllCalleeEdgesFrom(SILFunction *F) {
+  if (!CG)
+    return;
+  
+  auto &CalleeEdges = CG->getCallGraphNode(F)->getCalleeEdges();
+  while (!CalleeEdges.empty()) {
+    auto *Edge = *CalleeEdges.begin();
+    CG->removeEdge(Edge);
+  }
+}
+
+void CallGraphEditor::updatePartialApplyUses(swift::ApplySite AI) {
+  if (!CG)
+    return;
+  
+  for (auto *Use : AI.getInstruction()->getUses()) {
+    if (auto FAS = FullApplySite::isa(Use->getUser()))
+      replaceApplyWithNew(FAS, FAS);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -756,29 +838,6 @@ void CallGraph::verify() const {
                         "parent function's caller");
   }
 #endif
-}
-
-void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
-                                          FullApplySite New) {
-  if (!CG)
-    return;
-
-  if (auto *Edge = CG->getCallGraphEdge(Old))
-    CG->removeEdge(Edge);
-
-  CG->addEdgesForApply(New);
-}
-
-void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
-                             llvm::SmallVectorImpl<FullApplySite> &NewApplies) {
-  if (!CG)
-    return;
-  
-  if (auto *Edge = CG->getCallGraphEdge(Old))
-    CG->removeEdge(Edge);
-
-  for (auto NewApply : NewApplies)
-    CG->addEdgesForApply(NewApply);
 }
 
 void CallGraphAnalysis::verify() const {

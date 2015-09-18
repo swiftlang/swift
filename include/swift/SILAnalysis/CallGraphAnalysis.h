@@ -371,6 +371,10 @@ public:
     addEdgesForApply(AI, getCallGraphNode(AI.getFunction()));
   }
 
+  /// Removes a node from the graph. The node must not have any
+  /// caller or callee edges.
+  void removeNode(CallGraphNode *Node);
+
   void removeEdge(CallGraphEdge *Edge);
   void removeEdgesForApply(FullApplySite AI);
 
@@ -416,6 +420,7 @@ private:
   CallGraphEdge *makeCallGraphEdgeForCallee(FullApplySite Apply,
                                             SILValue Callee);
   void addEdgesForApply(FullApplySite AI, CallGraphNode *CallerNode);
+  void clearBottomUpSCCOrder();
   void computeBottomUpSCCOrder();
   void computeBottomUpFunctionOrder();
 };
@@ -428,7 +433,14 @@ public:
   void replaceApplyWithNew(FullApplySite Old, FullApplySite New);
   void replaceApplyWithNew(FullApplySite Old,
                            llvm::SmallVectorImpl<FullApplySite> &NewApplies);
-
+  
+  /// Detaches the call graph node from function \p Old and attaches it to
+  /// function \a New.
+  void moveNodeToNewFunction(SILFunction *Old, SILFunction *New);
+  
+  /// Removes all callee edges from function
+  void removeAllCalleeEdgesFrom(SILFunction *F);
+  
   /// Creates a new node for function \p F and adds callee edges for all
   /// full apply sites in the function.
   void addNewFunction(SILFunction *F) {
@@ -438,15 +450,29 @@ public:
     }
   }
 
+  /// Removes the call graph node of function \p F. The node may have any
+  /// adjacent caller or callee edges.
+  void removeCallGraphNode(SILFunction *F) {
+    if (CG)
+      CG->removeNode(CG->getCallGraphNode(F));
+  }
+
+  /// Removes edges from the apply site \p AI.
   void removeEdgesForApply(FullApplySite AI) {
     if (CG)
       CG->removeEdgesForApply(AI);
   }
 
+  /// Checks which function(s) are called by apply site \p AI and adds
+  /// edges to \a AI.
   void addEdgesForApply(FullApplySite AI) {
     if (CG)
       CG->addEdgesForApply(AI);
   }
+
+  /// Update uses of a changed apply site which is not a full apply site.
+  /// If a use is a full apply site, its call graph edge is updated.
+  void updatePartialApplyUses(ApplySite AI);
 
   void addEdgesForFunction(SILFunction *F) {
     if (CG)
