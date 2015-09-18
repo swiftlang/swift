@@ -118,48 +118,46 @@ internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
 //===--- Sequence ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal class _AnySequenceBox {
-  // FIXME: can't make _AnySequenceBox generic and return
-  // _AnyGenerator<Element> here due to <rdar://20211022>
-  func generate() -> _AnyGeneratorBase {_abstract()}
+internal class _AnySequenceBox<Element> {
+  internal func generate() -> AnyGenerator<Element> { _abstract() }
 
-  func _underestimateCount() -> Int  {_abstract()}
-  // FIXME: can't traffic in UnsafeMutablePointer<Element> and
-  // _ContiguousArrayBuffer<Element> here due to <rdar://20164041>
-  func _initializeTo(ptr: UnsafeMutablePointer<Void>) -> UnsafeMutablePointer<Void> {
+  internal func _underestimateCount() -> Int { _abstract() }
+
+  internal func _initializeTo(ptr: UnsafeMutablePointer<Element>)
+    -> UnsafeMutablePointer<Element> {
     _abstract()
   }
-  func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {_abstract()}
+  internal func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
+    _abstract()
+  }
 }
 
-internal class _AnyCollectionBoxBase : _AnySequenceBox {
-  init(startIndex: _ForwardIndexBoxType, endIndex: _ForwardIndexBoxType) {
+internal class _AnyCollectionBoxBase<Element> : _AnySequenceBox<Element> {
+  internal init(
+    startIndex: _ForwardIndexBoxType, endIndex: _ForwardIndexBoxType
+  ) {
     self.startIndex = startIndex
     self.endIndex = endIndex
   }
-  let startIndex: _ForwardIndexBoxType
-  let endIndex: _ForwardIndexBoxType
+  internal let startIndex: _ForwardIndexBoxType
+  internal let endIndex: _ForwardIndexBoxType
 }
 
 % for Kind in ['Sequence', 'Collection']:
 // FIXME: can't make this a protocol due to <rdar://20209031>
 internal class _${Kind}Box<S : ${Kind}Type>
-  : _Any${Kind}Box${'<S.Generator.Element>'if Kind == 'Collection' else ''} {
+  : _Any${Kind}Box<S.Generator.Element> {
   typealias Element = S.Generator.Element
 
-  override func generate() -> _AnyGeneratorBase {
-    // FIXME: an intermediate variable is a workaround for:
-    // <rdar://problem/20582672> _GeneratorBox(_base.generate()) does
-    // not compile when put into one expression
-    let x = _base.generate()
-    return _GeneratorBox(x)
+  override func generate() -> AnyGenerator<Element> {
+    return anyGenerator(_base.generate())
   }
   override func _underestimateCount() -> Int {
     return _base.underestimateCount()
   }
-  override func _initializeTo(ptr: UnsafeMutablePointer<Void>) 
-    -> UnsafeMutablePointer<Void> {
-    return UnsafeMutablePointer(_base._initializeTo(UnsafeMutablePointer(ptr)))
+  override func _initializeTo(ptr: UnsafeMutablePointer<Element>)
+    -> UnsafeMutablePointer<Element> {
+    return _base._initializeTo(ptr)
   }
   override func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
     return _base._copyToNativeArrayBuffer()._storage
@@ -233,10 +231,10 @@ public struct AnySequence<Element> : SequenceType {
   ///
   /// - Complexity: O(1).
   public func generate() -> AnyGenerator<Element> {
-    return unsafeDowncast(_box.generate())
+    return _box.generate()
   }
 
-  internal let _box: _AnySequenceBox
+  internal let _box: _AnySequenceBox<Element>
 }
 
 % for Kind in ['Sequence'] + [t + 'Collection' for t in traversals]:
@@ -244,12 +242,12 @@ extension Any${Kind} {
   public func underestimateCount() -> Int {
     return _box._underestimateCount()
   }
-  
+
   public func _initializeTo(ptr: UnsafeMutablePointer<Element>)
     -> UnsafeMutablePointer<Element> {
-    return UnsafeMutablePointer(_box._initializeTo(UnsafeMutablePointer(ptr)))
+    return _box._initializeTo(ptr)
   }
-  
+
   public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
     return _ContiguousArrayBuffer(self._box._copyToNativeArrayBuffer())
   }
@@ -490,7 +488,7 @@ public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
 //===--- Collections ------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
+internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase<Element> {
   subscript(_: _ForwardIndexBoxType) -> Element {_abstract()}
   func _count() -> IntMax {_abstract()}
 
@@ -593,7 +591,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   ///
   /// - Complexity: O(1).
   public func generate() -> AnyGenerator<Element> {
-    return unsafeDowncast(_box.generate())
+    return _box.generate()
   }
 
   /// The position of the first element in a non-empty collection.
