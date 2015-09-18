@@ -266,11 +266,12 @@ class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
   // A map of old to new available values.
   SmallVector<std::pair<ValueBase *, SILValue>, 16> AvailVals;
 
-  BaseThreadingCloner(SILFunction &F)
-    : SILClonerWithScopes(F), FromBB(nullptr), DestBB(nullptr) {}
+  BaseThreadingCloner(SILFunction &F, SILFunction &To)
+    : SILClonerWithScopes(To), FromBB(nullptr), DestBB(nullptr) {}
 
-  BaseThreadingCloner(SILFunction &F, SILBasicBlock *From, SILBasicBlock *Dest)
-    : SILClonerWithScopes(F), FromBB(From), DestBB(Dest) {}
+  BaseThreadingCloner(SILFunction &F, SILFunction &To,
+                      SILBasicBlock *From, SILBasicBlock *Dest)
+    : SILClonerWithScopes(To), FromBB(From), DestBB(Dest) {}
 
   void process(SILInstruction *I) { visit(I); }
 
@@ -303,9 +304,10 @@ class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
 class EdgeThreadingCloner : public BaseThreadingCloner {
 public:
   EdgeThreadingCloner(BranchInst *BI)
-      : BaseThreadingCloner(*BI->getFunction(), BI->getDestBB(), nullptr) {
-        DestBB = createEdgeBlockAndRedirectBranch(BI);
-      }
+      : BaseThreadingCloner(*BI->getFunction(), *BI->getFunction(),
+                            BI->getDestBB(), nullptr) {
+    DestBB = createEdgeBlockAndRedirectBranch(BI);
+  }
 
   SILBasicBlock *createEdgeBlockAndRedirectBranch(BranchInst *BI) {
     auto *Fn = BI->getFunction();
@@ -341,7 +343,8 @@ public:
 class BasicBlockCloner : public BaseThreadingCloner {
   public:
   BasicBlockCloner(SILBasicBlock *From, SILBasicBlock *To = nullptr)
-    : BaseThreadingCloner(*From->getParent()) {
+    : BaseThreadingCloner(*From->getParent(),
+                          To ? *To->getParent() : *From->getParent()) {
     FromBB = From;
     if (To == nullptr) {
       // Create a new BB that is to be used as a target
