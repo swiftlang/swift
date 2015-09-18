@@ -248,9 +248,10 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
       getterStream.str(), SILLinkage::PrivateExternal, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
       IsFragile_t::IsFragile);
+  GetterF->setDebugScope(Store->getFunction()->getDebugScope());
   auto *EntryBB = GetterF->createBasicBlock();
   // Copy instructions into GetterF
-  InstructionsCloner Cloner(*Store->getFunction(), Insns, EntryBB);
+  InstructionsCloner Cloner(*GetterF, Insns, EntryBB);
   Cloner.clone();
   GetterF->setInlined();
   CallGraphEditor(CG).addCallGraphNode(GetterF);
