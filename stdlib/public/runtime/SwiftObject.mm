@@ -637,7 +637,8 @@ void *swift::swift_bridgeObjectRetain(void *object) {
   }
   return objc_retain(static_cast<id>(objectRef));
 #else
-  return swift_retain(static_cast<HeapObject *>(objectRef));
+  swift_retain(static_cast<HeapObject *>(objectRef));
+  return static_cast<HeapObject *>(objectRef);
 #endif
 }
 
@@ -676,7 +677,8 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
     objc_ret = objc_retain(static_cast<id>(objectRef));
   return objc_ret;
 #else
-  return swift_retain_n(static_cast<HeapObject *>(objectRef), n);
+  swift_retain_n(static_cast<HeapObject *>(objectRef), n);
+  return static_cast<HeapObject *>(objectRef);
 #endif
 }
 
