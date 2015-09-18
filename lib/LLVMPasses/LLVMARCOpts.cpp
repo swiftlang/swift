@@ -58,6 +58,8 @@ STATISTIC(NumAllocateReleasePairs,
           "Number of swift allocate/release pairs eliminated");
 STATISTIC(NumStoreOnlyObjectsEliminated,
           "Number of swift stored-only objects eliminated");
+STATISTIC(NumUnknownRetainReleaseSRed,
+          "Number of unknownretain/release strength reduced to retain/release");
 
 llvm::cl::opt<bool>
 DisableARCOpts("disable-llvm-arc-opts", llvm::cl::init(false));
@@ -75,69 +77,155 @@ DisableARCOpts("disable-llvm-arc-opts", llvm::cl::init(false));
 /// This also does some trivial peep-hole optimizations as we go.
 static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
   bool Changed = false;
-  for (auto &BB : F)
-  for (auto I = BB.begin(); I != BB.end(); ) {
-    Instruction &Inst = *I++;
+  DenseSet<Value *> NativeRefs;
+  DenseMap<Value *, TinyPtrVector<Instruction *>> UnknownRetains;
+  DenseMap<Value *, TinyPtrVector<Instruction *>> UnknownReleases;
+  for (auto &BB : F) {
+    UnknownRetains.clear();
+    UnknownReleases.clear();
+    NativeRefs.clear();
+    for (auto I = BB.begin(); I != BB.end(); ) {
+      Instruction &Inst = *I++;
 
-    switch (classifyInstruction(Inst)) {
-    case RT_Unknown:
-    case RT_BridgeRelease:
-    case RT_AllocObject:
-    case RT_FixLifetime:
-    case RT_NoMemoryAccessed:
-    case RT_RetainUnowned:
-    case RT_CheckUnowned:
-      break;
-    case RT_Retain:
-    case RT_Release:
-    case RT_UnknownRelease: {
-      CallInst &CI = cast<CallInst>(Inst);
-      // swift_retain(null), swift_release(null) is a noop, zap it.
-      Value *ArgVal = CI.getArgOperand(0);
-      if (isa<ConstantPointerNull>(ArgVal)) {
-        CI.eraseFromParent();
-        Changed = true;
-        ++NumNoopDeleted;
-        continue;
+      switch (classifyInstruction(Inst)) {
+      case RT_Unknown:
+      case RT_BridgeRelease:
+      case RT_AllocObject:
+      case RT_FixLifetime:
+      case RT_NoMemoryAccessed:
+      case RT_RetainUnowned:
+      case RT_CheckUnowned:
+        break;
+      case RT_Retain: {
+        CallInst &CI = cast<CallInst>(Inst);
+        Value *ArgVal = CI.getArgOperand(0);
+        // retain(null) is a no-op.
+        if (isa<ConstantPointerNull>(ArgVal)) {
+          CI.eraseFromParent();
+          Changed = true;
+          ++NumNoopDeleted;
+          continue;
+        }
+        // Rewrite unknown retains into swift_retains.
+        NativeRefs.insert(ArgVal);
+        for (auto &X : UnknownRetains[ArgVal]) {
+          B.setInsertPoint(X);
+          B.createRetain(ArgVal);
+          X->eraseFromParent();
+          ++NumUnknownRetainReleaseSRed;
+          Changed = true;
+        }
+        UnknownRetains[ArgVal].clear();
+        break;
       }
-      break;
-    }
-    case RT_ObjCRelease: {
-      CallInst &CI = cast<CallInst>(Inst);
-      Value *ArgVal = CI.getArgOperand(0);
-      // objc_release(null) is a noop, zap it.
-      if (isa<ConstantPointerNull>(ArgVal)) {
-        CI.eraseFromParent();
-        Changed = true;
-        ++NumNoopDeleted;
-        continue;
-      }
-      break;
-    }
+      case RT_UnknownRetain: {
+        CallInst &CI = cast<CallInst>(Inst);
+        Value *ArgVal = CI.getArgOperand(0);
+        // unknownRetain(null) is a no-op.
+        if (isa<ConstantPointerNull>(ArgVal)) {
+          CI.eraseFromParent();
+          Changed = true;
+          ++NumNoopDeleted;
+          continue;
+        }
 
-    // These retain instructions return their argument so must be processed
-    // specially.
-    case RT_UnknownRetain:
-    case RT_BridgeRetain:
-    case RT_ObjCRetain: {
-      // Canonicalize the retain so that nothing uses its result.
-      CallInst &CI = cast<CallInst>(Inst);
-      Value *ArgVal = CI.getArgOperand(0);
-      if (!CI.use_empty()) {
-        CI.replaceAllUsesWith(ArgVal);
-        Changed = true;
+        // Have not encountered a strong retain/release. keep it in the
+        // unknown retain/release list for now. It might get replaced
+        // later.
+        if (NativeRefs.find(ArgVal) == NativeRefs.end()) {
+           UnknownRetains[ArgVal].push_back(&CI);
+        } else {
+          B.setInsertPoint(&CI);
+          B.createRetain(ArgVal);
+          CI.eraseFromParent();
+          ++NumUnknownRetainReleaseSRed;
+          Changed = true;
+        }
+        break;
+      }
+      case RT_Release: {
+        CallInst &CI = cast<CallInst>(Inst);
+        Value *ArgVal = CI.getArgOperand(0);
+        // release(null) is a no-op.
+        if (isa<ConstantPointerNull>(ArgVal)) {
+          CI.eraseFromParent();
+          Changed = true;
+          ++NumNoopDeleted;
+          continue;
+        }
+        // Rewrite unknown releases into swift_releases.
+        NativeRefs.insert(ArgVal);
+        for (auto &X : UnknownReleases[ArgVal]) {
+          B.setInsertPoint(X);
+          B.createRelease(ArgVal);
+          X->eraseFromParent();
+          ++NumUnknownRetainReleaseSRed;
+          Changed = true;
+        }
+        UnknownReleases[ArgVal].clear();
+        break;
+      }
+      case RT_UnknownRelease: {
+        CallInst &CI = cast<CallInst>(Inst);
+        Value *ArgVal = CI.getArgOperand(0);
+        // unknownRelease(null) is a no-op.
+        if (isa<ConstantPointerNull>(ArgVal)) {
+          CI.eraseFromParent();
+          Changed = true;
+          ++NumNoopDeleted;
+          continue;
+        }
+
+        // Have not encountered a strong retain/release. keep it in the
+        // unknown retain/release list for now. It might get replaced
+        // later.
+        if (NativeRefs.find(ArgVal) == NativeRefs.end()) {
+          UnknownReleases[ArgVal].push_back(&CI);
+        } else {
+          B.setInsertPoint(&CI);
+          B.createRelease(ArgVal);
+          CI.eraseFromParent();
+          ++NumUnknownRetainReleaseSRed;
+          Changed = true;
+        }
+        break;
+      }
+      case RT_ObjCRelease: {
+        CallInst &CI = cast<CallInst>(Inst);
+        Value *ArgVal = CI.getArgOperand(0);
+        // objc_release(null) is a noop, zap it.
+        if (isa<ConstantPointerNull>(ArgVal)) {
+          CI.eraseFromParent();
+          Changed = true;
+          ++NumNoopDeleted;
+          continue;
+        }
+        break;
       }
 
-      // {objc_retain,swift_unknownRetain}(null) is a noop, delete it.
-      if (isa<ConstantPointerNull>(ArgVal)) {
-        CI.eraseFromParent();
-        Changed = true;
-        ++NumNoopDeleted;
-        continue;
-      }
+      // These retain instructions return their argument so must be processed
+      // specially.
+      case RT_BridgeRetain:
+      case RT_ObjCRetain: {
+        // Canonicalize the retain so that nothing uses its result.
+        CallInst &CI = cast<CallInst>(Inst);
+        Value *ArgVal = CI.getArgOperand(0);
+        if (!CI.use_empty()) {
+          CI.replaceAllUsesWith(ArgVal);
+          Changed = true;
+        }
 
-      break;
-    }
+        // {objc_retain,swift_unknownRetain}(null) is a noop, delete it.
+        if (isa<ConstantPointerNull>(ArgVal)) {
+          CI.eraseFromParent();
+          Changed = true;
+          ++NumNoopDeleted;
+          continue;
+        }
+
+        break;
+      }
+      }
     }
   }
   return Changed;

@@ -290,6 +290,43 @@ define void @dont_remove_redundant_check_unowned(%swift.refcounted* %A, %swift.r
   ret void
 }
 
+; CHECK-LABEL: @unknown_retain_promotion
+; CHECK-NEXT: swift_retain
+; CHECK-NEXT: swift_retain
+; CHECK-NEXT: swift_retain
+; CHECK-NEXT: ret
+define void @unknown_retain_promotion(%swift.refcounted* %A) {
+  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  tail call void @swift_retain(%swift.refcounted* %A)
+  ret void
+}
+
+; CHECK-LABEL: @unknown_release_promotion
+; CHECK-NEXT: swift_release
+; CHECK-NEXT: swift_release
+; CHECK-NEXT: swift_release
+; CHECK-NEXT: ret
+define void @unknown_release_promotion(%swift.refcounted* %A) {
+  tail call void @swift_unknownRelease(%swift.refcounted* %A)
+  tail call void @swift_unknownRelease(%swift.refcounted* %A)
+  tail call void @swift_release(%swift.refcounted* %A)
+  ret void
+}
+
+; CHECK-LABEL: @unknown_retain_nopromotion
+; CHECK: bb1
+; CHECK-NOT: swift_retain
+; CHECK: ret
+define void @unknown_retain_nopromotion(%swift.refcounted* %A) {
+  tail call void @swift_retain(%swift.refcounted* %A)
+  br label %bb1
+bb1:
+  tail call void @swift_unknownRetain(%swift.refcounted* %A)
+  ret void
+}
+
+
 !llvm.dbg.cu = !{!1}
 !llvm.module.flags = !{!4}
 

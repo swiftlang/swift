@@ -41,6 +41,7 @@ class ARCEntryPointBuilder {
 
   // The constant cache.
   NullablePtr<Constant> Retain;
+  NullablePtr<Constant> Release;
   NullablePtr<Constant> CheckUnowned;
   NullablePtr<Constant> RetainN;
   NullablePtr<Constant> ReleaseN;
@@ -84,6 +85,17 @@ public:
     CI->setTailCall(true);
     return CI;
   }
+
+  CallInst *createRelease(Value *V) {
+    // Cast just to make sure that we have the right type.
+    V = B.CreatePointerCast(V, getObjectPtrTy());
+
+    // Create the call.
+    CallInst *CI = B.CreateCall(getRelease(), V);
+    CI->setTailCall(true);
+    return CI;
+  }
+
   
   CallInst *createCheckUnowned(Value *V) {
     // Cast just to make sure that we have the right type.
@@ -145,6 +157,21 @@ private:
                                    Type::getVoidTy(M.getContext()),
                                    ObjectPtrTy, nullptr);
     return Retain.get();
+  }
+
+  /// getRelease - Return a callable function for swift_release.
+  Constant *getRelease() {
+    if (Release)
+      return Release.get();;
+    auto *ObjectPtrTy = getObjectPtrTy();
+
+    auto &M = getModule();
+    auto AttrList = AttributeSet::get(
+        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
+    Release = M.getOrInsertFunction("swift_release", AttrList,
+                                   Type::getVoidTy(M.getContext()),
+                                   ObjectPtrTy, nullptr);
+    return Release.get();
   }
 
   Constant *getCheckUnowned() {
