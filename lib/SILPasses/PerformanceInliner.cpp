@@ -908,7 +908,7 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
   // Add the specialization to the call graph.
   CallGraphEditor Editor(&CG);
   if (SpecializedFunction)
-    Editor.addCallGraphNode(SpecializedFunction);
+    Editor.addNewFunction(SpecializedFunction);
 
   // Track the new applies from the specialization.
   for (auto NewApply : NewApplyPairs)
@@ -932,8 +932,6 @@ ApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
 
   for (auto NewApply : NewApplyPairs) {
     if (auto Apply = FullApplySite::isa(NewApply.first.getInstruction())) {
-      Editor.addEdgesForApply(Apply);
-
       assert(!OriginMap.count(Apply) && "Unexpected apply in map!");
       OriginMap[Apply] = FullApplySite(NewApply.second.getInstruction());
     }

@@ -435,7 +435,7 @@ static void specializeClosure(CallGraph &CG, ClosureInfo &CInfo,
 
     // Update the call graph with the newly created function.
     CallGraphEditor Editor(&CG);
-    Editor.addCallGraphNode(NewF);
+    Editor.addNewFunction(NewF);
   }
 
   // Rewrite the call

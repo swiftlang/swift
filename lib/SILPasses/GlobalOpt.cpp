@@ -254,7 +254,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
   InstructionsCloner Cloner(*GetterF, Insns, EntryBB);
   Cloner.clone();
   GetterF->setInlined();
-  CallGraphEditor(CG).addCallGraphNode(GetterF);
+  CallGraphEditor(CG).addNewFunction(GetterF);
 
   // Find the store instruction
   auto BB = EntryBB;
@@ -505,7 +505,7 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl,
   BasicBlockCloner Cloner(InitF->begin(), EntryBB);
   Cloner.clone();
   GetterF->setInlined();
-  CallGraphEditor(CG).addCallGraphNode(GetterF);
+  CallGraphEditor(CG).addNewFunction(GetterF);
 
   // Find the store instruction
   auto BB = EntryBB;

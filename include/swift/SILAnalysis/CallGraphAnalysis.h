@@ -428,9 +428,14 @@ public:
   void replaceApplyWithNew(FullApplySite Old, FullApplySite New);
   void replaceApplyWithNew(FullApplySite Old,
                            llvm::SmallVectorImpl<FullApplySite> &NewApplies);
-  void addCallGraphNode(SILFunction *F) {
-    if (CG)
+
+  /// Creates a new node for function \p F and adds callee edges for all
+  /// full apply sites in the function.
+  void addNewFunction(SILFunction *F) {
+    if (CG) {
       CG->addCallGraphNode(F);
+      CG->addEdges(F);
+    }
   }
 
   void removeEdgesForApply(FullApplySite AI) {
