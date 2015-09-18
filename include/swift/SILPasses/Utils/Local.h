@@ -52,8 +52,7 @@ inline ValueUserRange makeUserRange(iterator_range<SILValue::use_iterator> R) {
 /// \param Force If Force is set, don't check if the top level instructions
 ///        are considered dead - delete them regardless.
 /// \param C a callback called whenever an instruction is deleted.
-/// \return Returns true if any instructions were deleted.
-bool
+void
 recursivelyDeleteTriviallyDeadInstructions(
   ArrayRef<SILInstruction*> I, bool Force = false,
   std::function<void(SILInstruction *)> C = [](SILInstruction *){});
@@ -65,8 +64,7 @@ recursivelyDeleteTriviallyDeadInstructions(
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
 /// \param C a callback called whenever an instruction is deleted.
-/// \return Returns true if any instructions were deleted.
-bool
+void
 recursivelyDeleteTriviallyDeadInstructions(
   SILInstruction *I,
   bool Force = false,

@@ -75,7 +75,7 @@ namespace {
   using CallbackTy = std::function<void(SILInstruction *)>;
 } // end anonymous namespace
 
-bool swift::
+void swift::
 recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
                                            bool Force, CallbackTy Callback) {
   // Delete these instruction and others that become dead after it's deleted.
@@ -127,8 +127,6 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
     NextInsts.swap(DeadInsts);
     NextInsts.clear();
   }
-
-  return true;
 }
 
 /// \brief If the given instruction is dead, delete it along with its dead
@@ -138,12 +136,12 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
 /// \return Returns true if any instructions were deleted.
-bool swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
+void swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
                                                        bool Force,
                                                        CallbackTy Callback) {
 
   ArrayRef<SILInstruction *> AI = ArrayRef<SILInstruction *>(I);
-  return recursivelyDeleteTriviallyDeadInstructions(AI, Force, Callback);
+  recursivelyDeleteTriviallyDeadInstructions(AI, Force, Callback);
 }
 
 void swift::eraseUsesOfInstruction(SILInstruction *Inst,
