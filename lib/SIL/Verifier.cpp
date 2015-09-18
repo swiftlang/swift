@@ -529,11 +529,14 @@ public:
 
   void checkInstructionsSILLocation(SILInstruction *I) {
     // Check the debug scope.
-    if (!maybeScopeless(*I)) {
-      require(I->getDebugScope(), "instruction has a location, but no scope");
-      require(getFunction(I->getDebugScope()) == I->getParent()->getParent(),
-              "SILDebugScope of instruction points to a different function");
+    auto *DS = I->getDebugScope();
+    if (DS && !maybeScopeless(*I)) {
+      require(DS, "instruction has a location, but no scope");
+      require(getFunction(DS) == I->getFunction(),
+              "parent scope of instruction points to a different function");
     }
+    require(!DS || DS->InlinedCallSite || DS->SILFn == I->getFunction(),
+            "scope of a non-inlined instruction points to different function");
 
     // Check the location kind.
     SILLocation L = I->getLoc();
@@ -3139,6 +3142,8 @@ void SILModule::verify() const {
 #ifndef NDEBUG
 /// Determine whether an instruction may not have a SILDebugScope.
 bool swift::maybeScopeless(SILInstruction &I) {
-  return true;
+  if (I.getFunction()->isBare())
+    return true;
+  return !isa<DebugValueInst>(I) && !isa<DebugValueAddrInst>(I);
 }
 #endif

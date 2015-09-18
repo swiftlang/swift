@@ -1571,8 +1571,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       if (!DS) {
         if (CurSILFn->isBare())
           DS = CurSILFn->getDebugScope();
-        else
-          assert(maybeScopeless(I) && "instruction has location, but no scope");
+        // FIXME: Enable this assertion.
+        //assert(maybeScopeless(I) && "instruction has location, but no scope");
       }
 
       // Ignore scope-less instructions and have IRBuilder reuse the
