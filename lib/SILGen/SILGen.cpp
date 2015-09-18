@@ -668,6 +668,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     preEmitFunction(destroyer, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDestroyingDestructor", f);
     SILGenFunction(*this, *f).emitDestroyingDestructor(dd);
+    f->setDebugScope(new (M) SILDebugScope(dd, *f));
     postEmitFunction(destroyer, f);
   }
 
@@ -678,6 +679,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     preEmitFunction(deallocator, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDeallocatingDestructor", f);
     SILGenFunction(*this, *f).emitDeallocatingDestructor(dd);
+    f->setDebugScope(new (M) SILDebugScope(dd, *f));
     postEmitFunction(deallocator, f);
   }
 }
