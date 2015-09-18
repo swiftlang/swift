@@ -1471,42 +1471,6 @@ void PrintAST::printOneParameter(const Pattern *BodyPattern,
     RemoveFunc(DAK_AutoClosure);
 }
 
-namespace swift {
-  /// Return a faked default argument 
-  /// FIXME: This is an experimental hack.
-  Optional<StringRef> getFakeDefaultArgForType(Type type) {
-    if (!type) return None;
-
-    // For optional types, the default is "nil".
-    if (type->getOptionalObjectType()) return StringRef("nil");
-
-    if (auto structDecl = type->getStructOrBoundGenericStruct()) {
-      if (structDecl->getClangDecl()) {
-        // For option sets, the default is "[]".
-        for (auto attr : structDecl->getAttrs()) {
-          if (auto synthesizedProto = dyn_cast<SynthesizedProtocolAttr>(attr)) {
-            if (synthesizedProto->getProtocolKind()
-                  == KnownProtocolKind::OptionSetType)
-              return StringRef("[]");
-          }
-        }
-      }
-
-      // For (Unsafe)MutablePointer and Selector, the default is "nil".
-      auto name = structDecl->getName().str();
-      if (name == "UnsafeMutablePointer" ||
-          name == "UnsafePointer" ||
-          name == "Selector" ||
-          name == "COpaquePointer" ||
-          name == "AutoreleasingUnsafeMutablePointer" ||
-          name == "NSZone")
-        return StringRef("nil");
-    }
-    
-    return None;
-  }
-}
-
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   ArrayRef<Pattern *> BodyPatterns = AFD->getBodyParamPatterns();
 
@@ -1531,21 +1495,18 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
                           ArgNameIsAPIByDefault,
                           BodyTuple->getElement(i).hasEllipsis(),
                           /*Curried=*/CurrPattern > 0);
-        if (BodyTuple->getElement(i).hasEllipsis())
+        auto &CurrElt = BodyTuple->getElement(i);
+        auto CurrType = CurrElt.getPattern()->getType();
+        if (CurrElt.hasEllipsis())
           Printer << "...";
         if (Options.PrintDefaultParameterPlaceholder &&
-            BodyTuple->getElement(i).getDefaultArgKind() !=
-              DefaultArgumentKind::None) {
-          Printer << " = default";
-        } else if (Options.PrintFakeImportedDefaultArguments &&
-                   AFD->getClangDecl() &&
-                   (i == 0 ||
-                    !BodyTuple->getElement(i).getPattern()->getBoundName()
-                      .empty())) {
-          if (auto defaultArg = getFakeDefaultArgForType(
-                                  BodyTuple->getElement(i).getPattern()
-                                    ->getType())) {
-            Printer << " = " << *defaultArg;
+            CurrElt.getDefaultArgKind() != DefaultArgumentKind::None) {
+          if (AFD->getClangDecl()) {
+            // For Clang declarations, figure out the default we're using.
+            Printer << " = " << CurrType->getInferredDefaultArgString();
+          } else {
+            // Use placeholder anywhere else.
+            Printer << " = default";
           }
         }
       }
@@ -1560,14 +1521,6 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
                       ArgNameIsAPIByDefault,
                       /*StripOuterSliceType=*/false,
                       /*Curried=*/CurrPattern > 0);
-
-    if (Options.PrintFakeImportedDefaultArguments &&
-        AFD->getClangDecl()) {
-      if (auto defaultArg = getFakeDefaultArgForType(
-            BodyParen->getSubPattern()->getType())) {
-        Printer << " = " << *defaultArg;
-      }
-    }
     Printer << ")";
   }
 

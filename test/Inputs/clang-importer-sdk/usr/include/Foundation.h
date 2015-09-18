@@ -130,7 +130,7 @@ __attribute__((availability(ios,introduced=8.0)))
 @end
 
 @protocol NSCopying
-- (id)copyWithZone:(NSZone *)zone;
+- (id)copyWithZone:(nullable NSZone *)zone;
 @end
 
 @interface NSDictionary<KeyType : id<NSCopying>, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/

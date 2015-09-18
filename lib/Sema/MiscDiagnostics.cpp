@@ -1977,13 +1977,8 @@ void TypeChecker::checkOmitNeedlessWords(VarDecl *var) {
     .fixItReplace(var->getLoc(), newName->str());
 }
 
-namespace swift {
-// FIXME: Hackily defined in AST/ASTPrinter.cpp
-  Optional<StringRef> getFakeDefaultArgForType(Type type);
-}
-
 /// Determine the "fake" default argument provided by the given expression.
-static Optional<StringRef> getFakeDefaultArgForExpr(Expr *expr) {
+static Optional<StringRef> getDefaultArgForExpr(Expr *expr) {
   // Empty array literals, [].
   if (auto arrayExpr = dyn_cast<ArrayExpr>(expr)) {
     if (arrayExpr->getElements().empty())
@@ -2037,7 +2032,7 @@ static bool hasExtraneousDefaultArguments(
     return false;
 
   if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg))
-    arg = shuffle->getSubExpr()->getSemanticsProvidingExpr();
+    arg = shuffle->getSubExpr();
     
   TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
   ParenExpr *argParen = dyn_cast<ParenExpr>(arg);
@@ -2066,9 +2061,11 @@ static bool hasExtraneousDefaultArguments(
 
     for (unsigned i = 0; i != numElementsInParens; ++i) {
       auto &elt = tuple->getElements()[i];
-      auto defaultArg = getFakeDefaultArgForType(elt.getPattern()->getType());
-      if (!defaultArg)
+      if (elt.getDefaultArgKind() == DefaultArgumentKind::None)
         continue;
+
+      auto defaultArg
+        = elt.getPattern()->getType()->getInferredDefaultArgString();
 
       // Never consider removing the first argument for a "set" method
       // with an unnamed first argument.
@@ -2082,8 +2079,8 @@ static bool hasExtraneousDefaultArguments(
       SourceRange removalRange;
       if (argTuple && i < argTuple->getNumElements()) {
         // Check whether we have a default argument.
-        auto exprArg = getFakeDefaultArgForExpr(argTuple->getElement(i));
-        if (!exprArg || *defaultArg != *exprArg)
+        auto exprArg = getDefaultArgForExpr(argTuple->getElement(i));
+        if (!exprArg || defaultArg != *exprArg)
           continue;
 
         // Figure out where to start removing this argument.
@@ -2119,8 +2116,8 @@ static bool hasExtraneousDefaultArguments(
         }
       } else if (argParen) {
         // Check whether we have a default argument.
-        auto exprArg = getFakeDefaultArgForExpr(argParen->getSubExpr());
-        if (!exprArg || *defaultArg != *exprArg)
+        auto exprArg = getDefaultArgForExpr(argParen->getSubExpr());
+        if (!exprArg || defaultArg != *exprArg)
           continue;
 
         removalRange = SourceRange(argParen->getSubExpr()->getStartLoc(),
@@ -2165,23 +2162,6 @@ static bool hasExtraneousDefaultArguments(
       ranges.front().Start = argTuple->getLParenLoc();
       ranges.front().End
         = Lexer::getLocForEndOfToken(ctx.SourceMgr, argTuple->getRParenLoc());
-    }
-  } else if (argParen) {
-    // Parameter must have a default argument.
-    auto defaultArg = getFakeDefaultArgForType(bodyPattern->getType());
-    if (!defaultArg)
-      return false;
-
-    // Argument must be a default value.
-    auto argExpr = getFakeDefaultArgForExpr(argParen->getSubExpr());
-    if (!argExpr || *argExpr != *defaultArg)
-      return false;
-    
-    SourceRange removalRange(argParen->getSubExpr()->getStartLoc(),
-                             argParen->getRParenLoc());
-    if (!removalRange.isInvalid()) {
-      ranges.push_back(removalRange);
-      removedArgs.push_back(0);
     }
   }
 

@@ -803,6 +803,17 @@ public:
   /// Retrieve the type declaration directly referenced by this type, if any.
   TypeDecl *getDirectlyReferencedTypeDecl() const;
 
+  /// Retrieve the default argument string that would be inferred for this type,
+  /// assuming that we know it is inferred.
+  ///
+  /// This routine pre-supposes that we know that the given type is the type of
+  /// a parameter that has a default, and all we need to figure out is which
+  /// default argument should be print.
+  ///
+  /// FIXME: This should go away when/if inferred default arguments become
+  /// "real".
+  StringRef getInferredDefaultArgString();
+
 private:
   // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;

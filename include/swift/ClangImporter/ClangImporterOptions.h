@@ -69,6 +69,10 @@ public:
   /// with the type information of the corresponding parameter or
   /// property.
   bool OmitNeedlessWords = false;
+
+  // If true, infer default arguments for nullable pointers (nil) and
+  // option sets ([]).
+  bool InferDefaultArguments = false;
 };
 
 } // end namespace swift

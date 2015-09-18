@@ -2010,6 +2010,23 @@ clang::QualType ClangImporter::Implementation::getClangDeclContextType(
   return clang::QualType();
 }
 
+/// Determine whether we can infer a default argument for a parameter with
+/// the given \c type and (Clang) optionality.
+static bool canInferDefaultArgument(Type type,
+                                    OptionalTypeKind clangOptionality) {
+  // If it's stated to be optional in C, it defaults to 'nil'.
+  if (clangOptionality == OTK_Optional)
+    return true;
+
+  // Option sets default to "[]".
+  // FIXME: This is a gross way to get this information, because this approach
+  // is a short-lived hack.
+  if (type->getInferredDefaultArgString().size() == 2)
+    return true;
+
+  return false;
+}
+
 Type ClangImporter::Implementation::importMethodType(
        const clang::ObjCMethodDecl *clangDecl,
        clang::QualType resultType,
@@ -2252,6 +2269,22 @@ Type ClangImporter::Implementation::importMethodType(
     }
     ++nameIndex;
 
+    // Determine whether we have a default argument.
+    DefaultArgumentKind defaultArg = DefaultArgumentKind::None;
+    if (InferDefaultArguments &&
+        (kind == SpecialMethodKind::Regular ||
+         kind == SpecialMethodKind::Constructor)) {
+      // FIXME: Hack around the weirdness of 'optionalityOfParam'.
+      OptionalTypeKind actualOptionality = optionalityOfParam;
+      if (auto nullability = param->getType()->getNullability(
+                               param->getASTContext())) {
+        actualOptionality = translateNullability(*nullability);
+      }
+
+      if (canInferDefaultArgument(swiftParamTy, actualOptionality))
+        defaultArg = DefaultArgumentKind::Normal;
+    }
+
     // Compute the pattern to put into the body.
     Pattern *bodyPattern;
     // It doesn't actually matter which DeclContext we use, so just use the
@@ -2268,17 +2301,20 @@ Type ClangImporter::Implementation::importMethodType(
         new (SwiftContext) NoEscapeAttr(/*IsImplicit=*/false));
     }
 
+    // Set up the body pattern.
     bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     bodyPattern->setType(swiftParamTy);
     bodyPattern
       = new (SwiftContext) TypedPattern(bodyPattern,
                                         TypeLoc::withoutLoc(swiftParamTy));
     bodyPattern->setType(swiftParamTy);
-    bodyPatternElts.push_back(TuplePatternElt(bodyPattern));
+    TuplePatternElt patternElt(bodyPattern);
+    patternElt.setDefaultArgKind(defaultArg);
+    bodyPatternElts.push_back(patternElt);
 
     // Add the tuple elements for the function types.
-    swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name));
-    swiftBodyParams.push_back(TupleTypeElt(swiftParamTy, bodyName));
+    swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name, defaultArg));
+    swiftBodyParams.push_back(TupleTypeElt(swiftParamTy, bodyName, defaultArg));
   }
 
   // If we have a constructor with no parameters and a name with an

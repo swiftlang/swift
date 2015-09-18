@@ -796,6 +796,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Args.hasArg(OPT_enable_objc_implicit_properties);
 
   Opts.OmitNeedlessWords |= Args.hasArg(OPT_enable_omit_needless_words);
+  Opts.InferDefaultArguments |= Args.hasArg(OPT_enable_infer_default_arguments);
 
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 

@@ -195,6 +195,10 @@ def enable_omit_needless_words :
   Flag<["-"], "enable-omit-needless-words">,
   HelpText<"Omit needless words when importing Objective-C names">;
 
+def enable_infer_default_arguments :
+  Flag<["-"], "enable-infer-default-arguments">,
+  HelpText<"Infer default arguments for imported parameters">;
+
 def warn_omit_needless_words :
   Flag<["-"], "Womit-needless-words">,
   HelpText<"Warn about needless words in names">;

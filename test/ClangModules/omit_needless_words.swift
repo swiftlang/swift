@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify -Womit-needless-words %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify -Womit-needless-words -enable-infer-default-arguments %s
 
 // REQUIRES: objc_interop
 

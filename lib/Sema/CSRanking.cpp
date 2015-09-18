@@ -501,6 +501,22 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   return cs.solveSingle().hasValue();
 }
 
+/// Count the number of default arguments in the primary clause.
+static unsigned countDefaultArguments(AbstractFunctionDecl *func) {
+  auto pattern
+    = func->getBodyParamPatterns()[func->getImplicitSelfDecl() != 0];
+  auto tuple = dyn_cast<TuplePattern>(pattern);
+  if (!tuple) return 0;
+
+  unsigned count = 0;
+  for (const auto &elt : tuple->getElements()) {
+    if (elt.getDefaultArgKind() != DefaultArgumentKind::None)
+      ++count;
+  }
+
+  return count;
+}
+
 /// \brief Determine whether the first declaration is as "specialized" as
 /// the second declaration.
 ///
@@ -671,11 +687,29 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   // Solve the system.
   auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
 
-  if (!solution)
-    return false;
 
   // Ban value-to-optional conversions.
-  return solution->getFixedScore().Data[SK_ValueToOptional] == 0;
+  if (solution && solution->getFixedScore().Data[SK_ValueToOptional] == 0)
+    return true;
+
+  // Between two imported functions/methods, prefer one with fewer defaulted
+  // arguments.
+  //
+  // FIXME: This is a total hack; we should be comparing based on the number of
+  // default arguments at were actually used. It's only safe to do this because
+  // the count will be zero except when under the experimental
+  // InferDefaultArguments mode of the Clang importer.
+  if (isa<AbstractFunctionDecl>(decl1) && isa<AbstractFunctionDecl>(decl2) &&
+      decl1->getClangDecl() && decl2->getClangDecl()) {
+    unsigned defArgsIn1
+      = countDefaultArguments(cast<AbstractFunctionDecl>(decl1));
+    unsigned defArgsIn2
+      = countDefaultArguments(cast<AbstractFunctionDecl>(decl2));
+    if (defArgsIn1 < defArgsIn2)
+      return true;
+  }
+
+  return false;
 }
 
 Comparison TypeChecker::compareDeclarations(DeclContext *dc,
