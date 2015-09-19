@@ -143,13 +143,22 @@ public:
   /// other words we can replace its callee with a function_ref
   /// regardless of what kind of instruction the callee is now.
   bool hasSingleCallee() const {
+    return getSingleCalleeOrNull() != nullptr;
+  }
+
+  /// Gets the single callee if the apply has one.
+  CallGraphNode *getSingleCalleeOrNull() const {
     if (!isCalleeSetComplete())
-      return false;
+      return nullptr;
 
     if (CalleeSet.getPointer().is<CallGraphNode *>())
-      return CalleeSet.getPointer().get<CallGraphNode *>() != nullptr;
+      return CalleeSet.getPointer().get<CallGraphNode *>();
 
-    return CalleeSet.getPointer().get<CalleeSetType *>()->size() == 1;
+    auto *CS = CalleeSet.getPointer().get<CalleeSetType *>();
+    if (CS->size() != 1)
+      return nullptr;
+    
+    return *CS->begin();
   }
 
   unsigned getOrdinal() const {
@@ -393,6 +402,7 @@ public:
   
   void verify() const;
 
+  void verify(SILFunction *F) const;
 private:
   CallGraphNode *tryGetCallGraphNode(SILFunction *F) const {
     return const_cast<CallGraph *>(this)->tryGetCallGraphNode(F);
@@ -545,6 +555,8 @@ public:
   }
 
   virtual void verify() const;
+  
+  virtual void verify(SILFunction *F) const;
 };
 
 } // end namespace swift

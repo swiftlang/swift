@@ -797,45 +797,87 @@ void CallGraph::verify() const {
   //
   //    a. The function is in the current module.
   //    b. The call graph node is for that same function.
-  //    c. All the callee edges of the node have an apply that lives
-  //       in that function.
   //
+  // In addition, call the verify method for the function.
+  unsigned numEdges = 0;
   for (auto &P : FunctionToNodeMap) {
-    assert(Functions.count(P.first) &&
+    SILFunction *F = P.first;
+    CallGraphNode *Node = P.second;
+    assert(Functions.count(F) &&
            "Function in call graph but not in module!?");
-    assert(P.second->getFunction() == P.first &&
+    assert(Node->getFunction() == F &&
            "Func mapped to node, but node has different Function inside?!");
-    for (CallGraphEdge *Edge : P.second->getCalleeEdges()) {
-      assert(Edge->getApply().getFunction() == P.first &&
-             "Apply in callee set that is not in the callee function?!");
+    verify(F);
+    numEdges += Node->getCalleeEdges().size();
+  }
+
+  assert(ApplyToEdgeMap.size() == numEdges &&
+         "Some edges in ApplyToEdgeMap are not contained in any node");
+#endif
+}
+
+void CallGraph::verify(SILFunction *F) const {
+#ifndef NDEBUG
+  // Collect all full apply sites of the function.
+
+  CallGraphNode *Node = getCallGraphNode(F);
+  unsigned numEdges = 0;
+  
+  for (auto &BB : *F) {
+    for (auto &I : BB) {
+      auto FAS = FullApplySite::isa(&I);
+      if (!FAS)
+        continue;
+
+      auto *Edge = getCallGraphEdge(FAS);
+      assert(Edge && "no edge for full apply site");
+      
+      numEdges++;
+
+      assert(Edge->getApply().getInstruction() == &I &&
+             "Edge is not linked to the correct apply site");
+
+      assert(ApplyToEdgeMap.lookup(FAS) == Edge &&
+             "Edge is not in ApplyToEdgeMap");
+      
+      // In the trivial case that we call a known function, check if we have
+      // exactly one callee in the edge.
+      SILValue Callee = FAS.getCallee();
+      if (auto *PAI = dyn_cast<PartialApplyInst>(Callee))
+        Callee = PAI->getCallee();
+      
+      if (auto *FRI = dyn_cast<FunctionRefInst>(Callee)) {
+        auto *CalleeNode = Edge->getSingleCalleeOrNull();
+        assert(CalleeNode &&
+               CalleeNode->getFunction() == FRI->getReferencedFunction() &&
+               "Direct apply is not represented by a single-callee edge");
+      }
     }
   }
 
-  // For every pair (FullApplySite, CallGraphEdge) in the apply-to-edge
-  // map, verify:
-  //
-  //    a. The edge's apply is identical to the map key that maps
-  //       to the edge.
-  //    b. The apply is in a function in the module.
-  //    c. That function has a call graph node.
-  //    d. The edge is one of the callee edges of that call graph node.
-  //
-  for (auto &P : ApplyToEdgeMap) {
-    assert(P.second->getApply() == P.first &&
-           "Apply mapped to CallSiteEdge but not vis-a-versa?!");
-    assert(Functions.count(P.first.getFunction()) &&
-           "Apply in func not in module?!");
-    CallGraphNode *Node = getCallGraphNode(P.first.getFunction());
-
-    bool FoundEdge = false;
-    for (CallGraphEdge *Edge : Node->getCalleeEdges()) {
-      if (Edge == P.second) {
-        FoundEdge = true;
-        break;
-      }
+  // Check if we have an exact 1-to-1 mapping from full apply sites to edges.
+  auto &CalleeEdges = Node->getCalleeEdges();
+  assert(numEdges == CalleeEdges.size() && "More edges than full apply sites");
+  
+  // Make structural graph checks:
+  // 1.) Check that the callee edges are part of the callee node's caller set.
+  for (auto *Edge : CalleeEdges) {
+    assert(Edge->getApply().getFunction() == F &&
+           "Apply in callee set that is not in the callee function?!");
+    
+    for (auto *CalleeNode : Edge->getPartialCalleeSet()) {
+      auto &CallerEdges = CalleeNode->getPartialCallerEdges();
+      assert(std::find(CallerEdges.begin(), CallerEdges.end(), Edge) !=
+               CallerEdges.end() &&
+             "Edge not in caller set of callee");
     }
-    assert(FoundEdge && "Failed to find Apply CallGraphEdge in Apply inst "
-                        "parent function's caller");
+  }
+  // 2.) Check that the caller edges have this node in their callee sets.
+  for (auto *Edge : Node->getPartialCallerEdges()) {
+    auto CalleeSet = Edge->getPartialCalleeSet();
+    assert(std::find(CalleeSet.begin(), CalleeSet.end(), Node) !=
+             CalleeSet.end() &&
+           "Node not in callee set of caller edge");
   }
 #endif
 }
@@ -846,6 +888,15 @@ void CallGraphAnalysis::verify() const {
   if (!CG)
     return;
   CG->verify();
+#endif
+}
+
+void CallGraphAnalysis::verify(SILFunction *F) const {
+#ifndef NDEBUG
+  // If we don't have a callgraph, return.
+  if (!CG)
+    return;
+  CG->verify(F);
 #endif
 }
 
