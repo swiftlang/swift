@@ -22,7 +22,7 @@ enum RT_Kind {
   /// write) memory.
   RT_NoMemoryAccessed,
 
-  /// SwiftHeapObject *swift_retain(SwiftHeapObject *object)
+  /// void swift_retain(SwiftHeapObject *object)
   RT_Retain,
 
   /// void swift_retain_n(SwiftHeapObject *object)
