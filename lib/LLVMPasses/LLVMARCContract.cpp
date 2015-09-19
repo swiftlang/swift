@@ -170,6 +170,15 @@ bool SwiftARCContractImpl::run() {
 
       auto Kind = classifyInstruction(Inst);
       switch (Kind) {
+      // These instructions should not reach here based on the pass ordering.
+      // i.e. LLVMARCOpt -> LLVMContractOpt.
+      case RT_RetainN:
+      case RT_UnknownRetainN:
+      case RT_BridgeRetainN:
+      case RT_ReleaseN:
+      case RT_UnknownReleaseN:
+      case RT_BridgeReleaseN:
+        llvm_unreachable("These are only created by LLVMARCContract !");
       // Delete all fix lifetime instructions. After llvm-ir they have no use
       // and show up as calls in the final binary.
       case RT_FixLifetime:

@@ -25,6 +25,9 @@ enum RT_Kind {
   /// SwiftHeapObject *swift_retain(SwiftHeapObject *object)
   RT_Retain,
 
+  /// void swift_retain_n(SwiftHeapObject *object)
+  RT_RetainN,
+
   /// void swift::swift_retainUnowned(HeapObject *object)
   RT_RetainUnowned,
   
@@ -33,6 +36,9 @@ enum RT_Kind {
   
   /// void swift_release(SwiftHeapObject *object)
   RT_Release,
+
+  /// void swift_release_n(SwiftHeapObject *object)
+  RT_ReleaseN,
 
   /// SwiftHeapObject *swift_allocObject(SwiftHeapMetadata *metadata,
   ///                                    size_t size, size_t alignment)
@@ -47,8 +53,14 @@ enum RT_Kind {
   /// void swift_unknownRetain(%swift.refcounted* %P)
   RT_UnknownRetain,
 
+  /// void swift_unknownRetain_n(%swift.refcounted* %P)
+  RT_UnknownRetainN,
+
   /// void swift_unknownRelease(%swift.refcounted* %P)
   RT_UnknownRelease,
+
+  /// void swift_unknownRelease_n(%swift.refcounted* %P)
+  RT_UnknownReleaseN,
 
   /// void swift_fixLifetime(%swift.refcounted* %P)
   RT_FixLifetime,
@@ -56,8 +68,14 @@ enum RT_Kind {
   /// void swift_bridgeRetain(%swift.refcounted* %P)
   RT_BridgeRetain,
 
+  /// void swift_bridgeRetain_n(%swift.refcounted* %P)
+  RT_BridgeRetainN,
+
   /// void swift_bridgeRelease(%swift.refcounted* %P)
   RT_BridgeRelease,
+
+  /// void swift_bridgeRelease_n(%swift.refcounted* %P)
+  RT_BridgeReleaseN,
 
   /// This is not a runtime function that we support.  Maybe it is not a call,
   /// or is a call to something we don't care about.
@@ -78,16 +96,22 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
 
   return llvm::StringSwitch<RT_Kind>(F->getName())
     .Case("swift_retain", RT_Retain)
+    .Case("swift_retain_n", RT_RetainN)
     .Case("swift_release", RT_Release)
+    .Case("swift_release_n", RT_ReleaseN)
     .Case("swift_allocObject", RT_AllocObject)
     .Case("objc_release", RT_ObjCRelease)
     .Case("objc_retain", RT_ObjCRetain)
     .Case("swift_retainUnowned", RT_RetainUnowned)
     .Case("swift_checkUnowned", RT_CheckUnowned)
     .Case("swift_bridgeObjectRetain", RT_BridgeRetain)
+    .Case("swift_bridgeObjectRetain_n", RT_BridgeRetainN)
     .Case("swift_bridgeObjectRelease", RT_BridgeRelease)
+    .Case("swift_bridgeObjectRelease_n", RT_BridgeReleaseN)
     .Case("swift_unknownRetain", RT_UnknownRetain)
+    .Case("swift_unknownRetain_n", RT_UnknownRetainN)
     .Case("swift_unknownRelease", RT_UnknownRelease)
+    .Case("swift_unknownRelease_n", RT_UnknownReleaseN)
     .Case("swift_fixLifetime", RT_FixLifetime)
     .Default(RT_Unknown);
 }

@@ -40,9 +40,15 @@ SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS,
   case RT_ObjCRetain:
   case RT_BridgeRetain:
   case RT_UnknownRetain:
+  case RT_RetainN:
+  case RT_UnknownRetainN:
+  case RT_BridgeRetainN:
   case RT_FixLifetime:
     // These entrypoints don't modify any compiler-visible state.
     return MRI_NoModRef;
+  case RT_ReleaseN:
+  case RT_UnknownReleaseN:
+  case RT_BridgeReleaseN:
   case RT_Release:
   case RT_ObjCRelease:
   case RT_BridgeRelease:
