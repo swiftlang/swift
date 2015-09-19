@@ -348,7 +348,9 @@ FloatLiteralConvertible {
   //  Conversions from all floating-point types.
   init(_ value: Float)
   init(_ value: Double)
+#if arch(i386) || arch(x86_64)
   init(_ value: Float80)
+#endif
   
   //  TODO: where do conversions to/from string live?  IEEE-754 requires
   //  conversions to/from decimal character and hexadecimal character
@@ -893,6 +895,8 @@ extension Float : BinaryFloatingPointType, FloatingPointInterchangeType {
     self = unsafeBitCast(_representation, Float.self)
   }
   public init<T: BinaryFloatingPointType>(_ other: T) {
+    // rdar://16980851 #if does not work with 'switch'
+#if arch(i386) || arch(x86_64)
     switch other {
     case let f as Float:
       self = f
@@ -903,6 +907,16 @@ extension Float : BinaryFloatingPointType, FloatingPointInterchangeType {
     default:
       fatalError()
     }
+#else
+    switch other {
+    case let f as Float:
+      self = f
+    case let d as Double:
+      self = Float(d)
+    default:
+      fatalError()
+    }
+#endif
   }
   public func roundToIntegralTiesToAway() -> Float { return roundf(self) }
   public func roundToIntegralTowardZero() -> Float { return truncf(self) }
@@ -929,6 +943,8 @@ extension Double : BinaryFloatingPointType {
     self = unsafeBitCast(_representation, Double.self)
   }
   public init<T: BinaryFloatingPointType>(_ other: T) {
+    // rdar://16980851 #if does not work with 'switch' cases
+#if arch(i386) || arch(x86_64)
     switch other {
     case let f as Float:
       self = Double(f)
@@ -939,6 +955,16 @@ extension Double : BinaryFloatingPointType {
     default:
       fatalError()
     }
+#else
+    switch other {
+    case let f as Float:
+      self = Double(f)
+    case let d as Double:
+      self = d
+    default:
+      fatalError()
+    }
+#endif
   }
   public func roundToIntegralTiesToAway() -> Double { return round(self) }
   public func roundToIntegralTowardZero() -> Double { return trunc(self) }
