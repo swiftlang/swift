@@ -1272,6 +1272,39 @@ static Type applyNoEscape(Type type) {
   return type;
 }
 
+/// Determine the optionality of the given Clang parameter.
+///
+/// \param param The Clang parameter.
+///
+/// \param knownNonNull Whether a function- or method-level "nonnull" attribute
+/// applies to this parameter.
+///
+/// \param knownNullability When API notes describe the nullability of this
+/// parameter, that nullability.
+static OptionalTypeKind getParamOptionality(
+                          const clang::ParmVarDecl *param,
+                          bool knownNonNull,
+                          Optional<clang::NullabilityKind> knownNullability) {
+  auto &clangCtx = param->getASTContext();
+
+  // If nullability is available on the type, use it.
+  if (auto nullability = param->getType()->getNullability(clangCtx)) {
+    return ClangImporter::Implementation::translateNullability(*nullability);
+  }
+
+  // If it's known non-null, use that.
+  if (knownNonNull || param->hasAttr<clang::NonNullAttr>())
+    return OTK_None;
+
+  // If API notes gives us nullability, use that.
+  if (knownNullability)
+    return ClangImporter::Implementation::translateNullability(
+             *knownNullability);
+
+  // Default to implicitly unwrapped optionals.
+  return OTK_ImplicitlyUnwrappedOptional;
+}
+
 Type ClangImporter::Implementation::importFunctionType(
        const clang::FunctionDecl *clangDecl,
        clang::QualType resultType,
@@ -1340,21 +1373,12 @@ Type ClangImporter::Implementation::importFunctionType(
     }
 
     // Check nullability of the parameter.
-    OptionalTypeKind OptionalityOfParam = OTK_ImplicitlyUnwrappedOptional;
-
-    // If the parameter type has explicit nullability, it takes precedence.
-    if (param->getType()->getNullability(param->getASTContext())) {
-      OptionalityOfParam = OTK_None;
-    } else if (!nonNullArgs.empty() && nonNullArgs[index]) {
-      // Fall back to API notes.
-      OptionalityOfParam = OTK_None;
-    } else if (param->hasAttr<clang::NonNullAttr>()) {
-      OptionalityOfParam = OTK_None;
-    } else if (knownFn) {
-      // Fall back to API notes.
-      OptionalityOfParam = translateNullability(
-                             knownFn->getParamTypeInfo(index));
-    }
+    OptionalTypeKind OptionalityOfParam
+      = getParamOptionality(param, !nonNullArgs.empty() && nonNullArgs[index],
+                            knownFn
+                              ? Optional<clang::NullabilityKind>(
+                                  knownFn->getParamTypeInfo(index))
+                              : None);
 
     ImportTypeKind importKind = ImportTypeKind::Parameter;
     if (param->hasAttr<clang::CFReturnsRetainedAttr>())
@@ -2180,21 +2204,13 @@ Type ClangImporter::Implementation::importMethodType(
     // Import the parameter type into Swift.
 
     // Check nullability of the parameter.
-    OptionalTypeKind optionalityOfParam = OTK_ImplicitlyUnwrappedOptional;
-
-    // If the parameter type has explicit nullability, it takes precedence.
-    if (param->getType()->getNullability(param->getASTContext())) {
-      optionalityOfParam = OTK_None;
-    } else if (!nonNullArgs.empty() && nonNullArgs[paramIndex]) {
-      // Fall back to API notes.
-      optionalityOfParam = OTK_None;
-    } else if (param->hasAttr<clang::NonNullAttr>()) {
-      optionalityOfParam = OTK_None;
-    } else if (knownMethod) {
-      // Fall back to API notes.
-      optionalityOfParam =
-        translateNullability(knownMethod->getParamTypeInfo(paramIndex));
-    }
+    OptionalTypeKind optionalityOfParam
+      = getParamOptionality(param,
+                            !nonNullArgs.empty() && nonNullArgs[paramIndex],
+                            knownMethod
+                              ? Optional<clang::NullabilityKind>(
+                                  knownMethod->getParamTypeInfo(paramIndex))
+                              : None);
 
     bool allowNSUIntegerAsIntInParam = isFromSystemModule;
     if (allowNSUIntegerAsIntInParam) {
@@ -2273,16 +2289,9 @@ Type ClangImporter::Implementation::importMethodType(
     DefaultArgumentKind defaultArg = DefaultArgumentKind::None;
     if (InferDefaultArguments &&
         (kind == SpecialMethodKind::Regular ||
-         kind == SpecialMethodKind::Constructor)) {
-      // FIXME: Hack around the weirdness of 'optionalityOfParam'.
-      OptionalTypeKind actualOptionality = optionalityOfParam;
-      if (auto nullability = param->getType()->getNullability(
-                               param->getASTContext())) {
-        actualOptionality = translateNullability(*nullability);
-      }
-
-      if (canInferDefaultArgument(swiftParamTy, actualOptionality))
-        defaultArg = DefaultArgumentKind::Normal;
+         kind == SpecialMethodKind::Constructor) &&
+        canInferDefaultArgument(swiftParamTy, optionalityOfParam)) {
+      defaultArg = DefaultArgumentKind::Normal;
     }
 
     // Compute the pattern to put into the body.
