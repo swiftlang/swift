@@ -37,9 +37,10 @@
 #define SWIFT_SIL_DEBUGUTILS_H
 
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILInstruction.h"
 
 namespace swift {
+
+class SILInstruction;
   
 /// Returns true if the instruction \p Inst is an instruction which is only
 /// relevant for debug information and has no other impact on program semantics.

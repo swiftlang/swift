@@ -23,9 +23,10 @@
 
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SIL/SILInstruction.h"
-
 namespace swift {
+
+class SILInstruction;
+
 namespace PatternMatch {
 
 //===----------------------------------------------------------------------===//
