@@ -1128,16 +1128,16 @@ tests.test("Parts") {
   expectEqual(-23, (-Float.ulp).exponent)
   expectEqual(-125, (-2*Float.leastNormalMagnitude).exponent)
   expectEqual(-126, Float.leastNormalMagnitude.exponent)
-  expectEqual(-127, (-0.5*Float.leastNormalMagnitude).exponent)
 #if !arch(arm)
+  expectEqual(-127, (-0.5*Float.leastNormalMagnitude).exponent)
   expectEqual(-149, (-Float.leastMagnitude).exponent)
 #endif
   expectEqual(Int.min, Float(-0).exponent)
   expectEqual(Int.min, Float(0).exponent)
 #if !arch(arm)
   expectEqual(-149, Float.leastMagnitude.exponent)
-#endif
   expectEqual(-127, (Float.leastNormalMagnitude/2).exponent)
+#endif
   expectEqual(-126, Float.leastNormalMagnitude.exponent)
   expectEqual(-125, (2*Float.leastNormalMagnitude).exponent)
   expectEqual(-23, Float.ulp.exponent)
@@ -1156,16 +1156,16 @@ tests.test("Parts") {
   expectEqual(-52, (-Double.ulp).exponent)
   expectEqual(-1021, (-2*Double.leastNormalMagnitude).exponent)
   expectEqual(-1022, Double.leastNormalMagnitude.exponent)
-  expectEqual(-1023, (-0.5*Double.leastNormalMagnitude).exponent)
 #if !arch(arm)
+  expectEqual(-1023, (-0.5*Double.leastNormalMagnitude).exponent)
   expectEqual(-1074, (-Double.leastMagnitude).exponent)
 #endif
   expectEqual(Int.min, Double(-0).exponent)
   expectEqual(Int.min, Double(0).exponent)
 #if !arch(arm)
   expectEqual(-1074, Double.leastMagnitude.exponent)
-#endif
   expectEqual(-1023, (Double.leastNormalMagnitude/2).exponent)
+#endif
   expectEqual(-1022, Double.leastNormalMagnitude.exponent)
   expectEqual(-1021, (2*Double.leastNormalMagnitude).exponent)
   expectEqual(-52, Double.ulp.exponent)
