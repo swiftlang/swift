@@ -35,6 +35,12 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include <set>
 
+namespace llvm {
+
+class SmallBitVector;
+
+}
+
 namespace clang {
 class APValue;
 class Decl;
@@ -701,6 +707,8 @@ public:
              ArrayRef<const clang::ParmVarDecl *> params,
              clang::QualType resultType,
              const clang::DeclContext *dc,
+             const llvm::SmallBitVector &nonNullArgs,
+             const Optional<api_notes::ObjCMethodInfo> &knownMethod,
              bool returnsSelf);
 
   /// \brief Converts the given Swift identifier for Clang.
@@ -1030,6 +1038,11 @@ public:
 
   Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                           bool isFromSystemModule);
+
+  /// Determine whether we can infer a default argument for a parameter with
+  /// the given \c type and (Clang) optionality.
+  bool canInferDefaultArgument(clang::QualType type,
+                               OptionalTypeKind clangOptionality);
 
   /// \brief Import the type of an Objective-C method.
   ///

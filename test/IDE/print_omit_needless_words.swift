@@ -25,10 +25,10 @@
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector)
 
 // Note: "with" parameters.
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, object: AnyObject? = nil)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject? = nil)
 
 // Note: "with" parameters drop the "with".
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, object: AnyObject? = nil, object: AnyObject? = nil)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject? = nil, with: AnyObject? = nil)
 
 // Note: id -> "Object".
 // CHECK-FOUNDATION: func indexOf(_: AnyObject) -> Int
@@ -37,7 +37,7 @@
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
 
 // Note: Pointer-to-struct name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func copy(zone _: NSZone = nil) -> AnyObject!
+// CHECK-FOUNDATION: func copy(with _: NSZone = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
 // CHECK-FOUNDATION: func objectFor(_: NSCopying) -> AnyObject?
@@ -56,10 +56,10 @@
 // CHECK-FOUNDATION: func add(_: Double) -> NSNumber
 
 // Note: multi-word enum name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func someMethod(deprecatedOptions _: NSDeprecatedOptions = [])
+// CHECK-FOUNDATION: func someMethod(with _: NSDeprecatedOptions = [])
 
 // Note: class name matching; don't drop "With".
-// CHECK-FOUNDATION: class func request(string _: String!) -> Self!
+// CHECK-FOUNDATION: class func requestWith(_: String!) -> Self!
 
 // Note: Make sure NSURL works in various places
 // CHECK-FOUNDATION: open(_: NSURL!, completionHandler: ((Bool) -> Void)!)
@@ -88,7 +88,7 @@
 // CHECK-FOUNDATION: func withString(_: String) -> String
 
 // Note: Splitting on "With".
-// CHECK-FOUNDATION: func URL(addedString _: String) -> NSURL?
+// CHECK-FOUNDATION: func URLWithAddedString(_: String) -> NSURL?
 
 // Note: <property type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: var deletingLastPathComponent: NSURL? { get }
@@ -98,7 +98,7 @@
 
 // Note: usingBlock -> body
 // CHECK-FOUNDATION: func enumerateObjects(body _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(options _: NSEnumerationOptions = [], body: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(with _: NSEnumerationOptions = [], body: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
 
 // Note: WithBlock -> body
 // CHECK-FOUNDATION: func enumerateObjectsRandomly(body _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)

@@ -1904,7 +1904,7 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
       if (typeArgs.empty())
         return OmissionTypeName(className, "Object");
 
-      return OmissionTypeName(className,
+      return OmissionTypeName(className, false,
                               getClangTypeNameForOmission(typeArgs[0]).Name);
     }
 
@@ -1962,6 +1962,8 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
            ArrayRef<const clang::ParmVarDecl *> params,
            clang::QualType resultType,
            const clang::DeclContext *dc,
+           const llvm::SmallBitVector &nonNullArgs,
+           const Optional<api_notes::ObjCMethodInfo> &knownMethod,
            bool returnsSelf) {
   ASTContext &ctx = SwiftContext;
 
@@ -1976,8 +1978,24 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
 
   // Collect the parameter type names.
   SmallVector<OmissionTypeName, 4> paramTypes;
-  for (auto param : params) {
-    paramTypes.push_back(getClangTypeNameForOmission(param->getType()));
+  for (unsigned i = 0, n = params.size(); i != n; ++i) {
+    auto param = params[i];
+
+    // Figure out whether there will be a default argument for this
+    // parameter.
+    const clang::EnumType *enumTy = nullptr;
+    bool hasDefaultArg
+      = canInferDefaultArgument(
+          param->getType(),
+          getParamOptionality(param,
+                              !nonNullArgs.empty() && nonNullArgs[i],
+                              knownMethod
+                                ? Optional<clang::NullabilityKind>(
+                                    knownMethod->getParamTypeInfo(i))
+                                : None));
+
+    paramTypes.push_back(getClangTypeNameForOmission(param->getType())
+                            .withDefaultArgument(hasDefaultArg));
   }
 
   // Omit needless words.
@@ -2034,19 +2052,15 @@ clang::QualType ClangImporter::Implementation::getClangDeclContextType(
   return clang::QualType();
 }
 
-/// Determine whether we can infer a default argument for a parameter with
-/// the given \c type and (Clang) optionality.
-static bool canInferDefaultArgument(Type type,
-                                    OptionalTypeKind clangOptionality) {
+bool ClangImporter::Implementation::canInferDefaultArgument(
+       clang::QualType type, OptionalTypeKind clangOptionality) {
   // If it's stated to be optional in C, it defaults to 'nil'.
   if (clangOptionality == OTK_Optional)
     return true;
 
   // Option sets default to "[]".
-  // FIXME: This is a gross way to get this information, because this approach
-  // is a short-lived hack.
-  if (type->getInferredDefaultArgString().size() == 2)
-    return true;
+  if (const clang::EnumType *enumTy = type->getAs<clang::EnumType>())
+    return classifyEnum(enumTy->getDecl()) == EnumKind::Options;
 
   return false;
 }
@@ -2154,11 +2168,17 @@ Type ClangImporter::Implementation::importMethodType(
   auto errorInfo = considerErrorImport(*this, clangDecl, methodName, params,
                                        swiftResultTy, kind, isCustomName);
 
+  llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
+
   // If we should omit needless words and don't have a custom name, do so.
-  if (OmitNeedlessWords && !isCustomName && clangDecl) {
+  if (OmitNeedlessWords && !isCustomName && clangDecl &&
+      (kind == SpecialMethodKind::Regular ||
+       kind == SpecialMethodKind::Constructor)) {
     methodName = omitNeedlessWordsInFunctionName(
                    methodName, params, resultType,
                    clangDecl->getDeclContext(),
+                   nonNullArgs,
+                   knownMethod,
                    clangDecl->hasRelatedResultType());
   }
 
@@ -2187,7 +2207,6 @@ Type ClangImporter::Implementation::importMethodType(
   };
 
   auto argNames = methodName.getArgumentNames();
-  llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
   unsigned nameIndex = 0;
   for (size_t paramIndex = 0; paramIndex != params.size(); paramIndex++) {
     auto param = params[paramIndex];
@@ -2290,7 +2309,7 @@ Type ClangImporter::Implementation::importMethodType(
     if (InferDefaultArguments &&
         (kind == SpecialMethodKind::Regular ||
          kind == SpecialMethodKind::Constructor) &&
-        canInferDefaultArgument(swiftParamTy, optionalityOfParam)) {
+        canInferDefaultArgument(param->getType(), optionalityOfParam)) {
       defaultArg = DefaultArgumentKind::Normal;
     }
 

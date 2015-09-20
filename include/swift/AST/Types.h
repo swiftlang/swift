@@ -1254,6 +1254,11 @@ public:
     return TyAndDefaultArg.getInt();
   }
 
+  /// Whether we have a default argument.
+  bool hasDefaultArg() const {
+    return getDefaultArgKind() != DefaultArgumentKind::None;
+  }
+
   static inline Type getVarargBaseTy(Type VarArgT);
 
   /// Remove the type of this varargs element designator, without the array

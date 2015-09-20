@@ -282,15 +282,28 @@ struct OmissionTypeName {
   /// For a collection type, the name of the element type.
   StringRef CollectionElement;
 
-  /// Construct a type name.
-  OmissionTypeName(StringRef name = StringRef(),
-                   StringRef collectionElement = StringRef())
-    : Name(name), CollectionElement(collectionElement) { }
+  /// Whether the type would get a default argument.
+  bool DefaultArgument;
 
   /// Construct a type name.
-  OmissionTypeName(const char * name,
+  OmissionTypeName(StringRef name = StringRef(),
+                   bool defaultArgument = false,
                    StringRef collectionElement = StringRef())
-    : Name(name), CollectionElement(collectionElement) { }
+    : Name(name), CollectionElement(collectionElement),
+      DefaultArgument(defaultArgument) { }
+
+  /// Construct a type name.
+  OmissionTypeName(const char * name, bool defaultArgument = false,
+                   StringRef collectionElement = StringRef())
+    : Name(name), CollectionElement(collectionElement),
+      DefaultArgument(defaultArgument) { }
+
+  /// Produce a new type name for omission with a default argument.
+  OmissionTypeName withDefaultArgument(bool defaultArgument = true) {
+    OmissionTypeName result(*this);
+    result.DefaultArgument = defaultArgument;
+    return result;
+  }
 
   /// Determine whether the type name is empty.
   bool empty() const { return Name.empty(); }

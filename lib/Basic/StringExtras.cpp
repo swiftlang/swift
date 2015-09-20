@@ -438,15 +438,16 @@ static StringRef omitNeedlessWordsForResultType(StringRef name,
 StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
                                    NameRole role,
                                    StringScratchSpace &scratch) {
-  if (name.empty() || typeName.empty()) return name;
-
   // "usingBlock" -> "body" for block parameters.
   if ((role == NameRole::FirstParameter ||
        role == NameRole::SubsequentParameter) &&
-      (name == "usingBlock" || name == "withBlock") &&
-      typeName.Name == "Block") {
+      (name == "usingBlock" || name == "withBlock")) {
     return "body";
   }
+
+  // If we have no name or no type name, there is nothing to do.
+  if (name.empty() || typeName.empty()) return name;
+
 
   // Get the camel-case words in the name and type name.
   auto nameWords = camel_case::getWords(name);
@@ -567,19 +568,6 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
           break;
         }
 
-        // If removing the type information would leave us with a
-        // parameter named "with", lowercase the type information and
-        // keep that instead.
-        if ((role == NameRole::FirstParameter ||
-             role == NameRole::SubsequentParameter) &&
-            *nameWordRevIter == "with" &&
-            std::next(nameWordRevIter) == nameWordRevIterEnd) {
-          name = toLowercaseWord(
-                   name.substr(nameWordRevIter.base().getPosition()),
-                   scratch);
-          break;
-        }
-
         SWIFT_FALLTHROUGH;
 
       case PartOfSpeech::Verb:
@@ -672,48 +660,56 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       : NameRole::FirstParameter;
 
     StringRef name = role == NameRole::BaseName ? baseName : argNames[i];
-    StringRef newName = omitNeedlessWords(name, paramTypes[i], role, scratch);
 
-    // Split the base name on the preposition "with", if it's available.
-    if (role == NameRole::BaseName) {
-      // Scan backwards for the preposition "With".
-      auto nameWords = camel_case::getWords(newName);
+    // If the first parameter has a default argument, and there is a
+    // preposition in the base name, split the base name at that
+    // preposition.
+    if (role == NameRole::BaseName && paramTypes[0].DefaultArgument) {
+      // Scan backwards for a preposition.
+      auto nameWords = camel_case::getWords(name);
       auto nameWordRevIter = nameWords.rbegin(),
         nameWordRevIterEnd = nameWords.rend();
-      while (nameWordRevIter != nameWordRevIterEnd &&
-             !(*nameWordRevIter == "With")) {
-        ++nameWordRevIter;
+      bool found = false, done = false;
+      while (nameWordRevIter != nameWordRevIterEnd && !done) {
+        switch (getPartOfSpeech(*nameWordRevIter)) {
+        case PartOfSpeech::Preposition:
+          found = true;
+          done = true;
+          break;
+
+        case PartOfSpeech::Verb:
+        case PartOfSpeech::Gerund:
+          // Don't skip over verbs or gerunds.
+          done = true;
+          break;
+
+        case PartOfSpeech::Unknown:
+          ++nameWordRevIter;
+          break;
+        }
       }
 
-      // If we found "With" somewhere...
-      if (nameWordRevIter != nameWordRevIterEnd) {
-        // That isn't at the end...
-        unsigned afterWithPos = nameWordRevIter.base().getPosition();
-        if (afterWithPos > 4) {
-          // Find the text that follows "with". If there is nothing
-          // following "With" in the new name, use the original name.
-          StringRef remainingName;
-          if (afterWithPos == newName.size())
-            remainingName = name.substr(afterWithPos);
-          else
-            remainingName = newName.substr(afterWithPos);
-
-          // The first argument name is either "body" (for
-          // "WithBlock") or the lowercased text that followed "with".
-          if (remainingName == "Block")
-            argNames[0] = "body";
-          else
-            argNames[0] = toLowercaseWord(remainingName, scratch);
-
-          // The base name is everything up to (but not including) the "with".
-          baseName = name.substr(0, afterWithPos-4);
-
+      // If we found a preposition that's not at the beginning of the
+      // name, split there.
+      if (found) {
+        ++nameWordRevIter;
+        unsigned splitPos = nameWordRevIter.base().getPosition();
+        if (splitPos > 0) {
+          // Update the base name by splitting at the preposition.
           anyChanges = true;
-          continue;
+          baseName = name.substr(0, splitPos);
+
+          // Create a first argument name with the remainder of the base name,
+          // lowercased.
+          name = toLowercaseWord(name.substr(splitPos), scratch);
+          argNames[0] = name;
+          role = NameRole::FirstParameter;
         }
       }
     }
 
+    // Omit needless words from the name.
+    StringRef newName = omitNeedlessWords(name, paramTypes[i], role, scratch);
     if (name == newName) continue;
 
     anyChanges = true;
@@ -725,7 +721,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       // use "body" as a label for the first parameter.
       StringRef remainingName = name.substr(newName.size());
       if (camel_case::getLastWord(newName) == "Using" &&
-          remainingName == "Block") {
+          remainingName == "Block" && argNames[0].empty()) {
         argNames[0] = "body";
         baseName = newName.substr(0, newName.size() - 5);
       } else {

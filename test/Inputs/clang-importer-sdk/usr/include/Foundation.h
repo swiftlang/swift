@@ -923,7 +923,7 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
                                                          BOOL *stop))block;
 
 - (void)optionallyEnumerateObjects:(NSEnumerationOptions)opts
-                        usingBlock:(void (^)(id obj, NSUInteger idx,
+                              body:(void (^)(id obj, NSUInteger idx,
                                              BOOL *stop))block;
 
 - (void)enumerateObjectsWhileOrderingPizza:(BOOL)pizza

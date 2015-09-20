@@ -1807,7 +1807,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
       if (!args.empty() &&
           (bound->getDecl() == ctx.getArrayDecl() ||
            bound->getDecl() == ctx.getSetDecl())) {
-        return OmissionTypeName(nominal->getName().str(),
+        return OmissionTypeName(nominal->getName().str(), false,
                                 getTypeNameForOmission(args[0]).Name);
       }
     }
@@ -1865,8 +1865,9 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   argumentType = functionType->getAs<AnyFunctionType>()->getInput();
   if (auto tupleTy = argumentType->getAs<TupleType>()) {
     if (tupleTy->getNumElements() == argNameStrs.size()) {
-      for (auto argType : tupleTy->getElementTypes())
-        paramTypes.push_back(getTypeNameForOmission(argType));
+      for (const auto &elt : tupleTy->getElements())
+        paramTypes.push_back(getTypeNameForOmission(elt.getType())
+                               .withDefaultArgument(elt.hasDefaultArg()));
     }
   }
 
