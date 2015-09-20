@@ -16,6 +16,7 @@
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Utils/CFG.h"
 #include "llvm/Support/Debug.h"
@@ -97,8 +98,8 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   SILLocation BranchLoc = BackedgeBlocks.back()->getTerminator()->getLoc();
 
   // Create an unconditional branch that propagates the newly created BBArgs.
-  BranchInst *Branch = BranchInst::create(BranchLoc, Header, BBArgs, *F);
-  BEBlock->getInstList().insert(BEBlock->getInstList().end(), Branch);
+  BranchInst *Branch = SILBuilder(BEBlock).createBranch(BranchLoc,
+                                                        Header, BBArgs);
 
   // Redirect the backedge blocks to BEBlock instead of Header.
   for (auto *Pred : BackedgeBlocks) {

@@ -347,11 +347,8 @@ void CheckedCastBrJumpThreading::modifyCFGForUnknownPreds() {
   if (ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(Inst)) {
     if (CMI->getOperand() == Condition) {
       // Replace checked_cast_br by branch to FailureBB.
-      auto &InsnList = BB->getInstList();
-      auto *InsertedBI =
-          BranchInst::create(CCBI->getLoc(), FailureBB, *BB->getParent());
+      auto *InsertedBI = SILBuilder(BB).createBranch(CCBI->getLoc(), FailureBB);
       CCBI->eraseFromParent();
-      InsnList.insert(InsnList.end(), InsertedBI);
     }
   }
 }
@@ -416,14 +413,12 @@ void CheckedCastBrJumpThreading::modifyCFGForSuccessPreds() {
     // instead as their target.
 
     // Add an unconditional jump at the end of the block.
-    auto &InsnList = BB->getInstList();
-    SmallVector<SILValue, 8> SuccessBBArgs;
+    SmallVector<SILValue, 1> SuccessBBArgs;
     // Take argument value from the dominating BB
     SuccessBBArgs.push_back(DomSuccessBB->getBBArg(0));
-    auto *InsertedBI = BranchInst::create(CCBI->getLoc(), SuccessBB,
-                                          SuccessBBArgs, *BB->getParent());
+    auto *InsertedBI = SILBuilder(BB).createBranch(CCBI->getLoc(), SuccessBB,
+                                                   SuccessBBArgs);
     CCBI->eraseFromParent();
-    InsnList.insert(InsnList.end(), InsertedBI);
   }
 }
 
@@ -721,11 +716,8 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     modifyCFGForFailurePreds();
 
     if (InvertSuccess) {
-      auto *InsertedBI = BranchInst::create(CCBI->getLoc(), FailureBB,
-                                            *BB->getParent());
+      auto *InsertedBI = SILBuilder(BB).createBranch(CCBI->getLoc(), FailureBB);
       CCBI->eraseFromParent();
-      auto &InsnList = BB->getInstList();
-      InsnList.insert(InsnList.end(), InsertedBI);
       SuccessPreds.clear();
     } else {
       // Create a copy of the BB or reuse BB as
