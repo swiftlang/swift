@@ -703,14 +703,9 @@ SILInstruction *StringConcatenationOptimizer::optimize() {
 
   auto FnTy = FRIConvertFromBuiltin->getType();
   auto STResultType = FnTy.castTo<SILFunctionType>()->getResult().getSILType();
-  return ApplyInst::create(AI->getLoc(),
-                           FRIConvertFromBuiltin,
-                           FnTy,
-                           STResultType,
-                           ArrayRef<Substitution>(),
-                           Arguments,
-                           false,
-                           *FRIConvertFromBuiltin->getReferencedFunction());
+  return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin, FnTy,
+                             STResultType, ArrayRef<Substitution>(), Arguments,
+                             false);
 }
 
 /// Top level entry point
@@ -1517,17 +1512,16 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
     }
     SILInstruction *NewI = &BB->getInstList().back();
     if (!isa<TermInst>(NewI)) {
-      //Builder.setInsertionPoint(BB->getInstList().end());
-      NewI = BranchInst::create(Loc, SuccessBB, *BB->getParent());
-      BB->getInstList().insert(BB->end(), NewI);
+      Builder.setInsertionPoint(BB);
+      NewI = Builder.createBranch(Loc, SuccessBB);
     }
     WillSucceedAction();
     return NewI;
   } else {
     // Result is not used.
     EraseInstAction(Inst);
-    auto *NewI = BranchInst::create(Loc, SuccessBB, *BB->getParent());
-    BB->getInstList().insert(BB->end(), NewI);
+    Builder.setInsertionPoint(BB);
+    auto *NewI = Builder.createBranch(Loc, SuccessBB);
     WillSucceedAction();
     return NewI;
   }

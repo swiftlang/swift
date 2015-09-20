@@ -765,10 +765,6 @@ constantFoldStringConcatenation(ApplyInst *AI,
   if (!Concatenated)
     return false;
 
-  // Add the newly created instruction to the BB.
-  AI->getParent()->getInstList().insert(AI,
-                                        dyn_cast<SILInstruction>(Concatenated));
-
   // Replace all uses of the old instruction by a new instruction.
   SILValue(AI).replaceAllUsesWith(Concatenated);
 

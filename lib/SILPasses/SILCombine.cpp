@@ -173,8 +173,8 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       ++NumCombined;
       // Should we replace the old instruction with a new one?
       if (Result != I) {
-        // Insert the new instruction into the basic block.
-        I->getParent()->getInstList().insert(I, Result);
+        assert(&*std::prev(SILBasicBlock::iterator(I)) == Result &&
+              "Expected new instruction inserted before existing instruction!");
 
         if (auto FAS = FullApplySite::isa(Result)) {
           CallGraphEditor(CG).addEdgesForApply(FAS);

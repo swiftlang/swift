@@ -58,9 +58,8 @@ SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
   if (B != R.end())
     return nullptr;
 
-  return new (SEI->getModule()) UncheckedRefBitCastInst(SEI->getLoc(),
-                                                        URBCI->getOperand(),
-                                                        SEI->getType());
+  return Builder.createUncheckedRefBitCast(SEI->getLoc(), URBCI->getOperand(),
+                                           SEI->getType());
 }
 
 SILInstruction*
@@ -154,9 +153,10 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
       CaseValues.push_back(
           std::make_pair(elementDecl.get(), SEAI->getDefaultResult()));
 
-      return SelectEnumAddrInst::create(SEAI->getLoc(), SEAI->getEnumOperand(),
-                                        SEAI->getType(), SILValue(), CaseValues,
-                                        *SEAI->getFunction());
+      return Builder.createSelectEnumAddr(SEAI->getLoc(),
+                                          SEAI->getEnumOperand(),
+                                          SEAI->getType(), SILValue(),
+                                          CaseValues);
     }
   }
 
@@ -177,9 +177,8 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
   LoadInst *EnumVal = Builder.createLoad(SEAI->getLoc(),
                                           SEAI->getEnumOperand());
   EnumVal->setDebugScope(SEAI->getDebugScope());
-  auto *I = SelectEnumInst::create(SEAI->getLoc(), EnumVal, SEAI->getType(),
-                                   Default, Cases,
-                                   *SEAI->getFunction());
+  auto *I = Builder.createSelectEnum(SEAI->getLoc(), EnumVal, SEAI->getType(),
+                                     Default, Cases);
   I->setDebugScope(SEAI->getDebugScope());
   return I;
 }
@@ -363,8 +362,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   if (auto *UI = dyn_cast<UpcastInst>(LI->getOperand())) {
     auto NewLI = Builder.createLoad(LI->getLoc(), UI->getOperand());
     NewLI->setDebugScope(LI->getDebugScope());
-    return new (UI->getModule()) UpcastInst(LI->getLoc(), NewLI,
-                                            LI->getType());
+    return Builder.createUpcast(LI->getLoc(), NewLI, LI->getType());
   }
 
   // Given a load with multiple struct_extracts/tuple_extracts and no other
@@ -435,18 +433,17 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
     // retain_value of an enum_inst where we know that it has a payload can be
     // reduced to a retain_value on the payload.
     if (EI->hasOperand()) {
-      return new (RVI->getModule()) ReleaseValueInst(RVI->getLoc(),
-                                                     EI->getOperand());
+      return Builder.createReleaseValue(RVI->getLoc(), EI->getOperand());
     }
   }
 
   // ReleaseValueInst of an unowned type is an unowned_release.
   if (OperandTy.is<UnownedStorageType>())
-    return new (RVI->getModule()) UnownedReleaseInst(RVI->getLoc(), Operand);
+    return Builder.createUnownedRelease(RVI->getLoc(), Operand);
 
   // ReleaseValueInst of a reference type is a strong_release.
   if (OperandTy.isReferenceCounted(RVI->getModule()))
-    return new (RVI->getModule()) StrongReleaseInst(RVI->getLoc(), Operand);
+    return Builder.createStrongRelease(RVI->getLoc(), Operand);
 
   // ReleaseValueInst of a trivial type is a no-op.
   if (OperandTy.isTrivial(RVI->getModule()))
@@ -471,18 +468,17 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
     // retain_value of an enum_inst where we know that it has a payload can be
     // reduced to a retain_value on the payload.
     if (EI->hasOperand()) {
-      return new (RVI->getModule()) RetainValueInst(RVI->getLoc(),
-                                                    EI->getOperand());
+      return Builder.createRetainValue(RVI->getLoc(), EI->getOperand());
     }
   }
 
   // RetainValueInst of an unowned type is an unowned_retain.
   if (OperandTy.is<UnownedStorageType>())
-    return new (RVI->getModule()) UnownedRetainInst(RVI->getLoc(), Operand);
+    return Builder.createUnownedRetain(RVI->getLoc(), Operand);
 
   // RetainValueInst of a reference type is a strong_release.
   if (OperandTy.isReferenceCounted(RVI->getModule())) {
-    return new (RVI->getModule()) StrongRetainInst(RVI->getLoc(), Operand);
+    return Builder.createStrongRetain(RVI->getLoc(), Operand);
   }
 
   // RetainValueInst of a trivial type is a no-op + use propogation.
@@ -594,9 +590,8 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   // partial_apply without any substitutions or arguments is just a
   // thin_to_thick_function.
   if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0))
-    return new (PAI->getModule()) ThinToThickFunctionInst(PAI->getLoc(),
-                                                          PAI->getCallee(),
-                                                          PAI->getType());
+    return Builder.createThinToThickFunction(PAI->getLoc(), PAI->getCallee(),
+                                             PAI->getType());
 
   // partial_apply %reabstraction_thunk_typeAtoB(
   //    partial_apply %reabstraction_thunk_typeBtoA %closure_typeB))
@@ -916,11 +911,11 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
   auto Ty = Subs[0].getReplacement()->getCanonicalType();
   switch (Ty->canBeClass()) {
   case TypeTraitResult::IsNot:
-    return IntegerLiteralInst::create(BI->getLoc(), BI->getType(),
-                                      APInt(8, 0), *BI->getFunction());
+    return Builder.createIntegerLiteral(BI->getLoc(), BI->getType(),
+                                        APInt(8, 0));
   case TypeTraitResult::Is:
-    return IntegerLiteralInst::create(BI->getLoc(), BI->getType(),
-                                      APInt(8, 1), *BI->getFunction());
+    return Builder.createIntegerLiteral(BI->getLoc(), BI->getType(),
+                                        APInt(8, 1));
   case TypeTraitResult::CanBe:
     return nullptr;
   }
@@ -962,8 +957,8 @@ SILInstruction *SILCombiner::optimizeBuiltinCompareEq(BuiltinInst *BI,
   // Set to true if both sides are zero. Set to false if only one side is zero.
   bool Val = (LHS == RHS) ^ NegateResult;
 
-  return IntegerLiteralInst::create(BI->getLoc(), BI->getType(), APInt(1, Val),
-                                    *BI->getFunction());
+  return Builder.createIntegerLiteral(BI->getLoc(), BI->getType(),
+                                      APInt(1, Val));
 }
 
 SILInstruction *
@@ -1023,16 +1018,14 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   // Create the new apply inst.
   SILInstruction *NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    NAI = TryApplyInst::create(AI.getLoc(), FRI, CCSILTy,
-                               ArrayRef<Substitution>(), Args,
-                               TAI->getNormalBB(), TAI->getErrorBB(),
-                               *FRI->getReferencedFunction());
+    NAI = Builder.createTryApply(AI.getLoc(), FRI, CCSILTy,
+                                 ArrayRef<Substitution>(), Args,
+                                 TAI->getNormalBB(), TAI->getErrorBB());
   else
-    NAI = ApplyInst::create(AI.getLoc(), FRI, CCSILTy,
-                            ConvertCalleeTy->getSILResult(),
-                            ArrayRef<Substitution>(), Args,
-                            cast<ApplyInst>(AI)->isNonThrowing(),
-                            *FRI->getReferencedFunction());
+    NAI = Builder.createApply(AI.getLoc(), FRI, CCSILTy,
+                              ConvertCalleeTy->getSILResult(),
+                              ArrayRef<Substitution>(), Args,
+                              cast<ApplyInst>(AI)->isNonThrowing());
   NAI->setDebugScope(AI.getDebugScope());
   return NAI;
 }
@@ -1072,7 +1065,8 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
 
 /// Optimize builtins which receive the same value in their first and second
 /// operand.
-static SILInstruction *optimizeBuiltinWithSameOperands(BuiltinInst *I,
+static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
+                                                       BuiltinInst *I,
                                                        SILCombiner *C) {
   SILFunction &F = *I->getFunction();
 
@@ -1103,8 +1097,9 @@ static SILInstruction *optimizeBuiltinWithSameOperands(BuiltinInst *I,
   case BuiltinValueKind::ICMP_UGT:
   case BuiltinValueKind::FCMP_ONE:
     if (auto Ty = I->getType().getAs<BuiltinIntegerType>()) {
-      return IntegerLiteralInst::create(I->getLoc(), I->getType(),
-                                        APInt(Ty->getGreatestWidth(), 0), F);
+      // FIXME: Should also use SILBuilderWithScope?
+      return Builder.createIntegerLiteral(I->getLoc(), I->getType(),
+                                          APInt(Ty->getGreatestWidth(), 0));
     }
     break;
       
@@ -1120,8 +1115,9 @@ static SILInstruction *optimizeBuiltinWithSameOperands(BuiltinInst *I,
   case BuiltinValueKind::SDiv:
   case BuiltinValueKind::UDiv:
     if (auto Ty = I->getType().getAs<BuiltinIntegerType>()) {
-      return IntegerLiteralInst::create(I->getLoc(), I->getType(),
-                                        APInt(Ty->getGreatestWidth(), 1), F);
+      // FIXME: Should also use SILBuilderWithScope?
+      return Builder.createIntegerLiteral(I->getLoc(), I->getType(),
+                                          APInt(Ty->getGreatestWidth(), 1));
     }
     break;
 
@@ -1136,7 +1132,7 @@ static SILInstruction *optimizeBuiltinWithSameOperands(BuiltinInst *I,
       B.createIntegerLiteral(I->getLoc(), IntTy, /* Result */ 0),
       B.createIntegerLiteral(I->getLoc(), BoolTy, /* Overflow */ 0)
     };
-    return TupleInst::create(I->getLoc(), Ty, Elements, F);
+    return B.createTuple(I->getLoc(), Ty, Elements);
   }
       
   default:
@@ -1266,9 +1262,8 @@ SILInstruction *optimizeBuiltinArrayOperation(BuiltinInst *I,
       NewOpds.push_back(OldOpd);
     NewOpds[1] = NewOp1;
     NewOpds[2] = NewOp2;
-    return BuiltinInst::create(I->getLoc(), I->getName(), I->getType(),
-                               I->getSubstitutions(), NewOpds,
-                               *I->getFunction());
+    return Builder.createBuiltin(I->getLoc(), I->getName(), I->getType(),
+                                 I->getSubstitutions(), NewOpds);
   }
   return nullptr;
 }
@@ -1322,18 +1317,16 @@ SILInstruction *optimizeBitOp(BuiltinInst *BI,
 
   if (isZero(bits))
     // The bit operation yields to a constant, e.g. x & 0 -> 0
-    return IntegerLiteralInst::create(BI->getLoc(), BI->getType(), bits,
-                                      *BI->getFunction());
+    return Builder.createIntegerLiteral(BI->getLoc(), BI->getType(), bits);
   
   if (op != firstOp) {
     // We combined multiple bit operations to a single one,
     // e.g. (x & c1) & c2 -> x & (c1 & c2)
     auto *newLI = Builder.createIntegerLiteral(BI->getLoc(), BI->getType(),
                                                 bits);
-    return BuiltinInst::create(BI->getLoc(), BI->getName(), BI->getType(),
-                               BI->getSubstitutions(),
-                               { op, newLI },
-                               *BI->getFunction());
+    return Builder.createBuiltin(BI->getLoc(), BI->getName(), BI->getType(),
+                                 BI->getSubstitutions(),
+                                 { op, newLI });
   }
   return nullptr;
 }
@@ -1348,7 +1341,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
 
   if (I->getNumOperands() >= 2 && I->getOperand(0) == I->getOperand(1)) {
     // It's a builtin which has the same value in its first and second operand.
-    SILInstruction *Replacement = optimizeBuiltinWithSameOperands(I, this);
+    auto *Replacement = optimizeBuiltinWithSameOperands(Builder, I, this);
     if (Replacement)
       return Replacement;
   }
@@ -2196,10 +2189,10 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     // The type of the substition is the source type of the thin to thick
     // instruction.
     SILType substTy = TTTFI->getOperand().getType();
-    auto *NewAI = ApplyInst::create(AI->getLoc(), TTTFI->getOperand(),
-                             substTy, AI->getType(),
-                             AI->getSubstitutions(), Arguments,
-                             AI->isNonThrowing(), *AI->getFunction());
+    auto *NewAI = Builder.createApply(AI->getLoc(), TTTFI->getOperand(),
+                                      substTy, AI->getType(),
+                                      AI->getSubstitutions(), Arguments,
+                                      AI->isNonThrowing());
     NewAI->setDebugScope(AI->getDebugScope());
     return NewAI;
   }
@@ -2278,11 +2271,10 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
     // The type of the substitution is the source type of the thin to thick
     // instruction.
     SILType substTy = TTTFI->getOperand().getType();
-    auto *NewAI = TryApplyInst::create(AI->getLoc(), TTTFI->getOperand(),
-                                       substTy,
-                                       AI->getSubstitutions(), Arguments,
-                                       AI->getNormalBB(), AI->getErrorBB(),
-                                       *AI->getFunction());
+    auto *NewAI = Builder.createTryApply(AI->getLoc(), TTTFI->getOperand(),
+                                         substTy,
+                                         AI->getSubstitutions(), Arguments,
+                                         AI->getNormalBB(), AI->getErrorBB());
     NewAI->setDebugScope(AI->getDebugScope());
     return NewAI;
   }
@@ -2400,14 +2392,15 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   // (ref_to_raw_pointer x)
   if (auto *OER = dyn_cast<OpenExistentialRefInst>(RRPI->getOperand()))
     if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand()))
-      return new (RRPI->getModule()) RefToRawPointerInst(
-          RRPI->getLoc(), IER->getOperand(), RRPI->getType());
+      return Builder.createRefToRawPointer(RRPI->getLoc(), IER->getOperand(),
+                                           RRPI->getType());
 
   // (ref_to_raw_pointer (unchecked_ref_bit_cast x))
   //    -> (unchecked_trivial_bit_cast x)
   if (auto *URBCI = dyn_cast<UncheckedRefBitCastInst>(RRPI->getOperand())) {
-    return new (RRPI->getModule()) UncheckedTrivialBitCastInst(
-        RRPI->getLoc(), URBCI->getOperand(), RRPI->getType());
+    return Builder.createUncheckedTrivialBitCast(RRPI->getLoc(),
+                                                 URBCI->getOperand(),
+                                                 RRPI->getType());
   }
 
   return nullptr;
@@ -2625,9 +2618,8 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   //
   // (pointer-to-address (address-to-pointer %x)) -> (unchecked_addr_cast %x)
   if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand())) {
-    return new (PTAI->getModule()) UncheckedAddrCastInst(PTAI->getLoc(),
-                                                         ATPI->getOperand(),
-                                                         PTAI->getType());
+    return Builder.createUncheckedAddrCast(PTAI->getLoc(), ATPI->getOperand(),
+                                           PTAI->getType());
   }
 
   // Turn this also into a index_addr. We generate this pattern after switching
@@ -2687,8 +2679,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
             PTAI->getLoc(), Trunc->getName(), Trunc->getType(), {}, Distance);
 
         NewPTAI->setDebugScope(PTAI->getDebugScope());
-        return new (PTAI->getModule())
-            IndexAddrInst(PTAI->getLoc(), NewPTAI, DistanceAsWord);
+        return Builder.createIndexAddr(PTAI->getLoc(), NewPTAI, DistanceAsWord);
       }
     }
   }
@@ -2730,8 +2721,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
       auto *NewPTAI =
           Builder.createPointerToAddress(PTAI->getLoc(), Ptr, PTAI->getType());
       NewPTAI->setDebugScope(PTAI->getDebugScope());
-      return new (PTAI->getModule())
-          IndexAddrInst(PTAI->getLoc(), NewPTAI, Distance);
+      return Builder.createIndexAddr(PTAI->getLoc(), NewPTAI, Distance);
     }
   }
 
@@ -2746,13 +2736,14 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   //   ->
   // (unchecked-addr-cast x X->Z)
   if (auto *OtherUADCI = dyn_cast<UncheckedAddrCastInst>(UADCI->getOperand()))
-    return new (Mod) UncheckedAddrCastInst(
-        UADCI->getLoc(), OtherUADCI->getOperand(), UADCI->getType());
+    return Builder.createUncheckedAddrCast(UADCI->getLoc(),
+                                           OtherUADCI->getOperand(),
+                                           UADCI->getType());
 
   // (unchecked-addr-cast cls->superclass) -> (upcast cls->superclass)
   if (UADCI->getType() != UADCI->getOperand().getType() &&
       UADCI->getType().isSuperclassOf(UADCI->getOperand().getType()))
-    return new (Mod) UpcastInst(UADCI->getLoc(), UADCI->getOperand(),
+    return Builder.createUpcast(UADCI->getLoc(), UADCI->getOperand(),
                                 UADCI->getType());
 
   // See if we have all loads from this unchecked_addr_cast. If we do, load the
@@ -2824,25 +2815,27 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
   //   ->
   // (unchecked-ref-cast x X->Z)
   if (auto *OtherURCI = dyn_cast<UncheckedRefCastInst>(URCI->getOperand()))
-    return new (URCI->getModule()) UncheckedRefCastInst(
-        URCI->getLoc(), OtherURCI->getOperand(), URCI->getType());
+    return Builder.createUncheckedRefCast(URCI->getLoc(),
+                                          OtherURCI->getOperand(),
+                                          URCI->getType());
 
   // (unchecked_ref_cast (upcast x X->Y) Y->Z) -> (unchecked_ref_cast x X->Z)
   if (auto *UI = dyn_cast<UpcastInst>(URCI->getOperand()))
-    return new (URCI->getModule())
-        UncheckedRefCastInst(URCI->getLoc(), UI->getOperand(), URCI->getType());
+    return Builder.createUncheckedRefCast(URCI->getLoc(),
+                                              UI->getOperand(),
+                                              URCI->getType());
 
   if (URCI->getType() != URCI->getOperand().getType() &&
       URCI->getType().isSuperclassOf(URCI->getOperand().getType()))
-    return new (URCI->getModule())
-        UpcastInst(URCI->getLoc(), URCI->getOperand(), URCI->getType());
+    return Builder.createUpcast(URCI->getLoc(), URCI->getOperand(),
+                                URCI->getType());
 
   // (unchecked_ref_cast (open_existential_ref (init_existential_ref X))) ->
   // (unchecked_ref_cast X)
   if (auto *OER = dyn_cast<OpenExistentialRefInst>(URCI->getOperand()))
     if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand()))
-      return new (URCI->getModule()) UncheckedRefCastInst(
-          URCI->getLoc(), IER->getOperand(), URCI->getType());
+      return Builder.createUncheckedRefCast(URCI->getLoc(), IER->getOperand(),
+                                            URCI->getType());
 
   return nullptr;
 }
@@ -2890,14 +2883,14 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
     auto Op = UCCI->getOperand();
     if (LoweredTargetType.isAddress()) {
       // unconditional_checked_cast -> unchecked_addr_cast
-      return new (Mod) UncheckedAddrCastInst(Loc, Op, LoweredTargetType);
+      return Builder.createUncheckedAddrCast(Loc, Op, LoweredTargetType);
     } else if (LoweredTargetType.isHeapObjectReferenceType()) {
       if (!(Op.getType().isHeapObjectReferenceType() ||
             Op.getType().isClassExistentialType())) {
         return nullptr;
       }
       // unconditional_checked_cast -> unchecked_ref_cast
-      return new (Mod) UncheckedRefCastInst(Loc, Op, LoweredTargetType);
+      return Builder.createUncheckedRefCast(Loc, Op, LoweredTargetType);
     }
   }
 
@@ -2911,8 +2904,9 @@ visitRawPointerToRefInst(RawPointerToRefInst *RawToRef) {
   //   ->
   // (unchecked_ref_cast X->Z)
   if (auto *RefToRaw = dyn_cast<RefToRawPointerInst>(RawToRef->getOperand())) {
-    return new (RawToRef->getModule()) UncheckedRefCastInst(
-        RawToRef->getLoc(), RefToRaw->getOperand(), RawToRef->getType());
+    return Builder.createUncheckedRefCast(RawToRef->getLoc(),
+                                          RefToRaw->getOperand(),
+                                          RawToRef->getType());
   }
 
   return nullptr;
@@ -2995,10 +2989,9 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
       OrigTrueArgs.push_back(Op);
     for (const auto &Op : CBI->getFalseArgs())
       OrigFalseArgs.push_back(Op);
-    return CondBranchInst::create(CBI->getLoc(), X,
-                                  CBI->getFalseBB(), OrigFalseArgs,
-                                  CBI->getTrueBB(), OrigTrueArgs,
-                                  *CBI->getFunction());
+    return Builder.createCondBranch(CBI->getLoc(), X,
+                                    CBI->getFalseBB(), OrigFalseArgs,
+                                    CBI->getTrueBB(), OrigTrueArgs);
   }
 
   // cond_br (select_enum) -> switch_enum
@@ -3053,8 +3046,8 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
       return nullptr;
     }
 
-    return SwitchEnumInst::create(SEI->getLoc(), SEI->getEnumOperand(), Default,
-                                  Cases, *SEI->getFunction());
+    return Builder.createSwitchEnum(SEI->getLoc(), SEI->getEnumOperand(),
+                                    Default, Cases);
   }
 
   return nullptr;
@@ -3067,9 +3060,8 @@ visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI) {
   //   ->
   // (unchecked_ref_bit_cast X->Z x)
   if (auto *Op = dyn_cast<UncheckedRefBitCastInst>(URBCI->getOperand())) {
-    return new (URBCI->getModule()) UncheckedRefBitCastInst(URBCI->getLoc(),
-                                                            Op->getOperand(),
-                                                            URBCI->getType());
+    return Builder.createUncheckedRefBitCast(URBCI->getLoc(), Op->getOperand(),
+                                             URBCI->getType());
   }
 
   return nullptr;
@@ -3085,7 +3077,7 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
   SILValue Op = UTBCI->getOperand();
   if (auto *OtherUTBCI = dyn_cast<UncheckedTrivialBitCastInst>(Op)) {
     SILModule &Mod = UTBCI->getModule();
-    return new (Mod) UncheckedTrivialBitCastInst(UTBCI->getLoc(),
+    return Builder.createUncheckedTrivialBitCast(UTBCI->getLoc(),
                                                  OtherUTBCI->getOperand(),
                                                  UTBCI->getType());
   }
@@ -3096,7 +3088,7 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
   // (unchecked_trivial_bit_cast X->Z x)
   if (auto *URBCI = dyn_cast<UncheckedRefBitCastInst>(Op)) {
     SILModule &Mod = UTBCI->getModule();
-    return new (Mod) UncheckedTrivialBitCastInst(UTBCI->getLoc(),
+    return Builder.createUncheckedTrivialBitCast(UTBCI->getLoc(),
                                                  URBCI->getOperand(),
                                                  UTBCI->getType());
   }
@@ -3115,21 +3107,19 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   if (match(UBCI->getOperand(),
             m_CombineOr(m_UncheckedBitwiseCastInst(m_SILValue(Oper)),
                         m_UncheckedTrivialBitCastInst(m_SILValue(Oper))))) {
-    return new (UBCI->getModule()) UncheckedBitwiseCastInst(UBCI->getLoc(),
-                                                            Oper,
-                                                            UBCI->getType());
+    return Builder.createUncheckedBitwiseCast(UBCI->getLoc(), Oper,
+                                              UBCI->getType());
   }
   if (UBCI->getType().isTrivial(UBCI->getModule()))
-    return new (UBCI->getModule())
-      UncheckedTrivialBitCastInst(UBCI->getLoc(),
-                                  UBCI->getOperand(),
-                                  UBCI->getType());
+    return Builder.createUncheckedTrivialBitCast(UBCI->getLoc(),
+                                                 UBCI->getOperand(),
+                                                 UBCI->getType());
 
   if (UBCI->getType().canBitCastAsSingleRef()
       && UBCI->getOperand().getType().canBitCastAsSingleRef())
-    return new (UBCI->getModule()) UncheckedRefBitCastInst(UBCI->getLoc(),
-                                                           UBCI->getOperand(),
-                                                           UBCI->getType());
+    return Builder.createUncheckedRefBitCast(UBCI->getLoc(),
+                                             UBCI->getOperand(),
+                                             UBCI->getType());
 
   return nullptr;
 }
@@ -3149,9 +3139,8 @@ SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *SEI) {
       CaseValues.push_back(
           std::make_pair(elementDecl.get(), SEI->getDefaultResult()));
 
-      return SelectEnumInst::create(SEI->getLoc(), SEI->getEnumOperand(),
-                                    SEI->getType(), SILValue(), CaseValues,
-                                    *SEI->getFunction());
+      return Builder.createSelectEnum(SEI->getLoc(), SEI->getEnumOperand(),
+                                      SEI->getType(), SILValue(), CaseValues);
     }
   }
 
@@ -3174,8 +3163,8 @@ SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *SEI) {
     selected = SEI->getDefaultResult();
 
   if (auto *ILI = dyn_cast<IntegerLiteralInst>(selected)) {
-    return IntegerLiteralInst::create(ILI->getLoc(), ILI->getType(),
-                                      ILI->getValue(), *SEI->getFunction());
+    return Builder.createIntegerLiteral(ILI->getLoc(), ILI->getType(),
+                                        ILI->getValue());
   }
 
   return nullptr;
@@ -3184,7 +3173,7 @@ SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *SEI) {
 /// Helper function for simplifying convertions between
 /// thick and objc metatypes.
 static SILInstruction *
-visitMetatypeConversionInst(ConversionInst *MCI,
+visitMetatypeConversionInst(SILBuilder &Builder, ConversionInst *MCI,
                             MetatypeRepresentation Representation) {
   SILValue Op = MCI->getOperand(0);
   SILModule &Mod = MCI->getModule();
@@ -3195,17 +3184,16 @@ visitMetatypeConversionInst(ConversionInst *MCI,
   if (MetatypeTy->getRepresentation() != Representation)
     return nullptr;
 
-  if (dyn_cast<MetatypeInst>(Op)) {
-    return new (Mod) MetatypeInst(MCI->getLoc(), Ty);
-  } else if (auto *VMI = dyn_cast<ValueMetatypeInst>(Op)) {
-    return new (Mod) ValueMetatypeInst(MCI->getLoc(),
-                                       Ty,
-                                       VMI->getOperand());
-  } else if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Op)) {
-    return new (Mod) ExistentialMetatypeInst(MCI->getLoc(),
-                                             Ty,
+  if (dyn_cast<MetatypeInst>(Op))
+    return Builder.createMetatype(MCI->getLoc(), Ty);
+
+  if (auto *VMI = dyn_cast<ValueMetatypeInst>(Op))
+    return Builder.createValueMetatype(MCI->getLoc(), Ty, VMI->getOperand());
+
+  if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Op))
+    return Builder.createExistentialMetatype(MCI->getLoc(), Ty,
                                              EMI->getOperand());
-  }
+
   return nullptr;
 }
 
@@ -3220,7 +3208,8 @@ SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
   //
   // (thick_to_objc_metatype (existential_metatype @thick)) ->
   // (existential_metatype @objc_metatype)
-  return visitMetatypeConversionInst(TTOCMI, MetatypeRepresentation::Thick);
+  return visitMetatypeConversionInst(Builder, TTOCMI,
+                                     MetatypeRepresentation::Thick);
 }
 
 SILInstruction *
@@ -3234,7 +3223,8 @@ SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
   //
   // (objc_to_thick_metatype (existential_metatype @objc_metatype)) ->
   // (existential_metatype @thick)
-  return visitMetatypeConversionInst(OCTTMI, MetatypeRepresentation::ObjC);
+  return visitMetatypeConversionInst(Builder, OCTTMI,
+                                     MetatypeRepresentation::ObjC);
 }
 
 SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
@@ -3245,8 +3235,8 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
 
   if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand()))
     if (!canOverflow(BI))
-      return IntegerLiteralInst::create(TEI->getLoc(), TEI->getType(),
-                                        APInt(1, 0), *TEI->getFunction());
+      return Builder.createIntegerLiteral(TEI->getLoc(), TEI->getType(),
+                                          APInt(1, 0));
   return nullptr;
 }
 
@@ -3256,8 +3246,7 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
     if (FLI->getOperand().getType().isLoadable(FLI->getModule())) {
       auto Load = Builder.createLoad(FLI->getLoc(), SILValue(AI, 1));
       Load->setDebugScope(FLI->getDebugScope());
-      return new (FLI->getModule())
-          FixLifetimeInst(FLI->getLoc(), SILValue(Load, 0));
+      return Builder.createFixLifetime(FLI->getLoc(), SILValue(Load, 0));
     }
   }
   return nullptr;
@@ -3286,8 +3275,8 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
   if (MetatypeInst *MI = dyn_cast<MetatypeInst>(ARDI->getOperand())) {
     auto &Mod = ARDI->getModule();
     auto SILInstanceTy = MI->getType().getMetatypeInstanceType(Mod);
-    auto *ARI = new (Mod) AllocRefInst(
-        ARDI->getLoc(), SILInstanceTy, *ARDI->getFunction(), ARDI->isObjC());
+    auto *ARI = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
+                                       ARDI->isObjC());
     ARI->setDebugScope(ARDI->getDebugScope());
     return ARI;
   }
@@ -3306,8 +3295,8 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     if (CCBI && CCBI->isExact() && ARDI->getParent() == CCBI->getSuccessBB()) {
       auto &Mod = ARDI->getModule();
       auto SILInstanceTy = CCBI->getCastType().getMetatypeInstanceType(Mod);
-      auto *ARI = new (Mod) AllocRefInst(
-          ARDI->getLoc(), SILInstanceTy, *ARDI->getFunction(), ARDI->isObjC());
+      auto *ARI = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
+                                         ARDI->isObjC());
       ARI->setDebugScope(ARDI->getDebugScope());
       return ARI;
     }
