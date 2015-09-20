@@ -36,6 +36,10 @@ class SILBuilder {
 public:
   SILBuilder(SILFunction &F) : F(F), BB(0) {}
 
+  SILBuilder(SILFunction &F,
+             SmallVectorImpl<SILInstruction *> *InsertedInstrs)
+    : F(F), BB(0), InsertedInstrs(InsertedInstrs) {}
+
   explicit SILBuilder(SILInstruction *I,
                       SmallVectorImpl<SILInstruction*> *InsertedInstrs = 0)
     : F(*I->getFunction()), InsertedInstrs(InsertedInstrs) {

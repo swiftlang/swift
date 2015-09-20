@@ -103,8 +103,8 @@ SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
   if (SingleStore && SingleRelease) {
     // Release the value that was stored into the existential box. The box
     // is going away so we need to release the stored value now.
-    Builder->setInsertionPoint(SingleStore);
-    Builder->createReleaseValue(AEBI->getLoc(), SingleStore->getSrc());
+    Builder.setInsertionPoint(SingleStore);
+    Builder.createReleaseValue(AEBI->getLoc(), SingleStore->getSrc());
 
     // Erase the instruction that stores into the box and the release that
     // releases the box, and finally, release the box.
@@ -132,9 +132,9 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
 
 
   SILBasicBlock *Default = SEAI->hasDefault() ? SEAI->getDefaultBB() : 0;
-  LoadInst *EnumVal = Builder->createLoad(SEAI->getLoc(), SEAI->getOperand());
+  LoadInst *EnumVal = Builder.createLoad(SEAI->getLoc(), SEAI->getOperand());
   EnumVal->setDebugScope(SEAI->getDebugScope());
-  Builder->createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases)
+  Builder.createSwitchEnum(SEAI->getLoc(), EnumVal, Default, Cases)
     ->setDebugScope(SEAI->getDebugScope());
   return eraseInstFromFunction(*SEAI);
 }
@@ -174,7 +174,7 @@ SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
     Cases.push_back(SEAI->getCase(i));
 
   SILValue Default = SEAI->hasDefault() ? SEAI->getDefaultResult() : SILValue();
-  LoadInst *EnumVal = Builder->createLoad(SEAI->getLoc(),
+  LoadInst *EnumVal = Builder.createLoad(SEAI->getLoc(),
                                           SEAI->getEnumOperand());
   EnumVal->setDebugScope(SEAI->getDebugScope());
   auto *I = SelectEnumInst::create(SEAI->getLoc(), EnumVal, SEAI->getType(),
@@ -279,13 +279,13 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   }
 
   // Save the original insertion point.
-  auto OrigInsertionPoint = Builder->getInsertionPoint();
+  auto OrigInsertionPoint = Builder.getInsertionPoint();
 
   // If the only users of the alloc_stack are alloc, destroy and
   // init_existential_addr then we can promote the allocation of the init
   // existential.
   if (LegalUsers && IEI && !OEI) {
-    auto *ConcAlloc = Builder->createAllocStack(AS->getLoc(),
+    auto *ConcAlloc = Builder.createAllocStack(AS->getLoc(),
                                                 IEI->getLoweredConcreteType());
     ConcAlloc->setDebugScope(AS->getDebugScope());
     SILValue(IEI, 0).replaceAllUsesWith(ConcAlloc->getAddressResult());
@@ -294,15 +294,15 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 
     for (Operand *Op: AS->getUses()) {
       if (auto *DA = dyn_cast<DestroyAddrInst>(Op->getUser())) {
-        Builder->setInsertionPoint(DA);
-        Builder->createDestroyAddr(DA->getLoc(), SILValue(ConcAlloc, 1))
+        Builder.setInsertionPoint(DA);
+        Builder.createDestroyAddr(DA->getLoc(), SILValue(ConcAlloc, 1))
           ->setDebugScope(DA->getDebugScope());
         eraseInstFromFunction(*DA);
 
       }
       if (auto *DS = dyn_cast<DeallocStackInst>(Op->getUser())) {
-        Builder->setInsertionPoint(DS);
-        Builder->createDeallocStack(DS->getLoc(), SILValue(ConcAlloc, 0))
+        Builder.setInsertionPoint(DS);
+        Builder.createDeallocStack(DS->getLoc(), SILValue(ConcAlloc, 0))
           ->setDebugScope(DS->getDebugScope());
         eraseInstFromFunction(*DS);
       }
@@ -310,7 +310,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 
     eraseInstFromFunction(*AS);
     // Restore the insertion point.
-    Builder->setInsertionPoint(OrigInsertionPoint);
+    Builder.setInsertionPoint(OrigInsertionPoint);
   }
 
   // Remove a dead live range that is only copied into.
@@ -323,8 +323,8 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
       // Otherwise, just delete the copy_addr.
       if (auto *CopyAddr = dyn_cast<CopyAddrInst>(Op->getUser())) {
         if (CopyAddr->isTakeOfSrc() && CopyAddr->getSrc().getDef() != AS) {
-          Builder->setInsertionPoint(CopyAddr);
-          Builder->createDestroyAddr(CopyAddr->getLoc(), CopyAddr->getSrc())
+          Builder.setInsertionPoint(CopyAddr);
+          Builder.createDestroyAddr(CopyAddr->getLoc(), CopyAddr->getSrc())
               ->setDebugScope(CopyAddr->getDebugScope());
         }
       }
@@ -352,7 +352,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     eraseInstFromFunction(*AS);
 
     // Restore the insertion point.
-    Builder->setInsertionPoint(OrigInsertionPoint);
+    Builder.setInsertionPoint(OrigInsertionPoint);
   }
 
   return nullptr;
@@ -361,7 +361,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // (load (upcast-ptr %x)) -> (upcast-ref (load %x))
   if (auto *UI = dyn_cast<UpcastInst>(LI->getOperand())) {
-    auto NewLI = Builder->createLoad(LI->getLoc(), UI->getOperand());
+    auto NewLI = Builder.createLoad(LI->getLoc(), UI->getOperand());
     NewLI->setDebugScope(LI->getDebugScope());
     return new (UI->getModule()) UpcastInst(LI->getLoc(), NewLI,
                                             LI->getType());
@@ -409,10 +409,10 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
 
     // Ok, we have started to visit the range of instructions associated with
     // a new projection. Create the new address projection.
-    auto I = Proj.createAddrProjection(*Builder, LI->getLoc(), LI->getOperand());
+    auto I = Proj.createAddrProjection(Builder, LI->getLoc(), LI->getOperand());
     LastProj = &Proj;
     I.get()->setDebugScope(LI->getDebugScope());
-    LastNewLoad = Builder->createLoad(LI->getLoc(), I.get());
+    LastNewLoad = Builder.createLoad(LI->getLoc(), I.get());
     LastNewLoad->setDebugScope(LI->getDebugScope());
     replaceInstUsesWith(*Inst, LastNewLoad, 0);
     eraseInstFromFunction(*Inst);
@@ -656,7 +656,7 @@ class PartialApplyCombiner {
   // needed, Lifetime remains empty.
   ValueLifetime Lifetime;
 
-  SILBuilder *Builder;
+  SILBuilder &Builder;
 
   CallGraph *CG;
 
@@ -671,7 +671,7 @@ class PartialApplyCombiner {
   void releaseTemporaries();
 
 public:
-  PartialApplyCombiner(PartialApplyInst *PAI, SILBuilder *Builder,
+  PartialApplyCombiner(PartialApplyInst *PAI, SILBuilder &Builder,
                        CallGraph *CG, SILCombiner *SilCombiner)
       : isFirstTime(true), PAI(PAI), Builder(Builder), CG(CG),
         FRI(nullptr), SilCombiner(SilCombiner) {}
@@ -704,12 +704,12 @@ void PartialApplyCombiner::allocateTemporaries() {
     if (Param.isIndirectInOut())
       continue;
     if (isa<AllocStackInst>(Arg)) {
-      Builder->setInsertionPoint(PAI->getFunction()->begin()->begin());
+      Builder.setInsertionPoint(PAI->getFunction()->begin()->begin());
       // Create a new temporary at the beginning of a function.
-      auto *Tmp = Builder->createAllocStack(PAI->getLoc(), Arg.getType());
-      Builder->setInsertionPoint(PAI);
+      auto *Tmp = Builder.createAllocStack(PAI->getLoc(), Arg.getType());
+      Builder.setInsertionPoint(PAI);
       // Copy argument into this temporary.
-      Builder->createCopyAddr(PAI->getLoc(), Arg, SILValue(Tmp, 1),
+      Builder.createCopyAddr(PAI->getLoc(), Arg, SILValue(Tmp, 1),
                               IsTake_t::IsNotTake,
                               IsInitialization_t::IsInitialization);
 
@@ -737,8 +737,8 @@ void PartialApplyCombiner::deallocateTemporaries() {
   for (auto Op : Tmps) {
     for (auto *ExitBB : ExitBBs) {
       auto *Term = ExitBB->getTerminator();
-      Builder->setInsertionPoint(Term);
-      Builder->createDeallocStack(PAI->getLoc(), Op);
+      Builder.setInsertionPoint(Term);
+      Builder.createDeallocStack(PAI->getLoc(), Op);
     }
   }
 }
@@ -753,13 +753,13 @@ void PartialApplyCombiner::releaseTemporaries() {
     if (TmpType.isTrivial(PAI->getModule()))
       continue;
     for (auto *EndPoint : Lifetime.LastUsers) {
-      Builder->setInsertionPoint(next(SILBasicBlock::iterator(EndPoint)));
+      Builder.setInsertionPoint(next(SILBasicBlock::iterator(EndPoint)));
       auto TmpAddr = SILValue(Op.getDef(), 1);
       if (!TmpType.isAddressOnly(PAI->getModule())) {
-        auto *Load = Builder->createLoad(PAI->getLoc(), TmpAddr);
-        Builder->createReleaseValue(PAI->getLoc(), Load);
+        auto *Load = Builder.createLoad(PAI->getLoc(), TmpAddr);
+        Builder.createReleaseValue(PAI->getLoc(), Load);
       } else {
-        Builder->createDestroyAddr(PAI->getLoc(), TmpAddr);
+        Builder.createDestroyAddr(PAI->getLoc(), TmpAddr);
       }
     }
   }
@@ -768,7 +768,7 @@ void PartialApplyCombiner::releaseTemporaries() {
 /// Process an apply instruction which uses a partial_apply
 /// as its callee.
 void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
-  Builder->setInsertionPoint(AI.getInstruction());
+  Builder.setInsertionPoint(AI.getInstruction());
 
   // Prepare the args.
   SmallVector<SILValue, 8> Args;
@@ -776,7 +776,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   for (auto Op : AI.getArguments())
     Args.push_back(Op);
 
-  SILInstruction *InsertionPoint = Builder->getInsertionPoint();
+  SILInstruction *InsertionPoint = Builder.getInsertionPoint();
   // Next, the partial apply args.
 
   // Pre-process partial_apply arguments only once, lazily.
@@ -798,7 +798,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
     Args.push_back(Op);
   }
 
-  Builder->setInsertionPoint(InsertionPoint);
+  Builder.setInsertionPoint(InsertionPoint);
 
   // The thunk that implements the partial apply calls the closure function
   // that expects all arguments to be consumed by the function. However, the
@@ -808,7 +808,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   // arguments.
   for (auto Arg : PAI->getArguments())
     if (!Arg.getType().isAddress())
-      Builder->emitRetainValueOperation(PAI->getLoc(), Arg);
+      Builder.emitRetainValueOperation(PAI->getLoc(), Arg);
 
   auto *F = FRI->getReferencedFunction();
   SILType FnType = F->getLoweredType();
@@ -822,11 +822,11 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   FullApplySite NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     NAI =
-      Builder->createTryApply(AI.getLoc(), FRI, FnType, Subs, Args,
+      Builder.createTryApply(AI.getLoc(), FRI, FnType, Subs, Args,
                               TAI->getNormalBB(), TAI->getErrorBB());
   else
     NAI =
-      Builder->createApply(AI.getLoc(), FRI, FnType, ResultTy, Subs, Args,
+      Builder.createApply(AI.getLoc(), FRI, FnType, ResultTy, Subs, Args,
                            cast<ApplyInst>(AI)->isNonThrowing());
 
   NAI.getInstruction()->setDebugScope(AI.getDebugScope());
@@ -836,15 +836,15 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   // We also need to release the partial_apply instruction itself because it
   // is consumed by the apply_instruction.
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
-    Builder->setInsertionPoint(TAI->getNormalBB()->begin());
-    Builder->createStrongRelease(AI.getLoc(), PAI)
+    Builder.setInsertionPoint(TAI->getNormalBB()->begin());
+    Builder.createStrongRelease(AI.getLoc(), PAI)
       ->setDebugScope(AI.getDebugScope());
-    Builder->setInsertionPoint(TAI->getErrorBB()->begin());
-    Builder->createStrongRelease(AI.getLoc(), PAI)
+    Builder.setInsertionPoint(TAI->getErrorBB()->begin());
+    Builder.createStrongRelease(AI.getLoc(), PAI)
       ->setDebugScope(AI.getDebugScope());
-    Builder->setInsertionPoint(AI.getInstruction());
+    Builder.setInsertionPoint(AI.getInstruction());
   } else {
-    Builder->createStrongRelease(AI.getLoc(), PAI)
+    Builder.createStrongRelease(AI.getLoc(), PAI)
       ->setDebugScope(AI.getDebugScope());
   }
   // Update the set endpoints.
@@ -938,10 +938,10 @@ SILInstruction *SILCombiner::optimizeBuiltinCompareEq(BuiltinInst *BI,
             auto X = BI->getArguments()[0];
             SILValue One(ILOp);
             SILValue Zero(
-                Builder->createIntegerLiteral(BI->getLoc(), BI->getType(), 0));
-            SILValue Inverted(Builder->createBuiltin(
+                Builder.createIntegerLiteral(BI->getLoc(), BI->getType(), 0));
+            SILValue Inverted(Builder.createBuiltin(
                 BI->getLoc(), BI->getName(), BI->getType(), {}, {X, Zero}));
-            auto *Xor = Builder->createBuiltinBinaryFunction(
+            auto *Xor = Builder.createBuiltinBinaryFunction(
                 BI->getLoc(), "xor", BI->getType(), BI->getType(),
                 {Inverted, One});
             replaceInstUsesWith(*BI, Xor);
@@ -1005,13 +1005,13 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
     // other types alone.
     if (OldOpType.isAddress()) {
       assert(NewOpType.isAddress() && "Addresses should map to addresses.");
-      auto UAC = Builder->createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
+      auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
       UAC->setDebugScope(AI.getDebugScope());
       Args.push_back(UAC);
     } else if (OldOpType.isHeapObjectReferenceType()) {
       assert(NewOpType.isHeapObjectReferenceType() &&
              "refs should map to refs.");
-      auto URC = Builder->createUncheckedRefCast(AI.getLoc(), Op, NewOpType);
+      auto URC = Builder.createUncheckedRefCast(AI.getLoc(), Op, NewOpType);
       URC->setDebugScope(AI.getDebugScope());
       Args.push_back(URC);
     } else {
@@ -1067,7 +1067,7 @@ static bool recursivelyCollectARCUsers(UserListTy &Uses, SILInstruction *Inst) {
 SILInstruction *
 SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
   // String literals concatenation optimizer.
-  return tryToConcatenateStrings(AI, *Builder);
+  return tryToConcatenateStrings(AI, Builder);
 }
 
 /// Optimize builtins which receive the same value in their first and second
@@ -1197,24 +1197,24 @@ static SILInstruction *createIndexAddrFrom(IndexRawPointerInst *I,
                                            BuiltinInst *TruncOrBitCast,
                                            SILValue Ptr, SILValue Distance,
                                            SILType RawPointerTy,
-                                           SILBuilder *Builder) {
+                                           SILBuilder &Builder) {
   SILType InstanceType =
     Metatype->getType().getMetatypeInstanceType(I->getModule());
 
-  auto *NewPTAI = Builder->createPointerToAddress(
+  auto *NewPTAI = Builder.createPointerToAddress(
     I->getLoc(), Ptr, InstanceType.getAddressType());
   NewPTAI->setDebugScope(I->getDebugScope());
 
   auto *DistanceAsWord =
-      Builder->createBuiltin(I->getLoc(), TruncOrBitCast->getName(),
+      Builder.createBuiltin(I->getLoc(), TruncOrBitCast->getName(),
                              TruncOrBitCast->getType(), {}, Distance);
   DistanceAsWord->setDebugScope(I->getDebugScope());
 
-  auto *NewIAI = Builder->createIndexAddr(I->getLoc(), NewPTAI, DistanceAsWord);
+  auto *NewIAI = Builder.createIndexAddr(I->getLoc(), NewPTAI, DistanceAsWord);
   NewIAI->setDebugScope(I->getDebugScope());
 
   auto *NewATPI =
-    Builder->createAddressToPointer(I->getLoc(), NewIAI, RawPointerTy);
+    Builder.createAddressToPointer(I->getLoc(), NewIAI, RawPointerTy);
   NewATPI->setDebugScope(I->getDebugScope());
   return NewATPI;
 }
@@ -1222,7 +1222,7 @@ static SILInstruction *createIndexAddrFrom(IndexRawPointerInst *I,
 /// Optimize an array operation that has (index_raw_pointer b, sizeof(T) * Dist)
 /// operands into one that use index_addr as operands.
 SILInstruction *optimizeBuiltinArrayOperation(BuiltinInst *I,
-                                              SILBuilder *Builder) {
+                                              SILBuilder &Builder) {
   if (I->getNumOperands() < 3)
     return nullptr;
 
@@ -1300,7 +1300,7 @@ SILInstruction *optimizeBitOp(BuiltinInst *BI,
                               CombineFunc combine,
                               NeutralFunc isNeutral,
                               ZeroFunc isZero,
-                              SILBuilder *Builder,
+                              SILBuilder &Builder,
                               SILCombiner *C) {
   SILValue firstOp;
   APInt bits;
@@ -1328,7 +1328,7 @@ SILInstruction *optimizeBitOp(BuiltinInst *BI,
   if (op != firstOp) {
     // We combined multiple bit operations to a single one,
     // e.g. (x & c1) & c2 -> x & (c1 & c2)
-    auto *newLI = Builder->createIntegerLiteral(BI->getLoc(), BI->getType(),
+    auto *newLI = Builder.createIntegerLiteral(BI->getLoc(), BI->getType(),
                                                 bits);
     return BuiltinInst::create(BI->getLoc(), BI->getName(), BI->getType(),
                                BI->getSubstitutions(),
@@ -1372,7 +1372,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
                           m_SILValue(RCast))) &&
         LCast->getType(0) == RCast->getType(0)) {
 
-      auto *NewCmp = Builder->createBuiltinBinaryFunction(
+      auto *NewCmp = Builder.createBuiltinBinaryFunction(
           I->getLoc(), getBuiltinName(I->getBuiltinInfo().ID),
           LCast->getType(0), I->getType(), {LCast, RCast});
 
@@ -1621,12 +1621,12 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   FullApplySite NewAI;
 
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    NewAI = Builder->createTryApply(AI.getLoc(), AI.getCallee(),
+    NewAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
                                     NewSubstCalleeType,
                                     Substitutions, Args,
                                     TAI->getNormalBB(), TAI->getErrorBB());
   else
-    NewAI = Builder->createApply(AI.getLoc(), AI.getCallee(),
+    NewAI = Builder.createApply(AI.getLoc(), AI.getCallee(),
                                  NewSubstCalleeType,
                                  AI.getType(), Substitutions, Args,
                                  cast<ApplyInst>(AI)->isNonThrowing());
@@ -1778,7 +1778,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                             ProtocolConformance *Conformance) {
     SILValue OptionalExistential =
         WMI->hasOperand() ? WMI->getOperand() : SILValue();
-    auto *NewWMI = Builder->createWitnessMethod(WMI->getLoc(),
+    auto *NewWMI = Builder.createWitnessMethod(WMI->getLoc(),
                                                 ConcreteType,
                                                 Conformance, WMI->getMember(),
                                                 WMI->getType(),
@@ -1866,7 +1866,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
 ///
 ///  => apply %207<Int>(%227, ...)
 static ApplyInst *optimizeCastThroughThinFunctionPointer(
-    SILBuilder *Builder, ApplyInst *AI, FunctionRefInst *OrigThinFun,
+    SILBuilder &Builder, ApplyInst *AI, FunctionRefInst *OrigThinFun,
     PointerToThinFunctionInst *CastedThinFun) {
 
   // The original function type needs to be polymorphic.
@@ -1955,7 +1955,7 @@ static ApplyInst *optimizeCastThroughThinFunctionPointer(
       SILType::getPrimitiveObjectType(ConvertCalleeTy->substGenericArgs(
           AI->getModule(), AI->getModule().getSwiftModule(), Subs));
 
-  ApplyInst *NewApply = Builder->createApply(
+  ApplyInst *NewApply = Builder.createApply(
       AI->getLoc(), OrigThinFun, NewSubstCalleeType, AI->getType(), Subs, Args,
                                              AI->isNonThrowing());
   NewApply->setDebugScope(AI->getDebugScope());
@@ -2151,7 +2151,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
         SILParameterInfo PI = FT->getParameters()[i];
         auto Arg = AI->getArgument(i);
         if (PI.isConsumed() && !Arg.getType().isAddress())
-          Builder->emitReleaseValueOperation(AI->getLoc(), Arg);
+          Builder.emitReleaseValueOperation(AI->getLoc(), Arg);
       }
 
       // Erase all of the reference counting instructions and the Apply itself.
@@ -2254,7 +2254,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
         SILParameterInfo PI = FT->getParameters()[i];
         auto Arg = AI->getArgument(i);
         if (PI.isConsumed() && !Arg.getType().isAddress())
-          Builder->emitReleaseValueOperation(AI->getLoc(), Arg);
+          Builder.emitReleaseValueOperation(AI->getLoc(), Arg);
       }
 
       // Erase all of the reference counting instructions and the Apply itself.
@@ -2338,8 +2338,8 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   }
 
   // Add an `unreachable` to be the new terminator for this block
-  Builder->setInsertionPoint(CFI->getParent());
-  Builder->createUnreachable(ArtificialUnreachableLocation());
+  Builder.setInsertionPoint(CFI->getParent());
+  Builder.createUnreachable(ArtificialUnreachableLocation());
 
   return nullptr;
 }
@@ -2555,10 +2555,10 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   // need to worry about payloads.
   if (!IEAI->getElement()->hasArgumentType()) {
     EnumInst *E =
-      Builder->createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
+      Builder.createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
                           IEAI->getOperand().getType().getObjectType());
     E->setDebugScope(IEAI->getDebugScope());
-    Builder->createStore(IEAI->getLoc(), E, IEAI->getOperand())
+    Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand())
       ->setDebugScope(IEAI->getDebugScope());
     return eraseInstFromFunction(*IEAI);
   }
@@ -2591,11 +2591,11 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
 
   // In that case, create the payload enum/store.
   EnumInst *E =
-      Builder->createEnum(DataAddrInst->getLoc(), SI->getSrc(),
+      Builder.createEnum(DataAddrInst->getLoc(), SI->getSrc(),
                           DataAddrInst->getElement(),
                           DataAddrInst->getOperand().getType().getObjectType());
   E->setDebugScope(DataAddrInst->getDebugScope());
-  Builder->createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand())
+  Builder.createStore(DataAddrInst->getLoc(), E, DataAddrInst->getOperand())
     ->setDebugScope(DataAddrInst->getDebugScope());
   // Cleanup.
   eraseInstFromFunction(*SI);
@@ -2681,9 +2681,9 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
           return nullptr;
         }
 
-        auto *NewPTAI = Builder->createPointerToAddress(PTAI->getLoc(), Ptr,
+        auto *NewPTAI = Builder.createPointerToAddress(PTAI->getLoc(), Ptr,
                                                         PTAI->getType());
-        auto DistanceAsWord = Builder->createBuiltin(
+        auto DistanceAsWord = Builder.createBuiltin(
             PTAI->getLoc(), Trunc->getName(), Trunc->getType(), {}, Distance);
 
         NewPTAI->setDebugScope(PTAI->getDebugScope());
@@ -2728,7 +2728,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
       SILValue Ptr = IRPI->getOperand(0);
       SILValue Distance = Bytes->getArguments()[0];
       auto *NewPTAI =
-          Builder->createPointerToAddress(PTAI->getLoc(), Ptr, PTAI->getType());
+          Builder.createPointerToAddress(PTAI->getLoc(), Ptr, PTAI->getType());
       NewPTAI->setDebugScope(PTAI->getDebugScope());
       return new (PTAI->getModule())
           IndexAddrInst(PTAI->getLoc(), NewPTAI, Distance);
@@ -2802,9 +2802,9 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
     LoadInst *L = cast<LoadInst>(U->getUser());
 
     // Insert a new load from our source and bitcast that as appropriate.
-    LoadInst *NewLoad = Builder->createLoad(Loc, Op);
+    LoadInst *NewLoad = Builder.createLoad(Loc, Op);
     NewLoad->setDebugScope(Scope);
-    auto *BitCast = Builder->createUncheckedBitCast(Loc, NewLoad,
+    auto *BitCast = Builder.createUncheckedBitCast(Loc, NewLoad,
                                                     OutputTy.getObjectType());
     BitCast->setDebugScope(Scope);
 
@@ -2959,9 +2959,9 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
     LoadInst *L = cast<LoadInst>(U->getUser());
 
     // Insert a new Load of the enum and extract the data from that.
-    auto *Load = Builder->createLoad(Loc, EnumAddr);
+    auto *Load = Builder.createLoad(Loc, EnumAddr);
     Load->setDebugScope(Scope);
-    auto *D = Builder->createUncheckedEnumData(
+    auto *D = Builder.createUncheckedEnumData(
         Loc, Load, EnumElt, PayloadType);
     D->setDebugScope(Scope);
 
@@ -3254,7 +3254,7 @@ SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *FLI) {
   // fix_lifetime(alloc_stack) -> fix_lifetime(load(alloc_stack))
   if (auto *AI = dyn_cast<AllocStackInst>(FLI->getOperand())) {
     if (FLI->getOperand().getType().isLoadable(FLI->getModule())) {
-      auto Load = Builder->createLoad(FLI->getLoc(), SILValue(AI, 1));
+      auto Load = Builder.createLoad(FLI->getLoc(), SILValue(AI, 1));
       Load->setDebugScope(FLI->getDebugScope());
       return new (FLI->getModule())
           FixLifetimeInst(FLI->getLoc(), SILValue(Load, 0));

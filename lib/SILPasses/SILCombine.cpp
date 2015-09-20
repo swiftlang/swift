@@ -161,7 +161,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
     // If we have reached this point, all attempts to do simple simplifications
     // have failed. Prepare to SILCombine.
-    Builder->setInsertionPoint(I->getParent(), I);
+    Builder.setInsertionPoint(I->getParent(), I);
 
 #ifndef NDEBUG
     std::string OrigI;
@@ -212,6 +212,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     // SILBuilder during this iteration. Go through the tracking list and add
     // its contents to the worklist and then clear said list in preparation for
     // the next iteration.
+    auto &TrackingList = *Builder.getTrackingList();
     for (SILInstruction *I : TrackingList) {
       if (!DeletedInstSet.count(I))
         Worklist.add(I);
@@ -241,13 +242,6 @@ void SILCombineWorklist::addInitialGroup(ArrayRef<SILInstruction *> List) {
 bool SILCombiner::runOnFunction(SILFunction &F) {
   clear();
 
-  // Create a SILBuilder for F, initialize the tracking list, and add the
-  // callback so we can update the worklist if the SILBuilder deletes
-  // instructions.
-  SILBuilder B(F);
-  B.setTrackingList(&TrackingList);
-  Builder = &B;
-
   bool Changed = false;
   // Perform iterations until we do not make any changes.
   while (doOneIteration(F, Iteration)) {
@@ -256,7 +250,6 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
   }
 
   // Cleanup the builder and return whether or not we made any changes.
-  Builder = nullptr;
   return Changed;
 }
 
@@ -357,7 +350,13 @@ class SILCombine : public SILFunctionTransform {
 
     // Call Graph Analysis in case we need to perform Call Graph updates.
     auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
-    SILCombiner Combiner(AA, CGA->getCallGraphOrNull(),
+
+    // Create a SILBuilder with a tracking list for newly added
+    // instructions, which we will periodically move to our worklist.
+    llvm::SmallVector<SILInstruction *, 64> TrackingList;
+
+    SILBuilder B(*getFunction(), &TrackingList);
+    SILCombiner Combiner(B, AA, CGA->getCallGraphOrNull(),
                          getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
 

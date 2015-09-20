@@ -129,13 +129,7 @@ class SILCombiner :
   unsigned Iteration;
 
   /// Builder used to insert instructions.
-  SILBuilder *Builder;
-
-  /// A list that the builder inserts newly created instructions into. Its
-  /// contents are added to the worklist after every iteration unless the
-  /// instruction is in the DeletedInstructionList. Then the list
-  /// is cleared.
-  llvm::SmallVector<SILInstruction *, 64> TrackingList;
+  SILBuilder &Builder;
 
   /// A set of instructions which have been deleted during this iteration. It is
   /// used to make sure that we do not
@@ -148,9 +142,10 @@ class SILCombiner :
   CallGraph *CG;
 
 public:
-  SILCombiner(AliasAnalysis *AA, CallGraph *CG, bool removeCondFails)
+  SILCombiner(SILBuilder &B, AliasAnalysis *AA, CallGraph *CG,
+              bool removeCondFails)
       : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
-        Iteration(0), Builder(0), TrackingList(), DeletedInstSet(128),
+        Iteration(0), Builder(B), DeletedInstSet(128),
         CastOpt(CG,
                 /* ReplaceInstUsesAction */
                 [&](SILInstruction *I, ValueBase * V) {
