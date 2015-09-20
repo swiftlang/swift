@@ -3535,7 +3535,7 @@ bool SILParser::parseSILBasicBlock() {
 }
 
 ///   decl-sil:   [[only in SIL mode]]
-///     'sil' sil-linkage '@' identifier ':' sil-type decl-sil-body
+///     'sil' sil-linkage '@' identifier ':' sil-type decl-sil-body?
 ///   decl-sil-body:
 ///     '{' sil-basic-block+ '}'
 bool Parser::parseDeclSIL() {
