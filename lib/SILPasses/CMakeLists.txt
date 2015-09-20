@@ -55,4 +55,5 @@ add_swift_library(swiftSILPasses
   UsePrespecialized.cpp
   LetPropertiesOpts.cpp
   CallGraphPrinter.cpp
+  LoopRegionPrinter.cpp
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)

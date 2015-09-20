@@ -16,6 +16,7 @@
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/ADT/iterator_range.h"
 
 namespace swift {
   class DominanceInfo;
@@ -40,6 +41,11 @@ class SILLoop : public llvm::LoopBase<SILBasicBlock, SILLoop> {
 public:
   SILLoop() {}
   void dump() const;
+
+  iterator_range<iterator> getSubLoopRange() const {
+    return make_range(begin(), end());
+  }
+
 private:
   friend class llvm::LoopInfoBase<SILBasicBlock, SILLoop>;
 
@@ -71,6 +77,9 @@ public:
   iterator begin() const { return LI.begin(); }
   iterator end() const { return LI.end(); }
   bool empty() const { return LI.empty(); }
+  iterator_range<iterator> getTopLevelLoops() const {
+    return make_range(begin(), end());
+  }
 
   /// Return the inner most loop that BB lives in.  If a basic block is in no
   /// loop (for example the entry node), null is returned.

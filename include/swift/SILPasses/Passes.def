@@ -110,6 +110,10 @@ PASS(LateInliner, "late-inline",
      "Run the late inliner")
 PASS(LoopInfoPrinter, "loop-info-printer",
      "Display loop information")
+PASS(LoopRegionViewText, "loop-region-view-text",
+     "Construct the loop region data structure and dump its contents as text")
+PASS(LoopRegionViewCFG, "loop-region-view-cfg",
+     "Construct the loop region data structure and dump its contents as a pdf cfg")
 PASS(LoopRotate, "loop-rotate",
      "Rotate loops")
 PASS(LowerAggregateInstrs, "lower-aggregate-instrs",

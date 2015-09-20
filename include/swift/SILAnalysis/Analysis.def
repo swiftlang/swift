@@ -34,5 +34,6 @@ ANALYSIS(PostOrder)
 ANALYSIS(ClassHierarchy)
 ANALYSIS(RCIdentity)
 ANALYSIS(Destructor)
+ANALYSIS(LoopRegion)
 
 #undef ANALYSIS
