@@ -18,7 +18,7 @@
 @warn_unused_result
 public // @testable
 func _countLeadingZeros(value: Int64) -> Int64 {
-    return Int64(Builtin.int_ctlz_Int64(value.value, false.value))
+    return Int64(Builtin.int_ctlz_Int64(value._value, false._value))
 }
 
 /// Returns if `x` is a power of 2.

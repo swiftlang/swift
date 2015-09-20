@@ -12,11 +12,11 @@ bb0(%0 : $Int32, %1 : $Int32):
   debug_value %0 : $Int32  // let x               // id: %2
   debug_value %1 : $Int32  // let y               // id: %3
   %4 = alloc_stack $Int32  // var g               // users: %14, %18, %20, %21
-  %6 = struct_extract %1 : $Int32, #Int32.value   // user: %8
-  %7 = struct_extract %0 : $Int32, #Int32.value   // user: %8
+  %6 = struct_extract %1 : $Int32, #Int32._value   // user: %8
+  %7 = struct_extract %0 : $Int32, #Int32._value   // user: %8
   %8 = builtin "cmp_sgt_Word"(%6 : $Builtin.Int32, %7 : $Builtin.Int32) : $Builtin.Int1 // user: %9
   %9 = struct $Bool (%8 : $Builtin.Int1)          // user: %10
-  %10 = struct_extract %9 : $Bool, #Bool.value    // user: %11
+  %10 = struct_extract %9 : $Bool, #Bool._value    // user: %11
   br bb2                                          // id: %11
 
 bb1:                                              // Preds: bb0

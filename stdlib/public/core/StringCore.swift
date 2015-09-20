@@ -217,7 +217,7 @@ public struct _StringCore {
 
   /// Are we using an `NSString` for storage?
   public var hasCocoaBuffer: Bool {
-    return Int((_countAndFlags << 1).value) < 0
+    return Int((_countAndFlags << 1)._value) < 0
   }
 
   public var startASCII: UnsafeMutablePointer<UTF8.CodeUnit> {

@@ -21,7 +21,7 @@ bb0:
   %8 = integer_literal $Builtin.Int32, 1000000000
   // CHECK: integer_literal $Builtin.Int32, 1
   // CHECK: integer_literal $Builtin.Int1, -1
-  // CHECK: struct_element_addr {{.*}} : $*Int32, #Int32.value
+  // CHECK: struct_element_addr {{.*}} : $*Int32, #Int32._value
   br bb2(%2 : $Builtin.Int32)
 
 // CHECK: bb1:
@@ -40,7 +40,7 @@ bb2(%13 : $Builtin.Int32):
   // CHECK-NEXT: tuple_extract
   %19 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %19 : $Builtin.Int1
-  %21 = struct_element_addr %1 : $*Int32, #Int32.value
+  %21 = struct_element_addr %1 : $*Int32, #Int32._value
   // CHECK-NEXT: load
   %22 = load %21 : $*Builtin.Int32
   // CHECK-NEXT: builtin

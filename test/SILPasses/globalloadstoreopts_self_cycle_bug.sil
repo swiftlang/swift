@@ -45,8 +45,8 @@ bb0:
   store %2 to %8 : $*Int32
   %10 = ref_element_addr %7 : $NewRangeGenerator1, #NewRangeGenerator1.end
   store %5 to %10 : $*Int32
-  %12 = struct_element_addr %8 : $*Int32, #Int32.value
-  %13 = struct_element_addr %10 : $*Int32, #Int32.value
+  %12 = struct_element_addr %8 : $*Int32, #Int32._value
+  %13 = struct_element_addr %10 : $*Int32, #Int32._value
   %15 = load %12 : $*Builtin.Int32
   %16 = load %13 : $*Builtin.Int32
   %17 = builtin "cmp_eq_Int32"(%15 : $Builtin.Int32, %16 : $Builtin.Int32) : $Builtin.Int1
@@ -68,7 +68,7 @@ bb2(%20 : $Builtin.Int32):
   // CHECK: [[ID5:%[0-9]+]] = struct $Int32
   %29 = struct $Int32 (%26 : $Builtin.Int32)
   store %29 to %8 : $*Int32
-  %31 = struct_element_addr %0 : $*Int32, #Int32.value
+  %31 = struct_element_addr %0 : $*Int32, #Int32._value
   // CHECK: struct_extract [[Phi2]]
   // LICM: load
   %32 = load %31 : $*Builtin.Int32

@@ -246,7 +246,7 @@ extension LLVMFixedWidthIntegerType {
   public init<Other: LLVMIntegerType>(unsigned source: Other) {
     self.init(truncatingUnsigned: source)
     Builtin.condfail(
-      Self.bitWidth.isLessThanSigned(source.mostSignificant1Bit).value)
+      Self.bitWidth.isLessThanSigned(source.mostSignificant1Bit)._value)
   }
 
   /// Generalized construction from a signed LLVMIntegerType, trapping on
@@ -255,7 +255,7 @@ extension LLVMFixedWidthIntegerType {
   public init<Other: LLVMIntegerType>(signed source: Other) {
     self.init(truncatingSigned: source)
     Builtin.condfail(
-      (Other(truncatingSigned: self) != source).value
+      (Other(truncatingSigned: self) != source)._value
     )
   }
 }
@@ -268,8 +268,8 @@ extension Bool {
   }
   
   @transparent
-  public var value : Builtin.Int1 {
-    return Builtin.trunc_${IntWord}_Int1((self ? 1 : 0).value)
+  public var _value: Builtin.Int1 {
+    return Builtin.trunc_${IntWord}_Int1((self ? 1 : 0)._value)
   }
 }
 
@@ -335,7 +335,7 @@ public struct LLVMInt${bits} : LLVMFixedWidthIntegerType {
     rhs: Self_, trapOverflow: Bool
   ) -> Bool {
     let (newStorage, overflow) = Builtin.${operation}_with_overflow_Int${bits}(
-      storage, rhs.storage, trapOverflow.value)
+      storage, rhs.storage, trapOverflow._value)
     if trapOverflow {
       Builtin.condfail(overflow)
     }
@@ -476,7 +476,7 @@ public struct LLVMBigInt : LLVMIntegerType {
   public init(_builtinIntegerLiteral x: Builtin.${IntLiteral}) {
    let isNegative = Bool(
       Builtin.cmp_slt_${IntLiteral}(
-        x, Builtin.zext_${IntWord}_${IntLiteral}(0.value)))
+        x, Builtin.zext_${IntWord}_${IntLiteral}(0._value)))
     
     if !isNegative {
       self.init(_nonNegativeIntegerLiteral: x)
@@ -489,9 +489,9 @@ public struct LLVMBigInt : LLVMIntegerType {
   internal init(_nonNegativeIntegerLiteral x: Builtin.${IntLiteral}) {
     words = []
     
-    let mask = Builtin.zext_${IntWord}_${IntLiteral}(Int(-1).value)
-    let wordBits = Builtin.zext_${IntWord}_${IntLiteral}(${word_bits}.value)
-    let zero = Builtin.zext_${IntWord}_${IntLiteral}(0.value)
+    let mask = Builtin.zext_${IntWord}_${IntLiteral}(Int(-1)._value)
+    let wordBits = Builtin.zext_${IntWord}_${IntLiteral}(${word_bits}._value)
+    let zero = Builtin.zext_${IntWord}_${IntLiteral}(0._value)
 
     var rest = x
     var digit: LLVMWord = 0
@@ -509,9 +509,9 @@ public struct LLVMBigInt : LLVMIntegerType {
   internal init(_negativeIntegerLiteral x: Builtin.${IntLiteral}) {
     words = []
 
-    let mask = Builtin.zext_${IntWord}_${IntLiteral}(Int(-1).value)
-    let wordBits = Builtin.zext_${IntWord}_${IntLiteral}(${word_bits}.value)
-    let target = Builtin.sext_${IntWord}_${IntLiteral}(Int(-1).value)
+    let mask = Builtin.zext_${IntWord}_${IntLiteral}(Int(-1)._value)
+    let wordBits = Builtin.zext_${IntWord}_${IntLiteral}(${word_bits}._value)
+    let target = Builtin.sext_${IntWord}_${IntLiteral}(Int(-1)._value)
 
     var rest = x
     var digit: LLVMWord
@@ -669,7 +669,7 @@ public struct LLVMBigInt : LLVMIntegerType {
 
   @transparent // FIXME: should be @inline(__always)
   public var countWords: LLVMWord {
-    return LLVMWord(words.count.value)
+    return LLVMWord(words.count._value)
   }
   
   @inline(__always)
@@ -880,7 +880,7 @@ tests.test("Basics") {
   var prior: I8 = 0
   var current: I8 = 1
   while true {
-    let next = I8((UInt8(prior.storage) &+ UInt8(current.storage)).value)
+    let next = I8((UInt8(prior.storage) &+ UInt8(current.storage))._value)
     
     expectEqual(next, current.add(prior))
     expectEqual(next, prior.add(current))

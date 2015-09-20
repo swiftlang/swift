@@ -14,23 +14,23 @@
 
 /// A value type whose instances are either `true` or `false`.
 public struct Bool {
-  var value: Builtin.Int1
+  internal var _value: Builtin.Int1
 
   /// Default-initialize Boolean value to `false`.
   @transparent
   public init() {
     let zero: Int8 = 0
-    value = Builtin.trunc_Int8_Int1(zero.value)
+    self._value = Builtin.trunc_Int8_Int1(zero._value)
   }
 
   @transparent
-  init(_ v : Builtin.Int1) { value = v }
+  internal init(_ v: Builtin.Int1) { self._value = v }
 }
 
 extension Bool : _BuiltinBooleanLiteralConvertible, BooleanLiteralConvertible {
   @transparent
   public init(_builtinBooleanLiteral value: Builtin.Int1) {
-    self.value = value
+    self._value = value
   }
 
   /// Create an instance initialized to `value`.
@@ -44,7 +44,7 @@ extension Bool : BooleanType {
   @transparent
   @warn_unused_result
   public func _getBuiltinLogicValue() -> Builtin.Int1 {
-    return value
+    return _value
   }
 
   /// Identical to `self`.
@@ -91,12 +91,12 @@ extension Bool : Equatable, Hashable {
 @transparent
 @warn_unused_result
 public prefix func !(a: Bool) -> Bool {
-  return Bool(Builtin.xor_Int1(a.value, true.value))
+  return Bool(Builtin.xor_Int1(a._value, true._value))
 }
 
 @transparent
 @warn_unused_result
 public func ==(lhs: Bool, rhs: Bool) -> Bool {
-  return Bool(Builtin.cmp_eq_Int1(lhs.value, rhs.value))
+  return Bool(Builtin.cmp_eq_Int1(lhs._value, rhs._value))
 }
 

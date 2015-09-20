@@ -1959,11 +1959,11 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
 
   // Extract the i1 from the Bool struct.
   StructDecl *BoolStruct = cast<StructDecl>(Context.getBoolDecl());
-  auto Members = BoolStruct->lookupDirect(Context.Id_value);
+  auto Members = BoolStruct->lookupDirect(Context.Id__value);
   assert(Members.size() == 1 &&
-         "Bool should have only one property with name 'value'");
+         "Bool should have only one property with name '_value'");
   auto Member = dyn_cast<VarDecl>(Members[0]);
-  assert(Member &&"Bool should have a property with name 'value' of type Int1");
+  assert(Member &&"Bool should have a property with name '_value' of type Int1");
   auto *ETI = SGF.B.createStructExtract(loc, srcValue, Member);
 
   SGF.B.createSwitchValue(loc, SILValue(ETI, 0), defaultBB, caseBBs);

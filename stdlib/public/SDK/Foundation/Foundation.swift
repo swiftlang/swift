@@ -178,7 +178,7 @@ extension Int : _ObjectiveCBridgeable {
   }
 
   public init(_ number: NSNumber) {
-    value = number.integerValue.value
+    self = number.integerValue
   }
 
   public static func _getObjectiveCType() -> Any.Type {
@@ -212,7 +212,7 @@ extension UInt : _ObjectiveCBridgeable {
   }
 
   public init(_ number: NSNumber) {
-    value = number.unsignedIntegerValue.value
+    self = number.unsignedIntegerValue
   }
 
   public static func _getObjectiveCType() -> Any.Type {

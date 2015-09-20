@@ -318,7 +318,7 @@ func testCaseBool(value : Bool?) {
   // CHECK-NEXT: bb0(%0 : $Optional<Bool>):
   // CHECK: switch_enum %0 : $Optional<Bool>, case #Optional.Some!enumelt.1: bb1, default bb3
   // CHECK: bb1(%3 : $Bool):
-  // CHECK: [[ISTRUE:%[0-9]+]] = struct_extract %3 : $Bool, #Bool.value
+  // CHECK: [[ISTRUE:%[0-9]+]] = struct_extract %3 : $Bool, #Bool._value
   // CHECK: cond_br [[ISTRUE]], bb2, bb3
   // CHECK: bb2:
   // CHECK: function_ref @_TF16if_while_binding8marker_1FT_T_
@@ -331,7 +331,7 @@ func testCaseBool(value : Bool?) {
   // CHECK:   switch_enum %0 : $Optional<Bool>, case #Optional.Some!enumelt.1: bb4, default bb6
 
   // CHECK:   bb4(
-  // CHECK:   [[ISTRUE:%[0-9]+]] = struct_extract %10 : $Bool, #Bool.value   // user: %12
+  // CHECK:   [[ISTRUE:%[0-9]+]] = struct_extract %10 : $Bool, #Bool._value   // user: %12
   // CHECK:   cond_br [[ISTRUE]], bb6, bb5
 
   // CHECK: bb5:

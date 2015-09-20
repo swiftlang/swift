@@ -23,7 +23,7 @@ bb0(%0 : $*T, %1 : $Bool):
   %2 = alloc_stack $T  // var rvo                 // users: %9, %15, %17, %19
   debug_value_addr %0 : $*T
   debug_value_addr %2#1 : $*T
-  %3 = struct_extract %1 : $Bool, #Bool.value     // user: %4
+  %3 = struct_extract %1 : $Bool, #Bool._value     // user: %4
   cond_br %3, bb1, bb2                            // id: %4
 
 bb1:                                              // Preds: bb0
@@ -207,7 +207,7 @@ bb0(%0 : $*T):
 //CHECK: return
 sil hidden @branch : $@convention(thin) <T> (@in T, Bool) -> () {
 bb0(%0 : $*T, %1 : $Bool):
-  %2 = struct_extract %1 : $Bool, #Bool.value     // user: %3
+  %2 = struct_extract %1 : $Bool, #Bool._value     // user: %3
   cond_br %2, bb1, bb2                            // id: %3
 
 bb1:                                              // Preds: bb0
@@ -435,7 +435,7 @@ sil @use: $@convention(thin) <T> (@inout T) -> ()
 sil @not_dominated_uses: $@convention(thin) <T> (@in Optional<T>, @in Optional<T>, Bool) -> () {
 bb0(%0 : $*Optional<T>, %1 : $*Optional<T>, %3 : $Bool):
   %4 = alloc_stack $Optional<T>
-  %5 = struct_extract %3 : $Bool, #Bool.value
+  %5 = struct_extract %3 : $Bool, #Bool._value
   %f = function_ref @use : $@convention(thin) <T2> (@inout T2) -> ()
   cond_br %5, bb1, bb2
 

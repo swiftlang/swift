@@ -13,7 +13,7 @@ sil [noinline] @sink_signed_int : $@convention(thin) () -> ()
 sil hidden @sub_signed_branch_cond : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 2          // users: %3, %12
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %3, %7, %12, %17
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %3, %7, %12, %17
   %3 = builtin "cmp_slt_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
   cond_br %3, bb2, bb1                            // id: %4
 
@@ -55,7 +55,7 @@ bb2:                                              // Preds: bb0 bb1
 sil hidden @sub_signed_branch_cond2: $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 2          // users: %3, %12
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %3, %7, %12, %17
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %3, %7, %12, %17
   %3 = builtin "cmp_sge_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
   cond_br %3, bb1, bb2                            // id: %4
 
@@ -90,7 +90,7 @@ bb2:                                              // Preds: bb0 bb1
 sil hidden @sub_unsigned_branch_cond : $@convention(thin) (UInt64) -> () {
 bb0(%0 : $UInt64):
   %1 = integer_literal $Builtin.Int64, 2          // users: %3, %12
-  %2 = struct_extract %0 : $UInt64, #UInt64.value     // users: %3, %7, %12, %17
+  %2 = struct_extract %0 : $UInt64, #UInt64._value     // users: %3, %7, %12, %17
   %3 = builtin "cmp_ult_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
   cond_br %3, bb2, bb1                            // id: %4
 
@@ -125,7 +125,7 @@ bb2:                                              // Preds: bb0 bb1
 sil hidden @sub_unsigned_branch_cond2 : $@convention(thin) (UInt64) -> () {
 bb0(%0 : $UInt64):
   %1 = integer_literal $Builtin.Int64, 2          // users: %3, %12
-  %2 = struct_extract %0 : $UInt64, #UInt64.value     // users: %3, %7, %12, %17
+  %2 = struct_extract %0 : $UInt64, #UInt64._value     // users: %3, %7, %12, %17
   %3 = builtin "cmp_uge_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
   cond_br %3, bb1, bb2                            // id: %4
 
@@ -164,7 +164,7 @@ bb2:                                              // Preds: bb0 bb1
 sil hidden @unsigned_sub_previous_traps : $@convention(thin) (UInt64) -> () {
 bb0(%0 : $UInt64):
   %1 = integer_literal $Builtin.Int64, 9          // user: %4
-  %2 = struct_extract %0 : $UInt64, #UInt64.value     // users: %4, %10, %15, %20, %25
+  %2 = struct_extract %0 : $UInt64, #UInt64._value     // users: %4, %10, %15, %20, %25
   %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
   %4 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
   %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
@@ -201,7 +201,7 @@ bb0(%0 : $UInt64):
 sil hidden @signed_sub_previous_traps : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 9          // user: %4
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %4, %10, %15, %20, %25
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
   %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
   %4 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
   %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
@@ -244,7 +244,7 @@ bb0(%0 : $Int64):
 sil hidden @unsigned_add_previous_traps : $@convention(thin) (UInt64) -> () {
 bb0(%0 : $UInt64):
   %1 = integer_literal $Builtin.Int64, 9          // user: %4
-  %2 = struct_extract %0 : $UInt64, #UInt64.value     // users: %4, %10, %15, %20, %25
+  %2 = struct_extract %0 : $UInt64, #UInt64._value     // users: %4, %10, %15, %20, %25
   %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
   %4 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
   %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
@@ -293,7 +293,7 @@ bb0(%0 : $UInt64):
 sil hidden @signed_add_previous_traps : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 9          // user: %4
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %4, %10, %15, %20, %25
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
   %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
   %4 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
   %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
@@ -331,8 +331,8 @@ bb0(%0 : $Int64):
 // CHECK: return
 sil hidden @add1_signed_branch : $@convention(thin) (Int64, Int64) -> () {
 bb0(%0 : $Int64, %1 : $Int64):
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %4, %8, %14
-  %3 = struct_extract %1 : $Int64, #Int64.value       // user: %4
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %8, %14
+  %3 = struct_extract %1 : $Int64, #Int64._value       // user: %4
   %4 = builtin "cmp_slt_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1 // user: %5
   cond_br %4, bb1, bb2                            // id: %5
 
@@ -362,8 +362,8 @@ bb2:                                              // Preds: bb0 bb1
 // CHECK: return
 sil hidden @add1_unsigned_branch : $@convention(thin) (UInt64, UInt64) -> () {
 bb0(%0 : $UInt64, %1 : $UInt64):
-  %2 = struct_extract %0 : $UInt64, #UInt64.value     // users: %4, %8, %14
-  %3 = struct_extract %1 : $UInt64, #UInt64.value     // user: %4
+  %2 = struct_extract %0 : $UInt64, #UInt64._value     // users: %4, %8, %14
+  %3 = struct_extract %1 : $UInt64, #UInt64._value     // user: %4
   %4 = builtin "cmp_ult_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1 // user: %5
   cond_br %4, bb1, bb2                            // id: %5
 
@@ -392,7 +392,7 @@ bb2:                                              // Preds: bb0 bb1
 sil hidden @remove_past_checks : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 1          // user: %4
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %4, %8, %12, %16, %20
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %8, %12, %16, %20
   %3 = integer_literal $Builtin.Int1, -1          // users: %4, %8, %12, %16, %20
 // CHECK: sadd_with_overflow_Int64
   %4 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
@@ -443,13 +443,13 @@ bb0(%0 : $Int64):
 sil hidden @bitwidth_crash : $@convention(thin) (Int64, Int8) -> () {
 bb0(%0 : $Int64, %1 : $Int8):
   %2 = integer_literal $Builtin.Int64, 3          // user: %5
-  %3 = struct_extract %0 : $Int64, #Int64.value       // user: %5
+  %3 = struct_extract %0 : $Int64, #Int64._value       // user: %5
   %4 = integer_literal $Builtin.Int1, -1          // users: %5, %10
   %5 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %6
   %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 1 // user: %7
   cond_fail %6 : $Builtin.Int1                    // id: %7
   %8 = integer_literal $Builtin.Int8, 2           // user: %10
-  %9 = struct_extract %1 : $Int8, #Int8.value     // user: %10
+  %9 = struct_extract %1 : $Int8, #Int8._value     // user: %10
   %10 = builtin "sadd_with_overflow_Int8"(%8 : $Builtin.Int8, %9 : $Builtin.Int8, %4 : $Builtin.Int1) : $(Builtin.Int8, Builtin.Int1) // user: %11
   %11 = tuple_extract %10 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
   cond_fail %11 : $Builtin.Int1                   // id: %12
@@ -463,7 +463,7 @@ bb0(%0 : $Int64, %1 : $Int8):
 sil hidden @signed_cmpeq_sub : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 3          // users: %3, %12
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %3, %7, %12
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %3, %7, %12
   %3 = builtin "cmp_ne_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
   cond_br %3, bb1, bb2                            // id: %4
 
@@ -494,7 +494,7 @@ bb3:                                              // Preds: bb1 bb2
 sil hidden @unsigned_cmpeq_sub : $@convention(thin) (UInt64) -> () {
 bb0(%0 : $UInt64):
   %1 = integer_literal $Builtin.Int64, 3          // users: %3, %12
-  %2 = struct_extract %0 : $UInt64, #UInt64.value // users: %3, %7, %12
+  %2 = struct_extract %0 : $UInt64, #UInt64._value // users: %3, %7, %12
   %3 = builtin "cmp_ne_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
   cond_br %3, bb1, bb2                            // id: %4
 
@@ -527,7 +527,7 @@ bb3:                                              // Preds: bb1 bb2
 sil hidden @signed_mul_previous_traps : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 9          // user: %4
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %4, %10, %15, %20, %25
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
   %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
   %4 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
   %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
@@ -553,7 +553,7 @@ bb0(%0 : $Int64):
 sil hidden @unsigned_mul_previous_traps : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 9          // user: %4
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %4, %10, %15, %20, %25
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
   %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
   %4 = builtin "umul_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
   %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
@@ -578,7 +578,7 @@ bb0(%0 : $Int64):
 sil hidden @signed_mul_previous_traps_neg : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 9          // user: %4
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %4, %10, %15, %20, %25
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
   %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
 
   // This is X * 9
@@ -606,7 +606,7 @@ bb0(%0 : $Int64):
 sil hidden @signed_mul_previous_traps_abs_neg : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 1000          // user: %4
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %4, %10, %15, %20, %25
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
   %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
 
   // This is X * 9
@@ -634,7 +634,7 @@ bb0(%0 : $Int64):
 sil hidden @signed_mul_previous_traps_abs_neg2 : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 1000          // user: %4
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %4, %10, %15, %20, %25
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
   %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
 
   // This is X * 9
@@ -661,7 +661,7 @@ bb0(%0 : $Int64):
 sil hidden @signed_mul_traps_min_int : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   %1 = integer_literal $Builtin.Int64, 1          // user: %4
-  %2 = struct_extract %0 : $Int64, #Int64.value       // users: %4, %10, %15, %20, %25
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
   %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
 
   // This is X * 9
@@ -688,7 +688,7 @@ bb0(%0 : $Int64):
 sil hidden @signed_min_int_comparison : $@convention(thin) (Int8) -> () {
 bb0(%0 : $Int8):
   %1 = integer_literal $Builtin.Int8, -128
-  %2 = struct_extract %0 : $Int8, #Int8.value
+  %2 = struct_extract %0 : $Int8, #Int8._value
   %3 = integer_literal $Builtin.Int1, -1
 
   %4 = builtin "smul_with_overflow_Int8"(%2 : $Builtin.Int8, %1 : $Builtin.Int8, %3 : $Builtin.Int1) : $(Builtin.Int8, Builtin.Int1)

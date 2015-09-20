@@ -50,15 +50,15 @@ public struct ${vectype} :
     @transparent
     get {
       let elt = Builtin.${extractelement}(_vector,
-        (${i} as Int32).value)
+        (${i} as Int32)._value)
 
       return ${type}(_bits: elt)
     }
     @transparent
     set {
       _vector = Builtin.${insertelement}(_vector,
-        newValue.value,
-        (${i} as Int32).value)
+        newValue._value,
+        (${i} as Int32)._value)
     }
   }
 % end
@@ -78,8 +78,8 @@ public struct ${vectype} :
     var v: Builtin.${llvm_vectype} = Builtin.zeroInitializer()
 % for i in xrange(size):
     v = Builtin.${insertelement}(v,
-      ${component[i]}.value,
-      (${i} as Int32).value)
+      ${component[i]}._value,
+      (${i} as Int32)._value)
 % end
     _vector = v
   }
@@ -119,7 +119,7 @@ public struct ${vectype} :
       _precondition(index >= 0, "vector index out of range")
       _precondition(index < ${size}, "vector index out of range")
       let elt = Builtin.${extractelement}(_vector,
-        Int32(index).value)
+        Int32(index)._value)
       return ${type}(_bits: elt)
     }
     @transparent
@@ -127,8 +127,8 @@ public struct ${vectype} :
       _precondition(index >= 0, "vector index out of range")
       _precondition(index < ${size}, "vector index out of range")
       _vector = Builtin.${insertelement}(_vector,
-        value.value,
-        Int32(index).value)
+        value._value,
+        Int32(index)._value)
     }
   }
 

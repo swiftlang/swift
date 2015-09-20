@@ -20,7 +20,7 @@ bb0(%0 : $Int32):
   br bb1(%1 : $Builtin.Int32, %1 : $Builtin.Int32)
 
 bb1(%3 : $Builtin.Int32, %4 : $Builtin.Int32):
-  %6 = struct_extract %0 : $Int32, #Int32.value
+  %6 = struct_extract %0 : $Int32, #Int32._value
   %7 = builtin "cmp_slt_Int32"(%4 : $Builtin.Int32, %6 : $Builtin.Int32) : $Builtin.Int1
   cond_br %7, bb2, bb3
 
@@ -53,7 +53,7 @@ bb3:
 sil @for_in_loop : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 0
-  %2 = struct_extract %0 : $Int32, #Int32.value
+  %2 = struct_extract %0 : $Int32, #Int32._value
   br bb1(%1 : $Builtin.Int32, %1 : $Builtin.Int32)
 
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32):
@@ -87,12 +87,12 @@ bb3:
 
 sil @copy_iv : $@convention(thin) (Int32, Int32) -> () {
 bb0(%0 : $Int32, %1 : $Int32):
-  %2 = struct_extract %0 : $Int32, #Int32.value
+  %2 = struct_extract %0 : $Int32, #Int32._value
   %3 = integer_literal $Builtin.Int32, 2
   br bb1(%3 : $Builtin.Int32, %2 : $Builtin.Int32)
 
 bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32):
-  %8 = struct_extract %1 : $Int32, #Int32.value
+  %8 = struct_extract %1 : $Int32, #Int32._value
   %9 = builtin "cmp_ne_Int32"(%6 : $Builtin.Int32, %8 : $Builtin.Int32) : $Builtin.Int1
   cond_br %9, bb2, bb4
 

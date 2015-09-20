@@ -150,7 +150,7 @@ public struct StaticString
   ) {
     self._startPtrOrData = start
     self._byteSize = byteSize
-    self._flags = Bool(isASCII) ? (0x2 as UInt8).value : (0x0 as UInt8).value
+    self._flags = Bool(isASCII) ? (0x2 as UInt8)._value : (0x0 as UInt8)._value
   }
 
   @transparent
@@ -161,8 +161,8 @@ public struct StaticString
       unsafeBitCast(UInt(UInt32(unicodeScalar)), COpaquePointer.self)._rawValue
     self._byteSize = 0._builtinWordValue
     self._flags = UnicodeScalar(unicodeScalar).isASCII()
-      ? (0x3 as UInt8).value
-      : (0x1 as UInt8).value
+      ? (0x3 as UInt8)._value
+      : (0x1 as UInt8)._value
   }
 
   @effects(readonly)

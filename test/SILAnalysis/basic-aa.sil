@@ -454,12 +454,12 @@ sil_global @sil_global3 : $Int32
 // CHECK-NEXT: MustAlias
 // CHECK: PAIR #2.
 // CHECK-NEXT: (0):   %0 = global_addr @sil_global3 : $*Int32
-// CHECK-NEXT: (0):   %2 = struct_element_addr %1 : $*Int32, #Int32.value
+// CHECK-NEXT: (0):   %2 = struct_element_addr %1 : $*Int32, #Int32._value
 // CHECK-NEXT: PartialAlias
 sil @globals_alias : $@convention(thin) () -> () {
   %0 = global_addr @sil_global3 : $*Int32
   %1 = global_addr @sil_global3 : $*Int32
-  %2 = struct_element_addr %1 : $*Int32, #Int32.value
+  %2 = struct_element_addr %1 : $*Int32, #Int32._value
   %4 = tuple()
   return %4 : $()
 }
@@ -475,8 +475,8 @@ class HalfOpenRange {
 // CHECK-NEXT: (0):   %7 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.end
 // CHECK-NEXT: NoAlias
 // CHECK: PAIR #64.
-// CHECK-NEXT: (0):   %9 = struct_element_addr %5 : $*Int32, #Int32.value
-// CHECK-NEXT: (0):   %10 = struct_element_addr %7 : $*Int32, #Int32.value
+// CHECK-NEXT: (0):   %9 = struct_element_addr %5 : $*Int32, #Int32._value
+// CHECK-NEXT: (0):   %10 = struct_element_addr %7 : $*Int32, #Int32._value
 // CHECK-NEXT: NoAlias
 sil @different_fields : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int32, 0
@@ -488,8 +488,8 @@ sil @different_fields : $@convention(thin) () -> () {
   store %1 to %5 : $*Int32
   %7 = ref_element_addr %4 : $HalfOpenRange, #HalfOpenRange.end
   store %3 to %7 : $*Int32 
-  %9 = struct_element_addr %5 : $*Int32, #Int32.value 
-  %10 = struct_element_addr %7 : $*Int32, #Int32.value
+  %9 = struct_element_addr %5 : $*Int32, #Int32._value
+  %10 = struct_element_addr %7 : $*Int32, #Int32._value
   %11 = load %9 : $*Builtin.Int32
   %12 = load %10 : $*Builtin.Int32
   %13 = tuple() 

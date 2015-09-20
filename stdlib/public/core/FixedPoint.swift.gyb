@@ -184,7 +184,8 @@ T : UnsignedIntegerType, U : _SignedIntegerType
 public struct ${Self}
    : ${'SignedIntegerType' if sign == 's' else 'UnsignedIntegerType'},
      Comparable, Equatable {
-  public var value: Builtin.${BuiltinName}
+  public // @testable
+  var _value: Builtin.${BuiltinName}
 
   // FIXME: this declaration should be inferred.
   // <rdar://problem/18379938> Type checker refuses to use the default for
@@ -198,18 +199,18 @@ public struct ${Self}
   @transparent public
   init() {
     let maxWidthZero: IntMax = 0
-    value = Builtin.truncOrBitCast_Int${int_max_bits}_${BuiltinName}(
-       maxWidthZero.value)
+    self._value = Builtin.truncOrBitCast_Int${int_max_bits}_${BuiltinName}(
+       maxWidthZero._value)
   }
 
   @transparent public
   init(_ _v: Builtin.${BuiltinName}) {
-    value = _v
+    self._value = _v
   }
 
   @transparent public
   init(_bits: Builtin.${BuiltinName}) {
-    value = _bits
+    self._value = _bits
   }
 
 % if self_ty.is_word:
@@ -217,9 +218,9 @@ public struct ${Self}
   public // @testable
   init(_ v: Builtin.Word) {
 % if BuiltinName == 'Int32':
-    value = Builtin.truncOrBitCast_Word_Int32(v)
+    self._value = Builtin.truncOrBitCast_Word_Int32(v)
 % elif BuiltinName == 'Int64':
-    value = Builtin.zextOrBitCast_Word_Int64(v)
+    self._value = Builtin.zextOrBitCast_Word_Int64(v)
 % end
   }
 
@@ -227,9 +228,9 @@ public struct ${Self}
   public // @testable
   var _builtinWordValue: Builtin.Word {
 % if BuiltinName == 'Int32':
-    return Builtin.zextOrBitCast_Int32_Word(value)
+    return Builtin.zextOrBitCast_Int32_Word(_value)
 % elif BuiltinName == 'Int64':
-    return Builtin.truncOrBitCast_Int64_Word(value)
+    return Builtin.truncOrBitCast_Int64_Word(_value)
 % end
   }
 % end
@@ -244,7 +245,7 @@ public struct ${Self}
   @transparent public
   init(bigEndian value: ${Self}) {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
-    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value.value) )
+    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value._value) )
 #else
     _UnsupportedArchitectureError()
 #endif
@@ -278,7 +279,7 @@ public struct ${Self}
   /// byte order if necessary.
   public var bigEndian: ${Self} {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
-    return ${Self}(Builtin.int_bswap_${BuiltinName}(value) )
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
 #else
     _UnsupportedArchitectureError()
 #endif
@@ -297,7 +298,7 @@ public struct ${Self}
 %  if bits > 8:
   /// Returns the current integer with the byte order swapped.
   public var byteSwapped: ${Self} {
-    return ${Self}(Builtin.int_bswap_${BuiltinName}(value))
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(_value))
   }
 % end
 
@@ -397,7 +398,7 @@ extension ${Self} {
   /// overflow.
   @transparent public
   static func ${Method}WithOverflow(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
-    let tmp = Builtin.${sign}${op}_with_overflow_${BuiltinName}(lhs.value, rhs.value, false.value)
+    let tmp = Builtin.${sign}${op}_with_overflow_${BuiltinName}(lhs._value, rhs._value, false._value)
     return (${Self}(tmp.0), Bool(tmp.1))
   }
 % end
@@ -418,7 +419,7 @@ extension ${Self} {
 % end
     // FIXME: currently doesn't detect overflow -- blocked by:
     // <rdar://15735295> Need [su]{div,rem}_with_overflow IR
-    let tmp = Builtin.${sign}${op}_${BuiltinName}(lhs.value, rhs.value)
+    let tmp = Builtin.${sign}${op}_${BuiltinName}(lhs._value, rhs._value)
     return (${Self}(tmp), false)
   }
 %end
@@ -455,7 +456,7 @@ extension ${Self} {
 %    if Self != Src:
   public init(_ v: ${Src}) {
 %
-    let srcNotWord = v.value
+    let srcNotWord = v._value
 %
 %       if srcBits == bits and srcSign == sign:
     let dstNotWord = srcNotWord
@@ -479,7 +480,7 @@ extension ${Self} {
     let dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(srcNotWord)
 %       end
 %
-    value = dstNotWord
+    self._value = dstNotWord
   }
 %    end
 
@@ -491,7 +492,7 @@ extension ${Self} {
   @transparent
   public init(truncatingBitPattern: ${Src}) {
 %
-    let srcNotWord = truncatingBitPattern.value
+    let srcNotWord = truncatingBitPattern._value
 %
 %       if self_ty.bits == src_ty.bits:
     let dstNotWord = srcNotWord
@@ -499,7 +500,7 @@ extension ${Self} {
     let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(srcNotWord)
 %       end
 %
-    value = dstNotWord
+    self._value = dstNotWord
   }
 
 %    end
@@ -512,7 +513,7 @@ extension ${Self} {
   /// pattern of bits.
   @transparent
   public init(bitPattern: ${OtherSelf}) {
-    value = bitPattern.value
+    self._value = bitPattern._value
   }
 }
 
@@ -525,7 +526,7 @@ extension ${Self} {
 @transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   let (result, error) = Builtin.${sign}${method}_with_overflow_${BuiltinName}(
-    lhs.value, rhs.value, true.value)
+    lhs._value, rhs._value, true._value)
   // return overflowChecked((${Self}(result), Bool(error)))
   Builtin.condfail(error)
   return ${Self}(result)
@@ -535,13 +536,13 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 % for op,inst in [('/', 'div'), ('%', 'rem')]:
 @transparent
 public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  Builtin.condfail((rhs == 0).value)
+  Builtin.condfail((rhs == 0)._value)
 % if signed:
-  Builtin.condfail(((lhs == ${Self}.min) && (rhs == -1)).value)
+  Builtin.condfail(((lhs == ${Self}.min) && (rhs == -1))._value)
 % end
   // FIXME: currently doesn't detect overflow -- blocked by:
   // <rdar://15735295> Need [su]{div,rem}_with_overflow IR
-  let tmp = Builtin.${sign}${inst}_${BuiltinName}(lhs.value, rhs.value)
+  let tmp = Builtin.${sign}${inst}_${BuiltinName}(lhs._value, rhs._value)
   return ${Self}(tmp)
 }
 %end
@@ -550,7 +551,7 @@ public func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
 @transparent
 public prefix func ~(rhs: ${Self}) -> ${Self} {
   let mask = ${Self}.subtractWithOverflow(0, 1).0
-  return ${Self}(Builtin.xor_${BuiltinName}(rhs.value, mask.value))
+  return ${Self}(Builtin.xor_${BuiltinName}(rhs._value, mask._value))
 }
 
 % for op, name in (
@@ -559,7 +560,7 @@ public prefix func ~(rhs: ${Self}) -> ${Self} {
 %  ('>',sign+'gt'), ('>=',sign+'ge')):
 @transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.cmp_${name}_${BuiltinName}(lhs.value, rhs.value))
+  return Bool(Builtin.cmp_${name}_${BuiltinName}(lhs._value, rhs._value))
 }
 % end
 
@@ -573,14 +574,14 @@ public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   _precondition(rhs < ${Self}._sizeInBits,
       "shift amount is larger than type size in bits")
 % end
-  return ${Self}(Builtin.${name}_${BuiltinName}(lhs.value, rhs.value))
+  return ${Self}(Builtin.${name}_${BuiltinName}(lhs._value, rhs._value))
 }
 % end
 
 % for op, name in (('&','and'), ('^','xor'), ('|','or')):
 @transparent
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return ${Self}(Builtin.${name}_${BuiltinName}(lhs.value, rhs.value))
+  return ${Self}(Builtin.${name}_${BuiltinName}(lhs._value, rhs._value))
 }
 % end
 
@@ -637,7 +638,7 @@ public postfix func -- (inout x: ${Self}) -> ${Self} {
 @warn_unused_result
 public func _assumeNonNegative(x: ${Self}) -> ${Self} {
   _sanityCheck(x >= 0)
-  return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x.value))
+  return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))
 }
 % end
 
@@ -647,7 +648,7 @@ public func _assumeNonNegative(x: ${Self}) -> ${Self} {
 % for bits in fixedBitWidths:
 @transparent
 public func _leadingZeros(x: Builtin.Int${bits}) -> Builtin.Int${bits} {
-  return Builtin.int_ctlz_Int${bits}(x, true.value)
+  return Builtin.int_ctlz_Int${bits}(x, true._value)
 }
 % end
 

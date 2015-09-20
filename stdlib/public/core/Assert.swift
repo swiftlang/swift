@@ -70,7 +70,7 @@ public func precondition(
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
-    Builtin.condfail(error.value)
+    Builtin.condfail(error._value)
   }
 }
 
@@ -161,7 +161,7 @@ public func _precondition(
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
-    Builtin.condfail(error.value)
+    Builtin.condfail(error._value)
   }
 }
 
@@ -189,7 +189,7 @@ public func _overflowChecked<T>(
       _fatalErrorMessage("fatal error", "Overflow/underflow", file, line)
     }
   } else {
-    Builtin.condfail(error.value)
+    Builtin.condfail(error._value)
   }
   return result
 }

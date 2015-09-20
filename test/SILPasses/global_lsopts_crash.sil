@@ -25,7 +25,7 @@ bb0:
   store %13 to %11 : $*Int64
   %15 = integer_literal $Builtin.Int64, 10
   %16 = integer_literal $Builtin.Int1, -1
-  %18 = struct_element_addr %11 : $*Int64, #Int64.value
+  %18 = struct_element_addr %11 : $*Int64, #Int64._value
   br bb2(%12 : $Builtin.Int64)
 
 bb1:

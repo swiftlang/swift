@@ -150,7 +150,7 @@ sil @not_dominating : $@convention(thin) (Int32, @inout ArrayInt, @inout ArrayIn
 bb0(%0 : $Int32, %24 : $*ArrayInt, %25 : $*ArrayInt):
   %100 = integer_literal $Builtin.Int1, -1
   %101 = struct $Bool(%100 : $Builtin.Int1)
-  %1 = struct_extract %0 : $Int32, #Int32.value
+  %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32)
 
@@ -197,7 +197,7 @@ bb2:
   %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
   %15 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %6 : $Int32
   %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.Some!enumelt.1
-  %17 = struct_extract %16 : $Int32, #Int32.value
+  %17 = struct_extract %16 : $Int32, #Int32._value
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
@@ -214,7 +214,7 @@ sil @dominating : $@convention(thin) (Int32, @inout ArrayInt, @inout ArrayInt) -
 bb0(%0 : $Int32, %24 : $*ArrayInt, %25 : $*ArrayInt):
   %100 = integer_literal $Builtin.Int1, -1
   %101 = struct $Bool(%100 : $Builtin.Int1)
-  %1 = struct_extract %0 : $Int32, #Int32.value
+  %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32)
 
@@ -271,7 +271,7 @@ bb2:
   %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
   %15 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %6 : $Int32
   %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.Some!enumelt.1
-  %17 = struct_extract %16 : $Int32, #Int32.value
+  %17 = struct_extract %16 : $Int32, #Int32._value
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
@@ -288,7 +288,7 @@ sil @dominating_but_append : $@convention(thin) (Int32, @inout ArrayInt, @inout 
 bb0(%0 : $Int32, %24 : $*ArrayInt, %25 : $*ArrayInt):
   %100 = integer_literal $Builtin.Int1, -1
   %101 = struct $Bool(%100 : $Builtin.Int1)
-  %1 = struct_extract %0 : $Int32, #Int32.value
+  %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32)
 
@@ -344,7 +344,7 @@ bb2:
   %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
   %15 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %6 : $Int32
   %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.Some!enumelt.1
-  %17 = struct_extract %16 : $Int32, #Int32.value
+  %17 = struct_extract %16 : $Int32, #Int32._value
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
@@ -368,7 +368,7 @@ bb3:
 
 // HOIST-LABEL: sil @hoist
 // HOIST: bb0
-// HOIST: [[END:%[0-9]+]] = struct_extract %0 : $Int32, #Int32.value
+// HOIST: [[END:%[0-9]+]] = struct_extract %0 : $Int32, #Int32._value
 // HOIST: [[ZERO:%[0-9]+]] = integer_literal $Builtin.Int32, 0
 // HOIST: cond_br
 
@@ -410,7 +410,7 @@ sil @hoist : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt):
   %100 = integer_literal $Builtin.Int1, -1
   %101 = struct $Bool(%100 : $Builtin.Int1)
-  %1 = struct_extract %0 : $Int32, #Int32.value
+  %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
   br bb1(%2 : $Builtin.Int32)
 
@@ -470,7 +470,7 @@ sil @hoistinvariant : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt):
   %100 = integer_literal $Builtin.Int1, -1
   %101 = struct $Bool(%100 : $Builtin.Int1)
-  %1 = struct_extract %0 : $Int32, #Int32.value
+  %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
   %37 = struct $Int32(%2 : $Builtin.Int32)
   br bb1(%2 : $Builtin.Int32)
@@ -513,7 +513,7 @@ sil @hoistinvariant_array_is_not_an_arg : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %100 = integer_literal $Builtin.Int1, -1
   %101 = struct $Bool(%100 : $Builtin.Int1)
-  %1 = struct_extract %0 : $Int32, #Int32.value
+  %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
   %37 = struct $Int32(%2 : $Builtin.Int32)
   %f1 = function_ref @getArray : $@convention(thin) () -> ArrayInt
@@ -564,7 +564,7 @@ sil @hoist_rangechecked : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %24 : $*ArrayInt):
   %100 = integer_literal $Builtin.Int1, -1
   %101 = struct $Bool(%100 : $Builtin.Int1)
-  %1 = struct_extract %0 : $Int32, #Int32.value
+  %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
   %3 = integer_literal $Builtin.Int1, -1
   %61 = builtin "cmp_sle_Int32"(%2 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -614,7 +614,7 @@ bb0(%0 : $Array<Int>):
   %f1 = function_ref @getCount2 : $@convention(method) (@owned Array<Int>) -> Int32
   retain_value %0 : $Array<Int>
   %t1 = apply %f1(%0) : $@convention(method) (@owned Array<Int>) -> Int32
-  %c1 = struct_extract %t1 : $Int32, #Int32.value
+  %c1 = struct_extract %t1 : $Int32, #Int32._value
   %t2 = builtin "cmp_eq_Int32"(%z0 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %t2, bb5, bb1
 
@@ -662,7 +662,7 @@ bb0(%0 : $ArraySlice<Int>):
   %f1 = function_ref @getCount3 : $@convention(method) (@owned ArraySlice<Int>) -> Int32
   retain_value %0 : $ArraySlice<Int>
   %t1 = apply %f1(%0) : $@convention(method) (@owned ArraySlice<Int>) -> Int32
-  %c1 = struct_extract %t1 : $Int32, #Int32.value
+  %c1 = struct_extract %t1 : $Int32, #Int32._value
   %t2 = builtin "cmp_eq_Int32"(%z0 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %t2, bb2, bb1(%z0 : $Builtin.Int32)
 
@@ -711,7 +711,7 @@ sil @hoist_rangechecked_addr_proj_store : $@convention(thin) (Int32, @inout Arra
 bb0(%0 : $Int32, %24 : $*ArrayInt):
   %100 = integer_literal $Builtin.Int1, -1
   %101 = struct $Bool(%100 : $Builtin.Int1)
-  %1 = struct_extract %0 : $Int32, #Int32.value
+  %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
   %3 = integer_literal $Builtin.Int1, -1
   %61 = builtin "cmp_sle_Int32"(%2 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -774,7 +774,7 @@ sil @hoist_inclusive_rangechecked : $@convention(thin) (Int32, @inout ArrayInt) 
 bb0(%0 : $Int32, %24 : $*ArrayInt):
   %100 = integer_literal $Builtin.Int1, -1
   %101 = struct $Bool(%100 : $Builtin.Int1)
-  %1 = struct_extract %0 : $Int32, #Int32.value
+  %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
   %3 = integer_literal $Builtin.Int1, -1
   %61 = builtin "cmp_sle_Int32"(%2 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -836,7 +836,7 @@ sil @dont_hoist_variant_array: $@convention(thin) (Int32, @inout ArrayInt) -> In
 bb0(%0 : $Int32, %24 : $*ArrayInt):
   %100 = integer_literal $Builtin.Int1, -1
   %101 = struct $Bool(%100 : $Builtin.Int1)
-  %1 = struct_extract %0 : $Int32, #Int32.value
+  %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
   %3 = integer_literal $Builtin.Int1, -1
   %61 = builtin "cmp_sle_Int32"(%2 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
@@ -880,7 +880,7 @@ sil @dont_hoist_due_to_unknown_release : $@convention(thin) (Int32, @inout Array
 bb0(%0 : $Int32, %24 : $*ArrayInt, %100: $Builtin.NativeObject):
   %105 = integer_literal $Builtin.Int1, -1
   %106 = struct $Bool(%105 : $Builtin.Int1)
-  %1 = struct_extract %0 : $Int32, #Int32.value
+  %1 = struct_extract %0 : $Int32, #Int32._value
   %2 = integer_literal $Builtin.Int32, 0
   br bb1(%2 : $Builtin.Int32)
 
@@ -927,7 +927,7 @@ sil @hoist_but_dont_remove_bc_after_loop : $@convention(thin) (Int32, @inout Arr
 bb0(%0 : $Int32, %1 : $*ArrayInt):
   %2 = integer_literal $Builtin.Int1, -1
   %3 = struct $Bool (%2 : $Builtin.Int1)
-  %4 = struct_extract %0 : $Int32, #Int32.value
+  %4 = struct_extract %0 : $Int32, #Int32._value
   %5 = integer_literal $Builtin.Int32, 0
   %6 = builtin "cmp_eq_Int32"(%5 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int1
   cond_br %6, bb4(%5 : $Builtin.Int32), bb1

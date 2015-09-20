@@ -489,8 +489,8 @@ bb0(%0 : $Builtin.NativeObject):
 // Make sure SILCloner does not get into an infinite loop here.
 sil @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@convention(thin) (UInt32, UInt32) -> UInt32 {
 bb0(%0 : $UInt32, %1 : $UInt32):
-  %3 = struct_extract %0 : $UInt32, #UInt32.value   // user: %5
-  %4 = struct_extract %1 : $UInt32, #UInt32.value   // user: %5
+  %3 = struct_extract %0 : $UInt32, #UInt32._value   // user: %5
+  %4 = struct_extract %1 : $UInt32, #UInt32._value   // user: %5
   %5 = builtin "xor_Int32"(%3 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int32 // user: %6
   %6 = struct $UInt32 (%5 : $Builtin.Int32)         // user: %7
   return %6 : $UInt32                               // id: %7
@@ -871,13 +871,13 @@ sil @coldcall_caller : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
   %1 = alloc_stack $Bool                          // users: %7, %9, %11
   %2 = integer_literal $Builtin.Int32, 0          // user: %5
-  %4 = struct_extract %0 : $Int32, #Int32.value   // user: %5
+  %4 = struct_extract %0 : $Int32, #Int32._value   // user: %5
   %5 = builtin "cmp_eq_Word"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1 // user: %6
   %6 = struct $Bool (%5 : $Builtin.Int1)          // user: %7
   store %6 to %1#1 : $*Bool                       // id: %7
   %8 = function_ref @_TTSgSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@convention(thin) (@in Bool) -> Bool // user: %9
   %9 = apply %8(%1#1) : $@convention(thin) (@in Bool) -> Bool // user: %10
-  %10 = struct_extract %9 : $Bool, #Bool.value    // user: %12
+  %10 = struct_extract %9 : $Bool, #Bool._value    // user: %12
   dealloc_stack %1#0 : $*@local_storage Bool      // id: %11
   cond_br %10, bb1, bb2                           // id: %12
 
@@ -917,7 +917,7 @@ bb0:
   %v16 = struct $Bool (%v12 : $Builtin.Int1)
   store %v16 to %v9#1 : $*Bool                      // id: %17
   %v18 = apply %f1<Bool>(%v9#1) : $@convention(thin) <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0) -> Bool
-  %v19 = struct_extract %v18 : $Bool, #Bool.value
+  %v19 = struct_extract %v18 : $Bool, #Bool._value
   dealloc_stack %v9#0 : $*@local_storage Bool      // id: %20
   cond_br %v19, bb2, bb1                           // id: %21
 
@@ -945,7 +945,7 @@ bb0:
   %v16 = struct $Bool (%v12 : $Builtin.Int1)
   store %v16 to %v9#1 : $*Bool                      // id: %17
   %v18 = apply %f1<Bool>(%v9#1) : $@convention(thin) <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0) -> Bool
-  %v19 = struct_extract %v18 : $Bool, #Bool.value
+  %v19 = struct_extract %v18 : $Bool, #Bool._value
   dealloc_stack %v9#0 : $*@local_storage Bool      // id: %20
   cond_br %v19, bb2, bb1                           // id: %21
 

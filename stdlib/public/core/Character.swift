@@ -44,7 +44,7 @@ public struct Character :
 
     UTF8.encode(scalar, output: output)
     asInt |= (~0) << shift
-    _representation = .Small(Builtin.trunc_Int64_Int63(asInt.value))
+    _representation = .Small(Builtin.trunc_Int64_Int63(asInt._value))
   }
 
   @effects(readonly)
@@ -101,7 +101,7 @@ public struct Character :
     let bits = sizeofValue(initialUTF8) &* 8 &- 1
     if _fastPath(
       count == s._core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {
-      _representation = .Small(Builtin.trunc_Int64_Int63(initialUTF8.value))
+      _representation = .Small(Builtin.trunc_Int64_Int63(initialUTF8._value))
     }
     else {
       if let native = s._core.nativeBuffer
@@ -300,7 +300,7 @@ extension String {
 internal var _minASCIICharReprBuiltin: Builtin.Int63 {
   @inline(__always) get {
     let x: Int64 = 0x7FFFFFFFFFFFFF00
-    return Builtin.truncOrBitCast_Int64_Int63(x.value)
+    return Builtin.truncOrBitCast_Int64_Int63(x._value)
   }
 }
 

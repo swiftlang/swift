@@ -180,7 +180,7 @@ struct A1 {
   // CHECK-LABEL: sil hidden @_TFV15let_propagation2A12f1fS0_FT_VSs5Int32
   // CHECK: bb0
   // CHECK: struct_extract {{.*}}#A1.x
-  // CHECK: struct_extract {{.*}}#Int32.value
+  // CHECK: struct_extract {{.*}}#Int32._value
   // CHECK-NOT: load
   // CHECK-NOT: struct_extract
   // CHECK-NOT: struct_element_addr
@@ -212,7 +212,7 @@ class A2 {
   // CHECK: %[[X:[0-9]+]] = ref_element_addr {{.*}}A2.x
   // CHECK-NEXT: load %[[X]]
   // CHECK: ref_element_addr {{.*}}B2.i
-  // CHECK: %[[XI:[0-9]+]] = struct_element_addr {{.*}}#Int32.value
+  // CHECK: %[[XI:[0-9]+]] = struct_element_addr {{.*}}#Int32._value
   // CHECK-NEXT: load %[[XI]]
   // return
   func af() -> Int32 {

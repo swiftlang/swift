@@ -117,7 +117,7 @@ bb0(%0 : $Bool, %1 : $*MyStruct<T>):
   debug_value %0 : $Bool
 // CHECK-NOT: copy_addr
   copy_addr %1 to [initialization] %2#1 : $*MyStruct<T>
-  %5 = struct_extract %0 : $Bool, #Bool.value
+  %5 = struct_extract %0 : $Bool, #Bool._value
   cond_br %5, bb1, bb2
 
 // CHECK: bb1

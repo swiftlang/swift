@@ -39,7 +39,7 @@ public struct UnicodeScalar :
 
   /// Creates an instance of the NUL scalar value.
   public init() {
-    self._value = Int32(0).value
+    self._value = Int32(0)._value
   }
 
   init(_ value : Builtin.Int32) {
@@ -64,7 +64,7 @@ public struct UnicodeScalar :
         "high- and low-surrogate code points are not valid Unicode scalar values")
     _precondition(v <= 0x10FFFF, "value is outside of Unicode codespace")
 
-    self._value = v.value
+    self._value = v._value
   }
 
   /// Create an instance with numeric value `v`.

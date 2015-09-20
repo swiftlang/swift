@@ -77,8 +77,8 @@ bb1(%4 : $Int32):                                   // Preds: bb5 bb6
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb7, bb8 // id: %5
 
 bb2(%6 : $Int32):                                   // Preds: bb7 bb8
-  %7 = struct_extract %4 : $Int32, #Int32.value       // user: %10
-  %8 = struct_extract %6 : $Int32, #Int32.value       // user: %10
+  %7 = struct_extract %4 : $Int32, #Int32._value       // user: %10
+  %8 = struct_extract %6 : $Int32, #Int32._value       // user: %10
   %9 = integer_literal $Builtin.Int1, -1          // users: %10, %19, %28
   %10 = builtin "sadd_with_overflow_Int32"(%7 : $Builtin.Int32, %8 : $Builtin.Int32, %9 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %11, %12
   %11 = tuple_extract %10 : $(Builtin.Int32, Builtin.Int1), 0 // user: %19
@@ -89,7 +89,7 @@ bb2(%6 : $Int32):                                   // Preds: bb7 bb8
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb9, bb10 // id: %16
 
 bb3(%17 : $Int32):                                  // Preds: bb9 bb10
-  %18 = struct_extract %17 : $Int32, #Int32.value     // user: %19
+  %18 = struct_extract %17 : $Int32, #Int32._value     // user: %19
   %19 = builtin "sadd_with_overflow_Int32"(%11 : $Builtin.Int32, %18 : $Builtin.Int32, %9 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %20, %21
   %20 = tuple_extract %19 : $(Builtin.Int32, Builtin.Int1), 0 // user: %28
   %21 = tuple_extract %19 : $(Builtin.Int32, Builtin.Int1), 1 // user: %22
@@ -99,7 +99,7 @@ bb3(%17 : $Int32):                                  // Preds: bb9 bb10
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb11, bb12 // id: %25
 
 bb4(%26 : $Int32):                                  // Preds: bb11 bb12
-  %27 = struct_extract %26 : $Int32, #Int32.value     // user: %28
+  %27 = struct_extract %26 : $Int32, #Int32._value     // user: %28
   %28 = builtin "sadd_with_overflow_Int32"(%20 : $Builtin.Int32, %27 : $Builtin.Int32, %9 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %29, %30
   %29 = tuple_extract %28 : $(Builtin.Int32, Builtin.Int1), 0 // user: %32
   %30 = tuple_extract %28 : $(Builtin.Int32, Builtin.Int1), 1 // user: %31
@@ -186,8 +186,8 @@ bb1(%2 : $Int32):                                   // Preds: bb3 bb4
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb5, bb6 // id: %3
 
 bb2(%4 : $Int32):                                   // Preds: bb5 bb6
-  %5 = struct_extract %2 : $Int32, #Int32.value       // user: %8
-  %6 = struct_extract %4 : $Int32, #Int32.value       // user: %8
+  %5 = struct_extract %2 : $Int32, #Int32._value       // user: %8
+  %6 = struct_extract %4 : $Int32, #Int32._value       // user: %8
   %7 = integer_literal $Builtin.Int1, -1          // user: %8
   %8 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %9, %10
   %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0 // user: %12
@@ -240,8 +240,8 @@ bb1(%2 : $Int32):                                   // Preds: bb3 bb4
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb5, bb6 // id: %3
 
 bb2(%4 : $Int32):                                   // Preds: bb5 bb6
-  %5 = struct_extract %2 : $Int32, #Int32.value       // user: %8
-  %6 = struct_extract %4 : $Int32, #Int32.value       // user: %8
+  %5 = struct_extract %2 : $Int32, #Int32._value       // user: %8
+  %6 = struct_extract %4 : $Int32, #Int32._value       // user: %8
   %7 = integer_literal $Builtin.Int1, -1          // user: %8
   %8 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %9, %10
   %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0 // user: %12
@@ -295,8 +295,8 @@ bb1(%2 : $Int32):                                   // Preds: bb3 bb4
   checked_cast_br [exact] %0 : $FooClass to $FooClass, bb5, bb6 // id: %3
 
 bb2(%4 : $Int32):                                   // Preds: bb5 bb6
-  %5 = struct_extract %2 : $Int32, #Int32.value       // user: %8
-  %6 = struct_extract %4 : $Int32, #Int32.value       // user: %8
+  %5 = struct_extract %2 : $Int32, #Int32._value       // user: %8
+  %6 = struct_extract %4 : $Int32, #Int32._value       // user: %8
   %7 = integer_literal $Builtin.Int1, -1          // user: %8
   %8 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %9, %10
   %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0 // user: %12
@@ -332,7 +332,7 @@ bb6:                                              // Preds: bb1
 sil [noinline] @_TTOS_no2g__TFC18devirt_jump_thread8FooClass3foofS0_FSiSi : $@convention(method) (Int32, @guaranteed FooClass) -> Int32 {
 bb0(%0 : $Int32, %1 : $FooClass):
   %2 = integer_literal $Builtin.Int32, 11          // user: %5
-  %3 = struct_extract %0 : $Int32, #Int32.value       // user: %5
+  %3 = struct_extract %0 : $Int32, #Int32._value       // user: %5
   %4 = integer_literal $Builtin.Int1, -1          // user: %5
   %5 = builtin "sadd_with_overflow_Int32"(%3 : $Builtin.Int32, %2 : $Builtin.Int32, %4 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %6, %7
   %6 = tuple_extract %5 : $(Builtin.Int32, Builtin.Int1), 0 // user: %9
@@ -410,7 +410,7 @@ bb10(%26 : $C):
   %32 = init_existential_ref %26 : $C : $C, $AnyObject
   %33 = enum $Optional<AnyObject>, #Optional.Some!enumelt.1, %32 : $AnyObject
   %34 = apply %27(%30, %33) : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
-  %35 = struct_extract %34 : $Bool, #Bool.value
+  %35 = struct_extract %34 : $Bool, #Bool._value
   cond_br %35, bb11, bb12
 
 bb11:

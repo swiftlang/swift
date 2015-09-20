@@ -101,7 +101,7 @@ bb0(%0 : $Array<X>):
 // CHECK: return [[R]]
 sil @test_phi : $@convention(thin) (Bool) -> Bool {
 bb0(%0 : $Bool):
-  %2 = struct_extract %0 : $Bool, #Bool.value
+  %2 = struct_extract %0 : $Bool, #Bool._value
   %3 = function_ref @_array_X_init : $@convention(thin) () -> @owned Array<X>
   cond_br %2, bb1, bb2
 
@@ -125,7 +125,7 @@ bb3(%a1 : $Array<X>):
 // CHECK: return [[R]]
 sil @negative_test_phi : $@convention(thin) (Bool, @owned Array<X>) -> Bool {
 bb0(%0 : $Bool, %1 : $Array<X>):
-  %2 = struct_extract %0 : $Bool, #Bool.value
+  %2 = struct_extract %0 : $Bool, #Bool._value
   cond_br %2, bb1, bb2
 
 bb1:
@@ -216,7 +216,7 @@ sil @test_tuple_phi : $@convention(thin) (Bool) -> Bool {
 bb0(%0 : $Bool):
   %i1 = integer_literal $Builtin.Int64, 0
   %f1 = function_ref @_array_X_init : $@convention(thin) () -> @owned Array<X>
-  %2 = struct_extract %0 : $Bool, #Bool.value
+  %2 = struct_extract %0 : $Bool, #Bool._value
   cond_br %2, bb1, bb2
 
 bb1:
@@ -244,7 +244,7 @@ sil @test_tuple_phi_unknown : $@convention(thin) (Bool, @owned Array<X>) -> Bool
 bb0(%0 : $Bool, %1 : $Array<X>):
   %i1 = integer_literal $Builtin.Int64, 0
   %f1 = function_ref @_array_X_init : $@convention(thin) () -> @owned Array<X>
-  %2 = struct_extract %0 : $Bool, #Bool.value
+  %2 = struct_extract %0 : $Bool, #Bool._value
   cond_br %2, bb1, bb2
 
 bb1:
@@ -385,7 +385,7 @@ bb0(%0 : $Holder, %1 : $Bool):
   %3 = load %2 : $*Array<X>
 
   %i1 = function_ref @_array_X_init : $@convention(thin) () -> @owned Array<X>
-  %c1 = struct_extract %1 : $Bool, #Bool.value
+  %c1 = struct_extract %1 : $Bool, #Bool._value
   cond_br %c1, bb1, bb2
 
 bb1:
@@ -425,7 +425,7 @@ bb0(%0 : $Holder, %1 : $Bool):
   %3 = load %2 : $*Array<X>
 
   %i1 = function_ref @_array_X_init : $@convention(thin) () -> @owned Array<X>
-  %c1 = struct_extract %1 : $Bool, #Bool.value
+  %c1 = struct_extract %1 : $Bool, #Bool._value
   cond_br %c1, bb1, bb2
 
 bb1:

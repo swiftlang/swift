@@ -62,6 +62,7 @@ IDENTIFIER(SwiftObject)
 IDENTIFIER(toRaw)
 IDENTIFIER(Type)
 IDENTIFIER(value)
+IDENTIFIER(_value)
 
 // Operators
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")

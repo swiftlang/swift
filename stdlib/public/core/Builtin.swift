@@ -19,7 +19,7 @@ import SwiftShims
 @transparent
 internal var _nilRawPointer: Builtin.RawPointer {
   let zero: Int8 = 0
-  return Builtin.inttoptr_Int8(zero.value)
+  return Builtin.inttoptr_Int8(zero._value)
 }
 
 /// Returns the contiguous memory footprint of `T`.
@@ -281,7 +281,7 @@ public func _getUnsafePointerToStoredProperties(x: AnyObject)
 @warn_unused_result
 internal func _branchHint<C : BooleanType>(actual: C, _ expected: Bool)
   -> Bool {
-  return Bool(Builtin.int_expect_Int1(actual.boolValue.value, expected.value))
+  return Bool(Builtin.int_expect_Int1(actual.boolValue._value, expected._value))
 }
 
 /// Optimizer hint that `x` is expected to be `true`.

@@ -25,7 +25,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Int32):
   %12 = function_ref @globalinit_func11 : $@convention(thin) () -> () // users: %26, %13
   %14 = builtin "once"(%11 : $Builtin.RawPointer, %12 : $@convention(thin) () -> ()) : $()
   %15 = alloc_stack $Int32                        // users: %38, %40, %41
-  %16 = struct_element_addr %15#1 : $*Int32, #Int32.value // users: %28, %17
+  %16 = struct_element_addr %15#1 : $*Int32, #Int32._value // users: %28, %17
   %17 = load %16 : $*Builtin.Int32                // user: %20
   %18 = integer_literal $Builtin.Int32, -1         // user: %20
   %20 = builtin "xor_Int32"(%17 : $Builtin.Int32, %18 : $Builtin.Int32) : $Builtin.Int32 // user: %22
@@ -67,7 +67,7 @@ bb3(%35 : $()):                                   // Preds: bb2
 sil @remove_dead_args: $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 37
-  %3 = struct_extract %0 : $Int32, #Int32.value
+  %3 = struct_extract %0 : $Int32, #Int32._value
   %4 = builtin "cmp_ne_Int32"(%3 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   %5 = struct $Bool (%4 : $Builtin.Int1)
   cond_br %4, bb1, bb3
@@ -632,7 +632,7 @@ bb9(%17 : $Builtin.Int1):                         // Preds: bb2 bb5 bb8
 sil @DontFormSelectEnumBoolResult : $@convention(thin) (Numbers, Bool) -> Bool {
 bb0(%0 : $Numbers, %1 : $Bool):
   debug_value %0 : $Numbers  // let e             // id: %2
-  %2 = struct_extract %1 : $Bool, #Bool.value
+  %2 = struct_extract %1 : $Bool, #Bool._value
   switch_enum %0 : $Numbers, case #Numbers.First!enumelt: bb1, case #Numbers.Second!enumelt: bb3, case #Numbers.Third!enumelt: bb4, default bb6 // id: %4
 
 bb1:                                              // Preds: bb0

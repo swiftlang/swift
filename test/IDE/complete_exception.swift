@@ -227,7 +227,6 @@ func test015() {
 }
 // Check that we can complete on the bound value; Not exhaustive..
 // INT_DOT: Begin completions
-// INT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      value[#Int32#]; name=value
 // INT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      bigEndian[#Int32#]; name=bigEndian
 // INT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      littleEndian[#Int32#]; name=littleEndian
 // INT_DOT: End completions

@@ -175,19 +175,19 @@ def incIfSigned(bits, signed):
 
 public struct ${Self} {
   public // @testable
-  var value: Builtin.FPIEEE${bits}
+  var _value: Builtin.FPIEEE${bits}
 
   /// Create an instance initialized to zero.
   @transparent public
   init() {
     let zero: Int64 = 0
-    value = Builtin.uitofp_Int64_FPIEEE${bits}(zero.value)
+    self._value = Builtin.uitofp_Int64_FPIEEE${bits}(zero._value)
   }
 
   @transparent 
   public // @testable
   init(_bits v: Builtin.FPIEEE${bits}) {
-    value = v
+    self._value = v
   }
 
   /// Create an instance initialized to `value`.
@@ -209,11 +209,11 @@ extension ${Self} : FloatingPointType {
   public typealias _BitsType = UInt${bits}
 
   public static func _fromBitPattern(bits: _BitsType) -> ${Self} {
-    return ${Self}(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bits.value))
+    return ${Self}(_bits: Builtin.bitcast_Int${bits}_FPIEEE${bits}(bits._value))
   }
 
   public func _toBitPattern() -> _BitsType {
-    return _BitsType(Builtin.bitcast_FPIEEE${bits}_Int${bits}(value))
+    return _BitsType(Builtin.bitcast_FPIEEE${bits}_Int${bits}(_value))
   }
 
   @warn_unused_result
@@ -369,7 +369,7 @@ extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible
 
   /// Create an instance initialized to `value`.
   public init(integerLiteral value: Int64) {
-    self = ${Self}(_bits: Builtin.sitofp_Int64_FPIEEE${bits}(value.value))
+    self = ${Self}(_bits: Builtin.sitofp_Int64_FPIEEE${bits}(value._value))
   }
 }
 
@@ -422,37 +422,37 @@ extension ${Self} : FloatLiteralConvertible {
 @transparent
 @warn_unused_result
 public func ==(lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.fcmp_oeq_FPIEEE${bits}(lhs.value, rhs.value))
+  return Bool(Builtin.fcmp_oeq_FPIEEE${bits}(lhs._value, rhs._value))
 }
 
 @transparent
 @warn_unused_result
 public func != (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.fcmp_une_FPIEEE${bits}(lhs.value, rhs.value))
+  return Bool(Builtin.fcmp_une_FPIEEE${bits}(lhs._value, rhs._value))
 }
 
 @transparent
 @warn_unused_result
 public func <(lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.fcmp_olt_FPIEEE${bits}(lhs.value, rhs.value))
+  return Bool(Builtin.fcmp_olt_FPIEEE${bits}(lhs._value, rhs._value))
 }
 
 @transparent
 @warn_unused_result
 public func > (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.fcmp_ogt_FPIEEE${bits}(lhs.value, rhs.value))
+  return Bool(Builtin.fcmp_ogt_FPIEEE${bits}(lhs._value, rhs._value))
 }
 
 @transparent
 @warn_unused_result
 public func <= (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.fcmp_ole_FPIEEE${bits}(lhs.value, rhs.value))
+  return Bool(Builtin.fcmp_ole_FPIEEE${bits}(lhs._value, rhs._value))
 }
 
 @transparent
 @warn_unused_result
 public func >= (lhs: ${Self}, rhs: ${Self}) -> Bool {
-  return Bool(Builtin.fcmp_oge_FPIEEE${bits}(lhs.value, rhs.value))
+  return Bool(Builtin.fcmp_oge_FPIEEE${bits}(lhs._value, rhs._value))
 }
 
 @transparent
@@ -481,7 +481,7 @@ extension ${Self} : Hashable {
       return 0.0.hashValue
     } else {
   % end
-      let asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)
+      let asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(_value)
   %   if bits >= 64:
       return Int(Builtin.truncOrBitCast_Int${bits}_Word(asBuiltinInt))
   %   elif bits <= 32:
@@ -501,7 +501,7 @@ extension ${Self} : AbsoluteValuable {
   @transparent
   @warn_unused_result
   public static func abs(x: ${Self}) -> ${Self} {
-    return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(x.value))
+    return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(x._value))
   }
 }
 
@@ -514,7 +514,7 @@ public prefix func +(x: ${Self}) -> ${Self} {
 @transparent
 @warn_unused_result
 public prefix func -(x: ${Self}) -> ${Self} {
-  return ${Self}(_bits: Builtin.fneg_FPIEEE${bits}(x.value))
+  return ${Self}(_bits: Builtin.fneg_FPIEEE${bits}(x._value))
 }
 
 //===----------------------------------------------------------------------===//
@@ -529,7 +529,7 @@ extension ${Self} {
 %    ThatBuiltinName = builtinIntName(srcBits)
 %    sign = 's' if srcSigned else 'u'
   public init(_ v: ${That}) {
-    value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v.value)
+    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
 % end
 }
@@ -548,9 +548,9 @@ extension ${Self} {
   /// Construct an instance that approximates `other`.
   public init(_ other: ${That}) {
 %     if srcBits > bits:
-    value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(other.value)
+    _value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
 %     else:
-    value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(other.value)
+    _value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(other._value)
 %     end
   }
 
@@ -602,7 +602,7 @@ extension ${Self} : Strideable {
 @transparent
 @warn_unused_result
 public func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return ${Self}(_bits: Builtin.${name}_FPIEEE${bits}(lhs.value, rhs.value))
+  return ${Self}(_bits: Builtin.${name}_FPIEEE${bits}(lhs._value, rhs._value))
 }
 % end
 
@@ -669,7 +669,8 @@ extension ${Self} {
       "floating point value can not be converted to ${Self} because it is greater than ${Self}.max")
 
 %     end
-    value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(other.value)
+    self._value =
+      Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(other._value)
   }
 
 %      if srcBits == 80:

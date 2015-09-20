@@ -86,7 +86,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/ASCII") {
   // passed a literal that consists from a single Unicode scalar.
 
   // U+005A LATIN CAPITAL LETTER Z
-  let str = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a).value)
+  let str = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a)._value)
   expectEqual("Z", str.unicodeScalar)
   expectFalse(str.hasPointerRepresentation)
   expectTrue(str.isASCII)
@@ -103,7 +103,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/ASCII") {
 
 StaticStringTestSuite.test("UnicodeScalarRepresentation/NonASCII") {
   // U+042B CYRILLIC CAPITAL LETTER YERU
-  let str = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x042b).value)
+  let str = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x042b)._value)
   expectEqual("Ы", str.unicodeScalar)
   expectFalse(str.hasPointerRepresentation)
   expectFalse(str.isASCII)
@@ -125,7 +125,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8Start")
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "StaticString should have pointer representation" : "")
   .code {
-  let str = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a).value)
+  let str = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a)._value)
   let strOpaque = _opaqueIdentity(str)
   expectCrashLater()
   strOpaque.utf8Start
@@ -138,7 +138,7 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/byteSize")
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "StaticString should have pointer representation" : "")
   .code {
-  let str = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a).value)
+  let str = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a)._value)
   let strOpaque = _opaqueIdentity(str)
   expectCrashLater()
   strOpaque.byteSize

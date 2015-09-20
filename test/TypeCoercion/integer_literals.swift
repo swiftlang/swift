@@ -61,8 +61,8 @@ func chaining() {
 }
 
 func memberaccess() {
-  Int32(5.value) // expected-warning{{unused}}
+  Int32(5._value) // expected-warning{{unused}}
   // This diagnostic is actually better than it looks, because the inner type is Builtin.Int32, not actually Int32.
-  let x : Int32 = 7.value // expected-error{{cannot convert value of type 'Int32' to specified type 'Int32'}}
+  let x : Int32 = 7._value // expected-error{{cannot convert value of type 'Int32' to specified type 'Int32'}}
   _ = x
 }

@@ -9,8 +9,8 @@ import Swift
 sil @dead1 : $@convention(thin) (Int32, Int32) -> Int32 {
 // CHECK: bb0
 bb0(%0 : $Int32, %1 : $Int32):
-  %3 = struct_extract %0 : $Int32, #Int32.value
-  %4 = struct_extract %1 : $Int32, #Int32.value
+  %3 = struct_extract %0 : $Int32, #Int32._value
+  %4 = struct_extract %1 : $Int32, #Int32._value
   %5 = integer_literal $Builtin.Int1, -1
   %6 = builtin "sadd_with_overflow_Int32"(%3 : $Builtin.Int32, %4 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %7 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 0
@@ -87,10 +87,10 @@ bb0:
 
 bb1(%13 : $Int32, %14 : $Int32, %15 : $Int32, %16 : $Int32, %17 : $Int32):
   %18 = integer_literal $Builtin.Int32, 11
-  %20 = struct_extract %15 : $Int32, #Int32.value
+  %20 = struct_extract %15 : $Int32, #Int32._value
   %21 = builtin "cmp_slt_Int32"(%20 : $Builtin.Int32, %18 : $Builtin.Int32) : $Builtin.Int1
   %22 = struct $Bool (%21 : $Builtin.Int1)
-  %23 = struct_extract %22 : $Bool, #Bool.value
+  %23 = struct_extract %22 : $Bool, #Bool._value
   cond_br %23, bb2, bb10
 
 // CHECK: bb2:
@@ -102,19 +102,19 @@ bb2:
 
 bb3(%28 : $Int32, %29 : $Int32, %30 : $Int32, %31 : $Int32):
   %32 = integer_literal $Builtin.Int32, 22
-  %34 = struct_extract %30 : $Int32, #Int32.value
+  %34 = struct_extract %30 : $Int32, #Int32._value
   %35 = builtin "cmp_slt_Int32"(%34 : $Builtin.Int32, %32 : $Builtin.Int32) : $Builtin.Int1
   %36 = struct $Bool (%35 : $Builtin.Int1)
-  %37 = struct_extract %36 : $Bool, #Bool.value
+  %37 = struct_extract %36 : $Bool, #Bool._value
   cond_br %37, bb4, bb9
 
 // CHECK: bb4:
 bb4:
   %39 = integer_literal $Builtin.Int32, 0
-  %41 = struct_extract %28 : $Int32, #Int32.value
+  %41 = struct_extract %28 : $Int32, #Int32._value
   %42 = builtin "cmp_eq_Int32"(%39 : $Builtin.Int32, %41 : $Builtin.Int32) : $Builtin.Int1
   %43 = struct $Bool (%42 : $Builtin.Int1)
-  %44 = struct_extract %43 : $Bool, #Bool.value
+  %44 = struct_extract %43 : $Bool, #Bool._value
 // CHECK-NOT: cond_br
 // CHECK: br bb8
   cond_br %44, bb5, bb6(%28 : $Int32)
@@ -127,10 +127,10 @@ bb5:
 // CHECK: bb6
 bb6(%49 : $Int32):
   %50 = integer_literal $Builtin.Int32, 10
-  %52 = struct_extract %29 : $Int32, #Int32.value
+  %52 = struct_extract %29 : $Int32, #Int32._value
   %53 = builtin "cmp_eq_Int32"(%50 : $Builtin.Int32, %52 : $Builtin.Int32) : $Builtin.Int1
   %54 = struct $Bool (%53 : $Builtin.Int1)
-  %55 = struct_extract %54 : $Bool, #Bool.value
+  %55 = struct_extract %54 : $Bool, #Bool._value
 // CHECK-NOT: cond_br
 // CHECK: br bb8
   cond_br %55, bb7, bb8(%29 : $Int32)
@@ -144,7 +144,7 @@ bb7:
 
 // CHECK: bb8
 bb8(%60 : $Int32):
-  %61 = struct_extract %31 : $Int32, #Int32.value
+  %61 = struct_extract %31 : $Int32, #Int32._value
   %62 = integer_literal $Builtin.Int32, 1
   %64 = integer_literal $Builtin.Int1, -1
   %65 = builtin "sadd_with_overflow_Int32"(%61 : $Builtin.Int32, %62 : $Builtin.Int32, %64 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -152,7 +152,7 @@ bb8(%60 : $Int32):
   %67 = tuple_extract %65 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %67 : $Builtin.Int1
   %69 = struct $Int32 (%66 : $Builtin.Int32)
-  %70 = struct_extract %30 : $Int32, #Int32.value
+  %70 = struct_extract %30 : $Int32, #Int32._value
   %71 = integer_literal $Builtin.Int32, 1
   %73 = integer_literal $Builtin.Int1, -1
   %74 = builtin "sadd_with_overflow_Int32"(%70 : $Builtin.Int32, %71 : $Builtin.Int32, %73 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -165,7 +165,7 @@ bb8(%60 : $Int32):
 
 // CHECK: bb9:
 bb9:
-  %80 = struct_extract %15 : $Int32, #Int32.value
+  %80 = struct_extract %15 : $Int32, #Int32._value
   %81 = integer_literal $Builtin.Int32, 1
   %83 = integer_literal $Builtin.Int1, -1
   %84 = builtin "sadd_with_overflow_Int32"(%80 : $Builtin.Int32, %81 : $Builtin.Int32, %83 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)

@@ -4,8 +4,8 @@
 // Refer to members of literals
 //===----------------------------------------------------------------------===//
 func testLiteralMembers() {
-  _ = 0.value
-  Int(0.value) // expected-warning{{unused}}
+  _ = 0._value
+  Int(0._value) // expected-warning{{unused}}
 }
 
 
