@@ -596,10 +596,7 @@ SILBasicBlock *swift::splitEdge(TermInst *T, unsigned EdgeIdx,
   SmallVector<SILValue, 16> Args;
   getEdgeArgs(T, EdgeIdx, EdgeBB, Args);
 
-  // Connect it to the successor with the args of the old edge.
-  auto &InstList = EdgeBB->getInstList();
-  InstList.insert(InstList.end(),
-                  BranchInst::create(T->getLoc(), DestBB, Args, *Fn));
+  SILBuilder(EdgeBB).createBranch(T->getLoc(), DestBB, Args);
 
   // Strip the arguments and rewire the branch in the source block.
   changeBranchTarget(T, EdgeIdx, EdgeBB, /*PreserveArgs=*/false);
