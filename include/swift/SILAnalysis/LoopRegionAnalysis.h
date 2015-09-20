@@ -124,13 +124,9 @@ class LoopRegion {
     static constexpr unsigned MaxID = (unsigned(1) << IDBitSize) - 1;
     unsigned IsLoop : 1;
     unsigned ID : IDBitSize;
-
-    LoopRegionID(unsigned id, bool isloop) {
-      IsLoop = unsigned(isloop);
-      ID = id;
-    }
     bool operator<(const LoopRegionID &Other) const { return ID < Other.ID; }
   };
+  static_assert(std::is_pod<LoopRegionID>::value, "Expected pod");
 
   class SubregionData;
 
@@ -308,12 +304,6 @@ private:
   /// the case of loops this overhead is acceptable since we shouldn't have many
   /// loops (compared to BBs).
   struct SubregionData {
-    /// These checks are just for performance.
-    static_assert(std::is_trivially_copyable<LoopRegionID>::value,
-                  "Expected pod");
-    static_assert(sizeof(LoopRegionID) == sizeof(unsigned),
-                  "Expected an unsigned size integer");
-
     /// The RPO number of the header block of this loop or function. This is
     /// used as the RPO number for the whole region.
     unsigned RPONumOfHeaderBlock;
@@ -352,12 +342,12 @@ private:
 
     void addBBSubregion(LoopRegion *R) {
       assert(R->ID <= LoopRegionID::MaxID && "Unrepresentable ID");
-      Subregions.push_back(LoopRegionID(R->ID, false));
+      Subregions.push_back({R->ID, false});
     }
 
     void addLoopSubregion(LoopRegion *L, LoopRegion *Header) {
       assert(Header->ID <= LoopRegionID::MaxID && "Unrepresentable ID");
-      Subregions.push_back(LoopRegionID(Header->ID, true));
+      Subregions.push_back({Header->ID, true});
       Subloops.push_back({Header->ID, L->ID});
     }
 
