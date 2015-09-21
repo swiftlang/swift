@@ -2122,18 +2122,18 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     
     // If we know the platform runtime's "done" value, emit the check inline.
     llvm::BasicBlock *notDoneBB, *doneBB;
-    
+
     if (auto ExpectedPred = IGF.IGM.TargetInfo.OnceDonePredicateValue) {
       auto PredValue = IGF.Builder.CreateLoad(PredPtr,
                                               IGF.IGM.getPointerAlignment());
       auto ExpectedPredValue = llvm::ConstantInt::getSigned(IGF.IGM.OnceTy,
                                                             *ExpectedPred);
-      auto NotDone = IGF.Builder.CreateICmpNE(PredValue, ExpectedPredValue);
+      auto PredIsDone = IGF.Builder.CreateICmpEQ(PredValue, ExpectedPredValue);
       
       notDoneBB = IGF.createBasicBlock("once_not_done");
       doneBB = IGF.createBasicBlock("once_done");
       
-      IGF.Builder.CreateCondBr(NotDone, notDoneBB, doneBB);
+      IGF.Builder.CreateCondBr(PredIsDone, doneBB, notDoneBB);
       IGF.Builder.emitBlock(notDoneBB);
     }
     
@@ -2143,9 +2143,17 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     call->setCallingConv(IGF.IGM.RuntimeCC);
     
     // If we emitted the "done" check inline, join the branches.
-    if (IGF.IGM.TargetInfo.OnceDonePredicateValue) {
+    if (auto ExpectedPred = IGF.IGM.TargetInfo.OnceDonePredicateValue) {
       IGF.Builder.CreateBr(doneBB);
       IGF.Builder.emitBlock(doneBB);
+      // We can assume the once predicate is in the "done" state now.
+      auto PredValue = IGF.Builder.CreateLoad(PredPtr,
+                                              IGF.IGM.getPointerAlignment());
+      auto ExpectedPredValue = llvm::ConstantInt::getSigned(IGF.IGM.OnceTy,
+                                                            *ExpectedPred);
+      auto PredIsDone = IGF.Builder.CreateICmpEQ(PredValue, ExpectedPredValue);
+
+      IGF.Builder.CreateAssumption(PredIsDone);
     }
     
     // No return value.

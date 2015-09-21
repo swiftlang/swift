@@ -370,12 +370,15 @@ func testCondFail(b: Bool, c: Bool) {
 // CHECK-LABEL: define hidden void @_TF8builtins8testOnce{{.*}}(i8*, i8*) {{.*}} {
 // CHECK:         [[PRED_PTR:%.*]] = bitcast i8* %0 to [[WORD:i64|i32]]*
 // CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
-// CHECK-objc:    [[NOT_DONE:%.*]] = icmp ne [[WORD]] [[PRED]], -1
-// CHECK-objc:    br i1 [[NOT_DONE]], label %[[NOT_DONE:.*]], label %[[DONE:.*]]
+// CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
+// CHECK-objc:    br i1 [[IS_DONE]], label %[[DONE:.*]], label %[[NOT_DONE:.*]]
 // CHECK-objc:  [[NOT_DONE]]:
 // CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1)
 // CHECK-objc:    br label %[[DONE]]
 // CHECK-objc:  [[DONE]]:
+// CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
+// CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
+// CHECK-objc:    call void @llvm.assume(i1 [[IS_DONE]])
 
 func testOnce(p: Builtin.RawPointer, f: @convention(thin) () -> ()) {
   Builtin.once(p, f)
