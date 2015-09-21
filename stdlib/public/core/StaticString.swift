@@ -145,7 +145,7 @@ public struct StaticString
   }
 
   @transparent
-  init(
+  internal init(
     start: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1
   ) {
     self._startPtrOrData = start
@@ -154,13 +154,13 @@ public struct StaticString
   }
 
   @transparent
-  init(
+  internal init(
     unicodeScalar: Builtin.Int32
   ) {
     self._startPtrOrData =
       unsafeBitCast(UInt(UInt32(unicodeScalar)), COpaquePointer.self)._rawValue
     self._byteSize = 0._builtinWordValue
-    self._flags = UnicodeScalar(unicodeScalar).isASCII()
+    self._flags = UnicodeScalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII()
       ? (0x3 as UInt8)._value
       : (0x1 as UInt8)._value
   }

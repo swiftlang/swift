@@ -17,18 +17,18 @@ public struct UnicodeScalar :
   _BuiltinUnicodeScalarLiteralConvertible,
   UnicodeScalarLiteralConvertible {
 
-  var _value: Builtin.Int32
+  var _value: UInt32
 
   /// A numeric representation of `self`.
   public var value: UInt32 {
     get {
-      return UInt32(_value)
+      return _value
     }
   }
 
   @transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-    self._value = value
+    self._value = UInt32(value)
   }
 
   /// Create an instance initialized to `value`.
@@ -39,11 +39,7 @@ public struct UnicodeScalar :
 
   /// Creates an instance of the NUL scalar value.
   public init() {
-    self._value = Int32(0)._value
-  }
-
-  init(_ value : Builtin.Int32) {
-    self._value = value
+    self._value = 0
   }
 
   /// Create an instance with numeric value `v`.
@@ -64,7 +60,7 @@ public struct UnicodeScalar :
         "high- and low-surrogate code points are not valid Unicode scalar values")
     _precondition(v <= 0x10FFFF, "value is outside of Unicode codespace")
 
-    self._value = v._value
+    self._value = v
   }
 
   /// Create an instance with numeric value `v`.
