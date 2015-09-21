@@ -930,4 +930,6 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
                          withOptions:(NSEnumerationOptions)opts
                          usingBlock:(void (^)(id obj, NSUInteger idx,
                                               BOOL *stop))block;
+
+- (void)doSomethingWithCopying:(nonnull id<NSCopying>)copying;
 @end

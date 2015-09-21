@@ -103,6 +103,9 @@
 // Note: WithBlock -> body
 // CHECK-FOUNDATION: func enumerateObjectsRandomly(body _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
 
+// Note: id<Proto> treated as "Proto".
+// CHECK-FOUNDATION: func doSomethingWith(_: NSCopying)
+
 // Note: class method name stripping result type.
 // CHECK-APPKIT: class func red() -> NSColor
 

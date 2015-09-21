@@ -1912,9 +1912,13 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
     if (objcObjectPtr->isObjCIdType())
       return "Object";
 
-      // Objective-C "Class" type.
+    // Objective-C "Class" type.
     if (objcObjectPtr->isObjCClassType())
       return "Class";
+
+    // For id<Proto>, retrieve the name of "Proto".
+    if (objcObjectPtr->getNumProtocols() == 1)
+      return (*objcObjectPtr->qual_begin())->getName();
 
     return StringRef();
   }
