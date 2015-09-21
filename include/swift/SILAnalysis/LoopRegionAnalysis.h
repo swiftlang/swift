@@ -168,6 +168,12 @@ public:
         : InnerIter(iter), Subloops(subloops), IsInvalid(false) {}
 
   public:
+    using value_type = unsigned;
+    using reference = const unsigned &;
+    using pointer = void;
+    using iterator_category = std::bidirectional_iterator_tag;
+    using difference_type = void;
+
     /// Construct a subregion_iterator suitable for use with a basic block. It
     /// does not contain any data and can only be compared against another
     /// invalid iterator (for which it will return true). Any other usage
@@ -236,6 +242,12 @@ public:
         : InnerIter(iter), Subloops(subloops) {}
 
   public:
+    using value_type = unsigned;
+    using reference = const unsigned &;
+    using pointer = void;
+    using iterator_category = std::bidirectional_iterator_tag;
+    using difference_type = void;
+
     unsigned operator*() const {
       auto ID = *InnerIter;
       if (!ID.IsLoop)
