@@ -136,4 +136,4 @@
 
 // Make sure we're removing redundant context type info at both the
 // beginning and the end of a property.
-// CHECK-APPKIT: var byFlattening: NSBezierPath { get }
+// CHECK-APPKIT: var flattening: NSBezierPath { get }
