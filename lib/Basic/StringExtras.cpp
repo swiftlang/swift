@@ -619,6 +619,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                               ArrayRef<OmissionTypeName> paramTypes,
                               bool returnsSelf,
                               StringScratchSpace &scratch) {
+  bool anyChanges = false;
+
   // For zero-parameter methods that return 'Self' or a result type
   // that matches the declaration context, omit needless words from
   // the base name.
@@ -632,16 +634,15 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       StringRef oldBaseName = baseName;
       baseName = omitNeedlessWords(baseName, typeName, NameRole::Property,
                                    scratch);
-      return baseName != oldBaseName;
+      if (baseName != oldBaseName)
+        anyChanges = true;
     }
-
-    return false;
   }
 
   // Omit needless words in the base name based on the result type.
-  bool anyChanges = false;
   StringRef newBaseName
-    = omitNeedlessWordsForResultType(baseName, resultType,
+    = omitNeedlessWordsForResultType(baseName,
+                                     returnsSelf ? contextType : resultType,
                                      resultTypeMatchesContext, scratch);
   if (newBaseName != baseName) {
     baseName = newBaseName;

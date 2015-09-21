@@ -1983,7 +1983,6 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
 
     // Figure out whether there will be a default argument for this
     // parameter.
-    const clang::EnumType *enumTy = nullptr;
     bool hasDefaultArg
       = canInferDefaultArgument(
           param->getType(),

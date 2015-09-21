@@ -59,7 +59,7 @@
 // CHECK-FOUNDATION: func someMethod(with _: NSDeprecatedOptions = [])
 
 // Note: class name matching; don't drop "With".
-// CHECK-FOUNDATION: class func requestWith(_: String!) -> Self!
+// CHECK-FOUNDATION: class func withString(_: String!) -> Self!
 
 // Note: Make sure NSURL works in various places
 // CHECK-FOUNDATION: open(_: NSURL!, completionHandler: ((Bool) -> Void)!)
@@ -120,3 +120,10 @@
 
 // Note: Skipping over "Ref"
 // CHECK-CORECOOLING: func replace(_: CCPowerSupply!)
+
+// Make sure we're removing redundant result type info at both the
+// beginning and the end.
+// CHECK-APPKIT: func reversing() -> NSBezierPath
+
+// Make sure we're dealing with 'instancetype' properly.
+// CHECK-APPKIT: func inventing() -> Self

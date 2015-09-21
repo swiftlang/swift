@@ -252,3 +252,8 @@ struct Point3D { double x, y, z; };
 -(void)drawInAirAtPoint:(struct Point3D)point;
 -(void)setTextColor:(nullable NSColor *)color;
 @end
+
+@interface NSBezierPath : NSObject
+- (nonnull NSBezierPath *)bezierPathByReversingPath;
+- (nonnull instancetype)bezierPathByInventingPath;
+@end
