@@ -340,17 +340,22 @@ public:
     }
 
     // Next step: delete all dead functions.
+    bool NeedUpdate = false;
     for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
       SILFunction *F = FI++;
       if (!isAlive(F)) {
         DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
         NumDeadFunc++;
         CallGraphEditor(CG).removeCallGraphNode(F);
+        NeedUpdate = true;
         Module->eraseFunction(F);
         CGA->lockInvalidation();
         DFEPass->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
         CGA->unlockInvalidation();
       }
+    }
+    if (NeedUpdate) {
+      CallGraphEditor(CG).updateCalleeSets();
     }
   }
 };
@@ -448,16 +453,21 @@ public:
     findAliveFunctions();
     // Get rid of definitions for all global functions that are not marked as
     // alive.
+    bool NeedUpdate = false;
     for (auto FI = Module->begin(), EI = Module->end(); FI != EI;) {
       SILFunction *F = FI++;
       // Do not remove bodies of any functions that are alive.
       if (!isAlive(F)) {
         if (tryToConvertExternalDefinitionIntoDeclaration(F)) {
+          NeedUpdate = true;
           CGA->lockInvalidation();
           DFEPass->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
           CGA->unlockInvalidation();
         }
       }
+    }
+    if (NeedUpdate) {
+      CallGraphEditor(CGA->getCallGraphOrNull()).updateCalleeSets();
     }
   }
 };

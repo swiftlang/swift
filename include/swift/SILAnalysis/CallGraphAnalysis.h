@@ -496,6 +496,13 @@ public:
           CG->removeEdge(Edge);
     }
   }
+
+  /// Recomputes the callee sets. This should be done whenever a method is
+  /// deleted.
+  void updateCalleeSets() {
+    if (CG)
+      CG->computeClassMethodCallees();
+  }
 };
 
 class CallGraphLinkerEditor {

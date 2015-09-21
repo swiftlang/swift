@@ -126,6 +126,13 @@ void CallGraph::computeClassMethodCalleesForClass(ClassDecl *CD) {
 /// Incrementally compute the callees for each method of each class
 /// that we have a VTable for.
 void CallGraph::computeClassMethodCallees() {
+
+  // Remove contents of old callee sets - in case we are updating the sets.
+  for (auto Iter : CalleeSets) {
+    auto *CalleeSet = Iter.second;
+    CalleeSet->clear();
+  }
+
   for (auto &VTable : M.getVTableList())
     computeClassMethodCalleesForClass(VTable.getClass());
 }
@@ -813,6 +820,16 @@ void CallGraph::verify() const {
 
   assert(ApplyToEdgeMap.size() == numEdges &&
          "Some edges in ApplyToEdgeMap are not contained in any node");
+
+  // Verify the callee sets.
+  for (auto Iter : CalleeSets) {
+    auto *CalleeSet = Iter.second;
+    for (CallGraphNode *Node : *CalleeSet) {
+      SILFunction *F = Node->getFunction();
+      assert(tryGetCallGraphNode(F) &&
+             "Callee set contains dangling node poiners");
+    }
+  }
 #endif
 }
 
