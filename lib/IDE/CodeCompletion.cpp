@@ -2394,8 +2394,7 @@ public:
     lookupVisibleDecls(Lookup, CurrDeclContext, TypeResolver.get(), true);
     if (!HasReturn)
       return;
-    if (auto FD = dyn_cast_or_null<AbstractFunctionDecl>(
-        CurrDeclContext->getInnermostMethodContext())) {
+    if (auto FD = dyn_cast<AbstractFunctionDecl>(CurrDeclContext)) {
       Lookup.unboxType(FD->getType());
     }
   }
