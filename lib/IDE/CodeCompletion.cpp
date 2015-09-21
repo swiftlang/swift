@@ -1197,9 +1197,8 @@ public:
     for (auto *M : Modules) {
       if (M->isAvailable() &&
           !M->getTopLevelModuleName().startswith("_") &&
-          // Name hidden implies not imported yet, exactly what code completion
-          // wants.
-          M->NameVisibility == clang::Module::NameVisibilityKind::Hidden) {
+          M->getTopLevelModuleName() != CurrDeclContext->getASTContext().
+            SwiftShimsModuleName.str()) {
         auto MD = ModuleDecl::create(Ctx.getIdentifier(M->getTopLevelModuleName()),
                                      Ctx);
         CodeCompletionResultBuilder Builder(Sink,
