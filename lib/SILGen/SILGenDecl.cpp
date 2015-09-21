@@ -769,7 +769,7 @@ copyOrInitValueInto(ManagedValue value, bool isInit,
 
   // Extract the i1 from the Bool struct.
   StructDecl *BoolStruct = cast<StructDecl>(SGF.getASTContext().getBoolDecl());
-  auto Members = BoolStruct->lookupDirect(SGF.getASTContext().Id__value);
+  auto Members = BoolStruct->lookupDirect(SGF.getASTContext().Id_value_);
   assert(Members.size() == 1 &&
          "Bool should have only one property with name '_value'");
   auto Member = dyn_cast<VarDecl>(Members[0]);
