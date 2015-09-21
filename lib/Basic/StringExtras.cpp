@@ -653,33 +653,40 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       : argNames[0].empty() ? NameRole::BaseName
       : NameRole::FirstParameter;
 
+    // Omit needless words from the name.
     StringRef name = role == NameRole::BaseName ? baseName : argNames[i];
+    StringRef newName = ::omitNeedlessWords(name, paramTypes[i], role, scratch);
+
+    // Did the name change?
+    if (name != newName)
+      anyChanges = true;
 
     // If the first parameter has a default argument, and there is a
     // preposition in the base name, split the base name at that
     // preposition.
-    if (role == NameRole::BaseName && paramTypes[0].DefaultArgument) {
+    if (role == NameRole::BaseName && argNames[0].empty() &&
+        paramTypes[0].DefaultArgument) {
       // Scan backwards for a preposition.
-      auto nameWords = camel_case::getWords(name);
+      auto nameWords = camel_case::getWords(newName);
       auto nameWordRevIter = nameWords.rbegin(),
-        nameWordRevIterEnd = nameWords.rend();
+      nameWordRevIterEnd = nameWords.rend();
       bool found = false, done = false;
       while (nameWordRevIter != nameWordRevIterEnd && !done) {
         switch (getPartOfSpeech(*nameWordRevIter)) {
-        case PartOfSpeech::Preposition:
-          found = true;
-          done = true;
-          break;
+          case PartOfSpeech::Preposition:
+            found = true;
+            done = true;
+            break;
 
-        case PartOfSpeech::Verb:
-        case PartOfSpeech::Gerund:
-          // Don't skip over verbs or gerunds.
-          done = true;
-          break;
+          case PartOfSpeech::Verb:
+          case PartOfSpeech::Gerund:
+            // Don't skip over verbs or gerunds.
+            done = true;
+            break;
 
-        case PartOfSpeech::Unknown:
-          ++nameWordRevIter;
-          break;
+          case PartOfSpeech::Unknown:
+            ++nameWordRevIter;
+            break;
         }
       }
 
@@ -689,24 +696,28 @@ bool swift::omitNeedlessWords(StringRef &baseName,
         ++nameWordRevIter;
         unsigned splitPos = nameWordRevIter.base().getPosition();
         if (splitPos > 0) {
-          // Update the base name by splitting at the preposition.
-          anyChanges = true;
-          baseName = name.substr(0, splitPos);
-
           // Create a first argument name with the remainder of the base name,
           // lowercased.
-          name = toLowercaseWord(name.substr(splitPos), scratch);
-          argNames[0] = name;
-          role = NameRole::FirstParameter;
+          // FIXME: The "Block" detection here is a total hack. We need to
+          // track closures more reasonably.
+          StringRef newArgName = newName.substr(splitPos);
+          if ((paramTypes[0].Name == "Block" &&
+               (newArgName == "With" || newArgName == "Using")) ||
+              (newArgName == "WithBlock" || newArgName == "UsingBlock")) {
+            argNames[0] = "body";
+          } else {
+            argNames[0] = toLowercaseWord(newArgName, scratch);
+          }
+
+          // Update the base name by splitting at the preposition.
+          newName = newName.substr(0, splitPos);
+
+          anyChanges = true;
         }
       }
     }
 
-    // Omit needless words from the name.
-    StringRef newName = ::omitNeedlessWords(name, paramTypes[i], role, scratch);
     if (name == newName) continue;
-
-    anyChanges = true;
 
     // Record this change.
     if (role == NameRole::BaseName) {

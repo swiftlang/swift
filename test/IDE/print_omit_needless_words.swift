@@ -124,6 +124,9 @@
 // Note: Don't strip names that aren't preceded by a verb or preposition.
 // CHECK-APPKIT: func setTextColor(_: NSColor? = nil)
 
+// Note: Splitting with default arguments.
+// CHECK-APPKIT: func draw(`in` _: NSView? = nil)
+
 // Note: Skipping over "Ref"
 // CHECK-CORECOOLING: func replace(_: CCPowerSupply!)
 
