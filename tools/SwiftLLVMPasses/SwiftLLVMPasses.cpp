@@ -16,6 +16,8 @@ using namespace llvm;
 
 static RegisterPass<swift::SwiftAliasAnalysis>
   AA("swift-aa", "Swift Alias Analysis", false, true);
+static RegisterPass<swift::SwiftRCIdentity>
+  RC("swift-rc-identity", "Swift RC Identity Analysis", false, true);
 static RegisterPass<swift::SwiftARCOpt>
   AO("swift-arc-optimize", "Swift ARC optimization");
 static RegisterPass<swift::SwiftARCContract>

@@ -59,13 +59,17 @@ class SwiftARCContractImpl {
   /// Was a change made while running the optimization.
   bool Changed;
 
+  /// Swift RC Identity.
+  SwiftRCIdentity *RC;
+
   /// The function that we are processing.
   Function &F;
 
   /// The entry point builder that is used to construct ARC entry points.
   ARCEntryPointBuilder B;
 public:
-  SwiftARCContractImpl(Function &InF) : Changed(false), F(InF), B(F) {}
+  SwiftARCContractImpl(Function &InF, SwiftRCIdentity *InRC)
+    : Changed(false), F(InF), B(F), RC(InRC) {}
 
   // The top level run routine of the pass.
   bool run();
@@ -84,13 +88,15 @@ void SwiftARCContractImpl::
 performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
   // Go through all of our pointers and merge all of the retains with the
   // first retain we saw and all of the releases with the last release we saw.
+  llvm::Value *O = nullptr;
   for (auto &P : PtrToLocalStateMap) {
     Value *ArgVal = P.first;
     auto &RetainList = P.second.RetainList;
     if (RetainList.size() > 1) {
       // Create the retainN call right by the first retain.
       B.setInsertPoint(RetainList[0]);
-      B.createRetainN(RetainList[0]->getArgOperand(0), RetainList.size());
+      O = RetainList[0]->getArgOperand(0);
+      B.createRetainN(RC->getSwiftRCIdentityRoot(O), RetainList.size());
 
       // Replace all uses of the retain instructions with our new retainN and
       // then delete them.
@@ -108,7 +114,8 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       // Create the releaseN call right by the last release.
       auto *OldCI = ReleaseList[ReleaseList.size() - 1];
       B.setInsertPoint(OldCI);
-      B.createReleaseN(OldCI->getArgOperand(0), ReleaseList.size());
+      O = OldCI->getArgOperand(0);
+      B.createReleaseN(RC->getSwiftRCIdentityRoot(O), ReleaseList.size());
 
       // Remove all old release instructions.
       for (auto *Inst : ReleaseList) {
@@ -124,7 +131,8 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
     if (UnknownRetainList.size() > 1) {
       // Create the retainN call right by the first retain.
       B.setInsertPoint(UnknownRetainList[0]);
-      B.createUnknownRetainN(UnknownRetainList[0]->getArgOperand(0),
+      O = UnknownRetainList[0]->getArgOperand(0);
+      B.createUnknownRetainN(RC->getSwiftRCIdentityRoot(O),
                              UnknownRetainList.size());
 
       // Replace all uses of the retain instructions with our new retainN and
@@ -143,7 +151,8 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
       // Create the releaseN call right by the last release.
       auto *OldCI = UnknownReleaseList[UnknownReleaseList.size() - 1];
       B.setInsertPoint(OldCI);
-      B.createUnknownReleaseN(OldCI->getArgOperand(0),
+      O = OldCI->getArgOperand(0);
+      B.createUnknownReleaseN(RC->getSwiftRCIdentityRoot(O),
                               UnknownReleaseList.size());
 
       // Remove all old release instructions.
@@ -187,7 +196,7 @@ bool SwiftARCContractImpl::run() {
         continue;
       case RT_Retain: {
         auto *CI = cast<CallInst>(&Inst);
-        auto *ArgVal = CI->getArgOperand(0);
+        auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
 
         LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
         LocalEntry.RetainList.push_back(CI);
@@ -195,7 +204,7 @@ bool SwiftARCContractImpl::run() {
       }
       case RT_UnknownRetain: {
         auto *CI = cast<CallInst>(&Inst);
-        auto *ArgVal = CI->getArgOperand(0);
+        auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
 
         LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
         LocalEntry.UnknownRetainList.push_back(CI);
@@ -204,7 +213,7 @@ bool SwiftARCContractImpl::run() {
       case RT_Release: {
         // Stash any releases that we see.
         auto *CI = cast<CallInst>(&Inst);
-        auto *ArgVal = CI->getArgOperand(0);
+        auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
 
         LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
         LocalEntry.ReleaseList.push_back(CI);
@@ -213,7 +222,7 @@ bool SwiftARCContractImpl::run() {
       case RT_UnknownRelease: {
         // Stash any releases that we see.
         auto *CI = cast<CallInst>(&Inst);
-        auto *ArgVal = CI->getArgOperand(0);
+        auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
 
         LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
         LocalEntry.UnknownReleaseList.push_back(CI);
@@ -265,7 +274,8 @@ bool SwiftARCContractImpl::run() {
 }
 
 bool SwiftARCContract::runOnFunction(Function &F) {
-  return SwiftARCContractImpl(F).run();
+  RC = &getAnalysis<SwiftRCIdentity>();
+  return SwiftARCContractImpl(F, RC).run();
 }
 
 namespace llvm {
@@ -273,10 +283,20 @@ namespace llvm {
 }
 
 char SwiftARCContract::ID = 0;
-INITIALIZE_PASS(SwiftARCContract,
-                "swift-arc-contract", "Swift ARC contraction", false, false)
+INITIALIZE_PASS_BEGIN(SwiftARCContract,
+                      "swift-arc-contract", "Swift ARC contraction",
+                      false, false)
+INITIALIZE_PASS_DEPENDENCY(SwiftRCIdentity)
+INITIALIZE_PASS_END(SwiftARCContract,
+                    "swift-arc-contract", "Swift ARC contraction",
+                    false, false)
 
 llvm::FunctionPass *swift::createSwiftARCContractPass() {
   initializeSwiftARCContractPass(*llvm::PassRegistry::getPassRegistry());
   return new SwiftARCContract();
+}
+
+void SwiftARCContract::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
+  AU.addRequired<SwiftRCIdentity>();
+  AU.setPreservesCFG();
 }

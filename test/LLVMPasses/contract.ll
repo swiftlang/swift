@@ -62,6 +62,38 @@ bb3:
   ret %swift.refcounted* %A
 }
 
+; CHECK-LABEL: define %swift.refcounted* @swift_contractRetainNWithRCIdentity(%swift.refcounted* %A) {
+; CHECK: entry:
+; CHECK-NEXT: br i1 undef
+; CHECK: bb1:
+; CHECK-NEXT: tail call void @swift_retain_n(%swift.refcounted* %A, i32 2)
+; CHECK-NEXT: %0 = bitcast %swift.refcounted* %A to %swift.refcounted*
+; CHECK-NEXT: br label %bb3
+; CHECK: bb2:
+; CHECK-NEXT: tail call void @swift_retain(%swift.refcounted* %A)
+; CHECK-NEXT: br label %bb3
+; CHECK: bb3:
+; CHECK-NEXT: tail call void @swift_retain(%swift.refcounted* %A)
+; CHECK-NEXT: ret %swift.refcounted* %A
+define %swift.refcounted* @swift_contractRetainNWithRCIdentity(%swift.refcounted* %A) {
+entry:
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  tail call void @swift_retain(%swift.refcounted* %A)
+  %0 = bitcast %swift.refcounted* %A to %swift.refcounted*
+  tail call void @swift_retain(%swift.refcounted* %0)
+  br label %bb3
+
+bb2:
+  tail call void @swift_retain(%swift.refcounted* %A)
+  br label %bb3
+
+bb3:
+  tail call void @swift_retain(%swift.refcounted* %A)
+  ret %swift.refcounted* %A
+}
+
 ; CHECK-LABEL: define %swift.refcounted* @swift_contractReleaseN(%swift.refcounted* %A) {
 ; CHECK: entry:
 ; CHECK-NEXT: br i1 undef
@@ -99,6 +131,39 @@ bb3:
   tail call void @swift_release(%swift.refcounted* %A)
   ret %swift.refcounted* %A
 }
+
+; CHECK-LABEL: define %swift.refcounted* @swift_contractReleaseNWithRCIdentity(%swift.refcounted* %A) {
+; CHECK: entry:
+; CHECK-NEXT: br i1 undef
+; CHECK: bb1:
+; CHECK-NEXT: %0 = bitcast %swift.refcounted* %A to %swift.refcounted*
+; CHECK-NEXT: tail call void @swift_release_n(%swift.refcounted* %A, i32 2)
+; CHECK-NEXT: br label %bb3
+; CHECK: bb2:
+; CHECK-NEXT: tail call void @swift_release(%swift.refcounted* %A)
+; CHECK-NEXT: br label %bb3
+; CHECK: bb3:
+; CHECK-NEXT: tail call void @swift_release(%swift.refcounted* %A)
+; CHECK-NEXT: ret %swift.refcounted* %A
+define %swift.refcounted* @swift_contractReleaseNWithRCIdentity(%swift.refcounted* %A) {
+entry:
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  tail call void @swift_release(%swift.refcounted* %A)
+  %0 = bitcast %swift.refcounted* %A to %swift.refcounted*
+  tail call void @swift_release(%swift.refcounted* %0)
+  br label %bb3
+
+bb2:
+  tail call void @swift_release(%swift.refcounted* %A)
+  br label %bb3
+
+bb3:
+  tail call void @swift_release(%swift.refcounted* %A)
+  ret %swift.refcounted* %A
+}
+
 
 ; Make sure that we do not form retainN,releaseN over uses that may
 ; read the reference count of the object.

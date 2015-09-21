@@ -19,6 +19,7 @@
 
 namespace llvm {
   void initializeSwiftAliasAnalysisPass(PassRegistry&);
+  void initializeSwiftRCIdentityPass(PassRegistry&);
 } // end namespace llvm
 
 namespace swift {
@@ -45,21 +46,37 @@ namespace swift {
                                      const llvm::MemoryLocation &Loc) override;
   };
 
+  class SwiftRCIdentity : public llvm::ImmutablePass {
+  public:
+    static char ID; // Class identification, replacement for typeinfo
+    SwiftRCIdentity() : ImmutablePass(ID) {}
+
+    /// Returns the root of the RC-equivalent value for the given V.
+    llvm::Value *getSwiftRCIdentityRoot(llvm::Value *V);
+  private:
+    enum { MaxRecursionDepth = 16 };
+    bool doInitialization(llvm::Module &M) override;
+
+    void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
+      AU.setPreservesAll();
+    }
+    llvm::Value *stripPointerCasts(llvm::Value *Val);
+    llvm::Value *stripReferenceForwarding(llvm::Value *Val);
+  };
+
   class SwiftARCOpt : public llvm::FunctionPass {
     virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
     virtual bool runOnFunction(llvm::Function &F) override;
-
   public:
     static char ID;
     SwiftARCOpt();
   };
 
   class SwiftARCContract : public llvm::FunctionPass {
-    virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
-      AU.setPreservesCFG();
-    }
+    /// Swift RC Identity analysis.
+    SwiftRCIdentity *RC;
+    virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
     virtual bool runOnFunction(llvm::Function &F) override;
-
   public:
     static char ID;
     SwiftARCContract() : llvm::FunctionPass(ID) {}
