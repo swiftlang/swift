@@ -106,6 +106,9 @@
 // Note: id<Proto> treated as "Proto".
 // CHECK-FOUNDATION: func doSomethingWith(_: NSCopying)
 
+// Note: NSObject<Proto> treated as "Proto".
+// CHECK-FOUNDATION: func doSomethingElseWith(_: protocol<NSCopying, NSObjectProtocol>)
+
 // Note: class method name stripping result type.
 // CHECK-APPKIT: class func red() -> NSColor
 

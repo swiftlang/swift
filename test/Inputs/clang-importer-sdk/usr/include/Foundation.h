@@ -932,4 +932,5 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
                                               BOOL *stop))block;
 
 - (void)doSomethingWithCopying:(nonnull id<NSCopying>)copying;
+- (void)doSomethingElseWithCopying:(nonnull NSObject<NSCopying> *)copying;
 @end

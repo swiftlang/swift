@@ -1892,7 +1892,15 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
 
   // Objective-C object pointers.
   if (auto objcObjectPtr = type->getAs<clang::ObjCObjectPointerType>()) {
-    if (auto objcClass = objcObjectPtr->getInterfaceDecl()) {
+    auto objcClass = objcObjectPtr->getInterfaceDecl();
+
+    // For id<Proto> or NSObject<Proto>, retrieve the name of "Proto".
+    if (objcObjectPtr->getNumProtocols() == 1 &&
+        (!objcClass || objcClass->getName() == "NSObject"))
+      return (*objcObjectPtr->qual_begin())->getName();
+
+    // If there is a class, use it.
+    if (objcClass) {
       // If this isn't the name of an Objective-C collection, we're done.
       auto className = objcClass->getName();
       if (!isObjCCollectionName(className))
@@ -1915,10 +1923,6 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
     // Objective-C "Class" type.
     if (objcObjectPtr->isObjCClassType())
       return "Class";
-
-    // For id<Proto>, retrieve the name of "Proto".
-    if (objcObjectPtr->getNumProtocols() == 1)
-      return (*objcObjectPtr->qual_begin())->getName();
 
     return StringRef();
   }
