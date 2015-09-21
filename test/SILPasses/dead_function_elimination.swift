@@ -26,6 +26,26 @@ class Base {
 		// introduces a cycle
 		testClasses(self)
 	}
+
+	// alive, because called with super
+	@inline(never)
+	func calledWithSuper() {
+	}
+
+	// dead, because only overridden method is called
+	@inline(never)
+	func baseNotCalled() {
+	}
+
+	// alive, because called for Derived but not overridden in Derived
+	@inline(never)
+	func notInDerived() {
+	}
+
+	// dead, because only overridden method is called
+	@inline(never)
+	func notInOther() {
+	}
 }
 
 class Derived : Base {
@@ -37,12 +57,50 @@ class Derived : Base {
 	@inline(never)
 	override func deadMethod() {
 	}
+
+	@inline(never)
+	@_semantics("optimize.sil.never") // avoid devirtualization
+	override func calledWithSuper() {
+		super.calledWithSuper()
+	}
+
+	@inline(never)
+	override func baseNotCalled() {
+	}
+
+	@inline(never)
+	override func notInOther() {
+	}
+}
+
+class Other : Derived {
+	@inline(never)
+	override func baseNotCalled() {
+	}
+
+	@inline(never)
+	override func notInDerived() {
+	}
 }
 
 @inline(never)
 @_semantics("optimize.sil.never") // avoid devirtualization
 func testClasses(b: Base) {
 	b.aliveMethod()
+}
+
+@inline(never)
+@_semantics("optimize.sil.never") // avoid devirtualization
+func testWithDerived(d: Derived) {
+	d.baseNotCalled()
+	d.notInDerived()
+	d.calledWithSuper()
+}
+
+@inline(never)
+@_semantics("optimize.sil.never") // avoid devirtualization
+func testWithOther(o: Other) {
+	o.notInOther()
 }
 
 // Check if dead methods of classes with higher visibility are removed.
@@ -81,6 +139,8 @@ func testProtocols(p: Prot) {
 public func callTest() {
 	testClasses(Base())
 	testClasses(Derived())
+	testWithDerived(Derived())
+	testWithOther(Other())
 	testProtocols(Adopt())
 }
 
@@ -98,7 +158,11 @@ public func callTest() {
 
 // CHECK-LABEL: sil_vtable Base
 // CHECK: aliveMethod
+// CHECK: calledWithSuper
 // CHECK-NOT: deadMethod
+// CHECK-NOT: baseNotCalled
+// CHECK: notInDerived
+// CHECK-NOT: notInOther
 
 // CHECK-TESTING-LABEL: sil_vtable Base
 // CHECK-TESTING: deadMethod
@@ -106,9 +170,19 @@ public func callTest() {
 // CHECK-LABEL: sil_vtable Derived
 // CHECK: aliveMethod
 // CHECK-NOT: deadMethod
+// CHECK: baseNotCalled
+// CHECK: notInDerived
+// CHECK: notInOther
 
 // CHECK-TESTING-LABEL: sil_vtable Derived
 // CHECK-TESTING: deadMethod
+
+// CHECK-LABEL: sil_vtable Other
+// CHECK: aliveMethod
+// CHECK-NOT: deadMethod
+// CHECK: baseNotCalled
+// CHECK: notInDerived
+// CHECK: notInOther
 
 // CHECK-LABEL: sil_witness_table hidden Adopt: Prot
 // CHECK: aliveWitness!1: @{{.*}}aliveWitness

@@ -38,13 +38,16 @@ protected:
   /// Stores which functions implement a vtable or witness table method.
   struct MethodInfo {
 
-    MethodInfo() : isAlive(false) {}
+    MethodInfo() : isAnchor(false) {}
 
-    SmallVector<SILFunction *, 8> implementingFunctions;
+    /// All functions which implement the method. Together with the class for
+    /// which the function implements the method. In case of a witness method,
+    /// the class pointer is null.
+    SmallVector<std::pair<SILFunction *, ClassDecl *>, 8> implementingFunctions;
 
-    /// True, if the whole method is alive, which implies that all implementing
-    /// functions are alive.
-    bool isAlive;
+    /// True, if the whole method is alive, e.g. because it's class is visible
+    /// from outside. This implies that all implementing functions are alive.
+    bool isAnchor;
   };
 
   SILModule *Module;
@@ -95,31 +98,75 @@ protected:
     return entry;
   }
 
-  /// Adds a function which implements a vtable or witness method.
-  void addImplementingFunction(MethodInfo *mi, SILFunction *F) {
-    if (mi->isAlive)
+  /// Adds a function which implements a vtable or witness method. If it's a
+  /// vtable method, \p C is the class for which the function implements the
+  /// method. For witness methods \C is null.
+  void addImplementingFunction(MethodInfo *mi, SILFunction *F, ClassDecl *C) {
+    if (mi->isAnchor)
       ensureAlive(F);
-    mi->implementingFunctions.push_back(F);
+    mi->implementingFunctions.push_back(std::make_pair(F, C));
   }
 
   /// Returns true if a function is marked as alive.
   bool isAlive(SILFunction *F) { return AliveFunctions.count(F) != 0; }
 
   /// Marks a function as alive.
+  void makeAlive(SILFunction *F) {
+    AliveFunctions.insert(F);
+    assert(F && "function does not exist");
+    Worklist.insert(F);
+  }
+  
+  /// Marks a function as alive if it is not alive yet.
   void ensureAlive(SILFunction *F) {
-    if (!isAlive(F)) {
-      AliveFunctions.insert(F);
-      assert(F && "function does not exist");
-      Worklist.insert(F);
-    }
+    if (!isAlive(F))
+      makeAlive(F);
   }
 
-  /// Marks all implementing functions of a method as alive.
-  void ensureAlive(MethodInfo *mi) {
-    if (!mi->isAlive) {
-      mi->isAlive = true;
-      for (SILFunction *F : mi->implementingFunctions) {
-        ensureAlive(F);
+  /// Returns true if \a Derived is the same as \p Base or derived from it.
+  static bool isDerivedOrEqual(ClassDecl *Derived, ClassDecl *Base) {
+    for (;;) {
+      if (Derived == Base)
+        return true;
+      if (!Derived->hasSuperclass())
+        break;
+      Derived = Derived->getSuperclass()->getClassOrBoundGenericClass();
+    }
+    return false;
+  }
+
+  /// Returns true if the implementation of method \p FD in class \p ImplCl
+  /// may be called when the type of the class_method's operand is \p MethodCl.
+  /// Both, \p MethodCl and \p ImplCl, may by null if not known or if it's a
+  /// protocol method.
+  static bool canHaveSameImplementation(FuncDecl *FD, ClassDecl *MethodCl,
+                                        ClassDecl *ImplCl) {
+    if (!MethodCl || !ImplCl)
+      return true;
+
+    // All implementations of derived classes may be called.
+    if (isDerivedOrEqual(ImplCl, MethodCl))
+      return true;
+    
+    // Check if the method implementation is the same in a super class, i.e.
+    // it is not overridden in the derived class.
+    FuncDecl *Impl1 = MethodCl->findImplementingMethod(FD);
+    assert(Impl1);
+    FuncDecl *Impl2 = ImplCl->findImplementingMethod(FD);
+    assert(Impl2);
+    
+    return Impl1 == Impl2;
+  }
+
+  /// Marks the implementing functions of the method \p FD as alive. If it is a
+  /// class method, \p MethodCl is the type of the class_method instruction's
+  /// operand.
+  void ensureAlive(MethodInfo *mi, FuncDecl *FD, ClassDecl *MethodCl) {
+    for (auto &Pair : mi->implementingFunctions) {
+      SILFunction *FImpl = Pair.first;
+      if (!isAlive(FImpl) &&
+          canHaveSameImplementation(FD, MethodCl, Pair.second)) {
+        makeAlive(FImpl);
       }
     }
   }
@@ -138,10 +185,13 @@ protected:
     for (SILBasicBlock &BB : *F) {
       for (SILInstruction &I : BB) {
         if (auto *MI = dyn_cast<MethodInst>(&I)) {
-          auto *funcDecl =
-              cast<AbstractFunctionDecl>(MI->getMember().getDecl());
-          MethodInfo *mi = getMethodInfo(getBase(funcDecl));
-          ensureAlive(mi);
+          auto *funcDecl = getBase(
+              cast<AbstractFunctionDecl>(MI->getMember().getDecl()));
+          MethodInfo *mi = getMethodInfo(funcDecl);
+          ClassDecl *MethodCl = nullptr;
+          if (MI->getNumOperands() == 1)
+            MethodCl = MI->getOperand(0)->getType(0).getClassOrBoundGenericClass();
+          ensureAlive(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
           ensureAlive(FRI->getReferencedFunction());
         }
@@ -248,7 +298,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         auto *fd = cast<AbstractFunctionDecl>(entry.first.getDecl());
         fd = getBase(fd);
         MethodInfo *mi = getMethodInfo(fd);
-        addImplementingFunction(mi, F);
+        addImplementingFunction(mi, F, vTable.getClass());
 
         if (// Destructors are alive because they are called from swift_release
             entry.first.isDestructor()
@@ -261,7 +311,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
             || isVisibleExternally(fd)
             // Declarations are always accessible externally, so they are alive.
             || !F->isDefinition()) {
-          ensureAlive(mi);
+          ensureAlive(mi, nullptr, nullptr);
         }
       }
     }
@@ -282,9 +332,9 @@ class DeadFunctionElimination : FunctionLivenessComputation {
           continue;
 
         MethodInfo *mi = getMethodInfo(fd);
-        addImplementingFunction(mi, F);
+        addImplementingFunction(mi, F, nullptr);
         if (tableIsAlive || !F->isDefinition())
-          ensureAlive(mi);
+          ensureAlive(mi, nullptr, nullptr);
       }
     }
   }
