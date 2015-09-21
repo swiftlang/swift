@@ -14,6 +14,7 @@
 #define SWIFT_SILPASSES_UTILS_CFG_H
 
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILBuilder.h"
 
 namespace swift {
 
@@ -111,7 +112,8 @@ bool rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
 
 /// \brief Splits the basic block before the instruction with an unconditional
 /// branch and updates the dominator tree and loop info.
-SILBasicBlock *splitBasicBlockAndBranch(SILInstruction *SplitBeforeInst,
+SILBasicBlock *splitBasicBlockAndBranch(SILBuilder &B,
+                                        SILInstruction *SplitBeforeInst,
                                         DominanceInfo *DT, SILLoopInfo *LI);
 
 /// \brief Split all critical edges in the function updating the dominator tree

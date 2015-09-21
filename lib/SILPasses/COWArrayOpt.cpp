@@ -17,6 +17,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
@@ -1733,7 +1734,8 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
   // original preheader it might contain instructions that we can't clone.
   // This will be block that will contain the check whether to execute the
   // 'native swift array' loop or the original loop.
-  auto *CheckBlock = splitBasicBlockAndBranch(
+  SILBuilder B(HoistableLoopPreheader);
+  auto *CheckBlock = splitBasicBlockAndBranch(B,
       HoistableLoopPreheader->getTerminator(), DomTree, nullptr);
 
   // Get the exit blocks of the orignal loop.
@@ -1754,7 +1756,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
 
   // Split the preheader before the first instruction.
   SILBasicBlock *NewPreheader =
-      splitBasicBlockAndBranch(&*CheckBlock->begin(), DomTree, nullptr);
+    splitBasicBlockAndBranch(B, &*CheckBlock->begin(), DomTree, nullptr);
 
   // Clone the region from the new preheader up to (not including) the exit
   // blocks. This creates a second loop nest.
@@ -1773,7 +1775,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
         ArraySemanticsCall(C.copyTo(CheckBlock->getTerminator(), DomTree)));
 
   // Create a conditional branch on the fast condition being true.
-  SILBuilder B(CheckBlock->getTerminator());
+  B.setInsertionPoint(CheckBlock->getTerminator());
   auto IsFastNativeArray =
       createFastNativeArraysCheck(HoistedArrayPropCalls, B);
   B.createCondBranch(CheckBlock->getTerminator()->getLoc(),

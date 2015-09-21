@@ -106,17 +106,6 @@ SILBasicBlock *SILBasicBlock::splitBasicBlock(iterator I) {
   return New;
 }
 
-/// \brief Splits a basic block into two at the specified instruction and
-/// inserts an unconditional branch from the old basic block to the new basic
-/// block.
-SILBasicBlock *SILBasicBlock::splitBasicBlockAndBranch(iterator I,
-                                                       SILLocation BranchLoc) {
-  SILBasicBlock *New = splitBasicBlock(I);
-  getInstList().insert(getInstList().end(),
-                       BranchInst::create(BranchLoc, New, *getParent()));
-  return New;
-}
-
 /// \brief Move the basic block to after the specified basic block in the IR.
 void SILBasicBlock::moveAfter(SILBasicBlock *After) {
   assert(getParent() && getParent() == After->getParent() &&

@@ -552,12 +552,14 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
 
 /// Splits the basic block at the iterator with an unconditional branch and
 /// updates the dominator tree and loop info.
-SILBasicBlock *swift::splitBasicBlockAndBranch(SILInstruction *SplitBeforeInst,
+SILBasicBlock *swift::splitBasicBlockAndBranch(SILBuilder &B,
+                                               SILInstruction *SplitBeforeInst,
                                                DominanceInfo *DT,
                                                SILLoopInfo *LI) {
   auto *OrigBB = SplitBeforeInst->getParent();
-  auto *NewBB = OrigBB->splitBasicBlockAndBranch(SplitBeforeInst,
-                                                 SplitBeforeInst->getLoc());
+  auto *NewBB = OrigBB->splitBasicBlock(SplitBeforeInst);
+  B.setInsertionPoint(OrigBB);
+  B.createBranch(SplitBeforeInst->getLoc(), NewBB);
 
   // Update the dominator tree.
   if (DT) {
