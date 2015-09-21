@@ -124,9 +124,16 @@ class LoopRegion {
     static constexpr unsigned MaxID = (unsigned(1) << IDBitSize) - 1;
     unsigned IsLoop : 1;
     unsigned ID : IDBitSize;
+
+    LoopRegionID(unsigned id, bool isloop) {
+      IsLoop = unsigned(isloop);
+      ID = id;
+    }
     bool operator<(const LoopRegionID &Other) const { return ID < Other.ID; }
   };
-  static_assert(std::is_pod<LoopRegionID>::value, "Expected pod");
+  /// These checks are just for performance.
+  static_assert(IsTriviallyCopyable<LoopRegionID>::value,
+                "Expected trivially copyable type");
 
   class SubregionData;
 
@@ -342,12 +349,12 @@ private:
 
     void addBBSubregion(LoopRegion *R) {
       assert(R->ID <= LoopRegionID::MaxID && "Unrepresentable ID");
-      Subregions.push_back({R->ID, false});
+      Subregions.push_back(LoopRegionID(R->ID, false));
     }
 
     void addLoopSubregion(LoopRegion *L, LoopRegion *Header) {
       assert(Header->ID <= LoopRegionID::MaxID && "Unrepresentable ID");
-      Subregions.push_back({Header->ID, true});
+      Subregions.push_back(LoopRegionID(Header->ID, true));
       Subloops.push_back({Header->ID, L->ID});
     }
 
