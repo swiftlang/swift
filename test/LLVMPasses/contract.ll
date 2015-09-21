@@ -5,8 +5,11 @@ target triple = "x86_64-apple-macosx10.9"
 
 %swift.refcounted = type { %swift.heapmetadata*, i64 }
 %swift.heapmetadata = type { i64 (%swift.refcounted*)*, i64 (%swift.refcounted*)* }
+%swift.bridge = type opaque
 
 declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
+declare %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge*)
+declare void @swift_bridgeObjectRelease(%swift.bridge* )
 declare void @swift_release(%swift.refcounted* nocapture)
 declare void @swift_retain(%swift.refcounted* ) nounwind
 declare void @swift_unknownRelease(%swift.refcounted* nocapture)
@@ -14,6 +17,8 @@ declare void @swift_unknownRetain(%swift.refcounted* ) nounwind
 declare void @swift_fixLifetime(%swift.refcounted*)
 declare void @noread_user(%swift.refcounted*) readnone
 declare void @user(%swift.refcounted*)
+declare void @noread_user_bridged(%swift.bridge*) readnone
+declare void @user_bridged(%swift.bridge*)
 
 ; CHECK-LABEL: define void @fixlifetime_removal(i8*) {
 ; CHECK-NOT: call void swift_fixLifetime
@@ -494,6 +499,77 @@ bb2:
 bb3:
   tail call void @swift_unknownRelease(%swift.refcounted* %A)
   ret %swift.refcounted* %A
+}
+
+
+; CHECK-LABEL: define %swift.bridge* @swift_contractBridgeRetainWithBridge(%swift.bridge* %A) {
+; CHECK: bb1:
+; CHECK-NEXT: [[RET0:%.+]] = tail call %swift.bridge* @swift_bridgeObjectRetain_n(%swift.bridge* %A, i32 2)
+; CHECK-NEXT: tail call void @swift_bridgeObjectRelease(%swift.bridge* [[RET0:%.+]])
+; CHECK-NEXT: tail call void @swift_bridgeObjectRelease(%swift.bridge* %A)
+; CHECK-NEXT: ret %swift.bridge* %A
+define %swift.bridge* @swift_contractBridgeRetainWithBridge(%swift.bridge* %A) {
+bb1:
+  %0 = tail call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
+  %1 = tail call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
+  tail call void @swift_bridgeObjectRelease(%swift.bridge* %1)
+  tail call void @swift_bridgeObjectRelease(%swift.bridge* %A)
+  ret %swift.bridge* %A
+}
+
+; CHECK-LABEL: define %swift.bridge* @swift_contractBridgeRetainReleaseNInterleavedWithBridge(%swift.bridge* %A) {
+; CHECK: bb1:
+; CHECK-NEXT: [[RET0:%.+]] = tail call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
+; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)
+; CHECK-NEXT: call void @noread_user_bridged(%swift.bridge* %A)
+; CHECK-NEXT: tail call void @swift_bridgeObjectRelease_n(%swift.bridge* %A, i32 2)
+; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)
+; CHECK-NEXT: [[RET1:%.+]] = tail call %swift.bridge* @swift_bridgeObjectRetain_n(%swift.bridge* %A, i32 2)
+; CHECK-NEXT: tail call void @swift_bridgeObjectRelease(%swift.bridge* %A)
+; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)
+; CHECK-NEXT: call void @noread_user_bridged(%swift.bridge* %A)
+; CHECK-NEXT: tail call void @swift_bridgeObjectRelease_n(%swift.bridge* %A, i32 2)
+; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)
+; CHECK-NEXT: br label %bb3
+; CHECK: bb2:
+; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)
+; CHECK-NEXT: call void @swift_bridgeObjectRelease(%swift.bridge* %A)
+; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)
+; CHECK-NEXT: br label %bb3
+
+; CHECK: bb3:
+; CHECK-NEXT: tail call void @swift_bridgeObjectRelease(%swift.bridge* %A)
+; CHECK-NEXT: ret %swift.bridge* %A
+define %swift.bridge* @swift_contractBridgeRetainReleaseNInterleavedWithBridge(%swift.bridge* %A) {
+entry:
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  tail call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
+  call void @user_bridged(%swift.bridge* %A)
+  tail call void @swift_bridgeObjectRelease(%swift.bridge* %A)
+  call void @noread_user_bridged(%swift.bridge* %A)
+  tail call void @swift_bridgeObjectRelease(%swift.bridge* %A)
+  call void @user_bridged(%swift.bridge* %A)
+  tail call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
+  tail call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
+  tail call void @swift_bridgeObjectRelease(%swift.bridge* %A)
+  call void @user_bridged(%swift.bridge* %A)
+  tail call void @swift_bridgeObjectRelease(%swift.bridge* %A)
+  call void @noread_user_bridged(%swift.bridge* %A)
+  tail call void @swift_bridgeObjectRelease(%swift.bridge* %A)
+  call void @user_bridged(%swift.bridge* %A)
+  br label %bb3
+
+bb2:
+  call void @user_bridged(%swift.bridge* %A)
+  tail call void @swift_bridgeObjectRelease(%swift.bridge* %A)
+  call void @user_bridged(%swift.bridge* %A)
+  br label %bb3
+
+bb3:
+  tail call void @swift_bridgeObjectRelease(%swift.bridge* %A)
+  ret %swift.bridge* %A
 }
 
 !llvm.dbg.cu = !{!1}
