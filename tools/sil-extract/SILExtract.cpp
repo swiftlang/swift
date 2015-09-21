@@ -28,6 +28,7 @@
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/PassManager.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
@@ -111,7 +112,7 @@ removeUnwantedFunctions(SILModule *M, llvm::StringRef Name) {
         SILLocation Loc = BB.getInstList().back().getLoc();
         BB.splitBasicBlock(BB.begin());
         // Make terminator unreachable.
-        BB.getInstList().push_front(new (*M) UnreachableInst(Loc));
+        SILBuilder(&BB).createUnreachable(Loc);
 
         DeadFunctions.push_back(&F);
       }
