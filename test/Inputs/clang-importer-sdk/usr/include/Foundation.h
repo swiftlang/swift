@@ -934,3 +934,7 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 - (void)doSomethingWithCopying:(nonnull id<NSCopying>)copying;
 - (void)doSomethingElseWithCopying:(nonnull NSObject<NSCopying> *)copying;
 @end
+
+@interface NSMutableArray (Sorting)
+- (void)sortUsingFunction:(NSInteger (* __nonnull)(__nonnull id, __nonnull id))fimctopn;
+@end

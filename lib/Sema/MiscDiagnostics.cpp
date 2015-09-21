@@ -1833,6 +1833,13 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
     return archetypeTy->getName().str();
   }
 
+  // Function types.
+  if (auto funcTy = type->getAs<AnyFunctionType>()) {
+    if (funcTy->getRepresentation() == AnyFunctionType::Representation::Block)
+      return "Block";
+
+    return "Function";
+  }
   return "";
 }
 

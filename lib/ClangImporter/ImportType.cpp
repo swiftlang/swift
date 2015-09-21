@@ -1961,6 +1961,10 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
   if (type->getAs<clang::BlockPointerType>())
     return "Block";
 
+  // Function pointers.
+  if (type->isFunctionType())
+    return "Function";
+
   return StringRef();
 }
 

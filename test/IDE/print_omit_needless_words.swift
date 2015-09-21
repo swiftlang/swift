@@ -109,6 +109,9 @@
 // Note: NSObject<Proto> treated as "Proto".
 // CHECK-FOUNDATION: func doSomethingElseWith(_: protocol<NSCopying, NSObjectProtocol>)
 
+// Note: Function type -> "Function".
+// CHECK-FOUNDATION: func sortUsing(_: @convention(c) (AnyObject, AnyObject) -> Int)
+
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
 
