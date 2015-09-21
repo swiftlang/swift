@@ -663,6 +663,17 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
 ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
   SourceLoc ReturnLoc = consumeToken(tok::kw_return);
 
+  if (Tok.is(tok::code_complete)) {
+    auto CCE = new (Context) CodeCompletionExpr(SourceRange(Tok.getLoc()));
+    auto Result = makeParserResult(new (Context) ReturnStmt(ReturnLoc, CCE));
+    if (CodeCompletion) {
+      CodeCompletion->completeReturnStmt(CCE);
+    }
+    Result.setHasCodeCompletion();
+    consumeToken();
+    return Result;
+  }
+
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
   // followed by a '}', ';', statement or decl start keyword sequence.

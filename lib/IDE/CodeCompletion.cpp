@@ -901,6 +901,7 @@ public:
                                 bool HasReturn) override;
   void completeAssignmentRHS(AssignExpr *E) override;
   void completeCallArg(CallExpr *E) override;
+  void completeReturnStmt(CodeCompletionExpr *E) override;
   void addKeywords(CodeCompletionResultSink &Sink);
 
   void doneParsing() override;
@@ -3029,6 +3030,12 @@ void CodeCompletionCallbacksImpl::completeCallArg(CallExpr *E) {
   }
 }
 
+void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
+  CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = E;
+  Kind = CompletionKind::ReturnStmtExpr;
+}
+
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
     SmallVectorImpl<StringRef> &Keywords) {
   assert(!InEnumElementRawValue);
@@ -3126,6 +3133,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::UnresolvedMember:
   case CompletionKind::AssignmentRHS:
   case CompletionKind::CallArg:
+  case CompletionKind::ReturnStmtExpr:
     break;
 
   case CompletionKind::PostfixExprBeginning:
@@ -3449,6 +3457,16 @@ void CodeCompletionCallbacksImpl::doneParsing() {
                                                                 CodeCompleteTokenExpr))
       DoPostfixExprBeginning();
     break;
+  }
+
+  case CompletionKind::ReturnStmtExpr : {
+    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    if (auto FD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
+      if (auto FT = FD->getType()->getAs<FunctionType>()) {
+        Lookup.setExpectedTypes(FT->getResult());
+      }
+    }
+    Lookup.getValueCompletionsInDeclContext(Loc);
   }
   }
 

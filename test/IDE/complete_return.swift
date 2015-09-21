@@ -4,6 +4,7 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TRY_RETURN_INT | FileCheck %s -check-prefix=RETURN_INT_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TRY_RETURN_VOID | FileCheck %s -check-prefix=RETURN_VOID_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_TR1 | FileCheck %s -check-prefix=RETURN_TR1
 
 struct FooStruct {
   var instanceVar : Int
@@ -42,4 +43,18 @@ func testMisplacedTry() throws -> Int {
 
 func testMisplacedTryVoid() throws {
   try return #^TRY_RETURN_VOID^#
+}
+
+func testTR1() -> Int? {
+	var i : Int
+	var oi : Int?
+	var fs : FooStruct
+	return #^RETURN_TR1^#
+
+// RETURN_TR1: Begin completions
+// RETURN_TR1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: oi[#Int?#]{{; name=.+$}}
+// RETURN_TR1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: testTR1()[#Int?#]{{; name=.+$}}
+// RETURN_TR1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: i[#Int#]{{; name=.+$}}
+// RETURN_TR1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testReturnInt1()[#Void#]{{; name=.+$}}
+// RETURN_TR1-DAG: Decl[LocalVar]/Local:               fs[#FooStruct#]{{; name=.+$}}
 }

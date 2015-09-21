@@ -157,6 +157,8 @@ public:
 
   virtual void completeCallArg(CallExpr *E) = 0;
 
+  virtual void completeReturnStmt(CodeCompletionExpr *E) = 0;
+
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.
   virtual void doneParsing() = 0;
