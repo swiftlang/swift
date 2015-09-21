@@ -840,17 +840,19 @@ void CallGraph::verify(SILFunction *F) const {
       assert(ApplyToEdgeMap.lookup(FAS) == Edge &&
              "Edge is not in ApplyToEdgeMap");
       
-      // In the trivial case that we call a known function, check if we have
-      // exactly one callee in the edge.
-      SILValue Callee = FAS.getCallee();
-      if (auto *PAI = dyn_cast<PartialApplyInst>(Callee))
-        Callee = PAI->getCallee();
-      
-      if (auto *FRI = dyn_cast<FunctionRefInst>(Callee)) {
-        auto *CalleeNode = Edge->getSingleCalleeOrNull();
-        assert(CalleeNode &&
-               CalleeNode->getFunction() == FRI->getReferencedFunction() &&
-               "Direct apply is not represented by a single-callee edge");
+      if (Edge->isCalleeSetComplete()) {
+        // In the trivial case that we call a known function, check if we have
+        // exactly one callee in the edge.
+        SILValue Callee = FAS.getCallee();
+        if (auto *PAI = dyn_cast<PartialApplyInst>(Callee))
+          Callee = PAI->getCallee();
+        
+        if (auto *FRI = dyn_cast<FunctionRefInst>(Callee)) {
+          auto *CalleeNode = Edge->getSingleCalleeOrNull();
+          assert(CalleeNode &&
+                 CalleeNode->getFunction() == FRI->getReferencedFunction() &&
+                 "Direct apply is not represented by a single-callee edge");
+        }
       }
     }
   }
