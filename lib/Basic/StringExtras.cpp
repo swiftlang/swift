@@ -398,44 +398,42 @@ static StringRef toLowercaseWord(StringRef string, StringScratchSpace &scratch){
   return scratch.copyString(result);
 }
 
-/// Omit needless words for the result type of a name, which come at the
-/// beginning of the name.
-static StringRef omitNeedlessWordsForResultType(StringRef name,
-                                                OmissionTypeName resultType,
-                                                bool resultTypeMatchesContext,
-                                                StringScratchSpace &scratch){
-  if (resultType.empty())
+/// Omit needless words from the beginning of a name.
+static StringRef omitNeedlessWordsFromPrefix(StringRef name,
+                                             OmissionTypeName type,
+                                             StringScratchSpace &scratch){
+  if (type.empty())
     return name;
 
   // Match the result type to the beginning of the name.
-  StringRef newName = matchLeadingTypeName(name, resultType);
+  StringRef newName = matchLeadingTypeName(name, type);
   if (newName == name)
     return name;
 
   auto firstWord = camel_case::getFirstWord(newName);
 
-  // If we have "By" followed by a gerund, chop off the "By" as well and
-  // use the lowercased gerund.
-  if (firstWord == "By") {
-    if (getPartOfSpeech(camel_case::getFirstWord(newName.substr(2)))
-          == PartOfSpeech::Gerund) {
-      return toLowercaseWord(newName.substr(2), scratch);
-    }
-  }
-
-  // If we have a preposition, chop off the type information at the beginning.
-  //
-  // Only do this when the result type matches the context type.
-  if (resultTypeMatchesContext &&
-      getPartOfSpeech(firstWord) == PartOfSpeech::Preposition &&
+  // If we have a preposition, we can chop off type information at the
+  // beginning of the name.
+  if (getPartOfSpeech(firstWord) == PartOfSpeech::Preposition &&
       newName.size() > firstWord.size()) {
+    // If the preposition was "by" and is followed by a gerund, also remove
+    // "by".
+    if (firstWord == "By") {
+      StringRef nextWord = camel_case::getFirstWord(
+                             newName.substr(firstWord.size()));
+      if (getPartOfSpeech(nextWord) == PartOfSpeech::Gerund) {
+        return toLowercaseWord(newName.substr(firstWord.size()), scratch);
+      }
+    }
+
     return toLowercaseWord(newName, scratch);
   }
 
   return name;
 }
 
-StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
+static StringRef omitNeedlessWords(StringRef name,
+                                   OmissionTypeName typeName,
                                    NameRole role,
                                    StringScratchSpace &scratch) {
   // "usingBlock" -> "body" for block parameters.
@@ -447,7 +445,6 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
 
   // If we have no name or no type name, there is nothing to do.
   if (name.empty() || typeName.empty()) return name;
-
 
   // Get the camel-case words in the name and type name.
   auto nameWords = camel_case::getWords(name);
@@ -584,9 +581,6 @@ StringRef swift::omitNeedlessWords(StringRef name, OmissionTypeName typeName,
       break;
     }
 
-  } else if (role == NameRole::Property) {
-    // For a property, check whether type information is at the beginning.
-    name = omitNeedlessWordsForResultType(name, typeName, true, scratch);
   }
 
   // If we ended up with a name like "get" or "set", do nothing.
@@ -621,32 +615,31 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                               StringScratchSpace &scratch) {
   bool anyChanges = false;
 
-  // For zero-parameter methods that return 'Self' or a result type
-  // that matches the declaration context, omit needless words from
-  // the base name.
+  // If the result type matches the context, remove the context type from the
+  // prefix of the name.
   bool resultTypeMatchesContext = returnsSelf || (resultType == contextType);
-  if (paramTypes.empty()) {
-    if (resultTypeMatchesContext) {
-      OmissionTypeName typeName = returnsSelf ? contextType : resultType;
-      if (typeName.empty())
-        return false;
-
-      StringRef oldBaseName = baseName;
-      baseName = omitNeedlessWords(baseName, typeName, NameRole::Property,
-                                   scratch);
-      if (baseName != oldBaseName)
-        anyChanges = true;
+  if (resultTypeMatchesContext) {
+    StringRef newBaseName = omitNeedlessWordsFromPrefix(baseName, contextType,
+                                                        scratch);
+    if (newBaseName != baseName) {
+      baseName = newBaseName;
+      anyChanges = true;
     }
   }
 
-  // Omit needless words in the base name based on the result type.
-  StringRef newBaseName
-    = omitNeedlessWordsForResultType(baseName,
-                                     returnsSelf ? contextType : resultType,
-                                     resultTypeMatchesContext, scratch);
-  if (newBaseName != baseName) {
-    baseName = newBaseName;
-    anyChanges = true;
+  // Treat zero-parameter methods and properties the same way.
+  if (paramTypes.empty() && resultTypeMatchesContext) {
+    StringRef newBaseName = ::omitNeedlessWords(
+                              baseName,
+                              returnsSelf ? contextType : resultType,
+                              NameRole::Property,
+                              scratch);
+    if (newBaseName != baseName) {
+      baseName = newBaseName;
+      anyChanges = true;
+    }
+
+    return anyChanges;
   }
 
   // Omit needless words based on parameter types.
@@ -710,7 +703,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     }
 
     // Omit needless words from the name.
-    StringRef newName = omitNeedlessWords(name, paramTypes[i], role, scratch);
+    StringRef newName = ::omitNeedlessWords(name, paramTypes[i], role, scratch);
     if (name == newName) continue;
 
     anyChanges = true;

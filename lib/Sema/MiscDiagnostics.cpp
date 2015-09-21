@@ -1925,9 +1925,10 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
   if (!Context.LangOpts.WarnOmitNeedlessWords)
     return None;
 
-  auto name = var->getName();
-  if (name.empty())
+  if (var->getName().empty())
     return None;
+
+  auto name = var->getName().str();
 
   // Dig out the context type.
   Type contextType = var->getDeclContext()->getDeclaredInterfaceType();
@@ -1940,21 +1941,16 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
   while (auto optObjectTy = type->getAnyOptionalObjectType())
     type = optObjectTy;
 
-  // If the types refer to different nominal types, we're done.
-  if (contextType->getAnyNominal() != type->getAnyNominal())
-    return None;
-
   // Omit needless words.
   StringScratchSpace scratch;
-  StringRef newName
-    = swift::omitNeedlessWords(name.str(),
-                               getTypeNameForOmission(var->getType()),
-                               NameRole::Property, scratch);
+  OmissionTypeName typeName = getTypeNameForOmission(var->getType());
+  OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
+  if (omitNeedlessWords(name, { }, typeName, contextTypeName, { },
+                        /*returnsSelf=*/false, scratch)) {
+    return Context.getIdentifier(name);
+  }
 
-  if (newName == name.str())
-    return None;
-
-  return Context.getIdentifier(newName);
+  return None;
 }
 
 void TypeChecker::checkOmitNeedlessWords(AbstractFunctionDecl *afd) {

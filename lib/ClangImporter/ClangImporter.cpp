@@ -1308,8 +1308,7 @@ ClangImporter::Implementation::importName(const clang::NamedDecl *D,
     result = SwiftContext.getIdentifier(name.str());
   }
 
-  // Omit needless words from properties whose types match that of
-  // their enclosing class.
+  // Omit needless words from properties.
   if (OmitNeedlessWords) {
     if (auto objcProperty = dyn_cast<clang::ObjCPropertyDecl>(D)) {
       auto contextType = getClangDeclContextType(D->getDeclContext());
@@ -1317,14 +1316,11 @@ ClangImporter::Implementation::importName(const clang::NamedDecl *D,
         auto contextTypeName = getClangTypeNameForOmission(contextType);
         auto propertyTypeName = getClangTypeNameForOmission(
                                   objcProperty->getType());
-        if (contextTypeName == propertyTypeName) {
-          StringScratchSpace scratch;
-          StringRef newName = omitNeedlessWords(result.str(),
-                                                propertyTypeName,
-                                                NameRole::Property,
-                                                scratch);
-          if (newName != result.str())
-            result = SwiftContext.getIdentifier(newName);
+        StringScratchSpace scratch;
+        StringRef name = result.str();
+        if (omitNeedlessWords(name, { }, propertyTypeName, contextTypeName, { },
+                              /*returnsSelf=*/false, scratch)) {
+          result = SwiftContext.getIdentifier(name);
         }
       }
     }

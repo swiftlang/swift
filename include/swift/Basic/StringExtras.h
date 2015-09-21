@@ -337,41 +337,23 @@ public:
   StringRef copyString(StringRef string);
 };
 
-/// Attempt to omit needless words from the given name based on the
-/// name of the type associated with the name.
+/// Omit needless words for a declaration.
 ///
-/// \param name The name from which we will attempt to remove needless
-/// words.
-///
-/// \param typeName The name of the type of the entity being described.
-///
-/// \param role The role of the name, e.g., a parameter name, property
-/// name, base name of a function, etc.
-///
-/// \param scratch Scratch space that will be used for modifications beyond
-/// just chopping names.
-///
-/// \returns the updated name.
-StringRef omitNeedlessWords(StringRef name, OmissionTypeName typeName,
-                            NameRole role, StringScratchSpace &scratch);
-
-/// Omit needless words for a function, method, or initializer.
-///
-/// \param baseName The base name of the function. This value may be
+/// \param baseName The base name of the declaration. This value may be
 /// changed if any words are removed.
 ///
-/// \param argNames The names of the arguments to the function. The
-/// values in this array may be changed if any words are removed.
+/// \param argNames The names of the arguments to the function, or empty if
+/// the declaration is not a function. The values in this array may be changed if any words are removed.
 ///
-/// \param resultType The name of the result type of the function.
+/// \param resultType The name of the result type.
 ///
 /// \param contextType The name of the type of the enclosing context,
 /// e.g., the class name.
 ///
 /// \param paramTypes The names of the parameter types for the
-/// function.
+/// function, or empty if the declaration is not a function.
 ///
-/// \param returnsSelf Whether the result of the function is 'Self'
+/// \param returnsSelf Whether the result of the declaration is 'Self'
 /// (in Swift) or 'instancetype' (in Objective-C).
 ///
 /// \param scratch Scratch space that will be used for modifications beyond

@@ -81,10 +81,10 @@
 // Note: Int and Index match.
 // CHECK-FOUNDATION: func sliceFrom(_: Int, to: Int) -> String
 
-// Note: <result type>By<gerund> --> <gerund>.
+// Note: <context type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: func appending(_: String) -> String
 
-// Note: <result type>By<gerund> --> <gerund>.
+// Note: <context type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: func withString(_: String) -> String
 
 // Note: Splitting on "With".
@@ -109,10 +109,10 @@
 // Note: NSObject<Proto> treated as "Proto".
 // CHECK-FOUNDATION: func doSomethingElseWith(_: protocol<NSCopying, NSObjectProtocol>)
 
-// Note: class method name stripping result type.
+// Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
 
-// Note: instance method name stripping result type.
+// Note: instance method name stripping context type.
 // CHECK-APPKIT: func same() -> Self
 
 // Note: Unsafe(Mutable)Pointers get defaulted to 'nil'
@@ -127,9 +127,13 @@
 // Note: Skipping over "Ref"
 // CHECK-CORECOOLING: func replace(_: CCPowerSupply!)
 
-// Make sure we're removing redundant result type info at both the
+// Make sure we're removing redundant context type info at both the
 // beginning and the end.
 // CHECK-APPKIT: func reversing() -> NSBezierPath
 
 // Make sure we're dealing with 'instancetype' properly.
 // CHECK-APPKIT: func inventing() -> Self
+
+// Make sure we're removing redundant context type info at both the
+// beginning and the end of a property.
+// CHECK-APPKIT: var byFlattening: NSBezierPath { get }

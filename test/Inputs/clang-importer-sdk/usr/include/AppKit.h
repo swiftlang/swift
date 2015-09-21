@@ -256,4 +256,5 @@ struct Point3D { double x, y, z; };
 @interface NSBezierPath : NSObject
 - (nonnull NSBezierPath *)bezierPathByReversingPath;
 - (nonnull instancetype)bezierPathByInventingPath;
+@property(readonly,nonnull) NSBezierPath *bezierPathByFlatteningPath;
 @end
