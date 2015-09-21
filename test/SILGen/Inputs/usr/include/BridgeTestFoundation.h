@@ -50,6 +50,12 @@
 
 @end
 
+@interface NSDraggingItem
+
+@property(copy, nullable) NSArray *__nonnull (^imageComponentsProvider)(void);
+
+@end
+
 __null_unspecified NSString *bar(void);
 void setBar(__null_unspecified NSString *s);
 

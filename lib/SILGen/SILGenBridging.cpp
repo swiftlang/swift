@@ -65,6 +65,13 @@ static ManagedValue emitBridgeCollectionFromNative(SILGenFunction &gen,
                                                    SILType bridgedTy) {
   SILValue bridgeFn = gen.emitGlobalFunctionRef(loc, bridgeFnRef);
 
+  // If the expected return is optional, we'll need to wrap it.
+  OptionalTypeKind OTK = OTK_None;
+  SILType origBridgedTy = bridgedTy;
+  if (auto bridgedObjTy = bridgedTy.getAnyOptionalObjectType(gen.SGM.M, OTK)) {
+    bridgedTy = bridgedObjTy;
+  }
+
   // Figure out the type parameters.
   auto inputTy
     = collection.getType().getSwiftRValueType()->castTo<BoundGenericType>();
@@ -75,6 +82,12 @@ static ManagedValue emitBridgeCollectionFromNative(SILGenFunction &gen,
                                        bridgedTy,
                                        subs,
                                        { collection.forward(gen) });
+  // Wrap the result if necessary.
+  if (OTK != OTK_None) {
+    bridged = gen.B.createEnum(loc, bridged,
+                               gen.getASTContext().getOptionalSomeDecl(OTK),
+                               origBridgedTy);
+  }
 
   return gen.emitManagedRValueWithCleanup(bridged);
 }
