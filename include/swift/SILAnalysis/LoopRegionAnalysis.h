@@ -169,7 +169,7 @@ public:
 
   public:
     using value_type = unsigned;
-    using reference = const unsigned &;
+    using reference = unsigned;
     using pointer = void;
     using iterator_category = std::bidirectional_iterator_tag;
     using difference_type = void;
@@ -243,7 +243,7 @@ public:
 
   public:
     using value_type = unsigned;
-    using reference = const unsigned &;
+    using reference = unsigned;
     using pointer = void;
     using iterator_category = std::bidirectional_iterator_tag;
     using difference_type = void;
