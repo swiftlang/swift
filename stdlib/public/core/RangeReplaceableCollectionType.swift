@@ -124,8 +124,19 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// - Complexity: O(`self.count`).
   mutating func removeAtIndex(i: Index) -> Generator.Element
 
+  /// Customization point for `removeLast()`.  Implement this function if you
+  /// want to replace the default implementation.
+  ///
+  /// - Returns: A non-nil value if the operation was performed.
   @warn_unused_result
   mutating func _customRemoveLast() -> Generator.Element?
+
+  /// Customization point for `removeLast(_:)`.  Implement this function if you
+  /// want to replace the default implementation.
+  ///
+  /// - Returns: True if the operation was performed.
+  @warn_unused_result
+  mutating func _customRemoveLast(n: Int) -> Bool
 
   /// Remove the element at `startIndex` and return it.
   ///
@@ -136,7 +147,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Remove the first `n` elements.
   ///
   /// - Complexity: O(`self.count`)
-  /// - Requires: `self.count >= n`.
+  /// - Requires: `n >= 0 && self.count >= n`.
   mutating func removeFirst(n: Int)
 
   /// Remove the indicated `subRange` of elements.
@@ -200,6 +211,8 @@ extension RangeReplaceableCollectionType {
   }
 
   public mutating func removeFirst(n: Int) {
+    if n == 0 { return }
+    _precondition(n >= 0, "number of elements to remove should be non-negative")
     _precondition(count >= numericCast(n),
       "can't remove more items from a collection than it has")
     let end = startIndex.advancedBy(numericCast(n))
@@ -237,12 +250,48 @@ extension RangeReplaceableCollectionType where SubSequence == Self {
     self = self[startIndex.successor()..<endIndex]
     return element
   }
+
+  /// Remove the first `n` elements.
+  ///
+  /// - Complexity: O(1)
+  /// - Requires: `self.count >= n`.
+  public mutating func removeFirst(n: Int) {
+    if n == 0 { return }
+    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(count >= numericCast(n),
+      "can't remove more items from a collection than it contains")
+    self = self[startIndex.advancedBy(numericCast(n))..<endIndex]
+  }
 }
 
 extension RangeReplaceableCollectionType {
   @warn_unused_result
   public mutating func _customRemoveLast() -> Generator.Element? {
     return nil
+  }
+
+  @warn_unused_result
+  public mutating func _customRemoveLast(n: Int) -> Bool {
+    return false
+  }
+}
+
+extension RangeReplaceableCollectionType
+  where
+  Index : BidirectionalIndexType,
+  SubSequence == Self {
+
+  @warn_unused_result
+  public mutating func _customRemoveLast() -> Generator.Element? {
+    let element = last!
+    self = self[startIndex..<endIndex.predecessor()]
+    return element
+  }
+
+  @warn_unused_result
+  public mutating func _customRemoveLast(n: Int) -> Bool {
+    self = self[startIndex..<endIndex.advancedBy(numericCast(-n))]
+    return true
   }
 }
 
@@ -252,11 +301,27 @@ extension RangeReplaceableCollectionType where Index : BidirectionalIndexType {
   /// - Complexity: O(1)
   /// - Requires: `!self.isEmpty`
   public mutating func removeLast() -> Generator.Element {
-    _precondition(!isEmpty, "can't removeLast from an empty collection")
+    _precondition(!isEmpty, "can't remove last element from an empty collection")
     if let result = _customRemoveLast() {
       return result
     }
     return removeAtIndex(endIndex.predecessor())
+  }
+
+  /// Remove the last `n` elements.
+  ///
+  /// - Complexity: O(`self.count`)
+  /// - Requires: `n >= 0 && self.count >= n`.
+  public mutating func removeLast(n: Int) {
+    if n == 0 { return }
+    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(count >= numericCast(n),
+      "can't remove more items from a collection than it contains")
+    if _customRemoveLast(n) {
+      return
+    }
+    let end = endIndex
+    removeRange(end.advancedBy(numericCast(-n))..<end)
   }
 }
 

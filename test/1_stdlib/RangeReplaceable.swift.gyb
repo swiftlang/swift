@@ -47,6 +47,12 @@ RangeReplaceableTestSuite.test("removeLast/whereIndexIsBidirectional/dispatch") 
   expectCustomizable(tester, tester.log._customRemoveLast)
 }
 
+RangeReplaceableTestSuite.test("removeLast(n: Int)/whereIndexIsBidirectional/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  _ = tester.removeLast(1)
+  expectCustomizable(tester, tester.log._customRemoveLastN)
+}
+
 RangeReplaceableTestSuite.test("removeRange/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester(
     [ 1, 2, 3 ].map(OpaqueValue.init))

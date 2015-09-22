@@ -76,16 +76,16 @@ public struct PrefixUpToTest {
 internal struct RemoveFirstNTest {
   let collection: [Int]
   let numberToRemove: Int
-  let expected: [Int]
+  let expectedCollection: [Int]
   let loc: SourceLoc
 
   init(
-    collection: [Int], numberToRemove: Int, expected: [Int],
+    collection: [Int], numberToRemove: Int, expectedCollection: [Int],
     file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.collection = collection
     self.numberToRemove = numberToRemove
-    self.expected = expected
+    self.expectedCollection = expectedCollection
     self.loc = SourceLoc(file, line, comment: "removeFirst(n: Int) test data")
   }
 }
@@ -237,23 +237,43 @@ public let suffixFromTests = [
 let removeFirstTests: [RemoveFirstNTest] = [
   RemoveFirstNTest(
     collection: [1010],
+    numberToRemove: 0,
+    expectedCollection: [1010]
+  ),
+  RemoveFirstNTest(
+    collection: [1010],
     numberToRemove: 1,
-    expected: []
+    expectedCollection: []
+  ),
+  RemoveFirstNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 0,
+    expectedCollection: [1010, 2020, 3030, 4040, 5050]
   ),
   RemoveFirstNTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     numberToRemove: 1,
-    expected: [2020, 3030, 4040, 5050]
+    expectedCollection: [2020, 3030, 4040, 5050]
+  ),
+  RemoveFirstNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 2,
+    expectedCollection: [3030, 4040, 5050]
+  ),
+  RemoveFirstNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 3,
+    expectedCollection: [4040, 5050]
+  ),
+  RemoveFirstNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 4,
+    expectedCollection: [5050]
   ),
   RemoveFirstNTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     numberToRemove: 5,
-    expected: []
-  ),
-  RemoveFirstNTest(
-    collection: [1010, 2020, 3030, 4040, 5050],
-    numberToRemove: 5,
-    expected: []
+    expectedCollection: []
   ),
 ]
 
@@ -659,6 +679,99 @@ self.test("\(testNamePrefix).suffixFrom/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
+// removeFirst()/slice
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).removeFirst()/slice/semantics") {
+  for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
+    let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
+    var slice = c[c.startIndex..<c.endIndex]
+    let survivingIndices = Array(slice.startIndex.successor()..<slice.endIndex)
+    let removedElement = slice.removeFirst()
+    expectEqual(test.collection.first, extractValue(removedElement).value)
+    expectEqualSequence(
+      test.expectedCollection,
+      slice.map { extractValue($0).value },
+      "removeFirst() shouldn't mutate the tail of the slice",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.expectedCollection,
+      survivingIndices.map { extractValue(slice[$0]).value },
+      "removeFirst() shouldn't invalidate indices",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.collection,
+      c.map { extractValue($0).value },
+      "removeFirst() shouldn't mutate the collection that was sliced",
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+self.test("\(testNamePrefix).removeFirst()/slice/empty/semantics") {
+  let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
+  var slice = c[c.startIndex..<c.startIndex]
+  expectCrashLater()
+  _ = slice.removeFirst() // Should trap.
+}
+
+//===----------------------------------------------------------------------===//
+// removeFirst(n: Int)/slice
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).removeFirst(n: Int)/slice/semantics") {
+  for test in removeFirstTests {
+    let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
+    var slice = c[c.startIndex..<c.endIndex]
+    let survivingIndices =
+      Array(
+        slice.startIndex.advancedBy(numericCast(test.numberToRemove)) ..<
+        slice.endIndex
+      )
+    slice.removeFirst(test.numberToRemove)
+    expectEqualSequence(
+      test.expectedCollection,
+      slice.map { extractValue($0).value },
+      "removeFirst() shouldn't mutate the tail of the slice",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.expectedCollection,
+      survivingIndices.map { extractValue(slice[$0]).value },
+      "removeFirst() shouldn't invalidate indices",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.collection,
+      c.map { extractValue($0).value },
+      "removeFirst() shouldn't mutate the collection that was sliced",
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+self.test("\(testNamePrefix).removeFirst(n: Int)/slice/empty/semantics") {
+  let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
+  var slice = c[c.startIndex..<c.startIndex]
+  expectCrashLater()
+  slice.removeFirst(1) // Should trap.
+}
+
+self.test("\(testNamePrefix).removeFirst(n: Int)/slice/removeNegative/semantics") {
+  let c = makeWrappedCollection([1010, 2020].map(OpaqueValue.init))
+  var slice = c[c.startIndex..<c.startIndex]
+  expectCrashLater()
+  slice.removeFirst(-1) // Should trap.
+}
+
+self.test("\(testNamePrefix).removeFirst(n: Int)/slice/removeTooMany/semantics") {
+  let c = makeWrappedCollection([1010, 2020].map(OpaqueValue.init))
+  var slice = c[c.startIndex..<c.startIndex]
+  expectCrashLater()
+  slice.removeFirst(3) // Should trap.
+}
+
+//===----------------------------------------------------------------------===//
 
   } // addForwardCollectionTests
 
@@ -670,7 +783,7 @@ self.test("\(testNamePrefix).suffixFrom/semantics") {
     CollectionWithEquatableElement.Index : BidirectionalIndexType,
     Collection.SubSequence : CollectionType,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
-    Collection.SubSequence.SubSequence : CollectionType,
+    Collection.SubSequence.Index : BidirectionalIndexType,
     Collection.SubSequence == Collection.SubSequence.SubSequence,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
@@ -729,6 +842,105 @@ self.test("\(testNamePrefix).last") {
       ) { $0.value == $1.value }
     }
   }
+}
+
+//===----------------------------------------------------------------------===//
+// removeLast()/slice
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).removeLast()/slice/semantics") {
+  for test in removeLastTests.filter({ $0.numberToRemove == 1 }) {
+    let c = makeWrappedCollection(test.collection)
+    var slice = c[c.startIndex..<c.endIndex]
+    let survivingIndices =
+      Array(
+        slice.startIndex ..<
+        slice.endIndex.advancedBy(numericCast(-test.numberToRemove))
+      )
+    let removedElement = slice.removeLast()
+    expectEqual(
+      test.collection.last!.value,
+      extractValue(removedElement).value)
+    expectEqualSequence(
+      test.expectedCollection,
+      slice.map { extractValue($0).value },
+      "removeLast() shouldn't mutate the head of the slice",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.expectedCollection,
+      survivingIndices.map { extractValue(slice[$0]).value },
+      "removeLast() shouldn't invalidate indices",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.collection.map { $0.value },
+      c.map { extractValue($0).value },
+      "removeLast() shouldn't mutate the collection that was sliced",
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+self.test("\(testNamePrefix).removeLast()/slice/empty/semantics") {
+  let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
+  var slice = c[c.startIndex..<c.startIndex]
+  expectCrashLater()
+  _ = slice.removeLast() // Should trap.
+}
+
+//===----------------------------------------------------------------------===//
+// removeLast(n: Int)/slice
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).removeLast(n: Int)/slice/semantics") {
+  for test in removeLastTests {
+    let c = makeWrappedCollection(test.collection)
+    var slice = c[c.startIndex..<c.endIndex]
+    let survivingIndices =
+      Array(
+        slice.startIndex ..<
+        slice.endIndex.advancedBy(numericCast(-test.numberToRemove))
+      )
+    slice.removeLast(test.numberToRemove)
+    expectEqualSequence(
+      test.expectedCollection,
+      slice.map { extractValue($0).value },
+      "removeLast() shouldn't mutate the head of the slice",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.expectedCollection,
+      survivingIndices.map { extractValue(slice[$0]).value },
+      "removeLast() shouldn't invalidate indices",
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.collection.map { $0.value },
+      c.map { extractValue($0).value },
+      "removeLast() shouldn't mutate the collection that was sliced",
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+self.test("\(testNamePrefix).removeLast(n: Int)/slice/empty/semantics") {
+  let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
+  var slice = c[c.startIndex..<c.startIndex]
+  expectCrashLater()
+  slice.removeLast(1) // Should trap.
+}
+
+self.test("\(testNamePrefix).removeLast(n: Int)/slice/removeNegative/semantics") {
+  let c = makeWrappedCollection([1010, 2020].map(OpaqueValue.init))
+  var slice = c[c.startIndex..<c.startIndex]
+  expectCrashLater()
+  slice.removeLast(-1) // Should trap.
+}
+
+self.test("\(testNamePrefix).removeLast(n: Int)/slice/removeTooMany/semantics") {
+  let c = makeWrappedCollection([1010, 2020].map(OpaqueValue.init))
+  var slice = c[c.startIndex..<c.startIndex]
+  expectCrashLater()
+  slice.removeLast(3) // Should trap.
 }
 
 //===----------------------------------------------------------------------===//
@@ -872,9 +1084,9 @@ self.test("\(testNamePrefix).suffix/semantics") {
     Collection.Index : RandomAccessIndexType,
     CollectionWithEquatableElement.Index : RandomAccessIndexType,
     Collection.SubSequence : CollectionType,
-    Collection.SubSequence.Generator.Element == Collection.Generator.Element,
-    Collection.SubSequence.SubSequence : CollectionType,
     Collection.SubSequence == Collection.SubSequence.SubSequence,
+    Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.Index : RandomAccessIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",
@@ -940,42 +1152,6 @@ self.test("\(testNamePrefix).suffix/semantics") {
     expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
       stackTrace: SourceLocStack().with(test.loc))
   }
-}
-
-//===----------------------------------------------------------------------===//
-// removeFirst()
-//===----------------------------------------------------------------------===//
-self.test("\(testNamePrefix).removeFirst/slice/semantics") {
-  for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
-    let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
-    var slice = c[c.startIndex..<c.endIndex]
-    let survivingIndices = Array(slice.startIndex.successor()..<slice.endIndex)
-    let removedElement = slice.removeFirst()
-    expectEqual(test.collection.first, extractValue(removedElement).value)
-    expectEqualSequence(
-      test.expected,
-      slice.map { extractValue($0).value },
-      stackTrace: SourceLocStack().with(test.loc)
-    )
-    expectEqualSequence(
-      test.expected,
-      survivingIndices.map { extractValue(slice[$0]).value },
-      "removeFirst() shouldn't invalidate indices",
-      stackTrace: SourceLocStack().with(test.loc)
-    )
-    expectEqualSequence(
-      test.collection,
-      c.map { extractValue($0).value },
-      "removeFirst() shouldn't mutate the original collection",
-      stackTrace: SourceLocStack().with(test.loc))
-  }
-}
-
-self.test("\(testNamePrefix).removeFirst/slice/empty/semantics") {
-  let c = makeWrappedCollection(Array<OpaqueValue<Int>>())
-  var slice = c[c.startIndex..<c.startIndex]
-  expectCrashLater()
-  _ = slice.removeFirst() // Should trap.
 }
 
 //===----------------------------------------------------------------------===//

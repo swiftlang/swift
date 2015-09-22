@@ -169,20 +169,20 @@ internal struct RemoveAtIndexTest {
   }
 }
 
-internal struct RemoveLastTest {
+internal struct RemoveLastNTest {
   let collection: [OpaqueValue<Int>]
-  let expectedRemovedElement: Int
+  let numberToRemove: Int
   let expectedCollection: [Int]
   let loc: SourceLoc
 
   internal init(
-    collection: [Int], expectedRemovedElement: Int, expectedCollection: [Int],
+    collection: [Int], numberToRemove: Int, expectedCollection: [Int],
     file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.collection = collection.map(OpaqueValue.init)
-    self.expectedRemovedElement = expectedRemovedElement
+    self.numberToRemove = numberToRemove
     self.expectedCollection = expectedCollection
-    self.loc = SourceLoc(file, line, comment: "removeLast() test data")
+    self.loc = SourceLoc(file, line, comment: "removeLast(n: Int) test data")
   }
 }
 
@@ -250,6 +250,49 @@ internal struct OperatorPlusTest {
   }
 }
 
+let removeLastTests: [RemoveLastNTest] = [
+  RemoveLastNTest(
+    collection: [1010],
+    numberToRemove: 0,
+    expectedCollection: [1010]
+  ),
+  RemoveLastNTest(
+    collection: [1010],
+    numberToRemove: 1,
+    expectedCollection: []
+  ),
+  RemoveLastNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 0,
+    expectedCollection: [1010, 2020, 3030, 4040, 5050]
+  ),
+  RemoveLastNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 1,
+    expectedCollection: [1010, 2020, 3030, 4040]
+  ),
+  RemoveLastNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 2,
+    expectedCollection: [1010, 2020, 3030]
+  ),
+  RemoveLastNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 3,
+    expectedCollection: [1010, 2020]
+  ),
+  RemoveLastNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 4,
+    expectedCollection: [1010]
+  ),
+  RemoveLastNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 5,
+    expectedCollection: []
+  ),
+]
+
 extension TestSuite {
   /// Adds a set of tests for `RangeReplaceableCollectionType`.
   ///
@@ -264,7 +307,6 @@ extension TestSuite {
     CollectionWithEquatableElement : RangeReplaceableCollectionType
     where
     Collection.SubSequence : CollectionType,
-    Collection.SubSequence.SubSequence : CollectionType,
     Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
     CollectionWithEquatableElement.Generator.Element : Equatable
@@ -643,8 +685,9 @@ self.test("\(testNamePrefix).removeFirst()/semantics") {
     let removedElement = c.removeFirst()
     expectEqual(test.collection.first, extractValue(removedElement).value)
     expectEqualSequence(
-      test.expected,
+      test.expectedCollection,
       c.map { extractValue($0).value },
+      "removeFirst() shouldn't mutate the tail of the collection",
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
@@ -664,23 +707,30 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/semantics") {
     var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
     c.removeFirst(test.numberToRemove)
     expectEqualSequence(
-      test.expected,
+      test.expectedCollection,
       c.map { extractValue($0).value },
+      "removeFirst() shouldn't mutate the tail of the collection",
       stackTrace: SourceLocStack().with(test.loc)
     )
   }
+}
+
+self.test("\(testNamePrefix).removeFirst(n: Int)/empty/semantics") {
+  var c = makeWrappedCollection(Array<OpaqueValue<Int>>())
+  expectCrashLater()
+  c.removeFirst(1) // Should trap.
+}
+
+self.test("\(testNamePrefix).removeFirst(n: Int)/removeNegative/semantics") {
+  var c = makeWrappedCollection([1010, 2020, 3030].map(OpaqueValue.init))
+  expectCrashLater()
+  c.removeFirst(-1) // Should trap.
 }
 
 self.test("\(testNamePrefix).removeFirst(n: Int)/removeTooMany/semantics") {
   var c = makeWrappedCollection([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
   c.removeFirst(5) // Should trap.
-}
-
-self.test("\(testNamePrefix).removeFirst(n: Int)/empty/semantics") {
-  var c = makeWrappedCollection(Array<OpaqueValue<Int>>())
-  expectCrashLater()
-  _ = c.removeFirst() // Should trap.
 }
 
 //===----------------------------------------------------------------------===//
@@ -1030,9 +1080,9 @@ self.test("\(testNamePrefix).OperatorPlus") {
     Collection.Index : BidirectionalIndexType,
     CollectionWithEquatableElement.Index : BidirectionalIndexType,
     Collection.SubSequence : CollectionType,
-    Collection.SubSequence.SubSequence : CollectionType,
     Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.Index : BidirectionalIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",
@@ -1089,41 +1139,59 @@ self.test("\(testNamePrefix).OperatorPlus") {
 //===----------------------------------------------------------------------===//
 
 self.test("\(testNamePrefix).removeLast()/whereIndexIsBidirectional/semantics") {
-  let tests: [RemoveLastTest] = [
-    RemoveLastTest(
-      collection: [1010],
-      expectedRemovedElement: 1010,
-      expectedCollection: []),
-
-    RemoveLastTest(
-      collection: [1010, 2020, 3030, 4040, 5050],
-      expectedRemovedElement: 5050,
-      expectedCollection: [1010, 2020, 3030, 4040]),
-  ]
-
-  for test in tests {
+  for test in removeLastTests.filter({ $0.numberToRemove == 1 }) {
     var c = makeWrappedCollection(test.collection)
     let removedElement = c.removeLast()
+    expectEqual(
+      test.collection.last!.value,
+      extractValue(removedElement).value,
+      stackTrace: SourceLocStack().with(test.loc))
     expectEqualSequence(
       test.expectedCollection,
       c.map { extractValue($0).value },
-      stackTrace: SourceLocStack().with(test.loc))
-    expectEqual(
-      test.expectedRemovedElement,
-      extractValue(removedElement).value,
+      "removeLast() shouldn't mutate the head of the collection",
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
-self.test("\(testNamePrefix).removeLast()/whereIndexIsBidirectional/semantics/empty") {
-  let test = RemoveLastTest(
-    collection: [],
-    expectedRemovedElement: 0,
-    expectedCollection: [])
-
-  var c = makeWrappedCollection(test.collection)
+self.test("\(testNamePrefix).removeLast()/whereIndexIsBidirectional/empty/semantics") {
+  var c = makeWrappedCollection([])
   expectCrashLater()
-  c.removeLast()
+  c.removeLast() // Should trap.
+}
+
+//===----------------------------------------------------------------------===//
+// removeLast(n: Int)
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/semantics") {
+  for test in removeLastTests {
+    var c = makeWrappedCollection(test.collection)
+    c.removeLast(test.numberToRemove)
+    expectEqualSequence(
+      test.expectedCollection,
+      c.map { extractValue($0).value },
+      "removeLast() shouldn't mutate the head of the collection",
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/empty/semantics") {
+  var c = makeWrappedCollection([])
+  expectCrashLater()
+  c.removeLast(1) // Should trap.
+}
+
+self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/removeNegative/semantics") {
+  var c = makeWrappedCollection([1010, 2020].map(OpaqueValue.init))
+  expectCrashLater()
+  c.removeLast(-1) // Should trap.
+}
+
+self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/removeTooMany/semantics") {
+  var c = makeWrappedCollection([1010, 2020].map(OpaqueValue.init))
+  expectCrashLater()
+  c.removeLast(3) // Should trap.
 }
 
 //===----------------------------------------------------------------------===//
@@ -1137,10 +1205,9 @@ self.test("\(testNamePrefix).removeLast()/whereIndexIsBidirectional/semantics/em
     Collection.Index : RandomAccessIndexType,
     CollectionWithEquatableElement.Index : RandomAccessIndexType,
     Collection.SubSequence : CollectionType,
+    Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
-    Collection.SubSequence.SubSequence : CollectionType,
-    Collection.SubSequence == Collection.SubSequence.SubSequence,
-    Collection.SubSequence == Collection.SubSequence.SubSequence,
+    Collection.SubSequence.Index : RandomAccessIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",

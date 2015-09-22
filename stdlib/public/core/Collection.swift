@@ -538,11 +538,59 @@ extension CollectionType where Index : BidirectionalIndexType {
 }
 
 extension CollectionType where SubSequence == Self {
+  /// Remove the element at `startIndex` and return it.
+  ///
+  /// - Complexity: O(1)
+  /// - Requires: `!self.isEmpty`.
   public mutating func removeFirst() -> Generator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
     self = self[startIndex.successor()..<endIndex]
     return element
+  }
+
+  /// Remove the first `n` elements.
+  ///
+  /// - Complexity:
+  ///   - O(1) if `Index` conforms to `RandomAccessIndexType`
+  ///   - O(n) otherwise
+  /// - Requires: `n >= 0 && self.count >= n`.
+  public mutating func removeFirst(n: Int) {
+    if n == 0 { return }
+    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(count >= numericCast(n),
+      "can't remove more items from a collection than it contains")
+    self = self[startIndex.advancedBy(numericCast(n))..<endIndex]
+  }
+}
+
+extension CollectionType
+  where
+  SubSequence == Self,
+  Index : BidirectionalIndexType {
+
+  /// Remove an element from the end.
+  ///
+  /// - Complexity: O(1)
+  /// - Requires: `!self.isEmpty`
+  public mutating func removeLast() -> Generator.Element {
+    let element = last!
+    self = self[startIndex..<endIndex.predecessor()]
+    return element
+  }
+
+  /// Remove the last `n` elements.
+  ///
+  /// - Complexity:
+  ///   - O(1) if `Index` conforms to `RandomAccessIndexType`
+  ///   - O(n) otherwise
+  /// - Requires: `n >= 0 && self.count >= n`.
+  public mutating func removeLast(n: Int) {
+    if n == 0 { return }
+    _precondition(n >= 0, "number of elements to remove should be non-negative")
+    _precondition(count >= numericCast(n),
+      "can't remove more items from a collection than it contains")
+    self = self[startIndex..<endIndex.advancedBy(numericCast(-n))]
   }
 }
 

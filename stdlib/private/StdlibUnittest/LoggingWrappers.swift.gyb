@@ -67,6 +67,7 @@ public class RangeReplaceableCollectionLog {
   public static var removeAll = TypeIndexed(0)
   public static var removeAtIndex = TypeIndexed(0)
   public static var _customRemoveLast = TypeIndexed(0)
+  public static var _customRemoveLastN = TypeIndexed(0)
   public static var removeRange = TypeIndexed(0)
   public static var removeFirst = TypeIndexed(0)
   public static var removeFirstN = TypeIndexed(0)
@@ -162,6 +163,11 @@ public struct LoggingRangeReplaceableCollection<
   public mutating func _customRemoveLast() -> Base.Generator.Element? {
     ++Log._customRemoveLast[selfType]
     return base._customRemoveLast()
+  }
+
+  public mutating func _customRemoveLast(n: Int) -> Bool {
+    ++Log._customRemoveLastN[selfType]
+    return base._customRemoveLast(n)
   }
 
   public mutating func removeFirst() -> Base.Generator.Element {
