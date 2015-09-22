@@ -127,6 +127,9 @@
 // Note: Skipping over "3D"
 // CHECK-APPKIT: func drawInAirAt(_: Point3D)
 
+// Note: with<something> -> <something>
+// CHECK-APPKIT: func drawAt(_: Point3D, attributes: [String : AnyObject]? = nil)
+
 // Note: Don't strip names that aren't preceded by a verb or preposition.
 // CHECK-APPKIT: func setTextColor(_: NSColor? = nil)
 

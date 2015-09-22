@@ -591,8 +591,18 @@ static StringRef omitNeedlessWords(StringRef name,
       return origName;
     break;
 
+  case NameRole::SubsequentParameter: {
+    // For subsequent parameters, drop useless leading prepositions such as
+    // "with" and "using".
+    StringRef firstWord = camel_case::getFirstWord(name);
+    if (firstWord.size() < name.size() &&
+        (firstWord == "with" || firstWord == "using")) {
+      name = toLowercaseWord(name.substr(firstWord.size()), scratch);
+    }
+    break;
+  }
+
   case NameRole::FirstParameter:
-  case NameRole::SubsequentParameter:
   case NameRole::Partial:
     break;
   }
