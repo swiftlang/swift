@@ -75,7 +75,8 @@ DisableARCOpts("disable-llvm-arc-opts", llvm::cl::init(false));
 /// replaced with swift_retain.
 ///
 /// This also does some trivial peep-hole optimizations as we go.
-static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
+static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
+                                      SwiftRCIdentity *RC) {
   bool Changed = false;
   DenseSet<Value *> NativeRefs;
   DenseMap<Value *, TinyPtrVector<Instruction *>> UnknownRetains;
@@ -107,7 +108,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
         break;
       case RT_Retain: {
         CallInst &CI = cast<CallInst>(Inst);
-        Value *ArgVal = CI.getArgOperand(0);
+        Value *ArgVal = RC->getSwiftRCIdentityRoot(CI.getArgOperand(0));
         // retain(null) is a no-op.
         if (isa<ConstantPointerNull>(ArgVal)) {
           CI.eraseFromParent();
@@ -129,7 +130,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
       }
       case RT_UnknownRetain: {
         CallInst &CI = cast<CallInst>(Inst);
-        Value *ArgVal = CI.getArgOperand(0);
+        Value *ArgVal = RC->getSwiftRCIdentityRoot(CI.getArgOperand(0));
         // unknownRetain(null) is a no-op.
         if (isa<ConstantPointerNull>(ArgVal)) {
           CI.eraseFromParent();
@@ -154,7 +155,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
       }
       case RT_Release: {
         CallInst &CI = cast<CallInst>(Inst);
-        Value *ArgVal = CI.getArgOperand(0);
+        Value *ArgVal = RC->getSwiftRCIdentityRoot(CI.getArgOperand(0));
         // release(null) is a no-op.
         if (isa<ConstantPointerNull>(ArgVal)) {
           CI.eraseFromParent();
@@ -176,7 +177,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
       }
       case RT_UnknownRelease: {
         CallInst &CI = cast<CallInst>(Inst);
-        Value *ArgVal = CI.getArgOperand(0);
+        Value *ArgVal = RC->getSwiftRCIdentityRoot(CI.getArgOperand(0));
         // unknownRelease(null) is a no-op.
         if (isa<ConstantPointerNull>(ArgVal)) {
           CI.eraseFromParent();
@@ -201,7 +202,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
       }
       case RT_ObjCRelease: {
         CallInst &CI = cast<CallInst>(Inst);
-        Value *ArgVal = CI.getArgOperand(0);
+        Value *ArgVal = RC->getSwiftRCIdentityRoot(CI.getArgOperand(0));
         // objc_release(null) is a noop, zap it.
         if (isa<ConstantPointerNull>(ArgVal)) {
           CI.eraseFromParent();
@@ -218,7 +219,7 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
       case RT_ObjCRetain: {
         // Canonicalize the retain so that nothing uses its result.
         CallInst &CI = cast<CallInst>(Inst);
-        Value *ArgVal = CI.getArgOperand(0);
+        Value *ArgVal = RC->getSwiftRCIdentityRoot(CI.getArgOperand(0));
         if (!CI.use_empty()) {
           CI.replaceAllUsesWith(ArgVal);
           Changed = true;
@@ -248,10 +249,11 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
 /// moving it earlier in the function if possible, over instructions that do not
 /// access the released object.  If we get to a retain or allocation of the
 /// object, zap both.
-static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
+static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB,
+                                      SwiftRCIdentity *RC) {
   // FIXME: Call classifier should identify the object for us.  Too bad C++
   // doesn't have nice Swift-style enums.
-  Value *ReleasedObject = Release.getArgOperand(0);
+  Value *ReleasedObject = RC->getSwiftRCIdentityRoot(Release.getArgOperand(0));
 
   BasicBlock::iterator BBI = &Release;
 
@@ -264,7 +266,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     if (isa<PHINode>(BBI) ||
         // If we found the instruction that defines the value we're releasing,
         // don't push the release past it.
-        &*BBI == ReleasedObject) {
+        &*BBI == Release.getArgOperand(0)) {
       ++BBI;
       goto OutOfLoop;
     }
@@ -297,6 +299,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
       // API to drop multiple retain counts at once.
       CallInst &ThisRelease = cast<CallInst>(*BBI);
       Value *ThisReleasedObject = ThisRelease.getArgOperand(0);
+      ThisReleasedObject = RC->getSwiftRCIdentityRoot(ThisReleasedObject);
       if (ThisReleasedObject == ReleasedObject) {
         //Release.dump(); ThisRelease.dump(); BB.getParent()->dump();
         ++BBI;
@@ -311,6 +314,7 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     case RT_Retain: {  // swift_retain(obj)
       CallInst &Retain = cast<CallInst>(*BBI);
       Value *RetainedObject = Retain.getArgOperand(0);
+      RetainedObject = RC->getSwiftRCIdentityRoot(RetainedObject);
 
       // Since we canonicalized earlier, we know that if our retain has any
       // uses, they were replaced already. This assertion documents this
@@ -397,10 +401,11 @@ OutOfLoop:
 ///
 /// NOTE: this handles both objc_retain and swift_retain.
 ///
-static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
+static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB,
+                                     SwiftRCIdentity *RC) {
   // FIXME: Call classifier should identify the object for us.  Too bad C++
   // doesn't have nice Swift-style enums.
-  Value *RetainedObject = Retain.getArgOperand(0);
+  Value *RetainedObject = RC->getSwiftRCIdentityRoot(Retain.getArgOperand(0));
 
   BasicBlock::iterator BBI = &Retain, BBE = BB.getTerminator();
 
@@ -458,6 +463,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
       // it and the retain.
       CallInst &ThisRelease = cast<CallInst>(CurInst);
       Value *ThisReleasedObject = ThisRelease.getArgOperand(0);
+      ThisReleasedObject = RC->getSwiftRCIdentityRoot(ThisReleasedObject);
       if (ThisReleasedObject == RetainedObject) {
         Retain.eraseFromParent();
         ThisRelease.eraseFromParent();
@@ -893,7 +899,8 @@ static void performRedundantCheckUnownedRemoval(BasicBlock &BB) {
 
 /// performGeneralOptimizations - This does a forward scan over basic blocks,
 /// looking for interesting local optimizations that can be done.
-static bool performGeneralOptimizations(Function &F, ARCEntryPointBuilder &B) {
+static bool performGeneralOptimizations(Function &F, ARCEntryPointBuilder &B,
+                                        SwiftRCIdentity *RC) {
   bool Changed = false;
 
   // TODO: This is a really trivial local algorithm.  It could be much better.
@@ -914,7 +921,7 @@ static bool performGeneralOptimizations(Function &F, ARCEntryPointBuilder &B) {
       case RT_ObjCRelease:
       case RT_UnknownRelease:
       case RT_Release:
-        Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB);
+        Changed |= performLocalReleaseMotion(cast<CallInst>(I), BB, RC);
         break;
       case RT_BridgeRetain:
       case RT_Retain:
@@ -924,7 +931,7 @@ static bool performGeneralOptimizations(Function &F, ARCEntryPointBuilder &B) {
         // invalidate our iterators by parking it on the instruction before I.
         BasicBlock::iterator Safe = &I;
         Safe = Safe != BB.begin() ? std::prev(Safe) : BB.end();
-        if (performLocalRetainMotion(cast<CallInst>(I), BB)) {
+        if (performLocalRetainMotion(cast<CallInst>(I), BB, RC)) {
           // If we zapped or moved the retain, reset the iterator on the
           // instruction *newly* after the prev instruction.
           BBI = Safe != BB.end() ? std::next(Safe) : BB.begin();
@@ -968,6 +975,7 @@ INITIALIZE_PASS_BEGIN(SwiftARCOpt,
                       "swift-arc-optimize", "Swift ARC optimization",
                       false, false)
 INITIALIZE_PASS_DEPENDENCY(SwiftAliasAnalysis)
+INITIALIZE_PASS_DEPENDENCY(SwiftRCIdentity)
 INITIALIZE_PASS_END(SwiftARCOpt,
                     "swift-arc-optimize", "Swift ARC optimization",
                     false, false)
@@ -984,6 +992,7 @@ SwiftARCOpt::SwiftARCOpt() : FunctionPass(ID) {
 
 void SwiftARCOpt::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
   AU.addRequired<SwiftAliasAnalysis>();
+  AU.addRequired<SwiftRCIdentity>();
   AU.setPreservesCFG();
 }
 
@@ -993,11 +1002,12 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
 
   bool Changed = false;
   ARCEntryPointBuilder B(F);
+  RC = &getAnalysis<SwiftRCIdentity>();
 
   // First thing: canonicalize swift_retain and similar calls so that nothing
   // uses their result.  This exposes the copy that the function does to the
   // optimizer.
-  Changed |= canonicalizeInputFunction(F, B);
+  Changed |= canonicalizeInputFunction(F, B, RC);
 
   // Next, do a pass with a couple of optimizations:
   // 1) release() motion, eliminating retain/release pairs when it turns out
@@ -1006,7 +1016,7 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
   // 2) deletion of stored-only objects - objects that are allocated and
   //    potentially retained and released, but are only stored to and don't
   //    escape.
-  Changed |= performGeneralOptimizations(F, B);
+  Changed |= performGeneralOptimizations(F, B, RC);
 
   return Changed;
 }

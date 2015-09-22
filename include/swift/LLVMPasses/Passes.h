@@ -65,6 +65,8 @@ namespace swift {
   };
 
   class SwiftARCOpt : public llvm::FunctionPass {
+    /// Swift RC Identity analysis.
+    SwiftRCIdentity *RC;
     virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
     virtual bool runOnFunction(llvm::Function &F) override;
   public:

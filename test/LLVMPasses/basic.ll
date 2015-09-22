@@ -42,6 +42,29 @@ entry:
   ret void
 }
 
+; CHECK-LABEL: @trivial_retain_release_with_rcidentity(
+; CHECK-NEXT: entry:
+; CHECK-NEXT: [[RET0:%.+]] = bitcast %swift.refcounted* %P to %swift.refcounted*
+; CHECK-NEXT: [[RET1:%.+]] = bitcast %swift.refcounted* %P to %swift.refcounted*
+; CHECK-NEXT: [[RET2:%.+]] = bitcast %objc_object* %O to %objc_object*
+; CHECK-NEXT: call void @user
+; CHECK-NEXT: ret void
+
+define void @trivial_retain_release_with_rcidentity(%swift.refcounted* %P, %objc_object* %O, %swift.bridge * %B) {
+entry:
+  tail call void @swift_retain(%swift.refcounted* %P)
+  %0 = bitcast %swift.refcounted* %P to %swift.refcounted*
+  tail call void @swift_release(%swift.refcounted* %0) nounwind
+  tail call void @swift_unknownRetain(%swift.refcounted* %P)
+  %1 = bitcast %swift.refcounted* %P to %swift.refcounted*
+  tail call void @swift_unknownRelease(%swift.refcounted* %1)
+  tail call %objc_object* @objc_retain(%objc_object* %O)
+  %3 = bitcast %objc_object* %O to %objc_object*
+  tail call void @objc_release(%objc_object* %3)
+  call void @user(%swift.refcounted* %P) nounwind
+  ret void
+}
+
 ; retain_motion1 - This shows motion of a retain across operations that can't
 ; release an object.  Release motion can't zap this.
 
