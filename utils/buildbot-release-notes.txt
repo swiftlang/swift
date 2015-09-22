@@ -4,8 +4,20 @@ Latest
 * Global anyGenerator() functions have been changed into initializers on
   AnyGenerator, making the API more intuitive and idiomatic.
 
+* Anonymously-typed members of C structs and unions can now be accessed
+  from Swift. For example, given the following struct 'Pie', the 'crust'
+  and 'filling' members are now imported:
 
+  struct Pie {
+    struct { bool crispy; } crust;
+    union { int fruit; } filling;
+  }
 
+  Since Swift does not support anonymous structs, these fields are
+  imported as properties named 'crust' and 'filling' having nested types
+  named 'Pie.__Unnamed_crust' and 'Pie.__Unnamed_filling'.
+
+  (rdar://problem/21683348)
 
 *** Time warp: Changes between Xcode 6.1 (Swift 1.1) through Xcode 7.1
 (Swift 2.1) have been lost.  Contributions to rectify this would be
