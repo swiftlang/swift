@@ -437,13 +437,6 @@ static StringRef omitNeedlessWords(StringRef name,
                                    OmissionTypeName typeName,
                                    NameRole role,
                                    StringScratchSpace &scratch) {
-  // "usingBlock" -> "body" for block parameters.
-  if ((role == NameRole::FirstParameter ||
-       role == NameRole::SubsequentParameter) &&
-      (name == "usingBlock" || name == "withBlock")) {
-    return "body";
-  }
-
   // If we have no name or no type name, there is nothing to do.
   if (name.empty() || typeName.empty()) return name;
 
@@ -709,16 +702,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
         if (splitPos > 0) {
           // Create a first argument name with the remainder of the base name,
           // lowercased.
-          // FIXME: The "Block" detection here is a total hack. We need to
-          // track closures more reasonably.
-          StringRef newArgName = newName.substr(splitPos);
-          if ((paramTypes[0].Name == "Block" &&
-               (newArgName == "With" || newArgName == "Using")) ||
-              (newArgName == "WithBlock" || newArgName == "UsingBlock")) {
-            argNames[0] = "body";
-          } else {
-            argNames[0] = toLowercaseWord(newArgName, scratch);
-          }
+          argNames[0] = toLowercaseWord(newName.substr(splitPos), scratch);
 
           // Update the base name by splitting at the preposition.
           newName = newName.substr(0, splitPos);
@@ -732,18 +716,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
     // Record this change.
     if (role == NameRole::BaseName) {
-      // If, after dropping type information, the last word of the
-      // base name is "Using", drop the "Using" from the base name and
-      // use "body" as a label for the first parameter.
-      StringRef remainingName = name.substr(newName.size());
-      if (camel_case::getLastWord(newName) == "Using" &&
-          remainingName == "Block" && argNames[0].empty()) {
-        argNames[0] = "body";
-        baseName = newName.substr(0, newName.size() - 5);
-      } else {
-        // Otherwise, adopt the new base name.
-        baseName = newName;
-      }
+      baseName = newName;
     } else {
       argNames[i] = newName;
     }
