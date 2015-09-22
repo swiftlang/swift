@@ -80,31 +80,28 @@ func multiple_closure_refs(var x: Int) -> (() -> Int, () -> Int) {
   // CHECK: return [[RET]]
 }
 
-/* TODO: Full support for references between local functions
-// C/HECK-LABEL: sil hidden @_TF8closures18capture_local_func
+// CHECK-LABEL: sil hidden @_TF8closures18capture_local_func
 func capture_local_func(var x: Int) -> () -> () -> Int {
-  // C/HECK: [[XBOX:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
   func aleph() -> Int { return x }
-  // C/HECK: [[ALEPH_REF:%[0-9]+]] = function_ref @[[ALEPH_NAME:_TFF8closures18capture_local_func.*]] : $@convention(thin) (@owned @box Int, @inout Int) -> Int
-  // C/HECK: [[ALEPH_CLOSURE:%[0-9]+]] = partial_apply [[ALEPH_REF]]([[XBOX]]#0, [[XBOX]]#1)
 
   func beth() -> () -> Int { return aleph }
-  // C/HECK: [[BETH_REF:%[0-9]+]] = function_ref @[[BETH_NAME:_TFF8closures18capture_local_func.*]] : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int
-  // C/HECK: [[BETH_CLOSURE:%[0-9]+]] = partial_apply [[BETH_REF]]([[ALEPH_CLOSURE]])
+  // CHECK: [[BETH_REF:%[0-9]+]] = function_ref @[[BETH_NAME:_TFF8closures18capture_local_funcFSiFT_FT_SiL_4bethfT_FT_Si]] : $@convention(thin) (@owned @box Int, @inout Int) -> @owned @callee_owned () -> Int
+  // CHECK: [[BETH_CLOSURE:%[0-9]+]] = partial_apply [[BETH_REF]]([[XBOX]]#0, [[XBOX]]#1)
 
   return beth
-  // C/HECK: release [[ALEPH_CLOSURE]]
-  // C/HECK: release [[XBOX]]#0
-  // C/HECK: return [[BETH_CLOSURE]]
+  // CHECK: release [[XBOX]]#0
+  // CHECK: return [[BETH_CLOSURE]]
 }
-// C/HECK: sil shared @[[ALEPH_NAME]]
-// C/HECK: bb0([[XBOX:%[0-9]+]] : $@box Int, [[XADDR:%[0-9]+]] : $*Int):
+// CHECK: sil shared @[[ALEPH_NAME:_TFF8closures18capture_local_funcFSiFT_FT_SiL_5alephfT_Si]]
+// CHECK: bb0([[XBOX:%[0-9]+]] : $@box Int, [[XADDR:%[0-9]+]] : $*Int):
 
-// C/HECK: sil shared @[[BETH_NAME]]
-// C/HECK: bb0([[ALEPH:%[0-9]+]] : $@callee_owned () -> Int):
-// C/HECK: return [[ALEPH]]
-   */
+// CHECK: sil shared @[[BETH_NAME]]
+// CHECK: bb0([[XBOX:%[0-9]+]] : $@box Int, [[XADDR:%[0-9]+]] : $*Int):
+// CHECK: [[ALEPH_REF:%[0-9]+]] = function_ref @[[ALEPH_NAME]] : $@convention(thin) (@owned @box Int, @inout Int) -> Int
+// CHECK: [[ALEPH_CLOSURE:%[0-9]+]] = partial_apply [[ALEPH_REF]]([[XBOX]], [[XADDR]])
+// CHECK: return [[ALEPH_CLOSURE]]
 
 // CHECK-LABEL: sil hidden @_TF8closures22anon_read_only_capture
 func anon_read_only_capture(var x: Int) -> Int {
