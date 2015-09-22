@@ -130,7 +130,7 @@ internal struct InsertTest {
   }
 }
 
-internal struct SpliceTest {
+internal struct InsertContentsOfTest {
   let collection: [OpaqueValue<Int>]
   let newElements: [OpaqueValue<Int>]
   let indexSelection: IndexSelection
@@ -508,68 +508,68 @@ self.test("\(testNamePrefix).insert()/semantics") {
 //===----------------------------------------------------------------------===//
 
 self.test("\(testNamePrefix).insertContentsOf()/semantics") {
-  let tests: [SpliceTest] = [
-    SpliceTest(
+  let tests: [InsertContentsOfTest] = [
+    InsertContentsOfTest(
       collection: [],
       newElements: [],
       indexSelection: IndexSelection.Start,
       expected: []),
 
-    SpliceTest(
+    InsertContentsOfTest(
       collection: [],
       newElements: [1010],
       indexSelection: .Start,
       expected: [1010]),
 
-    SpliceTest(
+    InsertContentsOfTest(
       collection: [],
       newElements: [1010, 2020, 3030, 4040],
       indexSelection: .Start,
       expected: [1010, 2020, 3030, 4040]),
 
-    SpliceTest(
+    InsertContentsOfTest(
       collection: [2020],
       newElements: [1010],
       indexSelection: .Start,
       expected: [1010, 2020]),
 
-    SpliceTest(
+    InsertContentsOfTest(
       collection: [1010],
       newElements: [2020],
       indexSelection: .End,
       expected: [1010, 2020]),
 
-    SpliceTest(
+    InsertContentsOfTest(
       collection: [4040],
       newElements: [1010, 2020, 3030],
       indexSelection: .Start,
       expected: [1010, 2020, 3030, 4040]),
 
-    SpliceTest(
+    InsertContentsOfTest(
       collection: [1010],
       newElements: [2020, 3030, 4040],
       indexSelection: .End,
       expected: [1010, 2020, 3030, 4040]),
 
-    SpliceTest(
+    InsertContentsOfTest(
       collection: [1010, 2020, 4040, 5050],
       newElements: [3030],
       indexSelection: .Middle,
       expected: [1010, 2020, 3030, 4040, 5050]),
 
-    SpliceTest(
+    InsertContentsOfTest(
       collection: [4040, 5050, 6060],
       newElements: [1010, 2020, 3030],
       indexSelection: .Start,
       expected: [1010, 2020, 3030, 4040, 5050, 6060]),
 
-    SpliceTest(
+    InsertContentsOfTest(
       collection: [1010, 2020, 3030],
       newElements: [4040, 5050, 6060],
       indexSelection: .End,
       expected: [1010, 2020, 3030, 4040, 5050, 6060]),
 
-    SpliceTest(
+    InsertContentsOfTest(
       collection: [1010, 2020, 3030, 7070, 8080, 9090],
       newElements: [4040, 5050, 6060],
       indexSelection: .Middle,
