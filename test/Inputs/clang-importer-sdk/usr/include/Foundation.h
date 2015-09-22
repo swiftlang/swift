@@ -938,3 +938,7 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 @interface NSMutableArray (Sorting)
 - (void)sortUsingFunction:(NSInteger (* __nonnull)(__nonnull id, __nonnull id))fimctopn;
 @end
+
+@interface NSMutableArray (Removal)
+- (void)removeObjects:(nonnull NSArray *)objects;
+@end

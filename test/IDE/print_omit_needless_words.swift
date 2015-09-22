@@ -112,6 +112,9 @@
 // Note: Function type -> "Function".
 // CHECK-FOUNDATION: func sortUsing(_: @convention(c) (AnyObject, AnyObject) -> Int)
 
+// Note: Plural: NSArray without type arguments -> "Objects".
+// CHECK-FOUNDATION: func remove(_: [AnyObject])
+
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
 
