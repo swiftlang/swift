@@ -2871,6 +2871,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(GeneratorFn generator) {
     closure.setType(getMaterializeForSetCallbackType(ctx,
                                  getSelfTypeForCallbackDeclaration(Witness),
                                                      nullptr));
+    closure.getCaptureInfo().setGenericParamCaptures(true);
 
     llvm::raw_svector_ostream nameStream(name);
     nameStream << "_TTW";

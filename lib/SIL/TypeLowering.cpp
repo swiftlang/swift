@@ -1855,8 +1855,34 @@ TypeConverter::getEffectiveGenericParamsForContext(DeclContext *dc) {
   return dc->getGenericParamsOfContext();
 }
 
+GenericParamList *
+TypeConverter::getEffectiveGenericParams(AnyFunctionRef fn,
+                                         CaptureInfo captureInfo) {
+  auto dc = fn.getAsDeclContext()->getParent();
+
+  if (dc->isLocalContext() &&
+      !captureInfo.hasGenericParamCaptures()) {
+    return nullptr;
+  }
+
+  return getEffectiveGenericParamsForContext(dc);
+}
+
 CanGenericSignature
-TypeConverter::getEffectiveGenericSignatureForContext(DeclContext *dc) {
+TypeConverter::getEffectiveGenericSignature(AnyFunctionRef fn,
+                                            CaptureInfo captureInfo) {
+  auto dc = fn.getAsDeclContext();
+
+  if (auto sig = dc->getGenericSignatureOfContext())
+    return sig->getCanonicalSignature();
+
+  dc = dc->getParent();
+
+  if (dc->isLocalContext() &&
+      !captureInfo.hasGenericParamCaptures()) {
+    return nullptr;
+  }
+
   // Find the innermost context that has a generic parameter list.
   // FIXME: This is wrong for generic local functions in generic contexts.
   // Their GenericParamList is not semantically a child of the context
@@ -1876,11 +1902,16 @@ TypeConverter::getEffectiveGenericSignatureForContext(DeclContext *dc) {
 CanAnyFunctionType
 TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
                                            AnyFunctionRef theClosure) {
-  auto parentContext = theClosure.getAsDeclContext()->getParent();
-  // Capture generic parameters from the enclosing context.
-  GenericParamList *genericParams
-    = getEffectiveGenericParamsForContext(parentContext);
-  
+  // Get transitive closure of value captured by this function, and any
+  // captured functions.
+  auto captureInfo = getLoweredLocalCaptures(theClosure);
+
+  // Capture generic parameters from the enclosing context if necessary.
+  GenericParamList *genericParams =
+      getEffectiveGenericParams(theClosure, captureInfo);
+
+  // If we don't have any local captures (including function captures),
+  // there's no context to apply.
   if (!theClosure.getCaptureInfo().hasLocalCaptures()) {
     if (!genericParams)
       return adjustFunctionType(funcType,
@@ -1900,12 +1931,7 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
 
   SmallVector<TupleTypeElt, 8> inputFields;
 
-  // Note that the list of lowered local captures may be empty even if
-  // CaptureInfo::hasLocalCaptures() returned true. This is the case if e.g.
-  // a local function calls another local function which has no captures itself.
-  ArrayRef<CapturedValue> captures = getLoweredLocalCaptures(theClosure);
-
-  for (auto capture : captures) {
+  for (auto capture : captureInfo.getCaptures()) {
     auto VD = capture.getDecl();
     // A capture of a 'var' or 'inout' variable is done with the underlying
     // object type.
@@ -1955,12 +1981,16 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
 CanAnyFunctionType
 TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
                                                     AnyFunctionRef theClosure) {
-  auto context = theClosure.getAsDeclContext();
+  // Get transitive closure of value captured by this function, and any
+  // captured functions.
+  auto captureInfo = getLoweredLocalCaptures(theClosure);
 
-  // Capture generic parameters from the enclosing context.
-  CanGenericSignature genericSig
-    = getEffectiveGenericSignatureForContext(context);
+  // Capture generic parameters from the enclosing context if necessary.
+  CanGenericSignature genericSig = getEffectiveGenericSignature(theClosure,
+                                                                captureInfo);
 
+  // If we don't have any local captures (including function captures),
+  // there's no context to apply.
   if (!theClosure.getCaptureInfo().hasLocalCaptures()) {
     if (!genericSig)
       return adjustFunctionType(funcType,
@@ -1978,12 +2008,7 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
 
   SmallVector<TupleTypeElt, 8> inputFields;
 
-  // Note that the list of lowered local captures may be empty even if
-  // CaptureInfo::hasLocalCaptures() returned true. This is the case if e.g.
-  // a local function calls another local function which has no captures itself.
-  ArrayRef<CapturedValue> captures = getLoweredLocalCaptures(theClosure);
-
-  for (auto capture : captures) {
+  for (auto capture : captureInfo.getCaptures()) {
     // A capture of a 'var' or 'inout' variable is done with the underlying
     // object type.
     auto vd = capture.getDecl();
@@ -2019,7 +2044,9 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
     TupleType::get(inputFields, Context)->getCanonicalType();
   
   // Map context archetypes out of the captures.
-  capturedInputs = getInterfaceTypeOutOfContext(capturedInputs, context);
+  capturedInputs =
+      getInterfaceTypeOutOfContext(capturedInputs,
+                                   theClosure.getAsDeclContext());
 
   auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
                                           /*noreturn*/ false,
@@ -2117,22 +2144,22 @@ TypeConverter::getConstantContextGenericParams(SILDeclRef c) {
   ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
   
   /// Get the function generic params, including outer params.
-  auto getLocalFuncParams = [&](FuncDecl *func) -> GenericParamList * {
-    // FIXME: For local generic functions we need to chain the local generic
-    // context to the outer context.
-    if (auto GP = func->getGenericParamsOfContext())
-      return GP;
-    return getEffectiveGenericParamsForContext(func->getParent());
-  };
-  
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     if (auto *ACE = c.getAbstractClosureExpr()) {
+      auto captureInfo = getLoweredLocalCaptures(ACE);
+
       // Closures are currently never natively generic.
-      return {getEffectiveGenericParamsForContext(ACE->getParent()), nullptr};
+      return {getEffectiveGenericParams(ACE, captureInfo), nullptr};
     }
     FuncDecl *func = cast<FuncDecl>(vd);
-    return {getLocalFuncParams(func), func->getGenericParams()};
+    // FIXME: For local generic functions we need to chain the local generic
+    // context to the outer context.
+    if (auto GP = func->getGenericParamsOfContext())
+      return {GP, func->getGenericParams()};
+    auto captureInfo = getLoweredLocalCaptures(func);
+    return {getEffectiveGenericParams(func, captureInfo),
+            func->getGenericParams()};
   }
   case SILDeclRef::Kind::EnumElement: {
     auto eltDecl = cast<EnumElementDecl>(vd);
@@ -2328,11 +2355,15 @@ getAnyFunctionRefFromCapture(CapturedValue capture) {
   return None;
 }
 
-ArrayRef<CapturedValue>
+CaptureInfo
 TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   // First, bail out if there are no local captures at all.
-  if (!fn.getCaptureInfo().hasLocalCaptures())
-    return {};
+  if (!fn.getCaptureInfo().hasLocalCaptures()) {
+    CaptureInfo info;
+    info.setGenericParamCaptures(
+        fn.getCaptureInfo().hasGenericParamCaptures());
+    return info;
+  };
   
   // See if we've cached the lowered capture list for this function.
   auto found = LoweredCaptures.find(fn);
@@ -2342,12 +2373,16 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   // Recursively collect transitive captures from captured local functions.
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
   llvm::SetVector<CapturedValue> captures;
+  bool capturesGenericParams = false;
   
   std::function<void (AnyFunctionRef)> collectFunctionCaptures
   = [&](AnyFunctionRef curFn) {
     if (!visitedFunctions.insert(curFn).second)
       return;
   
+    if (curFn.getCaptureInfo().hasGenericParamCaptures())
+      capturesGenericParams = true;
+
     SmallVector<CapturedValue, 4> localCaptures;
     curFn.getCaptureInfo().getLocalCaptures(localCaptures);
     for (auto capture : localCaptures) {
@@ -2401,11 +2436,11 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   collectFunctionCaptures(fn);
   
   // Cache the uniqued set of transitive captures.
-  auto inserted = LoweredCaptures.insert({fn, {}});
+  auto inserted = LoweredCaptures.insert({fn, CaptureInfo()});
   assert(inserted.second && "already in map?!");
   auto &cachedCaptures = inserted.first->second;
-  std::copy(captures.begin(), captures.end(),
-            std::back_inserter(cachedCaptures));
+  cachedCaptures.setGenericParamCaptures(capturesGenericParams);
+  cachedCaptures.setCaptures(Context.AllocateCopy(captures));
   
   return cachedCaptures;
 }

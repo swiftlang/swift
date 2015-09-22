@@ -66,6 +66,12 @@ public:
       return AFD->getBodyParamPatterns();
     return TheFunction.get<AbstractClosureExpr *>()->getParamPatterns();
   }
+  
+  bool hasType() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->hasType();
+    return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
+  }
 
   Type getType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())

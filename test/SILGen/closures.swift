@@ -198,18 +198,24 @@ class SomeClass {
 class SomeGenericClass<T> {
   deinit {
     var i: Int = zero
-    // CHECK: [[C1REF:%[0-9]+]] = function_ref @_TFFC8closures16SomeGenericClassd{{.*}} : $@convention(thin) <τ_0_0> (@inout Int) -> Int
-    // CHECK: apply [[C1REF]]<T>([[IBOX:%[0-9]+]]#1) : $@convention(thin) <τ_0_0> (@inout Int) -> Int
+    // CHECK: [[C1REF:%[0-9]+]] = function_ref @_TFFC8closures16SomeGenericClassdU_FT_Si : $@convention(thin) (@inout Int) -> Int
+    // CHECK: apply [[C1REF]]([[IBOX:%[0-9]+]]#1) : $@convention(thin) (@inout Int) -> Int
     var x = { i + zero } ()
 
-    // CHECK: [[C2REF:%[0-9]+]] = function_ref @_TFFC8closures16SomeGenericClassdU0_FT{{.*}} : $@convention(thin) <τ_0_0> () -> Int
-    // CHECK: apply [[C2REF]]<T>() : $@convention(thin) <τ_0_0> () -> Int
+    // CHECK: [[C2REF:%[0-9]+]] = function_ref @_TFFC8closures16SomeGenericClassdU0_FT_Si : $@convention(thin) () -> Int
+    // CHECK: apply [[C2REF]]() : $@convention(thin) () -> Int
     var y = { zero } ()
+
+    // CHECK: [[C3REF:%[0-9]+]] = function_ref @_TFFC8closures16SomeGenericClassdU1_FT_T_ : $@convention(thin) <τ_0_0> () -> ()
+    // CHECK: apply [[C3REF]]<T>() : $@convention(thin) <τ_0_0> () -> ()
+    var z = { _ = T.self } ()
   }
 
-  // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU{{.*}} : $@convention(thin) <T> (@inout Int) -> Int
+  // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU_FT_Si : $@convention(thin) (@inout Int) -> Int
 
-  // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU0_FT{{.*}} : $@convention(thin) <T> () -> Int
+  // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU0_FT_Si : $@convention(thin) () -> Int
+
+  // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU1_FT_T_ : $@convention(thin) <T> () -> ()
 }
 
 // This is basically testing that the constraint system ranking

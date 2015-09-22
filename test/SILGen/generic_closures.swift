@@ -1,16 +1,43 @@
 // RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | FileCheck %s
 
-typealias Int = Builtin.Int64
-typealias Char = Builtin.Int32
-typealias Bool = Builtin.Int1
+import Swift
+
 var zero: Int
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures28generic_nondependent_context{{.*}}
 func generic_nondependent_context<T>(x: T, var y: Int) -> Int {
   func foo() -> Int { return y }
-  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures28generic_nondependent_context{{.*}} : $@convention(thin) <τ_0_0> (@owned @box Builtin.Int64, @inout Builtin.Int64) -> Builtin.Int64
-  // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]<T>
+  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures28generic_nondependent_context{{.*}} : $@convention(thin) (@owned @box Int, @inout Int) -> Int
+  // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]
   return foo()
+}
+
+// CHECK-LABEL: sil hidden @_TF16generic_closures15generic_capture{{.*}}
+func generic_capture<T>(x: T) -> Any.Type {
+  func foo() -> Any.Type { return T.self }
+  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures15generic_capture{{.*}} : $@convention(thin) <τ_0_0> () -> @thick protocol<>.Type
+  // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]
+  return foo()
+}
+
+// CHECK-LABEL: sil hidden @_TF16generic_closures20generic_capture_cast{{.*}}
+func generic_capture_cast<T>(x: T, y: Any) -> Bool {
+  func foo(a: Any) -> Bool { return a is T }
+  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures20generic_capture_cast{{.*}} : $@convention(thin) <τ_0_0> (@in protocol<>) -> Bool
+  // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]
+  return foo(y)
+}
+
+protocol Concept {
+  var sensical: Bool { get }
+}
+
+// CHECK-LABEL: sil hidden @_TF16generic_closures29generic_nocapture_existential{{.*}}
+func generic_nocapture_existential<T>(x: T, y: Concept) -> Bool {
+  func foo(a: Concept) -> Bool { return a.sensical }
+  // CHECK: [[FOO:%.*]] = function_ref @_TFF16generic_closures29generic_nocapture_existential{{.*}} : $@convention(thin) (@in Concept) -> Bool
+  // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]
+  return foo(y)
 }
 
 // CHECK-LABEL: sil hidden @_TF16generic_closures25generic_dependent_context{{.*}}
@@ -59,7 +86,7 @@ class NestedGeneric<U> {
 // CHECK-LABEL: sil shared @_TF16generic_closures24generic_curried_function{{.*}}
 func generic_curried_function<T, U>(x: T)(y: U) { }
 
-var f: (Char) -> () = generic_curried_function(zero)
+var f: (Int) -> () = generic_curried_function(zero)
 
   // <rdar://problem/15417773>
   // Ensure that nested closures capture the generic parameters of their nested

@@ -723,11 +723,14 @@ namespace {
     llvm::SmallPtrSet<ValueDecl *, 2> Diagnosed;
     /// The AbstractClosureExpr or AbstractFunctionDecl being analyzed.
     AnyFunctionRef AFR;
+    bool &capturesTypes;
   public:
     FindCapturedVars(TypeChecker &tc,
                      SmallVectorImpl<CapturedValue> &captureList,
+                     bool &capturesTypes,
                      AnyFunctionRef AFR)
-        : TC(tc), captureList(captureList), AFR(AFR) {
+        : TC(tc), captureList(captureList), AFR(AFR),
+          capturesTypes(capturesTypes) {
       if (auto AFD = AFR.getAbstractFunctionDecl())
         CaptureLoc = AFD->getLoc();
       else {
@@ -738,6 +741,31 @@ namespace {
         if (CaptureLoc.isInvalid())
           CaptureLoc = ACE->getLoc();
       }
+    }
+
+    /// \brief Check if the type of an expression references any generic
+    /// type parameters.
+    ///
+    /// FIXME: SILGen doesn't currently allow local generic functions to
+    /// capture generic parameters from an outer context. Once it does, we
+    /// will need to distinguish outer and inner type parameters here.
+    void checkType(Type type) {
+      // Nothing to do if the type is concrete.
+      if (!type || !type->hasArchetype())
+        return;
+
+      // Easy case.
+      if (!type->hasOpenedExistential()) {
+        capturesTypes = true;
+        return;
+      }
+
+      // This type contains both an archetype and an open existential. Walk the
+      // type to see if we have any archetypes that are *not* open existentials.
+      if (type.findIf([](Type t) -> bool {
+            return (t->is<ArchetypeType>() && !t->isOpenedExistential());
+          }))
+        capturesTypes = true;
     }
 
     /// Add the specified capture to the closure's capture list, diagnosing it
@@ -940,6 +968,9 @@ namespace {
 
         addCapture(CapturedValue(capture.getDecl(), Flags), captureLoc);
       }
+
+      if (innerClosure.getCaptureInfo().hasGenericParamCaptures())
+        capturesTypes = true;
     }
 
     bool walkToDeclPre(Decl *D) override {
@@ -954,6 +985,13 @@ namespace {
     }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      checkType(E->getType());
+
+      if (auto *ECE = dyn_cast<ExplicitCastExpr>(E)) {
+        checkType(ECE->getCastTypeLoc().getType());
+        return { true, E };
+      }
+
       if (auto *DRE = dyn_cast<DeclRefExpr>(E))
         return walkToDeclRefExpr(DRE);
 
@@ -972,6 +1010,7 @@ namespace {
         propagateCaptures(SubCE, SubCE->getStartLoc());
         return { false, E };
       }
+
       return { true, E };
     }
   };
@@ -982,8 +1021,12 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     return;
 
   SmallVector<CapturedValue, 4> Captures;
-  FindCapturedVars finder(*this, Captures, AFR);
+  bool GenericParamCaptures = false;
+  FindCapturedVars finder(*this, Captures, GenericParamCaptures, AFR);
   AFR.getBody()->walk(finder);
+
+  if (AFR.hasType())
+    finder.checkType(AFR.getType());
 
   // If this is an init(), explicitly walk the initializer values for members of
   // the type.  They will be implicitly emitted by SILGen into the generated
@@ -1004,13 +1047,38 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
       }
     }
   }
-  
-  
-  if (Captures.empty()) {
-    AFR.getCaptureInfo().setCaptures(None);
-    return;
+
+  // We don't distinguish inner from outer generic parameters yet, but also
+  // nested generics are not really supported by the rest of the compiler.
+  // There are three cases where getGenericSignatureOfContext() returns a
+  // non-null value:
+  //
+  // 1) Top-level generic functions
+  // 2) Methods with a generic signature either on the type or the method
+  // 3) Local generic functions
+  //
+  // But *not*
+  //
+  // 4) Closure or non-generic local function inside a generic context
+  //
+  // In case 1) and 2), usages of generic type parameters are never formally
+  // "captures". In case 3), the only way a generic type parameter can be
+  // captured is if the local generic function is itself nested inside a generic
+  // context. However, SILGen does not currently support this anyway.
+  //
+  // So we only set GenericParamCaptures in case 4), to avoid confusing SILGen.
+  // Eventually, the computation in checkType() will be more exact and this
+  // conditional should be removed.
+  if (!(AFR.getAbstractFunctionDecl() &&
+        AFR.getAbstractFunctionDecl()->hasType() &&
+        AFR.getAbstractFunctionDecl()->getGenericSignatureOfContext())) {
+    AFR.getCaptureInfo().setGenericParamCaptures(GenericParamCaptures);
   }
-  AFR.getCaptureInfo().setCaptures(Context.AllocateCopy(Captures));
+
+  if (Captures.empty())
+    AFR.getCaptureInfo().setCaptures(None);
+  else
+    AFR.getCaptureInfo().setCaptures(Context.AllocateCopy(Captures));
 
   // Diagnose if we have local captures and there were C pointers formed to
   // this function before we computed captures.

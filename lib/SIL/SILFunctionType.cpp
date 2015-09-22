@@ -19,6 +19,7 @@
 #define DEBUG_TYPE "libsil"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"

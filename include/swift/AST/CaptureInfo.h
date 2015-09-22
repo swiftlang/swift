@@ -68,18 +68,24 @@ public:
 
 /// \brief Stores information about captured variables.
 class CaptureInfo {
-  llvm::PointerIntPair<const CapturedValue *, 1, bool> CapturesAndComputed;
-  size_t Count = 0;
+  const CapturedValue *Captures;
+  unsigned Count = 0;
+  bool GenericParamCaptures : 1;
+  bool Computed : 1;
 
 public:
-  bool hasBeenComputed() { return CapturesAndComputed.getInt(); }
+  CaptureInfo()
+    : Captures(nullptr), Count(0), GenericParamCaptures(0), Computed(0) { }
+
+  bool hasBeenComputed() { return Computed; }
   bool empty() { return Count == 0; }
 
   ArrayRef<CapturedValue> getCaptures() const {
-    return llvm::makeArrayRef(CapturesAndComputed.getPointer(), Count);
+    return llvm::makeArrayRef(Captures, Count);
   }
   void setCaptures(ArrayRef<CapturedValue> C) {
-    CapturesAndComputed.setPointerAndInt(C.data(), true);
+    Captures = C.data();
+    Computed = true;
     Count = C.size();
   }
 
@@ -91,6 +97,15 @@ public:
 
   /// \returns true if getLocalCaptures() will return a non-empty list.
   bool hasLocalCaptures() const;
+
+  /// \returns true if the function captures any generic type parameters.
+  bool hasGenericParamCaptures() {
+    return GenericParamCaptures;
+  }
+
+  void setGenericParamCaptures(bool genericParamCaptures) {
+    GenericParamCaptures = genericParamCaptures;
+  }
 
   void dump() const;
   void print(raw_ostream &OS) const;

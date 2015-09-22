@@ -14,6 +14,7 @@
 #define SIL_TypeLowering_h
 
 #include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/CaptureInfo.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILLocation.h"
@@ -389,6 +390,12 @@ struct SILConstantInfo {
     return SILType::getPrimitiveObjectType(SILFnType);
   }
 
+  ArrayRef<Substitution> getForwardingSubstitutions(ASTContext &C) {
+    if (!ContextGenericParams)
+      return { };
+    return ContextGenericParams->getForwardingSubstitutions(C);
+  }
+
   friend bool operator==(SILConstantInfo lhs, SILConstantInfo rhs) {
     return lhs.FormalType == rhs.FormalType &&
            lhs.FormalInterfaceType == rhs.FormalInterfaceType &&
@@ -521,7 +528,7 @@ class TypeConverter {
   
   llvm::DenseMap<OverrideKey, SILConstantInfo> ConstantOverrideTypes;
   
-  llvm::DenseMap<AnyFunctionRef, std::vector<CapturedValue>> LoweredCaptures;
+  llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
   
   /// The set of recursive types we've already diagnosed.
   llvm::DenseSet<NominalTypeDecl *> RecursiveNominalTypes;
@@ -781,8 +788,13 @@ public:
   /// Retrieve the set of archetypes open in the given context.
   GenericParamList *getEffectiveGenericParamsForContext(DeclContext *dc);
 
-  /// Retrieve the set of generic parameters for the given context.
-  CanGenericSignature getEffectiveGenericSignatureForContext(DeclContext *dc);
+  /// Retrieve the set of archetypes closed over by the given function.
+  GenericParamList *getEffectiveGenericParams(AnyFunctionRef fn,
+                                              CaptureInfo captureInfo);
+
+  /// Retrieve the set of generic parameters closed over by the given function.
+  CanGenericSignature getEffectiveGenericSignature(AnyFunctionRef fn,
+                                                   CaptureInfo captureInfo);
 
   /// Push a generic function context. See GenericContextScope for an RAII
   /// interface to this function.
@@ -827,10 +839,10 @@ public:
   static SILLinkage getLinkageForProtocolConformance(
                                              const NormalProtocolConformance *C,
                                              ForDefinition_t definition);
-  
+
   /// Get the capture list from a closure, with transitive function captures
   /// flattened.
-  ArrayRef<CapturedValue> getLoweredLocalCaptures(AnyFunctionRef fn);
+  CaptureInfo getLoweredLocalCaptures(AnyFunctionRef fn);
 
   enum class ABIDifference : uint8_t {
     // No ABI differences, function can be trivially bitcast to result type.

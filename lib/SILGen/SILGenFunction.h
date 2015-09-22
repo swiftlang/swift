@@ -1039,7 +1039,6 @@ public:
 
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,
-                                ArrayRef<Substitution> forwardSubs,
                                 AnyFunctionRef TheClosure);
   
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,

@@ -205,10 +205,9 @@ ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
                                              SILConstantInfo constantInfo) {
   // If the function has captures, apply them.
   if (auto fn = constant.getAnyFunctionRef()) {
-    if (fn->getCaptureInfo().hasLocalCaptures()
-        || (fn->getAsDeclContext()->getParent()->isLocalContext()
-            && fn->getAsDeclContext()->isGenericContext())) {
-      return emitClosureValue(loc, constant, getForwardingSubstitutions(), *fn);
+    if (fn->getCaptureInfo().hasLocalCaptures() ||
+        fn->getCaptureInfo().hasGenericParamCaptures()) {
+      return emitClosureValue(loc, constant, *fn);
     }
   }
 
@@ -220,7 +219,8 @@ ManagedValue SILGenFunction::emitFunctionRef(SILLocation loc,
 void SILGenFunction::emitCaptures(SILLocation loc,
                                   AnyFunctionRef TheClosure,
                                   SmallVectorImpl<ManagedValue> &capturedArgs) {
-  for (auto capture : SGM.Types.getLoweredLocalCaptures(TheClosure)) {
+  auto captureInfo = SGM.Types.getLoweredLocalCaptures(TheClosure);
+  for (auto capture : captureInfo.getCaptures()) {
     auto *vd = capture.getDecl();
 
     switch (SGM.Types.getDeclCaptureKind(capture)) {
@@ -305,7 +305,6 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
 ManagedValue
 SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
-                                 ArrayRef<Substitution> forwardSubs,
                                  AnyFunctionRef TheClosure) {
   // FIXME: Stash the capture args somewhere and curry them on demand rather
   // than here.
@@ -326,11 +325,13 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   auto pft = constantInfo.SILFnType;
 
+  auto forwardSubs = constantInfo.getForwardingSubstitutions(getASTContext());
+
   bool wasSpecialized = false;
   if (pft->isPolymorphic() && !forwardSubs.empty()) {
     auto specialized = pft->substGenericArgs(F.getModule(),
-                                                F.getModule().getSwiftModule(),
-                                                forwardSubs);
+                                             F.getModule().getSwiftModule(),
+                                             forwardSubs);
     functionTy = SILType::getPrimitiveObjectType(specialized);
     wasSpecialized = true;
   }
@@ -676,9 +677,8 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
 
     // Forward captures.
     if (hasCaptures) {
-      ArrayRef<CapturedValue> LocalCaptures
-        = SGM.Types.getLoweredLocalCaptures(fd);
-      for (auto capture : LocalCaptures)
+      auto captureInfo = SGM.Types.getLoweredLocalCaptures(fd);
+      for (auto capture : captureInfo.getCaptures())
         forwardCaptureArgs(*this, curriedArgs, capture);
     }
   } else {

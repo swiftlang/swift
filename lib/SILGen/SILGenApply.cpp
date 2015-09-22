@@ -75,7 +75,7 @@ emitCapturesAsArgumentSource(SILGenFunction &gen,
   // The capture array should match the explosion schema of the closure's
   // first formal argument type.
   auto info = gen.SGM.Types.getConstantInfo(SILDeclRef::forAnyFunctionRef(fn));
-  auto subs = gen.getForwardingSubstitutions();
+  auto subs = info.getForwardingSubstitutions(gen.getASTContext());
   auto origFormalTy = info.FormalInterfaceType;
   CanFunctionType formalTy;
   if (!subs.empty()) {
@@ -1195,11 +1195,16 @@ public:
         substFnType = captures.second;
         setSelfParam(std::move(captures.first), captures.second.getInput());
       }
-      
-      // Forward local substitutions to a local function.
-      if (afd->getParent()->isLocalContext()) {
-        subs = SGF.getForwardingSubstitutions();
-      }
+
+      // FIXME: We should be checking hasLocalCaptures() on the lowered
+      // captures in the constant info too, to generate more efficient
+      // code for mutually recursive local functions which otherwise
+      // capture no state.
+      auto constantInfo = SGF.getConstantInfo(constant);
+
+      // Forward local substitutions to a non-generic local function.
+      if (afd->getParent()->isLocalContext() && !afd->getGenericParams())
+        subs = constantInfo.getForwardingSubstitutions(SGF.getASTContext());
     }
     
     if (e->getDeclRef().isSpecialized()) {
@@ -1232,8 +1237,14 @@ public:
       substFnType = captures.second;
       setSelfParam(std::move(captures.first), captures.second.getInput());
     }
-    subs = SGF.getForwardingSubstitutions();
     
+    // FIXME: We should be checking hasLocalCaptures() on the lowered
+    // captures in the constant info above, to generate more efficient
+    // code for mutually recursive local functions which otherwise
+    // capture no state.
+    auto constantInfo = SGF.getConstantInfo(constant);
+    subs = constantInfo.getForwardingSubstitutions(SGF.getASTContext());
+
     setCallee(Callee::forDirect(SGF, constant, substFnType, e));
     // If there are substitutions, add them, always at depth 0.
     if (!subs.empty())
