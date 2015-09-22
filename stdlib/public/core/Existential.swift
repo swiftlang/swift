@@ -41,7 +41,7 @@ internal struct _CollectionOf<
   /// - Complexity: O(1).
   func generate() -> AnyGenerator<T> {
     var index = startIndex
-    return anyGenerator {
+    return AnyGenerator {
       () -> T? in
       if _fastPath(index != self.endIndex) {
         ++index

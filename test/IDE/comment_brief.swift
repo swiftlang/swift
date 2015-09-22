@@ -123,17 +123,6 @@ struct Indentation {
   func briefBlockWithASCIIArt1() {}
 }
 
-/**
-* Aaa.
-*/
-class MyGenerator1 : _AnyGeneratorBase {
-}
-
-/**
-* Aaa.
-*/
-class MyGenerator2 : MyGenerator1 {
-}
 
 // CHECK: Func/briefLine1 {{.*}} BriefComment=none
 // CHECK-NEXT: Func/briefLine2 {{.*}} BriefComment=[Aaa.]
@@ -159,5 +148,4 @@ class MyGenerator2 : MyGenerator1 {
 // CHECK-NEXT: Func/briefMixed3 {{.*}} BriefComment=[Aaa.]
 // CHECK-NEXT: Struct/Indentation RawComment=none
 // CHECK-NEXT: Func/Indentation.briefBlockWithASCIIArt1 {{.*}} BriefComment=[Aaa.]
-// CHECK-NEXT: <Declaration>class MyGenerator1</Declaration>
-// CHECK-NEXT: <Declaration>class MyGenerator2 : MyGenerator1</Declaration>
+

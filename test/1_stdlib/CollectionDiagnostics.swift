@@ -364,3 +364,8 @@ func renamedRangeReplaceableCollectionTypeMethods(var c: DefaultedForwardRangeRe
   c.splice([ 10 ], atIndex: c.startIndex) // expected-error {{'splice(_:atIndex:)' has been renamed to 'insertContentsOf'}} {{5-11=insertContentsOf}}
 }
 
+func renamedAnyGenerator<G : GeneratorType>(g: G) {
+  _ = anyGenerator(g) // expected-error {{'anyGenerator' has been renamed to 'AnyGenerator'}}
+  _ = anyGenerator { 1 } // expected-error {{'anyGenerator' has been renamed to 'AnyGenerator'}}
+}
+

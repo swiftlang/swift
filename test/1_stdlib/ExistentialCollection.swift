@@ -57,26 +57,14 @@ tests.test("AnyGenerator") {
     // clients.
     let g: LazyMapGenerator<
       RangeGenerator<Int>, String> = lazyStrings.generate()
-    return anyGenerator(g)
+    return AnyGenerator(g)
   }
   expectEqual(["0", "1", "2", "3", "4"], Array(countStrings()))
 
   var x = 7
-  let g = anyGenerator { x < 15 ? x++ : nil }
+  let g = AnyGenerator { x < 15 ? x++ : nil }
   expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(g))
 }
-
-tests.test("AnyGenerator.init()/traps") {
-  // The assertion that is expected to be triggered by instantiating
-  // AnyGenerator is a _debugPrecondition() and there for will only trigger in
-  // -Onone mode.
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
-  }
-
-  _ = AnyGenerator<OpaqueValue<Int>>()
-}
-
 
 let initialCallCounts = [
   "successor": 0, "predecessor": 0,

@@ -22,95 +22,104 @@ internal func _abstract(file: StaticString = __FILE__, line: UInt = __LINE__) {
 //===--- Generator --------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public class _AnyGeneratorBase {}
-
-/// An abstract `GeneratorType` base class over `Element` elements.
+/// A type-erased generator of `Element`.
 ///
-/// Use this as a `Sequence`'s associated `Generator` type when you
-/// don't want to expose details of the concrete generator, a subclass.
-///
-/// It is an error to create instances of `AnyGenerator` that are not
-/// also instances of an `AnyGenerator` subclass.
+/// This generator forwards its `next()` method to an arbitrary underlying
+/// generator having the same `Element` type, hiding the specifics of the
+/// underlying `GeneratorType`.
 ///
 /// - seealso:
 ///   - `struct AnySequence<S : SequenceType>`
-///   - `func anyGenerator<G : GeneratorType>(base: G) -> AnyGenerator<G.Element>`
-///   - `func anyGenerator<Element>(body: ()->Element?) -> AnyGenerator<Element>`
-public class AnyGenerator<Element> : _AnyGeneratorBase, GeneratorType {
+public struct AnyGenerator<Element> : GeneratorType {
   @available(*, unavailable, renamed="Element")
   public typealias T = Element
 
-  /// Initialize the instance.  May only be called from a subclass
-  /// initializer.
-  override public init() {
-    super.init()
-    _debugPrecondition(
-      _typeID(self) != unsafeBitCast(AnyGenerator.self, ObjectIdentifier.self),
-      "AnyGenerator<Element> instances can not be created; create a subclass instance instead.")
+  /// Create a `GeneratorType` instance that wraps `base` but whose type
+  /// depends only on the type of `G.Element`.
+  ///
+  /// Example:
+  ///
+  ///     func countStrings() -> AnyGenerator<String> {
+  ///       let lazyStrings = (0..<10).lazy.map { String($0) }
+  ///
+  ///       // This is a really complicated type of no interest to our
+  ///       // clients.
+  ///       let g: MapSequenceGenerator<RangeGenerator<Int>, String>
+  ///         = lazyStrings.generate()
+  ///       return AnyGenerator(g)
+  ///     }
+  public init<G : GeneratorType where G.Element == Element>(_ base: G) {
+    self._box = _GeneratorBox(base)
+  }
+
+  /// Create a `GeneratorType` instance whose `next` method invokes
+  /// `body` and returns the result.
+  ///
+  /// Example:
+  ///
+  ///     var x = 7
+  ///     let g = AnyGenerator { x < 15 ? x++ : nil }
+  ///     let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
+  public init(body: () -> Element?) {
+    self._box = _GeneratorBox(_ClosureBasedGenerator(body))
+  }
+
+  internal init(_box: _AnyGeneratorBoxBase<Element>) {
+    self._box = _box
   }
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
-  ///
-  /// - Note: Subclasses must override this method.
-  public func next() -> Element? {_abstract()}
+  public func next() -> Element? {
+    return _box.next()
+  }
+
+  internal let _box: _AnyGeneratorBoxBase<Element>
 }
 
 /// Every `GeneratorType` can also be a `SequenceType`.  Note that
 /// traversing the sequence consumes the generator.
 extension AnyGenerator : SequenceType {}
 
-//===--- Generic Factories ------------------------------------------------===//
-// The following two functions should be initializers, but we can't
-// yet express that in the language.
-
-/// Return a `GeneratorType` instance that wraps `base` but whose type
-/// depends only on the type of `G.Element`.
-///
-/// Example:
-///
-///     func countStrings() -> AnyGenerator<String> {
-///       let lazyStrings = (0..<10).lazy.map { String($0) }
-///
-///       // This is a really complicated type of no interest to our
-///       // clients.
-///       let g: MapSequenceGenerator<RangeGenerator<Int>, String>
-///         = lazyStrings.generate()
-///       return anyGenerator(g)
-///     }
+@available(*, unavailable, renamed="AnyGenerator")
 public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> {
-  return _GeneratorBox(base)
+  fatalError("unavailable function can't be called")
 }
 
-internal class _FunctionGenerator<Element> : AnyGenerator<Element> {
-  init(_ body: ()->Element?) {
-    self.body = body
-  }
-  override func next() -> Element? { return body() }
-  let body: ()->Element?
-}
-
-/// Return a `GeneratorType` instance whose `next` method invokes
-/// `body` and returns the result.
-///
-/// Example:
-///
-///     var x = 7
-///     let g = anyGenerator { x < 15 ? x++ : nil }
-///     let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
-@warn_unused_result
+@available(*, unavailable, renamed="AnyGenerator")
 public func anyGenerator<Element>(body: ()->Element?) -> AnyGenerator<Element> {
-  return _FunctionGenerator(body)
+  fatalError("unavailable function can't be called")
+}
+
+internal struct _ClosureBasedGenerator<Element> : GeneratorType {
+  internal init(_ body: () -> Element?) {
+    self._body = body
+  }
+  internal func next() -> Element? { return _body() }
+  internal let _body: () -> Element?
+}
+
+internal class _AnyGeneratorBase {}
+
+internal class _AnyGeneratorBoxBase<Element>
+  : _AnyGeneratorBase, GeneratorType {
+
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
+  ///
+  /// - Note: Subclasses must override this method.
+  internal func next() -> Element? {_abstract()}
 }
 
 internal final class _GeneratorBox<
-  Base: GeneratorType
-> : AnyGenerator<Base.Element> {
-  init(_ base: Base) { self.base = base }
-  override func next() -> Base.Element? { return base.next() }
-  var base: Base
+  Base : GeneratorType
+> : _AnyGeneratorBoxBase<Base.Element> {
+  internal init(_ base: Base) { self._base = base }
+  internal override func next() -> Base.Element? { return _base.next() }
+  internal var _base: Base
 }
 
+@warn_unused_result
 internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
   return ObjectIdentifier(instance.dynamicType)
 }
@@ -150,7 +159,7 @@ internal class _${Kind}Box<S : ${Kind}Type>
   typealias Element = S.Generator.Element
 
   override func generate() -> AnyGenerator<Element> {
-    return anyGenerator(_base.generate())
+    return AnyGenerator(_base.generate())
   }
   override func _underestimateCount() -> Int {
     return _base.underestimateCount()
