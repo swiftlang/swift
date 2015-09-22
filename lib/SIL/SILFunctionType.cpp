@@ -1426,12 +1426,11 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
 
   // First, get a function type for the constant.  This creates the
   // right type for a getter or setter.
-  auto formalType = makeConstantType(constant, /*withCaptures*/ true);
-  auto formalInterfaceType = makeConstantInterfaceType(constant,
-                                                       /*withCaptures*/ true);
+  auto formalType = makeConstantType(constant);
+  auto formalInterfaceType = makeConstantInterfaceType(constant);
   GenericParamList *contextGenerics, *innerGenerics;
   std::tie(contextGenerics, innerGenerics)
-    = getConstantContextGenericParams(constant, /*withCaptures*/true);
+    = getConstantContextGenericParams(constant);
 
   // The formal type is just that with the right representation.
   auto rep = getDeclRefRepresentation(constant);
@@ -1742,8 +1741,8 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   // vtable thunk the same signature as the derived method.
   auto basePattern = AbstractionPattern(baseInfo.LoweredType);
 
-  auto baseInterfaceTy = makeConstantInterfaceType(base, false);
-  auto derivedInterfaceTy = makeConstantInterfaceType(derived, false);
+  auto baseInterfaceTy = makeConstantInterfaceType(base);
+  auto derivedInterfaceTy = makeConstantInterfaceType(derived);
 
   auto selfInterfaceTy = derivedInterfaceTy.getInput()->getRValueInstanceType();
 

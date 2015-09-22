@@ -2033,11 +2033,6 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
   return CanFunctionType::get(capturedInputs, funcType, extInfo);
 }
 
-CanAnyFunctionType
-TypeConverter::getConstantFormalTypeWithoutCaptures(SILDeclRef c) {
-  return makeConstantType(c, /*withCaptures*/ false);
-}
-
 /// Replace any DynamicSelf types with their underlying Self type.
 static Type replaceDynamicSelfWithSelf(Type t) {
   return t.transform([](Type type) -> Type {
@@ -2052,8 +2047,7 @@ static CanType replaceDynamicSelfWithSelf(CanType t) {
   return replaceDynamicSelfWithSelf(Type(t))->getCanonicalType();
 }
 
-CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
-                                                            bool withCaptures) {
+CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
 
   switch (c.kind) {
@@ -2064,7 +2058,6 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
       funcTy = cast<AnyFunctionType>(
                            getInterfaceTypeOutOfContext(funcTy, ACE->getParent()));
-      if (!withCaptures) return funcTy;
       return getFunctionInterfaceTypeWithCaptures(funcTy, ACE);
     }
 
@@ -2075,7 +2068,6 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
       funcTy = cast<AnyFunctionType>(
                          getInterfaceTypeOutOfContext(funcTy, func->getParent()));
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
-    if (!withCaptures) return funcTy;
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }
 
@@ -2121,12 +2113,10 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
 
 /// Get the context generic parameters for an entity.
 std::pair<GenericParamList *, GenericParamList *>
-TypeConverter::getConstantContextGenericParams(SILDeclRef c,
-                                               bool withCaptures) {
+TypeConverter::getConstantContextGenericParams(SILDeclRef c) {
   ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
   
-  /// Get the function generic params, including outer params if withCaptures is
-  /// set.
+  /// Get the function generic params, including outer params.
   auto getLocalFuncParams = [&](FuncDecl *func) -> GenericParamList * {
     // FIXME: For local generic functions we need to chain the local generic
     // context to the outer context.
@@ -2139,9 +2129,7 @@ TypeConverter::getConstantContextGenericParams(SILDeclRef c,
   case SILDeclRef::Kind::Func: {
     if (auto *ACE = c.getAbstractClosureExpr()) {
       // Closures are currently never natively generic.
-      if (!withCaptures) return {nullptr, nullptr};
-      return {getEffectiveGenericParamsForContext(ACE->getParent()),
-              nullptr};
+      return {getEffectiveGenericParamsForContext(ACE->getParent()), nullptr};
     }
     FuncDecl *func = cast<FuncDecl>(vd);
     return {getLocalFuncParams(func), func->getGenericParams()};
@@ -2172,27 +2160,23 @@ TypeConverter::getConstantContextGenericParams(SILDeclRef c,
     return {cast<ClassDecl>(vd)->getGenericParamsOfContext(), nullptr};
   case SILDeclRef::Kind::DefaultArgGenerator:
     // Use the context generic parameters of the original declaration.
-    return getConstantContextGenericParams(SILDeclRef(c.getDecl()),
-                                           /*captures*/ false);
+    return getConstantContextGenericParams(SILDeclRef(c.getDecl()));
   }
 }
 
-CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
-                                                   bool withCaptures) {
+CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c) {
   ValueDecl *vd = c.loc.dyn_cast<ValueDecl *>();
 
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       auto funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
-      if (!withCaptures) return funcTy;
       return getFunctionTypeWithCaptures(funcTy, ACE);
     }
 
     FuncDecl *func = cast<FuncDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(func->getType()->getCanonicalType());
     funcTy = cast<AnyFunctionType>(replaceDynamicSelfWithSelf(funcTy));
-    if (!withCaptures) return funcTy;
     return getFunctionTypeWithCaptures(funcTy, func);
   }
 

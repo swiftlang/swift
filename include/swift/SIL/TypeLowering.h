@@ -532,15 +532,14 @@ class TypeConverter {
   /// The current generic context signature.
   CanGenericSignature CurGenericContext;
   
-  CanAnyFunctionType makeConstantType(SILDeclRef constant, bool addCaptures);
-  CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant,
-                                               bool addCaptures);
+  CanAnyFunctionType makeConstantType(SILDeclRef constant);
+  CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
   /// Get the context parameters for a constant. Returns a pair of the innermost
   /// generic parameter list and the generic param list that directly applies
   /// to the constant, if any.
   std::pair<GenericParamList *, GenericParamList*>
-  getConstantContextGenericParams(SILDeclRef constant, bool addCaptures);
+  getConstantContextGenericParams(SILDeclRef constant);
   
   // Types converted during foreign bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
@@ -674,9 +673,6 @@ public:
   /// Returns the formal type, lowered AST type, and SILFunctionType
   /// for a constant reference.
   SILConstantInfo getConstantInfo(SILDeclRef constant);
-
-  /// Returns the type of a local function without any additional captures.
-  CanAnyFunctionType getConstantFormalTypeWithoutCaptures(SILDeclRef constant);
   
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(SILDeclRef constant) {
