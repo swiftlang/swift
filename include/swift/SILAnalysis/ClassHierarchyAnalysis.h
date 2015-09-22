@@ -21,14 +21,18 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
 
+using namespace llvm;
+
 namespace swift {
 
 class SILModule;
 class ClassDecl;
 class ClassHierarchyAnalysis : public SILAnalysis {
 public:
-  typedef llvm::SmallVector<ClassDecl *, 8> ClassList;
-  typedef llvm::SmallPtrSet<ClassDecl *, 32> ClassSet;
+  typedef SmallVector<ClassDecl *, 8> ClassList;
+  typedef SmallPtrSet<ClassDecl *, 32> ClassSet;
+  typedef SmallVector<NominalTypeDecl *, 8> NominalTypeList;
+  typedef DenseMap<ProtocolDecl *, NominalTypeList> ProtocolImplementations;
 
   ClassHierarchyAnalysis(SILModule *Mod)
       : SILAnalysis(AnalysisKind::ClassHierarchy), M(Mod) {
@@ -63,6 +67,14 @@ public:
     return IndirectSubclassesCache[C];
   }
 
+  NominalTypeList& getProtocolImplementations(ProtocolDecl *P) {
+    if (!ProtocolImplementationsCache.count(P)) {
+      // Lazy initialization
+      auto &K = ProtocolImplementationsCache[P];
+    }
+    return ProtocolImplementationsCache[P];
+  }
+
   /// Returns true if the class is inherited by another class in this module.
   bool hasKnownDirectSubclasses(ClassDecl *C) {
     return DirectSubclassesCache.count(C);
@@ -73,6 +85,11 @@ public:
   bool hasKnownIndirectSubclasses(ClassDecl *C) {
     return IndirectSubclassesCache.count(C) &&
            IndirectSubclassesCache[C].size() > 0;
+  }
+
+  /// Returns true if the protocol is implemented by any class in this module.
+  bool hasKnownImplementations(ProtocolDecl *C) {
+    return ProtocolImplementationsCache.count(C);
   }
 
   virtual void invalidate(SILFunction *F, SILAnalysis::PreserveKind K) {
@@ -88,10 +105,13 @@ private:
   SILModule *M;
 
   /// A cache that maps a class to all of its known direct subclasses.
-  llvm::DenseMap<ClassDecl*, ClassList> DirectSubclassesCache;
+  DenseMap<ClassDecl*, ClassList> DirectSubclassesCache;
 
   /// A cache that maps a class to all of its known indirect subclasses.
-  llvm::DenseMap<ClassDecl*, ClassList> IndirectSubclassesCache;
+  DenseMap<ClassDecl*, ClassList> IndirectSubclassesCache;
+
+  /// A cache that maps a protocol to all of its known implementations.
+  ProtocolImplementations ProtocolImplementationsCache;
 };
 
 }

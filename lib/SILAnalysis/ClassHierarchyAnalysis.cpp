@@ -19,7 +19,45 @@
 
 using namespace swift;
 
+namespace {
+/// A helper class to collect all nominal type declarations.
+class NominalTypeWalker: public ASTWalker {
+  ClassHierarchyAnalysis::ProtocolImplementations &ProtocolImplementationsCache;
+public:
+  NominalTypeWalker(ClassHierarchyAnalysis::ProtocolImplementations
+                        &ProtocolImplementationsCache)
+    :ProtocolImplementationsCache(ProtocolImplementationsCache) {
+  }
+
+  virtual bool walkToDeclPre(Decl *D) {
+    auto *NTD = dyn_cast<NominalTypeDecl>(D);
+    if (!NTD)
+      return true;
+    auto Protocols = NTD->getAllProtocols();
+    // We are only interested in types implementing protocols.
+    if (!Protocols.empty()) {
+      for (auto &Protocol : Protocols) {
+        auto &K = ProtocolImplementationsCache[Protocol];
+        K.push_back(NTD);
+      }
+    }
+    return true;
+  }
+};
+}
+
 void ClassHierarchyAnalysis::init() {
+  // Process all types implementing protocols.
+  SmallVector<Decl *, 32> Decls;
+  // TODO: It would be better if we could get all declarations
+  // from a given module, not only the top-level ones.
+  M->getSwiftModule()->getTopLevelDecls(Decls);
+
+  NominalTypeWalker Walker(ProtocolImplementationsCache);
+  for(auto *D: Decls) {
+    D->walk(Walker);
+  }
+
   // For each class declaration in our V-table list:
   for (auto &VT : M->getVTableList()) {
     ClassDecl *C = VT.getClass();
