@@ -4343,61 +4343,6 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
   return closureExpr;
 }
 
-// FIXME: This is duplicating work that should really only exist at the SIL
-// level. Once we have support for arbitrary function conversions, we should
-// rip this whole thing out.
-static bool areConvertibleTypesABICompatible(CanType lhs, CanType rhs) {
-  // Match identical types.
-  if (lhs == rhs)
-    return true;
-
-  // Recursively match tuple types.
-  auto lhsTuple = dyn_cast<TupleType>(lhs);
-  auto rhsTuple = dyn_cast<TupleType>(rhs);
-  if (lhsTuple && rhsTuple) {
-    if (lhsTuple->getNumElements() != rhsTuple->getNumElements())
-      return false;
-    return std::equal(lhsTuple.getElementTypes().begin(),
-                      lhsTuple.getElementTypes().end(),
-                      rhsTuple.getElementTypes().begin(),
-                      [](CanType lhsElem, CanType rhsElem) -> bool {
-      return areConvertibleTypesABICompatible(lhsElem, rhsElem);
-    });
-  } else if (lhsTuple && lhsTuple->getNumElements() == 1) {
-    return areConvertibleTypesABICompatible(lhsTuple.getElementTypes().front(),
-                                            rhs);
-  } else if (rhsTuple && rhsTuple->getNumElements() == 1) {
-    return areConvertibleTypesABICompatible(lhs,
-                                            rhsTuple.getElementTypes().front());
-  }
-
-  // Recursively match function types.
-  CanAnyFunctionType lhsFn = dyn_cast<AnyFunctionType>(lhs);
-  CanAnyFunctionType rhsFn = dyn_cast<AnyFunctionType>(rhs);
-  if (lhsFn && rhsFn) {
-    return
-      areConvertibleTypesABICompatible(lhsFn.getInput(), rhsFn.getInput()) &&
-      areConvertibleTypesABICompatible(lhsFn.getResult(), rhsFn.getResult());
-  }
-
-  // Match possibly-optional class reference types.
-  auto lhsUnwrapped = lhs.getAnyOptionalObjectType();
-  auto rhsUnwrapped = rhs.getAnyOptionalObjectType();
-
-  auto lhsObject = lhsUnwrapped ? lhsUnwrapped : lhs;
-  auto rhsObject = rhsUnwrapped ? rhsUnwrapped : rhs;
-  if (lhsObject->isAnyClassReferenceType() &&
-      rhsObject->isAnyClassReferenceType()) {
-    return true;
-  }
-
-  if (lhsUnwrapped && rhsUnwrapped)
-    return areConvertibleTypesABICompatible(lhsUnwrapped, rhsUnwrapped);
-
-  // Nothing else is ABI-compatible.
-  return false;
-}
-
 static void
 maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
                                            AnyFunctionType *toType) {
@@ -4413,9 +4358,7 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
     // Can convert from an ABI-compatible C function pointer.
     if (fromFnType
         && fromFnType->getRepresentation()
-            == AnyFunctionType::Representation::CFunctionPointer
-        && areConvertibleTypesABICompatible(fromType->getCanonicalType(),
-                                            toType->getCanonicalType()))
+            == AnyFunctionType::Representation::CFunctionPointer)
       return;
     
     // Can convert a decl ref to a global or local function that doesn't

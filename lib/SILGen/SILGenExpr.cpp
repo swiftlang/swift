@@ -1119,6 +1119,29 @@ RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(base));
 }
 
+static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
+                                              FunctionConversionExpr *e,
+                                              ManagedValue result) {
+  SILType loweredDestTy = SGF.getLoweredType(e->getType());
+
+  if (result.getType() == loweredDestTy)
+    return result;
+
+  // We're converting between C function pointer types. They better be
+  // ABI-compatible, since we can't emit a thunk.
+  if (SGF.SGM.Types.checkForABIDifferences(result.getSwiftType(),
+                                           loweredDestTy.getSwiftRValueType())
+        == TypeConverter::ABIDifference::NeedsThunk) {
+    SGF.SGM.diagnose(e, diag::unsupported_c_function_pointer_conversion,
+                     e->getSubExpr()->getType(), e->getType());
+    return SGF.emitUndef(e, loweredDestTy);
+  }
+
+  return ManagedValue::forUnmanaged(
+      SGF.B.createConvertFunction(e, result.getUnmanagedValue(),
+                                  loweredDestTy));
+}
+
 static RValue emitCFunctionPointer(SILGenFunction &gen,
                                    FunctionConversionExpr *conversionExpr) {
   auto expr = conversionExpr->getSubExpr();
@@ -1161,7 +1184,9 @@ static RValue emitCFunctionPointer(SILGenFunction &gen,
                          /*uncurryLevel*/ 0,
                          /*foreign*/ true);
   SILValue cRef = gen.emitGlobalFunctionRef(expr, cEntryPoint);
-  return RValue(gen, conversionExpr, ManagedValue::forUnmanaged(cRef));
+  ManagedValue result = convertCFunctionSignature(gen, conversionExpr,
+                                                  ManagedValue::forUnmanaged(cRef));
+  return RValue(gen, conversionExpr, result);
 }
 
 // Transform the AST-level types in the function signature without an
@@ -1258,11 +1283,22 @@ static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
                                                   SGFContext C)
 {
-  // A "conversion" to a C function pointer is done by referencing the thunk
-  // (or original C function) with the C calling convention.
-  if (e->getType()->castTo<AnyFunctionType>()->getRepresentation()
-        == AnyFunctionType::Representation::CFunctionPointer)
-    return emitCFunctionPointer(SGF, e);
+  CanAnyFunctionType srcRepTy =
+      cast<FunctionType>(e->getSubExpr()->getType()->getCanonicalType());
+  CanAnyFunctionType destRepTy =
+      cast<FunctionType>(e->getType()->getCanonicalType());
+
+  if (destRepTy->getRepresentation() == FunctionTypeRepresentation::CFunctionPointer) {
+    // A "conversion" of a DeclRef a C function pointer is done by referencing
+    // the thunk (or original C function) with the C calling convention.
+    if (srcRepTy->getRepresentation() != FunctionTypeRepresentation::CFunctionPointer)
+      return emitCFunctionPointer(SGF, e);
+
+    // Ok, we're converting a C function pointer value to another C function
+    // pointer.
+    auto result = SGF.emitRValueAsSingleValue(e->getSubExpr());
+    return RValue(SGF, e, convertCFunctionSignature(SGF, e, result));
+  }
 
   // Break the conversion into three stages:
   // 1) changing the representation from foreign to native
@@ -1271,11 +1307,6 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   //
   // We only do one of 1) or 3), but we have to do them in the right order
   // with respect to 2).
-  
-  CanAnyFunctionType srcRepTy =
-      cast<FunctionType>(e->getSubExpr()->getType()->getCanonicalType());
-  CanAnyFunctionType destRepTy =
-      cast<FunctionType>(e->getType()->getCanonicalType());
 
   CanAnyFunctionType srcTy = srcRepTy;
   CanAnyFunctionType destTy = destRepTy;

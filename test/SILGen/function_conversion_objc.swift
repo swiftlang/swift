@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -verify | FileCheck %s
 
 import Foundation
 
@@ -82,3 +82,30 @@ func blockToFuncExistential(x: @convention(block) () -> Int) -> () -> Any {
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFdCb__dSi_XFo__dSi_ : $@convention(thin) (@owned @convention(block) () -> Int) -> Int
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSi_XFo__iP__ : $@convention(thin) (@out protocol<>, @owned @callee_owned () -> Int) -> ()
+
+// C function pointer conversions
+
+class A : NSObject {}
+class B : A {}
+
+// CHECK-LABEL: sil hidden @_TF24function_conversion_objc18cFuncPtrConversionFcCS_1AT_cCS_1BT_
+func cFuncPtrConversion(x: @convention(c) A -> ()) -> @convention(c) B -> () {
+// CHECK:         convert_function %0 : $@convention(c) (A) -> () to $@convention(c) (B) -> ()
+// CHECK:         return
+  return x
+}
+
+func cFuncPtr(a: A) {}
+
+// CHECK-LABEL: sil hidden @_TF24function_conversion_objc19cFuncDeclConversionFT_cCS_1BT_
+func cFuncDeclConversion() -> @convention(c) B -> () {
+// CHECK:         function_ref @_TToF24function_conversion_objc8cFuncPtrFCS_1AT_ : $@convention(c) (A) -> ()
+// CHECK:         convert_function %0 : $@convention(c) (A) -> () to $@convention(c) (B) -> ()
+// CHECK:         return
+  return cFuncPtr
+}
+
+func cFuncPtrConversionUnsupported(x: @convention(c) (@convention(block) () -> ()) -> ())
+    -> @convention(c) (@convention(c) () -> ()) -> () {
+  return x  // expected-error{{C function pointer signature '@convention(c) (@convention(block) () -> ()) -> ()' is not compatible with expected type '@convention(c) (@convention(c) () -> ()) -> ()'}}
+}

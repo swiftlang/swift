@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -verify %s | FileCheck %s
 
 func values(arg: @convention(c) Int -> Int) -> @convention(c) Int -> Int {
   return arg
@@ -44,4 +44,10 @@ func pointers_to_swift_functions(x: Int) {
   calls_no_args(no_args)
   // CHECK:   [[NO_ARGS_C:%.*]] = function_ref @_TToF19c_function_pointers7no_argsFT_Si
   // CHECK:   apply {{.*}}([[NO_ARGS_C]])
+}
+
+func unsupported(a: Any) -> Int { return 0 }
+
+func pointers_to_bad_swift_functions(x: Int) {
+  calls(unsupported, x) // expected-error{{C function pointer signature '(Any) -> Int' is not compatible with expected type '@convention(c) Int -> Int'}}
 }
