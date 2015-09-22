@@ -219,7 +219,9 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
       case RT_ObjCRetain: {
         // Canonicalize the retain so that nothing uses its result.
         CallInst &CI = cast<CallInst>(Inst);
-        Value *ArgVal = RC->getSwiftRCIdentityRoot(CI.getArgOperand(0));
+        // Do not get RC identical value here, could end up with a
+        // crash in replaceAllUsesWith as the type maybe different.
+        Value *ArgVal = CI.getArgOperand(0);
         if (!CI.use_empty()) {
           CI.replaceAllUsesWith(ArgVal);
           Changed = true;
