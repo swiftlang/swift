@@ -18,6 +18,7 @@
 #define SWIFT_BASIC_STRINGEXTRAS_HPP
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -273,6 +274,15 @@ enum class NameRole {
   Partial,
 };
 
+/// Flags used by \c OmissionTypeName to describe the input type.
+enum class OmissionTypeFlags {
+  /// Whether the parameter with this type has a default argument.
+  DefaultArgument = 0x01,
+};
+
+/// Options that described omitted types.
+typedef OptionSet<OmissionTypeFlags> OmissionTypeOptions;
+
 /// Describes the name of a type as is used for omitting needless
 /// words.
 struct OmissionTypeName {
@@ -282,27 +292,36 @@ struct OmissionTypeName {
   /// For a collection type, the name of the element type.
   StringRef CollectionElement;
 
-  /// Whether the type would get a default argument.
-  bool DefaultArgument;
+  /// Options that describe this type.
+  OmissionTypeOptions Options;
 
   /// Construct a type name.
   OmissionTypeName(StringRef name = StringRef(),
-                   bool defaultArgument = false,
+                   OmissionTypeOptions options = None,
                    StringRef collectionElement = StringRef())
     : Name(name), CollectionElement(collectionElement),
-      DefaultArgument(defaultArgument) { }
+      Options(options) { }
 
   /// Construct a type name.
-  OmissionTypeName(const char * name, bool defaultArgument = false,
+  OmissionTypeName(const char * name, OmissionTypeOptions options = None,
                    StringRef collectionElement = StringRef())
     : Name(name), CollectionElement(collectionElement),
-      DefaultArgument(defaultArgument) { }
+      Options(options) { }
 
   /// Produce a new type name for omission with a default argument.
   OmissionTypeName withDefaultArgument(bool defaultArgument = true) {
     OmissionTypeName result(*this);
-    result.DefaultArgument = defaultArgument;
+    if (defaultArgument)
+      result.Options |= OmissionTypeFlags::DefaultArgument;
+    else
+      result.Options -= OmissionTypeFlags::DefaultArgument;
     return result;
+  }
+
+  /// Determine whether the parameter corresponding to this type has a default
+  /// argument.
+  bool hasDefaultArgument() const {
+    return Options.contains(OmissionTypeFlags::DefaultArgument);
   }
 
   /// Determine whether the type name is empty.

@@ -1910,9 +1910,9 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
       // is "Object".
       auto typeArgs = objcObjectPtr->getTypeArgs();
       if (typeArgs.empty())
-        return OmissionTypeName(className, false, "Object");
+        return OmissionTypeName(className, None, "Object");
 
-      return OmissionTypeName(className, false,
+      return OmissionTypeName(className, None,
                               getClangTypeNameForOmission(typeArgs[0]).Name);
     }
 

@@ -665,7 +665,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     // preposition in the base name, split the base name at that
     // preposition.
     if (role == NameRole::BaseName && argNames[0].empty() &&
-        paramTypes[0].DefaultArgument) {
+        paramTypes[0].hasDefaultArgument()) {
       // Scan backwards for a preposition.
       auto nameWords = camel_case::getWords(newName);
       auto nameWordRevIter = nameWords.rbegin(),

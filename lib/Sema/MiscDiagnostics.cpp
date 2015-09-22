@@ -1807,7 +1807,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
       if (!args.empty() &&
           (bound->getDecl() == ctx.getArrayDecl() ||
            bound->getDecl() == ctx.getSetDecl())) {
-        return OmissionTypeName(nominal->getName().str(), false,
+        return OmissionTypeName(nominal->getName().str(), None,
                                 getTypeNameForOmission(args[0]).Name);
       }
     }
