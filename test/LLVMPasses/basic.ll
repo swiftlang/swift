@@ -21,7 +21,23 @@ declare void @swift_bridgeObjectRelease(%swift.bridge*)
 declare void @swift_retainUnowned(%swift.refcounted*)
 
 declare void @user(%swift.refcounted *) nounwind
+declare void @user_objc(%objc_object*) nounwind
 declare void @unknown_func()
+
+; CHECK-LABEL: @trivial_objc_canonicalization(
+; CHECK-NEXT: entry:
+; CHECK-NEXT: [[RET0:%.+]] = bitcast i8* %O to %objc_object*
+; CHECK-NEXT: [[RET1:%.+]] = tail call %objc_object* @objc_retain(%objc_object* [[RET0:%.+]])
+; CHECK-NEXT: call void @user_objc(%objc_object* [[RET0:%.+]])
+; CHECK-NEXT: ret void
+
+define void @trivial_objc_canonicalization(i8* %O) {
+entry:
+  %0 = bitcast i8* %O to %objc_object*
+  %1 = tail call %objc_object* @objc_retain(%objc_object* %0)
+  call void @user_objc(%objc_object* %1) nounwind
+  ret void
+}
 
 ; CHECK-LABEL: @trivial_retain_release(
 ; CHECK-NEXT: entry:
