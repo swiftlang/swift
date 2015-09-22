@@ -941,7 +941,7 @@ void swift::addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
   // Always add a materializeForSet when we're creating trivial
   // accessors for a mutable stored property.  We only do this when we
-  // need to be able to access something polymorphicly, and we always
+  // need to be able to access something polymorphically, and we always
   // want a materializeForSet in such situations.
   if (setter) {
     FuncDecl *materializeForSet = addMaterializeForSet(storage, TC);

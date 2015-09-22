@@ -288,7 +288,7 @@ class alignas(1 << DeclAlignInBits) Decl {
 
     /// \brief Whether this declaration was mapped directly from a Clang AST.
     ///
-    /// Use getClangAST() to retrieve the corresponding Clang AST.
+    /// Use getClangNode() to retrieve the corresponding Clang AST.
     unsigned FromClang : 1;
 
     /// \brief Whether we've already performed early attribute validation.
