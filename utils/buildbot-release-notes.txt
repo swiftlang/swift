@@ -1,4 +1,8 @@
+Latest
+------
 
+* Global anyGenerator() functions have been changed into initializers on
+  AnyGenerator, making the API more intuitive and idiomatic.
 
 
 
