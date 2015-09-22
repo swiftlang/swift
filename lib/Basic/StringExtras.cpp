@@ -294,7 +294,13 @@ static bool isKeyword(StringRef identifier) {
 static Optional<StringRef> skipTypeSuffix(StringRef typeName) {
   if (typeName.empty()) return None;
 
-  /// \d+D for dimensionality.
+  // "Type" suffix.
+  if (camel_case::getLastWord(typeName) == "Type" &&
+      typeName.size() > 4) {
+    return typeName.drop_back(4);
+  }
+
+  // \d+D for dimensionality.
   if (typeName.back() == 'D' && typeName.size() > 1) {
     unsigned firstDigit = typeName.size() - 1;
     while (firstDigit > 0) {

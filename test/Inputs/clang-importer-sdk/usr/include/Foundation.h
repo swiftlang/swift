@@ -942,3 +942,7 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 @interface NSMutableArray (Removal)
 - (void)removeObjects:(nonnull NSArray *)objects;
 @end
+
+@interface NSMutableArray (TypeSuffix)
+- (void)doSomethingWithUnderlying:(NSUnderlyingType)underlying;
+@end

@@ -115,6 +115,9 @@
 // Note: Plural: NSArray without type arguments -> "Objects".
 // CHECK-FOUNDATION: func remove(_: [AnyObject])
 
+// Note: Skipping "Type" suffix.
+// CHECK-FOUNDATION: func doSomethingWith(_: NSUnderlyingType)
+
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
 
