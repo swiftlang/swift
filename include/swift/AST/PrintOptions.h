@@ -187,20 +187,13 @@ struct PrintOptions {
     return result;
   }
 
-  /// Retrieve the set of options suitable for interface generation.
-  static PrintOptions printInterface(bool skipHidden = true) {
+  /// Retrieve the set of options suitable for diagnostics printing.
+  static PrintOptions printForDiagnostics() {
     PrintOptions result = printVerbose();
     result.PrintAccessibility = true;
     result.Indent = 4;
     result.FullyQualifiedTypesIfAmbiguous = true;
     result.SynthesizeSugarOnTypes = true;
-
-    if (skipHidden) {
-      result.SkipUnavailable = true;
-      result.SkipImplicit = true;
-      result.SkipPrivateStdlibDecls = true;
-      result.SkipDeinit = true;
-    }
     result.PrintUserInaccessibleAttrs = false;
     result.PrintImplicitAttrs = false;
     result.ExcludeAttrList.push_back(DAK_Exported);
@@ -209,6 +202,16 @@ struct PrintOptions {
     result.PrintOverrideKeyword = false;
     result.AccessibilityFilter = Accessibility::Public;
     result.PrintIfConfig = false;
+    return result;
+  }
+
+  /// Retrieve the set of options suitable for interface generation.
+  static PrintOptions printInterface() {
+    PrintOptions result = printForDiagnostics();
+    result.SkipUnavailable = true;
+    result.SkipImplicit = true;
+    result.SkipPrivateStdlibDecls = true;
+    result.SkipDeinit = true;
     return result;
   }
 

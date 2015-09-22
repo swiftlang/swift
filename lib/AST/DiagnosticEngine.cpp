@@ -592,7 +592,7 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
           // Pretty-print the declaration we've picked.
           llvm::raw_svector_ostream out(buffer);
           TrackingPrinter printer(entries, out);
-          ppDecl->print(printer, PrintOptions::printInterface(false));
+          ppDecl->print(printer, PrintOptions::printForDiagnostics());
         }
 
         // Build a buffer with the pretty-printed declaration.
