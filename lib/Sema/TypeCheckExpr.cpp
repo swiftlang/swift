@@ -1016,6 +1016,24 @@ namespace {
   };
 }
 
+void TypeChecker::maybeDiagnoseCaptures(Expr *E, AnyFunctionRef AFR) {
+  if (!AFR.getCaptureInfo().hasBeenComputed()) {
+    // The capture list is not always initialized by the point we reference
+    // it. Remember we formed a C function pointer so we can diagnose later
+    // if necessary.
+    LocalCFunctionPointers[AFR].push_back(E);
+    return;
+  }
+
+  if (AFR.getCaptureInfo().hasGenericParamCaptures() ||
+      AFR.getCaptureInfo().hasLocalCaptures()) {
+    diagnose(E->getLoc(),
+             diag::c_function_pointer_from_function_with_context,
+             /*closure*/ AFR.getAbstractClosureExpr() != nullptr,
+             /*generic params*/ AFR.getCaptureInfo().hasGenericParamCaptures());
+  }
+}
+
 void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   if (AFR.getCaptureInfo().hasBeenComputed())
     return;
@@ -1083,13 +1101,8 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   // Diagnose if we have local captures and there were C pointers formed to
   // this function before we computed captures.
   auto cFunctionPointers = LocalCFunctionPointers.find(AFR);
-  if (cFunctionPointers != LocalCFunctionPointers.end()
-      && AFR.getCaptureInfo().hasLocalCaptures()) {
-    for (auto *expr : cFunctionPointers->second) {
-      diagnose(expr->getLoc(),
-               diag::c_function_pointer_from_function_with_context,
-               /*closure*/ AFR.getAbstractClosureExpr() != nullptr);
-    }
-  }
+  if (cFunctionPointers != LocalCFunctionPointers.end())
+    for (auto *expr : cFunctionPointers->second)
+      maybeDiagnoseCaptures(expr, AFR);
 }
 

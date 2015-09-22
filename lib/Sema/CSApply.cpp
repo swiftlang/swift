@@ -4408,7 +4408,6 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
   // pointer captures no context, we can only do the necessary thunking or
   // codegen if the original function is a direct reference to a global function
   // or context-free closure or local function.
-  // TODO: Also need to account for capture of generic type parameters.
   if (toType->getRepresentation()
        == AnyFunctionType::Representation::CFunctionPointer) {
     // Can convert from an ABI-compatible C function pointer.
@@ -4433,15 +4432,11 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
       if (fn->getDeclContext()->isTypeContext()) {
         tc.diagnose(expr->getLoc(),
                     diag::c_function_pointer_from_method);
-      } else if (!fn->getCaptureInfo().hasBeenComputed()) {
-        // The capture list is not always initialized by the point we reference
-        // it. Remember we formed a C function pointer so we can diagnose later
-        // if necessary.
-        tc.LocalCFunctionPointers[fn].push_back(expr);
-      } else if (fn->getCaptureInfo().hasLocalCaptures()) {
+      } else if (fn->getGenericParams()) {
         tc.diagnose(expr->getLoc(),
-                    diag::c_function_pointer_from_function_with_context,
-                    /*closure*/ false);
+                    diag::c_function_pointer_from_generic_function);
+      } else {
+        tc.maybeDiagnoseCaptures(expr, fn);
       }
     };
     
@@ -4463,16 +4458,7 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
     
     // Can convert a literal closure that doesn't capture context.
     if (auto closure = dyn_cast<ClosureExpr>(semanticExpr)) {
-      if (!closure->getCaptureInfo().hasBeenComputed()) {
-        // The capture list is not always initialized by the point we reference
-        // it. Remember we formed a C function pointer so we can diagnose later
-        // if necessary.
-        tc.LocalCFunctionPointers[closure].push_back(expr);
-      } else if (closure->getCaptureInfo().hasLocalCaptures()) {
-        tc.diagnose(expr->getLoc(),
-                    diag::c_function_pointer_from_function_with_context,
-                    /*closure*/ true);
-      }
+      tc.maybeDiagnoseCaptures(expr, closure);
       return;
     }
     

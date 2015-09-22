@@ -1207,6 +1207,10 @@ public:
   /// Type-check a for-each loop's pattern binding and sequence together.
   bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
 
+  /// \brief Lazily diagnose conversions to C function pointers of closures
+  /// with captures.
+  void maybeDiagnoseCaptures(Expr *E, AnyFunctionRef AFR);
+
   /// \brief Compute the set of captures for the given function or closure.
   void computeCaptures(AnyFunctionRef AFR);
 

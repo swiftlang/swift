@@ -640,9 +640,13 @@ ERROR(invalid_c_function_pointer_conversion_expr,sema_tcc,none,
       "a literal closure", ())
 ERROR(c_function_pointer_from_method,sema_tcc,none,
       "a C function pointer cannot be formed from a method", ())
+ERROR(c_function_pointer_from_generic_function,sema_tcc,none,
+      "a C function pointer cannot be formed from a reference to a generic "
+      "function", ())
 ERROR(c_function_pointer_from_function_with_context,sema_tcc,none,
       "a C function pointer cannot be formed from a "
-      "%select{local function|closure}0 that captures context", (bool))
+      "%select{local function|closure}0 that captures "
+      "%select{context|generic parameters}1", (bool, bool))
 NOTE(c_function_pointer_captures_here,sema_tcc,none,
      "%0 captured here", (Identifier))
 
