@@ -29,8 +29,8 @@
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_DECLS < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_OLDVALUE < %t.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBAL_ACCESSOR_INIT_1 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBAL_ACCESSOR_INIT_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBAL_ACCESSOR_INIT_1 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GLOBAL_ACCESSOR_INIT_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS1
 
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER_ACCESSOR_IMPLICIT_GET_1 | FileCheck %s -check-prefix=WITH_MEMBER_DECLS
@@ -103,11 +103,11 @@
 // RUN: FileCheck %s -check-prefix=WITH_LOCAL_DECLS < %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_OLDVALUE < %t.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOCAL_ACCESSOR_INIT_1 | FileCheck %s -check-prefix=WITH_LOCAL_DECLS
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOCAL_ACCESSOR_INIT_2 | FileCheck %s -check-prefix=WITH_LOCAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOCAL_ACCESSOR_INIT_1 | FileCheck %s -check-prefix=WITH_LOCAL_DECLS1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOCAL_ACCESSOR_INIT_2 | FileCheck %s -check-prefix=WITH_LOCAL_DECLS1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ACCESSOR_IN_MEMBER_FUNC_1 > %t.txt
-// RUN: FileCheck %s -check-prefix=WITH_GLOBAL_DECLS < %t.txt
+// RUN: FileCheck %s -check-prefix=WITH_GLOBAL_DECLS1 < %t.txt
 // RUN: FileCheck %s -check-prefix=ACCESSORS_IN_MEMBER_FUNC_1 < %t.txt
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ACCESSOR_IN_MEMBER_FUNC_2 > %t.txt
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_DECLS < %t.txt
@@ -134,6 +134,11 @@ func returnsInt() -> Int {}
 // WITH_GLOBAL_DECLS-DAG: Decl[FreeFunction]/CurrModule: returnsInt()[#Int#]{{; name=.+$}}
 // WITH_GLOBAL_DECLS: End completions
 
+// WITH_GLOBAL_DECLS1: Begin completions
+// WITH_GLOBAL_DECLS1-DAG: Decl[Struct]/CurrModule:       FooStruct[#FooStruct#]{{; name=.+$}}
+// WITH_GLOBAL_DECLS1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: returnsInt()[#Int#]{{; name=.+$}}
+// WITH_GLOBAL_DECLS1: End completions
+
 // WITH_MEMBER_DECLS: Begin completions
 // WITH_MEMBER_DECLS-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{; name=.+$}}
 // WITH_MEMBER_DECLS-DAG: Decl[FreeFunction]/CurrModule:    returnsInt()[#Int#]{{; name=.+$}}
@@ -158,6 +163,12 @@ func returnsInt() -> Int {}
 // WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/Local:         localFunc({#(a): Int#})[#Float#]{{; name=.+$}}
 // WITH_LOCAL_DECLS: End completions
 
+// WITH_LOCAL_DECLS1: Begin completions
+// WITH_LOCAL_DECLS1-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{; name=.+$}}
+// WITH_LOCAL_DECLS1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]:    returnsInt()[#Int#]{{; name=.+$}}
+// WITH_LOCAL_DECLS1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: functionParam[#Int#]{{; name=.+$}}
+// WITH_LOCAL_DECLS1-DAG: Decl[FreeFunction]/Local:         localFunc({#(a): Int#})[#Float#]{{; name=.+$}}
+// WITH_LOCAL_DECLS1: End completions
 
 // WITH_OLDVALUE: Begin completions
 // WITH_OLDVALUE-DAG: Decl[LocalVar]/Local: oldValue[#Int#]{{; name=.+$}}
@@ -437,7 +448,7 @@ func accessorsInFunction(functionParam: Int) {
 
 // ACCESSORS_IN_MEMBER_FUNC_1: Begin completions
 // ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[LocalVar]/Local:             self[#AccessorsInMemberFunction#]
-// ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[LocalVar]/Local:             functionParam[#Int#]
+// ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]:             functionParam[#Int#]
 // ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Double#]
 // ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Float#]
 // ACCESSORS_IN_MEMBER_FUNC_1: End completions

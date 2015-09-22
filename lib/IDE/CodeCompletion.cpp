@@ -3209,6 +3209,18 @@ namespace  {
         Ancestors.pop_back();
       return S;
     }
+
+    bool walkToDeclPre(Decl *D) override {
+      if (Predicate(D))
+        Ancestors.push_back(D);
+      return true;
+    }
+
+    bool walkToDeclPost(Decl *D) override {
+      if (Predicate(D))
+        Ancestors.pop_back();
+      return true;
+    }
   };
 }
 
@@ -3217,11 +3229,12 @@ namespace  {
 class CodeCompletionTypeContextAnalyzer {
   DeclContext *DC;
   Expr *ParsedExpr;
+  SourceManager &SM;
   ExprParentFinder Finder;
 
 public:
   CodeCompletionTypeContextAnalyzer(DeclContext *DC, Expr *ParsedExpr) : DC(DC),
-    ParsedExpr(ParsedExpr),
+    ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
     Finder(ParsedExpr, [](ASTNode Node) {
       if (auto E = Node.dyn_cast<Expr *>()) {
         switch(E->getKind()) {
@@ -3234,6 +3247,13 @@ public:
       } else if (auto S = Node.dyn_cast<Stmt *>()) {
         switch (S->getKind()) {
         case StmtKind::Return:
+          return true;
+        default:
+          return false;
+        }
+      } else if (auto D = Node.dyn_cast<Decl *>()) {
+        switch (D->getKind()) {
+        case DeclKind::PatternBinding:
           return true;
         default:
           return false;
@@ -3277,13 +3297,37 @@ public:
      }
    }
 
+  void analyzeDecl(Decl *D, std::vector<Type> &PotentialTypes) {
+    switch (D->getKind()) {
+      case DeclKind::PatternBinding: {
+        auto PBD = cast<PatternBindingDecl>(D);
+        for (unsigned I = 0; I < PBD->getNumPatternEntries(); ++ I) {
+          if (auto Init = PBD->getInit(I)) {
+            if (SM.rangeContains(Init->getSourceRange(), ParsedExpr->getLoc())) {
+              PotentialTypes.push_back(PBD->getPattern(I)->getType());
+              break;
+            }
+          }
+        }
+        break;
+      }
+      default:
+        llvm_unreachable("Unhandled decl kinds.");
+    }
+  }
+
   bool Analyze(llvm::SmallVectorImpl<Type> &PossibleTypes) {
+    // We cannot analyze without target.
+    if (!ParsedExpr)
+      return false;
     DC->walkContext(Finder);
     std::vector<Type> PotentialTypes;
     if (auto Parent = Finder.ParentClosest.dyn_cast<Expr*>()) {
       analyzeExpr(Parent, PotentialTypes);
     } else if (auto Parent = Finder.ParentClosest.dyn_cast<Stmt *>()) {
       analyzeStmt(Parent, PotentialTypes);
+    } else if (auto Parent = Finder.ParentClosest.dyn_cast<Decl *>()) {
+      analyzeDecl(Parent, PotentialTypes);
     }
     for (auto Ty : PotentialTypes) {
       if (Ty && Ty->getKind() != TypeKind::Error) {
@@ -3379,6 +3423,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::PostfixExprBeginning: {
+    CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
+                                               CodeCompleteTokenExpr);
+    llvm::SmallVector<Type, 1> Types;
+    if (Analyzer.Analyze(Types)) {
+      Lookup.setExpectedTypes(Types);
+    }
     DoPostfixExprBeginning();
     break;
   }
