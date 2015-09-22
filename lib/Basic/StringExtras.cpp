@@ -294,11 +294,6 @@ static bool isKeyword(StringRef identifier) {
 static Optional<StringRef> skipTypeSuffix(StringRef typeName) {
   if (typeName.empty()) return None;
 
-  // "Ptr" and "Ref" are common suffixes we can ignore.
-  if (typeName.endswith("Ref") || typeName.endswith("Ptr")) {
-    return typeName.drop_back(3);
-  }
-
   /// \d+D for dimensionality.
   if (typeName.back() == 'D' && typeName.size() > 1) {
     unsigned firstDigit = typeName.size() - 1;

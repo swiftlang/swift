@@ -1847,11 +1847,15 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
     if (auto typedefType = dyn_cast<clang::TypedefType>(typePtr)) {
       auto name = typedefType->getDecl()->getName();
 
+      auto lastWord = camel_case::getLastWord(name);
+
       // For Objective-C type parameters, drop the "Type" suffix if
       // present.
       if (isa<clang::ObjCTypeParamDecl>(typedefType->getDecl())) {
-        if (camel_case::getLastWord(name) == "Type")
+        if (lastWord == "Type") {
           name = name.drop_back(4);
+          lastWord = "";
+        }
       }
 
       // Objective-C selector type.
@@ -1866,6 +1870,11 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
       // Objective-C "Class" type.
       if (type->isObjCClassType() && name == "Class")
         return "Class";
+
+      // If this is an imported CF type, use that name.
+      StringRef CFName = getCFTypeName(typedefType->getDecl());
+      if (!CFName.empty())
+        return CFName;
 
       return name;
     }

@@ -1285,6 +1285,14 @@ static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl) {
   return false;
 }
 
+StringRef ClangImporter::Implementation::getCFTypeName(
+            const clang::TypedefNameDecl *decl) {
+  if (isCFTypeDecl(decl))
+    return getImportedCFTypeName(decl->getName());
+
+  return "";
+}
+
 /// Add an AvailableAttr to the declaration for the given
 /// version range.
 static void applyAvailableAttribute(Decl *decl, VersionRange &range,
