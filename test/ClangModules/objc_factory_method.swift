@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target x86_64-apple-macosx10.10 -parse %s -verify
 
+// REQUIRES: OS=macosx
 // REQUIRES: objc_interop
 
 import AppKit
