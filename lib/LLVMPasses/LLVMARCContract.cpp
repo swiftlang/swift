@@ -32,9 +32,6 @@ STATISTIC(NumRetainReleasesEliminatedByMergingIntoRetainReleaseN,
 STATISTIC(NumUnknownRetainReleasesEliminatedByMergingIntoRetainReleaseN,
           "Number of retain/release eliminated by merging into "
           "unknownRetain_n/unknownRelease_n");
-STATISTIC(NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN,
-          "Number of bridge retain/release eliminated by merging into "
-          "bridgeRetain_n/bridgeRelease_n");
 
 /// Pimpl implementation of SwiftARCContractPass.
 namespace {
@@ -44,8 +41,6 @@ struct LocalState {
   TinyPtrVector<CallInst *> ReleaseList;
   TinyPtrVector<CallInst *> UnknownRetainList;
   TinyPtrVector<CallInst *> UnknownReleaseList;
-  TinyPtrVector<CallInst *> BridgeRetainList;
-  TinyPtrVector<CallInst *> BridgeReleaseList;
 };
 
 /// This implements the very late (just before code generation) lowering
@@ -170,45 +165,6 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
     }
     UnknownReleaseList.clear();
 
-    auto &BridgeRetainList = P.second.BridgeRetainList;
-    if (BridgeRetainList.size() > 1) {
-      // Create the releaseN call right by the last release.
-      auto *OldCI = BridgeRetainList[BridgeRetainList.size() - 1];
-      B.setInsertPoint(OldCI);
-      O = OldCI->getArgOperand(0);
-      // Bridge retain may modify the input reference before forwarding it.
-      auto *I = B.createBridgeRetainN(RC->getSwiftRCIdentityRoot(O),
-                                      BridgeRetainList.size());
-
-      // Remove all old retain instructions.
-      for (auto *Inst : BridgeRetainList) {
-        Inst->replaceAllUsesWith(I);
-        Inst->eraseFromParent();
-        NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
-      }
-
-      NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
-    }
-    BridgeRetainList.clear();
-
-    auto &BridgeReleaseList = P.second.BridgeReleaseList;
-    if (BridgeReleaseList.size() > 1) {
-      // Create the releaseN call right by the last release.
-      auto *OldCI = BridgeReleaseList[BridgeReleaseList.size() - 1];
-      B.setInsertPoint(OldCI);
-      O = OldCI->getArgOperand(0);
-      B.createBridgeReleaseN(RC->getSwiftRCIdentityRoot(O),
-                              BridgeReleaseList.size());
-
-      // Remove all old release instructions.
-      for (auto *Inst : BridgeReleaseList) {
-        Inst->eraseFromParent();
-        NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
-      }
-
-      NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
-    }
-    BridgeReleaseList.clear();
   }
 }
 
@@ -272,25 +228,11 @@ bool SwiftARCContractImpl::run() {
         LocalEntry.UnknownReleaseList.push_back(CI);
         continue;
       }
-      case RT_BridgeRetain: {
-        auto *CI = cast<CallInst>(&Inst);
-        auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
-
-        LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
-        LocalEntry.BridgeRetainList.push_back(CI);
-        continue;
-      }
-      case RT_BridgeRelease: {
-        auto *CI = cast<CallInst>(&Inst);
-        auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
-
-        LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
-        LocalEntry.BridgeReleaseList.push_back(CI);
-        continue;
-      }
       case RT_Unknown:
       case RT_AllocObject:
       case RT_NoMemoryAccessed:
+      case RT_BridgeRelease:
+      case RT_BridgeRetain:
       case RT_RetainUnowned:
       case RT_CheckUnowned:
       case RT_ObjCRelease:

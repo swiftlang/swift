@@ -47,12 +47,9 @@ class ARCEntryPointBuilder {
   NullablePtr<Constant> ReleaseN;
   NullablePtr<Constant> UnknownRetainN;
   NullablePtr<Constant> UnknownReleaseN;
-  NullablePtr<Constant> BridgeRetainN;
-  NullablePtr<Constant> BridgeReleaseN;
 
   // The type cache.
   NullablePtr<Type> ObjectPtrTy;
-  NullablePtr<Type> BridgeObjectPtrTy;
 
 public:
   ARCEntryPointBuilder(Function &F) : B(F.begin()), Retain(), ObjectPtrTy() {}
@@ -141,21 +138,6 @@ public:
     return CI;
   }
 
-  CallInst *createBridgeRetainN(Value *V, uint32_t n) {
-    // Cast just to make sure we have the right object type.
-    V = B.CreatePointerCast(V, getBridgeObjectPtrTy());
-    CallInst *CI = B.CreateCall(getBridgeRetainN(), {V, getIntConstant(n)});
-    CI->setTailCall(true);
-    return CI;
-  }
-
-  CallInst *createBridgeReleaseN(Value *V, uint32_t n) {
-    // Cast just to make sure we have the right object type.
-    V = B.CreatePointerCast(V, getBridgeObjectPtrTy());
-    CallInst *CI = B.CreateCall(getBridgeReleaseN(), {V, getIntConstant(n)});
-    CI->setTailCall(true);
-    return CI;
-  }
 
 private:
   Module &getModule() {
@@ -271,40 +253,6 @@ private:
     return UnknownReleaseN.get();
   }
 
-  /// Return a callable function for swift_bridgeRetain_n.
-  Constant *getBridgeRetainN() {
-    if (BridgeRetainN)
-      return BridgeRetainN.get();
-    auto *BridgeObjectPtrTy = getBridgeObjectPtrTy();
-    auto &M = getModule();
-
-    auto *Int32Ty = Type::getInt32Ty(M.getContext());
-    auto AttrList = AttributeSet::get(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    BridgeRetainN = M.getOrInsertFunction("swift_bridgeObjectRetain_n",
-                                          AttrList, BridgeObjectPtrTy,
-                                          BridgeObjectPtrTy,
-                                          Int32Ty, nullptr);
-    return BridgeRetainN.get();
-  }
-
-  /// Return a callable function for swift_bridgeRelease_n.
-  Constant *getBridgeReleaseN() {
-    if (BridgeReleaseN)
-      return BridgeReleaseN.get();
-    auto *ObjectPtrTy = getObjectPtrTy();
-    auto &M = getModule();
-
-    auto *Int32Ty = Type::getInt32Ty(M.getContext());
-    auto AttrList = AttributeSet::get(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-    BridgeReleaseN = M.getOrInsertFunction("swift_bridgeObjectRelease_n",
-                                            AttrList,
-                                            Type::getVoidTy(M.getContext()),
-                                            BridgeObjectPtrTy, Int32Ty,
-                                            nullptr);
-    return BridgeReleaseN.get();
-  }
 
   Type *getObjectPtrTy() {
     if (ObjectPtrTy)
@@ -313,15 +261,6 @@ private:
     ObjectPtrTy = M.getTypeByName("swift.refcounted")->getPointerTo();
     assert(ObjectPtrTy && "Could not find the swift heap object type by name");
     return ObjectPtrTy.get();
-  }
-
-  Type *getBridgeObjectPtrTy() {
-    if (BridgeObjectPtrTy)
-      return BridgeObjectPtrTy.get();
-    auto &M = getModule();
-    BridgeObjectPtrTy = M.getTypeByName("swift.bridge")->getPointerTo();
-    assert(BridgeObjectPtrTy && "Could not find the swift bridge object type by name");
-    return BridgeObjectPtrTy.get();
   }
 
   Constant *getIntConstant(uint32_t constant) {
