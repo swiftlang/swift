@@ -67,12 +67,7 @@ public:
     return IndirectSubclassesCache[C];
   }
 
-  NominalTypeList& getProtocolImplementations(ProtocolDecl *P) {
-    if (!ProtocolImplementationsCache.count(P)) {
-      // Lazy initialization
-      // FIXME: Why isn't the "return" below enough?
-      (void)ProtocolImplementationsCache[P];
-    }
+  const NominalTypeList &getProtocolImplementations(ProtocolDecl *P) {
     return ProtocolImplementationsCache[P];
   }
 
