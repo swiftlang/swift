@@ -198,7 +198,10 @@ public:
   /// Emit functions, variables and tables which are needed anyway, e.g. because
   /// they are externally visible.
   void emitGlobalTopLevel();
-  
+
+  /// Emit the protocol conformance records needed by each IR module.
+  void emitProtocolConformances();
+
   /// Emit everthing which is reachable from already emitted IR.
   void emitLazyDefinitions();
   

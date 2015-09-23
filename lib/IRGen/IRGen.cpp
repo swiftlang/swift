@@ -547,7 +547,10 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   }
   
   IRGenModule *PrimaryGM = dispatcher.getPrimaryIGM();
-  
+
+  // Emit protocol conformances.
+  dispatcher.emitProtocolConformances();
+
   // Okay, emit any definitions that we suddenly need.
   dispatcher.emitLazyDefinitions();
   
