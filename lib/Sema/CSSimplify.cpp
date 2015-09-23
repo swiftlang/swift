@@ -611,6 +611,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   case TypeMatchKind::OperatorArgumentConversion:
   case TypeMatchKind::ArgumentConversion:
   case TypeMatchKind::BindType:
+  case TypeMatchKind::BindParamType:
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
   case TypeMatchKind::ConformsTo:
@@ -771,6 +772,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     break;
 
   case TypeMatchKind::BindType:
+  case TypeMatchKind::BindParamType:
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
   case TypeMatchKind::Subtype:
@@ -875,6 +877,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
                                          TypeMatchKind kind) {
   switch (kind) {
   case TypeMatchKind::BindType:
+  case TypeMatchKind::BindParamType:
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
     return rep1 != rep2;
@@ -932,6 +935,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   TypeMatchKind subKind;
   switch (kind) {
   case TypeMatchKind::BindType:
+  case TypeMatchKind::BindParamType:
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
     subKind = kind;
@@ -1091,6 +1095,9 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
   case TypeMatchKind::BindType:
   case TypeMatchKind::BindToPointerType:
     return ConstraintKind::Bind;
+
+  case TypeMatchKind::BindParamType:
+    return ConstraintKind::BindParam;
 
   case TypeMatchKind::SameType:
     return ConstraintKind::Equal;
@@ -1322,6 +1329,25 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return SolutionKind::Solved;
     }
 
+    case TypeMatchKind::BindParamType: {
+      if (typeVar2 && !typeVar1) {
+        if (auto *iot = dyn_cast<InOutType>(desugar1)) {
+          assignFixedType(typeVar2, LValueType::get(iot->getObjectType()));
+        } else {
+          assignFixedType(typeVar2, type1);
+        }
+        return SolutionKind::Solved;
+      } else if (typeVar1 && !typeVar2) {
+        if (auto *lvt = dyn_cast<LValueType>(desugar2)) {
+          assignFixedType(typeVar1, InOutType::get(lvt->getObjectType()));
+        } else {
+          assignFixedType(typeVar1, type2);
+        }
+        return SolutionKind::Solved;
+      }
+      return SolutionKind::Unsolved;
+    }
+
     // We need to be careful about mapping 'raw' argument type variables to
     // parameter tuples containing default args, or varargs in the first
     // position. If we naively bind the type variable to the parameter tuple,
@@ -1536,6 +1562,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       break;
 
     case TypeKind::LValue:
+      if (kind == TypeMatchKind::BindParamType) {
+        recordFailure(getConstraintLocator(locator),
+                      Failure::IsForbiddenLValue, type1, type2);
+        return SolutionKind::Error;
+      }
       return matchTypes(cast<LValueType>(desugar1)->getObjectType(),
                         cast<LValueType>(desugar2)->getObjectType(),
                         TypeMatchKind::SameType, subFlags,
@@ -1544,7 +1575,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     
     case TypeKind::InOut:
       // If the RHS is an inout type, the LHS must be an @lvalue type.
-      if (kind >= TypeMatchKind::OperatorArgumentConversion) {
+      if (kind == TypeMatchKind::BindParamType ||
+          kind >= TypeMatchKind::OperatorArgumentConversion) {
         if (shouldRecordFailures())
           recordFailure(getConstraintLocator(locator),
                         Failure::IsForbiddenLValue, type1, type2);
@@ -1982,6 +2014,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           return SolutionKind::Solved;
         }
         parts.pop_back();
+      }
+    }
+  }
+
+  if (concrete && kind == TypeMatchKind::BindParamType) {
+    if (auto *iot = dyn_cast<InOutType>(desugar1)) {
+      if (auto *lvt = dyn_cast<LValueType>(desugar2)) {
+        return matchTypes(iot->getObjectType(), lvt->getObjectType(),
+                          TypeMatchKind::BindType, subFlags,
+                          locator.withPathElement(
+                            ConstraintLocator::ArrayElementType));
       }
     }
   }
@@ -3524,6 +3567,7 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   switch (kind) {
   case ConstraintKind::Bind: return TypeMatchKind::BindType;
   case ConstraintKind::Equal: return TypeMatchKind::SameType;
+  case ConstraintKind::BindParam: return TypeMatchKind::BindParamType;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
   case ConstraintKind::ExplicitConversion:
@@ -4315,6 +4359,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   switch (constraint.getKind()) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
+  case ConstraintKind::BindParam:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::ExplicitConversion:

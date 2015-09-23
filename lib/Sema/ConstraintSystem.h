@@ -572,6 +572,11 @@ enum class TypeMatchKind : char {
   BindType,
   /// \brief Binds to a pointer element type.
   BindToPointerType,
+  /// \brief Bind the type of a function parameter to the type of a reference
+  /// to it from within the function body. The param type is an inout type iff
+  /// the reference type is an lvalue type with the same object type.
+  /// Otherwise, the two types must be the same type.
+  BindParamType,
   /// \brief Require the types to match exactly, but strips lvalueness from
   /// a type when binding to a type variable.
   SameType,

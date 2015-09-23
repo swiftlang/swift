@@ -919,6 +919,20 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   Type valueType = TC.getUnopenedTypeOfReference(value, Type(), DC, base,
                                                  /*wantInterfaceType=*/true);
 
+  // If this is a let-param whose type is a type variable, this is an untyped
+  // closure param that may be bound to an inout type later. References to the
+  // param should have lvalue type instead. Express the relationship with a new
+  // constraint.
+  if (auto *param = dyn_cast<ParamDecl>(value)) {
+    if (param->isLet() && valueType->is<TypeVariableType>()) {
+      Type paramType = valueType;
+      valueType = createTypeVariable(getConstraintLocator(locator),
+                                     TVO_CanBindToLValue);
+      addConstraint(ConstraintKind::BindParam, paramType, valueType,
+                    getConstraintLocator(locator));
+    }
+  }
+
   // Adjust the type of the reference.
   valueType = openType(valueType, locator,
                        replacements,

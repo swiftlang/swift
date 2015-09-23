@@ -27,7 +27,7 @@ struct X2 {
   func g() -> Float { return 0 }  
 }
 
-f0(X2(), {$0.g()})  // expected-error {{type of expression is ambiguous without more context}}
+f0(X2(), {$0.g()})
 
 // Autoclosure
 func f1(@autoclosure f f: () -> Int) { }
@@ -133,5 +133,25 @@ var _: (Int, Int)-> Int = {a in 0}
 // expected-error @+1 {{contextual type for closure argument list expects 3 arguments, but 2 were specified}}
 var _: (Int, Int, Int)-> Int = {a, b in a+b}
 
+// <rdar://problem/15998821> Fail to infer types for closure that takes an inout argument
+func r15998821() {
+  func take_closure(x : (inout Int)-> ()) { }
 
+  func test1() {
+    take_closure { (inout a : Int) in
+      a = 42
+    }
+  }
 
+  func test2() {
+    take_closure { a in
+      a = 42
+    }
+  }
+
+  func withPtr(body: (inout Int) -> Int) {}
+  func f() { withPtr { p in return p } }
+
+  let g = { x in x = 3 }
+  take_closure(g)
+}

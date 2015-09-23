@@ -630,6 +630,7 @@ static bool shouldBindToValueType(Constraint *constraint)
     return true;
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
+  case ConstraintKind::BindParam:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -679,6 +680,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     switch (constraint->getKind()) {
     case ConstraintKind::Bind:
     case ConstraintKind::Equal:
+    case ConstraintKind::BindParam:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ExplicitConversion:
@@ -868,6 +870,20 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       if (typeVar->getImpl().canBindToLValue() !=
             otherTypeVar->getImpl().canBindToLValue())
         continue;
+    }
+
+    // BindParam constraints are not reflexive and must be treated specially.
+    if (constraint->getKind() == ConstraintKind::BindParam) {
+      if (kind == AllowedBindingKind::Subtypes) {
+        if (auto *lvt = type->getAs<LValueType>()) {
+          type = InOutType::get(lvt->getObjectType());
+        }
+      } else if (kind == AllowedBindingKind::Supertypes) {
+        if (auto *iot = type->getAs<InOutType>()) {
+          type = LValueType::get(iot->getObjectType());
+        }
+      }
+      kind = AllowedBindingKind::Exact;
     }
 
     if (exactTypes.insert(type->getCanonicalType()).second)
