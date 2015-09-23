@@ -30,6 +30,22 @@ namespace swift {
   
 namespace DerivedConformance {
 
+/// Determine the derivable requirement that would satisfy the given
+/// requirement, if there is one.
+///
+/// \param nominal The nominal type for which we are determining whether to
+/// derive a witness.
+///
+/// \param requirement The requirement for which we are checking for a
+/// derivation. This requirement need not be within a derivable protocol,
+/// because derivable requirements can get restated in inherited unrelated or
+/// unrelated protocols.
+///
+/// \returns The requirement whose witness could be derived to potentially
+/// satisfy this given requirement, or NULL if there is no such requirement.
+ValueDecl *getDerivableRequirement(NominalTypeDecl *nominal,
+                                   ValueDecl *requirement);
+
 /// Derive a RawRepresentable requirement for an enum, if it has a valid
 /// raw type and raw values for all of its cases.
 ///

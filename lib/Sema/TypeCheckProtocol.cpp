@@ -2052,12 +2052,16 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
   }
 
-  // Determine whether we can derive this conformance.
-  // FIXME: Hoist this computation out of here.
+  // Determine whether we can derive a witness for this requirement.
   bool canDerive = false;
   if (auto *nominal = Adoptee->getAnyNominal()) {
-    if (nominal->derivesProtocolConformance(Proto))
-      canDerive = true;
+    // Can a witness for this requirement be derived for this nominal type?
+    if (auto derivable = DerivedConformance::getDerivableRequirement(
+                           nominal,
+                           requirement)) {
+      if (derivable == requirement)
+        canDerive = true;
+    }
   }
 
   // Gather the witnesses.

@@ -21,6 +21,78 @@
 using namespace swift;
 using namespace DerivedConformance;
 
+ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
+                                                       ValueDecl *requirement) {
+  ASTContext &ctx = nominal->getASTContext();
+  auto name = requirement->getFullName();
+
+  // Local function that retrieves the requirement with the same name as
+  // the provided requirement, but within the given known protocol.
+  auto getRequirement = [&](KnownProtocolKind kind) -> ValueDecl * {
+    // Dig out the protocol.
+    auto proto = ctx.getProtocol(kind);
+    if (!proto) return nullptr;
+
+    // Check whether this nominal type derives conformances to the
+    if (!nominal->derivesProtocolConformance(proto)) return nullptr;
+
+    // Retrieve the requirement.
+    for (auto result : proto->lookupDirect(name))
+      return result;
+
+    return nullptr;
+  };
+
+  // Properties.
+  if (isa<VarDecl>(requirement)) {
+    // RawRepresentable.rawValue
+    if (name.isSimpleName(ctx.Id_rawValue))
+      return getRequirement(KnownProtocolKind::RawRepresentable);
+
+    // Hashable.hashValue
+    if (name.isSimpleName(ctx.Id_hashValue))
+      return getRequirement(KnownProtocolKind::Hashable);
+
+    // ErrorType._code
+    if (name.isSimpleName(ctx.Id_code_))
+      return getRequirement(KnownProtocolKind::ErrorType);
+
+    // _BridgedNSError._NSErrorDomain
+    if (name.isSimpleName(ctx.Id_NSErrorDomain))
+      return getRequirement(KnownProtocolKind::_BridgedNSError);
+
+    return nullptr;
+  }
+
+  // Functions.
+  if (auto func = dyn_cast<FuncDecl>(requirement)) {
+    if (func->isOperator() && name.getBaseName().str() == "==")
+      return getRequirement(KnownProtocolKind::Equatable);
+
+    return nullptr;
+  }
+
+  // Initializers.
+  if (isa<ConstructorDecl>(requirement)) {
+    auto argumentNames = name.getArgumentNames();
+    if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_rawValue)
+      return getRequirement(KnownProtocolKind::RawRepresentable);
+
+    return nullptr;
+  }
+
+  // Associated types.
+  if (isa<AssociatedTypeDecl>(requirement)) {
+    // RawRepresentable.RawValue
+    if (name.isSimpleName(ctx.Id_RawValue))
+      return getRequirement(KnownProtocolKind::RawRepresentable);
+
+    return nullptr;
+  }
+
+  return nullptr;
+}
+
 void DerivedConformance::_insertOperatorDecl(ASTContext &C,
                                              IterableDeclContext *scope,
                                              Decl *member) {
