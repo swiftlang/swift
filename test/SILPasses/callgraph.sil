@@ -1,0 +1,216 @@
+// RUN: %target-sil-opt %s -call-graph-printer -o /dev/null | FileCheck --check-prefix=CHECK --check-prefix=CHECK-NOWMO %s
+// RUN: %target-sil-opt %s -wmo -call-graph-printer -o /dev/null | FileCheck --check-prefix=CHECK --check-prefix=CHECK-WMO %s
+
+sil_stage canonical
+
+// CHECK: *** Call Graph ***
+// CHECK: Function #1: private_bottom
+// CHECK: Demangled: private_bottom
+// CHECK: Trivially dead: no
+// CHECK: All callers known: yes
+// CHECK: Binds self: no
+// CHECK: Callers:
+
+// CHECK: Name: private_middle
+// CHECK: Demangled: private_middle
+sil private @private_bottom : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+
+// CHECK: Function #2: private_middle
+// CHECK: Demangled: private_middle
+// CHECK: Trivially dead: no
+// CHECK: All callers known: yes
+// CHECK: Binds self: no
+// CHECK: Call sites:
+
+// CHECK: Call site #5:   %1 = apply %0() : $@convention(thin) () -> ()
+// CHECK: All callees known: yes
+// CHECK: Known callees:
+// CHECK: Name: private_bottom
+// CHECK: Demangled: private_bottom
+
+// CHECK: Callers:
+
+// CHECK: Name: private_top
+// CHECK: Demangled: private_top
+sil private @private_middle : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @private_bottom : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #3: private_top
+// CHECK: Demangled: private_top
+// CHECK: Trivially dead: yes
+// CHECK: All callers known: yes
+// CHECK: Binds self: no
+// CHECK: Call sites:
+
+// CHECK: Call site #4:   %1 = apply %0() : $@convention(thin) () -> ()
+// CHECK: All callees known: yes
+// CHECK: Known callees:
+// CHECK: Name: private_middle
+// CHECK: Demangled: private_middle
+sil private @private_top : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @private_middle : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #4: internal_bottom
+// CHECK: Demangled: internal_bottom
+// CHECK: Trivially dead: no
+// CHECK-NOWMO: All callers known: no
+// CHECK-WMO: All callers known: yes
+// CHECK: Binds self: no
+// CHECK-NOWMO: Known Callers:
+// CHECK-WMO: Callers:
+
+// CHECK: Name: internal_middle
+// CHECK: Demangled: internal_middle
+sil hidden @internal_bottom : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+
+// CHECK: Function #5: internal_middle
+// CHECK: Demangled: internal_middle
+// CHECK: Trivially dead: no
+// CHECK-NOWMO: All callers known: no
+// CHECK-WMO: All callers known: yes
+// CHECK: Binds self: no
+// CHECK: Call sites:
+
+// CHECK: Call site #3:   %1 = apply %0() : $@convention(thin) () -> ()
+// CHECK: All callees known: yes
+// CHECK: Known callees:
+// CHECK: Name: internal_bottom
+// CHECK: Demangled: internal_bottom
+
+// CHECK-NOWMO: Known Callers:
+// CHECK-WMO: Callers:
+
+// CHECK: Name: internal_top
+// CHECK: Demangled: internal_top
+sil hidden @internal_middle : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @internal_bottom : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #6: internal_top
+// CHECK: Demangled: internal_top
+// CHECK-NOWMO: Trivially dead: no
+// CHECK-NOWMO: All callers known: no
+// CHECK-WMO: Trivially dead: yes
+// CHECK-WMO: All callers known: yes
+// CHECK: Binds self: no
+// CHECK: Call sites:
+
+// CHECK: Call site #2:   %1 = apply %0() : $@convention(thin) () -> ()
+// CHECK: All callees known: yes
+// CHECK: Known callees:
+// CHECK: Name: internal_middle
+// CHECK: Demangled: internal_middle
+sil hidden @internal_top : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @internal_middle : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #7: public_bottom
+// CHECK: Demangled: public_bottom
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: public_middle
+// CHECK: Demangled: public_middle
+sil @public_bottom : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+
+// CHECK: Function #8: public_middle
+// CHECK: Demangled: public_middle
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Call sites:
+
+// CHECK: Call site #1:   %1 = apply %0() : $@convention(thin) () -> ()
+// CHECK: All callees known: yes
+// CHECK: Known callees:
+// CHECK: Name: public_bottom
+// CHECK: Demangled: public_bottom
+
+// CHECK: Known Callers:
+
+// CHECK: Name: public_top
+// CHECK: Demangled: public_top
+sil @public_middle : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @public_bottom : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #9: public_top
+// CHECK: Demangled: public_top
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Call sites:
+
+// CHECK: Call site #0:   %1 = apply %0() : $@convention(thin) () -> ()
+// CHECK: All callees known: yes
+// CHECK: Known callees:
+// CHECK: Name: public_middle
+// CHECK: Demangled: public_middle
+sil @public_top : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @public_middle : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: *** Call Graph Statistics ***
+// CHECK: Number of call graph nodes: 9
+// CHECK: Number of call graph edges: 6
+// CHECK: Histogram of number of call sites per function:
+// CHECK: 0: 3
+// CHECK: 1: 6
+
+// CHECK: Histogram of number of callees per call site:
+// CHECK: 1: 6
+
+// CHECK: Histogram of number of callers per function:
+// CHECK: 0: 3
+// CHECK: 1: 6
+
+// CHECK: Bump pointer allocated memory (bytes): 4096
