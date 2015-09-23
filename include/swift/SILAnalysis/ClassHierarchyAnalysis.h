@@ -70,7 +70,8 @@ public:
   NominalTypeList& getProtocolImplementations(ProtocolDecl *P) {
     if (!ProtocolImplementationsCache.count(P)) {
       // Lazy initialization
-      auto &K = ProtocolImplementationsCache[P];
+      // FIXME: Why isn't the "return" below enough?
+      (void)ProtocolImplementationsCache[P];
     }
     return ProtocolImplementationsCache[P];
   }
