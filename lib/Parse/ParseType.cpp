@@ -49,7 +49,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 ///     type-simple '?'
 ///     type-simple '!'
 ///     type-collection
-ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
+ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
+                                               bool HandleCodeCompletion) {
   ParserResult<TypeRepr> ty;
   // If this is an "inout" marker for an identifier type, consume the inout.
   SourceLoc InOutLoc;
@@ -67,6 +68,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     ty = parseTypeTupleBody();
     break;
   case tok::code_complete:
+    if (!HandleCodeCompletion)
+      break;
     if (CodeCompletion)
       CodeCompletion->completeTypeSimpleBeginning();
     // Eat the code completion token because we handled it.
@@ -143,7 +146,8 @@ ParserResult<TypeRepr> Parser::parseType() {
 ///   type-function:
 ///     type-simple '->' type
 ///
-ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
+ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
+                                         bool HandleCodeCompletion) {
   // Parse attributes.
   TypeAttributes attrs;
   parseTypeAttributeList(attrs);
@@ -155,7 +159,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
     generics = maybeParseGenericParams();
   }
 
-  ParserResult<TypeRepr> ty = parseTypeSimple(MessageID);
+  ParserResult<TypeRepr> ty = parseTypeSimple(MessageID, HandleCodeCompletion);
   if (ty.hasCodeCompletion())
     return makeParserCodeCompletionResult<TypeRepr>();
 

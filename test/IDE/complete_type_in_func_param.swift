@@ -177,6 +177,12 @@
 // RUN: FileCheck %s -check-prefix=WITH_GLOBAL_TYPES < %t.types.txt
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_NO_NAME_1 > %t.types.txt
+// RUN: FileCheck %s -check-prefix=NO_COMPLETION < %t.types.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_NO_NAME_2 > %t.types.txt
+// RUN: FileCheck %s -check-prefix=NO_COMPLETION < %t.types.txt
+
 //===--- Helper types that are used in this test
 
 struct FooStruct {
@@ -370,3 +376,15 @@ class TestTypesForwardInParam8 {
   }
   typealias NestedTypealias = Int
 }
+
+class TestTypesWithoutName1 {
+  func instanceFunc(#^TYPE_NO_NAME_1^#) {
+  }
+}
+
+class TestTypesWithoutName2 {
+  func instanceFunc(a : Int, #^TYPE_NO_NAME_2^#) {
+  }
+}
+
+// NO_COMPLETION-NOT: Begin completions

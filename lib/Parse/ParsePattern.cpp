@@ -289,7 +289,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
     } else {
       SourceLoc typeStartLoc = Tok.getLoc();
-      auto type = parseType(diag::expected_parameter_type);
+      auto type = parseType(diag::expected_parameter_type, false);
       status |= type;
       param.Type = type.getPtrOrNull();
 

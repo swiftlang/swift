@@ -827,7 +827,8 @@ public:
   // Type Parsing
   
   ParserResult<TypeRepr> parseType();
-  ParserResult<TypeRepr> parseType(Diag<> MessageID);
+  ParserResult<TypeRepr> parseType(Diag<> MessageID,
+                                   bool HandleCodeCompletion = true);
 
   /// \brief Parse any type, but diagnose all types except type-identifier.
   ///
@@ -843,7 +844,8 @@ public:
                                   Diag<TypeLoc> NonIdentifierTypeMessageID);
 
   ParserResult<TypeRepr> parseTypeSimple();
-  ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID);
+  ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID,
+                                         bool HandleCodeCompletion = true);
   bool parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
