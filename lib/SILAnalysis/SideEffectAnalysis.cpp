@@ -20,6 +20,27 @@
 
 using namespace swift;
 
+SILInstruction::MemoryBehavior
+SideEffectAnalysis::FunctionEffects::getMemBehavior(bool IgnoreRetains) const {
+  if ((!IgnoreRetains && mayAllocObjects()) || mayReadRC())
+    return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+  
+  // Start with the global effects.
+  auto Behavior = GlobalEffects.getMemBehavior(IgnoreRetains);
+  
+  // Add effects from the parameters.
+  for (auto Iter = ParamEffects.begin(), End = ParamEffects.end();
+       Iter != End &&
+       Behavior < SILInstruction::MemoryBehavior::MayHaveSideEffects;
+       ++Iter) {
+    const Effects &ParamEffect = *Iter;
+    auto ArgBehavior = ParamEffect.getMemBehavior(IgnoreRetains);
+    if (ArgBehavior > Behavior)
+      Behavior = ArgBehavior;
+  }
+  return Behavior;
+}
+
 bool SideEffectAnalysis::FunctionEffects::mergeFrom(const FunctionEffects &RHS) {
   bool Changed = mergeFlags(RHS);
   Changed |= GlobalEffects.mergeFrom(RHS.GlobalEffects);

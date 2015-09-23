@@ -659,9 +659,6 @@ public:
      }
   }
   
-  /// Get the memory behavior from function side-effects.
-  MemBehavior getMemBehavior(const SideEffectAnalysis::Effects &E);
-
   MemBehavior visitLoadInst(LoadInst *LI);
   MemBehavior visitStoreInst(StoreInst *SI);
   MemBehavior visitApplyInst(ApplyInst *AI);
@@ -828,23 +825,6 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
   return MemBehavior::MayHaveSideEffects;
 }
 
-MemBehavior MemoryBehaviorVisitor::getMemBehavior(
-                                   const SideEffectAnalysis::Effects &E) {
-  if (E.mayRelease())
-    return MemBehavior::MayHaveSideEffects;
-
-  if (!IgnoreRefCountIncrements && E.mayRetain())
-    return MemBehavior::MayHaveSideEffects;
-
-  if (E.mayWrite())
-      return E.mayRead() ? MemBehavior::MayReadWrite : MemBehavior::MayWrite;
-
-  if (E.mayRead())
-    return MemBehavior::MayRead;
-
-  return MemBehavior::None;
-}
-
 MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
   
   SideEffectAnalysis::FunctionEffects ApplyEffects;
@@ -858,14 +838,14 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
     Behavior = MemBehavior::MayHaveSideEffects;
   } else {
     auto &GlobalEffects = ApplyEffects.getGlobalEffects();
-    Behavior = getMemBehavior(GlobalEffects);
+    Behavior = GlobalEffects.getMemBehavior(IgnoreRefCountIncrements);
 
     // Check all parameter effects.
     for (unsigned Idx = 0, End = AI->getNumArguments();
          Idx < End && Behavior < MemBehavior::MayHaveSideEffects;
          ++Idx) {
       auto &ArgEffect = ApplyEffects.getParameterEffects()[Idx];
-      auto ArgBehavior = getMemBehavior(ArgEffect);
+      auto ArgBehavior = ArgEffect.getMemBehavior(IgnoreRefCountIncrements);
       if (ArgBehavior > Behavior) {
         SILValue Arg = AI->getArgument(Idx);
         // We only consider the argument effects if the argument aliases V.

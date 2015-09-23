@@ -89,6 +89,26 @@ public:
     /// allocated objects)?
     bool mayRelease() const { return Releases; }
 
+    /// Gets the memory behavior considering the global effects and
+    /// all parameter effects. If \p IgnoreRetains is false, retain
+    /// instructions are considered as side effects.
+    SILInstruction::MemoryBehavior getMemBehavior(bool IgnoreRetains) const {
+      if (mayRelease())
+        return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+      
+      if (!IgnoreRetains && mayRetain())
+        return SILInstruction::MemoryBehavior::MayHaveSideEffects;
+      
+      if (mayWrite())
+        return mayRead() ? SILInstruction::MemoryBehavior::MayReadWrite :
+                           SILInstruction::MemoryBehavior::MayWrite;
+      
+      if (mayRead())
+        return SILInstruction::MemoryBehavior::MayRead;
+      
+      return SILInstruction::MemoryBehavior::None;
+    }
+
     /// Merge effects from \p RHS.
     bool mergeFrom(const Effects &RHS) {
       bool Changed = false;
@@ -194,7 +214,12 @@ public:
     /// Does this function read a refernce count other than with retain or
     /// release instructions, e.g. isUnique?
     bool mayReadRC() const { return ReadsRC; }
-    
+
+    /// Gets the overall memory behavior considering the global effects and
+    /// all parameter effects. If \p IgnoreRetains is false, retain
+    /// instructions are considered as side effects.
+    SILInstruction::MemoryBehavior getMemBehavior(bool IgnoreRetains) const;
+
     /// Get the global effects for the function. These are effects which cannot
     /// be associated to a specific parameter, e.g. writes to global variables
     /// or writes to unknown pointers.
