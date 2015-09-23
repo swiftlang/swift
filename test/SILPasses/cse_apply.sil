@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -cse -verify | FileCheck %s
+// RUN: %target-sil-opt %s -side-effects -cse -verify | FileCheck %s
 
 sil_stage canonical
 
@@ -45,5 +45,60 @@ bb0(%0 : $Int32, %1 : $Int32):
   cond_fail %28 : $Builtin.Int1                   // id: %29
   %30 = struct $Int32 (%27 : $Builtin.Int32)         // user: %31
   return %30 : $Int32                               // id: %31
+}
+
+sil @readnone : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  return %0 : $Int64
+}
+
+sil_global @gg : $Int64
+
+sil @readsome : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %g = global_addr @gg : $*Int64
+  %l = load %g : $*Int64
+  return %l : $Int64
+}
+
+//CHECK-LABEL: sil @cse_readnone_apply
+//CHECK: [[A:%[0-9]+]] = apply
+//CHECK: [[S:%[0-9]+]] = struct_extract [[A]]
+//CHECK: builtin "sadd_with_overflow_Int64"([[S]] : $Builtin.Int64, [[S]] : $Builtin.Int64
+//CHECK: return
+sil @cse_readnone_apply : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %2 = function_ref @readnone : $@convention(thin) (Int64, Int64) -> Int64
+  %3 = integer_literal $Builtin.Int64, 3
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = apply %2(%0, %4) : $@convention(thin) (Int64, Int64) -> Int64
+  %6 = apply %2(%0, %4) : $@convention(thin) (Int64, Int64) -> Int64
+  %7 = struct_extract %5 : $Int64, #Int64._value
+  %8 = struct_extract %6 : $Int64, #Int64._value
+  %9 = integer_literal $Builtin.Int1, 0
+  %10 = builtin "sadd_with_overflow_Int64"(%7 : $Builtin.Int64, %8 : $Builtin.Int64, %9 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 0
+  %14 = struct $Int64 (%11 : $Builtin.Int64)
+  return %14 : $Int64
+}
+
+//CHECK-LABEL: sil @dont_cse_readsome_apply
+//CHECK: %{{[0-9]+}} = apply
+//CHECK: %{{[0-9]+}} = apply
+//CHECK: return
+sil @dont_cse_readsome_apply : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %2 = function_ref @readsome : $@convention(thin) (Int64, Int64) -> Int64
+  %3 = integer_literal $Builtin.Int64, 3
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = apply %2(%0, %4) : $@convention(thin) (Int64, Int64) -> Int64
+  %6 = apply %2(%0, %4) : $@convention(thin) (Int64, Int64) -> Int64
+  %7 = struct_extract %5 : $Int64, #Int64._value
+  %8 = struct_extract %6 : $Int64, #Int64._value
+  %9 = integer_literal $Builtin.Int1, 0
+  %10 = builtin "sadd_with_overflow_Int64"(%7 : $Builtin.Int64, %8 : $Builtin.Int64, %9 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 0
+  %14 = struct $Int64 (%11 : $Builtin.Int64)
+  return %14 : $Int64
 }
 

@@ -29,6 +29,7 @@
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/SimplifyInstruction.h"
+#include "swift/SILAnalysis/SideEffectAnalysis.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/Statistic.h"
@@ -51,99 +52,11 @@ namespace {
 struct SimpleValue {
   SILInstruction *Inst;
 
-  SimpleValue(SILInstruction *I) : Inst(I) {
-    assert((isSentinel() || canHandle(I, true)) && "Inst can't be handled!");
-  }
+  SimpleValue(SILInstruction *I) : Inst(I) { }
 
   bool isSentinel() const {
     return Inst == llvm::DenseMapInfo<SILInstruction *>::getEmptyKey() ||
            Inst == llvm::DenseMapInfo<SILInstruction *>::getTombstoneKey();
-  }
-
-  static bool canHandle(SILInstruction *Inst, bool acceptSemanticCalls) {
-    if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
-      if (!AI->mayReadOrWriteMemory())
-        return true;
-      
-      if (acceptSemanticCalls) {
-        ArraySemanticsCall SemCall(AI);
-        switch (SemCall.getKind()) {
-          case ArrayCallKind::kGetCount:
-          case ArrayCallKind::kGetCapacity:
-          case ArrayCallKind::kCheckIndex:
-          case ArrayCallKind::kCheckSubscript:
-            if (SemCall.hasGuaranteedSelf()) {
-              return true;
-            }
-            return false;
-          default:
-            return false;
-        }
-      }
-      return false;
-    }
-    if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
-      return !BI->mayReadOrWriteMemory();
-    }
-    if (auto *CMI = dyn_cast<ClassMethodInst>(Inst)) {
-      return !CMI->isVolatile();
-    }
-    if (auto *WMI = dyn_cast<WitnessMethodInst>(Inst)) {
-      return !WMI->isVolatile();
-    }
-    switch (Inst->getKind()) {
-    case ValueKind::FunctionRefInst:
-    case ValueKind::GlobalAddrInst:
-    case ValueKind::IntegerLiteralInst:
-    case ValueKind::FloatLiteralInst:
-    case ValueKind::StringLiteralInst:
-    case ValueKind::StructInst:
-    case ValueKind::StructExtractInst:
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleInst:
-    case ValueKind::TupleExtractInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::MetatypeInst:
-    case ValueKind::NullClassInst:
-    case ValueKind::ValueMetatypeInst:
-    case ValueKind::ExistentialMetatypeInst:
-    case ValueKind::ObjCProtocolInst:
-    case ValueKind::RefElementAddrInst:
-    case ValueKind::IndexRawPointerInst:
-    case ValueKind::IndexAddrInst:
-    case ValueKind::PointerToAddressInst:
-    case ValueKind::AddressToPointerInst:
-    case ValueKind::CondFailInst:
-    case ValueKind::EnumInst:
-    case ValueKind::UncheckedEnumDataInst:
-    case ValueKind::IsNonnullInst:
-    case ValueKind::UncheckedRefBitCastInst:
-    case ValueKind::UncheckedTrivialBitCastInst:
-    case ValueKind::UncheckedBitwiseCastInst:
-    case ValueKind::RefToRawPointerInst:
-    case ValueKind::RawPointerToRefInst:
-    case ValueKind::RefToUnownedInst:
-    case ValueKind::UnownedToRefInst:
-    case ValueKind::RefToUnmanagedInst:
-    case ValueKind::UnmanagedToRefInst:
-    case ValueKind::UpcastInst:
-    case ValueKind::ThickToObjCMetatypeInst:
-    case ValueKind::ObjCToThickMetatypeInst:
-    case ValueKind::UncheckedRefCastInst:
-    case ValueKind::UncheckedAddrCastInst:
-    case ValueKind::ObjCMetatypeToObjectInst:
-    case ValueKind::ObjCExistentialMetatypeToObjectInst:
-    case ValueKind::SelectEnumInst:
-    case ValueKind::SelectValueInst:
-    case ValueKind::RefToBridgeObjectInst:
-    case ValueKind::BridgeObjectToRefInst:
-    case ValueKind::BridgeObjectToWordInst:
-    case ValueKind::ThinFunctionToPointerInst:
-    case ValueKind::PointerToThinFunctionInst:
-        return true;
-    default:
-        return false;
-    }
   }
 };
 } // end anonymous namespace
@@ -494,11 +407,15 @@ public:
   /// The call graph - We are removing apply instructions. The call graph needs
   /// to be updated.
   CallGraph *CG;
+  
+  SideEffectAnalysis *SEA;
 
-  CSE(bool RunsOnHighLevelSil, CallGraph *CG)
-      : CG(CG), RunsOnHighLevelSil(RunsOnHighLevelSil) {}
+  CSE(bool RunsOnHighLevelSil, CallGraph *CG, SideEffectAnalysis *SEA)
+      : CG(CG), SEA(SEA), RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
+  
+  bool canHandle(SILInstruction *Inst);
 
 private:
   
@@ -641,7 +558,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     }
 
     // If this is not a simple instruction that we can value number, skip it.
-    if (!SimpleValue::canHandle(Inst, RunsOnHighLevelSil))
+    if (!canHandle(Inst))
       continue;
 
     // If an instruction can be handled here, then it must also be handled
@@ -671,6 +588,100 @@ bool CSE::processNode(DominanceInfoNode *Node) {
   return Changed;
 }
 
+bool CSE::canHandle(SILInstruction *Inst) {
+  if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
+    if (!AI->mayReadOrWriteMemory())
+      return true;
+    
+    if (RunsOnHighLevelSil) {
+      ArraySemanticsCall SemCall(AI);
+      switch (SemCall.getKind()) {
+        case ArrayCallKind::kGetCount:
+        case ArrayCallKind::kGetCapacity:
+        case ArrayCallKind::kCheckIndex:
+        case ArrayCallKind::kCheckSubscript:
+          if (SemCall.hasGuaranteedSelf()) {
+            return true;
+          }
+          return false;
+        default:
+          return false;
+      }
+    }
+    
+    // We can CSE function calls which do not read or write memory and don't
+    // have any other side effects.
+    SideEffectAnalysis::FunctionEffects Effects;
+    SEA->getEffects(Effects, AI);
+    if (Effects.getMemBehavior(true) == SILInstruction::MemoryBehavior::None)
+      return true;
+    
+    return false;
+  }
+  if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
+    return !BI->mayReadOrWriteMemory();
+  }
+  if (auto *CMI = dyn_cast<ClassMethodInst>(Inst)) {
+    return !CMI->isVolatile();
+  }
+  if (auto *WMI = dyn_cast<WitnessMethodInst>(Inst)) {
+    return !WMI->isVolatile();
+  }
+  switch (Inst->getKind()) {
+    case ValueKind::FunctionRefInst:
+    case ValueKind::GlobalAddrInst:
+    case ValueKind::IntegerLiteralInst:
+    case ValueKind::FloatLiteralInst:
+    case ValueKind::StringLiteralInst:
+    case ValueKind::StructInst:
+    case ValueKind::StructExtractInst:
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleInst:
+    case ValueKind::TupleExtractInst:
+    case ValueKind::TupleElementAddrInst:
+    case ValueKind::MetatypeInst:
+    case ValueKind::NullClassInst:
+    case ValueKind::ValueMetatypeInst:
+    case ValueKind::ExistentialMetatypeInst:
+    case ValueKind::ObjCProtocolInst:
+    case ValueKind::RefElementAddrInst:
+    case ValueKind::IndexRawPointerInst:
+    case ValueKind::IndexAddrInst:
+    case ValueKind::PointerToAddressInst:
+    case ValueKind::AddressToPointerInst:
+    case ValueKind::CondFailInst:
+    case ValueKind::EnumInst:
+    case ValueKind::UncheckedEnumDataInst:
+    case ValueKind::IsNonnullInst:
+    case ValueKind::UncheckedRefBitCastInst:
+    case ValueKind::UncheckedTrivialBitCastInst:
+    case ValueKind::UncheckedBitwiseCastInst:
+    case ValueKind::RefToRawPointerInst:
+    case ValueKind::RawPointerToRefInst:
+    case ValueKind::RefToUnownedInst:
+    case ValueKind::UnownedToRefInst:
+    case ValueKind::RefToUnmanagedInst:
+    case ValueKind::UnmanagedToRefInst:
+    case ValueKind::UpcastInst:
+    case ValueKind::ThickToObjCMetatypeInst:
+    case ValueKind::ObjCToThickMetatypeInst:
+    case ValueKind::UncheckedRefCastInst:
+    case ValueKind::UncheckedAddrCastInst:
+    case ValueKind::ObjCMetatypeToObjectInst:
+    case ValueKind::ObjCExistentialMetatypeToObjectInst:
+    case ValueKind::SelectEnumInst:
+    case ValueKind::SelectValueInst:
+    case ValueKind::RefToBridgeObjectInst:
+    case ValueKind::BridgeObjectToRefInst:
+    case ValueKind::BridgeObjectToWordInst:
+    case ValueKind::ThinFunctionToPointerInst:
+    case ValueKind::PointerToThinFunctionInst:
+      return true;
+    default:
+      return false;
+  }
+}
+
 namespace {
 class SILCSE : public SILFunctionTransform {
   
@@ -688,8 +699,9 @@ class SILCSE : public SILFunctionTransform {
 
     // Call Graph Analysis in case we need to perform Call Graph updates.
     auto *CGA = PM->getAnalysis<CallGraphAnalysis>();
+    auto *SEA = PM->getAnalysis<SideEffectAnalysis>();
 
-    CSE C(RunsOnHighLevelSil, CGA->getCallGraphOrNull());
+    CSE C(RunsOnHighLevelSil, CGA->getCallGraphOrNull(), SEA);
     if (C.processFunction(*getFunction(), DA->get(getFunction())))
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
