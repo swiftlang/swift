@@ -410,3 +410,22 @@ enum ManyLiteralC : ManyLiteralable {
   case A
   case B = "0"
 }
+
+// rdar://problem/22476643
+public protocol RawValueA: RawRepresentable
+{
+  var rawValue: Double { get }
+}
+
+enum RawValueATest: Double, RawValueA {
+  case A, B
+}
+
+public protocol RawValueB
+{
+  var rawValue: Double { get }
+}
+
+enum RawValueBTest: Double, RawValueB {
+  case A, B
+}

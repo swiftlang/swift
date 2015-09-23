@@ -2059,8 +2059,20 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     if (auto derivable = DerivedConformance::getDerivableRequirement(
                            nominal,
                            requirement)) {
-      if (derivable == requirement)
+      if (derivable == requirement) {
+        // If it's the same requirement, we can derive it here.
         canDerive = true;
+      } else {
+        // Otherwise, go satisfy the derivable requirement, which can introduce
+        // a member that could in turn satisfy *this* requirement.
+        auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
+        ProtocolConformance *conformance = nullptr;
+        if (TC.conformsToProtocol(Adoptee, derivableProto, DC, None,
+                                  &conformance) &&
+            conformance) {
+          conformance->getWitness(derivable, &TC);
+        }
+      }
     }
   }
 
