@@ -2223,7 +2223,7 @@ namespace {
 
       Type superclassTy = typeContext->getDeclaredTypeInContext()
                             ->getSuperclass(&tc);
-      if (selfDecl->getType()->is<AnyMetatypeType>())
+      if (selfDecl->hasType() && selfDecl->getType()->is<AnyMetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
       return superclassTy;
     }

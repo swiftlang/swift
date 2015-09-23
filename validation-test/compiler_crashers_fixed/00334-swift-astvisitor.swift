@@ -1,9 +1,10 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
 import Foundation
-extension NSSet{let a{
-super.d.b.a{
+class A:NSObject{
+let i{
+super.E{
