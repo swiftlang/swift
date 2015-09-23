@@ -1068,8 +1068,6 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
 static SILInstruction *optimizeBuiltinWithSameOperands(SILBuilder &Builder,
                                                        BuiltinInst *I,
                                                        SILCombiner *C) {
-  SILFunction &F = *I->getFunction();
-
   // Handle all builtins which can be optimized.
   // We have to take special care about floating point operations because of
   // potential NaN values. E.g. ordered equal FCMP_OEQ(Nan, Nan) is not true.
@@ -2878,7 +2876,6 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
   // FIXME: rename from RemoveCondFails to RemoveRuntimeAsserts.
   if (RemoveCondFails) {
     auto LoweredTargetType = UCCI->getType();
-    auto &Mod = UCCI->getModule();
     auto Loc = UCCI->getLoc();
     auto Op = UCCI->getOperand();
     if (LoweredTargetType.isAddress()) {
@@ -3076,7 +3073,6 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
   // (unchecked_trivial_bit_cast X->Z x)
   SILValue Op = UTBCI->getOperand();
   if (auto *OtherUTBCI = dyn_cast<UncheckedTrivialBitCastInst>(Op)) {
-    SILModule &Mod = UTBCI->getModule();
     return Builder.createUncheckedTrivialBitCast(UTBCI->getLoc(),
                                                  OtherUTBCI->getOperand(),
                                                  UTBCI->getType());
@@ -3087,7 +3083,6 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
   //   ->
   // (unchecked_trivial_bit_cast X->Z x)
   if (auto *URBCI = dyn_cast<UncheckedRefBitCastInst>(Op)) {
-    SILModule &Mod = UTBCI->getModule();
     return Builder.createUncheckedTrivialBitCast(UTBCI->getLoc(),
                                                  URBCI->getOperand(),
                                                  UTBCI->getType());
@@ -3176,7 +3171,6 @@ static SILInstruction *
 visitMetatypeConversionInst(SILBuilder &Builder, ConversionInst *MCI,
                             MetatypeRepresentation Representation) {
   SILValue Op = MCI->getOperand(0);
-  SILModule &Mod = MCI->getModule();
   // Instruction has a proper target type already.
   SILType Ty = MCI->getType();
   auto MetatypeTy = Op.getType().getAs<AnyMetatypeType>();
@@ -3184,7 +3178,7 @@ visitMetatypeConversionInst(SILBuilder &Builder, ConversionInst *MCI,
   if (MetatypeTy->getRepresentation() != Representation)
     return nullptr;
 
-  if (dyn_cast<MetatypeInst>(Op))
+  if (isa<MetatypeInst>(Op))
     return Builder.createMetatype(MCI->getLoc(), Ty);
 
   if (auto *VMI = dyn_cast<ValueMetatypeInst>(Op))

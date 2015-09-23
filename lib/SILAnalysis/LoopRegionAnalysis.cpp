@@ -540,7 +540,7 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
 /// GraphUtils. But you gotta do what you gotta do.
 namespace {
 
-class LoopRegionWrapper;
+struct LoopRegionWrapper;
 
 struct LoopRegionFunctionInfoGrapherWrapper {
   LoopRegionFunctionInfo *FuncInfo;

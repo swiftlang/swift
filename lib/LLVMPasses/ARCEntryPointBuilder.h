@@ -292,7 +292,6 @@ private:
   Constant *getBridgeReleaseN() {
     if (BridgeReleaseN)
       return BridgeReleaseN.get();
-    auto *ObjectPtrTy = getObjectPtrTy();
     auto &M = getModule();
 
     auto *Int32Ty = Type::getInt32Ty(M.getContext());

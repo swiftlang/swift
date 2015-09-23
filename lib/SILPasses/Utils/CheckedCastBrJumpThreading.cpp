@@ -347,7 +347,7 @@ void CheckedCastBrJumpThreading::modifyCFGForUnknownPreds() {
   if (ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(Inst)) {
     if (CMI->getOperand() == Condition) {
       // Replace checked_cast_br by branch to FailureBB.
-      auto *InsertedBI = SILBuilder(BB).createBranch(CCBI->getLoc(), FailureBB);
+      SILBuilder(BB).createBranch(CCBI->getLoc(), FailureBB);
       CCBI->eraseFromParent();
     }
   }
@@ -416,8 +416,7 @@ void CheckedCastBrJumpThreading::modifyCFGForSuccessPreds() {
     SmallVector<SILValue, 1> SuccessBBArgs;
     // Take argument value from the dominating BB
     SuccessBBArgs.push_back(DomSuccessBB->getBBArg(0));
-    auto *InsertedBI = SILBuilder(BB).createBranch(CCBI->getLoc(), SuccessBB,
-                                                   SuccessBBArgs);
+    SILBuilder(BB).createBranch(CCBI->getLoc(), SuccessBB, SuccessBBArgs);
     CCBI->eraseFromParent();
   }
 }
@@ -716,7 +715,7 @@ bool CheckedCastBrJumpThreading::trySimplify(TermInst *Term) {
     modifyCFGForFailurePreds();
 
     if (InvertSuccess) {
-      auto *InsertedBI = SILBuilder(BB).createBranch(CCBI->getLoc(), FailureBB);
+      SILBuilder(BB).createBranch(CCBI->getLoc(), FailureBB);
       CCBI->eraseFromParent();
       SuccessPreds.clear();
     } else {

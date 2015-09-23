@@ -74,7 +74,7 @@ class SwiftARCContractImpl {
   ARCEntryPointBuilder B;
 public:
   SwiftARCContractImpl(Function &InF, SwiftRCIdentity *InRC)
-    : Changed(false), F(InF), B(F), RC(InRC) {}
+    : Changed(false), RC(InRC), F(InF), B(F) {}
 
   // The top level run routine of the pass.
   bool run();
@@ -95,7 +95,6 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
   // first retain we saw and all of the releases with the last release we saw.
   llvm::Value *O = nullptr;
   for (auto &P : PtrToLocalStateMap) {
-    Value *ArgVal = P.first;
     auto &RetainList = P.second.RetainList;
     if (RetainList.size() > 1) {
       // Create the retainN call right by the first retain.

@@ -496,7 +496,7 @@ public:
   CallGraph *CG;
 
   CSE(bool RunsOnHighLevelSil, CallGraph *CG)
-      : RunsOnHighLevelSil(RunsOnHighLevelSil), CG(CG) {}
+      : CG(CG), RunsOnHighLevelSil(RunsOnHighLevelSil) {}
 
   bool processFunction(SILFunction &F, DominanceInfo *DT);
 

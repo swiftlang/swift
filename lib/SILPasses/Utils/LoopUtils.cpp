@@ -98,8 +98,7 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   SILLocation BranchLoc = BackedgeBlocks.back()->getTerminator()->getLoc();
 
   // Create an unconditional branch that propagates the newly created BBArgs.
-  BranchInst *Branch = SILBuilder(BEBlock).createBranch(BranchLoc,
-                                                        Header, BBArgs);
+  SILBuilder(BEBlock).createBranch(BranchLoc, Header, BBArgs);
 
   // Redirect the backedge blocks to BEBlock instead of Header.
   for (auto *Pred : BackedgeBlocks) {

@@ -135,7 +135,7 @@ class LoopRegion {
   static_assert(IsTriviallyCopyable<LoopRegionID>::value,
                 "Expected trivially copyable type");
 
-  class SubregionData;
+  struct SubregionData;
 
 public:
   /// We operate in terms of FunctionTy, LoopTy, and BBTy so that this can
@@ -147,7 +147,7 @@ public:
   /// An iterator that knows how to iterate over the subregion indices of a
   /// region.
   class subregion_iterator {
-    friend class SubregionData;
+    friend struct SubregionData;
     llvm::SmallVectorImpl<LoopRegionID>::iterator InnerIter;
     const llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> *Subloops;
 
@@ -231,7 +231,7 @@ public:
   /// A reverse iterator version of subregion_iterator. See subregion_iterator
   /// for more information.
   class subregion_reverse_iterator {
-    friend class SubregionData;
+    friend struct SubregionData;
 
     llvm::SmallVectorImpl<LoopRegionID>::reverse_iterator InnerIter;
     const llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> &Subloops;
