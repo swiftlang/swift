@@ -21,20 +21,20 @@
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop0
-// CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
-// CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
-// CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
-// CHECK-WMO-WMO: return
+// CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
+// CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
+// CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
+// CHECK-WMO: return
 
 // CHECK-WMO-LABEL: sil @_TFC19let_properties_opts3FoocfMS0_FT1iVSs5Int64_S0_ : $@convention(method) (Int64, @owned Foo) -> @owned Foo 
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop0
-// CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
-// CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
-// CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
-// CHECK-WMO-WMO: return
+// CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
+// CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
+// CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
+// CHECK-WMO: return
 
 // Check that intializers do not contain a code to intialize private properties, 
 // because their values are propagated into their uses and they cannot be accessed
@@ -44,14 +44,14 @@
 // CHECK-LABEL: sil @_TFC19let_properties_opts3FoocfMS0_FT1iVSs5Int32_S0_ : $@convention(method) (Int32, @owned Foo) -> @owned Foo
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
-// CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
+// CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK: return
 
 // CHECK-LABEL: sil @_TFC19let_properties_opts3FoocfMS0_FT1iVSs5Int64_S0_ : $@convention(method) (Int64, @owned Foo) -> @owned Foo
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
-// CHECK-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
+// CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK: return
 

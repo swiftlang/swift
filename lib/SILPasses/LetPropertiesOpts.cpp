@@ -174,11 +174,9 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
       SILInstruction *I = prev(SILBasicBlock::iterator(Load));
       SILBuilderWithScope<1> B(Load);
       for (auto Use : Load->getUses()) {
-        if (isa<StoreInst>(Use->getUser())) {
-          if (CanRemove)
-            Use->getUser()->eraseFromParent();
+        if (isa<StoreInst>(Use->getUser()))
           continue;
-        }
+
         replaceLoadSequence(Use->getUser(), I, B);
         eraseUsesOfInstruction(Use->getUser());
         Use->getUser()->eraseFromParent();
