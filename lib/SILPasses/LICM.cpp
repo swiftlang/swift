@@ -18,6 +18,7 @@
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
+#include "swift/SILAnalysis/SideEffectAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
@@ -35,15 +36,53 @@
 
 using namespace swift;
 
-using ReadSet = llvm::SmallPtrSet<LoadInst *, 8>;
+/// Instructions which read from memory, e.g. loads, or function calls without
+/// side effects.
+using ReadSet = llvm::SmallPtrSet<SILInstruction *, 8>;
+
+/// Instructions which (potentially) write memory.
 using WriteSet = SmallVector<SILInstruction *, 8>;
 
+/// Returns true if the \p MayWrites set contains any memory writes which may
+/// alias with the memory addressed by \a LI.
 static bool mayWriteTo(AliasAnalysis *AA, WriteSet &MayWrites, LoadInst *LI) {
   for (auto *W : MayWrites)
     if (AA->mayWriteToMemory(W, LI->getOperand().getDef())) {
       DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to " << *LI << "\n");
       return true;
     }
+  return false;
+}
+
+/// Returns true if the \p MayWrites set contains any memory writes which may
+/// alias with any memory which is read by \p AI.
+static bool mayWriteTo(AliasAnalysis *AA, SideEffectAnalysis *SEA,
+                       WriteSet &MayWrites, ApplyInst *AI) {
+  SideEffectAnalysis::FunctionEffects E;
+  SEA->getEffects(E, AI);
+  assert(E.getMemBehavior(true) <= SILInstruction::MemoryBehavior::MayRead &&
+         "apply should only read from memory");
+  if (E.getGlobalEffects().mayRead() && !MayWrites.empty()) {
+    // We don't know which memory is read in the callee. Therefore we bail if
+    // there are any writes in the loop.
+    return true;
+  }
+
+  for (unsigned Idx = 0, End = AI->getNumArguments(); Idx < End; ++Idx) {
+    auto &ArgEffect = E.getParameterEffects()[Idx];
+    if (!ArgEffect.mayRead())
+      continue;
+
+    SILValue Arg = AI->getArgument(Idx);
+
+    // Check if the memory addressed by the argument may alias any writes.
+    for (auto *W : MayWrites) {
+      if (AA->mayWriteToMemory(W, Arg)) {
+        DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *W << " to " << *AI << "\n");
+        return true;
+      }
+    }
+  }
   return false;
 }
 
@@ -55,12 +94,15 @@ static void removeWrittenTo(AliasAnalysis *AA, ReadSet &Reads,
       isa<CondFailInst>(ByInst) || isa<DeallocStackInst>(ByInst))
     return;
 
-  SmallVector<LoadInst *, 8> RS(Reads.begin(), Reads.end());
-  for (auto R : RS)
-    if (AA->mayWriteToMemory(ByInst, R->getOperand())) {
-      DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *ByInst << " to " << *R << "\n");
-      Reads.erase(R);
-    }
+  SmallVector<SILInstruction *, 8> RS(Reads.begin(), Reads.end());
+  for (auto R : RS) {
+    auto *LI = dyn_cast<LoadInst>(R);
+    if (LI && !AA->mayWriteToMemory(ByInst, LI->getOperand()))
+      continue;
+
+    DEBUG(llvm::dbgs() << "  mayWriteTo\n" << *ByInst << " to " << *R << "\n");
+    Reads.erase(R);
+  }
 }
 
 static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
@@ -155,6 +197,27 @@ static bool sinkCondFail(SILLoop *Loop) {
   return Changed;
 }
 
+/// Checks if \p Inst has no side effects which prevent hoisting.
+/// The \a SafeReads set contain instructions which we already proved to have
+/// no such side effects.
+static bool hasNoSideEffect(SILInstruction *Inst, ReadSet &SafeReads) {
+  // We can (and must) hoist cond_fail instructions if the operand is
+  // invariant. We must hoist them so that we preserve memory safety. A
+  // cond_fail that would have protected (executed before) a memory access
+  // must - after hoisting - also be executed before said access.
+  if (isa<CondFailInst>(Inst))
+    return true;
+  
+  // Can't hoist if the instruction could read from memory and is not marked
+  // as safe.
+  if (SafeReads.count(Inst))
+    return true;
+
+  if (Inst->getMemoryBehavior() == SILInstruction::MemoryBehavior::None)
+    return true;
+  
+  return false;
+}
 
 static bool canHoistInstruction(SILInstruction *Inst, SILLoop *Loop,
                                 ReadSet &SafeReads) {
@@ -167,24 +230,9 @@ static bool canHoistInstruction(SILInstruction *Inst, SILLoop *Loop,
     return false;
 
   // Can't hoist instructions which may have side effects.
-  // We can (and must) hoist cond_fail instructions if the operand is
-  // invariant. We must hoist them so that we preserve memory safety. A
-  // cond_fail that would have protected (executed before) a memory access
-  // must - after hoisting - also be executed before said access.
-  if (Inst->mayHaveSideEffects() && !isa<CondFailInst>(Inst)) {
-    DEBUG(llvm::dbgs() << "   not side effect free.\n");
+  if (!hasNoSideEffect(Inst, SafeReads))
     return false;
-  }
-  
-  // Can't hoist if the instruction could read from memory and is not marked
-  // as safe.
-  LoadInst *LI = nullptr;
-  if (Inst->mayReadFromMemory() && !isa<CondFailInst>(Inst) &&
-      (!(LI = dyn_cast<LoadInst>(Inst)) || !SafeReads.count(LI))) {
-    DEBUG(llvm::dbgs() << "   may read aliased writes\n");
-    return false;
-  }
-  
+
   // The operands need to be loop invariant.
   if (!hasLoopInvariantOperands(Inst, Loop)) {
     DEBUG(llvm::dbgs() << "   loop variant operands\n");
@@ -348,6 +396,7 @@ class LoopTreeOptimization {
   SmallVector<SILLoop *, 8> BotUpWorkList;
   SILLoopInfo *LoopInfo;
   AliasAnalysis *AA;
+  SideEffectAnalysis *SEA;
   DominanceInfo *DomTree;
   bool Changed;
 
@@ -357,9 +406,10 @@ class LoopTreeOptimization {
 
 public:
   LoopTreeOptimization(SILLoop *TopLevelLoop, SILLoopInfo *LI,
-                       AliasAnalysis *AA, DominanceInfo *DT,
+                       AliasAnalysis *AA, SideEffectAnalysis *SEA,
+                       DominanceInfo *DT,
                        bool RunsOnHighLevelSil)
-      : LoopInfo(LI), AA(AA), DomTree(DT), Changed(false),
+      : LoopInfo(LI), AA(AA), SEA(SEA), DomTree(DT), Changed(false),
         RunsOnHighLevelSil(RunsOnHighLevelSil) {
     // Collect loops for a recursive bottom-up traversal in the loop tree.
     BotUpWorkList.push_back(TopLevelLoop);
@@ -425,6 +475,9 @@ void LoopTreeOptimization::analyzeCurrentLoop(
   SILLoop *Loop = CurrSummary->Loop;
   DEBUG(llvm::dbgs() << " Analysing accesses.\n");
 
+  // Contains function calls in the loop, which only read from memory.
+  SmallVector<ApplyInst *, 8> ReadOnlyApplies;
+
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
       // Ignore fix_lifetime instructions.
@@ -438,13 +491,24 @@ void LoopTreeOptimization::analyzeCurrentLoop(
           SafeReads.insert(LI);
         continue;
       }
-
-      // Remove clobbered loads we have seen before.
-      removeWrittenTo(AA, SafeReads, &Inst);
-
-      if (Inst.mayHaveSideEffects())
+      if (auto *AI = dyn_cast<ApplyInst>(&Inst)) {
+        // In contrast to load instructions, we first collect all read-only
+        // function calls and add them later to SafeReads.
+        SideEffectAnalysis::FunctionEffects E;
+        SEA->getEffects(E, AI);
+        if (E.getMemBehavior(true) <= SILInstruction::MemoryBehavior::MayRead)
+          ReadOnlyApplies.push_back(AI);
+      }
+      if (Inst.mayHaveSideEffects()) {
         MayWrites.push_back(&Inst);
+        // Remove clobbered loads we have seen before.
+        removeWrittenTo(AA, SafeReads, &Inst);
+      }
     }
+  }
+  for (auto *AI : ReadOnlyApplies) {
+    if (!mayWriteTo(AA, SEA, MayWrites, AI))
+      SafeReads.insert(AI);
   }
 }
 
@@ -486,6 +550,7 @@ public:
 
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
+    SideEffectAnalysis *SEA = PM->getAnalysis<SideEffectAnalysis>();
     DominanceInfo *DomTree = nullptr;
 
     DEBUG(llvm::dbgs() << "Processing loops in " << F->getName() << "\n");
@@ -493,7 +558,7 @@ public:
 
     for (auto *TopLevelLoop : *LoopInfo) {
       if (!DomTree) DomTree = DA->get(F);
-      LoopTreeOptimization Opt(TopLevelLoop, LoopInfo, AA, DomTree,
+      LoopTreeOptimization Opt(TopLevelLoop, LoopInfo, AA, SEA, DomTree,
                                RunsOnHighLevelSil);
       Changed |= Opt.optimize();
     }
