@@ -424,7 +424,16 @@ void CallGraph::addEdges(SILFunction *F) {
   }
 }
 
+// Print check lines prior to call graph output, and also print the
+// function bodies. This can be used to minimize the effort in
+// creating new call graph test cases.
+static llvm::cl::opt<std::string>
+CallGraphFileCheckPrefix("call-graph-file-check-prefix", llvm::cl::init(""),
+                   llvm::cl::desc("Print a FileCheck prefix before each line"));
+
 static void indent(llvm::raw_ostream &OS, int Indent) {
+  if (!CallGraphFileCheckPrefix.empty()) return;
+
   std::string Blanks(Indent, ' ');
   OS << Blanks;
 }
@@ -432,12 +441,13 @@ static void indent(llvm::raw_ostream &OS, int Indent) {
 static void printFlag(llvm::raw_ostream &OS,
                       const char *Description, bool Value, int Indent =0) {
   indent(OS, Indent);
-  OS << Description << ": " << (Value ? "yes\n" : "no\n");
+  OS << CallGraphFileCheckPrefix << Description << ": " <<
+    (Value ? "yes\n" : "no\n");
 }
 
 void CallGraphEdge::print(llvm::raw_ostream &OS, int Indent) {
   indent(OS, Indent);
-  OS << "Call site #" << Ordinal << ": ";
+  OS << CallGraphFileCheckPrefix << "Call site #" << Ordinal << ": ";
   OS << *getApply().getInstruction();
 
   printFlag(OS, "All callees known", isCalleeSetComplete(), Indent);
@@ -451,16 +461,16 @@ void CallGraphEdge::print(llvm::raw_ostream &OS, int Indent) {
 
   bool First = true;
   indent(OS, Indent);
-  OS << "Known callees:\n";
+  OS << CallGraphFileCheckPrefix << "Known callees:\n";
   for (auto *Callee : OrderedNodes) {
     if (!First)
       OS << "\n";
     First = false;
     auto Name = Callee->getFunction()->getName();
     indent(OS, Indent + 2);
-    OS << "Name: " << Name << "\n";
+    OS << CallGraphFileCheckPrefix << "Name: " << Name << "\n";
     indent(OS, Indent + 2);
-    OS << "Demangled: " <<
+    OS << CallGraphFileCheckPrefix << "Demangled: " <<
       demangle_wrappers::demangleSymbolAsString(Name) << "\n";
   }
 }
@@ -479,9 +489,9 @@ void CallGraphEdge::dump() {
 
 
 void CallGraphNode::print(llvm::raw_ostream &OS) {
-  OS << "Function #" << Ordinal << ": " <<
+  OS << CallGraphFileCheckPrefix << "Function #" << Ordinal << ": " <<
     getFunction()->getName() << "\n";
-  OS << "Demangled: " <<
+  OS << CallGraphFileCheckPrefix << "Demangled: " <<
     demangle_wrappers::demangleSymbolAsString(getFunction()->getName()) << "\n";
   printFlag(OS, "Trivially dead", isTriviallyDead());
   printFlag(OS, "All callers known", isCallerEdgesComplete());
@@ -489,7 +499,7 @@ void CallGraphNode::print(llvm::raw_ostream &OS) {
 
   auto &CalleeEdges = getCalleeEdges();
   if (!CalleeEdges.empty()) {
-    OS << "Call sites:\n";
+    OS << CallGraphFileCheckPrefix << "Call sites:\n";
 
     llvm::SmallVector<CallGraphEdge *, 8> OrderedCalleeEdges;
     orderEdges(CalleeEdges, OrderedCalleeEdges);
@@ -503,7 +513,8 @@ void CallGraphNode::print(llvm::raw_ostream &OS) {
 
   auto &CallerEdges = getPartialCallerEdges();
   if (!CallerEdges.empty()) {
-    OS << (!isCallerEdgesComplete() ? "Known " : "");
+    OS << CallGraphFileCheckPrefix <<
+      (!isCallerEdgesComplete() ? "Known " : "");
     OS << "Callers:\n";
 
     llvm::SmallVector<CallGraphEdge *, 8> OrderedCallerEdges;
@@ -517,13 +528,16 @@ void CallGraphNode::print(llvm::raw_ostream &OS) {
     for (auto *Caller : Callers) {
       OS << "\n";
       indent(OS, 2);
-      OS << "Name: " << Caller->getName() << "\n";
+      OS << CallGraphFileCheckPrefix << "Name: " << Caller->getName() << "\n";
       indent(OS, 2);
-      OS << "Demangled: " <<
+      OS << CallGraphFileCheckPrefix << "Demangled: " <<
         demangle_wrappers::demangleSymbolAsString(Caller->getName()) << "\n";
     }
     OS << "\n";
   }
+
+  if (!CallGraphFileCheckPrefix.empty())
+    getFunction()->print(OS);
 }
 
 void CallGraphNode::dump() {
@@ -533,7 +547,7 @@ void CallGraphNode::dump() {
 }
 
 void CallGraph::print(llvm::raw_ostream &OS) {
-  OS << "*** Call Graph ***\n";
+  OS << CallGraphFileCheckPrefix << "*** Call Graph ***\n";
 
   auto const &Funcs = getBottomUpFunctionOrder();
   for (auto *F : Funcs) {
@@ -574,7 +588,7 @@ struct Histogram {
     for (auto i = 0; i < NumBuckets; ++i) {
       auto *Separator = Last == i ? "+: " : ": ";
       if (Data[i])
-        OS << i << Separator << Data[i] << "\n";
+        OS << CallGraphFileCheckPrefix << i << Separator << Data[i] << "\n";
     }
     OS << "\n";
   }
@@ -606,21 +620,21 @@ void CallGraph::printStats(llvm::raw_ostream &OS) {
     }
   }
 
-  OS << "*** Call Graph Statistics ***\n";
+  OS << CallGraphFileCheckPrefix << "*** Call Graph Statistics ***\n";
 
-  OS << "Number of call graph nodes: " << CountNodes << "\n";
-  OS << "Number of call graph edges: " << CountCallSites << "\n";
+  OS << CallGraphFileCheckPrefix << "Number of call graph nodes: " << CountNodes << "\n";
+  OS << CallGraphFileCheckPrefix << "Number of call graph edges: " << CountCallSites << "\n";
 
-  OS << "Histogram of number of call sites per function:\n";
+  OS << CallGraphFileCheckPrefix << "Histogram of number of call sites per function:\n";
   CallSitesPerFunction.print(OS);
 
-  OS << "Histogram of number of callees per call site:\n";
+  OS << CallGraphFileCheckPrefix << "Histogram of number of callees per call site:\n";
   CalleesPerCallSite.print(OS);
 
-  OS << "Histogram of number of callers per function:\n";
+  OS << CallGraphFileCheckPrefix << "Histogram of number of callers per function:\n";
   CallersPerFunction.print(OS);
 
-  OS << "Bump pointer allocated memory (bytes): " <<
+  OS << CallGraphFileCheckPrefix << "Bump pointer allocated memory (bytes): " <<
     Allocator.getTotalMemory() << "\n";
 }
 
