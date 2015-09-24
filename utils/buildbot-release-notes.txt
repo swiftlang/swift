@@ -1,6 +1,10 @@
 Latest
 ------
 
+* All slice types now have removeFirst() and removeLast() methods.
+
+* ArraySlice.removeFirst() now preserves element indices.
+
 * Global anyGenerator() functions have been changed into initializers on
   AnyGenerator, making the API more intuitive and idiomatic.
 
