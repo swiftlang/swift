@@ -1492,26 +1492,26 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
       if (auto *UDREOp = dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator])) {
         auto name = UDREOp->getName().str();
 
-        if (result.getKind() == ConfigExprKind::CompilerVersion &&
-            (name.equals("||") || name.equals("&&"))) {
-          if (result.getKind() == ConfigExprKind::CompilerVersion) {
+        if (name.equals("||") || name.equals("&&")) {
+          auto rhs = evaluateConfigConditionExpr(elements[iOperand]);
+
+          if (result.getKind() == ConfigExprKind::CompilerVersion
+              || rhs.getKind() == ConfigExprKind::CompilerVersion) {
             diagnose(UDREOp->getLoc(), diag::cannot_combine_compiler_version);
             return ConfigParserState::error();
           }
-        }
-        
-        if (name.equals("||")) {
-          result = result || evaluateConfigConditionExpr(elements[iOperand]);
-          
-          if (result.isConditionActive())
-            break;
-          
-        } else if (name.equals("&&")) {
-          if (!result.isConditionActive()) {
-            break;
+
+          if (name.equals("||")) {
+            result = result || rhs;
+            if (result.isConditionActive())
+              break;
           }
-          
-          result = result && evaluateConfigConditionExpr(elements[iOperand]);
+
+          if (name.equals("&&")) {
+            result = result && rhs;
+            if (!result.isConditionActive())
+              break;
+          }
         } else {
           diagnose(SE->getLoc(),
                    diag::unsupported_build_config_binary_expression);

@@ -14,14 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <vector>
-
-#include "swift/Basic/Version.h"
-
-#include "swift/AST/DiagnosticsParse.h"
-#include "swift/Basic/LLVM.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/SmallString.h"
+#include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/Version.h"
+
+#include <vector>
 
 #define TOSTR2(X) #X
 #define TOSTR(X) TOSTR2(X)
@@ -50,28 +50,30 @@ void parseVersionString(StringRef VersionString,
                         SmallVectorImpl<unsigned> &Components,
                         SourceLoc Loc,
                         DiagnosticEngine *Diags) {
-  StringRef SwiftTagPrefix("swiftlang-");
-  if (VersionString.startswith_lower(SwiftTagPrefix))
-    VersionString = VersionString.substr(SwiftTagPrefix.size());
   SmallString<16> digits;
   llvm::raw_svector_ostream OS(digits);
+  unsigned Component;
   for (auto c : VersionString) {
     if (Loc.isValid())
       Loc = Loc.getAdvancedLoc(1);
-    if (isdigit(c)) {
+    if (clang::isDigit(c)) {
       OS << c;
     } else if (c == '.' && digits.str().size()) {
-      Components.push_back(std::atoi(OS.str().str().data()));
+      OS.str().getAsInteger(10, Component);
+      Components.push_back(Component);
       digits.clear();
     } else {
       Components.clear();
       if (Diags)
         Diags->diagnose(Loc, diag::invalid_character_in_compiler_version);
-      return;
+      else
+        llvm_unreachable("Invalid character in _compiler_version build configuration");
     }
   }
-  if (digits.str().size())
-    Components.push_back(std::atoi(OS.str().str().data()));
+  if (digits.str().size()) {
+    OS.str().getAsInteger(10, Component);
+    Components.push_back(Component);
+  }
 }
 
 CompilerVersion::CompilerVersion(const StringRef VersionString,

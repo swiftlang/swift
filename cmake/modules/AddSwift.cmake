@@ -1043,7 +1043,7 @@ function(_add_swift_library_single target name)
     set(PLIST_INFO_NAME ${name})
     set(PLIST_INFO_UTI "com.apple.dt.runtime.${name}")
     set(PLIST_INFO_VERSION "${SWIFT_VERSION}")
-    if (LLVM_SUBMIT_VERSION)
+    if (SWIFT_COMPILER_VERSION)
       set(PLIST_INFO_BUILD_VERSION
         "${SWIFT_COMPILER_VERSION}")
     endif()

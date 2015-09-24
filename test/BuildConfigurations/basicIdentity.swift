@@ -51,3 +51,15 @@ var r = q
 var s = Foo()
 #endif
 var t = s
+
+// Test symmetric version of FOO || BAR from above
+#if BAR || FOO
+var u = Foo()
+#endif
+var v = u
+
+// Test symmetric version of FOO && BAR from above
+#if BAZ && FOO
+var w = Foo()
+#endif
+var x = w
