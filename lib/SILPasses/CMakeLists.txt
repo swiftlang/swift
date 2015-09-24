@@ -30,6 +30,7 @@ add_swift_library(swiftSILPasses
   InstCount.cpp
   AADumper.cpp
   LoadStoreOpts.cpp
+  GlobalDeadStoreElimination.cpp
   DeadFunctionElimination.cpp
   GlobalOpt.cpp
   GlobalARCOpts.cpp
