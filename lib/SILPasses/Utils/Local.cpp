@@ -1402,11 +1402,13 @@ optimizeBridgedCasts(SILInstruction *Inst,
   CanType CanBridgedSourceTy(BridgedSourceTy);
 
   if (CanBridgedSourceTy == source && CanBridgedTargetTy == target) {
-    assert("Both source and target type are ObjC types");
+    // Both source and target type are ObjC types.
+    return nullptr;
   }
 
   if (CanBridgedSourceTy != source && CanBridgedTargetTy != target) {
-    assert("Both source and target type are Swift types");
+    // Both source and target type are Swift types.
+    return nullptr;
   }
 
   if (CanBridgedSourceTy || CanBridgedTargetTy) {
