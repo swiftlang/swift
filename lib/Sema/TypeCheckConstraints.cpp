@@ -1236,7 +1236,7 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   SmallVector<Solution, 4> viable;
   if (solveForExpression(expr, dc, /*convertType*/Type(),
                          allowFreeTypeVariables, listener, cs, viable,
-                         TypeCheckExprOptions()))
+                         TypeCheckExprFlags::SuppressDiagnostics))
     return None;
 
   // Get the expression's simplified type.

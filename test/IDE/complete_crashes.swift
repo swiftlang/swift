@@ -133,3 +133,9 @@ func rdar22688199() {
   let f = flip(curried)(#^RDAR_22688199^#
 }
 // FLIP_CURRIED: Pattern/ExprSpecific: ['(']{#b1: Int#}, {#b2: Int#})[#Int -> ()#]
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22836263
+func rdar22836263() {
+  let x: [Int]
+  nosuchfunc(x[0].#^RDAR_22836263^#)
+}
