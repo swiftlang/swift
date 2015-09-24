@@ -21,7 +21,7 @@
 #if _compiler_version("") // expected-error {{compiler version requirement is empty}}
   let y = 1
 #else
-  $#%^*&
+  let thisWillStillParseBecauseConfigIsError = 1
 #endif
 
 #if _compiler_version("10.10.10.10") && os(iOS) // expected-error {{cannot combine _compiler_version with binary operators}}

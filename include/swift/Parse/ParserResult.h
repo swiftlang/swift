@@ -260,7 +260,7 @@ public:
 
   bool shouldParse() const {
     if (Kind == ConfigExprKind::Error)
-      return false;
+      return true;
     return ConditionActive || (Kind != ConfigExprKind::CompilerVersion);
   }
 
