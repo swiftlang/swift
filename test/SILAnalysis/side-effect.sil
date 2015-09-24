@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -side-effects -sil-print-side-effects -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -side-effects -sil-print-side-effects -o /dev/null | FileCheck %s
 
 // REQUIRES: asserts
 

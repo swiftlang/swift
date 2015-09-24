@@ -1,6 +1,6 @@
 // All bbs should have IDs that match the rpo order put out when printing with -sil-sort-output
 
-// RUN: %target-sil-opt %s -loop-region-view-text -o /dev/null | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -loop-region-view-text -o /dev/null | FileCheck %s
 
 import Builtin
 

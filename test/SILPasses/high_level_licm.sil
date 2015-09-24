@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -high-level-licm -verify | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -high-level-licm | FileCheck %s
 
 sil_stage canonical
 

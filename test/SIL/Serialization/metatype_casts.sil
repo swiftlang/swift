@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -verify %s -o - | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -o - | FileCheck %s
 
 // Check that this file can be parsed at all.
 // SIL verifier should not crash on metatypes of metatypes.

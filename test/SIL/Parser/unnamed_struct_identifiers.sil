@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sdk %clang-importer-sdk-path %s -verify
+// RUN: %target-sil-opt -enable-sil-verify-all -sdk %clang-importer-sdk-path %s
 
 import ctypes
 

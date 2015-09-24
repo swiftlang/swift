@@ -1,5 +1,5 @@
 // Make sure that we can deserialize foundation.
-// RUN: %target-sil-opt -verify %platform-sdk-overlay-dir/Foundation.swiftmodule > /dev/null
+// RUN: %target-sil-opt -enable-sil-verify-all %platform-sdk-overlay-dir/Foundation.swiftmodule > /dev/null
 // RUN: llvm-bcanalyzer %platform-sdk-overlay-dir/Foundation.swiftmodule | FileCheck %s
 
 // REQUIRES: objc_interop

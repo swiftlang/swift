@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -verify | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s | FileCheck %s
 
 import Builtin
 import Swift

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -inline -sil-inline-test-threshold=50 -sil-combine -verify | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-test-threshold=50 -sil-combine | FileCheck %s
 
 sil_stage canonical
 

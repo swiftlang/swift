@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -verify
+// RUN: %target-sil-opt -enable-sil-verify-all %s
 
 import Swift
 sil @test : $@convention(thin) <U where U : AnyObject> (@inout Optional<U>) -> () {

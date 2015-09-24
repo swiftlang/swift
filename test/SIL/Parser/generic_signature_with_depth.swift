@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen | %target-sil-opt -verify | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen | %target-sil-opt -enable-sil-verify-all | FileCheck %s
 
 protocol mmGeneratorType {
   typealias Element

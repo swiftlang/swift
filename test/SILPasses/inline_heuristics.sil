@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-sil-opt %s -inline -debug-only=sil-inliner -sil-inline-test-threshold=1 2>%t/log | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -debug-only=sil-inliner -sil-inline-test-threshold=1 2>%t/log | FileCheck %s
 // RUN: FileCheck -check-prefix=LOG %s < %t/log
 // REQUIRES: asserts
 
