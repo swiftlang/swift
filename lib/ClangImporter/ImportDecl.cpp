@@ -4859,6 +4859,11 @@ namespace {
           if (!objcMethod)
             continue;
 
+          auto &clangSourceMgr = Impl.getClangASTContext().getSourceManager();
+          clang::PrettyStackTraceDecl trace(objcMethod, clang::SourceLocation(),
+                                            clangSourceMgr,
+                                            "importing (inherited)");
+
           // If this initializer came from a factory method, inherit
           // it as an initializer.
           if (objcMethod->isClassMethod()) {
@@ -6038,6 +6043,9 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   if (!ClangDecl)
     return nullptr;
 
+  clang::PrettyStackTraceDecl trace(ClangDecl, clang::SourceLocation(),
+                                    Instance->getSourceManager(), "importing");
+
   auto Canon = cast<clang::NamedDecl>(ClangDecl->getCanonicalDecl());
 
   if (auto Known = importDeclCached(Canon)) {
@@ -6078,6 +6086,10 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
                                                   bool forceClassMethod) {
   if (!decl)
     return nullptr;
+
+  clang::PrettyStackTraceDecl trace(decl, clang::SourceLocation(),
+                                    Instance->getSourceManager(),
+                                    "importing (mirrored)");
 
   auto canon = decl->getCanonicalDecl();
   auto known = ImportedProtocolDecls.find({{canon, forceClassMethod}, dc });
@@ -6375,6 +6387,10 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t unused,
                                               bool *hasMissingRequiredMembers) {
   assert(D->hasClangNode());
   auto clangDecl = cast<clang::ObjCContainerDecl>(D->getClangDecl());
+
+  clang::PrettyStackTraceDecl trace(clangDecl, clang::SourceLocation(),
+                                    Instance->getSourceManager(),
+                                    "loading members for");
 
   SwiftDeclConverter converter(*this);
 
