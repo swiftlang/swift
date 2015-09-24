@@ -71,7 +71,7 @@ void parseVersionString(StringRef VersionString,
     }
   }
   if (digits.str().size())
-    Components.push_back(std::atoi(OS.str().data()));
+    Components.push_back(std::atoi(OS.str().str().data()));
 }
 
 CompilerVersion::CompilerVersion(const StringRef VersionString,
