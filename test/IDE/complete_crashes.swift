@@ -139,3 +139,10 @@ func rdar22836263() {
   let x: [Int]
   nosuchfunc(x[0].#^RDAR_22836263^#)
 }
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22835966
+func rdar22835966() {
+  class Inner {
+    var prop = #^RDAR_22835966^#
+  }
+}

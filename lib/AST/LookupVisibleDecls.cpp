@@ -426,6 +426,7 @@ static void lookupVisibleMemberDeclsImpl(
     LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver,
     VisitedSet &Visited) {
   // Just look through l-valueness.  It doesn't affect name lookup.
+  assert(BaseTy && "lookup into null type");
   BaseTy = BaseTy->getRValueType();
 
   // Handle metatype references, as in "some_type.some_member".  These are
@@ -749,7 +750,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       BaseDecl = ND;
     }
 
-    if (BaseDecl) {
+    if (BaseDecl && ExtendedType) {
       ::lookupVisibleMemberDecls(ExtendedType, Consumer, DC, LS, Reason,
                                  TypeResolver);
     }
