@@ -665,6 +665,9 @@ public:
   MemBehavior visitStoreInst(StoreInst *SI);
   MemBehavior visitApplyInst(ApplyInst *AI);
   MemBehavior visitBuiltinInst(BuiltinInst *BI);
+  MemBehavior visitStrongReleaseInst(StrongReleaseInst *BI);
+  MemBehavior visitUnownedReleaseInst(UnownedReleaseInst *BI);
+  MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
 
   // Instructions which are none if our SILValue does not alias one of its
   // arguments. If we can not prove such a thing, return the relevant memory
@@ -863,6 +866,36 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
 
   DEBUG(llvm::dbgs() << "  Found apply, returning " << Behavior << '\n');
   return Behavior;
+}
+
+MemBehavior
+MemoryBehaviorVisitor::visitStrongReleaseInst(StrongReleaseInst *SI) {
+  // If this is a alloc_stack instruction, strong_release can not write to it,
+  // as its address is never going to be stored anywhere and strong_release
+  // does not take an inout parameter.
+  if (isa<AllocStackInst>(getUnderlyingObject(V)))
+    return MemBehavior::None;
+  return MemBehavior::MayHaveSideEffects;
+}
+
+MemBehavior
+MemoryBehaviorVisitor::visitUnownedReleaseInst(UnownedReleaseInst *SI) {
+  // If this is a alloc_stack instruction, unowned_release can not write to it,
+  // as its address is never going to be stored anywhere and unowned_release
+  // does not take an inout parameter.
+  if (isa<AllocStackInst>(getUnderlyingObject(V)))
+    return MemBehavior::None;
+  return MemBehavior::MayHaveSideEffects;
+}
+
+MemBehavior
+MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
+  // If this is a alloc_stack instruction, release_value can not write to it,
+  // as its address is never going to be stored anywhere and release_value
+  // does not take an inout parameter.
+  if (isa<AllocStackInst>(getUnderlyingObject(V)))
+    return MemBehavior::None;
+  return MemBehavior::MayHaveSideEffects;
 }
 
 SILInstruction::MemoryBehavior

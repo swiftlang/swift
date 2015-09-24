@@ -16,6 +16,11 @@ class B {
   init()
 }
 
+struct X {
+  var c : B
+  init()
+}
+
 enum Optional<T> {
   case None
   case Some(T)
@@ -1039,4 +1044,53 @@ bb3:
   store %0 to %6 : $*Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
+}
+
+// Check load forwarding across strong_release in case the stored memory does
+// not escape.
+// CHECK-LABEL: sil @test_store_forwarding_strong_release
+// CHECK: strong_release
+// CHECK-NOT: [[BOX0:%.*]] = load
+// CHECK: apply
+sil @test_store_forwarding_strong_release : $@convention(thin) (B, X) -> () {
+bb0(%0 : $B, %1 : $X):
+  %2 = alloc_stack $A                             // users: %3, %13
+  %3 = struct_element_addr %2#1 : $*A, #A.i       // users: %5, %10
+  %4 = integer_literal $Builtin.Int32, 32         // user: %5
+  store %4 to %3 : $*Builtin.Int32                // id: %5
+  %6 = ref_to_unowned %0 : $B to $@sil_unowned B  // user: %7
+  unowned_release %6 : $@sil_unowned B            // id: %7
+  strong_release %0 : $B                          // id: %8
+  release_value %1 : $X                           // id: %9
+  %10 = load %3 : $*Builtin.Int32                 // user: %12
+  // function_ref use
+  %11 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %12
+  %12 = apply %11(%10) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %2#0 : $*@local_storage A         // id: %13
+  %14 = tuple ()                                  // user: %15
+  return %14 : $()
+}
+
+// Check load forwarding across strong_release in case the loaded memory does
+// not escape.
+// CHECK-LABEL: sil @test_load_forwarding_strong_release
+// CHECK: strong_release
+// CHECK-NOT: [[BOX0:%.*]] = load
+// CHECK: apply
+sil @test_load_forwarding_strong_release : $@convention(thin) (B, X) -> () {
+bb0(%0 : $B, %1 : $X):
+  %2 = alloc_stack $A                             // users: %3, %12
+  %3 = struct_element_addr %2#1 : $*A, #A.i       // users: %4, %9
+  %4 = load %3 : $*Builtin.Int32
+  %5 = ref_to_unowned %0 : $B to $@sil_unowned B  // user: %6
+  unowned_release %5 : $@sil_unowned B            // id: %6
+  strong_release %0 : $B                          // id: %7
+  release_value %1 : $X                           // id: %8
+  %9 = load %3 : $*Builtin.Int32                  // user: %11
+  // function_ref use
+  %10 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %11
+  %11 = apply %10(%9) : $@convention(thin) (Builtin.Int32) -> ()
+  dealloc_stack %2#0 : $*@local_storage A         // id: %12
+  %13 = tuple ()                                  // user: %14
+  return %13 : $()                                // id: %14
 }
