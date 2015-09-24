@@ -495,3 +495,23 @@ sil @different_fields : $@convention(thin) () -> () {
   %13 = tuple() 
   return %13 : $() 
 }
+
+public final class C {
+  @sil_stored final var a: Int { get set }
+  @sil_stored final var b: Int { get set }
+   deinit 
+  init()
+}
+
+// CHECK-LABEL: @different_fields_of_different_refs
+// CHECK: PAIR #13.
+// CHECK-NEXT: (0):   %3 = ref_element_addr %0 : $C, #C.a
+// CHECK-NEXT: (0):   %4 = ref_element_addr %1 : $C, #C.b
+// CHECK-NEXT: NoAlias
+sil @different_fields_of_different_refs : $@convention(thin) (@owned C, @owned C, Int) -> Int {
+bb0(%0 : $C, %1 : $C, %2 : $Int):
+  %6 = ref_element_addr %0 : $C, #C.a
+  %8 = ref_element_addr %1 : $C, #C.b
+  return %2 : $Int
+}
+

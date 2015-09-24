@@ -283,16 +283,16 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
     // Do the base pointers alias?
     AliasAnalysis::AliasResult BaseAlias = AA.alias(O1, O2);
 
-    // If we get a NoAlias or a MayAlias, then there is nothing we can do here
-    // so just return the base alias value.
-    if (BaseAlias != AliasAnalysis::AliasResult::MustAlias)
-      return BaseAlias;
+    // If the underlying objects are not aliased, the projected values are also
+    // not aliased.
+    if (BaseAlias == AliasAnalysis::AliasResult::NoAlias)
+      return AliasAnalysis::AliasResult::NoAlias;
 
     // Otherwise, we have a MustAlias result. Since the base pointers alias each
     // other exactly, see if computing offsets from the common pointer tells us
     // about the relation of the resulting pointer.
     auto V1Path = ProjectionPath::getAddrProjectionPath(O1, V1, true);
-    auto V2Path = ProjectionPath::getAddrProjectionPath(O1, V2, true);
+    auto V2Path = ProjectionPath::getAddrProjectionPath(O2, V2, true);
 
     // getUnderlyingPath and findAddressProjectionPathBetweenValues disagree on
     // what the base pointer of the two values are. Be conservative and return
@@ -310,7 +310,8 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
     auto R = V1Path->computeSubSeqRelation(*V2Path);
 
     // If all of the projections are equal, the two GEPs must be the same.
-    if (R == SubSeqRelation_t::Equal)
+    if (BaseAlias == AliasAnalysis::AliasResult::MustAlias &&
+        R == SubSeqRelation_t::Equal)
       return AliasAnalysis::AliasResult::MustAlias;
 
     // The two GEPs do not alias if they are accessing different fields of
@@ -324,7 +325,8 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
 
     // If one of the GEPs is a super path of the other then they partially
     // alias. W
-    if (isStrictSubSeqRelation(R))
+    if (BaseAlias == AliasAnalysis::AliasResult::MustAlias &&
+        isStrictSubSeqRelation(R))
       return AliasAnalysis::AliasResult::PartialAlias;
   } else {
     // Ok, V2 is not an address projection. See if V2 after stripping casts
