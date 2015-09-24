@@ -146,3 +146,16 @@ func rdar22835966() {
     var prop = #^RDAR_22835966^#
   }
 }
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22834017 | FileCheck %s -check-prefix=INVALID_TYPE_INIT
+struct Foo {
+  let a: Anosuchtype
+  let b: Bnosuchtype
+  let c: Cnosuchtype
+}
+
+func rdar22834017() {
+  Foo(#^RDAR_22834017^#)
+}
+// FIXME: We could provide a useful completion here. rdar://problem/22846558
+// INVALID_TYPE_INIT-NOT: Begin completions

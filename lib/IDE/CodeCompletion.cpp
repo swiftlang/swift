@@ -1733,26 +1733,36 @@ public:
                             ->getResult()
                             ->castTo<AnyFunctionType>();
 
+    bool needInit = false;
+    if (IsSuperRefExpr) {
+      assert(addName.empty());
+      assert(isa<ConstructorDecl>(CurrDeclContext) &&
+             "can call super.init only inside a constructor");
+      needInit = true;
+    } else if (addName.empty() && HaveDot &&
+               Reason == DeclVisibilityKind::MemberOfCurrentNominal) {
+      // This case is querying the init function as member
+      needInit = true;
+    }
+
+    // If we won't be able to provide a result, bail out.
+    if (MemberType->is<ErrorType>() && addName.empty() && !needInit)
+      return;
+
     // Add the constructor, possibly including any default arguments.
     auto addConstructorImpl = [&](bool includeDefaultArgs = true) {
       CodeCompletionResultBuilder Builder(
           Sink, CodeCompletionResult::ResultKind::Declaration,
           getSemanticContext(CD, Reason), ExpectedTypes);
       Builder.setAssociatedDecl(CD);
-      if (IsSuperRefExpr) {
+      if (needInit) {
         assert(addName.empty());
-        assert(isa<ConstructorDecl>(CurrDeclContext) &&
-               "can call super.init only inside a constructor");
         addLeadingDot(Builder);
         Builder.addTextChunk("init");
       } else if (!addName.empty()) {
         Builder.addTextChunk(addName.str());
-      } else if (HaveDot &&
-                 Reason == DeclVisibilityKind::MemberOfCurrentNominal) {
-
-        // This case is querying the init function as member
-        assert(addName.empty());
-        Builder.addTextChunk("init");
+      } else {
+        assert(!MemberType->is<ErrorType>() && "will insert empty result");
       }
 
       if (MemberType->is<ErrorType>()) {
