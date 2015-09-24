@@ -17,10 +17,10 @@
 /// A *collection* that supports replacement of an arbitrary subRange
 /// of elements with the elements of another collection.
 public protocol RangeReplaceableCollectionType : CollectionType {
+  //===--- Fundamental Requirements ---------------------------------------===//
+
   /// Create an empty instance.
   init()
-
-  //===--- Fundamental Requirements ---------------------------------------===//
 
   /// Replace the given `subRange` of elements with `newElements`.
   ///
@@ -71,7 +71,12 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// storage, or even ignore the request completely.
   mutating func reserveCapacity(n: Index.Distance)
 
-  //===--- Derivable Requirements (see free functions below) --------------===//
+  //===--- Derivable Requirements -----------------------------------------===//
+
+  /// Creates a collection instance that contains `elements`.
+  init<
+    S : SequenceType where S.Generator.Element == Generator.Element
+  >(_ elements: S)
 
   /// Append `x` to `self`.
   ///
@@ -175,6 +180,13 @@ public protocol RangeReplaceableCollectionType : CollectionType {
 //===----------------------------------------------------------------------===//
 
 extension RangeReplaceableCollectionType {
+  public init<
+    S : SequenceType where S.Generator.Element == Generator.Element
+  >(_ elements: S) {
+    self.init()
+    appendContentsOf(elements)
+  }
+
   public mutating func append(newElement: Generator.Element) {
     insert(newElement, atIndex: endIndex)
   }

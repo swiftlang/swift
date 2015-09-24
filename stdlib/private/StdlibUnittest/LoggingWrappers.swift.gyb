@@ -61,6 +61,8 @@ public struct LoggingGenerator<Base: GeneratorType>
 ///
 /// Each static variable is a mapping of Type -> Number of calls.
 public class RangeReplaceableCollectionLog {
+  public static var init_ = TypeIndexed(0)
+  public static var initWithSequence = TypeIndexed(0)
   public static var append = TypeIndexed(0)
   public static var appendContentsOf = TypeIndexed(0)
   public static var insert = TypeIndexed(0)
@@ -97,6 +99,14 @@ public struct LoggingRangeReplaceableCollection<
 
   public init() {
     self.base = Base()
+    ++Log.init_[selfType]
+  }
+
+  public init<
+    S : SequenceType where S.Generator.Element == Generator.Element
+  >(_ elements: S) {
+    self.base = Base(elements)
+    ++Log.initWithSequence[selfType]
   }
 
   public init(_ base: Base) {

@@ -94,7 +94,7 @@ internal struct AppendTest {
   }
 }
 
-internal struct ExtendTest {
+internal struct AppendContentsOfTest {
   let collection: [OpaqueValue<Int>]
   let newElements: [OpaqueValue<Int>]
   let expected: [Int]
@@ -293,6 +293,43 @@ let removeLastTests: [RemoveLastNTest] = [
   ),
 ]
 
+let appendContentsOfTests: [AppendContentsOfTest] = [
+  AppendContentsOfTest(
+    collection: [],
+    newElements: [],
+    expected: []),
+
+  AppendContentsOfTest(
+    collection: [1010],
+    newElements: [],
+    expected: [1010]),
+
+  AppendContentsOfTest(
+    collection: [1010, 2020, 3030, 4040],
+    newElements: [],
+    expected: [1010, 2020, 3030, 4040]),
+
+  AppendContentsOfTest(
+    collection: [],
+    newElements: [1010],
+    expected: [1010]),
+
+  AppendContentsOfTest(
+    collection: [1010],
+    newElements: [2020],
+    expected: [1010, 2020]),
+
+  AppendContentsOfTest(
+    collection: [1010],
+    newElements: [2020, 3030, 4040],
+    expected: [1010, 2020, 3030, 4040]),
+
+  AppendContentsOfTest(
+    collection: [1010, 2020, 3030, 4040],
+    newElements: [5050, 6060, 7070, 8080],
+    expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]),
+]
+
 extension TestSuite {
   /// Adds a set of tests for `RangeReplaceableCollectionType`.
   ///
@@ -347,6 +384,29 @@ extension TestSuite {
     }
 
     testNamePrefix += String(Collection.Type)
+
+//===----------------------------------------------------------------------===//
+// init()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).init()/semantics") {
+  let c = Collection()
+  expectEqualSequence([], c.map { extractValue($0).value })
+}
+
+//===----------------------------------------------------------------------===//
+// init(SequenceType)
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).init(SequenceType)/semantics") {
+  for test in appendContentsOfTests {
+    let c = Collection(test.newElements.map(wrapValue))
+    expectEqualSequence(
+      test.newElements.map { $0.value },
+      c.map { extractValue($0).value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // replaceRange()
@@ -442,44 +502,7 @@ self.test("\(testNamePrefix).append()/semantics") {
 //===----------------------------------------------------------------------===//
 
 self.test("\(testNamePrefix).appendContentsOf()/semantics") {
-  let tests: [ExtendTest] = [
-    ExtendTest(
-      collection: [],
-      newElements: [],
-      expected: []),
-
-    ExtendTest(
-      collection: [1010],
-      newElements: [],
-      expected: [1010]),
-
-    ExtendTest(
-      collection: [1010, 2020, 3030, 4040],
-      newElements: [],
-      expected: [1010, 2020, 3030, 4040]),
-
-    ExtendTest(
-      collection: [],
-      newElements: [1010],
-      expected: [1010]),
-
-    ExtendTest(
-      collection: [1010],
-      newElements: [2020],
-      expected: [1010, 2020]),
-
-    ExtendTest(
-      collection: [1010],
-      newElements: [2020, 3030, 4040],
-      expected: [1010, 2020, 3030, 4040]),
-
-    ExtendTest(
-      collection: [1010, 2020, 3030, 4040],
-      newElements: [5050, 6060, 7070, 8080],
-      expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]),
-  ]
-
-  for test in tests {
+  for test in appendContentsOfTests {
     var c = makeWrappedCollection(test.collection)
     let newElements =
       MinimalForwardCollection(elements: test.newElements.map(wrapValue))

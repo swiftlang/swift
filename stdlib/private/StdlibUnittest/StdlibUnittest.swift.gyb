@@ -3491,6 +3491,15 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
     self._collectionState = _CollectionState(name: "\(self.dynamicType)", elementCount: 0)
   }
 
+  public init<
+    S : SequenceType where S.Generator.Element == T
+  >(_ elements: S) {
+    self.underestimatedCount = 0
+    self.elements = Array(elements)
+    self._collectionState =
+      _CollectionState(newRootStateForElementCount: self.elements.count)
+  }
+
   public func generate() -> MinimalGenerator<T> {
     return MinimalGenerator(elements)
   }
