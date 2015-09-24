@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen | %target-sil-opt -enable-sil-verify-all
+// RUN: %target-swift-frontend %s -emit-silgen | %target-sil-opt
 
 import Swift
 protocol P {
