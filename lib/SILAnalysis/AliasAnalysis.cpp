@@ -274,68 +274,68 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
   // If V2 is also a gep instruction with a must-alias or not-aliasing base
   // pointer, figure out if the indices of the GEPs tell us anything about the
   // derived pointers.
-  if (Projection::isAddrProjection(V2)) {
-    assert(!Projection::isAddrProjection(O1) &&
-           "underlying object may not be a projection");
-    assert(!Projection::isAddrProjection(O2) &&
-           "underlying object may not be a projection");
-
-    // Do the base pointers alias?
-    AliasAnalysis::AliasResult BaseAlias = AA.alias(O1, O2);
-
-    // If the underlying objects are not aliased, the projected values are also
-    // not aliased.
-    if (BaseAlias == AliasAnalysis::AliasResult::NoAlias)
-      return AliasAnalysis::AliasResult::NoAlias;
-
-    // Otherwise, we have a MustAlias result. Since the base pointers alias each
-    // other exactly, see if computing offsets from the common pointer tells us
-    // about the relation of the resulting pointer.
-    auto V1Path = ProjectionPath::getAddrProjectionPath(O1, V1, true);
-    auto V2Path = ProjectionPath::getAddrProjectionPath(O2, V2, true);
-
-    // getUnderlyingPath and findAddressProjectionPathBetweenValues disagree on
-    // what the base pointer of the two values are. Be conservative and return
-    // MayAlias.
-    //
-    // FIXME: The only way this should happen realistically is if there are
-    // casts in between two projection instructions. getUnderlyingObject will
-    // ignore that, while findAddressProjectionPathBetweenValues wont. The two
-    // solutions are to make address projections variadic (something on the wee
-    // horizon) or enable Projection to represent a cast as a special sort of
-    // projection.
-    if (!V1Path || !V2Path)
-      return AliasAnalysis::AliasResult::MayAlias;
-
-    auto R = V1Path->computeSubSeqRelation(*V2Path);
-
-    // If all of the projections are equal, the two GEPs must be the same.
-    if (BaseAlias == AliasAnalysis::AliasResult::MustAlias &&
-        R == SubSeqRelation_t::Equal)
-      return AliasAnalysis::AliasResult::MustAlias;
-
-    // The two GEPs do not alias if they are accessing different fields of
-    // the same object, since different fields of the same object should not
-    // overlap.
-    //
-    // TODO: Replace this with a check on the computed subseq relation. See the
-    // TODO in computeSubSeqRelation.
-    if (V1Path->hasNonEmptySymmetricDifference(V2Path.getValue()))
-      return AliasAnalysis::AliasResult::NoAlias;
-
-    // If one of the GEPs is a super path of the other then they partially
-    // alias. W
-    if (BaseAlias == AliasAnalysis::AliasResult::MustAlias &&
-        isStrictSubSeqRelation(R))
-      return AliasAnalysis::AliasResult::PartialAlias;
-  } else {
+  if (!Projection::isAddrProjection(V2)) {
     // Ok, V2 is not an address projection. See if V2 after stripping casts
     // aliases O1. If so, then we know that V2 must partially alias V1 via a
     // must alias relation on O1. This ensures that given an alloc_stack and a
     // gep from that alloc_stack, we say that they partially alias.
     if (isSameValueOrGlobal(O1, V2.stripCasts()))
       return AliasAnalysis::AliasResult::PartialAlias;
+
+    return AliasAnalysis::AliasResult::MayAlias;
   }
+  
+  assert(!Projection::isAddrProjection(O1) &&
+         "underlying object may not be a projection");
+  assert(!Projection::isAddrProjection(O2) &&
+         "underlying object may not be a projection");
+
+  // Do the base pointers alias?
+  AliasAnalysis::AliasResult BaseAlias = AA.alias(O1, O2);
+
+  // If the underlying objects are not aliased, the projected values are also
+  // not aliased.
+  if (BaseAlias == AliasAnalysis::AliasResult::NoAlias)
+    return AliasAnalysis::AliasResult::NoAlias;
+
+  // Let's do alias checking based on projections.
+  auto V1Path = ProjectionPath::getAddrProjectionPath(O1, V1, true);
+  auto V2Path = ProjectionPath::getAddrProjectionPath(O2, V2, true);
+
+  // getUnderlyingPath and findAddressProjectionPathBetweenValues disagree on
+  // what the base pointer of the two values are. Be conservative and return
+  // MayAlias.
+  //
+  // FIXME: The only way this should happen realistically is if there are
+  // casts in between two projection instructions. getUnderlyingObject will
+  // ignore that, while findAddressProjectionPathBetweenValues wont. The two
+  // solutions are to make address projections variadic (something on the wee
+  // horizon) or enable Projection to represent a cast as a special sort of
+  // projection.
+  if (!V1Path || !V2Path)
+    return AliasAnalysis::AliasResult::MayAlias;
+
+  auto R = V1Path->computeSubSeqRelation(*V2Path);
+
+  // If all of the projections are equal (and they have the same base pointer),
+  // the two GEPs must be the same.
+  if (BaseAlias == AliasAnalysis::AliasResult::MustAlias &&
+      R == SubSeqRelation_t::Equal)
+    return AliasAnalysis::AliasResult::MustAlias;
+
+  // The two GEPs do not alias if they are accessing different fields, even if
+  // we don't know the base pointers. Different fields should not overlap.
+  //
+  // TODO: Replace this with a check on the computed subseq relation. See the
+  // TODO in computeSubSeqRelation.
+  if (V1Path->hasNonEmptySymmetricDifference(V2Path.getValue()))
+    return AliasAnalysis::AliasResult::NoAlias;
+
+  // If one of the GEPs is a super path of the other then they partially
+  // alias. W
+  if (BaseAlias == AliasAnalysis::AliasResult::MustAlias &&
+      isStrictSubSeqRelation(R))
+    return AliasAnalysis::AliasResult::PartialAlias;
 
   // We failed to prove anything. Be conservative and return MayAlias.
   return AliasAnalysis::AliasResult::MayAlias;
