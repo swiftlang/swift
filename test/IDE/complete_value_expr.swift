@@ -108,7 +108,7 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_MODULES_1 | FileCheck %s -check-prefix=RESOLVE_MODULES_1
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INTERPOLATED_STRING_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INTERPOLATED_STRING_1 | FileCheck %s -check-prefix=FOO_OBJECT_DOT1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P2 | FileCheck %s -check-prefix=PROTOCOL_EXT_P2
@@ -1394,6 +1394,17 @@ func testResolveModules1() {
 func testInterpolatedString1() {
   "\(fooObject.#^INTERPOLATED_STRING_1^#)"
 }
+
+// FOO_OBJECT_DOT1: Begin completions
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceVar]/CurrNominal:      lazyInstanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc0()[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc2({#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc3({#(a): Int#}, {#(Float, Double)#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: instanceFunc4({#(a): Int?#}, {#b: Int!#}, {#c: &Int?#}, {#d: &Int!#})[#Void#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal:   instanceFunc5()[#Int?#]{{; name=.+$}}
+// FOO_OBJECT_DOT1-DAG: Decl[InstanceMethod]/CurrNominal:   instanceFunc6()[#Int!#]{{; name=.+$}}
 
 //===--- Check protocol extensions
 

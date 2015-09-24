@@ -378,6 +378,9 @@ public:
   /// Retrieve the declaration of Swift.Set<T>.
   NominalTypeDecl *getSetDecl() const;
 
+  /// Retrieve the declaration of Swift.SequenceType<T>.
+  NominalTypeDecl *getSequenceTypeDecl() const;
+
   /// Retrieve the declaration of Swift.Dictionary<K, V>.
   NominalTypeDecl *getDictionaryDecl() const;
 

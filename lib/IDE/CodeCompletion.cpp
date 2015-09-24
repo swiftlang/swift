@@ -3168,8 +3168,14 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
 
 namespace  {
   class ExprParentFinder : public ASTWalker {
+    friend class CodeCompletionTypeContextAnalyzer;
     Expr *ChildExpr;
     llvm::function_ref<bool(ASTNode)> Predicate;
+
+    bool arePositionsSame(Expr *E1, Expr *E2) {
+      return E1->getSourceRange().Start == E2->getSourceRange().Start &&
+        E1->getSourceRange().End == E2->getSourceRange().End;
+    }
 
   public:
     llvm::SmallVector<ASTNode, 5> Ancestors;
@@ -3180,7 +3186,7 @@ namespace  {
                      ChildExpr(ChildExpr), Predicate(Predicate) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (E == ChildExpr) {
+      if (E == ChildExpr || arePositionsSame(E, ChildExpr)) {
         if (!Ancestors.empty()) {
           ParentClosest = Ancestors.back();
           ParentFarthest = Ancestors.front();
@@ -3230,12 +3236,13 @@ class CodeCompletionTypeContextAnalyzer {
   DeclContext *DC;
   Expr *ParsedExpr;
   SourceManager &SM;
+  ASTContext &Context;
   ExprParentFinder Finder;
 
 public:
   CodeCompletionTypeContextAnalyzer(DeclContext *DC, Expr *ParsedExpr) : DC(DC),
     ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
-    Finder(ParsedExpr, [](ASTNode Node) {
+    Context(DC->getASTContext()), Finder(ParsedExpr, [](ASTNode Node) {
       if (auto E = Node.dyn_cast<Expr *>()) {
         switch(E->getKind()) {
         case ExprKind::Call:
@@ -3247,6 +3254,7 @@ public:
       } else if (auto S = Node.dyn_cast<Stmt *>()) {
         switch (S->getKind()) {
         case StmtKind::Return:
+        case StmtKind::ForEach:
           return true;
         default:
           return false;
@@ -3262,11 +3270,14 @@ public:
         return false;
   }) {}
 
-  void analyzeExpr(Expr *Parent, std::vector<Type> &PotentialTypes) {
+  void analyzeExpr(Expr *Parent, llvm::function_ref<void(Type)> Callback) {
     switch (Parent->getKind()) {
       case ExprKind::Call: {
+        std::vector<Type> PotentialTypes;
         CompletionLookup::collectArgumentExpectatation(*DC, cast<CallExpr>(Parent),
                                                        ParsedExpr, PotentialTypes);
+        for (Type Ty : PotentialTypes)
+          Callback(Ty);
         break;
       }
       case ExprKind::Assign: {
@@ -3277,7 +3288,7 @@ public:
         if (SM.isBeforeInBuffer(AE->getEqualLoc(), ParsedExpr->getStartLoc())) {
 
           // The destination is of the expected type.
-          PotentialTypes.push_back(AE->getDest()->getType());
+          Callback(AE->getDest()->getType());
         }
         break;
       }
@@ -3286,10 +3297,20 @@ public:
     }
   }
 
-   void analyzeStmt(Stmt *Parent, std::vector<Type> &PotentialTypes) {
+   void analyzeStmt(Stmt *Parent, llvm::function_ref<void(Type)> Callback) {
      switch (Parent->getKind()) {
        case StmtKind::Return: {
-         PotentialTypes.push_back(getReturnTypeFromContext(DC));
+         Callback(getReturnTypeFromContext(DC));
+         break;
+       }
+       case StmtKind::ForEach: {
+         auto FES = cast<ForEachStmt>(Parent);
+         if (auto SEQ = FES->getSequence()) {
+           if (SM.rangeContains(SEQ->getSourceRange(),
+                                ParsedExpr->getSourceRange())) {
+             Callback(Context.getSequenceTypeDecl()->getDeclaredInterfaceType());
+           }
+         }
          break;
        }
        default:
@@ -3297,15 +3318,17 @@ public:
      }
    }
 
-  void analyzeDecl(Decl *D, std::vector<Type> &PotentialTypes) {
+  void analyzeDecl(Decl *D, llvm::function_ref<void(Type)> Callback) {
     switch (D->getKind()) {
       case DeclKind::PatternBinding: {
         auto PBD = cast<PatternBindingDecl>(D);
         for (unsigned I = 0; I < PBD->getNumPatternEntries(); ++ I) {
           if (auto Init = PBD->getInit(I)) {
             if (SM.rangeContains(Init->getSourceRange(), ParsedExpr->getLoc())) {
-              PotentialTypes.push_back(PBD->getPattern(I)->getType());
-              break;
+              if (PBD->getPattern(I)->hasType()) {
+                Callback(PBD->getPattern(I)->getType());
+                break;
+              }
             }
           }
         }
@@ -3321,20 +3344,25 @@ public:
     if (!ParsedExpr)
       return false;
     DC->walkContext(Finder);
-    std::vector<Type> PotentialTypes;
-    if (auto Parent = Finder.ParentClosest.dyn_cast<Expr*>()) {
-      analyzeExpr(Parent, PotentialTypes);
-    } else if (auto Parent = Finder.ParentClosest.dyn_cast<Stmt *>()) {
-      analyzeStmt(Parent, PotentialTypes);
-    } else if (auto Parent = Finder.ParentClosest.dyn_cast<Decl *>()) {
-      analyzeDecl(Parent, PotentialTypes);
-    }
-    for (auto Ty : PotentialTypes) {
-      if (Ty && Ty->getKind() != TypeKind::Error) {
-        PossibleTypes.push_back(Ty->getRValueType());
+    auto Callback = [&] (Type Result) {
+      if (Result &&
+          Result->getKind() != TypeKind::Error)
+        PossibleTypes.push_back(Result->getRValueType());
+    };
+
+    for (auto It = Finder.Ancestors.rbegin(); It != Finder.Ancestors.rend();
+         ++ It) {
+      if (auto Parent = It->dyn_cast<Expr *>()) {
+        analyzeExpr(Parent, Callback);
+      } else if (auto Parent = It->dyn_cast<Stmt *>()) {
+        analyzeStmt(Parent, Callback);
+      } else if (auto Parent = It->dyn_cast<Decl *>()) {
+        analyzeDecl(Parent, Callback);
       }
+      if (!PossibleTypes.empty())
+        return true;
     }
-    return !PossibleTypes.empty();
+    return false;
   }
 };
 

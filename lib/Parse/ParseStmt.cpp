@@ -2250,8 +2250,6 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
     Container = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
   } else {
     Container = parseExprBasic(diag::expected_foreach_container);
-    if (Container.hasCodeCompletion())
-      return makeParserCodeCompletionResult<Stmt>();
     if (Container.isNull())
       Container = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
     Status |= Container;
