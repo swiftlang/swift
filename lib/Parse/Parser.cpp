@@ -726,3 +726,18 @@ SourceFile &ParserUnit::getSourceFile() {
   return *Impl.SF;
 }
 
+ConfigParserState swift::operator&&(ConfigParserState lhs,
+                                     ConfigParserState rhs) {
+  return ConfigParserState(lhs.isConditionActive() && rhs.isConditionActive(),
+                           ConfigExprKind::Binary);
+}
+
+ConfigParserState swift::operator||(ConfigParserState lhs,
+                                    ConfigParserState rhs) {
+  return ConfigParserState(lhs.isConditionActive() || rhs.isConditionActive(),
+                           ConfigExprKind::Binary);
+}
+
+ConfigParserState swift::operator!(ConfigParserState Result) {
+  return ConfigParserState(!Result.isConditionActive(), Result.getKind());
+}

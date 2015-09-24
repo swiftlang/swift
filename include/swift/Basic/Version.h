@@ -21,8 +21,56 @@
 
 #include <string>
 
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/SmallVector.h"
+
 namespace swift {
+
+class DiagnosticEngine;
+class SourceLoc;
+
 namespace version {
+
+/// Represents an internal compiler version, represented as a tuple of
+/// integers, or "version components".
+///
+/// For comparison, if a `CompilerVersion` contains more than one
+/// version component, the second one is ignored for comparison,
+/// as it represents a compiler variant with no defined ordering.
+class CompilerVersion {
+  llvm::SmallVector<unsigned, 5> Components;
+public:
+  /// Create a version that is always greater than or equal to all other
+  /// compiler versions.
+  ///
+  /// This should only be used in builds of Swift from latest source.
+  CompilerVersion();
+
+  /// Create a version from a string in source code.
+  ///
+  /// Must include only groups of digits separated by a dot.
+  CompilerVersion(const llvm::StringRef VersionString, SourceLoc Loc,
+                  DiagnosticEngine *Diags);
+
+  /// Return a printable string representation of the version.
+  std::string str() const;
+
+  /// Return the ith version component.
+  unsigned operator[](size_t i) const {
+    return Components[i];
+  }
+
+  /// Return the number of version components.
+  size_t size() const {
+    return Components.size();
+  }
+
+  bool empty() const {
+    return Components.empty();
+  }
+};
+
+bool operator>=(const CompilerVersion &lhs, const CompilerVersion &rhs);
 
 /// Retrieves the numeric {major, minor} Swift version.
 std::pair<unsigned, unsigned> getSwiftNumericVersion();

@@ -2490,9 +2490,9 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
     SourceLoc ClauseLoc = consumeToken();
     Expr *Condition = nullptr;
     
-    bool ClauseIsActive;
+    ConfigParserState ConfigState;
     if (isElse) {
-      ClauseIsActive = !foundActive;
+      ConfigState.setConditionActive(!foundActive);
     } else {
       if (Tok.isAtStartOfLine())
         diagnose(ClauseLoc, diag::expected_build_configuration_expression);
@@ -2506,17 +2506,16 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
       Condition = Configuration.get();
 
       // Evaluate the condition, to validate it.
-      bool condActive = evaluateConfigConditionExpr(Condition);
-      ClauseIsActive = condActive && !foundActive;
+      ConfigState = evaluateConfigConditionExpr(Condition);
     }
 
-    foundActive |= ClauseIsActive;
+    foundActive |= ConfigState.isConditionActive();
 
     if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
       diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
 
     Optional<Scope> scope;
-    if (!ClauseIsActive)
+    if (!ConfigState.isConditionActive())
       scope.emplace(this, ScopeKind::Brace, /*inactiveConfigBlock=*/true);
     
     SmallVector<Decl*, 8> Decls;
@@ -2524,7 +2523,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
     while (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
            Tok.isNot(tok::pound_elseif)) {
       Status = parseDecl(Decls, Flags);
-      
+
       if (Status.isError()) {
         diagnose(Tok, diag::expected_close_to_config_stmt);
         skipUntilConfigBlockClose();
@@ -2534,7 +2533,7 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 
     Clauses.push_back(IfConfigDeclClause(ClauseLoc, Condition,
                                          Context.AllocateCopy(Decls),
-                                         ClauseIsActive));
+                                         ConfigState.isConditionActive()));
 
     if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
       break;

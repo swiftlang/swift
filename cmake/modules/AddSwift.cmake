@@ -1045,7 +1045,7 @@ function(_add_swift_library_single target name)
     set(PLIST_INFO_VERSION "${SWIFT_VERSION}")
     if (LLVM_SUBMIT_VERSION)
       set(PLIST_INFO_BUILD_VERSION
-          "${LLVM_SUBMIT_VERSION}.${LLVM_SUBMIT_SUBVERSION}")
+        "${SWIFT_COMPILER_VERSION}")
     endif()
 
     set(PLIST_INFO_PLIST_OUT "${PLIST_INFO_PLIST}")

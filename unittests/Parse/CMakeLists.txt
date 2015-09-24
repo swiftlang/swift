@@ -1,4 +1,5 @@
 add_swift_unittest(SwiftParseTests
+  BuildConfigTests.cpp
   LexerTests.cpp
 )
 

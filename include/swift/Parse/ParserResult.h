@@ -217,6 +217,64 @@ template <typename T> ParserResult<T>::ParserResult(ParserStatus Status) {
     setHasCodeCompletion();
 }
 
+enum class ConfigExprKind {
+  Unknown,
+  Error,
+  OS,
+  Arch,
+  CompilerVersion,
+  Binary,
+  Paren,
+  DeclRef,
+  Boolean,
+  Integer
+};
+
+class ConfigParserState {
+
+  unsigned ConditionActive : 1;
+  ConfigExprKind Kind;
+public:
+  friend class ConfigParserState;
+
+  ConfigParserState() : ConditionActive(false), Kind(ConfigExprKind::Unknown) {}
+
+  ConfigParserState(bool ConditionActive, ConfigExprKind Kind)
+    : ConditionActive(ConditionActive), Kind(Kind) {}
+
+  bool isConditionActive() const {
+    return ConditionActive;
+  }
+
+  void setConditionActive(bool A) {
+    ConditionActive = A;
+  }
+
+  ConfigExprKind getKind() const {
+    return Kind;
+  }
+
+  void setKind(ConfigExprKind K) {
+    Kind = K;
+  }
+
+  bool shouldParse() const {
+    if (Kind == ConfigExprKind::Error)
+      return false;
+    return ConditionActive || (Kind != ConfigExprKind::CompilerVersion);
+  }
+
+  static ConfigParserState error() {
+    return ConfigParserState(false, ConfigExprKind::Error);
+  }
+};
+
+ConfigParserState operator&&(const ConfigParserState lhs,
+                              const ConfigParserState rhs);
+ConfigParserState operator||(const ConfigParserState lhs,
+                              const ConfigParserState rhs);
+ConfigParserState operator!(const ConfigParserState Result);
+
 } // namespace swift
 
 #endif // LLVM_SWIFT_PARSER_PARSER_RESULT_H

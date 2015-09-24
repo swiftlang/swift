@@ -14,10 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <vector>
+
 #include "swift/Basic/Version.h"
 
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/SmallString.h"
 
 #define TOSTR2(X) #X
 #define TOSTR(X) TOSTR2(X)
@@ -42,6 +46,82 @@
 namespace swift {
 namespace version {
 
+void parseVersionString(StringRef VersionString,
+                        SmallVectorImpl<unsigned> &Components,
+                        SourceLoc Loc,
+                        DiagnosticEngine *Diags) {
+  StringRef SwiftTagPrefix("swiftlang-");
+  if (VersionString.startswith_lower(SwiftTagPrefix))
+    VersionString = VersionString.substr(SwiftTagPrefix.size());
+  SmallString<16> digits;
+  llvm::raw_svector_ostream OS(digits);
+  for (auto c : VersionString) {
+    if (Loc.isValid())
+      Loc = Loc.getAdvancedLoc(1);
+    if (isdigit(c)) {
+      OS << c;
+    } else if (c == '.' && digits.str().size()) {
+      Components.push_back(std::atoi(OS.str().str().data()));
+      digits.clear();
+    } else {
+      Components.clear();
+      if (Diags)
+        Diags->diagnose(Loc, diag::invalid_character_in_compiler_version);
+      return;
+    }
+  }
+  if (digits.str().size())
+    Components.push_back(std::atoi(OS.str().data()));
+}
+
+CompilerVersion::CompilerVersion(const StringRef VersionString,
+                                 SourceLoc Loc, DiagnosticEngine *Diags) {
+  parseVersionString(VersionString, Components, Loc, Diags);
+}
+
+#ifdef SWIFT_COMPILER_VERSION
+
+CompilerVersion::CompilerVersion() {
+  parseVersionString(TOSTR(SWIFT_COMPILER_VERSION), Components, SourceLoc(),
+                     nullptr);
+}
+#endif
+
+std::string CompilerVersion::str() const {
+  std::string VersionString;
+  llvm::raw_string_ostream OS(VersionString);
+  for (auto i = Components.begin(); i != Components.end(); i++) {
+    OS << *i;
+    if (i != Components.end() - 1)
+      OS << '.';
+  }
+  return OS.str();
+}
+
+bool operator>=(const class CompilerVersion &lhs,
+                const class CompilerVersion &rhs) {
+
+  // The empty compiler version represents the latest possible version,
+  // usually built from the source repository.
+  if (lhs.empty())
+    return true;
+
+  auto n = std::min(lhs.size(), rhs.size());
+
+  for (size_t i = 0; i < n; ++i) {
+    // Skip the second component for comparison - this is just an internal
+    // compiler variant.
+    if (i == 1)
+      continue;
+
+    if (lhs[i] < rhs[i])
+      return false;
+    else if (lhs[i] > rhs[i])
+      return true;
+  }
+  return lhs.size() >= rhs.size();
+}
+
 std::pair<unsigned, unsigned> getSwiftNumericVersion() {
   return { SWIFT_VERSION_MAJOR, SWIFT_VERSION_MINOR };
 }
@@ -53,8 +133,8 @@ std::string getSwiftFullVersion() {
   OS << SWIFT_VENDOR " ";
 #endif
   OS << "Swift version " SWIFT_VERSION_STRING;
-#ifdef SWIFT_REPOSITORY_STRING
-  OS << " (" SWIFT_REPOSITORY_STRING ")";
+#ifdef SWIFT_COMPILER_VERSION
+  OS << " (" TOSTR(SWIFT_COMPILER_VERSION) ")";
 #endif
   return OS.str();
 }

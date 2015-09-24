@@ -68,6 +68,8 @@ set(SWIFT_VERSION "2.1" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
+set(SWIFT_COMPILER_VERSION "" CACHE STRING
+    "The internal version of the Swift compiler")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
     "compiler;clang-builtin-headers;clang-resource-dir-symlink;arclite-symlink;stdlib;stdlib-experimental;sdk-overlay;editor-integration;lang-docs;tools;testsuite-tools;dev")

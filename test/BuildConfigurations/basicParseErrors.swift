@@ -28,7 +28,7 @@ func h() {}
 #endif /* bbb */
 
 #if foo.bar() 
-      .baz() // expected-error {{unexpected target configuration expression argument type}}
+      .baz() // expected-error {{unexpected target configuration expression (expected 'os' or 'arch')}}
 
 #endif
 

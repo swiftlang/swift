@@ -1183,7 +1183,7 @@ public:
   ParserResult<CaseStmt> parseStmtCase();
 
   /// Evaluate the conditional configuration expression of an #if statement
-  bool evaluateConfigConditionExpr(Expr *configExpr);
+  ConfigParserState evaluateConfigConditionExpr(Expr *configExpr);
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing
