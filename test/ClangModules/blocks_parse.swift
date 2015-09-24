@@ -25,3 +25,21 @@ func testNoEscape(@noescape f: @convention(block) () -> Void, nsStr: NSString,
 
   _ = nsStr.enumerateLinesUsingBlock as Int // expected-error{{cannot convert value of type '(@noescape (String!) -> Void) -> Void' to type 'Int' in coercion}}
 }
+
+func checkTypeImpl<T>(inout a: T, _: T.Type) {}
+do {
+  var block = blockWithoutNullability()
+  checkTypeImpl(&block, ImplicitlyUnwrappedOptional<dispatch_block_t>.self)
+}
+do {
+  var block = blockWithNonnull()
+  checkTypeImpl(&block, dispatch_block_t.self)
+}
+do {
+  var block = blockWithNullUnspecified()
+  checkTypeImpl(&block, ImplicitlyUnwrappedOptional<dispatch_block_t>.self)
+}
+do {
+  var block = blockWithNullable()
+  checkTypeImpl(&block, Optional<dispatch_block_t>.self)
+}

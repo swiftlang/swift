@@ -8,3 +8,8 @@
 //- (void)enumerateLinesUsingBlock:(void (^)(NSString *line, BOOL *b)) f;
 
 @end
+
+dispatch_block_t blockWithoutNullability();
+dispatch_block_t __nonnull blockWithNonnull();
+dispatch_block_t __null_unspecified blockWithNullUnspecified();
+dispatch_block_t __nullable blockWithNullable();

@@ -90,9 +90,13 @@ namespace {
 
       /// The source type is a block pointer type.
       Block,
-      
+
       /// The source type is a function pointer type.
       CFunctionPointer,
+
+      /// The source type is a specially-handled pointer type (usually a mapped
+      /// typedef) that nonetheless needs to preserve nullability.
+      CustomNullablePointer,
     };
 
     ImportHintKind Kind;
@@ -118,6 +122,7 @@ namespace {
       case Reference:
       case Block:
       case CFunctionPointer:
+      case CustomNullablePointer:
         return 0;
 
       case NSArray:
@@ -163,6 +168,7 @@ namespace {
     case ImportHint::NSString:
     case ImportHint::ObjCPointer:
     case ImportHint::CFunctionPointer:
+    case ImportHint::CustomNullablePointer:
       return true;
     }
   }
@@ -562,6 +568,11 @@ namespace {
           hint = ImportHint::CFPointer;
         } else if (mappedType->isAnyExistentialType()) { // id, Class
           hint = ImportHint::ObjCPointer;
+        } else if (type->isBlockPointerType()) {
+          // FIXME: This should eventually be "isAnyPointerType", but right now
+          // non-object, non-block pointers are never Optional in Swift; they
+          // just can have a value of 'nil' themselves.
+          hint = ImportHint::CustomNullablePointer;
         }
         // Any other interesting mapped types should be hinted here.
 
