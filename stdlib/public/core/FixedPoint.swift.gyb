@@ -309,6 +309,7 @@ public struct ${Self}
   static var min: ${Self} { return ${'-%s-1' % max if signed else '0'} }
   @transparent
   public static var _sizeInBits: ${Self} { return ${bits} }
+  public static var _sizeInBytes: ${Self} { return ${bits}/8 }
 }
 
 extension ${Self} : Hashable {
