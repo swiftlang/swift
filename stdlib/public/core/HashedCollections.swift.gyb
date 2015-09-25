@@ -1592,7 +1592,7 @@ collections = [
 }%
 
 /// A wrapper around a bitmap storage with room for at least bitCount bits.
-internal struct _BitMap : CollectionType {
+internal struct _BitMap {
   internal let values: UnsafeMutablePointer<UInt>
   internal let bitCount: Int
 
@@ -1627,20 +1627,6 @@ internal struct _BitMap : CollectionType {
   internal func initializeToZero() {
     for i in 0 ..< numberOfWords {
       (values + i).initialize(0)
-    }
-  }
-
-  internal var startIndex: Int {
-    @warn_unused_result
-    get {
-      return 0
-    }
-  }
-
-  internal var endIndex: Int {
-    @warn_unused_result
-    get {
-      return bitCount
     }
   }
 
