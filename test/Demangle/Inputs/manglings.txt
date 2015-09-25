@@ -226,3 +226,4 @@ _TFeRq_27mangling_generic_extensions8Runcible_S_VS_3Foog1aSi ---> ext.mangling_g
 _TFeRq_27mangling_generic_extensions8Runcible_S_VS_3Foog1bq_ ---> ext.mangling_generic_extensions.mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.b.getter : A
 _TTRXFo_iT__iT_zoPSs9ErrorType__XFo__dT_zoPS___ ---> reabstraction thunk helper from @callee_owned (@in ()) -> (@out (), @error @owned Swift.ErrorType) to @callee_owned () -> (@unowned (), @error @owned Swift.ErrorType)
 _TFE1a ---> _TFE1a
+_TF21$__lldb_module_for_E0au3$E0PSs9ErrorType_ ---> $__lldb_module_for_E0.$E0.unsafeMutableAddressor : Swift.ErrorType

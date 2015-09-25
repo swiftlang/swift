@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
     llvm::StringRef inputContents = input.get()->getBuffer();
 
     // This doesn't handle Unicode symbols, but maybe that's okay.
-    llvm::Regex maybeSymbol("_T[_a-zA-Z0-9]+");
+    llvm::Regex maybeSymbol("_T[_a-zA-Z0-9$]+");
     llvm::SmallVector<llvm::StringRef, 1> matches;
     while (maybeSymbol.match(inputContents, &matches)) {
       llvm::outs() << substrBefore(inputContents, matches.front());
