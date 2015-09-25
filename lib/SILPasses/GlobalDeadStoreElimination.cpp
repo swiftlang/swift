@@ -612,10 +612,16 @@ void GlobalDeadStoreEliminationImpl::processStoreInst(SILInstruction *I) {
 
 void GlobalDeadStoreEliminationImpl::processUnknownMemInst(SILInstruction *I) {
   // We do not know what this instruction does or the memory that it *may*
-  // touch. Be conservative here and clear the kill set.
-  //
-  // TODO: Plug in AliasAnalysis memory behavior here.
-  getBBLocState(I)->clearLocations();
+  // touch. Hand it to alias analysis to see whether we need to invalidate
+  // any Location.
+  BBState *S = getBBLocState(I);
+  for (unsigned i = 0; i < S->WriteSetOut.size(); ++i) {
+    if (!S->isTrackingLocation(i))
+      continue;
+    if (!AA->mayReadFromMemory(I, LocationVault[i].getBase()))
+      continue;
+    getBBLocState(I)->stopTrackingLocation(i);
+  }
 }
 
 void GlobalDeadStoreEliminationImpl::processInstruction(SILInstruction *I) {

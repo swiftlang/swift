@@ -759,3 +759,38 @@ bb4:                                              // Preds: bb1 bb2
   dealloc_stack %1#0 : $*@local_storage foo       // id: %36
   return %35 : $()                                // id: %37
 }
+
+// Remove dead store in same basic block, test for alias analysis/side effect.
+// Currently, %14 = apply %13(%10) is marked as having side effect on the
+// store %8 to %9 : $*Int                          // id: %15
+//
+// CHECK-LABEL: DeadStoreSameBlockAcrossFunctionCallSimpleStruct
+// CHECK: bb1:
+// CHECK-NEXT: store
+// CHECK: function_ref
+sil hidden @DeadStoreSameBlockAcrossFunctionCallSimpleStruct : $@convention(thin) (Bool, Int) -> () {
+bb0(%0 : $Bool, %1 : $Int):
+  %2 = alloc_stack $S1                            // users: %6, %9, %18
+  // function_ref S1_init
+  %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
+  %4 = metatype $@thin S1.Type                    // user: %5
+  %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
+  store %5 to %2#1 : $*S1                         // id: %6
+  %7 = integer_literal $Builtin.Int64, 0          // user: %8
+  %8 = struct $Int (%7 : $Builtin.Int64)          // users: %12, %15
+  %9 = struct_element_addr %2#1 : $*S1, #S1.a     // users: %12, %15
+  %10 = alloc_ref $foo                            // user: %14
+  br bb1                                          // id: %11
+
+bb1:                                              // Preds: bb0
+  store %8 to %9 : $*Int                          // id: %12
+  %13 = function_ref @foo_user : $@convention(thin) (@guaranteed foo) -> () // user: %14
+  %14 = apply %13(%10) : $@convention(thin) (@guaranteed foo) -> ()
+  store %8 to %9 : $*Int                          // id: %15
+  br bb2                                          // id: %16
+
+bb2:                                              // Preds: bb1
+  %17 = tuple ()                                  // user: %19
+  dealloc_stack %2#0 : $*@local_storage S1        // id: %18
+  return %17 : $()                                // id: %19
+}
