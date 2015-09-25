@@ -110,7 +110,7 @@
 ///
 /// - See also: `LazySequence`, `LazyCollectionType`, `LazyCollection`
 ///
-/// - Note: the explicit permission to implement further operations
+/// - Note: The explicit permission to implement further operations
 ///   lazily applies only in contexts where the sequence is statically
 ///   known to conform to `LazySequenceType`.  Thus, side-effects such
 ///   as the accumulation of `result` below are never unexpectedly

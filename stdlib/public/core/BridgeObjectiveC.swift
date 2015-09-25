@@ -48,7 +48,7 @@ public protocol _ObjectiveCBridgeable {
   /// example, when bridging from `NSArray` to `Array<Element>`, we can defer
   /// the checking for the individual elements of the array.
   ///
-  /// - parameter result The location where the result is written. The optional
+  /// - parameter result: The location where the result is written. The optional
   ///   will always contain a value.
   static func _forceBridgeFromObjectiveC(
     source: _ObjectiveCType,
@@ -63,12 +63,12 @@ public protocol _ObjectiveCBridgeable {
   /// complete conversion to the value type; it cannot defer checking
   /// to a later time.
   ///
-  /// - parameter result The location where the result is written.
+  /// - parameter result: The location where the result is written.
   ///
-  /// - Returns: true if bridging succeeded, false otherwise. This redundant
-  ///   information is provided for the convenience of the runtime's dynamic_cast
+  /// - Returns: `true` if bridging succeeded, `false` otherwise. This redundant
+  ///   information is provided for the convenience of the runtime's `dynamic_cast`
   ///   implementation, so that it need not look into the optional representation
-  /// to determine success.
+  ///   to determine success.
   static func _conditionallyBridgeFromObjectiveC(
     source: _ObjectiveCType,
     inout result: Self?

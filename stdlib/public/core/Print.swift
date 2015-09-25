@@ -17,7 +17,7 @@
 /// The textual representations are obtained for each `item` via
 /// the expression `String(item)`.
 ///
-/// - Note: to print without a trailing newline, pass `terminator: ""`
+/// - Note: To print without a trailing newline, pass `terminator: ""`
 ///
 /// - SeeAlso: `debugPrint`, Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
@@ -48,7 +48,7 @@ public func print(
 /// The textual representations are obtained for each `item` via
 /// the expression `String(reflecting: item)`.
 ///
-/// - Note: to print without a trailing newline, pass `terminator: ""`
+/// - Note: To print without a trailing newline, pass `terminator: ""`
 ///
 /// - SeeAlso: `print`, Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
@@ -77,7 +77,7 @@ public func debugPrint(
 /// The textual representations are obtained for each `item` via
 /// the expression `String(item)`.
 ///
-/// - Note: to print without a trailing newline, pass `terminator: ""`
+/// - Note: To print without a trailing newline, pass `terminator: ""`
 ///
 /// - SeeAlso: `debugPrint`, Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`
@@ -98,7 +98,7 @@ public func print<Target: OutputStreamType>(
 /// The textual representations are obtained for each `item` via
 /// the expression `String(reflecting: item)`.
 ///
-/// - Note: to print without a trailing newline, pass `terminator: ""`
+/// - Note: To print without a trailing newline, pass `terminator: ""`
 ///
 /// - SeeAlso: `print`, Streamable`, `CustomStringConvertible`,
 ///   `CustomDebugStringConvertible`

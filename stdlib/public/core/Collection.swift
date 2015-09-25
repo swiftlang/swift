@@ -144,7 +144,7 @@ public protocol CollectionType : Indexable, SequenceType {
   /// A `SequenceType` that can represent a contiguous subrange of `self`'s
   /// elements.
   ///
-  /// - Note: this associated type appears as a requirement in
+  /// - Note: This associated type appears as a requirement in
   ///   `SequenceType`, but is restated here with stricter
   ///   constraints: in a `CollectionType`, the `SubSequence` should
   ///   also be a `CollectionType`.

@@ -110,7 +110,7 @@ public struct LazyFilterIndex<
   ///   the base collection between elements that satisfy the
   ///   predicate.
   ///
-  /// - Note: this operation may not satisfy the expected complexity
+  /// - Note: This operation may not satisfy the expected complexity
   ///   for models of `ForwardIndexType`.
   public func successor() -> LazyFilterIndex {
     for p in base.successor()..<_baseElements.endIndex {
