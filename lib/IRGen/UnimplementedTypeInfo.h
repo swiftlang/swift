@@ -37,6 +37,7 @@ public:
   llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const override;
   llvm::Constant *getStaticSize(IRGenModule &IGM) const override;
   llvm::Constant *getStaticAlignmentMask(IRGenModule &IGM) const override;
   llvm::Constant *getStaticStride(IRGenModule &IGM) const override;

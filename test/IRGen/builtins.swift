@@ -683,5 +683,23 @@ func isUniqueIUO(inout ref: Builtin.NativeObject?) -> Bool {
   return Builtin.isUnique(&iuo)
 }
 
-// CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}
+// CHECK-LABEL: define {{.*}} @{{.*}}generic_ispod_test
+func generic_ispod_test<T>(_: T) {
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 18
+  // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
+  // CHECK-NEXT: [[FLAGS:%.*]] = ptrtoint i8* [[T1]] to i64
+  // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i64 [[FLAGS]], 65536
+  // CHECK-NEXT: [[ISPOD:%.*]] = icmp eq i64 [[ISNOTPOD]], 0
+  // CHECK-NEXT: store i1 [[ISPOD]], i1* [[S:%.*]]
+  var s = Builtin.ispod(T.self)
+}
 
+// CHECK-LABEL: define {{.*}} @{{.*}}ispod_test
+func ispod_test() {
+  // CHECK: store i1 true, i1*
+  // CHECK: store i1 false, i1*
+  var t = Builtin.ispod(Int.self)
+  var f = Builtin.ispod(Builtin.NativeObject)
+}
+
+// CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}

@@ -88,6 +88,7 @@ public:
   llvm::Value *getSize(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *getStride(IRGenFunction &IGF, SILType T) const override;
+  llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const override;
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override;
 

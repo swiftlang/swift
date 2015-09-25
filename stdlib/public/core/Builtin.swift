@@ -549,3 +549,12 @@ func _isUniqueOrPinned_native<T>(inout object: T) -> Bool {
       (Builtin.reinterpretCast(object) as AnyObject).dynamicType))
   return Bool(Builtin.isUniqueOrPinned_native(&object))
 }
+
+/// Return true if type is a POD type. A POD type is a type that does not
+/// require any special handling on copying or destruction.
+@transparent
+@warn_unused_result
+public // @testable
+func _isPOD<T>(type: T.Type) -> Bool {
+  return Bool(Builtin.ispod(type))
+}

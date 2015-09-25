@@ -270,4 +270,11 @@ tests.test("type comparison") {
   expectFalse(t2o == nil2)
   expectFalse(nil2 == t2o)
 }
+
+tests.test("_isPOD") {
+  expectTrue(_isPOD(Int.self))
+  expectFalse(_isPOD(X.self))
+  expectFalse(_isPOD(P.self))
+}
+
 runAllTests()

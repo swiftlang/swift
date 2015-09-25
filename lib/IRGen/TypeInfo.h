@@ -216,6 +216,7 @@ public:
   virtual llvm::Value *getSize(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getStride(IRGenFunction &IGF, SILType T) const = 0;
+  virtual llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                                  SILType T) const = 0;
 

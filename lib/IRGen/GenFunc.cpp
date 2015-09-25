@@ -1700,6 +1700,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::IsPOD) {
+    args.claimAll();
+    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+                                             substitutions[0].getReplacement());
+    out.add(valueTy.second.getIsPOD(IGF, valueTy.first));
+    return;
+  }
+
+
   // addressof expects an lvalue argument.
   if (Builtin.ID == BuiltinValueKind::AddressOf) {
     llvm::Value *address = args.claimNext();

@@ -435,6 +435,10 @@ llvm::Constant *FixedTypeInfo::getStaticAlignmentMask(IRGenModule &IGM) const {
 llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF, SILType T) const {
   return FixedTypeInfo::getStaticStride(IGF.IGM);
 }
+llvm::Value *FixedTypeInfo::getIsPOD(IRGenFunction &IGF, SILType T) const {
+  return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+                                isPOD(ResilienceScope::Local) == IsPOD);
+}
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return asSizeConstant(IGM, getFixedStride());
 }

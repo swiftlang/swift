@@ -677,6 +677,13 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
+static ValueDecl *getIsPODOperation(ASTContext &Context, Identifier Id) {
+  GenericSignatureBuilder builder(Context);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.setResult(makeConcrete(BuiltinIntegerType::get(1,Context)));
+  return builder.build(Id);
+}
+
 static ValueDecl *getAllocOperation(ASTContext &Context, Identifier Id) {
   Type PtrSizeTy = BuiltinIntegerType::getWordType(Context);
   TupleTypeElt ArgElts[] = { PtrSizeTy, PtrSizeTy };
@@ -1479,6 +1486,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::Alignof:
   case BuiltinValueKind::StrideofNonZero:
     return getSizeOrAlignOfOperation(Context, Id);
+
+  case BuiltinValueKind::IsPOD:
+    return getIsPODOperation(Context, Id);
 
   case BuiltinValueKind::AllocRaw:
     return getAllocOperation(Context, Id);

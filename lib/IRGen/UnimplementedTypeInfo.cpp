@@ -73,6 +73,10 @@ llvm::Value *UnimplementedTypeInfo::getStride(IRGenFunction &IGF, SILType T)
 const {
   return getUndefSize(IGF.IGM);
 }
+llvm::Value *UnimplementedTypeInfo::getIsPOD(IRGenFunction &IGF, SILType T)
+const {
+  return llvm::UndefValue::get(IGF.IGM.Int1Ty);
+}
 llvm::Constant *UnimplementedTypeInfo::getStaticSize(IRGenModule &IGM) const {
   return nullptr;
 }
