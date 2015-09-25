@@ -2126,7 +2126,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 #if INTERNAL_CHECKS_ENABLED
     for var i = 0; i != capacity; ++i {
       if isInitializedEntry(i) {
-        let key = self[i]
+        let key = keyAt(i)
         result += "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
       } else {
         result += "bucket \(i), empty\n"
