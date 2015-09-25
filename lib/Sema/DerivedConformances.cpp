@@ -37,10 +37,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (!nominal->derivesProtocolConformance(proto)) return nullptr;
 
     // Retrieve the requirement.
-    for (auto result : proto->lookupDirect(name))
-      return result;
-
-    return nullptr;
+    auto results = proto->lookupDirect(name);
+    return  results.empty() ? nullptr : results.front();
   };
 
   // Properties.
