@@ -66,6 +66,9 @@ public:
   /// Are we debugging sil serialization.
   bool DebugSerialization = false;
 
+  /// Whether to dump verbose SIL with scope and location information.
+  bool EmitVerboseSIL = false;
+
   /// Optimization mode being used.
   SILOptMode Optimization = SILOptMode::NotSet;
 

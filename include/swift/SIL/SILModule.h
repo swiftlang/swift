@@ -476,13 +476,13 @@ public:
   void verify() const;
 
   /// Pretty-print the module.
-  void dump() const;
+  void dump(bool Verbose = false) const;
   
   /// Pretty-print the module to a file.
   /// Useful for dumping the module when running in a debugger.
   /// Warning: no error handling is done. Fails with an assert if the file
   /// cannot be opened.
-  void dump(const char *FileName) const;
+  void dump(const char *FileName, bool Verbose = false) const;
 
   /// Pretty-print the module to the designated stream.
   ///

@@ -1642,14 +1642,14 @@ void SILGlobalVariable::printName(raw_ostream &OS) const {
 }
       
 /// Pretty-print the SILModule to errs.
-void SILModule::dump() const {
-  print(llvm::errs());
+void SILModule::dump(bool Verbose) const {
+  print(llvm::errs(), Verbose);
 }
 
-void SILModule::dump(const char *FileName) const {
+void SILModule::dump(const char *FileName, bool Verbose) const {
   std::error_code EC;
   llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::F_None);
-  print(os);
+  print(os, Verbose);
 }
 
 static void printSILGlobals(llvm::raw_ostream &OS, bool Verbose,

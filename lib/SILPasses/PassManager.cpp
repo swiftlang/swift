@@ -129,18 +129,18 @@ static bool isDisabled(SILTransform *T) {
   return false;
 }
 
-static void printModule(SILModule *Mod) {
+static void printModule(SILModule *Mod, bool EmitVerboseSIL) {
   if (SILPrintOnlyFun.empty() && SILPrintOnlyFuns.empty()) {
     Mod->dump();
     return;
   }
   for (auto &F : *Mod) {
     if (!SILPrintOnlyFun.empty() && F.getName().str() == SILPrintOnlyFun)
-      F.dump();
+      F.dump(EmitVerboseSIL);
 
     if (!SILPrintOnlyFuns.empty() &&
         F.getName().find(SILPrintOnlyFuns, 0) != StringRef::npos)
-      F.dump();
+      F.dump(EmitVerboseSIL);
   }
 }
 
@@ -194,7 +194,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
         llvm::dbgs() << "*** SIL function before " << StageName << " "
                      << SFT->getName() << " (" << NumOptimizationIterations
                      << ") ***\n";
-        F.dump();
+        F.dump(Options.EmitVerboseSIL);
       }
 
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
@@ -213,7 +213,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
         llvm::dbgs() << "*** SIL function after " << StageName << " "
                      << SFT->getName() << " (" << NumOptimizationIterations
                      << ") ***\n";
-        F.dump();
+        F.dump(Options.EmitVerboseSIL);
       }
 
       // Remember if this pass didn't change anything.
@@ -252,7 +252,7 @@ void SILPassManager::runOneIteration() {
     llvm::dbgs() << "*** SIL module before "  << StageName
                  << " transformation (" << NumOptimizationIterations
                  << ") ***\n";
-    printModule(Mod);
+    printModule(Mod, Options.EmitVerboseSIL);
   }
   NumOptzIterations++;
   NumOptimizationIterations++;
@@ -292,7 +292,7 @@ void SILPassManager::runOneIteration() {
         llvm::dbgs() << "*** SIL module before " << StageName << " "
                      << SMT->getName() << " (" << NumOptimizationIterations
                      << ") ***\n";
-        printModule(Mod);
+        printModule(Mod, Options.EmitVerboseSIL);
       }
 
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
@@ -310,7 +310,7 @@ void SILPassManager::runOneIteration() {
         llvm::dbgs() << "*** SIL module after " << StageName << " "
                      << SMT->getName() << " (" << NumOptimizationIterations
                      << ") ***\n";
-        printModule(Mod);
+        printModule(Mod, Options.EmitVerboseSIL);
       }
 
       if (Options.VerifyAll &&
@@ -348,19 +348,19 @@ void SILPassManager::run() {
     if (SILPrintOnlyFun.empty() && SILPrintOnlyFuns.empty()) {
       llvm::dbgs() << "*** SIL module before transformation ("
                    << NumOptimizationIterations << ") ***\n";
-      Mod->dump();
+      Mod->dump(Options.EmitVerboseSIL);
     } else {
       for (auto &F : *Mod) {
         if (!SILPrintOnlyFun.empty() && F.getName().str() == SILPrintOnlyFun) {
           llvm::dbgs() << "*** SIL function before transformation ("
                        << NumOptimizationIterations << ") ***\n";
-          F.dump();
+          F.dump(Options.EmitVerboseSIL);
         }
         if (!SILPrintOnlyFuns.empty() &&
             F.getName().find(SILPrintOnlyFuns, 0) != StringRef::npos)
           llvm::dbgs() << "*** SIL function before transformation ("
                        << NumOptimizationIterations << ") ***\n";
-          F.dump();
+          F.dump(Options.EmitVerboseSIL);
       }
     }
   }
