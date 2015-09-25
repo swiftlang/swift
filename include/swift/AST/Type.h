@@ -164,7 +164,6 @@ class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
 
   static bool isReferenceTypeImpl(CanType type, bool functionsCount);
-  static bool isClassReferenceTypeImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type,
@@ -179,6 +178,7 @@ class CanType : public Type {
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getLValueOrInOutObjectTypeImpl(CanType type);
   static ClassDecl *getClassBoundImpl(CanType type);
+  static bool hasPointerRepresentationImpl(CanType type);
 
 public:
   explicit CanType(TypeBase *P = 0) : Type(P) {
@@ -272,6 +272,16 @@ public:
   
   CanType getLValueOrInOutObjectType() const {
     return getLValueOrInOutObjectTypeImpl(*this);
+  }
+
+  /// Are values of this type directly represented with a pointer.
+  ///
+  ///   - any of the builtin reference or pointer types
+  ///   - a class type
+  ///   - a bound generic class type
+  ///   - a class-bounded archetype type
+  bool hasPointerRepresentation() const {
+    return hasPointerRepresentationImpl(*this);
   }
   
   // Direct comparison is allowed for CanTypes - they are known canonical.

@@ -2767,11 +2767,12 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   if (InputIsTrivial && !OutputIsTrivial)
     return nullptr;
 
-  // The structs could have different size. We have code in the stdlib that
-  // casts pointers to differently sized integer types. This code prevents that
-  // we bitcast the values.
-  if (InputTy.getStructOrBoundGenericStruct() &&
-      OutputTy.getStructOrBoundGenericStruct())
+  // Check that the input type can be value cast to the output type.  It is
+  // possible to cast the address of a smaller InputType to the address of a
+  // larger OutputType (the actual memory object must be large enough to hold
+  // both types). However, such address casts cannot be converted to value
+  // casts.
+  if (!SILType::canUnsafeCastValue(InputTy, OutputTy, UADCI->getModule()))
     return nullptr;
 
   // For each user U of the unchecked_addr_cast...
@@ -2796,7 +2797,6 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
     auto *BitCast = Builder.createUncheckedBitCast(Loc, NewLoad,
                                                     OutputTy.getObjectType());
     BitCast->setDebugScope(Scope);
-
     // Replace all uses of the old load with the new bitcasted result and erase
     // the old load.
     replaceInstUsesWith(*L, BitCast, 0);

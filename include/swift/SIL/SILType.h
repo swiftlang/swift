@@ -380,7 +380,18 @@ public:
   const ASTContext &getASTContext() const {
     return getSwiftRValueType()->getASTContext();
   }
-  
+
+  /// True if the given type has at least the size and alignment of a native
+  /// pointer.
+  static bool isPointerSizeAndAligned(CanType t);
+
+  /// True if the layout of `fromType` is known to cover the layout of
+  /// `totype`. This is conservatively imprecise and is not
+  /// reflexive. `fromType` may be larger than the given type and still be
+  /// castable. It is the caller's responsibility to ensure that the overlapping
+  /// fields are layout compatible.
+  static bool canUnsafeCastValue(SILType fromType, SILType toType, SILModule &M);
+
   /// True if the type is block-pointer-compatible, meaning it either is a block
   /// or is an Optional or ImplicitlyUnwrappedOptional with a block payload.
   bool isBlockPointerCompatible() const {

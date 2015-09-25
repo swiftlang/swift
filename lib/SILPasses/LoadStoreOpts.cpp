@@ -459,11 +459,12 @@ initializeWithUncheckedAddrCast(SILValue Address, LoadInst *LI,
   if (InputIsTrivial && !OutputIsTrivial)
     return false;
 
-  // The structs could have different size. We have code in the stdlib that
-  // casts pointers to differently sized integer types. This code prevents
-  // that we bitcast the values.
-  if (OutputTy.getStructOrBoundGenericStruct() &&
-      InputTy.getStructOrBoundGenericStruct())
+  // Check that the input type can be value cast to the output type.  It is
+  // possible to cast the address of a smaller InputType to the address of a
+  // larger OutputType (the actual memory object must be large enough to hold
+  // both types). However, such address casts cannot be converted to value
+  // casts.
+  if (!SILType::canUnsafeCastValue(InputTy, OutputTy, Mod))
     return false;
 
   SILValue LdAddr = LI->getOperand();
