@@ -1640,7 +1640,7 @@ internal struct _BitMap : CollectionType {
   internal var endIndex: Int {
     @warn_unused_result
     get {
-      return numberOfWords
+      return bitCount
     }
   }
 
