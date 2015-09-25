@@ -741,7 +741,7 @@ private:
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] 
         = { "SEL", true };
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("NSZone")}] 
-        = { "NSZone *", true };
+        = { "struct _NSZone *", true };
 
       specialNames[{ctx.Id_Darwin, ctx.getIdentifier("DarwinBoolean")}]
         = { "Boolean", false};
@@ -1556,8 +1556,6 @@ public:
            "typedef uint_least16_t char16_t;\n"
            "typedef uint_least32_t char32_t;\n"
            "#endif\n"
-           "\n"
-           "typedef struct _NSZone NSZone;\n"
            "\n"
            "#if !defined(SWIFT_PASTE)\n"
            "# define SWIFT_PASTE_HELPER(x, y) x##y\n"

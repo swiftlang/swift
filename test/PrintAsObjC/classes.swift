@@ -222,7 +222,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (NSArray * __nonnull)emptyArray;
 // CHECK-NEXT: - (NSArray * __nullable)maybeArray;
 // CHECK-NEXT: - (NSRuncingMode)someEnum;
-// CHECK-NEXT: - (NSZone * __null_unspecified)zone;
+// CHECK-NEXT: - (struct _NSZone * __null_unspecified)zone;
 // CHECK-NEXT: - (CFTypeRef __nullable)cf:(CFTreeRef __nonnull)x str:(CFStringRef __nonnull)str str2:(CFMutableStringRef __nonnull)str2 obj:(CFAliasForTypeRef __nonnull)obj;
 // CHECK-NEXT: - (void)appKitInImplementation;
 // CHECK-NEXT: - (NSURL * __nullable)returnsURL;
