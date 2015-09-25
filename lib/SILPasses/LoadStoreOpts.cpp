@@ -87,17 +87,17 @@ static SILType getForwardingTypeForLS(const SILInstruction *I) {
 
 namespace {
 
-  /// This class represents either a single value or a covering of values that we
-  /// can load forward from via the introdution of a SILArgument. This enables us
-  /// to treat the case of having one value or multiple values and load and store
-  /// cases all at once abstractly and cleanly.
+  /// This class represents either a single value or a covering of values that
+  /// we can load forward from via the introdution of a SILArgument. This
+  /// enables us to treat the case of having one value or multiple values and
+  /// load and store cases all at once abstractly and cleanly.
   class LSValue {
     /// The "parent" basic block which this LSValue originated in.
     ///
     /// In the case where we are tracking one value this is the BB in which the
     /// actual value originated. In the case in which we are tracking a covering
-    /// set of loads, this is the BB where if we forward this load value, we will
-    /// need to insert a SILArgument.
+    /// set of loads, this is the BB where if we forward this load value, we
+    /// will need to insert a SILArgument.
     SILBasicBlock *ParentBB;
 
     /// The individual inst or covering inst set that this LSValue represents.
@@ -106,14 +106,14 @@ namespace {
     /// The lazily computed value that can be used to forward this LSValue.
     ///
     /// In the case where we have a single value this is always initialized. In
-    /// the case where we are handling a covering set, this is initially null and
-    /// when we insert the PHI node, this is set to the SILArgument which
+    /// the case where we are handling a covering set, this is initially null
+    /// and when we insert the PHI node, this is set to the SILArgument which
     /// represents the PHI node.
     ///
-    /// In the case where we are dealing with loads this is the loaded value or a
-    /// phi derived from a covering set of loaded values. In the case where we are
-    /// dealing with stores, this is the value that is stored or a phi of such
-    /// values.
+    /// In the case where we are dealing with loads this is the loaded value or
+    /// a phi derived from a covering set of loaded values. In the case where we
+    /// are dealing with stores, this is the value that is stored or a phi of
+    /// such values.
     SILValue ForwardingValue;
 
   public:
@@ -145,8 +145,8 @@ namespace {
       if (isSingleInst())
         return AA->mayWriteToMemory(Inst, getAddressForLS(getInst()));
 
-      // Otherwise, loop over all of our forwaring insts and return true if any of
-      // them alias Inst.
+      // Otherwise, loop over all of our forwaring insts and return true if any
+      // of them alias Inst.
       for (auto &I : getInsts())
         if (AA->mayWriteToMemory(Inst, getAddressForLS(I)))
           return true;
@@ -159,8 +159,8 @@ namespace {
       if (isSingleInst())
         return AA->mayReadFromMemory(Inst, getAddressForLS(getInst()));
 
-      // Otherwise, loop over all of our forwaring insts and return true if any of
-      // them alias Inst.
+      // Otherwise, loop over all of our forwaring insts and return true if any
+      // of them alias Inst.
       for (auto &I : getInsts())
         if (AA->mayReadFromMemory(Inst, getAddressForLS(I)))
           return true;
@@ -293,8 +293,8 @@ bool LSValue::operator==(const LSValue &Other) const {
 namespace {
 
   /// This class represents either a single value that we can load forward or a
-  /// covering of values that we could load forward from via the introdution of a
-  /// SILArgument. This enables us to treat both cases the same during our
+  /// covering of values that we could load forward from via the introdution of
+  /// a SILArgument. This enables us to treat both cases the same during our
   /// transformations in an abstract way.
   class LSLoad : public LSValue {
   public:
@@ -314,16 +314,16 @@ namespace {
 
 namespace {
 
-  /// This structure represents either a single value or a covering of values that
-  /// we could use in we can dead store elimination or store forward via the
-  /// introdution of a SILArgument. This enables us to treat both cases the same
-  /// during our transformations in an abstract way.
+  /// This structure represents either a single value or a covering of values
+  /// that we could use in we can dead store elimination or store forward via
+  /// the introdution of a SILArgument. This enables us to treat both cases the
+  /// same during our transformations in an abstract way.
   class LSStore : public LSValue {
     /// Set to true if this LSStore has been read from by some instruction so it
     /// must be live.
     ///
-    /// This allows us to know that the LSStore can not be deleted, but can still
-    /// be forwarded from.
+    /// This allows us to know that the LSStore can not be deleted, but can
+    /// still be forwarded from.
     bool HasReadDependence = false;
 
   public:
@@ -490,7 +490,8 @@ ForwardingAnalysis::ForwardingAnalysis(AliasAnalysis *AA, SILValue Address,
 
   // Attempt to find the projection path from Address -> Load->getOperand().
   // If we failed to find the path, return an empty value early.
-  Path = std::move(ProjectionPath::getAddrProjectionPath(Address, LI->getOperand()));
+  Path = std::move(
+    ProjectionPath::getAddrProjectionPath(Address, LI->getOperand()));
   if (!Path)
     return;
   Result = ForwardingAnalysisResult::Normal;
@@ -536,7 +537,8 @@ ForwardingAnalysis::forward(SILValue Addr, SILValue StoredValue,
   if (Result == ForwardingAnalysisResult::UncheckedAddress)
     return forwardAddrToUncheckedCastToLd(Addr, StoredValue, LI);
 
-  assert(Result == ForwardingAnalysisResult::Normal && "The default kind is Normal.");
+  assert(Result == ForwardingAnalysisResult::Normal &&
+         "The default kind is Normal.");
 
   // Next, try to promote partial loads from stores. If this fails, it will
   // return SILValue(), which is also our failure condition.
