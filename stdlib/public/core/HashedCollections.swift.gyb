@@ -1699,22 +1699,20 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> :
   /// address.
   @warn_unused_result
   internal static func bytesForKeys(capacity: Int) -> Int {
-    let difference = alignof(Key.self) - alignof(UInt)
-    let padding = difference > 0 ? difference : 0
+    let padding = max(0, alignof(Key.self) - alignof(UInt))
     return strideof(Key.self) * capacity + padding
   }
 
-  /// Returns the bytes necessary to store 'capacity' values and padding to align
-  /// the start to the alignment of the 'Value' type assuming a base address
-  /// aligned to the maximum of the alignment of the 'Key' type and the
-  /// alignment of a word..
+  /// Returns the bytes necessary to store 'capacity' values and padding to
+  /// align the start to the alignment of the 'Value' type assuming a base
+  /// address aligned to the maximum of the alignment of the 'Key' type and the
+  /// alignment of a word.
+
 %if Self == 'Dictionary':
   @warn_unused_result
   internal static func bytesForValues(capacity: Int) -> Int {
-    let maxPrevAlignment = alignof(Key.self) > alignof(UInt) ?
-        alignof(Key.self) : alignof(UInt)
-    let difference = alignof(Value.self) - maxPrevAlignment
-    let padding = difference > 0 ? difference : 0
+    let maxPrevAlignment = max(alignof(Key.self), alignof(UInt))
+    let padding = max(0, alignof(Value.self) - maxPrevAlignment)
     return strideof(Value.self) * capacity + padding
   }
 %end
