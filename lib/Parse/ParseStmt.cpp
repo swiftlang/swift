@@ -1605,14 +1605,14 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
         }
         if (fnName == "os") {
           if (!LangOptions::isOSBuildConfigSupported(argument)) {
-            diagnose(fnNameExpr->getLoc(),
+            diagnose(UDRE->getLoc(),
                      diag::unknown_build_config, "operating system",
                      fnName);
             return ConfigParserState::error();
           }
         } else if (fnName == "arch") {
           if (!LangOptions::isArchBuildConfigSupported(argument)) {
-            diagnose(fnNameExpr->getLoc(),
+            diagnose(UDRE->getLoc(),
                      diag::unknown_build_config, "architecture",
                      fnName);
             return ConfigParserState::error();
