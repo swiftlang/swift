@@ -151,7 +151,7 @@ public:
                                           CanSILFunctionType SrcTy,
                                           bool dropGenerics);
 
-  bool isNull() const { return bool(value.getPointer()); }
+  bool isNull() const { return value.getPointer() == nullptr; }
   explicit operator bool() const { return bool(value.getPointer()); }
 
   SILValueCategory getCategory() const {
