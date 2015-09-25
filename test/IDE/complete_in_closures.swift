@@ -49,6 +49,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INHERITANCE_IN_CLOSURE_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_INHERITANCE_IN_CLOSURE_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARGUMENT_TYPE_IN_CLOSURE_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_PARAM_1 | FileCheck %s -check-prefix=CLOSURE_PARAM_1
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -309,3 +310,13 @@ struct LazyVar3 {
     func test(x: #^ARGUMENT_TYPE_IN_CLOSURE_2^#
   }()
 }
+
+func closureTaker(theFunc:(theValue:Int) -> ()) {}
+
+func testClosureParam() {
+  closureTaker { (theValue) -> () in
+    #^CLOSURE_PARAM_1^#
+  }
+}
+// CLOSURE_PARAM_1: Begin completions
+// CLOSURE_PARAM_1-DAG: Decl[LocalVar]/CurrNominal:         theValue[#(Int)#]{{; name=.+$}}
