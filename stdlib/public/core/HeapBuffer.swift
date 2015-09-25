@@ -108,7 +108,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
 
   @warn_unused_result
   func _allocatedSize() -> Int {
-    return swift_malloc_size(_address)
+    return _swift_stdlib_malloc_size(_address)
   }
 
   @warn_unused_result

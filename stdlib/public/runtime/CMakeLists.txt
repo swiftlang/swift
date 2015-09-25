@@ -59,19 +59,19 @@ append_if(CXX_SUPPORTS_GLOBAL_CONSTRUCTORS_WARNING "-Wglobal-constructors" swift
 add_swift_library(swiftRuntime IS_STDLIB IS_STDLIB_CORE
   Casting.cpp
   Demangle.cpp
+  Enum.cpp
   ErrorObject.cpp
+  Errors.cpp
   GlobalObjects.cpp
+  Heap.cpp
   HeapObject.cpp
   KnownMetadata.cpp
+  LibcShims.cpp
   Metadata.cpp
+  Once.cpp
   Reflection.cpp
-  ShimsChecker.cpp
   Stubs.cpp
   SwiftObject.cpp
-  Enum.cpp
-  Once.cpp
-  Heap.cpp
-  Errors.cpp
   UnicodeExtendedGraphemeClusters.cpp.gyb
   ${swift_runtime_objc_sources}
   ${swift_runtime_dtrace_sources}

@@ -322,7 +322,7 @@ public func ==(lhs: String, rhs: String) -> Bool {
     if lhs._core.count != rhs._core.count {
       return false
     }
-    return memcmp(
+    return _swift_stdlib_memcmp(
       lhs._core.startASCII, rhs._core.startASCII,
       rhs._core.count) == 0
   }
@@ -348,7 +348,7 @@ extension String {
   @warn_unused_result
   public // @testable
   func _compareASCII(rhs: String) -> Int {
-    var compare = Int(memcmp(
+    var compare = Int(_swift_stdlib_memcmp(
       self._core.startASCII, rhs._core.startASCII,
       min(self._core.count, rhs._core.count)))
     if compare == 0 {

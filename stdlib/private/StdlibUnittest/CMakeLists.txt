@@ -14,9 +14,6 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
     Foundation)
 endif()
 if(SWIFT_HOST_VARIANT STREQUAL "linux")
-  find_package(BSD REQUIRED)
-  list(APPEND swift_stdlib_unittest_private_link_libraries
-    ${BSD_LIBRARIES})
   list(APPEND swift_stdlib_unittest_module_depends
     Glibc)
 endif()

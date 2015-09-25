@@ -12,7 +12,7 @@
 // String interop with C
 //===----------------------------------------------------------------------===//
 
-import SwiftShims // for strlen, strcpy, strcmp
+import SwiftShims
 
 extension String {
   /// Creates a new `String` by copying the nul-terminated UTF-8 data
@@ -25,7 +25,7 @@ extension String {
     if cs._isNull {
       return .None
     }
-    let len = Int(strlen(cs))
+    let len = Int(_swift_stdlib_strlen(cs))
     return String._fromCodeUnitSequence(UTF8.self,
         input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), count: len))
   }
@@ -43,7 +43,7 @@ extension String {
     if cs._isNull {
       return (.None, hadError: false)
     }
-    let len = Int(strlen(cs))
+    let len = Int(_swift_stdlib_strlen(cs))
     let (result, hadError) = String._fromCodeUnitSequenceWithRepair(UTF8.self,
         input: UnsafeBufferPointer(start: UnsafeMutablePointer(cs), count: len))
     return (result, hadError: hadError)
@@ -58,7 +58,7 @@ public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
   if s == nil {
     return .None
   }
-  let length = Int(strlen(s))
+  let length = Int(_swift_stdlib_strlen(s))
   var result = [CChar](count: length + 1, repeatedValue: 0)
   for var i = 0; i < length; ++i {
     // FIXME: this will not compile on platforms where 'CChar' is unsigned.

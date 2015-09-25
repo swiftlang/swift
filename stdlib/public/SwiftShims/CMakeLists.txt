@@ -1,9 +1,9 @@
 set(sources
   CoreFoundationShims.h
-  DarwinShims.h
   FoundationShims.h
   GlobalObjects.h
   HeapObject.h
+  LibcShims.h
   RefCount.h
   RuntimeShims.h
   RuntimeStubs.h

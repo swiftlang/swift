@@ -1,9 +1,9 @@
 module SwiftShims {
   header "CoreFoundationShims.h"
-  header "DarwinShims.h"
   header "FoundationShims.h"
   header "GlobalObjects.h"
   header "HeapObject.h"
+  header "LibcShims.h"
   header "RefCount.h"
   header "RuntimeShims.h"
   header "RuntimeStubs.h"
