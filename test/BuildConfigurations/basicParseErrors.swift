@@ -56,3 +56,8 @@ struct S {
 #else
 #endif
 
+#if os(youOS) // expected-warning {{unknown operating system for build configuration 'os'}}
+#endif
+
+#if arch(leg) // expected-warning {{unknown architecture for build configuration 'arch'}}
+#endif

@@ -1207,6 +1207,9 @@ ERROR(empty_compiler_version_string,parsing,none,
       "compiler version requirement is empty", ())
 ERROR(cannot_combine_compiler_version,parsing,none,
       "cannot combine _compiler_version with binary operators", ())
+WARNING(unknown_build_config,parsing,none,
+      "unknown %0 for build configuration '%1'",
+      (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // Availability query parsing diagnostics

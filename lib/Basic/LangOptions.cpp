@@ -23,6 +23,35 @@
 
 using namespace swift;
 
+const std::vector<std::string> LangOptions::SupportedOSBuildConfigArguments = {
+  "OSX",
+#if defined(SWIFT_ENABLE_TARGET_TVOS)
+  "tvOS",
+#endif
+  "watchOS",
+  "iOS",
+  "Linux"
+};
+
+const std::vector<std::string> LangOptions::SupportedArchBuildConfigArguments = {
+  "arm",
+  "arm64",
+  "i386",
+  "x86_64"
+};
+
+bool LangOptions::isOSBuildConfigSupported(llvm::StringRef OSName) {
+  auto foundIt = std::find(SupportedOSBuildConfigArguments.begin(),
+                           SupportedOSBuildConfigArguments.end(), OSName);
+  return foundIt != SupportedOSBuildConfigArguments.end();
+}
+
+bool LangOptions::isArchBuildConfigSupported(llvm::StringRef ArchName) {
+  auto foundIt = std::find(SupportedArchBuildConfigArguments.begin(),
+                           SupportedArchBuildConfigArguments.end(), ArchName);
+  return foundIt != SupportedArchBuildConfigArguments.end();
+}
+
 StringRef LangOptions::getTargetConfigOption(StringRef Name) const {
   // Last one wins.
   for (auto &Opt : reversed(TargetConfigOptions)) {

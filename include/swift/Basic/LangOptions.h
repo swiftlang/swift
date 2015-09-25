@@ -195,10 +195,24 @@ namespace swift {
       return BuildConfigOptions;
     }
 
+    /// The constant list of supported os build configuration arguments.
+    static const std::vector<std::string> SupportedOSBuildConfigArguments;
+
+    /// Returns true if the os build configuration argument represents
+    /// a supported target operating system.
+    static bool isOSBuildConfigSupported(StringRef OSName);
+
+    /// The constant list of supported arch build configuration arguments.
+    static const std::vector<std::string> SupportedArchBuildConfigArguments;
+
+    /// Returns true if the arch build configuration argument represents
+    /// a supported target architecture.
+    static bool isArchBuildConfigSupported(StringRef ArchName);
+
   private:
     llvm::SmallVector<std::pair<std::string, std::string>, 2>
         TargetConfigOptions; 
-    llvm::SmallVector<std::string, 2> BuildConfigOptions; 
+    llvm::SmallVector<std::string, 2> BuildConfigOptions;
   };
 }
 

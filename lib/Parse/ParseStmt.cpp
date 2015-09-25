@@ -1562,16 +1562,16 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
       return ConfigParserState::error();
     }
 
-    auto targetValue = fnNameExpr->getName().str();
+    auto fnName = fnNameExpr->getName().str();
 
-    if (!targetValue.equals("arch") && !targetValue.equals("os") &&
-        !targetValue.equals("_runtime") &&
-        !targetValue.equals("_compiler_version")) {
+    if (!fnName.equals("arch") && !fnName.equals("os") &&
+        !fnName.equals("_runtime") &&
+        !fnName.equals("_compiler_version")) {
       diagnose(CE->getLoc(), diag::unsupported_target_config_expression);
       return ConfigParserState::error();
     }
 
-    if (targetValue.equals("_compiler_version")) {
+    if (fnName.equals("_compiler_version")) {
       if (auto SLE = dyn_cast<StringLiteralExpr>(PE->getSubExpr())) {
         if (SLE->getValue().empty()) {
           diagnose(CE->getLoc(), diag::empty_compiler_version_string);
@@ -1593,18 +1593,33 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
       if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(PE->getSubExpr())) {
         // The sub expression should be an UnresolvedDeclRefExpr (we won't
         // tolerate extra parens).
-        auto targetString = UDRE->getName().str();
+        auto argument = UDRE->getName().str();
 
         // Error for values that don't make sense if there's a clear definition
         // of the possible values (as there is for _runtime).
-        if (targetValue.equals("_runtime") &&
-            !targetString.equals("_ObjC") && !targetString.equals("_Native")) {
+        if (fnName.equals("_runtime") &&
+            !argument.equals("_ObjC") && !argument.equals("_Native")) {
           diagnose(CE->getLoc(),
                    diag::unsupported_target_config_runtime_argument);
           return ConfigParserState::error();
         }
-        auto target = Context.LangOpts.getTargetConfigOption(targetValue);
-        return ConfigParserState(target == targetString,
+        if (fnName == "os") {
+          if (!LangOptions::isOSBuildConfigSupported(argument)) {
+            diagnose(fnNameExpr->getLoc(),
+                     diag::unknown_build_config, "operating system",
+                     fnName);
+            return ConfigParserState::error();
+          }
+        } else if (fnName == "arch") {
+          if (!LangOptions::isArchBuildConfigSupported(argument)) {
+            diagnose(fnNameExpr->getLoc(),
+                     diag::unknown_build_config, "architecture",
+                     fnName);
+            return ConfigParserState::error();
+          }
+        }
+        auto target = Context.LangOpts.getTargetConfigOption(fnName);
+        return ConfigParserState(target == argument,
                                  ConfigExprKind::DeclRef);
       } else {
         diagnose(CE->getLoc(), diag::unsupported_target_config_argument,
