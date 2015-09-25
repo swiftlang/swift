@@ -1540,7 +1540,7 @@ Restart:
     }
 
     if (getSubstring(TokStart + 1, 5).equals("endif") &&
-        isWhitespace(CurPtr[5])) {
+        (isWhitespace(CurPtr[5]) || CurPtr[5] == '\0')) {
       CurPtr += 5;
       return formToken(tok::pound_endif, TokStart);
     }

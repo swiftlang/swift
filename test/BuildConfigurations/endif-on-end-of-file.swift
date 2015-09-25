@@ -13,4 +13,5 @@ func debug(msg: String) {
 #else
 func debug(msg: String) {
 }
-#endif // last line in file
+// last line of file - make sure no \n sneaks in below #endif.
+#endif
