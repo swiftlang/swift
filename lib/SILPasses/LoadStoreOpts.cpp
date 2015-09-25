@@ -42,6 +42,7 @@ using namespace swift;
 static llvm::cl::opt<bool> DisableGDSE("sil-disable-loadstore-dse",
                                       llvm::cl::init(false), llvm::cl::Hidden);
 
+STATISTIC(NumSameValueStores,"Number of same value stores removed");
 STATISTIC(NumDeadStores,     "Number of dead stores removed");
 STATISTIC(NumDupLoads,       "Number of dup loads removed");
 STATISTIC(NumForwardedLoads, "Number of loads forwarded");
@@ -1000,6 +1001,11 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
   // If we are storing a value that is available in the load list then we
   // know that no one clobbered that address and the current store is
   // redundant and we can remove it.
+  //
+  // e.g.
+  // %0 = load %A
+  // ... nothing happens in middle and the %A contains the value of %0.
+  // store %0 to %A  <---- no need to do this store.
   if (auto *LdSrc = dyn_cast<LoadInst>(SI->getSrc())) {
     // Check that the loaded value is live and that the destination address
     // is the same as the loaded address.
@@ -1012,7 +1018,7 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
     // do.
     if (Iter != Loads.end() && LdSrcOp == SI->getDest()) {
       deleteUntrackedInstruction(Ctx, SI, StoreMap);
-      NumDeadStores++;
+      NumSameValueStores++;
       return true;
     }
   }
