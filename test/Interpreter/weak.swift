@@ -62,6 +62,23 @@ func testSwiftImplicitOptionalClass() {
 testSwiftImplicitOptionalClass()
 
 
+func testWeakInLet() {
+  print("testWeakInLet") // CHECK-LABEL: testWeakInLet
+
+  struct WeakBox {
+    weak var value: SwiftClassBase?
+  }
+
+  var obj: SwiftClassBase? = SwiftClass() // CHECK: SwiftClass Created
+  let box = WeakBox(value: obj)
+  printState(box.value) // CHECK-NEXT: is present
+  obj = nil // CHECK-NEXT: SwiftClass Destroyed
+  printState(box.value) // CHECK-NEXT: is nil
+}
+
+testWeakInLet()
+
+
 //======================== Test Classbound Protocols ========================
 
 
