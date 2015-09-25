@@ -14,10 +14,10 @@
 ///
 /// This pass eliminates dead stores across basic blocks.
 ///
-/// A store is dead if after the stored has occurred:
+/// A store is dead if after the store has occurred:
 ///
-/// 1. The stored to pointer is not used along any path to program exit.
-/// 2. The stored to pointer is overwritten by another store before any
+/// 1. The store to pointer is not used along any path to program exit.
+/// 2. The store to pointer is overwritten by another store before any
 /// potential use of the pointer.
 ///
 /// DeadStoreElimination (DSE) eliminates such stores by:
@@ -169,15 +169,25 @@ void Location::initialize(SILValue Dest) {
 
 namespace {
 
-/// BBState summarizes how Locations are accessed in a basic block.
+/// BBState summarizes how Locations are used in a basic block.
 ///
 /// Initially the WriteSetOut is empty. Before a basic block is processed, it is
 /// initialized to the intersection of WriteSetIns of all successors of the
 /// basic block.
 ///
+/// TODO: The initial state of WriteSetIn should be all 1's. Otherwise the
+/// dataflow solution will be too conservative in case of loops.
+/// consider this case, the dead store by var a = 10 before the loop will not
+/// be eliminated if the WriteSetIn is set to 0 initially. However, we can only
+/// eliminate the dead stores after the data flow stablizes.
+///
+///   var a = 10
+///   for _ in 0...1024 {}
+///   a = 10
+///
 /// Initially WriteSetIn is empty. After the basic block is processed, if its
-/// WriteSetOut is different from WriteSetIn, WriteSetIn is assigned the value
-/// of WriteSetOut and the data flow is rerun to reach fixed point.
+/// WriteSetOut is different from WriteSetIn, WriteSetIn is initialized to the
+/// value of WriteSetOut and the data flow is rerun.
 ///
 /// Instructions in each basic block are processed in post-order as follows:
 ///
@@ -432,18 +442,18 @@ public:
 
 bool GlobalDeadStoreEliminationImpl::isMayAliasingLocation(unsigned src,
                                                            unsigned dst) {
-  Location *SL = &LocationVault[src], *DL = &LocationVault[dst];
+  const Location &SL = LocationVault[src], DL = LocationVault[dst];
   // If the base does not alias, then the location can not alias.
-  if (AA->isNoAlias(SL->getBase(), DL->getBase()))
+  if (AA->isNoAlias(SL.getBase(), DL.getBase()))
     return false;
   return true;
 }
 
 bool GlobalDeadStoreEliminationImpl::isMustAliasingLocation(unsigned src,
                                                             unsigned dst) {
-  Location *SL = &LocationVault[src], *DL = &LocationVault[dst];
+  const Location &SL = LocationVault[src], &DL = LocationVault[dst];
   // If the base is not must alias, the location may not alias.
-  if (!AA->isMustAlias(SL->getBase(), DL->getBase()))
+  if (!AA->isMustAlias(SL.getBase(), DL.getBase()))
     return false;
   return true;
 }
@@ -579,11 +589,13 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
   if (!L.getBase())
     return;
 
-  // If the store is dead, add it to the dead store set.
-  if (updateWriteSetForWrite(I, S, getLocationBit(L))) {
-    DEBUG(llvm::dbgs() << "Instruction Dead: " << *I << "\n");
-    S->DeadStores.insert(I);
-  }
+  // Check whether the instruction is dead.
+  if (!updateWriteSetForWrite(I, S, getLocationBit(L)))
+    return;
+
+  // Instruction dead.
+  DEBUG(llvm::dbgs() << "Instruction Dead: " << *I << "\n");
+  S->DeadStores.insert(I);
 }
 
 void GlobalDeadStoreEliminationImpl::processLoadInst(SILInstruction *I) {
