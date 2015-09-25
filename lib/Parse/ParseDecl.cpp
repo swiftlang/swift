@@ -188,7 +188,11 @@ namespace {
 
     IgnorePrivateDeclTokens(Parser &P, DeclAttributes &Attrs)
       : TheParser(P), Attributes(Attrs) {
-      if (TheParser.IsParsingInterfaceTokens) {
+      // NOTE: It's generally not safe to ignore private decls in nominal
+      // types. Such private decls may affect the data layout of a class/struct
+      // or the vtable layout of a class. So only ignore global private decls.
+      if (TheParser.IsParsingInterfaceTokens &&
+          TheParser.CurDeclContext->isModuleScopeContext()) {
         SavedHashState = TheParser.SF.getInterfaceHashState();
       }
     }
