@@ -1560,9 +1560,12 @@ namespace {
                 return nullptr;
 
               // Remove one level of "Ref" from the typealias.
-              if (auto typealias = dyn_cast<TypeAliasDecl>(underlying))
-                SwiftType = typealias->getUnderlyingType();
-              else
+              if (auto typealias = dyn_cast<TypeAliasDecl>(underlying)) {
+                Type doublyUnderlyingTy = typealias->getUnderlyingType();
+                if (isa<NameAliasType>(doublyUnderlyingTy.getPointer()))
+                  SwiftType = doublyUnderlyingTy;
+              }
+              if (!SwiftType)
                 SwiftType = underlying->getDeclaredType();
 
               auto DC = Impl.importDeclContextOf(Decl);
