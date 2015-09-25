@@ -1527,8 +1527,8 @@ public:
         return elem->getName().str() == "Domain";
       });
       if (!hasDomainCase) {
-        os << "static NSString * const " << ED->getName() << "Domain = @\""
-           << M.getName() << "." << ED->getName() << "\";\n";
+        os << "static NSString * __nonnull const " << ED->getName()
+           << "Domain = @\"" << M.getName() << "." << ED->getName() << "\";\n";
       }
     }
 
