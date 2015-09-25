@@ -2563,6 +2563,12 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
         }
       }
     }
+  } else if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (method->isBodyThrowing()) {
+      // Attach the foreign error convention.
+      assert(errorConvention && "Missing error convention");
+      method->setForeignErrorConvention(*errorConvention);
+    }
   }
 }
 

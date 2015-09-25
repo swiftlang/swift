@@ -2046,3 +2046,15 @@ class SubclassThrowsObjCName : ThrowsObjCName {
   // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
   override func method9(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 }
+
+@objc protocol ProtocolThrowsObjCName {
+  optional func doThing(x: String) throws -> String // expected-note{{requirement 'doThing' declared here}}
+}
+
+class ConformsToProtocolThrowsObjCName1 : ProtocolThrowsObjCName {
+  @objc func doThing(x: String) throws -> String { return x } // okay
+}
+
+class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName { // expected-note{{class 'ConformsToProtocolThrowsObjCName2' declares conformance to protocol 'ProtocolThrowsObjCName' here}}
+  @objc func doThing(x: Int) throws -> String { return "" } // expected-error{{Objective-C method 'doThing:error:' provided by method 'doThing' conflicts with optional requirement method 'doThing' in protocol 'ProtocolThrowsObjCName'}}
+}
