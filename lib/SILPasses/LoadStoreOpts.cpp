@@ -38,6 +38,10 @@
 
 using namespace swift;
 
+/// Disable dead store elimination.
+static llvm::cl::opt<bool> DisableGDSE("sil-disable-loadstore-dse",
+                                      llvm::cl::init(false), llvm::cl::Hidden);
+
 STATISTIC(NumDeadStores,     "Number of dead stores removed");
 STATISTIC(NumDupLoads,       "Number of dup loads removed");
 STATISTIC(NumForwardedLoads, "Number of loads forwarded");
@@ -828,6 +832,10 @@ public:
   void invalidateReadFromStores(LSContext &Ctx, SILInstruction *Inst,
                                 CoveredStoreMap &StoreMap);
 
+  /// Update the load store states w.r.t. the store instruction.
+  void processStoreInst(LSContext &Ctx, StoreInst *SI,
+                        CoveredStoreMap &StoreMap);
+
   /// Try to prove that SI is a dead store updating all current state. If SI is
   /// dead, eliminate it.
   bool tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
@@ -968,6 +976,20 @@ void LSBBForwarder::invalidateReadFromStores(LSContext &Ctx,
                        << P.first);
     setReadDependencyOnStores(P.first, StoreMap);
   }
+}
+
+void LSBBForwarder::processStoreInst(LSContext &Ctx, StoreInst *SI,
+                                     CoveredStoreMap &StoreMap) {
+  // Invalidate any load that we can not prove does not read from the stores
+  // destination.
+  invalidateAliasingLoads(Ctx, SI, StoreMap);
+
+  // Invalidate any store that we can not prove does not write to the stored
+  // destination.
+  invalidateWriteToStores(Ctx, SI, StoreMap);
+
+  // Insert SI into our store list to start tracking.
+  startTrackingStore(Ctx, SI, StoreMap);
 }
 
 bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
@@ -1303,7 +1325,12 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
 
     // This is a StoreInst. Let's see if we can remove the previous stores.
     if (auto *SI = dyn_cast<StoreInst>(Inst)) {
-      Changed |= tryToEliminateDeadStores(Ctx, SI, StoreMap);
+      // If DSE is disabled, merely update states w.r.t. this store, but do not
+      // try to get rid of the store.
+      if (DisableGDSE)
+        processStoreInst(Ctx, SI, StoreMap);
+      else
+        Changed |= tryToEliminateDeadStores(Ctx, SI, StoreMap);
       continue;
     }
 
