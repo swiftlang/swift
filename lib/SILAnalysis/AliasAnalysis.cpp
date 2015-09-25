@@ -873,6 +873,8 @@ MemoryBehaviorVisitor::visitStrongReleaseInst(StrongReleaseInst *SI) {
   // If this is a alloc_stack instruction, strong_release can not write to it,
   // as its address is never going to be stored anywhere and strong_release
   // does not take an inout parameter.
+  // If it is stored somewhere/escapes, alloc box to stack pass would not have
+  // promoted the alloc_box to alloc_stack.
   if (isa<AllocStackInst>(getUnderlyingObject(V)))
     return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
@@ -883,6 +885,8 @@ MemoryBehaviorVisitor::visitUnownedReleaseInst(UnownedReleaseInst *SI) {
   // If this is a alloc_stack instruction, unowned_release can not write to it,
   // as its address is never going to be stored anywhere and unowned_release
   // does not take an inout parameter.
+  // If it is stored somewhere/escapes, alloc box to stack pass would not have
+  // promoted the alloc_box to alloc_stack.
   if (isa<AllocStackInst>(getUnderlyingObject(V)))
     return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
@@ -893,6 +897,8 @@ MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
   // If this is a alloc_stack instruction, release_value can not write to it,
   // as its address is never going to be stored anywhere and release_value
   // does not take an inout parameter.
+  // If it is stored somewhere/escapes, alloc box to stack pass would not have
+  // promoted the alloc_box to alloc_stack.
   if (isa<AllocStackInst>(getUnderlyingObject(V)))
     return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
