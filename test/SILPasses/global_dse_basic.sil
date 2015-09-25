@@ -794,3 +794,25 @@ bb2:                                              // Preds: bb1
   dealloc_stack %2#0 : $*@local_storage S1        // id: %18
   return %17 : $()                                // id: %19
 }
+
+
+// store to stack allocated memory can not alias with incoming argument.
+//
+// CHECK-LABEL: DeadStoreInoutAndStackAlias
+// CHECK: bb0
+// CHECK : struct_element_addr
+// CHECK-NOT: store
+// CHECK: load
+sil hidden @DeadStoreInoutAndStackAlias : $@convention(thin) (@inout A) -> () {
+bb0(%0 : $*A):
+  %1 = alloc_stack $A                             // users: %4, %8
+  %2 = integer_literal $Builtin.Int32, 0          // users: %5, %7
+  %3 = struct_element_addr %0 : $*A, #A.i         // user: %6
+  %4 = struct_element_addr %1#1 : $*A, #A.i       // users: %5, %7
+  store %2 to %4 : $*Builtin.Int32                // id: %5
+  %6 = load %3 : $*Builtin.Int32
+  store %2 to %4 : $*Builtin.Int32                // id: %7
+  dealloc_stack %1#0 : $*@local_storage A         // id: %8
+  %9 = tuple ()                                   // user: %10
+  return %9 : $()                                 // id: %10
+}
