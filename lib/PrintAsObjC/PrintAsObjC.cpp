@@ -1550,11 +1550,22 @@ public:
            "#include <stddef.h>\n"
            "#include <stdbool.h>\n"
            "\n"
-           "#if defined(__has_include) && __has_include(<uchar.h>)\n"
-           "# include <uchar.h>\n"
-           "#elif !defined(__cplusplus) || __cplusplus < 201103L\n"
+           "#if !defined(SWIFT_TYPEDEFS)\n"
+           "# define SWIFT_TYPEDEFS 1\n"
+           "# if defined(__has_include) && __has_include(<uchar.h>)\n"
+           "#  include <uchar.h>\n"
+           "# elif !defined(__cplusplus) || __cplusplus < 201103L\n"
            "typedef uint_least16_t char16_t;\n"
            "typedef uint_least32_t char32_t;\n"
+           "# endif\n"
+#define MAP_SIMD_TYPE(C_TYPE, _) \
+           "typedef " #C_TYPE " swift_" #C_TYPE "2"       \
+           "  __attribute__((__ext_vector_type__(2)));\n" \
+           "typedef " #C_TYPE " swift_" #C_TYPE "3"       \
+           "  __attribute__((__ext_vector_type__(3)));\n" \
+           "typedef " #C_TYPE " swift_" #C_TYPE "4"       \
+           "  __attribute__((__ext_vector_type__(4)));\n"
+#include "swift/ClangImporter/SIMDMappedTypes.def"
            "#endif\n"
            "\n"
            "#if !defined(SWIFT_PASTE)\n"
@@ -1634,14 +1645,6 @@ public:
              "enum _name : _type _name; "
              "enum SWIFT_ENUM_EXTRA _name : _type\n"
            "#endif\n"
-#define MAP_SIMD_TYPE(C_TYPE, _) \
-           "typedef " #C_TYPE " swift_" #C_TYPE "2"       \
-           "  __attribute__((__ext_vector_type__(2)));\n" \
-           "typedef " #C_TYPE " swift_" #C_TYPE "3"       \
-           "  __attribute__((__ext_vector_type__(3)));\n" \
-           "typedef " #C_TYPE " swift_" #C_TYPE "4"       \
-           "  __attribute__((__ext_vector_type__(4)));\n"
-#include "swift/ClangImporter/SIMDMappedTypes.def"
            ;
     static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,
                 "need to add SIMD typedefs here if max elements is increased");
