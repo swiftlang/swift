@@ -49,8 +49,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INHERITANCE_IN_CLOSURE_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_INHERITANCE_IN_CLOSURE_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARGUMENT_TYPE_IN_CLOSURE_2 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_PARAM_1 | FileCheck %s -check-prefix=CLOSURE_PARAM_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_PARAM_2 | FileCheck %s -check-prefix=CLOSURE_PARAM_2
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -311,21 +309,3 @@ struct LazyVar3 {
     func test(x: #^ARGUMENT_TYPE_IN_CLOSURE_2^#
   }()
 }
-
-func closureTaker(theFunc:(theValue:Int) -> ()) {}
-func closureTaker2(theFunc: (Value1:Int, Value2:Int) ->()) {}
-func testClosureParam1() {
-  closureTaker { (theValue) -> () in
-    #^CLOSURE_PARAM_1^#
-  }
-}
-// CLOSURE_PARAM_1: Begin completions
-// CLOSURE_PARAM_1-DAG: Decl[LocalVar]/CurrNominal:         theValue[#(Int)#]{{; name=.+$}}
-func testClosureParam2() {
-  closureTaker2 { (Value1, Value2) -> () in
-    #^CLOSURE_PARAM_2^#
-  }
-}
-// CLOSURE_PARAM_2: Begin completions
-// CLOSURE_PARAM_2-DAG: Decl[LocalVar]/CurrNominal:         Value1[#Int#]{{; name=.+$}}
-// CLOSURE_PARAM_2-DAG: Decl[LocalVar]/CurrNominal:         Value2[#Int#]{{; name=.+$}}
