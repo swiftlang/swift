@@ -145,14 +145,8 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
 
   // Clone all instructions from Insns into DestBB
   void clone() {
-    for (auto I : Insns) {
+    for (auto I : Insns)
       process(I);
-    }
-
-    // Set proper debug scope.
-    for (auto &I : *DestBB) {
-      I.setDebugScope(DestBB->getParent()->getDebugScope());
-    }
   }
 };
 
