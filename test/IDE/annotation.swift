@@ -320,3 +320,11 @@ func test11(a: CWS, i: Int) {
   // CHECK: <Param@[[@LINE-1]]:13>a</Param><Subscript@[[@LINE-3]]:3>[</Subscript><Param@[[@LINE-1]]:21>i</Param>,<Param@[[@LINE-1]]:21>i</Param><Subscript@[[@LINE-3]]:3>]</Subscript>
   a[i,i]
 }
+
+// CHECK: func <Func>test_defer</Func>() {
+func test_defer() {
+  defer {
+    // CHECK: <Func@[[@LINE-2]]:6>test_defer</Func>()
+    test_defer()
+  }
+}

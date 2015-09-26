@@ -282,6 +282,13 @@ prefix operator *~~ {}
 // CHECK: <attr-builtin>postfix</attr-builtin> <kw>operator</kw> ~~* {
 postfix operator ~~* {}
 
+func test_defer() {
+  defer {
+    // CHECK: <kw>let</kw> x : <type>Int</type> = <int>0</int>
+    let x : Int = 0
+  }
+}
+
 // FIXME: blah.
 //    FIXME:   blah blah
 // Something something, FIXME: blah

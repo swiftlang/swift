@@ -685,6 +685,13 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
       if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
         CharSourceRange(ConfigS->getEndLoc(), 6/*'#endif'*/) }))
         return { false, nullptr };
+
+  } else if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
+    if (auto *FD = DeferS->getTempDecl()) {
+      auto *RetS = FD->getBody()->walk(*this);
+      // Already walked children.
+      return { false, RetS };
+    }
   }
 
   return { true, S };

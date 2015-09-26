@@ -153,13 +153,23 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
 
 std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
   bool TraverseChildren = SEWalker.walkToStmtPre(S);
-  if (TraverseChildren && SEWalker.shouldWalkInactiveConfigRegion()) {
-    if (auto *ICS = dyn_cast<IfConfigStmt>(S)) {
-      TraverseChildren = false;
-      for(auto Clause : ICS->getClauses()) {
-        for (auto Member : Clause.Elements) {
-          Member.walk(*this);
+  if (TraverseChildren) {
+    if (SEWalker.shouldWalkInactiveConfigRegion()) {
+      if (auto *ICS = dyn_cast<IfConfigStmt>(S)) {
+        TraverseChildren = false;
+        for(auto Clause : ICS->getClauses()) {
+          for (auto Member : Clause.Elements) {
+            Member.walk(*this);
+          }
         }
+      }
+    }
+
+    if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
+      if (auto *FD = DeferS->getTempDecl()) {
+        auto *RetS = FD->getBody()->walk(*this);
+        // Already walked children.
+        return { false, RetS };
       }
     }
   }
