@@ -205,6 +205,7 @@ endif()
 # Include CMake modules
 #
 
+include(CheckCXXSourceRuns)
 include(CMakeParseArguments)
 include(SwiftTranslateFlag)
 include(SwiftHandleGybSources)
@@ -304,6 +305,34 @@ set(SWIFT_MODULE_CACHE_PATH
 if(XCODE)
   swift_common_xcode_cxx_config()
 endif()
+
+function(check_working_std_regex result_var_name)
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+    # Apple operating systems use libc++, which has a working std::regex.
+    set("${result_var_name}" TRUE PARENT_SCOPE)
+  else()
+    # libstdc++ 4.8 has an incomplete std::regex implementation, and crashes
+    # on many regexes.
+    # libstdc++ 4.9 works.
+    set(std_regex_test_source
+"
+#include <regex>
+const std::regex broken_regex{
+  \"([a]+)\",
+  std::regex::ECMAScript | std::regex::nosubs};
+
+int main() {}
+")
+
+    check_cxx_source_runs("${std_regex_test_source}" result)
+    if (result)
+      set("${result_var_name}" TRUE PARENT_SCOPE)
+    else()
+      set("${result_var_name}" FALSE PARENT_SCOPE)
+    endif()
+  endif()
+endfunction()
+check_working_std_regex(SWIFT_HAVE_WORKING_STD_REGEX)
 
 #
 # Enable additional warnings.

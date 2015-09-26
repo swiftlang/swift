@@ -22,6 +22,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Token.h"
+#include "swift/Config.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -238,8 +239,8 @@ class ModelASTWalker : public ASTWalker {
   unsigned BufferID;
   std::vector<StructureElement> SubStructureStack;
   SourceLoc LastLoc;
-  static const std::regex URLRxs[3];
-  static const std::regex DocCommentRxs[3];
+  static const std::regex &getURLRegex(unsigned Index);
+  static const std::regex &getDocCommentRegex(unsigned Index);
 
   Optional<SyntaxNode> parseFieldNode(StringRef Text, StringRef OrigText,
                                       SourceLoc OrigLoc);
@@ -307,26 +308,32 @@ private:
   }
 };
 
-const std::regex ModelASTWalker::URLRxs[3] =  {
+const std::regex &ModelASTWalker::getURLRegex(unsigned Index) {
+  static const std::regex Regexes[3] =  {
     std::regex{ RegexStrURL, std::regex::ECMAScript | std::regex::nosubs },
     std::regex{ RegexStrMailURL, std::regex::ECMAScript | std::regex::nosubs },
     std::regex{ RegexStrRadarURL, std::regex::ECMAScript | std::regex::nosubs }
-};
+  };
+  return Regexes[Index];
+}
 
-const std::regex ModelASTWalker::DocCommentRxs[3] = {
-  std::regex {
-    RegexStrParameter,
-    std::regex::egrep | std::regex::icase | std::regex::optimize
-  },
-  std::regex {
-    RegexStrDocCommentParametersHeading,
-    std::regex::egrep | std::regex::icase | std::regex::optimize
-  },
-  std::regex {
-    RegexStrDocCommentField,
-    std::regex::egrep | std::regex::icase | std::regex::optimize
-  }
-};
+const std::regex &ModelASTWalker::getDocCommentRegex(unsigned Index) {
+  static const std::regex Regexes[3] =  {
+    std::regex {
+      RegexStrParameter,
+      std::regex::egrep | std::regex::icase | std::regex::optimize
+    },
+    std::regex {
+      RegexStrDocCommentParametersHeading,
+      std::regex::egrep | std::regex::icase | std::regex::optimize
+    },
+    std::regex {
+      RegexStrDocCommentField,
+      std::regex::egrep | std::regex::icase | std::regex::optimize
+    }
+  };
+  return Regexes[Index];
+}
 
 SyntaxStructureKind syntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N) {
   if (isa<ClassDecl>(N))
@@ -1291,6 +1298,10 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
 bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
                                         unsigned &Start,
                                         std::regex &Regex) {
+#ifndef SWIFT_HAVE_WORKING_STD_REGEX
+  return false;
+#endif
+
   static const auto MailToPosition = std::find(URLProtocols.begin(),
                                                URLProtocols.end(),
                                                "mailto");
@@ -1306,11 +1317,11 @@ bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
         Text.substr(Index - It->size(), It->size()) == *It) {
       Start = Index - It->size();
       if (It < MailToPosition)
-        Regex = URLRxs[0];
+        Regex = getURLRegex(0);
       else if (It < RadarPosition)
-        Regex = URLRxs[1];
+        Regex = getURLRegex(1);
       else
-        Regex = URLRxs[2];
+        Regex = getURLRegex(2);
       return true;
     }
   }
@@ -1350,8 +1361,13 @@ bool ModelASTWalker::searchForURL(CharSourceRange Range) {
 Optional<SyntaxNode> ModelASTWalker::parseFieldNode(StringRef Text,
                                                     StringRef OrigText,
                                                     SourceLoc OrigLoc) {
+#ifndef SWIFT_HAVE_WORKING_STD_REGEX
+  return None;
+#endif
+
   std::match_results<StringRef::iterator> Matches;
-  for (auto &Rx : DocCommentRxs) {
+  for (unsigned i = 0; i != 3; ++i) {
+    auto &Rx = getDocCommentRegex(i);
     bool HadMatch = std::regex_search(Text.begin(), Text.end(), Matches, Rx);
     if (HadMatch)
       break;
