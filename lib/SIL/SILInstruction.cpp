@@ -19,6 +19,7 @@
 #include "swift/Basic/Unicode.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/AST/AST.h"
 #include "swift/Basic/AssertImplements.h"
@@ -39,6 +40,13 @@ Optional<SILLocation> SILValue::getLoc() const {
     return I->getLoc();
   }
   return None;
+}
+
+SILInstruction *SILInstruction::setDebugScope(SILDebugScope *DS) {
+  if (DebugScope && DebugScope->InlinedCallSite)
+    assert(DS->InlinedCallSite && "throwing away inlined scope info");
+  DebugScope = DS;
+  return this;
 }
 
 //===----------------------------------------------------------------------===//
