@@ -78,9 +78,17 @@ std::string SILType::getAsString() const {
 }
 
 bool SILType::isPointerSizeAndAligned(CanType t) {
-  if (t.hasPointerRepresentation())
+  if (t->isBridgeableObjectType()
+      || t->is<BuiltinNativeObjectType>()
+      || t->is<BuiltinBridgeObjectType>()
+      || t->is<BuiltinUnknownObjectType>()
+      || t->is<BuiltinRawPointerType>()) {
     return true;
-
+  }
+  if (auto protocol = dyn_cast<ProtocolType>(t)) {
+    return protocol->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)
+      || protocol->getDecl()->isObjC();
+  }
   if (auto intTy = dyn_cast<BuiltinIntegerType>(t))
     return intTy->getWidth().isPointerWidth();
 
@@ -445,15 +453,20 @@ SILType SILType::getAnyOptionalObjectType(SILModule &M,
 /// Return true of this type is the size of a single reference and holds a
 /// single reference ignoring spare bits.
 bool SILType::canBitCastAsSingleRef() const {
-  Type objType = getSwiftRValueType();
+  CanType objType = getSwiftRValueType();
   // Unwrap one level of Optional or ImplicitlyUnwrappedOptional.
-  if (auto optionalType = objType->getAnyOptionalObjectType())
+  if (CanType optionalType = objType.getAnyOptionalObjectType())
     objType = optionalType;
 
+  if (auto protocol = dyn_cast<ProtocolType>(objType)) {
+    return protocol->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)
+      || protocol->getDecl()->isObjC();
+  }
   return objType->mayHaveSuperclass()
-    || objType->is<BuiltinNativeObjectType>()
-    || objType->is<BuiltinBridgeObjectType>()
-    || objType->is<BuiltinUnknownObjectType>();
+    || objType.isObjCExistentialType()
+    || isa<BuiltinNativeObjectType>(objType)
+    || isa<BuiltinBridgeObjectType>(objType)
+    || isa<BuiltinUnknownObjectType>(objType);
 }
 
 /// True if the given type value is nonnull, and the represented type is NSError

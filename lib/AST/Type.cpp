@@ -1965,64 +1965,6 @@ bool TypeBase::isPotentiallyBridgedValueType() {
   return false;
 }
 
-bool CanType::hasPointerRepresentationImpl(CanType type) {
-  switch (type->getKind()) {
-#define SUGARED_TYPE(id, parent) case TypeKind::id:
-#define TYPE(id, parent)
-#include "swift/AST/TypeNodes.def"
-    llvm_unreachable("sugared canonical type?");
-
-  // These types have pointer representation.
-  case TypeKind::BuiltinUnknownObject:
-  case TypeKind::BuiltinNativeObject:
-  case TypeKind::BuiltinBridgeObject:
-  case TypeKind::Class:
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BuiltinRawPointer:
-    return true;
-
-  // Nothing else is statically guaranteed to have pointer representation.
-  case TypeKind::DynamicSelf:
-  case TypeKind::Archetype:
-  case TypeKind::Protocol:
-  case TypeKind::ProtocolComposition:
-  case TypeKind::UnboundGeneric:
-  case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
-  case TypeKind::GenericFunction:
-  case TypeKind::SILFunction:
-  case TypeKind::SILBox:
-  case TypeKind::SILBlockStorage:
-  case TypeKind::Error:
-  case TypeKind::Unresolved:
-  case TypeKind::BuiltinInteger:
-  case TypeKind::BuiltinFloat:
-  case TypeKind::BuiltinUnsafeValueBuffer:
-  case TypeKind::BuiltinVector:
-  case TypeKind::Tuple:
-  case TypeKind::Enum:
-  case TypeKind::Struct:
-  case TypeKind::Metatype:
-  case TypeKind::ExistentialMetatype:
-  case TypeKind::Module:
-  case TypeKind::LValue:
-  case TypeKind::InOut:
-  case TypeKind::TypeVariable:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage:
-    return false;
-
-  case TypeKind::GenericTypeParam:
-  case TypeKind::DependentMember:
-    llvm_unreachable("Dependent types can't answer representation query");
-  }
-
-  llvm_unreachable("Unhandled type kind!");
-}
-
 /// Is t1 not just a subtype of t2, but one such that its values are
 /// trivially convertible to values of the other?
 static bool canOverride(CanType t1, CanType t2,
