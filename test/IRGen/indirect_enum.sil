@@ -42,3 +42,9 @@ enum Foo<T> {
   indirect case Foo(Int)
   case Bar(T)
 }
+
+// rdar://problem/22169679
+enum E<T> {
+  indirect case A(E)
+  case B(T)
+}

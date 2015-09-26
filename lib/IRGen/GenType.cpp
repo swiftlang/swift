@@ -1654,9 +1654,12 @@ namespace {
     bool visitEnumDecl(EnumDecl *decl) {
       if (IGM.isResilient(decl, ResilienceScope::Local))
         return true;
+      if (decl->isIndirect())
+        return false;
 
       for (auto elt : decl->getAllElements()) {
         if (elt->hasArgumentType() &&
+            !elt->isIndirect() &&
             visit(elt->getArgumentType()->getCanonicalType()))
           return true;
       }
