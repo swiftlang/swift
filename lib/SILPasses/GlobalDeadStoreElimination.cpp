@@ -68,7 +68,7 @@
 using namespace swift;
 
 static llvm::cl::opt<bool> EnableGDSE("sil-enable-global-dse",
-                                      llvm::cl::init(false), llvm::cl::Hidden);
+                                      llvm::cl::init(true), llvm::cl::Hidden);
 
 STATISTIC(NumDeadStores, "Number of dead stores removed");
 

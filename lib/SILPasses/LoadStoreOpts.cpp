@@ -40,7 +40,7 @@ using namespace swift;
 
 /// Disable dead store elimination.
 static llvm::cl::opt<bool> DisableGDSE("sil-disable-loadstore-dse",
-                                      llvm::cl::init(false), llvm::cl::Hidden);
+                                      llvm::cl::init(true), llvm::cl::Hidden);
 
 STATISTIC(NumSameValueStores,"Number of same value stores removed");
 STATISTIC(NumDeadStores,     "Number of dead stores removed");
