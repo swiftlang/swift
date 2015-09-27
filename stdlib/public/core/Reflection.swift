@@ -51,7 +51,7 @@ public struct ObjectIdentifier : Hashable, Comparable {
 
   /// Construct an instance that uniquely identifies the class instance `x`.
   public init(_ x: AnyObject) {
-    self.value = unsafeBitCast(x, Builtin.RawPointer.self)
+    self.value = Builtin.bridgeToRawPointer(x)
   }
 
   /// Construct an instance that uniquely identifies the metatype `x`.
