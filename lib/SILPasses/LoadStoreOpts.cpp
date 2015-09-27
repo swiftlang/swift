@@ -1333,10 +1333,11 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
     if (auto *SI = dyn_cast<StoreInst>(Inst)) {
       // If DSE is disabled, merely update states w.r.t. this store, but do not
       // try to get rid of the store.
-      if (DisableGDSE)
+      if (DisableGDSE) {
         processStoreInst(Ctx, SI, StoreMap);
-      else
-        Changed |= tryToEliminateDeadStores(Ctx, SI, StoreMap);
+        continue;
+      }
+      Changed |= tryToEliminateDeadStores(Ctx, SI, StoreMap);
       continue;
     }
 
