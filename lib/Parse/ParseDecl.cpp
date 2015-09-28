@@ -945,8 +945,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                         Obsoleted,
                                         Unconditional,
                                         /*Implicit=*/false));
-      }
-      else {
+      } else {
+        // Not a known platform. Just drop the attribute.
         diagnose(Loc, diag::attr_availability_unknown_platform,
                  Platform, AttrName);
         return false;

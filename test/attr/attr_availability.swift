@@ -19,11 +19,11 @@ func noArgs() {}
 @available(*) // expected-error {{expected ',' in 'available' attribute}}
 func noKind() {}
 
-@available(badPlatform, unavailable) // expected-error {{unknown platform 'badPlatform' for attribute 'available'}}
+@available(badPlatform, unavailable) // expected-warning {{unknown platform 'badPlatform' for attribute 'available'}}
 func unavailable_bad_platform() {}
 
 // Handle unknown platform.
-@available(HAL9000, unavailable) // expected-error {{unknown platform 'HAL9000'}}
+@available(HAL9000, unavailable) // expected-warning {{unknown platform 'HAL9000'}}
 func availabilityUnknownPlatform() {}
 
 // <rdar://problem/17669805> Availability can't appear on a typealias
