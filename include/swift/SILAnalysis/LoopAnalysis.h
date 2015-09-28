@@ -43,7 +43,7 @@ public:
     return !branchesPreserved;
   }
 
-  // Computes loop information for the givne function using dominance
+  // Computes loop information for the given function using dominance
   // information.
   virtual SILLoopInfo *newFunctionAnalysis(SILFunction *F) override;
 
