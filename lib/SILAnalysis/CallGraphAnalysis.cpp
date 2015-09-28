@@ -114,7 +114,8 @@ void CallGraph::computeClassMethodCalleesForClass(ClassDecl *CD) {
       CallGraphEdge::CalleeSetType *CalleeSet;
       bool Complete;
 
-      std::tie(CalleeSet, Complete) = getOrCreateCalleeSetForClassMethod(Method);
+      std::tie(CalleeSet, Complete) =
+        getOrCreateCalleeSetForClassMethod(Method);
       assert(CalleeSet && "Unexpected null callee set!");
 
       CalleeSet->insert(Node);
@@ -622,16 +623,21 @@ void CallGraph::printStats(llvm::raw_ostream &OS) {
 
   OS << CallGraphFileCheckPrefix << "*** Call Graph Statistics ***\n";
 
-  OS << CallGraphFileCheckPrefix << "Number of call graph nodes: " << CountNodes << "\n";
-  OS << CallGraphFileCheckPrefix << "Number of call graph edges: " << CountCallSites << "\n";
+  OS << CallGraphFileCheckPrefix << "Number of call graph nodes: " <<
+    CountNodes << "\n";
+  OS << CallGraphFileCheckPrefix << "Number of call graph edges: " <<
+    CountCallSites << "\n";
 
-  OS << CallGraphFileCheckPrefix << "Histogram of number of call sites per function:\n";
+  OS << CallGraphFileCheckPrefix <<
+    "Histogram of number of call sites per function:\n";
   CallSitesPerFunction.print(OS);
 
-  OS << CallGraphFileCheckPrefix << "Histogram of number of callees per call site:\n";
+  OS << CallGraphFileCheckPrefix <<
+    "Histogram of number of callees per call site:\n";
   CalleesPerCallSite.print(OS);
 
-  OS << CallGraphFileCheckPrefix << "Histogram of number of callers per function:\n";
+  OS << CallGraphFileCheckPrefix <<
+    "Histogram of number of callers per function:\n";
   CallersPerFunction.print(OS);
 
   OS << CallGraphFileCheckPrefix << "Bump pointer allocated memory (bytes): " <<
@@ -770,7 +776,8 @@ void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
     CG->addEdgesForApply(NewApply);
 }
 
-void CallGraphEditor::moveNodeToNewFunction(SILFunction *Old, SILFunction *New) {
+void CallGraphEditor::moveNodeToNewFunction(SILFunction *Old,
+                                            SILFunction *New) {
   if (!CG)
     return;
 
@@ -1127,4 +1134,3 @@ void CallGraph::viewCG() {
   llvm::ViewGraph(&OCG, "callgraph");
 #endif
 }
-
