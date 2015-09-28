@@ -21,4 +21,5 @@ add_swift_library(swiftSILAnalysis
   RCStateTransition.cpp
   RCStateTransitionVisitors.cpp
   LoopRegionAnalysis.cpp
+  MemoryBehavior.cpp
   LINK_LIBRARIES swiftSILPassesUtils)
