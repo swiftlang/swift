@@ -713,6 +713,7 @@ public:
              const clang::DeclContext *dc,
              const llvm::SmallBitVector &nonNullArgs,
              const Optional<api_notes::ObjCMethodInfo> &knownMethod,
+             Optional<unsigned> errorParamIndex,
              bool returnsSelf);
 
   /// \brief Converts the given Swift identifier for Clang.
@@ -1046,7 +1047,8 @@ public:
   /// Determine whether we can infer a default argument for a parameter with
   /// the given \c type and (Clang) optionality.
   bool canInferDefaultArgument(clang::QualType type,
-                               OptionalTypeKind clangOptionality);
+                               OptionalTypeKind clangOptionality,
+                               bool isLastParameter);
 
   /// \brief Import the type of an Objective-C method.
   ///

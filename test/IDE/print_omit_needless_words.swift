@@ -25,10 +25,10 @@
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector)
 
 // Note: "with" parameters.
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject? = nil)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?)
 
 // Note: "with" parameters drop the "with".
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject? = nil, with: AnyObject? = nil)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?, with: AnyObject?)
 
 // Note: id -> "Object".
 // CHECK-FOUNDATION: func indexOf(_: AnyObject) -> Int
@@ -37,7 +37,7 @@
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
 
 // Note: Pointer-to-struct name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func copy(with _: NSZone = nil) -> AnyObject!
+// CHECK-FOUNDATION: func copyWith(_: NSZone) -> AnyObject!
 
 // Note: Objective-C type parameter names.
 // CHECK-FOUNDATION: func objectFor(_: NSCopying) -> AnyObject?
@@ -87,8 +87,11 @@
 // Note: <context type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: func withString(_: String) -> String
 
-// Note: Splitting on "With".
+// Note: Not splitting on "With".
 // CHECK-FOUNDATION: func URLWithAddedString(_: String) -> NSURL?
+
+// Note: CalendarUnits is not a set of "Options".
+// CHECK-FOUNDATION: class func forCalendarUnits(_: NSCalendarUnit) -> String!
 
 // Note: <property type>By<gerund> --> <gerund>.
 // CHECK-FOUNDATION: var deletingLastPathComponent: NSURL? { get }
@@ -100,7 +103,7 @@
 // CHECK-FOUNDATION: func enumerateObjectsUsing(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
 // CHECK-FOUNDATION: func enumerateObjects(with _: NSEnumerationOptions = [], using: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
 
-// Note: WithBlock -> body
+// Note: WithBlock -> body, nullable closures default to nil.
 // CHECK-FOUNDATION: func enumerateObjectsRandomly(with _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
@@ -124,20 +127,20 @@
 // Note: instance method name stripping context type.
 // CHECK-APPKIT: func same() -> Self
 
-// Note: Unsafe(Mutable)Pointers get defaulted to 'nil'
-// CHECK-APPKIT: func getRGBAComponents(_: UnsafeMutablePointer<Int8> = nil)
+// Note: Unsafe(Mutable)Pointers don't get defaulted to 'nil'
+// CHECK-APPKIT: func getRGBAComponents(_: UnsafeMutablePointer<Int8>)
 
 // Note: Skipping over "3D"
 // CHECK-APPKIT: func drawInAirAt(_: Point3D)
 
 // Note: with<something> -> <something>
-// CHECK-APPKIT: func drawAt(_: Point3D, attributes: [String : AnyObject]? = nil)
+// CHECK-APPKIT: func drawAt(_: Point3D, attributes: [String : AnyObject]?)
 
 // Note: Don't strip names that aren't preceded by a verb or preposition.
-// CHECK-APPKIT: func setTextColor(_: NSColor? = nil)
+// CHECK-APPKIT: func setTextColor(_: NSColor?)
 
 // Note: Splitting with default arguments.
-// CHECK-APPKIT: func draw(`in` _: NSView? = nil)
+// CHECK-APPKIT: func drawIn(_: NSView?)
 
 // Note: Skipping over "Ref"
 // CHECK-CORECOOLING: func replace(_: CCPowerSupply!)

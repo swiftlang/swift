@@ -1996,6 +1996,7 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
            const clang::DeclContext *dc,
            const llvm::SmallBitVector &nonNullArgs,
            const Optional<api_notes::ObjCMethodInfo> &knownMethod,
+           Optional<unsigned> errorParamIndex,
            bool returnsSelf) {
   ASTContext &ctx = SwiftContext;
 
@@ -2013,6 +2014,11 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
   for (unsigned i = 0, n = params.size(); i != n; ++i) {
     auto param = params[i];
 
+    bool isLastParameter
+      = (i == params.size() - 1) ||
+        (i == params.size() - 2 &&
+         errorParamIndex && *errorParamIndex == params.size() - 1);
+
     // Figure out whether there will be a default argument for this
     // parameter.
     bool hasDefaultArg
@@ -2023,7 +2029,8 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
                               knownMethod
                                 ? Optional<clang::NullabilityKind>(
                                     knownMethod->getParamTypeInfo(i))
-                                : None));
+                                : None),
+          isLastParameter);
 
     paramTypes.push_back(getClangTypeNameForOmission(param->getType())
                             .withDefaultArgument(hasDefaultArg));
@@ -2084,14 +2091,22 @@ clang::QualType ClangImporter::Implementation::getClangDeclContextType(
 }
 
 bool ClangImporter::Implementation::canInferDefaultArgument(
-       clang::QualType type, OptionalTypeKind clangOptionality) {
-  // If it's stated to be optional in C, it defaults to 'nil'.
-  if (clangOptionality == OTK_Optional)
+       clang::QualType type, OptionalTypeKind clangOptionality,
+       bool isLastParameter) {
+  // Nullable trailing closure parameters default to 'nil'.
+  if (clangOptionality == OTK_Optional && isLastParameter &&
+      (type->isFunctionPointerType() || type->isBlockPointerType()))
     return true;
 
-  // Option sets default to "[]".
+  // Option sets default to "[]" if they have "Options" in their name.
   if (const clang::EnumType *enumTy = type->getAs<clang::EnumType>())
-    return classifyEnum(enumTy->getDecl()) == EnumKind::Options;
+    if (classifyEnum(enumTy->getDecl()) == EnumKind::Options) {
+      auto enumName = enumTy->getDecl()->getName();
+      for (auto word : reversed(camel_case::getWords(enumName))) {
+        if (camel_case::sameWordIgnoreFirstCase(word, "options"))
+          return true;
+      }
+    }
 
   return false;
 }
@@ -2210,6 +2225,7 @@ Type ClangImporter::Implementation::importMethodType(
                    clangDecl->getDeclContext(),
                    nonNullArgs,
                    knownMethod,
+                   errorInfo ? Optional<unsigned>(errorInfo->ParamIndex) : None,
                    clangDecl->hasRelatedResultType());
   }
 
@@ -2337,10 +2353,15 @@ Type ClangImporter::Implementation::importMethodType(
 
     // Determine whether we have a default argument.
     DefaultArgumentKind defaultArg = DefaultArgumentKind::None;
+    bool isLastParameter
+      = (paramIndex == params.size() - 1) ||
+        (paramIndex == params.size() - 2 &&
+         errorInfo && errorInfo->ParamIndex == params.size() - 1);
     if (InferDefaultArguments &&
         (kind == SpecialMethodKind::Regular ||
          kind == SpecialMethodKind::Constructor) &&
-        canInferDefaultArgument(param->getType(), optionalityOfParam)) {
+        canInferDefaultArgument(param->getType(), optionalityOfParam,
+                                isLastParameter)) {
       defaultArg = DefaultArgumentKind::Normal;
     }
 

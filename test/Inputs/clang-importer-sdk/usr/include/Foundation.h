@@ -892,6 +892,7 @@ __attribute__((availability(macosx,introduced=10.11)))
 - (nonnull NSString *)stringByAppendingString:(nonnull NSString *)string;
 - (nonnull NSString *)stringWithString:(nonnull NSString *)string;
 - (nullable NSURL *)URLWithAddedString:(nonnull NSString *)string;
++ (NSString *)stringForCalendarUnits:(NSCalendarUnit)units;
 @end
 
 @interface NSURL (Properties)
