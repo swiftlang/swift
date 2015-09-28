@@ -536,7 +536,11 @@ class SILDeadFuncElimination : public SILModuleTransform {
 
     DEBUG(llvm::dbgs() << "Running DeadFuncElimination\n");
 
-    // Avoid that Deserializers keep references to functions in their caches.
+    // The deserializer caches functions that it deserializes so that if it is
+    // asked to deserialize that function again, it does not do extra work. This
+    // causes the function's reference count to be incremented causing it to be
+    // alive unnecessarily. We invalidate the SILLoaderCaches here so that we
+    // can eliminate such functions.
     getModule()->invalidateSILLoaderCaches();
 
     DeadFunctionElimination deadFunctionElimination(getModule(), CGA);
@@ -552,7 +556,11 @@ class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
 
     DEBUG(llvm::dbgs() << "Running ExternalFunctionDefinitionsElimination\n");
 
-    // Avoid that Deserializers keep references to functions in their caches.
+    // The deserializer caches functions that it deserializes so that if it is
+    // asked to deserialize that function again, it does not do extra work. This
+    // causes the function's reference count to be incremented causing it to be
+    // alive unnecessarily. We invalidate the SILLoaderCaches here so that we
+    // can eliminate the definitions of such functions.
     getModule()->invalidateSILLoaderCaches();
 
     ExternalFunctionDefinitionsElimination EFDFE(getModule(), CGA);
