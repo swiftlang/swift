@@ -96,7 +96,6 @@ SILBasicBlock *splitEdge(TermInst *T, unsigned EdgeIdx,
 /// \brief Splits the edges between two basic blocks.
 ///
 /// Updates dominance information and loop information if not null.
-/// Returns the newly created basic block on success.
 void splitEdgesFromTo(SILBasicBlock *From, SILBasicBlock *To,
                       DominanceInfo *DT = nullptr, SILLoopInfo *LI = nullptr);
 
