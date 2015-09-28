@@ -48,11 +48,20 @@ class LoopCanonicalizer : public SILFunctionTransform {
 
     bool Changed = false;
     std::vector<SILLoop *> Worklist;
+
     for (auto *L : LI->getTopLevelLoops())
       Worklist.push_back(L);
+
     while (Worklist.size()) {
       auto *L = Worklist.back();
       Worklist.pop_back();
+
+      // We currently do not perform loop canonicalizations that introduce new
+      // loops, so this will be safe. When that occurs, this pass will need to
+      // be updated.
+      for (auto *SubLoop : L->getSubLoops())
+        Worklist.push_back(SubLoop);
+
       if (canonicalizeLoop(L, DT, LI)) {
         DEBUG(llvm::dbgs() << "    Canonicalized: " << *L);
         Changed = true;

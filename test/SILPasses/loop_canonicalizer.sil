@@ -51,3 +51,41 @@ bb3:
 bb4:
   return undef : $()
 }
+
+// CHECK-LABEL: sil @insert_backedge_block_inner_loop : $@convention(thin) () -> () {
+// CHECK: bb1:
+// CHECK: br bb2
+// CHECK: bb2:
+// CHECK: br bb3
+// CHECK: bb3:
+// CHECK: cond_br undef, bb4, bb5
+// CHECK: bb4:
+// CHECK: br bb2
+// CHECK: bb5:
+// CHECK: cond_br undef, bb4, bb6
+// CHECK: bb6:
+// CHECK: cond_br undef, bb1, bb7
+// CHECK: bb7:
+// CHECK: return undef
+sil @insert_backedge_block_inner_loop : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  br bb2
+
+bb2:
+  br bb3
+
+bb3:
+  cond_br undef, bb2, bb4
+
+bb4:
+  cond_br undef, bb2, bb5
+
+bb5:
+  cond_br undef, bb1, bb6
+
+bb6:
+  return undef : $()
+}
