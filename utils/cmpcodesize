@@ -256,35 +256,56 @@ def compareFunctionSizes(oldFiles, newFiles):
     onlyInFile2 = []
     inBoth = []
 
+    onlyInFile1Size = 0
+    onlyInFile2Size = 0
+    inBothSize = 0
+
     for func, oldSize in oldSizes.items():
         newSize = newSizes[func]
         if newSize != 0:
             inBoth.append((func, oldSize, newSize))
         else:
             onlyInFile1.append((func, oldSize))
+            onlyInFile1Size += oldSize
 
     for func, newSize in newSizes.items():
         oldSize = oldSizes[func]
         if oldSize == 0:
             onlyInFile2.append((func, newSize))
+            onlyInFile2Size += newSize
 
     if onlyInFile1:
         print "Only in old file(s)"
         listFunctionSizes(onlyInFile1)
+        print "Total size of functions only in old file: {}".format(onlyInFile1Size)
         print
 
     if onlyInFile2:
         print "Only in new files(s)"
         listFunctionSizes(onlyInFile2)
+        print "Total size of functions only in new file: {}".format(onlyInFile2Size) 
         print
 
     if inBoth:
+        sizeIncrease = 0
+        sizeDecrease = 0
         print "%8s %8s %8s" % ("old", "new", "diff")
         for triple in sorted(inBoth, key=lambda tup: (tup[2] - tup[1], tup[1])):
             func = triple[0]
             oldSize = triple[1]
             newSize = triple[2]
+            diff = newSize - oldSize
+            if diff > 0:
+                sizeIncrease += diff
+            else:
+                sizeDecrease -= diff
+            if diff == 0:
+                inBothSize += newSize
             print "%8d %8d %8d %s" %(oldSize, newSize, newSize - oldSize, func)
+        print "Total size of functions with the same size in both files: {}".format(inBothSize)
+        print "Total size of functions that got smaller: {}".format(sizeDecrease)
+        print "Total size of functions that got bigger: {}".format(sizeIncrease)
+        print "Total size change of functions present in both files: {}".format(sizeIncrease - sizeDecrease)
 
 def main():
     allSections = False
