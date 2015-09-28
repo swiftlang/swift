@@ -18,14 +18,11 @@
 
 using namespace swift;
 
-SILLoopInfo *SILLoopAnalysis::getLoopInfo(SILFunction *F) {
-  if (!LoopInfos.count(F)) {
-    assert(DA != nullptr && "Expect a valid dominance analysis");
-    DominanceInfo *DT = DA->get(F);
-    assert(DT != nullptr && "Expect a valid dominance information");
-    LoopInfos[F] = new SILLoopInfo(F, DT);
-  }
-  return LoopInfos[F];
+SILLoopInfo *SILLoopAnalysis::newFunctionAnalysis(SILFunction *F) {
+  assert(DA != nullptr && "Expect a valid dominance analysis");
+  DominanceInfo *DT = DA->get(F);
+  assert(DT != nullptr && "Expect a valid dominance information");
+  return new SILLoopInfo(F, DT);
 }
 
 void SILLoopAnalysis::initialize(SILPassManager *PM) {

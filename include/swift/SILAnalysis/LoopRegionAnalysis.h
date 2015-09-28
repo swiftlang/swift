@@ -843,7 +843,7 @@ public:
   }
 
   virtual LoopRegionFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new LoopRegionFunctionInfo(F, POA->get(F), SLA->getLoopInfo(F));
+    return new LoopRegionFunctionInfo(F, POA->get(F), SLA->get(F));
   }
 
   virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {

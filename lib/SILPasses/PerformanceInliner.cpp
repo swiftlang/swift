@@ -737,8 +737,8 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
   ConstantTracker constTracker(Callee, &callerTracker, AI);
   
   DominanceInfo *DT = DA->get(Callee);
-  SILLoopInfo *LI = LA->getLoopInfo(Callee);
-  
+  SILLoopInfo *LI = LA->get(Callee);
+
   DominanceOrder domOrder(&Callee->front(), DT, Callee->size());
   
   // Calculate the inlining cost of the callee.
@@ -1030,7 +1030,7 @@ void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
                                                    SILLoopAnalysis *LA,
                                                    CallGraph &CG) {
   DominanceInfo *DT = DA->get(Caller);
-  SILLoopInfo *LI = LA->getLoopInfo(Caller);
+  SILLoopInfo *LI = LA->get(Caller);
 
   ConstantTracker constTracker(Caller);
   DominanceOrder domOrder(&Caller->front(), DT, Caller->size());

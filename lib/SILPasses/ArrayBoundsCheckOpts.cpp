@@ -1197,7 +1197,7 @@ public:
 
     SILFunction *F = getFunction();
     assert(F);
-    SILLoopInfo *LI = LA->getLoopInfo(F);
+    SILLoopInfo *LI = LA->get(F);
     assert(LI);
     DominanceInfo *DT = DA->get(F);
     assert(DT);

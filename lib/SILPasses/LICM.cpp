@@ -541,7 +541,7 @@ public:
   void run() override {
     SILFunction *F = getFunction();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
-    SILLoopInfo *LoopInfo = LA->getLoopInfo(F);
+    SILLoopInfo *LoopInfo = LA->get(F);
 
     if (LoopInfo->empty()) {
       DEBUG(llvm::dbgs() << "No loops in " << F->getName() << "\n");

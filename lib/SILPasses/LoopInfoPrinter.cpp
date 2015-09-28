@@ -31,7 +31,7 @@ class LoopInfoPrinter : public SILFunctionTransform {
     assert(LA);
     SILFunction *F = getFunction();
     assert(F);
-    SILLoopInfo *LI = LA->getLoopInfo(F);
+    SILLoopInfo *LI = LA->get(F);
     assert(LI);
 
     if (LI->empty()) {

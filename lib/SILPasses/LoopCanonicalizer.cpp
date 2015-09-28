@@ -38,7 +38,7 @@ class LoopCanonicalizer : public SILFunctionTransform {
 
     auto *LA = PM->getAnalysis<SILLoopAnalysis>();
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
-    auto *LI = LA->getLoopInfo(F);
+    auto *LI = LA->get(F);
     auto *DT = DA->get(F);
 
     if (LI->empty()) {

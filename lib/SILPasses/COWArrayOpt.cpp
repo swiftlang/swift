@@ -1030,7 +1030,7 @@ class COWArrayOptPass : public SILFunctionTransform {
     auto *LA = PM->getAnalysis<SILLoopAnalysis>();
     auto *RCIA =
       PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());
-    SILLoopInfo *LI = LA->getLoopInfo(getFunction());
+    SILLoopInfo *LI = LA->get(getFunction());
     CallGraph *CG = PM->getAnalysis<CallGraphAnalysis>()->getCallGraphOrNull();
     if (LI->empty()) {
       DEBUG(llvm::dbgs() << "  Skipping Function: No loops.\n");
@@ -1620,8 +1620,7 @@ public:
   }
 
   SILLoop *getLoop() {
-    auto *LoopInfo =
-        LoopAnalysis->getLoopInfo(HoistableLoopPreheader->getParent());
+    auto *LoopInfo = LoopAnalysis->get(HoistableLoopPreheader->getParent());
     return LoopInfo->getLoopFor(HoistableLoopPreheader->getSingleSuccessor());
   }
 
@@ -1807,7 +1806,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
 
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
-    SILLoopInfo *LI = LA->getLoopInfo(getFunction());
+    SILLoopInfo *LI = LA->get(getFunction());
     CallGraphAnalysis *CGA = PM->getAnalysis<CallGraphAnalysis>();
     CallGraph *CG = CGA->getCallGraphOrNull();
 

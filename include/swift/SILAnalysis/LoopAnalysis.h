@@ -28,50 +28,26 @@ namespace swift {
 namespace swift {
 
 /// Computes natural loop information for SIL basic blocks.
-class SILLoopAnalysis : public SILAnalysis {
-  using LoopInfoMap = llvm::DenseMap<SILFunction *, SILLoopInfo *>;
-
-  LoopInfoMap LoopInfos;
+class SILLoopAnalysis : public FunctionAnalysisBase<SILLoopInfo> {
   DominanceAnalysis *DA;
 public:
   SILLoopAnalysis(SILModule *)
-      : SILAnalysis(AnalysisKind::Loop), DA(nullptr) {}
-
-  virtual ~SILLoopAnalysis() {
-    for (auto LI : LoopInfos)
-      delete LI.second;
-  }
+      : FunctionAnalysisBase(AnalysisKind::Loop), DA(nullptr) {}
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::Loop;
   }
 
-  virtual void initialize(SILPassManager *PM);
-  
-  virtual void invalidate(SILAnalysis::PreserveKind K) {
-    if (K & PreserveKind::Branches) return;
-
-    for (auto LI : LoopInfos)
-      delete LI.second;
-
-    // Clear the maps.
-    LoopInfos.clear();
+  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
+    bool branchesPreserved = K & PreserveKind::Branches;
+    return !branchesPreserved;
   }
 
-  virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
-    if (K & PreserveKind::Branches) return;
+  // Computes loop information for the givne function using dominance
+  // information.
+  virtual SILLoopInfo *newFunctionAnalysis(SILFunction *F) override;
 
-    if (LoopInfos.count(F)) {
-      delete LoopInfos[F];
-      LoopInfos.erase(F);
-    }
-
-  }
-
-  // Computes loop information for the function using dominance information or
-  // returns a cached result if available.
-  SILLoopInfo *getLoopInfo(SILFunction *F);
-
+  virtual void initialize(SILPassManager *PM) override;
 };
 
 } // end namespace swift

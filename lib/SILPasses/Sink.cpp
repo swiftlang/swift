@@ -112,7 +112,7 @@ public:
     DT = PM->getAnalysis<DominanceAnalysis>()->get(getFunction());
     PO = getAnalysis<PostOrderAnalysis>()->get(getFunction());
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
-    LoopInfo = LA->getLoopInfo(getFunction());
+    LoopInfo = LA->get(getFunction());
 
     auto postOrder = PO->getPostOrder();
 
