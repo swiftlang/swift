@@ -75,13 +75,13 @@ public:
     return S->getKind() == AnalysisKind::RCIdentity;
   }
 
-  virtual void initialize(SILPassManager *PM);
+  virtual void initialize(SILPassManager *PM) override;
   
-  RCIdentityFunctionInfo *newFunctionAnalysis(SILFunction *F) {
+  virtual RCIdentityFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
     return new RCIdentityFunctionInfo(DA);
   }
 
-  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) {
+  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
     return true;
   }
 
