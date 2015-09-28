@@ -654,8 +654,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalPatterns |= Args.hasArg(OPT_enable_experimental_patterns);
 
-  Opts.EnableInterfaceTypeMangling |= Args.hasArg(OPT_enable_interface_type_mangling);
-
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   

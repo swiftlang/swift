@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen -enable-interface-type-mangling | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen | FileCheck %s
 
 protocol P {
   typealias Assoc1

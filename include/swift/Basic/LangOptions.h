@@ -123,9 +123,6 @@ namespace swift {
     /// new enough?
     bool EnableTargetOSChecking = true;
     
-    /// Mangle declarations using their interface types.
-    bool EnableInterfaceTypeMangling = true;
-    
     /// The target we are building for.
     ///
     /// This represents the minimum deployment target.

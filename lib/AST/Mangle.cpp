@@ -577,26 +577,17 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
                              unsigned uncurryLevel) {
   Type type;
   
-  // TODO: Use the interface type if enabled.
-  if (decl->getASTContext().LangOpts.EnableInterfaceTypeMangling) {
-    type = decl->hasType() ? decl->getInterfaceType()
-                           : ErrorType::get(decl->getASTContext());
-    
-  } else {
-    type = decl->hasType() ? decl->getType()
-                           : ErrorType::get(decl->getASTContext());
-  }
+  type = decl->hasType() ? decl->getInterfaceType()
+                         : ErrorType::get(decl->getASTContext());
   Mod = decl->getModuleContext();
   mangleType(type->getCanonicalType(), explosion, uncurryLevel);
 
-  if (decl->getASTContext().LangOpts.EnableInterfaceTypeMangling) {
-    // Bind the declaration's generic context for nested decls.
-    if (decl->getInterfaceType()
-        && !decl->getInterfaceType()->is<ErrorType>()) {
-      if (const auto context = dyn_cast<DeclContext>(decl)) {
-        if (auto params = context->getGenericParamsOfContext()) {
-          bindAllGenericParameters(*this, params);
-        }
+  // Bind the declaration's generic context for nested decls.
+  if (decl->getInterfaceType()
+      && !decl->getInterfaceType()->is<ErrorType>()) {
+    if (const auto context = dyn_cast<DeclContext>(decl)) {
+      if (auto params = context->getGenericParamsOfContext()) {
+        bindAllGenericParameters(*this, params);
       }
     }
   }
@@ -607,9 +598,8 @@ void Mangler::mangleGenericSignature(const GenericSignature *sig,
   // TODO: For staging purposes, only canonicalize the signature when interface
   // type mangling is enabled. We ought to do this all the time.
   assert(Mod);
-  if (sig->getASTContext().LangOpts.EnableInterfaceTypeMangling)
-    sig = sig->getCanonicalManglingSignature(*Mod);
-  
+  sig = sig->getCanonicalManglingSignature(*Mod);
+
   // Mangle the number of parameters.
   unsigned depth = 0;
   unsigned count = 0;
@@ -1611,24 +1601,13 @@ void Mangler::mangleProtocolConformance(const ProtocolConformance *conformance){
   
   ContextStack context(*this);
   // If the conformance is generic, mangle its generic parameters.
-  if (conformance->getDeclContext()->getASTContext()
-        .LangOpts.EnableInterfaceTypeMangling) {
-    Mod = conformance->getDeclContext()->getParentModule();
-    if (auto sig = conformance->getGenericSignature()) {
-      Buffer << 'u';
-      mangleGenericSignature(sig, ResilienceExpansion::Minimal);
-    }
-    mangleType(conformance->getInterfaceType()->getCanonicalType(),
-               ResilienceExpansion::Minimal, 0);
-  } else {
-    if (auto gp = conformance->getGenericParams()) {
-      Buffer << 'U';
-      bindGenericParameters(gp, /*mangle*/ true);
-    }
-    
-    mangleType(conformance->getType()->getCanonicalType(),
-               ResilienceExpansion::Minimal, 0);
+  Mod = conformance->getDeclContext()->getParentModule();
+  if (auto sig = conformance->getGenericSignature()) {
+    Buffer << 'u';
+    mangleGenericSignature(sig, ResilienceExpansion::Minimal);
   }
+  mangleType(conformance->getInterfaceType()->getCanonicalType(),
+             ResilienceExpansion::Minimal, 0);
   mangleProtocolName(conformance->getProtocol());
   mangleModule(conformance->getDeclContext()->getParentModule());
 }
