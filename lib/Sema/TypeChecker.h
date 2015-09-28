@@ -948,6 +948,9 @@ public:
   /// Resolve the raw type of the given enum.
   void resolveRawType(EnumDecl *enumDecl) override;
 
+  /// Resolve the inherited protocols of a given protocol.
+  void resolveInheritedProtocols(ProtocolDecl *protocol) override;
+
   /// Resolve the types in the inheritance clause of the given
   /// declaration context, which will be a nominal type declaration or
   /// extension declaration.

@@ -165,10 +165,6 @@ struct DenseMapInfo<GenericTypeParamKey> {
 }
 
 struct ArchetypeBuilder::Implementation {
-  /// Callback that produces the array of protocols describing the protocols
-  /// inherited by its argument.
-  std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols;
-
   /// A mapping from generic parameters to the corresponding potential
   /// archetypes.
   llvm::MapVector<GenericTypeParamKey, PotentialArchetype*> PotentialArchetypes;
@@ -669,19 +665,6 @@ ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
   : Mod(mod), Context(mod.getASTContext()), Diags(diags),
     Impl(new Implementation)
 {
-  Impl->getInheritedProtocols = [](ProtocolDecl *protocol) {
-    return protocol->getInheritedProtocols(nullptr);
-  };
-}
-
-ArchetypeBuilder::ArchetypeBuilder(
-  Module &mod, DiagnosticEngine &diags, 
-  LazyResolver *lazyResolver,
-  std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols)
-  : Mod(mod), Context(mod.getASTContext()), Diags(diags),
-    Resolver(lazyResolver), Impl(new Implementation)
-{
-  Impl->getInheritedProtocols = std::move(getInheritedProtocols);
 }
 
 ArchetypeBuilder::ArchetypeBuilder(ArchetypeBuilder &&) = default;
@@ -692,6 +675,10 @@ ArchetypeBuilder::~ArchetypeBuilder() {
 
   for (auto PA : Impl->PotentialArchetypes)
     delete PA.second;
+}
+
+LazyResolver *ArchetypeBuilder::getLazyResolver() const { 
+  return Context.getLazyResolver();
 }
 
 auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
@@ -790,7 +777,9 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   (void) inserted;
 
   // Add all of the inherited protocol requirements, recursively.
-  for (auto InheritedProto : Impl->getInheritedProtocols(Proto)) {
+  if (auto resolver = getLazyResolver())
+    resolver->resolveInheritedProtocols(Proto);
+  for (auto InheritedProto : Proto->getInheritedProtocols(getLazyResolver())) {
     if (Visited.count(InheritedProto))
       continue;
     if (addConformanceRequirement(T, InheritedProto, InnerSource, Visited))

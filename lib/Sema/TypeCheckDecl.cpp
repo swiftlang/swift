@@ -259,6 +259,10 @@ void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
   }
 }
 
+void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {
+  checkInheritanceClause(protocol);
+}
+
 void TypeChecker::resolveInheritanceClause(
        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) {
   // FIXME: Add a cached bit so this isn't O(n) in repeated calls.
@@ -739,11 +743,7 @@ static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
 
 /// Create a fresh archetype builder.
 ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
-  return ArchetypeBuilder(
-           *mod, Diags, this,
-           [=](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
-             return getDirectConformsTo(protocol);
-           });
+  return ArchetypeBuilder(*mod, Diags);
 }
 
 static void revertDependentTypeLoc(TypeLoc &tl) {

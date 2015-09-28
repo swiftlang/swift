@@ -97,6 +97,9 @@ public:
   /// Resolve the raw type of the given enum.
   virtual void resolveRawType(EnumDecl *enumDecl) = 0;
 
+  /// Resolve the inherited protocols of a given protocol.
+  virtual void resolveInheritedProtocols(ProtocolDecl *protocol) = 0;
+
   /// Resolve the type of an extension.
   ///
   /// This can be called to ensure that the members of an extension can be

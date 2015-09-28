@@ -117,7 +117,6 @@ private:
   ModuleDecl &Mod;
   ASTContext &Context;
   DiagnosticEngine &Diags;
-  LazyResolver *Resolver = nullptr;
   struct Implementation;
   std::unique_ptr<Implementation> Impl;
 
@@ -177,21 +176,13 @@ private:
   void visitPotentialArchetypes(F f);
 
 public:
-  ArchetypeBuilder(ModuleDecl &mod, DiagnosticEngine &diags);
-
   /// Construct a new archtype builder.
   ///
   /// \param mod The module in which the builder will create archetypes.
   ///
   /// \param diags The diagnostics entity to use.
-  ///
-  /// \param getInheritedProtocols A function that determines the set of
-  /// protocols inherited from the given protocol. This produces the final
-  /// results of ProtocolDecl::getProtocols().
-  ArchetypeBuilder(
-    ModuleDecl &mod, DiagnosticEngine &diags, LazyResolver *resolver,
-    std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
-      getInheritedProtocols);
+  ArchetypeBuilder(ModuleDecl &mod, DiagnosticEngine &diags);
+
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
 
@@ -202,7 +193,7 @@ public:
   ModuleDecl &getModule() const { return Mod; }
 
   /// Retrieve the lazy resolver, if there is one.
-  LazyResolver *getLazyResolver() const { return Resolver; }
+  LazyResolver *getLazyResolver() const;
 
   /// Enumerate the requirements that describe the signature of this
   /// archetype builder.
