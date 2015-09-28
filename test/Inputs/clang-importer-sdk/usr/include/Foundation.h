@@ -934,6 +934,11 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 
 - (void)doSomethingWithCopying:(nonnull id<NSCopying>)copying;
 - (void)doSomethingElseWithCopying:(nonnull NSObject<NSCopying> *)copying;
+
+- (void)enumerateObjectsWithNullableBlock:(void (^ __nullable)(
+                                                  id obj,
+                                                  NSUInteger idx,
+                                                  BOOL *stop))block;
 @end
 
 @interface NSMutableArray (Sorting)

@@ -27,3 +27,7 @@ func dropDefaultedWithoutRename(domain: String, code: Int, array: NSArray) {
 func dontDropUnnamedSetterArg(str: NSString) {
   str.setTextColor(nil) // don't drop this
 }
+
+func renameTrailingClosure(array: NSArray) {
+  array.enumerateObjectsWithNullableBlock { _, _, _ in print("foo") } // expected-warning{{enumerateObjectsWithNullableBlock' could be named 'enumerateObjects(withNullableBlock:)' [-Womit-needless-words]}}{{9-42=enumerateObjects}}
+}

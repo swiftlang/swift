@@ -2224,7 +2224,7 @@ void TypeChecker::checkOmitNeedlessWords(ApplyExpr *apply) {
   // Dig out the argument tuple.
   Expr *arg = apply->getArg();
   if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg))
-    arg = shuffle->getSubExpr()->getSemanticsProvidingExpr();
+    arg = shuffle->getSubExpr();
   TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
   ParenExpr *argParen = dyn_cast<ParenExpr>(arg);
 
