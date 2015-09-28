@@ -174,6 +174,19 @@ ArrayTestSuite.test("${array_type}/Sliceable/Enums") {
   */
 }
 
+ArrayTestSuite.test("${array_type}/append") {
+  var x: ${array_type}<Int> = []
+  x.reserveCapacity(10002)
+  let capacity = x.capacity
+  for _ in 1...10000 {
+    let y = x
+    x.append(1)
+    expectTrue(x.capacity == capacity)
+    let z = x
+    x.removeAtIndex(0)
+  }
+}
+
 ArrayTestSuite.test("${array_type}/emptyAllocation") {
   let arr0 = ${array_type}<Int>()
   let arr1 = ${array_type}<TestValueTy>(count: 0, repeatedValue: TestValueTy(0))

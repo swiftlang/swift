@@ -571,12 +571,13 @@ extension ${Self} : _ArrayType {
 
   @inline(never)
   internal mutating func _copyToNewGrownBuffer(oldCount: Int) {
-      var newBuffer =
-        Optional(_forceCreateUniqueMutableBufferForceGrow(&_buffer,
-                                                          oldCount,
-                                                          oldCount + 1))
-      _arrayOutOfPlaceUpdate(&_buffer, &newBuffer, oldCount, 0,
-                             _IgnorePointer())
+    let newCount = oldCount + 1
+    var newBuffer = Optional(
+      _forceCreateUniqueMutableBuffer(&_buffer,
+                                      newCount: oldCount,
+                                      countForCapacity: newCount))
+    _arrayOutOfPlaceUpdate(&_buffer, &newBuffer, oldCount, 0,
+                           _IgnorePointer())
   }
 
   @_semantics("array.make_mutable")
@@ -972,25 +973,26 @@ internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
 
 @inline(never)
 internal
-func _forceCreateUniqueMutableBufferForceGrow<_Buffer : _ArrayBufferType>(
-  inout source: _Buffer, _ newCount: Int, _ requiredCapacity: Int
+func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
+  inout source: _Buffer,  newCount: Int,  countForCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
   return _forceCreateUniqueMutableBufferImpl(&source,
                                              newCount,
-                                             requiredCapacity,
+                                             countForCapacity,
                                              true)
 }
 
 internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferType>(
   inout source: _Buffer, _ newCount: Int, _ requiredCapacity: Int,
-  _ shouldAlwaysGrow: Bool
+  _ useRequiredCapacityAsCountForResize: Bool
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
   _sanityCheck(newCount >= 0)
   _sanityCheck(requiredCapacity >= newCount)
 
+  let count = useRequiredCapacityAsCountForResize ? requiredCapacity : newCount
   let minimumCapacity = max(
     requiredCapacity,
-    newCount > source.capacity || shouldAlwaysGrow
+    count > source.capacity
       ? _growArrayCapacity(source.capacity) : source.capacity)
 
   return _ContiguousArrayBuffer(
