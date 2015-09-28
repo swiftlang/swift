@@ -174,7 +174,7 @@ ArrayTestSuite.test("${array_type}/Sliceable/Enums") {
   */
 }
 
-ArrayTestSuite.test("${array_type}/append") {
+ArrayTestSuite.test("${array_type}/appendNonUnique") {
   var x: ${array_type}<Int> = []
   x.reserveCapacity(10002)
   let capacity = x.capacity
