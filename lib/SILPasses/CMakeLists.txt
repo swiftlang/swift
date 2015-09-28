@@ -57,4 +57,5 @@ add_swift_library(swiftSILPasses
   LetPropertiesOpts.cpp
   CallGraphPrinter.cpp
   LoopRegionPrinter.cpp
+  LoopCanonicalizer.cpp
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)

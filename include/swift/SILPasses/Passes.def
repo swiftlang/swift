@@ -110,6 +110,8 @@ PASS(LateCodeMotion, "late-codemotion",
      "Code motion with release hoisting")
 PASS(LateInliner, "late-inline",
      "Run the late inliner")
+PASS(LoopCanonicalizer, "loop-canonicalizer",
+     "Canonicalize loops")
 PASS(LoopInfoPrinter, "loop-info-printer",
      "Display loop information")
 PASS(LoopRegionViewText, "loop-region-view-text",
