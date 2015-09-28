@@ -37,7 +37,7 @@
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
 
 // Note: Pointer-to-struct name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func copyWith(_: NSZone) -> AnyObject!
+// CHECK-FOUNDATION: func copy(with _: NSZone = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
 // CHECK-FOUNDATION: func objectFor(_: NSCopying) -> AnyObject?

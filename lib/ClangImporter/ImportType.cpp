@@ -2093,10 +2093,23 @@ clang::QualType ClangImporter::Implementation::getClangDeclContextType(
 bool ClangImporter::Implementation::canInferDefaultArgument(
        clang::QualType type, OptionalTypeKind clangOptionality,
        bool isLastParameter) {
-  // Nullable trailing closure parameters default to 'nil'.
-  if (clangOptionality == OTK_Optional && isLastParameter &&
-      (type->isFunctionPointerType() || type->isBlockPointerType()))
+  // Some nullable parameters default to 'nil'.
+  if (clangOptionality == OTK_Optional) {
+    // Nullable trailing closure parameters default to 'nil'.
+    if (isLastParameter &&
+        (type->isFunctionPointerType() || type->isBlockPointerType()))
     return true;
+
+    // NSZone parameters default to 'nil'.
+    if (auto ptrType = type->getAs<clang::PointerType>()) {
+      if (auto recType
+            = ptrType->getPointeeType()->getAs<clang::RecordType>()) {
+        if (recType->isStructureOrClassType() &&
+            recType->getDecl()->getName() == "_NSZone")
+          return true;
+      }
+    }
+  }
 
   // Option sets default to "[]" if they have "Options" in their name.
   if (const clang::EnumType *enumTy = type->getAs<clang::EnumType>())
