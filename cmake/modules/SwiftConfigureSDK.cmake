@@ -83,12 +83,15 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_PATH "" CACHE PATH "Path to the ${name} SDK")
 
   if(NOT SWIFT_SDK_${prefix}_PATH)
-    if(${SWIFT_USE_INTERNAL_SDK})
+    if(${SWIFT_DARWIN_USE_INTERNAL_SDK})
       # Prefer the internal SDK, if present, for building C code and linking.
       execute_process(
           COMMAND "xcrun" "--sdk" "${xcrun_name}.internal" "--show-sdk-path"
           OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PATH
           OUTPUT_STRIP_TRAILING_WHITESPACE)
+      if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/Frameworks/module.map")
+        message(FATAL_ERROR "Internal ${name} SDK not found at SWIFT_SDK_${prefix}_PATH.")
+      endif()
     endif()
   endif()
 

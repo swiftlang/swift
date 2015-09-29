@@ -126,6 +126,10 @@ option(SWIFT_EMBED_BITCODE_SECTION
     "If non-empty, embeds LLVM bitcode binary sections in the standard library and overlay binaries for supported platforms"
     FALSE)
 
+option(SWIFT_DARWIN_USE_INTERNAL_SDK
+    "If true, selects the internal SDK on Darwin"
+    FALSE)
+
 option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
     "Whether to enable CrashReporter integration"
     FALSE)
@@ -231,11 +235,10 @@ find_program(LIPO "lipo")
 
 if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")
   set(SWIFT_CROSS_COMPILING FALSE)
-  set(SWIFT_USE_INTERNAL_SDK FALSE)
 else()
   set(SWIFT_CROSS_COMPILING TRUE)
   # Cross compiling tools requires the internal SDK.
-  set(SWIFT_USE_INTERNAL_SDK TRUE)
+  set(SWIFT_DARWIN_USE_INTERNAL_SDK TRUE)
 endif()
 
 # Reset CMAKE_SYSTEM_PROCESSOR if not cross-compiling.
