@@ -481,9 +481,7 @@ bool GlobalDeadStoreEliminationImpl::processBasicBlock(SILBasicBlock *BB) {
   mergeSuccessorsWriteIn(BB);
 
   // Process instructions in post-order fashion.
-  for (SILBasicBlock::reverse_iterator I = BB->getInstList().rbegin(),
-                                       E = BB->getInstList().rend();
-       I != E; ++I) {
+  for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
     processInstruction(&(*I));
   }
 
