@@ -18,6 +18,7 @@
 #define SWIFT_SOURCELOC_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"
 #include <functional>
 
