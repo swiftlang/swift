@@ -4,7 +4,7 @@ import Foundation
 @available(OSX 10.10, iOS 8.0, *)
 extension LAError : _BridgedNSError {
   public static var _NSErrorDomain: String {
-    if #available(OSX 10.10, iOS 8.3, *) {
+    if #available(iOS 8.3, *) {
       return LAErrorDomain
     }
     return "com.apple.LocalAuthentication"
