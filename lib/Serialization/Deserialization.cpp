@@ -3826,7 +3826,8 @@ Type ModuleFile::getType(TypeID TID) {
 
     GenericSignature *genericSig = nullptr;
     if (!genericParamTypes.empty() || !requirements.empty())
-      genericSig = GenericSignature::get(genericParamTypes, requirements);
+      genericSig = GenericSignature::get(genericParamTypes, requirements,
+                                         /*isKnownCanonical=*/true);
 
     typeOrOffset = SILFunctionType::get(genericSig, extInfo,
                                         calleeConvention.getValue(),

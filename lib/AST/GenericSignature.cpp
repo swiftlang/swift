@@ -30,20 +30,40 @@ ASTContext &GenericSignature::getASTContext(
     return requirements.front().getFirstType()->getASTContext();
 }
 
+bool GenericSignature::isCanonical() const {
+  if (CanonicalSignatureOrASTContext.is<ASTContext*>()) return true;
+
+  return getCanonicalSignature() == this;
+}
+
 CanGenericSignature
 GenericSignature::getCanonicalSignature() const {
+  // If we haven't computed the canonical signature yet, do so now.
+  if (CanonicalSignatureOrASTContext.isNull()) {
+    // Compute the canonical signature.
+    CanGenericSignature canSig = getCanonical(getGenericParams(),
+                                              getRequirements());
+
+    // Record either the canonical signature or an indication that
+    // this is the canonical signature.
+    if (canSig != this)
+      CanonicalSignatureOrASTContext = canSig;
+    else
+      CanonicalSignatureOrASTContext = &getGenericParams()[0]->getASTContext();
+
+    // Return the canonical signature.
+    return canSig;
+  }
+
+  // A stored ASTContext indicates that this is the canonical
+  // signature.
   if (CanonicalSignatureOrASTContext.is<ASTContext*>())
     // TODO: CanGenericSignature should be const-correct.
     return CanGenericSignature(const_cast<GenericSignature*>(this));
   
-  if (auto p = CanonicalSignatureOrASTContext.dyn_cast<GenericSignature*>())
-    return CanGenericSignature(p);
-  
-  CanGenericSignature canSig = getCanonical(getGenericParams(),
-                                            getRequirements());
-  if (canSig != this)
-    CanonicalSignatureOrASTContext = canSig;
-  return canSig;
+  // Otherwise, return the stored canonical signature.
+  return CanGenericSignature(
+           CanonicalSignatureOrASTContext.get<GenericSignature*>());
 }
 
 /// Canonical ordering for dependent types in generic signatures.
@@ -105,7 +125,7 @@ CanGenericSignature
 GenericSignature::getCanonicalManglingSignature(Module &M) const {
   // Start from the elementwise-canonical signature.
   auto canonical = getCanonicalSignature();
-  auto &Context = *canonical->CanonicalSignatureOrASTContext.get<ASTContext*>();
+  auto &Context = canonical->getASTContext();
   
   // See if we cached the mangling signature.
   auto cached = Context.ManglingSignatures.find({canonical, &M});
@@ -268,7 +288,8 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
   
   // Build the minimized signature.
   auto manglingSig = GenericSignature::get(canonical->getGenericParams(),
-                                           minimalRequirements);
+                                           minimalRequirements,
+                                           /*isKnownCanonical=*/true);
   
   CanGenericSignature canSig(manglingSig);
   
@@ -278,8 +299,12 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
 }
 
 ASTContext &GenericSignature::getASTContext() const {
-  return *getCanonicalSignature()->CanonicalSignatureOrASTContext
-    .get<ASTContext *>();
+  // Canonical signatures store the ASTContext directly.
+  if (auto ctx = CanonicalSignatureOrASTContext.dyn_cast<ASTContext *>())
+    return *ctx;
+
+  // For everything else, just get it from the generic parameter.
+  return getASTContext(getGenericParams(), getRequirements());
 }
 
 TypeSubstitutionMap

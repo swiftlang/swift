@@ -3267,7 +3267,8 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
-                                        ArrayRef<Requirement> requirements) {
+                                        ArrayRef<Requirement> requirements,
+                                        bool isKnownCanonical) {
   if (params.empty() && requirements.empty())
     return nullptr;
 
@@ -3277,15 +3278,21 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
 
   auto &ctx = getASTContext(params, requirements);
   void *insertPos;
-  if (auto *sig = ctx.Impl.GenericSignatures.FindNodeOrInsertPos(ID, insertPos))
+  if (auto *sig = ctx.Impl.GenericSignatures.FindNodeOrInsertPos(ID,
+                                                                 insertPos)) {
+    if (isKnownCanonical)
+      sig->CanonicalSignatureOrASTContext = &ctx;
+
     return sig;
+  }
 
   // Allocate and construct the new signature.
   size_t bytes = sizeof(GenericSignature)
                + sizeof(GenericTypeParamType *) * params.size()
                + sizeof(Requirement) * requirements.size();
   void *mem = ctx.Allocate(bytes, alignof(GenericSignature));
-  auto newSig = new (mem) GenericSignature(params, requirements);
+  auto newSig = new (mem) GenericSignature(params, requirements,
+                                           isKnownCanonical);
   ctx.Impl.GenericSignatures.InsertNode(newSig, insertPos);
   return newSig;
 }
@@ -3307,7 +3314,8 @@ CanGenericSignature GenericSignature::getCanonical(
                               reqt.getFirstType()->getCanonicalType(),
                               reqt.getSecondType().getCanonicalTypeOrNull()));
   }
-  auto canSig = get(canonicalParams, canonicalRequirements);
+  auto canSig = get(canonicalParams, canonicalRequirements,
+                    /*isKnownCanonical=*/true);
   return CanGenericSignature(canSig);
 }
 

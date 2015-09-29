@@ -107,7 +107,8 @@ class GenericSignature : public llvm::FoldingSetNode {
   }
 
   GenericSignature(ArrayRef<GenericTypeParamType *> params,
-                   ArrayRef<Requirement> requirements);
+                   ArrayRef<Requirement> requirements,
+                   bool isKnownCanonical);
 
   mutable llvm::PointerUnion<GenericSignature *, ASTContext *>
     CanonicalSignatureOrASTContext;
@@ -119,7 +120,8 @@ public:
   /// Create a new generic signature with the given type parameters and
   /// requirements.
   static GenericSignature *get(ArrayRef<GenericTypeParamType *> params,
-                               ArrayRef<Requirement> requirements);
+                               ArrayRef<Requirement> requirements,
+                               bool isKnownCanonical = false);
 
   /// Create a new generic signature with the given type parameters and
   /// requirements, first canonicalizing the types.
@@ -167,10 +169,9 @@ public:
   GenericSignatureWitnessIterator getAllDependentTypes() const {
     return GenericSignatureWitnessIterator(getRequirements());
   }
-  
-  bool isCanonical() const {
-    return CanonicalSignatureOrASTContext.is<ASTContext*>();
-  }
+
+  /// Determines whether this ASTContext is canonical.
+  bool isCanonical() const;
   
   ASTContext &getASTContext() const;
   

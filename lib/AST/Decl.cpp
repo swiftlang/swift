@@ -540,7 +540,7 @@ GenericParamList::getAsCanonicalGenericSignature(
                        reqt.getFirstType()->getCanonicalType(),
                        reqt.getSecondType()->getCanonicalType());
   
-  return GenericSignature::get(params, requirements);
+  return GenericSignature::get(params, requirements, /*isKnownCanonical=*/true);
 }
 
 ArrayRef<Substitution>
@@ -1844,32 +1844,23 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
 }
 
 GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
-                                   ArrayRef<Requirement> requirements)
+                                   ArrayRef<Requirement> requirements,
+                                   bool isKnownCanonical)
   : NumGenericParams(params.size()), NumRequirements(requirements.size()),
     CanonicalSignatureOrASTContext()
 {
-  bool isCanonical = true;
-  
-  ASTContext *C = nullptr;
   auto paramsBuffer = getGenericParamsBuffer();
   for (unsigned i = 0; i < NumGenericParams; ++i) {
     paramsBuffer[i] = params[i];
-    C = &params[i]->getASTContext();
-    isCanonical &= params[i]->isCanonical();
   }
-  
+
   auto reqtsBuffer = getRequirementsBuffer();
   for (unsigned i = 0; i < NumRequirements; ++i) {
     reqtsBuffer[i] = requirements[i];
-    C = &requirements[i].getFirstType()->getASTContext();
-    isCanonical &= requirements[i].getFirstType()->isCanonical();
-    isCanonical &= !requirements[i].getSecondType()
-                    || requirements[i].getSecondType()->isCanonical();
   }
-  
-  if (isCanonical) {
-    CanonicalSignatureOrASTContext = C;
-  }
+
+  if (isKnownCanonical)
+    CanonicalSignatureOrASTContext = &getASTContext(params, requirements);
 }
 
 ArrayRef<GenericTypeParamType *> 
