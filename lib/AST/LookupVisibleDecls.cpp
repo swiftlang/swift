@@ -740,6 +740,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       if (Loc.isValid()) {
         auto CE = cast<ClosureExpr>(ACE);
         namelookup::FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());
+        if (auto P = CE->getParams()) {
+          namelookup::FindLocalVal(SM, Loc, Consumer)
+            .checkPattern(P, DeclVisibilityKind::FunctionParameter);
+        }
       }
     } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getExtendedType();

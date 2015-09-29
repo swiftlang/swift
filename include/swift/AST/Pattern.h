@@ -349,11 +349,14 @@ public:
   }
 
   MutableArrayRef<TuplePatternElt> getElements() {
-    return MutableArrayRef<TuplePatternElt>(getElementsBuffer(),
-                                            getNumElements());
+    return getNumElements() == 0 ? MutableArrayRef<TuplePatternElt>() :
+                                   MutableArrayRef<TuplePatternElt>(getElementsBuffer(),
+                                                                    getNumElements());
   }
   ArrayRef<TuplePatternElt> getElements() const {
-    return ArrayRef<TuplePatternElt>(getElementsBuffer(), getNumElements());
+    return getNumElements() == 0 ? ArrayRef<TuplePatternElt>() :
+                                   ArrayRef<TuplePatternElt>(getElementsBuffer(),
+                                                             getNumElements());
   }
 
   const TuplePatternElt &getElement(unsigned i) const {return getElements()[i];}

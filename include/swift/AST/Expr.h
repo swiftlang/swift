@@ -2826,8 +2826,12 @@ public:
       decltype(AbstractClosureExprBits)::InvalidDiscriminator
   };
 
-  ArrayRef<Pattern *> getParamPatterns() { return ParamPattern; }
-  ArrayRef<const Pattern *> getParamPatterns() const { return ParamPattern; }
+  ArrayRef<Pattern *> getParamPatterns() {
+    return ParamPattern ? ParamPattern : ArrayRef<Pattern *> ();
+  }
+  ArrayRef<const Pattern *> getParamPatterns() const {
+    return ParamPattern ? ParamPattern : ArrayRef<const Pattern *> ();
+  }
 
   unsigned getNaturalArgumentCount() const { return 1; }
 
