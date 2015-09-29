@@ -109,7 +109,7 @@ removeUnwantedFunctions(SILModule *M, llvm::StringRef Name) {
       if (F.size()) {
         SILBasicBlock &BB = F.front();
 
-        SILLocation Loc = BB.getInstList().back().getLoc();
+        SILLocation Loc = BB.back().getLoc();
         BB.splitBasicBlock(BB.begin());
         // Make terminator unreachable.
         SILBuilder(&BB).createUnreachable(Loc);
