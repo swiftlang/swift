@@ -370,6 +370,32 @@ struct StructWithStoredClassProperty : PropertyWithGetter {
 // CHECK-NEXT: dealloc_stack [[CCOPY]]#0
 // CHECK-NEXT: return
 
+// rdar://22676810
+
+protocol ExistentialProperty {
+  var p: PropertyWithGetterSetter { get set }
+}
+
+func testExistentialPropertyRead<T: ExistentialProperty>(inout t: T) {
+    let b = t.p.b
+}
+// CHECK-LABEL: sil hidden @_TF9protocols27testExistentialPropertyReaduRq_S_19ExistentialProperty_FRq_T_
+// CHECK:      [[T:%.*]] = alloc_box $T
+// CHECK:      copy_addr %0 to [initialization] [[T]]#1 : $*T
+// CHECK:      [[P_TEMP:%.*]] = alloc_stack $PropertyWithGetterSetter
+// CHECK:      [[T_TEMP:%.*]] = alloc_stack $T
+// CHECK:      copy_addr [[T]]#1 to [initialization] [[T_TEMP]]#1 : $*T
+// CHECK:      [[P_GETTER:%.*]] = witness_method $T, #ExistentialProperty.p!getter.1 :
+// CHECK-NEXT: apply [[P_GETTER]]<T>([[P_TEMP]]#1, [[T_TEMP]]#1)
+// CHECK-NEXT: destroy_addr [[T_TEMP]]#1
+// CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr [[P_TEMP]]#1 : $*PropertyWithGetterSetter to $*[[P_OPENED:@opened(.*) PropertyWithGetterSetter]]
+// CHECK-NEXT: [[T0:%.*]] = alloc_stack $[[P_OPENED]]
+// CHECK-NEXT: copy_addr [[OPEN]] to [initialization] [[T0]]#1
+// CHECK-NEXT: [[B_GETTER:%.*]] = witness_method $[[P_OPENED]], #PropertyWithGetterSetter.b!getter.1
+// CHECK-NEXT: apply [[B_GETTER]]<[[P_OPENED]]>([[T0]]#1)
+// CHECK-NEXT: destroy_addr [[T0]]#1
+// CHECK-NOT:  witness_method
+// CHECK:      return
 
 // CHECK-LABEL: sil_witness_table hidden ClassWithGetter: PropertyWithGetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: @_TTWC9protocols15ClassWithGetterS_18PropertyWithGetterS_FS1_g1aSi

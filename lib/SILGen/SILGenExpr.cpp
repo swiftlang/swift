@@ -3051,11 +3051,11 @@ void SILGenFunction::emitOpenExistentialExprImpl(
     // Create a writeback scope for the access to the existential lvalue.
     writebackScope.emplace(*this);
 
+    AccessKind accessKind = E->getExistentialValue()->getLValueAccessKind();
     existentialValue = emitAddressOfLValue(
                          E->getExistentialValue(),
-                         emitLValue(E->getExistentialValue(),
-                                    AccessKind::ReadWrite),
-                         AccessKind::ReadWrite);
+                         emitLValue(E->getExistentialValue(), accessKind),
+                         accessKind);
   } else {
     existentialValue = emitRValueAsSingleValue(
                          E->getExistentialValue(),
