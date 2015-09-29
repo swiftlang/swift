@@ -211,9 +211,9 @@ public struct ${Self}<Element>
     get {
       let isNativeTypeChecked = _getArrayPropertyIsNativeTypeChecked()
       _checkSubscript(index,
-                      hoistedIsNativeTypeCheckedBuffer: isNativeTypeChecked)
+                      wasNativeTypeCheckedBuffer: isNativeTypeChecked)
       return _getElement(index,
-                         hoistedIsNativeTypeCheckedBuffer: isNativeTypeChecked)
+                         wasNativeTypeCheckedBuffer: isNativeTypeChecked)
     }
     // on non-Objective-C, this should just be NativeOwner for all other
     // cases, including ArraySlice.
@@ -221,7 +221,7 @@ public struct ${Self}<Element>
 %  Owner = 'NativeOwner' if Self == 'ContiguousArray' else 'Owner'
 %  Result = 'Native' if Self == 'ContiguousArray' else 'Unknown'
     addressWith${Owner} {
-      _checkSubscript(index, hoistedIsNativeBuffer: true)
+      _checkSubscript(index, wasNativeBuffer: true)
       return (UnsafePointer(_buffer.subscriptBaseAddress + index),
               Builtin.castTo${Result}Object(_buffer.owner))
     }
@@ -230,7 +230,7 @@ public struct ${Self}<Element>
       _makeMutableAndUniqueOrPinned()
       // When an array was made mutable we know it is a backed by a native array
       // buffer.
-      _checkSubscript(index, hoistedIsNativeBuffer: true)
+      _checkSubscript(index, wasNativeBuffer: true)
 
       // We are hiding the access to '_buffer.owner' behind a semantic function
       // to help the compiler hoist uniqueness checks in the case of class or
@@ -248,7 +248,7 @@ public struct ${Self}<Element>
   /// ${O1}.
   public subscript(index: Int) -> Element {
     addressWithNativeOwner {
-      _checkSubscript(index, hoistedIsNativeBuffer: true)
+      _checkSubscript(index, wasNativeBuffer: true)
       return (UnsafePointer(_buffer.subscriptBaseAddress + index),
               Builtin.castToNativeObject(_buffer.owner))
     }
@@ -256,7 +256,7 @@ public struct ${Self}<Element>
       _makeMutableAndUniqueOrPinned()
       // When an array was made mutable we know it is a backed by a native array
       // buffer.
-      _checkSubscript(index, hoistedIsNativeBuffer: true)
+      _checkSubscript(index, wasNativeBuffer: true)
       return (_getElementAddress(index),
               Builtin.tryPin(Builtin.castToNativeObject(_buffer.owner)))
     }
@@ -346,9 +346,9 @@ public struct ${Self}<Element>
   /// ≤ index < count`.
   @_semantics("array.check_subscript")
   public // @testable
-  func _checkSubscript(index: Int, hoistedIsNativeBuffer: Bool) {
+  func _checkSubscript(index: Int, wasNativeBuffer: Bool) {
     _precondition(_buffer._isValidSubscript(index,
-                                  hoistedIsNativeBuffer: hoistedIsNativeBuffer),
+                                  wasNativeBuffer: wasNativeBuffer),
                   "${Self} index out of range")
   }
 
@@ -357,12 +357,12 @@ public struct ${Self}<Element>
   /// ≤ index < count`.
   @_semantics("array.check_subscript")
   public // @testable
-  func _checkSubscript(index: Int, hoistedIsNativeTypeCheckedBuffer: Bool) {
+  func _checkSubscript(index: Int, wasNativeTypeCheckedBuffer: Bool) {
     // Using this specialized version of ArrayBuffer._isValidSubscript (for
     // the Array subscript-getter) ensures that CSE can eliminate the
     // _precondition checks in _isValidSubscript in most cases.
     _precondition(_buffer._isValidSubscript(index,
-          hoistedIsNativeTypeCheckedBuffer: hoistedIsNativeTypeCheckedBuffer),
+          wasNativeTypeCheckedBuffer: wasNativeTypeCheckedBuffer),
           "${Self} index out of range")
   }
 %end
@@ -378,10 +378,10 @@ public struct ${Self}<Element>
   @_semantics("array.get_element")
   @inline(__always)
   public // @testable
-  func _getElement(index: Int, hoistedIsNativeTypeCheckedBuffer : Bool)
+  func _getElement(index: Int, wasNativeTypeCheckedBuffer : Bool)
       -> Element {
     return _buffer.getElement(index,
-      hoistedIsNativeTypeCheckedBuffer : hoistedIsNativeTypeCheckedBuffer)
+      wasNativeTypeCheckedBuffer : wasNativeTypeCheckedBuffer)
   }
 
   @warn_unused_result

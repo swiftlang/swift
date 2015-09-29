@@ -247,8 +247,8 @@ class ViolateInoutSafeySwitchToObjcBuffer {
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._getArrayPropertyIsNativeTypeChecked()
     for i in 0..<A.count {
-      A._checkSubscript(i, hoistedIsNativeTypeCheckedBuffer: isNativeTypeChecked)
-      A._getElement(i, hoistedIsNativeTypeCheckedBuffer: isNativeTypeChecked)
+      A._checkSubscript(i, wasNativeTypeCheckedBuffer: isNativeTypeChecked)
+      A._getElement(i, wasNativeTypeCheckedBuffer: isNativeTypeChecked)
       accessArrayViaInoutVolation()
     }
   }
@@ -288,8 +288,8 @@ class ViolateInoutSafeyNeedElementTypeCheck {
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._getArrayPropertyIsNativeTypeChecked()
     for i in 0..<A.count {
-      A._checkSubscript(i, hoistedIsNativeTypeCheckedBuffer: isNativeTypeChecked)
-      A._getElement(i, hoistedIsNativeTypeCheckedBuffer: isNativeTypeChecked)
+      A._checkSubscript(i, wasNativeTypeCheckedBuffer: isNativeTypeChecked)
+      A._getElement(i, wasNativeTypeCheckedBuffer: isNativeTypeChecked)
       accessArrayViaInoutVolation()
     }
   }

@@ -307,16 +307,16 @@ extension _ArrayBuffer {
   /// ≤ index < count`
   @warn_unused_result
   internal func _isValidSubscript(index : Int,
-                                  hoistedIsNativeBuffer: Bool) -> Bool {
-    if _fastPath(hoistedIsNativeBuffer) {
+                                  wasNativeBuffer: Bool) -> Bool {
+    if _fastPath(wasNativeBuffer) {
       // We need this precondition check to ensure memory safety. It ensures
       // that if due to an inout violation a store of a different representation
-      // to the array (an NSArray) happened between 'hoistedIsNativeBuffer' was
+      // to the array (an NSArray) happened between 'wasNativeBuffer' was
       // obtained  and now we still are memory safe. To ensure safety we need to
       // reload the 'isNative' flag from memory which _isNative will do -
-      // instead of relying on the value in 'hoistedIsNativeBuffer' which could
+      // instead of relying on the value in 'wasNativeBuffer' which could
       // have been invalidated by an intervening store since we obtained
-      // 'hoistedIsNativeBuffer'. See also the comment of _typeCheck.
+      // 'wasNativeBuffer'. See also the comment of _typeCheck.
       if (_isClassOrObjCExistential(Element.self)) {
         // Only non value elements can have non native storage.
         _precondition(_isNative,
@@ -326,7 +326,7 @@ extension _ArrayBuffer {
       // Note we call through to the native buffer here as it has a more
       // optimal implementation than just doing `index < count`.
       return _native._isValidSubscript(index,
-                                   hoistedIsNativeBuffer: hoistedIsNativeBuffer)
+                                   wasNativeBuffer: wasNativeBuffer)
     }
     // _getElementSlowPath does its own subscript checking. Therefore we just
     // return `true`. This simplifies the inlined code.
@@ -343,17 +343,17 @@ extension _ArrayBuffer {
   /// ≤ index < count`.
   @warn_unused_result
   internal func _isValidSubscript(index : Int,
-                                  hoistedIsNativeTypeCheckedBuffer : Bool)
+                                  wasNativeTypeCheckedBuffer : Bool)
                                     -> Bool {
-    // This is the same function as _isValidSubscript with hoistedIsNativeBuffer,
+    // This is the same function as _isValidSubscript with wasNativeBuffer,
     // except for the _precondition checks. See the comments there.
-    if _fastPath(hoistedIsNativeTypeCheckedBuffer) {
+    if _fastPath(wasNativeTypeCheckedBuffer) {
       if (_isClassOrObjCExistential(Element.self)) {
         _precondition(_isNativeTypeChecked,
           "inout rules were violated: the array was overwritten")
       }
       return _nativeTypeChecked._isValidSubscript(index,
-                                            hoistedIsNativeBuffer: true)
+                                            wasNativeBuffer: true)
     }
     if (_isClassOrObjCExistential(Element.self)) {
       _precondition(!_isNativeTypeChecked,
@@ -369,8 +369,8 @@ extension _ArrayBuffer {
 
   @inline(__always)
   @warn_unused_result
-  func getElement(i: Int, hoistedIsNativeTypeCheckedBuffer: Bool) -> Element {
-    if _fastPath(hoistedIsNativeTypeCheckedBuffer) {
+  func getElement(i: Int, wasNativeTypeCheckedBuffer: Bool) -> Element {
+    if _fastPath(wasNativeTypeCheckedBuffer) {
       return _nativeTypeChecked[i]
     }
     return unsafeBitCast(_getElementSlowPath(i), Element.self)
@@ -379,12 +379,14 @@ extension _ArrayBuffer {
   @inline(never)
   @warn_unused_result
   func _getElementSlowPath(i: Int) -> AnyObject {
-    _sanityCheck(_isClassOrObjCExistential(Element.self), "Only single reference elements can be indexed here.")
+    _sanityCheck(
+      _isClassOrObjCExistential(Element.self),
+      "Only single reference elements can be indexed here.")
     let element: AnyObject
     if _isNative {
       // _isValidSubscript does no subscript checking for the slow path.
       // Therefore we have to do it here.
-      _precondition(_native._isValidSubscript(i, hoistedIsNativeBuffer: true),
+      _precondition(_native._isValidSubscript(i, wasNativeBuffer: true),
                     "Array index out of range")
       element = castToBufferOf(AnyObject.self)._native[i]
       _precondition(
@@ -403,7 +405,7 @@ extension _ArrayBuffer {
   /// Get or set the value of the ith element.
   public subscript(i: Int) -> Element {
     get {
-      return getElement(i, hoistedIsNativeTypeCheckedBuffer:_isNativeTypeChecked)
+      return getElement(i, wasNativeTypeCheckedBuffer:_isNativeTypeChecked)
     }
     
     nonmutating set {

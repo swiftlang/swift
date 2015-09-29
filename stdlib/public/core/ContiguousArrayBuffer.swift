@@ -296,10 +296,10 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   }
 
   @warn_unused_result
-  func getElement(i: Int, hoistedIsNativeTypeCheckedBuffer: Bool) -> Element {
+  func getElement(i: Int, wasNativeTypeCheckedBuffer: Bool) -> Element {
     _sanityCheck(
       _isValidSubscript(i,
-          hoistedIsNativeBuffer: hoistedIsNativeTypeCheckedBuffer),
+          wasNativeBuffer: wasNativeTypeCheckedBuffer),
       "Array index out of range")
     // If the index is in bounds, we can assume we have storage.
     return firstElementAddress[i]
@@ -308,7 +308,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   /// Get or set the value of the ith element.
   public subscript(i: Int) -> Element {
     get {
-      return getElement(i, hoistedIsNativeTypeCheckedBuffer: true)
+      return getElement(i, wasNativeTypeCheckedBuffer: true)
     }
     nonmutating set {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
@@ -342,8 +342,10 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
 
   /// Returns whether the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`.
+  ///
+  /// wasNativeBuffer is used for interface compatibility with ArrayBuffer.
   @warn_unused_result
-  func _isValidSubscript(index : Int, hoistedIsNativeBuffer : Bool) -> Bool {
+  func _isValidSubscript(index : Int, wasNativeBuffer : Bool) -> Bool {
     /// Instead of returning 0 for no storage, we explicitly check
     /// for the existance of storage.
     /// Note that this is better than folding hasStorage in to
@@ -356,14 +358,14 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   /// ≤ index < count`.
   ///
   /// For ContiguousArrayBuffer, this is equivalent to the
-  /// `_isValidSubscript(_:hoistedIsNativeBuffer:)` form, but is necessary
+  /// `_isValidSubscript(_:wasNativeBuffer:)` form, but is necessary
   /// for interface parity with `ArrayBuffer`.
   @inline(__always)
   @warn_unused_result
-  func _isValidSubscript(index : Int, hoistedIsNativeTypeCheckedBuffer : Bool)
+  func _isValidSubscript(index : Int, wasNativeTypeCheckedBuffer : Bool)
       -> Bool {
     return _isValidSubscript(index,
-      hoistedIsNativeTypeCheckedBuffer : hoistedIsNativeTypeCheckedBuffer)
+      wasNativeTypeCheckedBuffer : wasNativeTypeCheckedBuffer)
   }
 
   /// The number of elements the buffer can store without reallocation.
