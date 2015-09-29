@@ -248,7 +248,7 @@ class ViolateInoutSafeySwitchToObjcBuffer {
     let isNativeTypeChecked = A._getArrayPropertyIsNativeTypeChecked()
     for i in 0..<A.count {
       A._checkSubscript(i, wasNativeTypeChecked: isNativeTypeChecked)
-      A._getElement(i, wasNativeTypeChecked: isNativeTypeChecked)
+      _ = A._getElement(i, wasNativeTypeChecked: isNativeTypeChecked)
       accessArrayViaInoutVolation()
     }
   }
@@ -289,7 +289,7 @@ class ViolateInoutSafeyNeedElementTypeCheck {
     let isNativeTypeChecked = A._getArrayPropertyIsNativeTypeChecked()
     for i in 0..<A.count {
       A._checkSubscript(i, wasNativeTypeChecked: isNativeTypeChecked)
-      A._getElement(i, wasNativeTypeChecked: isNativeTypeChecked)
+      _ = A._getElement(i, wasNativeTypeChecked: isNativeTypeChecked)
       accessArrayViaInoutVolation()
     }
   }
