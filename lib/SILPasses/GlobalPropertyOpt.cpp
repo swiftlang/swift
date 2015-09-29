@@ -36,7 +36,7 @@ namespace {
 /// The GlobalPropertyOpt performs an analysis on the whole module to determine
 /// the values of high-level properties.
 ///
-/// Currently only one property is handled and thats the isNativeNoTypeCheck
+/// Currently only one property is handled and thats the isNativeTypeChecked
 /// property for arrays. If the property can be proved to be true, the
 /// corresponding semantics-call is replaced by a true-literal.
 class GlobalPropertyOpt {
@@ -49,7 +49,7 @@ class GlobalPropertyOpt {
   struct Entry {
     
     Entry(SILValue Value, VarDecl *Field) :
-    Value(Value), Field(Field), isNativeNoTypeCheck(true) {
+    Value(Value), Field(Field), isNativeTypeChecked(true) {
     }
     
     /// Non-null if the entry represents an array value, a tuple with an array
@@ -61,7 +61,7 @@ class GlobalPropertyOpt {
     
     /// The property which we want to track: is the value/field a native swift
     /// array which doesn't need deferred type check.
-    bool isNativeNoTypeCheck;
+    bool isNativeTypeChecked;
     
     /// The edges in the dependency graph, i.e. entries, which depend on this
     /// entry.
@@ -206,9 +206,9 @@ class GlobalPropertyOpt {
   }
   
   void setNotNative(Entry *entry) {
-    if (entry->isNativeNoTypeCheck) {
+    if (entry->isNativeTypeChecked) {
       DEBUG(llvm::dbgs() << "      set not-native: " << *entry);
-      entry->isNativeNoTypeCheck = false;
+      entry->isNativeTypeChecked = false;
       WorkList.push_back(entry);
     }
   }
@@ -300,7 +300,7 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
         DEBUG(llvm::dbgs() << "      array semantics call: " << *AI);
         return;
       case ArrayCallKind::kArrayPropsIsNative:
-      case ArrayCallKind::kArrayPropsIsNativeNoTypeCheck:
+      case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
         // Remember the property-calls for later.
         DEBUG(llvm::dbgs() << "      property check: " << *AI);
         propertyCalls.push_back(AI);
@@ -447,7 +447,7 @@ void GlobalPropertyOpt::propagatePropertiesInGraph() {
   while (!WorkList.empty()) {
     Entry *entry = WorkList.pop_back_val();
     DEBUG(llvm::dbgs() << "    handle non-native entry: " << *entry);
-    assert(!entry->isNativeNoTypeCheck);
+    assert(!entry->isNativeTypeChecked);
     
     // Propagate the false-value to the dependent entries.
     for (Entry *depEntry : entry->Dependencies) {
@@ -469,12 +469,12 @@ bool GlobalPropertyOpt::replacePropertyCalls() {
     
     // Is the argument a native swift array?
     if (ValueEntries.count(array) != 0 &&
-        getValueEntry(array)->isNativeNoTypeCheck) {
+        getValueEntry(array)->isNativeTypeChecked) {
       
       ArraySemanticsCall semCall(AI);
       assert(
         (semCall.getKind() == ArrayCallKind::kArrayPropsIsNative ||
-         semCall.getKind() == ArrayCallKind::kArrayPropsIsNativeNoTypeCheck) &&
+         semCall.getKind() == ArrayCallKind::kArrayPropsIsNativeTypeChecked) &&
              "invalid semantics type");
   
       DEBUG(llvm::dbgs() << "  remove property check in function " <<

@@ -45,7 +45,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   // All other calls can be consider valid.
   default: break;
   case ArrayCallKind::kArrayPropsIsNative:
-  case ArrayCallKind::kArrayPropsIsNativeNoTypeCheck: {
+  case ArrayCallKind::kArrayPropsIsNativeTypeChecked: {
     // @guaranteed/@owned Self
     if (SemanticsCall->getNumArguments() != 1)
       return false;
@@ -120,8 +120,8 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
   auto Kind =
       llvm::StringSwitch<ArrayCallKind>(F->getSemanticsString())
           .Case("array.props.isNative", ArrayCallKind::kArrayPropsIsNative)
-          .Case("array.props.isNativeNoTypeCheck",
-                ArrayCallKind::kArrayPropsIsNativeNoTypeCheck)
+          .Case("array.props.isNativeTypeChecked",
+                ArrayCallKind::kArrayPropsIsNativeTypeChecked)
           .Case("array.init", ArrayCallKind::kArrayInit)
           .Case("array.uninitialized", ArrayCallKind::kArrayUninitialized)
           .Case("array.check_subscript", ArrayCallKind::kCheckSubscript)
@@ -211,7 +211,7 @@ bool swift::ArraySemanticsCall::canHoist(SILInstruction *InsertBefore,
 
   case ArrayCallKind::kCheckIndex:
   case ArrayCallKind::kArrayPropsIsNative:
-  case ArrayCallKind::kArrayPropsIsNativeNoTypeCheck:
+  case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
   case ArrayCallKind::kGetElementAddress:
   case ArrayCallKind::kGetCount:
   case ArrayCallKind::kGetCapacity:
@@ -330,7 +330,7 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
   auto Kind = getKind();
   switch (Kind) {
   case ArrayCallKind::kArrayPropsIsNative:
-  case ArrayCallKind::kArrayPropsIsNativeNoTypeCheck:
+  case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
   case ArrayCallKind::kGetCount:
   case ArrayCallKind::kGetCapacity: {
     assert(SemanticsCall->getNumArguments() == 1 &&

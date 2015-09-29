@@ -220,7 +220,7 @@ public:
       return !Call.mayHaveBridgedObjectElementType();
 
     case ArrayCallKind::kArrayPropsIsNative:
-    case ArrayCallKind::kArrayPropsIsNativeNoTypeCheck:
+    case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
     case ArrayCallKind::kGetElementAddress:
     case ArrayCallKind::kMakeMutable:
       // These do not call NSArray methods.

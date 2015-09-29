@@ -25,7 +25,7 @@ class CallGraph;
 enum class ArrayCallKind {
   kNone = 0,
   kArrayPropsIsNative,
-  kArrayPropsIsNativeNoTypeCheck,
+  kArrayPropsIsNativeTypeChecked,
   kCheckSubscript,
   kCheckIndex,
   kGetCount,

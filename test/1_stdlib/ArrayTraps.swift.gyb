@@ -245,10 +245,10 @@ class ViolateInoutSafeySwitchToObjcBuffer {
   func runLoop(inout A: [ElementClass]) {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
-    let isNativeNoTypeCheck = A._getArrayPropertyIsNativeNoTypeCheck()
+    let isNativeTypeChecked = A._getArrayPropertyIsNativeTypeChecked()
     for i in 0..<A.count {
-      A._checkSubscript(i, hoistedIsNativeNoTypeCheckBuffer: isNativeNoTypeCheck)
-      A._getElement(i, hoistedIsNativeNoTypeCheckBuffer: isNativeNoTypeCheck)
+      A._checkSubscript(i, hoistedIsNativeTypeCheckedBuffer: isNativeTypeChecked)
+      A._getElement(i, hoistedIsNativeTypeCheckedBuffer: isNativeTypeChecked)
       accessArrayViaInoutVolation()
     }
   }
@@ -286,10 +286,10 @@ class ViolateInoutSafeyNeedElementTypeCheck {
   func runLoop(inout A : [ElementClass]) {
     // Simulate what happens if we hoist array properties out of a loop and the
     // loop calls a function that violates inout safety and overrides the array.
-    let isNativeNoTypeCheck = A._getArrayPropertyIsNativeNoTypeCheck()
+    let isNativeTypeChecked = A._getArrayPropertyIsNativeTypeChecked()
     for i in 0..<A.count {
-      A._checkSubscript(i, hoistedIsNativeNoTypeCheckBuffer: isNativeNoTypeCheck)
-      A._getElement(i, hoistedIsNativeNoTypeCheckBuffer: isNativeNoTypeCheck)
+      A._checkSubscript(i, hoistedIsNativeTypeCheckedBuffer: isNativeTypeChecked)
+      A._getElement(i, hoistedIsNativeTypeCheckedBuffer: isNativeTypeChecked)
       accessArrayViaInoutVolation()
     }
   }

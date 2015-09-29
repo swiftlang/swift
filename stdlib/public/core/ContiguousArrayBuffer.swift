@@ -225,7 +225,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   }
 
   /// True, if the array is native and does not need a deferred type check.
-  var arrayPropertyIsNativeNoTypeCheck : Bool {
+  var arrayPropertyIsNativeTypeChecked : Bool {
     return true
   }
 
@@ -296,10 +296,10 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   }
 
   @warn_unused_result
-  func getElement(i: Int, hoistedIsNativeNoTypeCheckBuffer: Bool) -> Element {
+  func getElement(i: Int, hoistedIsNativeTypeCheckedBuffer: Bool) -> Element {
     _sanityCheck(
       _isValidSubscript(i,
-          hoistedIsNativeBuffer: hoistedIsNativeNoTypeCheckBuffer),
+          hoistedIsNativeBuffer: hoistedIsNativeTypeCheckedBuffer),
       "Array index out of range")
     // If the index is in bounds, we can assume we have storage.
     return firstElementAddress[i]
@@ -308,7 +308,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   /// Get or set the value of the ith element.
   public subscript(i: Int) -> Element {
     get {
-      return getElement(i, hoistedIsNativeNoTypeCheckBuffer: true)
+      return getElement(i, hoistedIsNativeTypeCheckedBuffer: true)
     }
     nonmutating set {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
@@ -360,10 +360,10 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   /// for interface parity with `ArrayBuffer`.
   @inline(__always)
   @warn_unused_result
-  func _isValidSubscript(index : Int, hoistedIsNativeNoTypeCheckBuffer : Bool)
+  func _isValidSubscript(index : Int, hoistedIsNativeTypeCheckedBuffer : Bool)
       -> Bool {
     return _isValidSubscript(index,
-      hoistedIsNativeNoTypeCheckBuffer : hoistedIsNativeNoTypeCheckBuffer)
+      hoistedIsNativeTypeCheckedBuffer : hoistedIsNativeTypeCheckedBuffer)
   }
 
   /// The number of elements the buffer can store without reallocation.

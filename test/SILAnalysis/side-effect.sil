@@ -261,7 +261,7 @@ bb0(%0 : $Array<Int32>):
 // CHECK: <func=,param0=>
 sil @arraysemantics_is_native_no_typecheck : $@convention(thin) (Array<Int32>) -> () {
 bb0(%0 : $Array<Int32>):
-  %f = function_ref @isNativeNoTypeCheck_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
+  %f = function_ref @isNativeTypeChecked_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
   %a = apply %f(%0) : $@convention(method) (@guaranteed Array<Int32>) -> Bool
 
   %r = tuple()
@@ -378,7 +378,7 @@ bb0(%0 : $Array<Int32>):
 }
 
 sil [_semantics "array.props.isNative"] @isNative_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
-sil [_semantics "array.props.isNativeNoTypeCheck"] @isNativeNoTypeCheck_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
+sil [_semantics "array.props.isNativeTypeChecked"] @isNativeTypeChecked_Int : $@convention(method) (@guaranteed Array<Int32>) -> Bool
 sil [_semantics "array.check_subscript"] @check_subscript_Int : $@convention(method) (Int32, Bool, @guaranteed Array<Int32>) -> ()
 sil [_semantics "array.check_index"] @check_index_Int : $@convention(method) (Int32, @guaranteed Array<Int32>) -> ()
 sil [_semantics "array.get_element"] @get_element_Int : $@convention(method) (@out Int32, Int32, Bool, @guaranteed Array<Int32>) -> ()

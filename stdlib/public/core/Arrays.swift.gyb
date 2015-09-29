@@ -209,25 +209,21 @@ public struct ${Self}<Element>
   public subscript(index: Int) -> Element {
 %if Self == 'Array':
     get {
-      let isNativeNoTypeCheck = _getArrayPropertyIsNativeNoTypeCheck()
+      let isNativeTypeChecked = _getArrayPropertyIsNativeTypeChecked()
       _checkSubscript(index,
-                      hoistedIsNativeNoTypeCheckBuffer: isNativeNoTypeCheck)
+                      hoistedIsNativeTypeCheckedBuffer: isNativeTypeChecked)
       return _getElement(index,
-                         hoistedIsNativeNoTypeCheckBuffer: isNativeNoTypeCheck)
+                         hoistedIsNativeTypeCheckedBuffer: isNativeTypeChecked)
     }
     // on non-Objective-C, this should just be NativeOwner for all other
     // cases, including ArraySlice.
-%elif Self == 'ArraySlice':
-    addressWithOwner {
-      _checkSubscript(index, hoistedIsNativeBuffer: true)
-      return (UnsafePointer(_buffer.subscriptBaseAddress + index),
-              Builtin.castToUnknownObject(_buffer.owner))
-    }
 %else:
-    addressWithNativeOwner {
+%  Owner = 'NativeOwner' if Self == 'ContiguousArray' else 'Owner'
+%  Result = 'Native' if Self == 'ContiguousArray' else 'Unknown'
+    addressWith${Owner} {
       _checkSubscript(index, hoistedIsNativeBuffer: true)
       return (UnsafePointer(_buffer.subscriptBaseAddress + index),
-              Builtin.castToNativeObject(_buffer.owner))
+              Builtin.castTo${Result}Object(_buffer.owner))
     }
 %end
     mutableAddressWithPinnedNativeOwner {
@@ -297,10 +293,10 @@ public struct ${Self}<Element>
   /// Returns true if the array is native and does not need a deferred type
   /// check.
   @warn_unused_result
-  @_semantics("array.props.isNativeNoTypeCheck")
+  @_semantics("array.props.isNativeTypeChecked")
   public // @testable
-  func _getArrayPropertyIsNativeNoTypeCheck() -> Bool {
-   return _buffer.arrayPropertyIsNativeNoTypeCheck
+  func _getArrayPropertyIsNativeTypeChecked() -> Bool {
+   return _buffer.arrayPropertyIsNativeTypeChecked
   }
 
   @warn_unused_result
@@ -361,12 +357,12 @@ public struct ${Self}<Element>
   /// ≤ index < count`.
   @_semantics("array.check_subscript")
   public // @testable
-  func _checkSubscript(index: Int, hoistedIsNativeNoTypeCheckBuffer: Bool) {
+  func _checkSubscript(index: Int, hoistedIsNativeTypeCheckedBuffer: Bool) {
     // Using this specialized version of ArrayBuffer._isValidSubscript (for
     // the Array subscript-getter) ensures that CSE can eliminate the
     // _precondition checks in _isValidSubscript in most cases.
     _precondition(_buffer._isValidSubscript(index,
-          hoistedIsNativeNoTypeCheckBuffer: hoistedIsNativeNoTypeCheckBuffer),
+          hoistedIsNativeTypeCheckedBuffer: hoistedIsNativeTypeCheckedBuffer),
           "${Self} index out of range")
   }
 %end
@@ -382,10 +378,10 @@ public struct ${Self}<Element>
   @_semantics("array.get_element")
   @inline(__always)
   public // @testable
-  func _getElement(index: Int, hoistedIsNativeNoTypeCheckBuffer : Bool)
+  func _getElement(index: Int, hoistedIsNativeTypeCheckedBuffer : Bool)
       -> Element {
     return _buffer.getElement(index,
-      hoistedIsNativeNoTypeCheckBuffer : hoistedIsNativeNoTypeCheckBuffer)
+      hoistedIsNativeTypeCheckedBuffer : hoistedIsNativeTypeCheckedBuffer)
   }
 
   @warn_unused_result

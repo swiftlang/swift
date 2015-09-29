@@ -475,7 +475,7 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   switch (Call.getKind()) {
   case ArrayCallKind::kNone:
   case ArrayCallKind::kArrayPropsIsNative:
-  case ArrayCallKind::kArrayPropsIsNativeNoTypeCheck:
+  case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
   case ArrayCallKind::kCheckSubscript:
   case ArrayCallKind::kCheckIndex:
   case ArrayCallKind::kGetCount:
@@ -1675,7 +1675,7 @@ createFastNativeArraysCheck(SmallVectorImpl<ArraySemanticsCall> &ArrayProps,
     auto Loc = (*Call).getLoc();
     auto CallKind = Call.getKind();
     if (CallKind == ArrayCallKind::kArrayPropsIsNative ||
-        CallKind == ArrayCallKind::kArrayPropsIsNativeNoTypeCheck) {
+        CallKind == ArrayCallKind::kArrayPropsIsNativeTypeChecked) {
       auto Val = createStructExtract(B, Loc, SILValue(Call, 0), 0);
       Result = createAnd(B, Loc, Result, Val);
     }
@@ -1711,7 +1711,7 @@ static void collectArrayPropsCalls(
 static void replaceArrayPropsCall(SILBuilder &B, ArraySemanticsCall C,
                                   CallGraph *CG) {
   assert(C.getKind() == ArrayCallKind::kArrayPropsIsNative ||
-         C.getKind() == ArrayCallKind::kArrayPropsIsNativeNoTypeCheck);
+         C.getKind() == ArrayCallKind::kArrayPropsIsNativeTypeChecked);
   ApplyInst *AI = C;
 
   SILType IntBoolTy = SILType::getBuiltinIntegerType(1, B.getASTContext());
