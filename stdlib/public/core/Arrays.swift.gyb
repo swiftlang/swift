@@ -569,21 +569,23 @@ extension ${Self} : _ArrayType {
     _sanityCheck(capacity >= minimumCapacity)
   }
 
+  /// Copy the contents of the current buffer to a new unique mutable buffer.
+  /// The count of the new buffer is set to 'oldCount', the capacity of the
+  /// new buffer is big enough to hold 'oldCount' + 1 elements.
   @inline(never)
-  internal mutating func _copyToNewGrownBuffer(oldCount: Int) {
+  internal mutating func _copyToNewBuffer(oldCount: Int) {
     let newCount = oldCount + 1
     var newBuffer = Optional(
-      _forceCreateUniqueMutableBuffer(&_buffer,
-                                      newCount: oldCount,
-                                      countForCapacity: newCount))
-    _arrayOutOfPlaceUpdate(&_buffer, &newBuffer, oldCount, 0,
-                           _IgnorePointer())
+      _forceCreateUniqueMutableBuffer(
+        &_buffer, countForNewBuffer: oldCount, minNewCapacity: newCount))
+    _arrayOutOfPlaceUpdate(
+      &_buffer, &newBuffer, oldCount, 0, _IgnorePointer())
   }
 
   @_semantics("array.make_mutable")
   internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      _copyToNewGrownBuffer(_buffer.count)
+      _copyToNewBuffer(_buffer.count)
     }
   }
 
@@ -592,7 +594,7 @@ extension ${Self} : _ArrayType {
     _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
 
     if _slowPath(oldCount + 1 > _buffer.capacity) {
-      _copyToNewGrownBuffer(oldCount)
+      _copyToNewBuffer(oldCount)
     }
   }
 
@@ -865,7 +867,8 @@ internal func _arrayOutOfPlaceReplace<
   let growth = insertCount - subRange.count
   let newCount = source.count + growth
   var newBuffer = Optional(
-    _forceCreateUniqueMutableBuffer(&source, newCount, newCount))
+    _forceCreateUniqueMutableBuffer(
+      &source, newCount: newCount, requiredCapacity: newCount))
 
   _arrayOutOfPlaceUpdate(
     &source, &newBuffer,
@@ -961,42 +964,58 @@ public func += <
 
 //===--- generic helpers --------------------------------------------------===//
 
+/// Create a unique mutable buffer that has enough capacity to hold 'newCount'
+/// elements and at least 'requiredCapacity' elements. Set the count of the new
+/// buffer to 'newCount'. The content of the buffer is uninitialized.
+/// The forumula used to compute the new buffers capacity is:
+///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
+///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
 @inline(never)
 internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
-  inout source: _Buffer, _ newCount: Int, _ requiredCapacity: Int
+  inout source: _Buffer, newCount: Int, requiredCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
-  return _forceCreateUniqueMutableBufferImpl(&source,
-                                             newCount,
-                                             requiredCapacity,
-                                             false)
+  return _forceCreateUniqueMutableBufferImpl(
+    &source, countForBuffer: newCount, minNewCapacity: newCount,
+    requiredCapacity: requiredCapacity)
 }
 
+/// Create a unique mutable buffer that has enough capacity to hold
+/// 'minNewCapacity' elements and set the count of the new buffer to
+/// 'countForNewBuffer'. The content of the buffer uninitialized.
+/// The forumula used to compute the new buffers capacity is:
+///   max(minNewCapacity, source.capacity) if minNewCapacity <= source.capacity
+///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
 @inline(never)
 internal
 func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
-  inout source: _Buffer,  newCount: Int,  countForCapacity: Int
+  inout source: _Buffer,  countForNewBuffer: Int,  minNewCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
-  return _forceCreateUniqueMutableBufferImpl(&source,
-                                             newCount,
-                                             countForCapacity,
-                                             true)
+  return _forceCreateUniqueMutableBufferImpl(
+    &source, countForBuffer: countForNewBuffer, minNewCapacity: minNewCapacity,
+    requiredCapacity: minNewCapacity)
 }
 
+/// Create a unique mutable buffer that has enough capacity to hold
+/// 'minNewCapacity' elements and at least 'requiredCapacity' elements and set
+/// the count of the new buffer to 'countForBuffer'. The content of the buffer
+/// uninitialized.
+/// The formula used to compute the new capacity is:
+///  max(requiredCapacity, source.capacity) if minNewCapacity <= source.capacity
+///  max(requiredCapacity, _growArrayCapacity(source.capacity))  otherwise
 internal func _forceCreateUniqueMutableBufferImpl<_Buffer : _ArrayBufferType>(
-  inout source: _Buffer, _ newCount: Int, _ requiredCapacity: Int,
-  _ useRequiredCapacityAsCountForResize: Bool
+  inout source: _Buffer,  countForBuffer: Int, minNewCapacity: Int,
+  requiredCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
-  _sanityCheck(newCount >= 0)
-  _sanityCheck(requiredCapacity >= newCount)
+  _sanityCheck(countForBuffer >= 0)
+  _sanityCheck(requiredCapacity >= countForBuffer)
+  _sanityCheck(minNewCapacity >= countForBuffer)
 
-  let count = useRequiredCapacityAsCountForResize ? requiredCapacity : newCount
   let minimumCapacity = max(
-    requiredCapacity,
-    count > source.capacity
+    requiredCapacity, minNewCapacity > source.capacity
       ? _growArrayCapacity(source.capacity) : source.capacity)
 
   return _ContiguousArrayBuffer(
-    count: newCount, minimumCapacity: minimumCapacity)
+    count: countForBuffer, minimumCapacity: minimumCapacity)
 }
 
 internal protocol _PointerFunctionType {
@@ -1112,8 +1131,9 @@ internal func _arrayReserve<
     return
   }
 
-  var newBuffer = Optional(_forceCreateUniqueMutableBuffer(&buffer, count,
-                                                           requiredCapacity))
+  var newBuffer = Optional(
+    _forceCreateUniqueMutableBuffer(
+      &buffer, newCount: count, requiredCapacity: requiredCapacity))
   _arrayOutOfPlaceUpdate(&buffer, &newBuffer, count, 0, _IgnorePointer())
 }
 
