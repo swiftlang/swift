@@ -519,6 +519,7 @@ public:
                                  TypeCheckExprFlags::IsDiscarded))
         return nullptr;
       FS->setInitializer(Initializer);
+      TC.checkIgnoredExpr(Initializer);
     }
 
     if (auto *Cond = FS->getCond().getPtrOrNull()) {
@@ -532,6 +533,7 @@ public:
                                  TypeCheckExprFlags::IsDiscarded))
         return nullptr;
       FS->setIncrement(Increment);
+      TC.checkIgnoredExpr(Increment);
     }
 
     AddLabeledStmt loopNest(*this, FS);
@@ -964,6 +966,16 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
 }
   
 void TypeChecker::checkIgnoredExpr(Expr *E) {
+  // For parity with C, several places in the grammar accept multiple
+  // comma-separated expressions and then bind them together as an implicit
+  // tuple.  Break these apart and check them separately.
+  if (E->isImplicit() && isa<TupleExpr>(E)) {
+    for (auto Elt : cast<TupleExpr>(E)->getElements()) {
+      checkIgnoredExpr(Elt);
+    }
+    return;
+  }
+
   // Complain about l-values that are neither loaded nor stored.
   if (E->getType()->isLValueType()) {
     diagnose(E->getLoc(), diag::expression_unused_lvalue)

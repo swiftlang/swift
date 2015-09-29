@@ -423,4 +423,19 @@ func testThrowNil() throws {
 }
 
 
+// <rdar://problem/16650625>
+func for_ignored_lvalue_init() {
+  var i = 0
+  for i;  // expected-error {{expression resolves to an unused l-value}}
+    i < 10; ++i {}
+}
+
+// rdar://problem/18643692
+func for_loop_multi_iter() {
+  for (var i = 0, x = 0; i < 10; i++,
+       x) { // expected-error {{expression resolves to an unused l-value}}
+    --x
+  }
+}
+
 

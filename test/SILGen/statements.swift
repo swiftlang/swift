@@ -233,13 +233,6 @@ func for_each_loop(x: [C]) {
   _ = 0
 }
 
-// <rdar://problem/16650625>
-func for_ignored_lvalue_init() {
-  var i = 0
-  for i; i < 10; ++i {}
-}
-
-
 // CHECK-LABEL: sil hidden @{{.*}}test_break
 func test_break(i : Int) {
   switch i {
@@ -351,11 +344,6 @@ func test_if_break(a : Bool) {
 
   // CHECK: [[OUT]]:
   // CHECK:   return
-}
-
-// rdar://problem/18643692
-func for_loop_multi_iter() {
-  for (var i = 0, x = 0; i < 10; i++, x) { --x }
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements7test_doFT_T_
