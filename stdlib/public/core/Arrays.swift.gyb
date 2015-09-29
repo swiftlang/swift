@@ -344,33 +344,32 @@ public struct ${Self}<Element>
   }
 
 
-%if Self == 'Array':
   /// Check that the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`.
   @_semantics("array.check_subscript")
   public // @testable
   func _checkSubscript(index: Int, wasNative: Bool) {
+#if ${'_runtime(_ObjC)' if Self == 'Array' else 'false'}
     _buffer._checkInoutAndNativeBounds(index, wasNative: wasNative)
+#else
+    _buffer._checkValidSubscript(index)
+#endif
   }
 
+% if Self == 'Array':
   /// Check that the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`.
   @_semantics("array.check_subscript")
   public // @testable
   func _checkSubscript(index: Int, wasNativeTypeChecked: Bool) {
+#if _runtime(_ObjC)
     _buffer._checkInoutAndNativeTypeCheckedBounds(index,
           wasNativeTypeChecked: wasNativeTypeChecked)
-  }
-%else:
-  /// Check that the given `index` is valid for subscripting, i.e. `0
-  /// ≤ index < count`.
-  @_semantics("array.check_subscript")
-  public // @testable
-  func _checkSubscript(index: Int, wasNative: Bool) {
+#else
     _buffer._checkValidSubscript(index)
+#endif
   }
-
-%end
+% end
 
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`.
   @_semantics("array.check_index")
@@ -384,10 +383,11 @@ public struct ${Self}<Element>
   @inline(__always)
   public // @testable
   func _getElement(index: Int, wasNativeTypeChecked : Bool) -> Element {
-    return _buffer.getElement(
-      index${
-        ', wasNativeTypeChecked: wasNativeTypeChecked'
-        if Self == 'Array' else ''})
+#if ${'_runtime(_ObjC)' if Self == 'Array' else 'false'}
+    return _buffer.getElement(index, wasNativeTypeChecked: wasNativeTypeChecked)
+#else
+    return _buffer.getElement(index)
+#endif
   }
 
   @warn_unused_result
