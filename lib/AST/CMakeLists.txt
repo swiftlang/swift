@@ -18,6 +18,7 @@ add_swift_library(swiftAST
   DiagnosticEngine.cpp
   DocComment.cpp
   Expr.cpp
+  GenericSignature.cpp
   Identifier.cpp
   LookupVisibleDecls.cpp
   Mangle.cpp
