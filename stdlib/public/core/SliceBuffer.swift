@@ -218,17 +218,14 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
     }
   }
 
-  /// Return whether the given `index` is valid for subscripting, i.e.
+  /// Traps unless the given `index` is valid for subscripting, i.e.
   /// `startIndex ≤ index < endIndex`
-  @warn_unused_result
-  internal func _isValidSubscript(
-    index : Int, wasNativeBuffer: Bool
-  ) -> Bool {
-    return index >= startIndex && index < endIndex
+  internal func _checkValidSubscript(index : Int) {
+    _precondition(
+      index >= startIndex && index < endIndex, "Index out of bounds")
   }
 
-  public
-  var capacity: Int {
+  public var capacity: Int {
     let count = self.count
     if _slowPath(!_hasNativeBuffer) {
       return count
@@ -252,7 +249,7 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
   }
 
   @warn_unused_result
-  func getElement(i: Int, wasNativeTypeCheckedBuffer: Bool) -> Element {
+  func getElement(i: Int) -> Element {
     _sanityCheck(i >= startIndex, "negative slice index is out of range")
     _sanityCheck(i < endIndex, "slice index out of range")
     return subscriptBaseAddress[i]
@@ -264,7 +261,7 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
   ///   `position != endIndex`.
   public subscript(position: Int) -> Element {
     get {
-      return getElement(position, wasNativeTypeCheckedBuffer: true)
+      return getElement(position)
     }
     nonmutating set {
       _sanityCheck(position >= startIndex, "negative slice index is out of range")

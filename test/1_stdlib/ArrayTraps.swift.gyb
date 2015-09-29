@@ -210,7 +210,7 @@ ArrayTraps.test("bounds_with_downcast")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
-    "fatal error: Array index out of range" : "")
+    "fatal error: Index out of range" : "")
   .code {
   let ba: [Base] = [ Derived(), Base() ]
   let da = ba as! [Derived]
@@ -247,8 +247,8 @@ class ViolateInoutSafeySwitchToObjcBuffer {
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._getArrayPropertyIsNativeTypeChecked()
     for i in 0..<A.count {
-      A._checkSubscript(i, wasNativeTypeCheckedBuffer: isNativeTypeChecked)
-      A._getElement(i, wasNativeTypeCheckedBuffer: isNativeTypeChecked)
+      A._checkSubscript(i, wasNativeTypeChecked: isNativeTypeChecked)
+      A._getElement(i, wasNativeTypeChecked: isNativeTypeChecked)
       accessArrayViaInoutVolation()
     }
   }
@@ -288,8 +288,8 @@ class ViolateInoutSafeyNeedElementTypeCheck {
     // loop calls a function that violates inout safety and overrides the array.
     let isNativeTypeChecked = A._getArrayPropertyIsNativeTypeChecked()
     for i in 0..<A.count {
-      A._checkSubscript(i, wasNativeTypeCheckedBuffer: isNativeTypeChecked)
-      A._getElement(i, wasNativeTypeCheckedBuffer: isNativeTypeChecked)
+      A._checkSubscript(i, wasNativeTypeChecked: isNativeTypeChecked)
+      A._getElement(i, wasNativeTypeChecked: isNativeTypeChecked)
       accessArrayViaInoutVolation()
     }
   }

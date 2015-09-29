@@ -296,23 +296,18 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
   }
 
   @warn_unused_result
-  func getElement(i: Int, wasNativeTypeCheckedBuffer: Bool) -> Element {
-    _sanityCheck(
-      _isValidSubscript(i,
-          wasNativeBuffer: wasNativeTypeCheckedBuffer),
-      "Array index out of range")
-    // If the index is in bounds, we can assume we have storage.
+  func getElement(i: Int) -> Element {
+    _sanityCheck(i >= 0 && i < count, "Array index out of range")
     return firstElementAddress[i]
   }
 
   /// Get or set the value of the ith element.
   public subscript(i: Int) -> Element {
     get {
-      return getElement(i, wasNativeTypeCheckedBuffer: true)
+      return getElement(i)
     }
     nonmutating set {
       _sanityCheck(i >= 0 && i < count, "Array index out of range")
-      // If the index is in bounds, we can assume we have storage.
 
       // FIXME: Manually swap because it makes the ARC optimizer happy.  See
       // <rdar://problem/16831852> check retain/release order
@@ -340,32 +335,14 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
     }
   }
 
-  /// Returns whether the given `index` is valid for subscripting, i.e. `0
+  /// Traps unless the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`.
-  ///
-  /// wasNativeBuffer is used for interface compatibility with ArrayBuffer.
-  @warn_unused_result
-  func _isValidSubscript(index : Int, wasNativeBuffer : Bool) -> Bool {
-    /// Instead of returning 0 for no storage, we explicitly check
-    /// for the existance of storage.
-    /// Note that this is better than folding hasStorage in to
-    /// the return from this function, as this implementation generates
-    /// no shortcircuiting blocks.
-    return (index >= 0) && (index < __bufferPointer.value.count)
-  }
-
-  /// Returns whether the given `index` is valid for subscripting, i.e. `0
-  /// ≤ index < count`.
-  ///
-  /// For ContiguousArrayBuffer, this is equivalent to the
-  /// `_isValidSubscript(_:wasNativeBuffer:)` form, but is necessary
-  /// for interface parity with `ArrayBuffer`.
   @inline(__always)
-  @warn_unused_result
-  func _isValidSubscript(index : Int, wasNativeTypeCheckedBuffer : Bool)
-      -> Bool {
-    return _isValidSubscript(index,
-      wasNativeTypeCheckedBuffer : wasNativeTypeCheckedBuffer)
+  func _checkValidSubscript(index : Int) {
+    _precondition(
+      (index >= 0) && (index < __bufferPointer.value.count),
+      "Index out of range"
+    )
   }
 
   /// The number of elements the buffer can store without reallocation.
