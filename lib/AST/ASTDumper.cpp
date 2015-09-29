@@ -1359,11 +1359,23 @@ public:
   }
   void printRec(TypeRepr *T);
 
+  static const char *getAccessKindString(AccessKind kind) {
+    switch (kind) {
+    case AccessKind::Read: return "read";
+    case AccessKind::Write: return "write";
+    case AccessKind::ReadWrite: return "readwrite";
+    }
+    llvm_unreachable("bad access kind");
+  }
+
   raw_ostream &printCommon(Expr *E, const char *C) {
     OS.indent(Indent) << '(' << C;
     if (E->isImplicit())
       OS << " implicit";
     OS << " type='" << E->getType() << '\'';
+
+    if (E->hasLValueAccessKind())
+      OS << " accessKind=" << getAccessKindString(E->getLValueAccessKind());
 
     // If we have a source range and an ASTContext, print the source range.
     if (auto Ty = E->getType()) {

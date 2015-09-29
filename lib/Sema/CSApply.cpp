@@ -643,6 +643,15 @@ namespace {
         }
       }
 
+      // If the opaque value has an l-value access kind, then
+      // the OpenExistentialExpr isn't making a derived l-value, which
+      // means this is our only chance to propagate the l-value access kind
+      // down to the original existential value.  Otherwise, propagateLVAK
+      // will handle this.
+      if (record.OpaqueValue->hasLValueAccessKind())
+        record.ExistentialValue->propagateLValueAccessKind(
+                                    record.OpaqueValue->getLValueAccessKind());
+
       // Form the open-existential expression.
       result = new (tc.Context) OpenExistentialExpr(
                                   record.ExistentialValue,
@@ -2639,6 +2648,11 @@ namespace {
     }
 
     Expr *visitInOutExpr(InOutExpr *expr) {
+      // The default assumption is that inouts are read-write.  It's easier
+      // to do this unconditionally here and then overwrite in the exception
+      // case (when we turn the inout into an UnsafePointer) than to try to
+      // discover that we're in that case right now.
+      expr->getSubExpr()->propagateLValueAccessKind(AccessKind::ReadWrite);
       auto lvTy = expr->getSubExpr()->getType()->castTo<LValueType>();
 
       // The type is simply inout.
@@ -3149,6 +3163,7 @@ namespace {
       auto destTy = cs.computeAssignDestType(expr->getDest(), expr->getLoc());
       if (!destTy)
         return nullptr;
+      expr->getDest()->propagateLValueAccessKind(AccessKind::Write);
 
       // Convert the source to the simplified destination type.
       auto locator =
@@ -4499,6 +4514,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     case ConversionRestrictionKind::LValueToRValue: {
       // Load from the lvalue.
+      expr->propagateLValueAccessKind(AccessKind::Read);
       expr = new (tc.Context) LoadExpr(expr, fromType->getRValueType());
 
       // Coerce the result.
@@ -4594,6 +4610,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::InoutToPointer: {
+      // Overwrite the l-value access kind to be read-only if we're
+      // converting to a non-mutable pointer type.
+      PointerTypeKind pointerKind;
+      auto toEltType = toType->getAnyPointerElementType(pointerKind);
+      assert(toEltType && "not a pointer type?"); (void) toEltType;
+      if (pointerKind == PTK_UnsafePointer) {
+        cast<InOutExpr>(expr->getValueProvidingExpr())->getSubExpr()
+          ->propagateLValueAccessKind(AccessKind::Read, /*overwrite*/ true);
+      }
+
       tc.requirePointerArgumentIntrinsics(expr->getLoc());
       return new (tc.Context) InOutToPointerExpr(expr, toType);
     }
@@ -4694,6 +4720,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // In an 'inout' operator like "++i", the operand is converted from
       // an implicit lvalue to an inout argument.
       assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
+      expr->propagateLValueAccessKind(AccessKind::ReadWrite);
       return new (tc.Context) InOutExpr(expr->getStartLoc(), expr,
                                             toType, /*isImplicit*/true);
     }
@@ -4710,6 +4737,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     if (performLoad) {
       // Load from the lvalue.
+      expr->propagateLValueAccessKind(AccessKind::Read);
       expr = new (tc.Context) LoadExpr(expr, fromLValue->getObjectType());
 
       // Coerce the result.
@@ -4933,6 +4961,7 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
 
   // Use InOutExpr to convert it to an explicit inout argument for the
   // receiver.
+  expr->propagateLValueAccessKind(AccessKind::ReadWrite);
   return new (ctx) InOutExpr(expr->getStartLoc(), expr,
                                  toType, /*isImplicit*/true);
 }

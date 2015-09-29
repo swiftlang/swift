@@ -16,6 +16,7 @@
 
 #include "swift/AST/Expr.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
 #include "swift/AST/Stmt.h"
 #include "swift/AST/AST.h"
@@ -182,6 +183,148 @@ Expr *Expr::getValueProvidingExpr() {
   return E;
 }
 
+/// Propagate l-value use information to children.
+void Expr::propagateLValueAccessKind(AccessKind accessKind,
+                                     bool allowOverwrite) {
+  /// A visitor class which walks an entire l-value expression.
+  class PropagateAccessKind
+       : public ExprVisitor<PropagateAccessKind, void, AccessKind> {
+#ifndef NDEBUG
+    bool AllowOverwrite;
+#endif
+  public:
+    PropagateAccessKind(bool allowOverwrite)
+#ifndef NDEBUG
+      : AllowOverwrite(allowOverwrite)
+#endif
+    {}
+
+    void visit(Expr *E, AccessKind kind) {
+      assert((AllowOverwrite || !E->hasLValueAccessKind()) &&
+             "l-value access kind has already been set");
+
+      assert(E->getType()->isAssignableType() &&
+             "setting access kind on non-l-value");
+      E->setLValueAccessKind(kind);
+
+      // Propagate this to sub-expressions.
+      ASTVisitor::visit(E, kind);
+    }
+
+#define NON_LVALUE_EXPR(KIND)                                           \
+    void visit##KIND##Expr(KIND##Expr *, AccessKind accessKind) {       \
+      llvm_unreachable("not an l-value");                               \
+    }
+#define LEAF_LVALUE_EXPR(KIND)                                          \
+    void visit##KIND##Expr(KIND##Expr *E, AccessKind accessKind) {}
+#define COMPLETE_PHYSICAL_LVALUE_EXPR(KIND, ACCESSOR)                   \
+    void visit##KIND##Expr(KIND##Expr *E, AccessKind accessKind) {      \
+      visit(E->ACCESSOR, accessKind);                                   \
+    }
+#define PARTIAL_PHYSICAL_LVALUE_EXPR(KIND, ACCESSOR)                    \
+    void visit##KIND##Expr(KIND##Expr *E, AccessKind accessKind) {      \
+      visit(E->ACCESSOR, getPartialAccessKind(accessKind));             \
+    }
+
+    void visitMemberRefExpr(MemberRefExpr *E, AccessKind accessKind) {
+      if (!E->getBase()->getType()->isLValueType()) return;
+      visit(E->getBase(), getBaseAccessKind(E->getMember(), accessKind));
+    }
+    void visitSubscriptExpr(SubscriptExpr *E, AccessKind accessKind) {
+      if (!E->getBase()->getType()->isLValueType()) return;
+      visit(E->getBase(), getBaseAccessKind(E->getDecl(), accessKind));
+    }
+
+    static AccessKind getPartialAccessKind(AccessKind accessKind) {
+      return (accessKind == AccessKind::Read
+                ? accessKind : AccessKind::ReadWrite);
+    }
+
+    static AccessKind getBaseAccessKind(ConcreteDeclRef member,
+                                        AccessKind accessKind) {
+      // We assume writes are partial writes, so the result is always
+      // either Read or ReadWrite.
+      auto memberDecl = cast<AbstractStorageDecl>(member.getDecl());
+
+      // If we're reading and the getter is mutating, or we're writing
+      // and the setter is mutating, this is readwrite.
+      if ((accessKind != AccessKind::Write &&
+           memberDecl->isGetterMutating()) ||
+          (accessKind != AccessKind::Read &&
+           !memberDecl->isSetterNonMutating())) {
+        return AccessKind::ReadWrite;
+      }
+
+      return AccessKind::Read;
+    }
+
+    void visitTupleExpr(TupleExpr *E, AccessKind accessKind) {
+      for (auto elt : E->getElements()) {
+        visit(elt, accessKind);
+      }
+    }
+
+    void visitOpenExistentialExpr(OpenExistentialExpr *E,
+                                  AccessKind accessKind) {
+      bool opaqueValueHadAK = E->getOpaqueValue()->hasLValueAccessKind();
+      AccessKind oldOpaqueValueAK =
+        (opaqueValueHadAK ? E->getOpaqueValue()->getLValueAccessKind()
+                          : AccessKind::Read);
+
+      visit(E->getSubExpr(), accessKind);
+
+      // Propagate the new access kind from the OVE to the original existential
+      // if we just set or changed it on the OVE.
+      if (E->getOpaqueValue()->hasLValueAccessKind()) {
+        auto newOpaqueValueAK = E->getOpaqueValue()->getLValueAccessKind();
+        if (!opaqueValueHadAK || newOpaqueValueAK != oldOpaqueValueAK)
+          visit(E->getExistentialValue(), newOpaqueValueAK);
+      }
+    }
+
+    LEAF_LVALUE_EXPR(DeclRef)
+    LEAF_LVALUE_EXPR(DiscardAssignment)
+    LEAF_LVALUE_EXPR(DynamicLookup)
+    LEAF_LVALUE_EXPR(OpaqueValue)
+
+    COMPLETE_PHYSICAL_LVALUE_EXPR(AnyTry, getSubExpr())
+    PARTIAL_PHYSICAL_LVALUE_EXPR(BindOptional, getSubExpr())
+    COMPLETE_PHYSICAL_LVALUE_EXPR(DotSyntaxBaseIgnored, getRHS());
+    PARTIAL_PHYSICAL_LVALUE_EXPR(ForceValue, getSubExpr())
+    COMPLETE_PHYSICAL_LVALUE_EXPR(Identity, getSubExpr())
+    PARTIAL_PHYSICAL_LVALUE_EXPR(TupleElement, getBase())
+
+    NON_LVALUE_EXPR(Error)
+    NON_LVALUE_EXPR(Literal)
+    NON_LVALUE_EXPR(SuperRef)
+    NON_LVALUE_EXPR(Type)
+    NON_LVALUE_EXPR(OtherConstructorDeclRef)
+    NON_LVALUE_EXPR(Collection)
+    NON_LVALUE_EXPR(CaptureList)
+    NON_LVALUE_EXPR(AbstractClosure)
+    NON_LVALUE_EXPR(InOut)
+    NON_LVALUE_EXPR(DynamicType)
+    NON_LVALUE_EXPR(RebindSelfInConstructor)
+    NON_LVALUE_EXPR(Apply)
+    NON_LVALUE_EXPR(ImplicitConversion)
+    NON_LVALUE_EXPR(ExplicitCast)
+    NON_LVALUE_EXPR(OptionalEvaluation)
+    NON_LVALUE_EXPR(If)
+    NON_LVALUE_EXPR(Assign)
+    NON_LVALUE_EXPR(DefaultValue)
+    NON_LVALUE_EXPR(CodeCompletion)
+
+#define UNCHECKED_EXPR(KIND, BASE) \
+    NON_LVALUE_EXPR(KIND)
+#include "swift/AST/ExprNodes.def"
+
+#undef PHYSICAL_LVALUE_EXPR
+#undef LEAF_LVALUE_EXPR
+#undef NON_LVALUE_EXPR
+  };
+
+  PropagateAccessKind(allowOverwrite).visit(this, accessKind);
+}
 
 /// Enumerate each immediate child expression of this node, invoking the
 /// specific functor on it.  This ignores statements and other non-expression

@@ -539,6 +539,18 @@ bool TypeBase::isVoid() {
   return isEqual(getASTContext().TheEmptyTupleType);
 }
 
+bool TypeBase::isAssignableType() {
+  if (isLValueType()) return true;
+  if (auto tuple = getAs<TupleType>()) {
+    for (auto eltType : tuple->getElementTypes()) {
+      if (!eltType->isAssignableType())
+        return false;
+    }
+    return true;
+  }
+  return false;
+}
+
 namespace {
 class GetRValueTypeVisitor : public TypeVisitor<GetRValueTypeVisitor, Type> {
 public:

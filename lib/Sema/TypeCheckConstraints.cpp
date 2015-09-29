@@ -1903,8 +1903,10 @@ Expr *TypeChecker::coerceToRValue(Expr *expr) {
   }
 
   // If we already have an rvalue, we're done, otherwise emit a load.
-  if (auto lvalueTy = expr->getType()->getAs<LValueType>())
+  if (auto lvalueTy = expr->getType()->getAs<LValueType>()) {
+    expr->propagateLValueAccessKind(AccessKind::Read);
     return new (Context) LoadExpr(expr, lvalueTy->getObjectType());
+  }
 
   return expr;
 }
@@ -1915,8 +1917,10 @@ Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
     return expr;
   
   // Load lvalues.
-  if (auto lvalue = expr->getType()->getAs<LValueType>())
+  if (auto lvalue = expr->getType()->getAs<LValueType>()) {
+    expr->propagateLValueAccessKind(AccessKind::Read);
     return new (Context) LoadExpr(expr, lvalue->getObjectType());
+  }
 
   // Walk into parenthesized expressions to update the subexpression.
   if (auto paren = dyn_cast<IdentityExpr>(expr)) {
