@@ -1342,7 +1342,7 @@ private:
     if (InsertedInstrs)
       InsertedInstrs->push_back(TheInst);
 
-    BB->getInstList().insert(InsertPt, TheInst);
+    BB->insert(InsertPt, TheInst);
   }
 };
 

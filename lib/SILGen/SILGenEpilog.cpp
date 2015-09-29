@@ -107,7 +107,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     }
     
     // Kill the branch to the now-dead epilog BB.
-    pred->getInstList().erase(predBranch);
+    pred->erase(predBranch);
 
     // Move any instructions from the EpilogBB to the end of the 'pred' block.
     pred->getInstList().splice(pred->end(), epilogBB->getInstList());
@@ -220,7 +220,7 @@ void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
       // then destroy it.
       throwLoc = branch->getLoc();
       exn = branch->getArgs()[0];
-      predBB->getInstList().erase(branch);
+      predBB->erase(branch);
 
       // Erase the rethrow block.
       eraseBasicBlock(rethrowBB);

@@ -90,6 +90,10 @@ public:
   using reverse_iterator = InstListType::reverse_iterator;
   using const_reverse_iterator = InstListType::const_reverse_iterator;
 
+  void insert(iterator InsertPt, SILInstruction *I);
+  void remove(SILInstruction *I);
+  void erase(SILInstruction *I);
+
   bool empty() const { return InstList.empty(); }
   iterator begin() { return InstList.begin(); }
   iterator end() { return InstList.end(); }

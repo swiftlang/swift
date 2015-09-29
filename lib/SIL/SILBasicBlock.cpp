@@ -55,6 +55,18 @@ SILModule &SILBasicBlock::getModule() const {
   return getParent()->getModule();
 }
 
+void SILBasicBlock::insert(iterator InsertPt, SILInstruction *I) {
+  getInstList().insert(InsertPt, I);
+}
+
+void SILBasicBlock::remove(SILInstruction *I) {
+  getInstList().remove(I);
+}
+
+void SILBasicBlock::erase(SILInstruction *I) {
+  getInstList().erase(I);
+}
+
 /// This method unlinks 'self' from the containing SILFunction and deletes it.
 void SILBasicBlock::eraseFromParent() {
   getParent()->getBlocks().erase(this);

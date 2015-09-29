@@ -113,7 +113,7 @@ SILModule &SILInstruction::getModule() const {
 /// block, but does not delete it.
 ///
 void SILInstruction::removeFromParent() {
-  getParent()->getInstList().remove(this);
+  getParent()->remove(this);
 }
 
 /// eraseFromParent - This method unlinks 'self' from the containing basic
@@ -121,7 +121,7 @@ void SILInstruction::removeFromParent() {
 ///
 void SILInstruction::eraseFromParent() {
   assert(use_empty() && "There are uses of instruction being deleted.");
-  getParent()->getInstList().erase(this);
+  getParent()->erase(this);
 }
 
 /// Unlink this instruction from its current basic block and insert it into
@@ -756,7 +756,7 @@ SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
   SILInstruction *NewInst = TrivialCloner::doIt(this);
 
   if (NewInst && InsertPt)
-    InsertPt->getParent()->getInstList().insert(InsertPt, NewInst);
+    InsertPt->getParent()->insert(InsertPt, NewInst);
   return NewInst;
 }
 

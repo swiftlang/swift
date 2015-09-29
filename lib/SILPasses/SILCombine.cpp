@@ -260,7 +260,7 @@ SILInstruction *SILCombiner::insertNewInstBefore(SILInstruction *New,
   assert(New && New->getParent() == 0 &&
          "New instruction already inserted into a basic block!");
   SILBasicBlock *BB = Old.getParent();
-  BB->getInstList().insert(&Old, New);  // Insert inst
+  BB->insert(&Old, New);  // Insert inst
   Worklist.add(New);
   return New;
 }
