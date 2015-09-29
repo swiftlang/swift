@@ -460,12 +460,12 @@ public:
     // Check that non-terminators look ok.
     if (!isa<TermInst>(I)) {
       require(!BB->empty(), "Can't be in a parent block if it is empty");
-      require(&*BB->getInstList().rbegin() != I,
+      require(&*BB->rbegin() != I,
               "Non-terminators cannot be the last in a block");
     } else {
       // Skip the check for UnreachableInst, if explicitly asked to do so.
       if (!isa<UnreachableInst>(I) || !SkipUnreachableMustBeLastErrors)
-        require(&*BB->getInstList().rbegin() == I,
+        require(&*BB->rbegin() == I,
                 "Terminator must be the last in block");
     }
 
