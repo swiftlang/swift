@@ -56,15 +56,23 @@ SILModule &SILBasicBlock::getModule() const {
 }
 
 void SILBasicBlock::insert(iterator InsertPt, SILInstruction *I) {
-  getInstList().insert(InsertPt, I);
+  InstList.insert(InsertPt, I);
+}
+
+void SILBasicBlock::push_back(SILInstruction *I) {
+  InstList.push_back(I);
+}
+
+void SILBasicBlock::push_front(SILInstruction *I) {
+  InstList.push_front(I);
 }
 
 void SILBasicBlock::remove(SILInstruction *I) {
-  getInstList().remove(I);
+  InstList.remove(I);
 }
 
 void SILBasicBlock::erase(SILInstruction *I) {
-  getInstList().erase(I);
+  InstList.erase(I);
 }
 
 /// This method unlinks 'self' from the containing SILFunction and deletes it.

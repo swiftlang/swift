@@ -96,7 +96,7 @@ class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    Dest->getParent()->getInstList().push_front(Cloned);
+    Dest->getParent()->push_front(Cloned);
     Cloned->moveBefore(Dest);
     SILClonerWithScopes<InstructionsCloner>::postProcess(Orig, Cloned);
     AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));

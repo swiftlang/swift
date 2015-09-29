@@ -293,7 +293,7 @@ class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    DestBB->getInstList().push_back(Cloned);
+    DestBB->push_back(Cloned);
     SILClonerWithScopes<BaseThreadingCloner>::postProcess(Orig, Cloned);
     AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
   }
