@@ -10,7 +10,7 @@ var NSEnumeratorAPI = TestSuite("NSEnumeratorAPI")
 
 NSEnumeratorAPI.test("SequenceType") {
   let result = NSDictionary().keyEnumerator()
-  isSequenceType(result)
+  expectSequenceType(result)
 }
 
 NSEnumeratorAPI.test("keyEnumerator") {

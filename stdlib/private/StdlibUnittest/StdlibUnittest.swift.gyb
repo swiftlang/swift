@@ -268,7 +268,7 @@ public func expectGE(lhs: Int, _ rhs: Int, ${TRACE}) {
 public func expectType<T>(_: T.Type, inout _ x: T) {}
 public func expectEqualType<T>(_: T.Type, _: T.Type) {}
 
-public func isSequenceType<
+public func expectSequenceType<
   X : SequenceType
   where
   X.SubSequence : SequenceType,

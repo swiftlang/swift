@@ -10,7 +10,7 @@ var NSSetAPI = TestSuite("NSSetAPI")
 
 NSSetAPI.test("SequenceType") {
   let result = NSSet()
-  isSequenceType(result)
+  expectSequenceType(result)
 }
 
 private func compareAnythingAtAll(x: AnyObject, y: AnyObject)
@@ -43,7 +43,7 @@ var NSOrderedSetAPI = TestSuite("NSOrderedSetAPI")
 
 NSOrderedSetAPI.test("SequenceType") {
   let result = NSOrderedSet()
-  isSequenceType(result)
+  expectSequenceType(result)
 }
 
 NSOrderedSetAPI.test("initWithObjects") {
@@ -74,7 +74,7 @@ var NSIndexSetAPI = TestSuite("NSIndexSetAPI")
 
 NSIndexSetAPI.test("SequenceType") {
   let result = NSIndexSet()
-  isSequenceType(result)
+  expectSequenceType(result)
   let s = NSIndexSet(indexesInRange: NSMakeRange(1, 1))
   var g = s.generate()
   // FIXME: Compiler doesn't accept these terms.
