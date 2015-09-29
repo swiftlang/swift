@@ -147,7 +147,7 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
   if (Opts.Optimize && !Opts.DisableLLVMOptzns) {
     PMBuilder.OptLevel = 3;
     PMBuilder.Inliner = llvm::createFunctionInliningPass(200);
-    PMBuilder.SLPVectorize = !Opts.DisableLLVMSLPVectorizer;
+    PMBuilder.SLPVectorize = false;
     PMBuilder.LoopVectorize = true;
   } else {
     PMBuilder.OptLevel = 0;
