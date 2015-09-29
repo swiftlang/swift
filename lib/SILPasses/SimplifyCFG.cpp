@@ -298,7 +298,7 @@ static bool isThreadableBlock(SILBasicBlock *BB,
     return false;
 
   unsigned Cost = 0;
-  for (auto &Inst : BB->getInstList()) {
+  for (auto &Inst : *BB) {
     if (!Inst.isTriviallyDuplicatable())
       return false;
 
@@ -912,7 +912,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // operation and whether the block is small enough to be worth duplicating.
   unsigned Cost = 0;
 
-  for (auto &Inst : DestBB->getInstList()) {
+  for (auto &Inst : *DestBB) {
     if (!Inst.isTriviallyDuplicatable())
       return false;
 
