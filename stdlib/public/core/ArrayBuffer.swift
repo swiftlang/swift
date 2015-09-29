@@ -304,38 +304,31 @@ extension _ArrayBuffer {
   }
   
   /// Return whether the given `index` is valid for subscripting, i.e. `0
-  /// ≤ index < count`
+  /// ≤ index < count`.
+  ///
+  /// wasNativeBuffer == _isNative in the absence of inout violations.
+  /// Because the optimizer can hoist the original check it might have
+  /// been invalidated by illegal user code.
   @warn_unused_result
-  internal func _isValidSubscript(index : Int,
-                                  wasNativeBuffer: Bool) -> Bool {
+  internal func _isValidSubscript(
+    index: Int, wasNativeBuffer: Bool
+  ) -> Bool {
+    // Favor the native case in the optimizer because overall, it's
+    // part of the fast path, even if it does more work in this
+    // function.
     if _fastPath(wasNativeBuffer) {
-      // We need this precondition check to ensure memory safety. It ensures
-      // that if due to an inout violation a store of a different representation
-      // to the array (an NSArray) happened between 'wasNativeBuffer' was
-      // obtained  and now we still are memory safe. To ensure safety we need to
-      // reload the 'isNative' flag from memory which _isNative will do -
-      // instead of relying on the value in 'wasNativeBuffer' which could
-      // have been invalidated by an intervening store since we obtained
-      // 'wasNativeBuffer'. See also the comment of _typeCheck.
-      if (_isClassOrObjCExistential(Element.self)) {
-        // Only non value elements can have non native storage.
-        _precondition(_isNative,
-          "inout rules were violated: the array was overwritten by an NSArray")
-      }
+      _precondition(
+        _isNative,
+        "inout rules were violated: the array was overwritten by an NSArray")
 
-      // Note we call through to the native buffer here as it has a more
-      // optimal implementation than just doing `index < count`.
-      return _native._isValidSubscript(index,
-                                   wasNativeBuffer: wasNativeBuffer)
+      return _native._isValidSubscript(index)
     }
+    
     // _getElementSlowPath does its own subscript checking. Therefore we just
     // return `true`. This simplifies the inlined code.
     // But first we have to make the check to ensure memory safety (see above).
-    if (_isClassOrObjCExistential(Element.self)) {
-      // Only non value elements can have non native storage.
-      _precondition(!_isNative,
-        "inout rules were violated: the array was overwritten by a native array")
-    }
+    _precondition(!_isNative,
+      "inout rules were violated: the array was overwritten by a native array")
     return true
   }
 
