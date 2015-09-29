@@ -1436,9 +1436,8 @@ extension TestSuite {
     where
     SequenceWithEquatableElement.Generator.Element : Equatable,
     Sequence.SubSequence : SequenceType,
-    Sequence.Generator.Element == Sequence.SubSequence.Generator.Element,
-    Sequence.SubSequence.SubSequence : SequenceType,
-    Sequence.SubSequence == Sequence.SubSequence.SubSequence
+    Sequence.SubSequence.Generator.Element == Sequence.Generator.Element,
+    Sequence.SubSequence.SubSequence == Sequence.SubSequence
   >(
     var testNamePrefix: String = "",
     makeSequence: ([Sequence.Generator.Element]) -> Sequence,

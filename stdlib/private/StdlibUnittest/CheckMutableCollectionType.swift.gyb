@@ -74,8 +74,8 @@ extension TestSuite {
     CollectionWithComparableElement : MutableCollectionType
     where
     Collection.SubSequence : MutableCollectionType,
-    Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.SubSequence == Collection.SubSequence,
     CollectionWithEquatableElement.Generator.Element : Equatable,
     CollectionWithComparableElement.Generator.Element : Comparable
   >(
@@ -374,13 +374,13 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
     CollectionWithComparableElement : MutableCollectionType
     where
     Collection.Index : BidirectionalIndexType,
-    CollectionWithEquatableElement.Index : BidirectionalIndexType,
-    CollectionWithComparableElement.Index : BidirectionalIndexType,
     Collection.SubSequence : MutableCollectionType,
-    Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
     Collection.SubSequence.Index : BidirectionalIndexType,
+    Collection.SubSequence.SubSequence == Collection.SubSequence,
+    CollectionWithEquatableElement.Index : BidirectionalIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable,
+    CollectionWithComparableElement.Index : BidirectionalIndexType,
     CollectionWithComparableElement.Generator.Element : Comparable
   >(
     var testNamePrefix: String = "",
@@ -491,13 +491,13 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     CollectionWithComparableElement : MutableCollectionType
     where
     Collection.Index : RandomAccessIndexType,
-    CollectionWithEquatableElement.Index : RandomAccessIndexType,
-    CollectionWithComparableElement.Index : RandomAccessIndexType,
     Collection.SubSequence : MutableCollectionType,
-    Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
     Collection.SubSequence.Index : RandomAccessIndexType,
+    Collection.SubSequence.SubSequence == Collection.SubSequence,
+    CollectionWithEquatableElement.Index : RandomAccessIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable,
+    CollectionWithComparableElement.Index : RandomAccessIndexType,
     CollectionWithComparableElement.Generator.Element : Comparable
   >(
     var testNamePrefix: String = "",

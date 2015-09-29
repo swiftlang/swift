@@ -344,8 +344,8 @@ extension TestSuite {
     CollectionWithEquatableElement : RangeReplaceableCollectionType
     where
     Collection.SubSequence : CollectionType,
-    Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.SubSequence == Collection.SubSequence,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",
@@ -1101,11 +1101,11 @@ self.test("\(testNamePrefix).OperatorPlus") {
     CollectionWithEquatableElement : RangeReplaceableCollectionType
     where
     Collection.Index : BidirectionalIndexType,
-    CollectionWithEquatableElement.Index : BidirectionalIndexType,
     Collection.SubSequence : CollectionType,
-    Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
     Collection.SubSequence.Index : BidirectionalIndexType,
+    Collection.SubSequence.SubSequence == Collection.SubSequence,
+    CollectionWithEquatableElement.Index : BidirectionalIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",
@@ -1226,11 +1226,11 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     CollectionWithEquatableElement : RangeReplaceableCollectionType
     where
     Collection.Index : RandomAccessIndexType,
-    CollectionWithEquatableElement.Index : RandomAccessIndexType,
     Collection.SubSequence : CollectionType,
-    Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
     Collection.SubSequence.Index : RandomAccessIndexType,
+    Collection.SubSequence.SubSequence == Collection.SubSequence,
+    CollectionWithEquatableElement.Index : RandomAccessIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",

@@ -284,8 +284,7 @@ extension TestSuite {
     where
     Collection.SubSequence : CollectionType,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
-    Collection.SubSequence.SubSequence : CollectionType,
-    Collection.SubSequence == Collection.SubSequence.SubSequence,
+    Collection.SubSequence.SubSequence == Collection.SubSequence,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",
@@ -780,11 +779,11 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/slice/removeTooMany/semantics")
     CollectionWithEquatableElement : CollectionType
     where
     Collection.Index : BidirectionalIndexType,
-    CollectionWithEquatableElement.Index : BidirectionalIndexType,
     Collection.SubSequence : CollectionType,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
     Collection.SubSequence.Index : BidirectionalIndexType,
-    Collection.SubSequence == Collection.SubSequence.SubSequence,
+    Collection.SubSequence.SubSequence == Collection.SubSequence,
+    CollectionWithEquatableElement.Index : BidirectionalIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",
@@ -1082,11 +1081,11 @@ self.test("\(testNamePrefix).suffix/semantics") {
     CollectionWithEquatableElement : CollectionType
     where
     Collection.Index : RandomAccessIndexType,
-    CollectionWithEquatableElement.Index : RandomAccessIndexType,
     Collection.SubSequence : CollectionType,
-    Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
     Collection.SubSequence.Index : RandomAccessIndexType,
+    Collection.SubSequence.SubSequence == Collection.SubSequence,
+    CollectionWithEquatableElement.Index : RandomAccessIndexType,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",
