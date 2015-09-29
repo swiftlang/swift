@@ -64,7 +64,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     // If the epilog was not branched to at all, kill the BB and
     // just emit the epilog into the current BB.
     while (!epilogBB->empty())
-      epilogBB->getInstList().back().eraseFromParent();
+      epilogBB->back().eraseFromParent();
     eraseBasicBlock(epilogBB);
 
     // If the current bb is terminated then the epilog is just unreachable.

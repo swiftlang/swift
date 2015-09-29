@@ -443,7 +443,7 @@ void swift::clearBlockBody(SILBasicBlock *BB) {
   // any uses of them with undef values.
   while (!BB->empty()) {
     // Grab the last instruction in the BB.
-    auto *Inst = &BB->getInstList().back();
+    auto *Inst = &BB->back();
 
     // Replace any still-remaining uses with undef values and erase.
     Inst->replaceAllUsesWithUndef();
@@ -1512,7 +1512,7 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
       }
       EraseInstAction(Inst);
     }
-    SILInstruction *NewI = &BB->getInstList().back();
+    SILInstruction *NewI = &BB->back();
     if (!isa<TermInst>(NewI)) {
       Builder.setInsertionPoint(BB);
       NewI = Builder.createBranch(Loc, SuccessBB);

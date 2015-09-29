@@ -94,6 +94,16 @@ public:
   void remove(SILInstruction *I);
   void erase(SILInstruction *I);
 
+  SILInstruction &back() { return InstList.back(); }
+  const SILInstruction &back() const {
+    return const_cast<SILBasicBlock *>(this)->back();
+  }
+
+  SILInstruction &front() { return InstList.front(); }
+  const SILInstruction &front() const {
+    return const_cast<SILBasicBlock *>(this)->front();
+  }
+
   bool empty() const { return InstList.empty(); }
   iterator begin() { return InstList.begin(); }
   iterator end() { return InstList.end(); }

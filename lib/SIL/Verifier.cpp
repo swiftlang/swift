@@ -421,7 +421,7 @@ public:
     // SILVerifier object will explode trying to compute dominance info.
     for (auto &BB : F) {
       require(!BB.empty(), "Basic blocks cannot be empty");
-      require(isa<TermInst>(BB.getInstList().back()),
+      require(isa<TermInst>(BB.back()),
               "Basic blocks must end with a terminator instruction");
     }
 
