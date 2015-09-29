@@ -766,7 +766,7 @@ bb4:                                              // Preds: bb1 bb2
 //
 // CHECK-LABEL: DeadStoreSameBlockAcrossFunctionCallSimpleStruct
 // CHECK: bb1:
-// CHECK-NOT: store
+// CHECK-NEXT: store
 // CHECK: function_ref
 sil hidden @DeadStoreSameBlockAcrossFunctionCallSimpleStruct : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):

@@ -178,14 +178,6 @@ public:
 
 } // end anonymous namespace
 
-static bool asInOutParam(ApplyInst *AI, SILValue V, AliasAnalysis &AA) {
-  // If argument may alias with V, then return true.
-  for (auto &A : AI->getArgumentOperands())
-    if (!AA.isNoAlias(A.get(), V))
-      return true;
-  return false;
-}
-
 MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
   if (AA.isNoAlias(LI->getOperand(), V, LI->getOperand().getType(),
                    findTypedAccessType(V))) {
@@ -252,6 +244,7 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
 }
 
 MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
+
   SideEffectAnalysis::FunctionEffects ApplyEffects;
   AA.getSideEffectAnalysis()->getEffects(ApplyEffects, AI);
 
@@ -282,12 +275,6 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
   }
   if (Behavior > MemBehavior::MayRead && isLetPointer(V))
     Behavior = MemBehavior::MayRead;
-
-  // If it is an allocstack and its not captured by inout paramter then the
-  // apply instruction can not read/modify the memory.
-  if (auto *ASI = dyn_cast<AllocStackInst>(getUnderlyingObject(V)))
-    if (!asInOutParam(AI, V, AA))
-      Behavior = MemBehavior::None;
 
   DEBUG(llvm::dbgs() << "  Found apply, returning " << Behavior << '\n');
   return Behavior;
