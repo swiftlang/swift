@@ -171,6 +171,10 @@ public:
     return contains(Other.getStart()) || contains(Other.getEnd());
   }
 
+  StringRef str() const {
+    return StringRef(Start.Value.getPointer(), ByteLength);
+  }
+
   /// \brief Return the length of this valid range in bytes.  Can be zero.
   unsigned getByteLength() const {
     assert(isValid() && "length does not make sense for an invalid range");
