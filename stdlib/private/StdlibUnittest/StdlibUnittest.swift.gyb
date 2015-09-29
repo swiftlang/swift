@@ -268,9 +268,22 @@ public func expectGE(lhs: Int, _ rhs: Int, ${TRACE}) {
 public func expectType<T>(_: T.Type, inout _ x: T) {}
 public func expectEqualType<T>(_: T.Type, _: T.Type) {}
 
-public func isSequenceType<X : SequenceType>(x: X) -> X { return x }
+public func isSequenceType<
+  X : SequenceType
+  where
+  X.SubSequence : SequenceType,
+  X.SubSequence.Generator.Element == X.Generator.Element,
+  X.SubSequence.SubSequence == X.SubSequence
+>(x: X) -> X { return x }
+
 public func expectIndexable<X : Indexable>(x: X) -> X { return x }
-public func expectCollectionType<X : CollectionType>(x: X) -> X { return x }
+public func expectCollectionType<
+  X : CollectionType
+  where
+  X.SubSequence : CollectionType,
+  X.SubSequence.Generator.Element == X.Generator.Element,
+  X.SubSequence.SubSequence == X.SubSequence
+>(x: X) -> X { return x }
 
 /// A slice is a `CollectionType` that when sliced returns an instance of
 /// itself.
