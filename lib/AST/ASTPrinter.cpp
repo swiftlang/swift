@@ -1093,7 +1093,8 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
   recordDeclLoc(decl,
     [&]{
       // We cannot extend sugared types.
-      auto *nominal = decl->getExtendedType()->getAnyNominal();
+      Type extendedType = decl->getExtendedType();
+      NominalTypeDecl *nominal = extendedType ? extendedType->getAnyNominal() : nullptr;
       if (!nominal) {
         // Fallback to TypeRepr.
         printTypeLoc(decl->getExtendedTypeLoc());

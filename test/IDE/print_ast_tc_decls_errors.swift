@@ -204,3 +204,14 @@ class C1 {
   // CHECK: init(data: )
   init(data:) // expected-error {{expected parameter type following ':'}}
 }
+
+
+protocol IllegalExtension {}
+class OuterContext {
+// CHECK: class OuterContext {
+  extension IllegalExtension { // expected-error {{declaration is only valid at file scope}}
+// CHECK:   extension IllegalExtension {
+    func protocolFunc() {}
+// CHECK:   func protocolFunc()
+  }
+}
