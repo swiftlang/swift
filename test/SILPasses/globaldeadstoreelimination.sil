@@ -39,6 +39,14 @@ struct S2 {
   init()
 }
 
+struct S3 {
+  var a: Int
+  var b: Int
+  init(a: Int, b: Int)
+  init()
+}
+
+
 class foo {
   var a: Int
    deinit
@@ -53,6 +61,7 @@ class B {
 sil @foo_user : $@convention(thin) (@guaranteed foo) -> ()
 sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
 sil @S2_init : $@convention(thin) (@thin S2.Type) -> S2
+sil @S3_init : $@convention(thin) (@thin S3.Type) -> S3
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 
 
@@ -256,35 +265,220 @@ bb3:
   return %9999 : $()
 }
 
-
 //////////////////////////////////////////////
 // Tests for GlobalDeadStoreElimination.cpp //
 //////////////////////////////////////////////
 
-// Remove dead store in same basic block.
+// We should be able to remove the store in bb0, but we currently
+// cant due to deficiency in alias analysis.
 //
-// CHECK-LABEL: DeadStoreSameBlockSimpleStruct
-// CHECK: bb1:
-// CHECK-NEXT: store
-// CHECK: br
-sil hidden @DeadStoreSameBlockSimpleStruct : $@convention(thin) (Bool, Int) -> () {
-bb0(%0 : $Bool, %1 : $Int):
-  %2 = alloc_stack $S1  // var x                  // users: %8, %13, %18, %23, %26
-  %5 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %7
-  %6 = metatype $@thin S1.Type                    // user: %7
-  %7 = apply %5(%6) : $@convention(thin) (@thin S1.Type) -> S1 // user: %8
-  store %7 to %2#1 : $*S1                         // id: %8
-  %11 = integer_literal $Builtin.Int64, 0         // user: %12
-  %12 = struct $Int (%11 : $Builtin.Int64)        // user: %14
-  %13 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %14
-  br bb1
+// CHECK-LABEL: DeadStoreWithAliasingBasesSimpleClass
+// CHECK: bb0([[RET0:%.+]] : $Bool):
+// CHECK-NEXT: [[RET1:%.+]] = alloc_ref
+// CHECK-NEXT: [[RET2:%.+]] = alloc_stack
+// CHECK-NEXT: store [[RET1:%.+]] to [[RET2:%.+]]
+// CHECK-NEXT: [[RET2:%.+]]  = load
+// CHECK-NEXT: [[RET3:%.+]]  = integer_literal
+// CHECK-NEXT: [[RET4:%.+]] = struct $Int
+// CHECK-NEXT: [[RET5:%.+]] = ref_element_addr
+// CHECK-NEXT: store [[RET4:%.+]] to [[RET5:%.+]]
+// CHECK-NEXT: [[RET6:%.+]] = ref_element_addr
+// CHECK-NEXT: store [[RET4:%.+]] to [[RET6:%.+]]
+sil hidden @DeadStoreWithAliasingBasesSimpleClass : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = alloc_ref $foo                             // users: %3, %6
+  %2 = alloc_stack $foo                           // users: %3, %8, %15
+  store %1 to %2#1 : $*foo                        // id: %3
+  %8 = load %2#1 : $*foo                          // user: %11
+  %4 = integer_literal $Builtin.Int64, 12         // user: %5
+  %5 = struct $Int (%4 : $Builtin.Int64)          // user: %7
+  %6 = ref_element_addr %1 : $foo, #foo.a         // user: %7
+  store %5 to %6 : $*Int                          // id: %7
+  %9 = ref_element_addr %8 : $foo, #foo.a        // user: %12
+  store %5 to %9 : $*Int                        // id: %12
+  br bb1                                          // id: %13
 
 bb1:                                              // Preds: bb0
-  store %12 to %13 : $*Int                        // id: %14
-  store %12 to %13 : $*Int                        // id: %14
-  br bb2                                          // id: %15
+  %14 = tuple ()                                  // user: %16
+  dealloc_stack %2#0 : $*@local_storage foo       // id: %15
+  return %14 : $()                                // id: %16
+}
 
-bb2:                                              // Preds: bb1 bb2
+// Remove dead stores in if-else block on a simple struct as there are stores
+// in the joint block.
+//
+// CHECK-LABEL: DeadStoreInIfElseBlockSimpleStruct
+// CHECK: bb1:
+// CHECK-NOT: store
+// CHECK: br
+// CHECK: bb2:
+// CHECK-NOT: store
+// CHECK: br
+sil hidden @DeadStoreInIfElseBlockSimpleStruct : $@convention(thin) (Bool, Int) -> () {
+bb0(%0 : $Bool, %1 : $Int):
+  %2 = alloc_stack $S1                            // users: %6, %11, %16, %21, %24
+  // function_ref S1_init
+  %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
+  %4 = metatype $@thin S1.Type                    // user: %5
+  %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
+  store %5 to %2#1 : $*S1                         // id: %6
+  %7 = struct_extract %0 : $Bool, #Bool.value     // user: %8
+  cond_br %7, bb1, bb2                            // id: %8
+
+bb1:                                              // Preds: bb0
+  %9 = integer_literal $Builtin.Int64, 0          // user: %10
+  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
+  %11 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %12
+  store %10 to %11 : $*Int                        // id: %12
+  br bb3                                          // id: %13
+
+bb2:                                              // Preds: bb0
+  %14 = integer_literal $Builtin.Int64, 1         // user: %15
+  %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
+  %16 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %17
+  store %15 to %16 : $*Int                        // id: %17
+  br bb3                                          // id: %18
+
+bb3:                                              // Preds: bb1 bb2
+  %19 = integer_literal $Builtin.Int64, 2         // user: %20
+  %20 = struct $Int (%19 : $Builtin.Int64)        // user: %22
+  %21 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %22
+  store %20 to %21 : $*Int                        // id: %22
+  %23 = tuple ()                                  // user: %25
+  dealloc_stack %2#0 : $*@local_storage S1        // id: %24
+  return %23 : $()                                // id: %25
+}
+
+// Remove a dead store in the split block as there are stores in the if-else
+// blocks.
+//
+// CHECK-LABEL: DeadStoreInSplitSimpleStruct
+// CHECK: bb1:
+// CHECK-NOT: store
+// CHECK: cond_br
+sil hidden @DeadStoreInSplitSimpleStruct : $@convention(thin) (Bool, Int) -> () {
+bb0(%0 : $Bool, %1 : $Int):
+  %2 = alloc_stack $S1                            // users: %6, %11, %16, %21, %25
+  // function_ref S1_init
+  %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
+  %4 = metatype $@thin S1.Type                    // user: %5
+  %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
+  store %5 to %2#1 : $*S1                         // id: %6
+  br bb1                                          // id: %7
+
+bb1:                                              // Preds: bb0
+  %8 = struct_extract %0 : $Bool, #Bool.value     // user: %13
+  %9 = integer_literal $Builtin.Int64, 0          // user: %10
+  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
+  %11 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %12
+  store %10 to %11 : $*Int                        // id: %12
+  cond_br %8, bb2, bb3                            // id: %13
+
+bb2:                                              // Preds: bb1
+  %14 = integer_literal $Builtin.Int64, 0         // user: %15
+  %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
+  %16 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %17
+  store %15 to %16 : $*Int                        // id: %17
+  br bb4                                          // id: %18
+
+bb3:                                              // Preds: bb1
+  %19 = integer_literal $Builtin.Int64, 1         // user: %20
+  %20 = struct $Int (%19 : $Builtin.Int64)        // user: %22
+  %21 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %22
+  store %20 to %21 : $*Int                        // id: %22
+  br bb4                                          // id: %23
+
+bb4:                                              // Preds: bb2 bb3
+  %24 = tuple ()                                  // user: %26
+  dealloc_stack %2#0 : $*@local_storage S1        // id: %25
+  return %24 : $()                                // id: %26
+}
+
+// Remove dead stores in split and else block.
+//
+// CHECK-LABEL: DeadStoreInSplitElseBlockSimpleStruct
+// CHECK: bb1:
+// CHECK-NOT: store
+// CHECK: cond_br
+sil hidden @DeadStoreInSplitElseBlockSimpleStruct : $@convention(thin) (Bool, Int) -> () {
+bb0(%0 : $Bool, %1 : $Int):
+  %2 = alloc_stack $S1                            // users: %6, %11, %17, %22, %25
+  // function_ref S1_init
+  %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
+  %4 = metatype $@thin S1.Type                    // user: %5
+  %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
+  store %5 to %2#1 : $*S1                         // id: %6
+  br bb1                                          // id: %7
+
+bb1:                                              // Preds: bb0
+  %8 = struct_extract %0 : $Bool, #Bool.value     // user: %13
+  %9 = integer_literal $Builtin.Int64, 0          // user: %10
+  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
+  %11 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %12
+  store %10 to %11 : $*Int                        // id: %12
+  cond_br %8, bb2, bb3                            // id: %13
+
+bb2:                                              // Preds: bb1
+  br bb4                                          // id: %14
+
+bb3:                                              // Preds: bb1
+  %15 = integer_literal $Builtin.Int64, 1         // user: %16
+  %16 = struct $Int (%15 : $Builtin.Int64)        // user: %18
+  %17 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %18
+  store %16 to %17 : $*Int                        // id: %18
+  br bb4                                          // id: %19
+
+bb4:                                              // Preds: bb2 bb3
+  %20 = integer_literal $Builtin.Int64, 0         // user: %21
+  %21 = struct $Int (%20 : $Builtin.Int64)        // user: %23
+  %22 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %23
+  store %21 to %22 : $*Int                        // id: %23
+  %24 = tuple ()                                  // user: %26
+  dealloc_stack %2#0 : $*@local_storage S1        // id: %25
+  return %24 : $()                                // id: %26
+}
+
+// Remove dead stores in else block, store is only partially dead
+// for split block.
+//
+// CHECK-LABEL: DeadStoreInElsePartialDeadStoreInSplitSimpleStruct
+// CHECK: bb1:
+// CHECK-NOT: store
+// CHECK: cond_br
+sil hidden @DeadStoreInElsePartialDeadStoreInSplitSimpleStruct : $@convention(thin) (Bool, Int) -> () {
+bb0(%0 : $Bool, %1 : $Int):
+  %2 = alloc_stack $S1                            // users: %6, %11, %18, %23, %26
+  // function_ref S1_init
+  %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
+  %4 = metatype $@thin S1.Type                    // user: %5
+  %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
+  store %5 to %2#1 : $*S1                         // id: %6
+  br bb1                                          // id: %7
+
+bb1:                                              // Preds: bb0
+  %8 = struct_extract %0 : $Bool, #Bool.value     // user: %14
+  %9 = integer_literal $Builtin.Int64, 0          // user: %10
+  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %13
+  %11 = struct_element_addr %2#1 : $*S1, #S1.a    // users: %12, %13
+  %12 = load %11 : $*Int
+  store %10 to %11 : $*Int                        // id: %13
+  cond_br %8, bb2, bb3                            // id: %14
+
+bb2:                                              // Preds: bb1
+  br bb4                                          // id: %15
+
+bb3:                                              // Preds: bb1
+  %16 = integer_literal $Builtin.Int64, 1         // user: %17
+  %17 = struct $Int (%16 : $Builtin.Int64)        // user: %19
+  %18 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %19
+  store %17 to %18 : $*Int                        // id: %19
+  br bb4                                          // id: %20
+
+bb4:                                              // Preds: bb2 bb3
+  %21 = integer_literal $Builtin.Int64, 0         // user: %22
+  %22 = struct $Int (%21 : $Builtin.Int64)        // user: %24
+  %23 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %24
+  store %22 to %23 : $*Int                        // id: %24
   %25 = tuple ()                                  // user: %27
   dealloc_stack %2#0 : $*@local_storage S1        // id: %26
   return %25 : $()                                // id: %27
@@ -293,222 +487,93 @@ bb2:                                              // Preds: bb1 bb2
 // Remove a dead store in the split block as there are stores in the if-else
 // blocks.
 //
-// CHECK-LABEL: DeadStoreInSplitBlocksSimpleStruct
-// CHECK: bb1:
-// CHECK-NOT: store
-// CHECK: cond_br
-sil hidden @DeadStoreInSplitBlocksSimpleStruct : $@convention(thin) (Bool, Int) -> () {
-bb0(%0 : $Bool, %1 : $Int):
-  %2 = alloc_stack $S1  // var x                  // users: %8, %13, %18, %23, %26
-  %5 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %7
-  %6 = metatype $@thin S1.Type                    // user: %7
-  %7 = apply %5(%6) : $@convention(thin) (@thin S1.Type) -> S1 // user: %8
-  store %7 to %2#1 : $*S1                         // id: %8
-  br bb1
-
-bb1:
-  %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
-  %26 = integer_literal $Builtin.Int64, 0
-  %12 = struct $Int (%26 : $Builtin.Int64)        // user: %14
-  %13 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %14
-  store %12 to %13 : $*Int                        // id: %14
-  cond_br %9, bb2, bb3                            // id: %10
-
-bb2:                                              // Preds: bb0
-  %22 = integer_literal $Builtin.Int64, 0         // user: %12
-  %23 = struct $Int (%22 : $Builtin.Int64)        // user: %14
-  store %23 to %13 : $*Int                        // id: %14
-  br bb4                                          // id: %15
-
-bb3:                                              // Preds: bb0
-  %16 = integer_literal $Builtin.Int64, 1         // user: %17
-  %17 = struct $Int (%16 : $Builtin.Int64)        // user: %19
-  store %17 to %13 : $*Int                        // id: %19
-  br bb4                                         // id: %20
-
-bb4:                                              // Preds: bb1 bb2
-  %25 = tuple ()                                  // user: %27
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %26
-  return %25 : $()                                // id: %27
-}
-
-// Remove dead stores in split and else block as there is a store
-// to the same location in the joint block.
-//
-// CHECK-LABEL: DeadStoreInSplitElseBlockSimpleStruct
-// CHECK: bb1:
-// CHECK-NOT: store
-// CHECK: cond_br
-sil hidden @DeadStoreInSplitElseBlockSimpleStruct : $@convention(thin) (Bool, Int) -> () {
-bb0(%0 : $Bool, %1 : $Int):
-  %2 = alloc_stack $S1  // var x                  // users: %8, %13, %18, %23, %26
-  %5 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %7
-  %6 = metatype $@thin S1.Type                    // user: %7
-  %7 = apply %5(%6) : $@convention(thin) (@thin S1.Type) -> S1 // user: %8
-  store %7 to %2#1 : $*S1                         // id: %8
-  br bb1
-
-bb1:
-  %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
-  %11 = integer_literal $Builtin.Int64, 0
-  %12 = struct $Int (%11 : $Builtin.Int64)        // user: %14
-  %13 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %14
-  store %12 to %13 : $*Int                        // id: %14
-  cond_br %9, bb2, bb3                            // id: %10
-
-bb2:                                              // Preds: bb0
-  br bb4                                          // id: %15
-
-bb3:                                              // Preds: bb0
-  %16 = integer_literal $Builtin.Int64, 1         // user: %17
-  %17 = struct $Int (%16 : $Builtin.Int64)        // user: %19
-  store %17 to %13 : $*Int                        // id: %19
-  br bb4                                          // id: %20
-
-bb4:                                              // Preds: bb1 bb2
-  %21 = integer_literal $Builtin.Int64, 0         // user: %12
-  %22 = struct $Int (%21 : $Builtin.Int64)        // user: %14
-  store %22 to %13 : $*Int                        // id: %14
-  %25 = tuple ()                                  // user: %27
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %26
-  return %25 : $()                                // id: %27
-}
-
-// Remove dead stores in split and else block.
-//
-// CHECK-LABEL: DeadStoreInElseSplitSimpleStruct
-// CHECK: bb1:
-// CHECK-NOT: store
-// CHECK: cond_br
-sil hidden @DeadStoreInElseSplitSimpleStruct : $@convention(thin) (Bool, Int) -> () {
-bb0(%0 : $Bool, %1 : $Int):
-  %2 = alloc_stack $S1  // var x                  // users: %8, %13, %18, %23, %26
-  %5 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %7
-  %6 = metatype $@thin S1.Type                    // user: %7
-  %7 = apply %5(%6) : $@convention(thin) (@thin S1.Type) -> S1 // user: %8
-  store %7 to %2#1 : $*S1                         // id: %8
-  br bb1
-
-bb1:
-  %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
-  %11 = integer_literal $Builtin.Int64, 0
-  %12 = struct $Int (%11 : $Builtin.Int64)        // user: %14
-  %13 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %14
-  store %12 to %13 : $*Int                        // id: %14
-  cond_br %9, bb2, bb3                            // id: %10
-
-bb2:                                              // Preds: bb0
-  br bb4                                          // id: %15
-
-bb3:                                              // Preds: bb0
-  %17 = integer_literal $Builtin.Int64, 1         // user: %17
-  %18 = struct $Int (%17 : $Builtin.Int64)        // user: %19
-  %19 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %19
-  store %18 to %13 : $*Int                        // id: %19
-  br bb4                                          // id: %20
-
-bb4:                                              // Preds: bb1 bb2
-  %22 = integer_literal $Builtin.Int64, 0         // user: %12
-  %23 = struct $Int (%22 : $Builtin.Int64)        // user: %14
-  %24 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %14
-  store %23 to %13 : $*Int                        // id: %14
-  %26 = tuple ()                                  // user: %27
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %26
-  return %26 : $()                                // id: %27
-}
-
-// Remove dead stores else block, but not split block as its only partially dead.
-//
-// CHECK-LABEL: DeadStoreInElseNotSplitSimpleStruct
-// CHECK: bb1:
-// CHECK-NEXT: [[RET0:%.+]] = integer_literal $Builtin.Int64
-// CHECK-NEXT: [[RET1:%.+]] = struct $Int
-// CHECK-NEXT: [[RET2:%.+]] = struct_element_addr
-// CHECK-NEXT: store [[RET1:%.+]] to [[RET0:%.+]]
-sil hidden @DeadStoreInElseNotSplitSimpleStruct : $@convention(thin) (Bool, Int) -> () {
-bb0(%0 : $Bool, %1 : $Int):
-  %2 = alloc_stack $S1  // var x                  // users: %8, %13, %18, %23, %26
-  %5 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %7
-  %6 = metatype $@thin S1.Type                    // user: %7
-  %7 = apply %5(%6) : $@convention(thin) (@thin S1.Type) -> S1 // user: %8
-  store %7 to %2#1 : $*S1                         // id: %8
-  br bb1
-
-bb1:
-  %11 = integer_literal $Builtin.Int64, 0
-  %12 = struct $Int (%11 : $Builtin.Int64)        // user: %14
-  %13 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %14
-  store %12 to %13 : $*Int                        // id: %14
-  %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
-  cond_br %9, bb2, bb3                            // id: %10
-
-bb2:                                              // Preds: bb0
-  %33 = load %13 : $*Int
-  br bb4                                          // id: %15
-
-bb3:                                              // Preds: bb0
-  %17 = integer_literal $Builtin.Int64, 1         // user: %17
-  %18 = struct $Int (%17 : $Builtin.Int64)        // user: %19
-  %19 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %19
-  store %18 to %13 : $*Int                        // id: %19
-  br bb4                                          // id: %20
-
-bb4:                                              // Preds: bb1 bb2
-  %22 = integer_literal $Builtin.Int64, 0         // user: %12
-  %23 = struct $Int (%22 : $Builtin.Int64)        // user: %14
-  %24 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %14
-  store %23 to %13 : $*Int                        // id: %14
-  %26 = tuple ()                                  // user: %27
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %26
-  return %26 : $()                                // id: %27
-}
-
-
-// Store in bb2 is still alive as post-order does not iterate over blocks
-// unreachable from the entry.
-//
-// Remove the store in bb1 though.
+// Store in bb1 is still alive as post-order does not iterate over unreachable
+// block.
 //
 // CHECK-LABEL: DeadStoreInUnreachablePredecessorSimpleStruct
+// CHECK: bb0
+// CHECK-NOT: store
+// CHECK: br
 // CHECK: bb1
 // CHECK-NOT: store
 // CHECK: br
 sil hidden @DeadStoreInUnreachablePredecessorSimpleStruct : $@convention(thin) (Bool, Int) -> () {
 bb0(%0 : $Bool, %1 : $Int):
-  %2 = alloc_stack $S1  // var x                  // users: %8, %13, %18, %23, %26
-  %5 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %7
-  %6 = metatype $@thin S1.Type                    // user: %7
-  %7 = apply %5(%6) : $@convention(thin) (@thin S1.Type) -> S1 // user: %8
-  store %7 to %2#1 : $*S1                         // id: %8
-  br bb1
+  %2 = alloc_stack $S1                            // users: %6, %11, %16, %21, %25
+  // function_ref S1_init
+  %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
+  %4 = metatype $@thin S1.Type                    // user: %5
+  %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
+  store %5 to %2#1 : $*S1                         // id: %6
+  br bb1                                          // id: %7
 
-bb1:
-  %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
-  %26 = integer_literal $Builtin.Int64, 0
-  %12 = struct $Int (%26 : $Builtin.Int64)        // user: %14
-  %13 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %14
-  store %12 to %13 : $*Int                        // id: %14
-  br bb3
+bb1:                                              // Preds: bb0
+  %8 = struct_extract %0 : $Bool, #Bool.value
+  %9 = integer_literal $Builtin.Int64, 0          // user: %10
+  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
+  %11 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %12
+  store %10 to %11 : $*Int                        // id: %12
+  br bb3                                          // id: %13
 
-bb2:                                              // Preds: bb0
-  %22 = integer_literal $Builtin.Int64, 0         // user: %12
-  %23 = struct $Int (%22 : $Builtin.Int64)        // user: %14
-  %24 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %14
-  store %23 to %24 : $*Int                        // id: %14
-  br bb3                                          // id: %15
+bb2:
+  %14 = integer_literal $Builtin.Int64, 0         // user: %15
+  %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
+  %16 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %17
+  store %15 to %16 : $*Int                        // id: %17
+  br bb3                                          // id: %18
 
-bb3:                                              // Preds: bb0
-  %16 = integer_literal $Builtin.Int64, 1         // user: %17
-  %17 = struct $Int (%16 : $Builtin.Int64)        // user: %19
-  store %17 to %13 : $*Int                        // id: %19
-  br bb4                                         // id: %20
+bb3:                                              // Preds: bb1 bb2
+  %19 = integer_literal $Builtin.Int64, 1         // user: %20
+  %20 = struct $Int (%19 : $Builtin.Int64)        // user: %22
+  %21 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %22
+  store %20 to %21 : $*Int                        // id: %22
+  br bb4                                          // id: %23
 
-bb4:                                              // Preds: bb1 bb2
-  %25 = tuple ()                                  // user: %27
-  dealloc_stack %2#0 : $*@local_storage S1        // id: %26
-  return %25 : $()                                // id: %27
+bb4:                                              // Preds: bb3
+  %24 = tuple ()                                  // user: %26
+  dealloc_stack %2#0 : $*@local_storage S1        // id: %25
+  return %24 : $()                                // id: %26
 }
 
+// Can not remove the store in bb0 as the its only partially dead, i.e.
+// the structure S3 has 2 fields.
+//
+// CHECK-LABEL: NoDeadStoreSimpleStruct
+// CHECK: bb0
+// CHECK: [[RET0:%.+]] = function_ref @S3_init
+// CHECK-NEXT: [[RET1:%.+]] = metatype $@thin S3.Type
+// CHECK-NEXT: [[RET2:%.+]] = apply [[RET0:%.+]]([[RET1:%.+]])
+// CHECK-NEXT: store [[RET2:%.+]] to
+sil hidden @NoDeadStoreSimpleStruct : $@convention(thin) (Bool, Int) -> () {
+bb0(%0 : $Bool, %1 : $Int):
+  %2 = alloc_stack $S3                            // users: %6, %11, %16, %20
+  // function_ref S3_init
+  %3 = function_ref @S3_init : $@convention(thin) (@thin S3.Type) -> S3 // user: %5
+  %4 = metatype $@thin S3.Type                    // user: %5
+  %5 = apply %3(%4) : $@convention(thin) (@thin S3.Type) -> S3 // user: %6
+  store %5 to %2#1 : $*S3                         // id: %6
+  %7 = struct_extract %0 : $Bool, #Bool.value     // user: %8
+  cond_br %7, bb1, bb2                            // id: %8
+
+bb1:                                              // Preds: bb0
+  %9 = integer_literal $Builtin.Int64, 0          // user: %10
+  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
+  %11 = struct_element_addr %2#1 : $*S3, #S3.a    // user: %12
+  store %10 to %11 : $*Int                        // id: %12
+  br bb3                                          // id: %13
+
+bb2:                                              // Preds: bb0
+  %14 = integer_literal $Builtin.Int64, 1         // user: %15
+  %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
+  %16 = struct_element_addr %2#1 : $*S3, #S3.a    // user: %17
+  store %15 to %16 : $*Int                        // id: %17
+  br bb3                                          // id: %18
+
+bb3:                                              // Preds: bb1 bb2
+  %19 = tuple ()                                  // user: %21
+  dealloc_stack %2#0 : $*@local_storage S3        // id: %20
+  return %19 : $()                                // id: %21
+}
 
 // CHECK-LABEL: DeadStoreInIfElseBlockComplexStruct
 // CHECK: bb1:
@@ -519,39 +584,43 @@ bb4:                                              // Preds: bb1 bb2
 // CHECK: br
 sil hidden @DeadStoreInIfElseBlockComplexStruct : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
-  %1 = alloc_stack $S2  // var x                  // users: %6, %11, %17, %23, %27
-  %3 = function_ref @S2_init : $@convention(thin) (@thin S2.Type) -> S2 // user: %5
-  %4 = metatype $@thin S2.Type                    // user: %5
-  %5 = apply %3(%4) : $@convention(thin) (@thin S2.Type) -> S2 // user: %6
-  store %5 to %1#1 : $*S2                         // id: %6
-  %7 = struct_extract %0 : $Bool, #Bool.value     // user: %8
-  %11 = struct_element_addr %1#1 : $*S2, #S2.x    // user: %12
-  %12 = struct_element_addr %11 : $*S1, #S1.a     // user: %13
-  cond_br %7, bb1, bb2                            // id: %8
+  %1 = alloc_stack $S2                            // users: %5, %10, %16, %22, %26
+  // function_ref S2_init
+  %2 = function_ref @S2_init : $@convention(thin) (@thin S2.Type) -> S2 // user: %4
+  %3 = metatype $@thin S2.Type                    // user: %4
+  %4 = apply %2(%3) : $@convention(thin) (@thin S2.Type) -> S2 // user: %5
+  store %4 to %1#1 : $*S2                         // id: %5
+  %6 = struct_extract %0 : $Bool, #Bool.value     // user: %7
+  cond_br %6, bb1, bb2                            // id: %7
 
 bb1:                                              // Preds: bb0
-  %9 = integer_literal $Builtin.Int64, 0          // user: %10
-  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %13
-  store %10 to %12 : $*Int                        // id: %13
-  br bb3                                          // id: %14
+  %8 = integer_literal $Builtin.Int64, 0          // user: %9
+  %9 = struct $Int (%8 : $Builtin.Int64)          // user: %12
+  %10 = struct_element_addr %1#1 : $*S2, #S2.x    // user: %11
+  %11 = struct_element_addr %10 : $*S1, #S1.a     // user: %12
+  store %9 to %11 : $*Int                         // id: %12
+  br bb3                                          // id: %13
 
 bb2:                                              // Preds: bb0
-  %15 = integer_literal $Builtin.Int64, 1         // user: %16
-  %16 = struct $Int (%15 : $Builtin.Int64)        // user: %19
-  store %16 to %12 : $*Int                        // id: %19
-  br bb3                                          // id: %20
+  %14 = integer_literal $Builtin.Int64, 1         // user: %15
+  %15 = struct $Int (%14 : $Builtin.Int64)        // user: %18
+  %16 = struct_element_addr %1#1 : $*S2, #S2.x    // user: %17
+  %17 = struct_element_addr %16 : $*S1, #S1.a     // user: %18
+  store %15 to %17 : $*Int                        // id: %18
+  br bb3                                          // id: %19
 
 bb3:                                              // Preds: bb1 bb2
-  %21 = integer_literal $Builtin.Int64, 2         // user: %22
-  %22 = struct $Int (%21 : $Builtin.Int64)        // user: %25
-  store %22 to %12 : $*Int                        // id: %25
-  %26 = tuple ()                                  // user: %28
-  dealloc_stack %1#0 : $*@local_storage S2        // id: %27
-  return %26 : $()                                // id: %28
+  %20 = integer_literal $Builtin.Int64, 2         // user: %21
+  %21 = struct $Int (%20 : $Builtin.Int64)        // user: %24
+  %22 = struct_element_addr %1#1 : $*S2, #S2.x    // user: %23
+  %23 = struct_element_addr %22 : $*S1, #S1.a     // user: %24
+  store %21 to %23 : $*Int                        // id: %24
+  %25 = tuple ()                                  // user: %27
+  dealloc_stack %1#0 : $*@local_storage S2        // id: %26
+  return %25 : $()                                // id: %27
 }
 
 // Remove dead stores in split and else block on a complex struct.
-// Test dead store get propagated correctly over empty block, i.e. bb2.
 //
 // CHECK-LABEL: DeadStoreInSplitElseBlockComplexStruct
 // CHECK: bb1:
@@ -562,36 +631,40 @@ bb3:                                              // Preds: bb1 bb2
 // CHECK: br
 sil hidden @DeadStoreInSplitElseBlockComplexStruct : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
-  %1 = alloc_stack $S2  // var x                  // users: %6, %11, %17, %23, %27
-  // function_ref test.S2.init (test.S2.Type)() -> test.S2
-  %3 = function_ref @S2_init : $@convention(thin) (@thin S2.Type) -> S2 // user: %5
-  %4 = metatype $@thin S2.Type                    // user: %5
-  %5 = apply %3(%4) : $@convention(thin) (@thin S2.Type) -> S2 // user: %6
-  store %5 to %1#1 : $*S2                         // id: %6
-  br bb1
+  %1 = alloc_stack $S2                            // users: %5, %9, %17, %23, %27
+  // function_ref S2_init
+  %2 = function_ref @S2_init : $@convention(thin) (@thin S2.Type) -> S2 // user: %4
+  %3 = metatype $@thin S2.Type                    // user: %4
+  %4 = apply %2(%3) : $@convention(thin) (@thin S2.Type) -> S2 // user: %5
+  store %4 to %1#1 : $*S2                         // id: %5
+  br bb1                                          // id: %6
 
-bb1:
-  %9 = integer_literal $Builtin.Int64, 0          // user: %10
-  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %13
-  %11 = struct_element_addr %1#1 : $*S2, #S2.x    // user: %12
-  %12 = struct_element_addr %11 : $*S1, #S1.a     // user: %13
-  store %10 to %12 : $*Int                        // id: %13
-  %7 = struct_extract %0 : $Bool, #Bool.value     // user: %8
-  cond_br %7, bb2, bb3                            // id: %8
+bb1:                                              // Preds: bb0
+  %7 = integer_literal $Builtin.Int64, 0          // user: %8
+  %8 = struct $Int (%7 : $Builtin.Int64)          // user: %11
+  %9 = struct_element_addr %1#1 : $*S2, #S2.x     // user: %10
+  %10 = struct_element_addr %9 : $*S1, #S1.a      // user: %11
+  store %8 to %10 : $*Int                         // id: %11
+  %12 = struct_extract %0 : $Bool, #Bool.value    // user: %13
+  cond_br %12, bb2, bb3                           // id: %13
 
-bb2:                                              // Preds: bb0
+bb2:                                              // Preds: bb1
   br bb4                                          // id: %14
 
-bb3:                                              // Preds: bb0
+bb3:                                              // Preds: bb1
   %15 = integer_literal $Builtin.Int64, 1         // user: %16
   %16 = struct $Int (%15 : $Builtin.Int64)        // user: %19
-  store %16 to %12 : $*Int                        // id: %19
+  %17 = struct_element_addr %1#1 : $*S2, #S2.x    // user: %18
+  %18 = struct_element_addr %17 : $*S1, #S1.a     // user: %19
+  store %16 to %18 : $*Int                        // id: %19
   br bb4                                          // id: %20
 
-bb4:                                              // Preds: bb1 bb2
+bb4:                                              // Preds: bb2 bb3
   %21 = integer_literal $Builtin.Int64, 2         // user: %22
   %22 = struct $Int (%21 : $Builtin.Int64)        // user: %25
-  store %22 to %12 : $*Int                        // id: %25
+  %23 = struct_element_addr %1#1 : $*S2, #S2.x    // user: %24
+  %24 = struct_element_addr %23 : $*S1, #S1.a     // user: %25
+  store %22 to %24 : $*Int                        // id: %25
   %26 = tuple ()                                  // user: %28
   dealloc_stack %1#0 : $*@local_storage S2        // id: %27
   return %26 : $()                                // id: %28
@@ -622,14 +695,59 @@ bb1:                                              // Preds: bb0
 bb2:                                              // Preds: bb0
   %16 = integer_literal $Builtin.Int64, 1         // user: %17
   %17 = struct $Int (%16 : $Builtin.Int64)        // user: %19
-  store %17 to %13 : $*Int                        // id: %19
+  %18 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %19
+  store %17 to %18 : $*Int                        // id: %19
   %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
   cond_br %9, bb1, bb3                            // id: %10
 
 bb3:                                              // Preds: bb1 bb2
   %21 = integer_literal $Builtin.Int64, 2         // user: %22
   %22 = struct $Int (%21 : $Builtin.Int64)        // user: %24
-  store %22 to %13 : $*Int                        // id: %24
+  %23 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %24
+  store %22 to %23 : $*Int                        // id: %24
+  %25 = tuple ()                                  // user: %27
+  dealloc_stack %2#0 : $*@local_storage S1        // id: %26
+  return %25 : $()                                // id: %27
+}
+
+// Remove dead stores in loop blocks, as the store in exit block kills them.
+//
+// CHECK-LABEL: DeadStoreInMultiLoopBlocksSimpleStruct
+// CHECK: bb1:
+// CHECK-NOT: store
+// CHECK: br
+// CHECK: bb2:
+// CHECK-NOT: store
+// CHECK: br
+sil hidden @DeadStoreInMultiLoopBlocksSimpleStruct : $@convention(thin) (Bool, Int) -> () {
+bb0(%0 : $Bool, %1 : $Int):
+  %2 = alloc_stack $S1  // var x                  // users: %8, %13, %18, %23, %26
+  %5 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %7
+  %6 = metatype $@thin S1.Type                    // user: %7
+  %7 = apply %5(%6) : $@convention(thin) (@thin S1.Type) -> S1 // user: %8
+  store %7 to %2#1 : $*S1                         // id: %8
+ br bb1
+
+bb1:                                              // Preds: bb0
+  %11 = integer_literal $Builtin.Int64, 0         // user: %12
+  %12 = struct $Int (%11 : $Builtin.Int64)        // user: %14
+  %13 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %14
+  store %12 to %13 : $*Int                        // id: %14
+  br bb2                                          // id: %15
+
+bb2:                                              // Preds: bb0
+  %16 = integer_literal $Builtin.Int64, 1         // user: %17
+  %17 = struct $Int (%16 : $Builtin.Int64)        // user: %19
+  %18 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %19
+  store %17 to %18 : $*Int                        // id: %19
+  %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
+  cond_br %9, bb1, bb3                            // id: %10
+
+bb3:                                              // Preds: bb1 bb2
+  %21 = integer_literal $Builtin.Int64, 2         // user: %22
+  %22 = struct $Int (%21 : $Builtin.Int64)        // user: %24
+  %23 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %24
+  store %22 to %23 : $*Int                        // id: %24
   %25 = tuple ()                                  // user: %27
   dealloc_stack %2#0 : $*@local_storage S1        // id: %26
   return %25 : $()                                // id: %27
@@ -648,9 +766,11 @@ bb3:                                              // Preds: bb1 bb2
 // CHECK-NEXT: struct
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: struct
+// CHECK-NEXT: tuple_element_addr
 // CHECK-NEXT: store
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: struct
+// CHECK-NEXT: tuple_element_addr
 // CHECK-NEXT: store
 sil hidden @DeadStoreInSimpleTuple : $@convention(thin) () -> Int {
 bb0:
@@ -665,15 +785,68 @@ bb0:
   store %7 to %2 : $*Int                          // id: %8
   %9 = integer_literal $Builtin.Int64, 10         // user: %10
   %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
-  store %10 to %1 : $*Int                        // id: %12
+  %11 = tuple_element_addr %0#1 : $*(a: Int, b: Int), 0 // user: %12
+  store %10 to %11 : $*Int                        // id: %12
   %13 = integer_literal $Builtin.Int64, 12        // user: %14
   %14 = struct $Int (%13 : $Builtin.Int64)        // user: %16
-  store %14 to %2 : $*Int                        // id: %16
+  %15 = tuple_element_addr %0#1 : $*(a: Int, b: Int), 1 // user: %16
+  store %14 to %15 : $*Int                        // id: %16
   %17 = integer_literal $Builtin.Int64, 22        // user: %19
   %18 = tuple ()
   %19 = struct $Int (%17 : $Builtin.Int64)        // user: %21
   dealloc_stack %0#0 : $*@local_storage (a: Int, b: Int) // id: %20
   return %19 : $Int                               // id: %21
+}
+
+// Remove dead stores in if else blocks for simple class.
+//
+// CHECK-LABEL: DeadStoreInIfElseSimpleClass
+// CHECK: bb1:
+// CHECK-NOT: store
+// CHECK: br
+// CHECK: bb2:
+// CHECK-NOT: store
+// CHECK: br
+sil hidden @DeadStoreInIfElseSimpleClass : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $foo                           // users: %8, %36
+  %3 = alloc_ref $foo                             // users: %6, %8, %11, %14, %17, %19, %22, %25, %27, %30, %33, %34
+  %4 = integer_literal $Builtin.Int64, 10         // user: %5
+  %5 = struct $Int (%4 : $Builtin.Int64)          // user: %7
+  %6 = ref_element_addr %3 : $foo, #foo.a         // user: %7
+  store %5 to %6 : $*Int                          // id: %7
+  store %3 to %1#1 : $*foo                        // id: %8
+  %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
+  cond_br %9, bb1, bb2                            // id: %10
+
+bb1:                                              // Preds: bb0
+  %12 = integer_literal $Builtin.Int64, 11        // user: %13
+  %13 = struct $Int (%12 : $Builtin.Int64)        // user: %15
+  %14 = ref_element_addr %3 : $foo, #foo.a        // user: %15
+  store %13 to %14 : $*Int                        // id: %15
+  %16 = tuple ()
+  br bb3                                          // id: %18
+
+bb2:                                              // Preds: bb0
+  %20 = integer_literal $Builtin.Int64, 12        // user: %21
+  %21 = struct $Int (%20 : $Builtin.Int64)        // user: %23
+  %22 = ref_element_addr %3 : $foo, #foo.a        // user: %23
+  store %21 to %22 : $*Int                        // id: %23
+  %24 = tuple ()
+  br bb3                                          // id: %26
+
+bb3:                                              // Preds: bb1 bb2
+  strong_retain %3 : $foo                         // id: %27
+  %28 = integer_literal $Builtin.Int64, 13        // user: %29
+  %29 = struct $Int (%28 : $Builtin.Int64)        // user: %31
+  %30 = ref_element_addr %3 : $foo, #foo.a        // user: %31
+  store %29 to %30 : $*Int                        // id: %31
+  %32 = tuple ()
+  strong_release %3 : $foo                        // id: %33
+  strong_release %3 : $foo                        // id: %34
+  %35 = tuple ()                                  // user: %37
+  dealloc_stack %1#0 : $*@local_storage foo       // id: %36
+  return %35 : $()                                // id: %37
 }
 
 // Remove dead store in split block for simple class.
@@ -684,38 +857,40 @@ bb0:
 // CHECK: cond_br
 sil hidden @DeadStoreInSplitSimpleClass : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
-  %1 = alloc_stack $foo                           // users: %8, %36
-  %3 = alloc_ref $foo                             // users: %6, %8, %11, %14, %17, %19, %22, %25, %27, %30, %33, %34
-  store %3 to %1#1 : $*foo                        // id: %8
-  br bb1
+  %1 = alloc_stack $foo                           // users: %3, %25
+  %2 = alloc_ref $foo                             // users: %3, %7, %13, %19, %23
+  store %2 to %1#1 : $*foo                        // id: %3
+  br bb1                                          // id: %4
 
-bb1:
-  %4 = integer_literal $Builtin.Int64, 10         // user: %5
-  %5 = struct $Int (%4 : $Builtin.Int64)          // user: %7
-  %6 = ref_element_addr %3 : $foo, #foo.a         // user: %7
-  store %5 to %6 : $*Int                          // id: %7
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int64, 10         // user: %6
+  %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
+  %7 = ref_element_addr %2 : $foo, #foo.a         // user: %8
+  store %6 to %7 : $*Int                          // id: %8
   %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
   cond_br %9, bb2, bb3                            // id: %10
 
-bb2:                                              // Preds: bb0
-  %12 = integer_literal $Builtin.Int64, 11        // user: %13
-  %13 = struct $Int (%12 : $Builtin.Int64)        // user: %15
-  store %13 to %6 : $*Int                        // id: %15
-  %16 = tuple ()
-  br bb4                                          // id: %18
+bb2:                                              // Preds: bb1
+  %11 = integer_literal $Builtin.Int64, 11        // user: %12
+  %12 = struct $Int (%11 : $Builtin.Int64)        // user: %14
+  %13 = ref_element_addr %2 : $foo, #foo.a        // user: %14
+  store %12 to %13 : $*Int                        // id: %14
+  %15 = tuple ()
+  br bb4                                          // id: %16
 
-bb3:                                              // Preds: bb0
-  %20 = integer_literal $Builtin.Int64, 12        // user: %21
-  %21 = struct $Int (%20 : $Builtin.Int64)        // user: %23
-  store %21 to %6 : $*Int                        // id: %23
-  %24 = tuple ()
-  br bb4                                          // id: %26
+bb3:                                              // Preds: bb1
+  %17 = integer_literal $Builtin.Int64, 12        // user: %18
+  %18 = struct $Int (%17 : $Builtin.Int64)        // user: %20
+  %19 = ref_element_addr %2 : $foo, #foo.a        // user: %20
+  store %18 to %19 : $*Int                        // id: %20
+  %21 = tuple ()
+  br bb4                                          // id: %22
 
-bb4:                                              // Preds: bb1 bb2
-  strong_release %3 : $foo                        // id: %34
-  %35 = tuple ()                                  // user: %37
-  dealloc_stack %1#0 : $*@local_storage foo       // id: %36
-  return %35 : $()                                // id: %37
+bb4:                                              // Preds: bb2 bb3
+  strong_release %2 : $foo                        // id: %23
+  %24 = tuple ()                                  // user: %26
+  dealloc_stack %1#0 : $*@local_storage foo       // id: %25
+  return %24 : $()                                // id: %26
 }
 
 // Can not remove partially dead store in split block for simple class.
@@ -728,34 +903,35 @@ bb4:                                              // Preds: bb1 bb2
 // CHECK-NEXT: store [[RET1:%.+]] to [[RET2:%.+]]
 sil hidden @PartialDeadStoreInSplitSimpleClass : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
-  %1 = alloc_stack $foo                           // users: %8, %36
-  %3 = alloc_ref $foo                             // users: %6, %8, %11, %14, %17, %19, %22, %25, %27, %30, %33, %34
-  store %3 to %1#1 : $*foo                        // id: %8
-  br bb1
+  %1 = alloc_stack $foo                           // users: %3, %20
+  %2 = alloc_ref $foo                             // users: %3, %7, %14, %18
+  store %2 to %1#1 : $*foo                        // id: %3
+  br bb1                                          // id: %4
 
-bb1:
-  %4 = integer_literal $Builtin.Int64, 10         // user: %5
-  %5 = struct $Int (%4 : $Builtin.Int64)          // user: %7
-  %6 = ref_element_addr %3 : $foo, #foo.a         // user: %7
-  store %5 to %6 : $*Int                          // id: %7
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int64, 10         // user: %6
+  %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
+  %7 = ref_element_addr %2 : $foo, #foo.a         // user: %8
+  store %6 to %7 : $*Int                          // id: %8
   %9 = struct_extract %0 : $Bool, #Bool.value     // user: %10
   cond_br %9, bb2, bb3                            // id: %10
 
-bb2:                                              // Preds: bb0
-  br bb4                                          // id: %18
+bb2:                                              // Preds: bb1
+  br bb4                                          // id: %11
 
-bb3:                                              // Preds: bb0
-  %20 = integer_literal $Builtin.Int64, 12        // user: %21
-  %21 = struct $Int (%20 : $Builtin.Int64)        // user: %23
-  store %21 to %6 : $*Int                        // id: %23
-  %24 = tuple ()
-  br bb4                                          // id: %26
+bb3:                                              // Preds: bb1
+  %12 = integer_literal $Builtin.Int64, 12        // user: %13
+  %13 = struct $Int (%12 : $Builtin.Int64)        // user: %15
+  %14 = ref_element_addr %2 : $foo, #foo.a        // user: %15
+  store %13 to %14 : $*Int                        // id: %15
+  %16 = tuple ()
+  br bb4                                          // id: %17
 
-bb4:                                              // Preds: bb1 bb2
-  strong_release %3 : $foo                        // id: %34
-  %35 = tuple ()                                  // user: %37
-  dealloc_stack %1#0 : $*@local_storage foo       // id: %36
-  return %35 : $()                                // id: %37
+bb4:                                              // Preds: bb2 bb3
+  strong_release %2 : $foo                        // id: %18
+  %19 = tuple ()                                  // user: %21
+  dealloc_stack %1#0 : $*@local_storage foo       // id: %20
+  return %19 : $()                                // id: %21
 }
 
 // Can not remove partially dead store in split block for simple class.

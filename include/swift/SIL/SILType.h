@@ -486,6 +486,11 @@ public:
   /// Returns true of a value of this type can be bitcast as a single reference.
   bool canBitCastAsSingleRef() const;
 
+  /// Returns the hash code for the SILType.
+  llvm::hash_code getHashCode() const {
+    return llvm::hash_combine(*this);
+  }
+
   //
   // Accessors for types used in SIL instructions:
   //
