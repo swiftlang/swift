@@ -1,4 +1,5 @@
 add_subdirectory(Utils)
+add_subdirectory(PassManager)
 add_swift_library(swiftSILPasses
   AADumper.cpp
   AllocBoxToStack.cpp
@@ -39,11 +40,8 @@ add_swift_library(swiftSILPasses
   LoopRotate.cpp
   MandatoryInlining.cpp
   MergeCondFail.cpp
-  PassManager.cpp
-  Passes.cpp
   PerformanceInliner.cpp
   PredictableMemOpt.cpp
-  PrettyStackTrace.cpp
   RemovePin.cpp
   SILCleanup.cpp
   SILCodeMotion.cpp
@@ -61,4 +59,8 @@ add_swift_library(swiftSILPasses
   StripDebugInfo.cpp
   UpdateSideEffects.cpp
   UsePrespecialized.cpp
-  LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)
+
+  LINK_LIBRARIES
+  swiftSILPassesPassManager
+  swiftSILPassesUtils
+  swiftSILAnalysis)
