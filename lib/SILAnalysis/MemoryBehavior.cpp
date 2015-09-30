@@ -118,6 +118,7 @@ public:
   MemBehavior visitLoadInst(LoadInst *LI);
   MemBehavior visitStoreInst(StoreInst *SI);
   MemBehavior visitApplyInst(ApplyInst *AI);
+  MemBehavior visitTryApplyInst(TryApplyInst *AI);
   MemBehavior visitBuiltinInst(BuiltinInst *BI);
   MemBehavior visitStrongReleaseInst(StrongReleaseInst *BI);
   MemBehavior visitUnownedReleaseInst(UnownedReleaseInst *BI);
@@ -243,6 +244,19 @@ MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {
   return MemBehavior::MayHaveSideEffects;
 }
 
+MemBehavior MemoryBehaviorVisitor::visitTryApplyInst(TryApplyInst *AI) {
+  MemBehavior Behavior = MemBehavior::MayHaveSideEffects;
+  // If it is an allocstack which does not escape, tryapply instruction can not
+  // read/modify the memory.
+  if (auto *ASI = dyn_cast<AllocStackInst>(getUnderlyingObject(V)))
+    if (isNonEscapingLocalObject(ASI->getAddressResult()))
+      Behavior = MemBehavior::None;
+
+  // Otherwise be conservative and return that we may have side effects.
+  DEBUG(llvm::dbgs() << "  Found tryapply, returning " << Behavior << '\n');
+  return Behavior;
+}
+
 MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
 
   SideEffectAnalysis::FunctionEffects ApplyEffects;
@@ -275,6 +289,13 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
   }
   if (Behavior > MemBehavior::MayRead && isLetPointer(V))
     Behavior = MemBehavior::MayRead;
+
+  // If it is an allocstack which does not escape, apply instruction can not
+  // read/modify the memory.
+  if (auto *ASI = dyn_cast<AllocStackInst>(getUnderlyingObject(V)))
+    if (isNonEscapingLocalObject(ASI->getAddressResult())) {
+      Behavior = MemBehavior::None;
+    }
 
   DEBUG(llvm::dbgs() << "  Found apply, returning " << Behavior << '\n');
   return Behavior;

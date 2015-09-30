@@ -14,6 +14,8 @@ class X {
 
 sil @unknown_func : $@convention(thin) (Int32, @inout Int32) -> ()
 
+sil @nouser_func : $@convention(thin) () -> ()
+
 sil @store_to_int : $@convention(thin) (Int32, @inout Int32) -> () {
 bb0(%0 : $Int32, %1 : $*Int32):
   store %0 to %1  : $*Int32
@@ -92,5 +94,36 @@ bb0(%0 : $X, %1 : $X):
 
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: @allocstack_apply_no_side_effect
+// CHECK:     PAIR #2
+// CHECK-NEXT:  (0):   %3 = apply %2() : $@convention(thin) () -> ()
+// CHECK-NEXT:  (1):   %1 = alloc_stack $Int32                         // user: %5
+// CHECK-NEXT:  r=0,w=0,se=0
+sil @allocstack_apply_no_side_effect : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = alloc_stack $Int32                         // user: %5
+  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %3 = apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()                                   // user: %6
+  dealloc_stack %1#0 : $*@local_storage Int32     // id: %5
+  return %4 : $()
+}
+
+// CHECK-LABEL: @allocstack_apply_side_effect
+// CHECK: PAIR #2.
+// CHECK-NEXT:  (0):   %3 = apply %2(%0, %1#1) : $@convention(thin) (Int32, @inout Int32) -> ()
+// CHECK-NEXT:  (1):   %1 = alloc_stack $Int32
+// CHECK-NEXT:  r=0,w=1,se=1
+sil @allocstack_apply_side_effect : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = alloc_stack $Int32                         // users: %3, %5
+  // function_ref store_to_int
+  %2 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> () // user: %3
+  %3 = apply %2(%0, %1#1) : $@convention(thin) (Int32, @inout Int32) -> ()
+  %4 = tuple ()                                   // user: %6
+  dealloc_stack %1#0 : $*@local_storage Int32     // id: %5
+  return %4 : $()                                 // id: %6
 }
 
