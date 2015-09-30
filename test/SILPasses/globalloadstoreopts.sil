@@ -58,20 +58,6 @@ bb0(%0 : $B):
   %8 = return %7 : $()
 }
 
-// CHECK-LABEL: sil @store_after_store
-// CHECK: alloc_box
-// CHECK-NEXT: store
-// CHECK-NEXT: tuple
-// CHECK: return
-sil @store_after_store : $@convention(thin) (@owned B) -> () {
-bb0(%0 : $B):
-  %1 = alloc_box $B
-  %2 = store %0 to %1#1 : $*B
-  %3 = store %0 to %1#1 : $*B
-  %4 = tuple()
-  %5 = return %4 : $()
-}
-
 // CHECK-LABEL: sil @eliminate_duplicate_loads_over_noread_builtins
 // CHECK: bb0
 // CHECK-NEXT: [[LOAD_RESULT:%[0-9]+]] = load
@@ -91,29 +77,6 @@ bb0(%0 : $*Builtin.Int64):
   %7 = builtin "sadd_with_overflow_Int64"(%5 : $Builtin.Int64, %6 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
   %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 0
   return %8 : $Builtin.Int64
-}
-
-// CHECK-LABEL: sil @dead_store_elimination_over_noread_builtins
-// CHECK: bb0
-// CHECK-NEXT: load
-// CHECK-NEXT: integer_literal
-// CHECK-NEXT: builtin
-// CHECK-NEXT: tuple_extract
-// CHECK-NEXT: store
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-sil @dead_store_elimination_over_noread_builtins : $@convention(thin) (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
-bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
-  %2 = load %0 : $*Builtin.Int64
-  %4 = integer_literal $Builtin.Int1, 0
-  %5 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %2 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
-  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
-  store %6 to %1 : $*Builtin.Int64
-  %8 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %2 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
-  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
-  store %9 to %1 : $*Builtin.Int64
-  %10 = tuple()
-  return %10 : $()
 }
 
 // CHECK-LABEL: sil @load_store_forwarding_over_noread_builtins
@@ -601,83 +564,6 @@ bb2:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @post_dominating_dead_store : $@convention(thin) (@inout Builtin.Int32) -> () {
-// CHECK: store
-// CHECK-NOT: store
-// CHECK: return
-sil @post_dominating_dead_store : $@convention(thin) (@inout Builtin.Int32) -> () {
-bb0(%0 : $*Builtin.Int32):
-  %1 = integer_literal $Builtin.Int32, 0
-  store %1 to %0 : $*Builtin.Int32
-  cond_br undef, bb1, bb2
-
-bb1:
-  br bb3
-
-bb2:
-  br bb3
-
-bb3:
-  store %1 to %0 : $*Builtin.Int32
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// We can not eliminate any stores here since we would need to be able
-// to understand that the first store is post dominated by the set of
-// stores. We are not smart enough to do that.
-//
-// CHECK-LABEL: sil @post_dominating_dead_store_partial_fail : $@convention(thin) (@inout Builtin.Int32) -> () {
-// CHECK: bb0(
-// CHECK: store
-// CHECK: bb1:
-// CHECK: store
-// CHECK: bb2:
-// CHECK: bb3:
-// CHECK: store
-// CHECK: return
-sil @post_dominating_dead_store_partial_fail : $@convention(thin) (@inout Builtin.Int32) -> () {
-bb0(%0 : $*Builtin.Int32):
-  %1 = integer_literal $Builtin.Int32, 0
-  %2 = integer_literal $Builtin.Int32, 1
-  %3 = integer_literal $Builtin.Int32, 2
-  store %1 to %0 : $*Builtin.Int32
-  cond_br undef, bb1, bb2
-
-bb1:
-  store %2 to %0 : $*Builtin.Int32
-  br bb3
-
-bb2:
-  br bb3
-
-bb3:
-  store %3 to %0 : $*Builtin.Int32
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// We can't eliminate any stores here.
-// CHECK-LABEL: sil @post_dominating_dead_store_fail : $@convention(thin) (@inout Builtin.Int32) -> () {
-// CHECK: store
-// CHECK: store
-// CHECK-NOT: store
-// CHECK: return
-sil @post_dominating_dead_store_fail : $@convention(thin) (@inout Builtin.Int32) -> () {
-bb0(%0 : $*Builtin.Int32):
-  %1 = integer_literal $Builtin.Int32, 0
-  %2 = integer_literal $Builtin.Int32, 1
-  store %1 to %0 : $*Builtin.Int32
-  cond_br undef, bb1, bb2
-
-bb1:
-  store %2 to %0 : $*Builtin.Int32
-  br bb2
-
-bb2:
-  %9999 = tuple()
-  return %9999 : $()
-}
 
 // Don't bitcast differently sized structs.
 // CHECK-LABEL: sil @store_to_load_forward_unchecked_addr_cast_different_sized_struct
@@ -932,27 +818,6 @@ bb0(%x : $D, %y : $D):
   return %l1 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: sil @test_read_dependence_allows_forwarding : $@convention(thin) (@inout A, A) -> A {
-// CHECK: bb0
-// CHECK-NEXT: store
-// CHECK-NEXT: unchecked_addr_cast
-// CHECK-NEXT: unchecked_addr_cast
-// CHECK-NEXT: load
-// CHECK-NEXT: store
-// CHECK-NEXT: return
-sil @test_read_dependence_allows_forwarding : $@convention(thin) (@inout A, A) -> A {
-bb0(%0 : $*A, %1 : $A):
-  store %1 to %0 : $*A
-  %2 = unchecked_addr_cast %0 : $*A to $*A
-  %3 = unchecked_addr_cast %2 : $*A to $*A
-  // This means that the first store is not dead.
-  %4 = load %3 : $*A
-  // But we still should be able to forward this load.
-  %5 = load %0 : $*A
-  store %1 to %0 : $*A
-  return %5 : $A
-}
-
 // CHECK-LABEL: sil @test_read_dependence_allows_forwarding_multi_bb_1 : $@convention(thin) (@inout A, A) -> A {
 // CHECK: bb0([[ARG_0:%.*]] : $*A, [[ARG_1:%.*]] : $A):
 // CHECK: store
@@ -1017,70 +882,6 @@ bb1:
 
 bb2:
   return %7 : $A
-}
-
-// Make sure that we do not eliminate a partially dead store as if it
-// was a full dead store.
-//
-// CHECK-LABEL: sil @partially_dead_store1 : $@convention(thin) (@inout AA, AA, A) -> () {
-// CHECK: store
-// CHECK: store
-sil @partially_dead_store1 : $@convention(thin) (@inout AA, AA, A) -> () {
-bb0(%0 : $*AA, %1 : $AA, %2 : $A):
-  store %1 to %0 : $*AA
-  %3 = unchecked_addr_cast %0 : $*AA to $*A
-  store %2 to %3 : $*A
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// Make sure that we do not eliminate a partially dead store as if it
-// was a full dead store.
-//
-// CHECK-LABEL: sil @partially_dead_store2 : $@convention(thin) (@inout AA, AA, A) -> () {
-// CHECK: store
-// CHECK: store
-sil @partially_dead_store2 : $@convention(thin) (@inout AA, AA, A) -> () {
-bb0(%0 : $*AA, %1 : $AA, %2 : $A):
-  store %1 to %0 : $*AA
-  %3 = struct_element_addr %0 : $*AA, #AA.a
-  store %2 to %3 : $*A
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// Make sure that we properly eliminate the stores in bb1, bb2 from StoreMap.
-//
-// CHECK-LABEL: sil @store_map_failed_dead_object_elim_invalidation : $@convention(thin) () -> () {
-// CHECK: bb1:
-// CHECK: store
-// CHECK: bb2:
-// CHECK: store
-// CHECK: bb3:
-// CHECK: store
-sil @store_map_failed_dead_object_elim_invalidation : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Int32, 32
-  %1 = integer_literal $Builtin.Int32, 64
-  %2 = function_ref @escaped_a : $@convention(thin) () -> Builtin.RawPointer
-  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
-  %4 = pointer_to_address %3 : $Builtin.RawPointer to $*Builtin.Int32  
-  %5 = apply %2() : $@convention(thin) () -> Builtin.RawPointer  
-  %6 = pointer_to_address %5 : $Builtin.RawPointer to $*Builtin.Int32
-  cond_br undef, bb1, bb2
-
-bb1:
-  store %0 to %4 : $*Builtin.Int32
-  br bb3
-
-bb2:
-  store %1 to %4 : $*Builtin.Int32
-  br bb3
-
-bb3:
-  store %0 to %6 : $*Builtin.Int32
-  %9999 = tuple()
-  return %9999 : $()
 }
 
 // Check load forwarding across strong_release in case the stored memory does

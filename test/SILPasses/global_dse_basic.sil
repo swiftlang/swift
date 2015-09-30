@@ -45,6 +45,11 @@ class foo {
   init()
 }
 
+class B {
+  var i : Builtin.Int32
+  init()
+}
+
 sil @foo_user : $@convention(thin) (@guaranteed foo) -> ()
 sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
 sil @S2_init : $@convention(thin) (@thin S2.Type) -> S2
@@ -54,6 +59,45 @@ sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 //////////////////////////////////////////////////////////////
 // Tests for LoadStoreOpts.cpp from globalloadstoreopts.sil //
 //////////////////////////////////////////////////////////////
+
+// CHECK-LABEL: sil @store_after_store
+// CHECK: alloc_box
+// CHECK-NEXT: store
+// CHECK-NEXT: tuple
+// CHECK: return
+sil @store_after_store : $@convention(thin) (@owned B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_box $B
+  %2 = store %0 to %1#1 : $*B
+  %3 = store %0 to %1#1 : $*B
+  %4 = tuple()
+  %5 = return %4 : $()
+}
+
+// CHECK-LABEL: sil @dead_store_elimination_over_noread_builtins
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: builtin
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: builtin
+// CHECK-NEXT: tuple_extract
+// CHECK-NEXT: store
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @dead_store_elimination_over_noread_builtins : $@convention(thin) (@inout Builtin.Int64, @inout Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  %2 = load %0 : $*Builtin.Int64
+  %4 = integer_literal $Builtin.Int1, 0
+  %5 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %2 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 0
+  store %6 to %1 : $*Builtin.Int64
+  %8 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %2 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 0
+  store %9 to %1 : $*Builtin.Int64
+  %10 = tuple()
+  return %10 : $()
+}
 
 // CHECK-LABEL: sil @post_dominating_dead_store : $@convention(thin) (@inout Builtin.Int32) -> () {
 // CHECK: store
