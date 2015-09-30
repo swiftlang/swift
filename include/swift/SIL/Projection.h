@@ -22,7 +22,6 @@
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILInstruction.h"
-#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
@@ -379,27 +378,13 @@ public:
   ProjectionPath(const ProjectionPath &Other) = delete;
 
   /// We only allow for moves of ProjectionPath since we only want them to be
-  /// able to be constructed by calling our factory method or by going through
-  /// the append function.
+  /// able to be constructed by calling our factory method.
   ProjectionPath(ProjectionPath &&Other) : Path(Other.Path) {}
-
-  /// Append the projections in Other onto this.
-  ProjectionPath &append(const ProjectionPath &Other) {
-    for (auto &X : Other.Path) {
-      push_back(X);
-    }
-    return *this;
-  }
 
   ProjectionPath &operator=(ProjectionPath &&O) {
     *this = std::move(O);
     O.Path.clear();
     return *this;
-  }
-
-  /// Returns the hashcode for the projection path.
-  llvm::hash_code getHashCode() const {
-    return llvm::hash_combine_range(Path.begin(), Path.end());
   }
 
   /// Create a new address projection path from the pointer Start through
@@ -468,14 +453,6 @@ public:
   const_reverse_iterator rbegin() const { return Path.rbegin(); }
   const_reverse_iterator rend() const { return Path.rend(); }
 };
-
-static inline llvm::hash_code hash_value(const Projection &P) {
-  if (P.isNominalKind()) {
-    return llvm::hash_value(P.getDecl());
-  } else {
-    return llvm::hash_value(P.getIndex());
-  }
-}
 
 class ProjectionTree;
 
@@ -549,14 +526,6 @@ public:
 
   ~ProjectionTreeNode() = default;
   ProjectionTreeNode(const ProjectionTreeNode &) = default;
-
-  llvm::ArrayRef<unsigned> getChildProjections() {
-     return llvm::makeArrayRef(ChildProjections);
-  }
-
-  llvm::Optional<Projection> &getProjection() {
-    return Proj;
-  }
 
   bool isRoot() const {
     // Root does not have a parent. So if we have a parent, we can not be root.
@@ -649,10 +618,6 @@ public:
 
   /// Return the module associated with this tree.
   SILModule &getModule() const { return Mod; }
-
-  llvm::ArrayRef<ProjectionTreeNode *> getProjectionTreeNodes() {
-    return llvm::makeArrayRef(ProjectionTreeNodes);
-  }
 
   /// Iterate over all values in the tree. The function should return false if
   /// it wants the iteration to end and true if it wants to continue.

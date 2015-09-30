@@ -116,37 +116,21 @@ private:
   KeyKind Kind;
   /// The base of the object.
   SILValue Base;
-  /// The path to reach the accessed field of the object.
-  Optional<ProjectionPath> Path;
 
 public:
   /// Constructors.
   Location() : Base(), Kind(NormalKey) {}
   Location(SILValue B) : Base(B), Kind(NormalKey) { initialize(B); }
-  Location(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
-      : Base(B), Path(std::move(P)), Kind(Kind) {}
 
   /// Copy constructor.
   Location(const Location &RHS) {
     Base = RHS.Base;
-    Path.reset();
     Kind = RHS.Kind;
-    if (!RHS.Path.hasValue())
-      return;
-    ProjectionPath X;
-    X.append(RHS.Path.getValue());
-    Path = std::move(X);
   }
 
   Location &operator=(const Location &RHS) {
     Base = RHS.Base;
-    Path.reset();
     Kind = RHS.Kind;
-    if (!RHS.Path.hasValue())
-      return *this;
-    ProjectionPath X;
-    X.append(RHS.Path.getValue());
-    Path = std::move(X);
     return *this;
   }
 
@@ -154,37 +138,6 @@ public:
   KeyKind getKind() const { return Kind; }
   void setKind(KeyKind K) { Kind = K; }
   SILValue getBase() const { return Base; }
-  Optional<ProjectionPath> &getPath() { return Path; }
-
-  /// Returns the hashcode for the location.
-  hash_code getHashCode() const {
-    hash_code HC = llvm::hash_combine(Base.getDef(), Base.getResultNumber(),
-                                      Base.getType());
-    if (!Path.hasValue())
-      return HC;
-    HC = llvm::hash_combine(HC, Path.getValue().getHashCode());
-    return HC;
-  }
-
-  /// Return true if the 2 locations have identical projection path.
-  /// If both locations have empty paths, they are treated as having
-  /// identical projection path.
-  bool hasIdenticalProjectionPath(const Location &RHS) const {
-    // If both Paths have no value, then locations different.
-    if (!Path.hasValue() && !RHS.Path.hasValue())
-      return false;
-    // If 1 Path has value while the other does not, then the 2 locations
-    // are different.
-    if (Path.hasValue() != RHS.Path.hasValue())
-      return false;
-    // If both Paths are empty, then 2 locations are the same.
-    if (Path.getValue().empty() && RHS.Path.getValue().empty())
-      return true;
-    // If 2 Paths have different values, then the 2 locations are different.
-    if (Path.getValue() != RHS.Path.getValue())
-      return false;
-    return true;
-  }
 
   /// Comparisons.
   bool operator!=(const Location &RHS) const { return !(*this == RHS); }
@@ -195,89 +148,20 @@ public:
     // If Base is different, then locations different.
     if (Base != RHS.Base)
       return false;
-
-    // If the projection path is different, then locations different.
-    if (!hasIdenticalProjectionPath(RHS))
-      return false;
-
     // These locations represent the same memory location.
     return true;
   }
 
-  /// Trace the given SILValue till the base of the accessed object. Also
-  /// construct the projection path to the field accessed.
+  /// Initialize this location with val as a base.
   void initialize(SILValue val);
-
-  /// Expand this location to its individual fields by performing a DFS on the
-  /// Projection Tree to find all the fields.
-  ///
-  /// In SIL, we can have a store to an aggregate and loads from its individual
-  /// fields. Therefore, we expands all the operations on aggregates into
-  /// individual fields.
-  void enumerateAggProjection(ProjectionPathList &Paths, ProjectionPath &Path,
-                              ProjectionTreeNode *Root,
-                              ProjectionTreeNodeList Nodes);
-
-  /// Given a SILType, return a list of ProjectionPaths to its individual
-  /// fields.
-  void enumerateAgg(SILModule *M, SILType Ty, ProjectionPathList &P,
-                    llvm::BumpPtrAllocator &BPA);
-
-  /// Expand this location to all individual fields it contains.
-  void expand(SILModule *Mod, llvm::SmallVector<Location, 8> &F,
-              llvm::BumpPtrAllocator &BPA, SILType Ty);
 };
 
 } // end anonymous namespace
 
 void Location::initialize(SILValue Dest) {
-  Base = getUnderlyingObject(Dest);
-  Path = ProjectionPath::getAddrProjectionPath(Base, Dest);
+  Base = Dest;
 }
 
-void Location::expand(SILModule *Mod, llvm::SmallVector<Location, 8> &Locs,
-                      llvm::BumpPtrAllocator &BPA, SILType Ty) {
-  // Using this location as template and expand the aggregates represented
-  // by this Location.
-  ProjectionPathList Paths;
-  enumerateAgg(Mod, Ty, Paths, BPA);
-  for (auto &P : Paths) {
-    ProjectionPath X;
-    X.append(Path.getValue());
-    Locs.push_back(Location(Base, X.append(P)));
-  }
-}
-
-void Location::enumerateAggProjection(ProjectionPathList &Paths,
-                                      ProjectionPath &Path,
-                                      ProjectionTreeNode *Root,
-                                      ProjectionTreeNodeList Nodes) {
-  // If this is the field. keep its projection tree.
-  if (Root->getChildProjections().empty()) {
-    ProjectionPath X;
-    X.append(Path);
-    Paths.push_back(std::move(X));
-    return;
-  }
-
-  for (auto &I : Root->getChildProjections()) {
-    Path.push_back(*Nodes[I]->getProjection().getPointer());
-    enumerateAggProjection(Paths, Path, Nodes[I], Nodes);
-    Path.pop_back(); // Backtrack.
-  }
-}
-
-void Location::enumerateAgg(SILModule *M, SILType Ty, ProjectionPathList &Paths,
-                            llvm::BumpPtrAllocator &Allocator) {
-  // Get the projection tree.
-  ProjectionTree PT(*M, Allocator, Ty);
-
-  // Start a depth first search on the projection tree to enumerate
-  // each field of the projection.
-  ProjectionPath Path;
-  ProjectionTreeNode *Root = PT.getRoot();
-  enumerateAggProjection(Paths, Path, Root, PT.getProjectionTreeNodes());
-}
 
 //===----------------------------------------------------------------------===//
 //                       Basic Block Location State
@@ -562,9 +446,6 @@ bool GlobalDeadStoreEliminationImpl::isMayAliasingLocation(unsigned src,
   // If the base does not alias, then the location can not alias.
   if (AA->isNoAlias(SL.getBase(), DL.getBase()))
     return false;
-  // If projection paths are different, then the locations can not alias.
-  if (!SL.hasIdenticalProjectionPath(DL))
-    return false;
   return true;
 }
 
@@ -573,9 +454,6 @@ bool GlobalDeadStoreEliminationImpl::isMustAliasingLocation(unsigned src,
   const Location &SL = LocationVault[src], &DL = LocationVault[dst];
   // If the base is not must alias, the location may not alias.
   if (!AA->isMustAlias(SL.getBase(), DL.getBase()))
-    return false;
-  // If projection paths are different, then the locations can not alias.
-  if (!SL.hasIdenticalProjectionPath(DL))
     return false;
   return true;
 }
@@ -689,20 +567,14 @@ void GlobalDeadStoreEliminationImpl::processRead(SILInstruction *I, BBState *S,
   // Construct a Location to represent the memory read by this instruction.
   Location L(Mem);
 
-  // We cant figure out the Base or Projection Path for the read instruction,
-  // process it as an unknown memory instruction for now.
-  if (!L.getBase() || !L.getPath().hasValue()) {
+  // We cant figure out the Base the read instruction, process it as an unknown
+  // memory instruction for now.
+  if (!L.getBase()) {
     processUnknownMemInst(I);
     return;
   }
 
-  // Expand the Mem with given into individual fields and process them as
-  // separate reads.
-  llvm::SmallVector<Location, 8> Locs;
-  L.expand(&I->getModule(), Locs, BPA, Mem.getType().getObjectType());
-  for (auto &E : Locs) {
-    updateWriteSetForRead(I, S, getLocationBit(E));
-  }
+  updateWriteSetForRead(I, S, getLocationBit(L));
 }
 
 void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
@@ -710,38 +582,29 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
   // Construct a Location to represent the memory written by this instruction.
   Location L(Mem);
 
-  // We cant figure out the Base or Projection Path for the store instruction,
-  // simply ignore it for now.
-  if (!L.getBase() || !L.getPath().hasValue())
+  // We cant figure out the Base the store instruction, simply ignore it for
+  // now.
+  if (!L.getBase())
     return;
 
-  // Expand the Mem into individual fields and process them as separate writes.
-  bool Dead = true;
-  llvm::SmallVector<Location, 8> Locs;
-  L.expand(&I->getModule(), Locs, BPA, Mem.getType().getObjectType());
-  for (auto &E : Locs) {
-    Dead &= updateWriteSetForWrite(I, S, getLocationBit(E));
-  }
+  // Check whether the instruction is dead.
+  if (!updateWriteSetForWrite(I, S, getLocationBit(L)))
+    return;
 
-  // Stores to all the components are dead, therefore this instruction is dead.
-  //
-  // TODO: handle partially dead store.
-  //
-  if (Dead) {
-    DEBUG(llvm::dbgs() << "Instruction Dead: " << *I << "\n");
-    S->DeadStores.insert(I);
-  }
+  // Instruction dead.
+  DEBUG(llvm::dbgs() << "Instruction Dead: " << *I << "\n");
+  S->DeadStores.insert(I);
 }
 
 void GlobalDeadStoreEliminationImpl::processLoadInst(SILInstruction *I) {
-  // Loading a loadable type.
   SILValue Mem = cast<LoadInst>(I)->getOperand();
+  // Loading a loadable type.
   processRead(I, getBBLocState(I), Mem);
 }
 
 void GlobalDeadStoreEliminationImpl::processStoreInst(SILInstruction *I) {
-  // Storing a loadable type.
   SILValue Mem = cast<StoreInst>(I)->getDest();
+  // Storing a loadable type.
   processWrite(I, getBBLocState(I), Mem);
 }
 
