@@ -49,6 +49,7 @@ add_swift_library(swiftSILPasses
   SILCodeMotion.cpp
   SILCombine.cpp
   SILCombinerVisitors.cpp
+  SILCombinerBuiltinVisitors.cpp
   SILLowerAggregateInstrs.cpp
   SILMem2Reg.cpp
   SILSROA.cpp
