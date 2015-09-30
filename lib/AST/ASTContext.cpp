@@ -3297,28 +3297,6 @@ GenericSignature *GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
   return newSig;
 }
 
-CanGenericSignature GenericSignature::getCanonical(
-                                        ArrayRef<GenericTypeParamType *> params,
-                                        ArrayRef<Requirement> requirements) {
-  // Canonicalize the parameters and requirements.
-  SmallVector<GenericTypeParamType*, 8> canonicalParams;
-  canonicalParams.reserve(params.size());
-  for (auto param : params) {
-    canonicalParams.push_back(cast<GenericTypeParamType>(param->getCanonicalType()));
-  }
-
-  SmallVector<Requirement, 8> canonicalRequirements;
-  canonicalRequirements.reserve(requirements.size());
-  for (auto &reqt : requirements) {
-    canonicalRequirements.push_back(Requirement(reqt.getKind(),
-                              reqt.getFirstType()->getCanonicalType(),
-                              reqt.getSecondType().getCanonicalTypeOrNull()));
-  }
-  auto canSig = get(canonicalParams, canonicalRequirements,
-                    /*isKnownCanonical=*/true);
-  return CanGenericSignature(canSig);
-}
-
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
                                          Identifier baseName,
                                          ArrayRef<Identifier> argumentNames) {

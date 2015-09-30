@@ -20,6 +20,42 @@
 #include "swift/AST/Types.h"
 using namespace swift;
 
+GenericSignature::GenericSignature(ArrayRef<GenericTypeParamType *> params,
+                                   ArrayRef<Requirement> requirements,
+                                   bool isKnownCanonical)
+  : NumGenericParams(params.size()), NumRequirements(requirements.size()),
+    CanonicalSignatureOrASTContext()
+{
+  auto paramsBuffer = getGenericParamsBuffer();
+  for (unsigned i = 0; i < NumGenericParams; ++i) {
+    paramsBuffer[i] = params[i];
+  }
+
+  auto reqtsBuffer = getRequirementsBuffer();
+  for (unsigned i = 0; i < NumRequirements; ++i) {
+    reqtsBuffer[i] = requirements[i];
+  }
+
+  if (isKnownCanonical)
+    CanonicalSignatureOrASTContext = &getASTContext(params, requirements);
+}
+
+ArrayRef<GenericTypeParamType *> 
+GenericSignature::getInnermostGenericParams() const {
+  auto params = getGenericParams();
+
+  // Find the point at which the depth changes.
+  unsigned depth = params.back()->getDepth();
+  for (unsigned n = params.size(); n > 0; --n) {
+    if (params[n-1]->getDepth() != depth) {
+      return params.slice(n);
+    }
+  }
+
+  // All parameters are at the same depth.
+  return params;
+}
+
 ASTContext &GenericSignature::getASTContext(
                                 ArrayRef<swift::GenericTypeParamType *> params,
                                 ArrayRef<swift::Requirement> requirements) {
@@ -34,6 +70,28 @@ bool GenericSignature::isCanonical() const {
   if (CanonicalSignatureOrASTContext.is<ASTContext*>()) return true;
 
   return getCanonicalSignature() == this;
+}
+
+CanGenericSignature GenericSignature::getCanonical(
+                                        ArrayRef<GenericTypeParamType *> params,
+                                        ArrayRef<Requirement> requirements) {
+  // Canonicalize the parameters and requirements.
+  SmallVector<GenericTypeParamType*, 8> canonicalParams;
+  canonicalParams.reserve(params.size());
+  for (auto param : params) {
+    canonicalParams.push_back(cast<GenericTypeParamType>(param->getCanonicalType()));
+  }
+
+  SmallVector<Requirement, 8> canonicalRequirements;
+  canonicalRequirements.reserve(requirements.size());
+  for (auto &reqt : requirements) {
+    canonicalRequirements.push_back(Requirement(reqt.getKind(),
+                              reqt.getFirstType()->getCanonicalType(),
+                              reqt.getSecondType().getCanonicalTypeOrNull()));
+  }
+  auto canSig = get(canonicalParams, canonicalRequirements,
+                    /*isKnownCanonical=*/true);
+  return CanGenericSignature(canSig);
 }
 
 CanGenericSignature
