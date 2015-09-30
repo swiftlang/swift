@@ -89,7 +89,7 @@ macro(configure_sdk_darwin
           COMMAND "xcrun" "--sdk" "${xcrun_name}.internal" "--show-sdk-path"
           OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PATH
           OUTPUT_STRIP_TRAILING_WHITESPACE)
-      if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/Frameworks/module.map")
+      if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/PrivateFrameworks")
         message(FATAL_ERROR "Internal ${name} SDK not found at SWIFT_SDK_${prefix}_PATH.")
       endif()
     endif()
