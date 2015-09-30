@@ -48,10 +48,10 @@ add_swift_library(swiftSILPasses
   SILCleanup.cpp
   SILCodeMotion.cpp
   SILCombine.cpp
-  SILCombinerVisitors.cpp
+  SILCombinerApplyVisitors.cpp
   SILCombinerBuiltinVisitors.cpp
   SILCombinerCastVisitors.cpp
-  SILCombinerApplyVisitors.cpp
+  SILCombinerMiscVisitors.cpp
   SILLowerAggregateInstrs.cpp
   SILMem2Reg.cpp
   SILSROA.cpp
