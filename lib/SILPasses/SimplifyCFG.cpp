@@ -1102,8 +1102,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 
     // Zap BI and move all of the instructions from DestBB into this one.
     BI->eraseFromParent();
-    BB->getInstList().splice(BB->end(), DestBB->getInstList(),
-                             DestBB->begin(), DestBB->end());
+    BB->spliceAtEnd(DestBB);
 
     // Revisit this block now that we've changed it and remove the DestBB.
     addToWorklist(BB);

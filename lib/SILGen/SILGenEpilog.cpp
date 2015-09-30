@@ -110,7 +110,7 @@ SILGenFunction::emitEpilogBB(SILLocation TopLevel) {
     pred->erase(predBranch);
 
     // Move any instructions from the EpilogBB to the end of the 'pred' block.
-    pred->getInstList().splice(pred->end(), epilogBB->getInstList());
+    pred->spliceAtEnd(epilogBB);
 
     // Finally we can erase the epilog BB.
     eraseBasicBlock(epilogBB);

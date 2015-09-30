@@ -750,7 +750,7 @@ bool swift::mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
   Branch->eraseFromParent();
 
   // Move the instruction from the successor block to the current block.
-  BB->getInstList().splice(BB->end(), SuccBB->getInstList());
+  BB->spliceAtEnd(SuccBB);
 
   if (DT)
     if (auto *SuccBBNode = DT->getNode(SuccBB)) {

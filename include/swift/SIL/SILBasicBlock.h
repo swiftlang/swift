@@ -106,6 +106,11 @@ public:
     return const_cast<SILBasicBlock *>(this)->front();
   }
 
+  /// Transfer the instructions from Other to the end of this block.
+  void spliceAtEnd(SILBasicBlock *Other) {
+    InstList.splice(end(), Other->InstList);
+  }
+
   bool empty() const { return InstList.empty(); }
   iterator begin() { return InstList.begin(); }
   iterator end() { return InstList.end(); }
