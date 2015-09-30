@@ -7,6 +7,15 @@ public func %%% (lhs: Int, rhs: Int) -> Int {
   return lhs + rhs
 }
 
+postfix operator => {}
+public postfix func =>(lhs: Int) -> Int {
+  return lhs + 1
+}
+postfix operator =-> {}
+internal postfix func =->(lhs: Int) -> Int {
+  return lhs + 1
+}
+
 public func visibleImport() {}
 public func hiddenImport() {}
 

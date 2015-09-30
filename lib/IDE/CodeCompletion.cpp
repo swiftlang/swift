@@ -222,9 +222,6 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
   case DeclKind::TopLevelCode:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
     llvm_unreachable("not expecting such a declaration result");
   case DeclKind::Module:
@@ -271,6 +268,10 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
       return CodeCompletionDeclKind::OperatorFunction;
     return CodeCompletionDeclKind::FreeFunction;
   }
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    return CodeCompletionDeclKind::OperatorFunction;
   case DeclKind::EnumElement:
     return CodeCompletionDeclKind::EnumElement;
   case DeclKind::Subscript:
@@ -2292,6 +2293,130 @@ public:
     }
   }
 
+  template <typename T>
+  void collectOperatorsFromMap(SourceFile::OperatorMap<T> &map,
+                               bool includePrivate,
+                               std::vector<OperatorDecl *> &results) {
+    for (auto &pair : map) {
+      if (pair.second.getInt() || includePrivate) {
+        results.push_back(pair.second.getPointer());
+      }
+    }
+  }
+
+  void collectOperatorsFrom(SourceFile *SF,
+                            std::vector<OperatorDecl *> &results) {
+    bool includePrivate = CurrDeclContext->getParentSourceFile() == SF;
+    collectOperatorsFromMap(SF->PrefixOperators, includePrivate, results);
+    collectOperatorsFromMap(SF->PostfixOperators, includePrivate, results);
+    collectOperatorsFromMap(SF->InfixOperators, includePrivate, results);
+  }
+
+  void collectOperatorsFrom(LoadedFile *F,
+                            std::vector<OperatorDecl *> &results) {
+    SmallVector<Decl *, 64> topLevelDecls;
+    F->getTopLevelDecls(topLevelDecls);
+    for (auto D : topLevelDecls) {
+      if (auto op = dyn_cast<OperatorDecl>(D))
+        results.push_back(op);
+    }
+  }
+
+  std::vector<OperatorDecl *> collectOperators() {
+    std::vector<OperatorDecl *> results;
+    assert(CurrDeclContext);
+    CurrDeclContext->getParentSourceFile()->forAllVisibleModules(
+    [&](Module::ImportedModule import) {
+      for (auto fileUnit : import.second->getFiles()) {
+        switch (fileUnit->getKind()) {
+        case FileUnitKind::Builtin:
+        case FileUnitKind::Derived:
+        case FileUnitKind::ClangModule:
+          continue;
+        case FileUnitKind::Source:
+          collectOperatorsFrom(cast<SourceFile>(fileUnit), results);
+          break;
+        case FileUnitKind::SerializedAST:
+          collectOperatorsFrom(cast<LoadedFile>(fileUnit), results);
+          break;
+        }
+      }
+    });
+    return results;
+  }
+
+  void addPostfixBang(Type resultType) {
+    auto semanticContext = SemanticContextKind::None;
+    CodeCompletionResultBuilder builder(
+        Sink, CodeCompletionResult::ResultKind::Pattern,
+        SemanticContextKind::None, {});
+    // FIXME: we can't use the exclaimation mark chunk kind, or it isn't
+    // included in the completion name.
+    builder.addTextChunk("!");
+    assert(resultType);
+    addTypeAnnotation(builder, resultType);
+  }
+
+  void addPostfixOperatorCompletion(OperatorDecl *op, Type resultType) {
+    // FIXME: we should get the semantic context of the function, not the
+    // operator decl.
+    auto semanticContext =
+        getSemanticContext(op, DeclVisibilityKind::VisibleAtTopLevel);
+    CodeCompletionResultBuilder builder(
+        Sink, CodeCompletionResult::ResultKind::Declaration, semanticContext,
+        {});
+    builder.setAssociatedDecl(op);
+    builder.addTextChunk(op->getName().str());
+    assert(resultType);
+    addTypeAnnotation(builder, resultType);
+  }
+
+  void tryPostfixOperator(Expr *expr, PostfixOperatorDecl *op) {
+    assert(expr->getType());
+    // We allocate these expressions on the stack because we know they can't
+    // escape and there isn't a better way to allocate scratch Expr nodes.
+    UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::PostfixOperator,
+                               expr->getSourceRange().End);
+    PostfixUnaryExpr opExpr(&UDRE, expr);
+    Expr *tempExpr = &opExpr;
+
+    if (auto T = getTypeOfCompletionContextExpr(
+            CurrDeclContext->getASTContext(),
+            const_cast<DeclContext *>(CurrDeclContext), tempExpr))
+      addPostfixOperatorCompletion(op, *T);
+  }
+
+  void getOperatorCompletions(Expr *LHS) {
+    std::vector<OperatorDecl *> operators = collectOperators();
+
+    // FIXME: this always chooses the first operator with the given name.
+    llvm::DenseSet<Identifier> seenOperators;
+
+    for (auto op : operators) {
+      if (!seenOperators.insert(op->getName()).second)
+        continue;
+
+      switch (op->getKind()) {
+      case DeclKind::PrefixOperator:
+        // Don't insert prefix operators in postfix position.
+        // FIXME: where should these get completed?
+        break;
+      case DeclKind::PostfixOperator:
+        tryPostfixOperator(LHS, cast<PostfixOperatorDecl>(op));
+        break;
+      case DeclKind::InfixOperator:
+        // TODO: implement
+        break;
+      default:
+        llvm_unreachable("unexpected operator kind");
+      }
+    }
+
+    // FIXME: unify this with the ?.member completions.
+    if (auto T = LHS->getType()->getRValueType()->getOptionalObjectType())
+      addPostfixBang(T);
+  }
+
   struct FilteredDeclConsumer : public swift::VisibleDeclConsumer {
     swift::VisibleDeclConsumer &Consumer;
     DeclFilter Filter;
@@ -3401,6 +3526,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (!ExprType && Kind != CompletionKind::PostfixExprParen &&
         Kind != CompletionKind::CallArg)
       return;
+    if (ExprType)
+      ParsedExpr->setType(*ExprType);
   }
 
   if (!ParsedTypeLoc.isNull() && !typecheckParsedType())
@@ -3475,6 +3602,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(*ExprType);
+    Lookup.getOperatorCompletions(ParsedExpr);
     break;
   }
 

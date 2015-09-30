@@ -685,26 +685,41 @@ bool swift::isConvertibleTo(Type Ty1, Type Ty2, DeclContext *DC) {
   }
 }
 
+static Optional<Type> getTypeOfCompletionContextExpr(TypeChecker &TC,
+                                                     DeclContext *DC,
+                                                     Expr *&parsedExpr) {
+
+  CanType originalType = parsedExpr->getType().getCanonicalTypeOrNull();
+  if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
+                                   FreeTypeVariableBinding::GenericParameters))
+    return T;
+
+  // Try to recover if we've made any progress.
+  if (parsedExpr && !isa<ErrorExpr>(parsedExpr) && parsedExpr->getType() &&
+      !parsedExpr->getType()->is<ErrorType>() &&
+      parsedExpr->getType().getCanonicalTypeOrNull() != originalType) {
+    return parsedExpr->getType();
+  }
+
+  return None;
+}
+
 /// \brief Return the type of an expression parsed during code completion, or
 /// a null \c Type on error.
 Optional<Type> swift::getTypeOfCompletionContextExpr(ASTContext &Ctx,
                                                      DeclContext *DC,
                                                      Expr *&parsedExpr) {
-  // Set up a diagnostics engine that swallows diagnostics.
-  DiagnosticEngine diags(Ctx.SourceMgr);
 
-  TypeChecker TC(Ctx, diags);
-  // Try to solve for the actual type of the expression.
-  if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
-                                   FreeTypeVariableBinding::GenericParameters))
-    return T;
-
-  // Try to recover by using the original unchecked type.
-  if (parsedExpr && !isa<ErrorExpr>(parsedExpr) && parsedExpr->getType() &&
-      !parsedExpr->getType()->is<ErrorType>())
-    return parsedExpr->getType();
-
-  return None;
+  if (Ctx.getLazyResolver()) {
+    TypeChecker *TC = static_cast<TypeChecker *>(Ctx.getLazyResolver());
+    return ::getTypeOfCompletionContextExpr(*TC, DC, parsedExpr);
+  } else {
+    // Set up a diagnostics engine that swallows diagnostics.
+    DiagnosticEngine diags(Ctx.SourceMgr);
+    TypeChecker TC(Ctx, diags);
+    // Try to solve for the actual type of the expression.
+    return ::getTypeOfCompletionContextExpr(TC, DC, parsedExpr);
+  }
 }
 
 bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,

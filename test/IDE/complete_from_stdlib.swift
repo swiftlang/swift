@@ -51,6 +51,10 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURNS_ANY_SEQUENCE | FileCheck %s -check-prefix=RETURNS_ANY_SEQUENCE
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_1 | FileCheck %s -check-prefix=POSTFIX_RVALUE_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_INT_2 | FileCheck %s -check-prefix=POSTFIX_LVALUE_INT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=POSTFIX_OPTIONAL_1 | FileCheck %s -check-prefix=POSTFIX_OPTIONAL
+
 // NO_STDLIB_PRIVATE: Begin completions
 // NO_STDLIB_PRIVATE-NOT: Decl[{{.*}}]{{[^:]*}}: _
 // NO_STDLIB_PRIVATE: End completions
@@ -207,3 +211,20 @@ struct Test1000 : SequenceType {
   func #^RETURNS_ANY_SEQUENCE^#
 }
 // RETURNS_ANY_SEQUENCE: Decl[InstanceMethod]/Super:         dropFirst(n: Int)
+
+func testPostfixOperator1(x: Int) {
+  x#^POSTFIX_INT_1^#
+}
+// POSTFIX_RVALUE_INT-NOT: ++
+// POSTFIX_RVALUE_INT-NOT: --
+
+func testPostfixOperator2(var x: Int) {
+  x#^POSTFIX_INT_2^#
+}
+// POSTFIX_LVALUE_INT: Decl[OperatorFunction]/OtherModule[Swift]: ++[#Int#]; name=
+// POSTFIX_LVALUE_INT: Decl[OperatorFunction]/OtherModule[Swift]: --[#Int#]; name=
+
+func testPostfixOperator3(x: MyInt??) {
+  x#^POSTFIX_OPTIONAL_1^#
+}
+// POSTFIX_OPTIONAL: Pattern/None: ![#MyInt?#]; name=!

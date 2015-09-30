@@ -22,6 +22,8 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=MODULE_QUALIFIED_5 | FileCheck %s -check-prefix=ERROR_COMMON
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=POSTFIX_OPERATOR_1 | FileCheck %s -check-prefix=POSTFIX_OPERATOR_1
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -I %t -code-completion-token=TOP_LEVEL_1 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_1 < %t.compl.txt
 // rdar://15305873 Code completion: implement proper shadowing of declarations represented by cached results
@@ -61,6 +63,9 @@ func testCompleteModuleQualified3() {
 // MODULE_QUALIFIED_3: Begin completions
 // MODULE_QUALIFIED_3-NEXT: Decl[Constructor]/CurrNominal:    ({#t: T#})[#BarGenericSwiftStruct1<T>#]
 // MODULE_QUALIFIED_3-NEXT: Decl[InstanceMethod]/CurrNominal: .bar1InstanceFunc({#self: BarGenericSwiftStruct1<T>#})[#() -> Void#]{{; name=.+$}}
+
+// FIXME: recovery is treating the reference to BarGenericSwiftStruct1<t_0_0> as Int.
+// MODULE_QUALIFIED_3-NEXT: Decl[OperatorFunction]/OtherModule[foo_swift_module]: =>[#Int#]
 // MODULE_QUALIFIED_3-NEXT: End completions
 
 func testCompleteModuleQualified4() {
@@ -69,11 +74,23 @@ func testCompleteModuleQualified4() {
 // MODULE_QUALIFIED_4: Begin completions
 // MODULE_QUALIFIED_4-NEXT: Decl[Constructor]/CurrNominal:    ({#t: T#}, {#u: U#})[#BarGenericSwiftStruct2<T, U>#]
 // MODULE_QUALIFIED_4-NEXT: Decl[InstanceMethod]/CurrNominal: .bar2InstanceFunc({#self: BarGenericSwiftStruct2<T, U>#})[#() -> Void#]
+
+// FIXME: recovery is treating the reference to BarGenericSwiftStruct1<t_0_0> as Int.
+// MODULE_QUALIFIED_4-NEXT: Decl[OperatorFunction]/OtherModule[foo_swift_module]: =>[#Int#]
 // MODULE_QUALIFIED_4-NEXT: End completions
 
 func testCompleteModuleQualified5() {
   corrupted_module.#^MODULE_QUALIFIED_5^#
 }
+
+func testPostfixOperator1(x: Int) {
+  x#^POSTFIX_OPERATOR_1^#
+}
+
+// POSTFIX_OPERATOR_1: Begin completions
+// POSTFIX_OPERATOR_1-DAG: Decl[OperatorFunction]/OtherModule[foo_swift_module]: =>[#Int#]
+// POSTFIX_OPERATOR_1-DAG-NOT: =->
+// POSTFIX_OPERATOR_1: End completions
 
 #^TOP_LEVEL_1^#
 // TOP_LEVEL_1: Begin completions
