@@ -1765,6 +1765,7 @@ public:
   MutableArrayRef<Expr *> getElements() { return Elements; }
   Expr *getElement(unsigned i) const { return Elements[i]; }
   void setElement(unsigned i, Expr *E) { Elements[i] = E; }
+  unsigned getNumElements() const { return Elements.size(); }
 
   SourceLoc getLBracketLoc() const { return LBracketLoc; }
   SourceLoc getRBracketLoc() const { return RBracketLoc; }
