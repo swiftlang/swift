@@ -51,6 +51,7 @@ add_swift_library(swiftSILPasses
   SILCombinerVisitors.cpp
   SILCombinerBuiltinVisitors.cpp
   SILCombinerCastVisitors.cpp
+  SILCombinerApplyVisitors.cpp
   SILLowerAggregateInstrs.cpp
   SILMem2Reg.cpp
   SILSROA.cpp
