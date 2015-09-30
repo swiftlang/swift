@@ -125,20 +125,20 @@ void SILInstruction::eraseFromParent() {
 }
 
 /// Unlink this instruction from its current basic block and insert it into
-/// the basic block that MovePos lives in, right before MovePos.
-void SILInstruction::moveBefore(SILInstruction *MovePos) {
-  MovePos->getParent()->getInstList().splice(MovePos,
-                                             getParent()->getInstList(), this);
+/// the basic block that Later lives in, right before Later.
+void SILInstruction::moveBefore(SILInstruction *Later) {
+  if (this == Later)
+    return;
+
+  getParent()->remove(this);
+  Later->getParent()->insert(Later, this);
 }
 
 /// Unlink this instruction from its current basic block and insert it into
-/// the basic block that MovePos lives in, right after MovePos.
-void SILInstruction::moveAfter(SILInstruction *MovePos) {
-  // Since MovePos is an instruction, we know that there is always a valid
-  // iterator after it.
-  auto NewPos = std::next(SILBasicBlock::iterator(MovePos));
-  MovePos->getParent()->getInstList().splice(NewPos,
-                                             getParent()->getInstList(), this);
+/// the basic block that Earlier lives in, right after Earlier.
+void SILInstruction::moveAfter(SILInstruction *Earlier) {
+  auto Later = std::next(SILBasicBlock::iterator(Earlier));
+  moveBefore(Later);
 }
 
 void SILInstruction::dropAllReferences() {

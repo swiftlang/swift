@@ -120,12 +120,12 @@ public:
   void eraseFromParent();
 
   /// Unlink this instruction from its current basic block and insert it into
-  /// the basic block that MovePos lives in, right before MovePos.
-  void moveBefore(SILInstruction *MovePos);
+  /// the basic block that Later lives in, right before Later.
+  void moveBefore(SILInstruction *Later);
 
   /// Unlink this instruction from its current basic block and insert it into
-  /// the basic block that MovePos lives in, right after MovePos.
-  void moveAfter(SILInstruction *MovePos);
+  /// the basic block that Earlier lives in, right after Earlier.
+  void moveAfter(SILInstruction *Earlier);
 
   /// \brief Drops all uses that belong to this instruction.
   void dropAllReferences();
