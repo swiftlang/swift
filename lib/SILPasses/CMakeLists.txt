@@ -1,61 +1,61 @@
 add_subdirectory(Utils)
 add_swift_library(swiftSILPasses
+  AADumper.cpp
   AllocBoxToStack.cpp
+  ArrayBoundsCheckOpts.cpp
+  CFGPrinter.cpp
+  COWArrayOpt.cpp
+  CSE.cpp
+  CallGraphPrinter.cpp
   CapturePromotion.cpp
   CapturePropagation.cpp
+  ClosureSpecializer.cpp
   ConstantPropagation.cpp
   CopyForwarding.cpp
-  CSE.cpp
-  SILCodeMotion.cpp
-  DataflowDiagnostics.cpp
-  DiagnoseUnreachable.cpp
-  InOutDeshadowing.cpp
-  Link.cpp
-  MandatoryInlining.cpp
-  Passes.cpp
-  PassManager.cpp
-  PredictableMemOpt.cpp
-  DefiniteInitialization.cpp
-  DIMemoryUseCollector.cpp
-  SILCleanup.cpp
-  SILCombine.cpp
-  SILMem2Reg.cpp
-  SpeculativeDevirtualizer.cpp
-  SimplifyCFG.cpp
-  PerformanceInliner.cpp
-  SILLowerAggregateInstrs.cpp
-  SILSROA.cpp
-  StripDebugInfo.cpp
-  DeadObjectElimination.cpp
-  InstCount.cpp
-  AADumper.cpp
-  LoadStoreOpts.cpp
-  GlobalDeadStoreElimination.cpp
-  DeadFunctionElimination.cpp
-  GlobalOpt.cpp
-  GlobalARCOpts.cpp
-  GlobalPropertyOpt.cpp
-  UpdateSideEffects.cpp
-  DeadCodeElimination.cpp
-  LoopInfoPrinter.cpp
-  FunctionSignatureOpts.cpp
-  CFGPrinter.cpp
-  LoopRotate.cpp
-  LICM.cpp
-  IVInfoPrinter.cpp
-  COWArrayOpt.cpp
-  ArrayBoundsCheckOpts.cpp
-  ClosureSpecializer.cpp
-  RemovePin.cpp
-  SILCombinerVisitors.cpp
-  Sink.cpp
-  ExternalDefsToDecls.cpp
-  MergeCondFail.cpp
-  PrettyStackTrace.cpp
   CropOverflowChecks.cpp
-  UsePrespecialized.cpp
+  DIMemoryUseCollector.cpp
+  DataflowDiagnostics.cpp
+  DeadCodeElimination.cpp
+  DeadFunctionElimination.cpp
+  DeadObjectElimination.cpp
+  DefiniteInitialization.cpp
+  DiagnoseUnreachable.cpp
+  ExternalDefsToDecls.cpp
+  FunctionSignatureOpts.cpp
+  GlobalARCOpts.cpp
+  GlobalDeadStoreElimination.cpp
+  GlobalOpt.cpp
+  GlobalPropertyOpt.cpp
+  IVInfoPrinter.cpp
+  InOutDeshadowing.cpp
+  InstCount.cpp
+  LICM.cpp
   LetPropertiesOpts.cpp
-  CallGraphPrinter.cpp
-  LoopRegionPrinter.cpp
+  Link.cpp
+  LoadStoreOpts.cpp
   LoopCanonicalizer.cpp
+  LoopInfoPrinter.cpp
+  LoopRegionPrinter.cpp
+  LoopRotate.cpp
+  MandatoryInlining.cpp
+  MergeCondFail.cpp
+  PassManager.cpp
+  Passes.cpp
+  PerformanceInliner.cpp
+  PredictableMemOpt.cpp
+  PrettyStackTrace.cpp
+  RemovePin.cpp
+  SILCleanup.cpp
+  SILCodeMotion.cpp
+  SILCombine.cpp
+  SILCombinerVisitors.cpp
+  SILLowerAggregateInstrs.cpp
+  SILMem2Reg.cpp
+  SILSROA.cpp
+  SimplifyCFG.cpp
+  Sink.cpp
+  SpeculativeDevirtualizer.cpp
+  StripDebugInfo.cpp
+  UpdateSideEffects.cpp
+  UsePrespecialized.cpp
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)
