@@ -122,7 +122,7 @@ SILBasicBlock *SILBasicBlock::splitBasicBlock(iterator I) {
     Parent->getBlocks().splice(Where, Parent->getBlocks(), First);
   // Move all of the specified instructions from the original basic block into
   // the new basic block.
-  New->getInstList().splice(New->end(), this->getInstList(), I, end());
+  New->InstList.splice(New->end(), InstList, I, end());
   return New;
 }
 

@@ -82,9 +82,6 @@ public:
   // SILInstruction List Inspection and Manipulation
   //===--------------------------------------------------------------------===//
 
-  InstListType &getInstList() { return InstList; }
-  const InstListType &getInstList() const { return InstList; }
-
   using iterator = InstListType::iterator;
   using const_iterator = InstListType::const_iterator;
   using reverse_iterator = InstListType::reverse_iterator;
