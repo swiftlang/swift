@@ -225,6 +225,10 @@ struct ASTContext::Implementation {
                            ArchetypeBuilder::PotentialArchetype *>>
     LazyArchetypes;
 
+  /// \brief Stored archetype builders.
+  llvm::DenseMap<std::pair<GenericSignature *, ModuleDecl *>,
+                 std::unique_ptr<ArchetypeBuilder>> ArchetypeBuilders;
+
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -1280,6 +1284,35 @@ void ASTContext::getVisibleTopLevelClangeModules(
     SmallVectorImpl<clang::Module*> &Modules) const {
   getClangModuleLoader()->getClangPreprocessor().getHeaderSearchInfo().
     collectAllModules(Modules);
+}
+
+ArchetypeBuilder *ASTContext::getOrCreateArchetypeBuilder(
+                    CanGenericSignature sig,
+                    ModuleDecl *mod) {
+  // Check whether we already have an archetype builder for this
+  // signature and module.
+  auto known = Impl.ArchetypeBuilders.find({sig, mod});
+  if (known != Impl.ArchetypeBuilders.end())
+    return known->second.get();
+
+  // Create a new archetype builder with the given signature.
+  auto builder = new ArchetypeBuilder(*mod, Diags);
+  builder->addGenericSignature(sig, /*adoptArchetypes=*/false,
+                               /*treatRequirementsAsExplicit=*/true);
+  
+  // Store this archetype builder.
+  Impl.ArchetypeBuilders[{sig, mod}]
+    = std::unique_ptr<ArchetypeBuilder>(builder);
+  return builder;
+}
+
+void ASTContext::setArchetypeBuilder(CanGenericSignature sig,
+                                     ModuleDecl *mod,
+                                     std::unique_ptr<ArchetypeBuilder> builder) {
+  if (Impl.ArchetypeBuilders.find({sig, mod})
+        == Impl.ArchetypeBuilders.end()) {
+    Impl.ArchetypeBuilders[{sig, mod}] = move(builder);
+  }
 }
 
 Module *

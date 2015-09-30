@@ -66,6 +66,16 @@ ASTContext &GenericSignature::getASTContext(
     return requirements.front().getFirstType()->getASTContext();
 }
 
+ArchetypeBuilder *GenericSignature::getArchetypeBuilder(ModuleDecl &mod) {
+  // The archetype builder is associated with the canonical signature.
+  if (!isCanonical())
+    return getCanonicalSignature()->getArchetypeBuilder(mod);
+
+  // Archetype builders are stored on the ASTContext.
+  return getASTContext().getOrCreateArchetypeBuilder(CanGenericSignature(this),
+                                                     &mod);
+}
+
 bool GenericSignature::isCanonical() const {
   if (CanonicalSignatureOrASTContext.is<ASTContext*>()) return true;
 
@@ -180,7 +190,7 @@ static int compareDependentTypes(const CanType *pa, const CanType *pb) {
 }
 
 CanGenericSignature
-GenericSignature::getCanonicalManglingSignature(Module &M) const {
+GenericSignature::getCanonicalManglingSignature(ModuleDecl &M) const {
   // Start from the elementwise-canonical signature.
   auto canonical = getCanonicalSignature();
   auto &Context = canonical->getASTContext();
@@ -194,10 +204,11 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
   // Otherwise, we need to compute it.
   // Dump the generic signature into an ArchetypeBuilder that will figure out
   // the minimal set of requirements.
-  ArchetypeBuilder builder(M, Context.Diags);
+  std::unique_ptr<ArchetypeBuilder> builder(new ArchetypeBuilder(M, 
+                                                                 Context.Diags));
   
-  builder.addGenericSignature(canonical, /*adoptArchetypes*/ false,
-                              /*treatRequirementsAsExplicit*/ true);
+  builder->addGenericSignature(canonical, /*adoptArchetypes*/ false,
+                               /*treatRequirementsAsExplicit*/ true);
   
   // Sort out the requirements.
   struct DependentConstraints {
@@ -209,12 +220,12 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
   llvm::DenseMap<CanType, DependentConstraints> constraints;
   llvm::DenseMap<CanType, SmallVector<CanType, 2>> sameTypes;
   
-  builder.enumerateRequirements([&](RequirementKind kind,
+  builder->enumerateRequirements([&](RequirementKind kind,
           ArchetypeBuilder::PotentialArchetype *archetype,
           llvm::PointerUnion<Type, ArchetypeBuilder::PotentialArchetype *> type,
           RequirementSource source) {
     CanType depTy
-      = archetype->getDependentType(builder, false)->getCanonicalType();
+      = archetype->getDependentType(*builder, false)->getCanonicalType();
     
     // Filter out redundant requirements.
     switch (source.getKind()) {
@@ -280,7 +291,7 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
         if (representative->isConcreteType())
           repTy = representative->getConcreteType()->getCanonicalType();
         else
-          repTy = representative->getDependentType(builder, false)
+          repTy = representative->getDependentType(*builder, false)
             ->getCanonicalType();
       }
       
@@ -353,6 +364,8 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
   
   // Cache the result.
   Context.ManglingSignatures.insert({{canonical, &M}, canSig});
+  Context.setArchetypeBuilder(canSig, &M, std::move(builder));
+
   return canSig;
 }
 
@@ -394,4 +407,70 @@ GenericSignature::getSubstitutionMap(ArrayRef<Substitution> args) const {
   
   assert(args.empty() && "did not use all substitutions?!");
   return subs;
+}
+
+bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {
+  if (!type->isTypeParameter()) return false;
+
+  auto &builder = *getArchetypeBuilder(mod);
+  auto pa = builder.resolveArchetype(type);
+  if (!pa) return false;
+
+  pa = pa->getRepresentative();
+
+  // If this type was mapped to a concrete type, then there is no
+  // requirement.
+  if (pa->isConcreteType()) return false;
+
+  // If there is a superclass bound, then obviously it must be a class.
+  if (pa->getSuperclass()) return true;
+
+  // If any of the protocols are class-bound, then it must be a class.
+  for (auto proto : pa->getConformsTo()) {
+    if (proto.first->requiresClass()) return true;
+  }
+
+  return false;
+}
+
+/// Determine the superclass bound on the given dependent type.
+Type GenericSignature::getSuperclassBound(Type type, ModuleDecl &mod) {
+  if (!type->isTypeParameter()) return nullptr;
+
+  auto &builder = *getArchetypeBuilder(mod);
+  auto pa = builder.resolveArchetype(type);
+  if (!pa) return nullptr;
+
+  pa = pa->getRepresentative();
+
+  // If this type was mapped to a concrete type, then there is no
+  // requirement.
+  if (pa->isConcreteType()) return nullptr;
+
+  // Retrieve the superclass bound.
+  return pa->getSuperclass();
+}
+
+/// Determine the set of protocols to which the given dependent type
+/// must conform.
+SmallVector<ProtocolDecl *, 2> GenericSignature::getConformsTo(Type type,
+                                                               ModuleDecl &mod) {
+  if (!type->isTypeParameter()) return { };
+
+  auto &builder = *getArchetypeBuilder(mod);
+  auto pa = builder.resolveArchetype(type);
+  if (!pa) return { };
+
+  pa = pa->getRepresentative();
+
+  // If this type was mapped to a concrete type, then there are no
+  // requirements.
+  if (pa->isConcreteType()) return { };
+
+  // Retrieve the protocols to which this type conforms.
+  SmallVector<ProtocolDecl *, 2> result;
+  for (auto proto : pa->getConformsTo())
+    result.push_back(proto.first);
+
+  return result;
 }

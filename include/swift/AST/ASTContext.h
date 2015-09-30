@@ -782,6 +782,16 @@ public:
   /// not necessarily loaded.
   void getVisibleTopLevelClangeModules(SmallVectorImpl<clang::Module*> &Modules) const;
 
+  /// Retrieve or create the stored archetype builder for the given
+  /// canonical generic signature and module.
+  ArchetypeBuilder *getOrCreateArchetypeBuilder(CanGenericSignature sig,
+                                                ModuleDecl *mod);
+
+  /// Set the stored archetype builder for the given canonical generic
+  /// signature and module.
+  void setArchetypeBuilder(CanGenericSignature sig,
+                           ModuleDecl *mod,
+                           std::unique_ptr<ArchetypeBuilder> builder);
 private:
   friend class Decl;
   Optional<RawComment> getRawComment(const Decl *D);

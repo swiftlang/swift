@@ -24,6 +24,8 @@
 
 namespace swift {
 
+class ArchetypeBuilder;
+
 /// Iterator that walks the generic parameter types declared in a generic
 /// signature and their dependent members.
 class GenericSignatureWitnessIterator {
@@ -115,7 +117,10 @@ class GenericSignature : public llvm::FoldingSetNode {
   
   static ASTContext &getASTContext(ArrayRef<GenericTypeParamType *> params,
                                    ArrayRef<Requirement> requirements);
-  
+
+  /// Retrieve the archetype builder for the given generic signature.
+  ArchetypeBuilder *getArchetypeBuilder(ModuleDecl &mod);
+
 public:
   /// Create a new generic signature with the given type parameters and
   /// requirements.
@@ -191,6 +196,16 @@ public:
     Profile(ID, getGenericParams(), getRequirements());
   }
   
+  /// Determine whether the given dependent type is required to be a class.
+  bool requiresClass(Type type, ModuleDecl &mod);
+
+  /// Determine the superclass bound on the given dependent type.
+  Type getSuperclassBound(Type type, ModuleDecl &mod);
+
+  /// Determine the set of protocols to which the given dependent type
+  /// must conform.
+  SmallVector<ProtocolDecl *, 2> getConformsTo(Type type, ModuleDecl &mod);
+
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);
