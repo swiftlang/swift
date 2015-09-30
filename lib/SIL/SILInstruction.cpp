@@ -137,6 +137,8 @@ void SILInstruction::moveBefore(SILInstruction *Later) {
 /// Unlink this instruction from its current basic block and insert it into
 /// the basic block that Earlier lives in, right after Earlier.
 void SILInstruction::moveAfter(SILInstruction *Earlier) {
+  // Since MovePos is an instruction, we know that there is always a valid
+  // iterator after it.
   auto Later = std::next(SILBasicBlock::iterator(Earlier));
   moveBefore(Later);
 }
