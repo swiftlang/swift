@@ -187,6 +187,7 @@ typedef __INT32_TYPE__ int32_t;
 - (NSNumber *)initWithUnsignedInteger:(NSUInteger)value;
 - (NSNumber *)initWithDouble:(double)value;
 - (NSNumber *)addDouble:(double)value;
+- (NSNumber *)addBool:(BOOL)value;
 
 - (NSNumber *)addUInt16:(unsigned short)value;
 - (NSNumber *)addInt:(int)value;

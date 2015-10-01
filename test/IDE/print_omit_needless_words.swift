@@ -55,6 +55,9 @@
 // Note: built-in types.
 // CHECK-FOUNDATION: func add(_: Double) -> NSNumber
 
+// Note: built-in types.
+// CHECK-FOUNDATION: func add(_: Bool) -> NSNumber
+
 // Note: builtin-types.
 // CHECK-FOUNDATION: func add(_: UInt16) -> NSNumber
 

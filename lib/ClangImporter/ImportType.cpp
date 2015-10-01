@@ -1882,6 +1882,10 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
       if (type->isObjCClassType() && name == "Class")
         return "Class";
 
+      // Objective-C "BOOL" type.
+      if (name == "BOOL")
+        return "Bool";
+
       // If this is an imported CF type, use that name.
       StringRef CFName = getCFTypeName(typedefType->getDecl());
       if (!CFName.empty())
