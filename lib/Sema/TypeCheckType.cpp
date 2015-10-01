@@ -519,20 +519,17 @@ static NominalTypeDecl *getEnclosingNominalContext(DeclContext *dc) {
 ///
 /// \param tc The type checker through which we should emit the diagnostic.
 /// \param dc The context in which name lookup occurred.
-/// \param components The components that refer to the type, where the last
-/// component refers to the type that could not be found.
 ///
 /// \returns either the corrected type, if possible, or an error type to
 /// that correction failed.
 static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                 Type parentType,
-                                ArrayRef<ComponentIdentTypeRepr *> components,
+                                SourceRange parentRange,
+                                ComponentIdentTypeRepr *comp,
                                 TypeResolutionOptions options,
                                 GenericTypeResolver *resolver) {
-  auto comp = components.back();
-
   // Unqualified lookup case.
-  if (components.size() == 1) {
+  if (parentType.isNull()) {
     // Attempt to refer to 'Self' within a non-protocol nominal
     // type. Fix this by replacing 'Self' with the nominal type name.
     NominalTypeDecl *nominal = nullptr;
@@ -556,8 +553,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     
     // Fallback.
     SourceLoc L = comp->getIdLoc();
-    SourceRange R = SourceRange(comp->getIdLoc(),
-                                components.back()->getIdLoc());
+    SourceRange R = SourceRange(comp->getIdLoc());
 
     // Check if the unknown type is in the type remappings.
     auto &Remapped = tc.Context.RemappedTypes;
@@ -591,9 +587,6 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
 
   // Qualified lookup case.
   // FIXME: Typo correction!
-  auto parentComponents = components.slice(0, components.size()-1);
-  auto parentRange = SourceRange(parentComponents.front()->getStartLoc(),
-                                 parentComponents.back()->getEndLoc());
 
   // Lookup into a type.
   if (auto moduleType = parentType->getAs<ModuleType>()) {
@@ -700,10 +693,108 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     if (!diagnoseErrors)
       return ErrorType::get(TC.Context);
 
-    return diagnoseUnknownType(TC, DC, nullptr, comp, options, resolver);
+    return diagnoseUnknownType(TC, DC, nullptr, SourceRange(), comp, options,
+                               resolver);
   }
 
   return current;
+}
+
+/// Resolve the given identifier type representation as a qualified
+/// lookup within the given parent type, returning the type it
+/// references.
+static Type resolveNestedIdentTypeComponent(
+              TypeChecker &TC, DeclContext *DC,
+              Type parentTy,
+              SourceRange parentRange,
+              ComponentIdentTypeRepr *comp,
+              TypeResolutionOptions options,
+              bool diagnoseErrors,
+              GenericTypeResolver *resolver) {
+  // If the parent is a dependent type, the member is a dependent member.
+  if (parentTy->isTypeParameter()) {
+    // Try to resolve the dependent member type to a specific associated
+    // type.
+    Type memberType = resolver->resolveDependentMemberType(parentTy, DC,
+                                                           parentRange,
+                                                           comp);
+    assert(memberType && "Received null dependent member type");
+
+    if (isa<GenericIdentTypeRepr>(comp) && !memberType->is<ErrorType>()) {
+      // FIXME: Highlight generic arguments and introduce a Fix-It to
+      // remove them.
+      if (diagnoseErrors)
+        TC.diagnose(comp->getIdLoc(), diag::not_a_generic_type, memberType);
+
+      // Drop the arguments.
+    }
+
+    return memberType;
+  }
+
+  // Look for member types with the given name.
+  bool isKnownNonCascading = options.contains(TR_KnownNonCascadingDependency);
+  if (!isKnownNonCascading && options.contains(TR_InExpression)) {
+    // Expressions cannot affect a function's signature.
+    isKnownNonCascading = isa<AbstractFunctionDecl>(DC);
+  }
+
+  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+  if (isKnownNonCascading)
+    lookupOptions |= NameLookupFlags::KnownPrivate;
+  if (options.contains(TR_ExtensionBinding))
+    lookupOptions -= NameLookupFlags::ProtocolMembers;
+  auto memberTypes = TC.lookupMemberType(DC, parentTy, comp->getIdentifier(),
+                                         lookupOptions);
+
+  // Name lookup was ambiguous. Complain.
+  // FIXME: Could try to apply generic arguments first, and see whether
+  // that resolves things. But do we really want that to succeed?
+  if (memberTypes.size() > 1) {
+    if (diagnoseErrors)
+      TC.diagnoseAmbiguousMemberType(parentTy, parentRange,
+                                     comp->getIdentifier(), comp->getIdLoc(),
+                                     memberTypes);
+    return ErrorType::get(TC.Context);
+  }
+
+  // If we didn't find anything, complain.
+  bool recovered = false;
+  Type memberType;
+  if (!memberTypes) {
+    // If we're not allowed to complain or we couldn't fix the
+    // source, bail out.
+    if (!diagnoseErrors) {
+      return ErrorType::get(TC.Context);
+    }
+
+    Type ty = diagnoseUnknownType(TC, DC, parentTy, parentRange, comp, options,
+                                  resolver);
+    if (ty->is<ErrorType>()) {
+      return ty;
+    }
+
+    recovered = true;
+    memberType = ty;
+  } else {
+    memberType = memberTypes.back().second;
+  }
+
+  if (parentTy->isExistentialType()) {
+    if (diagnoseErrors)
+      TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
+                  comp->getIdentifier());
+
+    return ErrorType::get(TC.Context);
+  }
+
+  // If there are generic arguments, apply them now.
+  if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
+    memberType = applyGenericTypeReprArgs(
+      TC, memberType, comp->getIdLoc(), DC, genComp->getGenericArgs(),
+      options.contains(TR_GenericSignature), resolver);
+
+  return memberType;
 }
 
 static Type resolveIdentTypeComponent(
@@ -745,11 +836,12 @@ static Type resolveIdentTypeComponent(
             if (matchingParam != genericParams->end()) {
               Type type = resolveTypeDecl(TC, *matchingParam, comp->getIdLoc(),
                                           DC, None, options, resolver);
-              comp->setValue(type);
               if (type->is<ErrorType>()) {
                 comp->setInvalid(TC.Context);
                 return type;
               }
+
+              comp->setValue(type);
             }
           }
         }
@@ -774,11 +866,13 @@ static Type resolveIdentTypeComponent(
               if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
                 Type type = resolveTypeDecl(TC, assocType, comp->getIdLoc(),
                                             DC, None, options, resolver);
-                comp->setValue(type);
+
                 if (type->is<ErrorType>()) {
                   comp->setInvalid(TC.Context);
                   return type;
                 }
+
+                comp->setValue(type);
                 break;
               }
             }
@@ -813,103 +907,16 @@ static Type resolveIdentTypeComponent(
       SourceRange parentRange(parentComps.front()->getIdLoc(),
                               parentComps.back()->getIdLoc());
 
-      
-      // If the parent is a dependent type, the member is a dependent member.
-      if (parentTy->isTypeParameter()) {
-        // Try to resolve the dependent member type to a specific associated
-        // type.
-        Type memberType = resolver->resolveDependentMemberType(parentTy, DC,
-                                                               parentRange,
-                                                               comp);
-        assert(memberType && "Received null dependent member type");
-
-        if (isa<GenericIdentTypeRepr>(comp) && !memberType->is<ErrorType>()) {
-          // FIXME: Highlight generic arguments and introduce a Fix-It to
-          // remove them.
-          if (diagnoseErrors)
-            TC.diagnose(comp->getIdLoc(), diag::not_a_generic_type, memberType);
-
-          // Drop the arguments.
-        }
-
-        comp->setValue(memberType);
-        return memberType;
-      }
-      
-      // Look for member types with the given name.
-      bool isKnownNonCascading =
-          options.contains(TR_KnownNonCascadingDependency);
-      if (!isKnownNonCascading && options.contains(TR_InExpression)) {
-        // Expressions cannot affect a function's signature.
-        isKnownNonCascading = isa<AbstractFunctionDecl>(DC);
-      }
-      
-      NameLookupOptions lookupOptions = defaultMemberLookupOptions;
-      if (isKnownNonCascading)
-        lookupOptions |= NameLookupFlags::KnownPrivate;
-      if (options.contains(TR_ExtensionBinding))
-        lookupOptions -= NameLookupFlags::ProtocolMembers;
-      auto memberTypes = TC.lookupMemberType(DC, parentTy,
-                                             comp->getIdentifier(),
-                                             lookupOptions);
-
-      // Name lookup was ambiguous. Complain.
-      // FIXME: Could try to apply generic arguments first, and see whether
-      // that resolves things. But do we really want that to succeed?
-      if (memberTypes.size() > 1) {
-        if (diagnoseErrors)
-          TC.diagnoseAmbiguousMemberType(parentTy,
-                                         parentRange,
-                                         comp->getIdentifier(),
-                                         comp->getIdLoc(),
-                                         memberTypes);
-        Type ty = ErrorType::get(TC.Context);
-        comp->setValue(ty);
-        return ty;
+      Type memberTy = resolveNestedIdentTypeComponent(TC, DC, parentTy,
+                                                      parentRange, comp,
+                                                      options, diagnoseErrors,
+                                                      resolver);
+      if (memberTy->is<ErrorType>()) {
+        comp->setInvalid(TC.Context);
+        return memberTy;
       }
 
-      // If we didn't find anything, complain.
-      bool recovered = false;
-      Type memberType;
-      if (!memberTypes) {
-        // If we're not allowed to complain or we couldn't fix the
-        // source, bail out.
-        if (!diagnoseErrors) {
-          Type ty = ErrorType::get(TC.Context);
-          comp->setValue(ty);
-          return ty;
-        }
-
-        Type ty = diagnoseUnknownType(TC, DC, parentTy, components, options,
-                                      resolver);
-        if (ty->is<ErrorType>()) {
-          comp->setInvalid(TC.Context);
-          return ty;
-        }
-
-        recovered = true;
-        memberType = ty;
-      } else {
-        memberType = memberTypes.back().second;
-      }
-
-      if (parentTy->isExistentialType()) {
-        TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
-                    comp->getIdentifier());
-        Type ty = ErrorType::get(TC.Context);
-        comp->setValue(ty);
-        return ty;
-      }
-
-      // If there are generic arguments, apply them now.
-      if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
-        memberType = applyGenericTypeReprArgs(
-                       TC, memberType, genComp->getIdLoc(), DC,
-                       genComp->getGenericArgs(),
-                       options.contains(TR_GenericSignature), resolver);
-
-      comp->setValue(memberType);
-      return memberType;
+      comp->setValue(memberTy);
     }
   }
 
@@ -924,9 +931,9 @@ static Type resolveIdentTypeComponent(
       TC.diagnose(comp->getIdLoc(), diag::use_non_type_value, VD->getName());
       TC.diagnose(VD, diag::use_non_type_value_prev, VD->getName());
     }
-    Type ty = ErrorType::get(TC.Context);
-    comp->setValue(ty);
-    return ty;
+
+    comp->setInvalid(TC.Context);
+    return ErrorType::get(TC.Context);
   }
 
   ArrayRef<TypeRepr *> genericArgs;
@@ -935,6 +942,11 @@ static Type resolveIdentTypeComponent(
 
   Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
                               genericArgs, options, resolver);
+  if (type->is<ErrorType>()) {
+    comp->setInvalid(TC.Context);
+    return type;
+  }
+
   comp->setValue(type);
   return type;
 }
