@@ -1807,8 +1807,6 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
   ParserResult<BraceStmt> body =
       parseBraceItemList(diag::expected_lbrace_after_do);
   status |= body;
-  if (status.hasCodeCompletion())
-    return makeParserResult<Stmt>(status, nullptr);
   if (body.isNull())
     body = makeParserResult(
         body, BraceStmt::create(Context, doLoc, {}, PreviousLoc, true));

@@ -2,6 +2,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_2 | FileCheck %s -check-prefix=LOOP_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_3 | FileCheck %s -check-prefix=LOOP_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_4 | FileCheck %s -check-prefix=LOOP_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=LOOP_5 | FileCheck %s -check-prefix=LOOP_5
 
 class Gen {
 	func IntGen() -> Int { return 0 }
@@ -52,4 +53,13 @@ class C {
 // LOOP_4-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]{{; name=.+$}}
 // LOOP_4-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]{{; name=.+$}}
 // LOOP_4-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntSeqGen()[#[Int]#]{{; name=.+$}}
+
+  func f5(a: [C]) {
+    do {
+      for user in a {
+        user.#^LOOP_5^#
+      }
+    } catch {}
+  }
+// LOOP_5: Begin completions
 }
