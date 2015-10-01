@@ -1515,6 +1515,10 @@ bool Traversal::visitInOutTypeRepr(InOutTypeRepr *T) {
   return false;
 }
 
+bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {
+  return false;
+}
+
 Expr *Expr::walk(ASTWalker &walker) {
   return Traversal(walker).doIt(this);
 }

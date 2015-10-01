@@ -210,6 +210,9 @@ TypeRepr *CloneVisitor::visitInOutTypeRepr(InOutTypeRepr *T) {
   return new (Ctx) InOutTypeRepr(visit(T->getBase()), T->getInOutLoc());
 }
 
+TypeRepr *CloneVisitor::visitFixedTypeRepr(FixedTypeRepr *T) {
+  return new (Ctx) FixedTypeRepr(T->getType(), T->getLoc());
+}
 
 TypeRepr *TypeRepr::clone(ASTContext &ctx) const {
   CloneVisitor visitor(ctx);
@@ -443,4 +446,9 @@ void InOutTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
   Printer << "inout ";
   printTypeRepr(Base, Printer, Opts);
+}
+
+void FixedTypeRepr::printImpl(ASTPrinter &Printer,
+                              const PrintOptions &Opts) const {
+  getType().print(Printer, Opts);
 }

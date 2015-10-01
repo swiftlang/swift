@@ -732,7 +732,37 @@ private:
   friend class TypeRepr;
 };
 
-  
+/// \brief A TypeRepr for a known, fixed type.
+///
+/// Fixed type representations should be used sparingly, in places
+/// where we need to specify some type (usually some built-in type)
+/// that cannot be spelled in the language proper.
+class FixedTypeRepr : public TypeRepr {
+  Type Ty;
+  SourceLoc Loc;
+
+public:
+  FixedTypeRepr(Type Ty, SourceLoc Loc)
+    : TypeRepr(TypeReprKind::Fixed), Ty(Ty), Loc(Loc) {}
+
+  /// Retrieve the location.
+  SourceLoc getLoc() const { return Loc; }
+
+  /// Retrieve the fixed type.
+  Type getType() const { return Ty; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Fixed;
+  }
+  static bool classof(const FixedTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Loc; }
+  SourceLoc getEndLocImpl() const { return Loc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 
 inline bool TypeRepr::isSimple() const {
   switch (getKind()) {
@@ -752,6 +782,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::ImplicitlyUnwrappedOptional:
   case TypeReprKind::ProtocolComposition:
   case TypeReprKind::Tuple:
+  case TypeReprKind::Fixed:
     return true;
 
   case TypeReprKind::Array:

@@ -1245,6 +1245,9 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   case TypeReprKind::Protocol:
     return resolveProtocolType(cast<ProtocolTypeRepr>(repr), options);
+
+  case TypeReprKind::Fixed:
+    return cast<FixedTypeRepr>(repr)->getType();
   }
   llvm_unreachable("all cases should be handled");
 }

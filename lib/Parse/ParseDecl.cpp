@@ -2714,12 +2714,8 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
                                             P->Context.AllocateCopy(args),
                                             SourceRange());
 
-    auto makeKnownType = [&](StringRef name, Type type) -> TypeRepr* {
-      auto result =
-        new (P->Context) SimpleIdentTypeRepr(SourceLoc(),
-                                             P->Context.getIdentifier(name));
-      result->setValue(type);
-      return result;
+    auto makeKnownType = [&](Type type) -> TypeRepr* {
+      return new (P->Context) FixedTypeRepr(type, SourceLoc());
     };
     auto makePairType = [&](TypeRepr *fst, TypeRepr *snd) -> TypeRepr* {
       return TupleTypeRepr::create(P->Context, {fst, snd}, SourceRange(),
@@ -2738,21 +2734,21 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
     //   (Unsafe{,Mutable}Pointer<T>, Builtin.UnknownObject)
     case AddressorKind::Owning:
       resultType = makePairType(resultType,
-          makeKnownType("UnknownObject", P->Context.TheUnknownObjectType));
+                                makeKnownType(P->Context.TheUnknownObjectType));
       break;
 
     // For native owning addressors, the return type is actually
     //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject)
     case AddressorKind::NativeOwning:
       resultType = makePairType(resultType,
-          makeKnownType("NativeObject", P->Context.TheNativeObjectType));
+                                makeKnownType(P->Context.TheNativeObjectType));
       break;
 
     // For native pinning addressors, the return type is actually
     //   (Unsafe{,Mutable}Pointer<T>, Builtin.NativeObject?)
     case AddressorKind::NativePinning: {
       auto optNativePtr = new (P->Context) OptionalTypeRepr(
-          makeKnownType("NativeObject", P->Context.TheNativeObjectType),
+          makeKnownType(P->Context.TheNativeObjectType),
           SourceLoc());
       resultType = makePairType(resultType, optNativePtr);
       break;

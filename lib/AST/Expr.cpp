@@ -1219,9 +1219,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
 TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
   // FIXME: This is horrible.
   if (Loc.isInvalid()) return createImplicit(Ty, C);
-  auto Name = C.getIdentifier("<<IMPLICIT>>");
-  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Name);
-  Repr->setValue(Ty);
+  auto *Repr = new (C) FixedTypeRepr(Ty, Loc);
   auto *Res = new (C) TypeExpr(TypeLoc(Repr, Ty));
   Res->setImplicit();
   Res->setType(MetatypeType::get(Ty, C));
