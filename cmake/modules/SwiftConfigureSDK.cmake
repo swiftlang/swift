@@ -65,26 +65,11 @@ macro(configure_sdk_darwin
   # variables.
 
   # Find the SDK
-  set(SWIFT_SDK_${prefix}_PUBLIC_PATH "" CACHE PATH
-      "Path to the ${name} pubilc SDK")
-
-  if(NOT SWIFT_SDK_${prefix}_PUBLIC_PATH)
-    execute_process(
-        COMMAND "xcrun" "--sdk" "${xcrun_name}" "--show-sdk-path"
-        OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PUBLIC_PATH
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
-  endif()
-
-  if(NOT EXISTS "${SWIFT_SDK_${prefix}_PUBLIC_PATH}/System/Library/Frameworks/module.map")
-    message(FATAL_ERROR "${name} SDK not found at SWIFT_SDK_${prefix}_PUBLIC_PATH.")
-  endif()
-
-  # Find the SDK
   set(SWIFT_SDK_${prefix}_PATH "" CACHE PATH "Path to the ${name} SDK")
 
   if(NOT SWIFT_SDK_${prefix}_PATH)
     if(${SWIFT_DARWIN_USE_INTERNAL_SDK})
-      # Prefer the internal SDK, if present, for building C code and linking.
+      # If requested, require the internal SDK.
       execute_process(
           COMMAND "xcrun" "--sdk" "${xcrun_name}.internal" "--show-sdk-path"
           OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PATH
@@ -96,6 +81,14 @@ macro(configure_sdk_darwin
   endif()
 
   if(NOT SWIFT_SDK_${prefix}_PATH)
+    execute_process(
+        COMMAND "xcrun" "--sdk" "${xcrun_name}" "--show-sdk-path"
+        OUTPUT_VARIABLE SWIFT_SDK_${prefix}_PUBLIC_PATH
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT EXISTS "${SWIFT_SDK_${prefix}_PUBLIC_PATH}/System/Library/Frameworks/module.map")
+      message(FATAL_ERROR "${name} SDK not found at SWIFT_SDK_${prefix}_PUBLIC_PATH.")
+    endif()
+
     set(SWIFT_SDK_${prefix}_PATH "${SWIFT_SDK_${prefix}_PUBLIC_PATH}")
   endif()
 
@@ -116,7 +109,6 @@ macro(configure_sdk_darwin
   else()
     set(SWIFT_SDK_${prefix}_INTERNAL_PATH "${SWIFT_SDK_${prefix}_PATH}")
   endif()
-
 
   if(NOT EXISTS "${SWIFT_SDK_${prefix}_PATH}/System/Library/Frameworks/module.map")
     message(FATAL_ERROR "${name} SDK not found at SWIFT_SDK_${prefix}_PATH.")
