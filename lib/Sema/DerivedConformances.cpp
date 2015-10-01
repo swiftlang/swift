@@ -23,6 +23,8 @@ using namespace DerivedConformance;
 
 ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
                                                        ValueDecl *requirement) {
+  // Note: whenever you update this function, also update
+  // TypeChecker::deriveProtocolRequirement.
   ASTContext &ctx = nominal->getASTContext();
   auto name = requirement->getFullName();
 

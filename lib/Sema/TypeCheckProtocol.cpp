@@ -4122,6 +4122,8 @@ void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
 ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
                                                   NominalTypeDecl *TypeDecl,
                                                   ValueDecl *Requirement) {
+  // Note: whenever you update this function, also update
+  // DerivedConformance::getDerivableRequirement.
   auto *protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
 
   auto knownKind = protocol->getKnownProtocolKind();
