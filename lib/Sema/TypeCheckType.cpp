@@ -609,6 +609,32 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                   TypeResolutionOptions options,
                                   bool diagnoseErrors,
                                   GenericTypeResolver *resolver) {
+  // Short-circuiting.
+  if (comp->isInvalid()) return nullptr;
+  if (comp->isBoundType()) return comp->getBoundType();
+
+  // If the component has already been bound to a declaration, handle
+  // that now.
+  if (comp->isBoundDecl()) {
+    ValueDecl *VD = comp->getBoundDecl();
+    auto typeDecl = dyn_cast<TypeDecl>(VD);
+    if (!typeDecl) {
+      if (diagnoseErrors) {
+        TC.diagnose(comp->getIdLoc(), diag::use_non_type_value, VD->getName());
+        TC.diagnose(VD, diag::use_non_type_value_prev, VD->getName());
+      }
+
+      return nullptr;
+    }
+
+    ArrayRef<TypeRepr *> genericArgs;
+    if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
+      genericArgs = genComp->getGenericArgs();
+
+    return resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
+                           genericArgs, options, resolver);
+  }
+
   // Resolve the first component, which is the only one that requires
   // unqualified name lookup.
   DeclContext *lookupDC = DC;
@@ -739,7 +765,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         TC.diagnose(result.Decl, diag::found_candidate);
       }
     }
-    return ErrorType::get(TC.Context);
+    return nullptr;
   }
 
   // If we found nothing, complain and give ourselves a chance to recover.
@@ -747,7 +773,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
     if (!diagnoseErrors)
-      return ErrorType::get(TC.Context);
+      return nullptr;
 
     return diagnoseUnknownType(TC, DC, nullptr, SourceRange(), comp, options,
                                resolver);
@@ -767,6 +793,10 @@ static Type resolveNestedIdentTypeComponent(
               TypeResolutionOptions options,
               bool diagnoseErrors,
               GenericTypeResolver *resolver) {
+  // Short-circuiting.
+  if (comp->isInvalid()) return nullptr;
+  if (comp->isBoundType()) return comp->getBoundType();
+
   // If the parent is a dependent type, the member is a dependent member.
   if (parentTy->isTypeParameter()) {
     // Try to resolve the dependent member type to a specific associated
@@ -811,7 +841,7 @@ static Type resolveNestedIdentTypeComponent(
       TC.diagnoseAmbiguousMemberType(parentTy, parentRange,
                                      comp->getIdentifier(), comp->getIdLoc(),
                                      memberTypes);
-    return ErrorType::get(TC.Context);
+    return nullptr;
   }
 
   // If we didn't find anything, complain.
@@ -821,13 +851,13 @@ static Type resolveNestedIdentTypeComponent(
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
     if (!diagnoseErrors) {
-      return ErrorType::get(TC.Context);
+      return nullptr;
     }
 
     Type ty = diagnoseUnknownType(TC, DC, parentTy, parentRange, comp, options,
                                   resolver);
     if (ty->is<ErrorType>()) {
-      return ty;
+      return nullptr;
     }
 
     recovered = true;
@@ -841,7 +871,7 @@ static Type resolveNestedIdentTypeComponent(
       TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
                   comp->getIdentifier());
 
-    return ErrorType::get(TC.Context);
+    return nullptr;
   }
 
   // If there are generic arguments, apply them now.
@@ -859,77 +889,46 @@ static Type resolveIdentTypeComponent(
               TypeResolutionOptions options,
               bool diagnoseErrors,
               GenericTypeResolver *resolver) {
-  auto &comp = components.back();
+  auto comp = components.back();
 
-  // If this component is invalid, return an error.
-  if (comp->isInvalid()) return ErrorType::get(TC.Context);
-
-  if (!comp->isBound()) {
-    auto parentComps = components.slice(0, components.size()-1);
-    if (parentComps.empty()) {
-      Type type = resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                                    diagnoseErrors, resolver);
-      if (type->is<ErrorType>()) {
-        comp->setInvalid(TC.Context);
-        return type;
-      }
-
-      comp->setValue(type);
-    } else {
-      // Perform member type lookup.
-      Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, options,
-                                                diagnoseErrors, resolver);
-      if (parentTy->is<ErrorType>()) {
-        comp->setInvalid(TC.Context);
-        return parentTy;
-      }
-
-      // FIXME: Want the end of the back range.
-      SourceRange parentRange(parentComps.front()->getIdLoc(),
-                              parentComps.back()->getIdLoc());
-
-      Type memberTy = resolveNestedIdentTypeComponent(TC, DC, parentTy,
-                                                      parentRange, comp,
-                                                      options, diagnoseErrors,
-                                                      resolver);
-      if (memberTy->is<ErrorType>()) {
-        comp->setInvalid(TC.Context);
-        return memberTy;
-      }
-
-      comp->setValue(memberTy);
+  // The first component uses unqualified lookup.
+  auto parentComps = components.slice(0, components.size()-1);
+  if (parentComps.empty()) {
+    Type type = resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
+                                                  diagnoseErrors, resolver);
+    if (!type || type->is<ErrorType>()) {
+      comp->setInvalid(TC.Context);
+      return ErrorType::get(TC.Context);
     }
+
+    comp->setValue(type);
+    return type;
   }
 
-  assert(comp->isBound());
-  if (Type ty = comp->getBoundType())
-    return ty;
+  // All remaining components use qualified lookup.
 
-  ValueDecl *VD = comp->getBoundDecl();
-  auto typeDecl = dyn_cast<TypeDecl>(VD);
-  if (!typeDecl) {
-    if (diagnoseErrors) {
-      TC.diagnose(comp->getIdLoc(), diag::use_non_type_value, VD->getName());
-      TC.diagnose(VD, diag::use_non_type_value_prev, VD->getName());
-    }
+  // Resolve the parent type.
+  Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, options,
+                                            diagnoseErrors, resolver);
+  if (parentTy->is<ErrorType>()) {
+    comp->setInvalid(TC.Context);
+    return parentTy;
+  }
 
+  // Resolve the nested type.
+  SourceRange parentRange(parentComps.front()->getIdLoc(),
+                          parentComps.back()->getSourceRange().End);
+  Type memberTy = resolveNestedIdentTypeComponent(TC, DC, parentTy,
+                                                  parentRange, comp,
+                                                  options, diagnoseErrors,
+                                                  resolver);
+  if (!memberTy || memberTy->is<ErrorType>()) {
     comp->setInvalid(TC.Context);
     return ErrorType::get(TC.Context);
   }
 
-  ArrayRef<TypeRepr *> genericArgs;
-  if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
-    genericArgs = genComp->getGenericArgs();
-
-  Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
-                              genericArgs, options, resolver);
-  if (type->is<ErrorType>()) {
-    comp->setInvalid(TC.Context);
-    return type;
-  }
-
-  comp->setValue(type);
-  return type;
+  comp->setValue(memberTy);
+  return memberTy;
 }
 
 // FIXME: Merge this with diagAvailability in MiscDiagnostics.cpp.
