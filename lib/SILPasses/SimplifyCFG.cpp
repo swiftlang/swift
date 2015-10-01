@@ -2388,8 +2388,13 @@ bool ArgumentSplitter::createNewArguments() {
   if (!Arg->getIncomingValues(IncomingValues))
     return false;
 
-  if (!Projection::getFirstLevelProjections(Arg, Mod, Projections))
+  // Only handle struct and tuple type.
+  SILType Ty = Arg->getType();
+  if (!Ty.getStructOrBoundGenericStruct() && !Ty.getAs<TupleType>())
     return false;
+
+  // Get the first level projection for the struct or tuple type.
+  Projection::getFirstLevelProjections(Arg, Mod, Projections);
 
   // We do not want to split arguments with less than 2 projections.
   if (Projections.size() < 2)

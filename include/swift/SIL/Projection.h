@@ -300,8 +300,8 @@ public:
   SILValue getOperandForAggregate(SILInstruction *I) const;
 
   /// Given a specific SILValue, return all first level projections if it is an
-  /// aggregate. Returns true if this was successful, false otherwise.
-  static bool getFirstLevelProjections(SILValue V, SILModule &Mod,
+  /// aggregate.
+  static void getFirstLevelProjections(SILValue V, SILModule &Mod,
                                        llvm::SmallVectorImpl<Projection> &Out);
 
   /// Form an aggregate of type BaseType using the SILValue Values. Returns the

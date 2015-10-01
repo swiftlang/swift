@@ -315,7 +315,7 @@ SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
   return SILValue();
 }
 
-bool Projection::getFirstLevelProjections(
+void Projection::getFirstLevelProjections(
     SILValue V, SILModule &Mod, llvm::SmallVectorImpl<Projection> &Out) {
   SILType Ty = V.getType();
   if (auto *S = Ty.getStructOrBoundGenericStruct()) {
@@ -323,7 +323,7 @@ bool Projection::getFirstLevelProjections(
       Out.push_back(Projection(ProjectionKind::Struct, Ty.getFieldType(V, Mod),
                                V, getIndexForValueDecl(V)));
     }
-    return true;
+    return;
   }
 
   if (auto TT = Ty.getAs<TupleType>()) {
@@ -331,10 +331,16 @@ bool Projection::getFirstLevelProjections(
       Out.push_back(Projection(ProjectionKind::Tuple, Ty.getTupleElementType(i),
                                nullptr, i));
     }
-    return true;
+    return;
   }
 
-  return false;
+  if (auto *C = Ty.getClassOrBoundGenericClass()) {
+    for (auto *V : C->getStoredProperties()) {
+      Out.push_back(Projection(ProjectionKind::Class, Ty.getFieldType(V, Mod),
+                               V, getIndexForValueDecl(V)));
+    }
+    return;
+  }
 }
 
 NullablePtr<SILInstruction>
