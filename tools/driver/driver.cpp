@@ -15,8 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/Program.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/FrontendUtil.h"
@@ -25,12 +26,14 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Errno.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/Program.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
@@ -56,16 +59,94 @@ extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 extern int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
                            void *MainAddr);
 
+/// Determine if the given invocation should run as a subcommand.
+///
+/// \param ExecName The name of the argv[0] we were invoked as.
+/// \param SubcommandName On success, the full name of the subcommand to invoke.
+/// \param Args On return, the adjusted program arguments to use.
+/// \returns True if running as a subcommand.
+static bool shouldRunAsSubcommand(StringRef ExecName,
+                                  SmallString<256> &SubcommandName,
+                                  SmallVectorImpl<const char *> &Args) {
+  assert(Args.size() > 0);
+
+  // If we are not run as 'swift', don't do anything special. This doesn't work
+  // with symlinks with alternate names, but we can't detect 'swift' vs 'swiftc'
+  // if we try and resolve using the actual executable path.
+  if (ExecName != "swift")
+    return false;
+
+  // If there are no program arguments, always invoke as normal.
+  if (Args.size() == 1)
+    return false;
+
+  // Otherwise, we have a program argument. If it looks like an option or a
+  // path, then invoke in interactive mode with the arguments as given.
+  StringRef FirstArg(Args[1]);
+  if (FirstArg.startswith("-") || FirstArg.find('.') != StringRef::npos ||
+      FirstArg.find('/') != StringRef::npos)
+    return false;
+
+  // Otherwise, we should have some sort of subcommand. Get the subcommand name
+  // and remove it from the program arguments.
+  StringRef Subcommand = Args[1];
+  Args.erase(&Args[1]);
+
+  // If the subcommand is one of the "built-in" 'repl' or 'run', then use the
+  // normal driver.
+  if (Subcommand == "repl" || Subcommand == "run")
+    return false;
+
+  // Form the subcommand name.
+  SubcommandName.assign("swift-");
+  SubcommandName.append(Subcommand);
+
+  return true;
+}
+
 int main(int argc_, const char **argv_) {
   INITIALIZE_LLVM(argc_, argv_);
 
-  llvm::SmallVector<const char *, 256> argv;
+  SmallVector<const char *, 256> argv;
   llvm::SpecificBumpPtrAllocator<char> ArgAllocator;
   std::error_code EC = llvm::sys::Process::GetArgumentVector(
       argv, llvm::ArrayRef<const char *>(argv_, argc_), ArgAllocator);
   if (EC) {
     llvm::errs() << "error: couldn't get arguments: " << EC.message() << '\n';
     return 1;
+  }
+
+  // Check if this invocation should execute a subcommand.
+  StringRef ExecName = llvm::sys::path::stem(argv[0]);
+  SmallString<256> SubcommandName;
+  if (shouldRunAsSubcommand(ExecName, SubcommandName, argv)) {
+    // We are running as a subcommand, try to find the subcommand adjacent to
+    // the executable we are running as.
+    SmallString<256> SubcommandPath(
+      llvm::sys::path::parent_path(getExecutablePath(argv[0])));
+    llvm::sys::path::append(SubcommandPath, SubcommandName);
+
+    // If we didn't find the tool there, search for it.let the OS search for it.
+    if (!llvm::sys::fs::exists(SubcommandPath)) {
+      // Search for the program and use the path if found. If there was an
+      // error, ignore it and just let the exec fail.
+      auto result = llvm::sys::findProgramByName(SubcommandName);
+      if (!result.getError())
+        SubcommandPath = *result;
+    }
+
+    // Rewrite the program argument.
+    argv[0] = SubcommandPath.c_str();
+    
+    // Execute the subcommand.
+    argv.push_back(nullptr);
+    ExecuteInPlace(SubcommandPath.c_str(), argv.data());
+
+    // If we reach here then an error occurred (typically a missing path).
+    std::string ErrorString = llvm::sys::StrError();
+    llvm::errs() << "error: unable to invoke subcommand: " << argv[0]
+                 << " (" << ErrorString << ")\n";
+    return 2;
   }
 
   // Handle integrated tools.
@@ -91,7 +172,7 @@ int main(int argc_, const char **argv_) {
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(PDC);
 
-  Driver TheDriver(Path, llvm::sys::path::stem(argv[0]), argv, Diags);
+  Driver TheDriver(Path, ExecName, argv, Diags);
   switch (TheDriver.getDriverKind()) {
   case Driver::DriverKind::AutolinkExtract:
     return autolink_extract_main(
