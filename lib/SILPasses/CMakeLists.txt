@@ -1,5 +1,7 @@
 add_subdirectory(Utils)
+add_subdirectory(SILCombiner)
 add_swift_library(swiftSILPasses
+  ${SILCOMBINER_SOURCES}
   AADumper.cpp
   AllocBoxToStack.cpp
   ArrayBoundsCheckOpts.cpp
@@ -47,11 +49,6 @@ add_swift_library(swiftSILPasses
   RemovePin.cpp
   SILCleanup.cpp
   SILCodeMotion.cpp
-  SILCombine.cpp
-  SILCombinerApplyVisitors.cpp
-  SILCombinerBuiltinVisitors.cpp
-  SILCombinerCastVisitors.cpp
-  SILCombinerMiscVisitors.cpp
   SILLowerAggregateInstrs.cpp
   SILMem2Reg.cpp
   SILSROA.cpp
