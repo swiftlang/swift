@@ -397,11 +397,6 @@ public:
     return *this;
   }
 
-  /// Returns the hashcode for the projection path.
-  llvm::hash_code getHashCode() const {
-    return llvm::hash_combine_range(Path.begin(), Path.end());
-  }
-
   /// Create a new address projection path from the pointer Start through
   /// various address projections to End. Returns Nothing::None if there is no
   /// such path.
@@ -468,6 +463,11 @@ public:
   const_reverse_iterator rbegin() const { return Path.rbegin(); }
   const_reverse_iterator rend() const { return Path.rend(); }
 };
+
+/// Returns the hashcode for the projection path.
+static inline llvm::hash_code hash_value(const ProjectionPath &P) {
+  return llvm::hash_combine_range(P.begin(), P.end());
+}
 
 static inline llvm::hash_code hash_value(const Projection &P) {
   if (P.isNominalKind()) {

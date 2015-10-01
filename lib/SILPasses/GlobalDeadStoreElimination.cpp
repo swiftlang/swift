@@ -162,7 +162,7 @@ public:
                                       Base.getType());
     if (!Path.hasValue())
       return HC;
-    HC = llvm::hash_combine(HC, Path.getValue().getHashCode());
+    HC = llvm::hash_combine(HC, hash_value(Path.getValue()));
     return HC;
   }
 
