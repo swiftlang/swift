@@ -2346,7 +2346,6 @@ public:
   }
 
   void addPostfixBang(Type resultType) {
-    auto semanticContext = SemanticContextKind::None;
     CodeCompletionResultBuilder builder(
         Sink, CodeCompletionResult::ResultKind::Pattern,
         SemanticContextKind::None, {});
