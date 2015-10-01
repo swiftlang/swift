@@ -303,36 +303,32 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
 
 MemBehavior
 MemoryBehaviorVisitor::visitStrongReleaseInst(StrongReleaseInst *SI) {
-  // If this is a alloc_stack instruction, strong_release can not write to it,
-  // as its address is never going to be stored anywhere and strong_release
-  // does not take an inout parameter.
-  // If it is stored somewhere/escapes, alloc box to stack pass would not have
-  // promoted the alloc_box to alloc_stack.
-  if (isa<AllocStackInst>(getUnderlyingObject(V)))
-    return MemBehavior::None;
+  // Need to make sure that the allocated memory does not escape.
+  // AllocBox to stack does not check for whether the address of promoted
+  // allocstack can escape.
+  //
+  // TODO: come up with a test case which shows isNonEscapingLocalObject is
+  // necessary.
+  if (AllocStackInst *ASI = dyn_cast<AllocStackInst>(getUnderlyingObject(V)))
+    if (isNonEscapingLocalObject(ASI->getAddressResult()))
+      return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
 }
 
 MemBehavior
 MemoryBehaviorVisitor::visitUnownedReleaseInst(UnownedReleaseInst *SI) {
-  // If this is a alloc_stack instruction, unowned_release can not write to it,
-  // as its address is never going to be stored anywhere and unowned_release
-  // does not take an inout parameter.
-  // If it is stored somewhere/escapes, alloc box to stack pass would not have
-  // promoted the alloc_box to alloc_stack.
-  if (isa<AllocStackInst>(getUnderlyingObject(V)))
-    return MemBehavior::None;
+  // Need to make sure that the allocated memory does not escape.
+  if (AllocStackInst *ASI = dyn_cast<AllocStackInst>(getUnderlyingObject(V)))
+    if (isNonEscapingLocalObject(ASI->getAddressResult()))
+      return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
 }
 
 MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
-  // If this is a alloc_stack instruction, release_value can not write to it,
-  // as its address is never going to be stored anywhere and release_value
-  // does not take an inout parameter.
-  // If it is stored somewhere/escapes, alloc box to stack pass would not have
-  // promoted the alloc_box to alloc_stack.
-  if (isa<AllocStackInst>(getUnderlyingObject(V)))
-    return MemBehavior::None;
+  // Need to make sure that the allocated memory does not escape.
+  if (AllocStackInst *ASI = dyn_cast<AllocStackInst>(getUnderlyingObject(V)))
+    if (isNonEscapingLocalObject(ASI->getAddressResult()))
+      return MemBehavior::None;
   return MemBehavior::MayHaveSideEffects;
 }
 
