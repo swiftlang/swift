@@ -146,3 +146,23 @@ func inferSameType2<T : P3, U : P4 where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc>
 // CHECK-NEXT:   T[.PCommonAssoc2].CommonAssoc == T[.PCommonAssoc1].CommonAssoc [inferred @ {{.*}}requirement_inference.swift:{{.*}}:69]
 // CHECK-NEXT: Generic signature
 func inferSameType3<T : PCommonAssoc1 where T.CommonAssoc : P1, T : PCommonAssoc2>(_: T) { }
+
+protocol P5 {
+  typealias Element
+}
+
+protocol P6 {
+  typealias AssocP6 : P5
+}
+
+protocol P7 : P6 {
+  typealias AssocP7: P6
+}
+
+// CHECK-LABEL: P7.nestedSameType1()@
+// CHECK: Canonical generic signature for mangling: <τ_0_0 where τ_0_0 : P7, τ_0_0.AssocP6.Element : P6, τ_0_0.AssocP6.Element == τ_0_0.AssocP7.AssocP6.Element>
+extension P7 where AssocP6.Element : P6, 
+        AssocP7.AssocP6.Element : P6,
+        AssocP6.Element == AssocP7.AssocP6.Element {
+  func nestedSameType1() { }
+}

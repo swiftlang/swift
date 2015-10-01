@@ -918,11 +918,12 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   }
 
   // Recursively merge the associated types of T2 into T1.
+  RequirementSource inferredSource(RequirementSource::Inferred, SourceLoc());
   for (auto T2Nested : T2->NestedTypes) {
     auto T1Nested = T1->getNestedType(T2Nested.first, *this, nullptr);
     if (addSameTypeRequirementBetweenArchetypes(T1Nested,
                                                 T2Nested.second.front(),
-                                                Source))
+                                                inferredSource))
       return true;
   }
 
