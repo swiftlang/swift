@@ -12,6 +12,10 @@ struct Int {
   var value : Builtin.Int64
 }
 
+struct Int64 {
+  var value : Builtin.Int64
+}
+
 struct Bool {
   var value : Builtin.Int1
 }
@@ -58,12 +62,19 @@ class B {
   init()
 }
 
+
+enum Example {
+  case A(Int64, Int64)
+  case B(Int64)
+  case C
+  case D
+}
+
 sil @foo_user : $@convention(thin) (@guaranteed foo) -> ()
 sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
 sil @S2_init : $@convention(thin) (@thin S2.Type) -> S2
 sil @S3_init : $@convention(thin) (@thin S3.Type) -> S3
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
-
 
 //////////////////////////////////////////////////////////////
 // Tests for LoadStoreOpts.cpp from globalloadstoreopts.sil //
@@ -1035,4 +1046,35 @@ bb0(%0 : $*A):
   dealloc_stack %1#0 : $*@local_storage A         // id: %8
   %9 = tuple ()                                   // user: %10
   return %9 : $()                                 // id: %10
+}
+
+// test dead store for enums. there should be only 1 store left.
+//
+// CHECK-LABEL: DeadStoreEnumSameCase
+// CHECK: store
+// CHECK-NOT: store
+// CHECK: return
+sil hidden @DeadStoreEnumSameCase : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = alloc_stack $Example  // var x             // users: %7, %14, %19
+  %1 = integer_literal $Builtin.Int64, 64         // user: %2
+  %2 = struct $Int64 (%1 : $Builtin.Int64)        // user: %5
+  %3 = integer_literal $Builtin.Int64, 64         // user: %4
+  %4 = struct $Int64 (%3 : $Builtin.Int64)        // user: %5
+  %5 = tuple (%2 : $Int64, %4 : $Int64)           // user: %6
+  %6 = enum $Example, #Example.A!enumelt.1, %5 : $(Int64, Int64) // users: %7, %15
+  store %6 to %0#1 : $*Example                    // id: %7
+  %8 = integer_literal $Builtin.Int64, 64         // user: %9
+  %9 = struct $Int64 (%8 : $Builtin.Int64)        // user: %12
+  %10 = integer_literal $Builtin.Int64, 64        // user: %11
+  %11 = struct $Int64 (%10 : $Builtin.Int64)      // user: %12
+  %12 = tuple (%9 : $Int64, %11 : $Int64)         // user: %13
+  %13 = enum $Example, #Example.A!enumelt.1, %12 : $(Int64, Int64) // users: %14, %18
+  store %13 to %0#1 : $*Example                   // id: %14
+  release_value %6 : $Example                     // id: %15
+  %16 = integer_literal $Builtin.Int64, 0         // user: %17
+  %17 = struct $Int64 (%16 : $Builtin.Int64)      // user: %20
+  release_value %13 : $Example                    // id: %18
+  dealloc_stack %0#0 : $*@local_storage Example   // id: %19
+  return %17 : $Int64                             // id: %20
 }
