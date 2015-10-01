@@ -5894,6 +5894,14 @@ void ClangImporter::Implementation::importAttributes(
                                                             SourceLoc(),
                                                             false));
   }
+  // Map __attribute__((const)).
+  if (ClangDecl->hasAttr<clang::ConstAttr>()) {
+    MappedDecl->getAttrs().add(new (C) EffectsAttr(EffectsKind::ReadNone));
+  }
+  // Map __attribute__((pure)).
+  if (ClangDecl->hasAttr<clang::PureAttr>()) {
+    MappedDecl->getAttrs().add(new (C) EffectsAttr(EffectsKind::ReadOnly));
+  }
 }
 
 Decl *
