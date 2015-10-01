@@ -260,3 +260,16 @@ struct Point3D { double x, y, z; };
 - (nonnull instancetype)bezierPathByInventingPath;
 @property(readonly,nonnull) NSBezierPath *bezierPathByFlatteningPath;
 @end
+
+@interface NSViewController ()
+- (void)dismissAnimated:(BOOL)animated;
+@end
+
+@interface NSScrollView ()
+- (BOOL)shouldCollapseAutoExpandedItemsForDeposited:(BOOL)deposited;
+- (NSRect)rectForCancelButtonWhenCentered:(BOOL)isCentered;
+@end
+
+@interface NSDocumentController ()
+- (void)openUntitledDocumentAndDisplay:(BOOL)displayDocument;
+@end

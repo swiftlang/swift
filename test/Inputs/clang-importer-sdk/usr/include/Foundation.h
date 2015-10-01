@@ -959,3 +959,7 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 @interface NSMutableArray (TypeSuffix)
 - (void)doSomethingWithUnderlying:(NSUnderlyingType)underlying;
 @end
+
+@interface NSString ()
+- (nonnull NSString *)stringByNormalizingXMLPreservingComments:(BOOL)preserveFlag;
+@end

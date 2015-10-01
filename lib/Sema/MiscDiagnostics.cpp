@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/Pattern.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
@@ -1763,10 +1764,36 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   if (!type)
     return "";
 
+  ASTContext &ctx = type->getASTContext();
+  Type boolType;
+  if (auto boolDecl = ctx.getBoolDecl())
+    boolType = boolDecl->getDeclaredInterfaceType();
+  Type objcBoolType;
+  if (auto objcBoolDecl = ctx.getObjCBoolDecl())
+    objcBoolType = objcBoolDecl->getDeclaredInterfaceType();
+
+  /// Determine the options associated with the given type.
+  auto getOptions = [&](Type type) {
+    // Look for Boolean types.
+    OmissionTypeOptions options;
+
+    // Look for Boolean types.
+    if (boolType && type->isEqual(boolType)) {
+      // Swift.Bool
+      options |= OmissionTypeFlags::Boolean;
+    } else if (objcBoolType && type->isEqual(objcBoolType)) {
+      // ObjectiveC.ObjCBool
+      options |= OmissionTypeFlags::Boolean;
+    }
+
+    return options;
+  };
+
   do {
     // If we have a typealias, return that name.
     if (auto aliasTy = dyn_cast<NameAliasType>(type.getPointer())) {
-      return aliasTy->getDecl()->getName().str();
+      return OmissionTypeName(aliasTy->getDecl()->getName().str(),
+                              getOptions(aliasTy));
     }
 
     // Strip off lvalue/inout types.
@@ -1807,12 +1834,13 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
       if (!args.empty() &&
           (bound->getDecl() == ctx.getArrayDecl() ||
            bound->getDecl() == ctx.getSetDecl())) {
-        return OmissionTypeName(nominal->getName().str(), None,
+        return OmissionTypeName(nominal->getName().str(),
+                                getOptions(bound),
                                 getTypeNameForOmission(args[0]).Name);
       }
     }
 
-    return nominal->getName().str();
+    return OmissionTypeName(nominal->getName().str(), getOptions(type));
   }
 
   // Generic type parameters.
@@ -1894,8 +1922,23 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
     returnsSelf = true;
   }
 
+  // Figure out the first parameter name.
+  StringRef firstParamName;
+  unsigned skipBodyPatterns = afd->getImplicitSelfDecl() ? 1 : 0;
+  auto bodyPattern = afd->getBodyParamPatterns()[skipBodyPatterns];
+  if (auto tuplePattern = dyn_cast<TuplePattern>(bodyPattern)) {
+    if (tuplePattern->getNumElements() > 0) {
+      auto firstParam = tuplePattern->getElement(0).getPattern();
+      if (auto named = dyn_cast<NamedPattern>(
+                         firstParam->getSemanticsProvidingPattern())) {
+        if (!named->getBodyName().empty())
+          firstParamName = named->getBodyName().str();
+      }
+    }
+  }
+
   StringScratchSpace scratch;
-  if (!swift::omitNeedlessWords(baseNameStr, argNameStrs,
+  if (!swift::omitNeedlessWords(baseNameStr, argNameStrs, firstParamName,
                                 getTypeNameForOmission(resultType),
                                 getTypeNameForOmission(contextType),
                                 paramTypes, returnsSelf, scratch))
@@ -1952,7 +1995,7 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
   StringScratchSpace scratch;
   OmissionTypeName typeName = getTypeNameForOmission(var->getType());
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
-  if (omitNeedlessWords(name, { }, typeName, contextTypeName, { },
+  if (omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
                         /*returnsSelf=*/false, scratch)) {
     return Context.getIdentifier(name);
   }

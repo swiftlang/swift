@@ -147,8 +147,8 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Void.
   TypeAliasDecl *VoidDecl = nullptr;
 
-  /// The declaration of NSObject.
-  NominalTypeDecl *NSObjectDecl = nullptr;
+  /// The declaration of ObjectiveC.ObjCBool.
+  StructDecl *ObjCBoolDecl = nullptr;
 
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
@@ -759,6 +759,26 @@ TypeAliasDecl *ASTContext::getVoidDecl() const {
   }
 
   return Impl.VoidDecl;
+}
+
+StructDecl *ASTContext::getObjCBoolDecl() {
+  if (!Impl.ObjCBoolDecl) {
+    SmallVector<ValueDecl *, 1> results;
+    if (Module *M = getModuleByName(Id_ObjectiveC.str())) {
+      M->lookupValue({ }, getIdentifier("ObjCBool"), NLKind::UnqualifiedLookup,
+                     results);
+      for (auto result : results) {
+        if (auto structDecl = dyn_cast<StructDecl>(result)) {
+          if (structDecl->getGenericParams() == nullptr) {
+            Impl.ObjCBoolDecl = structDecl;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return Impl.ObjCBoolDecl;
 }
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {

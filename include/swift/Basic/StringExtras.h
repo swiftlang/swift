@@ -278,6 +278,9 @@ enum class NameRole {
 enum class OmissionTypeFlags {
   /// Whether the parameter with this type has a default argument.
   DefaultArgument = 0x01,
+
+  /// Whether this parameter is of some Boolean type.
+  Boolean = 0x02,
 };
 
 /// Options that described omitted types.
@@ -324,6 +327,11 @@ struct OmissionTypeName {
     return Options.contains(OmissionTypeFlags::DefaultArgument);
   }
 
+  /// Whether this type is a Boolean type.
+  bool isBoolean() const {
+    return Options.contains(OmissionTypeFlags::Boolean);
+  }
+
   /// Determine whether the type name is empty.
   bool empty() const { return Name.empty(); }
 
@@ -364,6 +372,8 @@ public:
 /// \param argNames The names of the arguments to the function, or empty if
 /// the declaration is not a function. The values in this array may be changed if any words are removed.
 ///
+/// \param firstParamName The name of the first parameter.
+///
 /// \param resultType The name of the result type.
 ///
 /// \param contextType The name of the type of the enclosing context,
@@ -381,6 +391,7 @@ public:
 /// \returns true if any words were omitted, false otherwise.
 bool omitNeedlessWords(StringRef &baseName,
                        MutableArrayRef<StringRef> argNames,
+                       StringRef firstParamName,
                        OmissionTypeName resultType,
                        OmissionTypeName contextType,
                        ArrayRef<OmissionTypeName> paramTypes,

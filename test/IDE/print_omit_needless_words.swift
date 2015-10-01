@@ -133,6 +133,9 @@
 // Note: Skipping "Type" suffix.
 // CHECK-FOUNDATION: func doSomethingWith(_: NSUnderlyingType)
 
+// Introducing argument labels without pruning.
+// CHECK-FOUNDATION: func normalizingXMLPreservingComments(preserve _: Bool)
+
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
 
@@ -167,3 +170,17 @@
 // Make sure we're removing redundant context type info at both the
 // beginning and the end of a property.
 // CHECK-APPKIT: var flattening: NSBezierPath { get }
+
+// Introducing argument labels and pruning the base name.
+// CHECK-APPKIT: func dismiss(animated _: Bool)
+
+// Introducing argument labels and pruning the base name with a preposition.
+// CHECK-APPKIT: func shouldCollapseAutoExpandedItems(forDeposited _: Bool) -> Bool
+
+// Introducing argument labels and pruning the base name.
+// CHECK-APPKIT: func rectForCancelButton(whenCentered _: Bool)
+
+// Introducing argument labels and pruning the base name by splitting
+// at "and".
+// CHECK-APPKIT: func openUntitledDocument(display _: Bool)
+

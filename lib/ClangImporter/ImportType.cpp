@@ -1884,14 +1884,41 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
 
       // Objective-C "BOOL" type.
       if (name == "BOOL")
-        return "Bool";
+        return OmissionTypeName("Bool", OmissionTypeFlags::Boolean);
 
       // If this is an imported CF type, use that name.
       StringRef CFName = getCFTypeName(typedefType->getDecl());
       if (!CFName.empty())
         return CFName;
 
-      return name;
+      OmissionTypeOptions options;
+
+      // Determine whether this is a Boolean type.
+      if (typedefType->isBooleanType()) {
+        // Easy case: it's a typedef of 'bool' or '_Bool'.
+        options |= OmissionTypeFlags::Boolean;
+      } else {
+        // Check whether this is the Objective-C BOOL type.
+        clang::QualType boolType = type;
+        while (true) {
+          auto boolTypePtr = boolType.getTypePtr();
+          if (auto boolTypedefType = dyn_cast<clang::TypedefType>(boolTypePtr)){
+            if (boolTypedefType->getDecl()->getName() == "BOOL") {
+              options |= OmissionTypeFlags::Boolean;
+              break;
+            }
+          }
+
+          // Try to desugar one level...
+          clang::QualType desugared = boolType.getSingleStepDesugaredType(ctx);
+          if (desugared.getTypePtr() == boolType.getTypePtr())
+            break;
+
+          boolType = desugared;
+        }
+      }
+
+      return OmissionTypeName(name, options);
     }
 
     // Look through reference types.
@@ -1958,8 +1985,13 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
                                /*allowNSUIntegerAsInt=*/true,
                                /*canFullyBridgeTypes=*/true,
                                OTK_None)) {
-      if (auto nominal = type->getAnyNominal())
-        return nominal->getName().str();
+      if (auto nominal = type->getAnyNominal()) {
+        OmissionTypeOptions options;
+        if (nominal->getName().str() == "Bool")
+          options |= OmissionTypeFlags::Boolean;
+
+        return OmissionTypeName(nominal->getName().str(), options);
+      }
     }
   }
 
@@ -2000,9 +2032,14 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
   }
 
   // Collect the parameter type names.
+  StringRef firstParamName;
   SmallVector<OmissionTypeName, 4> paramTypes;
   for (unsigned i = 0, n = params.size(); i != n; ++i) {
     auto param = params[i];
+
+    // Capture the first parameter name.
+    if (i == 0)
+      firstParamName = param->getName();
 
     bool isLastParameter
       = (i == params.size() - 1) ||
@@ -2029,7 +2066,7 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
   // Omit needless words.
   StringRef baseName = name.getBaseName().str();
   StringScratchSpace scratch;
-  if (!omitNeedlessWords(baseName, argNames,
+  if (!omitNeedlessWords(baseName, argNames, firstParamName,
                          getClangTypeNameForOmission(resultType),
                          getClangTypeNameForOmission(
                            getClangDeclContextType(dc)),

@@ -1318,8 +1318,8 @@ ClangImporter::Implementation::importName(const clang::NamedDecl *D,
                                   objcProperty->getType());
         StringScratchSpace scratch;
         StringRef name = result.str();
-        if (omitNeedlessWords(name, { }, propertyTypeName, contextTypeName, { },
-                              /*returnsSelf=*/false, scratch)) {
+        if (omitNeedlessWords(name, { }, "", propertyTypeName, contextTypeName,
+                              { }, /*returnsSelf=*/false, scratch)) {
           result = SwiftContext.getIdentifier(name);
         }
       }

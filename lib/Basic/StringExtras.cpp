@@ -450,6 +450,11 @@ static StringRef omitNeedlessWordsFromPrefix(StringRef name,
   return name;
 }
 
+/// Identify certain vacuous names to which we do not want to reduce any name.
+static bool isVacuousName(StringRef name) {
+  return name == "set" || name == "get";
+}
+
 static StringRef omitNeedlessWords(StringRef name,
                                    OmissionTypeName typeName,
                                    NameRole role,
@@ -594,8 +599,8 @@ static StringRef omitNeedlessWords(StringRef name,
 
   }
 
-  // If we ended up with a name like "get" or "set", do nothing.
-  if (name == "get" || name == "set")
+  // If we ended up with a vacuous name like "get" or "set", do nothing.
+  if (isVacuousName(name))
     return origName;
 
   switch (role) {
@@ -627,8 +632,88 @@ static StringRef omitNeedlessWords(StringRef name,
   return name;
 }
 
+/// Determine whether this is a "bad" first argument label.
+static bool isBadFirstArgumentLabel(StringRef name) {
+  return name == "flag";
+}
+
+/// Whether this word can be used to split a first selector piece where the
+/// first parameter is of Boolean type.
+static bool canSplitForBooleanParameter(StringRef word) {
+  return camel_case::sameWordIgnoreFirstCase(word, "with") ||
+         camel_case::sameWordIgnoreFirstCase(word, "for") ||
+         camel_case::sameWordIgnoreFirstCase(word, "when") ||
+         camel_case::sameWordIgnoreFirstCase(word, "and");
+}
+
+/// Omit needless words by matching the first argument label at the end of a
+/// method's base name.
+///
+/// \param name The method base name which may be updated in the process.
+/// \param argName The argument name, which may be updated in the process.
+/// \param scratch Scratch space.
+///
+/// \return Indicates whether any changes were made.
+static bool omitNeedlessWordsMatchingFirstArgumentLabel(
+                   StringRef &name,
+                   StringRef &argName,
+                   StringScratchSpace &scratch) {
+  if (argName.empty())
+    return false;
+  
+  // Get the camel-case words in the name and type name.
+  auto nameWords = camel_case::getWords(name);
+  auto argNameWords = camel_case::getWords(argName);
+
+  // Match the last words in the method base name to the last words in the
+  // argument name.
+  auto nameWordRevIter = nameWords.rbegin(),
+    nameWordRevIterEnd = nameWords.rend();
+  auto argNameWordRevIter = argNameWords.rbegin(),
+    argNameWordRevIterEnd = argNameWords.rend();
+  bool anyMatches = false;
+  while (nameWordRevIter != nameWordRevIterEnd &&
+         argNameWordRevIter != argNameWordRevIterEnd) {
+    // If the names match, continue.
+    auto nameWord = *nameWordRevIter;
+    if (matchNameWordToTypeWord(nameWord, *argNameWordRevIter)) {
+      anyMatches = true;
+      ++nameWordRevIter;
+      ++argNameWordRevIter;
+      continue;
+    }
+
+    // Skip extra words in the argument name.
+    ++argNameWordRevIter;
+  }
+
+  // If nothing matched, we're done.
+  if (!anyMatches) return false;
+
+  // If the word before the match is a preposition, grab it as part of the
+  // argument name.
+  if (nameWordRevIter != nameWordRevIterEnd &&
+      getPartOfSpeech(*nameWordRevIter) == PartOfSpeech::Preposition) {
+    auto nextNameWordRevIter = nameWordRevIter;
+    ++nextNameWordRevIter;
+    if (nameWordRevIter.base().getPosition() > 0) {
+      nameWordRevIter = nextNameWordRevIter;
+    }
+  }
+
+  // Determine where to perform the split.
+  unsigned splitPos = nameWordRevIter.base().getPosition();
+  if (splitPos == 0) return false;
+
+  // Split into base name/first argument label.
+  argName = ::toLowercaseWord(name.substr(splitPos), scratch);
+  name = name.substr(0, splitPos);
+  return true;
+}
+
 bool swift::omitNeedlessWords(StringRef &baseName,
                               MutableArrayRef<StringRef> argNames,
+                              StringRef firstParamName,
                               OmissionTypeName resultType,
                               OmissionTypeName contextType,
                               ArrayRef<OmissionTypeName> paramTypes,
@@ -683,25 +768,47 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       anyChanges = true;
 
     // If the first parameter has a default argument, and there is a
-    // preposition in the base name, split the base name at that
-    // preposition.
+    // preposition in the base name, split the base name at that preposition.
+    // Alternatively, if the first parameter is of Boolean type and there is
+    // one of a small set of conjunctions and prepositions, split at that
+    // conjunction or preposition.
     if (role == NameRole::BaseName && argNames[0].empty() &&
-        paramTypes[0].hasDefaultArgument()) {
-      // Scan backwards for a preposition.
+        (paramTypes[0].hasDefaultArgument() ||
+         (paramTypes[0].isBoolean() && !isVacuousName(getFirstWord(newName))))){
+      // Scan backwards for a preposition or Boolean-splitting word.
       auto nameWords = camel_case::getWords(newName);
       auto nameWordRevIter = nameWords.rbegin(),
-      nameWordRevIterEnd = nameWords.rend();
-      bool found = false, done = false;
+        nameWordRevIterEnd = nameWords.rend();
+      bool found = false, done = false, isAnd = false;
       while (nameWordRevIter != nameWordRevIterEnd && !done) {
+        // If this is a boolean
+        if (paramTypes[0].isBoolean() &&
+            canSplitForBooleanParameter(*nameWordRevIter)) {
+          found = true;
+          done = true;
+          if (sameWordIgnoreFirstCase(*nameWordRevIter, "and"))
+            isAnd = true;
+
+          break;
+        }
+
         switch (getPartOfSpeech(*nameWordRevIter)) {
           case PartOfSpeech::Preposition:
-            found = true;
+            if (paramTypes[0].hasDefaultArgument())
+              found = true;
+
             done = true;
             break;
 
           case PartOfSpeech::Verb:
           case PartOfSpeech::Gerund:
-            // Don't skip over verbs or gerunds.
+            // Don't skip over verbs or gerunds unless we have a Boolean
+            // first parameter.
+            if (paramTypes[0].isBoolean()) {
+              ++nameWordRevIter;
+              break;
+            }
+
             done = true;
             break;
 
@@ -711,21 +818,58 @@ bool swift::omitNeedlessWords(StringRef &baseName,
         }
       }
 
-      // If we found a preposition that's not at the beginning of the
+      // If we found a split point that's not at the beginning of the
       // name, split there.
       if (found) {
         ++nameWordRevIter;
         unsigned splitPos = nameWordRevIter.base().getPosition();
         if (splitPos > 0) {
+          unsigned afterSplitPos = splitPos;
+
+          // Adjust to skip the "and", if that's what we matched.
+          if (isAnd && splitPos + 3 < newName.size())
+            afterSplitPos += 3;
+
           // Create a first argument name with the remainder of the base name,
           // lowercased.
-          argNames[0] = toLowercaseWord(newName.substr(splitPos), scratch);
+          argNames[0] = toLowercaseWord(newName.substr(afterSplitPos), scratch);
 
           // Update the base name by splitting at the preposition.
           newName = newName.substr(0, splitPos);
 
           anyChanges = true;
         }
+      }
+    }
+
+    // If the first parameter is of Boolean type and we don't have a label for
+    // the first argument, use the parameter name as the first argument label.
+    // Don't do this if the first word of the base name is vacuous.
+    if (role == NameRole::BaseName && argNames[0].empty() &&
+        paramTypes[0].isBoolean() &&
+        !isVacuousName(camel_case::getFirstWord(newName)) &&
+        camel_case::sameWordIgnoreFirstCase(camel_case::getLastWord(name),
+                                            camel_case::getLastWord(newName))) {
+      // Drop the "flag" suffix from the first parameter name, if it's there.
+      if (camel_case::sameWordIgnoreFirstCase(
+            camel_case::getLastWord(firstParamName),
+            "flag")) {
+        firstParamName = toLowercaseWord(firstParamName.drop_back(4), scratch);
+      }
+
+      // Adopt the first parameter name as the first argument label.
+      argNames[0] = firstParamName;
+
+      // Did anything change?
+      if (!firstParamName.empty())
+        anyChanges = true;
+
+      // Try to eliminate redundancy between the base name and the first
+      // parameter name.
+      if (omitNeedlessWordsMatchingFirstArgumentLabel(newName,
+                                                      argNames[0],
+                                                      scratch)) {
+        anyChanges = true;
       }
     }
 

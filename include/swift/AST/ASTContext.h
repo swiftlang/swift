@@ -429,6 +429,9 @@ public:
   /// Retrieve the declaration of Swift.Void.
   TypeAliasDecl *getVoidDecl() const;
 
+  /// Retrieve the declaration of ObjectiveC.ObjCBool.
+  StructDecl *getObjCBoolDecl();
+
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \
   FuncDecl *get##Name(LazyResolver *resolver) const;
