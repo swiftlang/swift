@@ -36,11 +36,6 @@ SILBasicBlock::SILBasicBlock(SILFunction *parent, SILBasicBlock *afterBB)
   }
 }
 SILBasicBlock::~SILBasicBlock() {
-  // Notify the module of the removal of the instructions before
-  // deleting the list.
-  for (auto I = begin(), E = end(); I != E; ++I)
-    getModule().instructionRemoved(&*I);
-
   // iplist's destructor is going to destroy the InstList.
 }
 
@@ -62,36 +57,21 @@ SILModule &SILBasicBlock::getModule() const {
 
 void SILBasicBlock::insert(iterator InsertPt, SILInstruction *I) {
   InstList.insert(InsertPt, I);
-
-  // Notify module after insertion.
-  getModule().instructionAdded(I);
 }
 
 void SILBasicBlock::push_back(SILInstruction *I) {
   InstList.push_back(I);
-
-  // Notify module after insertion.
-  getModule().instructionAdded(I);
 }
 
 void SILBasicBlock::push_front(SILInstruction *I) {
   InstList.push_front(I);
-
-  // Notify module after insertion.
-  getModule().instructionAdded(I);
 }
 
 void SILBasicBlock::remove(SILInstruction *I) {
-  // Notify module before removal.
-  getModule().instructionRemoved(I);
-
   InstList.remove(I);
 }
 
 void SILBasicBlock::erase(SILInstruction *I) {
-  // Notify module before removal.
-  getModule().instructionRemoved(I);
-
   InstList.erase(I);
 }
 

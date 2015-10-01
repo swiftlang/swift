@@ -190,16 +190,6 @@ private:
   /// has not been created yet.
   SerializedSILLoader *getSILLoader();
 
-  // Notification hook for when instructions are removed from the
-  // module. Not guaranteed to be called when instructions are moved
-  // between blocks.
-  void instructionRemoved(SILInstruction *I) { }
-
-  // Notification hook for when instructions are added to the
-  // module. Not guaranteed to be called when instructions are moved
-  // between blocks.
-  void instructionAdded(SILInstruction *I) { }
-
 public:
   ~SILModule();
 
