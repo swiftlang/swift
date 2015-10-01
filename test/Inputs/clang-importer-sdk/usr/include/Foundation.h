@@ -186,6 +186,9 @@ __attribute__((availability(ios,introduced=8.0)))
 - (NSNumber *)initWithDouble:(double)value;
 - (NSNumber *)addDouble:(double)value;
 
+- (NSNumber *)addUInt16:(unsigned short)value;
+- (NSNumber *)addInt:(int)value;
+
 @property NSInteger integerValue;
 @property NSUInteger unsignedIntegerValue;
 @end

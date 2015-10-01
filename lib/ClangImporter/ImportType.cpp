@@ -1947,29 +1947,15 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
     return StringRef();
   }
 
+  // Handle builtin types by importing them and getting the Swift name.
   if (auto builtinTy = type->getAs<clang::BuiltinType>()) {
-    switch (builtinTy->getKind()) {
-    case clang::BuiltinType::ObjCSel:
-      // Objective-C selector type.
-      return "Selector";
-
-    case clang::BuiltinType::Bool:
-      return "Bool";
-
-    case clang::BuiltinType::Double:
-      return "Double";
-
-    case clang::BuiltinType::Float:
-      return "Float";
-
-    case clang::BuiltinType::Int:
-      return "Int";
-
-    case clang::BuiltinType::UInt:
-      return "UInt";
-
-    default:
-      break;
+    if (Type type = importType(clang::QualType(builtinTy, 0),
+                               ImportTypeKind::Abstract,
+                               /*allowNSUIntegerAsInt=*/true,
+                               /*canFullyBridgeTypes=*/true,
+                               OTK_None)) {
+      if (auto nominal = type->getAnyNominal())
+        return nominal->getName().str();
     }
   }
 

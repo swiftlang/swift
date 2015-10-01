@@ -52,16 +52,6 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
                                                    unsigned maxScore) {
   using namespace camel_case;
 
-  // If one of the names starts with "with", drop it and compare the rest.
-  bool argStartsWith = startsWithIgnoreFirstCase(argName, "with");
-  bool paramStartsWith = startsWithIgnoreFirstCase(paramName, "with");
-  if (argStartsWith != paramStartsWith) {
-    if (argStartsWith)
-      argName = argName.substr(4);
-    else
-      paramName = paramName.substr(4);
-  }
-
   // Compute the edit distance.
   unsigned dist = argName.edit_distance(paramName, /*AllowReplacements=*/true,
                                         /*MaxEditDistance=*/maxScore);

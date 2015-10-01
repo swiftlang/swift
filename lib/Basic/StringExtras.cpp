@@ -181,7 +181,7 @@ bool camel_case::startsWithIgnoreFirstCase(StringRef word1, StringRef word2) {
   if (clang::toLowercase(word1[0]) != clang::toLowercase(word2[0]))
     return false;
 
-  return word1.substr(1) == word2.substr(1, word1.size() - 1);
+  return word1.substr(1, word2.size() - 1) == word2.substr(1);
 }
 
 StringRef camel_case::toLowercaseWord(StringRef string,
@@ -321,19 +321,32 @@ static bool matchNameWordToTypeWord(StringRef nameWord, StringRef typeWord) {
   // If the name word is longer, there's no match.
   if (nameWord.size() > typeWord.size()) return false;
 
-  // If the name word is shorter, we can match the suffix of the type so long
-  // as everything preceding the match is neither a lowercase letter nor a '_'.
+  // If the name word is shorter, try for a partial match.
   if (nameWord.size() < typeWord.size()) {
-    // Check for a name match at the end of the type.
-    if (!typeWord.endswith(nameWord)) return false;
+    // We can match the suffix of the type so long as everything preceding the
+    // match is neither a lowercase letter nor a '_'. This ignores type
+    // prefixes for acronyms, e.g., the 'NS' in 'NSURL'.
+    if (typeWord.endswith(nameWord)) {
+      // Check that everything preceding the match is neither a lowercase letter
+      // nor a '_'.
+      for (unsigned i = 0, n = nameWord.size(); i != n; ++i) {
+        if (clang::isLowercase(typeWord[i]) || typeWord[i] == '_') return false;
+      }
 
-    // Check that everything preceding the match is neither a lowercase letter
-    // nor a '_'.
-    for (unsigned i = 0, n = nameWord.size(); i != n; ++i) {
-      if (clang::isLowercase(typeWord[i]) || typeWord[i] == '_') return false;
+      return true;
     }
 
-    return true;
+    // We can match a prefix so long as everything following the match is
+    // a number.
+    if (camel_case::startsWithIgnoreFirstCase(typeWord, nameWord)) {
+      for (unsigned i = nameWord.size(), n = typeWord.size(); i != n; ++i) {
+        if (!clang::isDigit(typeWord[i])) return false;
+      }
+
+      return true;
+    }
+
+    return false;
   }
 
   // Check for an exact match.
