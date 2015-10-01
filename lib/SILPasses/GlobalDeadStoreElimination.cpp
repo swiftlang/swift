@@ -341,10 +341,7 @@ public:
 
   /// Constructors.
   BBState() : BB(nullptr) {}
-  BBState(SILBasicBlock *B, unsigned lcnt) : BB(B) {
-    WriteSetIn.resize(lcnt);
-    WriteSetOut.resize(lcnt);
-  }
+  BBState(SILBasicBlock *B) : BB(B) {}
 
   /// Check whether the WriteSetIn has changed. If it does, we need to
   /// re-iterate to reach fixed point.
@@ -356,7 +353,11 @@ public:
   void stopTrackingLocation(unsigned bit);
   bool isTrackingLocation(unsigned bit);
   void initialize(const BBState &L);
-  void intersect(const BBState &L);
+  /// *NOTE* Intersect can modify the input BBState. Given a basic block with
+  /// multiple successors each of which have differing bitvector sizes,
+  /// intersect will resize the bit vectors to the maximum of all bit vector
+  /// sizes.
+  void intersect(BBState &L);
 };
 
 } // end anonymous namespace
@@ -369,18 +370,33 @@ bool BBState::updateWriteSetIn() {
   return false;
 }
 
-void BBState::clearLocations() { WriteSetOut.reset(); }
+void BBState::clearLocations() { WriteSetOut.clear(); }
 
-void BBState::startTrackingLocation(unsigned bit) { WriteSetOut.set(bit); }
+void BBState::startTrackingLocation(unsigned bit) {
+  if (WriteSetOut.size() < bit + 1)
+    WriteSetOut.resize(bit + 1);
+  WriteSetOut.set(bit);
+}
 
-void BBState::stopTrackingLocation(unsigned bit) { WriteSetOut.reset(bit); }
+void BBState::stopTrackingLocation(unsigned bit) {
+  if (WriteSetOut.size() < bit + 1)
+    WriteSetOut.resize(bit + 1);
+  WriteSetOut.reset(bit);
+}
 
-bool BBState::isTrackingLocation(unsigned bit) { return WriteSetOut.test(bit); }
+bool BBState::isTrackingLocation(unsigned bit) {
+  if (WriteSetOut.size() < bit + 1)
+    WriteSetOut.resize(bit + 1);
+  return WriteSetOut.test(bit);
+}
 
 void BBState::initialize(const BBState &Succ) { WriteSetOut = Succ.WriteSetIn; }
 
-void BBState::intersect(const BBState &Succ) {
-  for (unsigned i = 0; i < WriteSetOut.size(); ++i) {
+void BBState::intersect(BBState &Succ) {
+  unsigned max = std::max(WriteSetOut.size(), Succ.WriteSetIn.size());
+  WriteSetOut.resize(max);
+  Succ.WriteSetIn.resize(max);
+  for (unsigned i = 0; i < max; ++i) {
     if (Succ.WriteSetIn.test(i))
       continue;
     // WriteSetIn is not set.
@@ -463,12 +479,6 @@ class GlobalDeadStoreEliminationImpl {
     return getBBLocState(I->getParent());
   }
 
-  /// Enumerate all the contained locations.
-  void enumerateLocation(SILModule *M, SILValue Mem);
-
-  /// Enumerate all the locations.
-  void enumerateLocations(SILFunction &F);
-
   /// Location read has been extracted, expanded and mapped to the bit
   /// position in the bitvector. process it using the bit position.
   void updateWriteSetForRead(SILInstruction *Inst, BBState *State,
@@ -487,14 +497,8 @@ class GlobalDeadStoreEliminationImpl {
   /// before processing them.
   void processWrite(SILInstruction *Inst, BBState *State, SILValue Value);
 
-  /// Enumerate locations accessed by this LoadInst.
-  void enumerateLoadInstLocation(SILInstruction *Inst);
-
   /// Process Instructions. Extract Locations from SIL LoadInst.
   void processLoadInst(SILInstruction *Inst);
-
-  /// Enumerate locations accessed by this StoreInst.
-  void enumerateStoreInstLocation(SILInstruction *Inst);
 
   /// Process Instructions. Extract Locations from SIL StoreInst.
   void processStoreInst(SILInstruction *Inst);
@@ -537,9 +541,6 @@ class GlobalDeadStoreEliminationImpl {
   /// NOTE: Adds the location to the location vault if necessary.
   unsigned getLocationBit(const Location &L);
 
-  /// Add a location to the LocationVault.
-  void addLocation(const Location &L);
-
 public:
   /// Constructor.
   GlobalDeadStoreEliminationImpl(SILFunction *F, SILModule *M,
@@ -565,7 +566,7 @@ public:
 bool GlobalDeadStoreEliminationImpl::isMayAliasingLocation(unsigned src,
                                                            unsigned dst) {
   const Location &SL = LocationVault[src], DL = LocationVault[dst];
-  // If the bases do not alias, then the locations can not alias.
+  // If the base does not alias, then the location can not alias.
   if (AA->isNoAlias(SL.getBase(), DL.getBase()))
     return false;
   // If one projection path is a prefix of another, then the locations
@@ -587,21 +588,21 @@ bool GlobalDeadStoreEliminationImpl::isMustAliasingLocation(unsigned src,
   return true;
 }
 
-void GlobalDeadStoreEliminationImpl::addLocation(const Location &Loc) {
-  LocToBitIndex[Loc] = LocationVault.size();
-  LocationVault.push_back(Loc);
-}
-
 unsigned GlobalDeadStoreEliminationImpl::getLocationBit(const Location &Loc) {
   // Return the bit position of the given Loc in the LocationVault. The bit
   // position is then used to set/reset the bitvector kept by each BBState.
   //
-  // We should have the location populated by the enumerateLocation at this
-  // point.
-  //
+  // See whether we can find it on the fast path. i.e. bit position looked up
+  // through the hash table.
   auto Iter = LocToBitIndex.find(Loc);
-  assert(Iter != LocToBitIndex.end() && "Location should have been enumerated");
-  return Iter->second;
+  if (Iter != LocToBitIndex.end())
+    return Iter->second;
+
+  // At this point, we know we do not have the location, insert it into the
+  // LocationVault and update the LocToBitIndex.
+  LocToBitIndex[Loc] = LocationVault.size();
+  LocationVault.push_back(Loc);
+  return getLocationBit(Loc);
 }
 
 bool GlobalDeadStoreEliminationImpl::processBasicBlock(SILBasicBlock *BB) {
@@ -712,6 +713,7 @@ void GlobalDeadStoreEliminationImpl::processRead(SILInstruction *I, BBState *S,
   }
 }
 
+
 void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
                                                   SILValue Mem) {
   // Construct a Location to represent the memory written by this instruction.
@@ -740,39 +742,10 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
   }
 }
 
-void GlobalDeadStoreEliminationImpl::enumerateLocation(SILModule *M,
-                                                       SILValue Mem) {
-  // Construct a Location to represent the memory written by this instruction.
-  Location L(Mem);
-
-  // If we cant figure out the Base or Projection Path for the memory location,
-  // simply ignore it for now.
-  if (!L.getBase() || !L.getPath().hasValue())
-    return;
-
-  // Expand the given Mem into individual fields and add them to the
-  // locationvault.
-  llvm::SmallVector<Location, 8> Locs;
-  L.expand(M, Locs, BPA, Mem.getType().getObjectType());
-  for (auto &E : Locs) {
-    addLocation(E);
-  }
-}
-
-void
-GlobalDeadStoreEliminationImpl::enumerateLoadInstLocation(SILInstruction *I) {
-  enumerateLocation(&I->getModule(), cast<LoadInst>(I)->getOperand());
-}
-
 void GlobalDeadStoreEliminationImpl::processLoadInst(SILInstruction *I) {
   // Loading a loadable type.
   SILValue Mem = cast<LoadInst>(I)->getOperand();
   processRead(I, getBBLocState(I), Mem);
-}
-
-void
-GlobalDeadStoreEliminationImpl::enumerateStoreInstLocation(SILInstruction *I) {
-  enumerateLocation(&I->getModule(), cast<StoreInst>(I)->getDest());
 }
 
 void GlobalDeadStoreEliminationImpl::processStoreInst(SILInstruction *I) {
@@ -802,9 +775,6 @@ void GlobalDeadStoreEliminationImpl::processInstruction(SILInstruction *I) {
     return;
 
   // A set of ad-hoc rules to process instructions.
-  //
-  // TODO: process more instructions.
-  //
   if (isa<LoadInst>(I)) {
     processLoadInst(I);
   } else if (isa<StoreInst>(I)) {
@@ -817,33 +787,10 @@ void GlobalDeadStoreEliminationImpl::processInstruction(SILInstruction *I) {
   invalidateLocationBase(I);
 }
 
-void GlobalDeadStoreEliminationImpl::enumerateLocations(SILFunction &F) {
-  // Enumerate all locations accessed by the loads or stores.
-  //
-  // TODO: process more instructions as we process more instructions in
-  // processInstruction.
-  //
-  for (auto &B : F) {
-    for (auto &I : B) {
-      if (isa<LoadInst>(&I)) {
-        enumerateLoadInstLocation(&I);
-      } else if (isa<StoreInst>(&I)) {
-        enumerateStoreInstLocation(&I);
-      }
-    }
-  }
-}
-
 void GlobalDeadStoreEliminationImpl::run() {
-  // Walk over the function and find all the locations accessed by
-  // this function.
-  enumerateLocations(*F);
-
-  // For all basic blocks in the function, initialize a BB state. Since we
-  // know all the locations accessed in this function, we can resize the bit
-  // vector to the approproate size.
+  // For all basic blocks in the function, initialize a BB state.
   for (auto &B : *F) {
-    BBToLocState[&B] = BBState(&B, LocationVault.size());
+    BBToLocState[&B] = BBState(&B);
   }
 
   auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
