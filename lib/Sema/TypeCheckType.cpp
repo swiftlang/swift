@@ -550,7 +550,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       tc.diagnose(comp->getIdLoc(), diag::self_in_nominal, nominal->getName())
         .fixItReplace(comp->getIdLoc(), nominal->getName().str());
       comp->overwriteIdentifier(nominal->getName());
-      comp->setValue(type);
+      comp->setValue(nominal);
       return type;
     }
     
@@ -572,7 +572,6 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
 
       // Replace the computed type with the suggested type.
       comp->overwriteIdentifier(tc.Context.getIdentifier(RemappedTy));
-      comp->setValue(I->second);
 
       // HACK: 'NSUInteger' suggests both 'UInt' and 'Int'.
       if (TypeName == "NSUInteger") {
