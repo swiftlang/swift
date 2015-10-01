@@ -608,7 +608,9 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
   return ErrorType::get(tc.Context);
 }
 
-static void
+/// Resolve the given identifier type representation as an unqualified type,
+/// returning the type it references.
+static Type
 resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                   ComponentIdentTypeRepr *comp,
                                   TypeResolutionOptions options,
@@ -626,9 +628,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     auto func = cast<FuncDecl>(DC);
     assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
 
-    auto dynamicSelfType = func->getDynamicSelf();
-    comp->setValue(dynamicSelfType);
-    return;
+    return func->getDynamicSelf();
   }
 
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
@@ -660,15 +660,12 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       genericArgs = genComp->getGenericArgs();
     Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
                                 DC, genericArgs, options, resolver);
-    if (type->is<ErrorType>()) {
-      comp->setInvalid(TC.Context);
-      return;
-    }
+    if (type->is<ErrorType>())
+      return type;
 
     // If this is the first result we found, record it.
     if (current.isNull()) {
       current = type;
-      comp->setValue(type);
       continue;
     }
 
@@ -693,25 +690,20 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         TC.diagnose(result.Decl, diag::found_candidate);
       }
     }
-    Type ty = ErrorType::get(TC.Context);
-    comp->setValue(ty);
-    return;
+    return ErrorType::get(TC.Context);
   }
 
   // If we found nothing, complain and give ourselves a chance to recover.
   if (current.isNull()) {
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
-    if (!diagnoseErrors) {
-      Type ty = ErrorType::get(TC.Context);
-      comp->setValue(ty);
-      return;
-    }
+    if (!diagnoseErrors)
+      return ErrorType::get(TC.Context);
 
-    comp->setValue(diagnoseUnknownType(TC, DC, nullptr, comp, options,
-                                       resolver));
-    return;
+    return diagnoseUnknownType(TC, DC, nullptr, comp, options, resolver);
   }
+
+  return current;
 }
 
 static Type resolveIdentTypeComponent(
@@ -798,8 +790,15 @@ static Type resolveIdentTypeComponent(
       }
 
       if (!comp->isBound()) {
-        resolveTopLevelIdentTypeComponent(TC, DC, comp, lookupOptions,
-                                          diagnoseErrors, resolver);
+        Type type = resolveTopLevelIdentTypeComponent(TC, DC, comp,
+                                                      lookupOptions,
+                                                      diagnoseErrors, resolver);
+        if (type->is<ErrorType>()) {
+          comp->setInvalid(TC.Context);
+          return type;
+        }
+
+        comp->setValue(type);
       }
     } else {
       // Perform member type lookup.
