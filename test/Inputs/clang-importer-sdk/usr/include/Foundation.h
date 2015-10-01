@@ -180,6 +180,8 @@ __attribute__((availability(ios,introduced=8.0)))
 @property NSRange rangeValue;
 @end
 
+typedef __INT32_TYPE__ int32_t;
+
 @interface NSNumber : NSValue
 - (NSNumber *)initWithInteger:(NSInteger)value;
 - (NSNumber *)initWithUnsignedInteger:(NSUInteger)value;
@@ -188,6 +190,7 @@ __attribute__((availability(ios,introduced=8.0)))
 
 - (NSNumber *)addUInt16:(unsigned short)value;
 - (NSNumber *)addInt:(int)value;
+- (NSNumber *)subtractInt32:(int32_t)value;
 
 @property NSInteger integerValue;
 @property NSUInteger unsignedIntegerValue;

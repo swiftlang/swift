@@ -313,6 +313,10 @@ static Optional<StringRef> skipTypeSuffix(StringRef typeName) {
     }
   }
 
+  // _t.
+  if (typeName.size() > 2 && typeName.endswith("_t")) {
+    return typeName.drop_back(2);
+  }
   return None;
 }
 

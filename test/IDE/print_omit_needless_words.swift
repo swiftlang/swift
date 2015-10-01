@@ -61,6 +61,9 @@
 // Note: builtin-types.
 // CHECK-FOUNDATION: func add(_: Int32) -> NSNumber
 
+// Note: Typedefs with a "_t" suffix".
+// CHECK-FOUNDATION: func subtract(_: Int32) -> NSNumber
+
 // Note: multi-word enum name matching; "with" splits the first piece.
 // CHECK-FOUNDATION: func someMethod(with _: NSDeprecatedOptions = [])
 
