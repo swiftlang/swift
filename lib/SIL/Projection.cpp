@@ -423,7 +423,7 @@ hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const {
     const Projection &RHSProj = *RHSReverseIter;
 
     // If we are accessing different fields of a common object, return
-    // false. The two projection paths must have a non-empty symmetric
+    // true. The two projection paths must have a non-empty symmetric
     // difference.
     if (areProjectionsToDifferentFields(LHSProj, RHSProj)) {
       DEBUG(llvm::dbgs() << "        Path different at index: " << i << '\n');
