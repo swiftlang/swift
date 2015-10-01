@@ -661,7 +661,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
                                 DC, genericArgs, options, resolver);
     if (type->is<ErrorType>()) {
-      comp->setValue(type);
+      comp->setInvalid(TC.Context);
       return;
     }
 
@@ -721,6 +721,10 @@ static Type resolveIdentTypeComponent(
               bool diagnoseErrors,
               GenericTypeResolver *resolver) {
   auto &comp = components.back();
+
+  // If this component is invalid, return an error.
+  if (comp->isInvalid()) return ErrorType::get(TC.Context);
+
   if (!comp->isBound()) {
     auto parentComps = components.slice(0, components.size()-1);
     if (parentComps.empty()) {
@@ -750,8 +754,10 @@ static Type resolveIdentTypeComponent(
               Type type = resolveTypeDecl(TC, *matchingParam, comp->getIdLoc(),
                                           DC, None, options, resolver);
               comp->setValue(type);
-              if (type->is<ErrorType>())
+              if (type->is<ErrorType>()) {
+                comp->setInvalid(TC.Context);
                 return type;
+              }
             }
           }
         }
@@ -777,8 +783,10 @@ static Type resolveIdentTypeComponent(
                 Type type = resolveTypeDecl(TC, assocType, comp->getIdLoc(),
                                             DC, None, options, resolver);
                 comp->setValue(type);
-                if (type->is<ErrorType>())
+                if (type->is<ErrorType>()) {
+                  comp->setInvalid(TC.Context);
                   return type;
+                }
                 break;
               }
             }
@@ -797,8 +805,10 @@ static Type resolveIdentTypeComponent(
       // Perform member type lookup.
       Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, options,
                                                 diagnoseErrors, resolver);
-      if (parentTy->is<ErrorType>())
+      if (parentTy->is<ErrorType>()) {
+        comp->setInvalid(TC.Context);
         return parentTy;
+      }
 
       // FIXME: Want the end of the back range.
       SourceRange parentRange(parentComps.front()->getIdLoc(),
@@ -874,7 +884,7 @@ static Type resolveIdentTypeComponent(
         Type ty = diagnoseUnknownType(TC, DC, parentTy, components, options,
                                       resolver);
         if (ty->is<ErrorType>()) {
-          comp->setValue(ty);
+          comp->setInvalid(TC.Context);
           return ty;
         }
 
@@ -1187,7 +1197,11 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
 
 Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   assert(repr && "Cannot validate null TypeReprs!");
-  
+
+  // If we know the type representation is invalid, just return an
+  // error type.
+  if (repr->isInvalid()) return ErrorType::get(TC.Context);
+
   // Strip the "is function input" bits unless this is a type that knows about
   // them.
   if (!isa<InOutTypeRepr>(repr) && !isa<TupleTypeRepr>(repr)) {
@@ -1534,8 +1548,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   // If we didn't build the type differently above, build it normally now.
   if (!ty) ty = resolveType(repr, options);
-  if (ty->is<ErrorType>())
+  if (ty->is<ErrorType>()) {
+    repr->setInvalid();
     return ty;
+  }
 
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
@@ -1593,12 +1609,16 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                                           FunctionType::ExtInfo extInfo) {
   Type inputTy = resolveType(repr->getArgsTypeRepr(),
                              options | TR_ImmediateFunctionInput);
-  if (inputTy->is<ErrorType>())
+  if (inputTy->is<ErrorType>()) {
+    repr->setInvalid();
     return inputTy;
+  }
   Type outputTy = resolveType(repr->getResultTypeRepr(),
                               options | TR_FunctionResult);
-  if (outputTy->is<ErrorType>())
+  if (outputTy->is<ErrorType>()) {
+    repr->setInvalid();
     return outputTy;
+  }
 
   extInfo = extInfo.withThrows(repr->throws());
   
@@ -1683,8 +1703,10 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
-  if (hasError)
+  if (hasError) {
+    repr->setInvalid();
     return ErrorType::get(Context);
+  }
 
   // FIXME: Remap the parsed context types to interface types.
   GenericSignature *genericSig = nullptr;
@@ -1825,7 +1847,10 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
   }
 
   // Propagate type-resolution errors out.
-  if (type->is<ErrorType>()) return true;
+  if (type->is<ErrorType>()) {
+    repr->setInvalid();
+    return true;
+  }
 
   assert(!isErrorResult || convention == ResultConvention::Owned);
   SILResultInfo resolvedResult(type->getCanonicalType(), convention);
@@ -1899,8 +1924,10 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
 Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
                                     TypeResolutionOptions options) {
   Type ty = resolveType(cast<InOutTypeRepr>(repr)->getBase(), options);
-  if (ty->is<ErrorType>())
+  if (ty->is<ErrorType>()) {
+    repr->setInvalid();
     return ty;
+  }
 
   if (!(options & TR_FunctionInput) &&
       !(options & TR_ImmediateFunctionInput)) {
@@ -1916,8 +1943,10 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
                                     TypeResolutionOptions options) {
   // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), withoutContext(options));
-  if (baseTy->is<ErrorType>())
+  if (baseTy->is<ErrorType>()) {
+    repr->setInvalid();
     return baseTy;
+  }
   
   if (ExprHandle *sizeEx = repr->getSize()) {
     // FIXME: We don't support fixed-length arrays yet.
@@ -1938,12 +1967,16 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                          TypeResolutionOptions options) {
   // FIXME: diagnose non-materializability of key/value type?
   Type keyTy = resolveType(repr->getKey(), withoutContext(options));
-  if (keyTy->is<ErrorType>())
+  if (keyTy->is<ErrorType>()) {
+    repr->setInvalid();
     return keyTy;
+  }
 
   Type valueTy = resolveType(repr->getValue(), withoutContext(options));
-  if (valueTy->is<ErrorType>())
+  if (valueTy->is<ErrorType>()) {
+    repr->setInvalid();
     return valueTy;
+  }
   
   if (auto dictTy = TC.getDictionaryType(repr->getBrackets().Start, keyTy, 
                                          valueTy)) {
@@ -1969,23 +2002,30 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
   // The T in T? is a generic type argument and therefore always an AST type.
   // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), withoutContext(options));
-  if (baseTy->is<ErrorType>())
+  if (baseTy->is<ErrorType>()) {
+    repr->setInvalid();
     return baseTy;
+  }
 
   auto optionalTy = TC.getOptionalType(repr->getQuestionLoc(), baseTy);
-  if (!optionalTy)
+  if (!optionalTy) {
+    repr->setInvalid();
     return ErrorType::get(Context);
+  }
 
   return optionalTy;
 }
 
-Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalTypeRepr *repr,
-                                                TypeResolutionOptions options) {
+Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
+       ImplicitlyUnwrappedOptionalTypeRepr *repr,
+       TypeResolutionOptions options) {
   // The T in T! is a generic type argument and therefore always an AST type.
   // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), withoutContext(options));
-  if (baseTy->is<ErrorType>())
+  if (baseTy->is<ErrorType>()) {
+    repr->setInvalid();
     return baseTy;
+  }
 
   auto uncheckedOptionalTy =
     TC.getImplicitlyUnwrappedOptionalType(repr->getExclamationLoc(), baseTy);
@@ -2009,13 +2049,17 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   for (auto tyR : repr->getElements()) {
     if (NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR)) {
       Type ty = resolveType(namedTyR->getTypeRepr(), elementOptions);
-      if (ty->is<ErrorType>())
+      if (ty->is<ErrorType>()) {
+        repr->setInvalid();
         return ty;
+      }
       elements.push_back(TupleTypeElt(ty, namedTyR->getName()));
     } else {
       Type ty = resolveType(tyR, elementOptions);
-      if (ty->is<ErrorType>())
+      if (ty->is<ErrorType>()) {
+        repr->setInvalid();
         return ty;
+      }
       elements.push_back(TupleTypeElt(ty));
     }
   }
@@ -2063,8 +2107,10 @@ Type TypeResolver::resolveProtocolCompositionType(
   SmallVector<Type, 4> ProtocolTypes;
   for (auto tyR : repr->getProtocols()) {
     Type ty = TC.resolveType(tyR, DC, withoutContext(options), Resolver);
-    if (ty->is<ErrorType>())
+    if (ty->is<ErrorType>()) {
+      repr->setInvalid();
       return ty;
+    }
     if (!ty->isExistentialType()) {
       TC.diagnose(tyR->getStartLoc(), diag::protocol_composition_not_protocol,
                   ty);
@@ -2080,8 +2126,10 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
                                        TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
   Type ty = resolveType(repr->getBase(), withoutContext(options));
-  if (ty->is<ErrorType>())
+  if (ty->is<ErrorType>()) {
+    repr->setInvalid();
     return ty;
+  }
 
   Optional<MetatypeRepresentation> storedRepr;
   
@@ -2111,8 +2159,10 @@ Type TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
                                        TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
   Type ty = resolveType(repr->getBase(), withoutContext(options));
-  if (ty->is<ErrorType>())
+  if (ty->is<ErrorType>()) {
+    repr->setInvalid();
     return ty;
+  }
 
   Optional<MetatypeRepresentation> storedRepr;
   

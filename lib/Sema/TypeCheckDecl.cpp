@@ -3974,7 +3974,7 @@ public:
     if (!dc->isTypeContext()) {
       TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_non_method,
                   dc->isLocalContext());
-      simpleRepr->setValue(ErrorType::get(TC.Context));
+      simpleRepr->setInvalid(TC.Context);
       return true;
     }
 
@@ -4001,7 +4001,7 @@ public:
       TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_struct_enum,
                   which, nominal->getName())
         .fixItReplace(simpleRepr->getIdLoc(), nominal->getName().str());
-      simpleRepr->setValue(ErrorType::get(TC.Context));
+      simpleRepr->setInvalid(TC.Context);
       return true;
     }
 

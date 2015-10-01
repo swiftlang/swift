@@ -72,6 +72,11 @@ void *TypeRepr::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 
+void ComponentIdentTypeRepr::setInvalid(ASTContext &ctx) {
+  TypeRepr::setInvalid();
+  Value = ErrorType::get(ctx);
+}
+
 static void printTypeRepr(const TypeRepr *TyR, ASTPrinter &Printer,
                           const PrintOptions &Opts) {
   if (TyR == nullptr)
