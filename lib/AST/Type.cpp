@@ -928,6 +928,9 @@ TypeDecl *TypeBase::getDirectlyReferencedTypeDecl() const {
   if (auto gp = dyn_cast<GenericTypeParamType>(this))
     return gp->getDecl();
 
+  if (auto depMem = dyn_cast<DependentMemberType>(this))
+    return depMem->getAssocType();
+
   return nullptr;
 }
 

@@ -799,6 +799,63 @@ static Type resolveNestedIdentTypeComponent(
   if (comp->isInvalid()) return nullptr;
   if (comp->isBoundType()) return comp->getBoundType();
 
+  // If a declaration has already been bound, use it.
+  if (ValueDecl *decl = comp->getBoundDecl()) {
+    // Make sure we have a type declaration.
+    auto typeDecl = dyn_cast<TypeDecl>(decl);
+    if (!typeDecl) {
+      if (diagnoseErrors) {
+        TC.diagnose(comp->getIdLoc(), diag::use_non_type_value,
+                    decl->getName());
+        TC.diagnose(decl, diag::use_non_type_value_prev,
+                    decl->getName());
+      }
+
+      return nullptr;
+    }
+
+    Type memberType;
+
+    if (parentTy->isTypeParameter()) {
+      // If the parent is a type parameter, the member is a dependent member.
+
+      // FIXME: We either have an associated type here or a member of
+      // some member of the superclass bound (or its superclasses),
+      // which should allow us to skip much of the work in
+      // resolveDependentMemberType.
+
+      // Try to resolve the dependent member type to a specific associated
+      // type.
+      memberType = resolver->resolveDependentMemberType(parentTy, DC,
+                                                        parentRange, comp);
+      assert(memberType && "Received null dependent member type");
+    } else {
+      // Otherwise, simply substitute the parent type into the member.
+      memberType = TC.substMemberTypeWithBase(DC->getParentModule(), typeDecl,
+                                              parentTy,
+                                              /*isTypeReference=*/true);
+    }
+
+    // If we had an error, fail.
+    if (memberType->is<ErrorType>())
+      return nullptr;
+
+    // If there are generic arguments, apply them now.
+    if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
+      memberType = applyGenericTypeReprArgs(
+                     TC, memberType, comp->getIdLoc(), DC,
+                     genComp->getGenericArgs(),
+                     options.contains(TR_GenericSignature),
+                     resolver);
+
+      if (memberType->is<ErrorType>())
+        return memberType;
+    }
+
+    // We're done.
+    return memberType;
+  }
+
   // If the parent is a dependent type, the member is a dependent member.
   if (parentTy->isTypeParameter()) {
     // Try to resolve the dependent member type to a specific associated
@@ -815,6 +872,11 @@ static Type resolveNestedIdentTypeComponent(
         TC.diagnose(comp->getIdLoc(), diag::not_a_generic_type, memberType);
 
       // Drop the arguments.
+    }
+
+    // If we know what type declaration we're referencing, store it.
+    if (auto typeDecl = memberType->getDirectlyReferencedTypeDecl()) {
+      comp->setValue(typeDecl);
     }
 
     return memberType;
@@ -849,6 +911,7 @@ static Type resolveNestedIdentTypeComponent(
   // If we didn't find anything, complain.
   bool recovered = false;
   Type memberType;
+  TypeDecl *member = nullptr;
   if (!memberTypes) {
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
@@ -864,8 +927,10 @@ static Type resolveNestedIdentTypeComponent(
 
     recovered = true;
     memberType = ty;
+    member = cast_or_null<TypeDecl>(comp->getBoundDecl());
   } else {
     memberType = memberTypes.back().second;
+    member = memberTypes.back().first;
   }
 
   if (parentTy->isExistentialType()) {
@@ -882,6 +947,8 @@ static Type resolveNestedIdentTypeComponent(
       TC, memberType, comp->getIdLoc(), DC, genComp->getGenericArgs(),
       options.contains(TR_GenericSignature), resolver);
 
+  if (member)
+    comp->setValue(member);
   return memberType;
 }
 
