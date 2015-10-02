@@ -800,10 +800,11 @@ static bool tryToSinkRefCountInst(SILBasicBlock::iterator T,
   return true;
 }
 
-static bool
-isRetainAvailableInSomeButNotAllPredecessors(SILValue Ptr, SILBasicBlock *BB,
-                                             AliasAnalysis *AA,
-                                             RCIdentityFunctionInfo *RCIA) {
+static bool isRetainAvailableInSomeButNotAllPredecessors(
+    SILValue Ptr, SILBasicBlock *BB, AliasAnalysis *AA,
+    RCIdentityFunctionInfo *RCIA,
+    llvm::SmallDenseMap<SILBasicBlock *, Optional<SILInstruction *>, 4>
+        &CheckUpToInstruction) {
   bool AvailInSome = false;
   bool NotAvailInSome = false;
 
@@ -822,10 +823,13 @@ isRetainAvailableInSomeButNotAllPredecessors(SILValue Ptr, SILBasicBlock *BB,
         });
 
     // Check that there is no decrement or check from the increment to the end
-    // of the basic block.
-    if (Retain == Pred->rend() ||
-        valueHasARCDecrementOrCheckInInstructionRange(
-            Ptr, &*Retain, Pred->getTerminator(), AA)) {
+    // of the basic block. After we have hoisted the first release  this release
+    // would prevent further hoisting. Instead we check that no decrement or
+    // check occurs upto this hoisted release.
+    auto End = CheckUpToInstruction[Pred];
+    auto EndIt = SILBasicBlock::iterator(End ? *End : Pred->getTerminator());
+    if (Retain == Pred->rend() || valueHasARCDecrementOrCheckInInstructionRange(
+                                      Ptr, &*Retain, EndIt, AA)) {
       NotAvailInSome = true;
       continue;
     }
@@ -850,6 +854,14 @@ static bool hoistDecrementsToPredecessors(SILBasicBlock *BB, AliasAnalysis *AA,
       return false;
 
   bool HoistedDecrement = false;
+
+  // When we hoist a release to the predecessor block this release would block
+  // hoisting further releases because it looks like a ARC decrement in the
+  // predecessor block. Instead once we hoisted a release we scan only to this
+  // release when looking for ARC decrements or checks.
+  llvm::SmallDenseMap<SILBasicBlock *, Optional<SILInstruction *>, 4>
+      CheckUpToInstruction;
+
   for (auto It = BB->begin(); It != BB->end();) {
     auto *Inst = &*It;
     ++It;
@@ -867,7 +879,8 @@ static bool hoistDecrementsToPredecessors(SILBasicBlock *BB, AliasAnalysis *AA,
     if (valueHasARCUsesInInstructionRange(Ptr, BB->begin(), Inst, AA))
       continue;
 
-    if (!isRetainAvailableInSomeButNotAllPredecessors(Ptr, BB, AA, RCIA))
+    if (!isRetainAvailableInSomeButNotAllPredecessors(Ptr, BB, AA, RCIA,
+                                                      CheckUpToInstruction))
       continue;
 
     // Hoist decrement to predecessors.
@@ -875,12 +888,17 @@ static bool hoistDecrementsToPredecessors(SILBasicBlock *BB, AliasAnalysis *AA,
     SILBuilderWithScope<> Builder(Inst, Inst->getDebugScope());
     for (auto *PredBB : BB->getPreds()) {
       Builder.setInsertionPoint(PredBB->getTerminator());
+      SILInstruction *Release;
       if (isa<StrongReleaseInst>(Inst)) {
-        Builder.createStrongRelease(Inst->getLoc(), Ptr);
+        Release = Builder.createStrongRelease(Inst->getLoc(), Ptr);
       } else {
         assert(isa<ReleaseValueInst>(Inst) && "This can only be retain_value");
-        Builder.createReleaseValue(Inst->getLoc(), Ptr);
+        Release = Builder.createReleaseValue(Inst->getLoc(), Ptr);
       }
+      // Update the last instruction to consider when looking for ARC uses or
+      // decrements in predecessor blocks.
+      if (!CheckUpToInstruction[PredBB])
+        CheckUpToInstruction[PredBB] = Release;
     }
 
     Inst->eraseFromParent();
