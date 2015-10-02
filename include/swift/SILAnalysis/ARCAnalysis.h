@@ -240,37 +240,6 @@ public:
 /// FinalRelease.
 bool getFinalReleasesForValue(SILValue Value, ReleaseTracker &Tracker);
 
-/// A move only struct which encodes a guaranteed call sequence.
-///
-/// A guaranteed call sequence is the following:
-///
-/// retain(x)
-/// ... Nothing that touches ref counts ...
-/// call f1(@guaranteed_self x)
-/// ... Nothing that touches ref counts ...
-/// call f2(@guaranteed_self x)
-/// ... Nothing that touches ref counts ...
-/// ...
-/// ... Nothing that touches ref counts ...
-/// call fN(@guaranteed_self x)
-/// ... Nothing that touches ref counts ...
-/// release(x)
-struct GuaranteedCallSequence {
-  SILInstruction *Retain;
-  llvm::TinyPtrVector<ApplyInst *> ApplyList;
-
-  GuaranteedCallSequence() = default;
-  ~GuaranteedCallSequence() = default;
-  GuaranteedCallSequence(const GuaranteedCallSequence &) = delete;
-  GuaranteedCallSequence(GuaranteedCallSequence &&) = default;
-};
-
-/// Attempt to find the guaranteed call sequence for release. On success returns
-/// results in Out.
-bool findGuaranteedCallSequence(SILInstruction *Release, AliasAnalysis *AA,
-                                RCIdentityFunctionInfo *RCFI,
-                                GuaranteedCallSequence &Out);
-
 } // end namespace swift
 
 #endif
