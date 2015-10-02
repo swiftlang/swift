@@ -454,17 +454,13 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             ArrayRef<TypeRepr *> genericArgs,
                             TypeResolutionOptions options,
                             GenericTypeResolver *resolver) {
+  assert(dc && "No declaration context for type resolution?");
   TC.validateDecl(typeDecl);
 
-  Type type;
-  if (dc) {
-    // Resolve the type declaration to a specific type. How this occurs
-    // depends on the current context and where the type was found.
-    type = TC.resolveTypeInContext(typeDecl, dc, options, !genericArgs.empty(),
-                                   resolver);
-  } else {
-    type = typeDecl->getDeclaredType();
-  }
+  // Resolve the type declaration to a specific type. How this occurs
+  // depends on the current context and where the type was found.
+  Type type = TC.resolveTypeInContext(typeDecl, dc, options,
+                                      !genericArgs.empty(), resolver);
 
   // FIXME: Defensive check that shouldn't be needed, but prevents a
   // huge number of crashes on ill-formed code.
