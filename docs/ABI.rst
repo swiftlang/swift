@@ -765,7 +765,7 @@ Globals
   entity ::= static? entity-kind context entity-name
   entity-kind ::= 'F'                    // function (ctor, accessor, etc.)
   entity-kind ::= 'v'                    // variable (let/var)
-  entity-kind ::= 's'                    // subscript itself (not the individual accessors)
+  entity-kind ::= 'i'                    // subscript ('i'ndex) itself (not the individual accessors)
   entity-kind ::= 'I'                    // initializer
   entity-name ::= decl-name type         // named declaration
   entity-name ::= 'A' index              // default argument generator
@@ -796,15 +796,15 @@ Globals
   addressor-kind ::= 'p'                 // pinning addressor (native owner)
 
 An ``entity`` starts with a ``nominal-type-kind`` (``[COPV]``), a
-substitution (``[S]``) of a nominal type, or an ``entity-kind``
-(``[FIsv]``).
+substitution (``[Ss]``) of a nominal type, or an ``entity-kind``
+(``[FIiv]``).
 
 An ``entity-name`` starts with ``[AaCcDggis]`` or a ``decl-name``.
 A ``decl-name`` starts with ``[LP]`` or an ``identifier`` (``[0-9oX]``).
 
 A ``context`` starts with either an ``entity``, an ``extension`` (which starts
-with ``[E]``), or a ``module``, which might be an ``identifier`` (``[0-9oX]``)
-or a substitution of a module (``[S]``).
+with ``[Ee]``), or a ``module``, which might be an ``identifier`` (``[0-9oX]``)
+or a substitution of a module (``[Ss]``).
 
 A global mangling starts with an ``entity`` or ``[MTWw]``.
 
@@ -1137,22 +1137,33 @@ if it mangled again.) The result type will mangle using the substitution for
 ``zim.zang``, ``CS0_zoo`` (and acquire substitution ``S3_``). The full
 function type thus mangles as ``fTCC3zim4zang4zungCS1_CS_7zippity_CS0_zoo``.
 
+::
+
+  substitution ::= 's'
+
+The special substitution ``s`` is used for the ``Swift`` standard library
+module.
+
 Predefined Substitutions
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 ::
 
+  known-module ::= 's'                       // Swift
   known-module ::= 'SC'                      // C
   known-module ::= 'So'                      // Objective-C
-  known-module ::= 'Ss'                      // Swift
   known-nominal-type ::= 'Sa'                // Swift.Array
   known-nominal-type ::= 'Sb'                // Swift.Bool
   known-nominal-type ::= 'Sc'                // Swift.UnicodeScalar
   known-nominal-type ::= 'Sd'                // Swift.Float64
   known-nominal-type ::= 'Sf'                // Swift.Float32
   known-nominal-type ::= 'Si'                // Swift.Int
+  known-nominal-type ::= 'SP'                // Swift.UnsafePointer
+  known-nominal-type ::= 'Sp'                // Swift.UnsafeMutablePointer
   known-nominal-type ::= 'SQ'                // Swift.ImplicitlyUnwrappedOptional
   known-nominal-type ::= 'Sq'                // Swift.Optional
+  known-nominal-type ::= 'SR'                // Swift.UnsafeBufferPointer
+  known-nominal-type ::= 'Sr'                // Swift.UnsafeMutableBufferPointer
   known-nominal-type ::= 'SS'                // Swift.String
   known-nominal-type ::= 'Su'                // Swift.UInt
 

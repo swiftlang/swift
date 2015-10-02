@@ -79,7 +79,7 @@ public func testBridgedCastFromSwiftToObjC(s: String) -> NSString {
 // Check that this cast does not get eliminated, because
 // the compiler does not statically know if this object
 // is NSNumber can can be converted into Int.
-// CHECK-LABEL: sil [noinline] @_TF17cast_folding_objc35testMayBeBridgedCastFromObjCtoSwiftFPSs9AnyObject_Si
+// CHECK-LABEL: sil [noinline] @_TF17cast_folding_objc35testMayBeBridgedCastFromObjCtoSwiftFPs9AnyObject_Si
 // CHECK: unconditional_checked_cast_addr
 // CHECK: return
 @inline(never)
@@ -90,7 +90,7 @@ public func testMayBeBridgedCastFromObjCtoSwift(o: AnyObject) -> Int {
 // Check that this cast does not get eliminated, because
 // the compiler does not statically know if this object
 // is NSString can can be converted into String.
-// CHECK-LABEL: sil [noinline] @_TF17cast_folding_objc41testConditionalBridgedCastFromObjCtoSwiftFPSs9AnyObject_GSqSS_
+// CHECK-LABEL: sil [noinline] @_TF17cast_folding_objc41testConditionalBridgedCastFromObjCtoSwiftFPs9AnyObject_GSqSS_
 // CHECK: unconditional_checked_cast_addr
 // CHECK: return
 @inline(never)

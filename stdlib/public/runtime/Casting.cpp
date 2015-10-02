@@ -1401,10 +1401,10 @@ static bool _dynamicCastUnknownClassIndirect(OpaqueValue *dest,
 }
 
 #if SWIFT_OBJC_INTEROP
-extern "C" const ProtocolDescriptor _TMpSs9ErrorType;
+extern "C" const ProtocolDescriptor _TMps9ErrorType;
 
 static const WitnessTable *findErrorTypeWitness(const Metadata *srcType) {
-  return swift_conformsToProtocol(srcType, &_TMpSs9ErrorType);
+  return swift_conformsToProtocol(srcType, &_TMps9ErrorType);
 }
 
 static const Metadata *getNSErrorTypeMetadata() {
@@ -2659,12 +2659,12 @@ recur:
 // The return type is incorrect.  It is only important that it is
 // passed using 'sret'.
 extern "C" OpaqueExistentialContainer
-_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(OpaqueValue *value,
+_TFs24_injectValueIntoOptionalU__FQ_GSqQ__(OpaqueValue *value,
                                             const Metadata *T);
 // The return type is incorrect.  It is only important that it is
 // passed using 'sret'.
 extern "C" OpaqueExistentialContainer
-_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
+_TFs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
 
 static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
   auto kind = T->getKind();
@@ -2726,7 +2726,7 @@ struct _ObjectiveCBridgeableWitnessTable {
 
 } // unnamed namespace
 
-extern "C" const ProtocolDescriptor _TMpSs21_ObjectiveCBridgeable;
+extern "C" const ProtocolDescriptor _TMps21_ObjectiveCBridgeable;
 
 /// Dynamic cast from a value type that conforms to the _ObjectiveCBridgeable
 /// protocol to a class type, first by bridging the value to its Objective-C
@@ -2906,11 +2906,11 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
 //===----------------------------------------------------------------------===//
 
 extern "C" const _ObjectiveCBridgeableWitnessTable
-_TWPVSs19_BridgeableMetatypeSs21_ObjectiveCBridgeableSs;
+_TWPVs19_BridgeableMetatypes21_ObjectiveCBridgeables;
 
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
-  auto w = swift_conformsToProtocol(T, &_TMpSs21_ObjectiveCBridgeable);
+  auto w = swift_conformsToProtocol(T, &_TMps21_ObjectiveCBridgeable);
   if (LLVM_LIKELY(w))
     return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
   // Class and ObjC existential metatypes can be bridged, but metatypes can't
@@ -2920,14 +2920,14 @@ findBridgeWitness(const Metadata *T) {
   case MetadataKind::Metatype: {
     auto metaTy = static_cast<const MetatypeMetadata *>(T);
     if (metaTy->InstanceType->isAnyClass())
-      return &_TWPVSs19_BridgeableMetatypeSs21_ObjectiveCBridgeableSs;
+      return &_TWPVs19_BridgeableMetatypes21_ObjectiveCBridgeables;
     break;
   }
   case MetadataKind::ExistentialMetatype: {
     auto existentialMetaTy =
       static_cast<const ExistentialMetatypeMetadata *>(T);
     if (existentialMetaTy->isObjC())
-      return &_TWPVSs19_BridgeableMetatypeSs21_ObjectiveCBridgeableSs;
+      return &_TWPVs19_BridgeableMetatypes21_ObjectiveCBridgeables;
     break;
   }
 

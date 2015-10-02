@@ -211,8 +211,8 @@ bb0(%0 : $@thick S<T>.Type):
   return %3 : $S<T>
 }
 
-// CHECK-LABEL: sil @_TF5depth3topFT_VSs5Int32 : $@convention(thin) () -> Int32
-sil @_TF5depth3topFT_VSs5Int32 : $@convention(thin) () -> Int32 {
+// CHECK-LABEL: sil @_TF5depth3topFT_Vs5Int32 : $@convention(thin) () -> Int32
+sil @_TF5depth3topFT_Vs5Int32 : $@convention(thin) () -> Int32 {
 // CHECK: bb0
 bb0:
 // CHECK-NOT: apply

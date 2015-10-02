@@ -32,7 +32,7 @@ func main(x: Int64) -> Void
 // ASM-CHECK: .loc	[[FILEID:[0-9]]] [[@LINE+1]] 5
     call_me (
 // ASM-CHECK-NOT: .loc	[[FILEID]] [[@LINE+1]] 5
-// CHECK: @_TTSf2d_i_n___TFF9linetable4mainFVSs5Int64T_U_FT_T_
+// CHECK: @_TTSf2d_i_n___TFF9linetable4mainFVs5Int64T_U_FT_T_
         {
             var result = my_class.do_something(x)
             markUsed(result)
@@ -57,7 +57,7 @@ func main(x: Int64) -> Void
 // ASM-CHECK: ret
 }
 
-// ASM-CHECK:_TTSf2d_i_n___TFF9linetable4mainFVSs5Int64T_U_FT_T_:
+// ASM-CHECK:_TTSf2d_i_n___TFF9linetable4mainFVs5Int64T_U_FT_T_:
 // ASM-CHECK-NOT: retq
 // The end-of-prologue should have a valid location.
 // ASM-CHECK: .loc	[[FILEID]] 37 {{[0-9]+}} prologue_end

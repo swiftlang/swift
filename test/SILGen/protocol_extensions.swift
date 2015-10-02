@@ -505,13 +505,13 @@ func testExistentials1(p1: P1, b: Bool, i: Int64) {
   p1.f1()
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[CURRIED1:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_8curried1uRq_S0__fq_fSbFVSs5Int64T_
+  // CHECK: [[CURRIED1:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_8curried1uRq_S0__fq_fSbFVs5Int64T_
   // CHECK: [[CURRIED1]]<@opened([[UUID]]) P1>([[I]], [[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Int64, Bool, @in_guaranteed τ_0_0) -> ()
   p1.curried1(b)(i)
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]]#1
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_g9subscriptFVSs5Int64Sb
+  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_g9subscriptFVs5Int64Sb
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[I]], [[POPENED_COPY]]#1) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Int64, @in_guaranteed τ_0_0) -> Bool
   // CHECK: destroy_addr [[POPENED_COPY]]#1
   // CHECK: store{{.*}} : $*Bool

@@ -42,7 +42,7 @@ func foo(var a: Int64, var _ b: Int64) -> Int64 {
        // CHECK-DAG: smul{{.*}}, !dbg ![[MUL:[0-9]+]]
        // CHECK-DAG: [[MUL]] = !DILocation(line: [[@LINE+4]], column: 16,
        // Runtime call to multiply function:
-       // CHECK-NOSIL: @_TZFSsoi1mFTVSs5Int64S__S_{{.*}}, !dbg ![[MUL:[0-9]+]]
+       // CHECK-NOSIL: @_TZFsoi1mFTVs5Int64S__S_{{.*}}, !dbg ![[MUL:[0-9]+]]
        // CHECK-NOSIL: [[MUL]] = !DILocation(line: [[@LINE+1]], column: 16,
        return a*b
      } else {
@@ -64,7 +64,7 @@ func foo(var a: Int64, var _ b: Int64) -> Int64 {
 
 // Function type for foo.
 // CHECK-DAG: ![[FOOTYPE]] = !DISubroutineType(types: ![[PARAMTYPES:[0-9]+]])
-// CHECK-DAG: ![[PARAMTYPES]] = !{!"_TtVSs5Int64", !"_TtVSs5Int64", !"_TtVSs5Int64"}
+// CHECK-DAG: ![[PARAMTYPES]] = !{!"_TtVs5Int64", !"_TtVs5Int64", !"_TtVs5Int64"}
 // Import of the main module with the implicit name.
 // CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[MAINFILE]], entity: ![[MAINMODULE:[0-9]+]], line: 1)
 // CHECK-DAG: ![[MAINMODULE]] = !DIModule({{.*}}, name: "basic"

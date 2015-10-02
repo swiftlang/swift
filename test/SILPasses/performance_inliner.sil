@@ -487,7 +487,7 @@ bb0(%0 : $Builtin.NativeObject):
 //////////
 
 // Make sure SILCloner does not get into an infinite loop here.
-sil @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@convention(thin) (UInt32, UInt32) -> UInt32 {
+sil @_TFsoi1xFT3lhsVs5UWord3rhsS__S_ : $@convention(thin) (UInt32, UInt32) -> UInt32 {
 bb0(%0 : $UInt32, %1 : $UInt32):
   %3 = struct_extract %0 : $UInt32, #UInt32._value   // user: %5
   %4 = struct_extract %1 : $UInt32, #UInt32._value   // user: %5
@@ -496,12 +496,12 @@ bb0(%0 : $UInt32, %1 : $UInt32):
   return %6 : $UInt32                               // id: %7
 }
 
-sil @_TFSsop1tFT1aVSs5UWord_S_ : $@convention(thin) (UInt32) -> UInt32 {
+sil @_TFsop1tFT1aVs5UWord_S_ : $@convention(thin) (UInt32) -> UInt32 {
 bb0(%0 : $UInt32):
   // function_ref Swift.^ [infix] (lhs : Swift.UInt32, rhs : Swift.UInt32) -> Swift.UInt32
-  %1 = function_ref @_TFSsoi1xFT3lhsVSs5UWord3rhsS__S_ : $@convention(thin) (UInt32, UInt32) -> UInt32 // user: %6
+  %1 = function_ref @_TFsoi1xFT3lhsVs5UWord3rhsS__S_ : $@convention(thin) (UInt32, UInt32) -> UInt32 // user: %6
   // function_ref Swift.~ [prefix] (a : Swift.UInt32) -> Swift.UInt32
-  %2 = function_ref @_TFSsop1tFT1aVSs5UWord_S_ : $@convention(thin) (UInt32) -> UInt32 // user: %5
+  %2 = function_ref @_TFsop1tFT1aVs5UWord_S_ : $@convention(thin) (UInt32) -> UInt32 // user: %5
   %3 = integer_literal $Builtin.Int32, 0            // user: %4
   %4 = struct $UInt32 (%3 : $Builtin.Int32)         // user: %5
   %5 = apply %2(%4) : $@convention(thin) (UInt32) -> UInt32     // user: %6
@@ -844,7 +844,7 @@ bb0:
 }
 
 // Generic call to "branchHint" for use in specialized @slowPath
-sil public_external [transparent] [_semantics "branchhint"] @_TFSs11_branchHintUSs11BooleanType__FTQ_Sb_Sb : $@convention(thin) <C where C : BooleanType> (@in C, Bool) -> Bool {
+sil public_external [transparent] [_semantics "branchhint"] @_TFs11_branchHintUs11BooleanType__FTQ_Sb_Sb : $@convention(thin) <C where C : BooleanType> (@in C, Bool) -> Bool {
 bb0(%0 : $*C, %1 : $Bool):
   %2 = witness_method $C, #BooleanType.boolValue!getter.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : BooleanType> (@inout τ_0_0) -> Bool // user: %4
   %3 = apply %2<C>(%0) : $@convention(witness_method) <τ_0_0 where τ_0_0 : BooleanType> (@inout τ_0_0) -> Bool
@@ -852,11 +852,11 @@ bb0(%0 : $*C, %1 : $Bool):
 }
 
 // Specialized call to "slowPath" for use in @coldcall_caller
-sil shared [noinline] [transparent] [_semantics "slowpath"] @_TTSgSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@convention(thin) (@in Bool) -> Bool {
+sil shared [noinline] [transparent] [_semantics "slowpath"] @_TTSgSbSbs11BooleanType___TFs9_slowPathUs11BooleanType__FQ_Sb : $@convention(thin) (@in Bool) -> Bool {
 bb0(%0 : $*Bool):
   %3 = integer_literal $Builtin.Int1, 0
   %4 = struct $Bool (%3 : $Builtin.Int1)
-  %5 = function_ref @_TFSs11_branchHintUSs11BooleanType__FTQ_Sb_Sb : $@convention(thin) <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0, Bool) -> Bool
+  %5 = function_ref @_TFs11_branchHintUs11BooleanType__FTQ_Sb_Sb : $@convention(thin) <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0, Bool) -> Bool
   %6 = apply %5<Bool>(%0, %4) : $@convention(thin) <τ_0_0 where τ_0_0 : BooleanType> (@in τ_0_0, Bool) -> Bool
   return %6 : $Bool
 }
@@ -875,7 +875,7 @@ bb0(%0 : $Int32):
   %5 = builtin "cmp_eq_Word"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1 // user: %6
   %6 = struct $Bool (%5 : $Builtin.Int1)          // user: %7
   store %6 to %1#1 : $*Bool                       // id: %7
-  %8 = function_ref @_TTSgSbSbSs11BooleanType___TFSs9_slowPathUSs11BooleanType__FQ_Sb : $@convention(thin) (@in Bool) -> Bool // user: %9
+  %8 = function_ref @_TTSgSbSbs11BooleanType___TFs9_slowPathUs11BooleanType__FQ_Sb : $@convention(thin) (@in Bool) -> Bool // user: %9
   %9 = apply %8(%1#1) : $@convention(thin) (@in Bool) -> Bool // user: %10
   %10 = struct_extract %9 : $Bool, #Bool._value    // user: %12
   dealloc_stack %1#0 : $*@local_storage Bool      // id: %11

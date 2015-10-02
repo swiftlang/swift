@@ -7,10 +7,10 @@ import Swift
 
 // TODO: Provide tests for other architectures
 
-// CHECK-x86_64: %VSC11BitfieldOne = type <{ %VSs6UInt32, %VSC6Nested, [1 x i8], [4 x i8], [4 x i8], %Sf, [1 x i8], [7 x i8], %VSs6UInt64, %VSs6UInt32 }>
+// CHECK-x86_64: %VSC11BitfieldOne = type <{ %Vs6UInt32, %VSC6Nested, [1 x i8], [4 x i8], [4 x i8], %Sf, [1 x i8], [7 x i8], %Vs6UInt64, %Vs6UInt32 }>
 // CHECK-x86_64: %VSC6Nested = type <{ %Sf, [3 x i8] }>
 
-// CHECK-x86_64: %VSC26BitfieldSeparatorReference = type [[BITFIELD_SEP_TYPE:<{ %VSs5UInt8, \[3 x i8\], %VSs5UInt8 }>]]
+// CHECK-x86_64: %VSC26BitfieldSeparatorReference = type [[BITFIELD_SEP_TYPE:<{ %Vs5UInt8, \[3 x i8\], %Vs5UInt8 }>]]
 // CHECK-x86_64: %VSC25BitfieldSeparatorSameName = type [[BITFIELD_SEP_TYPE]]
 // CHECK-x86_64: %VSC36BitfieldSeparatorDifferentNameStruct = type [[BITFIELD_SEP_TYPE]]
 // CHECK-x86_64: %VSC21BitfieldSeparatorAnon = type [[BITFIELD_SEP_TYPE]]
@@ -33,7 +33,7 @@ bb0:
 //   Make the first call and pull all the values out of the indirect result.
 // CHECK-x86_64:   call void @createBitfieldOne(%VSC11BitfieldOne* noalias nocapture sret [[RESULT]])
 // CHECK-x86_64:   [[ADDR_A:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 0
-// CHECK-x86_64:   [[ADDR_A_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_A]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_A_V:%.*]] = getelementptr inbounds %Vs6UInt32, %Vs6UInt32* [[ADDR_A]], i32 0, i32 0
 // CHECK-x86_64:   [[A:%.*]] = load i32, i32* [[ADDR_A_V]], align 8
 // CHECK-x86_64:   [[ADDR_B:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 1
 // CHECK-x86_64:   [[ADDR_B_X:%.*]] = getelementptr inbounds %VSC6Nested, %VSC6Nested* [[ADDR_B]], i32 0, i32 0
@@ -55,14 +55,14 @@ bb0:
 // CHECK-x86_64:   [[ADDR_JK_1:%.*]] = bitcast [1 x i8]* [[ADDR_JK]] to i8*
 // CHECK-x86_64:   [[JK:%.*]] = load i8, i8* [[ADDR_JK_1]], align 8
 // CHECK-x86_64:   [[ADDR_L:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 8
-// CHECK-x86_64:   [[ADDR_L_V:%.*]] = getelementptr inbounds %VSs6UInt64, %VSs6UInt64* [[ADDR_L]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_L_V:%.*]] = getelementptr inbounds %Vs6UInt64, %Vs6UInt64* [[ADDR_L]], i32 0, i32 0
 // CHECK-x86_64:   [[L:%.*]] = load i64, i64* [[ADDR_L_V]], align 8
 // CHECK-x86_64:   [[ADDR_M:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 9
-// CHECK-x86_64:   [[ADDR_M_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_M]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_M_V:%.*]] = getelementptr inbounds %Vs6UInt32, %Vs6UInt32* [[ADDR_M]], i32 0, i32 0
 // CHECK-x86_64:   [[M:%.*]] = load i32, i32* [[ADDR_M_V]], align 8
 //   Put all of the values into the indirect argument and make the second call.
 // CHECK-x86_64:   [[ADDR_A:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 0
-// CHECK-x86_64:   [[ADDR_A_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_A]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_A_V:%.*]] = getelementptr inbounds %Vs6UInt32, %Vs6UInt32* [[ADDR_A]], i32 0, i32 0
 // CHECK-x86_64:   store i32 [[A]], i32* [[ADDR_A_V]], align 8
 // CHECK-x86_64:   [[ADDR_B:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 1
 // CHECK-x86_64:   [[ADDR_B_X:%.*]] = getelementptr inbounds %VSC6Nested, %VSC6Nested* [[ADDR_B]], i32 0, i32 0
@@ -84,10 +84,10 @@ bb0:
 // CHECK-x86_64:   [[ADDR_JK_1:%.*]] = bitcast [1 x i8]* [[ADDR_JK]] to i8*
 // CHECK-x86_64:   store i8 [[JK]], i8* [[ADDR_JK_1]], align 8
 // CHECK-x86_64:   [[ADDR_L:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 8
-// CHECK-x86_64:   [[ADDR_L_V:%.*]] = getelementptr inbounds %VSs6UInt64, %VSs6UInt64* [[ADDR_L]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_L_V:%.*]] = getelementptr inbounds %Vs6UInt64, %Vs6UInt64* [[ADDR_L]], i32 0, i32 0
 // CHECK-x86_64:   store i64 [[L]], i64* [[ADDR_L_V]], align 8
 // CHECK-x86_64:   [[ADDR_M:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[ARG]], i32 0, i32 9
-// CHECK-x86_64:   [[ADDR_M_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_M]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_M_V:%.*]] = getelementptr inbounds %Vs6UInt32, %Vs6UInt32* [[ADDR_M]], i32 0, i32 0
 // CHECK-x86_64:   store i32 [[M]], i32* [[ADDR_M_V]], align 8
 // CHECK-x86_64:   call void @consumeBitfieldOne(%VSC11BitfieldOne* byval align 8 [[ARG]])
 // CHECK-x86_64:   ret void

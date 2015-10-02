@@ -5,7 +5,7 @@
 
 struct DoesNotBridgeToObjC {}
 
-// CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation23testAnyObjectToArrayIntFPSs9AnyObject_Sb
+// CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation23testAnyObjectToArrayIntFPs9AnyObject_Sb
 // CHECK-NEXT: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Array<Int>
@@ -15,7 +15,7 @@ func testAnyObjectToArrayInt(a: AnyObject) -> Bool {
   return a is [Int]
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation26testAnyObjectToArrayStringFPSs9AnyObject_Sb
+// CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation26testAnyObjectToArrayStringFPs9AnyObject_Sb
 // CHECK-NEXT: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Array<String>
@@ -25,7 +25,7 @@ func testAnyObjectToArrayString(a: AnyObject) -> Bool {
   return a is [String]
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TTSf4dg___TF31cast_folding_objc_no_foundation30testAnyObjectToArrayNotBridgedFPSs9AnyObject_Sb
+// CHECK-LABEL: sil hidden [noinline] @_TTSf4dg___TF31cast_folding_objc_no_foundation30testAnyObjectToArrayNotBridgedFPs9AnyObject_Sb
 // CHECK-NEXT: bb0:
 // CHECK: [[VALUE:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK: [[RESULT:%.*]] = struct $Bool ([[VALUE]] : $Builtin.Int1)
@@ -35,7 +35,7 @@ func testAnyObjectToArrayNotBridged(a: AnyObject) -> Bool {
   return a is [DoesNotBridgeToObjC]
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation25testAnyObjectToDictionaryFPSs9AnyObject_Sb
+// CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation25testAnyObjectToDictionaryFPs9AnyObject_Sb
 // CHECK-NEXT: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Dictionary<Int, String>
@@ -45,7 +45,7 @@ func testAnyObjectToDictionary(a: AnyObject) -> Bool {
   return a is [Int:String]
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation21testAnyObjectToStringFPSs9AnyObject_Sb
+// CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation21testAnyObjectToStringFPs9AnyObject_Sb
 // CHECK-NEXT: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $String

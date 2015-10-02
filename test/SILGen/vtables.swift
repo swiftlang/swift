@@ -168,4 +168,4 @@ class DerivedWithoutDefaults : BaseWithDefaults {
 // CHECK:         #Observed.x!setter
 
 // CHECK-LABEL: sil_vtable DerivedWithoutDefaults {
-// CHECK:         #BaseWithDefaults.a!1: _TFC7vtables22DerivedWithoutDefaults1afS0_FGSqPSs9AnyObject__T_
+// CHECK:         #BaseWithDefaults.a!1: _TFC7vtables22DerivedWithoutDefaults1afS0_FGSqPs9AnyObject__T_

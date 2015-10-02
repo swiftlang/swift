@@ -9,8 +9,8 @@ import Builtin
 import Swift
 
 // Check that this recursive function is specialized only for Int32.
-// CHECK-LABEL: sil shared [noinline] @_TTSg5VSs5Int32___TF29specialize_recursive_generics18recursive_genericsU__FQ_T_
-// CHECK: function_ref @_TTSg5VSs5Int32___TF29specialize_recursive_generics18recursive_genericsU__FQ_T_
+// CHECK-LABEL: sil shared [noinline] @_TTSg5Vs5Int32___TF29specialize_recursive_generics18recursive_genericsU__FQ_T_
+// CHECK: function_ref @_TTSg5Vs5Int32___TF29specialize_recursive_generics18recursive_genericsU__FQ_T_
 // CHECK: return
 sil [noinline] @_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_ : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
@@ -28,12 +28,12 @@ bb0(%0 : $*T):
 
 // Check that this recursive function is specialized twice: for (Int, Double) and for (Double, Int).
 
-// CHECK-LABEL: sil shared [noinline] @_TTSg5Sd_VSs5Int32___TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
-// CHECK: function_ref @_TTSg5VSs5Int32_Sd___TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
+// CHECK-LABEL: sil shared [noinline] @_TTSg5Sd_Vs5Int32___TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
+// CHECK: function_ref @_TTSg5Vs5Int32_Sd___TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
 // CHECK: return
 
-// CHECK-LABEL: sil shared [noinline] @_TTSg5VSs5Int32_Sd___TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
-// CHECK: function_ref @_TTSg5Sd_VSs5Int32___TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
+// CHECK-LABEL: sil shared [noinline] @_TTSg5Vs5Int32_Sd___TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
+// CHECK: function_ref @_TTSg5Sd_Vs5Int32___TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_
 // CHECK: return
 
 

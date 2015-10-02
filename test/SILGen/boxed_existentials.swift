@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s --check-prefix=GUARANTEED
 
 func test_type_lowering(x: ErrorType) { }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials18test_type_loweringFPSs9ErrorType_T_ : $@convention(thin) (@owned ErrorType) -> () {
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials18test_type_loweringFPs9ErrorType_T_ : $@convention(thin) (@owned ErrorType) -> () {
 // CHECK:         strong_release %0 : $ErrorType
 
 class Document {}
@@ -17,7 +17,7 @@ enum ClericalError: ErrorType {
 func test_concrete_erasure(x: ClericalError) -> ErrorType {
   return x
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_concrete_erasureFOS_13ClericalErrorPSs9ErrorType_
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_concrete_erasureFOS_13ClericalErrorPs9ErrorType_
 // CHECK:         [[EXISTENTIAL:%.*]] = alloc_existential_box $ErrorType, $ClericalError
 // CHECK:         store %0 to [[EXISTENTIAL]]#1 : $*ClericalError
 // CHECK:         return [[EXISTENTIAL]]#0 : $ErrorType
@@ -27,7 +27,7 @@ protocol HairType {}
 func test_composition_erasure(x: protocol<HairType, ErrorType>) -> ErrorType {
   return x
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials24test_composition_erasureFPSs9ErrorTypeS_8HairType_PS0__
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials24test_composition_erasureFPs9ErrorTypeS_8HairType_PS0__
 // CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr [[OLD_EXISTENTIAL:%.*]] : $*protocol<ErrorType, HairType> to $*[[VALUE_TYPE:@opened\(.*\) protocol<ErrorType, HairType>]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $ErrorType, $[[VALUE_TYPE]]
 // CHECK:         copy_addr [[VALUE_ADDR]] to [initialization] [[NEW_EXISTENTIAL]]#1
@@ -39,7 +39,7 @@ protocol HairClassType: class {}
 func test_class_composition_erasure(x: protocol<HairClassType, ErrorType>) -> ErrorType {
   return x
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials30test_class_composition_erasureFPSs9ErrorTypeS_13HairClassType_PS0__
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials30test_class_composition_erasureFPs9ErrorTypeS_13HairClassType_PS0__
 // CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $protocol<ErrorType, HairClassType> to $[[VALUE_TYPE:@opened\(.*\) protocol<ErrorType, HairClassType>]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $ErrorType, $[[VALUE_TYPE]]
 // CHECK:         store [[VALUE]] to [[NEW_EXISTENTIAL]]#1
@@ -48,7 +48,7 @@ func test_class_composition_erasure(x: protocol<HairClassType, ErrorType>) -> Er
 func test_property(x: ErrorType) -> String {
   return x._domain
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials13test_propertyFPSs9ErrorType_SS
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials13test_propertyFPs9ErrorType_SS
 // CHECK:         [[VALUE:%.*]] = open_existential_box %0 : $ErrorType to $*[[VALUE_TYPE:@opened\(.*\) ErrorType]]
 // FIXME: Extraneous copy here
 // CHECK-NEXT:    [[COPY:%[0-9]+]] = alloc_stack $[[VALUE_TYPE]]
@@ -63,7 +63,7 @@ func test_property(x: ErrorType) -> String {
 func test_property_of_lvalue(var x: ErrorType) -> String {
   return x._domain
 }
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPSs9ErrorType_SS
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials23test_property_of_lvalueFPs9ErrorType_SS
 // CHECK:         [[VAR:%.*]] = alloc_box $ErrorType
 // CHECK-NEXT:    store %0 to [[VAR]]#1
 // CHECK-NEXT:    [[VALUE_BOX:%.*]] = load [[VAR]]#1
@@ -83,7 +83,7 @@ extension ErrorType {
   final func extensionMethod() { }
 }
 
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_extension_methodFPSs9ErrorType_T_
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials21test_extension_methodFPs9ErrorType_T_
 func test_extension_method(error: ErrorType) {
   // CHECK: [[VALUE:%.*]] = open_existential_box %0
   // CHECK: [[METHOD:%.*]] = function_ref
@@ -99,8 +99,8 @@ func test_extension_method(error: ErrorType) {
 
 func plusOneErrorType() -> ErrorType { }
 
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials31test_open_existential_semanticsFTPSs9ErrorType_PS0___T_
-// GUARANTEED-LABEL: sil hidden @_TF18boxed_existentials31test_open_existential_semanticsFTPSs9ErrorType_PS0___T_
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials31test_open_existential_semanticsFTPs9ErrorType_PS0___T_
+// GUARANTEED-LABEL: sil hidden @_TF18boxed_existentials31test_open_existential_semanticsFTPs9ErrorType_PS0___T_
 func test_open_existential_semantics(guaranteed: ErrorType,
                                      var _ immediate: ErrorType) {
   // CHECK: [[IMMEDIATE_BOX:%.*]] = alloc_box $ErrorType
@@ -162,7 +162,7 @@ func test_open_existential_semantics(guaranteed: ErrorType,
   plusOneErrorType().extensionMethod()
 }
 
-// CHECK-LABEL: sil hidden @_TF18boxed_existentials14erasure_to_anyFTPSs9ErrorType_PS0___P_
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials14erasure_to_anyFTPs9ErrorType_PS0___P_
 // CHECK:       bb0([[OUT:%.*]] : $*protocol<>, [[GUAR:%.*]] : $ErrorType,
 func erasure_to_any(guaranteed: ErrorType, var _ immediate: ErrorType) -> Any {
   // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box $ErrorType

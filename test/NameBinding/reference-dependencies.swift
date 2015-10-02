@@ -38,13 +38,13 @@
 // CHECK-NEXT: - ["V4main10IntWrapper", ""]
 // CHECK-NEXT: - ["VV4main10IntWrapper16InnerForNoReason", ""]
 // CHECK-NEXT: - ["C4main8Subclass", ""]
-// CHECK-NEXT: - ["PSs23ArrayLiteralConvertible", ""]
+// CHECK-NEXT: - ["Ps23ArrayLiteralConvertible", ""]
 // CHECK-NEXT: - ["Sb", ""]
 // CHECK-NEXT: - ["VE4mainSb11InnerToBool", ""]
 // CHECK: - ["V4main9Sentinel1", ""]
 // CHECK-NEXT: - ["V4main9Sentinel2", ""]
-// CHECK: - ["PSs23ArrayLiteralConvertible", "useless"]
-// CHECK-NEXT: - ["PSs23ArrayLiteralConvertible", "useless2"]
+// CHECK: - ["Ps23ArrayLiteralConvertible", "useless"]
+// CHECK-NEXT: - ["Ps23ArrayLiteralConvertible", "useless2"]
 // CHECK-NEXT: - ["Sb", "InnerToBool"]
 
 // CHECK-LABEL: {{^depends-top-level:$}}
@@ -335,22 +335,22 @@ struct Sentinel2 {}
 // CHECK-LABEL: {{^depends-member:$}}
 // CHECK-DAG: - ["V4main10IntWrapper", "Int"]
 // CHECK-DAG: - ["V4main10IntWrapper", "deinit"]
-// CHECK-DAG: - ["PSs10Comparable", ""]
+// CHECK-DAG: - ["Ps10Comparable", ""]
 // CHECK-DAG: - ["C4main18ClassFromOtherFile", ""]
 // CHECK-DAG: - !private ["Si", "Distance"]
 // CHECK-DAG: - !private ["Si", "IntegerLiteralType"]
 // CHECK-DAG: - !private ["Si", "Stride"]
 // CHECK-DAG: - !private ["Si", "deinit"]
 // CHECK-DAG: - !private ["Si", "max"]
-// CHECK-DAG: - ["PSs23FloatLiteralConvertible", ""]
-// CHECK-DAG: - !private ["PSs31UnicodeScalarLiteralConvertible", ""]
-// CHECK-DAG: - !private ["PSs10Strideable", "Stride"]
+// CHECK-DAG: - ["Ps23FloatLiteralConvertible", ""]
+// CHECK-DAG: - !private ["Ps31UnicodeScalarLiteralConvertible", ""]
+// CHECK-DAG: - !private ["Ps10Strideable", "Stride"]
 // CHECK-DAG: - !private ["Sa", "Element"]
 // CHECK-DAG: - !private ["Sa", "reduce"]
 // CHECK-DAG: - !private ["Sb", "_getBuiltinLogicValue"]
 // CHECK-DAG: - ["Sb", "InnerToBool"]
-// CHECK-DAG: - !private ["VSs10Dictionary", "Key"]
-// CHECK-DAG: - !private ["VSs10Dictionary", "Value"]
+// CHECK-DAG: - !private ["Vs10Dictionary", "Key"]
+// CHECK-DAG: - !private ["Vs10Dictionary", "Value"]
 // CHECK-DAG: - !private ["V4main17OtherFileIntArray", "Generator"]
 // CHECK-DAG: - !private ["V4main17OtherFileIntArray", "deinit"]
 // CHECK-DAG: - !private ["V4main18OtherFileOuterType", "InnerType"]
@@ -360,9 +360,9 @@ struct Sentinel2 {}
 // CHECK-DAG: - !private ["V4main25OtherFileProtoImplementor", "deinit"]
 // CHECK-DAG: - !private ["V4main26OtherFileProtoImplementor2", "deinit"]
 // CHECK-DAG: - !private ["V4main28OtherFileProtoNonImplementor", "deinit"]
-// CHECK-DAG: - !private ["VSs14EmptyGenerator", "Element"]
-// CHECK-DAG: - !private ["VSs14EmptyGenerator", "init"]
-// CHECK-DAG: - !private ["VSs17IndexingGenerator", "Element"]
+// CHECK-DAG: - !private ["Vs14EmptyGenerator", "Element"]
+// CHECK-DAG: - !private ["Vs14EmptyGenerator", "init"]
+// CHECK-DAG: - !private ["Vs17IndexingGenerator", "Element"]
 // CHECK-DAG: - ["O4main13OtherFileEnum", "Value"]
 // CHECK-DAG: - !private ["V4main20OtherFileEnumWrapper", "Enum"]
 
@@ -384,15 +384,15 @@ struct Sentinel2 {}
 
 // CHECK-LABEL: {{^depends-nominal:$}}
 // CHECK-DAG: - "V4main10IntWrapper"
-// CHECK-DAG: - "PSs10Comparable"
+// CHECK-DAG: - "Ps10Comparable"
 // CHECK-DAG: - "C4main18ClassFromOtherFile"
 // CHECK-DAG: !private "Si"
-// CHECK-DAG: - "PSs23FloatLiteralConvertible"
-// CHECK-DAG: !private "PSs31UnicodeScalarLiteralConvertible"
-// CHECK-DAG: !private "PSs10Strideable"
+// CHECK-DAG: - "Ps23FloatLiteralConvertible"
+// CHECK-DAG: !private "Ps31UnicodeScalarLiteralConvertible"
+// CHECK-DAG: !private "Ps10Strideable"
 // CHECK-DAG: !private "Sa"
 // CHECK-DAG: - "Sb"
-// CHECK-DAG: !private "VSs10Dictionary"
+// CHECK-DAG: !private "Vs10Dictionary"
 // CHECK-DAG: !private "V4main17OtherFileIntArray"
 // CHECK-DAG: !private "V4main18OtherFileOuterType"
 // CHECK-DAG: !private "VV4main18OtherFileOuterType9InnerType"
@@ -400,8 +400,8 @@ struct Sentinel2 {}
 // CHECK-DAG: !private "V4main25OtherFileProtoImplementor"
 // CHECK-DAG: !private "V4main26OtherFileProtoImplementor2"
 // CHECK-DAG: !private "V4main28OtherFileProtoNonImplementor"
-// CHECK-DAG: !private "VSs14EmptyGenerator"
-// CHECK-DAG: !private "VSs17IndexingGenerator"
+// CHECK-DAG: !private "Vs14EmptyGenerator"
+// CHECK-DAG: !private "Vs17IndexingGenerator"
 // CHECK-DAG: - "O4main13OtherFileEnum"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"

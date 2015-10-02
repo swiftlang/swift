@@ -21,12 +21,12 @@
 namespace swift {
 
 // _direct type metadata for Swift._EmptyArrayStorage
-extern "C" ClassMetadata _TMdCSs18_EmptyArrayStorage;
+extern "C" ClassMetadata _TMdCs18_EmptyArrayStorage;
 
 extern "C" _SwiftEmptyArrayStorage _swiftEmptyArrayStorage = {
   // HeapObject header;
   {
-    &_TMdCSs18_EmptyArrayStorage, // is-a pointer
+    &_TMdCs18_EmptyArrayStorage, // is-a pointer
   },
   
   // _SwiftArrayBodyStorage body;

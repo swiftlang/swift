@@ -13,7 +13,7 @@ hasNoPrototype()
 // CHECK-LABEL: sil @main
 // -- Foreign function is referenced with C calling conv and ownership semantics
 // CHECK:   [[NSANSE:%.*]] = function_ref @NSAnse : $@convention(c) (ImplicitlyUnwrappedOptional<Ansible>) -> @autoreleased ImplicitlyUnwrappedOptional<Ansible>
-// CHECK:   [[ANSIBLE_CTOR:%.*]] = function_ref @_TFCSo7AnsibleCfMS_FT7bellsOnGSQPSs9AnyObject___GSQS__
+// CHECK:   [[ANSIBLE_CTOR:%.*]] = function_ref @_TFCSo7AnsibleCfMS_FT7bellsOnGSQPs9AnyObject___GSQS__
 // CHECK:   [[NSOBJECT_CTOR:%.*]] = function_ref @_TFCSo8NSObjectCfMS_FT_S_ : $@convention(thin) (@thick NSObject.Type) -> @owned NSObject
 // CHECK:   [[ANSIBLE:%.*]] = apply [[ANSIBLE_CTOR]]
 // CHECK:   [[NSANSE_RESULT:%.*]] = apply [[NSANSE]]([[ANSIBLE]])
@@ -26,7 +26,7 @@ hasNoPrototype()
 // CHECK:   apply [[NOPROTO]]()
 
 // -- Constructors for imported Ansible
-// CHECK-LABEL: sil  shared @_TFCSo7AnsibleCfMS_FT7bellsOnGSQPSs9AnyObject___GSQS__ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<AnyObject>, @thick Ansible.Type) -> @owned ImplicitlyUnwrappedOptional<Ansible>
+// CHECK-LABEL: sil  shared @_TFCSo7AnsibleCfMS_FT7bellsOnGSQPs9AnyObject___GSQS__ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<AnyObject>, @thick Ansible.Type) -> @owned ImplicitlyUnwrappedOptional<Ansible>
 
 
 // -- Constructors for imported NSObject

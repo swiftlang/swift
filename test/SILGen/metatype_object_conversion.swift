@@ -10,7 +10,7 @@ protocol CP : class {}
 
 @objc protocol OP {}
 
-// CHECK-LABEL: sil hidden @_TF26metatype_object_conversion16metatypeToObjectFMCS_1CPSs9AnyObject_ 
+// CHECK-LABEL: sil hidden @_TF26metatype_object_conversion16metatypeToObjectFMCS_1CPs9AnyObject_ 
 func metatypeToObject(x: C.Type) -> AnyObject {
   // CHECK: bb0([[THICK:%.*]] : $@thick C.Type):
   // CHECK:   [[OBJC:%.*]] = thick_to_objc_metatype [[THICK]]
@@ -19,7 +19,7 @@ func metatypeToObject(x: C.Type) -> AnyObject {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF26metatype_object_conversion27existentialMetatypeToObjectFPMPS_2CP_PSs9AnyObject_
+// CHECK-LABEL: sil hidden @_TF26metatype_object_conversion27existentialMetatypeToObjectFPMPS_2CP_Ps9AnyObject_
 func existentialMetatypeToObject(x: CP.Type) -> AnyObject {
   // CHECK: bb0([[THICK:%.*]] : $@thick CP.Type):
   // CHECK:   [[OBJC:%.*]] = thick_to_objc_metatype [[THICK]]

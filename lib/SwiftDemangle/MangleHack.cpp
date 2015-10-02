@@ -29,7 +29,7 @@ _swift_mangleSimpleClass(const char *module, const char *class_) {
   size_t classLength = strlen(class_);
   char *value = nullptr;
   if (strcmp(module, swift::STDLIB_NAME) == 0) {
-    int result = asprintf(&value, "_TtCSs%zu%s", classLength, class_);
+    int result = asprintf(&value, "_TtCs%zu%s", classLength, class_);
     assert(result > 0);
     (void)result;
   } else {
@@ -48,7 +48,7 @@ _swift_mangleSimpleProtocol(const char *module, const char *protocol) {
   size_t protocolLength = strlen(protocol);
   char *value = nullptr;
   if (strcmp(module, swift::STDLIB_NAME) == 0) {
-    int result = asprintf(&value, "_TtPSs%zu%s_", protocolLength, protocol);
+    int result = asprintf(&value, "_TtPs%zu%s_", protocolLength, protocol);
     assert(result > 0);
     (void)result;
   } else {

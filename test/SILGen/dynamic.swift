@@ -67,8 +67,8 @@ protocol Proto {
 // CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foo10objcMethodfS0_FT_T_
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foog8objcPropSi
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC7dynamic3Foos8objcPropSi
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foog9subscriptFT4objcPSs9AnyObject__Si
-// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foos9subscriptFT4objcPSs9AnyObject__Si
+// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foog9subscriptFT4objcPs9AnyObject__Si
+// CHECK-LABEL: sil hidden [thunk] @_TToFC7dynamic3Foos9subscriptFT4objcPs9AnyObject__Si
 
 // TODO: dynamic initializing ctor must be objc dispatched
 // CHECK-LABEL: sil hidden @_TFC7dynamic3FooCfMS0_FT7dynamicSi_S0_
@@ -104,9 +104,9 @@ protocol Proto {
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.objcProp!getter.1 :
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_s8objcPropSi
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.objcProp!setter.1 :
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_g9subscriptFT4objcPSs9AnyObject__Si
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_g9subscriptFT4objcPs9AnyObject__Si
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!getter.1 :
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_s9subscriptFT4objcPSs9AnyObject__Si
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_s9subscriptFT4objcPs9AnyObject__Si
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!setter.1 :
 
 // Dynamic witnesses use objc dispatch:
@@ -191,11 +191,11 @@ class Subclass: Foo {
 
   override subscript(objc objc: AnyObject) -> Int {
     get { return super[objc: objc] }
-    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclassg9subscriptFT4objcPSs9AnyObject__Si
-    // CHECK:         function_ref @_TFC7dynamic3Foog9subscriptFT4objcPSs9AnyObject__Si
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclassg9subscriptFT4objcPs9AnyObject__Si
+    // CHECK:         function_ref @_TFC7dynamic3Foog9subscriptFT4objcPs9AnyObject__Si
     set { super[objc: objc] = newValue }
-    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclasss9subscriptFT4objcPSs9AnyObject__Si
-    // CHECK:         function_ref @_TFC7dynamic3Foos9subscriptFT4objcPSs9AnyObject__Si
+    // CHECK-LABEL: sil hidden @_TFC7dynamic8Subclasss9subscriptFT4objcPs9AnyObject__Si
+    // CHECK:         function_ref @_TFC7dynamic3Foos9subscriptFT4objcPs9AnyObject__Si
   }
 
   // Dynamic methods are super-dispatched by objc_msgSend
@@ -443,8 +443,8 @@ public class Sub : Base {
 // CHECK-LABEL:   #Foo.subscript!setter.1:   _TFC7dynamic3Foos9subscriptFT6nativeSi_Si    // dynamic.Foo.subscript.setter : (native : Swift.Int) -> Swift.Int
 // CHECK-LABEL:   #Foo.init!initializer.1:   _TFC7dynamic3FoocfMS0_FT4objcSi_S0_  // dynamic.Foo.init (dynamic.Foo.Type)(objc : Swift.Int) -> dynamic.Foo
 // CHECK-LABEL:   #Foo.objcMethod!1:         _TFC7dynamic3Foo10objcMethodfS0_FT_T_      // dynamic.Foo.objcMethod (dynamic.Foo)() -> ()
-// CHECK-LABEL:   #Foo.subscript!getter.1: _TFC7dynamic3Foog9subscriptFT4objcPSs9AnyObject__Si // dynamic.Foo.subscript.getter : (objc : Swift.AnyObject) -> Swift.Int
-// CHECK-LABEL:   #Foo.subscript!setter.1: _TFC7dynamic3Foos9subscriptFT4objcPSs9AnyObject__Si // dynamic.Foo.subscript.setter : (objc : Swift.AnyObject) -> Swift.Int
+// CHECK-LABEL:   #Foo.subscript!getter.1: _TFC7dynamic3Foog9subscriptFT4objcPs9AnyObject__Si // dynamic.Foo.subscript.getter : (objc : Swift.AnyObject) -> Swift.Int
+// CHECK-LABEL:   #Foo.subscript!setter.1: _TFC7dynamic3Foos9subscriptFT4objcPs9AnyObject__Si // dynamic.Foo.subscript.setter : (objc : Swift.AnyObject) -> Swift.Int
 // CHECK-NOT:     dynamic.Foo.init (dynamic.Foo.Type)(dynamic : Swift.Int) -> dynamic.Foo
 // CHECK-NOT:     dynamic.Foo.dynamicMethod
 // CHECK-NOT:     dynamic.Foo.subscript.getter (dynamic : Swift.Int) -> Swift.Int

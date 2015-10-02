@@ -15,8 +15,8 @@ import def_transparent
 // SIL: store [[RESULT]] to [[RAW]] : $*Bool
 var raw = testTransparent(x: false)
 
-// SIL: [[TMP:%.+]] = global_addr @_Tv11transparent3tmpVSs5Int32 : $*Int32
-// SIL: [[FUNC2:%.+]] = function_ref @_TF15def_transparent11testBuiltinFT_VSs5Int32 : $@convention(thin) () -> Int32
+// SIL: [[TMP:%.+]] = global_addr @_Tv11transparent3tmpVs5Int32 : $*Int32
+// SIL: [[FUNC2:%.+]] = function_ref @_TF15def_transparent11testBuiltinFT_Vs5Int32 : $@convention(thin) () -> Int32
 // SIL: [[RESULT2:%.+]] = apply [[FUNC2]]() : $@convention(thin) () -> Int32
 // SIL: store [[RESULT2]] to [[TMP]] : $*Int32
 var tmp = testBuiltin()
@@ -29,7 +29,7 @@ func test_partial(i: Int32, j: Int32) {
 // SIL: bb0(%0 : $Bool):
 // SIL: return %0 : $Bool
 
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TF15def_transparent11testBuiltinFT_VSs5Int32 : $@convention(thin) () -> Int32 {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TF15def_transparent11testBuiltinFT_Vs5Int32 : $@convention(thin) () -> Int32 {
 // SIL: bb0:
 // SIL: integer_literal $Builtin.Int32, 300
 // SIL: string_literal utf8 "foo"
@@ -56,10 +56,10 @@ func test_switch(u: MaybePair) {
   do_switch(u: u)
 }
 
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7WrapperCfMS0_FT3ValVSs5Int32_S0_ : $@convention(thin) (Int32, @thin Wrapper.Type) -> Wrapper {
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper8getValuefS0_FT_VSs5Int32 : $@convention(method) (Wrapper) -> Int32 {
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapperg10valueAgainVSs5Int32 : $@convention(method) (Wrapper) -> Int32 {
-// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper13getValueAgainfS0_FT_VSs5Int32 : $@convention(method) (Wrapper) -> Int32 {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7WrapperCfMS0_FT3ValVs5Int32_S0_ : $@convention(thin) (Int32, @thin Wrapper.Type) -> Wrapper {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper8getValuefS0_FT_Vs5Int32 : $@convention(method) (Wrapper) -> Int32 {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapperg10valueAgainVs5Int32 : $@convention(method) (Wrapper) -> Int32 {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_TFV15def_transparent7Wrapper13getValueAgainfS0_FT_Vs5Int32 : $@convention(method) (Wrapper) -> Int32 {
 func test_wrapper() {
   var w = Wrapper(Val: 42)
   

@@ -40,8 +40,8 @@ extension def_enum.TrafficLight : ErrorType {}
 
 extension def_enum.Term : ErrorType {}
 
-// CHECK-NORMAL-LABEL: define hidden i64 @_TFO12enum_derived7Phantomg8rawValueVSs5Int64(i1, %swift.type* nocapture readnone %T) #1
-// CHECK-TESTABLE-LABEL: define i64 @_TFO12enum_derived7Phantomg8rawValueVSs5Int64(i1, %swift.type* nocapture readnone %T) #1
+// CHECK-NORMAL-LABEL: define hidden i64 @_TFO12enum_derived7Phantomg8rawValueVs5Int64(i1, %swift.type* nocapture readnone %T) #1
+// CHECK-TESTABLE-LABEL: define i64 @_TFO12enum_derived7Phantomg8rawValueVs5Int64(i1, %swift.type* nocapture readnone %T) #1
 
 enum Phantom<T> : Int64 {
   case Up

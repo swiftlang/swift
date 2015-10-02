@@ -19,7 +19,7 @@ func square(x: Int64) -> Int64 {
 // CHECK-DAG: ![[MUL:.*]] = distinct !DILexicalBlock(
   let res = x * x
 // *(Int, Int) is a transparent function and should not show up in the debug info.
-// TRANSPARENT-CHECK-NOT: !DISubprogram(name: "_TFSsoi1mFTSiSi_Si"
+// TRANSPARENT-CHECK-NOT: !DISubprogram(name: "_TFsoi1mFTSiSi_Si"
   return res
 }
 let c = Int64(x)
@@ -28,4 +28,4 @@ let y = square(c)
 markUsed(y)
 
 // Check if the inlined and removed square function still has the correct linkage name in the debug info.
-// CHECK-DAG: !DISubprogram(name: "square", linkageName: "_TF4main6squareFVSs5Int64S0_"
+// CHECK-DAG: !DISubprogram(name: "square", linkageName: "_TF4main6squareFVs5Int64S0_"

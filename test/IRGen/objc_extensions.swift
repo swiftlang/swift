@@ -10,7 +10,7 @@ import gizmo
 
 // Check that metadata for nested enums added in extensions to imported classes
 // gets emitted concretely.
-// CHECK: @_TWPOE15objc_extensionsCSo8NSObjectP33_1F05E59585E0BB585FCA206FBFF1A92D8SomeEnumSs9EquatableS_ =
+// CHECK: @_TWPOE15objc_extensionsCSo8NSObjectP33_1F05E59585E0BB585FCA206FBFF1A92D8SomeEnums9EquatableS_ =
 
 // CHECK: [[CATEGORY_NAME:@.*]] = private unnamed_addr constant [16 x i8] c"objc_extensions\00"
 // CHECK: [[METHOD_TYPE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"

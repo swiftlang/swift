@@ -7,7 +7,7 @@
 import Foundation
 
 func foo() -> Int64 {
-  // CHECK-LABEL: define internal i64 @_TToFCF10objc_local3fooFT_VSs5Int64L_3Bar10returnFivefS1_FT_S0_
+  // CHECK-LABEL: define internal i64 @_TToFCF10objc_local3fooFT_Vs5Int64L_3Bar10returnFivefS1_FT_S0_
   class Bar: NSObject {
     @objc func returnFive() -> Int64 { return 6 }
   }

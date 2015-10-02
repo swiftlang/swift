@@ -3,12 +3,12 @@ import Swift
 @asmname("inlineMe") public func inlineMe() -> Bool
 
 
-sil public_external @_TFSsoi2neUSs9Equatable__FTQ_Q__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+sil public_external @_TFsoi2neUs9Equatable__FTQ_Q__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
 
 sil public [fragile] @inlineMe : $@convention(thin) () -> Bool {
 bb0:
   // function_ref Swift.!= infix <A : Swift.Equatable>(A, A) -> Swift.Bool
-  %0 = function_ref @_TFSsoi2neUSs9Equatable__FTQ_Q__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool // user: %7
+  %0 = function_ref @_TFsoi2neUs9Equatable__FTQ_Q__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool // user: %7
   %1 = alloc_stack $ComparisonResult            // users: %3, %7, %9
   %2 = enum $ComparisonResult, #ComparisonResult.Same!enumelt // user: %3
   store %2 to %1#1 : $*ComparisonResult         // id: %3

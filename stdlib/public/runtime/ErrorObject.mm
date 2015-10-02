@@ -171,7 +171,7 @@ static const WitnessTable *getNSErrorConformanceToErrorType() {
   // Swift source.
   
   static auto TheWitnessTable = dlsym(RTLD_DEFAULT,
-                                   "_TWPCSo7CFErrorSs9ErrorType10Foundation");
+                                   "_TWPCSo7CFErrors9ErrorType10Foundation");
   assert(TheWitnessTable &&
          "Foundation overlay not loaded, or CFError: ErrorType conformance "
          "not available");

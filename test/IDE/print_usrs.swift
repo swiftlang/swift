@@ -20,7 +20,7 @@ class MyCls {
   var www : Int = 0
   // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test5MyCls3fooFS0_FSiT_{{$}}
   func foo(x : Int) {}
-  // CHECK: [[@LINE+1]]:3 s:sC14swift_ide_test5MyCls9subscriptFSiSf{{$}}
+  // CHECK: [[@LINE+1]]:3 s:iC14swift_ide_test5MyCls9subscriptFSiSf{{$}}
   subscript(i: Int) -> Float {
     // CHECK: [[@LINE+1]]:5 s:FC14swift_ide_test5MyClsg9subscriptFSiSf{{$}}
     get { return 0.0 }
@@ -45,7 +45,7 @@ class GenericClass {
     GenericClass.classFunc(self)
   }
 
-  // CHECK: [[@LINE+2]]:3 s:sC14swift_ide_test12GenericClass9subscriptFSiSf{{$}}
+  // CHECK: [[@LINE+2]]:3 s:iC14swift_ide_test12GenericClass9subscriptFSiSf{{$}}
   // CHECK: [[@LINE+1]]:13 s:vC14swift_ide_test12GenericClass1iSi{{$}}
   subscript(i: Int) -> Float {
     // CHECK: [[@LINE+1]]:5 s:FC14swift_ide_test12GenericClassg9subscriptFSiSf{{$}}
@@ -102,7 +102,7 @@ class GenCls<T> {
   // CHECK: [[@LINE+1]]:14 s:ZFC14swift_ide_test6GenCls4cfoourFMGS0_q__FT_T_{{$}}
   class func cfoo() {}
 
-  // CHECK: [[@LINE+1]]:3 s:sC14swift_ide_test6GenCls9subscriptFTSiSi_Si{{$}}
+  // CHECK: [[@LINE+1]]:3 s:iC14swift_ide_test6GenCls9subscriptFTSiSi_Si{{$}}
   subscript (i : Int, j : Int) -> Int {
     // CHECK: [[@LINE+1]]:5 s:FC14swift_ide_test6GenClsg9subscriptFTSiSi_Si{{$}}
     get {

@@ -270,7 +270,7 @@ bb0(%0 : $*T):
 
 sil @_TFSq4SomeU__fMGSqQ__FQ_GSqQ__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @in τ_0_0, @thin Optional<τ_0_0>.Type) -> ()
 
-sil @_TFSsoi2neU__FTGSqQ__VSs26_OptionalNilComparisonType_Sb : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, _OptionalNilComparisonType) -> Bool
+sil @_TFsoi2neU__FTGSqQ__Vs26_OptionalNilComparisonType_Sb : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, _OptionalNilComparisonType) -> Bool
 
 //CHECK-LABEL: option_init
 //CHECK: alloc_stack
@@ -329,7 +329,7 @@ bb0(%0 : $*AnyObject):
   %s5 = struct $_OptionalNilComparisonType ()
   retain_value %o2 : $Optional<AnyObject>
 
-  %f1 = function_ref @_TFSsoi2neU__FTGSqQ__VSs26_OptionalNilComparisonType_Sb : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, _OptionalNilComparisonType) -> Bool
+  %f1 = function_ref @_TFsoi2neU__FTGSqQ__Vs26_OptionalNilComparisonType_Sb : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, _OptionalNilComparisonType) -> Bool
   %c5 = apply %f1<AnyObject>(%l4#1, %s5) : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, _OptionalNilComparisonType) -> Bool
   dealloc_stack %l4#0 : $*@local_storage Optional<AnyObject>
   destroy_addr %l1#1 : $*Optional<AnyObject>

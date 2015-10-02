@@ -4,14 +4,14 @@
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @_TF10objc_error24NSErrorErrorType_erasureFCSo7NSErrorPSs9ErrorType_
+// CHECK-LABEL: sil hidden @_TF10objc_error24NSErrorErrorType_erasureFCSo7NSErrorPs9ErrorType_
 // CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $NSError : $NSError, $ErrorType
 // CHECK:         return [[ERROR_TYPE]]
 func NSErrorErrorType_erasure(x: NSError) -> ErrorType {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF10objc_error34NSErrorErrorType_archetype_erasureuRdq_CSo7NSError_Fq_PSs9ErrorType_
+// CHECK-LABEL: sil hidden @_TF10objc_error34NSErrorErrorType_archetype_erasureuRdq_CSo7NSError_Fq_Ps9ErrorType_
 // CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $T : $T, $ErrorType
 // CHECK:         return [[ERROR_TYPE]]
 func NSErrorErrorType_archetype_erasure<T : NSError>(t: T) -> ErrorType {
@@ -61,7 +61,7 @@ func test_cast_to_nserror() {
 
 // A class-constrained archetype may be NSError, so we can't use scalar casts
 // in that case either.
-// CHECK-LABEL: sil hidden @_TF10objc_error28test_cast_to_class_archetypeuRq_Ss9AnyObject_Fq_T_
+// CHECK-LABEL: sil hidden @_TF10objc_error28test_cast_to_class_archetypeuRq_s9AnyObject_Fq_T_
 func test_cast_to_class_archetype<T: AnyObject>(_: T) {
   // CHECK: unconditional_checked_cast_addr {{.*}} ErrorClass in {{%.*}} : $*ErrorClass to T in {{.*}} : $*T
   let e = ErrorClass()

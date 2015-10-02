@@ -88,11 +88,11 @@ public func testTopLevel() {
 // CHECK: %objc_class* @"OBJC_CLASS_$_PrivFooSub"
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfMS_FT2__VSs5Int32_GSQS__
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfMS_FT2__Vs5Int32_GSQS__
 // CHECK: @"\01L_selector(init:)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfMS_FT9__twoArgsVSs5Int325otherS0__GSQS__
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfMS_FT9__twoArgsVs5Int325otherS0__GSQS__
 // CHECK: @"\01L_selector(initWithTwoArgs:other:)"
-// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfMS_FT8__oneArgVSs5Int32_GSQS__
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfMS_FT8__oneArgVs5Int32_GSQS__
 // CHECK: @"\01L_selector(initWithOneArg:)"
 // CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfMS_FT8__noArgsT__GSQS__
 // CHECK: @"\01L_selector(initWithNoArgs)"

@@ -27,13 +27,13 @@ protocol Emergency {}
 class Ambulance : Emergency {}
 class FashionPolice {}
 
-// CHECK-LABEL: sil hidden @_TF14metatype_casts30anyObjectToExistentialMetatypeFPSs9AnyObject_GSqPMPS_9Emergency__ : $@convention(thin) (@owned AnyObject) -> Optional<Emergency.Type>
+// CHECK-LABEL: sil hidden @_TF14metatype_casts30anyObjectToExistentialMetatypeFPs9AnyObject_GSqPMPS_9Emergency__ : $@convention(thin) (@owned AnyObject) -> Optional<Emergency.Type>
 func anyObjectToExistentialMetatype(o: AnyObject) -> Emergency.Type? {
   // CHECK: checked_cast_addr_br take_always AnyObject in {{%.*}} : $*AnyObject to Emergency.Type in {{%.*}}
   return o as? Emergency.Type
 }
 
-// CHECK-LABEL: sil hidden @_TF14metatype_casts19anyObjectToMetatypeFPSs9AnyObject_GSqMCS_13FashionPolice_ : $@convention(thin) (@owned AnyObject) -> Optional<FashionPolice.Type>
+// CHECK-LABEL: sil hidden @_TF14metatype_casts19anyObjectToMetatypeFPs9AnyObject_GSqMCS_13FashionPolice_ : $@convention(thin) (@owned AnyObject) -> Optional<FashionPolice.Type>
 func anyObjectToMetatype(o: AnyObject) -> FashionPolice.Type? {
   // CHECK: checked_cast_addr_br take_always AnyObject in {{%.*}} : $*AnyObject to FashionPolice.Type in {{%.*}}
   return o as? FashionPolice.Type

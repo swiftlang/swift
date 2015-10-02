@@ -159,14 +159,14 @@ bb4:                                              // Preds: bb2
 }
 
 // peephole: UInt16(Int32(x >> 1)) -> (x >> 1)
-// CHECK-LABEL: sil @_TF4test36test_uint16_trunc_u_to_s_zext_lshr_1FVSs6UInt16S0_ : $@convention(thin) (UInt16) -> UInt16
+// CHECK-LABEL: sil @_TF4test36test_uint16_trunc_u_to_s_zext_lshr_1FVs6UInt16S0_ : $@convention(thin) (UInt16) -> UInt16
 // CHECK: builtin "lshr_Int16"
 // CHECK-NOT: builtin "zext_Int16_Int32"
 // CHECK-NOT: builtin "s_to_u_checked_trunc_Int32_Int16"
 // CHECK-NOT: tuple_extract
 // CHECK: return
 // test.test_uint16_trunc_u_to_s_zext_lshr_1 (Swift.UInt16) -> Swift.UInt16
-sil @_TF4test36test_uint16_trunc_u_to_s_zext_lshr_1FVSs6UInt16S0_ : $@convention(thin) (UInt16) -> UInt16 {
+sil @_TF4test36test_uint16_trunc_u_to_s_zext_lshr_1FVs6UInt16S0_ : $@convention(thin) (UInt16) -> UInt16 {
 bb0(%0 : $UInt16):
   debug_value %0 : $UInt16  // let x              // id: %1
   %2 = integer_literal $Builtin.Int16, 1          // user: %7
@@ -197,14 +197,14 @@ bb3:                                              // Preds: bb2
 
 
 // peephole: Int16(Int32(x >> 1)) -> (x >> 1)
-// CHECK-LABEL: sil @_TF4test35test_int16_trunc_u_to_s_zext_lshr_1FVSs6UInt16VSs5Int16 : $@convention(thin) (UInt16) -> Int16
+// CHECK-LABEL: sil @_TF4test35test_int16_trunc_u_to_s_zext_lshr_1FVs6UInt16Vs5Int16 : $@convention(thin) (UInt16) -> Int16
 // CHECK: builtin "lshr_Int16"
 // CHECK-NOT: builtin "zext_Int16_Int32"
 // CHECK-NOT: builtin "s_to_u_checked_trunc_Int32_Int16"
 // CHECK-NOT: tuple_extract
 // CHECK: return
 // test.test_int16_trunc_u_to_s_zext_lshr_1 (Swift.UInt16) -> Swift.Int16
-sil @_TF4test35test_int16_trunc_u_to_s_zext_lshr_1FVSs6UInt16VSs5Int16 : $@convention(thin) (UInt16) -> Int16 {
+sil @_TF4test35test_int16_trunc_u_to_s_zext_lshr_1FVs6UInt16Vs5Int16 : $@convention(thin) (UInt16) -> Int16 {
 bb0(%0 : $UInt16):
   debug_value %0 : $UInt16  // let x              // id: %1
   %2 = integer_literal $Builtin.Int16, 1          // user: %7
@@ -290,13 +290,13 @@ bb0:
 // sizeof is known to return strictly positive values
 // But Word->Int64 is not a safe conversion
 // No peephole for UInt16(UInt32(sizeof(Int)))
-// CHECK-LABEL: sil @_TF4test35test_int16_trunc_s_to_u_zext_sizeofFT_VSs6UInt16 : $@convention(thin) () -> UInt16
+// CHECK-LABEL: sil @_TF4test35test_int16_trunc_s_to_u_zext_sizeofFT_Vs6UInt16 : $@convention(thin) () -> UInt16
 // CHECK: builtin "zextOrBitCast_Word_Int64"
 // CHECK: builtin "s_to_u_checked_trunc_Int64_Int32"
 // CHECK: builtin "u_to_u_checked_trunc_Int32_Int16"
 // CHECK: return
 // test.test_int16_trunc_s_to_u_zext_sizeof () -> Swift.UInt16
-sil @_TF4test35test_int16_trunc_s_to_u_zext_sizeofFT_VSs6UInt16 : $@convention(thin) () -> UInt16 {
+sil @_TF4test35test_int16_trunc_s_to_u_zext_sizeofFT_Vs6UInt16 : $@convention(thin) () -> UInt16 {
 bb0:
   %0 = metatype $@thin Int.Type
   %2 = metatype $@thick Int.Type                  // user: %3
@@ -320,7 +320,7 @@ bb0:
 
 
 // peephole: UInt16(UInt32(Int16(x>>1))) -> x>>1
-// CHECK-LABEL: sil @_TF4test34test_int16_trunc_s_to_u_zext_int16FVSs6UInt16S0_ : $@convention(thin) (UInt16) -> UInt16
+// CHECK-LABEL: sil @_TF4test34test_int16_trunc_s_to_u_zext_int16FVs6UInt16S0_ : $@convention(thin) (UInt16) -> UInt16
 // CHECK: builtin "lshr_Int16"
 // CHECK-NOT: builtin "u_to_s_checked_conversion_Int16"
 // CHECK-NOT: builtin "s_to_u_checked_conversion_Int16"
@@ -329,7 +329,7 @@ bb0:
 // CHECK-NOT: tuple_extract
 // CHECK: return
 // test.test_int16_trunc_s_to_u_zext_int16 (Swift.UInt16) -> Swift.UInt16
-sil @_TF4test34test_int16_trunc_s_to_u_zext_int16FVSs6UInt16S0_ : $@convention(thin) (UInt16) -> UInt16 {
+sil @_TF4test34test_int16_trunc_s_to_u_zext_int16FVs6UInt16S0_ : $@convention(thin) (UInt16) -> UInt16 {
 bb0(%0 : $UInt16):
   debug_value %0 : $UInt16  // let x              // id: %1
   %2 = integer_literal $Builtin.Int16, 1          // user: %7
@@ -368,13 +368,13 @@ bb3:                                              // Preds: bb2
 }
 
 // peephole: Int8(x & 127) -> remove overflow check
-// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVSs5Int32VSs4Int8 : $@convention(thin) (Int32) -> Int8
+// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVs5Int32Vs4Int8 : $@convention(thin) (Int32) -> Int8
 // CHECK: builtin "and_Int32"
 // CHECK: builtin "s_to_s_checked_trunc_Int32_Int8"
 // CHECK-NOT: cond_fail
 // CHECK: return
 // peephole_trunc_and_ext.test_s_to_s_checked_trunc_of_and (Swift.Int32) -> Swift.Int8
-sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVSs5Int32VSs4Int8 : $@convention(thin) (Int32) -> Int8 {
+sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVs5Int32Vs4Int8 : $@convention(thin) (Int32) -> Int8 {
 bb0(%0 : $Int32):
   debug_value %0 : $Int32  // let x               // id: %1
   %2 = integer_literal $Builtin.Int32, 127        // user: %5
@@ -391,13 +391,13 @@ bb0(%0 : $Int32):
 }
 
 // peephole: UInt8(x & 255) -> remove overflow check
-// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVSs5Int32VSs5UInt8 : $@convention(thin) (Int32) -> UInt8
+// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVs5Int32Vs5UInt8 : $@convention(thin) (Int32) -> UInt8
 // CHECK: builtin "and_Int32"
 // CHECK: builtin "s_to_u_checked_trunc_Int32_Int8"
 // CHECK-NOT: cond_fail
 // CHECK: return
 // peephole_trunc_and_ext.test_s_to_u_checked_trunc_of_and (Swift.Int32) -> Swift.UInt8
-sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVSs5Int32VSs5UInt8 : $@convention(thin) (Int32) -> UInt8 {
+sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVs5Int32Vs5UInt8 : $@convention(thin) (Int32) -> UInt8 {
 bb0(%0 : $Int32):
   debug_value %0 : $Int32  // let x               // id: %1
   %2 = integer_literal $Builtin.Int32, 255        // user: %5
@@ -414,13 +414,13 @@ bb0(%0 : $Int32):
 }
 
 // peephole: UInt8(x & 255) -> remove overflow check
-// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVSs6UInt32VSs5UInt8 : $@convention(thin) (UInt32) -> UInt8
+// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVs6UInt32Vs5UInt8 : $@convention(thin) (UInt32) -> UInt8
 // CHECK: builtin "and_Int32"
 // CHECK: builtin "u_to_u_checked_trunc_Int32_Int8"
 // CHECK-NOT: cond_fail
 // CHECK: return
 // peephole_trunc_and_ext.test_u_to_u_checked_trunc_of_and (Swift.UInt32) -> Swift.UInt8
-sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVSs6UInt32VSs5UInt8 : $@convention(thin) (UInt32) -> UInt8 {
+sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVs6UInt32Vs5UInt8 : $@convention(thin) (UInt32) -> UInt8 {
 bb0(%0 : $UInt32):
   debug_value %0 : $UInt32  // let x              // id: %1
   %2 = integer_literal $Builtin.Int32, 255        // user: %5
@@ -437,13 +437,13 @@ bb0(%0 : $UInt32):
 }
 
 // peephole: Int8(x & 127) -> remove overflow check
-// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVSs6UInt32VSs4Int8 : $@convention(thin) (UInt32) -> Int8
+// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVs6UInt32Vs4Int8 : $@convention(thin) (UInt32) -> Int8
 // CHECK: builtin "and_Int32"
 // CHECK: builtin "u_to_s_checked_trunc_Int32_Int8"
 // CHECK-NOT: cond_fail
 // CHECK: return
 // peephole_trunc_and_ext.test_u_to_s_checked_trunc_of_and (Swift.UInt32) -> Swift.Int8
-sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVSs6UInt32VSs4Int8 : $@convention(thin) (UInt32) -> Int8 {
+sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVs6UInt32Vs4Int8 : $@convention(thin) (UInt32) -> Int8 {
 bb0(%0 : $UInt32):
   debug_value %0 : $UInt32  // let x              // id: %1
   %2 = integer_literal $Builtin.Int32, 127        // user: %5

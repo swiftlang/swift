@@ -162,7 +162,7 @@ Here is an example of a ``.sil`` file::
   sil @_T5norms11taxicabNormfT1aV5norms5Point_Sd : $(Point) -> Double {
   bb0(%0 : $Point):
     // func Swift.+(Double, Double) -> Double
-    %1 = function_ref @_TSsoi1pfTSdSd_Sd
+    %1 = function_ref @_Tsoi1pfTSdSd_Sd
     %2 = struct_extract %0 : $Point, #Point.x
     %3 = struct_extract %0 : $Point, #Point.y
     %4 = apply %1(%2, %3) : $(Double, Double) -> Double

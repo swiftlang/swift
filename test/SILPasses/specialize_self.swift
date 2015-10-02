@@ -9,7 +9,7 @@ func cast<T,R>(x: T) -> R? {
 }
 
 // CHECK-LABEL: static specialize_self.Base.returnIfSelf (specialize_self.Base.Type)(Swift.AnyObject) -> Swift.Optional<Self>
-// CHECK-NEXT: sil hidden @_TZFC15specialize_self4Base12returnIfSelffMS0_FPSs9AnyObject_GSqDS0__ : $@convention(thin) (@owned AnyObject, @thick Base.Type) -> @owned Optional<Base>
+// CHECK-NEXT: sil hidden @_TZFC15specialize_self4Base12returnIfSelffMS0_FPs9AnyObject_GSqDS0__ : $@convention(thin) (@owned AnyObject, @thick Base.Type) -> @owned Optional<Base>
 // CHECK: [[CAST:%[0-9]+]] = function_ref @_TF15specialize_self4castu0_rFq_GSqq0__
 // CHECK: apply [[CAST]]<AnyObject, Self>
 class Base {

@@ -50,7 +50,7 @@ class Foo: Fooable {
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(garply:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[GARPLY_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void (i8*, i8*, i8*)* @_TToFC12objc_methods3Foo6garplyfS0_FGSqPSs9AnyObject__T_ to i8*)
+// CHECK:     i8* bitcast (void (i8*, i8*, i8*)* @_TToFC12objc_methods3Foo6garplyfS0_FGSqPs9AnyObject__T_ to i8*)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(block:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([12 x i8], [12 x i8]* [[BLOCK_SIGNATURE_TRAD]], i64 0, i64 0),

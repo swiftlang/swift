@@ -18,7 +18,7 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
 // CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:  [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NATIVE]]
-// CHECK:  [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
+// CHECK:  [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
 // CHECK:  apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:  [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:  return [[NATIVE]] 
@@ -41,7 +41,7 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NATIVE]]
-// CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
+// CHECK:   [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
 // CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   return [[NATIVE]]
@@ -156,7 +156,7 @@ func callBar() -> String {
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NATIVE]]
-// CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
+// CHECK:   [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
 // CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   return [[NATIVE]]
@@ -382,9 +382,9 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // arguments lifetime-extends the bridged pointer for the right duration.
 // <rdar://problem/16738050>
 
-// CHECK-LABEL: sil shared @_TFCSo7NSArrayCfMS_FT7objectsGVSs13UnsafePointerGSqPSs9AnyObject___5countVSs5Int32_S_
+// CHECK-LABEL: sil shared @_TFCSo7NSArrayCfMS_FT7objectsGVs13UnsafePointerGSqPs9AnyObject___5countVs5Int32_S_
 // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic
-// CHECK:         [[METHOD:%.*]] = function_ref @_TTOFCSo7NSArraycfMS_FT7objectsGVSs13UnsafePointerGSqPSs9AnyObject___5countVSs5Int32_S_
+// CHECK:         [[METHOD:%.*]] = function_ref @_TTOFCSo7NSArraycfMS_FT7objectsGVs13UnsafePointerGSqPs9AnyObject___5countVs5Int32_S_
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]
 // CHECK:         return [[RESULT]]
 

@@ -9,7 +9,7 @@ func array_of_funcs() -> [(() -> ())] {
   return [{}, {}]
 }
 
-// CHECK-LABEL: sil hidden @_TF25array_literal_abstraction13dict_of_funcsFT_GVSs10DictionarySiFT_T__
+// CHECK-LABEL: sil hidden @_TF25array_literal_abstraction13dict_of_funcsFT_GVs10DictionarySiFT_T__
 // CHECK:         pointer_to_address {{.*}} $*(Int, @callee_owned (@out (), @in ()) -> ())
 func dict_of_funcs() -> Dictionary<Int, () -> ()> {
   return [0: {}, 1: {}]

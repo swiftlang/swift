@@ -7,9 +7,9 @@
 
 // CHECK-LABEL: sil [noinline] @_TF13prespecialize4testFTRGSaSi_4sizeSi_T_ 
 // Look for generic specialization <Swift.Int with Swift.Int : Swift.ForwardIndexType in Swift, Swift.Int with Swift.Int : Swift._SignedIntegerType in Swift, Swift.Int with Swift.Int : Swift._BuiltinIntegerLiteralConvertible in Swift, Swift.Int> of Swift.Range.generate <A where A: Swift.ForwardIndexType> (Swift.Range<A>)() -> Swift.RangeGenerator<A>
-// CHECK: function_ref @_TTSg5SiSiSs16ForwardIndexTypeSs_SiSiSs18_SignedIntegerTypeSs_SiSiSs33_BuiltinIntegerLiteralConvertibleSs_Si___TFVSs5Range8generateuRq_Ss16ForwardIndexType_fGS_q__FT_GVSs14RangeGeneratorq__
+// CHECK: function_ref @_TTSg5SiSis16ForwardIndexTypes_SiSis18_SignedIntegerTypes_SiSis33_BuiltinIntegerLiteralConvertibles_Si___TFVs5Range8generateuRq_s16ForwardIndexType_fGS_q__FT_GVs14RangeGeneratorq__
 // Look for generic specialization <Swift.Int with Swift.Int : Swift.ForwardIndexType in Swift, Swift.Int with Swift.Int : Swift._SignedIntegerType in Swift, Swift.Int with Swift.Int : Swift._BuiltinIntegerLiteralConvertible in Swift, Swift.Int> of Swift.RangeGenerator.next <A where A: Swift.ForwardIndexType> (inout Swift.RangeGenerator<A>)() -> Swift.Optional<A>
-// CHECK: function_ref @_TTSg5SiSiSs16ForwardIndexTypeSs_SiSiSs18_SignedIntegerTypeSs_SiSiSs33_BuiltinIntegerLiteralConvertibleSs_Si___TFVSs14RangeGenerator4nextuRq_Ss16ForwardIndexType_fRGS_q__FT_GSqq__
+// CHECK: function_ref @_TTSg5SiSis16ForwardIndexTypes_SiSis18_SignedIntegerTypes_SiSis33_BuiltinIntegerLiteralConvertibles_Si___TFVs14RangeGenerator4nextuRq_s16ForwardIndexType_fRGS_q__FT_GSqq__
 // Look for generic specialization <Swift.Int> of Swift.Array.subscript.getter : (Swift.Int) -> A
 // CHECK: function_ref {{@_TTSg5Si___TFSag9subscriptFSiq_|@_TTSg5Si___TFSaap9subscriptFSiq_}}
 // CHECK: return

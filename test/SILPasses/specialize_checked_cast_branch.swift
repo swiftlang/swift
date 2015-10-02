@@ -33,26 +33,26 @@ func ArchetypeToArchetypeCast<T1, T2>(t1 t1 : T1, t2 : T2) -> T2 {
 ArchetypeToArchetypeCast(t1: c, t2: c)
 
 // x -> x where x is not a class.
-// CHECK-LABEL: sil shared @_TTSgVSs5UInt8_S____TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@convention(thin) (@out UInt8, @in UInt8, @in UInt8) -> () {
+// CHECK-LABEL: sil shared @_TTSgVs5UInt8_S____TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@convention(thin) (@out UInt8, @in UInt8, @in UInt8) -> () {
 // CHECK: [[T0:%.*]] = load %1 : $*UInt8
 // CHECK: enum $Optional<UInt8>, #Optional.Some!enumelt.1, [[T0]] : $UInt8
 // CHECK: bb1:
 ArchetypeToArchetypeCast(t1: b, t2: b)
 
 // x -> y where x,y are not classes and x is a different type from y.
-// CHECK-LABEL: sil shared @_TTSgVSs5UInt8_VSs6UInt64___TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@convention(thin) (@out UInt64, @in UInt8, @in UInt64) -> () {
+// CHECK-LABEL: sil shared @_TTSgVs5UInt8_Vs6UInt64___TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@convention(thin) (@out UInt64, @in UInt8, @in UInt64) -> () {
 // CHECK: enum $Optional<UInt64>, #Optional.None
 // CHECK: bb1:
 ArchetypeToArchetypeCast(t1: b, t2: f)
 
 // x -> y where x is not a class but y is.
-// CHECK-LABEL: sil shared @_TTSgVSs5UInt8_C30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@convention(thin) (@out C, @in UInt8, @in C) -> () {
+// CHECK-LABEL: sil shared @_TTSgVs5UInt8_C30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@convention(thin) (@out C, @in UInt8, @in C) -> () {
 // CHECK: enum $Optional<C>, #Optional.None
 // CHECK: bb1:
 ArchetypeToArchetypeCast(t1: b, t2: c)
 
 // y -> x where x is a class but y is not.
-// CHECK-LABEL: sil shared @_TTSgC30specialize_checked_cast_branch1C_VSs5UInt8___TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@convention(thin) (@out UInt8, @in C, @in UInt8) -> () {
+// CHECK-LABEL: sil shared @_TTSgC30specialize_checked_cast_branch1C_Vs5UInt8___TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@convention(thin) (@out UInt8, @in C, @in UInt8) -> () {
 // CHECK: enum $Optional<UInt8>, #Optional.None
 // CHECK: bb1:
 ArchetypeToArchetypeCast(t1: c, t2: b)
@@ -120,12 +120,12 @@ func ArchetypeToConcreteCastE<T>(t t : T) -> E {
   _preconditionFailure("??? Profit?")
 }
 
-// CHECK-LABEL: sil shared @_TTSgVSs5UInt8___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__VSs5UInt8 : $@convention(thin) (@in UInt8) -> UInt8 {
+// CHECK-LABEL: sil shared @_TTSgVs5UInt8___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__Vs5UInt8 : $@convention(thin) (@in UInt8) -> UInt8 {
 // CHECK-NEXT: bb0
 // CHECK-NEXT: [[VALUE:%.*]] = load %0 : $*UInt8
 ArchetypeToConcreteCastUInt8(t: b)
 
-// CHECK-LABEL: sil shared @_TTSgC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__VSs5UInt8 : $@convention(thin) (@in C) -> UInt8 {
+// CHECK-LABEL: sil shared @_TTSgC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__Vs5UInt8 : $@convention(thin) (@in C) -> UInt8 {
 // CHECK: bb0
 // CHECK-NOT: checked_cast_br archetype_to_concrete
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
@@ -133,7 +133,7 @@ ArchetypeToConcreteCastUInt8(t: b)
 // CHECK: unreachable
 ArchetypeToConcreteCastUInt8(t: c)
 
-// CHECK-LABEL: sil shared @_TTSgVSs6UInt64___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__VSs5UInt8 : $@convention(thin) (@in UInt64) -> UInt8 {
+// CHECK-LABEL: sil shared @_TTSgVs6UInt64___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__Vs5UInt8 : $@convention(thin) (@in UInt64) -> UInt8 {
 // CHECK-NEXT: bb0
 // CHECK-NOT: checked_cast_br archetype_to_concrete
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
@@ -146,7 +146,7 @@ ArchetypeToConcreteCastUInt8(t: f)
 // CHECK-NEXT:  [[VALUE:%.*]] = load %0 : $*C
 ArchetypeToConcreteCastC(t: c)
 
-// CHECK-LABEL: sil shared @_TTSgVSs5UInt8___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastCU__FT1tQ__CS_1C : $@convention(thin) (@in UInt8) -> @owned C {
+// CHECK-LABEL: sil shared @_TTSgVs5UInt8___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastCU__FT1tQ__CS_1C : $@convention(thin) (@in UInt8) -> @owned C {
 // CHECK: bb0
 // CHECK-NOT: checked_cast_br archetype_to_concrete
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
@@ -207,19 +207,19 @@ func ConcreteToArchetypeCastD<T>(t t: D, t2: T) -> T {
   _preconditionFailure("??? Profit?")
 }
 
-// CHECK-LABEL: sil shared @_TTSgVSs5UInt8___TF30specialize_checked_cast_branch28ConcreteToArchetypeCastUInt8U__FT1tVSs5UInt82t2Q__Q_ : $@convention(thin) (@out UInt8, UInt8, @in UInt8) -> () {
+// CHECK-LABEL: sil shared @_TTSgVs5UInt8___TF30specialize_checked_cast_branch28ConcreteToArchetypeCastUInt8U__FT1tVs5UInt82t2Q__Q_ : $@convention(thin) (@out UInt8, UInt8, @in UInt8) -> () {
 // CHECK: bb0
 // CHECK:  enum $Optional<UInt8>, #Optional.Some!enumelt.1, %1
 // CHECK: bb1
 ConcreteToArchetypeCastUInt8(t: b, t2: b)
 
-// CHECK-LABEL: sil shared @_TTSgC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch28ConcreteToArchetypeCastUInt8U__FT1tVSs5UInt82t2Q__Q_ : $@convention(thin) (@out C, UInt8, @in C) -> () {
+// CHECK-LABEL: sil shared @_TTSgC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch28ConcreteToArchetypeCastUInt8U__FT1tVs5UInt82t2Q__Q_ : $@convention(thin) (@out C, UInt8, @in C) -> () {
 // CHECK: bb0
 // CHECK:  enum $Optional<C>, #Optional.None
 // CHECK: bb1
 ConcreteToArchetypeCastUInt8(t: b, t2: c)
 
-// CHECK-LABEL: sil shared @_TTSgVSs6UInt64___TF30specialize_checked_cast_branch28ConcreteToArchetypeCastUInt8U__FT1tVSs5UInt82t2Q__Q_ : $@convention(thin) (@out UInt64, UInt8, @in UInt64) -> () {
+// CHECK-LABEL: sil shared @_TTSgVs6UInt64___TF30specialize_checked_cast_branch28ConcreteToArchetypeCastUInt8U__FT1tVs5UInt82t2Q__Q_ : $@convention(thin) (@out UInt64, UInt8, @in UInt64) -> () {
 // CHECK: bb0
 // CHECK:  enum $Optional<UInt64>, #Optional.None
 // CHECK: bb1
@@ -231,7 +231,7 @@ ConcreteToArchetypeCastUInt8(t: b, t2: f)
 // CHECK: bb1
 ConcreteToArchetypeCastC(t: c, t2: c)
 
-// CHECK-LABEL: sil shared @_TTSgVSs5UInt8___TF30specialize_checked_cast_branch24ConcreteToArchetypeCastCU__FT1tCS_1C2t2Q__Q_ : $@convention(thin) (@out UInt8, @owned C, @in UInt8) -> () {
+// CHECK-LABEL: sil shared @_TTSgVs5UInt8___TF30specialize_checked_cast_branch24ConcreteToArchetypeCastCU__FT1tCS_1C2t2Q__Q_ : $@convention(thin) (@out UInt8, @owned C, @in UInt8) -> () {
 // CHECK: bb0
 // CHECK:  enum $Optional<UInt8>, #Optional.None
 // CHECK: bb1
@@ -286,7 +286,7 @@ SuperToArchetypeCastC(c: c, t: c)
 // CHECK: bb1
 SuperToArchetypeCastC(c: c, t: d)
 
-// CHECK-LABEL: sil shared @_TTSgVSs5UInt8___TF30specialize_checked_cast_branch21SuperToArchetypeCastCU__FT1cCS_1C1tQ__Q_ : $@convention(thin) (@out UInt8, @owned C, @in UInt8) -> () {
+// CHECK-LABEL: sil shared @_TTSgVs5UInt8___TF30specialize_checked_cast_branch21SuperToArchetypeCastCU__FT1cCS_1C1tQ__Q_ : $@convention(thin) (@out UInt8, @owned C, @in UInt8) -> () {
 // CHECK: bb0
 // CHECK:  enum $Optional<UInt8>, #Optional.None
 // CHECK: bb1
@@ -316,19 +316,19 @@ func ExistentialToArchetypeCast<T>(o o : AnyObject, t : T) -> T {
   _preconditionFailure("??? Profit?")
 }
 
-// CHECK-LABEL: sil shared @_TTSgC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch26ExistentialToArchetypeCastU__FT1oPSs9AnyObject_1tQ__Q_ : $@convention(thin) (@out C, @owned AnyObject, @in C) -> () {
+// CHECK-LABEL: sil shared @_TTSgC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch26ExistentialToArchetypeCastU__FT1oPs9AnyObject_1tQ__Q_ : $@convention(thin) (@out C, @owned AnyObject, @in C) -> () {
 // CHECK: bb0
 // CHECK:  checked_cast_br %1 : $AnyObject to $C
 // CHECK: bb1
 ExistentialToArchetypeCast(o: o, t: c)
 
-// CHECK-LABEL: sil shared @_TTSgVSs5UInt8___TF30specialize_checked_cast_branch26ExistentialToArchetypeCastU__FT1oPSs9AnyObject_1tQ__Q_ : $@convention(thin) (@out UInt8, @owned AnyObject, @in UInt8) -> () {
+// CHECK-LABEL: sil shared @_TTSgVs5UInt8___TF30specialize_checked_cast_branch26ExistentialToArchetypeCastU__FT1oPs9AnyObject_1tQ__Q_ : $@convention(thin) (@out UInt8, @owned AnyObject, @in UInt8) -> () {
 // CHECK: bb0
 // CHECK:  checked_cast_addr_br take_always AnyObject in {{%.*}} : $*AnyObject to UInt8 in {{%.*}} : $*UInt8,
 // CHECK: bb1
 ExistentialToArchetypeCast(o: o, t: b)
 
-// CHECK-LABEL: sil shared @_TTSgPSs9AnyObject____TF30specialize_checked_cast_branch26ExistentialToArchetypeCastU__FT1oPSs9AnyObject_1tQ__Q_ : $@convention(thin) (@out AnyObject, @owned AnyObject, @in AnyObject) -> () {
+// CHECK-LABEL: sil shared @_TTSgPs9AnyObject____TF30specialize_checked_cast_branch26ExistentialToArchetypeCastU__FT1oPs9AnyObject_1tQ__Q_ : $@convention(thin) (@out AnyObject, @owned AnyObject, @in AnyObject) -> () {
 // CHECK: bb0
 // CHECK-NOT: checked_cast_br %
 // CHECK:  enum $Optional<AnyObject>, #Optional.Some!enumelt.1, %1 : $AnyObject

@@ -1039,7 +1039,7 @@ class Foo {
   init()
 }
 
-sil @_TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_ : $@convention(method) (Int32, Int32, Foo) -> Int32 {
+sil @_TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_ : $@convention(method) (Int32, Int32, Foo) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32, %2 : $Foo):
   %3 = tuple ()
   %4 = alloc_stack $Int32  // var x               // users: %17, %6
@@ -1058,7 +1058,7 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $Foo):
   return %13 : $Int32
 }
 
-sil @_TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_ : $@convention(method) (Int32, Int32, Int32, Foo) -> () {
+sil @_TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_ : $@convention(method) (Int32, Int32, Int32, Foo) -> () {
 bb0(%0 : $Int32, %1 : $Int32, %2 : $Int32, %3 : $Foo):
   %4 = alloc_stack $Int32  // var value           // users: %16, %5
   store %0 to %4#1 : $*Int32
@@ -1408,10 +1408,10 @@ else:
 
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_
-// CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_
+// CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
+// CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
 // CHECK: } 
 sil_vtable Foo {
-  #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_
-  #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_
+  #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVs5Int32S1__S1_
+  #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVs5Int32S1__S1_
 }

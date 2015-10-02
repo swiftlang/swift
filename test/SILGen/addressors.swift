@@ -16,14 +16,14 @@ struct A {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TFV10addressors1Alu9subscriptFVSs5Int32S1_ : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
+// CHECK-LABEL: sil hidden @_TFV10addressors1Alu9subscriptFVs5Int32S1_ : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
 // CHECK: bb0([[INDEX:%.*]] : $Int32, [[SELF:%.*]] : $A):
 // CHECK:   [[BASE:%.*]] = struct_extract [[SELF]] : $A, #A.base
 // CHECK:   [[T0:%.*]] = struct_extract [[BASE]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
 // CHECK:   [[T1:%.*]] = struct $UnsafePointer<Int32> ([[T0]] : $Builtin.RawPointer)
 // CHECK:   return [[T1]] : $UnsafePointer<Int32>
 
-// CHECK-LABEL: sil hidden @_TFV10addressors1Aau9subscriptFVSs5Int32S1_ : $@convention(method) (Int32, @inout A) -> UnsafeMutablePointer<Int32>
+// CHECK-LABEL: sil hidden @_TFV10addressors1Aau9subscriptFVs5Int32S1_ : $@convention(method) (Int32, @inout A) -> UnsafeMutablePointer<Int32>
 // CHECK: bb0([[INDEX:%.*]] : $Int32, [[SELF:%.*]] : $*A):
 // CHECK:   [[T0:%.*]] = struct_element_addr [[SELF]] : $*A, #A.base
 // CHECK:   [[BASE:%.*]] = load [[T0]] : $*UnsafeMutablePointer<Int32>
@@ -38,14 +38,14 @@ func test0() {
 // CHECK: store [[AVAL]] to [[A]]#1
   var a = A()
 
-// CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1Alu9subscriptFVSs5Int32S1_ :
+// CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1Alu9subscriptFVs5Int32S1_ :
 // CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[AVAL]])
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
 // CHECK: [[Z:%.*]] = load [[T3]] : $*Int32
   let z = a[10]
 
-// CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1Aau9subscriptFVSs5Int32S1_ :
+// CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1Aau9subscriptFVs5Int32S1_ :
 // CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[A]]#1)
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
@@ -54,7 +54,7 @@ func test0() {
 // CHECK: store {{%.*}} to [[T3]]
   a[5] += z
 
-// CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1Aau9subscriptFVSs5Int32S1_ :
+// CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1Aau9subscriptFVs5Int32S1_ :
 // CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[A]]#1)
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
@@ -62,12 +62,12 @@ func test0() {
   a[3] = 6
 }
 
-// CHECK-LABEL: sil hidden @_TF10addressors5test1FT_VSs5Int32 : $@convention(thin) () -> Int32
+// CHECK-LABEL: sil hidden @_TF10addressors5test1FT_Vs5Int32 : $@convention(thin) () -> Int32
 func test1() -> Int32 {
 // CHECK: [[CTOR:%.*]] = function_ref @_TFV10addressors1ACfMS0_FT_S0_
 // CHECK: [[T0:%.*]] = metatype $@thin A.Type
 // CHECK: [[A:%.*]] = apply [[CTOR]]([[T0]]) : $@convention(thin) (@thin A.Type) -> A
-// CHECK: [[ACCESSOR:%.*]] = function_ref @_TFV10addressors1Alu9subscriptFVSs5Int32S1_ : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
+// CHECK: [[ACCESSOR:%.*]] = function_ref @_TFV10addressors1Alu9subscriptFVs5Int32S1_ : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
 // CHECK: [[PTR:%.*]] = apply [[ACCESSOR]]({{%.*}}, [[A]]) : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
 // CHECK: [[T0:%.*]] = struct_extract [[PTR]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
 // CHECK: [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
@@ -81,8 +81,8 @@ var global: Int32 {
   unsafeAddress {
     return UnsafePointer(uninitAddr)
   }
-// CHECK: sil hidden @_TF10addressorslu6globalVSs5Int32 : $@convention(thin) () -> UnsafePointer<Int32> {
-// CHECK:   [[T0:%.*]] = global_addr @_Tv10addressors10uninitAddrGVSs20UnsafeMutablePointerVSs5Int32_ : $*UnsafeMutablePointer<Int32>
+// CHECK: sil hidden @_TF10addressorslu6globalVs5Int32 : $@convention(thin) () -> UnsafePointer<Int32> {
+// CHECK:   [[T0:%.*]] = global_addr @_Tv10addressors10uninitAddrGVs20UnsafeMutablePointerVs5Int32_ : $*UnsafeMutablePointer<Int32>
 // CHECK:   [[T1:%.*]] = load [[T0]] : $*UnsafeMutablePointer<Int32>
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
 // CHECK:   [[T3:%.*]] = struct $UnsafePointer<Int32> ([[T2]] : $Builtin.RawPointer)
@@ -92,8 +92,8 @@ var global: Int32 {
 func test_global() -> Int32 {
   return global
 }
-// CHECK: sil hidden @_TF10addressors11test_globalFT_VSs5Int32 : $@convention(thin) () -> Int32 {
-// CHECK:   [[T0:%.*]] = function_ref @_TF10addressorslu6globalVSs5Int32 : $@convention(thin) () -> UnsafePointer<Int32>
+// CHECK: sil hidden @_TF10addressors11test_globalFT_Vs5Int32 : $@convention(thin) () -> Int32 {
+// CHECK:   [[T0:%.*]] = function_ref @_TF10addressorslu6globalVs5Int32 : $@convention(thin) () -> UnsafePointer<Int32>
 // CHECK:   [[T1:%.*]] = apply [[T0]]() : $@convention(thin) () -> UnsafePointer<Int32>
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
 // CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
@@ -118,7 +118,7 @@ struct B : Subscriptable {
 // CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int32, 0
 // CHECK:   [[INDEX:%.*]] = struct $Int32 ([[T0]] : $Builtin.Int32)
 // CHECK:   [[RHS:%.*]] = integer_literal $Builtin.Int32, 7
-// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Bau9subscriptFVSs5Int32S1_
+// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Bau9subscriptFVs5Int32S1_
 // CHECK:   [[PTR:%.*]] = apply [[T0]]([[INDEX]], [[B]])
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
@@ -142,7 +142,7 @@ struct CArray<T> {
 
 func id_int(i: Int32) -> Int32 { return i }
 
-// CHECK-LABEL: sil hidden @_TF10addressors11test_carrayFRGVS_6CArrayFVSs5Int32S1__S1_ : $@convention(thin) (@inout CArray<Int32 -> Int32>) -> Int32 {
+// CHECK-LABEL: sil hidden @_TF10addressors11test_carrayFRGVS_6CArrayFVs5Int32S1__S1_ : $@convention(thin) (@inout CArray<Int32 -> Int32>) -> Int32 {
 // CHECK: bb0([[ARRAY:%.*]] : $*CArray<Int32 -> Int32>):
 func test_carray(inout array: CArray<Int32 -> Int32>) -> Int32 {
 // CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors6CArrayau9subscriptFSiq_ :
@@ -169,26 +169,26 @@ struct D : Subscriptable {
   }
 }
 // Setter.
-// SILGEN-LABEL: sil hidden [transparent] @_TFV10addressors1Ds9subscriptFVSs5Int32S1_
+// SILGEN-LABEL: sil hidden [transparent] @_TFV10addressors1Ds9subscriptFVs5Int32S1_
 // SILGEN: bb0([[VALUE:%.*]] : $Int32, [[I:%.*]] : $Int32, [[SELF:%.*]] : $*D):
 // SILGEN:   debug_value [[VALUE]] : $Int32
 // SILGEN:   debug_value [[I]] : $Int32
 // SILGEN:   [[BOX:%.*]] = alloc_box $D
 // SILGEN:   copy_addr [[SELF]] to [initialization] [[BOX]]#1 : $*D     // id: %6
-// SILGEN:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVSs5Int32S1_{{.*}}
+// SILGEN:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_{{.*}}
 // SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[BOX]]#1)
 // SILGEN:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
 // SILGEN:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to $*Int32
 // SILGEN:   assign [[VALUE]] to [[ADDR]] : $*Int32
 
 // materializeForSet.
-// SILGEN: sil hidden [transparent] @_TFV10addressors1Dm9subscriptFVSs5Int32S1_
+// SILGEN: sil hidden [transparent] @_TFV10addressors1Dm9subscriptFVs5Int32S1_
 // SILGEN: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[I:%.*]] : $Int32, [[SELF:%.*]] : $*D):
 // SILGEN:   debug_value [[BUFFER]]
 // SILGEN:   debug_value [[I]]
 // SILGEN:   [[BOX:%.*]] = alloc_box $D
 // SILGEN:   copy_addr [[SELF]] to [initialization] [[BOX]]#1 : $*D
-// SILGEN:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVSs5Int32S1_
+// SILGEN:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_
 // SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[BOX]]#1)
 // SILGEN:   [[ADDR:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
 // SILGEN:   [[INIT:%.*]] = function_ref @_TFSqCurfMGSqq__FT10nilLiteralT__GSqq__
@@ -205,20 +205,20 @@ struct D : Subscriptable {
 func make_int() -> Int32 { return 0 }
 func take_int_inout(inout value: Int32) {}
 
-// CHECK-LABEL: sil hidden @_TF10addressors6test_dFRVS_1DVSs5Int32 : $@convention(thin) (@inout D) -> Int32
+// CHECK-LABEL: sil hidden @_TF10addressors6test_dFRVS_1DVs5Int32 : $@convention(thin) (@inout D) -> Int32
 // CHECK: bb0([[ARRAY:%.*]] : $*D):
 func test_d(inout array: D) -> Int32 {
-// CHECK:   [[T0:%.*]] = function_ref @_TF10addressors8make_intFT_VSs5Int32
+// CHECK:   [[T0:%.*]] = function_ref @_TF10addressors8make_intFT_Vs5Int32
 // CHECK:   [[V:%.*]] = apply [[T0]]()
-// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVSs5Int32S1_
+// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_
 // CHECK:   [[T1:%.*]] = apply [[T0]]({{%.*}}, [[ARRAY]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>,
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
 // CHECK:   store [[V]] to [[ADDR]] : $*Int32
   array[0] = make_int()
 
-// CHECK:   [[FN:%.*]] = function_ref @_TF10addressors14take_int_inoutFRVSs5Int32T_
-// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVSs5Int32S1_
+// CHECK:   [[FN:%.*]] = function_ref @_TF10addressors14take_int_inoutFRVs5Int32T_
+// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_
 // CHECK:   [[T1:%.*]] = apply [[T0]]({{%.*}}, [[ARRAY]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>,
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Int32
@@ -226,7 +226,7 @@ func test_d(inout array: D) -> Int32 {
   take_int_inout(&array[1])
 
 // CHECK:   [[T0:%.*]] = load [[ARRAY]]
-// CHECK:   [[T1:%.*]] = function_ref @_TFV10addressors1Dg9subscriptFVSs5Int32S1_ 
+// CHECK:   [[T1:%.*]] = function_ref @_TFV10addressors1Dg9subscriptFVs5Int32S1_ 
 // CHECK:   [[T2:%.*]] = apply [[T1]]({{%.*}}, [[T0]])
 // CHECK:   return [[T2]]
   return array[2]
@@ -241,7 +241,7 @@ struct E {
 
 // CHECK-LABEL: sil hidden @_TF10addressors6test_eFVS_1ET_
 // CHECK: bb0([[E:%.*]] : $E):
-// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Eau5valueVSs5Int32
+// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors1Eau5valueVs5Int32
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[E]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]]
 // CHECK:   [[T3:%.*]] = pointer_to_address [[T2]]
@@ -263,15 +263,15 @@ class F {
   }
 }
 
-// CHECK: sil hidden @_TFC10addressors1Flo5valueVSs5Int32 : $@convention(method) (@guaranteed F) -> @owned (UnsafePointer<Int32>, Builtin.NativeObject) {
-// CHECK: sil hidden @_TFC10addressors1Fao5valueVSs5Int32 : $@convention(method) (@guaranteed F) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject) {
+// CHECK: sil hidden @_TFC10addressors1Flo5valueVs5Int32 : $@convention(method) (@guaranteed F) -> @owned (UnsafePointer<Int32>, Builtin.NativeObject) {
+// CHECK: sil hidden @_TFC10addressors1Fao5valueVs5Int32 : $@convention(method) (@guaranteed F) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject) {
 
 func test_f0(f: F) -> Int32 {
   return f.value
 }
-// CHECK: sil hidden @_TF10addressors7test_f0FCS_1FVSs5Int32 : $@convention(thin) (@owned F) -> Int32 {
+// CHECK: sil hidden @_TF10addressors7test_f0FCS_1FVs5Int32 : $@convention(thin) (@owned F) -> Int32 {
 // CHECK: bb0([[SELF:%0]] : $F):
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Flo5valueVSs5Int32 : $@convention(method) (@guaranteed F) -> @owned (UnsafePointer<Int32>, Builtin.NativeObject)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Flo5valueVs5Int32 : $@convention(method) (@guaranteed F) -> @owned (UnsafePointer<Int32>, Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 1
@@ -290,7 +290,7 @@ func test_f1(f: F) {
 // CHECK: bb0([[SELF:%0]] : $F):
 // CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int32, 14
 // CHECK:   [[VALUE:%.*]] = struct $Int32 ([[T0]] : $Builtin.Int32)
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Fao5valueVSs5Int32 : $@convention(method) (@guaranteed F) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Fao5valueVs5Int32 : $@convention(method) (@guaranteed F) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
@@ -313,9 +313,9 @@ class G {
     }
   }
 }
-// CHECK: sil hidden [transparent] @_TFC10addressors1Gg5valueVSs5Int32 : $@convention(method) (@guaranteed G) -> Int32 {
+// CHECK: sil hidden [transparent] @_TFC10addressors1Gg5valueVs5Int32 : $@convention(method) (@guaranteed G) -> Int32 {
 // CHECK: bb0([[SELF:%0]] : $G):
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Glo5valueVSs5Int32 : $@convention(method) (@guaranteed G) -> @owned (UnsafePointer<Int32>, Builtin.NativeObject)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Glo5valueVs5Int32 : $@convention(method) (@guaranteed G) -> @owned (UnsafePointer<Int32>, Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Builtin.NativeObject), 1
@@ -326,9 +326,9 @@ class G {
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
 // CHECK:   return [[VALUE]] : $Int32
 
-// CHECK: sil hidden [transparent] @_TFC10addressors1Gs5valueVSs5Int32 : $@convention(method) (Int32, @guaranteed G) -> () {
+// CHECK: sil hidden [transparent] @_TFC10addressors1Gs5valueVs5Int32 : $@convention(method) (Int32, @guaranteed G) -> () {
 // CHECK: bb0([[VALUE:%0]] : $Int32, [[SELF:%1]] : $G):
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueVSs5Int32 : $@convention(method) (@guaranteed G) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueVs5Int32 : $@convention(method) (@guaranteed G) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
@@ -339,10 +339,10 @@ class G {
 // CHECK:   strong_release [[OWNER]] : $Builtin.NativeObject
 
 //   materializeForSet for G.value
-// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Gm5valueVSs5Int32 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed G) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>) {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Gm5valueVs5Int32 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed G) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>) {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $G):
 //   Call the addressor.
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueVSs5Int32 : $@convention(method) (@guaranteed G) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Gao5valueVs5Int32 : $@convention(method) (@guaranteed G) -> @owned (UnsafeMutablePointer<Int32>, Builtin.NativeObject)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[T1:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 0
 // CHECK:   [[T2:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
@@ -358,14 +358,14 @@ class G {
 // CHECK:   [[ADDR_OWNER:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Builtin.NativeObject), 1
 // CHECK:   [[PTR:%.*]] = struct_extract [[T0]] :
 //   Set up the callback.
-// CHECK:   [[T1:%.*]] = function_ref @_TFFC10addressors1Gm5valueVSs5Int32U_FTBpRBBRS0_MS0__T_ :
+// CHECK:   [[T1:%.*]] = function_ref @_TFFC10addressors1Gm5valueVs5Int32U_FTBpRBBRS0_MS0__T_ :
 // CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[T1]]
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout G, @thick G.Type) -> ()>)
 // CHECK:   return [[RESULT]]
 
 //   materializeForSet callback for G.value
-// CHECK-LABEL: sil @_TFFC10addressors1Gm5valueVSs5Int32U_FTBpRBBRS0_MS0__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout G, @thick G.Type) -> () {
+// CHECK-LABEL: sil @_TFFC10addressors1Gm5valueVs5Int32U_FTBpRBBRS0_MS0__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout G, @thick G.Type) -> () {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*G, [[SELFTYPE:%3]] : $@thick G.Type):
 // CHECK:   [[T0:%.*]] = project_value_buffer $Builtin.NativeObject in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
@@ -387,15 +387,15 @@ class H {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TFC10addressors1Hlp5valueVSs5Int32 : $@convention(method) (@guaranteed H) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>) {
-// CHECK-LABEL: sil hidden @_TFC10addressors1Hap5valueVSs5Int32 : $@convention(method) (@guaranteed H) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>) {
+// CHECK-LABEL: sil hidden @_TFC10addressors1Hlp5valueVs5Int32 : $@convention(method) (@guaranteed H) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>) {
+// CHECK-LABEL: sil hidden @_TFC10addressors1Hap5valueVs5Int32 : $@convention(method) (@guaranteed H) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>) {
 
 func test_h0(f: H) -> Int32 {
   return f.value
 }
-// CHECK-LABEL: sil hidden @_TF10addressors7test_h0FCS_1HVSs5Int32 : $@convention(thin) (@owned H) -> Int32 {
+// CHECK-LABEL: sil hidden @_TF10addressors7test_h0FCS_1HVs5Int32 : $@convention(thin) (@owned H) -> Int32 {
 // CHECK: bb0([[SELF:%0]] : $H):
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Hlp5valueVSs5Int32 : $@convention(method) (@guaranteed H) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Hlp5valueVs5Int32 : $@convention(method) (@guaranteed H) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Optional<Builtin.NativeObject>), 1
@@ -414,7 +414,7 @@ func test_h1(f: H) {
 // CHECK: bb0([[SELF:%0]] : $H):
 // CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int32, 14
 // CHECK:   [[VALUE:%.*]] = struct $Int32 ([[T0]] : $Builtin.Int32)
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Hap5valueVSs5Int32 : $@convention(method) (@guaranteed H) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Hap5valueVs5Int32 : $@convention(method) (@guaranteed H) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 1
@@ -437,9 +437,9 @@ class I {
     }
   }
 }
-// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Ig5valueVSs5Int32 : $@convention(method) (@guaranteed I) -> Int32 {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Ig5valueVs5Int32 : $@convention(method) (@guaranteed I) -> Int32 {
 // CHECK: bb0([[SELF:%0]] : $I):
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Ilp5valueVSs5Int32 : $@convention(method) (@guaranteed I) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Ilp5valueVs5Int32 : $@convention(method) (@guaranteed I) -> @owned (UnsafePointer<Int32>, Optional<Builtin.NativeObject>)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafePointer<Int32>, Optional<Builtin.NativeObject>), 1
@@ -450,9 +450,9 @@ class I {
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK:   return [[VALUE]] : $Int32
 
-// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Is5valueVSs5Int32 : $@convention(method) (Int32, @guaranteed I) -> () {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Is5valueVs5Int32 : $@convention(method) (Int32, @guaranteed I) -> () {
 // CHECK: bb0([[VALUE:%0]] : $Int32, [[SELF:%1]] : $I):
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Iap5valueVSs5Int32 : $@convention(method) (@guaranteed I) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Iap5valueVs5Int32 : $@convention(method) (@guaranteed I) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[PTR:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[OWNER:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 1
@@ -462,10 +462,10 @@ class I {
 // CHECK:   store [[VALUE]] to [[T2]] : $*Int32
 // CHECK:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
 
-// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Im5valueVSs5Int32 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed I) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>) {
+// CHECK-LABEL: sil hidden [transparent] @_TFC10addressors1Im5valueVs5Int32 : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed I) -> (Builtin.RawPointer, Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>) {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $I):
 //   Call the addressor.
-// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Iap5valueVSs5Int32 : $@convention(method) (@guaranteed I) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>)
+// CHECK:   [[ADDRESSOR:%.*]] = function_ref @_TFC10addressors1Iap5valueVs5Int32 : $@convention(method) (@guaranteed I) -> @owned (UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>)
 // CHECK:   [[T0:%.*]] = apply [[ADDRESSOR]]([[SELF]])
 // CHECK:   [[T1:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[T2:%.*]] = tuple_extract [[T0]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 1
@@ -480,14 +480,14 @@ class I {
 // CHECK:   [[T0:%.*]] = tuple_extract [[TUPLE]] : $(UnsafeMutablePointer<Int32>, Optional<Builtin.NativeObject>), 0
 // CHECK:   [[PTR:%.*]] = struct_extract [[T0]] :
 //   Set up the callback.
-// CHECK:   [[T1:%.*]] = function_ref @_TFFC10addressors1Im5valueVSs5Int32U_FTBpRBBRS0_MS0__T_ :
+// CHECK:   [[T1:%.*]] = function_ref @_TFFC10addressors1Im5valueVs5Int32U_FTBpRBBRS0_MS0__T_ :
 // CHECK:   [[CALLBACK:%.*]] = enum $Optional<{{.*}}>, #Optional.Some!enumelt.1, [[T1]] 
 //   Epilogue.
 // CHECK:   [[RESULT:%.*]] = tuple ([[PTR]] : $Builtin.RawPointer, [[CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout I, @thick I.Type) -> ()>)
 // CHECK:   return [[RESULT]]
 
 //   materializeForSet callback for I.value
-// CHECK-LABEL: sil @_TFFC10addressors1Im5valueVSs5Int32U_FTBpRBBRS0_MS0__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout I, @thick I.Type) -> () {
+// CHECK-LABEL: sil @_TFFC10addressors1Im5valueVs5Int32U_FTBpRBBRS0_MS0__T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout I, @thick I.Type) -> () {
 // CHECK: bb0([[BUFFER:%0]] : $Builtin.RawPointer, [[STORAGE:%1]] : $*Builtin.UnsafeValueBuffer, [[SELF:%2]] : $*I, [[SELFTYPE:%3]] : $@thick I.Type):
 // CHECK:   [[T0:%.*]] = project_value_buffer $Optional<Builtin.NativeObject> in [[STORAGE]] : $*Builtin.UnsafeValueBuffer
 // CHECK:   [[T1:%.*]] = address_to_pointer [[T0]]
@@ -519,7 +519,7 @@ func test_rec(outer: RecOuter) -> Int32 {
   return outer.middle.inner[0]
 }
 // This uses the mutable addressor.
-// CHECK-LABEL: sil hidden @_TF10addressors8test_recFCS_8RecOuterVSs5Int32 : $@convention(thin) (@owned RecOuter) -> Int32 {
+// CHECK-LABEL: sil hidden @_TF10addressors8test_recFCS_8RecOuterVs5Int32 : $@convention(thin) (@owned RecOuter) -> Int32 {
 // CHECK:   function_ref @_TFC10addressors8RecOuterap6middleVS_9RecMiddle
 // CHECK:   struct_element_addr {{.*}} : $*RecMiddle, #RecMiddle.inner
-// CHECK:   function_ref @_TFV10addressors8RecInnerg9subscriptFVSs5Int32S1_ 
+// CHECK:   function_ref @_TFV10addressors8RecInnerg9subscriptFVs5Int32S1_ 

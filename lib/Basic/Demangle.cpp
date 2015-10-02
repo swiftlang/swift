@@ -1002,8 +1002,6 @@ private:
       return NodeFactory::create(Node::Kind::Module, MANGLING_MODULE_OBJC);
     if (Mangled.nextIf('C'))
       return NodeFactory::create(Node::Kind::Module, MANGLING_MODULE_C);
-    if (Mangled.nextIf('s'))
-      return NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
     if (Mangled.nextIf('a'))
       return createSwiftType(Node::Kind::Structure, "Array");
     if (Mangled.nextIf('b'))
@@ -1016,10 +1014,18 @@ private:
       return createSwiftType(Node::Kind::Structure, "Float");
     if (Mangled.nextIf('i'))
       return createSwiftType(Node::Kind::Structure, "Int");
+    if (Mangled.nextIf('P'))
+      return createSwiftType(Node::Kind::Structure, "UnsafePointer");
+    if (Mangled.nextIf('p'))
+      return createSwiftType(Node::Kind::Structure, "UnsafeMutablePointer");
     if (Mangled.nextIf('q'))
       return createSwiftType(Node::Kind::Enum, "Optional");
     if (Mangled.nextIf('Q'))
       return createSwiftType(Node::Kind::Enum, "ImplicitlyUnwrappedOptional");
+    if (Mangled.nextIf('R'))
+      return createSwiftType(Node::Kind::Structure, "UnsafeBufferPointer");
+    if (Mangled.nextIf('r'))
+      return createSwiftType(Node::Kind::Structure, "UnsafeMutableBufferPointer");
     if (Mangled.nextIf('S'))
       return createSwiftType(Node::Kind::Structure, "String");
     if (Mangled.nextIf('u'))
@@ -1033,6 +1039,9 @@ private:
   }
 
   NodePointer demangleModule() {
+    if (Mangled.nextIf('s')) {
+      return NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
+    }
     if (Mangled.nextIf('S')) {
       NodePointer module = demangleSubstitutionIndex();
       if (!module)
@@ -1095,6 +1104,19 @@ private:
       return proto;
     }
 
+    if (Mangled.nextIf('s')) {
+      NodePointer stdlib = NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
+
+      NodePointer name = demangleDeclName();
+      if (!name) return nullptr;
+
+      auto proto = NodeFactory::create(Node::Kind::Protocol);
+      proto->addChild(std::move(stdlib));
+      proto->addChild(std::move(name));
+      Substitutions.push_back(proto);
+      return proto;
+    }
+
     return demangleDeclarationName(Node::Kind::Protocol);
   }
 
@@ -1148,6 +1170,8 @@ private:
     }
     if (Mangled.nextIf('S'))
       return demangleSubstitutionIndex();
+    if (Mangled.nextIf('s'))
+      return NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
     if (isStartOfEntity(Mangled.peek()))
       return demangleEntity();
     return demangleModule();
@@ -1198,7 +1222,7 @@ private:
       entityBasicKind = Node::Kind::Variable;
     } else if (Mangled.nextIf('I')) {
       entityBasicKind = Node::Kind::Initializer;
-    } else if (Mangled.nextIf('s')) {
+    } else if (Mangled.nextIf('i')) {
       entityBasicKind = Node::Kind::Subscript;
     } else {
       return demangleNominalType();
@@ -1356,7 +1380,7 @@ private:
         if (!Mangled)
           return nullptr;
         char c = Mangled.peek();
-        if (c != '_' && c != 'S'
+        if (c != '_' && c != 'S' && c != 's'
             && (nodeKind == Node::Kind::AssociatedType || c != 'U')
             && !isStartOfIdentifier(c))
           break;
@@ -1588,6 +1612,10 @@ private:
         return makeSelfType(sub);
       else
         return makeAssociatedType(sub);
+    }
+    if (Mangled.nextIf('s')) {
+      NodePointer stdlib = NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
+      return makeAssociatedType(stdlib);
     }
     if (Mangled.nextIf('d')) {
       Node::IndexType depth, index;

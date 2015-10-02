@@ -102,7 +102,7 @@ struct LoadableStruct {
   // CHECK:         [[DELEGATEE_SELF_MAT:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<LoadableStruct>
   // CHECK:         [[DELEGATEE_INIT:%.*]] = function_ref @_TFV21failable_initializers14LoadableStructCfMS0_FT3iuoSb_GSQS0__
   // CHECK:         [[DELEGATEE_SELF:%.*]] = apply [[DELEGATEE_INIT]]
-  // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
+  // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
   // CHECK:         [[TMP:%.*]] = alloc_stack $LoadableStruct
   // CHECK:         apply [[GET_VALUE_FN]]<LoadableStruct>([[TMP]]#1, [[DELEGATEE_SELF_MAT]]#1)
   // CHECK:         [[DELEGATEE_SELF_VAL:%.*]] = load [[TMP]]
@@ -119,7 +119,7 @@ struct LoadableStruct {
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $LoadableStruct
     // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*LoadableStruct
     // CHECK:   function_ref @_TFV21failable_initializers14LoadableStructCfMS0_FT10alwaysFailCS_1C_GSqS0__
-    // CHECK:   function_ref @_TFSs17_getOptionalValueurFGSqq__q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @in Optional<τ_0_0>) -> ()
+    // CHECK:   function_ref @_TFs17_getOptionalValueurFGSqq__q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @in Optional<τ_0_0>) -> ()
     // CHECK: ret
     self.init(alwaysFail: delegateToFail)!
   }
@@ -208,7 +208,7 @@ struct AddressOnlyStruct {
   // CHECK:         [[DELEGATEE_SELF:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<AddressOnlyStruct>
   // CHECK:         [[DELEGATEE_INIT:%.*]] = function_ref @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT3iuoSb_GSQS0__
   // CHECK:         apply [[DELEGATEE_INIT]]([[DELEGATEE_SELF]]
-  // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
+  // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
   // CHECK:         [[TMP:%.*]] = alloc_stack $AddressOnlyStruct
   // CHECK:         apply [[GET_VALUE_FN]]<AddressOnlyStruct>([[TMP]]#1, [[DELEGATEE_SELF]]#1)
   // CHECK:         copy_addr [take] [[TMP]]#1 to [[SELF_MARKED]]
@@ -515,7 +515,7 @@ extension LoadableStruct {
   // CHECK:   try_apply [[OTHER_INIT]]({{%.+}}, %1) : $@convention(thin) (Bool, @thin LoadableStruct.Type) -> (@owned Optional<LoadableStruct>, @error ErrorType), normal [[SUCCESS:[^ ]+]], error [[FAILURE:[^ ]+]]
   // CHECK: [[SUCCESS]]([[VALUE:%.+]] : $Optional<LoadableStruct>):
   // CHECK:   store [[VALUE]] to [[BOX:%.+]]#1 : $*Optional<LoadableStruct>
-  // CHECK:   [[FORCE_FN:%.+]] = function_ref @_TFSs17_getOptionalValueurFGSqq__q_
+  // CHECK:   [[FORCE_FN:%.+]] = function_ref @_TFs17_getOptionalValueurFGSqq__q_
   // CHECK:   [[RESULT_BOX:%.+]] = alloc_stack $LoadableStruct
   // CHECK:   = apply [[FORCE_FN]]<LoadableStruct>([[RESULT_BOX]]#1, [[BOX]]#1)
   // CHECK:   [[RESULT:%.+]] = load [[RESULT_BOX]]#1 : $*LoadableStruct

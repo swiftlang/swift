@@ -4,7 +4,7 @@
 
 import Foundation
 
-// CHECK-LABEL: sil hidden @_TF25objc_attr_NSManaged_multi9testMultiFCS_10SwiftGizmoPSs9AnyObject_ : $@convention(thin) (@owned SwiftGizmo) -> @owned AnyObject {
+// CHECK-LABEL: sil hidden @_TF25objc_attr_NSManaged_multi9testMultiFCS_10SwiftGizmoPs9AnyObject_ : $@convention(thin) (@owned SwiftGizmo) -> @owned AnyObject {
 func testMulti(obj: SwiftGizmo) -> AnyObject {
   // CHECK: = class_method [volatile] %0 : $SwiftGizmo, #SwiftGizmo.kvc!1.foreign : SwiftGizmo -> () -> () , $@convention(objc_method) (SwiftGizmo) -> ()
   // CHECK-NOT: return

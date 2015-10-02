@@ -181,7 +181,7 @@ enum ColorError : ErrorType {
   case Red, Green, Blue
 }
 
-//CHECK-LABEL: sil hidden @_TF6errors6IThrowFzT_VSs5Int32
+//CHECK-LABEL: sil hidden @_TF6errors6IThrowFzT_Vs5Int32
 //CHECK: builtin "willThrow"
 //CHECK-NEXT: throw
 func IThrow() throws -> Int32 {
@@ -190,7 +190,7 @@ func IThrow() throws -> Int32 {
 }
 
 // Make sure that we are not emitting calls to 'willThrow' on rethrow sites.
-//CHECK-LABEL: sil hidden @_TF6errors12DoesNotThrowFzT_VSs5Int32
+//CHECK-LABEL: sil hidden @_TF6errors12DoesNotThrowFzT_Vs5Int32
 //CHECK-NOT: builtin "willThrow"
 //CHECK: return
 func DoesNotThrow() throws -> Int32 {
@@ -270,7 +270,7 @@ func create<T>(fn: () throws -> T) throws -> T {
 func testThunk(fn: () throws -> Int) throws -> Int {
   return try create(fn)
 }
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSizoPSs9ErrorType__XFo__iSizoPS___ : $@convention(thin) (@out Int, @owned @callee_owned () -> (Int, @error ErrorType)) -> @error ErrorType
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__dSizoPs9ErrorType__XFo__iSizoPS___ : $@convention(thin) (@out Int, @owned @callee_owned () -> (Int, @error ErrorType)) -> @error ErrorType
 // CHECK: bb0(%0 : $*Int, %1 : $@callee_owned () -> (Int, @error ErrorType)):
 // CHECK:   try_apply %1()
 // CHECK: bb1([[T0:%.*]] : $Int):
@@ -380,7 +380,7 @@ func test_variadic(cat: Cat) throws {
 // CHECK-LABEL: sil hidden @_TF6errors13test_variadicFzCS_3CatT_
 // CHECK:       [[TAKE_FN:%.*]] = function_ref @_TF6errors14take_many_catsFztGSaCS_3Cat__T_ : $@convention(thin) (@owned Array<Cat>) -> @error ErrorType
 // CHECK:       [[N:%.*]] = integer_literal $Builtin.Word, 4
-// CHECK:       [[T0:%.*]] = function_ref @_TFSs27_allocateUninitializedArrayurFBwTGSaq__Bp_
+// CHECK:       [[T0:%.*]] = function_ref @_TFs27_allocateUninitializedArrayurFBwTGSaq__Bp_
 // CHECK:       [[T1:%.*]] = apply [[T0]]<Cat>([[N]])
 // CHECK:       [[ARRAY:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 0
 // CHECK:       [[T2:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 1
@@ -420,7 +420,7 @@ func test_variadic(cat: Cat) throws {
 //   Failure from element 0.
 // CHECK:     [[ERR_0]]([[ERROR:%.*]] : $ErrorType):
 // CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TFSs29_deallocateUninitializedArrayurFGSaq__T_
+// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TFs29_deallocateUninitializedArrayurFGSaq__T_
 // CHECK-NEXT:  apply [[T0]]<Cat>([[ARRAY]])
 // CHECK-NEXT:  br [[RETHROW:.*]]([[ERROR]] : $ErrorType)
 //   Failure from element 2.
@@ -428,7 +428,7 @@ func test_variadic(cat: Cat) throws {
 // CHECK-NEXT:  destroy_addr [[ELT1]]
 // CHECK-NEXT:  destroy_addr [[ELT0]]
 // CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TFSs29_deallocateUninitializedArrayurFGSaq__T_
+// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TFs29_deallocateUninitializedArrayurFGSaq__T_
 // CHECK-NEXT:  apply [[T0]]<Cat>([[ARRAY]])
 // CHECK-NEXT:  br [[RETHROW]]([[ERROR]] : $ErrorType)
 //   Failure from element 3.
@@ -437,7 +437,7 @@ func test_variadic(cat: Cat) throws {
 // CHECK-NEXT:  destroy_addr [[ELT1]]
 // CHECK-NEXT:  destroy_addr [[ELT0]]
 // CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TFSs29_deallocateUninitializedArrayurFGSaq__T_
+// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TFs29_deallocateUninitializedArrayurFGSaq__T_
 // CHECK-NEXT:  apply [[T0]]<Cat>([[ARRAY]])
 // CHECK-NEXT:  br [[RETHROW]]([[ERROR]] : $ErrorType)
 //   Failure from call.

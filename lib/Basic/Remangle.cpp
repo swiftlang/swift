@@ -351,7 +351,7 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
   SUCCESS_IF_IS(node->getChild(1)->getText(), EXPECTED, SUBSTITUTION)
 
   case Node::Kind::Module:
-    SUCCESS_IF_TEXT_IS(STDLIB_NAME, "Ss");
+    SUCCESS_IF_TEXT_IS(STDLIB_NAME, "s");
     SUCCESS_IF_TEXT_IS(MANGLING_MODULE_OBJC, "So");
     SUCCESS_IF_TEXT_IS(MANGLING_MODULE_C, "SC");
     break;
@@ -734,7 +734,7 @@ void Remangler::mangleVariable(Node *node, EntityContext &ctx) {
 }
 
 void Remangler::mangleSubscript(Node *node, EntityContext &ctx) {
-  mangleNamedAndTypedEntity(node, 's', "", ctx);
+  mangleNamedAndTypedEntity(node, 'i', "", ctx);
 }
 
 void Remangler::mangleInitializer(Node *node, EntityContext &ctx) {

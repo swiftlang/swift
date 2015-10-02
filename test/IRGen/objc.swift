@@ -14,7 +14,7 @@ import gizmo
 // CHECK: [[TEST2:%C4objc5Test2]] = type
 // CHECK: [[OBJC:%objc_object]] = type
 // CHECK: [[GIZMO:%CSo5Gizmo]] = type
-// CHECK: [[ID:%V4objc2id]] = type <{ %PSs9AnyObject_ }>
+// CHECK: [[ID:%V4objc2id]] = type <{ %Ps9AnyObject_ }>
 // CHECK: [[RECT:%VSC4Rect]] = type
 // CHECK: [[FLOAT:%Sf]] = type
 

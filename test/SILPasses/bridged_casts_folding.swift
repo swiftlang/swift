@@ -192,7 +192,7 @@ var nsDictInt: NSDictionary = [1:1, 2:2, 3:3, 4:4]
 var nsDictDouble: NSDictionary = [1.1 : 1.1, 2.2 : 2.2, 3.3 : 3.3, 4.4 : 4.4]
 var nsDictString: NSDictionary = ["One":"One", "Two":"Two", "Three":"Three", "Four":"Four"]
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding30testForcedCastNStoSwiftDictIntFT_GVSs10DictionarySiSi_
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding30testForcedCastNStoSwiftDictIntFT_GVs10DictionarySiSi_
 // CHECK-NOT: unconditional_checked
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
 // CHECK: return
@@ -202,7 +202,7 @@ public func testForcedCastNStoSwiftDictInt() -> [Int:Int] {
   return dict
 }
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding28testCondCastNStoSwiftDictIntFT_GSqGVSs10DictionarySiSi__
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding28testCondCastNStoSwiftDictIntFT_GSqGVs10DictionarySiSi__
 // CHECK-NOT: checked_cast
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._conditionallyBridgeFromObjectiveC!1
 // CHECK: return
@@ -212,7 +212,7 @@ public func testCondCastNStoSwiftDictInt() -> [Int:Int]? {
   return dictOpt
 }
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding33testForcedCastNStoSwiftDictDoubleFT_GVSs10DictionarySdSd_
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding33testForcedCastNStoSwiftDictDoubleFT_GVs10DictionarySdSd_
 // CHECK-NOT: unconditional_checked
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
 // CHECK: return
@@ -222,7 +222,7 @@ public func testForcedCastNStoSwiftDictDouble() -> [Double:Double] {
   return dict
 }
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding31testCondCastNStoSwiftDictDoubleFT_GSqGVSs10DictionarySdSd__
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding31testCondCastNStoSwiftDictDoubleFT_GSqGVs10DictionarySdSd__
 // CHECK-NOT: checked_cast
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._conditionallyBridgeFromObjectiveC!1
 // CHECK: return
@@ -233,7 +233,7 @@ public func testCondCastNStoSwiftDictDouble() -> [Double:Double]? {
 }
 
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding33testForcedCastNStoSwiftDictStringFT_GVSs10DictionarySSSS_
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding33testForcedCastNStoSwiftDictStringFT_GVs10DictionarySSSS_
 // CHECK-NOT: unconditional_checked
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
 // CHECK: return
@@ -243,7 +243,7 @@ public func testForcedCastNStoSwiftDictString() -> [String:String] {
   return dict
 }
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding31testCondCastNStoSwiftDictStringFT_GSqGVSs10DictionarySSSS__
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding31testCondCastNStoSwiftDictStringFT_GSqGVs10DictionarySSSS__
 // CHECK-NOT: checked_cast
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._conditionallyBridgeFromObjectiveC!1
 // CHECK: return
@@ -253,7 +253,7 @@ public func testCondCastNStoSwiftDictString() -> [String:String]? {
   return dictOpt
 }
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding40testForcedCastNSDictStringtoSwiftDictIntFT_GVSs10DictionarySiSi_
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding40testForcedCastNSDictStringtoSwiftDictIntFT_GVs10DictionarySiSi_
 // CHECK-NOT: unconditional_checked
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
 // CHECK: return
@@ -264,7 +264,7 @@ public func testForcedCastNSDictStringtoSwiftDictInt() -> [Int:Int] {
 }
 
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding38testCondCastNSDictStringtoSwiftDictIntFT_GSqGVSs10DictionarySiSi__
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding38testCondCastNSDictStringtoSwiftDictIntFT_GSqGVs10DictionarySiSi__
 // CHECK-NOT: checked_cast
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._conditionallyBridgeFromObjectiveC!1
 // CHECK: return
@@ -281,7 +281,7 @@ var nsSetInt: NSSet = [1, 2, 3, 4]
 var nsSetDouble: NSSet = [1.1, 2.2, 3.3, 4.4]
 var nsSetString: NSSet = ["One", "Two", "Three", "Four"]
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding29testForcedCastNStoSwiftSetIntFT_GVSs3SetSi_
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding29testForcedCastNStoSwiftSetIntFT_GVs3SetSi_
 // CHECK-NOT: unconditional_checked
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
 // CHECK: return
@@ -291,7 +291,7 @@ public func testForcedCastNStoSwiftSetInt() -> Set<Int> {
   return set
 }
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding27testCondCastNStoSwiftSetIntFT_GSqGVSs3SetSi__
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding27testCondCastNStoSwiftSetIntFT_GSqGVs3SetSi__
 // CHECK-NOT: checked_cast
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._conditionallyBridgeFromObjectiveC!1
 // CHECK: return
@@ -301,7 +301,7 @@ public func testCondCastNStoSwiftSetInt() -> Set<Int>? {
   return setOpt
 }
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding32testForcedCastNStoSwiftSetDoubleFT_GVSs3SetSd_
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding32testForcedCastNStoSwiftSetDoubleFT_GVs3SetSd_
 // CHECK-NOT: unconditional_checked
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
 // CHECK: return
@@ -311,7 +311,7 @@ public func testForcedCastNStoSwiftSetDouble() -> Set<Double> {
   return set
 }
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding30testCondCastNStoSwiftSetDoubleFT_GSqGVSs3SetSd__
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding30testCondCastNStoSwiftSetDoubleFT_GSqGVs3SetSd__
 // CHECK-NOT: checked_cast
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._conditionallyBridgeFromObjectiveC!1
 // CHECK: return
@@ -322,7 +322,7 @@ public func testCondCastNStoSwiftSetDouble() -> Set<Double>? {
 }
 
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding32testForcedCastNStoSwiftSetStringFT_GVSs3SetSS_
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding32testForcedCastNStoSwiftSetStringFT_GVs3SetSS_
 // CHECK-NOT: unconditional_checked
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
 // CHECK: return
@@ -332,7 +332,7 @@ public func testForcedCastNStoSwiftSetString() -> Set<String> {
   return set
 }
 
-// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding30testCondCastNStoSwiftSetStringFT_GSqGVSs3SetSS__
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding30testCondCastNStoSwiftSetStringFT_GSqGVs3SetSS__
 // CHECK-NOT: checked_cast
 // CHECK: witness_method{{.*}}#_ObjectiveCBridgeable._conditionallyBridgeFromObjectiveC!1
 // CHECK: return

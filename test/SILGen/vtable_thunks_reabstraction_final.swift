@@ -42,7 +42,7 @@ class GenericSub<U: AnyObject>: GenericSuper<U>, Barrable {
   }
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWuRq_Ss9AnyObject_GC33vtable_thunks_reabstraction_final10GenericSubq__S0_8BarrableS0_FS2_3foouRq_S2__fq_Fqq_S2_3BarGSqqq_S2_3Bar_
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWuRq_s9AnyObject_GC33vtable_thunks_reabstraction_final10GenericSubq__S0_8BarrableS0_FS2_3foouRq_S2__fq_Fqq_S2_3BarGSqqq_S2_3Bar_
 // CHECK:         class_method {{%.*}} : $GenericSub<U>, #GenericSub.foo!1 {{.*}}, $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (@out Optional<τ_0_0>, @in τ_0_0, @guaranteed GenericSub<τ_0_0>) -> ()
 
 class C {}

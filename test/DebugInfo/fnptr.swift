@@ -26,7 +26,7 @@ func main() -> Int64 {
     // CHECK-DAG: ![[BAZMEMBER]] = !DIDerivedType(tag: DW_TAG_member,{{.*}} baseType: ![[BAZPTR:[0-9]+]]
     // CHECK-DAG: ![[BAZPTR]] = !DIDerivedType(tag: DW_TAG_pointer_type,{{.*}} baseType: ![[BAZT:[0-9]+]]
     // CHECK-DAG: ![[BAZT]] = !DISubroutineType(types: ![[BAZARGS:.*]])
-    // CHECK-DAG: ![[BAZARGS]] = !{!"_TtVSs5Int64", !"_TtSf"}
+    // CHECK-DAG: ![[BAZARGS]] = !{!"_TtVs5Int64", !"_TtSf"}
     var baz_function_pointer = baz
     baz_function_pointer(2.89)
 
@@ -36,7 +36,7 @@ func main() -> Int64 {
     // CHECK-DAG: ![[BARZMEMBER]] = !DIDerivedType(tag: DW_TAG_member,{{.*}} baseType: ![[BARZPTR:[0-9]+]]
     // CHECK-DAG: ![[BARZPTR]] = !DIDerivedType(tag: DW_TAG_pointer_type,{{.*}} baseType: ![[BARZT:[0-9]+]]
     // CHECK-DAG: ![[BARZT]] = !DISubroutineType(types: ![[BARZARGS:.*]])
-    // CHECK-DAG: ![[BARZARGS]] = !{!"_TtVSs5Int64", !"_TtSf", !"_TtSf"}
+    // CHECK-DAG: ![[BARZARGS]] = !{!"_TtVs5Int64", !"_TtSf", !"_TtSf"}
     var barz_function_pointer = barz
     return barz_function_pointer(2.89, -1.0)
 }

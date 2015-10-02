@@ -200,7 +200,7 @@ struct OptionalPlaygroundQuickLook {
 struct MirrorWitnessTable;
   
 /// The protocol descriptor for _Reflectable from the stdlib.
-extern "C" const ProtocolDescriptor _TMpSs12_Reflectable;
+extern "C" const ProtocolDescriptor _TMps12_Reflectable;
   
 // This structure needs to mirror _MagicMirrorData in the stdlib.
 struct MagicMirrorData {
@@ -661,14 +661,14 @@ extern "C" const Metadata _TMdSi; // Int
 extern "C" const Metadata _TMdSu; // UInt
 extern "C" const Metadata _TMdSf; // Float
 extern "C" const Metadata _TMdSd; // Double
-extern "C" const Metadata _TMdVSs4Int8;
-extern "C" const Metadata _TMdVSs5Int16;
-extern "C" const Metadata _TMdVSs5Int32;
-extern "C" const Metadata _TMdVSs5Int64;
-extern "C" const Metadata _TMdVSs5UInt8;
-extern "C" const Metadata _TMdVSs6UInt16;
-extern "C" const Metadata _TMdVSs6UInt32;
-extern "C" const Metadata _TMdVSs6UInt64;
+extern "C" const Metadata _TMdVs4Int8;
+extern "C" const Metadata _TMdVs5Int16;
+extern "C" const Metadata _TMdVs5Int32;
+extern "C" const Metadata _TMdVs5Int64;
+extern "C" const Metadata _TMdVs5UInt8;
+extern "C" const Metadata _TMdVs6UInt16;
+extern "C" const Metadata _TMdVs6UInt32;
+extern "C" const Metadata _TMdVs6UInt64;
   
 // Set to 1 to enable reflection of objc ivars.
 #define REFLECT_OBJC_IVARS 0
@@ -679,26 +679,26 @@ extern "C" const Metadata _TMdVSs6UInt64;
 static const Metadata *getMetadataForEncoding(const char *encoding) {
   switch (*encoding) {
   case 'c': // char
-    return &_TMdVSs4Int8;
+    return &_TMdVs4Int8;
   case 's': // short
-    return &_TMdVSs5Int16;
+    return &_TMdVs5Int16;
   case 'i': // int
-    return &_TMdVSs5Int32;
+    return &_TMdVs5Int32;
   case 'l': // long
     return &_TMdSi;
   case 'q': // long long
-    return &_TMdVSs5Int64;
+    return &_TMdVs5Int64;
       
   case 'C': // unsigned char
-    return &_TMdVSs5UInt8;
+    return &_TMdVs5UInt8;
   case 'S': // unsigned short
-    return &_TMdVSs6UInt16;
+    return &_TMdVs6UInt16;
   case 'I': // unsigned int
-    return &_TMdVSs6UInt32;
+    return &_TMdVs6UInt32;
   case 'L': // unsigned long
     return &_TMdSu;
   case 'Q': // unsigned long long
-    return &_TMdVSs6UInt64;
+    return &_TMdVs6UInt64;
       
   case 'B': // _Bool
     return &_TMdSb;
@@ -924,48 +924,48 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
 // Addresses of the type metadata and Mirror witness tables for the primitive
 // mirrors.
 extern "C" const Metadata OpaqueMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVSs13_OpaqueMirror");
+  __asm__(UNDERSCORE "_TMdVs13_OpaqueMirror");
 extern "C" const MirrorWitnessTable OpaqueMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs13_OpaqueMirrorSs11_MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVs13_OpaqueMirrors11_MirrorTypes");
 extern "C" const Metadata TupleMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVSs12_TupleMirror");
+  __asm__(UNDERSCORE "_TMdVs12_TupleMirror");
 extern "C" const MirrorWitnessTable TupleMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs12_TupleMirrorSs11_MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVs12_TupleMirrors11_MirrorTypes");
 
 extern "C" const Metadata StructMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVSs13_StructMirror");
+  __asm__(UNDERSCORE "_TMdVs13_StructMirror");
 extern "C" const MirrorWitnessTable StructMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs13_StructMirrorSs11_MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVs13_StructMirrors11_MirrorTypes");
 
 extern "C" const Metadata EnumMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVSs11_EnumMirror");
+  __asm__(UNDERSCORE "_TMdVs11_EnumMirror");
 extern "C" const MirrorWitnessTable EnumMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs11_EnumMirrorSs11_MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVs11_EnumMirrors11_MirrorTypes");
 
 extern "C" const Metadata ClassMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVSs12_ClassMirror");
+  __asm__(UNDERSCORE "_TMdVs12_ClassMirror");
 extern "C" const MirrorWitnessTable ClassMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs12_ClassMirrorSs11_MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVs12_ClassMirrors11_MirrorTypes");
 
 extern "C" const Metadata ClassSuperMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVSs17_ClassSuperMirror");
+  __asm__(UNDERSCORE "_TMdVs17_ClassSuperMirror");
 extern "C" const MirrorWitnessTable ClassSuperMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs17_ClassSuperMirrorSs11_MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVs17_ClassSuperMirrors11_MirrorTypes");
 
 extern "C" const Metadata MetatypeMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVSs15_MetatypeMirror");
+  __asm__(UNDERSCORE "_TMdVs15_MetatypeMirror");
 extern "C" const MirrorWitnessTable MetatypeMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs15_MetatypeMirrorSs11_MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVs15_MetatypeMirrors11_MirrorTypes");
   
 #if SWIFT_OBJC_INTEROP
 extern "C" const Metadata ObjCMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVSs11_ObjCMirror");
+  __asm__(UNDERSCORE "_TMdVs11_ObjCMirror");
 extern "C" const MirrorWitnessTable ObjCMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs11_ObjCMirrorSs11_MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVs11_ObjCMirrors11_MirrorTypes");
 extern "C" const Metadata ObjCSuperMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVSs16_ObjCSuperMirror");
+  __asm__(UNDERSCORE "_TMdVs16_ObjCSuperMirror");
 extern "C" const MirrorWitnessTable ObjCSuperMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs16_ObjCSuperMirrorSs11_MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVs16_ObjCSuperMirrors11_MirrorTypes");
 #endif
 
 #undef UNDERSCORE
@@ -1155,7 +1155,7 @@ recur:
     // the witness table from the container.
     unsigned wtOffset = 0;
     for (unsigned i = 0; i < existential->Protocols.NumProtocols; ++i) {
-      if (existential->Protocols[i] == &_TMpSs12_Reflectable) {
+      if (existential->Protocols[i] == &_TMps12_Reflectable) {
         return std::make_tuple(
             reinterpret_cast<const _ReflectableWitnessTable*>(
               existential->getWitnessTable(Value, wtOffset)),
@@ -1190,7 +1190,7 @@ recur:
   
   return std::make_tuple(
       reinterpret_cast<const _ReflectableWitnessTable*>(
-        swift_conformsToProtocol(T, &_TMpSs12_Reflectable)),
+        swift_conformsToProtocol(T, &_TMps12_Reflectable)),
       T,
       Value);
 }

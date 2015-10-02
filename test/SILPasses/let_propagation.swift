@@ -141,8 +141,8 @@ func sum3() -> Int32 {
 // Check that gx and gy are loaded only once and then reused.
 // CHECK-LABEL: sil {{.*}}testUseGlobalLet
 // CHECK: bb0
-// CHECK: global_addr @_Tv15let_propagation2gyVSs5Int32
-// CHECK: global_addr @_Tv15let_propagation2gxVSs5Int32
+// CHECK: global_addr @_Tv15let_propagation2gyVs5Int32
+// CHECK: global_addr @_Tv15let_propagation2gxVs5Int32
 // CHECK: struct_element_addr
 // CHECK: load
 // CHECK: struct_element_addr
@@ -177,7 +177,7 @@ struct A1 {
     }
   }
 
-  // CHECK-LABEL: sil hidden @_TFV15let_propagation2A12f1fS0_FT_VSs5Int32
+  // CHECK-LABEL: sil hidden @_TFV15let_propagation2A12f1fS0_FT_Vs5Int32
   // CHECK: bb0
   // CHECK: struct_extract {{.*}}#A1.x
   // CHECK: struct_extract {{.*}}#Int32._value
@@ -192,7 +192,7 @@ struct A1 {
     return x + x
   }
 
-  // CHECK-LABEL: sil hidden @_TFV15let_propagation2A12f2fS0_FT_VSs5Int32
+  // CHECK-LABEL: sil hidden @_TFV15let_propagation2A12f2fS0_FT_Vs5Int32
   // CHECK: bb0
   // CHECK: integer_literal $Builtin.Int32, 200
   // CHECK-NEXT: struct $Int32
@@ -207,7 +207,7 @@ struct A1 {
 
 class A2 {
   let x: B2 = B2()
-  // CHECK-LABEL: sil hidden @_TFC15let_propagation2A22affS0_FT_VSs5Int32
+  // CHECK-LABEL: sil hidden @_TFC15let_propagation2A22affS0_FT_Vs5Int32
   // bb0
   // CHECK: %[[X:[0-9]+]] = ref_element_addr {{.*}}A2.x
   // CHECK-NEXT: load %[[X]]

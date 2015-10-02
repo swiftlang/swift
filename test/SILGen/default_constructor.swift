@@ -36,7 +36,7 @@ class E {
 // CHECK-LABEL: sil hidden @_TFC19default_constructor1EcfMS0_FT_S0_ : $@convention(method) (@owned E) -> @owned E
 // CHECK-NEXT: bb0([[SELFIN:%[0-9]+]] : $E)
 // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized
-// CHECK: [[INT64_CTOR:%[0-9]+]] = function_ref @_TFVSs5Int64CfMS_FT_S_ : $@convention(thin) (@thin Int64.Type) -> Int64
+// CHECK: [[INT64_CTOR:%[0-9]+]] = function_ref @_TFVs5Int64CfMS_FT_S_ : $@convention(thin) (@thin Int64.Type) -> Int64
 // CHECK-NEXT: [[INT64:%[0-9]+]] = metatype $@thin Int64.Type
 // CHECK-NEXT: [[ZERO:%[0-9]+]] = apply [[INT64_CTOR]]([[INT64]]) : $@convention(thin) (@thin Int64.Type) -> Int64
 // CHECK-NEXT: [[IREF:%[0-9]+]] = ref_element_addr [[SELF]] : $E, #E.i
@@ -75,7 +75,7 @@ struct G {
 
 // CHECK-NOT: default_constructor.G.init (default_constructor.G.Type)()
 // CHECK-LABEL: default_constructor.G.init (default_constructor.G.Type)(bar : Swift.Optional<Swift.Int32>)
-// CHECK-NEXT: sil hidden @_TFV19default_constructor1GCfMS0_FT3barGSqVSs5Int32__S0_
+// CHECK-NEXT: sil hidden @_TFV19default_constructor1GCfMS0_FT3barGSqVs5Int32__S0_
 // CHECK-NOT: default_constructor.G.init (default_constructor.G.Type)()
 
 func useImplicitDecls() {

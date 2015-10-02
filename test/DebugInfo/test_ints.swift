@@ -5,9 +5,9 @@
 // CHECK-SAME:             size: 64, align: 64
 // CHECK-NOT:              offset: 0
 // CHECK-NOT:              DIFlagFwdDecl
-// CHECK-SAME:             identifier: "_TtVSs5Int64"
+// CHECK-SAME:             identifier: "_TtVs5Int64"
 // CHECK: !DIGlobalVariable(name: "a",{{.*}} line: [[@LINE+2]]
-// CHECK-SAME:              type: !"_TtVSs5Int64"
+// CHECK-SAME:              type: !"_TtVs5Int64"
 var a : Int64 = 2
 
 // CHECK: !DIGlobalVariable(name: "b",{{.*}} line: [[@LINE+2]]

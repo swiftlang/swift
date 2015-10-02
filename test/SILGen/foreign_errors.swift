@@ -64,7 +64,7 @@ extension NSObject {
 // CHECK:   [[T0:%.*]] = function_ref @swift_convertErrorTypeToNSError : $@convention(thin) (@owned ErrorType) -> @owned NSError
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[ERR]])
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.Some!enumelt.1, [[T1]] : $NSError
-// CHECK:   [[SETTER:%.*]] = function_ref @_TFVSs33AutoreleasingUnsafeMutablePointers6memoryq_ :
+// CHECK:   [[SETTER:%.*]] = function_ref @_TFVs33AutoreleasingUnsafeMutablePointers6memoryq_ :
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   store [[OBJCERR]] to [[TEMP]]#1
 // CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]]#1, %0)
@@ -90,7 +90,7 @@ extension NSObject {
 // CHECK:   [[T0:%.*]] = function_ref @swift_convertErrorTypeToNSError : $@convention(thin) (@owned ErrorType) -> @owned NSError
 // CHECK:   [[T1:%.*]] = apply [[T0]]([[ERR]])
 // CHECK:   [[OBJCERR:%.*]] = enum $Optional<NSError>, #Optional.Some!enumelt.1, [[T1]] : $NSError
-// CHECK:   [[SETTER:%.*]] = function_ref @_TFVSs33AutoreleasingUnsafeMutablePointers6memoryq_ :
+// CHECK:   [[SETTER:%.*]] = function_ref @_TFVs33AutoreleasingUnsafeMutablePointers6memoryq_ :
 // CHECK:   [[TEMP:%.*]] = alloc_stack $Optional<NSError>
 // CHECK:   store [[OBJCERR]] to [[TEMP]]#1
 // CHECK:   apply [[SETTER]]<Optional<NSError>>([[TEMP]]#1, %0)
@@ -147,7 +147,7 @@ class VeryErrorProne : ErrorProne {
     try super.init(one: two)
   }
 }
-// CHECK:    sil hidden @_TFC14foreign_errors14VeryErrorPronecfMS0_FzT7withTwoGSqPSs9AnyObject___S0_
+// CHECK:    sil hidden @_TFC14foreign_errors14VeryErrorPronecfMS0_FzT7withTwoGSqPs9AnyObject___S0_
 // CHECK:      [[BOX:%.*]] = alloc_box $VeryErrorProne
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[BOX]]#1
 // CHECK:      [[T0:%.*]] = load [[MARKED_BOX]]
@@ -178,8 +178,8 @@ func testProtocol(p: ErrorProneProtocol) throws {
 class ExtremelyErrorProne : ErrorProne {
   override func conflict3(obj: AnyObject, error: ()) throws {}
 }
-// CHECK: sil hidden @_TFC14foreign_errors19ExtremelyErrorProne9conflict3fS0_FzTPSs9AnyObject_5errorT__T_
-// CHECK: sil hidden [thunk] @_TToFC14foreign_errors19ExtremelyErrorProne9conflict3fS0_FzTPSs9AnyObject_5errorT__T_ : $@convention(objc_method) (AnyObject, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, ExtremelyErrorProne) -> Bool
+// CHECK: sil hidden @_TFC14foreign_errors19ExtremelyErrorProne9conflict3fS0_FzTPs9AnyObject_5errorT__T_
+// CHECK: sil hidden [thunk] @_TToFC14foreign_errors19ExtremelyErrorProne9conflict3fS0_FzTPs9AnyObject_5errorT__T_ : $@convention(objc_method) (AnyObject, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, ExtremelyErrorProne) -> Bool
 
 // These conventions are usable because of swift_error. rdar://21715350
 func testNonNilError() throws -> Float {
@@ -201,7 +201,7 @@ func testNonNilError() throws -> Float {
 func testPreservedResult() throws -> CInt {
   return try ErrorProne.ounce()
 }
-// CHECK: sil hidden @_TF14foreign_errors19testPreservedResultFzT_VSs5Int32
+// CHECK: sil hidden @_TF14foreign_errors19testPreservedResultFzT_Vs5Int32
 // CHECK:   [[T0:%.*]] = metatype $@thick ErrorProne.Type
 // CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.ounce!1.foreign : ErrorProne.Type -> () throws -> Int32 , $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @objc_metatype ErrorProne.Type) -> Int32
 // CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>

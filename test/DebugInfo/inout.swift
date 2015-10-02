@@ -10,20 +10,20 @@ typealias MyFloat = Float
 
 // CHECK: define hidden void @_TF5inout13modifyFooHeap
 // CHECK: %[[ALLOCB:.*]] = alloca %Sf
-// CHECK: %[[ALLOCA:.*]] = alloca %VSs5Int64*
+// CHECK: %[[ALLOCA:.*]] = alloca %Vs5Int64*
 // CHECK-DAG:  call void @llvm.dbg.declare(metadata {{.*}} %[[ALLOCA]], metadata ![[A:[0-9]+]]
 // CHECK-DAG:  call void @llvm.dbg.declare(metadata {{.*}} %[[ALLOCB]], metadata ![[B:[0-9]+]], metadata !{{[0-9]+}})
 
 // Closure with promoted capture.
-// PROMO-CHECK: define {{.*}}@_TTSf2d_i___TFF5inout13modifyFooHeapFTRVSs5Int64Sf_T_U_FT_S0_
+// PROMO-CHECK: define {{.*}}@_TTSf2d_i___TFF5inout13modifyFooHeapFTRVs5Int64Sf_T_U_FT_S0_
 // PROMO-CHECK: call void @llvm.dbg.declare(metadata {{(i32|i64)}}* %{{.*}}, metadata ![[A1:[0-9]+]], metadata ![[EMPTY_EXPR:[0-9]+]])
 
 // PROMO-CHECK-DAG: ![[EMPTY_EXPR]] = !DIExpression()
-// PROMO-CHECK-DAG: ![[REFINT:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_TtRVSs5Int64"
-// PROMO-CHECK-DAG: ![[A1]] = !DILocalVariable(name: "a", arg: 1{{.*}} type: !"_TtVSs5Int64"
-// PROMO-CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtRVSs5Int64"
+// PROMO-CHECK-DAG: ![[REFINT:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_TtRVs5Int64"
+// PROMO-CHECK-DAG: ![[A1]] = !DILocalVariable(name: "a", arg: 1{{.*}} type: !"_TtVs5Int64"
+// PROMO-CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtRVs5Int64"
 func modifyFooHeap(inout a: Int64,
-// CHECK-DAG: ![[A]] = !DILocalVariable(name: "a", arg: 1{{.*}} line: [[@LINE-1]],{{.*}} type: !"_TtRVSs5Int64"
+// CHECK-DAG: ![[A]] = !DILocalVariable(name: "a", arg: 1{{.*}} line: [[@LINE-1]],{{.*}} type: !"_TtRVs5Int64"
 // CHECK-DAG: ![[B]] = !DILocalVariable(name: "b", arg: 2{{.*}} line: [[@LINE+2]],{{.*}} type: ![[MYFLOAT:[0-9]+]]
 // CHECK-DAG: ![[MYFLOAT]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_Tta5inout7MyFloat",{{.*}} baseType: !"_TtSf"
                    var _ b: MyFloat)
@@ -37,12 +37,12 @@ func modifyFooHeap(inout a: Int64,
 }
 
 // Inout reference type.
-// FOO-CHECK: define {{.*}}@_TF5inout9modifyFooFTRVSs5Int64Sf_T_
-// FOO-CHECK: call void @llvm.dbg.declare(metadata %VSs5Int64** %{{.*}}, metadata ![[U:[0-9]+]], metadata ![[EMPTY_EXPR:.*]])
+// FOO-CHECK: define {{.*}}@_TF5inout9modifyFooFTRVs5Int64Sf_T_
+// FOO-CHECK: call void @llvm.dbg.declare(metadata %Vs5Int64** %{{.*}}, metadata ![[U:[0-9]+]], metadata ![[EMPTY_EXPR:.*]])
 // FOO-CHECK-DAG: ![[EMPTY_EXPR]] = !DIExpression()
 func modifyFoo(inout u: Int64,
 // FOO-CHECK-DAG: !DILocalVariable(name: "v", arg: 2{{.*}} line: [[@LINE+2]],{{.*}} type: ![[MYFLOAT:[0-9]+]]
-// FOO-CHECK-DAG: [[U]] = !DILocalVariable(name: "u", arg: 1{{.*}} line: [[@LINE-2]],{{.*}} type: !"_TtRVSs5Int64"
+// FOO-CHECK-DAG: [[U]] = !DILocalVariable(name: "u", arg: 1{{.*}} line: [[@LINE-2]],{{.*}} type: !"_TtRVs5Int64"
                var _ v: MyFloat)
 // FOO-CHECK-DAG: ![[MYFLOAT]] = !DIDerivedType(tag: DW_TAG_typedef, name: "_Tta5inout7MyFloat",{{.*}} baseType: !"_TtSf"
 {

@@ -146,7 +146,7 @@ final class C2:C {
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
-// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver1FCS_2C1VSs5Int32 :
+// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver1FCS_2C1Vs5Int32 :
 // CHECK: integer_literal $Builtin.Int32, 2
 // CHECK: struct $Int32 (%{{.*}} : $Builtin.Int32)
 // CHECK-NOT: class_method
@@ -159,7 +159,7 @@ func driver1(var c: C1) -> Int32 {
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
-// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver3FCS_1CVSs5Int32 :
+// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver3FCS_1CVs5Int32 :
 // CHECK: bb{{[0-9]+}}(%{{[0-9]+}} : $C2):
 // CHECK-NOT: bb{{.*}}:
 // check that for C2, we convert the non-optional result into an optional and then cast.
@@ -228,7 +228,7 @@ public class D2: D1 {
 
 // Check that the boo call gets properly devirtualized and that
 // that D2.foo() is inlined thanks to this.
-// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver2FCS_2D2VSs5Int32
+// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver2FCS_2D2Vs5Int32
 // CHECK-NOT: class_method
 // CHECK: checked_cast_br [exact] %{{.*}} : $D1 to $D2
 // CHECK: bb2

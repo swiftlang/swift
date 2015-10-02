@@ -94,13 +94,13 @@ extension ErrorType {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TF19existential_erasure12errorHandlerFzPSs9ErrorType_PS0__
+// CHECK-LABEL: sil hidden @_TF19existential_erasure12errorHandlerFzPs9ErrorType_PS0__
 func errorHandler(e: ErrorType) throws -> ErrorType {
 // CHECK-NEXT: bb0(%0 : $ErrorType):
 // CHECK:  debug_value %0 : $ErrorType
 // CHECK:  [[OPEN:%.*]] = open_existential_box %0 : $ErrorType to $*[[OPEN_TYPE:@opened\(.*\) ErrorType]]
 // CHECK:  [[RESULT:%.*]] = alloc_existential_box $ErrorType, $[[OPEN_TYPE]]
-// CHECK:  [[FUNC:%.*]] = function_ref @_TFeRq_Ss9ErrorType_19existential_erasureS_17returnOrThrowSelfuRq_S__fq_FzT_q_
+// CHECK:  [[FUNC:%.*]] = function_ref @_TFeRq_s9ErrorType_19existential_erasureS_17returnOrThrowSelfuRq_S__fq_FzT_q_
 // CHECK:  try_apply [[FUNC]]<[[OPEN_TYPE]]>([[RESULT]]#1, [[OPEN]])
 //
 // CHECK: bb1

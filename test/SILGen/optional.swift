@@ -67,7 +67,7 @@ func wrap<T>(x: T) -> T? { return x }
 
 // CHECK-LABEL: sil hidden @_TF8optional16wrap_then_unwrap
 func wrap_then_unwrap<T>(x: T) -> T {
-  // CHECK: [[FORCE:%.*]] = function_ref @_TFSs17_getOptionalValueurFGSqq__q_
+  // CHECK: [[FORCE:%.*]] = function_ref @_TFs17_getOptionalValueurFGSqq__q_
   // CHECK: apply [[FORCE]]<{{.*}}>(%0, {{%.*}})
   return wrap(x)!
 }
@@ -83,7 +83,7 @@ func tuple_bind(x: (Int, String)?) -> String? {
 
 // rdar://21883752 - We were crashing on this function because the deallocation happened
 // out of scope.
-// CHECK-LABEL: sil hidden @_TF8optional16crash_on_deallocFTGVSs10DictionarySiGSaSi___T_
+// CHECK-LABEL: sil hidden @_TF8optional16crash_on_deallocFTGVs10DictionarySiGSaSi___T_
 func crash_on_dealloc(var dict : [Int : [Int]] = [:]) {
   dict[1]?.append(2)
 }

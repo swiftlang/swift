@@ -3,7 +3,7 @@
 import Builtin
 import Swift
 
-sil @_TSs5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
+sil @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
 
 // CHECK-LABEL: sil @liveness0
 // CHECK-NOT: alloc_stack
@@ -40,7 +40,7 @@ bb3:                                              // Preds: bb1
 
 bb4:                                              // Preds: bb3 bb2
   // function_ref  
-  %25 = function_ref @_TSs5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %36
+  %25 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %36
   %26 = load %8#1 : $*Int64                       // user: %30
   %27 = integer_literal $Builtin.Int64, 2         // user: %31
   %28 = integer_literal $Builtin.Int1, -1         // user: %31

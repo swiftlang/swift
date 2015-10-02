@@ -60,14 +60,14 @@ optional(x: .None)
 
 var pair : (Int, Double) = makePair(a: 1, b: 2.5)
 
-// SIL:   [[DIFFERENT_A:%.+]] = function_ref @_TF8def_func9differentuRq_Ss9Equatable_FT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
-// SIL:   [[DIFFERENT_B:%.+]] = function_ref @_TF8def_func9differentuRq_Ss9Equatable_FT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// SIL:   [[DIFFERENT_A:%.+]] = function_ref @_TF8def_func9differentuRq_s9Equatable_FT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// SIL:   [[DIFFERENT_B:%.+]] = function_ref @_TF8def_func9differentuRq_s9Equatable_FT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
 
 different(a: 1, b: 2)
 different(a: false, b: false)
 
-// SIL:   [[DIFFERENT2_A:%.+]] = function_ref @_TF8def_func10different2uRq_Ss9Equatable_FT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
-// SIL:   [[DIFFERENT2_B:%.+]] = function_ref @_TF8def_func10different2uRq_Ss9Equatable_FT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// SIL:   [[DIFFERENT2_A:%.+]] = function_ref @_TF8def_func10different2uRq_s9Equatable_FT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// SIL:   [[DIFFERENT2_B:%.+]] = function_ref @_TF8def_func10different2uRq_s9Equatable_FT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
 different2(a: 1, b: 2)
 different2(a: false, b: false)
 

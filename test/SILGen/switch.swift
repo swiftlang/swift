@@ -493,7 +493,7 @@ func test_isa_class_1(let x x: B) {
   f()
 }
 
-// CHECK-LABEL: sil hidden @_TF6switch16test_isa_class_2FT1xCS_1B_PSs9AnyObject_
+// CHECK-LABEL: sil hidden @_TF6switch16test_isa_class_2FT1xCS_1B_Ps9AnyObject_
 func test_isa_class_2(x x: B) -> AnyObject {
   // CHECK:   strong_retain [[X:%0]]
   switch x {

@@ -7,7 +7,7 @@
 // CHECK-SAME:             identifier: "_TtO4enum5Color"
 enum Color : UInt64 {
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "Red"
-// CHECK-SAME:           baseType: !"_TtVSs6UInt64"
+// CHECK-SAME:           baseType: !"_TtVs6UInt64"
 // CHECK-SAME:           size: 8, align: 8{{[,)]}}
   case Red, Green, Blue
 }
@@ -22,7 +22,7 @@ enum MaybeIntPair {
 // CHECK-SAME:           size: 136, align: 64{{[,)]}}
 case None
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "Just"
-// CHECK-SAME:           baseType: !"_TtTVSs5Int64S__"
+// CHECK-SAME:           baseType: !"_TtTVs5Int64S__"
 // CHECK-SAME:           size: 136, align: 64{{[,)]}}
   case Just(Int64, Int64)
 }

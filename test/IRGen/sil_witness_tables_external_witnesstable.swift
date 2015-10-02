@@ -5,8 +5,8 @@
 
 import Swift
 
-// CHECK: @_TMdVSs1X = external global %swift.type
-// CHECK: @_TWPVSs1XSs1PSs = external global i8*
+// CHECK: @_TMdVs1X = external global %swift.type
+// CHECK: @_TWPVs1Xs1Ps = external global i8*
 
 func doSomething<T : P>(t : T) -> Y {
   return t.doSomething()

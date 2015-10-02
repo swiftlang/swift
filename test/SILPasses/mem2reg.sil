@@ -12,7 +12,7 @@ bb0(%0 : $Int64):
   %1 = alloc_stack $Int64  // var c               // users: %5, %2
   store %0 to %1#1 : $*Int64                      // id: %2
   // function_ref Swift.print (val : Swift.Int64) -> ()
-  %3 = function_ref @_TSs5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %4
+  %3 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %4
   %4 = apply %3(%0) : $@convention(thin) (Int64) -> ()
   dealloc_stack %1#0 : $*@local_storage Int64     // id: %5
   %6 = tuple ()                                   // user: %7
@@ -20,7 +20,7 @@ bb0(%0 : $Int64):
 }
 
 // Swift.print (val : Swift.Int64) -> ()
-sil @_TSs5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
+sil @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
 
 // CHECK-LABEL: sil @multiple_store_vals
 // CHECK-NOT: alloc_stack
@@ -131,7 +131,7 @@ bb0(%0 : $Int64):
   store %13 to %3#1 : $*Int64                     // id: %14
 
   // function_ref Swift.print (val : Swift.Int64) -> ()
-  %16 = function_ref @_TSs5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %18
+  %16 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %18
   %17 = load %3#1 : $*Int64                       // user: %18
   %18 = apply %16(%17) : $@convention(thin) (Int64) -> ()
   dealloc_stack %3#0 : $*@local_storage Int64     // id: %19

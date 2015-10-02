@@ -49,7 +49,7 @@ extension Gizmo : Bells {
 // CHECK:   [[IUO_RESULT_TEMP:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<Gizmo>
 // CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]]#1 : $*ImplicitlyUnwrappedOptional<Gizmo>
 
-// CHECK:   [[UNWRAP_FUNC:%[0-9]+]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
+// CHECK:   [[UNWRAP_FUNC:%[0-9]+]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
 // CHECK:   [[UNWRAPPED_RESULT_TEMP:%[0-9]+]] = alloc_stack $Gizmo
 // CHECK:   apply [[UNWRAP_FUNC]]<Gizmo>([[UNWRAPPED_RESULT_TEMP]]#1, [[IUO_RESULT_TEMP]]#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
 // CHECK:   [[UNWRAPPED_RESULT:%[0-9]+]] = load [[UNWRAPPED_RESULT_TEMP]]#1 : $*Gizmo
@@ -64,8 +64,8 @@ protocol Subscriptable {
   subscript(x: Int) -> AnyObject { get }
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWCSo7NSArray14objc_witnesses13SubscriptableS0_FS1_g9subscriptFSiPSs9AnyObject_ : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @owned AnyObject {
-// CHECK:         function_ref @_TTOFCSo7NSArrayg9subscriptFSiPSs9AnyObject_ : $@convention(method) (Int, @guaranteed NSArray) -> @owned AnyObject
-// CHECK-LABEL: sil shared @_TTOFCSo7NSArrayg9subscriptFSiPSs9AnyObject_ : $@convention(method) (Int, @guaranteed NSArray) -> @owned AnyObject {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWCSo7NSArray14objc_witnesses13SubscriptableS0_FS1_g9subscriptFSiPs9AnyObject_ : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @owned AnyObject {
+// CHECK:         function_ref @_TTOFCSo7NSArrayg9subscriptFSiPs9AnyObject_ : $@convention(method) (Int, @guaranteed NSArray) -> @owned AnyObject
+// CHECK-LABEL: sil shared @_TTOFCSo7NSArrayg9subscriptFSiPs9AnyObject_ : $@convention(method) (Int, @guaranteed NSArray) -> @owned AnyObject {
 // CHECK:         class_method [volatile] %1 : $NSArray, #NSArray.subscript!getter.1.foreign
 extension NSArray: Subscriptable {}

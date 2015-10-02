@@ -402,7 +402,7 @@ bb9:
 
 bb10(%26 : $C):
 
-  %27 = function_ref @_TZFSsoi3eeeFTGSqPSs9AnyObject__GSqPS____Sb : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
+  %27 = function_ref @_TZFsoi3eeeFTGSqPs9AnyObject__GSqPS____Sb : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
   strong_retain %13 : $C
   %29 = init_existential_ref %13 : $C : $C, $AnyObject
   %30 = enum $Optional<AnyObject>, #Optional.Some!enumelt.1, %29 : $AnyObject
@@ -440,7 +440,7 @@ bb14(%48 : $Int32):
 sil [transparent] [fragile] @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@convention(method) (Bool) -> Builtin.Int1
 
 
-sil [fragile] @_TZFSsoi3eeeFTGSqPSs9AnyObject__GSqPS____Sb : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
+sil [fragile] @_TZFsoi3eeeFTGSqPs9AnyObject__GSqPS____Sb : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
 
 sil_witness_table C: AnyObject module main
 

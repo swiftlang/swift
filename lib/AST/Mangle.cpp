@@ -315,9 +315,9 @@ void Mangler::mangleModule(const Module *module) {
 
   // Try the special 'swift' substitution.
   // context ::= known-module
-  // known-module ::= 'Ss'
+  // known-module ::= 's'
   if (module->isStdlibModule()) {
-    Buffer << "Ss";
+    Buffer << "s";
     return;
   }
 
@@ -1686,7 +1686,7 @@ void Mangler::mangleEntity(const ValueDecl *decl,
   if (isa<VarDecl>(decl)) {
     Buffer << 'v';
   } else if (isa<SubscriptDecl>(decl)) {
-    Buffer << 's';
+    Buffer << 'i';
   } else if (isa<GenericTypeParamDecl>(decl)) {
     shouldBindParent = BindGenerics::None;
     Buffer << 't';

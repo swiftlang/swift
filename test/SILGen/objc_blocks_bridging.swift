@@ -111,7 +111,7 @@ class Test: NSObject {
 func clearDraggingItemImageComponentsProvider(x: NSDraggingItem) {
   x.imageComponentsProvider = {}
 }
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oGSaPSs9AnyObject___XFdCb__aGSqCSo7NSArray__
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oGSaPs9AnyObject___XFdCb__aGSqCSo7NSArray__
 // CHECK:         [[CONVERT:%.*]] = function_ref @_TF10Foundation22_convertArrayToNSArrayurFGSaq__CSo7NSArray
 // CHECK:         [[CONVERTED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL:%.*]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[CONVERTED]]

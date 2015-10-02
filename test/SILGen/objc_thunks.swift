@@ -201,7 +201,7 @@ class Hoozit : Gizmo {
   // CHECK: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[SELF]] : $Hoozit, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo! , $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NOT: unconditional_checked_cast downcast [[SELF_REPLACED]] : $Gizmo to $Hoozit
-  // CHECK: function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
+  // CHECK: function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
   // CHECK: unchecked_ref_cast
   // CHECK: return
   override init(bellsOn x : Int) {
@@ -367,7 +367,7 @@ class DesignatedStubs : Gizmo {
   override init() { i = 5 }
 
   // CHECK-LABEL: sil hidden @_TFC11objc_thunks15DesignatedStubscfMS0_FT7bellsOnSi_GSQS0__
-  // CHECK: function_ref @_TFSs26_unimplemented_initializer
+  // CHECK: function_ref @_TFs26_unimplemented_initializer
   // CHECK: string_literal utf8 "objc_thunks.DesignatedStubs"
   // CHECK: string_literal utf8 "init(bellsOn:)"
   // CHECK: string_literal utf8 "{{.*}}objc_thunks.swift"

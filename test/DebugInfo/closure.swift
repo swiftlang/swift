@@ -14,7 +14,7 @@ func foldl1<T>(list: [T], _ function: (a: T, b: T) -> T) -> T {
 var a = [Int64](count: 10, repeatedValue: 0)
 for i in 0..<10 { a[i] = Int64(i) }
 // A closure is not an artificial function (the last i32 0).
-// CHECK: !DISubprogram({{.*}}linkageName: "_TF7closureU_FTVSs5Int64S0__S0_",{{.*}} line: 20,{{.*}} scopeLine: 20,
+// CHECK: !DISubprogram({{.*}}linkageName: "_TF7closureU_FTVs5Int64S0__S0_",{{.*}} line: 20,{{.*}} scopeLine: 20,
 // CHECK: !DILocalVariable(name: "$0", arg: 1{{.*}} line: [[@LINE+2]],
 // CHECK: !DILocalVariable(name: "$1", arg: 2{{.*}} line: [[@LINE+1]],
 var sum:Int64 = foldl1(a, { $0 + $1 })

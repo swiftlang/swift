@@ -17,11 +17,11 @@ public enum E {
 }
 
 
-// CHECK-LABEL: sil @_TF10fold_enums18recreate_optional1FGSqVSs5Int32_GSqS0__
+// CHECK-LABEL: sil @_TF10fold_enums18recreate_optional1FGSqVs5Int32_GSqS0__
 // CHECK: bb0(%0 : $Optional<Int32>)
 // CHECK-NOT: bb1
 // CHECK: return %0 : $Optional<Int32> 
-sil @_TF10fold_enums18recreate_optional1FGSqVSs5Int32_GSqS0__ : $@convention(thin) (Optional<Int32>) -> Optional<Int32> {
+sil @_TF10fold_enums18recreate_optional1FGSqVs5Int32_GSqS0__ : $@convention(thin) (Optional<Int32>) -> Optional<Int32> {
 bb0(%0 : $Optional<Int32>):
   debug_value %0 : $Optional<Int32>  // let x     // id: %1
   switch_enum %0 : $Optional<Int32>, case #Optional.Some!enumelt.1: bb1, default bb2 // id: %2
@@ -65,11 +65,11 @@ bb3(%8 : $Optional<Int32>):
   return %8 : $Optional<Int32>
 }
 
-// CHECK-LABEL: sil @_TF10fold_enums18recreate_optional2FGSqVSs5Int32_GSqS0__
+// CHECK-LABEL: sil @_TF10fold_enums18recreate_optional2FGSqVs5Int32_GSqS0__
 // CHECK: bb0(%0 : $Optional<Int32>)
 // CHECK-NOT: bb1
 // CHECK: return %0 : $Optional<Int32> 
-sil @_TF10fold_enums18recreate_optional2FGSqVSs5Int32_GSqS0__ : $@convention(thin) (Optional<Int32>) -> Optional<Int32> {
+sil @_TF10fold_enums18recreate_optional2FGSqVs5Int32_GSqS0__ : $@convention(thin) (Optional<Int32>) -> Optional<Int32> {
 bb0(%0 : $Optional<Int32>):
   debug_value %0 : $Optional<Int32>  // let x     // id: %1
   switch_enum %0 : $Optional<Int32>, case #Optional.Some!enumelt.1: bb1, default bb2 // id: %2
