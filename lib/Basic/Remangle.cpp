@@ -363,6 +363,10 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry) {
       SUCCESS_IF_DECLNAME_IS("Double", "Sd");
       SUCCESS_IF_DECLNAME_IS("Float", "Sf");
       SUCCESS_IF_DECLNAME_IS("Int", "Si");
+      SUCCESS_IF_DECLNAME_IS("UnsafePointer", "SP");
+      SUCCESS_IF_DECLNAME_IS("UnsafeMutablePointer", "Sp");
+      SUCCESS_IF_DECLNAME_IS("UnsafeBufferPointer", "SR");
+      SUCCESS_IF_DECLNAME_IS("UnsafeMutableBufferPointer", "Sr");
       SUCCESS_IF_DECLNAME_IS("String", "SS");
       SUCCESS_IF_DECLNAME_IS("UInt", "Su");
     }

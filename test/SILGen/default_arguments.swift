@@ -193,7 +193,7 @@ func takeDSOHandle(handle: UnsafeMutablePointer<Void> = __DSO_HANDLE__) { }
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments13testDSOHandleFT_T_
 func testDSOHandle() {
-  // CHECK: [[DSO_HANDLE:%[0-9]+]] = global_addr @_Tv17default_arguments12__dso_handleGVs20UnsafeMutablePointerT__ : $*UnsafeMutablePointer<()>
+  // CHECK: [[DSO_HANDLE:%[0-9]+]] = global_addr @_Tv17default_arguments12__dso_handleGSpT__ : $*UnsafeMutablePointer<()>
   takeDSOHandle()
 }
 

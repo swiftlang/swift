@@ -7,7 +7,7 @@ import Swift
 
 // CHECK: [[A:%C13generic_types1A]] = type <{ [[REF:%swift.refcounted]], [[INT:%Si]] }>
 // CHECK: [[INT]] = type <{ i64 }>
-// CHECK: [[B:%C13generic_types1B]] = type <{ [[REF:%swift.refcounted]], [[UNSAFE:%Vs20UnsafeMutablePointer]] }>
+// CHECK: [[B:%C13generic_types1B]] = type <{ [[REF:%swift.refcounted]], [[UNSAFE:%Sp]] }>
 // CHECK: [[C:%C13generic_types1C]] = type
 // FIXME: [[D:%C13generic_types1D]] = type
 

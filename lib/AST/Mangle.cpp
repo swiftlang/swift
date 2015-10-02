@@ -1459,11 +1459,23 @@ bool Mangler::tryMangleStandardSubstitution(const NominalTypeDecl *decl) {
   } else if (name == "Float") {
     Buffer << "Sf";
     return true;
+  } else if (name == "UnsafePointer") {
+    Buffer << "SP";
+    return true;
+  } else if (name == "UnsafeMutablePointer") {
+    Buffer << "Sp";
+    return true;
   } else if (name == "Optional") {
     Buffer << "Sq";
     return true;
   } else if (name == "ImplicitlyUnwrappedOptional") {
     Buffer << "SQ";
+    return true;
+  } else if (name == "UnsafeBufferPointer") {
+    Buffer << "SR";
+    return true;
+  } else if (name == "UnsafeMutableBufferPointer") {
+    Buffer << "Sr";
     return true;
   } else if (name == "Array") {
     Buffer << "Sa";
