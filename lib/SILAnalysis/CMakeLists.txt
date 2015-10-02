@@ -8,7 +8,7 @@ add_swift_library(swiftSILAnalysis
   LoopAnalysis.cpp
   ClassHierarchyAnalysis.cpp
   IVAnalysis.cpp
-  CallGraphAnalysis.cpp
+  CallGraph.cpp
   SimplifyInstruction.cpp
   DestructorAnalysis.cpp
   CFG.cpp

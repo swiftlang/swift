@@ -1,4 +1,4 @@
-//===----- CallGraphAnalysis.cpp - Call graph construction ----*- C++ -*---===//
+//===------ CallGraph.cpp - The Call Graph Data Structure ----*- C++ -*----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILAnalysis/CallGraphAnalysis.h"
+#include "swift/SILAnalysis/CallGraph.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/DemangleWrappers.h"
@@ -358,7 +358,7 @@ void CallGraph::removeNode(CallGraphNode *Node) {
   clearBottomUpSCCOrder();
 
   FunctionToNodeMap.erase(Node->getFunction());
-  
+
   // Call the destructor for the node. The memory will be reclaimed
   // when the call graph is deleted by virtue of the bump pointer
   // allocator.
@@ -757,10 +757,10 @@ void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
                                           FullApplySite New) {
   if (!CG)
     return;
-  
+
   if (auto *Edge = CG->getCallGraphEdge(Old))
     CG->removeEdge(Edge);
-  
+
   CG->addEdgesForApply(New);
 }
 
@@ -768,10 +768,10 @@ void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
                              llvm::SmallVectorImpl<FullApplySite> &NewApplies) {
   if (!CG)
     return;
-  
+
   if (auto *Edge = CG->getCallGraphEdge(Old))
     CG->removeEdge(Edge);
-  
+
   for (auto NewApply : NewApplies)
     CG->addEdgesForApply(NewApply);
 }
@@ -791,7 +791,7 @@ void CallGraphEditor::moveNodeToNewFunction(SILFunction *Old,
 void CallGraphEditor::removeAllCalleeEdgesFrom(SILFunction *F) {
   if (!CG)
     return;
-  
+
   auto &CalleeEdges = CG->getCallGraphNode(F)->getCalleeEdges();
   while (!CalleeEdges.empty()) {
     auto *Edge = *CalleeEdges.begin();
@@ -802,7 +802,7 @@ void CallGraphEditor::removeAllCalleeEdgesFrom(SILFunction *F) {
 void CallGraphEditor::updatePartialApplyUses(swift::ApplySite AI) {
   if (!CG)
     return;
-  
+
   for (auto *Use : AI.getInstruction()->getUses()) {
     if (auto FAS = FullApplySite::isa(Use->getUser()))
       replaceApplyWithNew(FAS, FAS);
@@ -860,7 +860,7 @@ void CallGraph::verify(SILFunction *F) const {
 
   CallGraphNode *Node = getCallGraphNode(F);
   unsigned numEdges = 0;
-  
+
   for (auto &BB : *F) {
     for (auto &I : BB) {
       auto FAS = FullApplySite::isa(&I);
@@ -869,7 +869,7 @@ void CallGraph::verify(SILFunction *F) const {
 
       auto *Edge = getCallGraphEdge(FAS);
       assert(Edge && "no edge for full apply site");
-      
+
       numEdges++;
 
       assert(Edge->getApply().getInstruction() == &I &&
@@ -877,14 +877,14 @@ void CallGraph::verify(SILFunction *F) const {
 
       assert(ApplyToEdgeMap.lookup(FAS) == Edge &&
              "Edge is not in ApplyToEdgeMap");
-      
+
       if (Edge->isCalleeSetComplete()) {
         // In the trivial case that we call a known function, check if we have
         // exactly one callee in the edge.
         SILValue Callee = FAS.getCallee();
         if (auto *PAI = dyn_cast<PartialApplyInst>(Callee))
           Callee = PAI->getCallee();
-        
+
         if (auto *FRI = dyn_cast<FunctionRefInst>(Callee)) {
           auto *CalleeNode = Edge->getSingleCalleeOrNull();
           assert(CalleeNode &&
@@ -898,13 +898,13 @@ void CallGraph::verify(SILFunction *F) const {
   // Check if we have an exact 1-to-1 mapping from full apply sites to edges.
   auto &CalleeEdges = Node->getCalleeEdges();
   assert(numEdges == CalleeEdges.size() && "More edges than full apply sites");
-  
+
   // Make structural graph checks:
   // 1.) Check that the callee edges are part of the callee node's caller set.
   for (auto *Edge : CalleeEdges) {
     assert(Edge->getApply().getFunction() == F &&
            "Apply in callee set that is not in the callee function?!");
-    
+
     for (auto *CalleeNode : Edge->getPartialCalleeSet()) {
       auto &CallerEdges = CalleeNode->getPartialCallerEdges();
       assert(std::find(CallerEdges.begin(), CallerEdges.end(), Edge) !=
@@ -922,24 +922,6 @@ void CallGraph::verify(SILFunction *F) const {
 #endif
 }
 
-void CallGraphAnalysis::verify() const {
-#ifndef NDEBUG
-  // If we don't have a callgraph, return.
-  if (!CG)
-    return;
-  CG->verify();
-#endif
-}
-
-void CallGraphAnalysis::verify(SILFunction *F) const {
-#ifndef NDEBUG
-  // If we don't have a callgraph, return.
-  if (!CG)
-    return;
-  CG->verify(F);
-#endif
-}
-
 //===----------------------------------------------------------------------===//
 //                          View CG Implementation
 //===----------------------------------------------------------------------===//
@@ -949,30 +931,30 @@ void CallGraphAnalysis::verify(SILFunction *F) const {
 /// Another representation of the call graph using sorted vectors instead of
 /// sets. Used for viewing the callgraph as dot file with llvm::ViewGraph.
 struct OrderedCallGraph {
-  
+
   struct Node;
-  
+
   struct Edge {
     Edge(CallGraphEdge *CGEdge, Node *Child) : CGEdge(CGEdge), Child(Child) { }
     CallGraphEdge *CGEdge;
     Node *Child;
   };
-  
+
   struct Node {
     CallGraphNode *CGNode;
     OrderedCallGraph *OCG;
     int NumCallSites = 0;
     SmallVector<Edge, 8> Children;
   };
-  
+
   struct child_iterator : public std::iterator<std::random_access_iterator_tag,
                                                Node *, ptrdiff_t> {
     SmallVectorImpl<Edge>::iterator baseIter;
-    
+
     child_iterator(SmallVectorImpl<Edge>::iterator baseIter) :
       baseIter(baseIter)
     { }
-    
+
     child_iterator &operator++() { baseIter++; return *this; }
     child_iterator operator++(int) { auto tmp = *this; baseIter++; return tmp; }
     Node *operator*() const { return baseIter->Child; }
@@ -986,9 +968,9 @@ struct OrderedCallGraph {
       return baseIter - RHS.baseIter;
     }
   };
-  
+
   OrderedCallGraph(CallGraph *CG);
-  
+
   CallGraph *CG;
   std::vector<Node> Nodes;
 
@@ -1016,7 +998,7 @@ OrderedCallGraph::OrderedCallGraph(CallGraph *CG) {
   for (Node &ONode : Nodes) {
     llvm::SmallVector<CallGraphEdge *, 8> OrderedEdges;
     orderEdges(ONode.CGNode->getCalleeEdges(), OrderedEdges);
-    
+
     ONode.NumCallSites = OrderedEdges.size();
     for (auto *CGEdge : OrderedEdges) {
       llvm::SmallVector<CallGraphNode *, 4> OrderedCallees;
@@ -1032,7 +1014,7 @@ OrderedCallGraph::OrderedCallGraph(CallGraph *CG) {
 }
 
 namespace llvm {
-  
+
   /// Wraps a dot node label string to multiple lines. The \p NumEdgeLabels
   /// gives an estimate on the minimum width of the node shape.
   static void wrap(std::string &Str, int NumEdgeLabels) {
@@ -1052,13 +1034,13 @@ namespace llvm {
         LastSpace = i;
     }
   }
-  
+
   /// CallGraph GraphTraits specialization so the CallGraph can be
   /// iterable by generic graph iterators.
   template <> struct GraphTraits<OrderedCallGraph::Node *> {
     typedef OrderedCallGraph::Node NodeType;
     typedef OrderedCallGraph::child_iterator ChildIteratorType;
-    
+
     static NodeType *getEntryNode(NodeType *N) { return N; }
     static inline ChildIteratorType child_begin(NodeType *N) {
       return N->Children.begin();
@@ -1071,9 +1053,9 @@ namespace llvm {
   template <> struct GraphTraits<OrderedCallGraph *>
   : public GraphTraits<OrderedCallGraph::Node *> {
     typedef OrderedCallGraph *GraphType;
-    
+
     static NodeType *getEntryNode(GraphType F) { return nullptr; }
-    
+
     typedef OrderedCallGraph::iterator nodes_iterator;
     static nodes_iterator nodes_begin(GraphType OCG) {
       return OCG->Nodes.begin();
@@ -1086,9 +1068,9 @@ namespace llvm {
   /// a dot file.
   template <>
   struct DOTGraphTraits<OrderedCallGraph *> : public DefaultDOTGraphTraits {
-    
+
     DOTGraphTraits(bool isSimple = false) : DefaultDOTGraphTraits(isSimple) {}
-    
+
     std::string getNodeLabel(const OrderedCallGraph::Node *Node,
                              const OrderedCallGraph *Graph) {
       SILFunction *F = Node->CGNode->getFunction();
@@ -1096,7 +1078,7 @@ namespace llvm {
       wrap(Label, Node->NumCallSites);
       return Label;
     }
-    
+
     std::string getNodeDescription(const OrderedCallGraph::Node *Node,
                              const OrderedCallGraph *Graph) {
       SILFunction *F = Node->CGNode->getFunction();
@@ -1105,7 +1087,7 @@ namespace llvm {
       wrap(Label, Node->NumCallSites);
       return Label;
     }
-    
+
     static std::string getEdgeSourceLabel(const OrderedCallGraph::Node *Node,
                                           OrderedCallGraph::child_iterator I) {
       std::string Label;
@@ -1114,7 +1096,7 @@ namespace llvm {
       O << '%' << Node->OCG->InstToIDMap[Inst];
       return Label;
     }
-    
+
     static std::string getEdgeAttributes(const OrderedCallGraph::Node *Node,
                                          OrderedCallGraph::child_iterator I,
                                          const OrderedCallGraph *Graph) {
