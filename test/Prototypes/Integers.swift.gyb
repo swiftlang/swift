@@ -13,7 +13,6 @@
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/out.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
-// REQUIRES: rdar22835350
 import Swift
 
 //===--- Low-level integers -----------------------------------------------===//
@@ -234,10 +233,16 @@ extension LLVMFixedWidthIntegerType {
   internal mutating func _replaceLow<Other: LLVMIntegerType>(
     var n: LLVMWord, unsignedWordsWith source: Other
   ) {
-    while n != 0 {
-      n.sub_InPlace(1)
-      self.shl_InPlace(${word_bits})
-      self.or_InPlace(Self(truncatingUnsigned: source.unsignedWord(n)))
+    if (${word_bits} as LLVMWord).isLessThanSigned(Self.bitWidth) {
+      while n != 0 {
+        n.sub_InPlace(1)
+        self.shl_InPlace(${word_bits})
+        self.or_InPlace(Self(truncatingUnsigned: source.unsignedWord(n)))
+      }
+    }
+    else {
+      _sanityCheck(n == 1)
+      self = Self(truncatingUnsigned: source.unsignedWord(0))
     }
   }
   
@@ -326,6 +331,10 @@ public struct LLVMInt${bits} : LLVMFixedWidthIntegerType {
 % for operation in builtinBinaryOperations:
   @transparent
   public mutating func ${operation}_InPlace(rhs: Self_) {
+  % if 'sh' in operation:
+    Builtin.condfail(rhs.isLessThanSigned(0)._value)
+    Builtin.condfail((!rhs.isLessThanSigned(${bits}))._value)
+  % end
     storage = Builtin.${operation}_Int${bits}(storage, rhs.storage)
   }
 % end
