@@ -481,29 +481,59 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   return NAI;
 }
 
-typedef SmallVector<SILInstruction*, 4> UserListTy;
-/// \brief Returns a list of instructions that project or perform reference
-/// counting operations on the instruction or its uses in argument \p Inst.
-/// The function returns False if there are non-ARC instructions.
-static bool recursivelyCollectARCUsers(UserListTy &Uses, SILInstruction *Inst) {
-  Uses.push_back(Inst);
-  for (auto Inst : Inst->getUses()) {
-    if (isa<RefCountingInst>(Inst->getUser()) ||
-        isa<DebugValueInst>(Inst->getUser())) {
-      Uses.push_back(Inst->getUser());
+bool
+SILCombiner::recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value) {
+  for (auto *Use : Value->getUses()) {
+    SILInstruction *Inst = Use->getUser();
+    if (isa<RefCountingInst>(Inst) ||
+        isa<DebugValueInst>(Inst)) {
+      Uses.push_back(Inst);
       continue;
     }
-    SILInstruction *Proj;
-    if ((Proj = dyn_cast<TupleExtractInst>(Inst->getUser())) ||
-        (Proj = dyn_cast<StructExtractInst>(Inst->getUser())) ||
-        (Proj = dyn_cast<PointerToAddressInst>(Inst->getUser())))
-      if (recursivelyCollectARCUsers(Uses, Proj))
+    if (isa<TupleExtractInst>(Inst) ||
+        isa<StructExtractInst>(Inst) ||
+        isa<PointerToAddressInst>(Inst)) {
+      Uses.push_back(Inst);
+      if (recursivelyCollectARCUsers(Uses, Inst))
         continue;
-
+    }
     return false;
   }
-
   return true;
+}
+
+void SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
+  // Make sure to release and destroy any owned or in-arguments.
+  auto FuncType = FAS.getOrigCalleeType();
+  assert(FuncType->getParameters().size() == FAS.getNumArguments() &&
+         "mismatching number of arguments");
+  for (int i = 0, e = FAS.getNumArguments(); i < e; ++i) {
+    SILParameterInfo PI = FuncType->getParameters()[i];
+    auto Arg = FAS.getArgument(i);
+    switch (PI.getConvention()) {
+      case ParameterConvention::Indirect_In:
+        Builder.createDestroyAddr(FAS.getLoc(), Arg);
+        break;
+      case ParameterConvention::Direct_Owned:
+        Builder.createReleaseValue(FAS.getLoc(), Arg);
+        break;
+      case ParameterConvention::Indirect_In_Guaranteed:
+      case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_Out:
+      case ParameterConvention::Direct_Unowned:
+      case ParameterConvention::Direct_Deallocating:
+      case ParameterConvention::Direct_Guaranteed:
+        break;
+    }
+  }
+
+  // Erase all of the reference counting instructions (in reverse order to have
+  // no dangling uses).
+  for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
+    eraseInstFromFunction(**rit);
+
+  // And the Apply itself.
+  eraseInstFromFunction(*FAS.getInstruction());
 }
 
 SILInstruction *
@@ -1210,33 +1240,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       FRI->getReferencedFunction()->getEffectsKind() < EffectsKind::ReadWrite) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
-      // When deleting Apply instructions make sure to release any owned
-      // arguments.
-      auto FT = FRI->getFunctionType();
-      for (int i = 0, e = AI->getNumArguments(); i < e; ++i) {
-        SILParameterInfo PI = FT->getParameters()[i];
-        auto Arg = AI->getArgument(i);
-        switch (PI.getConvention()) {
-          case ParameterConvention::Indirect_In:
-            Builder.createDestroyAddr(AI->getLoc(), Arg);
-            break;
-          case ParameterConvention::Direct_Owned:
-            Builder.createReleaseValue(AI->getLoc(), Arg);
-            break;
-          case ParameterConvention::Indirect_In_Guaranteed:
-          case ParameterConvention::Indirect_Inout:
-          case ParameterConvention::Indirect_Out:
-          case ParameterConvention::Direct_Unowned:
-          case ParameterConvention::Direct_Deallocating:
-          case ParameterConvention::Direct_Guaranteed:
-            break;
-        }
-      }
-
-      // Erase all of the reference counting instructions and the Apply itself.
-      for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
-        eraseInstFromFunction(**rit);
-
+      eraseApply(AI, Users);
       return nullptr;
     }
     // We found a user that we can't handle.
@@ -1254,10 +1258,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       UserListTy Users;
       // If the uninitialized array is only written into then it can be removed.
       if (recursivelyCollectARCUsers(Users, AI)) {
-        // Erase all of the reference counting instructions on the array and the
-        // allocation-apply itself.
-        for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
-          eraseInstFromFunction(**rit);
+        eraseApply(AI, Users);
+        return nullptr;
       }
     }
   }
@@ -1310,6 +1312,55 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   return nullptr;
 }
 
+bool SILCombiner::
+isTryApplyResultNotUsed(UserListTy &AcceptedUses, TryApplyInst *TAI) {
+  SILBasicBlock *NormalBB = TAI->getNormalBB();
+  SILBasicBlock *ErrorBB = TAI->getErrorBB();
+
+  // The results of a try_apply are not only the normal and error return values,
+  // but also the decision whether it throws or not. Therefore we have to check
+  // if both, the normal and the error block, are empty and lead to a common
+  // destination block.
+
+  // Check if the normal and error blocks have a common single successor.
+  auto *NormalBr = dyn_cast<BranchInst>(NormalBB->getTerminator());
+  if (!NormalBr)
+    return false;
+  auto *ErrorBr = dyn_cast<BranchInst>(ErrorBB->getTerminator());
+  if (!ErrorBr || ErrorBr->getDestBB() != NormalBr->getDestBB())
+    return false;
+
+  assert(NormalBr->getNumArgs() == ErrorBr->getNumArgs() &&
+         "mismatching number of arguments for the same destination block");
+
+  // Check if both blocks pass the same arguments to the common destination.
+  for (unsigned Idx = 0, End = NormalBr->getNumArgs(); Idx < End; Idx++) {
+    if (NormalBr->getArg(Idx) != ErrorBr->getArg(Idx))
+      return false;
+  }
+
+  // Check if the normal and error results only have ARC operations as uses.
+  if (!recursivelyCollectARCUsers(AcceptedUses, NormalBB->getBBArg(0)))
+    return false;
+  if (!recursivelyCollectARCUsers(AcceptedUses, ErrorBB->getBBArg(0)))
+    return false;
+
+  SmallPtrSet<SILInstruction *, 8> UsesSet;
+  for (auto *I : AcceptedUses)
+    UsesSet.insert(I);
+
+  // Check if the normal and error blocks are empty, except the ARC uses.
+  for (auto &I : *NormalBB) {
+    if (!UsesSet.count(&I) && !isa<TermInst>(&I))
+      return false;
+  }
+  for (auto &I : *ErrorBB) {
+    if (!UsesSet.count(&I) && !isa<TermInst>(&I))
+      return false;
+  }
+  return true;
+}
+
 SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
   // from visitPartialApplyInst(), so bail here.
@@ -1325,21 +1376,22 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   if (FRI &&
       FRI->getReferencedFunction()->getEffectsKind() < EffectsKind::ReadWrite) {
     UserListTy Users;
-    if (recursivelyCollectARCUsers(Users, AI)) {
-      // When deleting Apply instructions make sure to release any owned
-      // arguments.
-      auto FT = FRI->getFunctionType();
-      for (int i = 0, e = AI->getNumArguments(); i < e; ++i) {
-        SILParameterInfo PI = FT->getParameters()[i];
-        auto Arg = AI->getArgument(i);
-        if (PI.isConsumed() && !Arg.getType().isAddress())
-          Builder.emitReleaseValueOperation(AI->getLoc(), Arg);
-      }
+    if (isTryApplyResultNotUsed(Users, AI)) {
+      SILBasicBlock *BB = AI->getParent();
+      SILBasicBlock *NormalBB = AI->getNormalBB();
+      SILBasicBlock *ErrorBB = AI->getErrorBB();
+      SILLocation Loc = AI->getLoc();
+      eraseApply(AI, Users);
+      Builder.setInsertionPoint(BB);
 
-      // Erase all of the reference counting instructions and the Apply itself.
-      for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
-        eraseInstFromFunction(**rit);
+      // Replace the try_apply with a cond_br false, which will be removed by
+      // SimplifyCFG. We don't want to modify the CFG in SILCombine.
+      auto *TrueLit = Builder.createIntegerLiteral(Loc,
+                SILType::getBuiltinIntegerType(1, Builder.getASTContext()), 0);
+      Builder.createCondBranch(Loc, TrueLit, NormalBB, ErrorBB);
 
+      NormalBB->eraseBBArg(0);
+      ErrorBB->eraseBBArg(0);
       return nullptr;
     }
     // We found a user that we can't handle.

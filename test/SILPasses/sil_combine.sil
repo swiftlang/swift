@@ -1717,6 +1717,133 @@ bb0(%0 : $*SSS):
 
 sil [readonly] @read_only_in : $@convention(thin) (@in SSS) -> ()
 
+struct MyError : ErrorType {
+}
+
+sil @unknown : $@convention(thin) () -> ()
+sil [readonly] @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
+
+//CHECK-LABEL: sil @test_delete_readonly_try_apply
+//CHECK:      bb0(%0 : $ZZZ): 
+//CHECK-NEXT:   strong_release %0
+//CHECK-NEXT:   [[IL:%[0-9]+]] = integer_literal $Builtin.Int1, 0
+//CHECK-NEXT:   cond_br [[IL]], bb1, bb2
+//CHECK:      bb1:
+//CHECK-NEXT:   br bb3
+//CHECK:      bb2:
+//CHECK-NEXT:   br bb3
+//CHECK:      bb3:
+//CHECK:        return
+sil @test_delete_readonly_try_apply : $@convention(thin) (@owned ZZZ) -> () {
+bb0(%0 : $ZZZ):
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+
+bb1(%4 : $ZZZ):
+  strong_release %4 : $ZZZ
+  br bb3
+
+bb2(%8 : $ErrorType):
+  strong_release %8 : $ErrorType
+  br bb3
+
+bb3:
+  %6 = tuple ()
+  return %6 : $()
+}
+
+//CHECK-LABEL: sil @test_dont_delete_readonly_try_apply1
+//CHECK: try_apply %{{[0-9]+}}(%0)
+sil @test_dont_delete_readonly_try_apply1 : $@convention(thin) (@owned ZZZ) -> () {
+bb0(%0 : $ZZZ):
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+
+bb1(%4 : $ZZZ):
+  strong_release %4 : $ZZZ
+  br bb3
+
+bb2(%8 : $ErrorType):
+  // Additional instructions in error block.
+  %u = function_ref @unknown : $@convention(thin) () -> ()
+  %r = apply %u() : $@convention(thin) () -> ()
+  strong_release %8 : $ErrorType
+  br bb3
+
+bb3:
+  %6 = tuple ()
+  return %6 : $()
+}
+
+//CHECK-LABEL: sil @test_dont_delete_readonly_try_apply2
+//CHECK: try_apply %{{[0-9]+}}(%0)
+sil @test_dont_delete_readonly_try_apply2 : $@convention(thin) (@owned ZZZ) -> () {
+bb0(%0 : $ZZZ):
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+
+bb1(%4 : $ZZZ):
+  // Additional instructions in normal return block.
+  %u = function_ref @unknown : $@convention(thin) () -> ()
+  %r = apply %u() : $@convention(thin) () -> ()
+  strong_release %4 : $ZZZ
+  br bb3
+
+bb2(%8 : $ErrorType):
+  strong_release %8 : $ErrorType
+  br bb3
+
+bb3:
+  %6 = tuple ()
+  return %6 : $()
+}
+
+//CHECK-LABEL: sil @test_dont_delete_readonly_try_apply3
+//CHECK: try_apply %{{[0-9]+}}(%0)
+sil @test_dont_delete_readonly_try_apply3 : $@convention(thin) (@owned ZZZ) -> () {
+bb0(%0 : $ZZZ):
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+
+bb1(%4 : $ZZZ):
+  strong_release %4 : $ZZZ
+  br bb3
+
+bb2(%8 : $ErrorType):
+  strong_release %8 : $ErrorType
+  // Normal and error block don't have a common successor block.
+  br bb4
+
+bb3:
+  %u = function_ref @unknown : $@convention(thin) () -> ()
+  %r = apply %u() : $@convention(thin) () -> ()
+  br bb4
+
+bb4:
+  %6 = tuple ()
+  return %6 : $()
+}
+
+//CHECK-LABEL: sil @test_dont_delete_readonly_try_apply4
+//CHECK: try_apply %{{[0-9]+}}(%0)
+sil @test_dont_delete_readonly_try_apply4 : $@convention(thin) (@owned ZZZ, @owned ZZZ) -> @owned ZZZ {
+bb0(%0 : $ZZZ, %1 : $ZZZ):
+  %2 = function_ref @readonly_throwing : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType)
+  try_apply %2(%0) : $@convention(thin) (@owned ZZZ) -> (ZZZ, @error ErrorType), normal bb1, error bb2
+
+bb1(%4 : $ZZZ):
+  strong_release %4 : $ZZZ
+  br bb3(%0 : $ZZZ)
+
+bb2(%8 : $ErrorType):
+  strong_release %8 : $ErrorType
+  // Normal and error block don't use the same block arguments for the common successor.
+  br bb3(%1 : $ZZZ)
+
+bb3(%a : $ZZZ):
+  return %a : $ZZZ
+}
+
 
 // FIXME: <rdar://problem/20980377> Add dead array elimination to DeadObjectElimination
 // CHECK-LABEL: test_dead_array

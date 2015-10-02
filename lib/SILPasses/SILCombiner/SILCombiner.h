@@ -295,6 +295,21 @@ private:
   /// Add reachable code to the worklist. Meant to be used when starting to
   /// process a new function.
   void addReachableCodeToWorklist(SILBasicBlock *BB);
+
+  typedef SmallVector<SILInstruction*, 4> UserListTy;
+
+  /// \brief Returns a list of instructions that project or perform reference
+  /// counting operations on \p Value or on its uses.
+  /// \return return false if \p Value has other than ARC uses.
+  static bool recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value);
+
+  /// Erases an apply instruction including all it's uses \p.
+  /// Inserts release/destroy instructions for all owner and in-parameters.
+  void eraseApply(FullApplySite FAS, const UserListTy &Users);
+
+  /// Returns true if the results of an try_apply are not used.
+  static bool isTryApplyResultNotUsed(UserListTy &AcceptedUses,
+                                      TryApplyInst *TAI);
 };
 
 } // end namespace swift
