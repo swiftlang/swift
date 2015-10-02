@@ -572,14 +572,122 @@ void Mangler::mangleDeclTypeForDebugger(const ValueDecl *decl) {
   mangleDeclType(decl, ResilienceExpansion::Minimal, /*uncurry*/ 0);
 }
 
+/// Is this declaration a method for mangling purposes? If so, we'll leave the
+/// Self type out of its mangling.
+static bool isMethodDecl(const Decl *decl) {
+  return isa<AbstractFunctionDecl>(decl)
+    && (isa<NominalTypeDecl>(decl->getDeclContext())
+        || isa<ExtensionDecl>(decl->getDeclContext()));
+}
+
+static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
+  if (auto gp = type->getAs<GenericTypeParamType>()) {
+    return gp->getDepth() >= methodDepth;
+  }
+  if (auto dm = type->getAs<DependentMemberType>()) {
+    return genericParamIsBelowDepth(dm->getBase(), methodDepth);
+  }
+  // Non-dependent types in a same-type requirement don't affect whether we
+  // mangle the requirement.
+  return false;
+}
+
+Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
+                                ArrayRef<GenericTypeParamType *> &genericParams,
+                                unsigned &initialParamDepth,
+                                ArrayRef<Requirement> &requirements,
+                                SmallVectorImpl<Requirement> &requirementsBuf) {
+  auto &C = decl->getASTContext();
+  if (!decl->hasType())
+    return ErrorType::get(C);
+
+  Type type = decl->getInterfaceType();
+
+  CanGenericSignature sig;
+  initialParamDepth = 0;
+  if (auto gft = type->getAs<GenericFunctionType>()) {
+    assert(Mod);
+    sig = gft->getGenericSignature()->getCanonicalManglingSignature(*Mod);
+    genericParams = sig->getGenericParams();
+    requirements = sig->getRequirements();
+
+    type = FunctionType::get(gft->getInput(), gft->getResult(),
+                             gft->getExtInfo());
+  } else {
+    genericParams = {};
+    requirements = {};
+  }
+
+  // Shed the 'self' type and generic requirements from method manglings.
+  if (C.LangOpts.DisableSelfTypeMangling
+      && isMethodDecl(decl)) {
+
+    // Drop the Self argument clause from the type.
+    type = type->castTo<AnyFunctionType>()->getResult();
+
+    // Drop generic parameters and requirements from the method's context.
+    if (auto parentGenericSig =
+          decl->getDeclContext()->getGenericSignatureOfContext()) {
+      // The method's depth starts below the depth of the context.
+      if (!parentGenericSig->getGenericParams().empty())
+        initialParamDepth =
+          parentGenericSig->getGenericParams().back()->getDepth()+1;
+
+      while (!genericParams.empty()) {
+        if (genericParams.front()->getDepth() >= initialParamDepth)
+          break;
+        genericParams = genericParams.slice(1);
+      }
+
+      requirementsBuf.clear();
+      for (auto &reqt : sig->getRequirements()) {
+        switch (reqt.getKind()) {
+        case RequirementKind::WitnessMarker:
+          // Not needed for mangling.
+          continue;
+
+        case RequirementKind::Conformance:
+          // We don't need the requirement if the constrained type is above the
+          // method depth.
+          if (!genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth))
+            continue;
+          break;
+        case RequirementKind::SameType:
+          // We don't need the requirement if both types are above the method
+          // depth, or non-dependent.
+          if (!genericParamIsBelowDepth(reqt.getFirstType(),initialParamDepth)&&
+              !genericParamIsBelowDepth(reqt.getSecondType(),initialParamDepth))
+            continue;
+          break;
+        }
+
+        // If we fell through the switch, mangle the requirement.
+        requirementsBuf.push_back(reqt);
+      }
+      requirements = requirementsBuf;
+    }
+  }
+
+  return type;
+}
+
 void Mangler::mangleDeclType(const ValueDecl *decl,
                              ResilienceExpansion explosion,
                              unsigned uncurryLevel) {
-  Type type;
-  
-  type = decl->hasType() ? decl->getInterfaceType()
-                         : ErrorType::get(decl->getASTContext());
+  ArrayRef<GenericTypeParamType *> genericParams;
+  unsigned initialParamDepth;
+  ArrayRef<Requirement> requirements;
+  SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();
+  Type type = getDeclTypeForMangling(decl, genericParams, initialParamDepth,
+                                     requirements, requirementsBuf);
+
+  // Mangle the generic signature, if any.
+  if (!genericParams.empty() || !requirements.empty()) {
+    Buffer << 'u';
+    mangleGenericSignatureParts(genericParams, initialParamDepth,
+                                requirements, explosion);
+  }
 
   mangleType(type->getCanonicalType(), explosion, uncurryLevel);
 
@@ -594,10 +702,11 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
   }
 }
 
-void Mangler::mangleGenericSignature(const GenericSignature *sig,
-                                     ResilienceExpansion expansion) {
-  assert(Mod);
-  sig = sig->getCanonicalManglingSignature(*Mod);
+void Mangler::mangleGenericSignatureParts(
+                                        ArrayRef<GenericTypeParamType*> params,
+                                        unsigned initialParamDepth,
+                                        ArrayRef<Requirement> requirements,
+                                        ResilienceExpansion expansion) {
 
   // Mangle the number of parameters.
   unsigned depth = 0;
@@ -606,7 +715,9 @@ void Mangler::mangleGenericSignature(const GenericSignature *sig,
   // Since it's unlikely (but not impossible) to have zero generic parameters
   // at a depth, encode indexes starting from 1, and use a special mangling
   // for zero.
-  auto mangleGenericParamCount = [&](unsigned count) {
+  auto mangleGenericParamCount = [&](unsigned depth, unsigned count) {
+    if (depth < initialParamDepth)
+      return;
     if (count == 0)
       Buffer << 'z';
     else
@@ -615,15 +726,14 @@ void Mangler::mangleGenericSignature(const GenericSignature *sig,
   
   // As a special case, mangle nothing if there's a single generic parameter
   // at depth 0.
-  if (sig->getGenericParams().size() == 1
-      && sig->getGenericParams()[0]->getDepth() == 0)
+  if (params.size() == 1 && params[0]->getDepth() == 0)
     goto mangle_requirements;
   
-  for (auto param : sig->getGenericParams()) {
+  for (auto param : params) {
     if (param->getDepth() != depth) {
       assert(param->getDepth() > depth && "generic params not ordered");
       while (depth < param->getDepth()) {
-        mangleGenericParamCount(count);
+        mangleGenericParamCount(depth, count);
         ++depth;
         count = 0;
       }
@@ -631,12 +741,12 @@ void Mangler::mangleGenericSignature(const GenericSignature *sig,
     assert(param->getIndex() == count && "generic params not ordered");
     ++count;
   }
-  mangleGenericParamCount(count);
+  mangleGenericParamCount(depth, count);
 
 mangle_requirements:
   bool didMangleRequirement = false;
   // Mangle the requirements.
-  for (auto &reqt : sig->getRequirements()) {
+  for (auto &reqt : requirements) {
     switch (reqt.getKind()) {
     case RequirementKind::WitnessMarker:
       break;
@@ -679,6 +789,16 @@ mangle_requirements:
     Buffer << 'r';
   else
     Buffer << '_';
+}
+
+void Mangler::mangleGenericSignature(const GenericSignature *sig,
+                                     ResilienceExpansion expansion) {
+  assert(Mod);
+  sig = sig->getCanonicalManglingSignature(*Mod);
+
+  mangleGenericSignatureParts(sig->getGenericParams(), 0,
+                              sig->getRequirements(),
+                              expansion);
 }
 
 static void mangleMetatypeRepresentation(raw_ostream &Buffer,

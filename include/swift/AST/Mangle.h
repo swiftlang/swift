@@ -100,6 +100,7 @@ public:
   void mangleDeclName(const ValueDecl *decl);
   void mangleDeclType(const ValueDecl *decl, ResilienceExpansion expansion,
                       unsigned uncurryingLevel);
+
   void mangleEntity(const ValueDecl *decl, ResilienceExpansion expansion,
                     unsigned uncurryingLevel);
   void mangleConstructorEntity(const ConstructorDecl *ctor, bool isAllocating,
@@ -184,6 +185,15 @@ private:
     mangleType(BlandTy, ResilienceExpansion::Minimal, 0);
   }
 
+  void mangleGenericSignatureParts(ArrayRef<GenericTypeParamType *> params,
+                                   unsigned initialParamDepth,
+                                   ArrayRef<Requirement> requirements,
+                                   ResilienceExpansion expansion);
+  Type getDeclTypeForMangling(const ValueDecl *decl,
+                              ArrayRef<GenericTypeParamType *> &genericParams,
+                              unsigned &initialParamIndex,
+                              ArrayRef<Requirement> &requirements,
+                              SmallVectorImpl<Requirement> &requirementsBuf);
 };
   
 } // end namespace Mangle
