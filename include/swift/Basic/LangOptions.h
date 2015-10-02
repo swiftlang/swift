@@ -123,6 +123,9 @@ namespace swift {
     /// new enough?
     bool EnableTargetOSChecking = true;
     
+    /// Don't mangle the Self type as part of declaration manglings.
+    bool DisableSelfTypeMangling = false;
+    
     /// The target we are building for.
     ///
     /// This represents the minimum deployment target.

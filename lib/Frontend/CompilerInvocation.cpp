@@ -652,7 +652,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.UseMalloc |= Args.hasArg(OPT_use_malloc);
 
-  Opts.EnableExperimentalPatterns |= Args.hasArg(OPT_enable_experimental_patterns);
+  Opts.EnableExperimentalPatterns |=
+    Args.hasArg(OPT_enable_experimental_patterns);
+
+  Opts.DisableSelfTypeMangling |=
+    Args.hasArg(OPT_disable_self_type_mangling);
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
