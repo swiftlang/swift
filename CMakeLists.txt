@@ -74,6 +74,7 @@ set(SWIFT_COMPILER_VERSION "" CACHE STRING
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
     "compiler;clang-builtin-headers;clang-resource-dir-symlink;arclite-symlink;stdlib;stdlib-experimental;sdk-overlay;editor-integration;lang-docs;tools;testsuite-tools;dev")
 
+# Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
     "A semicolon-separated list of components to install ${_SWIFT_KNOWN_INSTALL_COMPONENTS}")
 # Components are disjoint set of files that can be installed by Swift.  The
