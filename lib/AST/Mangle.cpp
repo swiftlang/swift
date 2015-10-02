@@ -1712,7 +1712,7 @@ void Mangler::mangleDirectness(bool isIndirect) {
 }
 
 void Mangler::mangleProtocolConformance(const ProtocolConformance *conformance){
-  // protocol-conformance ::= ('U' generic-parameters '_')?
+  // protocol-conformance ::= ('u' generic-parameters '_')?
   //                          type protocol module
   // FIXME: explosion level?
   

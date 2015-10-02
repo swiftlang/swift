@@ -907,7 +907,6 @@ Types
   type ::= 'R' type                          // inout
   type ::= 'T' tuple-element* '_'            // tuple
   type ::= 't' tuple-element* '_'            // variadic tuple
-  type ::= 'U' generics '_' type             // generic type (old)
   type ::= 'Xo' type                         // @unowned type
   type ::= 'Xu' type                         // @unowned(unsafe) type
   type ::= 'Xw' type                         // @weak type
@@ -935,7 +934,7 @@ Types
   throws-annotation ::= 'z'                  // 'throws' annotation on function types
 
 
-  type ::= 'u' generic-signature type        // generic type (new)
+  type ::= 'u' generic-signature type        // generic type
   type ::= 'q' index                         // dependent generic parameter
                                              //   with depth = 0, idx = N
   type ::= 'qd' index index                  // dependent generic parameter
@@ -996,21 +995,6 @@ Generics
 
 ::
 
-  generics ::= generic-parameter+ ('U' generic-parameter+)?
-  generic-parameter ::= protocol-list '_'
-  protocol-list ::= protocol*
-  protocol ::= substitution
-  protocol ::= declaration-name
-
-``<protocol-list>`` is unambiguous because protocols are always top-level,
-so the structure is quite simple. If there are associated types in the signature,
-they are mangled following a second ``U``.
-
-``<protocol>`` must not start with ``M``.
-
-::
-
-  protocol-conformance ::= ('U' generics '_')? type protocol module
   protocol-conformance ::= ('u' generic-signature)? type protocol module
 
 ``<protocol-conformance>`` refers to a type's conformance to a protocol. The named
