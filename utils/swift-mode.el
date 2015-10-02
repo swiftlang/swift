@@ -61,40 +61,40 @@
 (if (not swift-mode-syntax-table)
     (progn
       (setq swift-mode-syntax-table (make-syntax-table))
-      (mapcar (function (lambda (n)
-                          (modify-syntax-entry (aref n 0)
-                                               (aref n 1)
-                                               swift-mode-syntax-table)))
-              '(
-                ;; whitespace (` ')
-                [?\f  " "]
-                [?\t  " "]
-                [?\   " "]
-                ;; word constituents (`w')
-                ;; punctuation
-                [?< "."]
-                [?> "."]
-                ;; comments
-                [?/  ". 124"]
-                [?*  ". 23b"]
-                [?\n  ">"]
-                [?\^m  ">"]
-                ;; symbol constituents (`_')
-                [?_ "_"]
-                ;; punctuation (`.')
-                ;; open paren (`(')
-                [?\( "())"]
-                [?\[ "(]"]
-                [?\{ "(}"]
-                ;; close paren (`)')
-                [?\) ")("]
-                [?\] ")["]
-                [?\} "){"]
-                ;; string quote ('"')
-                [?\" "\""]
-                ;; escape-syntax characters ('\\')
-                [?\\ "\\"]
-                ))))
+      (mapc (function (lambda (n)
+                        (modify-syntax-entry (aref n 0)
+                                             (aref n 1)
+                                             swift-mode-syntax-table)))
+            '(
+              ;; whitespace (` ')
+              [?\f  " "]
+              [?\t  " "]
+              [?\   " "]
+              ;; word constituents (`w')
+              ;; punctuation
+              [?< "."]
+              [?> "."]
+              ;; comments
+              [?/  ". 124"]
+              [?*  ". 23b"]
+              [?\n  ">"]
+              [?\^m  ">"]
+              ;; symbol constituents (`_')
+              [?_ "_"]
+              ;; punctuation (`.')
+              ;; open paren (`(')
+              [?\( "())"]
+              [?\[ "(]"]
+              [?\{ "(}"]
+              ;; close paren (`)')
+              [?\) ")("]
+              [?\] ")["]
+              [?\} "){"]
+              ;; string quote ('"')
+              [?\" "\""]
+              ;; escape-syntax characters ('\\')
+              [?\\ "\\"]
+              ))))
 
 ;; --------------------- Abbrev table -----------------------------
 
