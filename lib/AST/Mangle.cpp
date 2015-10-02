@@ -580,6 +580,7 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
   type = decl->hasType() ? decl->getInterfaceType()
                          : ErrorType::get(decl->getASTContext());
   Mod = decl->getModuleContext();
+
   mangleType(type->getCanonicalType(), explosion, uncurryLevel);
 
   // Bind the declaration's generic context for nested decls.
@@ -595,8 +596,6 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
 
 void Mangler::mangleGenericSignature(const GenericSignature *sig,
                                      ResilienceExpansion expansion) {
-  // TODO: For staging purposes, only canonicalize the signature when interface
-  // type mangling is enabled. We ought to do this all the time.
   assert(Mod);
   sig = sig->getCanonicalManglingSignature(*Mod);
 
@@ -640,7 +639,6 @@ mangle_requirements:
   for (auto &reqt : sig->getRequirements()) {
     switch (reqt.getKind()) {
     case RequirementKind::WitnessMarker:
-      // TODO: Do we need to mangle this?
       break;
         
     case RequirementKind::Conformance: {
@@ -653,9 +651,8 @@ mangle_requirements:
           && protocols.size() == 1) {
         // Protocol constraints are the common case, so mangle them more
         // efficiently.
-        // TODO: Once we stabilize on generic mangling signatures, we could
-        // golf this a little more by assuming the first type is a dependent
-        // type.
+        // TODO: We could golf this a little more by assuming the first type
+        // is a dependent type.
         mangleType(reqt.getFirstType()->getCanonicalType(), expansion, 0);
         mangleProtocolName(protocols[0]);
         break;
