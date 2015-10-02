@@ -612,6 +612,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // If the component has already been bound to a declaration, handle
   // that now.
   if (comp->isBoundDecl()) {
+    // Diagnose non-type declarations.
     ValueDecl *VD = comp->getBoundDecl();
     auto typeDecl = dyn_cast<TypeDecl>(VD);
     if (!typeDecl) {
@@ -623,10 +624,12 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       return nullptr;
     }
 
+    // Retrieve the generic arguments, if there are any.
     ArrayRef<TypeRepr *> genericArgs;
     if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
       genericArgs = genComp->getGenericArgs();
 
+    // Resolve the type declaration within this context.
     return resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
                            genericArgs, options, resolver);
   }
@@ -656,18 +659,17 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       genericParams = cast<AbstractFunctionDecl>(DC)->getGenericParams();
     }
 
-    if (!isa<GenericIdentTypeRepr>(comp)) {
-      if (genericParams) {
-        auto matchingParam =
-            std::find_if(genericParams->begin(), genericParams->end(),
-                         [comp](const GenericTypeParamDecl *param) {
-          return param->getFullName().matchesRef(comp->getIdentifier());
-        });
+    if (genericParams) {
+      auto matchingParam =
+          std::find_if(genericParams->begin(), genericParams->end(),
+                       [comp](const GenericTypeParamDecl *param) {
+        return param->getFullName().matchesRef(comp->getIdentifier());
+      });
 
-        if (matchingParam != genericParams->end()) {
-          return resolveTypeDecl(TC, *matchingParam, comp->getIdLoc(),
-                                 DC, None, options, resolver);
-        }
+      if (matchingParam != genericParams->end()) {
+        comp->setValue(*matchingParam);
+        return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
+                                                 diagnoseErrors, resolver);
       }
     }
 
@@ -688,8 +690,9 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         for (const auto decl : decls) {
           // FIXME: Better ambiguity handling.
           if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-            return resolveTypeDecl(TC, assocType, comp->getIdLoc(),
-                                   DC, None, options, resolver);
+            comp->setValue(assocType);
+            return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
+                                                     diagnoseErrors, resolver);
           }
         }
       }
@@ -714,6 +717,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
 
   // Process the names we found.
   Type current;
+  TypeDecl *currentDecl = nullptr;
   bool isAmbiguous = false;
   for (const auto &result : globals) {
     // Ignore non-type declarations.
@@ -737,6 +741,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     // If this is the first result we found, record it.
     if (current.isNull()) {
       current = type;
+      currentDecl = typeDecl;
       continue;
     }
 
@@ -775,6 +780,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                resolver);
   }
 
+  comp->setValue(currentDecl);
   return current;
 }
 
