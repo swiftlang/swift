@@ -417,6 +417,11 @@ public:
     DidConsumeSelf,
   };
   SelfInitDelegationStates SelfInitDelegationState = NormalSelf;
+
+  /// After the state transitions to DidConsumeSelf, we store the self value
+  /// in here, since the original box has been zeroed out. Subsequent accesses
+  /// of self borrow this value.
+  SILValue SelfInitDelegationValue;
   
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;

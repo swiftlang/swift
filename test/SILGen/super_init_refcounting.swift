@@ -3,6 +3,7 @@
 class Foo {
   init() {}
   init(_ x: Foo) {}
+  init(_ x: Int) {}
 }
 
 class Bar: Foo {
@@ -62,5 +63,29 @@ class Bad: Foo {
   // crash on it.
   override init() {
     super.init(self)
+  }
+}
+
+class Good: Foo {
+  let x: Int
+
+  // CHECK-LABEL: sil hidden @_TFC22super_init_refcounting4GoodcfMS0_FT_S0_
+  // CHECK:         [[SELF_BOX:%.*]] = alloc_box $Good
+  // CHECK:         [[SELF:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]#1
+  // CHECK:         store %0 to [[SELF]]
+  // CHECK:         [[SELF_OBJ:%.*]] = load [[SELF]]
+  // CHECK:         [[X_ADDR:%.*]] = ref_element_addr [[SELF_OBJ]] : $Good, #Good.x
+  // CHECK:         assign {{.*}} to [[X_ADDR]] : $*Int
+  // CHECK:         [[SELF_OBJ:%.*]] = load [[SELF]] : $*Good
+  // CHECK:         [[NULL:%.*]] = null_class $Good
+  // CHECK:         store [[NULL]] to [[SELF]] : $*Good
+  // CHECK:         [[SUPER_OBJ:%.*]] = upcast [[SELF_OBJ]] : $Good to $Foo
+  // CHECK:         [[SUPER_INIT:%.*]] = function_ref @_TFC22super_init_refcounting3FoocfMS0_FSiS0_
+  // CHECK:         [[X_ADDR:%.*]] = ref_element_addr [[SELF_OBJ]] : $Good, #Good.x
+  // CHECK:         [[X:%.*]] = load [[X_ADDR]] : $*Int
+  // CHECK:         apply [[SUPER_INIT]]([[X]], [[SUPER_OBJ]])
+  override init() {
+    x = 10
+    super.init(x)
   }
 }

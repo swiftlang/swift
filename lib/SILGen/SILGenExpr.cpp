@@ -340,12 +340,11 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
           break;
             
         case DidConsumeSelf:
-          // We already consumed self. This shouldn't happen in valid code, because
-          // 'super.init(self)' is a DI violation, but we haven't run DI yet,
-          // so we can't actually crash here. At least emit
-          // somewhat balanced code.
-          takes = IsNotTake;
-          break;
+          // We already consumed self, but there may be subsequent loads if
+          // the call to 'super.init' or 'self.init' involves instance variables.
+          // Just borrow the previous self value, since it will be guaranteed
+          // up until the 'super.init' or 'self.init' call.
+          return ManagedValue::forUnmanaged(SelfInitDelegationValue);
         }
       } else {
         takes = IsNotTake;
@@ -367,6 +366,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
       if (takes == IsTake) {
         auto Zero = B.createNullClass(loc, Result.getType().getObjectType());
         B.createStore(loc, Zero, Result.getValue());
+
+        SelfInitDelegationValue = value.getValue();
       }
 
       return value;
