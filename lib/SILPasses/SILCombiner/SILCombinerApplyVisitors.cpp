@@ -1216,8 +1216,21 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       for (int i = 0, e = AI->getNumArguments(); i < e; ++i) {
         SILParameterInfo PI = FT->getParameters()[i];
         auto Arg = AI->getArgument(i);
-        if (PI.isConsumed() && !Arg.getType().isAddress())
-          Builder.emitReleaseValueOperation(AI->getLoc(), Arg);
+        switch (PI.getConvention()) {
+          case ParameterConvention::Indirect_In:
+            Builder.createDestroyAddr(AI->getLoc(), Arg);
+            break;
+          case ParameterConvention::Direct_Owned:
+            Builder.createReleaseValue(AI->getLoc(), Arg);
+            break;
+          case ParameterConvention::Indirect_In_Guaranteed:
+          case ParameterConvention::Indirect_Inout:
+          case ParameterConvention::Indirect_Out:
+          case ParameterConvention::Direct_Unowned:
+          case ParameterConvention::Direct_Deallocating:
+          case ParameterConvention::Direct_Guaranteed:
+            break;
+        }
       }
 
       // Erase all of the reference counting instructions and the Apply itself.

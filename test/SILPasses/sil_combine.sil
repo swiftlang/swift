@@ -1670,32 +1670,53 @@ class ZZZ {
   init()
 }
 
-sil @_TFC4main3ZZZd : $@convention(method) (@owned ZZZ) -> @owned Builtin.NativeObject
-sil @_TFC4main3ZZZD : $@convention(method) (@owned ZZZ) -> ()
-sil @_TFC4main3ZZZcfMS0_FT_S0_ : $@convention(method) (@owned ZZZ) -> @owned ZZZ
-sil @_TFC4main3ZZZCfMS0_FT_S0_ : $@convention(thin) (@thick ZZZ.Type) -> @owned ZZZ
+struct SSS {
+}
 
-//CHECK-LABEL: test_delete_readonly_function
-//CHECK-NOT: apply 
-//CHECK: strong_release %0
+//CHECK-LABEL: sil @test_delete_readonly_owned
+//CHECK: bb0(%0 : $ZZZ): 
+//CHECK-NEXT: strong_release %0
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
-sil @test_delete_readonly_function : $@convention(thin) (@owned ZZZ) -> () {
+sil @test_delete_readonly_owned : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
-  debug_value %0 : $ZZZ  // let x                 // id: %1
-  %2 = function_ref @_TF4main3barFCS_3ZZZT_ : $@convention(thin) (@owned ZZZ) -> () // user: %4
-  strong_retain %0 : $ZZZ                         // id: %3
+  %2 = function_ref @read_only_owned : $@convention(thin) (@owned ZZZ) -> () // user: %4
   %4 = apply %2(%0) : $@convention(thin) (@owned ZZZ) -> ()
-  strong_release %0 : $ZZZ                        // id: %5
   %6 = tuple ()                                   // user: %7
   return %6 : $()                                 // id: %7
 }
 
-sil [readonly] @_TF4main3barFCS_3ZZZT_ : $@convention(thin) (@owned ZZZ) -> ()
+sil [readonly] @read_only_owned : $@convention(thin) (@owned ZZZ) -> ()
 
-sil_vtable ZZZ {
-  #ZZZ.init!initializer.1: _TFC4main3ZZZcfMS0_FT_S0_	// main.ZZZ.init (main.ZZZ.Type)() -> main.ZZZ
+//CHECK-LABEL: sil @test_delete_readonly_guaranteed
+//CHECK: bb0(%0 : $ZZZ): 
+//CHECK-NEXT: tuple
+//CHECK-NEXT: return
+sil @test_delete_readonly_guaranteed : $@convention(thin) (@guaranteed ZZZ) -> () {
+bb0(%0 : $ZZZ):
+  %2 = function_ref @read_only_guaranteed : $@convention(thin) (@guaranteed ZZZ) -> () // user: %4
+  %4 = apply %2(%0) : $@convention(thin) (@guaranteed ZZZ) -> ()
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
 }
+
+sil [readonly] @read_only_guaranteed : $@convention(thin) (@guaranteed ZZZ) -> ()
+
+//CHECK-LABEL: sil @test_delete_readonly_in
+//CHECK: bb0(%0 : $*SSS): 
+//CHECK-NEXT: destroy_addr %0
+//CHECK-NEXT: tuple
+//CHECK-NEXT: return
+sil @test_delete_readonly_in : $@convention(thin) (@in SSS) -> () {
+bb0(%0 : $*SSS):
+  %2 = function_ref @read_only_in : $@convention(thin) (@in SSS) -> () // user: %4
+  %4 = apply %2(%0) : $@convention(thin) (@in SSS) -> ()
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+}
+
+sil [readonly] @read_only_in : $@convention(thin) (@in SSS) -> ()
+
 
 // FIXME: <rdar://problem/20980377> Add dead array elimination to DeadObjectElimination
 // CHECK-LABEL: test_dead_array
