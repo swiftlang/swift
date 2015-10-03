@@ -100,13 +100,21 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
 
 namespace {
 
+/// Forward declaration of classes.
+class Location;
+
 using ProjectionTreeNodeList = llvm::ArrayRef<ProjectionTreeNode *>;
 using ProjectionPathList = llvm::SmallVector<ProjectionPath, 8>;
+using LocationList = llvm::SmallVector<Location, 8>;
 using hash_code = llvm::hash_code;
 
 /// A Location is an abstraction of an object field in program. It consists of a
 /// base that is the tracked SILValue. In a subsequent commit this will be
 /// expanded to include a path.
+///
+/// TODO: move Location class into separate file so that LoadForwarding pass can
+/// use it as well.
+///
 class Location {
 public:
   enum KeyKind : uint8_t { EmptyKey = 0, TombstoneKey, NormalKey };
@@ -166,6 +174,13 @@ public:
     return HC;
   }
 
+  /// Returns the type of the Location.
+  SILType getType() const {
+    if (Path.getValue().empty())
+      return Base.getType();
+    return Path.getValue().front().getType();
+  }
+
   /// Return false if one projection path is a prefix of another. false
   /// otherwise.
   bool hasNonEmptySymmetricPathDifference(const Location &RHS) const {
@@ -215,24 +230,12 @@ public:
   /// construct the projection path to the field accessed.
   void initialize(SILValue val);
 
-  /// Expand this location to its individual fields by performing a DFS on the
-  /// Projection Tree to find all the fields.
+  /// Expand this location to all individual fields it contains.
   ///
   /// In SIL, we can have a store to an aggregate and loads from its individual
   /// fields. Therefore, we expand all the operations on aggregates onto
   /// individual fields.
-  void enumerateAggProjection(ProjectionPathList &Paths, ProjectionPath &Path,
-                              ProjectionTreeNode *Root,
-                              ProjectionTreeNodeList Nodes);
-
-  /// Given a type, return a list of ProjectionPaths to its individual
-  /// fields.
-  void enumerateAgg(SILModule *M, SILType Ty, ProjectionPathList &P,
-                    llvm::BumpPtrAllocator &BPA);
-
-  /// Expand this location to all individual fields it contains.
-  void expand(SILModule *Mod, llvm::SmallVector<Location, 8> &F,
-              llvm::BumpPtrAllocator &BPA, SILType Ty);
+  void expand(SILModule *Mod, LocationList &F);
 };
 
 } // end anonymous namespace
@@ -242,48 +245,35 @@ void Location::initialize(SILValue Dest) {
   Path = ProjectionPath::getAddrProjectionPath(Base, Dest);
 }
 
-void Location::expand(SILModule *Mod, llvm::SmallVector<Location, 8> &Locs,
-                      llvm::BumpPtrAllocator &BPA, SILType Ty) {
+void Location::expand(SILModule *Mod, LocationList &Locs) {
   // Expands the given type into locations each of which contains 1 field from
   // the type.
-  ProjectionPathList Paths;
-  enumerateAgg(Mod, Ty, Paths, BPA);
-  for (auto &P : Paths) {
-    ProjectionPath X;
-    X.append(Path.getValue());
-    Locs.push_back(Location(Base, X.append(P)));
+  LocationList Worklist;
+  llvm::SmallVector<Projection, 8> Projections;
+
+  Worklist.push_back(*this);
+  while (!Worklist.empty()) {
+    // Get the next level projections based on current location's type.
+    Location L = Worklist.pop_back_val();
+    Projections.clear();
+    Projection::getFirstLevelProjections(L.getType(), *Mod, Projections);
+
+    // Reached the end of the projection tree, this field can not be expanded
+    // anymore.
+    if (Projections.empty()) {
+      Locs.push_back(L);
+      continue;
+    }
+
+    // Keep expanding the location.
+    for (auto &P : Projections) {
+      ProjectionPath X;
+      X.append(P);
+      X.append(L.Path.getValue());
+      Location LL(Base, X);
+      Worklist.push_back(LL);
+    }
   }
-}
-
-void Location::enumerateAggProjection(ProjectionPathList &Paths,
-                                      ProjectionPath &Path,
-                                      ProjectionTreeNode *Root,
-                                      ProjectionTreeNodeList Nodes) {
-  // If this is the field. keep its projection tree.
-  if (Root->getChildProjections().empty()) {
-    ProjectionPath X;
-    X.append(Path);
-    Paths.push_back(std::move(X));
-    return;
-  }
-
-  for (auto &I : Root->getChildProjections()) {
-    Path.push_back(*Nodes[I]->getProjection().getPointer());
-    enumerateAggProjection(Paths, Path, Nodes[I], Nodes);
-    Path.pop_back(); // Backtrack.
-  }
-}
-
-void Location::enumerateAgg(SILModule *M, SILType Ty, ProjectionPathList &Paths,
-                            llvm::BumpPtrAllocator &Allocator) {
-  // Get the projection tree.
-  ProjectionTree PT(*M, Allocator, Ty);
-
-  // Start a depth first search on the projection tree to enumerate
-  // each field of the type.
-  ProjectionPath Path;
-  ProjectionTreeNode *Root = PT.getRoot();
-  enumerateAggProjection(Paths, Path, Root, PT.getProjectionTreeNodes());
 }
 
 //===----------------------------------------------------------------------===//
@@ -705,8 +695,8 @@ void GlobalDeadStoreEliminationImpl::processRead(SILInstruction *I, BBState *S,
 
   // Expand the given Mem into individual fields and process them as
   // separate reads.
-  llvm::SmallVector<Location, 8> Locs;
-  L.expand(&I->getModule(), Locs, BPA, Mem.getType().getObjectType());
+  LocationList Locs;
+  L.expand(&I->getModule(), Locs);
   for (auto &E : Locs) {
     updateWriteSetForRead(I, S, getLocationBit(E));
   }
@@ -724,8 +714,8 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
 
   // Expand the given Mem into individual fields and process them as separate writes.
   bool Dead = true;
-  llvm::SmallVector<Location, 8> Locs;
-  L.expand(&I->getModule(), Locs, BPA, Mem.getType().getObjectType());
+  LocationList Locs;
+  L.expand(&I->getModule(), Locs);
   for (auto &E : Locs) {
     Dead &= updateWriteSetForWrite(I, S, getLocationBit(E));
   }
@@ -752,8 +742,8 @@ void GlobalDeadStoreEliminationImpl::enumerateLocation(SILModule *M,
 
   // Expand the given Mem into individual fields and add them to the
   // locationvault.
-  llvm::SmallVector<Location, 8> Locs;
-  L.expand(M, Locs, BPA, Mem.getType().getObjectType());
+  LocationList Locs;
+  L.expand(M, Locs);
   for (auto &E : Locs) {
     addLocation(E);
   }

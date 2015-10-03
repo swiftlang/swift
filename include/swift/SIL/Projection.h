@@ -304,6 +304,11 @@ public:
   static void getFirstLevelProjections(SILValue V, SILModule &Mod,
                                        llvm::SmallVectorImpl<Projection> &Out);
 
+  /// Given a specific SILType, return all first level projections if it is an
+  /// aggregate.
+  static void getFirstLevelProjections(SILType V, SILModule &Mod,
+                                       llvm::SmallVectorImpl<Projection> &Out);
+
   /// Form an aggregate of type BaseType using the SILValue Values. Returns the
   /// aggregate on success if this is a case we handle or an empty SILValue
   /// otherwise.
@@ -383,6 +388,12 @@ public:
   /// the append function.
   ProjectionPath(ProjectionPath &&Other) : Path(Other.Path) {}
 
+  /// Append the projection P onto this.
+  ProjectionPath &append(const Projection &P) {
+    push_back(P);
+    return *this;
+  }
+
   /// Append the projections in Other onto this.
   ProjectionPath &append(const ProjectionPath &Other) {
     for (auto &X : Other.Path) {
@@ -431,6 +442,9 @@ public:
 
   /// Returns the last element of the path.
   const Projection &back() const { return Path.back(); }
+  
+  /// Returns the first element of the path.
+  const Projection &front() const { return Path.front(); }
 
   /// Returns true if LHS and RHS have all the same projections in the same
   /// order.
