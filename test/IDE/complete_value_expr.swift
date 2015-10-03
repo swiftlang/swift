@@ -1699,7 +1699,7 @@ func testUnusableProtExt(x: PWithT) {
   x.#^PROTOCOL_EXT_UNUSABLE_EXISTENTIAL^#
 }
 // PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Begin completions
-// PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   foo({#(x): `Self`.T#})[#`Self`.T#]{{; name=.+}}
+// PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   foo({#(x): Self.T#})[#Self.T#]{{; name=.+}}
 // PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   bar({#(x): T#})[#T#]{{; name=.+}}
 // PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: End completions
 
@@ -1733,8 +1733,8 @@ func testDeDuped(x: dedupS) {
 func testDeDuped2(x: dedupP) {
   x#^PROTOCOL_EXT_DEDUP_2^#
 // PROTOCOL_EXT_DEDUP_2: Begin completions, 4 items
-// PROTOCOL_EXT_DEDUP_2: Decl[InstanceMethod]/CurrNominal:   .foo()[#`Self`.T#]; name=foo()
-// PROTOCOL_EXT_DEDUP_2: Decl[InstanceVar]/CurrNominal:      .bar[#`Self`.T#]; name=bar
+// PROTOCOL_EXT_DEDUP_2: Decl[InstanceMethod]/CurrNominal:   .foo()[#Self.T#]; name=foo()
+// PROTOCOL_EXT_DEDUP_2: Decl[InstanceVar]/CurrNominal:      .bar[#Self.T#]; name=bar
 // PROTOCOL_EXT_DEDUP_2: Decl[Subscript]/CurrNominal:        [{#Self.T#}][#Self.T#]; name=[Self.T]
 // FIXME: duplicate subscript on protocol type rdar://problem/22086900
 // PROTOCOL_EXT_DEDUP_2: Decl[Subscript]/CurrNominal:        [{#Self.T#}][#Self.T#]; name=[Self.T]

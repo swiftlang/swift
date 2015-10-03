@@ -2049,6 +2049,14 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
   return SourceRange(getNameLoc(), endLoc);
 }
 
+bool GenericTypeParamDecl::isProtocolSelf() const {
+  if (!isImplicit()) return false;
+  auto dc = getDeclContext();
+  if (!dc->isProtocolOrProtocolExtensionContext()) return false;
+  return dc->getProtocolSelf() == this;
+}
+
+
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
                                        TypeLoc defaultDefinition)

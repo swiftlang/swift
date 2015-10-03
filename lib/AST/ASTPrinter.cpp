@@ -105,6 +105,16 @@ void ASTPrinter::printTextImpl(StringRef Text) {
   printText(Text);
 }
 
+void ASTPrinter::printTypeRef(const TypeDecl *TD, Identifier Name) {
+  PrintNameContext Context = PrintNameContext::Normal;
+  if (auto GP = dyn_cast<GenericTypeParamDecl>(TD)) {
+    if (GP->isProtocolSelf())
+      Context = PrintNameContext::GenericParameter;
+  }
+
+  printName(Name, Context);
+}
+
 void ASTPrinter::printModuleRef(ModuleEntity Mod, Identifier Name) {
   printName(Name);
 }
@@ -124,7 +134,18 @@ ASTPrinter &ASTPrinter::operator<<(UUID UU) {
   return *this;
 }
 
-void ASTPrinter::printName(Identifier Name) {
+/// Determine whether to escape the fiven keyword in the given context.
+static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
+  switch (context) {
+  case PrintNameContext::Normal:
+    return true;
+
+  case PrintNameContext::GenericParameter:
+    return keyword != "Self";
+  }
+}
+
+void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
   if (Name.empty()) {
     *this << "_";
     return;
@@ -134,6 +155,10 @@ void ASTPrinter::printName(Identifier Name) {
       .Case(#KW, true)
 #include "swift/Parse/Tokens.def"
       .Default(false);
+
+  if (IsKeyword)
+    IsKeyword = escapeKeywordInContext(Name.str(), Context);
+
   if (IsKeyword)
     *this << "`";
   *this << Name.str();
@@ -2910,7 +2935,15 @@ public:
         visit(parent);
         Printer << ".";
       }
-      Printer << T->getName().str();
+
+      if (T->getName().empty())
+        Printer << "<anonymous>";
+      else {
+        PrintNameContext context = PrintNameContext::Normal;
+        if (T->getSelfProtocol())
+          context = PrintNameContext::GenericParameter;
+        Printer.printName(T->getName(), context);
+      }
     }
   }
 
@@ -2938,8 +2971,13 @@ public:
     auto Name = T->getName();
     if (Name.empty())
       Printer << "<anonymous>";
-    else
-      Printer.printName(Name);
+    else {
+      PrintNameContext context = PrintNameContext::Normal;
+      if (T->getDecl() && T->getDecl()->isProtocolSelf())
+        context = PrintNameContext::GenericParameter;
+
+      Printer.printName(Name, context);
+    }
   }
 
   void visitAssociatedTypeType(AssociatedTypeType *T) {

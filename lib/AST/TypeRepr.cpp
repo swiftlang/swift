@@ -314,10 +314,10 @@ void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
       else
         Printer.printTypeRef(TD, getIdentifier());
     } else {
-      Printer << getIdentifier().str();
+      Printer.printName(getIdentifier());
     }
   } else {
-    Printer << getIdentifier().str();
+    Printer.printName(getIdentifier());
   }
   if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(this))
     printGenericArgs(Printer, Opts, GenIdT->getGenericArgs());

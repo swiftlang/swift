@@ -44,7 +44,7 @@ var TopLevelVar: TopLevelVar? { return nil } // expected-error 2 {{use of undecl
 
 
 protocol AProtocol {
-  typealias e : e  // expected-error {{inheritance from non-protocol, non-class type '`Self`.e'}}
+  typealias e : e  // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
 }
 
 

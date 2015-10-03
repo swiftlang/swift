@@ -626,7 +626,7 @@ struct d0200_EscapedIdentifiers {
 
   func `func`<`let`: `protocol`, `where` where `where` : `protocol`>(
       `class`: Int, `struct`: `protocol`, `foo`: `let`, `bar`: `where`) {}
-// PASS_COMMON-NEXT: {{^}}  func `func`<`let` : `protocol`, `where` where where : `protocol`>(`class`: Int, `struct`: `protocol`, foo: let, bar: where){{$}}
+// PASS_COMMON-NEXT: {{^}}  func `func`<`let` : `protocol`, `where` where `where` : `protocol`>(`class`: Int, `struct`: `protocol`, foo: `let`, bar: `where`){{$}}
 
   var `var`: `struct` = `struct`()
 // PASS_COMMON-NEXT: {{^}}  var `var`: {{(d0200_EscapedIdentifiers.)?}}`struct`{{$}}

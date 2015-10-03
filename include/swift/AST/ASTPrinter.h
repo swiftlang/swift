@@ -23,6 +23,15 @@ namespace swift {
   class ModuleEntity;
   class TypeDecl;
 
+/// Describes the context in which a name is being printed, which
+/// affects the keywords that need to be escaped.
+enum class PrintNameContext {
+  // Normal context
+  Normal,
+  // Generic parameter context, where 'Self' is not escaped.
+  GenericParameter,
+};
+
 /// An abstract class used to print an AST.
 class ASTPrinter {
   unsigned CurrentIndentation = 0;
@@ -49,9 +58,8 @@ public:
   virtual void printDeclPost(const Decl *D) {}
 
   /// Called when printing the referenced name of a type declaration.
-  virtual void printTypeRef(const TypeDecl *TD, Identifier Name) {
-    printName(Name);
-  }
+  virtual void printTypeRef(const TypeDecl *TD, Identifier Name);
+
   /// Called when printing the referenced name of a module.
   virtual void printModuleRef(ModuleEntity Mod, Identifier Name);
 
@@ -65,7 +73,8 @@ public:
   ASTPrinter &operator<<(unsigned long long N);
   ASTPrinter &operator<<(UUID UU);
 
-  void printName(Identifier Name);
+  void printName(Identifier Name,
+                 PrintNameContext Context = PrintNameContext::Normal);
 
   void setIndent(unsigned NumSpaces) {
     CurrentIndentation = NumSpaces;

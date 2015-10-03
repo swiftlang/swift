@@ -2,7 +2,7 @@
 
 class C { }
 
-protocol P { // expected-note{{requirement specified as '`Self`.AssocP' : 'C' [with Self = X]}}
+protocol P { // expected-note{{requirement specified as 'Self.AssocP' : 'C' [with Self = X]}}
   typealias AssocP : C
 }
 
