@@ -1125,9 +1125,8 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
       diagnose(Components.back()->getIdLoc(),
                diag::note_module_as_type, moduleName);
     }
-    Type ty = ErrorType::get(Context);
-    Components.back()->setValue(ty);
-    return ty;
+    Components.back()->setInvalid(Context);
+    return ErrorType::get(Context);
   }
 
   // We allow a type to conform to a protocol that is less available than
@@ -1144,9 +1143,8 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
       diagnoseAvailability(result, IdType,
                            Components.back()->getIdLoc(), DC, *this,
                            AllowPotentiallyUnavailableProtocol)) {
-    Type ty = ErrorType::get(Context);
-    Components.back()->setValue(ty);
-    return ty;
+    Components.back()->setInvalid(Context);
+    return ErrorType::get(Context);
   }
   
   return result;
