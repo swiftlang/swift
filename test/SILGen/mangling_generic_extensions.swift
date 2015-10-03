@@ -49,8 +49,8 @@ extension Foo where T: Runcible, T.Spoon: Runcible {
 // declaration, so we would no longer want to use the extension mangling
 // in unconstrained cases.
 extension Runcible {
-  // CHECK-LABEL: sil hidden @_TFeRq_27mangling_generic_extensions8Runcible_S_S0_5runceuRq_S0__fq_FT_T_
-  // NO-SELF-LABEL: sil hidden @_TFeRq_27mangling_generic_extensions8Runcible_S_S0_5runcefT_T_
+  // CHECK-LABEL: sil hidden @_TFE27mangling_generic_extensionsPS_8Runcible5runceuRq_S0__fq_FT_T_
+  // NO-SELF-LABEL: sil hidden @_TFE27mangling_generic_extensionsPS_8Runcible5runcefT_T_
   func runce() {}
 }
 

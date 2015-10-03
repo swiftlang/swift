@@ -52,7 +52,7 @@ func getObjectUID<T: ObjectUID>(var x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[X2:%.*]] = load [[X_TMP]]
   // CHECK: strong_release [[X2]]
   // -- call nextCLSID from protocol ext
-  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_TFeRq_25protocol_class_refinement3UID_S_S0_s9nextCLSIDSi
+  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_TFE25protocol_class_refinementPS_3UIDs9nextCLSIDSi
   // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[XBOX]]#1)
   x.nextCLSID = x.uid()
 
@@ -68,7 +68,7 @@ func getObjectUID<T: ObjectUID>(var x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[X2:%.*]] = load [[X_TMP]]
   // CHECK: strong_release [[X2]]
   // -- call secondNextCLSID from class-constrained protocol ext
-  // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_TFeRq_25protocol_class_refinement9ObjectUID_S_S0_s15secondNextCLSIDSi
+  // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_TFE25protocol_class_refinementPS_9ObjectUIDs15secondNextCLSIDSi
   // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[X1]])
   // CHECK: strong_release [[X1]]
   x.secondNextCLSID = x.uid()
@@ -102,7 +102,7 @@ func getBaseObjectUID<T: UID where T: Base>(var x: T) -> (Int, Int, Int) {
   // CHECK: [[X2:%.*]] = load [[X_TMP]]
   // CHECK: strong_release [[X2]]
   // -- call nextCLSID from protocol ext
-  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_TFeRq_25protocol_class_refinement3UID_S_S0_s9nextCLSIDSi
+  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @_TFE25protocol_class_refinementPS_3UIDs9nextCLSIDSi
   // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[XBOX]]#1)
   x.nextCLSID = x.uid()
   return (x.iid, x.clsid, x.nextCLSID)

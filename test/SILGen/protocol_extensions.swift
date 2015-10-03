@@ -10,7 +10,7 @@ struct Box {
 }
 
 extension P1 {
-  // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions2P1_S_S0_6extP1auRq_S0__fq_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P16extP1auRq_S0__fq_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $*Self):
   final func extP1a() {
     // CHECK: [[WITNESS:%[0-9]+]] = witness_method $Self, #P1.reqP1a!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
@@ -19,10 +19,10 @@ extension P1 {
     // CHECK: return
   }
 
-  // CHECK-LABEL: sil @_TFeRq_19protocol_extensions2P1_S_S0_6extP1buRq_S0__fq_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
+  // CHECK-LABEL: sil @_TFE19protocol_extensionsPS_2P16extP1buRq_S0__fq_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $*Self):
   public final func extP1b() {
-    // CHECK: [[FN:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_6extP1auRq_S0__fq_FT_T_ : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
+    // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P16extP1auRq_S0__fq_FT_T_ : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     // CHECK-NEXT: apply [[FN]]<Self>([[SELF]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     extP1a()
     // CHECK: return
@@ -39,7 +39,7 @@ extension P1 {
   final func callSubscript() -> Int {
     // But here we have to do a witness method call:
 
-    // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions2P1_S_S0_13callSubscriptuRq_S0__fq_FT_Si
+    // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P113callSubscriptuRq_S0__fq_FT_Si
     // CHECK-NEXT: bb0(%0 : $*Self):
     // CHECK: witness_method $Self, #P1.subscript!getter.1
     // CHECK: return
@@ -71,7 +71,7 @@ class C : P1 {
 //   (materializeForSet test from above)
 // CHECK-LABEL: sil [transparent] [thunk] @_TTWC19protocol_extensions1CS_2P1S_FS1_m9subscriptFSiSi
 // CHECK-NEXT: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*C):
-// CHECK: function_ref @_TFeRq_19protocol_extensions2P1_S_S0_g9subscriptFSiSi
+// CHECK: function_ref @_TFE19protocol_extensionsPS_2P1g9subscriptFSiSi
 // CHECK: return
 
 class D : C { }
@@ -99,7 +99,7 @@ func inout_func(inout n: Int) {}
 // CHECK-NEXT: bb0([[M:%[0-9]+]] : $MetaHolder, [[DD:%[0-9]+]] : $@thick D.Type, [[D:%[0-9]+]] : $D):
 func testD(m: MetaHolder, dd: D.Type, d: D) {
   // CHECK: [[D2:%[0-9]+]] = alloc_box $D
-  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_11returnsSelfuRq_S0__fq_FT_q_
+  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P111returnsSelfuRq_S0__fq_FT_q_
   // CHECK: [[DCOPY:%[0-9]+]] = alloc_stack $D
   // CHECK: store [[D]] to [[DCOPY]]#1 : $*D
   // CHECK: [[RESULT:%[0-9]+]] = alloc_stack $D
@@ -107,110 +107,110 @@ func testD(m: MetaHolder, dd: D.Type, d: D) {
   var d2: D = d.returnsSelf()
 
   // CHECK: metatype $@thick D.Type
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g22staticReadOnlyPropertySi
   let _ = D.staticReadOnlyProperty
 
   // CHECK: metatype $@thick D.Type
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   D.staticReadWrite1 = 1
 
   // CHECK: metatype $@thick D.Type
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite1Si
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: dealloc_stack
   D.staticReadWrite1 += 1
 
   // CHECK: metatype $@thick D.Type
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   D.staticReadWrite2 = Box(number: 2)
 
   // CHECK: metatype $@thick D.Type
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   D.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
   // CHECK: metatype $@thick D.Type
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   inout_func(&D.staticReadWrite2.number)
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g22staticReadOnlyPropertySi
   let _ = dd.staticReadOnlyProperty
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   dd.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite1Si
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: dealloc_stack
   dd.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   dd.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   dd.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   inout_func(&dd.staticReadWrite2.number)
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g22staticReadOnlyPropertySi
   let _ = m.d.staticReadOnlyProperty
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   m.d.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite1Si
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: dealloc_stack
   m.d.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   m.d.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   m.d.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   inout_func(&m.d.staticReadWrite2.number)
 
@@ -219,123 +219,123 @@ func testD(m: MetaHolder, dd: D.Type, d: D) {
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions5testSFTVS_10MetaHolder2ssMVS_1S_T_
 func testS(m: MetaHolder, ss: S.Type) {
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g22staticReadOnlyPropertySi
   // CHECK: metatype $@thick S.Type
   let _ = S.staticReadOnlyProperty
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: metatype $@thick S.Type
   S.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite1Si
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: dealloc_stack
   S.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick S.Type
   S.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   S.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   inout_func(&S.staticReadWrite2.number)
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g22staticReadOnlyPropertySi
   // CHECK: metatype $@thick S.Type
   let _ = ss.staticReadOnlyProperty
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: metatype $@thick S.Type
   ss.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite1Si
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: dealloc_stack
   ss.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick S.Type
   ss.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   ss.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   inout_func(&ss.staticReadWrite2.number)
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g22staticReadOnlyPropertySi
   // CHECK: metatype $@thick S.Type
   let _ = m.s.staticReadOnlyProperty
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: metatype $@thick S.Type
   m.s.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite1Si
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: dealloc_stack
   m.s.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick S.Type
   m.s.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   m.s.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick S.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   inout_func(&m.s.staticReadWrite2.number)
 
@@ -344,123 +344,123 @@ func testS(m: MetaHolder, ss: S.Type) {
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions5testGurFTGVS_17GenericMetaHolderq__2ggMGVS_1Gq___T_
 func testG<T>(m: GenericMetaHolder<T>, gg: G<T>.Type) {
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g22staticReadOnlyPropertySi
   // CHECK: metatype $@thick G<T>.Type
   let _ = G<T>.staticReadOnlyProperty
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: metatype $@thick G<T>.Type
   G<T>.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite1Si
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: dealloc_stack
   G<T>.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick G<T>.Type
   G<T>.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   G<T>.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   inout_func(&G<T>.staticReadWrite2.number)
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g22staticReadOnlyPropertySi
   // CHECK: metatype $@thick G<T>.Type
   let _ = gg.staticReadOnlyProperty
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: metatype $@thick G<T>.Type
   gg.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite1Si
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: dealloc_stack
   gg.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick G<T>.Type
   gg.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   gg.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   inout_func(&gg.staticReadWrite2.number)
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g22staticReadOnlyPropertySi
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g22staticReadOnlyPropertySi
   // CHECK: metatype $@thick G<T>.Type
   let _ = m.g.staticReadOnlyProperty
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: metatype $@thick G<T>.Type
   m.g.staticReadWrite1 = 1
 
   // CHECK: alloc_stack $Int
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite1Si
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite1Si
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite1Si
   // CHECK: dealloc_stack
   m.g.staticReadWrite1 += 1
 
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick G<T>.Type
   m.g.staticReadWrite2 = Box(number: 2)
 
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   m.g.staticReadWrite2.number += 5
 
   // CHECK: function_ref @_TF19protocol_extensions10inout_funcFRSiT_
   // CHECK: alloc_stack $Box
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_g16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1g16staticReadWrite2VS_3Box
   // CHECK: metatype $@thick G<T>.Type
   // CHECK: store
   // CHECK: load
-  // CHECK: function_ref @_TZFeRq_19protocol_extensions2P1_S_S0_s16staticReadWrite2VS_3Box
+  // CHECK: function_ref @_TZFE19protocol_extensionsPS_2P1s16staticReadWrite2VS_3Box
   // CHECK: dealloc_stack
   inout_func(&m.g.staticReadWrite2.number)
 
@@ -500,18 +500,18 @@ extension P1 {
 // CHECK: bb0([[P:%[0-9]+]] : $*P1, [[B:%[0-9]+]] : $Bool, [[I:%[0-9]+]] : $Int64):
 func testExistentials1(p1: P1, b: Bool, i: Int64) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]])
-  // CHECK: [[F1:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_2f1uRq_S0__fq_FT_T_
+  // CHECK: [[F1:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P12f1uRq_S0__fq_FT_T_
   // CHECK: apply [[F1]]<@opened([[UUID]]) P1>([[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
   p1.f1()
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[CURRIED1:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_8curried1uRq_S0__fq_fSbFVs5Int64T_
+  // CHECK: [[CURRIED1:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P18curried1uRq_S0__fq_fSbFVs5Int64T_
   // CHECK: [[CURRIED1]]<@opened([[UUID]]) P1>([[I]], [[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Int64, Bool, @in_guaranteed τ_0_0) -> ()
   p1.curried1(b)(i)
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]]#1
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_g9subscriptFVs5Int64Sb
+  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P1g9subscriptFVs5Int64Sb
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[I]], [[POPENED_COPY]]#1) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Int64, @in_guaranteed τ_0_0) -> Bool
   // CHECK: destroy_addr [[POPENED_COPY]]#1
   // CHECK: store{{.*}} : $*Bool
@@ -520,7 +520,7 @@ func testExistentials1(p1: P1, b: Bool, i: Int64) {
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]]#1
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_g4propSb
+  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P1g4propSb
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[POPENED_COPY]]#1) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> Bool
   // CHECK: store{{.*}} : $*Bool
   // CHECK: dealloc_stack [[POPENED_COPY]]
@@ -533,7 +533,7 @@ func testExistentials2(p1: P1) {
   // CHECK: [[P1A:%[0-9]+]] = alloc_box $P1
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[P1AINIT:%[0-9]+]] = init_existential_addr [[P1A]]#1 : $*P1, $@opened([[UUID2:".*"]]) P1
-  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_11returnsSelfuRq_S0__fq_FT_q_
+  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P111returnsSelfuRq_S0__fq_FT_q_
   // CHECK: apply [[FN]]<@opened([[UUID]]) P1>([[P1AINIT]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
   var p1a: P1 = p1.returnsSelf()
 }
@@ -543,13 +543,13 @@ func testExistentials2(p1: P1) {
 func testExistentialsGetters(p1: P1) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]]#1
-  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_g5prop2Sb
+  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P1g5prop2Sb
   // CHECK: [[B:%[0-9]+]] = apply [[FN]]<@opened([[UUID]]) P1>([[POPENED_COPY]]#1) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> Bool
   let b: Bool = p1.prop2
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: copy_addr [[POPENED]] to [initialization] [[POPENED_COPY:%.*]]#1
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_g9subscriptFSbSb
+  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P1g9subscriptFSbSb
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED_COPY]]#1) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @in_guaranteed τ_0_0) -> Bool
   let b2: Bool = p1[b]
 }
@@ -560,13 +560,13 @@ func testExistentialSetters(var p1: P1, b: Bool) {
   // CHECK: [[PBOX:%[0-9]+]] = alloc_box $P1
   // CHECK-NEXT: copy_addr [take] [[P]] to [initialization] [[PBOX]]#1 : $*P1
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[PBOX]]#1 : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_s5prop2Sb
+  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P1s5prop2Sb
   // CHECK: apply [[GETTER]]<@opened([[UUID]]) P1>([[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK-NOT: deinit_existential_addr
   p1.prop2 = b
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[PBOX]]#1 : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[SUBSETTER:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_s9subscriptFSbSb
+  // CHECK: [[SUBSETTER:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P1s9subscriptFSbSb
   // CHECK: apply [[SUBSETTER]]<@opened([[UUID]]) P1>([[B]], [[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, Bool, @inout τ_0_0) -> ()
   // CHECK-NOT: deinit_existential_addr [[PBOX]]#1 : $*P1
   p1[b] = b
@@ -594,7 +594,7 @@ func testLogicalExistentialSetters(var hasAP1: HasAP1, _ b: Bool) {
   // CHECK: [[SOMEP1_GETTER:%[0-9]+]] = function_ref @_TFV19protocol_extensions6HasAP1g6someP1PS_2P1_ : $@convention(method) (@out P1, @in_guaranteed HasAP1) -> ()
   // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]]#1, %6#1) : $@convention(method) (@out P1, @in_guaranteed HasAP1) -> ()
   // CHECK: [[P1_OPENED:%[0-9]+]] = open_existential_addr [[P1_COPY]]#1 : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[PROP2_SETTER:%[0-9]+]] = function_ref @_TFeRq_19protocol_extensions2P1_S_S0_s5prop2Sb : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
+  // CHECK: [[PROP2_SETTER:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P1s5prop2Sb : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK: apply [[PROP2_SETTER]]<@opened([[UUID]]) P1>([[B]], [[P1_OPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK: [[SOMEP1_SETTER:%[0-9]+]] = function_ref @_TFV19protocol_extensions6HasAP1s6someP1PS_2P1_ : $@convention(method) (@in P1, @inout HasAP1) -> ()
   // CHECK: apply [[SOMEP1_SETTER]]([[P1_COPY]]#1, [[HASP1_BOX]]#1) : $@convention(method) (@in P1, @inout HasAP1) -> ()
@@ -680,7 +680,7 @@ protocol InitRequirement {
 }
 
 extension InitRequirement {
-  // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions15InitRequirement_S_S0_CuRq_S0__fMq_FT1dCS_1D_q_ : $@convention(thin) <Self where Self : InitRequirement> (@out Self, @owned D, @thick Self.Type) -> ()
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_15InitRequirementCuRq_S0__fMq_FT1dCS_1D_q_ : $@convention(thin) <Self where Self : InitRequirement> (@out Self, @owned D, @thick Self.Type) -> ()
   // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   init(d: D) {
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@out τ_0_0, @owned C, @thick τ_0_0.Type) -> ()
@@ -689,8 +689,8 @@ extension InitRequirement {
     self.init(c: d)
   }
 
-  // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions15InitRequirement_S_S0_CuRq_S0__fMq_FT2d2CS_1D_q_
-  // CHECK:         function_ref @_TFeRq_19protocol_extensions15InitRequirement_S_S0_CuRq_S0__fMq_FT1dCS_1D_q_
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_15InitRequirementCuRq_S0__fMq_FT2d2CS_1D_q_
+  // CHECK:         function_ref @_TFE19protocol_extensionsPS_15InitRequirementCuRq_S0__fMq_FT1dCS_1D_q_
   init(d2: D) {
     self.init(d: d2)
   }
@@ -701,7 +701,7 @@ protocol ClassInitRequirement: class {
 }
 
 extension ClassInitRequirement {
-  // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions20ClassInitRequirement_S_S0_CuRq_S0__fMq_FT1dCS_1D_q_ : $@convention(thin) <Self where Self : ClassInitRequirement> (@owned D, @thick Self.Type) -> @owned Self
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_20ClassInitRequirementCuRq_S0__fMq_FT1dCS_1D_q_ : $@convention(thin) <Self where Self : ClassInitRequirement> (@owned D, @thick Self.Type) -> @owned Self
   // CHECK:       bb0([[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #ClassInitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : ClassInitRequirement> (@owned C, @thick τ_0_0.Type) -> @owned τ_0_0
   // CHECK:         [[ARG_UP:%.*]] = upcast [[ARG]]
@@ -723,7 +723,7 @@ func foo(t: ObjCInitRequirement.Type, c: OC) -> ObjCInitRequirement {
 }
 
 extension ObjCInitRequirement {
-  // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions19ObjCInitRequirement_S_S0_CuRq_S0__fMq_FT1dCS_2OD_q_ : $@convention(thin) <Self where Self : ObjCInitRequirement> (@owned OD, @thick Self.Type) -> @owned Self
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_19ObjCInitRequirementCuRq_S0__fMq_FT1dCS_2OD_q_ : $@convention(thin) <Self where Self : ObjCInitRequirement> (@owned OD, @thick Self.Type) -> @owned Self
   // CHECK:       bb0([[ARG:%.*]] : $OD, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   // CHECK:         [[OBJC_SELF_TYPE:%.*]] = thick_to_objc_metatype [[SELF_TYPE]]
   // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic [objc] [[OBJC_SELF_TYPE]] : $@objc_metatype Self.Type, $Self
@@ -796,18 +796,18 @@ protocol P2 {
 }
 
 extension P2 {
-  // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions2P2_S_S0_2f1uRq_S0__fq_Fqq_S0_1AT_
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P22f1uRq_S0__fq_Fqq_S0_1AT_
   // CHECK: witness_method $Self, #P2.f2!1
-  // CHECK: function_ref @_TFeRq_19protocol_extensions2P2_S_S0_2f3uRq_S0__fq_Fqq_S0_1AT_
+  // CHECK: function_ref @_TFE19protocol_extensionsPS_2P22f3uRq_S0__fq_Fqq_S0_1AT_
   // CHECK: return
   func f1(a: A) {
     f2(a)
     f3(a)
   }
 
-  // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions2P2_S_S0_2f2uRq_S0__fq_Fqq_S0_1AT_
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P22f2uRq_S0__fq_Fqq_S0_1AT_
   // CHECK: witness_method $Self, #P2.f1!1
-  // CHECK: function_ref @_TFeRq_19protocol_extensions2P2_S_S0_2f3uRq_S0__fq_Fqq_S0_1AT_
+  // CHECK: function_ref @_TFE19protocol_extensionsPS_2P22f3uRq_S0__fq_Fqq_S0_1AT_
   // CHECK: return
   func f2(a: A) {
     f1(a)
@@ -816,7 +816,7 @@ extension P2 {
 
   func f3(a: A) {}
 
-  // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions2P2_S_S0_2f4uRq_S0__fq_FT_T_
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P22f4uRq_S0__fq_FT_T_
   // CHECK: witness_method $Self, #P2.f1!1
   // CHECK: witness_method $Self, #P2.f2!1
   // CHECK: return

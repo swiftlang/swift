@@ -48,19 +48,19 @@ func archetype_init_partial_apply<T: C where T: P>(t: T.Type) {
   let requiredT: Double -> T = T.init
   // CHECK: function_ref @_TFP18partial_apply_init1PCuRq_S0__FMq_FT5protoSS_q_
   let protoT: String -> T = T.init
-  // CHECK: function_ref @_TFeRq_18partial_apply_init1P_S_S0_CuRq_S0__FMq_FT8protoExtSf_q_
+  // CHECK: function_ref @_TFE18partial_apply_initPS_1PCuRq_S0__FMq_FT8protoExtSf_q_
   let protoExtT: Float -> T = T.init
 
   // CHECK: function_ref @_TFC18partial_apply_init1CCFMS0_FT8requiredSd_S0_
   let requiredM: Double -> T = t.init
   // CHECK: function_ref @_TFP18partial_apply_init1PCuRq_S0__FMq_FT5protoSS_q_
   let protoM: String -> T = t.init
-  // CHECK: function_ref @_TFeRq_18partial_apply_init1P_S_S0_CuRq_S0__FMq_FT8protoExtSf_q_
+  // CHECK: function_ref @_TFE18partial_apply_initPS_1PCuRq_S0__FMq_FT8protoExtSf_q_
   let protoExtM: Float -> T = t.init
 }
 
 // CHECK-LABEL: sil shared @_TFP18partial_apply_init1PCuRq_S0__FMq_FT5protoSS_q_
 // CHECK:         witness_method $Self, #P.init!allocator.1
-// CHECK-LABEL: sil shared @_TFeRq_18partial_apply_init1P_S_S0_CuRq_S0__FMq_FT8protoExtSf_q_
-// CHECK:         function_ref @_TFeRq_18partial_apply_init1P_S_S0_CuRq_S0__fMq_FT8protoExtSf_q_
+// CHECK-LABEL: sil shared @_TFE18partial_apply_initPS_1PCuRq_S0__FMq_FT8protoExtSf_q_
+// CHECK:         function_ref @_TFE18partial_apply_initPS_1PCuRq_S0__fMq_FT8protoExtSf_q_
 

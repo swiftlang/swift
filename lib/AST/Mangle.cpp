@@ -249,7 +249,10 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
     if (ExtD->getParentModule() != decl->getParentModule()
         || ExtD->isConstrainedExtension()
         || ExtD->getDeclaredInterfaceType()->isExistentialType()) {
-      if (auto sig = ExtD->getGenericSignature()) {
+      auto sig = ExtD->getGenericSignature();
+      // If the extension is constrained, mangle the generic signature that
+      // constrains it.
+      if (sig && ExtD->isConstrainedExtension()) {
         Buffer << 'e';
         Mod = ExtD->getModuleContext();
         mangleGenericSignature(sig, ResilienceExpansion::Minimal);

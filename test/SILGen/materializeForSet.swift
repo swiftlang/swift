@@ -245,7 +245,7 @@ func improveWizard(inout wizard: Wizard) {
 //   Call the getter and materialize the result in the temporary.
 // SILGEN-NEXT:  [[T0:%.*]] = load [[WIZARD:.*]] : $*Wizard
 // SILGEN-NEXT:  function_ref
-// SILGEN-NEXT:  [[GETTER:%.*]] = function_ref @_TFeRq_17materializeForSet5Magic_S_S0_g5hocusSi
+// SILGEN-NEXT:  [[GETTER:%.*]] = function_ref @_TFE17materializeForSetPS_5Magicg5hocusSi
 // SILGEN-NEXT:  [[WTEMP:%.*]] = alloc_stack $Wizard
 // SILGEN-NEXT:  store [[T0]] to [[WTEMP]]#1
 // SILGEN-NEXT:  [[T0:%.*]] = apply [[GETTER]]<Wizard>([[WTEMP]]#1)
@@ -254,7 +254,7 @@ func improveWizard(inout wizard: Wizard) {
 // SILGEN-NEXT:  apply [[IMPROVE]]([[TEMP]]#1)
 // SILGEN-NEXT:  [[T0:%.*]] = load [[TEMP]]#1
 // SILGEN-NEXT:  function_ref
-// SILGEN-NEXT:  [[SETTER:%.*]] = function_ref @_TFeRq_17materializeForSet5Magic_S_S0_s5hocusSi
+// SILGEN-NEXT:  [[SETTER:%.*]] = function_ref @_TFE17materializeForSetPS_5Magics5hocusSi
 // SILGEN-NEXT:  apply [[SETTER]]<Wizard>([[T0]], [[WIZARD]])
 // SILGEN-NEXT:  dealloc_stack [[WTEMP]]#0
 // SILGEN-NEXT:  dealloc_stack [[TEMP]]#0
