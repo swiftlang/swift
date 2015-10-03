@@ -123,7 +123,7 @@ public protocol SequenceType {
   ///   skip subsequent calls.
   ///
   /// - Complexity: O(`self.count`)
-  func forEach(@noescape body: (Generator.Element) throws -> ()) rethrows
+  func forEach(@noescape body: (Generator.Element) throws -> Void) rethrows
 
   /// Returns a subsequence containing all but the first `n` elements.
   ///
@@ -575,7 +575,7 @@ extension SequenceType {
   ///
   /// - Complexity: O(`self.count`)
   public func forEach(
-    @noescape body: (Generator.Element) throws -> ()
+    @noescape body: (Generator.Element) throws -> Void
   ) rethrows {
     for element in self {
       try body(element)

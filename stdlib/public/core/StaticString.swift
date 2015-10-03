@@ -117,7 +117,7 @@ public struct StaticString
     } else {
       var buffer: UInt64 = 0
       var i = 0
-      let sink: (UInt8) -> () = {
+      let sink: (UInt8) -> Void = {
         buffer = buffer | (UInt64($0) << (UInt64(i) * 8))
         ++i
       }

@@ -119,7 +119,7 @@ var _seenExpectCrash = false
 /// Run `body` and expect a failure to happen.
 ///
 /// The check passes iff `body` triggers one or more failures.
-public func expectFailure(${TRACE1}, body: () -> ()) {
+public func expectFailure(${TRACE1}, body: () -> Void) {
   let startAnyExpectFailed = _anyExpectFailed
   _anyExpectFailed = false
   body()
@@ -399,9 +399,9 @@ func _defaultTestSuiteFailedCallback() {
   abort()
 }
 
-var _testSuiteFailedCallback: () -> () = _defaultTestSuiteFailedCallback
+var _testSuiteFailedCallback: () -> Void = _defaultTestSuiteFailedCallback
 
-public func _setTestSuiteFailedCallback(callback: () -> ()) {
+public func _setTestSuiteFailedCallback(callback: () -> Void) {
   _testSuiteFailedCallback = callback
 }
 
@@ -828,8 +828,8 @@ public class TestSuite {
   public func test(
     name: String,
     file: String = __FILE__, line: UInt = __LINE__,
-    _ testFunction: () -> ()) {
-    
+    _ testFunction: () -> Void
+  ) {
     _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
     .code(testFunction)
   }
@@ -840,12 +840,12 @@ public class TestSuite {
     return _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
   }
 
-  public func setUp(code: () -> ()) {
+  public func setUp(code: () -> Void) {
     _precondition(_testSetUpCode == nil, "set-up code already set")
     _testSetUpCode = code
   }
 
-  public func tearDown(code: () -> ()) {
+  public func tearDown(code: () -> Void) {
     _precondition(_testTearDownCode == nil, "tear-down code already set")
     _testTearDownCode = code
   }
@@ -880,7 +880,7 @@ public class TestSuite {
     let stdinText: String?
     let stdinEndsWithEOF: Bool
     let crashOutputMatches: [String]
-    let code: () -> ()
+    let code: () -> Void
 
     /// Whether the test harness should stop reusing the child process after
     /// running this test.
@@ -938,7 +938,7 @@ public class TestSuite {
       return self
     }
 
-    public func code(testFunction: () -> ()) {
+    public func code(testFunction: () -> Void) {
       _testSuite._tests.append(
         _Test(
           name: _name, testLoc: _data._testLoc!, xfail: _data._xfail,
@@ -954,10 +954,10 @@ public class TestSuite {
   var _tests: [_Test] = []
 
   /// Code that is run before every test.
-  var _testSetUpCode: (() -> ())?
+  var _testSetUpCode: (() -> Void)?
 
   /// Code that is run after every test.
-  var _testTearDownCode: (() -> ())?
+  var _testTearDownCode: (() -> Void)?
 
   /// Maps test name to index in `_tests`.
   var _testNameToIndex: [String : Int] = [:]

@@ -272,7 +272,7 @@ extension String {
     Encoding: UnicodeCodecType
   >(encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
-    let output: (Encoding.CodeUnit) -> () = { _ in ++codeUnitCount }
+    let output: (Encoding.CodeUnit) -> Void = { _ in ++codeUnitCount }
     self._encode(encoding, output: output)
     return codeUnitCount
   }
@@ -286,7 +286,7 @@ extension String {
   // with unpaired surrogates
   func _encode<
     Encoding: UnicodeCodecType
-  >(encoding: Encoding.Type, output: (Encoding.CodeUnit) -> ())
+  >(encoding: Encoding.Type, output: (Encoding.CodeUnit) -> Void)
   {
     return _core.encode(encoding, output: output)
   }

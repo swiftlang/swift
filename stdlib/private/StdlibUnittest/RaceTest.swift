@@ -47,7 +47,7 @@ import Glibc
 #if _runtime(_ObjC)
 import ObjectiveC
 #else
-func autoreleasepool(@noescape code: () -> ()) {
+func autoreleasepool(@noescape code: () -> Void) {
   // Native runtime does not have autorelease pools.  Execute the code
   // directly.
   code()
@@ -92,8 +92,9 @@ public protocol RaceTestWithPerTrialDataType {
 
   /// Evaluates the observations made by all threads for a particular instance
   /// of `RaceData`.
-  func evaluateObservations(observations: [Observation],
-    _ sink: (RaceTestObservationEvaluation) -> ())
+  func evaluateObservations(
+    observations: [Observation],
+    _ sink: (RaceTestObservationEvaluation) -> Void)
 }
 
 /// The result of evaluating observations.

@@ -143,7 +143,7 @@ where T.Generator.Element == T._Buffer.Element,
 
   func checkReallocations(
     var a: T, _ growthDescription: String, _ growBy1: (inout _: T)->()
-  ) -> () {
+  ) {
     var reallocations = 0
 
     // Note: right now this test is dependent on a growth factor of 2.

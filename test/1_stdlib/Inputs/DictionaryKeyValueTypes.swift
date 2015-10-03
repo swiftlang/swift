@@ -615,7 +615,7 @@ func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
 }
 
 func slurpFastEnumerationFromSwift(
-  a: NSArray, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> (),
+  a: NSArray, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void,
   maxItems: Int? = nil
 ) {
   var state = NSFastEnumerationState()
@@ -657,7 +657,7 @@ func slurpFastEnumerationFromSwift(
 typealias AnyObjectTuple2 = (AnyObject, AnyObject)
 
 func slurpFastEnumerationFromSwift(
-  d: NSDictionary, _ fe: NSFastEnumeration, _ sink: (AnyObjectTuple2) -> (),
+  d: NSDictionary, _ fe: NSFastEnumeration, _ sink: (AnyObjectTuple2) -> Void,
   maxItems: Int? = nil
 ) {
   var state = NSFastEnumerationState()
@@ -697,7 +697,7 @@ func slurpFastEnumerationFromSwift(
 }
 
 func slurpFastEnumerationOfNSEnumeratorFromSwift(
-  a: NSArray, _ enumerator: NSEnumerator, _ sink: (AnyObject) -> (),
+  a: NSArray, _ enumerator: NSEnumerator, _ sink: (AnyObject) -> Void,
   maxFastEnumerationItems: Int
 ) {
   slurpFastEnumerationFromSwift(
@@ -708,7 +708,8 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift(
 }
 
 func slurpFastEnumerationOfNSEnumeratorFromSwift(
-  d: NSDictionary, _ enumerator: NSEnumerator, _ sink: (AnyObjectTuple2) -> (),
+  d: NSDictionary, _ enumerator: NSEnumerator,
+  _ sink: (AnyObjectTuple2) -> Void,
   maxFastEnumerationItems: Int
 ) {
   slurpFastEnumerationFromSwift(
@@ -723,7 +724,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift(
 import SlurpFastEnumeration
 
 func slurpFastEnumerationFromObjC(
-  a: NSArray, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> ()
+  a: NSArray, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void
 ) {
   let objcValues = NSMutableArray()
   slurpFastEnumerationOfArrayFromObjCImpl(a, fe, objcValues)
@@ -790,7 +791,7 @@ func _checkArrayFastEnumerationImpl(
   expected: [Int],
   _ a: NSArray,
   _ makeEnumerator: () -> NSFastEnumeration,
-  _ useEnumerator: (NSArray, NSFastEnumeration, (AnyObject)->()) -> (),
+  _ useEnumerator: (NSArray, NSFastEnumeration, (AnyObject)->()) -> Void,
   _ convertValue: (AnyObject) -> Int
 ) {
   let expectedContentsWithoutIdentity =
@@ -923,7 +924,7 @@ func _checkSetFastEnumerationImpl(
   expected: [Int],
   _ s: NSSet,
   _ makeEnumerator: () -> NSFastEnumeration,
-  _ useEnumerator: (NSSet, NSFastEnumeration, (AnyObject)->()) -> (),
+  _ useEnumerator: (NSSet, NSFastEnumeration, (AnyObject)->()) -> Void,
   _ convertMember: (AnyObject) -> Int
 ) {
   let expectedContentsWithoutIdentity =
@@ -955,7 +956,7 @@ func _checkSetFastEnumerationImpl(
 }
 
 func slurpFastEnumerationFromObjC(
-  s: NSSet, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> ()
+  s: NSSet, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void
 ) {
   let objcValues = NSMutableArray()
   slurpFastEnumerationOfArrayFromObjCImpl(s, fe, objcValues)
@@ -965,7 +966,7 @@ func slurpFastEnumerationFromObjC(
 }
 
 func slurpFastEnumerationOfNSEnumeratorFromSwift(
-  s: NSSet, _ enumerator: NSEnumerator, _ sink: (AnyObject) -> (),
+  s: NSSet, _ enumerator: NSEnumerator, _ sink: (AnyObject) -> Void,
   maxFastEnumerationItems: Int
 ) {
   slurpFastEnumerationFromSwift(
@@ -976,7 +977,7 @@ func slurpFastEnumerationOfNSEnumeratorFromSwift(
 }
 
 func slurpFastEnumerationFromSwift(
-  s: NSSet, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> (),
+  s: NSSet, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> Void,
   maxItems: Int? = nil
 ) {
   var state = NSFastEnumerationState()
@@ -1059,7 +1060,7 @@ func checkSetEnumeratorPartialFastEnumerationFromSwift(
 
 
 func slurpFastEnumerationFromObjC(
-  d: NSDictionary, _ fe: NSFastEnumeration, _ sink: (AnyObjectTuple2) -> ()
+  d: NSDictionary, _ fe: NSFastEnumeration, _ sink: (AnyObjectTuple2) -> Void
 ) {
   let objcPairs = NSMutableArray()
   slurpFastEnumerationOfDictionaryFromObjCImpl(d, fe, objcPairs)
@@ -1141,7 +1142,7 @@ func _checkDictionaryFastEnumerationImpl(
   expected: [(Int, Int)],
   _ d: NSDictionary,
   _ makeEnumerator: () -> NSFastEnumeration,
-  _ useEnumerator: (NSDictionary, NSFastEnumeration, (AnyObjectTuple2)->()) -> (),
+  _ useEnumerator: (NSDictionary, NSFastEnumeration, (AnyObjectTuple2)->()) -> Void,
   _ convertKey: (AnyObject) -> Int,
   _ convertValue: (AnyObject) -> Int
 ) {
@@ -1151,7 +1152,7 @@ func _checkDictionaryFastEnumerationImpl(
 
   for i in 0..<3 {
     var actualContents = [ExpectedDictionaryElement]()
-    let sink: (AnyObjectTuple2) -> () = {
+    let sink: (AnyObjectTuple2) -> Void = {
       (key, value) in
       actualContents.append(ExpectedDictionaryElement(
         key: convertKey(key),

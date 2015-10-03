@@ -44,8 +44,10 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialDataType {
     return Observation(unsafeBitCast(v, UInt.self))
   }
 
-  func evaluateObservations(observations: [Observation],
-      _ sink: (RaceTestObservationEvaluation) -> ()) {
+  func evaluateObservations(
+    observations: [Observation],
+    _ sink: (RaceTestObservationEvaluation) -> Void
+  ) {
     sink(evaluateObservationsAllEqual(observations))
   }
 }
@@ -85,8 +87,10 @@ struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
       unsafeBitCast(objcPairs[3], UInt.self))
   }
 
-  func evaluateObservations(observations: [Observation],
-      _ sink: (RaceTestObservationEvaluation) -> ()) {
+  func evaluateObservations(
+    observations: [Observation],
+    _ sink: (RaceTestObservationEvaluation) -> Void
+  ) {
     sink(evaluateObservationsAllEqual(observations))
   }
 }

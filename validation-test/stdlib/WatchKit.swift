@@ -19,7 +19,7 @@ WatchKitTests.test("WKInterfaceController/reloadRootControllers(_:)") {
 WatchKitTests.test("WKInterfaceController/presentController(_:)") {
   var curried = WKInterfaceController.presentController
   typealias ExpectedType =
-    (WKInterfaceController) -> ([(name: String, context: AnyObject)]) -> ()
+    (WKInterfaceController) -> ([(name: String, context: AnyObject)]) -> Void
   let checkType: ExpectedType = curried
   _blackHole(checkType)
 

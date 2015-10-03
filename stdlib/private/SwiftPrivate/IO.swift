@@ -102,7 +102,7 @@ public struct _FDOutputStream : OutputStreamType {
   public mutating func write(string: String) {
     let utf8 = string.nulTerminatedUTF8
     utf8.withUnsafeBufferPointer {
-      (utf8) -> () in
+      (utf8) -> Void in
       var writtenBytes = 0
       let bufferSize = utf8.count - 1
       while writtenBytes != bufferSize {

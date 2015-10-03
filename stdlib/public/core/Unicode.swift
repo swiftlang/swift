@@ -66,7 +66,7 @@ public protocol UnicodeCodecType {
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `output` on each `CodeUnit`.
-  static func encode(input: UnicodeScalar, output: (CodeUnit) -> ())
+  static func encode(input: UnicodeScalar, output: (CodeUnit) -> Void)
 }
 
 /// A codec for [UTF-8](http://www.unicode.org/glossary/#UTF_8).
@@ -444,7 +444,10 @@ public struct UTF8 : UnicodeCodecType {
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `output` on each `CodeUnit`.
-  public static func encode(input: UnicodeScalar, output put: (CodeUnit) -> ()) {
+  public static func encode(
+    input: UnicodeScalar,
+    output put: (CodeUnit) -> Void
+  ) {
     var c = UInt32(input)
     var buf3 = UInt8(c & 0xFF)
 
@@ -610,7 +613,10 @@ public struct UTF16 : UnicodeCodecType {
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `output` on each `CodeUnit`.
-  public static func encode(input: UnicodeScalar, output put: (CodeUnit) -> ()) {
+  public static func encode(
+    input: UnicodeScalar,
+    output put: (CodeUnit) -> Void
+  ) {
     let scalarValue: UInt32 = UInt32(input)
 
     if scalarValue <= UInt32(UInt16.max) {
@@ -665,8 +671,10 @@ public struct UTF32 : UnicodeCodecType {
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `output` on each `CodeUnit`.
-  public static func encode(input: UnicodeScalar,
-      output put: (CodeUnit) -> ()) {
+  public static func encode(
+    input: UnicodeScalar,
+    output put: (CodeUnit) -> Void
+  ) {
     put(UInt32(input))
   }
 }
@@ -683,7 +691,7 @@ public func transcode<
   OutputEncoding : UnicodeCodecType
   where InputEncoding.CodeUnit == Input.Element>(
   inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
-  var _ input: Input, _ output: (OutputEncoding.CodeUnit) -> (),
+  var _ input: Input, _ output: (OutputEncoding.CodeUnit) -> Void,
   stopOnError: Bool
 ) -> Bool {
 

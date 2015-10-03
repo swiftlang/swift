@@ -128,8 +128,8 @@ class Missile {
 }
 
 func checkPointerCorrectness(check: Check,
-  _ f: UnsafeMutablePointer<Missile> ->
-    (UnsafeMutablePointer<Missile>, count: Int) -> (),
+  _ f: (UnsafeMutablePointer<Missile>) ->
+    (UnsafeMutablePointer<Missile>, count: Int) -> Void,
   _ withMissiles: Bool = false) {
   let ptr = UnsafeMutablePointer<Missile>.alloc(4)
   switch check {
@@ -176,7 +176,7 @@ func checkPointerCorrectness(check: Check,
 }
 
 let checkPtr: ((UnsafeMutablePointer<Missile> ->
-  (UnsafeMutablePointer<Missile>, count: Int) -> ()), Bool) -> Check -> ()
+  (UnsafeMutablePointer<Missile>, count: Int) -> Void), Bool) -> Check -> Void
   = { (f, m) in return { checkPointerCorrectness($0, f, m) } }
 
 UnsafeMutablePointerTestSuite.test("moveInitializeBackwardFrom") {

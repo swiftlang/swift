@@ -105,7 +105,7 @@ public struct _StringBuffer {
 
     if isAscii {
       var p = UnsafeMutablePointer<UTF8.CodeUnit>(result.start)
-      let sink: (UTF32.CodeUnit) -> () = {
+      let sink: (UTF32.CodeUnit) -> Void = {
         (p++).memory = UTF8.CodeUnit($0)
       }
       let hadError = transcode(
@@ -116,7 +116,7 @@ public struct _StringBuffer {
     }
     else {
       var p = result._storage.baseAddress
-      let sink: (UTF16.CodeUnit) -> () = {
+      let sink: (UTF16.CodeUnit) -> Void = {
         (p++).memory = $0
       }
       let hadError = transcode(

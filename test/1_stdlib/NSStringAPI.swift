@@ -221,7 +221,7 @@ NSStringAPIs.test("capitalizedString") {
 
 NSStringAPIs.test("localizedCapitalizedString") {
   if #available(OSX 10.11, iOS 9.0, *) {
-    withOverriddenNSLocaleCurrentLocale("en") { () -> () in
+    withOverriddenNSLocaleCurrentLocale("en") { () -> Void in
       expectEqual(
         "Foo Foo Foo Foo",
         "foo Foo fOO FOO".localizedCapitalizedString)
@@ -1209,7 +1209,7 @@ NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
 }
 
 NSStringAPIs.test("containsString(_:)") {
-  withOverriddenNSLocaleCurrentLocale("en") { () -> () in
+  withOverriddenNSLocaleCurrentLocale("en") { () -> Void in
     expectFalse("".containsString(""))
     expectFalse("".containsString("a"))
     expectFalse("a".containsString(""))
@@ -1237,7 +1237,7 @@ NSStringAPIs.test("containsString(_:)") {
 }
 
 NSStringAPIs.test("localizedCaseInsensitiveContainsString(_:)") {
-  withOverriddenNSLocaleCurrentLocale("en") { () -> () in
+  withOverriddenNSLocaleCurrentLocale("en") { () -> Void in
     expectFalse("".localizedCaseInsensitiveContainsString(""))
     expectFalse("".localizedCaseInsensitiveContainsString("a"))
     expectFalse("a".localizedCaseInsensitiveContainsString(""))
@@ -1266,7 +1266,7 @@ NSStringAPIs.test("localizedCaseInsensitiveContainsString(_:)") {
 
 NSStringAPIs.test("localizedStandardContainsString(_:)") {
   if #available(OSX 10.11, iOS 9.0, *) {
-    withOverriddenNSLocaleCurrentLocale("en") { () -> () in
+    withOverriddenNSLocaleCurrentLocale("en") { () -> Void in
       expectFalse("".localizedStandardContainsString(""))
       expectFalse("".localizedStandardContainsString("a"))
       expectFalse("a".localizedStandardContainsString(""))
@@ -1300,7 +1300,7 @@ NSStringAPIs.test("localizedStandardRangeOfString(_:)") {
       return toIntRange(
         string, string.localizedStandardRangeOfString(substring))
     }
-    withOverriddenNSLocaleCurrentLocale("en") { () -> () in
+    withOverriddenNSLocaleCurrentLocale("en") { () -> Void in
       expectEmpty(rangeOfString("", ""))
       expectEmpty(rangeOfString("", "a"))
       expectEmpty(rangeOfString("a", ""))

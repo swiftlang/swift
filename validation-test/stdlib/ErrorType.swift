@@ -36,8 +36,10 @@ struct ErrorTypeAsNSErrorRaceTest : RaceTestWithPerTrialDataType {
     return Observation3Int(domainInt, code, userInfoInt)
   }
 
-  func evaluateObservations(observations: [Observation3Int],
-      _ sink: (RaceTestObservationEvaluation) -> ()) {
+  func evaluateObservations(
+    observations: [Observation3Int],
+    _ sink: (RaceTestObservationEvaluation) -> Void
+  ) {
     sink(evaluateObservationsAllEqual(observations))
   }
 }

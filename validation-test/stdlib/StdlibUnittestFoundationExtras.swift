@@ -35,13 +35,13 @@ FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(NSLocale)") {
 FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(NSLocale)/nested") {
   withOverriddenNSLocaleCurrentLocale(
     NSLocale(localeIdentifier: "uk")) {
-    () -> () in
+    () -> Void in
 
     expectCrashLater()
 
     withOverriddenNSLocaleCurrentLocale(
       NSLocale(localeIdentifier: "uk")) {
-      () -> () in
+      () -> Void in
 
       return ()
     }

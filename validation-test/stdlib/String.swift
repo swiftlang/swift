@@ -796,8 +796,8 @@ StringTests.test("toInt") {
   // then print if the new String is or is not still an Int.
   func testConvertabilityOfStringWithModification(
     initialValue: Int,
-    modification: (inout chars: [UTF8.CodeUnit]) -> () )
-  {
+    modification: (inout chars: [UTF8.CodeUnit]) -> Void
+  ) {
     var chars = Array(String(initialValue).utf8)
     modification(chars: &chars)
     let str = String._fromWellFormedCodeUnitSequence(UTF8.self, input: chars)

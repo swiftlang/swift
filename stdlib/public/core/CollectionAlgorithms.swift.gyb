@@ -260,7 +260,7 @@ ${orderingRequirementForComparable}
   public mutating func sortInPlace() {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
-      (baseAddress, count) -> () in
+      (baseAddress, count) -> Void in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
       bufferPointer.sortInPlace()
@@ -288,7 +288,7 @@ ${orderingRequirementForPredicate}
 
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
-      (baseAddress, count) -> () in
+      (baseAddress, count) -> Void in
       var bufferPointer =
         UnsafeMutableBufferPointer(start: baseAddress, count: count)
       bufferPointer.sortInPlace(escapableIsOrderedBefore)

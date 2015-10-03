@@ -96,11 +96,11 @@ func _assertionFailed(
   _ file: StaticString, _ line: UInt
 ) {
   prefix.withUTF8Buffer {
-    (prefix) -> () in
+    (prefix) -> Void in
     message.withUTF8Buffer {
-      (message) -> () in
+      (message) -> Void in
       file.withUTF8Buffer {
-        (file) -> () in
+        (file) -> Void in
         _reportFatalErrorInFile(
           prefix.baseAddress, UInt(prefix.count),
           message.baseAddress, UInt(message.count),
@@ -124,12 +124,12 @@ func _assertionFailed(
   _ file: StaticString, _ line: UInt
 ) {
   prefix.withUTF8Buffer {
-    (prefix) -> () in
+    (prefix) -> Void in
     let messageUTF8 = message.nulTerminatedUTF8
     messageUTF8.withUnsafeBufferPointer {
-      (messageUTF8) -> () in
+      (messageUTF8) -> Void in
       file.withUTF8Buffer {
-        (file) -> () in
+        (file) -> Void in
         _reportFatalErrorInFile(
           prefix.baseAddress, UInt(prefix.count),
           messageUTF8.baseAddress, UInt(messageUTF8.count),

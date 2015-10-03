@@ -107,7 +107,9 @@ class CodecTest<Codec : TestableUnicodeCodec> {
     nsEncode(scalar.value, Codec.encodingId(), &nsEncodeBuffer, &used)
     let nsEncoded = nsEncodeBuffer[0..<(used/sizeof(CodeUnit.self))]
     var encodeIndex = encodeBuffer.startIndex
-    let encodeOutput: (CodeUnit) -> () = { self.encodeBuffer[encodeIndex++] = $0 }
+    let encodeOutput: (CodeUnit) -> Void = {
+      self.encodeBuffer[encodeIndex++] = $0
+    }
 
     var g = nsEncoded.generate()
     var decoded: UnicodeScalar

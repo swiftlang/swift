@@ -37,7 +37,7 @@ public struct Character :
     var asInt: UInt64 = 0
     var shift: UInt64 = 0
 
-    let output: (UTF8.CodeUnit) -> () = {
+    let output: (UTF8.CodeUnit) -> Void = {
       asInt |= UInt64($0) << shift
       shift += 8
     }
@@ -204,7 +204,7 @@ public struct Character :
       _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
       self.count = UInt16(count)
       var u16: UInt64 = 0
-      let output: (UTF16.CodeUnit) -> () = {
+      let output: (UTF16.CodeUnit) -> Void = {
         u16 = u16 << 16
         u16 = u16 | UInt64($0)
       }

@@ -458,7 +458,7 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   }
 
   public func forEach(
-    @noescape body: (Base.Generator.Element) throws -> ()
+    @noescape body: (Base.Generator.Element) throws -> Void
   ) rethrows {
     ++Log.forEach[selfType]
     try base.forEach(body)

@@ -484,11 +484,11 @@ ArrayTestSuite.test(
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
 
-func withInoutInt(inout x: Int, body: (inout x: Int) -> ()) {
+func withInoutInt(inout x: Int, body: (inout x: Int) -> Void) {
   body(x: &x)
 }
 
-func withInoutT<T>(inout x: T, body: (inout x: T) -> ()) {
+func withInoutT<T>(inout x: T, body: (inout x: T) -> Void) {
   body(x: &x)
 }
 
@@ -1733,7 +1733,7 @@ ArrayTestSuite.test("${array_type}<Void>/map") {
   // stride == 0.
   if true {
     let input: ${array_type}<Void> = [ (), (), () ]
-    let result = input.map { (_) -> () in return () }
+    let result = input.map { (_) -> Void in return () }
     expectEqual(3, result.count)
   }
 
@@ -1741,7 +1741,7 @@ ArrayTestSuite.test("${array_type}<Void>/map") {
     let input: ${array_type}<OpaqueValue<Int>> = [
       OpaqueValue(10), OpaqueValue(20), OpaqueValue(30)
     ]
-    let result = input.map { (_) -> () in return () }
+    let result = input.map { (_) -> Void in return () }
     expectEqual(3, result.count)
   }
 }
