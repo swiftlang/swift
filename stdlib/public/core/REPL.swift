@@ -10,25 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME: Function types don't work yet as generic parameters
-public struct _REPLExitHandler {
-  var f : () -> ()
+internal var _replExitHandlers: [() -> Void] = []
 
-  init(_ f: () -> ()) {
-    self.f = f
-  }
-}
-
-var _replExitHandlers = [_REPLExitHandler]()
-
-public func _atREPLExit(handler: () -> ()) {
-  _replExitHandlers.append(_REPLExitHandler(handler))
+public func _atREPLExit(handler: () -> Void) {
+  _replExitHandlers.append(handler)
 }
 
 internal func _replExit() {
-  let reversed = _replExitHandlers.reverse()
-  for handler in reversed {
-    handler.f()
+  for handler in _replExitHandlers.reverse() {
+    handler()
   }
 }
 
