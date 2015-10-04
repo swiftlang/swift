@@ -15,6 +15,7 @@
 
 using namespace swift;
 
+
 //===----------------------------------------------------------------------===//
 //                                  Location
 //===----------------------------------------------------------------------===//
@@ -68,6 +69,47 @@ void Location::expand(SILModule *Mod, LocationList &Locs) {
       X.append(L.Path.getValue());
       Location LL(Base, X);
       Worklist.push_back(LL);
+    }
+  }
+}
+
+void Location::enumerateLocation(SILModule *M, SILValue Mem,
+                                 std::vector<Location> &LV,
+                                 llvm::DenseMap<Location, unsigned> &BM) {
+  // Construct a Location to represent the memory written by this instruction.
+  Location L(Mem);
+
+  // If we cant figure out the Base or Projection Path for the memory location,
+  // simply ignore it for now.
+  if (!L.getBase() || !L.getPath().hasValue())
+    return;
+
+  // Expand the given Mem into individual fields and add them to the
+  // locationvault.
+  LocationList Locs;
+  L.expand(M, Locs);
+  for (auto &Loc : Locs) {
+    BM[Loc] = LV.size();
+    LV.push_back(Loc);
+  }
+}
+
+void Location::enumerateLocations(SILFunction &F,
+                                  std::vector<Location> &LV,
+                                  llvm::DenseMap<Location, unsigned> &BM) {
+  // Enumerate all locations accessed by the loads or stores.
+  //
+  // TODO: process more instructions as we process more instructions in
+  // processInstruction.
+  //
+  SILValue Op;
+  for (auto &B : F) {
+    for (auto &I : B) {
+      if (auto *LI = dyn_cast<LoadInst>(&I)) {
+        enumerateLocation(&I.getModule(), LI->getOperand(), LV, BM);
+      } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
+        enumerateLocation(&I.getModule(), SI->getDest(), LV, BM);
+      }
     }
   }
 }

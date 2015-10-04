@@ -41,7 +41,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-dead-store-opt"
-#include "swift/SILPasses/Passes.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
@@ -49,6 +48,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Utils/SILSSAUpdater.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
@@ -199,35 +199,6 @@ void BBState::intersect(const BBState &Succ) {
   }
 }
 
-namespace llvm {
-
-template <> struct DenseMapInfo<Location> {
-  static inline Location getEmptyKey() {
-    Location L;
-    L.setKind(Location::EmptyKey);
-    return L;
-  }
-  static inline Location getTombstoneKey() {
-    Location L;
-    L.setKind(Location::TombstoneKey);
-    return L;
-  }
-  static unsigned getHashValue(const Location &Loc) {
-    return hash_value(Loc);
-  }
-  static bool isEqual(const Location &LHS, const Location &RHS) {
-    if (LHS.getKind() == Location::EmptyKey &&
-        RHS.getKind() == Location::EmptyKey)
-      return true;
-    if (LHS.getKind() == Location::TombstoneKey &&
-        RHS.getKind() == Location::TombstoneKey)
-      return true;
-    return LHS == RHS;
-  }
-};
-
-} // namespace llvm
-
 //===----------------------------------------------------------------------===//
 //                          Top Level Implementation
 //===----------------------------------------------------------------------===//
@@ -269,12 +240,6 @@ class GlobalDeadStoreEliminationImpl {
     return getBBLocState(I->getParent());
   }
 
-  /// Enumerate all the contained locations.
-  void enumerateLocation(SILModule *M, SILValue Mem);
-
-  /// Enumerate all the locations.
-  void enumerateLocations(SILFunction &F);
-
   /// Location read has been extracted, expanded and mapped to the bit
   /// position in the bitvector. process it using the bit position.
   void updateWriteSetForRead(SILInstruction *Inst, BBState *State,
@@ -294,14 +259,8 @@ class GlobalDeadStoreEliminationImpl {
   void processWrite(SILInstruction *Inst, BBState *State, SILValue Val,
                     SILValue Mem);
 
-  /// Enumerate locations accessed by this LoadInst.
-  void enumerateLoadInstLocation(SILInstruction *Inst);
-
   /// Process Instructions. Extract Locations from SIL LoadInst.
   void processLoadInst(SILInstruction *Inst);
-
-  /// Enumerate locations accessed by this StoreInst.
-  void enumerateStoreInstLocation(SILInstruction *Inst);
 
   /// Process Instructions. Extract Locations from SIL StoreInst.
   void processStoreInst(SILInstruction *Inst);
@@ -348,9 +307,6 @@ class GlobalDeadStoreEliminationImpl {
   ///
   /// NOTE: Adds the location to the location vault if necessary.
   unsigned getLocationBit(const Location &L);
-
-  /// Add a location to the LocationVault.
-  void addLocation(const Location &L);
 
 public:
   /// Constructor.
@@ -402,11 +358,6 @@ bool GlobalDeadStoreEliminationImpl::isMustAliasingLocation(unsigned src,
   if (!SL.hasIdenticalProjectionPath(DL))
     return false;
   return true;
-}
-
-void GlobalDeadStoreEliminationImpl::addLocation(const Location &Loc) {
-  LocToBitIndex[Loc] = LocationVault.size();
-  LocationVault.push_back(Loc);
 }
 
 unsigned GlobalDeadStoreEliminationImpl::getLocationBit(const Location &Loc) {
@@ -628,39 +579,10 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
   }
 }
 
-void GlobalDeadStoreEliminationImpl::enumerateLocation(SILModule *M,
-                                                       SILValue Mem) {
-  // Construct a Location to represent the memory written by this instruction.
-  Location L(Mem);
-
-  // If we cant figure out the Base or Projection Path for the memory location,
-  // simply ignore it for now.
-  if (!L.getBase() || !L.getPath().hasValue())
-    return;
-
-  // Expand the given Mem into individual fields and add them to the
-  // locationvault.
-  LocationList Locs;
-  L.expand(M, Locs);
-  for (auto &E : Locs) {
-    addLocation(E);
-  }
-}
-
-void
-GlobalDeadStoreEliminationImpl::enumerateLoadInstLocation(SILInstruction *I) {
-  enumerateLocation(&I->getModule(), cast<LoadInst>(I)->getOperand());
-}
-
 void GlobalDeadStoreEliminationImpl::processLoadInst(SILInstruction *I) {
   // Loading a loadable type.
   SILValue Mem = cast<LoadInst>(I)->getOperand();
   processRead(I, getBBLocState(I), Mem);
-}
-
-void
-GlobalDeadStoreEliminationImpl::enumerateStoreInstLocation(SILInstruction *I) {
-  enumerateLocation(&I->getModule(), cast<StoreInst>(I)->getDest());
 }
 
 void GlobalDeadStoreEliminationImpl::processStoreInst(SILInstruction *I) {
@@ -706,27 +628,10 @@ void GlobalDeadStoreEliminationImpl::processInstruction(SILInstruction *I) {
   invalidateLocationBase(I);
 }
 
-void GlobalDeadStoreEliminationImpl::enumerateLocations(SILFunction &F) {
-  // Enumerate all locations accessed by the loads or stores.
-  //
-  // TODO: process more instructions as we process more instructions in
-  // processInstruction.
-  //
-  for (auto &B : F) {
-    for (auto &I : B) {
-      if (isa<LoadInst>(&I)) {
-        enumerateLoadInstLocation(&I);
-      } else if (isa<StoreInst>(&I)) {
-        enumerateStoreInstLocation(&I);
-      }
-    }
-  }
-}
-
 void GlobalDeadStoreEliminationImpl::run() {
   // Walk over the function and find all the locations accessed by
   // this function.
-  enumerateLocations(*F);
+  Location::enumerateLocations(*F, LocationVault, LocToBitIndex);
 
   // For all basic blocks in the function, initialize a BB state. Since we
   // know all the locations accessed in this function, we can resize the bit

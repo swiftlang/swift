@@ -22,6 +22,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILAnalysis/ValueTracking.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
@@ -150,6 +151,16 @@ public:
   /// fields. Therefore, we expand all the operations on aggregates onto
   /// individual fields.
   void expand(SILModule *Mod, LocationList &F);
+
+  /// Enumerate the given Mem Location.
+  static void enumerateLocation(SILModule *M, SILValue Mem,
+                                std::vector<Location> &LocationVault,
+                                llvm::DenseMap<Location, unsigned> &LocToBit);
+
+  /// Enumerate all the locations in the function.
+  static void enumerateLocations(SILFunction &F,
+                                 std::vector<Location> &LocationVault,
+                                 llvm::DenseMap<Location, unsigned> &LocToBit);
 };
 
 static inline llvm::hash_code hash_value(const Location &L) {
@@ -157,6 +168,42 @@ static inline llvm::hash_code hash_value(const Location &L) {
                             L.getBase().getType());
 }
 
+
 } // end swift namespace
+
+
+/// Location is used in DenseMap, define functions required by DenseMap.
+namespace llvm {
+
+using swift::Location;
+
+template <> struct DenseMapInfo<Location> {
+  static inline Location getEmptyKey() {
+    Location L;
+    L.setKind(Location::EmptyKey);
+    return L;
+  }
+  static inline Location getTombstoneKey() {
+    Location L;
+    L.setKind(Location::TombstoneKey);
+    return L;
+  }
+  static unsigned getHashValue(const Location &Loc) {
+    return hash_value(Loc);
+  }
+  static bool isEqual(const Location &LHS, const Location &RHS) {
+    if (LHS.getKind() == Location::EmptyKey &&
+        RHS.getKind() == Location::EmptyKey)
+      return true;
+    if (LHS.getKind() == Location::TombstoneKey &&
+        RHS.getKind() == Location::TombstoneKey)
+      return true;
+    return LHS == RHS;
+  }
+};
+
+} // namespace llvm
+
+
 
 #endif  // SWIFT_LOCATION_H
