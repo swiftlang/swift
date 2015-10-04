@@ -546,46 +546,6 @@ bb4:                                              // Preds: bb3
   return %24 : $()                                // id: %26
 }
 
-// Can not remove the store in bb0 as the its only partially dead, i.e.
-// the structure S3 has 2 fields.
-//
-// CHECK-LABEL: NoDeadStoreSimpleStruct
-// CHECK: bb0
-// CHECK: [[RET0:%.+]] = function_ref @S3_init
-// CHECK-NEXT: [[RET1:%.+]] = metatype $@thin S3.Type
-// CHECK-NEXT: [[RET2:%.+]] = apply [[RET0:%.+]]([[RET1:%.+]])
-// CHECK-NEXT: store [[RET2:%.+]] to
-sil hidden @NoDeadStoreSimpleStruct : $@convention(thin) (Bool, Int) -> () {
-bb0(%0 : $Bool, %1 : $Int):
-  %2 = alloc_stack $S3                            // users: %6, %11, %16, %20
-  // function_ref S3_init
-  %3 = function_ref @S3_init : $@convention(thin) (@thin S3.Type) -> S3 // user: %5
-  %4 = metatype $@thin S3.Type                    // user: %5
-  %5 = apply %3(%4) : $@convention(thin) (@thin S3.Type) -> S3 // user: %6
-  store %5 to %2#1 : $*S3                         // id: %6
-  %7 = struct_extract %0 : $Bool, #Bool.value     // user: %8
-  cond_br %7, bb1, bb2                            // id: %8
-
-bb1:                                              // Preds: bb0
-  %9 = integer_literal $Builtin.Int64, 0          // user: %10
-  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
-  %11 = struct_element_addr %2#1 : $*S3, #S3.a    // user: %12
-  store %10 to %11 : $*Int                        // id: %12
-  br bb3                                          // id: %13
-
-bb2:                                              // Preds: bb0
-  %14 = integer_literal $Builtin.Int64, 1         // user: %15
-  %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
-  %16 = struct_element_addr %2#1 : $*S3, #S3.a    // user: %17
-  store %15 to %16 : $*Int                        // id: %17
-  br bb3                                          // id: %18
-
-bb3:                                              // Preds: bb1 bb2
-  %19 = tuple ()                                  // user: %21
-  dealloc_stack %2#0 : $*@local_storage S3        // id: %20
-  return %19 : $()                                // id: %21
-}
-
 // CHECK-LABEL: DeadStoreInIfElseBlockComplexStruct
 // CHECK: bb1:
 // CHECK-NOT: store
@@ -1078,3 +1038,45 @@ bb0:
   dealloc_stack %0#0 : $*@local_storage Example   // id: %19
   return %17 : $Int64                             // id: %20
 }
+
+// The store in bb0 as the its only partially dead, i.e.
+// the structure S3 has 2 fields.
+//
+// CHECK-LABEL: PartialDeadStoreSimpleStruct
+// CHECK: bb0
+// CHECK-NEXT: [[RET0:%.+]] = alloc_stack
+// CHECK: [[RET1:%.+]] = function_ref @S3_init
+// CHECK-NEXT: [[RET2:%.+]] = metatype $@thin S3.Type
+// CHECK-NEXT: [[RET3:%.+]] = apply [[RET1:%.+]]([[RET2:%.+]])
+// CHECK-NOT: store [[RET3:%.+]] to [[RET0:%.+]]#1 : $*S3
+sil hidden @PartialDeadStoreSimpleStruct : $@convention(thin) (Bool, Int) -> () {
+bb0(%0 : $Bool, %1 : $Int):
+  %2 = alloc_stack $S3                            // users: %6, %11, %16, %20
+  // function_ref S3_init
+  %3 = function_ref @S3_init : $@convention(thin) (@thin S3.Type) -> S3 // user: %5
+  %4 = metatype $@thin S3.Type                    // user: %5
+  %5 = apply %3(%4) : $@convention(thin) (@thin S3.Type) -> S3 // user: %6
+  store %5 to %2#1 : $*S3                         // id: %6
+  %7 = struct_extract %0 : $Bool, #Bool.value     // user: %8
+  cond_br %7, bb1, bb2                            // id: %8
+
+bb1:                                              // Preds: bb0
+  %9 = integer_literal $Builtin.Int64, 0          // user: %10
+  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
+  %11 = struct_element_addr %2#1 : $*S3, #S3.a    // user: %12
+  store %10 to %11 : $*Int                        // id: %12
+  br bb3                                          // id: %13
+
+bb2:                                              // Preds: bb0
+  %14 = integer_literal $Builtin.Int64, 1         // user: %15
+  %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
+  %16 = struct_element_addr %2#1 : $*S3, #S3.a    // user: %17
+  store %15 to %16 : $*Int                        // id: %17
+  br bb3                                          // id: %18
+
+bb3:                                              // Preds: bb1 bb2
+  %19 = tuple ()                                  // user: %21
+  dealloc_stack %2#0 : $*@local_storage S3        // id: %20
+  return %19 : $()                                // id: %21
+}
+

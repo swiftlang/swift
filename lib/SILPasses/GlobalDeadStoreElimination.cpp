@@ -71,6 +71,7 @@ static llvm::cl::opt<bool> EnableGDSE("sil-enable-global-dse",
                                       llvm::cl::init(true), llvm::cl::Hidden);
 
 STATISTIC(NumDeadStores, "Number of dead stores removed");
+STATISTIC(NumPartialDeadStores, "Number of partial dead stores removed");
 
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
@@ -179,6 +180,12 @@ public:
     if (Path.getValue().empty())
       return Base.getType();
     return Path.getValue().front().getType();
+  }
+
+  void subtractPaths(Optional<ProjectionPath> &P) {
+    if (!P.hasValue())
+      return;
+    ProjectionPath::subtractPaths(Path.getValue(), P.getValue());
   }
 
   /// Return false if one projection path is a prefix of another. false
@@ -471,11 +478,12 @@ class GlobalDeadStoreEliminationImpl {
 
   /// There is a read to a location, expand the location into individual fields
   /// before processing them.
-  void processRead(SILInstruction *Inst, BBState *State, SILValue Value);
+  void processRead(SILInstruction *Inst, BBState *State, SILValue Mem);
 
   /// There is a write to a location, expand the location into individual fields
   /// before processing them.
-  void processWrite(SILInstruction *Inst, BBState *State, SILValue Value);
+  void processWrite(SILInstruction *Inst, BBState *State, SILValue Val,
+                    SILValue Mem);
 
   /// Enumerate locations accessed by this LoadInst.
   void enumerateLoadInstLocation(SILInstruction *Inst);
@@ -491,6 +499,11 @@ class GlobalDeadStoreEliminationImpl {
 
   /// Process Instructions. Extract Locations from SIL Unknown Memory Inst.
   void processUnknownMemInst(SILInstruction *Inst);
+
+  /// Process the partial dead store. Try to break down the store into largest
+  /// chunks that are alive.
+  bool mergeLiveStores(SILType Ty, ProjectionPath &P,
+                       llvm::DenseSet<Location> &Locs);
 
   /// Check whether the instruction invalidate any Locations due to change in
   /// its Location Base.
@@ -548,6 +561,11 @@ public:
 
   /// Entry point for global dead store elimination.
   void run();
+
+  /// Create the value or address extraction based on the give Base and
+  /// projection path.
+  SILValue createExtractPath(SILValue VA, Optional<ProjectionPath> &Path,
+                             SILInstruction *Inst, bool IsValExtract);
 };
 
 } // end anonymous namespace
@@ -702,7 +720,38 @@ void GlobalDeadStoreEliminationImpl::processRead(SILInstruction *I, BBState *S,
   }
 }
 
+SILValue
+GlobalDeadStoreEliminationImpl::createExtractPath(SILValue Base,
+                                                  Optional<ProjectionPath> &Path,
+                                                  SILInstruction *Inst,
+                                                  bool IsValExt) {
+  // If we found a projection path, but there are no projections, then the two
+  // loads must be the same, return PrevLI.
+  if (!Path || Path->empty())
+    return Base;
+
+  // Ok, at this point we know that we can construct our aggregate projections
+  // from our list of address projections.
+  SILValue LastExtract = Base;
+  SILBuilder Builder(Inst);
+
+  // Construct the path!
+  for (auto PI = Path->rbegin(), PE = Path->rend(); PI != PE; ++PI) {
+    if (IsValExt) {
+      LastExtract = PI->createValueProjection(Builder, Inst->getLoc(),
+                                              LastExtract).get();
+      continue;
+    }
+    LastExtract = PI->createAddrProjection(Builder, Inst->getLoc(),
+                                            LastExtract).get();
+  }
+
+  // Return the last extract we created.
+  return LastExtract;
+}
+
 void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
+                                                  SILValue Val,
                                                   SILValue Mem) {
   // Construct a Location to represent the memory written by this instruction.
   Location L(Mem);
@@ -716,17 +765,57 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
   bool Dead = true;
   LocationList Locs;
   L.expand(&I->getModule(), Locs);
+  llvm::BitVector V(Locs.size());
+  unsigned idx = 0;
   for (auto &E : Locs) {
-    Dead &= updateWriteSetForWrite(I, S, getLocationBit(E));
+    if (updateWriteSetForWrite(I, S, getLocationBit(E)))
+      V.set(idx);
+    Dead &= V.test(idx);
+    ++idx;
   }
 
-  // Stores to all the components are dead, therefore this instruction is dead.
-  //
-  // TODO: handle partially dead store.
-  //
+  // Fully dead store - stores to all the components are dead, therefore this
+  // instruction is dead.
   if (Dead) {
     DEBUG(llvm::dbgs() << "Instruction Dead: " << *I << "\n");
     S->DeadStores.insert(I);
+    ++NumDeadStores;
+    return;
+  }
+
+  // Partial dead store - stores to some locations are dead, but not all. This is
+  // a partially dead store. Also at this point we know what locations are dead.
+  if (V.any()) {
+    // Take out locations that are dead.
+    llvm::DenseSet<Location> LocsAlive;
+    SILValue B = Locs[0].getBase();
+    Optional<ProjectionPath> BP = ProjectionPath::getAddrProjectionPath(B, Mem);
+    for (unsigned i = 0; i < V.size(); ++i) {
+      if (V.test(i))
+        continue;
+      // We are already tracking all the stores to this Mem as dead.
+      S->stopTrackingLocation(i);
+      // Strip off the projection path from base to the accessed field.
+      Locs[i].subtractPaths(BP);
+      LocsAlive.insert(Locs[i]);
+    }
+
+    // Create the individual stores that are alive.
+    //
+    // TODO: All these locations are alive, try to create as few aggregated
+    // store as possible out of them.
+    //
+    SILBuilderWithScope<16> Builder(I);
+    for (auto &X : LocsAlive) {
+      SILValue Value = createExtractPath(Val, X.getPath(), I, true);
+      SILValue Addr = createExtractPath(Mem, X.getPath(), I, false);
+      Builder.createStore(Addr.getLoc().getValue(), Value, Addr);
+    }
+
+    // Lastly, mark the old store as dead.
+    DEBUG(llvm::dbgs() << "Instruction Partially Dead: " << *I << "\n");
+    S->DeadStores.insert(I);
+    ++NumPartialDeadStores;
   }
 }
 
@@ -767,8 +856,9 @@ GlobalDeadStoreEliminationImpl::enumerateStoreInstLocation(SILInstruction *I) {
 
 void GlobalDeadStoreEliminationImpl::processStoreInst(SILInstruction *I) {
   // Storing a loadable type.
+  SILValue Val = cast<StoreInst>(I)->getSrc();
   SILValue Mem = cast<StoreInst>(I)->getDest();
-  processWrite(I, getBBLocState(I), Mem);
+  processWrite(I, getBBLocState(I), Val, Mem);
 }
 
 void GlobalDeadStoreEliminationImpl::processUnknownMemInst(SILInstruction *I) {
@@ -856,7 +946,6 @@ void GlobalDeadStoreEliminationImpl::run() {
     for (auto &I : getBBLocState(BB)->DeadStores) {
       DEBUG(llvm::dbgs() << "*** Removing: " << *I << " ***\n");
       I->eraseFromParent();
-      ++NumDeadStores;
     }
   }
 }
