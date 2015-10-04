@@ -45,6 +45,7 @@
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
+#include "swift/SIL/Location.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -66,6 +67,7 @@
 #include <algorithm>
 
 using namespace swift;
+using swift::Location;
 
 static llvm::cl::opt<bool> EnableGDSE("sil-enable-global-dse",
                                       llvm::cl::init(true), llvm::cl::Hidden);
@@ -92,194 +94,6 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
     return true;
   default:
     return false;
-  }
-}
-
-//===----------------------------------------------------------------------===//
-//                                  Location
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// Forward declaration of classes.
-class Location;
-
-using ProjectionTreeNodeList = llvm::ArrayRef<ProjectionTreeNode *>;
-using ProjectionPathList = llvm::SmallVector<ProjectionPath, 8>;
-using LocationList = llvm::SmallVector<Location, 8>;
-using hash_code = llvm::hash_code;
-
-/// A Location is an abstraction of an object field in program. It consists of a
-/// base that is the tracked SILValue. In a subsequent commit this will be
-/// expanded to include a path.
-///
-/// TODO: move Location class into separate file so that LoadForwarding pass can
-/// use it as well.
-///
-class Location {
-public:
-  enum KeyKind : uint8_t { EmptyKey = 0, TombstoneKey, NormalKey };
-
-private:
-  /// Empty key, tombstone key or normal key.
-  KeyKind Kind;
-  /// The base of the object.
-  SILValue Base;
-  /// The path to reach the accessed field of the object.
-  Optional<ProjectionPath> Path;
-
-public:
-  /// Constructors.
-  Location() : Base(), Kind(NormalKey) {}
-  Location(SILValue B) : Base(B), Kind(NormalKey) { initialize(B); }
-  Location(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
-      : Base(B), Path(std::move(P)), Kind(Kind) {}
-
-  /// Copy constructor.
-  Location(const Location &RHS) {
-    Base = RHS.Base;
-    Path.reset();
-    Kind = RHS.Kind;
-    if (!RHS.Path.hasValue())
-      return;
-    ProjectionPath X;
-    X.append(RHS.Path.getValue());
-    Path = std::move(X);
-  }
-
-  Location &operator=(const Location &RHS) {
-    Base = RHS.Base;
-    Path.reset();
-    Kind = RHS.Kind;
-    if (!RHS.Path.hasValue())
-      return *this;
-    ProjectionPath X;
-    X.append(RHS.Path.getValue());
-    Path = std::move(X);
-    return *this;
-  }
-
-  /// Getters and setters for Location.
-  KeyKind getKind() const { return Kind; }
-  void setKind(KeyKind K) { Kind = K; }
-  SILValue getBase() const { return Base; }
-  Optional<ProjectionPath> &getPath() { return Path; }
-
-  /// Returns the hashcode for the location.
-  hash_code getHashCode() const {
-    hash_code HC = llvm::hash_combine(Base.getDef(), Base.getResultNumber(),
-                                      Base.getType());
-    if (!Path.hasValue())
-      return HC;
-    HC = llvm::hash_combine(HC, hash_value(Path.getValue()));
-    return HC;
-  }
-
-  /// Returns the type of the Location.
-  SILType getType() const {
-    if (Path.getValue().empty())
-      return Base.getType();
-    return Path.getValue().front().getType();
-  }
-
-  void subtractPaths(Optional<ProjectionPath> &P) {
-    if (!P.hasValue())
-      return;
-    ProjectionPath::subtractPaths(Path.getValue(), P.getValue());
-  }
-
-  /// Return false if one projection path is a prefix of another. false
-  /// otherwise.
-  bool hasNonEmptySymmetricPathDifference(const Location &RHS) const {
-    const ProjectionPath &P = RHS.Path.getValue();
-    return Path.getValue().hasNonEmptySymmetricDifference(P);
-  }
-
-  /// Return true if the 2 locations have identical projection paths.
-  /// If both locations have empty paths, they are treated as having
-  /// identical projection path.
-  bool hasIdenticalProjectionPath(const Location &RHS) const {
-    // If both Paths have no value, then locations are different.
-    if (!Path.hasValue() && !RHS.Path.hasValue())
-      return false;
-    // If 1 Path has value while the other does not, then the 2 locations
-    // are different.
-    if (Path.hasValue() != RHS.Path.hasValue())
-      return false;
-    // If both Paths are empty, then the 2 locations are the same.
-    if (Path.getValue().empty() && RHS.Path.getValue().empty())
-      return true;
-    // If 2 Paths have different values, then the 2 locations are different.
-    if (Path.getValue() != RHS.Path.getValue())
-      return false;
-    return true;
-  }
-
-  /// Comparisons.
-  bool operator!=(const Location &RHS) const { return !(*this == RHS); }
-  bool operator==(const Location &RHS) const {
-    // If type is not the same, then locations different.
-    if (Kind != RHS.Kind)
-      return false;
-    // If Base is different, then locations different.
-    if (Base != RHS.Base)
-      return false;
-
-    // If the projection paths are different, then locations are different.
-    if (!hasIdenticalProjectionPath(RHS))
-      return false;
-
-    // These locations represent the same memory location.
-    return true;
-  }
-
-  /// Trace the given SILValue till the base of the accessed object. Also
-  /// construct the projection path to the field accessed.
-  void initialize(SILValue val);
-
-  /// Expand this location to all individual fields it contains.
-  ///
-  /// In SIL, we can have a store to an aggregate and loads from its individual
-  /// fields. Therefore, we expand all the operations on aggregates onto
-  /// individual fields.
-  void expand(SILModule *Mod, LocationList &F);
-};
-
-} // end anonymous namespace
-
-void Location::initialize(SILValue Dest) {
-  Base = getUnderlyingObject(Dest);
-  Path = ProjectionPath::getAddrProjectionPath(Base, Dest);
-}
-
-void Location::expand(SILModule *Mod, LocationList &Locs) {
-  // Expands the given type into locations each of which contains 1 field from
-  // the type.
-  LocationList Worklist;
-  llvm::SmallVector<Projection, 8> Projections;
-
-  Worklist.push_back(*this);
-  while (!Worklist.empty()) {
-    // Get the next level projections based on current location's type.
-    Location L = Worklist.pop_back_val();
-    Projections.clear();
-    Projection::getFirstLevelProjections(L.getType(), *Mod, Projections);
-
-    // Reached the end of the projection tree, this field can not be expanded
-    // anymore.
-    if (Projections.empty()) {
-      Locs.push_back(L);
-      continue;
-    }
-
-    // Keep expanding the location.
-    for (auto &P : Projections) {
-      ProjectionPath X;
-      X.append(P);
-      X.append(L.Path.getValue());
-      Location LL(Base, X);
-      Worklist.push_back(LL);
-    }
   }
 }
 
@@ -387,11 +201,6 @@ void BBState::intersect(const BBState &Succ) {
 
 namespace llvm {
 
-static inline llvm::hash_code hash_value(const Location &L) {
-  return llvm::hash_combine(L.getBase().getDef(), L.getBase().getResultNumber(),
-                            L.getBase().getType());
-}
-
 template <> struct DenseMapInfo<Location> {
   static inline Location getEmptyKey() {
     Location L;
@@ -404,7 +213,7 @@ template <> struct DenseMapInfo<Location> {
     return L;
   }
   static unsigned getHashValue(const Location &Loc) {
-    return llvm::hash_value(Loc);
+    return hash_value(Loc);
   }
   static bool isEqual(const Location &LHS, const Location &RHS) {
     if (LHS.getKind() == Location::EmptyKey &&
