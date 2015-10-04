@@ -930,6 +930,8 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
     auto sig = validateGenericSignature(nominal->getGenericParams(),
                                         nominal->getDeclContext(),
                                         nullptr, nullptr, invalid);
+    assert(sig->getInnermostGenericParams().size()
+             == nominal->getGenericParams()->size());
     nominal->setGenericSignature(sig);
     nominal->setIsValidatingGenericSignature(false);
   }

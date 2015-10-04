@@ -970,7 +970,6 @@ static Type resolveIdentTypeComponent(
       return ErrorType::get(TC.Context);
     }
 
-    comp->setValue(type);
     return type;
   }
 
