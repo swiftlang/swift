@@ -274,6 +274,18 @@ ArrayRef<Type> TypeBase::getAllGenericArgs(SmallVectorImpl<Type> &scratch) {
       continue;
     }
 
+    // For a protocol type, use its Self parameter.
+    if (auto protoType = type->getAs<ProtocolType>()) {
+      auto proto = protoType->getDecl();
+      allGenericArgs.push_back(
+        llvm::makeArrayRef(
+          proto->getProtocolSelf()->getDeclaredInterfaceType()));
+
+      // Continue up to the parent.
+      type = protoType->getParent();
+      continue;
+    }
+
     // Look through non-generic nominal types.
     if (auto nominal = type->getAs<NominalType>()) {
       type = nominal->getParent();
