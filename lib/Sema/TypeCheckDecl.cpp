@@ -757,59 +757,6 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 
   // Make sure we validate the type again.
   tl.setType(Type(), /*validated=*/false);
-
-  // Walker that reverts dependent identifier types.
-  class RevertWalker : public ASTWalker {
-  public:
-    // Skip expressions.
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      return { false, expr };
-    }
-
-    // Skip statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
-    }
-
-    // Skip patterns
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
-      return { false, pattern };
-    }
-
-    bool walkToTypeReprPost(TypeRepr *repr) override {
-      auto identType = dyn_cast<IdentTypeRepr>(repr);
-      if (!identType)
-        return true;
-
-      for (auto &comp : identType->getComponentRange()) {
-        // If it's not a bound type, we're done.
-        if (!comp->isBoundType())
-          return true;
-
-        // If the bound type isn't dependent, there's nothing to do.
-        auto type = comp->getBoundType();
-        if (!type->hasTypeParameter())
-          return true;
-
-        // Turn a generic parameter type back into a reference to the
-        // generic parameter itself.
-        if (auto genericParamType
-            = dyn_cast<GenericTypeParamType>(type.getPointer())) {
-          assert(genericParamType->getDecl() && "Missing type parameter decl");
-          comp->setValue(genericParamType->getDecl());
-        } else {
-          comp->revert();
-        }
-      }
-
-      return true;
-    }
-  };
-
-  if (tl.isNull())
-    return;
-
-  tl.getTypeRepr()->walk(RevertWalker());
 }
 
 static void revertDependentPattern(Pattern *pattern) {
@@ -1742,12 +1689,12 @@ class TypeAccessibilityDiagnoser : private ASTWalker {
     if (!CITR)
       return true;
 
-    const ValueDecl *VD = getValueDecl(CITR);
+    const ValueDecl *VD = CITR->getBoundDecl();
     if (!VD)
       return true;
 
     if (minAccessibilityType) {
-      const ValueDecl *minDecl = getValueDecl(minAccessibilityType);
+      const ValueDecl *minDecl = minAccessibilityType->getBoundDecl();
       if (minDecl->getFormalAccess() <= VD->getFormalAccess())
         return true;
     }
@@ -1757,14 +1704,6 @@ class TypeAccessibilityDiagnoser : private ASTWalker {
   }
 
 public:
-  static const ValueDecl *getValueDecl(const ComponentIdentTypeRepr *TR) {
-    if (const ValueDecl *VD = TR->getBoundDecl())
-      return VD;
-    if (auto Ty = TR->getBoundType())
-      return Ty->getDirectlyReferencedTypeDecl();
-    return nullptr;
-  }
-
   static const TypeRepr *findMinAccessibleType(TypeRepr *TR) {
     TypeAccessibilityDiagnoser diagnoser;
     TR->walk(diagnoser);
@@ -1820,7 +1759,7 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
   diag.flush();
 
   if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(complainRepr)) {
-    const ValueDecl *VD = TypeAccessibilityDiagnoser::getValueDecl(CITR);
+    const ValueDecl *VD = CITR->getBoundDecl();
     TC.diagnose(VD, diag::type_declared_here);
   }
 }
@@ -3974,7 +3913,7 @@ public:
     if (!dc->isTypeContext()) {
       TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_non_method,
                   dc->isLocalContext());
-      simpleRepr->setInvalid(TC.Context);
+      simpleRepr->setInvalid();
       return true;
     }
 
@@ -4001,7 +3940,7 @@ public:
       TC.diagnose(simpleRepr->getIdLoc(), diag::dynamic_self_struct_enum,
                   which, nominal->getName())
         .fixItReplace(simpleRepr->getIdLoc(), nominal->getName().str());
-      simpleRepr->setInvalid(TC.Context);
+      simpleRepr->setInvalid();
       return true;
     }
 

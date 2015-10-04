@@ -72,9 +72,11 @@ void *TypeRepr::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 
-void ComponentIdentTypeRepr::setInvalid(ASTContext &ctx) {
-  TypeRepr::setInvalid();
-  Value = ErrorType::get(ctx);
+Identifier ComponentIdentTypeRepr::getIdentifier() const {
+  if (IdOrDecl.is<Identifier>())
+    return IdOrDecl.get<Identifier>();
+
+  return IdOrDecl.get<ValueDecl *>()->getName();
 }
 
 static void printTypeRepr(const TypeRepr *TyR, ASTPrinter &Printer,
@@ -307,18 +309,10 @@ void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
       Printer.printModuleRef(MD, getIdentifier());
     else
       Printer.printTypeRef(TD, getIdentifier());
-  } else if (Type Ty = getBoundType()) {
-    if (TypeDecl *TD = Ty->getDirectlyReferencedTypeDecl()) {
-      if (auto MD = dyn_cast<ModuleDecl>(TD))
-        Printer.printModuleRef(MD, getIdentifier());
-      else
-        Printer.printTypeRef(TD, getIdentifier());
-    } else {
-      Printer.printName(getIdentifier());
-    }
   } else {
     Printer.printName(getIdentifier());
   }
+
   if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(this))
     printGenericArgs(Printer, Opts, GenIdT->getGenericArgs());
 }

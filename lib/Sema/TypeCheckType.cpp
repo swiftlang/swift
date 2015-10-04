@@ -607,13 +607,11 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                   GenericTypeResolver *resolver) {
   // Short-circuiting.
   if (comp->isInvalid()) return nullptr;
-  if (comp->isBoundType()) return comp->getBoundType();
 
   // If the component has already been bound to a declaration, handle
   // that now.
-  if (comp->isBoundDecl()) {
+  if (ValueDecl *VD = comp->getBoundDecl()) {
     // Diagnose non-type declarations.
-    ValueDecl *VD = comp->getBoundDecl();
     auto typeDecl = dyn_cast<TypeDecl>(VD);
     if (!typeDecl) {
       if (diagnoseErrors) {
@@ -797,7 +795,6 @@ static Type resolveNestedIdentTypeComponent(
               GenericTypeResolver *resolver) {
   // Short-circuiting.
   if (comp->isInvalid()) return nullptr;
-  if (comp->isBoundType()) return comp->getBoundType();
 
   // If a declaration has already been bound, use it.
   if (ValueDecl *decl = comp->getBoundDecl()) {
@@ -985,7 +982,7 @@ static Type resolveIdentTypeComponent(
     Type type = resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
                                                   diagnoseErrors, resolver);
     if (!type || type->is<ErrorType>()) {
-      comp->setInvalid(TC.Context);
+      comp->setInvalid();
       return ErrorType::get(TC.Context);
     }
 
@@ -998,7 +995,7 @@ static Type resolveIdentTypeComponent(
   Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, options,
                                             diagnoseErrors, resolver);
   if (parentTy->is<ErrorType>()) {
-    comp->setInvalid(TC.Context);
+    comp->setInvalid();
     return parentTy;
   }
 
@@ -1010,7 +1007,7 @@ static Type resolveIdentTypeComponent(
                                                   options, diagnoseErrors,
                                                   resolver);
   if (!memberTy || memberTy->is<ErrorType>()) {
-    comp->setInvalid(TC.Context);
+    comp->setInvalid();
     return ErrorType::get(TC.Context);
   }
 
@@ -1142,7 +1139,7 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
       diagnose(Components.back()->getIdLoc(),
                diag::note_module_as_type, moduleName);
     }
-    Components.back()->setInvalid(Context);
+    Components.back()->setInvalid();
     return ErrorType::get(Context);
   }
 
@@ -1160,7 +1157,7 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
       diagnoseAvailability(result, IdType,
                            Components.back()->getIdLoc(), DC, *this,
                            AllowPotentiallyUnavailableProtocol)) {
-    Components.back()->setInvalid(Context);
+    Components.back()->setInvalid();
     return ErrorType::get(Context);
   }
   
@@ -3411,19 +3408,6 @@ public:
         TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
                     proto->getName());
         Diagnosed.insert(proto);
-      }
-
-      return;
-    }
-
-    if (auto ty = comp->getBoundType()) {
-      if (auto proto = dyn_cast_or_null<ProtocolDecl>(
-                         ty->getDirectlyReferencedTypeDecl())) {
-        if (!proto->existentialTypeSupported(&TC)) {
-          TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
-                      proto->getName());
-          Diagnosed.insert(proto);
-        }
       }
 
       return;

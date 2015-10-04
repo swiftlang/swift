@@ -197,46 +197,32 @@ public:
 
 class ComponentIdentTypeRepr : public IdentTypeRepr {
   SourceLoc Loc;
-  Identifier Id;
 
-  /// Value is the decl or type that this refers to.
+  /// Either the identifier or declaration that describes this
+  /// component.
   ///
-  /// After name binding, the value is set to the decl being
-  /// referenced. After type checking, it is set to the type.
-  ///
-  /// FIXME: Can we sneak the Id into this union?
-  llvm::PointerUnion<ValueDecl*, Type> Value;
+  /// The initial parsed representation is always an identifier, and
+  /// name binding will resolve this to a specific declaration.
+  llvm::PointerUnion<Identifier, ValueDecl *> IdOrDecl;
 
 protected:
   ComponentIdentTypeRepr(TypeReprKind K, SourceLoc Loc, Identifier Id)
-    : IdentTypeRepr(K), Loc(Loc), Id(Id) {}
+    : IdentTypeRepr(K), Loc(Loc), IdOrDecl(Id) {}
 
 public:
   SourceLoc getIdLoc() const { return Loc; }
-  Identifier getIdentifier() const { return Id; }
+  Identifier getIdentifier() const;
 
   /// Replace the identifier with a new identifier, e.g., due to typo
   /// correction.
-  void overwriteIdentifier(Identifier newId) { Id = newId; }
+  void overwriteIdentifier(Identifier newId) { IdOrDecl = newId; }
 
   /// Return true if this has been name-bound already.
-  bool isBound() const { return !Value.isNull(); }
-  bool isBoundDecl() const { return Value.is<ValueDecl*>() && isBound(); }
-  bool isBoundType() const { return Value.is<Type>() && isBound(); }
+  bool isBound() const { return IdOrDecl.is<ValueDecl *>(); }
 
-  ValueDecl *getBoundDecl() const {
-    return Value.dyn_cast<ValueDecl*>();
-  }
-  Type getBoundType() const {
-    return Value.dyn_cast<Type>();
-  }
+  ValueDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<ValueDecl*>(); }
 
-  void setValue(ValueDecl *VD) { Value = VD; }
-  void setValue(Type T) { Value = T; }
-
-  void setInvalid(ASTContext &ctx);
-
-  void revert() { Value = (ValueDecl*)nullptr; }
+  void setValue(ValueDecl *VD) { IdOrDecl = VD; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::SimpleIdent ||

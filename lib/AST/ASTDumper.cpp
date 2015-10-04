@@ -2129,8 +2129,8 @@ public:
       printCommon(nullptr, "component");
       OS << " id='" << comp->getIdentifier() << '\'';
       OS << " bind=";
-      if (comp->isBoundDecl()) OS << "decl";
-      else if (comp->isBoundType()) OS << "type";
+      if (comp->isBound())
+        comp->getBoundDecl()->dumpRef(OS);
       else OS << "none";
       OS << ')';
       if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(comp)) {

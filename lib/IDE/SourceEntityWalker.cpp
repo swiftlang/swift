@@ -282,16 +282,6 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
 
       return passReference(VD, IdT->getIdLoc());
     }
-
-    if (Type Ty = IdT->getBoundType()) {
-      if (TypeDecl *TyD = Ty->getDirectlyReferencedTypeDecl()) {
-        if (ModuleDecl *ModD = dyn_cast<ModuleDecl>(TyD))
-          return passReference(ModD, std::make_pair(IdT->getIdentifier(),
-                                                    IdT->getIdLoc()));
-
-        return passReference(TyD, IdT->getIdLoc());
-      }
-    }
   }
   return true;
 }
