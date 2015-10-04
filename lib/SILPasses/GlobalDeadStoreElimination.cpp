@@ -297,12 +297,6 @@ class GlobalDeadStoreEliminationImpl {
   ///
   void invalidateLocationBase(SILInstruction *Inst);
 
-  /// Check whether the 2 Locations may alias each other or not.
-  bool isMayAliasingLocation(unsigned src, unsigned dst);
-
-  /// Check whether the 2 Locations must alias each other or not.
-  bool isMustAliasingLocation(unsigned src, unsigned dst);
-
   /// Get the bit representing the location in the LocationVault.
   ///
   /// NOTE: Adds the location to the location vault if necessary.
@@ -334,31 +328,6 @@ public:
 };
 
 } // end anonymous namespace
-
-bool GlobalDeadStoreEliminationImpl::isMayAliasingLocation(unsigned src,
-                                                           unsigned dst) {
-  const Location &SL = LocationVault[src], DL = LocationVault[dst];
-  // If the bases do not alias, then the locations can not alias.
-  if (AA->isNoAlias(SL.getBase(), DL.getBase()))
-    return false;
-  // If one projection path is a prefix of another, then the locations
-  // could alias.
-  if (SL.hasNonEmptySymmetricPathDifference(DL))
-    return false;
-  return true;
-}
-
-bool GlobalDeadStoreEliminationImpl::isMustAliasingLocation(unsigned src,
-                                                            unsigned dst) {
-  const Location &SL = LocationVault[src], &DL = LocationVault[dst];
-  // If the bases are not must-alias, the locations may not alias.
-  if (!AA->isMustAlias(SL.getBase(), DL.getBase()))
-    return false;
-  // If projection paths are different, then the locations can not alias.
-  if (!SL.hasIdenticalProjectionPath(DL))
-    return false;
-  return true;
-}
 
 unsigned GlobalDeadStoreEliminationImpl::getLocationBit(const Location &Loc) {
   // Return the bit position of the given Loc in the LocationVault. The bit
@@ -427,7 +396,7 @@ void GlobalDeadStoreEliminationImpl::updateWriteSetForRead(SILInstruction *I,
   for (unsigned i = 0; i < S->WriteSetOut.size(); ++i) {
     if (!S->isTrackingLocation(i))
       continue;
-    if (!isMayAliasingLocation(i, bit))
+    if (!LocationVault[i].isMayAliasLocation(LocationVault[bit], AA))
       continue;
     DEBUG(llvm::dbgs() << "Loc Removal: " << LocationVault[i].getBase()
                        << "Instruction: " << *I << "\n");
@@ -444,7 +413,7 @@ bool GlobalDeadStoreEliminationImpl::updateWriteSetForWrite(SILInstruction *I,
     if (!S->isTrackingLocation(i))
       continue;
     // If 2 locations may alias, we can still keep both stores.
-    if (!isMustAliasingLocation(i, bit))
+    if (!LocationVault[i].isMustAliasLocation(LocationVault[bit], AA))
       continue;
     IsDead = true;
     // No need to check the rest of the upward visible stores as this store

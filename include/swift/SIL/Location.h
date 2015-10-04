@@ -19,6 +19,7 @@
 #ifndef SWIFT_LOCATION_H
 #define SWIFT_LOCATION_H
 
+#include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILAnalysis/ValueTracking.h"
@@ -152,6 +153,12 @@ public:
   /// individual fields.
   void expand(SILModule *Mod, LocationList &F);
 
+  /// Check whether the 2 Locations may alias each other or not.
+  bool isMayAliasLocation(const Location &RHS, AliasAnalysis *AA);
+
+  /// Check whether the 2 Locations must alias each other or not.
+  bool isMustAliasLocation(const Location &RHS, AliasAnalysis *AA);
+
   /// Enumerate the given Mem Location.
   static void enumerateLocation(SILModule *M, SILValue Mem,
                                 std::vector<Location> &LocationVault,
@@ -203,7 +210,5 @@ template <> struct DenseMapInfo<Location> {
 };
 
 } // namespace llvm
-
-
 
 #endif  // SWIFT_LOCATION_H

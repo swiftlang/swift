@@ -73,6 +73,27 @@ void Location::expand(SILModule *Mod, LocationList &Locs) {
   }
 }
 
+bool Location::isMayAliasLocation(const Location &RHS, AliasAnalysis *AA) {
+  // If the bases do not alias, then the locations can not alias.
+  if (AA->isNoAlias(Base, RHS.getBase()))
+    return false;
+  // If one projection path is a prefix of another, then the locations
+  // could alias.
+  if (hasNonEmptySymmetricPathDifference(RHS))
+    return false;
+  return true;
+}
+
+bool Location::isMustAliasLocation(const Location &RHS, AliasAnalysis *AA) {
+  // If the bases are not must-alias, the locations may not alias.
+  if (!AA->isMustAlias(Base, RHS.getBase()))
+    return false;
+  // If projection paths are different, then the locations can not alias.
+  if (!hasIdenticalProjectionPath(RHS))
+    return false;
+  return true;
+}
+
 void Location::enumerateLocation(SILModule *M, SILValue Mem,
                                  std::vector<Location> &LV,
                                  llvm::DenseMap<Location, unsigned> &BM) {
