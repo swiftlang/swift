@@ -829,6 +829,25 @@ static Type resolveNestedIdentTypeComponent(
       memberType = resolver->resolveDependentMemberType(parentTy, DC,
                                                         parentRange, comp);
       assert(memberType && "Received null dependent member type");
+    } else if (isa<AssociatedTypeDecl>(typeDecl) &&
+               !parentTy->is<ArchetypeType>() &&
+               !parentTy->isExistentialType()) {
+      auto assocType = cast<AssociatedTypeDecl>(typeDecl);
+
+      // Find the conformance and dig out the type witness.
+      ConformanceCheckOptions conformanceOptions;
+      if (options.contains(TR_InExpression))
+        conformanceOptions |= ConformanceCheckFlags::InExpression;
+
+      auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
+      ProtocolConformance *conformance = nullptr;
+      if (!TC.conformsToProtocol(parentTy, protocol, DC, conformanceOptions,
+                                 &conformance) ||
+          !conformance) {
+        return nullptr;
+      }
+
+      return conformance->getTypeWitness(assocType, &TC).getReplacement();
     } else {
       // Otherwise, simply substitute the parent type into the member.
       memberType = TC.substMemberTypeWithBase(DC->getParentModule(), typeDecl,
@@ -995,7 +1014,6 @@ static Type resolveIdentTypeComponent(
     return ErrorType::get(TC.Context);
   }
 
-  comp->setValue(memberTy);
   return memberTy;
 }
 

@@ -374,9 +374,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     for (AssociatedTypeDecl *assocType : inferredAssociatedTypes) {
       // If the type does not actually conform to the protocol, skip this
       // member entirely.
-      // FIXME: The "isComplete()" check here is bogus. It's entirely possible
-      // that we're in the middle of checking this protocol and just need a
-      // particular witness.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
       ProtocolConformance *conformance = nullptr;
       if (!conformsToProtocol(type, protocol, dc, conformanceOptions,
