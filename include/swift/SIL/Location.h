@@ -1,4 +1,4 @@
-//===--- Location.h ---------------------------------------------------- -===//
+//===------------------------- Location.h ------------------------------- -===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -34,7 +34,6 @@ namespace swift {
 //===----------------------------------------------------------------------===//
 //                                  Location
 //===----------------------------------------------------------------------===//
-
 /// Forward declaration.
 class Location;
 using LocationList = llvm::SmallVector<Location, 8>;
@@ -153,7 +152,8 @@ public:
   /// individual fields.
   void expand(SILModule *Mod, LocationList &F, bool OnlyLeafNode = true);
 
-  /// Get the first level locations for this location.
+  /// Get the first level locations based on this location's first level
+  /// projection.
   void getFirstLevelLocations(LocationList &Locs, SILModule *Mod);
 
   /// Check whether the 2 Locations may alias each other or not.
@@ -182,7 +182,6 @@ static inline llvm::hash_code hash_value(const Location &L) {
   return llvm::hash_combine(L.getBase().getDef(), L.getBase().getResultNumber(),
                             L.getBase().getType());
 }
-
 
 } // end swift namespace
 

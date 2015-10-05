@@ -35,35 +35,29 @@
 /// convergence.
 ///
 /// At the core of DSE, there is the Location class. a Location is an
-/// abstraction of an object field in program. It consists of currently a base
-/// but will eventually include a path as well.
+/// abstraction of an object field in program. It consists of a base and a 
+/// projection path to the field accessed.
 ///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-dead-store-opt"
 #include "swift/SILAnalysis/AliasAnalysis.h"
-#include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SIL/Location.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILPasses/Passes.h"
-#include "swift/SILPasses/Utils/SILSSAUpdater.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILAnalysis/ValueTracking.h"
-#include "llvm/ADT/None.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/MathExtras.h"
 #include <algorithm>
 
 using namespace swift;
@@ -609,8 +603,9 @@ void GlobalDeadStoreEliminationImpl::run() {
   // convergence. Everytime the WriteSetIn of a basic block changes, the
   // optimization is rerun.
   //
-  // TODO: We only need to rerun basicblocks with successors changed.
+  // TODO: We only need to rerun basic blocks with successors changed.
   // use a worklist in the future.
+  //
   bool Changed = false;
   do {
     Changed = false;

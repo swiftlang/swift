@@ -1,4 +1,4 @@
-//===--- Location.cpp ---------------------------------------------------===//
+//===-------------------------- Location.cpp ------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,7 +15,6 @@
 
 using namespace swift;
 
-
 //===----------------------------------------------------------------------===//
 //                                  Location
 //===----------------------------------------------------------------------===//
@@ -26,7 +25,7 @@ void Location::initialize(SILValue Dest) {
 }
 
 bool Location::hasIdenticalProjectionPath(const Location &RHS) const {
-  // If both Paths have no value, then locations are different.
+  // If both Paths have no value, then the 2 locations are different.
   if (!Path.hasValue() && !RHS.Path.hasValue())
     return false;
   // If 1 Path has value while the other does not, then the 2 locations
@@ -36,7 +35,7 @@ bool Location::hasIdenticalProjectionPath(const Location &RHS) const {
   // If both Paths are empty, then the 2 locations are the same.
   if (Path.getValue().empty() && RHS.Path.getValue().empty())
     return true;
-  // If 2 Paths have different values, then the 2 locations are different.
+  // If both Paths have different values, then the 2 locations are different.
   if (Path.getValue() != RHS.Path.getValue())
     return false;
   return true;
@@ -50,6 +49,7 @@ void Location::expand(SILModule *Mod, LocationList &Locs, bool OnlyLeafNode) {
 
   if (!OnlyLeafNode)
     Locs.push_back(*this);
+
   Worklist.push_back(*this);
   while (!Worklist.empty()) {
     // Get the next level projections based on current location's type.
@@ -109,7 +109,7 @@ void Location::mergeLocations(llvm::DenseSet<Location> &Locs, Location &M,
     return;
 
   // Get all the nodes in the projection tree, then go from leaf nodes to their
-  // parents. This guarantees that at the point a parent is processed, their
+  // parents. This guarantees that at the point the parent is processed, its 
   // children have been processed already.
   LocationList AllLocs;
   M.expand(Mod, AllLocs, false);
