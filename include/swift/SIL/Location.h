@@ -151,13 +151,21 @@ public:
   /// In SIL, we can have a store to an aggregate and loads from its individual
   /// fields. Therefore, we expand all the operations on aggregates onto
   /// individual fields.
-  void expand(SILModule *Mod, LocationList &F);
+  void expand(SILModule *Mod, LocationList &F, bool OnlyLeafNode = true);
+
+  /// Get the first level locations for this location.
+  void getFirstLevelLocations(LocationList &Locs, SILModule *Mod);
 
   /// Check whether the 2 Locations may alias each other or not.
   bool isMayAliasLocation(const Location &RHS, AliasAnalysis *AA);
 
   /// Check whether the 2 Locations must alias each other or not.
   bool isMustAliasLocation(const Location &RHS, AliasAnalysis *AA);
+
+  /// Given a set of locations derived from the same base, try to merge them into
+  /// smallest number of Locations possible.
+  static void mergeLocations(llvm::DenseSet<Location> &Locs, Location &Base,
+                             SILModule *Mod);
 
   /// Enumerate the given Mem Location.
   static void enumerateLocation(SILModule *M, SILValue Mem,

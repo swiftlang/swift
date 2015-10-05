@@ -50,6 +50,19 @@ struct S3 {
   init()
 }
 
+struct S4 {
+ var a: Int
+ var b: Int
+ init(a: Int, b: Int)
+ init()
+}
+ 
+struct S5 {
+ var x: S4
+ var y: Int
+ init(x: S4, y: Int)
+ init()
+}
 
 class foo {
   var a: Int
@@ -62,7 +75,6 @@ class B {
   init()
 }
 
-
 enum Example {
   case A(Int64, Int64)
   case B(Int64)
@@ -74,6 +86,7 @@ sil @foo_user : $@convention(thin) (@guaranteed foo) -> ()
 sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
 sil @S2_init : $@convention(thin) (@thin S2.Type) -> S2
 sil @S3_init : $@convention(thin) (@thin S3.Type) -> S3
+sil @S5_init : $@convention(thin) (@thin S5.Type) -> S5
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 
 //////////////////////////////////////////////////////////////
@@ -1080,3 +1093,24 @@ bb3:                                              // Preds: bb1 bb2
   return %19 : $()                                // id: %21
 }
 
+/// Make sure we can coalesce the 2 live stores to the 2 fields in S4.
+///
+/// CHECK-LABEL : PartialDeadStoreStructInStruct
+/// CHECK: [[RET0:%.+]] = struct_extract
+/// CHECK: [[RET1:%.+]] = struct_element_addr
+/// CHECK: store [[RET0:%.+]] to [[RET1:%.+]] : $*S4
+sil hidden @PartialDeadStoreStructInStruct : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S5  // var i                  // users: %4, %7, %10
+  %1 = function_ref @S5_init : $@convention(thin) (@thin S5.Type) -> S5 // user: %3
+  %2 = metatype $@thin S5.Type                    // user: %3
+  %3 = apply %1(%2) : $@convention(thin) (@thin S5.Type) -> S5 // user: %4
+  store %3 to %0#1 : $*S5                         // id: %4
+  %5 = integer_literal $Builtin.Int64, 11         // user: %6
+  %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
+  %7 = struct_element_addr %0#1 : $*S5, #S5.y     // user: %8
+  store %6 to %7 : $*Int                          // id: %8
+  %9 = tuple ()                                   // user: %11
+  dealloc_stack %0#0 : $*@local_storage S5        // id: %10
+  return %9 : $()                                 // id: %11
+}

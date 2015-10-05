@@ -42,12 +42,14 @@ bool Location::hasIdenticalProjectionPath(const Location &RHS) const {
   return true;
 }
 
-void Location::expand(SILModule *Mod, LocationList &Locs) {
-  // Expands the given type into locations each of which contains 1 field from
-  // the type.
+void Location::expand(SILModule *Mod, LocationList &Locs, bool OnlyLeafNode) {
+  // Perform a BFS to expand the given type into locations each of which
+  // contains 1 field from the type.
   LocationList Worklist;
   llvm::SmallVector<Projection, 8> Projections;
 
+  if (!OnlyLeafNode)
+    Locs.push_back(*this);
   Worklist.push_back(*this);
   while (!Worklist.empty()) {
     // Get the next level projections based on current location's type.
@@ -69,6 +71,10 @@ void Location::expand(SILModule *Mod, LocationList &Locs) {
       X.append(L.Path.getValue());
       Location LL(Base, X);
       Worklist.push_back(LL);
+
+      // Keep the intermediate nodes as well.
+      if (!OnlyLeafNode)
+        Locs.push_back(LL);
     }
   }
 }
@@ -83,6 +89,53 @@ bool Location::isMayAliasLocation(const Location &RHS, AliasAnalysis *AA) {
     return false;
   return true;
 }
+
+void Location::getFirstLevelLocations(LocationList &Locs, SILModule *Mod) {
+  SILType Ty = getType();
+  llvm::SmallVector<Projection, 8> Out;
+  Projection::getFirstLevelProjections(Ty, *Mod, Out);
+  for (auto &X : Out) {
+    ProjectionPath P;
+    P.append(X);
+    P.append(Path.getValue());
+    Locs.push_back(Location(Base, P));
+  }
+}
+
+void Location::mergeLocations(llvm::DenseSet<Location> &Locs, Location &M,
+                              SILModule *Mod) {
+  // Nothing to merge.
+  if (Locs.empty())
+    return;
+
+  // Get all the nodes in the projection tree, then go from leaf nodes to their
+  // parents. This guarantees that at the point a parent is processed, their
+  // children have been processed already.
+  LocationList AllLocs;
+  M.expand(Mod, AllLocs, false);
+  for (auto I = AllLocs.rbegin(), E = AllLocs.rend(); I != E; ++I) {
+    LocationList FirstLevel;
+    I->getFirstLevelLocations(FirstLevel, Mod);
+
+    if (FirstLevel.empty())
+      continue;
+
+    bool Alive = true;
+    for (auto &X : FirstLevel) {
+      if (Locs.find(X) != Locs.end())
+        continue;
+      Alive = false;
+    }
+
+    // All first level locations are alive, create the new aggregated location.
+    if (Alive) {
+      for (auto &X : FirstLevel)
+        Locs.erase(X);
+      Locs.insert(*I);
+    }
+  }
+}
+
 
 bool Location::isMustAliasLocation(const Location &RHS, AliasAnalysis *AA) {
   // If the bases are not must-alias, the locations may not alias.
@@ -134,3 +187,5 @@ void Location::enumerateLocations(SILFunction &F,
     }
   }
 }
+
+

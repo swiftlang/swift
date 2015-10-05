@@ -268,11 +268,6 @@ class GlobalDeadStoreEliminationImpl {
   /// Process Instructions. Extract Locations from SIL Unknown Memory Inst.
   void processUnknownMemInst(SILInstruction *Inst);
 
-  /// Process the partial dead store. Try to break down the store into largest
-  /// chunks that are alive.
-  bool mergeLiveStores(SILType Ty, ProjectionPath &P,
-                       llvm::DenseSet<Location> &Locs);
-
   /// Check whether the instruction invalidate any Locations due to change in
   /// its Location Base.
   ///
@@ -529,11 +524,11 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
       LocsAlive.insert(Locs[i]);
     }
 
+    // Try to create as few aggregated stores as possible out of these
+    // locations.
+    Location::mergeLocations(LocsAlive, L, Mod);
+
     // Create the individual stores that are alive.
-    //
-    // TODO: All these locations are alive, try to create as few aggregated
-    // store as possible out of them.
-    //
     SILBuilderWithScope<16> Builder(I);
     for (auto &X : LocsAlive) {
       SILValue Value = createExtractPath(Val, X.getPath(), I, true);
