@@ -2041,6 +2041,10 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
     if (i == 0)
       firstParamName = param->getName();
 
+    // Determine the number of parameters.
+    unsigned numParams = params.size();
+    if (errorParamIndex) --numParams;
+
     bool isLastParameter
       = (i == params.size() - 1) ||
         (i == params.size() - 2 &&
@@ -2057,6 +2061,7 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
                                 ? Optional<clang::NullabilityKind>(
                                     knownMethod->getParamTypeInfo(i))
                                 : None),
+          name.getBaseName(), numParams,
           isLastParameter);
 
     paramTypes.push_back(getClangTypeNameForOmission(param->getType())
@@ -2119,7 +2124,12 @@ clang::QualType ClangImporter::Implementation::getClangDeclContextType(
 
 bool ClangImporter::Implementation::canInferDefaultArgument(
        clang::QualType type, OptionalTypeKind clangOptionality,
-       bool isLastParameter) {
+       Identifier baseName, unsigned numParams, bool isLastParameter) {
+  // Don't introduce a default argument for setters with only a single
+  // parameter.
+  if (numParams == 1 && camel_case::getFirstWord(baseName.str()) == "set")
+    return false;
+
   // Some nullable parameters default to 'nil'.
   if (clangOptionality == OTK_Optional) {
     // Nullable trailing closure parameters default to 'nil'.
@@ -2293,6 +2303,10 @@ Type ClangImporter::Implementation::importMethodType(
     swiftBodyParams.push_back(TupleTypeElt(type, argName));
   };
 
+  // Determine the number of parameters.
+  unsigned numEffectiveParams = params.size();
+  if (errorInfo) --numEffectiveParams;
+
   auto argNames = methodName.getArgumentNames();
   unsigned nameIndex = 0;
   for (size_t paramIndex = 0; paramIndex != params.size(); paramIndex++) {
@@ -2397,10 +2411,12 @@ Type ClangImporter::Implementation::importMethodType(
       = (paramIndex == params.size() - 1) ||
         (paramIndex == params.size() - 2 &&
          errorInfo && errorInfo->ParamIndex == params.size() - 1);
+
     if (InferDefaultArguments &&
         (kind == SpecialMethodKind::Regular ||
          kind == SpecialMethodKind::Constructor) &&
         canInferDefaultArgument(param->getType(), optionalityOfParam,
+                                methodName.getBaseName(), numEffectiveParams,
                                 isLastParameter)) {
       defaultArg = DefaultArgumentKind::Normal;
     }

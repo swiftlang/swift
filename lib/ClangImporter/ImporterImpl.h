@@ -1048,6 +1048,8 @@ public:
   /// the given \c type and (Clang) optionality.
   bool canInferDefaultArgument(clang::QualType type,
                                OptionalTypeKind clangOptionality,
+                               Identifier baseName,
+                               unsigned numParams,
                                bool isLastParameter);
 
   /// \brief Import the type of an Objective-C method.

@@ -133,6 +133,9 @@
 // Note: Skipping "Type" suffix.
 // CHECK-FOUNDATION: func doSomethingWith(_: NSUnderlyingType)
 
+// Don't introduce default arguments for lone parameters to setters.
+// CHECK-FOUNDATION: func setDefaultEnumerationOptions(_: NSEnumerationOptions)
+
 // Introducing argument labels without pruning.
 // CHECK-FOUNDATION: func normalizingXMLPreservingComments(preserve _: Bool)
 

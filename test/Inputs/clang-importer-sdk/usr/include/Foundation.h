@@ -958,6 +958,7 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 
 @interface NSMutableArray (TypeSuffix)
 - (void)doSomethingWithUnderlying:(NSUnderlyingType)underlying;
+- (void)setDefaultEnumerationOptions:(NSEnumerationOptions)options;
 @end
 
 @interface NSString ()
