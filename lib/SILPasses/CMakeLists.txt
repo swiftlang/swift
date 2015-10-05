@@ -34,7 +34,7 @@ add_swift_library(swiftSILPasses
   LICM.cpp
   LetPropertiesOpts.cpp
   Link.cpp
-  LoadStoreOpts.cpp
+  GlobalRedundantLoadElimination.cpp
   LoopCanonicalizer.cpp
   LoopInfoPrinter.cpp
   LoopRegionPrinter.cpp
