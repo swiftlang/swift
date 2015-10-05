@@ -964,3 +964,7 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 @interface NSString ()
 - (nonnull NSString *)stringByNormalizingXMLPreservingComments:(BOOL)preserveFlag;
 @end
+
+@interface NSSet ()
+- (nonnull NSSet *)setByAddingObject:(nonnull id)object;
+@end

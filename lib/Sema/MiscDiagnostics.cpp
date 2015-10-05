@@ -1840,6 +1840,10 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
       }
     }
 
+    // AnyObject -> "Object".
+    if (type->isAnyObject())
+      return "Object";
+
     return OmissionTypeName(nominal->getName().str(), getOptions(type));
   }
 

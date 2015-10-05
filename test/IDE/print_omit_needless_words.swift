@@ -139,6 +139,9 @@
 // Introducing argument labels without pruning.
 // CHECK-FOUNDATION: func normalizingXMLPreservingComments(preserve _: Bool)
 
+// Collection element types.
+// CHECK-FOUNDATION: func adding(_: AnyObject) -> Set<NSObject>
+
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
 

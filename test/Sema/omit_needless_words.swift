@@ -26,3 +26,7 @@ extension String {
   func appendObjects(objects: [AnyObject]) { } // expected-warning{{'appendObjects' could be named 'append'}}{{8-21=append}}
   func appendMagicNameStrings(strings: [MagicNameString]) { } // expected-warning{{'appendMagicNameStrings' could be named 'append'}}{{8-30=append}}
 }
+
+class NSArray {
+  func arrayByAddingObject(x: AnyObject) -> NSArray { return NSArray() } // expected-warning{{'arrayByAddingObject' could be named 'adding' [-Womit-needless-words]}}{{8-27=adding}}
+}
