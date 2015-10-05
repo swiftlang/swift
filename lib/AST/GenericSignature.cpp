@@ -469,8 +469,26 @@ SmallVector<ProtocolDecl *, 2> GenericSignature::getConformsTo(Type type,
 
   // Retrieve the protocols to which this type conforms.
   SmallVector<ProtocolDecl *, 2> result;
-  for (auto proto : pa->getConformsTo())
-    result.push_back(proto.first);
+  for (auto proto : pa->getConformsTo()) {
+    switch (proto.second.getKind()) {
+    case RequirementSource::Explicit:
+    case RequirementSource::Inferred:
+      result.push_back(proto.first);
+      break;
+
+    case RequirementSource::Redundant:
+    case RequirementSource::Protocol:
+      // Drop redundant requirements.
+      break;
+
+    case RequirementSource::OuterScope:
+      llvm_unreachable("Not part of the generic signature");
+    }
+  }
+
+  // Sort the resulting set of protocols.
+  llvm::array_pod_sort(result.begin(), result.end(),
+                       ProtocolType::compareProtocols);
 
   return result;
 }
