@@ -1877,6 +1877,9 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   if (!Context.LangOpts.WarnOmitNeedlessWords)
     return None;
 
+  if (afd->isInvalid())
+    return None;
+
   DeclName name = afd->getFullName();
   if (!name)
     return None;
@@ -1971,6 +1974,9 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
 /// Attempt to omit needless words from the name of the given declaration.
 static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
+
+  if (var->isInvalid())
+    return None;
 
   if (!Context.LangOpts.WarnOmitNeedlessWords)
     return None;
@@ -2076,6 +2082,9 @@ static bool hasExtraneousDefaultArguments(
               SmallVectorImpl<SourceRange> &ranges,
               SmallVectorImpl<unsigned> &removedArgs) {
   if (!afd->getClangDecl())
+    return false;
+
+  if (afd->isInvalid())
     return false;
 
   if (auto shuffle = dyn_cast<TupleShuffleExpr>(arg))
