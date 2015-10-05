@@ -187,3 +187,8 @@
 // at "and".
 // CHECK-APPKIT: func openUntitledDocument(display _: Bool)
 
+// Don't strip due to weak type information.
+// CHECK-APPKIT: func setContentHuggingPriority(_: NSLayoutPriority)
+
+// Look through typedefs of pointers.
+// CHECK-APPKIT: func layoutAt(_: NSPointPointer)

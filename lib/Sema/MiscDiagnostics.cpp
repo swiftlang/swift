@@ -1790,10 +1790,10 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
   };
 
   do {
-    // If we have a typealias, return that name.
+    // Look through typealiases.
     if (auto aliasTy = dyn_cast<NameAliasType>(type.getPointer())) {
-      return OmissionTypeName(aliasTy->getDecl()->getName().str(),
-                              getOptions(aliasTy));
+      type = aliasTy->getDecl()->getUnderlyingType();
+      continue;
     }
 
     // Strip off lvalue/inout types.

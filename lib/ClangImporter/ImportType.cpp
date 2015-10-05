@@ -1852,21 +1852,21 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
 
   // Dig through the type, looking for a typedef-name and stripping
   // references along the way.
+  StringRef lastTypedefName;
   do {
     // The name of a typedef-name.
     auto typePtr = type.getTypePtr();
     if (auto typedefType = dyn_cast<clang::TypedefType>(typePtr)) {
       auto name = typedefType->getDecl()->getName();
 
-      auto lastWord = camel_case::getLastWord(name);
-
       // For Objective-C type parameters, drop the "Type" suffix if
       // present.
       if (isa<clang::ObjCTypeParamDecl>(typedefType->getDecl())) {
-        if (lastWord == "Type") {
+        if (camel_case::getLastWord(name) == "Type") {
           name = name.drop_back(4);
-          lastWord = "";
         }
+
+        return name;
       }
 
       // Objective-C selector type.
@@ -1891,34 +1891,14 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
       if (!CFName.empty())
         return CFName;
 
-      OmissionTypeOptions options;
+      // If we have NS(U)Integer or CGFloat, return it.
+      if (name == "NSInteger" || name == "NSUInteger" || name == "CGFloat")
+        return name;
 
-      // Determine whether this is a Boolean type.
-      if (typedefType->isBooleanType()) {
-        // Easy case: it's a typedef of 'bool' or '_Bool'.
-        options |= OmissionTypeFlags::Boolean;
-      } else {
-        // Check whether this is the Objective-C BOOL type.
-        clang::QualType boolType = type;
-        while (true) {
-          auto boolTypePtr = boolType.getTypePtr();
-          if (auto boolTypedefType = dyn_cast<clang::TypedefType>(boolTypePtr)){
-            if (boolTypedefType->getDecl()->getName() == "BOOL") {
-              options |= OmissionTypeFlags::Boolean;
-              break;
-            }
-          }
-
-          // Try to desugar one level...
-          clang::QualType desugared = boolType.getSingleStepDesugaredType(ctx);
-          if (desugared.getTypePtr() == boolType.getTypePtr())
-            break;
-
-          boolType = desugared;
-        }
-      }
-
-      return OmissionTypeName(name, options);
+      // Otherwise, desugar one level...
+      lastTypedefName = name;
+      type = typedefType->getDecl()->getUnderlyingType();
+      continue;
     }
 
     // Look through reference types.
@@ -1996,8 +1976,12 @@ OmissionTypeName ClangImporter::Implementation::getClangTypeNameForOmission(
   }
 
   // Tag types.
-  if (auto tagType = type->getAs<clang::TagType>())
+  if (auto tagType = type->getAs<clang::TagType>()) {
+    if (tagType->getDecl()->getName().empty())
+      return lastTypedefName;
+
     return tagType->getDecl()->getName();
+  }
 
   // Block pointers.
   if (type->getAs<clang::BlockPointerType>())

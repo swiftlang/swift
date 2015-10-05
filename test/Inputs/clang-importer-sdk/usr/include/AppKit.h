@@ -273,3 +273,11 @@ struct Point3D { double x, y, z; };
 @interface NSDocumentController ()
 - (void)openUntitledDocumentAndDisplay:(BOOL)displayDocument;
 @end
+
+typedef float NSLayoutPriority;
+typedef NSPoint *NSPointPointer;
+
+@interface NSView ()
+-(void)setContentHuggingPriority:(NSLayoutPriority)priority;
+-(void)layoutAtPoint:(NSPointPointer)point;
+@end
