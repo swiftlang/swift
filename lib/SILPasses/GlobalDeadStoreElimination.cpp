@@ -97,6 +97,9 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
 
 namespace {
 
+/// If a large store is broken down to too many smaller stores, bail out.
+const unsigned MaxPartialDeadStoreCountLimit = 4;
+
 /// BBState summarizes how Locations are used in a basic block.
 ///
 /// Initially the WriteSetOut is empty. Before a basic block is processed, it is
@@ -521,6 +524,10 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
     // Try to create as few aggregated stores as possible out of these
     // locations.
     Location::mergeLocations(LocsAlive, L, Mod);
+
+    // Oops, we have too many smaller stores generated, bail out.
+    if (LocsAlive.size() > MaxPartialDeadStoreCountLimit)
+      return;
 
     // Create the individual stores that are alive.
     SILBuilderWithScope<16> Builder(I);
