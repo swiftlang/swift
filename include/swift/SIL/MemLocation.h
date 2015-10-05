@@ -1,4 +1,4 @@
-//===------------------------- Location.h ------------------------------- -===//
+//===------------------------ MemLocation.h ----------------------------- -===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the class Location. A Location is an abstraction of an
+// This file defines the class Location. A MemLocation is an abstraction of an
 // object field in program. It consists of a base that is the tracked SILValue
 // and a projection path to the represented field.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_LOCATION_H
-#define SWIFT_LOCATION_H
+#ifndef SWIFT_MEM_LOCATION_H
+#define SWIFT_MEM_LOCATION_H
 
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SIL/Projection.h"
@@ -32,13 +32,13 @@
 namespace swift {
 
 //===----------------------------------------------------------------------===//
-//                                  Location
+//                              Memory Location
 //===----------------------------------------------------------------------===//
 /// Forward declaration.
-class Location;
-using LocationList = llvm::SmallVector<Location, 8>;
+class MemLocation;
+using MemLocationList = llvm::SmallVector<MemLocation, 8>;
 
-class Location {
+class MemLocation {
 public:
   enum KeyKind : uint8_t { EmptyKey = 0, TombstoneKey, NormalKey };
 
@@ -52,13 +52,13 @@ private:
 
 public:
   /// Constructors.
-  Location() : Base(), Kind(NormalKey) {}
-  Location(SILValue B) : Base(B), Kind(NormalKey) { initialize(B); }
-  Location(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
+  MemLocation() : Base(), Kind(NormalKey) {}
+  MemLocation(SILValue B) : Base(B), Kind(NormalKey) { initialize(B); }
+  MemLocation(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
       : Base(B), Path(std::move(P)), Kind(Kind) {}
 
   /// Copy constructor.
-  Location(const Location &RHS) {
+  MemLocation(const MemLocation &RHS) {
     Base = RHS.Base;
     Path.reset();
     Kind = RHS.Kind;
@@ -69,7 +69,7 @@ public:
     Path = std::move(X);
   }
 
-  Location &operator=(const Location &RHS) {
+  MemLocation &operator=(const MemLocation &RHS) {
     Base = RHS.Base;
     Path.reset();
     Kind = RHS.Kind;
@@ -81,7 +81,7 @@ public:
     return *this;
   }
 
-  /// Getters and setters for Location.
+  /// Getters and setters for MemLocation.
   KeyKind getKind() const { return Kind; }
   void setKind(KeyKind K) { Kind = K; }
   SILValue getBase() const { return Base; }
@@ -98,7 +98,7 @@ public:
     return HC;
   }
 
-  /// Returns the type of the Location.
+  /// Returns the type of the MemLocation.
   SILType getType() const {
     if (Path.getValue().empty())
       return Base.getType();
@@ -113,7 +113,7 @@ public:
 
   /// Return false if one projection path is a prefix of another. false
   /// otherwise.
-  bool hasNonEmptySymmetricPathDifference(const Location &RHS) const {
+  bool hasNonEmptySymmetricPathDifference(const MemLocation &RHS) const {
     const ProjectionPath &P = RHS.Path.getValue();
     return Path.getValue().hasNonEmptySymmetricDifference(P);
   }
@@ -121,11 +121,11 @@ public:
   /// Return true if the 2 locations have identical projection paths.
   /// If both locations have empty paths, they are treated as having
   /// identical projection path.
-  bool hasIdenticalProjectionPath(const Location &RHS) const;
+  bool hasIdenticalProjectionPath(const MemLocation &RHS) const;
 
   /// Comparisons.
-  bool operator!=(const Location &RHS) const { return !(*this == RHS); }
-  bool operator==(const Location &RHS) const {
+  bool operator!=(const MemLocation &RHS) const { return !(*this == RHS); }
+  bool operator==(const MemLocation &RHS) const {
     // If type is not the same, then locations different.
     if (Kind != RHS.Kind)
       return false;
@@ -150,35 +150,35 @@ public:
   /// In SIL, we can have a store to an aggregate and loads from its individual
   /// fields. Therefore, we expand all the operations on aggregates onto
   /// individual fields.
-  void expand(SILModule *Mod, LocationList &F, bool OnlyLeafNode = true);
+  void expand(SILModule *Mod, MemLocationList &F, bool OnlyLeafNode = true);
 
   /// Get the first level locations based on this location's first level
   /// projection.
-  void getFirstLevelLocations(LocationList &Locs, SILModule *Mod);
+  void getFirstLevelMemLocations(MemLocationList &Locs, SILModule *Mod);
 
-  /// Check whether the 2 Locations may alias each other or not.
-  bool isMayAliasLocation(const Location &RHS, AliasAnalysis *AA);
+  /// Check whether the 2 MemLocations may alias each other or not.
+  bool isMayAliasMemLocation(const MemLocation &RHS, AliasAnalysis *AA);
 
-  /// Check whether the 2 Locations must alias each other or not.
-  bool isMustAliasLocation(const Location &RHS, AliasAnalysis *AA);
+  /// Check whether the 2 MemLocations must alias each other or not.
+  bool isMustAliasMemLocation(const MemLocation &RHS, AliasAnalysis *AA);
 
   /// Given a set of locations derived from the same base, try to merge them into
-  /// smallest number of Locations possible.
-  static void mergeLocations(llvm::DenseSet<Location> &Locs, Location &Base,
-                             SILModule *Mod);
+  /// smallest number of MemLocations possible.
+  static void mergeMemLocations(llvm::DenseSet<MemLocation> &Locs, MemLocation &Base,
+                                SILModule *Mod);
 
-  /// Enumerate the given Mem Location.
-  static void enumerateLocation(SILModule *M, SILValue Mem,
-                                std::vector<Location> &LocationVault,
-                                llvm::DenseMap<Location, unsigned> &LocToBit);
+  /// Enumerate the given Mem MemLocation.
+  static void enumerateMemLocation(SILModule *M, SILValue Mem,
+                                   std::vector<MemLocation> &MemLocationVault,
+                                   llvm::DenseMap<MemLocation, unsigned> &LocToBit);
 
   /// Enumerate all the locations in the function.
-  static void enumerateLocations(SILFunction &F,
-                                 std::vector<Location> &LocationVault,
-                                 llvm::DenseMap<Location, unsigned> &LocToBit);
+  static void enumerateMemLocations(SILFunction &F,
+                                    std::vector<MemLocation> &MemLocationVault,
+                                    llvm::DenseMap<MemLocation, unsigned> &LocToBit);
 };
 
-static inline llvm::hash_code hash_value(const Location &L) {
+static inline llvm::hash_code hash_value(const MemLocation &L) {
   return llvm::hash_combine(L.getBase().getDef(), L.getBase().getResultNumber(),
                             L.getBase().getType());
 }
@@ -186,31 +186,31 @@ static inline llvm::hash_code hash_value(const Location &L) {
 } // end swift namespace
 
 
-/// Location is used in DenseMap, define functions required by DenseMap.
+/// MemLocation is used in DenseMap, define functions required by DenseMap.
 namespace llvm {
 
-using swift::Location;
+using swift::MemLocation;
 
-template <> struct DenseMapInfo<Location> {
-  static inline Location getEmptyKey() {
-    Location L;
-    L.setKind(Location::EmptyKey);
+template <> struct DenseMapInfo<MemLocation> {
+  static inline MemLocation getEmptyKey() {
+    MemLocation L;
+    L.setKind(MemLocation::EmptyKey);
     return L;
   }
-  static inline Location getTombstoneKey() {
-    Location L;
-    L.setKind(Location::TombstoneKey);
+  static inline MemLocation getTombstoneKey() {
+    MemLocation L;
+    L.setKind(MemLocation::TombstoneKey);
     return L;
   }
-  static unsigned getHashValue(const Location &Loc) {
+  static unsigned getHashValue(const MemLocation &Loc) {
     return hash_value(Loc);
   }
-  static bool isEqual(const Location &LHS, const Location &RHS) {
-    if (LHS.getKind() == Location::EmptyKey &&
-        RHS.getKind() == Location::EmptyKey)
+  static bool isEqual(const MemLocation &LHS, const MemLocation &RHS) {
+    if (LHS.getKind() == MemLocation::EmptyKey &&
+        RHS.getKind() == MemLocation::EmptyKey)
       return true;
-    if (LHS.getKind() == Location::TombstoneKey &&
-        RHS.getKind() == Location::TombstoneKey)
+    if (LHS.getKind() == MemLocation::TombstoneKey &&
+        RHS.getKind() == MemLocation::TombstoneKey)
       return true;
     return LHS == RHS;
   }
@@ -218,4 +218,4 @@ template <> struct DenseMapInfo<Location> {
 
 } // namespace llvm
 
-#endif  // SWIFT_LOCATION_H
+#endif  // SWIFT_MEM_LOCATION_H

@@ -27,7 +27,7 @@ add_swift_library(swiftSIL
   SILDeclRef.cpp
   LoopInfo.cpp
   Projection.cpp
-  Location.cpp
+  MemLocation.cpp
   Mangle.cpp
   Linker.cpp
   LINK_LIBRARIES
