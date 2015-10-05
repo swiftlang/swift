@@ -91,6 +91,10 @@ if target == '':
         target = 'armv7k-apple-watchos2.0'
     if sdk == 'watchos.simulator':
         target = 'i386-apple-watchos2.0'
+    if sdk in ('appletvos', 'appletvos.internal'):
+        target = 'arm64-apple-tvos9'
+    if sdk == 'appletvos.simulator':
+        target = 'x86_64-apple-tvos9'
 
 # Figure out the SDK root for the requested SDK
 sdkroot = subprocess.check_output(['xcrun', '--show-sdk-path', '--sdk', sdk]).rstrip()
