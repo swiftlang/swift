@@ -52,6 +52,7 @@ size_t llvm::markup::measureIndentation(StringRef Text) {
 
     if (Text[i] == '\t') {
       Col += ((i + 8) / 8) * 8;
+      continue;
     }
     return i;
   }
