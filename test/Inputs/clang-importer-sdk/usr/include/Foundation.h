@@ -967,4 +967,11 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 
 @interface NSSet ()
 - (nonnull NSSet *)setByAddingObject:(nonnull id)object;
+@property (readonly) BOOL empty;
+- (BOOL)nonEmpty;
+@property (readonly) BOOL isStringSet;
+@property (readonly) BOOL wantsAUnion;
+@property (readonly) BOOL watchesItsLanguage;
+@property (readonly) BOOL appliesForAJob;
+@property (readonly) BOOL setShouldBeInfinite;
 @end

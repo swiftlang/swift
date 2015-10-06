@@ -2059,7 +2059,8 @@ DeclName ClangImporter::Implementation::omitNeedlessWordsInFunctionName(
                          getClangTypeNameForOmission(resultType),
                          getClangTypeNameForOmission(
                            getClangDeclContextType(dc)),
-                         paramTypes, returnsSelf, scratch))
+                         paramTypes, returnsSelf, /*isProperty=*/false,
+                         scratch))
     return name;
 
   /// Retrieve a replacement identifier.

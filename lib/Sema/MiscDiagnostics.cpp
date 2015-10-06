@@ -1948,7 +1948,7 @@ static Optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd) {
   if (!swift::omitNeedlessWords(baseNameStr, argNameStrs, firstParamName,
                                 getTypeNameForOmission(resultType),
                                 getTypeNameForOmission(contextType),
-                                paramTypes, returnsSelf, scratch))
+                                paramTypes, returnsSelf, false, scratch))
     return None;
 
   /// Retrieve a replacement identifier.
@@ -2006,7 +2006,7 @@ static Optional<Identifier> omitNeedlessWords(VarDecl *var) {
   OmissionTypeName typeName = getTypeNameForOmission(var->getType());
   OmissionTypeName contextTypeName = getTypeNameForOmission(contextType);
   if (omitNeedlessWords(name, { }, "", typeName, contextTypeName, { },
-                        /*returnsSelf=*/false, scratch)) {
+                        /*returnsSelf=*/false, true, scratch)) {
     return Context.getIdentifier(name);
   }
 

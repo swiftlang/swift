@@ -142,6 +142,15 @@
 // Collection element types.
 // CHECK-FOUNDATION: func adding(_: AnyObject) -> Set<NSObject>
 
+// Boolean properties get an "is" prefix.
+// CHECK-FOUNDATION: var isEmpty: Bool { get }
+// CHECK-FOUNDATION: func nonEmpty() -> Bool
+// CHECK-FOUNDATION: var isStringSet: Bool { get }
+// CHECK-FOUNDATION: var wantsAUnion: Bool { get }
+// CHECK-FOUNDATION: var watchesItsLanguage: Bool { get }
+// CHECK-FOUNDATION: var appliesForAJob: Bool { get }
+// CHECK-FOUNDATION: var setShouldBeInfinite: Bool { get }
+
 // Note: class method name stripping context type.
 // CHECK-APPKIT: class func red() -> NSColor
 

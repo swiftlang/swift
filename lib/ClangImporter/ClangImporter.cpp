@@ -1319,7 +1319,8 @@ ClangImporter::Implementation::importName(const clang::NamedDecl *D,
         StringScratchSpace scratch;
         StringRef name = result.str();
         if (omitNeedlessWords(name, { }, "", propertyTypeName, contextTypeName,
-                              { }, /*returnsSelf=*/false, scratch)) {
+                              { }, /*returnsSelf=*/false, /*isProperty=*/true,
+                              scratch)) {
           result = SwiftContext.getIdentifier(name);
         }
       }

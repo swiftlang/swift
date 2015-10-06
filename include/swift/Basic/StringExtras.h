@@ -43,6 +43,7 @@ namespace swift {
     Unknown,
     Preposition,
     Verb,
+    AuxiliaryVerb,
     Gerund,
   };
 
@@ -385,6 +386,8 @@ public:
 /// \param returnsSelf Whether the result of the declaration is 'Self'
 /// (in Swift) or 'instancetype' (in Objective-C).
 ///
+/// \param isProperty Whether this is the name of a property.
+///
 /// \param scratch Scratch space that will be used for modifications beyond
 /// just chopping names.
 ///
@@ -396,6 +399,7 @@ bool omitNeedlessWords(StringRef &baseName,
                        OmissionTypeName contextType,
                        ArrayRef<OmissionTypeName> paramTypes,
                        bool returnsSelf,
+                       bool isProperty,
                        StringScratchSpace &scratch);
 }
 
