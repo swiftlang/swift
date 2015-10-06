@@ -2169,3 +2169,36 @@ void swift::replaceLoadSequence(SILInstruction *I,
   llvm_unreachable("Unknown instruction sequence for reading from a global");
 }
 
+/// Are the callees that could be called through Decl statically
+/// knowable based on the Decl and the compilation mode?
+bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
+  if (Decl.isForeign)
+    return false;
+
+  const DeclContext *AssocDC = M.getAssociatedContext();
+  if (!AssocDC)
+    return false;
+
+  FuncDecl *FD = Decl.getFuncDecl();
+
+  // FIXME: Handle other things like init().
+  if (!FD)
+    return false;
+
+  // Only handle members defined within the SILModule's associated context.
+  if (!FD->isChildContextOf(AssocDC))
+    return false;
+
+  if (FD->isDynamic())
+    return false;
+
+  // Only consider 'private' members, unless we are in whole-module compilation.
+  switch (FD->getEffectiveAccess()) {
+  case Accessibility::Public:
+    return false;
+  case Accessibility::Internal:
+    return M.isWholeModule();
+  case Accessibility::Private:
+    return true;
+  }
+}

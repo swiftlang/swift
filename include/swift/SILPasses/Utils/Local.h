@@ -619,6 +619,11 @@ void replaceLoadSequence(SILInstruction *I,
                          SILInstruction *Value,
                          SILBuilder &B);
 
+
+/// Do we have enough information to determine all callees that could
+/// be reached by calling the function represented by Decl?
+bool calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl);
+
 } // end namespace swift
 
 #endif

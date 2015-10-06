@@ -630,37 +630,18 @@ static SILInstruction *tryDevirtualizeWitnessMethod(FullApplySite AI) {
 
 /// Return the final class decl based on access control information.
 static bool isKnownFinal(SILModule &M, SILDeclRef Member) {
-  if (Member.isForeign)
+  if (!calleesAreStaticallyKnowable(M, Member))
     return false;
 
-  const DeclContext *AssocDC = M.getAssociatedContext();
-  if (!AssocDC)
-    return false;
-
-  FuncDecl *FD = Member.getFuncDecl();
-
-  // FIXME: Handle other things like init().
-  if (!FD)
-    return false;
+  auto *FD = Member.getAbstractFunctionDecl();
+  assert(FD && "Expected abstract function decl!");
 
   assert(!FD->isFinal() && "Unexpected indirect call to final method!");
 
-  // Only handle members defined within the SILModule's associated context.
-  if (!FD->isChildContextOf(AssocDC))
+  if (FD->isOverridden())
     return false;
 
-  if (FD->isDynamic() || FD->isOverridden())
-    return false;
-
-  // Only consider 'private' members, unless we are in whole-module compilation.
-  switch (FD->getEffectiveAccess()) {
-  case Accessibility::Public:
-    return false;
-  case Accessibility::Internal:
-    return M.isWholeModule();
-  case Accessibility::Private:
-    return true;
-  }
+  return true;
 }
 
 /// Attempt to devirtualize the given apply if possible, and return a
