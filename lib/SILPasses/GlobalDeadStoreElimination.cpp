@@ -40,7 +40,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-dead-store-elim"
+#define DEBUG_TYPE "sil-dead-store-opt"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SIL/MemLocation.h"
