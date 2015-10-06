@@ -341,7 +341,7 @@ private:
     return root;
   }
 
-  Node *Root;
+  Node *Root = nullptr;
 
 public:
   PrefixMap() {}
