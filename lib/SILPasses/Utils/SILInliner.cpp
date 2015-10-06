@@ -162,6 +162,7 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     // trying to clone the ThrowInst.
     if (ThrowInst *TI = dyn_cast<ThrowInst>(BI->first->getTerminator())) {
       if (auto *A = dyn_cast<ApplyInst>(AI)) {
+        (void)A;
         assert(A->isNonThrowing() &&
                "apply of a function with error result must be non-throwing");
         getBuilder().createUnreachable(Loc.getValue());
