@@ -61,6 +61,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Linking.h"
+#include "MetadataPath.h"
 #include "NecessaryBindings.h"
 #include "NonFixedTypeInfo.h"
 #include "ProtocolInfo.h"
@@ -3623,18 +3624,14 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
 namespace {
   struct Fulfillment {
     Fulfillment() = default;
-    Fulfillment(unsigned sourceIndex, unsigned depth, unsigned index)
-      : SourceIndex(sourceIndex), Depth(depth), Index(index) {}
+    Fulfillment(unsigned sourceIndex, MetadataPath &&path)
+      : SourceIndex(sourceIndex), Path(std::move(path)) {}
 
     /// The source index.
     unsigned SourceIndex;
 
-    /// The distance up the metadata chain.
-    /// 0 is the origin metadata, 1 is the parent of that, etc.
-    unsigned Depth;
-
-    /// The generic argument index.
-    unsigned Index;
+    /// The path from the source metadata.
+    MetadataPath Path;
   };
   typedef std::pair<Type, ProtocolDecl*> FulfillmentKey;
 
@@ -3681,9 +3678,10 @@ namespace {
       unsigned Index;
 
     public:
-      SmallVector<NominalTypeDecl*, 2> TypesForDepths;
+      CanType Type;
 
-      Source(SourceKind kind, unsigned index) : Kind(kind), Index(index) {
+      Source(SourceKind kind, unsigned index, CanType type)
+         : Kind(kind), Index(index), Type(type) {
         assert(index != InvalidSourceIndex || !requiresSourceIndex(kind));
       }
 
@@ -3695,6 +3693,7 @@ namespace {
     };
 
   protected:
+    ModuleDecl &M;
     CanSILFunctionType FnType;
     std::vector<Source> Sources;
 
@@ -3706,7 +3705,7 @@ namespace {
     // a generic parameter or a member of a generic parameter, or return null
     // if it does not.
     ArchetypeType::NestedType getRepresentativeArchetype(Type depType) {
-      assert(depType->hasTypeParameter()
+      assert(depType->isTypeParameter()
              && "considering non-dependent type?!");
 
       auto *potential = ParamArchetypes.resolveArchetype(depType);
@@ -3718,7 +3717,7 @@ namespace {
 
   public:
     PolymorphicConvention(CanSILFunctionType fnType, Module &M)
-        : FnType(fnType), ParamArchetypes(M, M.getASTContext().Diags) {
+        : M(M), FnType(fnType), ParamArchetypes(M, M.getASTContext().Diags) {
       assert(hasPolymorphicParameters(fnType));
 
       auto params = fnType->getParameters();
@@ -3739,13 +3738,14 @@ namespace {
         // arguments; doing so would potentially make the signature
         // incompatible with other witnesses for the same method.
         selfIndex = params.size() - 1;
-        Sources.emplace_back(SourceKind::WitnessSelf, InvalidSourceIndex);
+        Sources.emplace_back(SourceKind::WitnessSelf, InvalidSourceIndex,
+                             CanType());
         considerWitnessSelf(params[selfIndex], selfIndex);
       } else if (rep == SILFunctionTypeRepresentation::ObjCMethod) {
         // Objective-C methods also always derive all polymorphic parameter
         // information from the Self argument.
         selfIndex = params.size() - 1;
-        Sources.emplace_back(SourceKind::ClassPointer, selfIndex);
+        Sources.emplace_back(SourceKind::ClassPointer, selfIndex, CanType());
         considerWitnessSelf(params[selfIndex], selfIndex);
       } else {
         // We don't need to pass anything extra as long as all of the
@@ -3769,10 +3769,11 @@ namespace {
     /// Extract dependent type metadata for a value witness function of the given
     /// type.
     PolymorphicConvention(NominalTypeDecl *ntd, Module &M)
-      : FnType(getNotionalFunctionType(ntd)),
+      : M(M), FnType(getNotionalFunctionType(ntd)),
         ParamArchetypes(M, M.getASTContext().Diags)
     {
-      Sources.emplace_back(SourceKind::Metadata, 0);
+      auto paramType = FnType->getParameters()[0].getType();
+      Sources.emplace_back(SourceKind::Metadata, 0, paramType);
 
       // Build archetypes from the generic signature so we can consult the
       // protocol requirements on the parameters and dependent types.
@@ -3781,8 +3782,8 @@ namespace {
       ParamArchetypes.addGenericSignature(FnType->getGenericSignature(),
                                           false);
 
-      auto paramType = FnType->getParameters()[0].getType();
-      considerBoundGenericType(cast<BoundGenericType>(paramType), 0);
+      considerBoundGenericType(cast<BoundGenericType>(paramType),
+                              MetadataPath());
     }
 
     ArrayRef<Source> getSources() const { return Sources; }
@@ -3792,6 +3793,10 @@ namespace {
         return gs->getAllDependentTypes();
       return GenericSignatureWitnessIterator::emptyRange();
     }
+
+    /// Given that we have metadata for a type, is it exactly of the
+    /// specified type, or might it be a subtype?
+    enum IsExact_t : bool { IsInexact = false, IsExact = true };
 
   private:
     static CanSILFunctionType getNotionalFunctionType(NominalTypeDecl *D) {
@@ -3812,32 +3817,27 @@ namespace {
                                   param, result, None, ctx);
     }
 
-    template <class T>
-    void considerNewSource(SourceKind kind, unsigned paramIndex,
-                           const T &consider) {
+    /// Is the given type interesting for fulfillments?
+    static bool isInterestingTypeForFulfillments(CanType type) {
+      return type->hasTypeParameter();
+    }
+
+    void considerNewTypeSource(SourceKind kind, unsigned paramIndex,
+                               CanType type, IsExact_t isExact) {
+      if (!isInterestingTypeForFulfillments(type)) return;
+
       // Remember how many fulfillments we currently have.
       auto numFulfillments = Fulfillments.size();
 
       // Prospectively add a source.
-      Sources.emplace_back(kind, paramIndex);
+      Sources.emplace_back(kind, paramIndex, type);
 
       // Consider the source.
-      consider();
+      considerType(type, MetadataPath(), isExact);
 
       // If we didn't add anything, remove the source.
       if (Fulfillments.size() == numFulfillments)
         Sources.pop_back();
-    }
-
-    void considerNewTypeSource(SourceKind kind, unsigned paramIndex,
-                               CanType type) {
-      if (auto nomTy = dyn_cast<NominalType>(type)) {
-        considerNewSource(kind, paramIndex,
-                          [&] { considerNominalType(nomTy, 0); });
-      } else if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
-        considerNewSource(kind, paramIndex,
-                          [&] { considerBoundGenericType(boundTy, 0); });
-      }
     }
 
     /// Testify to generic parameters in the Self type.
@@ -3845,11 +3845,12 @@ namespace {
       CanType selfTy = param.getType();
       if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
         selfTy = metaTy.getInstanceType();
+      Sources.back().Type = selfTy;
 
       if (auto nomTy = dyn_cast<NominalType>(selfTy))
-        considerNominalType(nomTy, 0);
+        considerNominalType(nomTy, MetadataPath());
       else if (auto bgTy = dyn_cast<BoundGenericType>(selfTy))
-        considerBoundGenericType(bgTy, 0);
+        considerBoundGenericType(bgTy, MetadataPath());
       else if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy))
         considerWitnessParamType(paramTy);
       else
@@ -3871,8 +3872,10 @@ namespace {
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_Inout:
         if (!isSelfParameter) return;
-        considerNewTypeSource(SourceKind::GenericLValueMetadata,
-                              paramIndex, type);
+        if (type->getNominalOrBoundGenericNominal()) {
+          considerNewTypeSource(SourceKind::GenericLValueMetadata,
+                                paramIndex, type, IsExact);
+        }
         return;
 
       case ParameterConvention::Direct_Owned:
@@ -3880,13 +3883,9 @@ namespace {
       case ParameterConvention::Direct_Guaranteed:
       case ParameterConvention::Direct_Deallocating:
         // Classes are sources of metadata.
-        if (auto classTy = dyn_cast<ClassType>(type)) {
-          considerNewSource(SourceKind::ClassPointer, paramIndex,
-                            [&] { considerNominalType(classTy, 0); });
-          return;
-        } else if (auto boundTy = dyn_cast<BoundGenericClassType>(type)) {
-          considerNewSource(SourceKind::ClassPointer, paramIndex,
-                            [&] { considerBoundGenericType(boundTy, 0); });
+        if (type->getClassOrBoundGenericClass()) {
+          considerNewTypeSource(SourceKind::ClassPointer, paramIndex, type,
+                                IsInexact);
           return;
         }
 
@@ -3896,7 +3895,8 @@ namespace {
             return;
 
           CanType objTy = metatypeTy.getInstanceType();
-          considerNewTypeSource(SourceKind::Metadata, paramIndex, objTy);
+          considerNewTypeSource(SourceKind::Metadata, paramIndex, objTy,
+                                IsInexact);
           return;
         }
 
@@ -3905,33 +3905,51 @@ namespace {
       llvm_unreachable("bad parameter convention");
     }
 
-    void considerParentType(CanType parent, unsigned depth) {
+    /// Given that we have a source for metadata of the given type, check
+    /// to see if it fulfills anything.
+    ///
+    /// \param isExact - true if the metadata is known to be exactly the
+    ///   metadata for the given type, false if it might be a subtype
+    void considerType(CanType type, MetadataPath &&path, IsExact_t isExact) {
+
+      // Type parameters.  Inexact metadata are useless here.
+      if (isExact && type->isTypeParameter()) {
+        return considerTypeParameter(type, std::move(path));
+      }
+
+      // Inexact metadata will be a problem if we ever try to use this
+      // to remember that we already have the metadata for something.
+      if (auto nomTy = dyn_cast<NominalType>(type)) {
+        return considerNominalType(nomTy, std::move(path));
+      }
+      if (auto boundTy = dyn_cast<BoundGenericType>(type)) {
+        return considerBoundGenericType(boundTy, std::move(path));
+      }
+
+      // TODO: tuples
+      // TODO: functions
+      // TODO: metatypes
+    }
+
+    void considerParentType(CanType parent, MetadataPath &&path) {
       // We might not have a parent type.
       if (!parent) return;
 
       // If we do, it has to be nominal one way or another.
-      depth++;
-      if (auto nom = dyn_cast<NominalType>(parent))
-        considerNominalType(nom, depth);
-      else
-        considerBoundGenericType(cast<BoundGenericType>(parent), depth);
+      path.addNominalParentComponent();
+      considerType(parent, std::move(path), IsExact);
     }
 
-    void considerNominalType(NominalType *type, unsigned depth) {
-      assert(Sources.back().TypesForDepths.size() == depth);
-      Sources.back().TypesForDepths.push_back(type->getDecl());
-
+    void considerNominalType(CanNominalType type, MetadataPath &&path) {
       // Nominal types add no generic arguments themselves, but they
       // may have the arguments of their parents.
-      considerParentType(CanType(type->getParent()), depth);
+      considerParentType(type.getParent(), std::move(path));
     }
 
-    void considerBoundGenericType(BoundGenericType *type, unsigned depth) {
-      assert(Sources.back().TypesForDepths.size() == depth);
-      Sources.back().TypesForDepths.push_back(type->getDecl());
-
+    void considerBoundGenericType(CanBoundGenericType type,
+                                  MetadataPath &&path) {
       auto params = type->getDecl()->getGenericParams()->getAllArchetypes();
-      auto substitutions = type->getSubstitutions(/*FIXME:*/nullptr, nullptr);
+      auto substitutions = type->getSubstitutions(&M, nullptr);
       assert(params.size() >= substitutions.size() &&
              "generic decl archetypes should parallel generic type subs");
 
@@ -3939,31 +3957,34 @@ namespace {
         auto sub = substitutions[i];
         CanType arg = sub.getReplacement()->getCanonicalType();
 
-        // Right now, we can only pull things out of the direct
-        // arguments, not out of nested metadata.  For example, this
-        // prevents us from realizing that we can rederive T and U in the
-        // following:
-        //   \forall T U . Vector<T->U> -> ()
+        if (!isInterestingTypeForFulfillments(arg))
+          continue;
+
+        // If the argument is a type parameter, fulfill conformances for it.
         if (arg->isTypeParameter()) {
-          // Find the archetype from the dependent type.
-          considerDependentType(arg, params[i], depth, i);
+          considerTypeArgConformances(arg, params[i], path, i);
         }
+
+        // Refine the path.
+        MetadataPath argPath = path;
+        argPath.addNominalTypeArgumentComponent(i);
+        considerType(arg, std::move(argPath), IsExact);
       }
 
-      // Match against the parent first.  The polymorphic type
+      // Also match against the parent.  The polymorphic type
       // will start with any arguments from the parent.
-      considerParentType(CanType(type->getParent()), depth);
+      considerParentType(CanType(type->getParent()), std::move(path));
     }
 
-    /// We found a reference to the dependent arg type at the given depth
-    /// and index.  Add any fulfillments this gives us.
-    void considerDependentType(Type arg,
-                               ArchetypeType *param,
-                               unsigned depth,
-                               unsigned index) {
-      // If we don't have a representative archetype for this dependent type,
-      // don't try to fulfill it. It doesn't directly correspond to one of our
-      // parameters or their associated types.
+    void considerTypeArgConformances(CanType arg, ArchetypeType *param,
+                                     const MetadataPath &path,
+                                     unsigned argIndex) {
+      // Our sources are the protocol conformances that are recorded in
+      // the generic metadata.
+      auto storedConformances = param->getConformsTo();
+      if (storedConformances.empty()) return;
+
+      // Our targets are the conformances required for the type argument.
       auto representative = getRepresentativeArchetype(arg);
       if (!representative)
         return;
@@ -3971,14 +3992,32 @@ namespace {
       if (!arch)
         return;
 
-      // First, record that we can find this dependent type at this point.
-      addFulfillment(arg, nullptr, depth, index);
+      auto requiredConformances = arch->getConformsTo();
+      if (requiredConformances.empty()) return;
 
-      // Now consider each of the protocols that the parameter guarantees.
-      for (auto protocol : param->getConformsTo()) {
-        if (requiresFulfillment(arch, protocol))
-          addFulfillment(arg, protocol, depth, index);
+      for (auto target : requiredConformances) {
+        // Ignore trivial protocols.
+        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(target))
+          continue;
+
+        // Check each of the stored conformances.
+        for (size_t confIndex : indices(storedConformances)) {
+          // TODO: maybe this should consider indirect conformance.
+          // But that should be part of the metadata path.
+          if (target == storedConformances[confIndex]) {
+            MetadataPath confPath = path;
+            confPath.addNominalTypeArgumentConformanceComponent(argIndex,
+                                                                confIndex);
+            addFulfillment(arg, target, std::move(confPath));
+          }
+        }
       }
+    }
+
+    /// We found a reference to the dependent arg type at the given path.
+    /// Add any fulfillments this gives us.
+    void considerTypeParameter(CanType arg, MetadataPath &&path) {
+      addFulfillment(arg, nullptr, std::move(path));
     }
 
     /// We're binding an archetype for a protocol witness.
@@ -3990,7 +4029,7 @@ namespace {
       // First of all, the archetype or concrete type fulfills its own
       // requirements.
       if (auto arch = representative.getAsArchetype())
-        considerDependentType(arg, arch, 0, 0);
+        addSelfFulfillment(arg, arch, MetadataPath());
 
       // FIXME: We can't pass associated types of Self through the witness
       // CC, so as a hack, fake up impossible fulfillments for the associated
@@ -4019,35 +4058,45 @@ namespace {
         if (rootParamTy == arg) {
           auto depRep = getRepresentativeArchetype(depTy);
           assert(depRep && "no representative for dependent type?!");
-          if (auto depArch = depRep.getAsArchetype())
-            considerDependentType(depTy, depArch, ~0u, ~0u);
+          if (auto depArch = depRep.getAsArchetype()) {
+            MetadataPath path;
+            path.addImpossibleComponent();
+            addSelfFulfillment(CanType(depTy), depArch, std::move(path));
+          }
         }
       }
     }
 
-    /// Does the given archetype require the given protocol to be fulfilled?
-    static bool requiresFulfillment(ArchetypeType *representative,
-                                    ProtocolDecl *proto) {
-      // TODO: protocol inheritance should be considered here somehow.
-      for (auto argProto : representative->getConformsTo()) {
-        if (argProto == proto)
-          return true;
+    void addSelfFulfillment(CanType arg, ArchetypeType *arch,
+                            MetadataPath &&path) {
+      for (auto protocol : arch->getConformsTo()) {
+        addFulfillment(arg, protocol, MetadataPath(path));
       }
-      return false;
+      addFulfillment(arg, nullptr, std::move(path));
     }
 
-    /// Testify that there's a fulfillment at the given depth and level.
-    void addFulfillment(Type arg, ProtocolDecl *proto,
-                        unsigned depth, unsigned index) {
+    /// Testify that there's a fulfillment at the given path.
+    void addFulfillment(CanType arg, ProtocolDecl *proto,
+                        MetadataPath &&path) {
       assert(!Sources.empty() && "adding fulfillment without source?");
       auto sourceIndex = Sources.size() - 1;
 
       // Only add a fulfillment if we don't have any previous
-      // fulfillment for that value.
+      // fulfillment for that value or if it 's cheaper than the existing
+      // fulfillment.
       assert(arg->isTypeParameter() && "fulfilling non-dependent type?!");
       auto key = FulfillmentKey(arg, proto);
-      Fulfillments.insert(std::make_pair(key,
-                                   Fulfillment(sourceIndex, depth, index)));
+
+      auto it = Fulfillments.find(key);
+      if (it != Fulfillments.end()) {
+        if (path.cost() < it->second.Path.cost()) {
+          it->second.SourceIndex = sourceIndex;
+          it->second.Path = std::move(path);
+        }
+      } else {
+        Fulfillments.insert(std::make_pair(key, 
+                                   Fulfillment(sourceIndex, std::move(path))));
+      }
     }
   };
 
@@ -4057,7 +4106,8 @@ namespace {
     GenericParamList *ContextParams;
 
     struct SourceValue {
-      SmallVector<llvm::Value*, 4> MetadataForDepths;
+      llvm::Value *Value = nullptr;
+      MetadataPath::Map<llvm::Value*> Cache;
     };
 
     std::vector<SourceValue> SourceValues;
@@ -4145,31 +4195,14 @@ namespace {
 
     /// Produce the metadata value for the given depth, using the
     /// given cache.
-    llvm::Value *getMetadataForDepth(unsigned sourceIndex, unsigned depth) {
+    llvm::Value *getMetadataForFulfillment(const Fulfillment &fulfillment) {
+      unsigned sourceIndex = fulfillment.SourceIndex;
       auto &source = getSources()[sourceIndex];
       auto &sourceValue = SourceValues[sourceIndex];
-      assert(!sourceValue.MetadataForDepths.empty());
 
-      // Drill down until we get to that depth.
-      while (depth >= sourceValue.MetadataForDepths.size()) {
-        auto child = sourceValue.MetadataForDepths.back();
-        auto childDecl =
-          source.TypesForDepths[sourceValue.MetadataForDepths.size()];
-        auto parent = emitParentMetadataRef(IGF, childDecl, child);
-        sourceValue.MetadataForDepths.push_back(parent);
-      }
-      return sourceValue.MetadataForDepths[depth];
-    }
-
-    /// Produce the base metadata value and declaration for the given
-    /// fulfillment.
-    std::pair<llvm::Value*, NominalTypeDecl *>
-    getAncestorForFulfillment(const Fulfillment &fulfillment) {
-      auto ancestor = getMetadataForDepth(fulfillment.SourceIndex,
-                                          fulfillment.Depth);
-      auto ancestorDecl =
-        Sources[fulfillment.SourceIndex].TypesForDepths[fulfillment.Depth];
-      return std::make_pair(ancestor, ancestorDecl);
+      return fulfillment.Path.followFromTypeMetadata(IGF, source.Type,
+                                                     sourceValue.Value,
+                                                     &sourceValue.Cache);
     }
   };
 };
@@ -4183,7 +4216,7 @@ void EmitPolymorphicParameters::emit(Explosion &in,
     llvm::Value *value =
       emitSourceForParameters(source, in, witnessMetadata, getParameter);
     SourceValues.emplace_back();
-    SourceValues.back().MetadataForDepths.push_back(value);
+    SourceValues.back().Value = value;
   }
 
   emitWithSourcesBound(in);
@@ -4196,7 +4229,7 @@ EmitPolymorphicParameters::emitForGenericValueWitness(llvm::Value *selfMeta) {
   // We get the source metadata verbatim from the value witness signature.
   assert(getSources().size() == 1);
   SourceValues.emplace_back();
-  SourceValues.back().MetadataForDepths.push_back(selfMeta);
+  SourceValues.back().Value = selfMeta;
 
   // All our archetypes should be satisfiable from the source.
   Explosion empty;
@@ -4220,11 +4253,7 @@ EmitPolymorphicParameters::emitWithSourcesBound(Explosion &in) {
     // If the reference is fulfilled by the source, go for it.
     auto it = Fulfillments.find(FulfillmentKey(depTy, nullptr));
     if (it != Fulfillments.end()) {
-      auto &fulfillment = it->second;
-      auto ancestorAndDecl = getAncestorForFulfillment(fulfillment);
-      metadata = emitArgumentMetadataRef(IGF, ancestorAndDecl.second,
-                                         fulfillment.Index,
-                                         ancestorAndDecl.first);
+      metadata = getMetadataForFulfillment(it->second);
 
     // Otherwise, it's just next in line.
     } else {
@@ -4242,11 +4271,7 @@ EmitPolymorphicParameters::emitWithSourcesBound(Explosion &in) {
       // If the protocol witness table is fulfilled by the source, go for it.
       auto it = Fulfillments.find(FulfillmentKey(depTy, protocol));
       if (it != Fulfillments.end()) {
-        auto &fulfillment = it->second;
-        auto ancestorAndDecl = getAncestorForFulfillment(fulfillment);
-        wtable = emitArgumentWitnessTableRef(IGF, ancestorAndDecl.second,
-                                             fulfillment.Index, protocol,
-                                             ancestorAndDecl.first);
+        wtable = getMetadataForFulfillment(it->second);
 
       // Otherwise, it's just next in line.
       } else {
@@ -4256,6 +4281,135 @@ EmitPolymorphicParameters::emitWithSourcesBound(Explosion &in) {
     }
     IGF.bindArchetype(contextTy, metadata, wtables);
   }
+}
+
+llvm::Value *
+MetadataPath::followFromTypeMetadata(IRGenFunction &IGF,
+                                     CanType sourceType,
+                                     llvm::Value *source,
+                                     Map<llvm::Value*> *cache) const {
+  return follow(IGF, sourceType, nullptr, source,
+                Path.begin(), Path.end(), cache);
+}
+
+llvm::Value *
+MetadataPath::followFromWitnessTable(IRGenFunction &IGF,
+                                     ProtocolDecl *sourceDecl,
+                                     llvm::Value *source,
+                                     Map<llvm::Value*> *cache) const {
+  return follow(IGF, CanType(), sourceDecl, source,
+                Path.begin(), Path.end(), cache);
+}
+
+llvm::Value *MetadataPath::follow(IRGenFunction &IGF,
+                                  CanType sourceType, Decl *sourceDecl,
+                                  llvm::Value *source,
+                                  iterator begin, iterator end,
+                                  Map<llvm::Value*> *cache) {
+  assert(source && "no source metadata value!");
+  iterator i = begin;
+
+  // If there's a cache, look for the entry matching the longest prefix
+  // of this path.
+  if (cache) {
+    auto result = cache->findPrefix(begin, end);
+    if (result.first) {
+      source = *result.first;
+
+      // If that was the end, there's no more work to do; don't bother
+      // adjusting the source decl/type.
+      if (result.second == end)
+        return source;
+
+      // Advance sourceDecl/sourceType past the cached prefix.
+      while (i != result.second) {
+        Component component = *i++;
+        (void)followComponent(IGF, sourceType, sourceDecl,
+                              /*source*/ nullptr, component);
+      }
+    }
+  }
+
+  // Drill in on the actual source value.
+  while (i != end) {
+    auto component = *i++;
+    source = followComponent(IGF, sourceType, sourceDecl, source, component);
+
+    // Remember this in the cache at the next position.
+    if (cache) {
+      cache->insertNew(begin, i, source);
+    }
+  }
+
+  return source;
+}
+
+/// Drill down on a single stage of component.
+///
+/// sourceType and sourceDecl will be adjusted to refer to the new
+/// component.  Source can be null, in which case this will be the only
+/// thing done.
+llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
+                                           CanType &sourceType,
+                                           Decl *&sourceDecl,
+                                           llvm::Value *source,
+                                           Component component) {
+  switch (component.getKind()) {
+  case Component::Kind::NominalTypeArgument: {
+    auto generic = cast<BoundGenericType>(sourceType);
+    auto index = component.getPrimaryIndex();
+    if (source) {
+      source = emitArgumentMetadataRef(IGF, generic->getDecl(), index, source);
+    }
+
+    auto subs = generic->getSubstitutions(IGF.IGM.SILMod->getSwiftModule(),
+                                          nullptr);
+    sourceType = subs[index].getReplacement()->getCanonicalType();
+    return source;
+  }
+
+  /// Generic type argument protocol conformance.
+  case Component::Kind::NominalTypeArgumentConformance: {
+    auto generic = cast<BoundGenericType>(sourceType);
+    auto argIndex = component.getPrimaryIndex();
+    auto confIndex = component.getSecondaryIndex();
+
+    ProtocolDecl *protocol =
+      generic->getDecl()->getGenericParams()->getAllArchetypes()[argIndex]
+                                            ->getConformsTo()[confIndex];
+
+    if (source) {
+      source = emitArgumentWitnessTableRef(IGF, generic->getDecl(), argIndex,
+                                           protocol, source);
+    }
+
+    sourceType = CanType();
+    sourceDecl = protocol;
+    return source;
+  }
+
+  case Component::Kind::NominalParent: {
+    NominalTypeDecl *nominalDecl;
+    if (auto nominal = dyn_cast<NominalType>(sourceType)) {
+      nominalDecl = nominal->getDecl();
+      sourceType = nominal.getParent();
+    } else {
+      auto generic = cast<BoundGenericType>(sourceType);
+      nominalDecl = generic->getDecl();
+      sourceType = generic.getParent();
+    }
+
+    if (source) {
+      source = emitParentMetadataRef(IGF, nominalDecl, source);
+    }
+    return source;
+  }
+
+  case Component::Kind::Impossible:
+    llvm_unreachable("following an impossible path!");
+
+  } 
+  llvm_unreachable("bad metata path component");
 }
 
 /// Collect any required metadata for a witness method from the end of
@@ -4774,8 +4928,9 @@ namespace {
           continue;
 
         // Pass the type argument if not fulfilled.
-        if (!Fulfillments.count(FulfillmentKey(depTy, nullptr)))
+        if (!Fulfillments.count(FulfillmentKey(depTy, nullptr))) {
           out.push_back(IGM.TypeMetadataPtrTy);
+        }
 
         // Pass each signature requirement that needs a witness table
         // separately (unless fulfilled).
@@ -4783,8 +4938,9 @@ namespace {
           if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
             continue;
 
-          if (!Fulfillments.count(FulfillmentKey(depTy, protocol)))
+          if (!Fulfillments.count(FulfillmentKey(depTy, protocol))) {
             out.push_back(IGM.WitnessTablePtrTy);
+          }
         }
       }
     }
