@@ -1373,7 +1373,7 @@ func testTypeCheckWithUnsolvedVariables3() {
 func testTypeCheckNil() {
   nil#^TC_UNSOLVED_VARIABLES_4^#
 }
-// TC_UNSOLVED_VARIABLES_4-NOT: Begin completions
+// TC_UNSOLVED_VARIABLES_4-NOT: Decl{{.*}}: .{{[a-zA-Z]}}
 
 //===--- Check that we can look up into modules
 

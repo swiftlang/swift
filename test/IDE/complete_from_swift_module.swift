@@ -63,10 +63,9 @@ func testCompleteModuleQualified3() {
 // MODULE_QUALIFIED_3: Begin completions
 // MODULE_QUALIFIED_3-NEXT: Decl[Constructor]/CurrNominal:    ({#t: T#})[#BarGenericSwiftStruct1<T>#]
 // MODULE_QUALIFIED_3-NEXT: Decl[InstanceMethod]/CurrNominal: .bar1InstanceFunc({#self: BarGenericSwiftStruct1<T>#})[#() -> Void#]{{; name=.+$}}
-
 // FIXME: recovery is treating the reference to BarGenericSwiftStruct1<t_0_0> as Int.
-// MODULE_QUALIFIED_3-NEXT: Decl[OperatorFunction]/OtherModule[foo_swift_module]: =>[#Int#]
-// MODULE_QUALIFIED_3-NEXT: End completions
+// MODULE_QUALIFIED_3: Decl[OperatorFunction]/OtherModule[foo_swift_module]: =>[#Int#]
+// MODULE_QUALIFIED_3: End completions
 
 func testCompleteModuleQualified4() {
   foo_swift_module.BarGenericSwiftStruct2#^MODULE_QUALIFIED_4^#
@@ -74,9 +73,8 @@ func testCompleteModuleQualified4() {
 // MODULE_QUALIFIED_4: Begin completions
 // MODULE_QUALIFIED_4-NEXT: Decl[Constructor]/CurrNominal:    ({#t: T#}, {#u: U#})[#BarGenericSwiftStruct2<T, U>#]
 // MODULE_QUALIFIED_4-NEXT: Decl[InstanceMethod]/CurrNominal: .bar2InstanceFunc({#self: BarGenericSwiftStruct2<T, U>#})[#() -> Void#]
-
 // FIXME: recovery is treating the reference to BarGenericSwiftStruct1<t_0_0> as Int.
-// MODULE_QUALIFIED_4-NEXT: Decl[OperatorFunction]/OtherModule[foo_swift_module]: =>[#Int#]
+// MODULE_QUALIFIED_4: Decl[OperatorFunction]/OtherModule[foo_swift_module]: =>[#Int#]
 // MODULE_QUALIFIED_4-NEXT: End completions
 
 func testCompleteModuleQualified5() {
@@ -89,6 +87,7 @@ func testPostfixOperator1(x: Int) {
 
 // POSTFIX_OPERATOR_1: Begin completions
 // POSTFIX_OPERATOR_1-DAG: Decl[OperatorFunction]/OtherModule[foo_swift_module]: =>[#Int#]
+// POSTFIX_OPERATOR_1-DAG: Decl[OperatorFunction]/OtherModule[foo_swift_module]:  %%% {#Int#}[#Int#]
 // POSTFIX_OPERATOR_1-DAG-NOT: =->
 // POSTFIX_OPERATOR_1: End completions
 

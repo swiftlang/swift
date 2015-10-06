@@ -2385,26 +2385,99 @@ public:
       addPostfixOperatorCompletion(op, *T);
   }
 
+  void addInfixOperatorCompletion(OperatorDecl *op, Type resultType,
+                                  Type RHSType) {
+    // FIXME: we should get the semantic context of the function, not the
+    // operator decl.
+    auto semanticContext =
+        getSemanticContext(op, DeclVisibilityKind::VisibleAtTopLevel);
+    CodeCompletionResultBuilder builder(
+        Sink, CodeCompletionResult::ResultKind::Declaration, semanticContext,
+        {});
+    builder.setAssociatedDecl(op);
+    // FIXME: detect whether we need space on the LHS.
+    builder.addTextChunk(" ");
+    builder.addTextChunk(op->getName().str());
+    builder.addTextChunk(" ");
+    if (RHSType)
+      builder.addCallParameter(Identifier(), Identifier(), RHSType, false);
+    if (resultType)
+      addTypeAnnotation(builder, resultType);
+  }
+
+  void tryInfixOperatorCompletion(InfixOperatorDecl *op, SequenceExpr *SE) {
+    if (op->getName().str() == "~>")
+      return;
+
+    MutableArrayRef<Expr *> sequence = SE->getElements();
+    assert(sequence.size() >= 3 && !sequence.back() &&
+           !sequence.drop_back(1).back() && "sequence not cleaned up");
+    assert((sequence.size() & 1) && "sequence expr ending with operator");
+
+    // FIXME: these checks should apply to the LHS of the operator, not the
+    // immediately left expression.  Move under the type-checking.
+    Expr *LHS = sequence.drop_back(2).back();
+    if (LHS->getType()->is<MetatypeType>() ||
+        LHS->getType()->is<AnyFunctionType>())
+      return;
+
+    // We allocate these expressions on the stack because we know they can't
+    // escape and there isn't a better way to allocate scratch Expr nodes.
+    UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::BinaryOperator,
+                               SourceLoc());
+    sequence.drop_back(1).back() = &UDRE;
+    CodeCompletionExpr CCE((SourceRange()));
+    sequence.back() = &CCE;
+
+    Expr *expr = SE;
+    if (!typeCheckCompletionSequence(const_cast<DeclContext *>(CurrDeclContext),
+                                     expr)) {
+
+      if (!LHS->getType()->getRValueType()->getAnyOptionalObjectType()) {
+        // Don't complete optional operators on non-optional types.
+        // FIXME: can we get the type-checker to disallow these for us?
+        if (op->getName().str() == "??")
+          return;
+        if (auto NT = CCE.getType()->getNominalOrBoundGenericNominal()) {
+          if (NT->getName() ==
+              CurrDeclContext->getASTContext().Id_OptionalNilComparisonType)
+            return;
+        }
+      }
+
+      addInfixOperatorCompletion(op, expr->getType(), CCE.getType());
+    }
+  }
+
   void getOperatorCompletions(Expr *LHS) {
     std::vector<OperatorDecl *> operators = collectOperators();
 
     // FIXME: this always chooses the first operator with the given name.
-    llvm::DenseSet<Identifier> seenOperators;
+    llvm::DenseSet<Identifier> seenPostfixOperators;
+    llvm::DenseSet<Identifier> seenInfixOperators;
+
+    // Create a single sequence expression, which we will modify for each
+    // operator, filling in the operator and dummy right-hand side.
+    SmallVector<Expr *, 3> sequence = {LHS, /*op*/ nullptr, /*RHS*/ nullptr};
+    auto *SE = SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
 
     for (auto op : operators) {
-      if (!seenOperators.insert(op->getName()).second)
-        continue;
-
       switch (op->getKind()) {
       case DeclKind::PrefixOperator:
         // Don't insert prefix operators in postfix position.
         // FIXME: where should these get completed?
         break;
       case DeclKind::PostfixOperator:
-        tryPostfixOperator(LHS, cast<PostfixOperatorDecl>(op));
+        if (seenPostfixOperators.insert(op->getName()).second)
+          tryPostfixOperator(LHS, cast<PostfixOperatorDecl>(op));
         break;
       case DeclKind::InfixOperator:
-        // TODO: implement
+        if (seenInfixOperators.insert(op->getName()).second) {
+          tryInfixOperatorCompletion(cast<InfixOperatorDecl>(op), SE);
+          // Reset sequence.
+          SE->setElement(SE->getNumElements() - 1, nullptr);
+          SE->setElement(SE->getNumElements() - 2, nullptr);
+        }
         break;
       default:
         llvm_unreachable("unexpected operator kind");

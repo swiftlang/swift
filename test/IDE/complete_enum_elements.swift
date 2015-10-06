@@ -194,13 +194,14 @@ enum BazEnum<T> {
 // BAZ_INT_ENUM_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .bazStaticFunc()[#Void#]{{; name=.+$}}
 // BAZ_INT_ENUM_NO_DOT-NEXT: End completions
 
-// BAZ_T_ENUM_NO_DOT: Begin completions, 6 items
+// BAZ_T_ENUM_NO_DOT: Begin completions
 // BAZ_T_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Baz1[#BazEnum<T>#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-NEXT: Decl[EnumElement]/CurrNominal:    .Baz2({#T#})[#(T) -> BazEnum<T>#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .bazInstanceFunc({#self: &BazEnum<T>#})[#() -> Void#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal:      .staticVar[#Int#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-NEXT: Decl[StaticVar]/CurrNominal:      .staticVarT[#T#]{{; name=.+$}}
 // BAZ_T_ENUM_NO_DOT-NEXT: Decl[StaticMethod]/CurrNominal:   .bazStaticFunc()[#Void#]{{; name=.+$}}
+// BAZ_T_ENUM_NO_DOT-NEXT: Decl[OperatorFunction]/OtherModule[Swift]: != {#Any.Type?#}[#Bool#]
 // BAZ_T_ENUM_NO_DOT-NEXT: End completions
 
 // BAZ_INT_ENUM_DOT: Begin completions, 6 items

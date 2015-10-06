@@ -997,7 +997,8 @@ namespace {
     }
 
     virtual Type visitCodeCompletionExpr(CodeCompletionExpr *E) {
-      return nullptr;
+      // If the expression has already been assigned a type; just use that type.
+      return E->getType();
     }
 
     Type visitLiteralExpr(LiteralExpr *expr) {

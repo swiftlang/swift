@@ -1250,6 +1250,70 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
   return exprType;
 }
 
+bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
+  PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+
+  // Construct a constraint system from this expression.
+  ConstraintSystem CS(*this, DC, ConstraintSystemFlags::AllowFixes);
+  CleanupIllFormedExpressionRAII cleanup(Context, expr);
+
+  auto *SE = cast<SequenceExpr>(expr);
+  assert(SE->getNumElements() >= 3);
+  auto *op = SE->getElement(SE->getNumElements() - 2);
+  auto *CCE = cast<CodeCompletionExpr>(SE->getElements().back());
+
+  // Resolve the op.
+  op = resolveDeclRefExpr(cast<UnresolvedDeclRefExpr>(op), DC);
+  SE->setElement(SE->getNumElements() - 2, op);
+
+  // Fold the sequence.
+  expr = foldSequence(SE, DC);
+
+  // Find the code-completion expression and operator again.
+  assert(SE->getNumElements() == 3 && "not implemented");
+  auto *binExpr = dyn_cast<BinaryExpr>(expr);
+  if (!binExpr)
+    return true;
+  CCE = cast<CodeCompletionExpr>(binExpr->getArg()->getElement(1));
+
+  // Update the output expression.
+  expr = binExpr;
+
+  // Add type variable for the code-completion expression.
+  auto tvRHS =
+      CS.createTypeVariable(CS.getConstraintLocator(CCE), TVO_CanBindToLValue);
+  CCE->setType(tvRHS);
+
+  if (auto generated = CS.generateConstraints(expr)) {
+    expr = generated;
+  } else {
+    return true;
+  }
+
+  if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
+    log << "---Initial constraints for the given expression---\n";
+    expr->print(log);
+    log << "\n";
+    CS.print(log);
+  }
+
+  // Attempt to solve the constraint system.
+  SmallVector<Solution, 4> viable;
+  if (CS.solve(viable, FreeTypeVariableBinding::GenericParameters))
+    return true;
+
+  auto &solution = viable[0];
+  if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
+    log << "---Solution---\n";
+    solution.dump(log);
+  }
+
+  expr->setType(solution.simplifyType(*this, expr->getType()));
+  CCE->setType(solution.simplifyType(*this, CCE->getType()));
+  return false;
+}
 
 bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
                                              Type convertType) {

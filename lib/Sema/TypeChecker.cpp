@@ -722,6 +722,19 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(ASTContext &Ctx,
   }
 }
 
+bool swift::typeCheckCompletionSequence(DeclContext *DC, Expr *&parsedExpr) {
+  auto &ctx = DC->getASTContext();
+  if (ctx.getLazyResolver()) {
+    TypeChecker *TC = static_cast<TypeChecker *>(ctx.getLazyResolver());
+    return TC->typeCheckCompletionSequence(parsedExpr, DC);
+  } else {
+    // Set up a diagnostics engine that swallows diagnostics.
+    DiagnosticEngine diags(ctx.SourceMgr);
+    TypeChecker TC(ctx, diags);
+    return TC.typeCheckCompletionSequence(parsedExpr, DC);
+  }
+}
+
 bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                                SourceLoc EndTypeCheckLoc) {
   auto &Ctx = AFD->getASTContext();

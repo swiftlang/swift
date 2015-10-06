@@ -145,7 +145,7 @@ class ThisDerived1 : ThisBase1 {
 
   init() {
     self#^CONSTRUCTOR_SELF_NO_DOT_1^#
-// CONSTRUCTOR_SELF_NO_DOT_1: Begin completions, 18 items
+// CONSTRUCTOR_SELF_NO_DOT_1: Begin completions, 20 items
 // CONSTRUCTOR_SELF_NO_DOT_1: End completions
   }
 
@@ -157,7 +157,7 @@ class ThisDerived1 : ThisBase1 {
 
   deinit {
     self#^DESTRUCTOR_SELF_NO_DOT_1^#
-// DESTRUCTOR_SELF_NO_DOT_1: Begin completions, 18 items
+// DESTRUCTOR_SELF_NO_DOT_1: Begin completions, 20 items
 // DESTRUCTOR_SELF_NO_DOT_1: End completions
 
     self.#^DESTRUCTOR_SELF_DOT_1^#
@@ -167,7 +167,7 @@ class ThisDerived1 : ThisBase1 {
 
   func test1() {
     self#^FUNC_SELF_NO_DOT_1^#
-// FUNC_SELF_NO_DOT_1: Begin completions, 18 items
+// FUNC_SELF_NO_DOT_1: Begin completions, 20 items
 // FUNC_SELF_NO_DOT_1: End completions
   }
 

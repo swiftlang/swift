@@ -13,10 +13,10 @@ class BadMembers1 {
 func badMembers1(a: BadMembers1) {
   a#^BAD_MEMBERS_1^#
 }
-// BAD_MEMBERS_1: Begin completions, 2 items
+// BAD_MEMBERS_1: Begin completions
 // BAD_MEMBERS_1-NEXT: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
 // BAD_MEMBERS_1-NEXT: Decl[Subscript]/CurrNominal:   [{#Int#}][#Double#]{{; name=.+$}}
-// BAD_MEMBERS_1-NEXT: End completions
+// BAD_MEMBERS_1: End completions
 
 protocol BadMembers2 {
   var prop: Int {

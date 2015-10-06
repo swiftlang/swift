@@ -1079,6 +1079,8 @@ public:
                               FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
 
+  bool typeCheckCompletionSequence(Expr *&expr, DeclContext *DC);
+
   /// \brief Type check the given expression assuming that its children
   /// have already been fully type-checked.
   ///
