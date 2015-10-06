@@ -74,6 +74,18 @@ PartOfSpeech swift::getPartOfSpeech(StringRef word) {
       return PartOfSpeech::Gerund;
   }
 
+  // "auto" tends to be used as a verb prefix.
+  if (word.startswith("auto") && word.size() > 4) {
+    if (getPartOfSpeech(word.substr(4)) == PartOfSpeech::Verb)
+      return PartOfSpeech::Verb;
+  }
+
+  // "re" can prefix a verb.
+  if (word.startswith("re") && word.size() > 2) {
+    if (getPartOfSpeech(word.substr(2)) == PartOfSpeech::Verb)
+      return PartOfSpeech::Verb;
+  }
+
   return PartOfSpeech::Unknown;
 }
 
