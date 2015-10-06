@@ -83,6 +83,19 @@ struct S7 {
   init()
 }
 
+class SelfLoop {
+  var a: SelfLoop
+  init()
+   deinit 
+}
+
+struct S8 {
+  var i: SelfLoop
+  var k: Int
+  init(i: SelfLoop, k: Int)
+  init()
+}
+
 class foo {
   var a: Int
    deinit
@@ -108,6 +121,7 @@ sil @S3_init : $@convention(thin) (@thin S3.Type) -> S3
 sil @S5_init : $@convention(thin) (@thin S5.Type) -> S5
 sil @S6_init : $@convention(thin) (@thin S6.Type) -> S6
 sil @S7_init : $@convention(thin) (@thin S7.Type) -> S7
+sil @S8_init : $@convention(thin) (@thin S8.Type) -> @owned S8
 sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 
 //////////////////////////////////////////////////////////////
@@ -1179,4 +1193,31 @@ bb0:
   %9 = tuple ()                                   // user: %11
   dealloc_stack %0#0 : $*@local_storage S7        // id: %10
   return %9 : $()                                 // id: %11
+}
+
+/// Make sure we do not hang in this test case. Test for Location::expand.
+/// expand should stop on class type. Also need to get rid of the partial
+/// dead store.
+///
+/// CHECK-LABEL: SelfLoopClassTestTypeExpansion
+/// CHECK: [[RET0:%.+]] = struct_extract
+/// CHECK: [[RET1:%.+]] = struct_element_addr
+/// CHECK-NEXT: store [[RET0:%.+]] to [[RET1:%.+]] : $*SelfLoop  
+sil hidden @SelfLoopClassTestTypeExpansion : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S8  // var h                  // users: %4, %7, %13
+  %1 = function_ref @S8_init : $@convention(thin) (@thin S8.Type) -> @owned S8 // user: %3
+  %2 = metatype $@thin S8.Type                    // user: %3
+  %3 = apply %1(%2) : $@convention(thin) (@thin S8.Type) -> @owned S8 // users: %4, %9
+  store %3 to %0#1 : $*S8                         // id: %4
+  %5 = integer_literal $Builtin.Int64, 12         // user: %6
+  %6 = struct $Int (%5 : $Builtin.Int64)          // users: %8, %10
+  %7 = struct_element_addr %0#1 : $*S8, #S8.k     // user: %8
+  store %6 to %7 : $*Int                          // id: %8
+  %9 = struct_extract %3 : $S8, #S8.i             // user: %10
+  %10 = struct $S8 (%9 : $SelfLoop, %6 : $Int)    // user: %11
+  release_value %10 : $S8                         // id: %11
+  %12 = tuple ()                                  // user: %14
+  dealloc_stack %0#0 : $*@local_storage S8        // id: %13
+  return %12 : $()                                // id: %14
 }

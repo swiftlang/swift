@@ -48,13 +48,33 @@ void MemLocation::expand(SILModule *Mod, MemLocationList &Locs,
   MemLocationList Worklist;
   llvm::SmallVector<Projection, 8> Projections;
 
-  if (!OnlyLeafNode)
-    Locs.push_back(*this);
-
   Worklist.push_back(*this);
   while (!Worklist.empty()) {
     // Get the next level projections based on current location's type.
     MemLocation L = Worklist.pop_back_val();
+
+    // If this is a class type, we have reached the end of the type
+    // tree for this memory location.
+    //
+    // We do not push its next level projection into the worklist,
+    // if we do that, we could run into an infinite loop, e.g. 
+    //
+    //   class SelfLoop {
+    //     var p : SelfLoop
+    //   }
+    //
+    //   struct XYZ {
+    //     var x : Int
+    //     var y : SelfLoop
+    //   }
+    //
+    // The worklist would never be empty in this case !.
+    //
+    if (L.getType().getClassOrBoundGenericClass()) {
+      Locs.push_back(L);
+      continue;
+    }
+
     Projections.clear();
     Projection::getFirstLevelProjections(L.getType(), *Mod, Projections);
 
@@ -65,17 +85,17 @@ void MemLocation::expand(SILModule *Mod, MemLocationList &Locs,
       continue;
     }
 
+    // Keep the intermediate nodes as well.
+    if (!OnlyLeafNode)
+      Locs.push_back(L);
+
     // Keep expanding the location.
     for (auto &P : Projections) {
       ProjectionPath X;
       X.append(P);
       X.append(L.Path.getValue());
-      MemLocation LL(Base, X);
-      Worklist.push_back(LL);
-
-      // Keep the intermediate nodes as well.
-      if (!OnlyLeafNode)
-        Locs.push_back(LL);
+      MemLocation Next(Base, X);
+      Worklist.push_back(Next);
     }
   }
 }
@@ -118,6 +138,10 @@ void MemLocation::mergeMemLocations(llvm::DenseSet<MemLocation> &Locs,
   MemLocationList AllLocs;
   M.expand(Mod, AllLocs, false);
   for (auto I = AllLocs.rbegin(), E = AllLocs.rend(); I != E; ++I) {
+    // If this is a class reference type, we have reached end of the type tree.
+    if (I->getType().getClassOrBoundGenericClass())
+      continue;
+
     MemLocationList FirstLevel;
     I->getFirstLevelMemLocations(FirstLevel, Mod);
 
