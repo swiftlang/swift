@@ -44,7 +44,7 @@ func testPostfix2(var x: S) {
   x#^POSTFIX_2^#
 }
 // POSTFIX_2: Begin completions
-// POSTFIX_2-DAG: Decl[OperatorFunction]/CurrModule:  ++[#S#]
+// POSTFIX_2-DAG: Decl[PostfixOperatorFunction]/CurrModule:  ++[#S#]
 // POSTFIX_2-DAG-NOT: --
 // POSTFIX_2: End completions
 
@@ -54,7 +54,7 @@ postfix func +-(x: S) -> S? { return x }
 func testPostfix3(x: S) {
   x#^POSTFIX_3^#
 }
-// POSTFIX_3: Decl[OperatorFunction]/CurrModule:  +-[#S?#]
+// POSTFIX_3: Decl[PostfixOperatorFunction]/CurrModule:  +-[#S?#]
 
 func testPostfix4(x: S?) {
   x#^POSTFIX_4^#
@@ -66,7 +66,7 @@ postfix func +-<G>(x: [G]) -> G { return x! }
 func testPostfix5(x: [T]) {
   x#^POSTFIX_5^#
 }
-// POSTFIX_5: Decl[OperatorFunction]/CurrModule:  +-[#T#]
+// POSTFIX_5: Decl[PostfixOperatorFunction]/CurrModule:  +-[#T#]
 
 protocol Fooable {}
 extension Int : Fooable {}
@@ -77,12 +77,12 @@ postfix func ***<G: Fooable>(x: G) -> G { return x }
 func testPostfix6() {
   1 + 2 * 3#^POSTFIX_6^#
 }
-// POSTFIX_6: Decl[OperatorFunction]/CurrModule:  ***[#Int#]
+// POSTFIX_6: Decl[PostfixOperatorFunction]/CurrModule:  ***[#Int#]
 
 func testPostfix7() {
   1 + 2 * 3.0#^POSTFIX_7^#
 }
-// POSTFIX_7: Decl[OperatorFunction]/CurrModule:  ***[#Double#]
+// POSTFIX_7: Decl[PostfixOperatorFunction]/CurrModule:  ***[#Double#]
 
 func testPostfix8(x: S) {
   x#^POSTFIX_8^#
@@ -97,12 +97,12 @@ protocol P {
 func testPostfix9<G: P where G.T == Int>(x: G) {
   x.foo()#^POSTFIX_9^#
 }
-// POSTFIX_9: Decl[OperatorFunction]/CurrModule: ***[#Int#]
+// POSTFIX_9: Decl[PostfixOperatorFunction]/CurrModule: ***[#Int#]
 
 func testPostfix10<G: P where G.T : Fooable>(x: G) {
   x.foo()#^POSTFIX_10^#
 }
-// POSTFIX_10: Decl[OperatorFunction]/CurrModule: ***[#G.T#]
+// POSTFIX_10: Decl[PostfixOperatorFunction]/CurrModule: ***[#G.T#]
 
 
 // ===--- Infix operators
@@ -125,8 +125,8 @@ func testInfix1(x: S2) {
 }
 // S2_INFIX: Begin completions
 // FIXME: rdar://problem/22997089 - should be CurrModule
-// S2_INFIX-DAG: Decl[OperatorFunction]/OtherModule[Swift]:   + {#S2#}[#S2#]
-// S2_INFIX-DAG: Decl[OperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
+// S2_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:   + {#S2#}[#S2#]
+// S2_INFIX-DAG: Decl[InfixOperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
 // S2_INFIX-DAG-NOT: **=
 // S2_INFIX-DAG-NOT: +=
 // S2_INFIX-DAG-NOT: *
@@ -140,9 +140,9 @@ func testInfix2(var x: S2) {
 }
 // S2_INFIX_LVALUE: Begin completions
 // FIXME: rdar://problem/22997089 - should be CurrModule
-// S2_INFIX_LVALUE-DAG: Decl[OperatorFunction]/OtherModule[Swift]:   + {#S2#}[#S2#]
-// S2_INFIX_LVALUE-DAG: Decl[OperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
-// S2_INFIX_LVALUE-DAG: Decl[OperatorFunction]/CurrModule:   **= {#Int#}[#Void#]
+// S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:   + {#S2#}[#S2#]
+// S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
+// S2_INFIX_LVALUE-DAG: Decl[InfixOperatorFunction]/CurrModule:   **= {#Int#}[#Void#]
 // S2_INFIX_LVALUE-DAG-NOT: +=
 // S2_INFIX_LVALUE-DAG-NOT: *
 // S2_INFIX_LVALUE-DAG-NOT: ??
@@ -170,13 +170,13 @@ func testInfix7(x: S2?) {
   x#^INFIX_7^#
 }
 // S2_INFIX_OPTIONAL: Begin completions
-// S2_INFIX_OPTIONAL-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  ?? {#S2#}[#S2#]
-// S2_INFIX_OPTIONAL-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  == {#{{.*}}#}[#Bool#]
-// S2_INFIX_OPTIONAL-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  != {#{{.*}}#}[#Bool#]
+// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ?? {#S2#}[#S2#]
+// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#{{.*}}#}[#Bool#]
+// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#{{.*}}#}[#Bool#]
 // The equality operators don't come from equatable.
 // S2_INFIX_OPTIONAL-DAG-NOT: == {#S2
 // FIXME: rdar://problem/22996887 - shouldn't complete with optional LHS
-// S2_INFIX_OPTIONAL-DAG: Decl[OperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
+// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
 // S2_INFIX_OPTIONAL: End completions
 
 struct S3: Equatable {}
@@ -188,8 +188,8 @@ func testInfix8(x: S3?) {
 }
 // The equality operators come from equatable.
 // S3_INFIX_OPTIONAL: Begin completions
-// S3_INFIX_OPTIONAL-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  != {#S3?#}[#Bool#]
-// S3_INFIX_OPTIONAL-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  == {#S3?#}[#Bool#]
+// S3_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#S3?#}[#Bool#]
+// S3_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#S3?#}[#Bool#]
 // S3_INFIX_OPTIONAL: End completions
 
 infix operator **** {
@@ -201,7 +201,7 @@ func ****<T: Fooable>(x: T, y: T) -> T { return x }
 func testInfix9<T: P where T.T: Fooable>(x: T) {
   x.foo()#^INFIX_9^#
 }
-// FOOABLE_INFIX: Decl[OperatorFunction]/CurrModule:   **** {#T.T#}[#T.T#]
+// FOOABLE_INFIX: Decl[InfixOperatorFunction]/CurrModule:   **** {#T.T#}[#T.T#]
 
 func testInfix10<T: P where T.T: Fooable>(x: T) {
   (x.foo() **** x.foo())#^INFIX_10^#
@@ -210,7 +210,7 @@ func testInfix10<T: P where T.T: Fooable>(x: T) {
 func testInfix11() {
   S2#^INFIX_11^#
 }
-// NO_OPERATORS-NOT: Decl[OperatorFunction]
+// NO_OPERATORS-NOT: Decl[InfixOperatorFunction]
 func testInfix12() {
   P#^INFIX_12^#
 }
@@ -237,8 +237,8 @@ func testInfix19(x: EmptyClass) {
   x#^INFIX_19^#
 }
 // EMPTYCLASS_INFIX: Begin completions
-// EMPTYCLASS_INFIX-DAG: Decl[OperatorFunction]/OtherModule[Swift]: === {#AnyObject?#}[#Bool#]
-// EMPTYCLASS_INFIX-DAG: Decl[OperatorFunction]/OtherModule[Swift]: !== {#AnyObject?#}[#Bool#]
+// EMPTYCLASS_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: === {#AnyObject?#}[#Bool#]
+// EMPTYCLASS_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: !== {#AnyObject?#}[#Bool#]
 // EMPTYCLASS_INFIX: End completions
 
 enum E {

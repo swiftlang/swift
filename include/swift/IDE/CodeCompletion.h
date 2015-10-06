@@ -107,6 +107,7 @@ public:
       ExclamationMark,
       QuestionMark,
       Ampersand,
+      Whitespace,
 
       /// The first chunk of a substring that describes the parameter for a
       /// generic type.
@@ -195,6 +196,7 @@ public:
              Kind == ChunkKind::ExclamationMark ||
              Kind == ChunkKind::QuestionMark ||
              Kind == ChunkKind::Ampersand ||
+             Kind == ChunkKind::Whitespace ||
              Kind == ChunkKind::CallParameterName ||
              Kind == ChunkKind::CallParameterInternalName ||
              Kind == ChunkKind::CallParameterColon ||
@@ -392,7 +394,9 @@ enum class CodeCompletionDeclKind {
   Subscript,
   StaticMethod,
   InstanceMethod,
-  OperatorFunction,
+  PrefixOperatorFunction,
+  PostfixOperatorFunction,
+  InfixOperatorFunction,
   FreeFunction,
   StaticVar,
   InstanceVar,
@@ -535,6 +539,19 @@ public:
   CodeCompletionDeclKind getAssociatedDeclKind() const {
     assert(getKind() == Declaration);
     return static_cast<CodeCompletionDeclKind>(AssociatedDeclKind);
+  }
+
+  bool isOperator() const {
+    if (getKind() != Declaration)
+      return false;
+    switch (getAssociatedDeclKind()) {
+    case CodeCompletionDeclKind::PrefixOperatorFunction:
+    case CodeCompletionDeclKind::PostfixOperatorFunction:
+    case CodeCompletionDeclKind::InfixOperatorFunction:
+      return true;
+    default:
+      return false;
+    }
   }
 
   ExpectedTypeRelation getExpectedTypeRelation() const {

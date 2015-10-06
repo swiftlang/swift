@@ -54,6 +54,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
     case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
     case CodeCompletionString::Chunk::ChunkKind::Ampersand:
+    case CodeCompletionString::Chunk::ChunkKind::Whitespace:
     case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail:
       if (!C.isAnnotation())
@@ -118,7 +119,9 @@ static void toDisplayString(CodeCompletionResult *Result,
         case CodeCompletionDeclKind::Subscript:
         case CodeCompletionDeclKind::StaticMethod:
         case CodeCompletionDeclKind::InstanceMethod:
-        case CodeCompletionDeclKind::OperatorFunction:
+        case CodeCompletionDeclKind::PrefixOperatorFunction:
+        case CodeCompletionDeclKind::PostfixOperatorFunction:
+        case CodeCompletionDeclKind::InfixOperatorFunction:
         case CodeCompletionDeclKind::FreeFunction:
           OS << " -> ";
           break;

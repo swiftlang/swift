@@ -349,6 +349,11 @@ public:
     addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor, " {}");
   }
+
+  void addWhitespace(StringRef space) {
+    addChunkWithText(
+        CodeCompletionString::Chunk::ChunkKind::Whitespace, space);
+  }
 };
 
 } // namespace ide

@@ -158,6 +158,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::ExclamationMark:
     case Chunk::ChunkKind::QuestionMark:
     case Chunk::ChunkKind::Ampersand:
+    case Chunk::ChunkKind::Whitespace:
       AnnotatedTextChunk = C.isAnnotation();
       SWIFT_FALLTHROUGH;
     case Chunk::ChunkKind::CallParameterName:
@@ -264,14 +265,30 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
         return CodeCompletionDeclKind::StaticMethod;
       return CodeCompletionDeclKind::InstanceMethod;
     }
-    if (FD->isOperator())
-      return CodeCompletionDeclKind::OperatorFunction;
+    if (FD->isOperator()) {
+      if (auto op = FD->getOperatorDecl()) {
+        switch (op->getKind()) {
+        case DeclKind::PrefixOperator:
+          return CodeCompletionDeclKind::PrefixOperatorFunction;
+        case DeclKind::PostfixOperator:
+          return CodeCompletionDeclKind::PostfixOperatorFunction;
+        case DeclKind::InfixOperator:
+          return CodeCompletionDeclKind::InfixOperatorFunction;
+        default:
+          llvm_unreachable("unexpected operator kind");
+        }
+      } else {
+        return CodeCompletionDeclKind::InfixOperatorFunction;
+      }
+    }
     return CodeCompletionDeclKind::FreeFunction;
   }
   case DeclKind::InfixOperator:
+    return CodeCompletionDeclKind::InfixOperatorFunction;
   case DeclKind::PrefixOperator:
+    return CodeCompletionDeclKind::PrefixOperatorFunction;
   case DeclKind::PostfixOperator:
-    return CodeCompletionDeclKind::OperatorFunction;
+    return CodeCompletionDeclKind::PostfixOperatorFunction;
   case DeclKind::EnumElement:
     return CodeCompletionDeclKind::EnumElement;
   case DeclKind::Subscript:
@@ -322,8 +339,14 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     case CodeCompletionDeclKind::InstanceMethod:
       Prefix.append("[InstanceMethod]");
       break;
-    case CodeCompletionDeclKind::OperatorFunction:
-      Prefix.append("[OperatorFunction]");
+    case CodeCompletionDeclKind::PrefixOperatorFunction:
+      Prefix.append("[PrefixOperatorFunction]");
+      break;
+    case CodeCompletionDeclKind::PostfixOperatorFunction:
+      Prefix.append("[PostfixOperatorFunction]");
+      break;
+    case CodeCompletionDeclKind::InfixOperatorFunction:
+      Prefix.append("[InfixOperatorFunction]");
       break;
     case CodeCompletionDeclKind::FreeFunction:
       Prefix.append("[FreeFunction]");
@@ -640,6 +663,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     case CodeCompletionString::Chunk::ChunkKind::Ellipsis:
     case CodeCompletionString::Chunk::ChunkKind::Comma:
     case CodeCompletionString::Chunk::ChunkKind::Ampersand:
+    case CodeCompletionString::Chunk::ChunkKind::Whitespace:
     case CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword:
     case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
     case CodeCompletionString::Chunk::ChunkKind::ThrowsKeyword:
@@ -2396,9 +2420,9 @@ public:
         {});
     builder.setAssociatedDecl(op);
     // FIXME: detect whether we need space on the LHS.
-    builder.addTextChunk(" ");
+    builder.addWhitespace(" ");
     builder.addTextChunk(op->getName().str());
-    builder.addTextChunk(" ");
+    builder.addWhitespace(" ");
     if (RHSType)
       builder.addCallParameter(Identifier(), Identifier(), RHSType, false);
     if (resultType)
@@ -3985,7 +4009,9 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       case CodeCompletionDeclKind::Subscript:
       case CodeCompletionDeclKind::StaticMethod:
       case CodeCompletionDeclKind::InstanceMethod:
-      case CodeCompletionDeclKind::OperatorFunction:
+      case CodeCompletionDeclKind::PrefixOperatorFunction:
+      case CodeCompletionDeclKind::PostfixOperatorFunction:
+      case CodeCompletionDeclKind::InfixOperatorFunction:
       case CodeCompletionDeclKind::FreeFunction:
       case CodeCompletionDeclKind::StaticVar:
       case CodeCompletionDeclKind::InstanceVar:

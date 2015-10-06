@@ -225,8 +225,8 @@ func testPostfixOperator1(x: Int) {
 func testPostfixOperator2(var x: Int) {
   x#^POSTFIX_INT_2^#
 }
-// POSTFIX_LVALUE_INT: Decl[OperatorFunction]/OtherModule[Swift]: ++[#Int#]; name=
-// POSTFIX_LVALUE_INT: Decl[OperatorFunction]/OtherModule[Swift]: --[#Int#]; name=
+// POSTFIX_LVALUE_INT: Decl[PostfixOperatorFunction]/OtherModule[Swift]: ++[#Int#]; name=
+// POSTFIX_LVALUE_INT: Decl[PostfixOperatorFunction]/OtherModule[Swift]: --[#Int#]; name=
 
 func testPostfixOperator3(x: MyInt??) {
   x#^POSTFIX_OPTIONAL_1^#
@@ -237,12 +237,12 @@ func testInfixOperator1(x: Int) {
   x#^INFIX_INT_1^#
 }
 // INFIX_INT: Begin completions
-// INFIX_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  ... {#Int#}[#Range<Int>#]
-// INFIX_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  &+ {#Int#}[#Int#]
-// INFIX_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  + {#Int#}[#Int#]
-// INFIX_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  << {#Int#}[#Int#]
-// INFIX_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  < {#Int#}[#Bool#]
-// INFIX_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  == {#Int#}[#Bool#]
+// INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ... {#Int#}[#Range<Int>#]
+// INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  &+ {#Int#}[#Int#]
+// INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#Int#}[#Int#]
+// INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  << {#Int#}[#Int#]
+// INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  < {#Int#}[#Bool#]
+// INFIX_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#Int#}[#Bool#]
 // INFIX_INT-DAG-NOT: &&
 // INFIX_INT-DAG-NOT: +=
 // INFIX_INT: End completions
@@ -250,13 +250,13 @@ func testInfixOperator2(var x: Int) {
   x#^INFIX_INT_2^#
 }
 // INFIX_LVALUE_INT: Begin completions
-// INFIX_LVALUE_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  ... {#Int#}[#Range<Int>#]
-// INFIX_LVALUE_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  &+ {#Int#}[#Int#]
-// INFIX_LVALUE_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  + {#Int#}[#Int#]
-// INFIX_LVALUE_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  << {#Int#}[#Int#]
-// INFIX_LVALUE_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  < {#Int#}[#Bool#]
-// INFIX_LVALUE_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  == {#Int#}[#Bool#]
-// INFIX_LVALUE_INT-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  += {#Int#}[#Void#]
+// INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ... {#Int#}[#Range<Int>#]
+// INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  &+ {#Int#}[#Int#]
+// INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#Int#}[#Int#]
+// INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  << {#Int#}[#Int#]
+// INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  < {#Int#}[#Bool#]
+// INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#Int#}[#Bool#]
+// INFIX_LVALUE_INT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  += {#Int#}[#Void#]
 // INFIX_LVALUE_INT-NOT: &&
 // INFIX_LVALUE_INT: End completions
 
@@ -264,9 +264,9 @@ func testInfixOperator3(x: String) {
   x#^INFIX_STRING_1^#
 }
 // INFIX_STRING: Begin completions
-// INFIX_STRING-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  + {#String#}[#String#]
-// INFIX_STRING-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  == {#String#}[#Bool#]
-// INFIX_STRING-DAG: Decl[OperatorFunction]/OtherModule[Swift]:  < {#String#}[#Bool#]
+// INFIX_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#String#}[#String#]
+// INFIX_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#String#}[#Bool#]
+// INFIX_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  < {#String#}[#Bool#]
 // INFIX_STRING-NOT: +=
 // INFIX_STRING-NOT: <<
 // INFIX_STRING: End completions
