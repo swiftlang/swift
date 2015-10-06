@@ -8,6 +8,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_8 | FileCheck %s -check-prefix=POSTFIX_8
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_9 | FileCheck %s -check-prefix=POSTFIX_9
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=POSTFIX_10 | FileCheck %s -check-prefix=POSTFIX_10
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=S_POSTFIX_SPACE | FileCheck %s -check-prefix=S_POSTFIX_SPACE
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_1 | FileCheck %s -check-prefix=S2_INFIX
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_2 | FileCheck %s -check-prefix=S2_INFIX_LVALUE
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_3 | FileCheck %s -check-prefix=S2_INFIX_LVALUE
@@ -30,6 +31,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_20 | FileCheck %s -check-prefix=NO_OPERATORS
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_21 | FileCheck %s -check-prefix=NO_OPERATORS
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_22 | FileCheck %s -check-prefix=NO_OPERATORS
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=S2_INFIX_SPACE | FileCheck %s -check-prefix=S2_INFIX_SPACE
 
 struct S {}
 postfix operator ++ {}
@@ -103,6 +105,11 @@ func testPostfix10<G: P where G.T : Fooable>(x: G) {
   x.foo()#^POSTFIX_10^#
 }
 // POSTFIX_10: Decl[PostfixOperatorFunction]/CurrModule: ***[#G.T#]
+
+func testPostfixSpace(var x: S) {
+  x #^S_POSTFIX_SPACE^#
+}
+// S_POSTFIX_SPACE: Decl[PostfixOperatorFunction]/CurrModule/Erase[1]:  ++[#S#]
 
 
 // ===--- Infix operators
@@ -254,3 +261,9 @@ func testInfix21() {
 func testInfix22() {
   E.B#^INFIX_22^#
 }
+
+func testSpace(x: S2) {
+  x #^S2_INFIX_SPACE^#
+}
+// S2_INFIX_SPACE: Decl[InfixOperatorFunction]/CurrModule: [' ']** {#Int#}[#S2#]
+// S2_INFIX_SPACE: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#S2#}[#S2#]

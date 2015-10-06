@@ -354,6 +354,11 @@ public:
     addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::Whitespace, space);
   }
+
+  void addAnnotatedWhitespace(StringRef space) {
+    addWhitespace(space);
+    getLastChunk().setIsAnnotation();
+  }
 };
 
 } // namespace ide

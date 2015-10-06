@@ -1263,8 +1263,11 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         // completion token, and thus they are not related.
         return Result;
       }
-      if (CodeCompletion && Result.isNonNull())
-        CodeCompletion->completePostfixExpr(Result.get());
+
+      if (CodeCompletion && Result.isNonNull()) {
+        bool hasSpace = Tok.getLoc() != getEndOfPreviousLoc();
+        CodeCompletion->completePostfixExpr(Result.get(), hasSpace);
+      }
       // Eat the code completion token because we handled it.
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionResult<Expr>();

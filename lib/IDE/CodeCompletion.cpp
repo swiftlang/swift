@@ -781,6 +781,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   DeclAttrKind AttrKind;
   int AttrParamIndex;
   bool IsInSil;
+  bool HasSpace = false;
   Optional<DeclKind> AttTargetDK;
 
   SmallVector<StringRef, 3> ParsedKeywords;
@@ -903,7 +904,7 @@ public:
   void completeExpr() override;
   void completeDotExpr(Expr *E, SourceLoc DotLoc) override;
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
-  void completePostfixExpr(Expr *E) override;
+  void completePostfixExpr(Expr *E, bool hasSpace) override;
   void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
@@ -1086,6 +1087,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool HaveLParen = false;
   bool IsSuperRefExpr = false;
   bool IsDynamicLookup = false;
+  bool HaveLeadingSpace = false;
 
   /// \brief True if we are code completing inside a static method.
   bool InsideStaticMethod = false;
@@ -1216,6 +1218,8 @@ public:
   void setIsDynamicLookup() {
     IsDynamicLookup = true;
   }
+
+  void setHaveLeadingSpace(bool value) { HaveLeadingSpace = value; }
 
   void addExpressionSpecificDecl(const Decl *D) {
     ExpressionSpecificDecls.insert(D);
@@ -2388,6 +2392,10 @@ public:
     CodeCompletionResultBuilder builder(
         Sink, CodeCompletionResult::ResultKind::Declaration, semanticContext,
         {});
+
+    // FIXME: handle variable amounts of space.
+    if (HaveLeadingSpace)
+      builder.setNumBytesToErase(1);
     builder.setAssociatedDecl(op);
     builder.addTextChunk(op->getName().str());
     assert(resultType);
@@ -2419,8 +2427,11 @@ public:
         Sink, CodeCompletionResult::ResultKind::Declaration, semanticContext,
         {});
     builder.setAssociatedDecl(op);
-    // FIXME: detect whether we need space on the LHS.
-    builder.addWhitespace(" ");
+
+    if (HaveLeadingSpace)
+      builder.addAnnotatedWhitespace(" ");
+    else
+      builder.addWhitespace(" ");
     builder.addTextChunk(op->getName().str());
     builder.addWhitespace(" ");
     if (RHSType)
@@ -3125,13 +3136,14 @@ void CodeCompletionCallbacksImpl::completePostfixExprBeginning(CodeCompletionExp
   CodeCompleteTokenExpr = E;
 }
 
-void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
+void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E, bool hasSpace) {
   assert(P.Tok.is(tok::code_complete));
 
   // Don't produce any results in an enum element.
   if (InEnumElementRawValue)
     return;
 
+  HasSpace = hasSpace;
   Kind = CompletionKind::PostfixExpr;
   ParsedExpr = E;
   CurDeclContext = P.CurDeclContext;
@@ -3695,6 +3707,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::PostfixExpr: {
+    Lookup.setHaveLeadingSpace(HasSpace);
     if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(*ExprType);

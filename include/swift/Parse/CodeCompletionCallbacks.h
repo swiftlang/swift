@@ -101,7 +101,7 @@ public:
   virtual void completePostfixExprBeginning(CodeCompletionExpr *E) = 0;
 
   /// \brief Complete a given expr-postfix.
-  virtual void completePostfixExpr(Expr *E) = 0;
+  virtual void completePostfixExpr(Expr *E, bool hasSpace) = 0;
 
   /// \brief Complete a given expr-postfix, given that there is a following
   /// left parenthesis.
