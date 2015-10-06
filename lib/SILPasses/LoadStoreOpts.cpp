@@ -1,4 +1,4 @@
-//=== GlobalRedundantLoadElimination.cpp - SIL Load Forwardingi Optimization ==//
+//===---- LoadStoreOpts.cpp - SIL Load/Store Optimizations Forwarding -----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This pass eliminates redundant loads and performs load forwarding.
+// This pass eliminates redundant loads, dead stores, and performs load
+// forwarding.
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-redundant-load-opt"
+#define DEBUG_TYPE "load-store-opts"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -37,7 +38,12 @@
 
 using namespace swift;
 
+/// Disable dead store elimination.
+static llvm::cl::opt<bool> DisableGDSE("sil-disable-loadstore-dse",
+                                      llvm::cl::init(true), llvm::cl::Hidden);
+
 STATISTIC(NumSameValueStores,"Number of same value stores removed");
+STATISTIC(NumDeadStores,     "Number of dead stores removed");
 STATISTIC(NumDupLoads,       "Number of dup loads removed");
 STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 
@@ -1023,7 +1029,9 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
 
   // If we are storing to a previously stored address that this store post
   // dominates, delete the old store.
+  llvm::SmallVector<SILValue, 4> StoresToDelete;
   llvm::SmallVector<SILValue, 4> StoresToStopTracking;
+  bool Changed = false;
   for (auto &P : Stores) {
     if (!P.second.aliasingWrite(AA, SI))
       continue;
@@ -1063,8 +1071,25 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
       continue;
     }
 
-    // To the same location, remove the old store and track the new store.
-    StoresToStopTracking.push_back(P.first);
+    // If this store does not post dominate prev store, we can not eliminate
+    // it. But do remove prev store from the store list and start tracking the
+    // new store.
+    //
+    // We are only given this if we are being used for multi-bb load store opts
+    // (when this is required). If we are being used for single-bb load store
+    // opts, this is not necessary, so skip it.
+    if (!P.second.postdominates(PDI, SI)) {
+      StoresToStopTracking.push_back(P.first);
+      DEBUG(llvm::dbgs() << "        Found dead store... That we don't "
+            "postdominate... Can't remove it but will track it.");
+      continue;
+    }
+
+    DEBUG(llvm::dbgs() << "        Found a dead previous store... Removing...:"
+                       << P);
+    Changed = true;
+    StoresToDelete.push_back(P.first);
+    NumDeadStores++;
   }
 
   for (auto &P : StoreMap) {
@@ -1073,12 +1098,14 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
     StoresToStopTracking.push_back(P.first);
   }
 
+  for (SILValue SIOp : StoresToDelete)
+    deleteStoreMappedToAddress(Ctx, SIOp, StoreMap);
   for (SILValue SIOp : StoresToStopTracking)
     stopTrackingAddress(SIOp, StoreMap);
 
   // Insert SI into our store list to start tracking.
   startTrackingStore(Ctx, SI, StoreMap);
-  return false;
+  return Changed;
 }
 
 /// See if there is an extract path from LI that we can replace with PrevLI. If
@@ -1304,6 +1331,12 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
 
     // This is a StoreInst. Let's see if we can remove the previous stores.
     if (auto *SI = dyn_cast<StoreInst>(Inst)) {
+      // If DSE is disabled, merely update states w.r.t. this store, but do not
+      // try to get rid of the store.
+      if (DisableGDSE) {
+        processStoreInst(Ctx, SI, StoreMap);
+        continue;
+      }
       Changed |= tryToEliminateDeadStores(Ctx, SI, StoreMap);
       continue;
     }
@@ -1702,7 +1735,7 @@ void LSContext::stopTrackingInst(SILInstruction *I, CoveredStoreMap &StoreMap) {
 
 namespace {
 
-class GlobalRedundantLoadElimination : public SILFunctionTransform {
+class GlobalLoadStoreOpts : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() override {
@@ -1730,6 +1763,6 @@ class GlobalRedundantLoadElimination : public SILFunctionTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createGlobalRedundantLoadElimination() {
-  return new GlobalRedundantLoadElimination();
+SILTransform *swift::createGlobalLoadStoreOpts() {
+  return new GlobalLoadStoreOpts();
 }

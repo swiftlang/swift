@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -inline -global-redundant-load-elim -inline  | FileCheck %s --check-prefix=CHECK-INLINE
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -inline -global-load-store-opts -inline  | FileCheck %s --check-prefix=CHECK-INLINE
 // RUN: %target-sil-opt -enable-sil-verify-all %s -early-inline  | FileCheck %s --check-prefix=CHECK-EARLY-INLINE
 // RUN: %target-sil-opt -enable-sil-verify-all %s -specdevirt  | FileCheck %s --check-prefix=CHECK-SPECDEVIRT
 // RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining  | FileCheck %s --check-prefix=CHECK-MANDATORY-INLINING

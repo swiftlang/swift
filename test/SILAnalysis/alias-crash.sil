@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -global-redundant-load-elim | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -global-load-store-opts | FileCheck %s
 
 sil_stage canonical
 
