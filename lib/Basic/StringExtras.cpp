@@ -467,7 +467,11 @@ static StringRef omitNeedlessWordsFromPrefix(StringRef name,
 
 /// Identify certain vacuous names to which we do not want to reduce any name.
 static bool isVacuousName(StringRef name) {
-  return name == "set" || name == "get";
+  return camel_case::sameWordIgnoreFirstCase(name, "get") ||
+         camel_case::sameWordIgnoreFirstCase(name, "for") ||
+         camel_case::sameWordIgnoreFirstCase(name, "set") ||
+         camel_case::sameWordIgnoreFirstCase(name, "using") ||
+         camel_case::sameWordIgnoreFirstCase(name, "with");
 }
 
 static StringRef omitNeedlessWords(StringRef name,
@@ -628,17 +632,7 @@ static StringRef omitNeedlessWords(StringRef name,
       return origName;
     break;
 
-  case NameRole::SubsequentParameter: {
-    // For subsequent parameters, drop useless leading prepositions such as
-    // "with" and "using".
-    StringRef firstWord = camel_case::getFirstWord(name);
-    if (firstWord.size() < name.size() &&
-        (firstWord == "with" || firstWord == "using")) {
-      name = toLowercaseWord(name.substr(firstWord.size()), scratch);
-    }
-    break;
-  }
-
+  case NameRole::SubsequentParameter:
   case NameRole::FirstParameter:
   case NameRole::Partial:
     break;
@@ -715,6 +709,9 @@ static bool omitNeedlessWordsMatchingFirstArgumentLabel(
   // Determine where to perform the split.
   unsigned splitPos = nameWordRevIter.base().getPosition();
   if (splitPos == 0) return false;
+
+  // If we would be left with a vacuous argument name, don't split.
+  if (isVacuousName(name.substr(splitPos))) return false;
 
   // Split into base name/first argument label.
   argName = ::toLowercaseWord(name.substr(splitPos), scratch);
@@ -875,8 +872,14 @@ bool swift::omitNeedlessWords(StringRef &baseName,
             afterSplitPos += 3;
 
           // Create a first argument name with the remainder of the base name,
-          // lowercased.
-          argNames[0] = toLowercaseWord(newName.substr(afterSplitPos), scratch);
+          // lowercased. If we would end up with a vacuous name, go
+          // back and get the original.
+          StringRef newArgName = newName.substr(afterSplitPos);
+          if (isVacuousName(newArgName)) {
+            size_t pos = name.rfind(newArgName);
+            newArgName = name.substr(pos);
+          }
+          argNames[0] = toLowercaseWord(newArgName, scratch);
 
           // Update the base name by splitting at the preposition.
           newName = newName.substr(0, splitPos);

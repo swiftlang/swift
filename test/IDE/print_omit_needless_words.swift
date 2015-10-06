@@ -25,10 +25,10 @@
 // CHECK-FOUNDATION: func makeObjectsPerform(_: Selector)
 
 // Note: "with" parameters.
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, withObject: AnyObject?)
 
 // Note: "with" parameters drop the "with".
-// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, with: AnyObject?, with: AnyObject?)
+// CHECK-FOUNDATION: func makeObjectsPerform(_: Selector, withObject: AnyObject?, withObject: AnyObject?)
 
 // Note: id -> "Object".
 // CHECK-FOUNDATION: func indexOf(_: AnyObject) -> Int
@@ -37,14 +37,11 @@
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
 
 // Note: Pointer-to-struct name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func copy(with _: NSZone = nil) -> AnyObject!
+// CHECK-FOUNDATION: func copy(withZone _: NSZone = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
 // CHECK-FOUNDATION: func objectFor(_: NSCopying) -> AnyObject?
 // CHECK-FOUNDATION: func removeObjectFor(_: NSCopying)
-
-// Note: Allow argument labels that are keywords.
-// CHECK-FOUNDATION: func setObject(_: AnyObject, `for`: NSCopying)
 
 // Note: Don't drop the name of the first parameter in an initializer entirely.
 // CHECK-FOUNDATION: init(array: [AnyObject])
@@ -68,7 +65,7 @@
 // CHECK-FOUNDATION: func subtract(_: Int32) -> NSNumber
 
 // Note: multi-word enum name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func someMethod(with _: NSDeprecatedOptions = [])
+// CHECK-FOUNDATION: func someMethod(withDeprecatedOptions _: NSDeprecatedOptions = [])
 
 // Note: class name matching; don't drop "With".
 // CHECK-FOUNDATION: class func withString(_: String!) -> Self!
@@ -113,10 +110,10 @@
 
 // Note: usingBlock -> body
 // CHECK-FOUNDATION: func enumerateObjectsUsing(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(with _: NSEnumerationOptions = [], using: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(withOptions _: NSEnumerationOptions = [], usingBlock: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
-// CHECK-FOUNDATION: func enumerateObjectsRandomly(with _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
+// CHECK-FOUNDATION: func enumerateObjectsRandomly(withBlock _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
 // CHECK-FOUNDATION: func doSomethingWith(_: NSCopying)
@@ -164,7 +161,7 @@
 // CHECK-APPKIT: func drawInAirAt(_: Point3D)
 
 // Note: with<something> -> <something>
-// CHECK-APPKIT: func drawAt(_: Point3D, attributes: [String : AnyObject]?)
+// CHECK-APPKIT: func drawAt(_: Point3D, withAttributes: [String : AnyObject]?)
 
 // Note: Don't strip names that aren't preceded by a verb or preposition.
 // CHECK-APPKIT: func setTextColor(_: NSColor?)
