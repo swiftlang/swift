@@ -40,7 +40,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <iterator>
-#include <type_traits>
+#include "swift/Basic/type_traits.h"
 
 namespace swift {
 
@@ -61,10 +61,10 @@ class PrefixMap {
 public:
   using KeyType = ArrayRef<KeyElementType>;
 
-  static_assert(std::is_trivially_copyable<KeyElementType>::value,
+  static_assert(IsTriviallyCopyable<KeyElementType>::value,
                 "key element type must be trivially copyable");
-  static_assert(std::is_trivially_default_constructible<KeyElementType>::value,
-                "key element type must be default-initializable");
+  static_assert(IsTriviallyConstructible<KeyElementType>::value,
+                "key element type must be trivially default-initializable");
 
 private:
   template <typename T>
