@@ -14,6 +14,7 @@ add_swift_unittest(SwiftBasicTests
   FileSystemTests.cpp
   SourceManager.cpp
   TreeScopedHashTableTests.cpp
+  PrefixMapTest.cpp
   StringExtrasTest.cpp
   SuccessorMapTest.cpp
   Unicode.cpp

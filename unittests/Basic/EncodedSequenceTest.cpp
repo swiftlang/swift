@@ -3,6 +3,8 @@
 
 using namespace swift;
 
+namespace {
+
 struct Element {
   unsigned X, Y, Z;
 
@@ -99,6 +101,8 @@ struct Tester {
     }
   }
 };
+
+}
 
 TEST(EncodedSequenceTest, PushIterate) {
   Tester tester;

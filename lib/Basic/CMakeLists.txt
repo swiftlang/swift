@@ -21,6 +21,7 @@ add_swift_library(swiftBasic
   LangOptions.cpp
   Platform.cpp
   PrettyStackTrace.cpp
+  PrefixMap.cpp
   PrimitiveParsing.cpp
   Program.cpp
   Punycode.cpp

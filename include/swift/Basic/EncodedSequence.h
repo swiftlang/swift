@@ -23,6 +23,7 @@
 
 #include <climits>
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/PrefixMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Host.h"
 
@@ -305,6 +306,8 @@ public:
     }
     bool operator==(iterator other) const { return Ptr == other.Ptr; }
     bool operator!=(iterator other) const { return Ptr != other.Ptr; }
+
+    const Chunk *getRawChunkPtr() const { return Ptr; };
   };
 
   iterator begin() const { return iterator(chunks().begin()); }
@@ -323,6 +326,43 @@ public:
     Chunk *ptr = storage.data();
     elt.encode(ptr);
   }
+
+  /// A mapping from encoded sequences to some sort of value.
+  ///
+  /// This class is just a trivial type-adjusting wrapper around PrefixMap;
+  /// see the documentation there for information about how to use this
+  /// data structure.
+  template <class ValueType> class Map {
+    using MapBase = PrefixMap<Chunk, ValueType>;
+    MapBase TheMap;
+
+  public:
+    using SequenceIterator = EncodedSequence::iterator;
+    using KeyType = typename MapBase::KeyType;
+    using Handle = typename MapBase::Handle;
+
+    std::pair<Handle, SequenceIterator>
+    findPrefix(SequenceIterator begin, SequenceIterator end) const {
+      auto result = TheMap.findPrefix(getKey(begin, end));
+      return { result.first, SequenceIterator(result.second) };
+    }
+
+    template <class T>
+    std::pair<Handle, bool>
+    insert(SequenceIterator begin, SequenceIterator end, T &&value) {
+      return TheMap.insert(getKey(begin, end), std::forward<T>(value));
+    }
+
+    template <class T>
+    Handle insertNew(SequenceIterator begin, SequenceIterator end, T &&value) {
+      return TheMap.insertNew(getKey(begin, end), std::forward<T>(value));
+    }
+
+  private:
+    static KeyType getKey(SequenceIterator begin, SequenceIterator end) {
+      return KeyType(begin.getRawChunkPtr(), end.getRawChunkPtr());
+    }
+  };
 };
 
 } // end namespace swift
