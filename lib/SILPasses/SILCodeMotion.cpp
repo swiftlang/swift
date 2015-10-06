@@ -305,6 +305,55 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
   return *DifferentOperandIndex;
 }
 
+/// Return the value that's passed from block \p From to block \p To
+/// (if there is a branch between From and To) as the Nth argument.
+SILValue getArgForBlock(SILBasicBlock *From, SILBasicBlock *To,
+                        unsigned ArgNum) {
+  TermInst *Term = From->getTerminator();
+  if (auto *CondBr = dyn_cast<CondBranchInst>(Term)) {
+    if (CondBr->getFalseBB() == To)
+      return CondBr->getFalseArgs()[ArgNum];
+
+    if (CondBr->getTrueBB() == To)
+      return CondBr->getTrueArgs()[ArgNum];
+  }
+
+  if (auto *Br = dyn_cast<BranchInst>(Term))
+    return Br->getArg(ArgNum);
+
+  return SILValue();
+}
+
+// Try to sink values from the Nth argument \p ArgNum.
+static bool sinkLiteralArguments(SILBasicBlock *BB, unsigned ArgNum) {
+  assert(ArgNum < BB->getNumBBArg() && "Invalid argument");
+
+  // Check if the argument passed to the first predecessor is a literal inst.
+  SILBasicBlock *FirstPred = *BB->pred_begin();
+  SILValue FirstArg = getArgForBlock(FirstPred, BB, ArgNum);
+  LiteralInst *FirstLiteral = dyn_cast_or_null<LiteralInst>(FirstArg.getDef());
+  if (!FirstLiteral)
+    return false;
+
+  // Check if the Nth argument in all predecessors is identical.
+  for (auto P : BB->getPreds()) {
+    if (P == FirstPred)
+      continue;
+
+    // Check that the incoming value is identical to the first literal.
+    SILValue PredArg = getArgForBlock(P, BB, ArgNum);
+    LiteralInst *PredLiteral = dyn_cast_or_null<LiteralInst>(PredArg.getDef());
+    if (!PredLiteral || !PredLiteral->isIdenticalTo(FirstLiteral))
+      return false;
+  }
+
+  // Replace the use of the argument with the cloned literal.
+  auto Cloned = FirstLiteral->clone(BB->begin());
+  BB->getBBArg(ArgNum)->replaceAllUsesWith(Cloned);
+
+  return true;
+}
+
 // Try to sink values from the Nth argument \p ArgNum.
 static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   assert(ArgNum < BB->getNumBBArg() && "Invalid argument");
@@ -422,6 +471,23 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     }
 
   return true;
+}
+
+
+/// Try to sink literals that are passed to arguments that are coming from
+/// multiple predecessors.
+/// Notice that unline other sinking methods in this file we do allow sinking
+/// of literals from blocks with multiple sucessors.
+static bool sinkLiteralsFromPredecessors(SILBasicBlock *BB) {
+  if (BB->pred_empty() || BB->getSinglePredecessor())
+    return false;
+
+  // Try to sink values from each of the arguments to the basic block.
+  bool Changed = false;
+  for (int i = 0, e = BB->getNumBBArg(); i < e; ++i)
+    Changed |= sinkLiteralArguments(BB, i);
+
+  return Changed;
 }
 
 /// Try to sink identical arguments coming from multiple predecessors.
@@ -1638,6 +1704,7 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     Changed |= canonicalizeRefCountInstrs(State.getBB());
     Changed |= sinkCodeFromPredecessors(State.getBB());
     Changed |= sinkArgumentsFromPredecessors(State.getBB());
+    Changed |= sinkLiteralsFromPredecessors(State.getBB());
 
     // Then perform the dataflow.
     DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");

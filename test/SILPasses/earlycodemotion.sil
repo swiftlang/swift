@@ -1516,3 +1516,24 @@ bb2(%5 : $X):
   strong_release %5 : $X
   br bb2(%5 : $X)
 }
+
+
+// CHECK-LABEL: sil @sink_literals_through_arguments
+sil @sink_literals_through_arguments : $@convention(thin) (Builtin.Int1) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %x1 = string_literal utf8 "0"
+  br bb3(%x1 : $Builtin.RawPointer)
+
+bb2:
+  %y1 = string_literal utf8 "0"
+  br bb3(%y1 : $Builtin.RawPointer)
+
+bb3(%z1 : $Builtin.RawPointer):
+  //CHECK: string_literal utf8 "0"
+  //CHECK-NEXT: return
+  return %z1 : $Builtin.RawPointer
+}
+
