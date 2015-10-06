@@ -1422,6 +1422,24 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   return gvarAddr;
 }
 
+/// Return True if the function \p f is a 'readonly' function. Checking
+/// for the SIL @effects(readonly) attribute is not enough because this
+/// definition does not match the definition of the LLVM readonly function
+/// attribute. In this function we do the actual check.
+static bool isReadOnlyFunction(SILFunction *f) {
+  // Check if the function has any 'owned' parameters. Owned parameters may
+  // call the destructor of the object which could violate the readonly-ness
+  // of the function.
+  for (auto &ParamInfo : f->getLoweredFunctionType()->getParameters()) {
+    if (ParamInfo.isConsumed())
+      return false;
+  }
+
+  auto Eff = f->getEffectsKind();
+  return Eff == EffectsKind::ReadNone ||
+         Eff == EffectsKind::ReadOnly;
+}
+
 /// Find the entry point for a SIL function.
 llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                                                   ForDefinition_t forDefinition) {
@@ -1464,6 +1482,10 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   if (f->getInlineStrategy() == NoInline) {
     attrs = attrs.addAttribute(fnType->getContext(),
                 llvm::AttributeSet::FunctionIndex, llvm::Attribute::NoInline);
+  }
+  if (isReadOnlyFunction(f)) {
+    attrs = attrs.addAttribute(fnType->getContext(),
+                llvm::AttributeSet::FunctionIndex, llvm::Attribute::ReadOnly);
   }
   fn = link.createFunction(*this, fnType, cc, attrs, insertBefore);
 
