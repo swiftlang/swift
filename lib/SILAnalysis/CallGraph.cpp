@@ -62,9 +62,8 @@ CallGraph::CallGraph(SILModule *Mod, bool completeModule)
   // at which point we process those functions (adding edges), and it
   // would be an error to process those functions again when we come
   // across them in the module.
-  for (auto I = Workitems.rbegin(), E = Workitems.rend(); I != E; ++I) {
+  for (auto I = Workitems.begin(), E = Workitems.end(); I != E; ++I)
     addEdges(*I);
-  }
 
   if (DumpCallGraph)
     dump();
