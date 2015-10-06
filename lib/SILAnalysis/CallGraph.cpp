@@ -111,11 +111,7 @@ void CallGraph::computeClassMethodCalleesForClass(ClassDecl *CD) {
     // overrides by inserting the call graph node for the function
     // that this method invokes.
     do {
-      CallGraphEdge::CalleeSetType *CalleeSet;
-      bool Complete;
-
-      std::tie(CalleeSet, Complete) =
-        getOrCreateCalleeSetForClassMethod(Method);
+      auto *CalleeSet = getOrCreateCalleeSetForClassMethod(Method);
       assert(CalleeSet && "Unexpected null callee set!");
 
       CalleeSet->insert(Node);
@@ -153,31 +149,27 @@ CallGraphNode *CallGraph::addCallGraphNode(SILFunction *F) {
   return Node;
 }
 
-std::pair<CallGraphEdge::CalleeSetType *, bool>
+CallGraphEdge::CalleeSetType *
 CallGraph::tryGetCalleeSetForClassMethod(SILDeclRef Decl) {
-  auto *AFD = Decl.getAbstractFunctionDecl();
-  assert(AFD && "Expected abstract function decl!");
-
-  auto Found = CalleeSets.find(AFD);
-  if (Found == CalleeSets.end())
-    return std::make_pair(nullptr, false);
-
-  // FIXME: Determine whether the set is complete.
-  return std::make_pair(Found->second, false);
-}
-
-std::pair<CallGraphEdge::CalleeSetType *, bool>
-CallGraph::getOrCreateCalleeSetForClassMethod(SILDeclRef Decl) {
   auto *AFD = cast<AbstractFunctionDecl>(Decl.getDecl());
+
   auto Found = CalleeSets.find(AFD);
   if (Found != CalleeSets.end())
-    return std::make_pair(Found->second, false);
+    return Found->second;
 
+  return nullptr;
+}
+
+CallGraphEdge::CalleeSetType *
+CallGraph::getOrCreateCalleeSetForClassMethod(SILDeclRef Decl) {
+  if (auto *ExistingSet = tryGetCalleeSetForClassMethod(Decl))
+    return ExistingSet;
+
+  auto *AFD = cast<AbstractFunctionDecl>(Decl.getDecl());
   auto *CalleeSet = new (Allocator) CallGraphEdge::CalleeSetType;
   CalleeSets.insert(std::make_pair(AFD, CalleeSet));
 
-  // FIXME: Determine whether the set is complete.
-  return std::make_pair(CalleeSet, false);
+  return CalleeSet;
 }
 
 
@@ -256,16 +248,14 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
   case ValueKind::ClassMethodInst: {
     auto *CMI = cast<ClassMethodInst>(Callee);
 
-    CallGraphEdge::CalleeSetType *CalleeSet;
-    bool Complete;
-
-    std::tie(CalleeSet, Complete) =
-      tryGetCalleeSetForClassMethod(CMI->getMember());
+    auto *CalleeSet = tryGetCalleeSetForClassMethod(CMI->getMember());
 
     // FIXME: Review the cases where we are not currently generating
     //        callee sets.
     if (!CalleeSet)
       return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
+
+    bool Complete = false;
 
     return new (Allocator) CallGraphEdge(Apply, CalleeSet, Complete,
                                          EdgeOrdinal++);

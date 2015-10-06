@@ -353,10 +353,10 @@ public:
     return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
   }
 
-  std::pair<CallGraphEdge::CalleeSetType *, bool>
+  CallGraphEdge::CalleeSetType *
   tryGetCalleeSetForClassMethod(SILDeclRef Decl);
 
-  std::pair<CallGraphEdge::CalleeSetType *, bool>
+  CallGraphEdge::CalleeSetType *
   getOrCreateCalleeSetForClassMethod(SILDeclRef Decl);
 
   // Functions for getting bottom-up lists of SCCs or functions in the
