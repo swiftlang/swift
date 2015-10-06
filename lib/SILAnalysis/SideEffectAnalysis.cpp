@@ -138,14 +138,6 @@ SideEffectAnalysis::FunctionEffects::getEffectsOn(SILValue Addr) {
   return &GlobalEffects;
 }
 
-static bool hasOwnedParameters(SILFunction *F) {
-  for (auto &ParamInfo : F->getLoweredFunctionType()->getParameters()) {
-    if (ParamInfo.isConsumed())
-      return true;
-  }
-  return false;
-}
-
 bool SideEffectAnalysis::getDefinedEffects(FunctionEffects &Effects,
                                            SILFunction *F) {
   if (F->getLoweredFunctionType()->isNoReturn()) {
@@ -159,7 +151,7 @@ bool SideEffectAnalysis::getDefinedEffects(FunctionEffects &Effects,
       // @effects(readonly) is worthless if we have owned parameters, because
       // the release inside the callee may call a deinit, which itself can do
       // anything.
-      if (!hasOwnedParameters(F)) {
+      if (!F->hasOwnedParameters()) {
         Effects.GlobalEffects.Reads = true;
         return true;
       }

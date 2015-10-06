@@ -262,6 +262,16 @@ public:
     return getLoweredFunctionType()->hasSelfParam();
   }
 
+  /// Returns true if the function has parameters that are consumed by the
+  // callee.
+  bool hasOwnedParameters() {
+    for (auto &ParamInfo : getLoweredFunctionType()->getParameters()) {
+      if (ParamInfo.isConsumed())
+        return true;
+    }
+    return false;
+  }
+
   /// Returns true if this function either has a self metadata argument or
   /// object that Self metadata may be derived from.
   bool hasSelfMetadataParam() const;
