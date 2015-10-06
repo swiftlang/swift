@@ -24,7 +24,6 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
