@@ -265,5 +265,7 @@ func testInfix22() {
 func testSpace(x: S2) {
   x #^S2_INFIX_SPACE^#
 }
-// S2_INFIX_SPACE: Decl[InfixOperatorFunction]/CurrModule: [' ']** {#Int#}[#S2#]
-// S2_INFIX_SPACE: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#S2#}[#S2#]
+// S2_INFIX_SPACE: Begin completions
+// S2_INFIX_SPACE-DAG: Decl[InfixOperatorFunction]/CurrModule: [' ']** {#Int#}[#S2#]
+// S2_INFIX_SPACE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#S2#}[#S2#]
+// S2_INFIX_SPACE: End completions
