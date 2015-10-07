@@ -99,14 +99,7 @@ public:
   /// Return a callee set that is known to be complete.
   CalleeSetType getCompleteCalleeSet() const {
     assert(isCalleeSetComplete() && "Attempt to get an incomplete call set!");
-    if (CalleeSet.getPointer().is<CalleeSetType *>())
-      return *CalleeSet.getPointer().get<CalleeSetType *>();
-
-    CalleeSetType Result;
-    if (auto *Node = CalleeSet.getPointer().get<CallGraphNode *>())
-      Result.insert(Node);
-
-    return Result;
+    return getPartialCalleeSet();
   }
 
   /// Return a callee set that is not known to be complete.
