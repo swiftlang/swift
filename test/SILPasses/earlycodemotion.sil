@@ -3,6 +3,13 @@
 import Builtin
 import Swift
 
+class fuzz { }
+
+enum Boo {
+  case one
+  case two
+}
+
 class B { }
 class E : B { }
 
@@ -1536,4 +1543,38 @@ bb3(%z1 : $Builtin.RawPointer):
   //CHECK-NEXT: return
   return %z1 : $Builtin.RawPointer
 }
+
+// CHECK-LABEL: sil hidden @sink_allocation_inst
+sil hidden @sink_allocation_inst : $@convention(thin) (Boo, Boo) -> Bool {
+bb0(%0 : $Boo, %1 : $Boo):
+  debug_value %0 : $Boo  // let x                 // id: %2
+  debug_value %0 : $Boo                           // id: %3
+  debug_value %0 : $Boo  // let self              // id: %4
+  switch_enum %0 : $Boo, case #Boo.one!enumelt: bb1, case #Boo.two!enumelt: bb3 // id: %5
+
+bb1:                                              // Preds: bb0 
+  %6 = alloc_ref $fuzz                            // users: %7, %8
+  // TODO: handle debug values while sinking
+  // debug_value %6 : $fuzz  // let self             // id: %7
+  br bb2(%6 : $fuzz)                              // id: %8
+
+bb3:                                              // Preds: bb0 
+  %15 = alloc_ref $fuzz                           // users: %16, %17 
+  // TODO: handle debug values while sinking
+  // debug_value %15 : $fuzz  // let self            // id: %16 
+  br bb2(%15 : $fuzz)                             // id: %17 
+
+bb2(%9 : $fuzz):
+  // Make sure we have a single alloc_ref instruction and not two.
+  // CHECK: alloc_ref
+  // CHECK-NOT: alloc_ref
+  // CHECK: return
+  debug_value %9 : $fuzz  // let lhs              // id: %10 
+  %11 = integer_literal $Builtin.Int1, -1         // user: %12 
+  %12 = struct $Bool (%11 : $Builtin.Int1)        // user: %14 
+  strong_release %9 : $fuzz                       // id: %13 
+  return %12 : $Bool                              // id: %14 
+}
+
+
 

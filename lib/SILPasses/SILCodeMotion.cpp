@@ -259,7 +259,6 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
 static llvm::Optional<unsigned>
 cheaperToPassOperandsAsArguments(SILInstruction *First,
                                  SILInstruction *Second) {
-  
   // This will further enable to sink strong_retain_unowned instructions,
   // which provides more opportinities for the unowned-optimization in
   // LLVMARCOpts.
@@ -373,7 +372,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     return false;
 
   // Don't move instructions that are sensitive to their location.
-  if (FSI->mayHaveSideEffects())
+  if (FSI->mayHaveSideEffects() && !isa<AllocationInst>(FSI))
     return false;
 
   // If the instructions are different, but only in terms of a cheap operand
