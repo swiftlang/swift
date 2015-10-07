@@ -105,6 +105,11 @@ public:
     return Path.getValue().front().getType();
   }
 
+  /// Returns whether the memory location has been initialized properly.
+  bool isValid() const {
+    return Base && Path.hasValue();
+  }
+
   void subtractPaths(Optional<ProjectionPath> &P) {
     if (!P.hasValue())
       return;
@@ -181,6 +186,11 @@ public:
 static inline llvm::hash_code hash_value(const MemLocation &L) {
   return llvm::hash_combine(L.getBase().getDef(), L.getBase().getResultNumber(),
                             L.getBase().getType());
+}
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, MemLocation &V) {
+  V.getBase().print(OS);
+  return OS;
 }
 
 } // end swift namespace

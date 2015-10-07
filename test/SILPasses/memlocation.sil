@@ -1,0 +1,63 @@
+// RUN: %target-sil-opt %s -memlocation-dump | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+///////////////////////
+// Type Declarations //
+///////////////////////
+
+struct Int {
+  var value : Builtin.Int64
+}
+
+struct Int64 {
+  var value : Builtin.Int64
+}
+
+struct Bool {
+  var value : Builtin.Int1
+}
+
+
+class B {
+  var i : Builtin.Int32
+  init()
+}
+
+struct S1 {
+  var a: Int
+  init(a: Int, b: Int)
+  init()
+}
+
+sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
+
+// CHECK-LABEL: @store_after_store
+// CHECK: #0  [[RET0:%.+]] = alloc_box
+// CHECK: #1  [[RET0:%.+]] = alloc_box
+sil @store_after_store : $@convention(thin) (@owned B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_box $B
+  %2 = store %0 to %1#1 : $*B
+  %3 = store %0 to %1#1 : $*B
+  %4 = tuple()
+  %5 = return %4 : $()
+}
+
+// CHECK-LABEL: @store_after_store_struct
+// CHECK: #0  [[RET0:%.+]] = alloc_stack
+// CHECK: #1  [[RET0:%.+]] = alloc_stack
+sil @store_after_store_struct : $@convention(thin) () -> () {
+  %1 = alloc_stack $S1
+  %9 = integer_literal $Builtin.Int64, 0          // user: %10
+  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
+  %11 = struct_element_addr %1#1 : $*S1, #S1.a    // user: %12
+  store %10 to %11 : $*Int                        // id: %12
+  store %10 to %11 : $*Int
+  %4 = tuple()
+  dealloc_stack %1#0 : $*@local_storage S1        // id: %13
+  %5 = return %4 : $()
+}
+
