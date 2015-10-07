@@ -88,7 +88,8 @@ private:
   /// The source location and scope of the function.
   SILDebugScope *DebugScope;
 
-  /// The function's bare attribute. Bare means that the function is SIL-only.
+  /// The function's bare attribute. Bare means that the function is SIL-only
+  /// and does not require debug info.
   unsigned Bare : 1;
 
   /// The function's transparent attribute.
@@ -391,6 +392,7 @@ public:
   IsFragile_t isFragile() const { return IsFragile_t(Fragile); }
   void setFragile(IsFragile_t isFrag) { Fragile = isFrag; }
 
+  /// Get this function's thunk attribute.
   IsThunk_t isThunk() const { return IsThunk_t(Thunk); }
   void setThunk(IsThunk_t isThunk) { Thunk = isThunk; }
 

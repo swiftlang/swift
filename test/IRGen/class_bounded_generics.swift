@@ -246,7 +246,7 @@ class SomeSwiftClass {
   class func foo() {}
 }
 
-// T must have a Swift loayout, so we can load this metatype with a direct access.
+// T must have a Swift layout, so we can load this metatype with a direct access.
 // CHECK-LABEL: define hidden void @_TF22class_bounded_generics22class_bounded_metatype
 // CHECK:      [[T0:%.*]] = getelementptr inbounds %C22class_bounded_generics14SomeSwiftClass, %C22class_bounded_generics14SomeSwiftClass* {{%.*}}, i32 0, i32 0, i32 0
 // CHECK-NEXT: [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8

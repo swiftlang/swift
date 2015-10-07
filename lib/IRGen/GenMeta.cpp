@@ -4169,7 +4169,7 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
 }
 
 namespace {
-  /// A class for finding a protocol witness table for a type argument
+  /// A class for finding a vtable entry offset for a method argument
   /// in a class metadata object.
   BEGIN_METADATA_SEARCHER_1(FindClassMethodIndex, Class,
                             SILDeclRef, TargetMethod)

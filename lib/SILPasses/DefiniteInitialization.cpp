@@ -1414,8 +1414,6 @@ void LifetimeChecker::processUninitializedRelease(unsigned ReleaseID,
 /// a release.  As such, we have to push the releases up the CFG to where the
 /// value is initialized.
 ///
-/// This returns true if the release was deleted.
-///
 void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   SILInstruction *Release = Releases[ReleaseID];
   
@@ -1486,7 +1484,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   if (Availability.hasAny(DIKind::Partial))
     HasConditionalInitAssignOrDestroys = true;
 
-  // Otherwise, it is conditionally live, safe it for later processing.
+  // Otherwise, it is conditionally live, save it for later processing.
   ConditionalDestroys.push_back({ ReleaseID, Availability });
 }
 

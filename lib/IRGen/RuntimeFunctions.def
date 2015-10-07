@@ -59,19 +59,19 @@ FUNCTION(AllocObject,    swift_allocObject,   RuntimeCC,
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind))
 
-// void swift_deallocObject(RefCounted *obj, size_t size, size_t alignMask);
+// void swift_deallocObject(HeapObject *obj, size_t size, size_t alignMask);
 FUNCTION(DeallocObject,  swift_deallocObject, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind))
 
-// void swift_deallocClassInstance(RefCounted *obj, size_t size, size_t alignMask);
+// void swift_deallocClassInstance(HeapObject *obj, size_t size, size_t alignMask);
 FUNCTION(DeallocClassInstance,  swift_deallocClassInstance, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind))
 
-// void swift_deallocUninitializedClassInstance(RefCounted *obj, size_t size, size_t alignMask);
+// void swift_deallocUninitializedClassInstance(HeapObject *obj, size_t size, size_t alignMask);
 FUNCTION(DeallocUninitializedClassInstance,  swift_deallocUninitializedClassInstance, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy, SizeTy, SizeTy),
