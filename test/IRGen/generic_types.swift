@@ -9,7 +9,7 @@ import Swift
 // CHECK: [[INT]] = type <{ i64 }>
 // CHECK: [[B:%C13generic_types1B]] = type <{ [[REF:%swift.refcounted]], [[UNSAFE:%Sp]] }>
 // CHECK: [[C:%C13generic_types1C]] = type
-// FIXME: [[D:%C13generic_types1D]] = type
+// CHECK: [[D:%C13generic_types1D]] = type
 
 // CHECK: @_TMPdC13generic_types1A = global [[A_METADATA_T:{.*\* } }]] {
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[A_METADATA_CREATE:@[a-z0-9_]+]],
@@ -67,16 +67,16 @@ import Swift
 // CHECK:   i64 1,
 // CHECK:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
 // CHECK: }
-// FIXME: @_TMPdC13generic_types1D = global [[D_METADATA_T:{.*\* } }]] {
-// FIXME:   void ([[D]]*)* @_TFC13generic_types1DD,
-// FIXME:   i8** @_TWVBo,
-// FIXME:   i64 0,
-// FIXME:   %swift.type* null,
-// FIXME:   %swift.opaque* @_objc_empty_cache,
-// FIXME:   %swift.opaque* null,
-// FIXME:   i64 1,
-// FIXME:   void (i64, [[D]]*)* @_TFC13generic_types1D3run
-// FIXME: }
+// CHECK: @_TMPdC13generic_types1D = global [[D_METADATA_T:{.*\* } }]] {
+// CHECK:   void ([[D]]*)* @_TFC13generic_types1DD,
+// CHECK:   i8** @_TWVBo,
+// CHECK:   i64 0,
+// CHECK:   %swift.type* null,
+// CHECK:   %swift.opaque* @_objc_empty_cache,
+// CHECK:   %swift.opaque* null,
+// CHECK:   i64 1,
+// CHECK:   void (%Si*, [[D]]*)* @_TTVFC13generic_types1D3runurfGS0_q__FSiT_
+// CHECK: }
 
 // CHECK: define private %swift.type* [[A_METADATA_CREATE]](%swift.type_pattern*, i8**) {{.*}} {
 // CHECK: entry:
@@ -120,12 +120,9 @@ class B<T> {
 
 class C<T> : A<Int> {}
 
-/* FIXME: We don't properly reabstract D.run to match the indirect calling
-   convention of A.run. rdar://problem/19572664
 class D<T> : A<Int> {
   override func run(t: Int) {}
 }
- */
 
 struct E<T> {
   var x : Int
