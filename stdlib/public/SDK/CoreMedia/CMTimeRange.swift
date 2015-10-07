@@ -90,6 +90,6 @@ public func == (range1: CMTimeRange, range2: CMTimeRange) -> Bool {
 
 @warn_unused_result
 public func != (range1: CMTimeRange, range2: CMTimeRange) -> Bool {
-  return CMTimeRangeEqual(range1, range2).boolValue
+  return !CMTimeRangeEqual(range1, range2).boolValue
 }
 
