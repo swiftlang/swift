@@ -433,7 +433,7 @@ void GlobalDeadStoreEliminationImpl::processRead(SILInstruction *I, BBState *S,
 
   // If we cant figure out the Base or Projection Path for the read instruction,
   // process it as an unknown memory instruction for now.
-  if (!L.getBase() || !L.getPath().hasValue()) {
+  if (!L.isValid()) {
     processUnknownMemInst(I);
     return;
   }
@@ -441,7 +441,7 @@ void GlobalDeadStoreEliminationImpl::processRead(SILInstruction *I, BBState *S,
   // Expand the given Mem into individual fields and process them as
   // separate reads.
   MemLocationList Locs;
-  L.expand(&I->getModule(), Locs);
+  MemLocation::expand(L, &I->getModule(), Locs);
   for (auto &E : Locs) {
     updateWriteSetForRead(I, S, getMemLocationBit(E));
   }
@@ -485,13 +485,13 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
 
   // If we cant figure out the Base or Projection Path for the store instruction,
   // simply ignore it for now.
-  if (!L.getBase() || !L.getPath().hasValue())
+  if (!L.isValid())
     return;
 
   // Expand the given Mem into individual fields and process them as separate writes.
   bool Dead = true;
   MemLocationList Locs;
-  L.expand(&I->getModule(), Locs);
+  MemLocation::expand(L, &I->getModule(), Locs);
   llvm::BitVector V(Locs.size());
   unsigned idx = 0;
   for (auto &E : Locs) {
@@ -529,7 +529,7 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
 
     // Try to create as few aggregated stores as possible out of these
     // locations.
-    MemLocation::mergeMemLocations(LocsAlive, L, Mod);
+    MemLocation::reduce(L, Mod, LocsAlive);
 
     // Oops, we have too many smaller stores generated, bail out.
     if (LocsAlive.size() > MaxPartialDeadStoreCountLimit)

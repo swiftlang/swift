@@ -41,14 +41,14 @@ bool MemLocation::hasIdenticalProjectionPath(const MemLocation &RHS) const {
   return true;
 }
 
-void MemLocation::expand(SILModule *Mod, MemLocationList &Locs,
+void MemLocation::expand(MemLocation &B, SILModule *Mod, MemLocationList &Locs,
                          bool OnlyLeafNode) {
   // Perform a BFS to expand the given type into locations each of which
   // contains 1 field from the type.
   MemLocationList Worklist;
   llvm::SmallVector<Projection, 8> Projections;
 
-  Worklist.push_back(*this);
+  Worklist.push_back(B);
   while (!Worklist.empty()) {
     // Get the next level projections based on current location's type.
     MemLocation L = Worklist.pop_back_val();
@@ -93,8 +93,8 @@ void MemLocation::expand(SILModule *Mod, MemLocationList &Locs,
     for (auto &P : Projections) {
       ProjectionPath X;
       X.append(P);
-      X.append(L.Path.getValue());
-      MemLocation Next(Base, X);
+      X.append(L.getPath().getValue());
+      MemLocation Next(L.getBase(), X);
       Worklist.push_back(Next);
     }
   }
@@ -125,9 +125,8 @@ void MemLocation::getFirstLevelMemLocations(MemLocationList &Locs,
   }
 }
 
-void MemLocation::mergeMemLocations(llvm::DenseSet<MemLocation> &Locs,
-                                    MemLocation &M,
-                                    SILModule *Mod) {
+void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
+                         llvm::DenseSet<MemLocation> &Locs) {
   // Nothing to merge.
   if (Locs.empty())
     return;
@@ -136,7 +135,7 @@ void MemLocation::mergeMemLocations(llvm::DenseSet<MemLocation> &Locs,
   // parents. This guarantees that at the point the parent is processed, its 
   // children have been processed already.
   MemLocationList AllLocs;
-  M.expand(Mod, AllLocs, false);
+  MemLocation::expand(Base, Mod, AllLocs, false);
   for (auto I = AllLocs.rbegin(), E = AllLocs.rend(); I != E; ++I) {
     // If this is a class reference type, we have reached end of the type tree.
     if (I->getType().getClassOrBoundGenericClass())
@@ -184,13 +183,13 @@ MemLocation::enumerateMemLocation(SILModule *M, SILValue Mem,
 
   // If we cant figure out the Base or Projection Path for the memory location,
   // simply ignore it for now.
-  if (!L.getBase() || !L.getPath().hasValue())
+  if (!L.isValid())
     return;
 
   // Expand the given Mem into individual fields and add them to the
   // locationvault.
   MemLocationList Locs;
-  L.expand(M, Locs);
+  MemLocation::expand(L, M, Locs);
   for (auto &Loc : Locs) {
     BM[Loc] = LV.size();
     LV.push_back(Loc);

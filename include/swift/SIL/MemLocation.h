@@ -150,13 +150,6 @@ public:
   /// construct the projection path to the field accessed.
   void initialize(SILValue val);
 
-  /// Expand this location to all individual fields it contains.
-  ///
-  /// In SIL, we can have a store to an aggregate and loads from its individual
-  /// fields. Therefore, we expand all the operations on aggregates onto
-  /// individual fields.
-  void expand(SILModule *Mod, MemLocationList &F, bool OnlyLeafNode = true);
-
   /// Get the first level locations based on this location's first level
   /// projection.
   void getFirstLevelMemLocations(MemLocationList &Locs, SILModule *Mod);
@@ -167,10 +160,19 @@ public:
   /// Check whether the 2 MemLocations must alias each other or not.
   bool isMustAliasMemLocation(const MemLocation &RHS, AliasAnalysis *AA);
 
-  /// Given a set of locations derived from the same base, try to merge them into
-  /// smallest number of MemLocations possible.
-  static void mergeMemLocations(llvm::DenseSet<MemLocation> &Locs, MemLocation &Base,
-                                SILModule *Mod);
+
+  /// Expand this location to all individual fields it contains.
+  ///
+  /// In SIL, we can have a store to an aggregate and loads from its individual
+  /// fields. Therefore, we expand all the operations on aggregates onto
+  /// individual fields.
+  static void expand(MemLocation &Base, SILModule *Mod, MemLocationList &F,
+                     bool OnlyLeafNode = true);
+
+  /// Given a set of locations derived from the same base, try to merge/reduce
+  /// them into smallest number of MemLocations possible.
+  static void reduce(MemLocation &Base, SILModule *Mod,
+                     llvm::DenseSet<MemLocation> &Locs);
 
   /// Enumerate the given Mem MemLocation.
   static void enumerateMemLocation(SILModule *M, SILValue Mem,

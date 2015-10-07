@@ -47,12 +47,12 @@ class MemLocationDumper : public SILFunctionTransform {
           L.initialize(LI->getOperand());
           if (!L.isValid())
             continue;
-          L.expand(&Fn.getModule(), Locs);
+          MemLocation::expand(L, &Fn.getModule(), Locs);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           L.initialize(SI->getDest());
           if (!L.isValid())
             continue;
-          L.expand(&Fn.getModule(), Locs);
+          MemLocation::expand(L, &Fn.getModule(), Locs);
         }
       }
 
