@@ -327,9 +327,11 @@ emitResultIsZeroErrorCheck(SILGenFunction &gen, SILLocation loc,
 
   ASTContext &ctx = gen.getASTContext();
   SILValue resultIsError =
-    gen.B.createBuiltin(loc, ctx.getIdentifier(zeroIsError ? "cmp_eq" : "cmp_ne"),
-                        SILType::getBuiltinIntegerType(1, ctx),
-                        {}, {resultValue, zero});
+    gen.B.createBuiltinBinaryFunction(loc,
+                                      zeroIsError ? "cmp_eq" : "cmp_ne",
+                                      resultValue.getType(),
+                                      SILType::getBuiltinIntegerType(1, ctx),
+                                      {resultValue, zero});
 
   SILBasicBlock *errorBB = gen.createBasicBlock(FunctionSection::Postmatter);
   SILBasicBlock *contBB = gen.createBasicBlock();

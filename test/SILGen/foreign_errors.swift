@@ -32,8 +32,8 @@ func test0() throws {
 
   //   Pull out the boolean value and compare it to zero.
   // CHECK: [[T0:%.*]] = struct_extract [[RESULT]]
-  // CHECK: [[T1:%.*]] = integer_literal $[[PRIM:Builtin.Int[0-9]+]], 0
-  // CHECK: [[T2:%.*]] = builtin "cmp_eq"([[T0]] : $[[PRIM]], [[T1]] : $[[PRIM]])
+  // CHECK: [[T1:%.*]] = integer_literal $Builtin.Int1
+  // CHECK: [[T2:%.*]] = builtin "cmp_eq_Int1"([[T0]] : $Builtin.Int1, [[T1]] : $Builtin.Int1)
   // CHECK: cond_br [[T2]], [[ERROR_BB:bb[0-9]+]], [[NORMAL_BB:bb[0-9]+]]
   try ErrorProne.fail()
 
@@ -208,7 +208,7 @@ func testPreservedResult() throws -> CInt {
 // CHECK:   [[RESULT:%.*]] = apply [[T1]](
 // CHECK:   [[T0:%.*]] = struct_extract [[RESULT]]
 // CHECK:   [[T1:%.*]] = integer_literal $[[PRIM:Builtin.Int[0-9]+]], 0
-// CHECK:   [[T2:%.*]] = builtin "cmp_eq"([[T0]] : $[[PRIM]], [[T1]] : $[[PRIM]])
+// CHECK:   [[T2:%.*]] = builtin "cmp_eq_Int32"([[T0]] : $[[PRIM]], [[T1]] : $[[PRIM]])
 // CHECK:   cond_br [[T2]], [[ERROR_BB:bb[0-9]+]], [[NORMAL_BB:bb[0-9]+]]
 // CHECK: [[NORMAL_BB]]:
 // CHECK-NOT: release

@@ -266,16 +266,21 @@ public:
   BuiltinInst *createBuiltinBinaryFunction(SILLocation Loc, StringRef Name,
                                            SILType OpdTy, SILType ResultTy,
                                            ArrayRef<SILValue> Args) {
-    CanType IntTy = OpdTy.getSwiftRValueType();
-    auto BuiltinIntTy = cast<BuiltinIntegerType>(IntTy);
+    auto &C = getASTContext();
+
     llvm::SmallString<16> NameStr = Name;
-    if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
-      NameStr += "_Word";
+    if (auto BuiltinIntTy = dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
+      if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
+        NameStr += "_Word";
+      } else {
+        unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
+        NameStr += "_Int" + llvm::utostr(NumBits);
+      }
     } else {
-      unsigned NumBits = BuiltinIntTy->getWidth().getFixedWidth();
-      NameStr += "_Int" + llvm::utostr(NumBits);
+      assert(OpdTy.getSwiftRValueType() == C.TheRawPointerType);
+      NameStr += "_RawPointer";
     }
-    auto Ident = getASTContext().getIdentifier(NameStr);
+    auto Ident = C.getIdentifier(NameStr);
     return insert(BuiltinInst::create(Loc, Ident, ResultTy, {}, Args, F));
   }
 
