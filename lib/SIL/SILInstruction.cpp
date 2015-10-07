@@ -216,7 +216,7 @@ namespace {
     }
 
     bool visitAllocStackInst(const AllocStackInst *RHS) {
-      return false;
+      return true;
     }
 
     bool visitDeallocBoxInst(const DeallocBoxInst *RHS) {
@@ -224,7 +224,7 @@ namespace {
     }
 
     bool visitAllocBoxInst(const AllocBoxInst *RHS) {
-      return false;
+      return true;
     }
 
     bool visitDeallocRefInst(const DeallocRefInst *RHS) {
@@ -232,11 +232,11 @@ namespace {
     }
 
     bool visitAllocRefInst(const AllocRefInst *RHS) {
-      return false;
+      return true;
     }
 
     bool visitAllocRefDynamicInst(const AllocRefDynamicInst *RHS) {
-      return false;
+      return true;
     }
 
     bool visitProjectValueBufferInst(const ProjectValueBufferInst *RHS) {
@@ -259,7 +259,7 @@ namespace {
     bool visitStrongRetainUnownedInst(const StrongRetainUnownedInst *RHS) {
       return true;
     }
-      
+
     bool visitLoadInst(const LoadInst *RHS) {
       return true;
     }
