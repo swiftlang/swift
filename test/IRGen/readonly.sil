@@ -19,7 +19,7 @@ sil @_TFC8readonly3XXXCfMS0_FT_S0_ : $@convention(thin) (@thick XXX.Type) -> @ow
 //CHECK: target datalayout
 
 //CHECK: ; Function Attrs: readonly
-//CHECK-NEXT: define void @function_foo(i64)
+//CHECK-NEXT: define void @function_foo(
 sil [readonly] @function_foo : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = tuple ()                                   // user: %2
