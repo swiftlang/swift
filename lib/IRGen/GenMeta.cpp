@@ -41,7 +41,7 @@
 #include "FixedTypeInfo.h"
 #include "GenClass.h"
 #include "GenPoly.h"
-#include "GenProto.h"
+#include "GenArchetype.h"
 #include "GenStruct.h"
 #include "HeapTypeInfo.h"
 #include "IRGenModule.h"

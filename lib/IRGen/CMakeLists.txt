@@ -2,6 +2,7 @@ add_swift_library(swiftIRGen
   DebugTypeInfo.cpp
   EnumPayload.cpp
   ExtraInhabitants.cpp
+  GenArchetype.cpp
   GenCast.cpp
   GenClangDecl.cpp
   GenClangType.cpp
@@ -15,6 +16,7 @@ add_swift_library(swiftIRGen
   GenMeta.cpp
   GenObjC.cpp
   GenEnum.cpp
+  GenExistential.cpp
   GenOpaque.cpp
   GenPoly.cpp
   GenProto.cpp

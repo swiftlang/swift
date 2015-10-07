@@ -43,8 +43,10 @@
 
 #include "CallEmission.h"
 #include "Explosion.h"
+#include "GenArchetype.h"
 #include "GenCast.h"
 #include "GenClass.h"
+#include "GenExistential.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
 #include "GenMeta.h"

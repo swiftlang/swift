@@ -109,6 +109,7 @@ namespace irgen {
   class FixedTypeInfo;
   class FormalType;
   class IRGenDebugInfo;
+  class IRGenFunction;
   class LinkEntity;
   class LoadableTypeInfo;
   class ProtocolInfo;
@@ -512,6 +513,11 @@ public:
                                 ArrayRef<FieldTypeInfo> fieldTypes,
                                 llvm::Function *fn);
   llvm::Constant *emitProtocolConformances();
+
+  llvm::Constant *getOrCreateHelperFunction(StringRef name,
+                                            llvm::Type *resultType,
+                                            ArrayRef<llvm::Type*> paramTypes,
+                        llvm::function_ref<void(IRGenFunction &IGF)> generate);
 
 private:
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;

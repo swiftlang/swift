@@ -2628,3 +2628,45 @@ IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *C,
                                storageTy, WitnessTableTy, WitnessTablePtrTy,
                                DebugTypeInfo());
 }
+
+/// Should we be defining the given helper function?
+static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
+                                          llvm::Constant *fn) {
+  llvm::Function *def = dyn_cast<llvm::Function>(fn);
+  if (!def) return nullptr;
+  if (!def->empty()) return nullptr;
+
+  def->setLinkage(llvm::Function::LinkOnceODRLinkage);
+  def->setVisibility(llvm::Function::HiddenVisibility);
+  def->setDoesNotThrow();
+  def->setCallingConv(IGM.RuntimeCC);
+  return def;
+}
+
+/// Get or create a helper function with the given name and type, lazily
+/// using the given generation function to fill in its body.
+///
+/// The helper function will be shared between translation units within the
+/// current linkage unit, so choose the name carefully to ensure that it
+/// does not collide with any other helper function.  In general, it should
+/// be a Swift-specific C reserved name; that is, it should start with
+//  "__swift".
+llvm::Constant *
+IRGenModule::getOrCreateHelperFunction(StringRef fnName, llvm::Type *resultTy,
+                                       ArrayRef<llvm::Type*> paramTys,
+                        llvm::function_ref<void(IRGenFunction &IGF)> generate) {
+  llvm::FunctionType *fnTy =
+    llvm::FunctionType::get(resultTy, paramTys, false);
+
+  llvm::Constant *fn = Module.getOrInsertFunction(fnName, fnTy);
+
+  if (llvm::Function *def = shouldDefineHelper(*this, fn)) {
+    IRGenFunction IGF(*this, def);
+    if (DebugInfo)
+      DebugInfo->emitArtificialFunction(IGF, def);
+    generate(IGF);
+  }
+
+  return fn;
+}
+

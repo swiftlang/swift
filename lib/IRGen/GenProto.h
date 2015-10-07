@@ -38,92 +38,6 @@ namespace irgen {
   class IRGenModule;
   class ProtocolInfo;
   class TypeInfo;
-
-  /// Emit the metadata and witness table initialization for an allocated
-  /// opaque existential container.
-  Address emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
-                                   Address dest,
-                                   SILType destType,
-                                   CanType formalSrcType,
-                                   SILType loweredSrcType,
-                                   ArrayRef<ProtocolConformance*> conformances);
-
-  /// Emit an existential metatype container from a metatype value
-  /// as an explosion.
-  void emitExistentialMetatypeContainer(IRGenFunction &IGF,
-                                        Explosion &out,
-                                        SILType outType,
-                                        llvm::Value *metatype,
-                                        SILType metatypeType,
-                                 ArrayRef<ProtocolConformance*> conformances);
-  
-  
-  /// Emit a class existential container from a class instance value
-  /// as an explosion.
-  void emitClassExistentialContainer(IRGenFunction &IGF,
-                                 Explosion &out,
-                                 SILType outType,
-                                 llvm::Value *instance,
-                                 CanType instanceFormalType,
-                                 SILType instanceLoweredType,
-                                 ArrayRef<ProtocolConformance*> conformances);
-
-  /// Allocate a boxed existential container with uninitialized space to hold a
-  /// value of a given type.
-  Address emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
-                                  Explosion &dest,
-                                  SILType destType,
-                                  CanType formalSrcType,
-                                  SILType loweredSrcType,
-                                  ArrayRef<ProtocolConformance *> conformances);
-  
-  /// "Deinitialize" an existential container whose contained value is allocated
-  /// but uninitialized, by deallocating the buffer owned by the container if any.
-  void emitOpaqueExistentialContainerDeinit(IRGenFunction &IGF,
-                                            Address container,
-                                            SILType type);
-  
-  /// Deallocate a boxed existential container with uninitialized space to hold
-  /// a value of a given type.
-  void emitBoxedExistentialContainerDeallocation(IRGenFunction &IGF,
-                                                 Explosion &container,
-                                                 SILType containerType,
-                                                 CanType valueType);
-  
-  /// Emit a projection from an existential container address to the address
-  /// of its concrete value buffer.
-  ///
-  /// \param openedArchetype If non-null, the archetype that will capture the
-  /// metadata and witness tables produced by projecting the archetype.
-  Address emitOpaqueExistentialProjection(IRGenFunction &IGF,
-                                          Address base,
-                                          SILType baseTy,
-                                          CanArchetypeType openedArchetype);
-  
-  /// Extract the instance pointer from a class existential value.
-  ///
-  /// \param openedArchetype If non-null, the archetype that will capture the
-  /// metadata and witness tables produced by projecting the archetype.
-  llvm::Value *emitClassExistentialProjection(IRGenFunction &IGF,
-                                              Explosion &base,
-                                              SILType baseTy,
-                                              CanArchetypeType openedArchetype);
-
-  /// Extract the metatype pointer from an existential metatype value.
-  ///
-  /// \param openedTy If non-null, a metatype of the archetype that
-  ///   will capture the metadata and witness tables
-  llvm::Value *emitExistentialMetatypeProjection(IRGenFunction &IGF,
-                                                 Explosion &base,
-                                                 SILType baseTy,
-                                                 CanType openedTy);
-
-  /// Project the address of the value inside a boxed existential container,
-  /// and open an archetype to its contained type.
-  Address emitBoxedExistentialProjection(IRGenFunction &IGF,
-                                         Explosion &base,
-                                         SILType baseTy,
-                                         CanArchetypeType openedArchetype);
   
   /// Extract the method pointer from an archetype's witness table
   /// as a function value.
@@ -161,7 +75,7 @@ namespace irgen {
                                       Explosion &params,
                                       WitnessMetadata &metadata);
 
-  using GetParameterFn = std::function<llvm::Value*(unsigned)>;
+  using GetParameterFn = llvm::function_ref<llvm::Value*(unsigned)>;
 
   /// In the prelude of a generic function, perform the bindings for a
   /// generics clause.
@@ -215,44 +129,31 @@ namespace irgen {
 
   /// Emit a witness table reference.
   llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
-                                   CanArchetypeType archetype,
-                                   ProtocolDecl *protocol);
-
-  /// Emit a witness table reference.
-  llvm::Value *emitWitnessTableRef(IRGenFunction &IGF,
                                    CanType srcType,
                                    const TypeInfo &srcTI,
                                    ProtocolDecl *proto,
                                    const ProtocolInfo &protoI,
                                    ProtocolConformance *conformance);
 
-  /// Emit a dynamic metatype lookup for the given archetype.
-  llvm::Value *emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
-                                                Address archetypeAddr,
-                                                SILType archetypeType);
-  
-  /// Emit the existential metatype of an opaque existential value.
-  void emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
-                                       SILType type, Explosion &out);
-  
-  /// Emit the existential metatype of a class existential value.
-  void emitMetatypeOfClassExistential(IRGenFunction &IGF,
-                                      Explosion &value, SILType metatypeType,
-                                      SILType existentialType, Explosion &out);
+  /// An entry in a list of known protocols.
+  class ProtocolEntry {
+    ProtocolDecl *Protocol;
+    const ProtocolInfo &Impl;
 
-  /// Emit the existential metatype of a boxed existential value.
-  void emitMetatypeOfBoxedExistential(IRGenFunction &IGF, Explosion &value,
-                                      SILType type, Explosion &out);
+  public:
+    explicit ProtocolEntry(ProtocolDecl *proto, const ProtocolInfo &impl)
+      : Protocol(proto), Impl(impl) {}
 
-  /// Emit the existential metatype of a metatype.
-  void emitMetatypeOfMetatype(IRGenFunction &IGF, Explosion &value,
-                              SILType existentialType, Explosion &out);
+    ProtocolDecl *getProtocol() const { return Protocol; }
+    const ProtocolInfo &getInfo() const { return Impl; }
+  };
 
-  std::pair<Address, llvm::Value*>
-  emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,
-                                                Address base,
-                                                SILType baseTy,
-                                                CanType openedArchetype);
+  using GetWitnessTableFn =
+    llvm::function_ref<llvm::Value*(unsigned originIndex)>;
+  llvm::Value *emitImpliedWitnessTableRef(IRGenFunction &IGF,
+                                          ArrayRef<ProtocolEntry> protos,
+                                          ProtocolDecl *target,
+                                    const GetWitnessTableFn &getWitnessTable);
 
   /// Allocate space for a value in a value buffer.
   Address emitAllocateBuffer(IRGenFunction &IGF, SILType valueType,
