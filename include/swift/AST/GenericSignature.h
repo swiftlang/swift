@@ -206,6 +206,9 @@ public:
   /// must conform.
   SmallVector<ProtocolDecl *, 2> getConformsTo(Type type, ModuleDecl &mod);
 
+  /// Determine whether the given dependent type is equal to a concrete type.
+  bool isConcreteType(Type type, ModuleDecl &mod);
+
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);

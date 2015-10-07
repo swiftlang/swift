@@ -469,26 +469,23 @@ SmallVector<ProtocolDecl *, 2> GenericSignature::getConformsTo(Type type,
 
   // Retrieve the protocols to which this type conforms.
   SmallVector<ProtocolDecl *, 2> result;
-  for (auto proto : pa->getConformsTo()) {
-    switch (proto.second.getKind()) {
-    case RequirementSource::Explicit:
-    case RequirementSource::Inferred:
-      result.push_back(proto.first);
-      break;
+  for (auto proto : pa->getConformsTo())
+    result.push_back(proto.first);
 
-    case RequirementSource::Redundant:
-    case RequirementSource::Protocol:
-      // Drop redundant requirements.
-      break;
-
-    case RequirementSource::OuterScope:
-      llvm_unreachable("Not part of the generic signature");
-    }
-  }
-
-  // Sort the resulting set of protocols.
-  llvm::array_pod_sort(result.begin(), result.end(),
-                       ProtocolType::compareProtocols);
+  // Canonicalize the resulting set of protocols.
+  ProtocolType::canonicalizeProtocols(result);
 
   return result;
+}
+
+/// Determine whether the given dependent type is equal to a concrete type.
+bool GenericSignature::isConcreteType(Type type, ModuleDecl &mod) {
+  if (!type->isTypeParameter()) return true;
+
+  auto &builder = *getArchetypeBuilder(mod);
+  auto pa = builder.resolveArchetype(type);
+  if (!pa) return true;
+
+  pa = pa->getRepresentative();
+  return pa->isConcreteType();
 }
