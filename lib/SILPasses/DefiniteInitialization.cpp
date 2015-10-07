@@ -1251,7 +1251,7 @@ void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
 
   // super.init also requires that all ivars are initialized before the
   // superclass initializer runs.
-  for (unsigned i = 0, e = TheMemory.getNumMemoryElements(); i != e; ++i) {
+  for (unsigned i = 0, e = TheMemory.NumElements-1; i != e; ++i) {
     if (Liveness.get(i) == DIKind::Yes) continue;
 
     // If the super.init call is implicit generated, produce a specific
