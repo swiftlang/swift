@@ -24,19 +24,19 @@ SILType SILType::getExceptionType(const ASTContext &C) {
 }
 
 SILType SILType::getNativeObjectType(const ASTContext &C) {
-  return SILType(CanType(C.TheNativeObjectType), SILValueCategory::Object);
+  return SILType(C.TheNativeObjectType, SILValueCategory::Object);
 }
 
 SILType SILType::getBridgeObjectType(const ASTContext &C) {
-  return SILType(CanType(C.TheBridgeObjectType), SILValueCategory::Object);
+  return SILType(C.TheBridgeObjectType, SILValueCategory::Object);
 }
 
 SILType SILType::getUnknownObjectType(const ASTContext &C) {
-  return getPrimitiveObjectType(CanType(C.TheUnknownObjectType));
+  return getPrimitiveObjectType(C.TheUnknownObjectType);
 }
 
 SILType SILType::getRawPointerType(const ASTContext &C) {
-  return getPrimitiveObjectType(CanType(C.TheRawPointerType));
+  return getPrimitiveObjectType(C.TheRawPointerType);
 }
 
 SILType SILType::getBuiltinIntegerType(unsigned bitWidth,
@@ -46,7 +46,7 @@ SILType SILType::getBuiltinIntegerType(unsigned bitWidth,
 
 SILType SILType::getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
                                      const ASTContext &C) {
-  Type ty;
+  CanType ty;
   switch (Kind) {
   case BuiltinFloatType::IEEE16:  ty = C.TheIEEE16Type; break;
   case BuiltinFloatType::IEEE32:  ty = C.TheIEEE32Type; break;
@@ -55,7 +55,7 @@ SILType SILType::getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
   case BuiltinFloatType::IEEE128: ty = C.TheIEEE128Type; break;
   case BuiltinFloatType::PPC128:  ty = C.ThePPC128Type; break;
   }
-  return getPrimitiveObjectType(CanType(ty));
+  return getPrimitiveObjectType(ty);
 }
 
 SILType SILType::getBuiltinWordType(const ASTContext &C) {

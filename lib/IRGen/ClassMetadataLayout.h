@@ -191,7 +191,7 @@ private:
     // TODO: consider emitting at different explosion levels and
     // uncurryings.
     auto explosionLevel = ResilienceExpansion::Minimal;
-    unsigned uncurryLevel = fn->getNaturalArgumentCount() - 1;
+    unsigned uncurryLevel = SILDeclRef::ConstructAtNaturalUncurryLevel;
     
     if (isa<FuncDecl>(fn))
       maybeAddMethod(fn, SILDeclRef::Kind::Func, explosionLevel, uncurryLevel);

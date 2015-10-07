@@ -1749,7 +1749,7 @@ static CanAnyFunctionType getDestructorType(DestructorDecl *dd,
       .withSILRepresentation(SILFunctionTypeRepresentation::Method);
   
   CanType resultTy = isDeallocating? TupleType::getEmpty(C)->getCanonicalType()
-                                   : CanType(C.TheNativeObjectType);
+                                   : C.TheNativeObjectType;
 
   if (auto params = dd->getDeclContext()->getGenericParamsOfContext())
     return CanPolymorphicFunctionType::get(classType, resultTy, params, extInfo);
@@ -1779,7 +1779,7 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
       .withSILRepresentation(SILFunctionTypeRepresentation::Method);
 
   CanType resultTy = isDeallocating? TupleType::getEmpty(C)->getCanonicalType()
-                                   : CanType(C.TheNativeObjectType);
+                                   : C.TheNativeObjectType;
 
   auto sig = dd->getDeclContext()->getGenericSignatureOfContext();
   if (sig)
