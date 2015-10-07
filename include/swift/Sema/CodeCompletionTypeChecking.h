@@ -55,7 +55,7 @@ namespace swift {
                                                 DeclContext *DC,
                                                 Expr *&parsedExpr);
 
-  /// Typecheck a the sequence expression \p parsedExpr for code completion.
+  /// Typecheck the sequence expression \p parsedExpr for code completion.
   ///
   /// This requires that \p parsedExpr is a SequenceExpr and that it contains:
   ///   * ... leading sequence  LHS
@@ -68,6 +68,9 @@ namespace swift {
   ///
   /// The LHS should already be type-checked or this will be very slow.
   bool typeCheckCompletionSequence(DeclContext *DC, Expr *&parsedExpr);
+
+  /// Typecheck the given expression.
+  bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
 
   /// Partially typecheck the specified function body.
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,

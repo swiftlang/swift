@@ -2484,16 +2484,61 @@ public:
     }
   }
 
-  void getOperatorCompletions(Expr *LHS) {
+  void flattenBinaryExpr(BinaryExpr *expr, SmallVectorImpl<Expr *> &sequence) {
+    auto LHS = expr->getArg()->getElement(0);
+    if (auto binexpr = dyn_cast<BinaryExpr>(LHS))
+      flattenBinaryExpr(binexpr, sequence);
+    else
+      sequence.push_back(LHS);
+
+    sequence.push_back(expr->getFn());
+
+    auto RHS = expr->getArg()->getElement(1);
+    if (auto binexpr = dyn_cast<BinaryExpr>(RHS))
+      flattenBinaryExpr(binexpr, sequence);
+    else
+      sequence.push_back(RHS);
+  }
+
+  void typeCheckLeadingSequence(SmallVectorImpl<Expr *> &sequence) {
+    Expr *expr =
+        SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
+    // Take advantage of the fact the type-checker leaves the types on the AST.
+    if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
+                             expr)) {
+      if (auto binexpr = dyn_cast<BinaryExpr>(expr)) {
+        // Rebuild the sequence from the type-checked version.
+        sequence.clear();
+        flattenBinaryExpr(binexpr, sequence);
+        return;
+      }
+    }
+
+    // Fall back to just using the immediate LHS.
+    auto LHS = sequence.back();
+    sequence.clear();
+    sequence.push_back(LHS);
+  }
+
+  void getOperatorCompletions(Expr *LHS, ArrayRef<Expr *> leadingSequence) {
     std::vector<OperatorDecl *> operators = collectOperators();
 
     // FIXME: this always chooses the first operator with the given name.
     llvm::DenseSet<Identifier> seenPostfixOperators;
     llvm::DenseSet<Identifier> seenInfixOperators;
 
+    SmallVector<Expr *, 3> sequence(leadingSequence.begin(),
+                                    leadingSequence.end());
+    sequence.push_back(LHS);
+    assert((sequence.size() & 1) && "sequence expr ending with operator");
+
+    if (sequence.size() > 1)
+      typeCheckLeadingSequence(sequence);
+
     // Create a single sequence expression, which we will modify for each
     // operator, filling in the operator and dummy right-hand side.
-    SmallVector<Expr *, 3> sequence = {LHS, /*op*/ nullptr, /*RHS*/ nullptr};
+    sequence.push_back(nullptr); // operator
+    sequence.push_back(nullptr); // RHS
     auto *SE = SequenceExpr::create(CurrDeclContext->getASTContext(), sequence);
 
     for (auto op : operators) {
@@ -3711,7 +3756,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(*ExprType);
-    Lookup.getOperatorCompletions(ParsedExpr);
+    Lookup.getOperatorCompletions(ParsedExpr, leadingSequenceExprs);
     break;
   }
 

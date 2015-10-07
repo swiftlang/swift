@@ -58,6 +58,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_INT_1 | FileCheck %s -check-prefix=INFIX_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_INT_2 | FileCheck %s -check-prefix=INFIX_LVALUE_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_STRING_1 | FileCheck %s -check-prefix=INFIX_STRING
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INFIX_EXT_STRING_1 | FileCheck %s -check-prefix=INFIX_EXT_STRING
 
 // NO_STDLIB_PRIVATE: Begin completions
 // NO_STDLIB_PRIVATE-NOT: Decl[{{.*}}]{{[^:]*}}: _
@@ -270,3 +271,13 @@ func testInfixOperator3(x: String) {
 // INFIX_STRING-NOT: +=
 // INFIX_STRING-NOT: <<
 // INFIX_STRING: End completions
+
+func testInfixOperator4(x: String) {
+  x == ""#^INFIX_EXT_STRING_1^#
+}
+// INFIX_EXT_STRING: Begin completions
+// INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#String#}[#String#]
+// INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#Bool#}[#Bool#]
+// INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  || {#Bool#}[#Bool#]
+// INFIX_EXT_STRING-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  && {#Bool#}[#Bool#]
+// INFIX_EXT_STRING: End completions

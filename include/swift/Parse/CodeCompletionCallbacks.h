@@ -37,6 +37,8 @@ protected:
   /// case.
   bool InEnumElementRawValue = false;
 
+  std::vector<Expr *> leadingSequenceExprs;
+
 public:
   CodeCompletionCallbacks(Parser &P)
       : P(P), Context(P.Context) {
@@ -50,6 +52,10 @@ public:
 
   void setDelayedParsedDecl(Decl *D) {
     DelayedParsedDecl = D;
+  }
+
+  void setLeadingSequenceExprs(ArrayRef<Expr *> exprs) {
+    leadingSequenceExprs.assign(exprs.begin(), exprs.end());
   }
 
   class InCStyleForExprRAII {

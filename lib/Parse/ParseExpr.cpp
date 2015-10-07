@@ -208,7 +208,14 @@ ParserResult<Expr> Parser::parseExprSequence(Diag<> Message,
       parseExprSequenceElement(Message, isExprBasic);
     HasCodeCompletion |= Primary.hasCodeCompletion();
     if (Primary.isNull()) {
-      return Primary.hasCodeCompletion() ? Primary : nullptr;
+      if (Primary.hasCodeCompletion()) {
+        if (CodeCompletion) {
+          CodeCompletion->setLeadingSequenceExprs(SequencedExprs);
+        }
+        return Primary;
+      } else {
+        return nullptr;
+      }
     }
     SequencedExprs.push_back(Primary.get());
     

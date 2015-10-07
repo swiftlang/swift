@@ -1270,14 +1270,20 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   expr = foldSequence(SE, DC);
 
   // Find the code-completion expression and operator again.
-  assert(SE->getNumElements() == 3 && "not implemented");
-  auto *binExpr = dyn_cast<BinaryExpr>(expr);
-  if (!binExpr)
+  BinaryExpr *exprAsBinOp = nullptr;
+  while (auto *binExpr = dyn_cast<BinaryExpr>(expr)) {
+    auto *RHS = binExpr->getArg()->getElement(1);
+    if (RHS == CCE) {
+      exprAsBinOp = binExpr;
+      break;
+    }
+    expr = RHS;
+  }
+  if (!exprAsBinOp)
     return true;
-  CCE = cast<CodeCompletionExpr>(binExpr->getArg()->getElement(1));
 
-  // Update the output expression.
-  expr = binExpr;
+  // Ensure the output expression is up to date.
+  assert(exprAsBinOp == expr && "found wrong expr?");
 
   // Add type variable for the code-completion expression.
   auto tvRHS =

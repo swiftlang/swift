@@ -32,6 +32,12 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_21 | FileCheck %s -check-prefix=NO_OPERATORS
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=INFIX_22 | FileCheck %s -check-prefix=NO_OPERATORS
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=S2_INFIX_SPACE | FileCheck %s -check-prefix=S2_INFIX_SPACE
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_1 | FileCheck %s -check-prefix=S2_INFIX
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_2 > %t.ext_infix_2
+// RUN: FileCheck %s -check-prefix=S4_EXT_INFIX < %t.ext_infix_2
+// RUN: FileCheck %s -check-prefix=S4_EXT_INFIX_NEG < %t.ext_infix_2
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_3 | FileCheck %s -check-prefix=S4_EXT_INFIX_SIMPLE
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=EXT_INFIX_4 | FileCheck %s -check-prefix=S4_EXT_INFIX_SIMPLE
 
 struct S {}
 postfix operator ++ {}
@@ -269,3 +275,48 @@ func testSpace(x: S2) {
 // S2_INFIX_SPACE-DAG: Decl[InfixOperatorFunction]/CurrModule: [' ']** {#Int#}[#S2#]
 // S2_INFIX_SPACE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']+ {#S2#}[#S2#]
 // S2_INFIX_SPACE: End completions
+
+func testExtInfix1(var x: S2) {
+  x + S2() + x + S2() + x + S2() + x#^EXT_INFIX_1^#
+}
+
+struct S4 {}
+func +(x: S4, y: S4) -> S4 { return x }
+func ==(x: S4, y: S4) -> Bool { return true }
+
+infix operator +++ {
+  associativity left
+  precedence 1
+}
+func +++(x: S4, y: S4) -> S4 { return x }
+infix operator &&& {
+  associativity left
+  precedence 255
+}
+func &&&(x: Bool, y: Bool) -> S4 { return x }
+
+func testExtInfix2(x: S4) {
+  x + x == x + x#^EXT_INFIX_2^#
+}
+// S4_EXT_INFIX: Begin completions
+// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#Bool#}[#Bool#]
+// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#S4#}[#S4#]
+// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#Bool#}[#Bool#]
+// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  && {#Bool#}[#Bool#]
+// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  || {#Bool#}[#Bool#]
+// S4_EXT_INFIX: End completions
+
+// S4_EXT_INFIX_NEG-NOT: +++
+// S4_EXT_INFIX_NEG-NOT: &&&
+
+func testExtInfix3(x: S4) {
+   x + x#^EXT_INFIX_3^#
+}
+// S4_EXT_INFIX_SIMPLE: Begin completions
+// S4_EXT_INFIX_SIMPLE-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#S4#}[#S4#]
+// S4_EXT_INFIX_SIMPLE-DAG: Decl[InfixOperatorFunction]/CurrModule:  +++ {#S4#}[#S4#]
+// S4_EXT_INFIX_SIMPLE: End completions
+
+func testExtInfix4(x: S4) {
+   1 + 1.0 + x#^EXT_INFIX_4^#
+}
