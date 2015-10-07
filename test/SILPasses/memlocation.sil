@@ -32,7 +32,32 @@ struct S1 {
   init()
 }
 
+struct S2 {
+  var a: Int
+  var b: Int
+  init(a: Int, b: Int)
+  init()
+}
+
+struct S3 {
+  var a: S2
+  var b: Int
+  var c: S2
+  init(a: S2, b: Int, c: S2)
+  init()
+}
+
+struct S4 {
+  var x: S3
+  var y: S3
+  init(x: S3, y: S3)
+  init()
+}
+
 sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
+sil @S2_init : $@convention(thin) (@thin S2.Type) -> S2
+sil @S3_init : $@convention(thin) (@thin S3.Type) -> S3
+sil @S4_init : $@convention(thin) (@thin S4.Type) -> S4
 
 // CHECK-LABEL: @store_after_store
 // CHECK: #0  [[RET0:%.+]] = alloc_box
@@ -64,4 +89,107 @@ sil @store_after_store_struct : $@convention(thin) () -> () {
   dealloc_stack %1#0 : $*@local_storage S1        // id: %13
   %5 = return %4 : $()
 }
+
+
+// Make sure all the structs get expanded correctly.
+//
+// CHECK-LABEL: @many_struct_allocs
+// CHECK: alloc_stack $S2
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var b: Int
+// CHECK-NEXT: alloc_stack $S2
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var a: Int
+// CHECK-NEXT: alloc_stack $S3
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var b: Int
+// CHECK-NEXT: var c: S2
+// CHECK-NEXT: alloc_stack $S3
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var a: Int
+// CHECK-NEXT: var c: S2
+// CHECK-NEXT: alloc_stack $S3
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var b: Int
+// CHECK-NEXT: alloc_stack $S3
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var b: Int
+// CHECK-NEXT: var a: S2
+// CHECK-NEXT: alloc_stack $S3
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var a: Int
+// CHECK-NEXT: var a: S2
+// CHECK-NEXT: alloc_stack $S4
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var b: Int
+// CHECK-NEXT: var c: S2
+// CHECK-NEXT: var y: S3
+// CHECK-NEXT: alloc_stack $S4
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var a: Int
+// CHECK-NEXT: var c: S2
+// CHECK-NEXT: var y: S3
+// CHECK-NEXT: alloc_stack $S4
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var b: Int
+// CHECK-NEXT: var y: S3
+// CHECK-NEXT: alloc_stack $S4
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var b: Int
+// CHECK-NEXT: var a: S2
+// CHECK-NEXT: var y: S3
+// CHECK-NEXT: alloc_stack $S4
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var a: Int
+// CHECK-NEXT: var a: S2
+// CHECK-NEXT: var y: S3
+// CHECK-NEXT: alloc_stack $S4
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var b: Int
+// CHECK-NEXT: var c: S2
+// CHECK-NEXT: var x: S3
+// CHECK-NEXT: alloc_stack $S4
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var a: Int
+// CHECK-NEXT: var c: S2
+// CHECK-NEXT: var x: S3
+// CHECK-NEXT: alloc_stack $S4
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var b: Int
+// CHECK-NEXT: var x: S3
+// CHECK-NEXT: alloc_stack $S4
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var b: Int
+// CHECK-NEXT: var a: S2
+// CHECK-NEXT: var x: S3
+// CHECK-NEXT: alloc_stack $S4
+// CHECK-NEXT: var value: Int64
+// CHECK-NEXT: var a: Int
+// CHECK-NEXT: var a: S2
+// CHECK-NEXT: var x: S3
+sil hidden @many_struct_allocs : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S2  // var a                  // users: %6, %18
+  %1 = alloc_stack $S3  // var b                  // users: %10, %17
+  %2 = alloc_stack $S4  // var c                  // users: %14, %16
+  %3 = function_ref @S2_init : $@convention(thin) (@thin S2.Type) -> S2 // user: %5
+  %4 = metatype $@thin S2.Type                    // user: %5
+  %5 = apply %3(%4) : $@convention(thin) (@thin S2.Type) -> S2 // user: %6
+  store %5 to %0#1 : $*S2                         // id: %6
+  // function_ref struct.S3.init (struct.S3.Type)() -> struct.S3
+  %7 = function_ref @S3_init : $@convention(thin) (@thin S3.Type) -> S3 // user: %9
+  %8 = metatype $@thin S3.Type                    // user: %9
+  %9 = apply %7(%8) : $@convention(thin) (@thin S3.Type) -> S3 // user: %10
+  store %9 to %1#1 : $*S3                         // id: %10
+  %11 = function_ref @S4_init : $@convention(thin) (@thin S4.Type) -> S4 // user: %13
+  %12 = metatype $@thin S4.Type                   // user: %13
+  %13 = apply %11(%12) : $@convention(thin) (@thin S4.Type) -> S4 // user: %14
+  store %13 to %2#1 : $*S4                        // id: %14
+  %15 = tuple ()                                  // user: %19
+  dealloc_stack %2#0 : $*@local_storage S4        // id: %16
+  dealloc_stack %1#0 : $*@local_storage S3        // id: %17
+  dealloc_stack %0#0 : $*@local_storage S2        // id: %18
+  return %15 : $()                                // id: %19
+}
+
 
