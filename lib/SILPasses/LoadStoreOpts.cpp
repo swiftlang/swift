@@ -38,12 +38,7 @@
 
 using namespace swift;
 
-/// Disable dead store elimination.
-static llvm::cl::opt<bool> DisableGDSE("sil-disable-loadstore-dse",
-                                      llvm::cl::init(true), llvm::cl::Hidden);
-
 STATISTIC(NumSameValueStores,"Number of same value stores removed");
-STATISTIC(NumDeadStores,     "Number of dead stores removed");
 STATISTIC(NumDupLoads,       "Number of dup loads removed");
 STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 
@@ -324,13 +319,6 @@ namespace {
   /// the introdution of a SILArgument. This enables us to treat both cases the
   /// same during our transformations in an abstract way.
   class LSStore : public LSValue {
-    /// Set to true if this LSStore has been read from by some instruction so it
-    /// must be live.
-    ///
-    /// This allows us to know that the LSStore can not be deleted, but can
-    /// still be forwarded from.
-    bool HasReadDependence = false;
-
   public:
     LSStore(StoreInst *NewStore) : LSValue(NewStore) {}
 
@@ -343,19 +331,6 @@ namespace {
         I->eraseFromParent();
       }
     }
-
-    /// Returns true if I post dominates all of the stores that we are tracking.
-    bool postdominates(PostDominanceInfo *PDI, SILInstruction *I) {
-      for (SILInstruction *Stores : getInsts()) {
-        if (!PDI->properlyDominates(I, Stores)) {
-          return false;
-        }
-      }
-      return true;
-    }
-    
-    void setHasReadDependence() { HasReadDependence = true; }
-    bool hasReadDependence() const { return HasReadDependence; }
 
     bool mayWriteToMemory(AliasAnalysis *AA, SILInstruction *Inst) {
       for (auto &I : getInsts()) {
@@ -743,23 +718,6 @@ public:
   void startTrackingLoad(LSContext &Ctx, LoadInst *LI,
                          CoveredStoreMap &StoreMap) {
     DEBUG(llvm::dbgs() << "        Tracking Load: " << *LI);
-
-#ifndef NDEBUG
-    // Make sure that any stores we are tracking that may alias this load have
-    // the read dependence bit set.
-    auto *AA = Ctx.getAA();
-    for (auto &P : Stores) {
-      assert((!P.second.aliasingWrite(AA, LI) ||
-              P.second.hasReadDependence()) &&
-             "Found aliasing store without read dependence");
-    }
-    for (auto &P : StoreMap) {
-      assert((!P.second.aliasingWrite(AA, LI) ||
-              P.second.hasReadDependence()) &&
-             "Found aliasing store without read dependence");
-    }
-#endif
-
     Loads.insert({LI->getOperand(), LSLoad(LI)});
   }
 
@@ -795,24 +753,6 @@ public:
     StoreMap.erase(Addr);
   }
 
-  /// Stop tracking any state related to the address \p Addr.
-  void setReadDependencyOnStores(SILValue Addr, CoveredStoreMap &StoreMap) {
-    DEBUG(llvm::dbgs() << "        Adding read dependency: " << Addr);
-    {
-      auto Iter = Stores.find(Addr);
-      if (Iter != Stores.end()) {
-        Iter->second.setHasReadDependence();
-      }
-    }
-
-    {
-      auto Iter = StoreMap.find(Addr);
-      if (Iter != StoreMap.end()) {
-        Iter->second.setHasReadDependence();
-      }
-    }
-  }
-
   /// Delete the store that we have mapped to Addr, plus other instructions
   /// which get dead due to the removed store.
   void deleteStoreMappedToAddress(LSContext &Ctx, SILValue Addr,
@@ -828,14 +768,6 @@ public:
   /// Invalidate our store if Inst writes to the destination location.
   void invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst,
                                CoveredStoreMap &StoreMap);
-
-  /// Invalidate our store if Inst reads from the destination location.
-  void invalidateReadFromStores(LSContext &Ctx, SILInstruction *Inst,
-                                CoveredStoreMap &StoreMap);
-
-  /// Update the load store states w.r.t. the store instruction.
-  void processStoreInst(LSContext &Ctx, StoreInst *SI,
-                        CoveredStoreMap &StoreMap);
 
   /// Try to prove that SI is a dead store updating all current state. If SI is
   /// dead, eliminate it.
@@ -964,38 +896,8 @@ invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst,
   }
 }
 
-void LSBBForwarder::invalidateReadFromStores(LSContext &Ctx,
-                                             SILInstruction *Inst,
-                                             CoveredStoreMap &StoreMap) {
-  AliasAnalysis *AA = Ctx.getAA();
-  for (auto &P : Stores) {
-    if (!P.second.aliasingRead(AA, Inst))
-      continue;
-
-    DEBUG(llvm::dbgs() << "        Found an instruction that reads from "
-                          "memory such that a store has a read dependence:"
-                       << P.first);
-    setReadDependencyOnStores(P.first, StoreMap);
-  }
-}
-
-void LSBBForwarder::processStoreInst(LSContext &Ctx, StoreInst *SI,
-                                     CoveredStoreMap &StoreMap) {
-  // Invalidate any load that we can not prove does not read from the stores
-  // destination.
-  invalidateAliasingLoads(Ctx, SI, StoreMap);
-
-  // Invalidate any store that we can not prove does not write to the stored
-  // destination.
-  invalidateWriteToStores(Ctx, SI, StoreMap);
-
-  // Insert SI into our store list to start tracking.
-  startTrackingStore(Ctx, SI, StoreMap);
-}
-
 bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
                                              CoveredStoreMap &StoreMap) {
-  PostDominanceInfo *PDI = Ctx.getPDI();
   AliasAnalysis *AA = Ctx.getAA();
 
   // If we are storing a value that is available in the load list then we
@@ -1029,67 +931,15 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
 
   // If we are storing to a previously stored address that this store post
   // dominates, delete the old store.
-  llvm::SmallVector<SILValue, 4> StoresToDelete;
   llvm::SmallVector<SILValue, 4> StoresToStopTracking;
   bool Changed = false;
   for (auto &P : Stores) {
     if (!P.second.aliasingWrite(AA, SI))
       continue;
 
-    // If this store has a read dependency then it can not be dead. We need to
-    // remove it from the store list and start tracking the new store, though.
-    if (P.second.hasReadDependence()) {
-      StoresToStopTracking.push_back(P.first);
-      DEBUG(llvm::dbgs()
-            << "        Found an aliasing store... But we don't "
-               "know that it must alias... Can't remove it but will track it.");
-      continue;
-    }
-
-    // We know that the locations might alias. Check whether if they are the
-    // exact same location.
-    //
-    // Some things to note:
-    //
-    // 1. Our alias analysis is relatively conservative with must alias. We only
-    // return must alias for two values V1, V2 if:
-    //   a. V1 == V2.
-    //   b. getUnderlyingObject(V1) == getUnderlingObject(V2) and the projection
-    //      paths from V1.stripCasts() to V2.stripCasts() to the underlying
-    //      objects are exactly the same and do not contain any casts.
-    // 2. There are FileCheck sil tests that verifies that the correct
-    // load store behavior is preserved in case this behavior changes.
-    bool IsStoreToSameLocation = AA->isMustAlias(SI->getDest(), P.first);
-
-    // If this store may alias but is not known to be to the same location, we
-    // cannot eliminate it. We need to remove it from the store list and start
-    // tracking the new store, though.
-    if (!IsStoreToSameLocation) {
-      StoresToStopTracking.push_back(P.first);
-      DEBUG(llvm::dbgs() << "        Found an aliasing store... But we don't "
-            "know that it must alias... Can't remove it but will track it.");
-      continue;
-    }
-
-    // If this store does not post dominate prev store, we can not eliminate
-    // it. But do remove prev store from the store list and start tracking the
-    // new store.
-    //
-    // We are only given this if we are being used for multi-bb load store opts
-    // (when this is required). If we are being used for single-bb load store
-    // opts, this is not necessary, so skip it.
-    if (!P.second.postdominates(PDI, SI)) {
-      StoresToStopTracking.push_back(P.first);
-      DEBUG(llvm::dbgs() << "        Found dead store... That we don't "
-            "postdominate... Can't remove it but will track it.");
-      continue;
-    }
-
-    DEBUG(llvm::dbgs() << "        Found a dead previous store... Removing...:"
-                       << P);
-    Changed = true;
-    StoresToDelete.push_back(P.first);
-    NumDeadStores++;
+    // SI may alias with this store, this store can not be dead nor can its
+    // value be forwarded.
+    StoresToStopTracking.push_back(P.first);
   }
 
   for (auto &P : StoreMap) {
@@ -1098,8 +948,6 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
     StoresToStopTracking.push_back(P.first);
   }
 
-  for (SILValue SIOp : StoresToDelete)
-    deleteStoreMappedToAddress(Ctx, SIOp, StoreMap);
   for (SILValue SIOp : StoresToStopTracking)
     stopTrackingAddress(SIOp, StoreMap);
 
@@ -1189,23 +1037,14 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
   // the load we will rerun the algorithm allowing us to hit the store the
   // second time through. But modeling memory effects precisely is an
   // imperitive.
-  llvm::SmallVector<SILValue, 8> ReadDependencyStores;
-
   auto *AA = Ctx.getAA();
   // If we are loading a value that we just stored, forward the stored value.
   for (auto &I : Stores) {
     SILValue Addr = I.first;
 
     ForwardingAnalysis FA(Ctx.getAA(), Addr, LI);
-    if (!FA.canForward()) {
-      // Although the addresses match, we cannot load the stored value. If we do
-      // not forward the load to be conservative, we need to set a read
-      // dependency on this store.
-      if (I.second.mayWriteToMemory(AA, LI)) {
-        ReadDependencyStores.push_back(Addr);
-      }
+    if (!FA.canForward())
       continue;
-    }
 
     SILValue Value = I.second.getForwardingValue();
     SILValue Result = FA.forward(Addr, Value, LI);
@@ -1221,15 +1060,8 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
   // Check if we can forward from multiple stores.
   for (auto &I : StoreMap) {
     ForwardingAnalysis FA(AA, I.first, LI);
-    if (!FA.canForward()) {
-      // Although the addresses match, we cannot load the stored value. If we do
-      // not forward the load to be conservative, we need to set a read
-      // dependency on this store.
-      if (I.second.mayWriteToMemory(AA, LI)) {
-        ReadDependencyStores.push_back(I.first);
-      }
+    if (!FA.canForward())
       continue;
-    }
 
     DEBUG(llvm::dbgs() << "        Checking from: ");
     for (auto *SI : I.second.getInsts()) {
@@ -1248,13 +1080,6 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
     NumForwardedLoads++;
     return true;
   }
-
-  // If we were unable to eliminate the load, then set the read dependency bit
-  // on all of the addresses that we could have a dependency upon.
-  for (auto V : ReadDependencyStores) {
-    setReadDependencyOnStores(V, StoreMap);
-  }
-
   return false;
 }
 
@@ -1331,12 +1156,6 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
 
     // This is a StoreInst. Let's see if we can remove the previous stores.
     if (auto *SI = dyn_cast<StoreInst>(Inst)) {
-      // If DSE is disabled, merely update states w.r.t. this store, but do not
-      // try to get rid of the store.
-      if (DisableGDSE) {
-        processStoreInst(Ctx, SI, StoreMap);
-        continue;
-      }
       Changed |= tryToEliminateDeadStores(Ctx, SI, StoreMap);
       continue;
     }
@@ -1359,13 +1178,6 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
       DEBUG(llvm::dbgs() << "        Found readnone instruction, does not "
                             "affect loads and stores.\n");
       continue;
-    }
-
-    // All other instructions that read from the memory location of the store
-    // act as a read dependency on the store meaning that the store can no
-    // longer be dead.
-    if (Inst->mayReadFromMemory()) {
-      invalidateReadFromStores(Ctx, Inst, StoreMap);
     }
 
     // If we have an instruction that may write to memory and we can not prove
