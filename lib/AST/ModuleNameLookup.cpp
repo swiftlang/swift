@@ -171,12 +171,7 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
     auto newEndIter = std::remove_if(localDecls.begin(), localDecls.end(),
                                     [=](ValueDecl *VD) {
       if (typeResolver) {
-        // Do not resolve values in a type context - doing so could potentially
-        // lead to an infinitely recursive validation loop.
-        if ((resolutionKind != ResolutionKind::TypesOnly) ||
-            dyn_cast<TypeDecl>(VD)) {
-          typeResolver->resolveDeclSignature(VD);
-        }
+	typeResolver->resolveAccessibility(VD);
       }
       if (!VD->hasAccessibility())
         return false;
