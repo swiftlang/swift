@@ -494,13 +494,14 @@ static inline llvm::hash_code hash_value(const Projection &P) {
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, Projection &P) {
   if (P.isNominalKind()) 
     P.getDecl()->print(OS);
-  OS << P.getIndex();
+  else 
+    OS << P.getIndex();
   return OS;
 }
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, ProjectionPath &P) {
   for (auto &X : P)
-    OS << X;
+    OS << X << "\n";
   return OS;
 }
 

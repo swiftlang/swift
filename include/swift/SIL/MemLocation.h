@@ -190,6 +190,7 @@ static inline llvm::hash_code hash_value(const MemLocation &L) {
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, MemLocation &V) {
   V.getBase().print(OS);
+  OS << V.getPath().getValue();
   return OS;
 }
 

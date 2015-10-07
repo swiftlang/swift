@@ -48,7 +48,11 @@ bb0(%0 : $B):
 
 // CHECK-LABEL: @store_after_store_struct
 // CHECK: #0  [[RET0:%.+]] = alloc_stack
+// CHECK-NEXT: Int64
+// CHECK-NEXT: Int
 // CHECK: #1  [[RET0:%.+]] = alloc_stack
+// CHECK-NEXT: Int64
+// CHECK-NEXT: Int
 sil @store_after_store_struct : $@convention(thin) () -> () {
   %1 = alloc_stack $S1
   %9 = integer_literal $Builtin.Int64, 0          // user: %10
