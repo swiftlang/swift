@@ -1,19 +1,79 @@
-//===---- LoadStoreOpts.cpp - SIL Load/Store Optimizations Forwarding -----===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
-//
-// This pass eliminates redundant loads, dead stores, and performs load
-// forwarding.
-//
-//===----------------------------------------------------------------------===//
+///===---- LoadStoreOpts.cpp - SIL Load/Store Optimizations Forwarding -----===//
+///
+/// This source file is part of the Swift.org open source project
+///
+/// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+/// Licensed under Apache License v2.0 with Runtime Library Exception
+///
+/// See http://swift.org/LICENSE.txt for license information
+/// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+///
+///===----------------------------------------------------------------------===//
+///
+/// This pass eliminates redundant loads, dead stores, and performs load
+/// forwarding.
+///
+/// TODO: Plan to implement new redundant load elimination, a.k.a. load
+/// forwarding.
+///
+/// A load can be eliminated if its value has already been held somewhere,
+/// i.e. loaded by a previous load, memory location stored by a known
+/// value.
+///
+/// In this case, one can replace the load instruction with the previous
+/// results.
+///
+/// RedudantLoadElimination (RLE) eliminates such loads by:
+///
+/// 1. Introducing a notion of a MemLocation that is used to model objects
+/// fields. (See below for more details).
+///
+/// 2. Introducing a notion of a MemValue that is used to model the value
+/// that currently resides in the associated MemLocation on the particular
+/// program path. (See below for more details).
+///
+/// 3. Performing a RPO walk over the control flow graph, tracking any
+/// MemLocations that are read from or stored into in each basic block. The
+/// read or stored value, kept in a map (gen-set) from MemLocation <-> MemValue,
+/// becomes the avalable value for the MemLocation. 
+///
+/// 4. An optimistic iterative intersection-based dataflow is performed on the
+/// gen sets until convergence.
+///
+/// At the core of RLE, there is the MemLocation class. a MemLocation is an
+/// abstraction of an object field in program. It consists of a base and a 
+/// projection path to the field accessed.
+///
+/// In SIL, one can access an aggregate as a whole, i.e. store to a struct with
+/// 2 Int fields. A store like this will generate 2 *indivisible* MemLocations, 
+/// 1 for each field and in addition to keeping a list of MemLocation, RLE also
+/// keeps their available MemValues. We call it *indivisible* because it can not
+/// be broken down to more MemLocations.
+///
+/// MemValues consists of a base - a SILValue from the load or store inst,
+/// as well as a projection path to which the field it represents. So, a
+/// store to an 2-field struct as mentioned above will generate 2 MemLocations
+/// and 2 MemValues.
+///
+/// Every basic block keeps a map between MemLocation <-> MemValue. By keeping
+/// the MemLocation and MemValue in their indivisible form, one can
+/// easily find which part of the load is redundant and how to compute its
+/// forwarding value.
+///
+/// Given the case which the 2 fields of the struct both have available values,
+/// RLE can find their MemValues (maybe by struct_extract from a larger value)
+/// and then aggregate them.
+///
+/// However, this may introduce a lot of extraction and aggregation which may
+/// not be necessary. i.e. a store the the struct followed by a load from the
+/// struct. To solve this problem, when RLE detects that an load instruction
+/// can be replaced by forwarded value, it will try to find minimum # of
+/// extraction necessary to form the forwarded value. It will group the
+/// available value's by the MemValue base, i.e. the MemValues come from the
+/// same instruction,  and then use extraction to obtain the needed components
+/// of the base.
+///
+///===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "load-store-opts"
 #include "swift/SILPasses/Passes.h"
