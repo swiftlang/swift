@@ -22,6 +22,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SILAnalysis/Analysis.h"
 #include "swift/SILPasses/Transforms.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -32,14 +33,37 @@ using namespace swift;
 
 namespace {
 
+enum class MLKind : unsigned {
+  OnlyExpansion=0,
+  OnlyReduction=1,
+  All=2,
+};
+
+} // end anonymous namespace
+
+static llvm::cl::opt<MLKind>
+DebugMemLocationKinds("ml", llvm::cl::desc("MemLocation Kinds:"),
+             llvm::cl::init(MLKind::All),
+             llvm::cl::values(clEnumValN(MLKind::OnlyExpansion,
+                                         "only-expansion",
+                                         "only-expansion"),
+                              clEnumValN(MLKind::OnlyReduction,
+                                         "only-reduction",
+                                         "only-reduction"),
+                              clEnumValN(MLKind::All,
+                                         "all",
+                                         "all"),
+                              clEnumValEnd));
+
+
+
+namespace {
+
 /// Dumps the alias relations between all instructions of a function.
 class MemLocationDumper : public SILFunctionTransform {
 
-  void run() override {
-    SILFunction &Fn = *getFunction();
-    llvm::outs() << "@" << Fn.getName() << "\n";
+  void testExpansion(SILFunction &Fn) {
     MemLocationList Locs;
-
     for (auto &BB : Fn) {
       for (auto &II : BB) {
         MemLocation L;
@@ -64,6 +88,15 @@ class MemLocationDumper : public SILFunctionTransform {
       Locs.clear();
     }
     llvm::outs() << "\n";
+  }
+
+  void run() override {
+    SILFunction &Fn = *getFunction();
+    llvm::outs() << "@" << Fn.getName() << "\n";
+    if (DebugMemLocationKinds == MLKind::OnlyExpansion) {
+      testExpansion(Fn);
+      return;
+    }
   }
 
   StringRef getName() override { return "Mem Location Dumper"; }
