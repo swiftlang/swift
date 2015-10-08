@@ -2,38 +2,67 @@
 
 .. FunctionEffects:
 
-Function Effects: Attributes, Analysis, and Optimization
+Function Effects: Analysis, Optimization, and Annotation
 ========================================================
 
 .. contents::
 
-This is a working document. Once we agree on the approach and
-terminology, this can move into docs/FunctionEffects.rst, and the
-codebase can be cleanup up a bit to reflect the consistent
-terminology.
+.. note::
+
+   This is a working document. Once we agree on the approach and
+   terminology, this can move into docs/FunctionEffects.rst, and the
+   codebase can be cleanup up a bit to reflect the consistent
+   terminology.
 
 Introduction
 ------------
 
-[Andy] There is a lot of subtlety involved in specifying or
-summarizing function effects. I want to first put forth an underlying
-model for reasoning about the effects' semantics, demonstrate that we
-can prove soundness in all the cases we care about for CoW and any
-other foreseeable purpose, then go back if needed and add sugary
-syntax and proper defaults for specifying the effects. I won't get
-hung up on the attributes being too fine grained or tricky to use.
+This document formalizes the effects that functions have on program
+state for the purpose of facilitating compiler optimization. By
+modeling more precise function effects, the optimizer can make more
+assumptions leading to more agressive transformation of the program.
 
-A clearly defined set of effects primitives should cover
-SILEffectsAnalysis and should form an API for used in the
-optimizer. The attributes required for CoW optimization should be
-described in terms of these effects, except for the obviously CoW
-specific attributes: makeunique, preserveunique, and
-projectssubobject.
+Function effects may be deduced by the compiler during program
+analyis. However, in certain situations it is helpful to directly
+communicate function effects to the compiler via function attributes
+or types. These source level annotations may or may not be statically
+enforceable.
 
-For the sake of discussion at least, we use of Swift-level syntax for
+This document specifies a comprehensive set of primitives and their
+semantics. These primitives are the optimizer's interface to function
+effects. They should be sufficient to express any analysis or
+annotation supported by the compiler that express a function's affect
+on program state.
+
+Within the optimizer, SILEffectsAnalysis deduces function effects
+through analysis of SIL code. It's result directly maps to effects
+primitives.
+
+Optimization of copy-on-Write data structures, such as Array, requires
+guaranteed function effects that cannot be deduced through analysis of
+SIL code. This necessitates a language for annotating functions. Some
+annotations are obviously specific to CoW semantics and cannot be
+defined in terms of general effects primitives: make_unique,
+preserve_unique, and projects_subobject. However, all other annotations
+required for CoW optimization are really guarantees regarding the
+program state that is affected by a CoW methods. These annotations
+should map precisely to a set of effects primitives.
+
+For the sake of discussion, we use of Swift-level syntax for
 specifying effects primitives. It may be debatable whether we actually
-want to expose this syntax, but some sort of syntax will need to be
-exposed to build optimizable CoW types.
+want to expose this syntax, but as explained above, some syntax will
+need to be exposed to build optimizable CoW types.
+
+.. note::
+
+   [Andy] There is a lot of subtlety involved in specifying or
+   summarizing function effects. I want to first put forth an
+   underlying model for reasoning about the effects' semantics,
+   demonstrate that we can prove soundness in all the cases we care
+   about for CoW and any other foreseeable purpose, then go back if
+   needed and add sugary syntax and proper defaults for specifying the
+   effects. I won't get hung up on the attributes being too fine
+   grained or tricky to use.
 
 Effects Primitives
 ------------------
