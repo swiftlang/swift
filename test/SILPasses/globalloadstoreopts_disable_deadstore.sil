@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -global-load-store-opts -sil-disable-loadstore-dse 
+// RUN: %target-sil-opt -enable-sil-verify-all %s -module-name Swift -global-redundant-load-elim -sil-disable-loadstore-dse 
 
 import Builtin
 

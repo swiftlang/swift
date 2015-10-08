@@ -75,7 +75,7 @@
 ///
 ///===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "load-store-opts"
+#define DEBUG_TYPE "sil-redundant-load-elim"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -1585,13 +1585,13 @@ void LSContext::stopTrackingInst(SILInstruction *I) {
 
 namespace {
 
-class GlobalLoadStoreOpts : public SILFunctionTransform {
+class GlobalRedundantLoadElimination : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
 
-    DEBUG(llvm::dbgs() << "***** Load Store Elimination on function: "
+    DEBUG(llvm::dbgs() << "***** Redundant Load Elimination on function: "
           << F->getName() << " *****\n");
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
@@ -1608,11 +1608,11 @@ class GlobalLoadStoreOpts : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 
-  StringRef getName() override { return "SIL Load Store Opts"; }
+  StringRef getName() override { return "SIL Redundant Load Elimination"; }
 };
 
 } // end anonymous namespace
 
-SILTransform *swift::createGlobalLoadStoreOpts() {
-  return new GlobalLoadStoreOpts();
+SILTransform *swift::createGlobalRedundantLoadElimination() {
+  return new GlobalRedundantLoadElimination();
 }

@@ -186,7 +186,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addSimplifyCFG();
 
   // Perform retain/release code motion and run the first ARC optimizer.
-  PM.addGlobalLoadStoreOpts();
+  PM.addGlobalRedundantLoadElimination();
   PM.addGlobalDeadStoreElimination();
   PM.addEarlyCodeMotion();
   PM.addGlobalARCOpts();
@@ -314,7 +314,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addCSE();
   PM.addSILCombine();
   PM.addJumpThreadSimplifyCFG();
-  PM.addGlobalLoadStoreOpts();
+  PM.addGlobalRedundantLoadElimination();
   PM.addGlobalDeadStoreElimination();
   PM.addLateCodeMotion();
   PM.addGlobalARCOpts();

@@ -82,8 +82,8 @@ PASS(FunctionSignatureOpts, "function-signature-opts",
      "Optimize Function Signatures")
 PASS(GlobalARCOpts, "global-arc-opts",
      "Perform multiple basic block arc optimizations")
-PASS(GlobalLoadStoreOpts, "global-load-store-opts",
-     "Multiple basic block load store opts")
+PASS(GlobalRedundantLoadElimination, "global-redundant-load-elim",
+     "Multiple basic block redundant load elimination")
 PASS(GlobalDeadStoreElimination, "global-dead-store-elim",
      "Multiple basic block dead store elimination")
 PASS(GlobalOpt, "global-opt",
