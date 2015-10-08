@@ -384,6 +384,7 @@ namespace {
   class ElementUseCollector {
     const DIMemoryObjectInfo &TheMemory;
     SmallVectorImpl<DIMemoryUse> &Uses;
+    SmallVectorImpl<SILBasicBlock*> &FailureBBs;
     SmallVectorImpl<SILInstruction*> &Releases;
     
     /// This is true if definite initialization has finished processing assign
@@ -405,9 +406,11 @@ namespace {
   public:
     ElementUseCollector(const DIMemoryObjectInfo &TheMemory,
                         SmallVectorImpl<DIMemoryUse> &Uses,
+                        SmallVectorImpl<SILBasicBlock*> &FailureBBs,
                         SmallVectorImpl<SILInstruction*> &Releases,
                         bool isDefiniteInitFinished)
-      : TheMemory(TheMemory), Uses(Uses), Releases(Releases),
+      : TheMemory(TheMemory), Uses(Uses),
+        FailureBBs(FailureBBs), Releases(Releases),
         isDefiniteInitFinished(isDefiniteInitFinished) {
     }
 
@@ -1153,8 +1156,12 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     // If this is an ApplyInst, check to see if this is part of a self.init
     // call in a delegating initializer.
     DIUseKind Kind = DIUseKind::Load;
-    if (isa<FullApplySite>(User) && isSelfInitUse(User))
+    if (isa<FullApplySite>(User) && isSelfInitUse(User)) {
       Kind = DIUseKind::SelfInit;
+    
+      if (auto *TAI = dyn_cast<TryApplyInst>(User))
+        FailureBBs.push_back(TAI->getErrorBB());
+    }
 
     // If this is a ValueMetatypeInst, check to see if it's part of a
     // self.init call to a factory initializer in a delegating
@@ -1254,6 +1261,10 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         if (auto *UCI = dyn_cast<UpcastInst>(User))
           if (auto *subAI = isSuperInitUse(UCI)) {
             Uses.push_back(DIMemoryUse(subAI, DIUseKind::SuperInit, 0, 1));
+            
+            if (auto *TAI = dyn_cast<TryApplyInst>(subAI))
+              FailureBBs.push_back(TAI->getErrorBB());
+
             continue;
           }
 
@@ -1266,8 +1277,12 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         
         // If this is an ApplyInst, check to see if this is part of a self.init
         // call in a delegating initializer.
-        if (isa<FullApplySite>(User) && isSelfInitUse(User))
+        if (isa<FullApplySite>(User) && isSelfInitUse(User)) {
           Kind = DIUseKind::SelfInit;
+
+          if (auto *TAI = dyn_cast<TryApplyInst>(User))
+            FailureBBs.push_back(TAI->getErrorBB());
+        }
 
         // If this is a ValueMetatypeInst, check to see if it's part of a
         // self.init call to a factory initializer in a delegating
@@ -1372,7 +1387,9 @@ void ElementUseCollector::collectDelegatingValueTypeInitSelfUses() {
 /// and storing the information found into the Uses and Releases lists.
 void swift::collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                                      SmallVectorImpl<DIMemoryUse> &Uses,
+                                     SmallVectorImpl<SILBasicBlock*> &FailureBBs,
                                      SmallVectorImpl<SILInstruction*> &Releases,
                                      bool isDIFinished) {
-  ElementUseCollector(MemoryInfo, Uses, Releases, isDIFinished).collectFrom();
+  ElementUseCollector(MemoryInfo, Uses, FailureBBs, Releases, isDIFinished)
+      .collectFrom();
 }

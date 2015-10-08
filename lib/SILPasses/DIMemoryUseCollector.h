@@ -277,6 +277,7 @@ struct DIMemoryUse {
 /// and storing the information found into the Uses and Releases lists.
 void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                               SmallVectorImpl<DIMemoryUse> &Uses,
+                              SmallVectorImpl<SILBasicBlock*> &FailureBBs,
                               SmallVectorImpl<SILInstruction*> &Releases,
                               bool isDefiniteInitFinished);
 

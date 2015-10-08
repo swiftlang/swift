@@ -124,7 +124,7 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
 //===----------------------------------------------------------------------===//
 
 namespace {
-  enum class DIKind {
+  enum class DIKind : unsigned char {
     No,
     Yes,
     Partial
@@ -298,6 +298,15 @@ namespace {
     /// The live out information of the block. This is the LocalAvailability
     /// plus the information merged-in from the predecessor blocks.
     AvailabilitySet OutAvailability;
+    
+    /// Keep track of blocks where the contents of the self box are not valid
+    /// because we're in an error path dominated by a self.init or super.init
+    /// delegation.
+    Optional<DIKind> LocalSelfConsumed;
+    
+    /// The live out information of the block. This is the LocalSelfConsumed
+    /// plus the information merged-in from the predecessor blocks.
+    Optional<DIKind> OutSelfConsumed;
 
     LiveOutBlockState(unsigned NumElements)
       : HasNonLoadUse(false),
@@ -310,6 +319,35 @@ namespace {
     void setUnknownToNotAvailable() {
       LocalAvailability.changeUnsetElementsTo(DIKind::No);
       OutAvailability.changeUnsetElementsTo(DIKind::No);
+      if (!LocalSelfConsumed.hasValue())
+        LocalSelfConsumed = DIKind::No;
+      if (!OutSelfConsumed.hasValue())
+        OutSelfConsumed = DIKind::No;
+    }
+
+    /// Transfer function for dataflow analysis.
+    ///
+    /// \param pred Value from a predecessor block
+    /// \param out Current live-out
+    /// \param local Value from current block, overrides predecessor
+    /// \param result Out parameter
+    ///
+    /// \return True if the result was different from the live-out
+    bool transferAvailability(const Optional<DIKind> pred,
+                              const Optional<DIKind> out,
+                              const Optional<DIKind> local,
+                              Optional<DIKind> &result) {
+      if (local.hasValue()) {
+        // A local availability overrides the incoming value.
+        result = local;
+      } else {
+        result = mergeKinds(out, pred);
+      }
+      if (result.hasValue() &&
+          (!out.hasValue() || result.getValue() != out.getValue())) {
+        return true;
+      }
+      return false;
     }
 
     /// Merge the state from a predecessor block into the OutAvailability.
@@ -317,21 +355,25 @@ namespace {
     bool mergeFromPred(const LiveOutBlockState &Pred) {
       bool changed = false;
       for (unsigned i = 0, e = OutAvailability.size(); i != e; ++i) {
-        const Optional<DIKind> out = OutAvailability.getConditional(i);
-        const Optional<DIKind> local = LocalAvailability.getConditional(i);
         Optional<DIKind> result;
-        if (local.hasValue()) {
-          // A local availability overrides the incoming value.
-          result = local;
-        } else {
-          result = mergeKinds(out, Pred.OutAvailability.getConditional(i));
-        }
-        if (result.hasValue() &&
-            (!out.hasValue() || result.getValue() != out.getValue())) {
+        if (transferAvailability(Pred.OutAvailability.getConditional(i),
+                                 OutAvailability.getConditional(i),
+                                 LocalAvailability.getConditional(i),
+                                 result)) {
           changed = true;
           OutAvailability.set(i, result);
         }
       }
+
+      Optional<DIKind> result;
+      if (transferAvailability(Pred.OutSelfConsumed,
+                               OutSelfConsumed,
+                               LocalSelfConsumed,
+                               result)) {
+        changed = true;
+        OutSelfConsumed = result;
+      }
+
       return changed;
     }
 
@@ -346,7 +388,27 @@ namespace {
         OutAvailability.set(Use.FirstElement+i, DIKind::Yes);
       }
     }
+
+    /// Mark the block as a failure path, indicating the self value has been
+    /// consumed.
+    void markFailure() {
+      LocalSelfConsumed = DIKind::Yes;
+      OutSelfConsumed = DIKind::Yes;
+    }
+
+    /// If true, we're not done with our dataflow analysis yet.
+    bool containsUndefinedValues() {
+      return (!OutSelfConsumed.hasValue() ||
+              OutAvailability.containsUnknownElements());
+    }
   };
+
+  struct ConditionalDestroy {
+    unsigned ReleaseID;
+    AvailabilitySet Availability;
+    DIKind SelfConsumed;
+  };
+
 } // end anonymous namespace
 
 namespace {
@@ -361,7 +423,7 @@ namespace {
 
     SmallVectorImpl<DIMemoryUse> &Uses;
     SmallVectorImpl<SILInstruction*> &Releases;
-    std::vector<std::pair<unsigned, AvailabilitySet>> ConditionalDestroys;
+    std::vector<ConditionalDestroy> ConditionalDestroys;
 
     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
 
@@ -381,6 +443,7 @@ namespace {
   public:
     LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                     SmallVectorImpl<DIMemoryUse> &Uses,
+                    SmallVectorImpl<SILBasicBlock *> &FailureBBs,
                     SmallVectorImpl<SILInstruction*> &Releases);
 
     void doIt();
@@ -394,6 +457,7 @@ namespace {
     
     AvailabilitySet getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt,
                                       unsigned NumElts);
+    DIKind getSelfConsumedAtInst(SILInstruction *Inst);
 
     bool isInitializedAtUse(const DIMemoryUse &Use, bool *SuperInitDone = 0);
 
@@ -419,7 +483,9 @@ namespace {
 
     typedef SmallVector<SILBasicBlock *, 16> WorkListType;
     void putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList);
-    void getPredsLiveOut(SILBasicBlock *BB, AvailabilitySet &Result);
+    void computePredsLiveOut(SILBasicBlock *BB);
+    void getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result);
+    void getOutSelfConsumed(SILBasicBlock *BB, Optional<DIKind> &Result);
 
     bool shouldEmitError(SILInstruction *Inst);
     std::string getUninitElementName(const DIMemoryUse &Use);
@@ -434,6 +500,7 @@ namespace {
 
 LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                                  SmallVectorImpl<DIMemoryUse> &Uses,
+                                 SmallVectorImpl<SILBasicBlock*> &FailureBBs,
                                  SmallVectorImpl<SILInstruction*> &Releases)
   : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory), Uses(Uses),
     Releases(Releases) {
@@ -459,6 +526,11 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     // they are live-in or a full element store.  This means that the block they
     // are in should be treated as a live out for cross-block analysis purposes.
     BBInfo.markAvailable(Use);
+  }
+
+  // Mark blocks where the self value has been consumed.
+  for (auto *bb : FailureBBs) {
+    getBlockInfo(bb).markFailure();
   }
 
   // If isn't really a use, but we account for the alloc_box/mark_uninitialized
@@ -1427,13 +1499,15 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   // release of a class in an initializer, the later is used for local variable
   // destruction.
   assert(isa<StrongReleaseInst>(Release) || isa<DestroyAddrInst>(Release));
+  
+  AvailabilitySet Availability =
+    getLivenessAtInst(Release, 0, TheMemory.NumElements);
+  DIKind SelfConsumed =
+    getSelfConsumedAtInst(Release);
 
   // If the memory object is completely initialized, then nothing needs to be
   // done at this release point.
-  AvailabilitySet Availability =
-    getLivenessAtInst(Release, 0, TheMemory.NumElements);
   if (Availability.isAllYes()) return;
-
 
   // Right now we don't fully support cleaning up a partially initialized object
   // after a failure.  Handle this by only allowing an early 'return nil' in an
@@ -1480,12 +1554,12 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
     return;
   }
   
-  // If any elements are partially live, we need to emit conditional logic.
+  // If any elements are conditionally live, we need to emit conditional logic.
   if (Availability.hasAny(DIKind::Partial))
     HasConditionalInitAssignOrDestroys = true;
 
-  // Otherwise, it is conditionally live, save it for later processing.
-  ConditionalDestroys.push_back({ ReleaseID, Availability });
+  // Otherwise, it is partially live, save it for later processing.
+  ConditionalDestroys.push_back({ ReleaseID, Availability, SelfConsumed });
 }
 
 static Identifier getBinaryFunction(StringRef Name, SILType IntSILTy,
@@ -1686,9 +1760,9 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
   // lifetime ends.  In this case, we have to make sure not to destroy an
   // element that wasn't initialized yet.
   for (auto &CDElt : ConditionalDestroys) {
-    auto *Release = Releases[CDElt.first];
+    auto *Release = Releases[CDElt.ReleaseID];
     auto Loc = Release->getLoc();
-    auto &Availability = CDElt.second;
+    auto &Availability = CDElt.Availability;
     
     // If the memory is not-fully initialized at the destroy_addr, then there
     // can be multiple issues: we could have some tuple elements initialized and
@@ -1774,7 +1848,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       // Set up the uninitialized release block.
       if (TheMemory.isDelegatingInit()) {
         assert(NumMemoryElements == 1);
-        processUninitializedRelease(CDElt.first, DeallocBlock->begin());
+        processUninitializedRelease(CDElt.ReleaseID, DeallocBlock->begin());
       }
     }
 
@@ -1785,14 +1859,14 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     // so if the self instance was fully initialized and we destroyed it
     // above, don't double-free the memory here.
     if (!TheMemory.isDelegatingInit())
-      processUninitializedRelease(CDElt.first, B.getInsertionPoint());
+      processUninitializedRelease(CDElt.ReleaseID, B.getInsertionPoint());
   }
 }
 
 void LifetimeChecker::
 putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
   LiveOutBlockState &State = getBlockInfo(BB);
-  if (!State.isInWorkList && State.OutAvailability.containsUnknownElements()) {
+  if (!State.isInWorkList && State.containsUndefinedValues()) {
     DEBUG(llvm::dbgs() << "    add block " << BB->getDebugID()
           << " to worklist\n");
     WorkList.push_back(BB);
@@ -1801,7 +1875,7 @@ putIntoWorkList(SILBasicBlock *BB, WorkListType &WorkList) {
 }
 
 void LifetimeChecker::
-getPredsLiveOut(SILBasicBlock *BB, AvailabilitySet &Result) {
+computePredsLiveOut(SILBasicBlock *BB) {
   DEBUG(llvm::dbgs() << "  Get liveness for block " << BB->getDebugID() << "\n");
   
   // Collect blocks for which we have to calculate the out-availability.
@@ -1843,19 +1917,39 @@ getPredsLiveOut(SILBasicBlock *BB, AvailabilitySet &Result) {
       DEBUG(llvm::dbgs() << "      Block " << WorkBB->getDebugID() << " out: "
             << BBState.OutAvailability << "\n");
 
-      // Clear the worklist-flag for the next call to getPredsLiveOut().
+      // Clear the worklist-flag for the next call to computePredsLiveOut().
       // This could be moved out of the outer loop, but doing it here avoids
       // another loop with getBlockInfo() calls.
       BBState.isInWorkList = false;
     }
   } while (changed);
+}
 
-  // Finally merge to the result (= state at BB's entry).
+void LifetimeChecker::
+getOutAvailability(SILBasicBlock *BB, AvailabilitySet &Result) {
+  computePredsLiveOut(BB);
+  
   for (auto Pred : BB->getPreds()) {
-    Result.mergeIn(getBlockInfo(Pred).OutAvailability);
+    // If self was consumed in a predecessor P, don't look at availability
+    // at all, because there's no point in making things more conditional
+    // than they are. If we enter the current block through P, the self value
+    // will be null and we don't have to destroy anything.
+    auto &BBInfo = getBlockInfo(Pred);
+    if (BBInfo.OutSelfConsumed.hasValue() &&
+        *BBInfo.OutSelfConsumed == DIKind::Yes)
+      continue;
+
+    Result.mergeIn(BBInfo.OutAvailability);
   }
   DEBUG(llvm::dbgs() << "    Result: " << Result << "\n");
+}
 
+void LifetimeChecker::
+getOutSelfConsumed(SILBasicBlock *BB, Optional<DIKind> &Result) {
+  computePredsLiveOut(BB);
+  
+  for (auto Pred : BB->getPreds())
+    Result = mergeKinds(Result, getBlockInfo(Pred).OutSelfConsumed);
 }
 
 /// getLivenessAtInst - Compute the liveness state for any number of tuple
@@ -1902,7 +1996,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
       }
     }
 
-    getPredsLiveOut(InstBB, Result);
+    getOutAvailability(InstBB, Result);
 
     // If the result element wasn't computed, we must be analyzing code within
     // an unreachable cycle that is not dominated by "TheMemory".  Just force
@@ -1954,7 +2048,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
   }
 
   // Compute the liveness of each element according to our predecessors.
-  getPredsLiveOut(InstBB, Result);
+  getOutAvailability(InstBB, Result);
   
   // If any of the elements was locally satisfied, make sure to mark them.
   for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i) {
@@ -1966,6 +2060,33 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
     }
   }
   return Result;
+}
+
+/// getSelfConsumedAtInst - Compute the liveness state for any number of tuple
+/// elements at the specified instruction.  The elements are returned as an
+/// AvailabilitySet.  Elements outside of the range specified may not be
+/// computed correctly.
+DIKind LifetimeChecker::
+getSelfConsumedAtInst(SILInstruction *Inst) {
+  DEBUG(llvm::dbgs() << "Get self consumed at " << *Inst);
+
+  Optional<DIKind> Result;
+
+  SILBasicBlock *InstBB = Inst->getParent();
+  auto &BlockInfo = getBlockInfo(InstBB);
+
+  if (BlockInfo.LocalSelfConsumed.hasValue())
+    return *BlockInfo.LocalSelfConsumed;
+
+  getOutSelfConsumed(InstBB, Result);
+
+  // If the result element wasn't computed, we must be analyzing code within
+  // an unreachable cycle that is not dominated by "TheMemory".  Just force
+  // the unset element to yes so that clients don't have to handle this.
+  if (!Result.hasValue())
+    Result = DIKind::Yes;
+
+  return *Result;
 }
 
 /// The specified instruction is a use of some number of elements.  Determine
@@ -2011,12 +2132,13 @@ static bool processMemoryObject(SILInstruction *I) {
 
   // Set up the datastructure used to collect the uses of the allocation.
   SmallVector<DIMemoryUse, 16> Uses;
+  SmallVector<SILBasicBlock*, 1> FailureBBs;
   SmallVector<SILInstruction*, 4> Releases;
 
   // Walk the use list of the pointer, collecting them into the Uses array.
-  collectDIElementUsesFrom(MemInfo, Uses, Releases, false);
+  collectDIElementUsesFrom(MemInfo, Uses, FailureBBs, Releases, false);
 
-  LifetimeChecker(MemInfo, Uses, Releases).doIt();
+  LifetimeChecker(MemInfo, Uses, FailureBBs, Releases).doIt();
   return true;
 }
 
