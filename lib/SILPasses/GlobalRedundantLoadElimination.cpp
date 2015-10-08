@@ -641,18 +641,18 @@ forwardAddrToLdWithExtractPath(SILValue Address, SILValue StoredValue,
 }
 
 //===----------------------------------------------------------------------===//
-//                            LSContext Interface
+//                            RLEContext Interface
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-class LSBBForwarder;
+class RLEBBForwarder;
 class LSStore;
 
 /// This class stores global state that we use when processing and also drives
 /// the computation. We put its interface at the top for use in other parts of
 /// the pass which may want to use this global information.
-class LSContext {
+class RLEContext {
   /// Function this context is currently processing.
   SILFunction *F;
 
@@ -676,24 +676,24 @@ class LSContext {
 
   /// A map from each BasicBlock to its index in the BBIDToForwarderMap.
   ///
-  /// TODO: Each block does not need its own LSBBForwarder instance. Only
+  /// TODO: Each block does not need its own RLEBBForwarder instance. Only
   /// the set of reaching loads and stores is specific to the block.
   llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap;
 
-  /// A "map" from a BBID (which is just an index) to an LSBBForwarder.
-  std::vector<LSBBForwarder> BBIDToForwarderMap;
+  /// A "map" from a BBID (which is just an index) to an RLEBBForwarder.
+  std::vector<RLEBBForwarder> BBIDToForwarderMap;
 
 public:
-  LSContext(SILFunction *F, AliasAnalysis *AA, PostDominanceInfo *PDI,
+  RLEContext(SILFunction *F, AliasAnalysis *AA, PostDominanceInfo *PDI,
             PostOrderFunctionInfo::reverse_range RPOT);
 
-  LSContext(const LSContext &) = delete;
-  LSContext(LSContext &&) = default;
-  ~LSContext() = default;
+  RLEContext(const RLEContext &) = delete;
+  RLEContext(RLEContext &&) = default;
+  ~RLEContext() = default;
 
   bool runIteration();
 
-  /// Remove all LSValues from all LSBBForwarders which contain the load/store
+  /// Remove all LSValues from all RLEBBForwarders which contain the load/store
   /// instruction \p I.
   void stopTrackingInst(SILInstruction *I);
 
@@ -712,7 +712,7 @@ public:
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
-//                               LSBBForwarder
+//                               RLEBBForwarder
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -753,7 +753,7 @@ namespace {
 ///
 /// With these in mind, we have the following invariants:
 /// 1. All pointers that have available stored values should be no-alias.
-class LSBBForwarder {
+class RLEBBForwarder {
 
   /// The basic block that we are optimizing.
   SILBasicBlock *BB;
@@ -774,13 +774,13 @@ class LSBBForwarder {
   llvm::SmallMapVector<unsigned, SILValue, 8> AvailLocs;
 
 public:
-  LSBBForwarder() = default;
+  RLEBBForwarder() = default;
 
   void init(SILBasicBlock *NewBB) {
     BB = NewBB;
   }
 
-  bool optimize(LSContext &Ctx);
+  bool optimize(RLEContext &Ctx);
 
   SILBasicBlock *getBB() const { return BB; }
 
@@ -811,7 +811,7 @@ public:
   /// Merge in the states of all predecessors.
   void mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                                              unsigned> &BBToBBIDMap,
-                              std::vector<LSBBForwarder> &BBIDToForwarderMap);
+                              std::vector<RLEBBForwarder> &BBIDToForwarderMap);
 
   /// Clear all state in the BB optimizer.
   void clear() {
@@ -820,7 +820,7 @@ public:
   }
 
   /// Add this load to our tracking list.
-  void startTrackingLoad(LSContext &Ctx, LoadInst *LI) {
+  void startTrackingLoad(RLEContext &Ctx, LoadInst *LI) {
     DEBUG(llvm::dbgs() << "        Tracking Load: " << *LI);
 
 #ifndef NDEBUG
@@ -838,7 +838,7 @@ public:
   }
 
   /// Add this store to our tracking list.
-  void startTrackingStore(LSContext &Ctx, StoreInst *SI) {
+  void startTrackingStore(RLEContext &Ctx, StoreInst *SI) {
     DEBUG(llvm::dbgs() << "        Tracking Store: " << *SI);
 
 #ifndef NDEBUG
@@ -876,52 +876,52 @@ public:
 
   /// Delete the store that we have mapped to Addr, plus other instructions
   /// which get dead due to the removed store.
-  void deleteStoreMappedToAddress(LSContext &Ctx, SILValue Addr);
+  void deleteStoreMappedToAddress(RLEContext &Ctx, SILValue Addr);
 
-  void deleteUntrackedInstruction(LSContext &Ctx, SILInstruction *I);
+  void deleteUntrackedInstruction(RLEContext &Ctx, SILInstruction *I);
 
   /// Invalidate any loads that we can not prove that Inst does not write to.
-  void invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst);
+  void invalidateAliasingLoads(RLEContext &Ctx, SILInstruction *Inst);
 
   /// Invalidate our store if Inst writes to the destination location.
-  void invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst);
+  void invalidateWriteToStores(RLEContext &Ctx, SILInstruction *Inst);
 
   /// Invalidate our store if Inst reads from the destination location.
-  void invalidateReadFromStores(LSContext &Ctx, SILInstruction *Inst);
+  void invalidateReadFromStores(RLEContext &Ctx, SILInstruction *Inst);
 
   /// Update the load store states w.r.t. the store instruction.
-  void trackStoreInst(LSContext &Ctx, StoreInst *SI);
+  void trackStoreInst(RLEContext &Ctx, StoreInst *SI);
 
   /// Try to prove that SI is a dead store updating all current state. If SI is
   /// dead, eliminate it.
-  bool tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI);
+  bool tryToEliminateDeadStores(RLEContext &Ctx, StoreInst *SI);
 
   /// Try to find a previously known value that we can forward to LI. This
   /// includes from stores and loads.
-  bool tryToForwardLoad(LSContext &Ctx, LoadInst *LI);
+  bool tryToForwardLoad(RLEContext &Ctx, LoadInst *LI);
 
   /// Process Instruction which writes to memory in an unknown way. 
-  void processUnknownWriteInst(LSContext &Ctx, SILInstruction *I);
+  void processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I);
 
   /// Process Instructions. Extract MemLocations from SIL LoadInst.
-  void processLoadInst(LSContext &Ctx, LoadInst *LI);
+  void processLoadInst(RLEContext &Ctx, LoadInst *LI);
 
   /// Process Instructions. Extract MemLocations from SIL StoreInst.
-  void processStoreInst(LSContext &Ctx, StoreInst *SI);
+  void processStoreInst(RLEContext &Ctx, StoreInst *SI);
 
 private:
 
   /// Merge in the state of an individual predecessor.
-  void mergePredecessorState(LSBBForwarder &OtherState);
+  void mergePredecessorState(RLEBBForwarder &OtherState);
 
   bool tryToSubstitutePartialAliasLoad(SILValue PrevAddr, SILValue PrevValue,
                                        LoadInst *LI);
 
-  bool tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI);
+  bool tryToForwardStoresToLoad(RLEContext &Ctx, LoadInst *LI);
 
-  bool tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI);
+  bool tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI);
 
-  void verify(LSContext &Ctx);
+  void verify(RLEContext &Ctx);
 };
 
 #ifndef NDEBUG
@@ -940,7 +940,7 @@ inline raw_ostream &operator<<(raw_ostream &os,
 
 } // end anonymous namespace
 
-void LSBBForwarder::deleteStoreMappedToAddress(LSContext &Ctx,
+void RLEBBForwarder::deleteStoreMappedToAddress(RLEContext &Ctx,
                                                SILValue Addr) {
   auto SIIter = Stores.find(Addr);
   if (SIIter == Stores.end())
@@ -966,8 +966,8 @@ void LSBBForwarder::deleteStoreMappedToAddress(LSContext &Ctx,
 }
 
 void
-LSBBForwarder::
-deleteUntrackedInstruction(LSContext &Ctx, SILInstruction *I) {
+RLEBBForwarder::
+deleteUntrackedInstruction(RLEContext &Ctx, SILInstruction *I) {
   DEBUG(llvm::dbgs() << "        Deleting all instructions recursively from: "
                      << *I);
   auto UpdateFun = [&](SILInstruction *DeadI) {
@@ -977,8 +977,8 @@ deleteUntrackedInstruction(LSContext &Ctx, SILInstruction *I) {
 }
 
 void
-LSBBForwarder::
-invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst) {
+RLEBBForwarder::
+invalidateAliasingLoads(RLEContext &Ctx, SILInstruction *Inst) {
   AliasAnalysis *AA = Ctx.getAA();
   llvm::SmallVector<SILValue, 4> InvalidatedLoadList;
   for (auto &P : Loads)
@@ -994,8 +994,8 @@ invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst) {
 }
 
 void
-LSBBForwarder::
-invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst) {
+RLEBBForwarder::
+invalidateWriteToStores(RLEContext &Ctx, SILInstruction *Inst) {
   AliasAnalysis *AA = Ctx.getAA();
   llvm::SmallVector<SILValue, 4> InvalidatedStoreList;
   for (auto &P : Stores)
@@ -1009,7 +1009,7 @@ invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst) {
   }
 }
 
-void LSBBForwarder::invalidateReadFromStores(LSContext &Ctx,
+void RLEBBForwarder::invalidateReadFromStores(RLEContext &Ctx,
                                              SILInstruction *Inst) {
   AliasAnalysis *AA = Ctx.getAA();
   for (auto &P : Stores) {
@@ -1023,7 +1023,7 @@ void LSBBForwarder::invalidateReadFromStores(LSContext &Ctx,
   }
 }
 
-void LSBBForwarder::trackStoreInst(LSContext &Ctx, StoreInst *SI) {
+void RLEBBForwarder::trackStoreInst(RLEContext &Ctx, StoreInst *SI) {
   // Invalidate any load that we can not prove does not read from the stores
   // destination.
   invalidateAliasingLoads(Ctx, SI);
@@ -1036,7 +1036,7 @@ void LSBBForwarder::trackStoreInst(LSContext &Ctx, StoreInst *SI) {
   startTrackingStore(Ctx, SI);
 }
 
-bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI) {
+bool RLEBBForwarder::tryToEliminateDeadStores(RLEContext &Ctx, StoreInst *SI) {
   PostDominanceInfo *PDI = Ctx.getPDI();
   AliasAnalysis *AA = Ctx.getAA();
 
@@ -1146,7 +1146,7 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI) {
 
 /// See if there is an extract path from LI that we can replace with PrevLI. If
 /// we delete all uses of LI this way, delete LI.
-bool LSBBForwarder::tryToSubstitutePartialAliasLoad(SILValue PrevLIAddr,
+bool RLEBBForwarder::tryToSubstitutePartialAliasLoad(SILValue PrevLIAddr,
                                                     SILValue PrevLIValue,
                                                     LoadInst *LI) {
   bool Changed = false;
@@ -1212,7 +1212,7 @@ static SILValue fixPhiPredBlocks(ArrayRef<SILInstruction *> Stores,
 /// Attempt to forward available values from stores to this load. If we do not
 /// perform store -> load forwarding, all stores which we failed to forward from
 /// which may alias the load will have the read dependency bit set on them.
-bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI) {
+bool RLEBBForwarder::tryToForwardStoresToLoad(RLEContext &Ctx, LoadInst *LI) {
   // The list of stores that this load conservatively depends on. If we do not
   // eliminate the load from some store, we need to set the read dependency bit
   // on all stores that may alias the load.
@@ -1264,7 +1264,7 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI) {
 
 /// Try to forward a previously seen load to this load. We allow for multiple
 /// loads to be tracked from the same value.
-bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI) {
+bool RLEBBForwarder::tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI) {
   // Search the previous loads and replace the current load or one of the
   // current loads uses with one of the previous loads.
   for (auto &P : Loads) {
@@ -1302,7 +1302,7 @@ bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI) {
   return false;
 }
 
-void LSBBForwarder::processUnknownWriteInst(LSContext &Ctx, SILInstruction *I){
+void RLEBBForwarder::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I){
   auto *AA = Ctx.getAA();
   llvm::SmallVector<unsigned, 8> LocDeleteList;
   for (auto &X : AvailLocs) {
@@ -1319,7 +1319,7 @@ void LSBBForwarder::processUnknownWriteInst(LSContext &Ctx, SILInstruction *I){
   }
 }
 
-void LSBBForwarder::processStoreInst(LSContext &Ctx, StoreInst *SI) {
+void RLEBBForwarder::processStoreInst(RLEContext &Ctx, StoreInst *SI) {
   // Initialize the memory location.
   MemLocation L(cast<StoreInst>(SI)->getDest());
 
@@ -1339,7 +1339,7 @@ void LSBBForwarder::processStoreInst(LSContext &Ctx, StoreInst *SI) {
   } 
 }
 
-void LSBBForwarder::processLoadInst(LSContext &Ctx, LoadInst *LI) {
+void RLEBBForwarder::processLoadInst(RLEContext &Ctx, LoadInst *LI) {
   // Initialize the memory location.
   MemLocation L(cast<LoadInst>(LI)->getOperand());
 
@@ -1357,7 +1357,7 @@ void LSBBForwarder::processLoadInst(LSContext &Ctx, LoadInst *LI) {
   } 
 }
 
-bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI) {
+bool RLEBBForwarder::tryToForwardLoad(RLEContext &Ctx, LoadInst *LI) {
 
   if (tryToForwardLoadsToLoad(Ctx, LI))
     return true;
@@ -1374,7 +1374,7 @@ bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI) {
 
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
-bool LSBBForwarder::optimize(LSContext &Ctx) {
+bool RLEBBForwarder::optimize(RLEContext &Ctx) {
   auto II = BB->begin(), E = BB->end();
   bool Changed = false;
   while (II != E) {
@@ -1460,7 +1460,7 @@ bool LSBBForwarder::optimize(LSContext &Ctx) {
   return Changed;
 }
 
-void LSBBForwarder::mergePredecessorState(LSBBForwarder &OtherState) {
+void RLEBBForwarder::mergePredecessorState(RLEBBForwarder &OtherState) {
   // Merge in the predecessor state.
   DEBUG(llvm::dbgs() << "        Initial Stores:\n");
   llvm::SmallVector<SILValue, 8> DeleteList;
@@ -1520,10 +1520,10 @@ void LSBBForwarder::mergePredecessorState(LSBBForwarder &OtherState) {
 }
 
 void
-LSBBForwarder::
+RLEBBForwarder::
 mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                                       unsigned> &BBToBBIDMap,
-                       std::vector<LSBBForwarder> &BBIDToForwarderMap) {
+                       std::vector<RLEBBForwarder> &BBIDToForwarderMap) {
   // Clear the state if the basic block has no predecessor.
   if (BB->getPreds().begin() == BB->getPreds().end()) {
     clear();
@@ -1555,9 +1555,9 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
     if (I == BBToBBIDMap.end())
       continue;
 
-    LSBBForwarder &Other = BBIDToForwarderMap[I->second];
+    RLEBBForwarder &Other = BBIDToForwarderMap[I->second];
 
-    // If we have not had at least one predecessor, initialize LSBBForwarder
+    // If we have not had at least one predecessor, initialize RLEBBForwarder
     // with the state of the initial predecessor.
     // If BB is also a predecessor of itself, we should not initialize.
     if (!HasAtLeastOnePred && !HasSelfCycle) {
@@ -1585,7 +1585,7 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
   }
 }
 
-void LSBBForwarder::verify(LSContext &Ctx) {
+void RLEBBForwarder::verify(RLEContext &Ctx) {
 #ifndef NDEBUG
   llvm::SmallVector<SILValue, 8> Values;
   auto *AA = Ctx.getAA();
@@ -1602,7 +1602,7 @@ void LSBBForwarder::verify(LSContext &Ctx) {
 }
 
 //===----------------------------------------------------------------------===//
-//                          LSContext Implementation
+//                          RLEContext Implementation
 //===----------------------------------------------------------------------===//
 
 static inline unsigned
@@ -1619,7 +1619,7 @@ roundPostOrderSize(PostOrderFunctionInfo::reverse_range R) {
   return unsigned(SizeRoundedToPow2);
 }
 
-LSContext::LSContext(SILFunction *F, AliasAnalysis *AA, PostDominanceInfo *PDI,
+RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA, PostDominanceInfo *PDI,
                      PostOrderFunctionInfo::reverse_range RPOT)
     : F(F), AA(AA), PDI(PDI), ReversePostOrder(RPOT),
       BBToBBIDMap(roundPostOrderSize(RPOT)),
@@ -1631,7 +1631,7 @@ LSContext::LSContext(SILFunction *F, AliasAnalysis *AA, PostDominanceInfo *PDI,
   }
 }
 
-MemLocation &LSContext::getMemLocation(const unsigned index) {
+MemLocation &RLEContext::getMemLocation(const unsigned index) {
   // Return the bit position of the given Loc in the MemLocationVault. The bit
   // position is then used to set/reset the bitvector kept by each BBState.
   //
@@ -1641,7 +1641,7 @@ MemLocation &LSContext::getMemLocation(const unsigned index) {
   return MemLocationVault[index];
 }
 
-unsigned LSContext::getMemLocationBit(const MemLocation &Loc) {
+unsigned RLEContext::getMemLocationBit(const MemLocation &Loc) {
   // Return the bit position of the given Loc in the MemLocationVault. The bit
   // position is then used to set/reset the bitvector kept by each BBState.
   //
@@ -1654,7 +1654,7 @@ unsigned LSContext::getMemLocationBit(const MemLocation &Loc) {
 }
 
 bool
-LSContext::runIteration() {
+RLEContext::runIteration() {
   // Walk over the function and find all the locations accessed by
   // this function.
   MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex);
@@ -1664,12 +1664,12 @@ LSContext::runIteration() {
     auto IDIter = BBToBBIDMap.find(BB);
     assert(IDIter != BBToBBIDMap.end() && "We just constructed this!?");
     unsigned ID = IDIter->second;
-    LSBBForwarder &Forwarder = BBIDToForwarderMap[ID];
+    RLEBBForwarder &Forwarder = BBIDToForwarderMap[ID];
     assert(Forwarder.getBB() == BB && "We just constructed this!?");
 
     DEBUG(llvm::dbgs() << "Visiting bb" << BB->getDebugID() << "\n");
 
-    // Merge the predecessors. After merging, LSBBForwarder now contains
+    // Merge the predecessors. After merging, RLEBBForwarder now contains
     // lists of stores|loads that reach the beginning of the basic block
     // along all paths.
     Forwarder.mergePredecessorStates(BBToBBIDMap, BBIDToForwarderMap);
@@ -1683,7 +1683,7 @@ LSContext::runIteration() {
   return Changed;
 }
 
-void LSContext::stopTrackingInst(SILInstruction *I) {
+void RLEContext::stopTrackingInst(SILInstruction *I) {
   if (auto *SI = dyn_cast<StoreInst>(I)) {
   } else if (! isa<LoadInst>(I)) {
     return;
@@ -1705,7 +1705,7 @@ void LSContext::stopTrackingInst(SILInstruction *I) {
     auto IDIter = BBToBBIDMap.find(WorkBB);
     if (IDIter == BBToBBIDMap.end())
       continue;
-    LSBBForwarder &F = BBIDToForwarderMap[IDIter->second];
+    RLEBBForwarder &F = BBIDToForwarderMap[IDIter->second];
 
     // Remove the LSValue if it contains I. If not, we don't have to continue
     // with the successors.
@@ -1739,7 +1739,7 @@ class GlobalRedundantLoadElimination : public SILFunctionTransform {
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
     auto *PDT = PM->getAnalysis<PostDominanceAnalysis>()->get(F);
 
-    LSContext Ctx(F, AA, PDT, PO->getReversePostOrder());
+    RLEContext Ctx(F, AA, PDT, PO->getReversePostOrder());
 
     bool Changed = false;
     while (Ctx.runIteration())
