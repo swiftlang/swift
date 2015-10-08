@@ -648,9 +648,6 @@ namespace {
 class LSBBForwarder;
 class LSStore;
 
-/// Map an address to a list of StoreInst, one for each predecessor.
-using CoveredStoreMap = llvm::DenseMap<SILValue, LSStore>;
-
 /// This class stores global state that we use when processing and also drives
 /// the computation. We put its interface at the top for use in other parts of
 /// the pass which may want to use this global information.
@@ -686,7 +683,7 @@ public:
 
   /// Remove all LSValues from all LSBBForwarders which contain the load/store
   /// instruction \p I.
-  void stopTrackingInst(SILInstruction *I, CoveredStoreMap &StoreMap);
+  void stopTrackingInst(SILInstruction *I);
 
   AliasAnalysis *getAA() const { return AA; }
   PostDominanceInfo *getPDI() const { return PDI; }
@@ -759,7 +756,7 @@ public:
     BB = NewBB;
   }
 
-  bool optimize(LSContext &Ctx, CoveredStoreMap &StoreMap);
+  bool optimize(LSContext &Ctx);
 
   SILBasicBlock *getBB() const { return BB; }
 
@@ -790,8 +787,7 @@ public:
   /// Merge in the states of all predecessors.
   void mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                                              unsigned> &BBToBBIDMap,
-                              std::vector<LSBBForwarder> &BBIDToForwarderMap,
-                              CoveredStoreMap &StoreMap);
+                              std::vector<LSBBForwarder> &BBIDToForwarderMap);
 
   /// Clear all state in the BB optimizer.
   void clear() {
@@ -800,8 +796,7 @@ public:
   }
 
   /// Add this load to our tracking list.
-  void startTrackingLoad(LSContext &Ctx, LoadInst *LI,
-                         CoveredStoreMap &StoreMap) {
+  void startTrackingLoad(LSContext &Ctx, LoadInst *LI) {
     DEBUG(llvm::dbgs() << "        Tracking Load: " << *LI);
 
 #ifndef NDEBUG
@@ -813,19 +808,13 @@ public:
               P.second.hasReadDependence()) &&
              "Found aliasing store without read dependence");
     }
-    for (auto &P : StoreMap) {
-      assert((!P.second.aliasingWrite(AA, LI) ||
-              P.second.hasReadDependence()) &&
-             "Found aliasing store without read dependence");
-    }
 #endif
 
     Loads.insert({LI->getOperand(), LSLoad(LI)});
   }
 
   /// Add this store to our tracking list.
-  void startTrackingStore(LSContext &Ctx, StoreInst *SI,
-                          CoveredStoreMap &StoreMap) {
+  void startTrackingStore(LSContext &Ctx, StoreInst *SI) {
     DEBUG(llvm::dbgs() << "        Tracking Store: " << *SI);
 
 #ifndef NDEBUG
@@ -839,24 +828,19 @@ public:
     }
 #endif
 
-    // If we have this store in StoreMap, remove it. We never track pointers in
-    // both the StoreMap and Stores.
-    //
     // In the case of Stores this will overwrite whatever we have there.
-    StoreMap.erase(SI->getDest());
     Stores.insert({SI->getDest(), LSStore(SI)});
   }
 
   /// Stop tracking any state related to the address \p Addr.
-  void stopTrackingAddress(SILValue Addr, CoveredStoreMap &StoreMap) {
+  void stopTrackingAddress(SILValue Addr) {
     DEBUG(llvm::dbgs() << "        No Longer Tracking: " << Addr);
     Loads.erase(Addr);
     Stores.erase(Addr);
-    StoreMap.erase(Addr);
   }
 
   /// Stop tracking any state related to the address \p Addr.
-  void setReadDependencyOnStores(SILValue Addr, CoveredStoreMap &StoreMap) {
+  void setReadDependencyOnStores(SILValue Addr) {
     DEBUG(llvm::dbgs() << "        Adding read dependency: " << Addr);
     {
       auto Iter = Stores.find(Addr);
@@ -864,71 +848,47 @@ public:
         Iter->second.setHasReadDependence();
       }
     }
-
-    {
-      auto Iter = StoreMap.find(Addr);
-      if (Iter != StoreMap.end()) {
-        Iter->second.setHasReadDependence();
-      }
-    }
   }
 
   /// Delete the store that we have mapped to Addr, plus other instructions
   /// which get dead due to the removed store.
-  void deleteStoreMappedToAddress(LSContext &Ctx, SILValue Addr,
-                                  CoveredStoreMap &StoreMap);
+  void deleteStoreMappedToAddress(LSContext &Ctx, SILValue Addr);
 
-  void deleteUntrackedInstruction(LSContext &Ctx, SILInstruction *I,
-                                  CoveredStoreMap &StoreMap);
+  void deleteUntrackedInstruction(LSContext &Ctx, SILInstruction *I);
 
   /// Invalidate any loads that we can not prove that Inst does not write to.
-  void invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst,
-                               CoveredStoreMap &StoreMap);
+  void invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst);
 
   /// Invalidate our store if Inst writes to the destination location.
-  void invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst,
-                               CoveredStoreMap &StoreMap);
+  void invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst);
 
   /// Invalidate our store if Inst reads from the destination location.
-  void invalidateReadFromStores(LSContext &Ctx, SILInstruction *Inst,
-                                CoveredStoreMap &StoreMap);
+  void invalidateReadFromStores(LSContext &Ctx, SILInstruction *Inst);
 
   /// Update the load store states w.r.t. the store instruction.
-  void processStoreInst(LSContext &Ctx, StoreInst *SI,
-                        CoveredStoreMap &StoreMap);
+  void processStoreInst(LSContext &Ctx, StoreInst *SI);
 
   /// Try to prove that SI is a dead store updating all current state. If SI is
   /// dead, eliminate it.
-  bool tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
-                                CoveredStoreMap &StoreMap);
+  bool tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI);
 
   /// Try to find a previously known value that we can forward to LI. This
   /// includes from stores and loads.
-  bool tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
-                        CoveredStoreMap &StoreMap);
+  bool tryToForwardLoad(LSContext &Ctx, LoadInst *LI);
 
 private:
 
   /// Merge in the state of an individual predecessor.
   void mergePredecessorState(LSBBForwarder &OtherState);
 
-  /// Update StoreMap for a given basic block, if there is a reaching store
-  /// for an address from all the predecessors.
-  void updateStoreMap(llvm::DenseMap<SILBasicBlock *,
-                                     unsigned> &BBToBBIDMap,
-                      std::vector<LSBBForwarder> &BBIDToForwarderMap,
-                      CoveredStoreMap &StoreMap);
-
   bool tryToSubstitutePartialAliasLoad(SILValue PrevAddr, SILValue PrevValue,
                                        LoadInst *LI);
 
-  bool tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
-                                CoveredStoreMap &StoreMap);
+  bool tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI);
 
-  bool tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
-                               CoveredStoreMap &StoreMap);
+  bool tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI);
 
-  void verify(LSContext &Ctx, CoveredStoreMap &StoreMap);
+  void verify(LSContext &Ctx);
 };
 
 #ifndef NDEBUG
@@ -948,8 +908,7 @@ inline raw_ostream &operator<<(raw_ostream &os,
 } // end anonymous namespace
 
 void LSBBForwarder::deleteStoreMappedToAddress(LSContext &Ctx,
-                                               SILValue Addr,
-                                               CoveredStoreMap &StoreMap) {
+                                               SILValue Addr) {
   auto SIIter = Stores.find(Addr);
   if (SIIter == Stores.end())
     return;
@@ -962,7 +921,7 @@ void LSBBForwarder::deleteStoreMappedToAddress(LSContext &Ctx,
     InstsToDelete.push_back(SI);
 
   auto UpdateFun = [&](SILInstruction *DeadI) {
-    Ctx.stopTrackingInst(DeadI, StoreMap);
+    Ctx.stopTrackingInst(DeadI);
   };
 
   // Delete the instructions.
@@ -975,20 +934,18 @@ void LSBBForwarder::deleteStoreMappedToAddress(LSContext &Ctx,
 
 void
 LSBBForwarder::
-deleteUntrackedInstruction(LSContext &Ctx, SILInstruction *I,
-                           CoveredStoreMap &StoreMap) {
+deleteUntrackedInstruction(LSContext &Ctx, SILInstruction *I) {
   DEBUG(llvm::dbgs() << "        Deleting all instructions recursively from: "
                      << *I);
   auto UpdateFun = [&](SILInstruction *DeadI) {
-    Ctx.stopTrackingInst(DeadI, StoreMap);
+    Ctx.stopTrackingInst(DeadI);
   };
   recursivelyDeleteTriviallyDeadInstructions(I, true, UpdateFun);
 }
 
 void
 LSBBForwarder::
-invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst,
-                        CoveredStoreMap &StoreMap) {
+invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst) {
   AliasAnalysis *AA = Ctx.getAA();
   llvm::SmallVector<SILValue, 4> InvalidatedLoadList;
   for (auto &P : Loads)
@@ -999,34 +956,28 @@ invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst,
     DEBUG(llvm::dbgs() << "        Found an instruction that writes to memory"
           " such that a load operand is invalidated:"
           << LIOp);
-    stopTrackingAddress(LIOp, StoreMap);
+    stopTrackingAddress(LIOp);
   }
 }
 
 void
 LSBBForwarder::
-invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst,
-                        CoveredStoreMap &StoreMap) {
+invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst) {
   AliasAnalysis *AA = Ctx.getAA();
   llvm::SmallVector<SILValue, 4> InvalidatedStoreList;
   for (auto &P : Stores)
     if (P.second.aliasingWrite(AA, Inst))
       InvalidatedStoreList.push_back(P.first);
 
-  for (auto &P : StoreMap)
-    if (P.second.aliasingWrite(AA, Inst))
-      InvalidatedStoreList.push_back(P.first);
-
   for (SILValue SIOp : InvalidatedStoreList) {
     DEBUG(llvm::dbgs() << "        Found an instruction that writes to memory"
           " such that a store is invalidated:" << SIOp);
-    stopTrackingAddress(SIOp, StoreMap);
+    stopTrackingAddress(SIOp);
   }
 }
 
 void LSBBForwarder::invalidateReadFromStores(LSContext &Ctx,
-                                             SILInstruction *Inst,
-                                             CoveredStoreMap &StoreMap) {
+                                             SILInstruction *Inst) {
   AliasAnalysis *AA = Ctx.getAA();
   for (auto &P : Stores) {
     if (!P.second.aliasingRead(AA, Inst))
@@ -1035,26 +986,24 @@ void LSBBForwarder::invalidateReadFromStores(LSContext &Ctx,
     DEBUG(llvm::dbgs() << "        Found an instruction that reads from "
                           "memory such that a store has a read dependence:"
                        << P.first);
-    setReadDependencyOnStores(P.first, StoreMap);
+    setReadDependencyOnStores(P.first);
   }
 }
 
-void LSBBForwarder::processStoreInst(LSContext &Ctx, StoreInst *SI,
-                                     CoveredStoreMap &StoreMap) {
+void LSBBForwarder::processStoreInst(LSContext &Ctx, StoreInst *SI) {
   // Invalidate any load that we can not prove does not read from the stores
   // destination.
-  invalidateAliasingLoads(Ctx, SI, StoreMap);
+  invalidateAliasingLoads(Ctx, SI);
 
   // Invalidate any store that we can not prove does not write to the stored
   // destination.
-  invalidateWriteToStores(Ctx, SI, StoreMap);
+  invalidateWriteToStores(Ctx, SI);
 
   // Insert SI into our store list to start tracking.
-  startTrackingStore(Ctx, SI, StoreMap);
+  startTrackingStore(Ctx, SI);
 }
 
-bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
-                                             CoveredStoreMap &StoreMap) {
+bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI) {
   PostDominanceInfo *PDI = Ctx.getPDI();
   AliasAnalysis *AA = Ctx.getAA();
 
@@ -1077,7 +1026,7 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
     // completely contained within the loaded value which we do not currently
     // do.
     if (Iter != Loads.end() && LdSrcOp == SI->getDest()) {
-      deleteUntrackedInstruction(Ctx, SI, StoreMap);
+      deleteUntrackedInstruction(Ctx, SI);
       NumSameValueStores++;
       return true;
     }
@@ -1085,7 +1034,7 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
 
   // Invalidate any load that we can not prove does not read from the stores
   // destination.
-  invalidateAliasingLoads(Ctx, SI, StoreMap);
+  invalidateAliasingLoads(Ctx, SI);
 
   // If we are storing to a previously stored address that this store post
   // dominates, delete the old store.
@@ -1152,19 +1101,13 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
     NumDeadStores++;
   }
 
-  for (auto &P : StoreMap) {
-    if (!P.second.aliasingWrite(AA, SI))
-      continue;
-    StoresToStopTracking.push_back(P.first);
-  }
-
   for (SILValue SIOp : StoresToDelete)
-    deleteStoreMappedToAddress(Ctx, SIOp, StoreMap);
+    deleteStoreMappedToAddress(Ctx, SIOp);
   for (SILValue SIOp : StoresToStopTracking)
-    stopTrackingAddress(SIOp, StoreMap);
+    stopTrackingAddress(SIOp);
 
   // Insert SI into our store list to start tracking.
-  startTrackingStore(Ctx, SI, StoreMap);
+  startTrackingStore(Ctx, SI);
   return Changed;
 }
 
@@ -1236,8 +1179,7 @@ static SILValue fixPhiPredBlocks(ArrayRef<SILInstruction *> Stores,
 /// Attempt to forward available values from stores to this load. If we do not
 /// perform store -> load forwarding, all stores which we failed to forward from
 /// which may alias the load will have the read dependency bit set on them.
-bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
-                                             CoveredStoreMap &StoreMap) {
+bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI) {
   // The list of stores that this load conservatively depends on. If we do not
   // eliminate the load from some store, we need to set the read dependency bit
   // on all stores that may alias the load.
@@ -1273,38 +1215,7 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
 
     DEBUG(llvm::dbgs() << "        Forwarding store from: " << *Addr);
     SILValue(LI).replaceAllUsesWith(Result);
-    deleteUntrackedInstruction(Ctx, LI, StoreMap);
-    NumForwardedLoads++;
-    return true;
-  }
-
-  // Check if we can forward from multiple stores.
-  for (auto &I : StoreMap) {
-    ForwardingAnalysis FA(AA, I.first, LI);
-    if (!FA.canForward()) {
-      // Although the addresses match, we cannot load the stored value. If we do
-      // not forward the load to be conservative, we need to set a read
-      // dependency on this store.
-      if (I.second.mayWriteToMemory(AA, LI)) {
-        ReadDependencyStores.push_back(I.first);
-      }
-      continue;
-    }
-
-    DEBUG(llvm::dbgs() << "        Checking from: ");
-    for (auto *SI : I.second.getInsts()) {
-      DEBUG(llvm::dbgs() << "          " << *SI);
-      (void)SI;
-    }
-
-    // Create a BBargument to merge in multiple stores.
-    SILValue PhiValue = fixPhiPredBlocks(I.second.getInsts(), BB);
-    SILValue Result = FA.forward(I.first, PhiValue, LI);
-    assert(Result && "Forwarding from multiple stores failed!");
-
-    DEBUG(llvm::dbgs() << "        Forwarding from multiple stores: ");
-    SILValue(LI).replaceAllUsesWith(Result);
-    deleteUntrackedInstruction(Ctx, LI, StoreMap);
+    deleteUntrackedInstruction(Ctx, LI);
     NumForwardedLoads++;
     return true;
   }
@@ -1312,7 +1223,7 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
   // If we were unable to eliminate the load, then set the read dependency bit
   // on all of the addresses that we could have a dependency upon.
   for (auto V : ReadDependencyStores) {
-    setReadDependencyOnStores(V, StoreMap);
+    setReadDependencyOnStores(V);
   }
 
   return false;
@@ -1320,8 +1231,7 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
 
 /// Try to forward a previously seen load to this load. We allow for multiple
 /// loads to be tracked from the same value.
-bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
-                                            CoveredStoreMap &StoreMap) {
+bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI) {
   // Search the previous loads and replace the current load or one of the
   // current loads uses with one of the previous loads.
   for (auto &P : Loads) {
@@ -1337,7 +1247,7 @@ bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
       DEBUG(llvm::dbgs() << "        Replacing with previous load: "
             << *Result);
       SILValue(LI).replaceAllUsesWith(Result);
-      deleteUntrackedInstruction(Ctx, LI, StoreMap);
+      deleteUntrackedInstruction(Ctx, LI);
       NumDupLoads++;
       return true;
     }
@@ -1359,16 +1269,15 @@ bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
   return false;
 }
 
-bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
-                                     CoveredStoreMap &StoreMap) {
+bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI) {
 
-  if (tryToForwardLoadsToLoad(Ctx, LI, StoreMap))
+  if (tryToForwardLoadsToLoad(Ctx, LI))
     return true;
 
-  if (tryToForwardStoresToLoad(Ctx, LI, StoreMap))
+  if (tryToForwardStoresToLoad(Ctx, LI))
     return true;
 
-  startTrackingLoad(Ctx, LI, StoreMap);
+  startTrackingLoad(Ctx, LI);
 
   // No partial aliased loads were successfully forwarded. Return false to
   // indicate no change.
@@ -1377,14 +1286,13 @@ bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
 
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
-bool LSBBForwarder::optimize(LSContext &Ctx,
-                             CoveredStoreMap &StoreMap) {
+bool LSBBForwarder::optimize(LSContext &Ctx) {
   auto II = BB->begin(), E = BB->end();
   bool Changed = false;
   while (II != E) {
     // Make sure that all of our invariants have been maintained. This is a noop
     // when asserts are disabled.
-    verify(Ctx, StoreMap);
+    verify(Ctx);
 
     SILInstruction *Inst = II++;
     DEBUG(llvm::dbgs() << "    Visiting: " << *Inst);
@@ -1394,17 +1302,17 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
       // If DSE is disabled, merely update states w.r.t. this store, but do not
       // try to get rid of the store.
       if (DisableGDSE) {
-        processStoreInst(Ctx, SI, StoreMap);
+        processStoreInst(Ctx, SI);
         continue;
       }
-      Changed |= tryToEliminateDeadStores(Ctx, SI, StoreMap);
+      Changed |= tryToEliminateDeadStores(Ctx, SI);
       continue;
     }
 
     // This is a LoadInst. Let's see if we can find a previous loaded, stored
     // value to use instead of this load.
     if (auto *LI = dyn_cast<LoadInst>(Inst)) {
-      Changed |= tryToForwardLoad(Ctx, LI, StoreMap);
+      Changed |= tryToForwardLoad(Ctx, LI);
       continue;
     }
 
@@ -1425,7 +1333,7 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
     // act as a read dependency on the store meaning that the store can no
     // longer be dead.
     if (Inst->mayReadFromMemory()) {
-      invalidateReadFromStores(Ctx, Inst, StoreMap);
+      invalidateReadFromStores(Ctx, Inst);
     }
 
     // If we have an instruction that may write to memory and we can not prove
@@ -1434,10 +1342,10 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
     if (Inst->mayWriteToMemory()) {
       // Invalidate any load that we can not prove does not read from one of the
       // writing instructions operands.
-      invalidateAliasingLoads(Ctx, Inst, StoreMap);
+      invalidateAliasingLoads(Ctx, Inst);
 
       // Invalidate our store if Inst writes to the destination location.
-      invalidateWriteToStores(Ctx, Inst, StoreMap);
+      invalidateWriteToStores(Ctx, Inst);
     }
   }
 
@@ -1470,12 +1378,6 @@ void LSBBForwarder::mergePredecessorState(LSBBForwarder &OtherState) {
   if (DeleteList.size()) {
     DEBUG(llvm::dbgs() << "        Stores no longer being tracked:\n");
     for (SILValue V : DeleteList) {
-      // TLDR: We do not remove stores from StoreMap here.
-      //
-      // We perform dataflow over self loops. This is done by initializing our
-      // merging with the original BB state in a later iteration if we
-      // additionally perform some change in the function. Since we only do this
-      // with self loops and in all other cases are conservative, this is safe.
       Stores.erase(V);
     }
     DeleteList.clear();
@@ -1502,113 +1404,22 @@ void LSBBForwarder::mergePredecessorState(LSBBForwarder &OtherState) {
   }
 }
 
-/// Update StoreMap for a given basic block, if there is a reaching store
-/// for an address from all the predecessors.
-void LSBBForwarder::
-updateStoreMap(llvm::DenseMap<SILBasicBlock *,
-                              unsigned> &BBToBBIDMap,
-               std::vector<LSBBForwarder> &BBIDToForwarderMap,
-               CoveredStoreMap &StoreMap) {
-  if (std::distance(BB->pred_begin(), BB->pred_end()) <= 1)
-    return;
-
-  bool FirstPred = true;
-
-  for (auto Pred : BB->getPreds()) {
-    // Bail out if one of the predecessors has a terminator that we currently
-    // do not handle.
-    if (!isa<CondBranchInst>(Pred->getTerminator()) &&
-        !isa<BranchInst>(Pred->getTerminator())) {
-      StoreMap.clear();
-      return;
-    }
-
-    auto I = BBToBBIDMap.find(Pred);
-    if (I == BBToBBIDMap.end()) {
-      StoreMap.clear();
-      return;
-    }
-    LSBBForwarder &Other = BBIDToForwarderMap[I->second];
-
-    // Calculate SILValues that are stored once in this predecessor.
-    llvm::DenseMap<SILValue, StoreInst *> StoredMapOfThisPred;
-    llvm::SmallSet<SILValue, 16> StoredValuesOfThisPred;
-    for (auto &P : Other.Stores) {
-      if (!StoredValuesOfThisPred.count(P.first)) {
-        // Assert to make sure to update this when we transition covering stores
-        // to use LSValues.
-        assert(P.second.getInsts().size() == 1);
-        auto *SI = cast<StoreInst>(P.second.getInsts()[0]);
-        StoredMapOfThisPred[P.first] = SI;
-      } else {
-        StoredMapOfThisPred.erase(P.first);
-      }
-      StoredValuesOfThisPred.insert(P.first);
-    }
-
-    if (FirstPred) {
-      // Update StoreMap with stores from the first predecessor.
-      for (auto I = StoredMapOfThisPred.begin(), E = StoredMapOfThisPred.end();
-           I != E; I++) {
-        StoreMap.insert({I->first, LSStore(I->second)});
-        DEBUG(llvm::dbgs() << "        Updating StoreMap bb" <<
-              Pred->getDebugID() << ": " << I->first << "          " <<
-              *I->second);
-      }
-    } else {
-      // Merge in stores from other predecessors.
-      for (auto I = StoreMap.begin(), E = StoreMap.end(); I != E;) {
-        SILValue Current = I->first;
-        if (!StoredMapOfThisPred.count(Current) ||
-            cast<StoreInst>(I->second.getInsts()[0])->getSrc().getType() !=
-            StoredMapOfThisPred[Current]->getSrc().getType()) {
-          DEBUG(llvm::dbgs() << "        Removing from StoreMap: " << Current);
-          I++; // Move to the next before erasing the current.
-          StoreMap.erase(Current);
-        }
-        else {
-          I->second.addValue(StoredMapOfThisPred[Current]);
-          DEBUG(llvm::dbgs() << "        Updating StoreMap bb" <<
-                Pred->getDebugID() << ": " << Current <<
-                "          " << *StoredMapOfThisPred[Current]);
-          I++;
-        }
-      }
-    }
-    FirstPred = false;
-  }
-}
-
 void
 LSBBForwarder::
 mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                                       unsigned> &BBToBBIDMap,
-                       std::vector<LSBBForwarder> &BBIDToForwarderMap,
-                       CoveredStoreMap &StoreMap) {
+                       std::vector<LSBBForwarder> &BBIDToForwarderMap) {
   // Clear the state if the basic block has no predecessor.
   if (BB->getPreds().begin() == BB->getPreds().end()) {
     clear();
     return;
   }
 
-  // Update StoreMap. Do this before updating Stores since we need the states
-  // at the end of the basic blocks.
-  //
-  // The reason why we need the states at the end of the basic blocks is that
-  // the optimization that this is used for is a simple self cycle. If we move
-  // this later we will have already cleared this basic blocks's state when we
-  // merged in our predecessors.
-  //
-  // Once we have a fully optimistic iterative dataflow that uses LSValues
-  // this should be removed.
-  updateStoreMap(BBToBBIDMap, BBIDToForwarderMap, StoreMap);
-
   bool HasAtLeastOnePred = false;
   // If we have a self cycle, we keep the old state and merge in states
   // of other predecessors. Otherwise, we initialize the state with the first
   // predecessor's state and merge in states of other predecessors.
   //
-  // Again, this is why we call updateStoreMap earlier.
   SILBasicBlock *TheBB = getBB();
   bool HasSelfCycle = std::any_of(BB->pred_begin(), BB->pred_end(),
                                   [&TheBB](SILBasicBlock *Pred) -> bool {
@@ -1656,31 +1467,14 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
     }
     HasAtLeastOnePred = true;
   }
-
-  // If we updated the StoreMap earlier and later on we discovered that along
-  // all predecessors we have a store, remove the store from the store map.
-  // Otherwise we will be representing the same store in two places.
-  for (auto &P : Stores) {
-    DEBUG(llvm::dbgs() << "        Removing from StoreMap: " << P);
-    StoreMap.erase(P.first);
-  }
 }
 
-void LSBBForwarder::verify(LSContext &Ctx, CoveredStoreMap &StoreMap) {
+void LSBBForwarder::verify(LSContext &Ctx) {
 #ifndef NDEBUG
   llvm::SmallVector<SILValue, 8> Values;
   auto *AA = Ctx.getAA();
 
   for (auto &P : Stores) {
-    for (auto V : Values) {
-      for (SILInstruction *SI : P.second.getInsts()) {
-        assert(!AA->mayWriteToMemory(SI, V) && "Found overlapping stores");
-      }
-    }
-    Values.push_back(P.first);
-  }
-
-  for (auto &P : StoreMap) {
     for (auto V : Values) {
       for (SILInstruction *SI : P.second.getInsts()) {
         assert(!AA->mayWriteToMemory(SI, V) && "Found overlapping stores");
@@ -1734,26 +1528,22 @@ LSContext::runIteration() {
 
     DEBUG(llvm::dbgs() << "Visiting bb" << BB->getDebugID() << "\n");
 
-    CoveredStoreMap StoreMap;
-
     // Merge the predecessors. After merging, LSBBForwarder now contains
     // lists of stores|loads that reach the beginning of the basic block
     // along all paths.
-    Forwarder.mergePredecessorStates(BBToBBIDMap, BBIDToForwarderMap,
-                                     StoreMap);
+    Forwarder.mergePredecessorStates(BBToBBIDMap, BBIDToForwarderMap);
 
     // Remove dead stores, merge duplicate loads, and forward stores to
     // loads. We also update lists of stores|loads to reflect the end
     // of the basic block.
-    Changed |= Forwarder.optimize(*this, StoreMap);
+    Changed |= Forwarder.optimize(*this);
   }
 
   return Changed;
 }
 
-void LSContext::stopTrackingInst(SILInstruction *I, CoveredStoreMap &StoreMap) {
+void LSContext::stopTrackingInst(SILInstruction *I) {
   if (auto *SI = dyn_cast<StoreInst>(I)) {
-    StoreMap.erase(SI->getDest());
   } else if (! isa<LoadInst>(I)) {
     return;
   }
