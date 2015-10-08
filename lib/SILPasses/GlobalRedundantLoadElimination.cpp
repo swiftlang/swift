@@ -1630,6 +1630,10 @@ RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA, PostDominanceInfo *PDI
     BBToBBIDMap[BB] = count;
     BBIDToForwarderMap[count].init(BB);
   }
+
+  // Walk over the function and find all the locations accessed by
+  // this function.
+  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex);
 }
 
 MemLocation &RLEContext::getMemLocation(const unsigned index) {
@@ -1656,10 +1660,6 @@ unsigned RLEContext::getMemLocationBit(const MemLocation &Loc) {
 
 bool
 RLEContext::runIteration() {
-  // Walk over the function and find all the locations accessed by
-  // this function.
-  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex);
-
   bool Changed = false;
   for (SILBasicBlock *BB : ReversePostOrder) {
     auto IDIter = BBToBBIDMap.find(BB);
