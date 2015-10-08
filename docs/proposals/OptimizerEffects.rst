@@ -566,7 +566,12 @@ This would mean that foo's unspecified effects are bounded by the
 unspecified effects of T's deinitializer. The reality of designing
 polymorphic effects will be much more complicated.
 
-.. note::
+A different approach would be to statically constrain effects on
+generic types, protocol conformance, and closures. This wouldn't solve
+the general problem, but could be a very useful tool for static
+enforcement.
+
+.. note:: Examples of function effects systems:
 
    [JoeG] For example, the effect type system model in Koka
    (https://koka.codeplex.com) can handle exceptions, side
@@ -574,10 +579,8 @@ polymorphic effects will be much more complicated.
    pretty elegant way. It's my hope that "throws" can provide a seed
    toward a full effects system like theirs.
 
-A different approach would be to statically constrain effects on
-generic types, protocol conformance, and closures. This wouldn't solve
-the general problem, but could be a very useful tool for static
-enforcement.
+   http://www.eff-lang.org: A language with first-class effects.
+
 
 Purity
 ------
