@@ -40,7 +40,7 @@ add_swift_library(swiftSILPasses
   LoopRegionPrinter.cpp
   LoopRotate.cpp
   MandatoryInlining.cpp
-  MemLocationDumper.cpp
+  MemLocationPrinter.cpp
   MergeCondFail.cpp
   PassManager.cpp
   Passes.cpp
