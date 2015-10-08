@@ -113,9 +113,11 @@ unspecified state.
 CoW Optimization Requirements
 -----------------------------
 
-[arnold] The following proposal is still worded using the syntax I sent out to
-the list.  As Andrew points out this can be recast in terms @effects attributes
-and argument attributes.
+.. note::
+
+   [arnold] The following proposal is still worded using the syntax I
+   sent out to the list.  As Andrew points out this can be recast in
+   terms @effects attributes and argument attributes.
 
 Copy-on-write type effects proposal
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -220,6 +222,14 @@ Example:::
       return storage.elementAddressAt(index)
     }
 
+
+.. note::
+
+   [Andy] I'd like to rename the annotations shown below. The names
+   should probably reflect the typical usage rather attempt to
+   describe the semantics. The semantics are defined by mapping these
+   names to a set of primitive effects.
+    
 argonlyglobaleffects
 
 The method does not have any global side effect and does not read global state
@@ -704,8 +714,11 @@ reference counting effects: capture and release. Optimizations that
 depend on reference count stability, like uniqueness hoisting, cannot
 treat pure functions as side-effect free.
 
-[Andy] It may be possible to make some assumptions about immutability
-of ``let`` variables, which could lead to similar optimization.
+.. note::
+
+   [Andy] It may be possible to make some assumptions about
+   immutability of ``let`` variables, which could lead to similar
+   optimization.
 
 TODO: Need more clarity and examples
 
@@ -718,8 +731,11 @@ The optimizer does not currently have a way of statically determining
 or enforcing effects of a function that takes a closure. We could
 introduce attributes that statically enforce constraints. For example,
 and @pure closure would only be permitted to close over pure values.
-[Andy] That is a fairly strict requirement, but not one that I know
-how to overcome.
+
+.. note::
+
+   [Andy] That is a fairly strict requirement, but not one that I know
+   how to overcome.
 
 Thread Safety
 -------------
