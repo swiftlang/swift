@@ -1554,14 +1554,12 @@ bb0(%0 : $Boo, %1 : $Boo):
 
 bb1:                                              // Preds: bb0 
   %6 = alloc_ref $fuzz                            // users: %7, %8
-  // TODO: handle debug values while sinking
-  // debug_value %6 : $fuzz  // let self             // id: %7
+  debug_value %6 : $fuzz  // let self             // id: %7
   br bb2(%6 : $fuzz)                              // id: %8
 
 bb3:                                              // Preds: bb0 
   %15 = alloc_ref $fuzz                           // users: %16, %17 
-  // TODO: handle debug values while sinking
-  // debug_value %15 : $fuzz  // let self            // id: %16 
+  debug_value %15 : $fuzz  // let self            // id: %16 
   br bb2(%15 : $fuzz)                             // id: %17 
 
 bb2(%9 : $fuzz):

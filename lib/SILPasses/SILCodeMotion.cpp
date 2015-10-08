@@ -19,6 +19,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
@@ -353,6 +354,14 @@ static bool sinkLiteralArguments(SILBasicBlock *BB, unsigned ArgNum) {
   return true;
 }
 
+/// Deletes all of the debug instructions that use \p Inst.
+static void deleteAllDebugUses(ValueBase *Inst) {
+  for (auto U : Inst->getUses()) {
+    auto II = U->getUser();
+    if (isDebugInst(II)) II->eraseFromParent();
+  }
+}
+
 // Try to sink values from the Nth argument \p ArgNum.
 static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   assert(ArgNum < BB->getNumBBArg() && "Invalid argument");
@@ -368,7 +377,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   Clones.push_back(FirstPredArg);
 
   // We only move instructions with a single use.
-  if (!FSI || !FSI->hasOneUse())
+  if (!FSI || !hasOneNonDebugUse(*FSI))
     return false;
 
   // Don't move instructions that are sensitive to their location.
@@ -392,7 +401,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     // Find the Nth argument passed to BB.
     SILValue Arg = TI->getOperand(ArgNum);
     SILInstruction *SI = dyn_cast<SILInstruction>(Arg);
-    if (!SI || !SI->hasOneUse())
+    if (!SI || !hasOneNonDebugUse(*SI))
       return false;
     if (SI->isIdenticalTo(FSI)) {
       Clones.push_back(SI);
@@ -418,6 +427,9 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
     return false;
 
   SILValue Undef = SILUndef::get(FirstPredArg.getType(), BB->getModule());
+
+  // Delete the debug info of the instruction that we are about to sink.
+  deleteAllDebugUses(FSI);
 
   if (DifferentOperandIndex) {
     // Sink one of the instructions to BB
@@ -464,6 +476,7 @@ static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   // and try to delete the instruction.
   for (auto S : Clones)
     if (S.getDef() != FSI) {
+      deleteAllDebugUses(S.getDef());
       S.replaceAllUsesWith(Undef);
       auto DeadArgInst = cast<SILInstruction>(S.getDef());
       recursivelyDeleteTriviallyDeadInstructions(DeadArgInst);
