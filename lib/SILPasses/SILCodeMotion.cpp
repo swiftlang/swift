@@ -354,14 +354,6 @@ static bool sinkLiteralArguments(SILBasicBlock *BB, unsigned ArgNum) {
   return true;
 }
 
-/// Deletes all of the debug instructions that use \p Inst.
-static void deleteAllDebugUses(ValueBase *Inst) {
-  for (auto U : Inst->getUses()) {
-    auto II = U->getUser();
-    if (isDebugInst(II)) II->eraseFromParent();
-  }
-}
-
 // Try to sink values from the Nth argument \p ArgNum.
 static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   assert(ArgNum < BB->getNumBBArg() && "Invalid argument");

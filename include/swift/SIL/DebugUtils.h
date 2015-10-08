@@ -48,6 +48,15 @@ inline bool isDebugInst(SILInstruction *Inst) {
   return isa<DebugValueInst>(Inst) || isa<DebugValueAddrInst>(Inst);
 }
 
+/// Deletes all of the debug instructions that use \p Inst.
+inline void deleteAllDebugUses(ValueBase *Inst) {
+  for (auto U : Inst->getUses()) {
+    auto II = U->getUser();
+    if (isDebugInst(II))
+      II->eraseFromParent();
+  }
+}
+
 /// This iterator filters out any debug (or non-debug) instructions from a range
 /// of uses, provided by the underlying use-iterator \p Base.
 /// If \p nonDebugInsts is true, then the iterator provides a view to all non-
