@@ -160,6 +160,8 @@ public:
   /// Check whether the 2 MemLocations must alias each other or not.
   bool isMustAliasMemLocation(const MemLocation &RHS, AliasAnalysis *AA);
 
+  /// Print MemLocation.
+  void print() const;
 
   /// Expand this location to all individual fields it contains.
   ///
@@ -190,7 +192,7 @@ static inline llvm::hash_code hash_value(const MemLocation &L) {
                             L.getBase().getType());
 }
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, MemLocation &V) {
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, MemLocation V) {
   V.getBase().print(OS);
   OS << V.getPath().getValue();
   return OS;

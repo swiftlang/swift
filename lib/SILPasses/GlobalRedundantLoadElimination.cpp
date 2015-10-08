@@ -708,6 +708,13 @@ public:
 
   /// Given the bit, get the memory location from the MemLocationVault.
   MemLocation &getMemLocation(const unsigned index);
+
+  /// Dump all the memory locations in the MemLocationVault.
+  void printMemLocationVault() {
+    for (auto &X : MemLocationVault) {
+      X.print();
+    }
+  }
 };
 
 } // end anonymous namespace

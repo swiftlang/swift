@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-memlocation"
 #include "swift/SIL/MemLocation.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -22,6 +23,10 @@ using namespace swift;
 void MemLocation::initialize(SILValue Dest) {
   Base = getUnderlyingObject(Dest);
   Path = ProjectionPath::getAddrProjectionPath(Base, Dest);
+}
+
+void MemLocation::print() const {
+  llvm::outs() << *this;
 }
 
 bool MemLocation::hasIdenticalProjectionPath(const MemLocation &RHS) const {
