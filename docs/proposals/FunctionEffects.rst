@@ -564,22 +564,38 @@ With some knowledge of bar() and T can become::
     bar(t)
   }
 
-If our own implementation of value types, like Array, Set, and String where annotated as know "pure values" and if their common operations are known to comply with some low-level effects, then the optimizer could infer more general purity of operations on those types. The optimizer could then also reason about purity of operations on user defined types composed from Arrays, Sets, and Strings.
+If our own implementation of value types, like Array, Set, and String
+where annotated as know "pure values" and if their common operations
+are known to comply with some low-level effects, then the optimizer
+could infer more general purity of operations on those types. The
+optimizer could then also reason about purity of operations on user
+defined types composed from Arrays, Sets, and Strings.
 
 "Pure" Value Types
 ~~~~~~~~~~~~~~~~~~
 
-Conceptually, a pure value does not share state with another value. Any trivial struct is automatically pure. Other structs can be declared pure by the author. It then becomes the author's resonsibility to guarantee value semantics. For instance, any stored reference into the heap must either be to immutable data or protected by CoW.
+Conceptually, a pure value does not share state with another
+value. Any trivial struct is automatically pure. Other structs can be
+declared pure by the author. It then becomes the author's
+resonsibility to guarantee value semantics. For instance, any stored
+reference into the heap must either be to immutable data or protected
+by CoW.
 
-Since a pure value type can in practice share implementation state, we need an enforcable definition of such types. More formally:
+Since a pure value type can in practice share implementation state, we
+need an enforcable definition of such types. More formally:
 
-- Copying or destroying a pure value cannot affect other program state.
+- Copying or destroying a pure value cannot affect other program
+  state.
 
-- Reading memory referenced from a pure value does not depend on other program state. Writing memory referenced from a pure value cannot affect other program state.
+- Reading memory referenced from a pure value does not depend on other
+  program state. Writing memory referenced from a pure value cannot
+  affect other program state.
 
-The purity of functions that operate on these values, including their own methods, must be deduced independently.
+The purity of functions that operate on these values, including their
+own methods, must be deduced independently.
 
-From the optimizer perspective, there are two aspects of type purity that fall out of the definition:
+From the optimizer perspective, there are two aspects of type purity
+that fall out of the definition:
 
 (1) Side Effects of Copies
 
@@ -593,35 +609,74 @@ From the optimizer perspective, there are two aspects of type purity that fall o
     Mutation of the pure value cannot affect program state apart from that value,
     AND writing program state outside the value cannot affect the pure value.
 
-[Note] Reference counts are exposed through the isUniquelyReferenced API. Since copying a pure value can increase the reference of the storage, strictly speaking, a pure function can have user-visible side effects. We side step this issue by placing the burden on the user of the isUniquelyReferenced API. The compiler only guarantees that the API returns a non-unique reference count if there does happen to be an aliasing reference after optimization, which the user cannot control. The user must ensure that the program behaves identically in either case apart from its performance characteristics.
+[Note] Reference counts are exposed through the isUniquelyReferenced
+API. Since copying a pure value can increase the reference of the
+storage, strictly speaking, a pure function can have user-visible side
+effects. We side step this issue by placing the burden on the user of
+the isUniquelyReferenced API. The compiler only guarantees that the
+API returns a non-unique reference count if there does happen to be an
+aliasing reference after optimization, which the user cannot
+control. The user must ensure that the program behaves identically in
+either case apart from its performance characteristics.
 
 Recognizing Value Types
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-A major difficulty in recognizing value types arises when those types are implemented in terms of unsafe code with arbitrary side effects. This is the crux of the difficulty in defining the CoW effects. Consequently, communicating purity to the compiler will require some function annotations and/or type constraints.
+A major difficulty in recognizing value types arises when those types
+are implemented in terms of unsafe code with arbitrary side
+effects. This is the crux of the difficulty in defining the CoW
+effects. Consequently, communicating purity to the compiler will
+require some function annotations and/or type constraints.
 
-Erik suggested that a CoW-implemented value type have its storage annotated. The compiler can then defer inlining methods that expose the storage (this is a generalization of the current Array design). The compiler would need to treat calls to those implementation methods as an optimization boundary until it effectively lowers value types. After value type lowering, the compiler would no longer be able to consider those CoW types as value types anywhere in the code. I think this would simplify optimization of nonmutating operations on CoW types; however, most of Arnold's work has been to support optimization across mutating CoW operations, which will still require highly complex logic.
+Erik suggested that a CoW-implemented value type have its storage
+annotated. The compiler can then defer inlining methods that expose
+the storage (this is a generalization of the current Array
+design). The compiler would need to treat calls to those
+implementation methods as an optimization boundary until it
+effectively lowers value types. After value type lowering, the
+compiler would no longer be able to consider those CoW types as value
+types anywhere in the code. I think this would simplify optimization
+of nonmutating operations on CoW types; however, most of Arnold's work
+has been to support optimization across mutating CoW operations, which
+will still require highly complex logic.
 
-As discussed above, CoW types will often be generic, making the effects of an operation on the CoW type dependent on the effects of destroying an object of the element type.
+As discussed above, CoW types will often be generic, making the
+effects of an operation on the CoW type dependent on the effects of
+destroying an object of the element type.
 
 TODO: Need more clarity and examples
 
 Inferring Function Purity
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The optimizer can infer function purity by knowing that (1) the function does not access unspecified state, (2) all arguments are pure values, and (3) no calls are made into nonpure code.
+The optimizer can infer function purity by knowing that (1) the
+function does not access unspecified state, (2) all arguments are pure
+values, and (3) no calls are made into nonpure code.
 
-(1) The effects system described above already tells the optimizer via analysis or annotation that the function does not access unspecified state.
+(1) The effects system described above already tells the optimizer via
+    analysis or annotation that the function does not access
+    unspecified state.
 
-(2) Copying or destroying a pure value by definition has no impact on other program state. The optimizer may either deduce this from the type definition, or it may rely on a type constraint.
+(2) Copying or destroying a pure value by definition has no impact on
+    other program state. The optimizer may either deduce this from the
+    type definition, or it may rely on a type constraint.
 
-(3) Naturally, any calls within the function body must be transitively pure. There is no need to check a calls to the storage deinitializer, which should already be guaranteed pure by virtue of (2).
+(3) Naturally, any calls within the function body must be transitively
+    pure. There is no need to check a calls to the storage
+    deinitializer, which should already be guaranteed pure by virtue
+    of (2).
 
-Mutability of a pure value should not affect the purity of functions that operate on the value. An inout argument is semantically nothing more than a copy of the value.
+Mutability of a pure value should not affect the purity of functions
+that operate on the value. An inout argument is semantically nothing
+more than a copy of the value.
 
-[Note] Pure functions do not depend on or imply anything about the reference counting effects: capture and release. Optimizations that depend on reference count stability, like uniqueness hoisting, cannot treat pure functions as side-effect free.
+[Note] Pure functions do not depend on or imply anything about the
+reference counting effects: capture and release. Optimizations that
+depend on reference count stability, like uniqueness hoisting, cannot
+treat pure functions as side-effect free.
 
-[Andy] It may be possible to make some assumptions about immutability of ``let`` variables, which could lead to similar optimization.
+[Andy] It may be possible to make some assumptions about immutability
+of ``let`` variables, which could lead to similar optimization.
 
 TODO: Need more clarity and examples
 
@@ -630,15 +685,29 @@ Closures
 
 Mostly TBD.
 
-The optimizer does not currently have a way of statically determining or enforcing effects of a function that takes a closure. We could introduce attributes that statically enforce constraints. For example, and @pure closure would only be permitted to close over pure values.
-[Andy] That is a fairly strict requirement, but not one that I know how to overcome.
+The optimizer does not currently have a way of statically determining
+or enforcing effects of a function that takes a closure. We could
+introduce attributes that statically enforce constraints. For example,
+and @pure closure would only be permitted to close over pure values.
+[Andy] That is a fairly strict requirement, but not one that I know
+how to overcome.
 
 Thread Safety
 -------------
 
-The Swift concurrency proposal refers to a ``Copyable`` type. A type must be Copyable in order to pass it across threads via a ``gateway``. The definition of a Copyable type is equivalent to a "pure value". However, it was also proposed that the programmer be able to annotate arbitrary data types as Copyable even if they contain shared state as long as it is protected via a mutex. However, such data types cannot be considered pure by the optimizer. I instead propose that a separate constraint, Synchronized, be attributed to shareable types that are not pure. An object could be passed through a gateway either if it is a PureValue or is Synchronized.
+The Swift concurrency proposal refers to a ``Copyable`` type. A type
+must be Copyable in order to pass it across threads via a
+``gateway``. The definition of a Copyable type is equivalent to a
+"pure value". However, it was also proposed that the programmer be
+able to annotate arbitrary data types as Copyable even if they contain
+shared state as long as it is protected via a mutex. However, such
+data types cannot be considered pure by the optimizer. I instead
+propose that a separate constraint, Synchronized, be attributed to
+shareable types that are not pure. An object could be passed through a
+gateway either if it is a PureValue or is Synchronized.
 
-Annotations for thread safety run into the same problems with generics and closures.
+Annotations for thread safety run into the same problems with generics
+and closures.
 
 API and Resilience
 ------------------
@@ -646,6 +715,12 @@ API and Resilience
 Any type constraints, function effects, or closure attributes that we
 introduce on public functions become part of the API.
 
-Naturally, there are resilience implications to user-specified effects. Moving to a weaker set of declared effects is not resilient.
+Naturally, there are resilience implications to user-specified
+effects. Moving to a weaker set of declared effects is not resilient.
 
-Generally, a default-safe policy provides a much better user model from some effects. For example, we could decide that functions cannot affect unspecified state by default. If the user accesses globals, they then need to annotate their function. However, default safety dictates that any neccessary annotations should be introduced before declaring API stability.
+Generally, a default-safe policy provides a much better user model
+from some effects. For example, we could decide that functions cannot
+affect unspecified state by default. If the user accesses globals,
+they then need to annotate their function. However, default safety
+dictates that any neccessary annotations should be introduced before
+declaring API stability.
