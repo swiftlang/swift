@@ -26,6 +26,7 @@ add_swift_library(swiftSILPasses
   FunctionSignatureOpts.cpp
   GlobalARCOpts.cpp
   GlobalDeadStoreElimination.cpp
+  GlobalRedundantLoadElimination.cpp
   GlobalOpt.cpp
   GlobalPropertyOpt.cpp
   IVInfoPrinter.cpp
@@ -34,7 +35,6 @@ add_swift_library(swiftSILPasses
   LICM.cpp
   LetPropertiesOpts.cpp
   Link.cpp
-  LoadStoreOpts.cpp
   LoopCanonicalizer.cpp
   LoopInfoPrinter.cpp
   LoopRegionPrinter.cpp
