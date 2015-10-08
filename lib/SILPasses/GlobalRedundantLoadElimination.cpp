@@ -653,6 +653,9 @@ class LSStore;
 /// the computation. We put its interface at the top for use in other parts of
 /// the pass which may want to use this global information.
 class LSContext {
+  /// Function this context is currently processing.
+  SILFunction *F;
+
   /// The alias analysis that we will use during all computations.
   AliasAnalysis *AA;
 
@@ -662,6 +665,14 @@ class LSContext {
   /// The range that we use to iterate over the reverse post order of the given
   /// function.
   PostOrderFunctionInfo::reverse_range ReversePostOrder;
+
+  /// Keeps all the locations for the current function. The BitVector in each
+  /// BBState is then laid on top of it to keep track of which MemLocation
+  /// has an upward visible store.
+  std::vector<MemLocation> MemLocationVault;
+
+  /// Contains a map between location to their index in the MemLocationVault.
+  llvm::DenseMap<MemLocation, unsigned> LocToBitIndex;
 
   /// A map from each BasicBlock to its index in the BBIDToForwarderMap.
   ///
@@ -673,7 +684,7 @@ class LSContext {
   std::vector<LSBBForwarder> BBIDToForwarderMap;
 
 public:
-  LSContext(AliasAnalysis *AA, PostDominanceInfo *PDI,
+  LSContext(SILFunction *F, AliasAnalysis *AA, PostDominanceInfo *PDI,
             PostOrderFunctionInfo::reverse_range RPOT);
 
   LSContext(const LSContext &) = delete;
@@ -688,6 +699,14 @@ public:
 
   AliasAnalysis *getAA() const { return AA; }
   PostDominanceInfo *getPDI() const { return PDI; }
+
+  /// Get the bit representing the location in the MemLocationVault.
+  ///
+  /// NOTE: Adds the location to the location vault if necessary.
+  unsigned getMemLocationBit(const MemLocation &L);
+
+  /// Given the bit, get the memory location from the MemLocationVault.
+  MemLocation &getMemLocation(const unsigned index);
 };
 
 } // end anonymous namespace
@@ -752,7 +771,7 @@ class LSBBForwarder {
 
   /// This is a list of memlocations that have available values. Eventually,
   /// AvailLocs should replace Stores and Loads.
-  llvm::DenseSet<MemLocation> AvailLocs;
+  llvm::SmallMapVector<unsigned, SILValue, 8> AvailLocs;
 
 public:
   LSBBForwarder() = default;
@@ -1285,16 +1304,16 @@ bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI) {
 
 void LSBBForwarder::processUnknownWriteInst(LSContext &Ctx, SILInstruction *I){
   auto *AA = Ctx.getAA();
-  llvm::SmallVector<MemLocation, 8> LocDeleteList;
+  llvm::SmallVector<unsigned, 8> LocDeleteList;
   for (auto &X : AvailLocs) {
-    if (!AA->mayWriteToMemory(I, X.getBase()))
+    if (!AA->mayWriteToMemory(I, Ctx.getMemLocation(X.first).getBase()))
       continue;
-    LocDeleteList.push_back(X);
+    LocDeleteList.push_back(X.first);
   }
 
   if (LocDeleteList.size()) {
     DEBUG(llvm::dbgs() << "        MemLocation no longer being tracked:\n");
-    for (MemLocation &V : LocDeleteList) {
+    for (unsigned V : LocDeleteList) {
       AvailLocs.erase(V);
     }
   }
@@ -1316,7 +1335,7 @@ void LSBBForwarder::processStoreInst(LSContext &Ctx, StoreInst *SI) {
   MemLocationList Locs;
   MemLocation::expand(L, &SI->getModule(), Locs);
   for (auto &X : Locs) {
-    AvailLocs.insert(X);
+    AvailLocs[Ctx.getMemLocationBit(X)] = SILValue();
   } 
 }
 
@@ -1334,7 +1353,7 @@ void LSBBForwarder::processLoadInst(LSContext &Ctx, LoadInst *LI) {
   MemLocationList Locs;
   MemLocation::expand(L, &LI->getModule(), Locs);
   for (auto &X : Locs) {
-    AvailLocs.insert(X);
+    AvailLocs[Ctx.getMemLocationBit(X)] = SILValue();
   } 
 }
 
@@ -1481,18 +1500,18 @@ void LSBBForwarder::mergePredecessorState(LSBBForwarder &OtherState) {
     DEBUG(llvm::dbgs() << "        All loads still being tracked!\n");
   }
 
-  llvm::SmallVector<MemLocation, 8> LocDeleteList;
+  llvm::SmallVector<unsigned, 8> LocDeleteList;
   DEBUG(llvm::dbgs() << "            Initial AvailLocs:\n");
   for (auto &P : AvailLocs) {
-    auto Iter = OtherState.AvailLocs.find(P);
+    auto Iter = OtherState.AvailLocs.find(P.first);
     if (Iter != OtherState.AvailLocs.end())
       continue;
-    LocDeleteList.push_back(P);
+    LocDeleteList.push_back(P.first);
   }
 
   if (LocDeleteList.size()) {
     DEBUG(llvm::dbgs() << "        MemLocation no longer being tracked:\n");
-    for (MemLocation &V : LocDeleteList) {
+    for (unsigned V : LocDeleteList) {
       AvailLocs.erase(V);
     }
   } else {
@@ -1600,9 +1619,9 @@ roundPostOrderSize(PostOrderFunctionInfo::reverse_range R) {
   return unsigned(SizeRoundedToPow2);
 }
 
-LSContext::LSContext(AliasAnalysis *AA, PostDominanceInfo *PDI,
+LSContext::LSContext(SILFunction *F, AliasAnalysis *AA, PostDominanceInfo *PDI,
                      PostOrderFunctionInfo::reverse_range RPOT)
-    : AA(AA), PDI(PDI), ReversePostOrder(RPOT),
+    : F(F), AA(AA), PDI(PDI), ReversePostOrder(RPOT),
       BBToBBIDMap(roundPostOrderSize(RPOT)),
       BBIDToForwarderMap(roundPostOrderSize(RPOT)) {
   for (SILBasicBlock *BB : ReversePostOrder) {
@@ -1612,10 +1631,35 @@ LSContext::LSContext(AliasAnalysis *AA, PostDominanceInfo *PDI,
   }
 }
 
+MemLocation &LSContext::getMemLocation(const unsigned index) {
+  // Return the bit position of the given Loc in the MemLocationVault. The bit
+  // position is then used to set/reset the bitvector kept by each BBState.
+  //
+  // We should have the location populated by the enumerateMemLocation at this
+  // point.
+  //
+  return MemLocationVault[index];
+}
+
+unsigned LSContext::getMemLocationBit(const MemLocation &Loc) {
+  // Return the bit position of the given Loc in the MemLocationVault. The bit
+  // position is then used to set/reset the bitvector kept by each BBState.
+  //
+  // We should have the location populated by the enumerateMemLocation at this
+  // point.
+  //
+  auto Iter = LocToBitIndex.find(Loc);
+  assert(Iter != LocToBitIndex.end() && "MemLocation should have been enumerated");
+  return Iter->second;
+}
+
 bool
 LSContext::runIteration() {
-  bool Changed = false;
+  // Walk over the function and find all the locations accessed by
+  // this function.
+  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex);
 
+  bool Changed = false;
   for (SILBasicBlock *BB : ReversePostOrder) {
     auto IDIter = BBToBBIDMap.find(BB);
     assert(IDIter != BBToBBIDMap.end() && "We just constructed this!?");
@@ -1695,7 +1739,7 @@ class GlobalRedundantLoadElimination : public SILFunctionTransform {
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
     auto *PDT = PM->getAnalysis<PostDominanceAnalysis>()->get(F);
 
-    LSContext Ctx(AA, PDT, PO->getReversePostOrder());
+    LSContext Ctx(F, AA, PDT, PO->getReversePostOrder());
 
     bool Changed = false;
     while (Ctx.runIteration())
