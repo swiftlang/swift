@@ -1,14 +1,13 @@
 add_subdirectory(Utils)
 add_subdirectory(SILCombiner)
+add_subdirectory(UtilityPasses)
 add_swift_library(swiftSILPasses
   ${SILCOMBINER_SOURCES}
-  AADumper.cpp
+  ${UTILITYPASSES_SOURCES}
   AllocBoxToStack.cpp
   ArrayBoundsCheckOpts.cpp
-  CFGPrinter.cpp
   COWArrayOpt.cpp
   CSE.cpp
-  CallGraphPrinter.cpp
   CapturePromotion.cpp
   CapturePropagation.cpp
   ClosureSpecializer.cpp
@@ -29,18 +28,11 @@ add_swift_library(swiftSILPasses
   GlobalRedundantLoadElimination.cpp
   GlobalOpt.cpp
   GlobalPropertyOpt.cpp
-  IVInfoPrinter.cpp
   InOutDeshadowing.cpp
-  InstCount.cpp
   LICM.cpp
   LetPropertiesOpts.cpp
-  Link.cpp
-  LoopCanonicalizer.cpp
-  LoopInfoPrinter.cpp
-  LoopRegionPrinter.cpp
   LoopRotate.cpp
   MandatoryInlining.cpp
-  MemLocationPrinter.cpp
   MergeCondFail.cpp
   PassManager.cpp
   Passes.cpp
@@ -56,7 +48,5 @@ add_swift_library(swiftSILPasses
   SimplifyCFG.cpp
   Sink.cpp
   SpeculativeDevirtualizer.cpp
-  StripDebugInfo.cpp
-  UpdateSideEffects.cpp
   UsePrespecialized.cpp
   LINK_LIBRARIES swiftSILPassesUtils swiftSILAnalysis)

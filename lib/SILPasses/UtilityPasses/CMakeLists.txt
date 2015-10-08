@@ -1,0 +1,14 @@
+set(UTILITYPASSES_SOURCES
+  UtilityPasses/AADumper.cpp
+  UtilityPasses/CFGPrinter.cpp
+  UtilityPasses/CallGraphPrinter.cpp
+  UtilityPasses/IVInfoPrinter.cpp
+  UtilityPasses/InstCount.cpp
+  UtilityPasses/Link.cpp
+  UtilityPasses/LoopInfoPrinter.cpp
+  UtilityPasses/LoopCanonicalizer.cpp
+  UtilityPasses/LoopRegionPrinter.cpp
+  UtilityPasses/MemLocationPrinter.cpp
+  UtilityPasses/StripDebugInfo.cpp
+  UtilityPasses/UpdateSideEffects.cpp
+  PARENT_SCOPE)
