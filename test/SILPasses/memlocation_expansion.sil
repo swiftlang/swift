@@ -54,10 +54,25 @@ struct S4 {
   init()
 }
 
+class SelfLoop {
+  var a: Int 
+  var b: Int 
+  var c: SelfLoop
+   deinit 
+  init()
+}
+
+struct S5 {
+  var a: SelfLoop
+  init(a: SelfLoop)
+  init()
+}
+
 sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
 sil @S2_init : $@convention(thin) (@thin S2.Type) -> S2
 sil @S3_init : $@convention(thin) (@thin S3.Type) -> S3
 sil @S4_init : $@convention(thin) (@thin S4.Type) -> S4
+sil @S5_init : $@convention(thin) (@thin S5.Type) -> S5
 
 // CHECK-LABEL: @store_after_store
 // CHECK: #0  [[RET0:%.+]] = alloc_box
@@ -192,4 +207,18 @@ bb0:
   return %15 : $()                                // id: %19
 }
 
-
+// CHECK-LABEL: self_loop 
+// CHECK: alloc_stack $S5                            // users: %4, %7
+// CHECK-NEXT: var a: SelfLoop
+sil hidden @self_loop : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S5  // var b                  // users: %4, %7
+  %1 = function_ref @S5_init : $@convention(thin) (@thin S5.Type) -> S5 // user: %3
+  %2 = metatype $@thin S5.Type                    // user: %3
+  %3 = apply %1(%2) : $@convention(thin) (@thin S5.Type) -> S5 // users: %4, %5
+  store %3 to %0#1 : $*S5                         // id: %4
+  release_value %3 : $S5                          // id: %5
+  %6 = tuple ()                                   // user: %8
+  dealloc_stack %0#0 : $*@local_storage S5        // id: %7
+  return %6 : $()                                 // id: %8
+}
