@@ -43,10 +43,10 @@ public:
   enum KeyKind : uint8_t { EmptyKey = 0, TombstoneKey, NormalKey };
 
 private:
-  /// Empty key, tombstone key or normal key.
-  KeyKind Kind;
   /// The base of the object.
   SILValue Base;
+  /// Empty key, tombstone key or normal key.
+  KeyKind Kind;
   /// The path to reach the accessed field of the object.
   Optional<ProjectionPath> Path;
 
@@ -55,7 +55,7 @@ public:
   MemLocation() : Base(), Kind(NormalKey) {}
   MemLocation(SILValue B) : Base(B), Kind(NormalKey) { initialize(B); }
   MemLocation(SILValue B, ProjectionPath &P, KeyKind Kind = NormalKey)
-      : Base(B), Path(std::move(P)), Kind(Kind) {}
+      : Base(B), Kind(Kind), Path(std::move(P)) {}
 
   /// Copy constructor.
   MemLocation(const MemLocation &RHS) {
