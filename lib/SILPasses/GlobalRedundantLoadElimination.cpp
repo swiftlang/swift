@@ -77,6 +77,7 @@
 
 #define DEBUG_TYPE "sil-redundant-load-elim"
 #include "swift/SILPasses/Passes.h"
+#include "swift/SIL/MemLocation.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -749,6 +750,10 @@ class LSBBForwarder {
   /// of the loop below.
   llvm::SmallMapVector<SILValue, LSLoad, 8> Loads;
 
+  /// This is a list of memlocations that have available values. Eventually,
+  /// AvailLocs should replace Stores and Loads.
+  llvm::DenseSet<MemLocation> AvailLocs;
+
 public:
   LSBBForwarder() = default;
 
@@ -866,7 +871,7 @@ public:
   void invalidateReadFromStores(LSContext &Ctx, SILInstruction *Inst);
 
   /// Update the load store states w.r.t. the store instruction.
-  void processStoreInst(LSContext &Ctx, StoreInst *SI);
+  void trackStoreInst(LSContext &Ctx, StoreInst *SI);
 
   /// Try to prove that SI is a dead store updating all current state. If SI is
   /// dead, eliminate it.
@@ -875,6 +880,15 @@ public:
   /// Try to find a previously known value that we can forward to LI. This
   /// includes from stores and loads.
   bool tryToForwardLoad(LSContext &Ctx, LoadInst *LI);
+
+  /// Process Instruction which writes to memory in an unknown way. 
+  void processUnknownWriteInst(LSContext &Ctx, SILInstruction *I);
+
+  /// Process Instructions. Extract MemLocations from SIL LoadInst.
+  void processLoadInst(LSContext &Ctx, LoadInst *LI);
+
+  /// Process Instructions. Extract MemLocations from SIL StoreInst.
+  void processStoreInst(LSContext &Ctx, StoreInst *SI);
 
 private:
 
@@ -990,7 +1004,7 @@ void LSBBForwarder::invalidateReadFromStores(LSContext &Ctx,
   }
 }
 
-void LSBBForwarder::processStoreInst(LSContext &Ctx, StoreInst *SI) {
+void LSBBForwarder::trackStoreInst(LSContext &Ctx, StoreInst *SI) {
   // Invalidate any load that we can not prove does not read from the stores
   // destination.
   invalidateAliasingLoads(Ctx, SI);
@@ -1269,6 +1283,61 @@ bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI) {
   return false;
 }
 
+void LSBBForwarder::processUnknownWriteInst(LSContext &Ctx, SILInstruction *I){
+  auto *AA = Ctx.getAA();
+  llvm::SmallVector<MemLocation, 8> LocDeleteList;
+  for (auto &X : AvailLocs) {
+    if (!AA->mayWriteToMemory(I, X.getBase()))
+      continue;
+    LocDeleteList.push_back(X);
+  }
+
+  if (LocDeleteList.size()) {
+    DEBUG(llvm::dbgs() << "        MemLocation no longer being tracked:\n");
+    for (MemLocation &V : LocDeleteList) {
+      AvailLocs.erase(V);
+    }
+  }
+}
+
+void LSBBForwarder::processStoreInst(LSContext &Ctx, StoreInst *SI) {
+  // Initialize the memory location.
+  MemLocation L(cast<StoreInst>(SI)->getDest());
+
+  // If we cant figure out the Base or Projection Path for the read instruction,
+  // process it as an unknown memory instruction for now.
+  if (!L.isValid()) {
+    processUnknownWriteInst(Ctx, SI);
+    return;
+  }
+
+  // Expand the given Mem into individual fields and process them as
+  // separate reads.
+  MemLocationList Locs;
+  MemLocation::expand(L, &SI->getModule(), Locs);
+  for (auto &X : Locs) {
+    AvailLocs.insert(X);
+  } 
+}
+
+void LSBBForwarder::processLoadInst(LSContext &Ctx, LoadInst *LI) {
+  // Initialize the memory location.
+  MemLocation L(cast<LoadInst>(LI)->getOperand());
+
+  // If we cant figure out the Base or Projection Path for the read instruction,
+  // simply ignore it for now.
+  if (!L.isValid())
+    return;
+
+  // Expand the given Mem into individual fields and process them as
+  // separate reads.
+  MemLocationList Locs;
+  MemLocation::expand(L, &LI->getModule(), Locs);
+  for (auto &X : Locs) {
+    AvailLocs.insert(X);
+  } 
+}
+
 bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI) {
 
   if (tryToForwardLoadsToLoad(Ctx, LI))
@@ -1299,10 +1368,13 @@ bool LSBBForwarder::optimize(LSContext &Ctx) {
 
     // This is a StoreInst. Let's see if we can remove the previous stores.
     if (auto *SI = dyn_cast<StoreInst>(Inst)) {
+      // Keep track of the available value this store generates.
+      processStoreInst(Ctx, SI);
+
       // If DSE is disabled, merely update states w.r.t. this store, but do not
       // try to get rid of the store.
       if (DisableGDSE) {
-        processStoreInst(Ctx, SI);
+        trackStoreInst(Ctx, SI);
         continue;
       }
       Changed |= tryToEliminateDeadStores(Ctx, SI);
@@ -1312,6 +1384,9 @@ bool LSBBForwarder::optimize(LSContext &Ctx) {
     // This is a LoadInst. Let's see if we can find a previous loaded, stored
     // value to use instead of this load.
     if (auto *LI = dyn_cast<LoadInst>(Inst)) {
+      // Keep track of the available value this load generates.
+      processLoadInst(Ctx, LI);
+
       Changed |= tryToForwardLoad(Ctx, LI);
       continue;
     }
@@ -1340,6 +1415,9 @@ bool LSBBForwarder::optimize(LSContext &Ctx) {
     // that it and its operands can not alias a load we have visited, invalidate
     // that load.
     if (Inst->mayWriteToMemory()) {
+      // Invalidate all the aliasing location.
+      processUnknownWriteInst(Ctx, Inst);
+
       // Invalidate any load that we can not prove does not read from one of the
       // writing instructions operands.
       invalidateAliasingLoads(Ctx, Inst);
@@ -1402,6 +1480,24 @@ void LSBBForwarder::mergePredecessorState(LSBBForwarder &OtherState) {
   } else {
     DEBUG(llvm::dbgs() << "        All loads still being tracked!\n");
   }
+
+  llvm::SmallVector<MemLocation, 8> LocDeleteList;
+  DEBUG(llvm::dbgs() << "            Initial AvailLocs:\n");
+  for (auto &P : AvailLocs) {
+    auto Iter = OtherState.AvailLocs.find(P);
+    if (Iter != OtherState.AvailLocs.end())
+      continue;
+    LocDeleteList.push_back(P);
+  }
+
+  if (LocDeleteList.size()) {
+    DEBUG(llvm::dbgs() << "        MemLocation no longer being tracked:\n");
+    for (MemLocation &V : LocDeleteList) {
+      AvailLocs.erase(V);
+    }
+  } else {
+    DEBUG(llvm::dbgs() << "        All loads still being tracked!\n");
+  }
 }
 
 void
@@ -1450,6 +1546,7 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                          << "\n");
       Stores = Other.Stores;
       Loads = Other.Loads;
+      AvailLocs = Other.AvailLocs;
 
       DEBUG(llvm::dbgs() << "        Tracking Loads:\n";
             for (auto &P : Loads) {
