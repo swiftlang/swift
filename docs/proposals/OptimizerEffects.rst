@@ -1,9 +1,9 @@
 :orphan:
 
-.. FunctionEffects:
+.. OptimizerEffects:
 
-Function Effects: Analysis, Optimization, and Annotation
-========================================================
+Optimizer Effects: Summarizing and specifing function side effects
+==================================================================
 
 .. contents::
 
