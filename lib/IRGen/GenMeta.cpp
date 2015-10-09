@@ -325,14 +325,14 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
   // If we have less than four arguments, use a fast entry point.
   assert(genericArgs.Values.size() > 0 && "no generic args?!");
   if (genericArgs.Values.size() <= 4) {
-    llvm::Constant *fastMetadataGetters[] = {
-      nullptr,
-      IGF.IGM.getGetGenericMetadata1Fn(),
-      IGF.IGM.getGetGenericMetadata2Fn(),
-      IGF.IGM.getGetGenericMetadata3Fn(),
-      IGF.IGM.getGetGenericMetadata4Fn(),
-    };
-    auto fastGetter = fastMetadataGetters[genericArgs.Values.size()];
+    llvm::Constant *fastGetter;
+    switch (genericArgs.Values.size()) {
+    case 1: fastGetter = IGF.IGM.getGetGenericMetadata1Fn(); break;
+    case 2: fastGetter = IGF.IGM.getGetGenericMetadata2Fn(); break;
+    case 3: fastGetter = IGF.IGM.getGetGenericMetadata3Fn(); break;
+    case 4: fastGetter = IGF.IGM.getGetGenericMetadata4Fn(); break;
+    default: llvm_unreachable("bad number of generic arguments");
+    }
     
     SmallVector<llvm::Value *, 5> args;
     args.push_back(metadata);
