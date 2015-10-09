@@ -31,12 +31,12 @@ DiagnosticEngine &IterativeTypeChecker::getDiags() const {
 
 void IterativeTypeChecker::process(
        TypeCheckRequest request,
-       llvm::function_ref<void(TypeCheckRequest)> recordDependency) {
+       UnsatisfiedDependency unsatisfiedDependency) {
   switch (request.getKind()) {
 #define TYPE_CHECK_REQUEST(Request,PayloadName)                   \
   case TypeCheckRequest::Request:                                 \
     return process##Request(request.get##PayloadName##Payload(),  \
-                            recordDependency);
+                            unsatisfiedDependency);
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
   }
@@ -61,9 +61,12 @@ void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
     // Process this requirement, enumerating dependencies if anything else needs
     // to be handled first.
     SmallVector<TypeCheckRequest, 4> unsatisfied;
-    process(request, [&](TypeCheckRequest dependency) {
+    process(request, [&](TypeCheckRequest dependency) -> bool {
+      if (isSatisfied(dependency)) return false;
+
       // Record the unsatisfied dependency.
       unsatisfied.push_back(dependency);
+      return true;
     });
 
     // If there were no unsatisfied dependencies, we're done.

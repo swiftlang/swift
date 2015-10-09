@@ -87,7 +87,7 @@ bool IterativeTypeChecker::isTypeCheckInheritedClauseEntrySatisfied(
 
 void IterativeTypeChecker::processTypeCheckInheritedClauseEntry(
        TypeCheckRequest::InheritedClauseEntryPayloadType payload,
-       llvm::function_ref<void(TypeCheckRequest)> recordDependency) {
+       UnsatisfiedDependency unsatisfiedDependency) {
   TypeResolutionOptions options;
   DeclContext *dc;
   TypeLoc *inherited;
@@ -118,7 +118,7 @@ bool IterativeTypeChecker::isTypeCheckSuperclassSatisfied(ClassDecl *payload) {
 
 void IterativeTypeChecker::processTypeCheckSuperclass(
        ClassDecl *classDecl,
-       llvm::function_ref<void(TypeCheckRequest)> recordDependency) {
+       UnsatisfiedDependency unsatisfiedDependency) {
   // The superclass should be the first inherited type. However, so
   // long as we see already-resolved types that refer to protocols,
   // skip over them to keep looking for a misplaced superclass. The
@@ -130,10 +130,9 @@ void IterativeTypeChecker::processTypeCheckSuperclass(
     TypeLoc &inherited = inheritedClause[i];
 
     // If this inherited type has not been resolved, we depend on it.
-    if (!inherited.getType()) {
-      recordDependency(
-        TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
-                         { classDecl, i }));
+    if (unsatisfiedDependency(
+          TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
+                           { classDecl, i }))) {
       return;
     }
 
@@ -160,7 +159,7 @@ bool IterativeTypeChecker::isTypeCheckRawTypeSatisfied(EnumDecl *payload) {
 
 void IterativeTypeChecker::processTypeCheckRawType(
        EnumDecl *enumDecl,
-       llvm::function_ref<void(TypeCheckRequest)> recordDependency) {
+       UnsatisfiedDependency unsatisfiedDependency) {
   // The raw type should be the first inherited type. However, so
   // long as we see already-resolved types that refer to protocols,
   // skip over them to keep looking for a misplaced raw type. The
@@ -171,11 +170,10 @@ void IterativeTypeChecker::processTypeCheckRawType(
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     TypeLoc &inherited = inheritedClause[i];
 
-    // If this inherited type has not been resolved, we depend on it.
-    if (!inherited.getType()) {
-      recordDependency(
-        TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
-                         { enumDecl, i }));
+    // We depend on having resolved the inherited type.
+    if (unsatisfiedDependency(
+          TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
+                           { enumDecl, i }))) {
       return;
     }
 
@@ -200,7 +198,7 @@ bool IterativeTypeChecker::isInheritedProtocolsSatisfied(ProtocolDecl *payload){
 
 void IterativeTypeChecker::processInheritedProtocols(
        ProtocolDecl *protocol,
-       llvm::function_ref<void(TypeCheckRequest)> recordDependency) {
+       UnsatisfiedDependency unsatisfiedDependency) {
   // Computing the set of inherited protocols depends on the complete
   // inheritance clause.
   // FIXME: Technically, we only need very basic name binding.
@@ -210,11 +208,10 @@ void IterativeTypeChecker::processInheritedProtocols(
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     TypeLoc &inherited = inheritedClause[i];
 
-    // If this inherited type has not been resolved, we depend on it.
-    if (!inherited.getType()) {
-      recordDependency(
-        TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
-                         { protocol, i }));
+    // We depend on having resolved the inherited type.
+    if (unsatisfiedDependency(
+          TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
+                           { protocol, i }))) {
       anyDependencies = true;
       continue;
     }

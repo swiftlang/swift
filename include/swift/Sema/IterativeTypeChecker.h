@@ -29,6 +29,11 @@ namespace swift {
 class ASTContext;
 class TypeChecker;
 
+/// A callback used to check whether a particular dependency of this
+/// operation has been satisfied. If so, it returns \c false. If not,
+/// the dependency will be recorded and this operation returns \c true.
+typedef llvm::function_ref<bool(TypeCheckRequest)> UnsatisfiedDependency;
+
 /// An iterative type checker that processes type check requests to
 /// ensure that the AST has the information needed by the client.
 class IterativeTypeChecker {
@@ -47,12 +52,12 @@ class IterativeTypeChecker {
          TypeCheckRequest::PayloadName##PayloadType payload);           \
   void process##Request(                                                \
          TypeCheckRequest::PayloadName##PayloadType payload,            \
-         llvm::function_ref<void(TypeCheckRequest)> recordDependency);
+         UnsatisfiedDependency unsatisfiedDependency);
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
 
   void process(TypeCheckRequest request,
-               llvm::function_ref<void(TypeCheckRequest)> recordDependency);
+               UnsatisfiedDependency unsatisfiedDependency);
 
 public:
   IterativeTypeChecker(TypeChecker &tc) : TC(tc) { }
@@ -68,10 +73,6 @@ public:
 
   /// Determine whether the given request has already been satisfied.
   bool isSatisfied(TypeCheckRequest request);
-
-  /// Enumerate the dependencies of the given type-check request.
-  void enumerateDependenciesOf(TypeCheckRequest request,
-                               llvm::function_ref<void(TypeCheckRequest)> fn);
 
   /// Satisfy the given request.
   void satisfy(TypeCheckRequest request);
