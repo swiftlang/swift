@@ -20,6 +20,7 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
@@ -284,7 +285,18 @@ void CompilerInstance::performSema() {
         auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
         Module *importModule = Context->getModule(std::make_pair(moduleID,
                                                                  SourceLoc()));
-        importModules.push_back(importModule);
+        if (importModule) {
+          importModules.push_back(importModule);
+        } else {
+          Diagnostics.diagnose(SourceLoc(), diag::sema_no_import,
+                               ImplicitImportModuleName);
+          if (Invocation.getSearchPathOptions().SDKPath.empty() &&
+              llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
+            Diagnostics.diagnose(SourceLoc(), diag::sema_no_import_no_sdk);
+            Diagnostics.diagnose(SourceLoc(),
+                                 diag::sema_no_import_no_sdk_xcrun);
+          }
+        }
       } else {
         Diagnostics.diagnose(SourceLoc(), diag::error_bad_module_name,
                              ImplicitImportModuleName, false);
