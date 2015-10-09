@@ -1293,7 +1293,6 @@ bool RLEBBForwarder::tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI) {
       return true;
     }
 
-#if 0
     // Otherwise check if LI's operand partially aliases PrevLI's operand. If
     // so, see if LI has any uses which could use PrevLI instead of LI
     // itself. If LI has no uses after this is completed, delete it and return
@@ -1306,7 +1305,6 @@ bool RLEBBForwarder::tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI) {
     if (Ctx.getAA()->isPartialAlias(LI->getOperand(), Addr)) {
       tryToSubstitutePartialAliasLoad(Addr, Value, LI);
     }
-#endif
   }
 
   return false;
