@@ -216,6 +216,53 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
   return FullApplySite();
 }
 
+
+/// Insert instructions to cast a value of tuple type from
+/// \p SrcTupleTy into \p DstTupleTy.
+/// Returns the SILInstruction performing the cast.
+SILInstruction *
+swift::castTupleReturnType(SILModule &M, SILLocation Loc, SILValue Value,
+                           SILType SrcTupleTy, SILType DstTupleTy,
+                           SILBuilder &B) {
+  auto SrcTy = cast<TupleType>(SrcTupleTy.getSwiftRValueType());
+  auto DstTy = cast<TupleType>(DstTupleTy.getSwiftRValueType());
+  SmallVector<SILValue, 4> TupleElements;
+  auto TupleElementTypes = SrcTy.getElementTypes();
+  unsigned NumElements = SrcTy->getElements().size();
+  for (unsigned i = 0; i < NumElements; ++i) {
+    auto EltTy = TupleElementTypes[i];
+    auto ExtractedElt = B.createTupleExtract(Loc, Value, i);
+    OptionalTypeKind OTK;
+    auto OptionalEltTy =
+        EltTy.getCanonicalTypeOrNull()->getAnyOptionalObjectType(OTK);
+    if (!OptionalEltTy
+        || !isa<FunctionType>(OptionalEltTy.getCanonicalTypeOrNull())) {
+      // No need to convert this parameter
+      TupleElements.push_back(ExtractedElt);
+      continue;
+    }
+
+    // Dereference the optional value
+    auto *SomeDecl = B.getASTContext().getOptionalSomeDecl(OTK);
+    auto FuncPtr = B.createUncheckedEnumData(Loc, ExtractedElt,
+        SomeDecl);
+
+    auto AIOptionalEltTy =
+        DstTy.getElementType(i).getCanonicalTypeOrNull()
+                                  ->getAnyOptionalObjectType();
+    auto SILAIOptionalEltTy = M.Types.getLoweredType(
+        AIOptionalEltTy);
+    auto ConvertedFuncPtr = B.createConvertFunction(Loc, FuncPtr,
+        SILAIOptionalEltTy);
+
+    TupleElements.push_back(
+        B.createOptionalSome(Loc, ConvertedFuncPtr, OTK,
+            SILType::getPrimitiveObjectType(DstTy.getElementType(i))));
+  }
+
+  return B.createTuple(Loc, DstTupleTy, TupleElements);
+}
+
 /// Cast a return value into expected type if necessary.
 /// This may happen e.g. when:
 /// - a type of the return value is a subclass of the expected return type.

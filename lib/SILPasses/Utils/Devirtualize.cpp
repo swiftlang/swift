@@ -341,50 +341,6 @@ static SILValue conditionallyCastAddr(SILBuilderWithScope<16> &B,
   return B.createUncheckedRefCast(Loc, Arg, ParamTy);
 }
 
-/// Insert instructions to cast the tuple return type into appropiate
-/// tuple type expected by the original apply_inst.
-static SILInstruction *castTupleReturnType(FullApplySite AI, SILValue Value,
-    CanTypeWrapper<TupleType> ResultTupleTy, SILFunction *F, SILBuilder& B) {
-  auto AITupleTy = cast<TupleType>(AI.getType().getSwiftRValueType());
-  SmallVector<SILValue, 4> TupleElements;
-  auto TupleElementTypes = ResultTupleTy.getElementTypes();
-  unsigned NumElements = ResultTupleTy->getElements().size();
-  for (unsigned i = 0; i < NumElements; ++i) {
-    auto EltTy = TupleElementTypes[i];
-    auto ExtractedElt = B.createTupleExtract(AI.getLoc(), Value, i);
-    OptionalTypeKind OTK;
-    auto OptionalEltTy =
-        EltTy.getCanonicalTypeOrNull()->getAnyOptionalObjectType(OTK);
-    if (!OptionalEltTy
-        || !isa<FunctionType>(OptionalEltTy.getCanonicalTypeOrNull())) {
-      // No need to convert this parameter
-      TupleElements.push_back(ExtractedElt);
-      continue;
-    }
-
-    // Dereference the optional value
-    auto *SomeDecl = B.getASTContext().getOptionalSomeDecl(OTK);
-    auto FuncPtr = B.createUncheckedEnumData(AI.getLoc(), ExtractedElt,
-        SomeDecl);
-
-    auto AIOptionalEltTy =
-        AITupleTy.getElementType(i).getCanonicalTypeOrNull()->getAnyOptionalObjectType();
-    auto SILAIOptionalEltTy = AI.getModule().Types.getLoweredType(
-        AIOptionalEltTy);
-    auto ConvertedFuncPtr = B.createConvertFunction(AI.getLoc(), FuncPtr,
-        SILAIOptionalEltTy);
-
-    TupleElements.push_back(
-        B.createOptionalSome(AI.getLoc(), ConvertedFuncPtr, OTK,
-            SILType::getPrimitiveObjectType(AITupleTy.getElementType(i))));
-  }
-
-  // Now create a new tuple
-  DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
-  NumClassDevirt++;
-  return B.createTuple(AI.getLoc(), AI.getType(), TupleElements);
-}
-
 /// \brief Devirtualize an apply of a class method.
 ///
 /// \p AI is the apply to devirtualize.
@@ -498,12 +454,15 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
   // the function types and reconstruct the tuple.
   if (auto *FD = dyn_cast<FuncDecl>(CMI->getMember().getDecl())) {
     if (FD->isAccessor()) {
-      if (auto ResultTupleTy = dyn_cast<TupleType>(ReturnType.getSwiftRValueType())) {
+      if (isa<TupleType>(ReturnType.getSwiftRValueType())) {
         assert(isa<ApplyInst>(NewAI) && "should be an apply_inst");
-        CastedReturnValue = castTupleReturnType(AI, ResultValue, ResultTupleTy, F, B);
+        CastedReturnValue = castTupleReturnType(Mod, AI.getLoc(), ResultValue,
+                                                ReturnType, AI.getType(), B);
         if (NormalBB) {
           B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnValue });
         }
+        DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
+        NumClassDevirt++;
         return CastedReturnValue;
       }
     }

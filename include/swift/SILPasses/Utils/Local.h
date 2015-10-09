@@ -96,6 +96,22 @@ FullApplySite findApplyFromDevirtualizedResult(SILInstruction *I);
 SILValue castReturnValue(SILBuilder &B, SILValue ReturnValue, SILLocation Loc,
                          SILType ReturnTy, SILType ExpectedReturnTy);
 
+/// Cast a return value which has a tuple type into a different
+/// layout compatible tuple type.
+/// This may be required e.g. in the following cases:
+/// - if tuple elements have the same types, but differ in their labels.
+/// - if one of the tuple elements is of a function type,
+///   which may refer to a subclass instead of a superclass in its signature.
+///   These function types are ABI-compatible between the subclass and a
+///   superclass.
+///
+/// To make the SIL type system happy, cast between tuple types by
+/// reconstructing a tuple of the target type from elements of the tuple
+/// of the source type. Cast elements during reconstruction, if required.
+SILInstruction *castTupleReturnType(SILModule &M, SILLocation Loc,
+                                    SILValue Value, SILType SrcTupleType,
+                                    SILType DstTupleType, SILBuilder &B);
+
 /// Replace an apply with an instruction that produces the same value,
 /// then delete the apply and the instructions that produce its callee
 /// if possible.
