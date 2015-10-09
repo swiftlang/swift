@@ -89,6 +89,10 @@ void eraseUsesOfValue(SILValue V);
 
 FullApplySite findApplyFromDevirtualizedResult(SILInstruction *I);
 
+/// Checks if casting of a return value can be handled by the optimizer.
+bool canCastReturnValue(SILModule &M, SILType ReturnTy,
+                        SILType ExpectedReturnTy);
+
 /// Cast a return value into expected type if necessary.
 /// This may happen e.g. when:
 /// - a type of the return value is a subclass of the expected return type.

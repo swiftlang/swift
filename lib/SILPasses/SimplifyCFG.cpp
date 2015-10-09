@@ -1868,15 +1868,21 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
   if (isTryApplyOfConvertFunction(TAI, Callee, CalleeType) ||
       isTryApplyWithUnreachableError(TAI, Callee, CalleeType)) {
 
+    auto CalleeFnTy = cast<SILFunctionType>(CalleeType.getSwiftRValueType());
+
+    auto ReturnTy = CalleeFnTy->getSILResult();
+    auto OrigReturnTy = TAI->getNormalBB()->getBBArg(0)->getType();
+
+    // Bail if the cast between the actual and expected return types cannot
+    // be handled.
+    if (!canCastReturnValue(TAI->getModule(), ReturnTy, OrigReturnTy))
+      return false;
+
     SmallVector<SILValue, 8> Args;
     for (auto Arg : TAI->getArguments()) {
       Args.push_back(Arg);
     }
 
-    auto CalleeFnTy = cast<SILFunctionType>(CalleeType.getSwiftRValueType());
-
-    auto ReturnTy = CalleeFnTy->getSILResult();
-    auto OrigReturnTy = TAI->getNormalBB()->getBBArg(0)->getType();
 
     assert (CalleeFnTy->getParameters().size() == Args.size() &&
             "The number of arguments should match");

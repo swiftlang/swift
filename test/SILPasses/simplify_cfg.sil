@@ -2306,3 +2306,77 @@ bb2(%10 : $ErrorType):
 
 sil [noinline] @returnLabledTuple: $@convention(thin) () -> (first: Int32, second: Int32)
 sil [noinline] @returnUnlabledTuple : $@convention(thin) () -> (Int32, Int32)
+
+public class AAA {
+}
+
+public class BBB : AAA {
+}
+
+@inline(never) func returnUnlabledTuple(b: BBB) -> (BBB, BBB)
+
+func testit(f: (BBB) throws -> (AAA, AAA), _ b: BBB) throws -> (AAA, AAA)
+
+func callit(b: BBB) throws -> (AAA, AAA)
+
+sil [noinline] @returnUnlabledTupleOfClasses : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB) {
+bb0(%0 : $BBB):
+  debug_value %0 : $BBB
+  strong_retain %0 : $BBB
+  %3 = tuple (%0 : $BBB, %0 : $BBB)
+  return %3 : $(BBB, BBB)
+}
+
+sil @testFunctorReturningUnlabeledTuple : $@convention(thin) (@owned @callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType), @owned BBB) -> (@owned (AAA, AAA), @error ErrorType) {
+bb0(%0 : $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType), %1 : $BBB):
+  debug_value %0 : $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType)
+  debug_value %1 : $BBB
+  strong_retain %0 : $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType)
+  strong_retain %1 : $BBB
+  try_apply %0(%1) : $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType), normal bb1, error bb2
+
+bb1(%7 : $(AAA, AAA)):
+  %8 = tuple_extract %7 : $(AAA, AAA), 0
+  %9 = tuple_extract %7 : $(AAA, AAA), 1
+  %10 = tuple (%8 : $AAA, %9 : $AAA)
+  strong_release %1 : $BBB
+  strong_release %0 : $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType)
+  return %10 : $(AAA, AAA)
+
+bb2(%14 : $ErrorType):
+  strong_release %1 : $BBB
+  strong_release %0 : $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType)
+  throw %14 : $ErrorType
+}
+
+
+// Check that we don't crash on this. Currently we just do not optimize try_apply if
+// we cannot cast the actual return type into expected return type.
+// TODO: Change the checks when we support more complex casts of return types.
+// CHECK-LABEL: @testCallingFunctionWithFunctorReturningUnlabeledTuple
+// CHECK: try_apply {{%[0-9]+}}
+// CHECK: return
+sil @testCallingFunctionWithFunctorReturningUnlabeledTuple : $@convention(thin) (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType) {
+bb0(%0 : $BBB):
+  debug_value %0 : $BBB
+
+  %2 = function_ref @testFunctorReturningUnlabeledTuple : $@convention(thin) (@owned @callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType), @owned BBB) -> (@owned (AAA, AAA), @error ErrorType)
+
+  %3 = function_ref @returnUnlabledTupleOfClasses : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB)
+  %4 = thin_to_thick_function %3 : $@convention(thin) (@owned BBB) -> @owned (BBB, BBB) to $@callee_owned (@owned BBB) -> @owned (BBB, BBB)
+  %5 = convert_function %4 : $@callee_owned (@owned BBB) -> @owned (BBB, BBB) to $@callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType)
+  strong_retain %0 : $BBB
+  try_apply %2(%5, %0) : $@convention(thin) (@owned @callee_owned (@owned BBB) -> (@owned (AAA, AAA), @error ErrorType), @owned BBB) -> (@owned (AAA, AAA), @error ErrorType), normal bb1, error bb2
+
+bb1(%8 : $(AAA, AAA)):
+  %9 = tuple_extract %8 : $(AAA, AAA), 0
+  %10 = tuple_extract %8 : $(AAA, AAA), 1
+  %11 = tuple (%9 : $AAA, %10 : $AAA)
+  strong_release %0 : $BBB
+  return %11 : $(AAA, AAA)
+
+bb2(%14 : $ErrorType):
+  strong_release %0 : $BBB
+  throw %14 : $ErrorType
+}
+

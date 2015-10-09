@@ -300,6 +300,88 @@ swift::castTupleReturnType(SILModule &M, SILLocation Loc, SILValue Value,
   return B.createTuple(Loc, DstTupleTy, TupleElements);
 }
 
+/// Checks if casting of a return value can be handled by the optimizer.
+/// NOTE: canCastReturnValue and castReturnValue should be always kept in sync!
+///       In the ideal case, the optimizer should be able to handle any such
+///       casts, but until we are there, be more selective.
+bool swift::canCastReturnValue(SILModule &M, SILType ReturnTy,
+                               SILType ExpectedReturnTy) {
+  // No conversion is needed if types are the same.
+  if (ReturnTy == ExpectedReturnTy)
+    return true;
+
+  // Check if the return type is an optional of the apply_inst type
+  // or the other way around
+  bool UnwrapOptionalResult = false;
+  bool WrapOptionalResult = false;
+  OptionalTypeKind OTK;
+  OptionalTypeKind AI_OTK;
+
+  // Eventually, the return type should be casted into the original
+  // expected type.
+  auto OptionalReturnType =
+      ReturnTy.getSwiftRValueType().getAnyOptionalObjectType(OTK);
+
+  auto OptionalAIType =
+      ExpectedReturnTy.getSwiftRValueType().getAnyOptionalObjectType(AI_OTK);
+
+  if (!OptionalAIType && !OptionalReturnType
+      && ExpectedReturnTy.isSuperclassOf(ReturnTy)) {
+    return true;
+  }
+
+  if (!OptionalAIType && !OptionalReturnType
+      && isLayoutCompatibleTypes(ReturnTy, ExpectedReturnTy, M)) {
+    return true;
+  }
+
+  // Return type if not an optional, but the expected type is an optional
+  // and the first one is the subclass of the second one.
+  if (OptionalAIType && !OptionalReturnType
+      && SILType::getPrimitiveObjectType(OptionalAIType).isSuperclassOf(
+          ReturnTy)) {
+    // The function returns a non-optional result.
+    // We need to wrap it into an optional.
+    auto OptType =
+        OptionalType::get(AI_OTK, ReturnTy.getSwiftRValueType()).
+                      getCanonicalTypeOrNull();
+    OptionalReturnType = ReturnTy.getSwiftRValueType();
+
+    if (OptionalAIType == OptionalReturnType) {
+      return true;
+    }
+  }
+
+  if (OptionalReturnType && OptionalAIType
+      && SILType::getPrimitiveObjectType(OptionalAIType).isSuperclassOf(
+           SILType::getPrimitiveObjectType(OptionalReturnType))) {
+    // Both types have the same optionality and one of them
+    // is the superclass of the other.
+    return true;
+  }
+
+  if (OptionalReturnType && OptionalAIType
+      && isLayoutCompatibleTypes(OptionalReturnType, OptionalAIType, M)) {
+    // Both types have the same optionality.
+    // Both types are layout compatible types.
+    // So, cast one of them into the other one.
+    return true;
+  }
+
+  if (OptionalReturnType == ExpectedReturnTy.getSwiftRValueType()) {
+    UnwrapOptionalResult = true;
+  }
+
+  if (OptionalAIType == ReturnTy.getSwiftRValueType()) {
+    WrapOptionalResult = true;
+  }
+
+  // Only addresses and refs can have their types changed due to
+  // covariant return types or contravariant argument types."
+  return (ReturnTy.isAddress() || ReturnTy.isHeapObjectReferenceType()
+          || UnwrapOptionalResult || WrapOptionalResult);
+}
+
 /// Cast a return value into expected type if necessary.
 /// This may happen e.g. when:
 /// - a type of the return value is a subclass of the expected return type.
