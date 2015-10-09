@@ -44,6 +44,12 @@
 #include <objc/runtime.h>
 #endif
 
+#if defined(__APPLE__) && defined(VM_MEMORY_SWIFT_METADATA)
+#define VM_TAG_FOR_SWIFT_METADATA VM_MAKE_TAG(VM_MEMORY_SWIFT_METADATA)
+#else
+#define VM_TAG_FOR_SWIFT_METADATA (-1)
+#endif
+
 using namespace swift;
 using namespace metadataimpl;
 
@@ -58,7 +64,7 @@ void *MetadataAllocator::alloc(size_t size) {
   if (LLVM_UNLIKELY(size > pagesizeMask)) {
     auto mem = mmap(nullptr, (size + pagesizeMask) & ~pagesizeMask,
                     PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE,
-                    -1, 0);
+                    VM_TAG_FOR_SWIFT_METADATA, 0);
     if (mem == MAP_FAILED)
       crash("unable to allocate memory for metadata cache");
     return mem;
@@ -71,7 +77,7 @@ void *MetadataAllocator::alloc(size_t size) {
                       != (((uintptr_t)end & ~pagesizeMask)))){
     next = (char*)
       mmap(nullptr, pagesizeMask+1, PROT_READ|PROT_WRITE,
-           MAP_ANON|MAP_PRIVATE, -1, 0);
+           MAP_ANON|MAP_PRIVATE, VM_TAG_FOR_SWIFT_METADATA, 0);
 
     if (next == MAP_FAILED)
       crash("unable to allocate memory for metadata cache");
