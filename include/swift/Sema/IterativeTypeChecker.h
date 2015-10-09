@@ -70,6 +70,9 @@ class IterativeTypeChecker {
   /// Diagnose a reference cycle.
   void diagnoseCircularReference(ArrayRef<TypeCheckRequest> requests);
 
+  /// Determine whether the given request has already been satisfied.
+  bool isSatisfied(TypeCheckRequest request);
+
 public:
   IterativeTypeChecker(TypeChecker &tc) : TC(tc) { }
 
@@ -82,10 +85,13 @@ public:
     return getDiags().diagnose(std::forward<ArgTypes>(Args)...);
   }
 
-  /// Determine whether the given request has already been satisfied.
-  bool isSatisfied(TypeCheckRequest request);
-
   /// Satisfy the given request.
+  ///
+  /// Ensures that the given type check request has been satisfied. On
+  /// completion of this operation, one can query the AST for
+  /// information regarding this particular request, e.g., get the
+  /// type of a declaration, perform name lookup into a particular
+  /// context, and so on.
   void satisfy(TypeCheckRequest request);
 };
 

@@ -323,7 +323,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
                           typeAliasDecl->getDeclContext(),
                           options, nullptr, &unsatisfiedDependency)) {
         typeAliasDecl->setInvalid();
-        typeAliasDecl->overwriteType(ErrorType::get(TC.Context));
+        typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
         typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
       }
       
@@ -340,7 +340,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
 bool IterativeTypeChecker::breakCycleForResolveTypeDecl(TypeDecl *typeDecl) {
   if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
     typeAliasDecl->setInvalid();
-    typeAliasDecl->overwriteType(ErrorType::get(TC.Context));
+    typeAliasDecl->overwriteType(ErrorType::get(getASTContext()));
     typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
     return true;
   }

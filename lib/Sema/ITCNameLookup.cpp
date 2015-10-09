@@ -62,7 +62,7 @@ bool IterativeTypeChecker::isQualifiedLookupInDeclContextSatisfied(
   // If we needed them for this query, did we already add implicit
   // initializers?
   auto name = payload.Name;
-  if ((!name || name.matchesRef(TC.Context.Id_init)) &&
+  if ((!name || name.matchesRef(getASTContext().Id_init)) &&
       !nominal->addedImplicitInitializers())
     return false;
 
@@ -113,7 +113,7 @@ void IterativeTypeChecker::processQualifiedLookupInDeclContext(
   // implicitly-declared initializers.
   // FIXME: Recursion into old type checker.
   auto name = payload.Name;
-  if (!name || name.matchesRef(TC.Context.Id_init))
+  if (!name || name.matchesRef(getASTContext().Id_init))
     TC.resolveImplicitConstructors(nominal);
 }
 
