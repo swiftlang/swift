@@ -1016,23 +1016,14 @@ initialize_super:
   IGF.Builder.CreateCall(initFn, {classMetadata, superMetadata});
 }
 
-/// Get or create an accessor function to the given non-dependent type.
-static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
-                                                     CanType type,
-                                               ForDefinition_t shouldDefine) {
-  assert(!type->hasArchetype());
-  llvm::Function *accessor =
-    IGM.getAddrOfTypeMetadataAccessFunction(type, shouldDefine);
-
-  // If we're not supposed to define the accessor, or if we already
-  // have defined it, just return the pointer.
-  if (!shouldDefine || !accessor->empty())
-    return accessor;
-
-  // Okay, define the accessor.
-
-  llvm::Constant *nullMetadata =
-    llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy);
+/// Emit the body of a lazy cache accessor.
+void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
+                                        llvm::Function *accessor,
+                                        llvm::GlobalVariable *cacheVariable,
+         const llvm::function_ref<llvm::Value*(IRGenFunction &IGF)> &getValue) {
+  llvm::Constant *null =
+    llvm::ConstantPointerNull::get(
+                        cast<llvm::PointerType>(cacheVariable->getValueType()));
 
   accessor->setDoesNotThrow();
 
@@ -1041,13 +1032,14 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
   accessor->setDoesNotAccessMemory();
 
   // Set up the cache variable.
-  auto cacheVariable = cast<llvm::GlobalVariable>(
-             IGM.getAddrOfTypeMetadataLazyCacheVariable(type, ForDefinition));
-  cacheVariable->setInitializer(nullMetadata);
+  cacheVariable->setInitializer(null);
   cacheVariable->setAlignment(IGM.getPointerAlignment().getValue());
   Address cache(cacheVariable, IGM.getPointerAlignment());
 
   IRGenFunction IGF(IGM, accessor);
+
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
 
   // Okay, first thing, check the cache variable.
   //
@@ -1074,14 +1066,13 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
   // Compare the load result against null.
   auto isNullBB = IGF.createBasicBlock("cacheIsNull");
   auto contBB = IGF.createBasicBlock("cont");
-  llvm::Value *comparison = IGF.Builder.CreateICmpEQ(load, nullMetadata);
+  llvm::Value *comparison = IGF.Builder.CreateICmpEQ(load, null);
   IGF.Builder.CreateCondBr(comparison, isNullBB, contBB);
   auto loadBB = IGF.Builder.GetInsertBlock();
 
   // If the load yielded null, emit the type metadata.
   IGF.Builder.emitBlock(isNullBB);
-  emitDirectTypeMetadataInitialization(IGF, type);
-  llvm::Value *directResult = emitDirectTypeMetadataRef(IGF, type);
+  llvm::Value *directResult = getValue(IGF);
 
   // Store it back to the cache variable.  The direct metadata lookup is
   // required to have already dependency-ordered any initialization
@@ -1093,11 +1084,34 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
 
   // Emit the continuation block.
   IGF.Builder.emitBlock(contBB);
-  auto phi = IGF.Builder.CreatePHI(IGM.TypeMetadataPtrTy, 2);
+  auto phi = IGF.Builder.CreatePHI(null->getType(), 2);
   phi->addIncoming(load, loadBB);
   phi->addIncoming(directResult, storeBB);
 
   IGF.Builder.CreateRet(phi);
+}
+
+/// Get or create an accessor function to the given non-dependent type.
+static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
+                                                     CanType type,
+                                               ForDefinition_t shouldDefine) {
+  assert(!type->hasArchetype());
+  llvm::Function *accessor =
+    IGM.getAddrOfTypeMetadataAccessFunction(type, shouldDefine);
+
+  // If we're not supposed to define the accessor, or if we already
+  // have defined it, just return the pointer.
+  if (!shouldDefine || !accessor->empty())
+    return accessor;
+
+  // Okay, define the accessor.
+  auto cacheVariable = cast<llvm::GlobalVariable>(
+             IGM.getAddrOfTypeMetadataLazyCacheVariable(type, ForDefinition));
+  emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
+                              [&](IRGenFunction &IGF) -> llvm::Value* {
+    emitDirectTypeMetadataInitialization(IGF, type);
+    return emitDirectTypeMetadataRef(IGF, type);
+  });
 
   return accessor;
 }

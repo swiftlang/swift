@@ -63,6 +63,12 @@ namespace irgen {
   /// Is the given method known to be callable by vtable dispatch?
   bool hasKnownVTableEntry(IRGenModule &IGM, AbstractFunctionDecl *theMethod);
 
+  /// Emit the body of a lazy cache access function.
+  void emitLazyCacheAccessFunction(IRGenModule &IGM,
+                                   llvm::Function *accessor,
+                                   llvm::GlobalVariable *cacheVariable,
+        const llvm::function_ref<llvm::Value *(IRGenFunction &IGF)> &getValue);
+
   /// Emit a declaration reference to a metatype object.
   void emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
                        Explosion &explosion);
