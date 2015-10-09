@@ -710,7 +710,7 @@ public:
   MemLocation &getMemLocation(const unsigned index);
 
   /// Dump all the memory locations in the MemLocationVault.
-  void printMemLocationVault() {
+  void printMemLocationVault() const {
     for (auto &X : MemLocationVault) {
       X.print();
     }
