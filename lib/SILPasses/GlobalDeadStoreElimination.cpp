@@ -38,6 +38,15 @@
 /// abstraction of an object field in program. It consists of a base and a 
 /// projection path to the field accessed.
 ///
+/// When a load or store instruction is encountered, the memory is broken down
+/// to the indivisible components, i.e aggregates are broken down to their
+/// individual fields using the expand function. This gives the flexbility to
+/// find exactly which part of the store is alive and which part is dead.
+///
+/// After the live parts of the store are determined, they are merged into the
+/// minimum number of stores possible using the reduce function. This is done
+/// so that we do not bloat SIL IR.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-dead-store-opt"
