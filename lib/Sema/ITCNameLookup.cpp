@@ -33,15 +33,14 @@ bool IterativeTypeChecker::isQualifiedLookupInTypeSatisfied(
 
   // Module lookup is lookup within the module's DeclContext.
   if (auto moduleType = type->getAs<ModuleType>())
-    return isSatisfied(TypeCheckRequest(
-                         TypeCheckRequest::QualifiedLookupInDeclContext,
-                         { moduleType->getModule(), payload.second }));
+    return isSatisfied(
+             requestQualifiedLookupInDeclContext(
+               { moduleType->getModule(), payload.second }));
 
   // Nominal type lookup is lookup within the module's DeclContext.
   if (auto nominal = type->getAnyNominal())
-    return isSatisfied(TypeCheckRequest(
-                         TypeCheckRequest::QualifiedLookupInDeclContext,
-                         { nominal, payload.second }));
+    return isSatisfied(
+             requestQualifiedLookupInDeclContext({ nominal, payload.second }));
 
   // For everything else, we can perform lookup.
   return true;
@@ -98,15 +97,12 @@ void IterativeTypeChecker::processQualifiedLookupInDeclContext(
 
   // For classes, we need the superclass (if any) to support qualified lookup.
   if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-    if (unsatisfiedDependency(TypeCheckRequest(
-                                TypeCheckRequest::TypeCheckSuperclass,
-                                classDecl)))
+    if (unsatisfiedDependency(requestTypeCheckSuperclass(classDecl)))
       return;
 
     if (auto superclass = classDecl->getSuperclass()) {
-      if (unsatisfiedDependency(TypeCheckRequest(
-                                  TypeCheckRequest::QualifiedLookupInType,
-                                  { superclass, payload.second })))
+      if (unsatisfiedDependency(
+            requestQualifiedLookupInType({ superclass, payload.second })))
         return;
     }
   }
@@ -148,9 +144,8 @@ bool IterativeTypeChecker::isUnqualifiedLookupInDeclContextSatisfied(
   case DeclContextKind::ExtensionDecl:
     // Check whether we can perform qualified lookup into this
     // declaration context.
-    if (!isSatisfied(TypeCheckRequest(
-                       TypeCheckRequest::QualifiedLookupInDeclContext,
-                       { dc, payload.second })))
+    if (!isSatisfied(
+          requestQualifiedLookupInDeclContext({ dc, payload.second })))
       return false;
       
     // FIXME: If there is a name, actually perform qualified lookup

@@ -688,9 +688,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       // declaration context.
       if (unsatisfiedDependency &&
           (*unsatisfiedDependency)(
-            TypeCheckRequest(
-              TypeCheckRequest::QualifiedLookupInDeclContext,
-              { DC, comp->getIdentifier() })))
+            requestQualifiedLookupInDeclContext({ DC, comp->getIdentifier() })))
         return nullptr;
 
       auto nominal = DC->isNominalTypeOrNominalTypeExtensionContext();
@@ -723,8 +721,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // declaration context.
   if (unsatisfiedDependency &&
       (*unsatisfiedDependency)(
-        TypeCheckRequest(TypeCheckRequest::UnqualifiedLookupInDeclContext,
-                         { DC, comp->getIdentifier() })))
+        requestUnqualifiedLookupInDeclContext({ DC, comp->getIdentifier() })))
     return nullptr;
 
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
@@ -936,8 +933,7 @@ static Type resolveNestedIdentTypeComponent(
   // We need to be able to perform qualified lookup into the given type.
   if (unsatisfiedDependency &&
       (*unsatisfiedDependency)(
-        TypeCheckRequest(TypeCheckRequest::QualifiedLookupInType,
-                         { parentTy, comp->getIdentifier() })))
+        requestQualifiedLookupInType({ parentTy, comp->getIdentifier() })))
     return nullptr;
 
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;

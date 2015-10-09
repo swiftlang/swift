@@ -131,8 +131,7 @@ void IterativeTypeChecker::processTypeCheckSuperclass(
 
     // If this inherited type has not been resolved, we depend on it.
     if (unsatisfiedDependency(
-          TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
-                           { classDecl, i }))) {
+          requestTypeCheckInheritedClauseEntry({ classDecl, i }))) {
       return;
     }
 
@@ -172,8 +171,7 @@ void IterativeTypeChecker::processTypeCheckRawType(
 
     // We depend on having resolved the inherited type.
     if (unsatisfiedDependency(
-          TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
-                           { enumDecl, i }))) {
+          requestTypeCheckInheritedClauseEntry({ enumDecl, i }))) {
       return;
     }
 
@@ -210,8 +208,7 @@ void IterativeTypeChecker::processInheritedProtocols(
 
     // We depend on having resolved the inherited type.
     if (unsatisfiedDependency(
-          TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
-                           { protocol, i }))) {
+          requestTypeCheckInheritedClauseEntry({ protocol, i }))) {
       anyDependencies = true;
       continue;
     }

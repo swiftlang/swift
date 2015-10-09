@@ -228,18 +228,17 @@ static void validateAttributes(TypeChecker &TC, Decl *VD);
 
 void TypeChecker::resolveSuperclass(ClassDecl *classDecl) {
   IterativeTypeChecker ITC(*this);
-  ITC.satisfy(TypeCheckRequest(TypeCheckRequest::TypeCheckSuperclass,
-                               classDecl));
+  ITC.satisfy(requestTypeCheckSuperclass(classDecl));
 }
 
 void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
   IterativeTypeChecker ITC(*this);
-  ITC.satisfy(TypeCheckRequest(TypeCheckRequest::TypeCheckRawType, enumDecl));
+  ITC.satisfy(requestTypeCheckRawType(enumDecl));
 }
 
 void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {
   IterativeTypeChecker ITC(*this);
-  ITC.satisfy(TypeCheckRequest(TypeCheckRequest::InheritedProtocols, protocol));
+  ITC.satisfy(requestInheritedProtocols(protocol));
 }
 
 void TypeChecker::resolveInheritanceClause(
@@ -253,9 +252,7 @@ void TypeChecker::resolveInheritanceClause(
   }
 
   for (unsigned i = 0; i != numInherited; ++i) {
-    ITC.satisfy(TypeCheckRequest(
-                  TypeCheckRequest::TypeCheckInheritedClauseEntry,
-                   { decl, i }));
+    ITC.satisfy(requestTypeCheckInheritedClauseEntry({ decl, i }));
   }
 }
 

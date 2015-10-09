@@ -113,6 +113,15 @@ public:
 /// the dependency will be recorded and this operation returns \c true.
 typedef llvm::function_ref<bool(TypeCheckRequest)> UnsatisfiedDependency;
 
+// Create requestXXX functions to more easily form type check requests
+// of the appropriate type.
+#define TYPE_CHECK_REQUEST(Request,PayloadName)                                \
+inline TypeCheckRequest request##Request(                                      \
+                          TypeCheckRequest::PayloadName##PayloadType payload) {\
+  return TypeCheckRequest(TypeCheckRequest::Request, payload);                 \
+}
+#include "swift/Sema/TypeCheckRequestKinds.def"
+
 }
 
 #endif /* SWIFT_SEMA_TYPE_CHECK_REQUEST_H */
