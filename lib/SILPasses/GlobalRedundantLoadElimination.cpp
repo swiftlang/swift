@@ -779,7 +779,7 @@ class RLEBBForwarder {
 
   /// This is a list of memlocations that have available values. Eventually,
   /// AvailLocs should replace Stores and Loads.
-  llvm::SmallMapVector<unsigned, SILValue, 8> AvailLocs;
+  llvm::SmallMapVector<MemLocation, SILValue, 8> AvailLocs;
 
 public:
   RLEBBForwarder() = default;
@@ -1312,16 +1312,16 @@ bool RLEBBForwarder::tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI) {
 
 void RLEBBForwarder::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I){
   auto *AA = Ctx.getAA();
-  llvm::SmallVector<unsigned, 8> LocDeleteList;
+  llvm::SmallVector<MemLocation, 8> LocDeleteList;
   for (auto &X : AvailLocs) {
-    if (!AA->mayWriteToMemory(I, Ctx.getMemLocation(X.first).getBase()))
+    if (!AA->mayWriteToMemory(I, X.first.getBase()))
       continue;
     LocDeleteList.push_back(X.first);
   }
 
   if (LocDeleteList.size()) {
     DEBUG(llvm::dbgs() << "        MemLocation no longer being tracked:\n");
-    for (unsigned V : LocDeleteList) {
+    for (MemLocation &V : LocDeleteList) {
       AvailLocs.erase(V);
     }
   }
@@ -1343,7 +1343,7 @@ void RLEBBForwarder::processStoreInst(RLEContext &Ctx, StoreInst *SI) {
   MemLocationList Locs;
   MemLocation::expand(L, &SI->getModule(), Locs);
   for (auto &X : Locs) {
-    AvailLocs[Ctx.getMemLocationBit(X)] = SILValue();
+    AvailLocs[X] = SILValue();
   } 
 }
 
@@ -1361,7 +1361,7 @@ void RLEBBForwarder::processLoadInst(RLEContext &Ctx, LoadInst *LI) {
   MemLocationList Locs;
   MemLocation::expand(L, &LI->getModule(), Locs);
   for (auto &X : Locs) {
-    AvailLocs[Ctx.getMemLocationBit(X)] = SILValue();
+    AvailLocs[X] = SILValue();
   } 
 }
 
@@ -1506,7 +1506,7 @@ void RLEBBForwarder::mergePredecessorState(RLEBBForwarder &OtherState) {
     DEBUG(llvm::dbgs() << "        All loads still being tracked!\n");
   }
 
-  llvm::SmallVector<unsigned, 8> LocDeleteList;
+  llvm::SmallVector<MemLocation, 8> LocDeleteList;
   DEBUG(llvm::dbgs() << "            Initial AvailLocs:\n");
   for (auto &P : AvailLocs) {
     auto Iter = OtherState.AvailLocs.find(P.first);
@@ -1517,7 +1517,7 @@ void RLEBBForwarder::mergePredecessorState(RLEBBForwarder &OtherState) {
 
   if (LocDeleteList.size()) {
     DEBUG(llvm::dbgs() << "        MemLocation no longer being tracked:\n");
-    for (unsigned V : LocDeleteList) {
+    for (MemLocation &V : LocDeleteList) {
       AvailLocs.erase(V);
     }
   } else {
