@@ -43,14 +43,16 @@ class IterativeTypeChecker {
   // enumerateDependenciesOf<request kind> functions, and
   // satisfy<request kind> functions.
 #define TYPE_CHECK_REQUEST(Request,PayloadName)                         \
-  bool is##Request##Satisfied(                                        \
-         TypeCheckRequest::PayloadName##PayloadType payload);         \
-  void enumerateDependenciesOf##Request(                              \
-         TypeCheckRequest::PayloadName##PayloadType payload,          \
-         llvm::function_ref<void(TypeCheckRequest)> fn);              \
-  void satisfy##Request(TypeCheckRequest::PayloadName##PayloadType payload);
+  bool is##Request##Satisfied(                                          \
+         TypeCheckRequest::PayloadName##PayloadType payload);           \
+  void process##Request(                                                \
+         TypeCheckRequest::PayloadName##PayloadType payload,            \
+         llvm::function_ref<void(TypeCheckRequest)> recordDependency);
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
+
+  void process(TypeCheckRequest request,
+               llvm::function_ref<void(TypeCheckRequest)> recordDependency);
 
 public:
   IterativeTypeChecker(TypeChecker &tc) : TC(tc) { }

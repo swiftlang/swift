@@ -29,6 +29,19 @@ DiagnosticEngine &IterativeTypeChecker::getDiags() const {
   return getASTContext().Diags;
 }
 
+void IterativeTypeChecker::process(
+       TypeCheckRequest request,
+       llvm::function_ref<void(TypeCheckRequest)> recordDependency) {
+  switch (request.getKind()) {
+#define TYPE_CHECK_REQUEST(Request,PayloadName)                   \
+  case TypeCheckRequest::Request:                                 \
+    return process##Request(request.get##PayloadName##Payload(),  \
+                            recordDependency);
+
+#include "swift/Sema/TypeCheckRequestKinds.def"
+  }
+}
+
 /// Determine whether the given request has already been satisfied.
 bool IterativeTypeChecker::isSatisfied(TypeCheckRequest request) {
   switch (request.getKind()) {
@@ -40,53 +53,29 @@ bool IterativeTypeChecker::isSatisfied(TypeCheckRequest request) {
   }
 }
 
-void IterativeTypeChecker::enumerateDependenciesOf(
-       TypeCheckRequest request,
-       llvm::function_ref<void(TypeCheckRequest)> fn) {
-  switch (request.getKind()) {
-#define TYPE_CHECK_REQUEST(Request,PayloadName)         \
-  case TypeCheckRequest::Request:                       \
-    return enumerateDependenciesOf##Request(            \
-             request.get##PayloadName##Payload(),       \
-             fn);
-
-#include "swift/Sema/TypeCheckRequestKinds.def"
-  }
-}
-
 void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
   // If the request has already been satisfied, we're done.
   if (isSatisfied(request)) return;
 
-  // Make sure all of the dependencies have been satisfied before continuing.
   while (true) {
-    // Enumerate all of the dependencies of this request and capture
-    // those that have not been satisfied.
+    // Process this requirement, enumerating dependencies if anything else needs
+    // to be handled first.
     SmallVector<TypeCheckRequest, 4> unsatisfied;
-    enumerateDependenciesOf(request, [&](TypeCheckRequest dependency) {
-      // If the dependency has already been satisfied, there's nothing to do.
-      if (isSatisfied(dependency)) return;
-
+    process(request, [&](TypeCheckRequest dependency) {
       // Record the unsatisfied dependency.
       unsatisfied.push_back(dependency);
     });
 
-    // If all dependencies were satisfied, we're done.
-    if (unsatisfied.empty()) break;
+    // If there were no unsatisfied dependencies, we're done.
+    if (unsatisfied.empty()) {
+      assert(isSatisfied(request));
+      break;
+    }
 
     // Recurse to satisfy any unsatisfied dependencies.
     // FIXME: Don't recurse in the iterative type checker, silly!
-    for (auto dependency: unsatisfied) {
+    for (auto dependency : unsatisfied) {
       satisfy(dependency);
     }
-  }
-
-  // Satisfy this request.
-  switch (request.getKind()) {
-#define TYPE_CHECK_REQUEST(Request,PayloadName)                         \
-  case TypeCheckRequest::Request:                                       \
-    return satisfy##Request(request.get##PayloadName##Payload());
-
-#include "swift/Sema/TypeCheckRequestKinds.def"
   }
 }

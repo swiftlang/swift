@@ -85,15 +85,9 @@ bool IterativeTypeChecker::isTypeCheckInheritedClauseEntrySatisfied(
   return !inherited.getType().isNull();
 }
 
-void IterativeTypeChecker::enumerateDependenciesOfTypeCheckInheritedClauseEntry(
+void IterativeTypeChecker::processTypeCheckInheritedClauseEntry(
        TypeCheckRequest::InheritedClauseEntryPayloadType payload,
-       llvm::function_ref<void(TypeCheckRequest)>) {
-  // FIXME: depends on type checking the TypeRepr for this inheritance
-  // clause entry.
-}
-
-void IterativeTypeChecker::satisfyTypeCheckInheritedClauseEntry(
-       TypeCheckRequest::InheritedClauseEntryPayloadType payload) {
+       llvm::function_ref<void(TypeCheckRequest)> recordDependency) {
   TypeResolutionOptions options;
   DeclContext *dc;
   TypeLoc *inherited;
@@ -122,36 +116,31 @@ bool IterativeTypeChecker::isTypeCheckSuperclassSatisfied(ClassDecl *payload) {
   return payload->LazySemanticInfo.Superclass.getInt();
 }
 
-void IterativeTypeChecker::enumerateDependenciesOfTypeCheckSuperclass(
-       ClassDecl *payload,
-       llvm::function_ref<void(TypeCheckRequest)> fn) {
+void IterativeTypeChecker::processTypeCheckSuperclass(
+       ClassDecl *classDecl,
+       llvm::function_ref<void(TypeCheckRequest)> recordDependency) {
   // The superclass should be the first inherited type. However, so
   // long as we see already-resolved types that refer to protocols,
   // skip over them to keep looking for a misplaced superclass. The
   // actual error will be diagnosed when we perform full semantic
   // analysis on the class itself.
-  auto inheritedClause = payload->getInherited();
+  Type superclassType;
+  auto inheritedClause = classDecl->getInherited();
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     TypeLoc &inherited = inheritedClause[i];
 
     // If this inherited type has not been resolved, we depend on it.
     if (!inherited.getType()) {
-      fn(TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
-                          { payload, i }));
+      recordDependency(
+        TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
+                         { classDecl, i }));
       return;
     }
 
     // If this resolved inherited type is existential, keep going.
     if (inherited.getType()->isExistentialType()) continue;
 
-    break;
-  }
-}
-
-void IterativeTypeChecker::satisfyTypeCheckSuperclass(ClassDecl *classDecl) {
-  // Loop through the inheritance clause looking for a class type.
-  Type superclassType;
-  for (const auto &inherited : classDecl->getInherited()) {
+    // If this resolved type is a class, we're done.
     if (inherited.getType()->getClassOrBoundGenericClass()) {
       superclassType = inherited.getType();
       break;
@@ -169,40 +158,28 @@ bool IterativeTypeChecker::isTypeCheckRawTypeSatisfied(EnumDecl *payload) {
   return payload->LazySemanticInfo.RawType.getInt();
 }
 
-void IterativeTypeChecker::enumerateDependenciesOfTypeCheckRawType(
-       EnumDecl *payload,
-       llvm::function_ref<void(TypeCheckRequest)> fn) {
+void IterativeTypeChecker::processTypeCheckRawType(
+       EnumDecl *enumDecl,
+       llvm::function_ref<void(TypeCheckRequest)> recordDependency) {
   // The raw type should be the first inherited type. However, so
   // long as we see already-resolved types that refer to protocols,
   // skip over them to keep looking for a misplaced raw type. The
   // actual error will be diagnosed when we perform full semantic
   // analysis on the enum itself.
-  auto inheritedClause = payload->getInherited();
+  Type rawType;
+  auto inheritedClause = enumDecl->getInherited();
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     TypeLoc &inherited = inheritedClause[i];
 
     // If this inherited type has not been resolved, we depend on it.
     if (!inherited.getType()) {
-      fn(TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
-                          { payload, i }));
+      recordDependency(
+        TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
+                         { enumDecl, i }));
       return;
     }
 
     // If this resolved inherited type is existential, keep going.
-    if (inherited.getType()->isExistentialType()) continue;
-
-    break;
-  }
-}
-
-void IterativeTypeChecker::satisfyTypeCheckRawType(EnumDecl *enumDecl) {
-  // Loop through the inheritance clause looking for a non-existential
-  // nominal type.
-  Type rawType;
-  for (const auto &inherited : enumDecl->getInherited()) {
-    if (!inherited.getType()) break;
-
-    // Skip existential types.
     if (inherited.getType()->isExistentialType()) continue;
 
     // Record this raw type.
@@ -221,39 +198,39 @@ bool IterativeTypeChecker::isInheritedProtocolsSatisfied(ProtocolDecl *payload){
   return payload->isInheritedProtocolsValid();
 }
 
-void IterativeTypeChecker::enumerateDependenciesOfInheritedProtocols(
-       ProtocolDecl *payload,
-       llvm::function_ref<void(TypeCheckRequest)> fn) {
+void IterativeTypeChecker::processInheritedProtocols(
+       ProtocolDecl *protocol,
+       llvm::function_ref<void(TypeCheckRequest)> recordDependency) {
   // Computing the set of inherited protocols depends on the complete
   // inheritance clause.
   // FIXME: Technically, we only need very basic name binding.
-  auto inheritedClause = payload->getInherited();
+  auto inheritedClause = protocol->getInherited();
+  bool anyDependencies = false;
+  llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     TypeLoc &inherited = inheritedClause[i];
 
     // If this inherited type has not been resolved, we depend on it.
     if (!inherited.getType()) {
-      fn(TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
-                          { payload, i }));
+      recordDependency(
+        TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
+                         { protocol, i }));
+      anyDependencies = true;
+      continue;
     }
-  }
-}
-
-void IterativeTypeChecker::satisfyInheritedProtocols(ProtocolDecl *protocol) {
-  // Gather all of the existential types in the inherited list.
-  // Loop through the inheritance clause looking for a non-existential
-  // nominal type.
-  llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
-  for (const auto &inherited : protocol->getInherited()) {
-    if (!inherited.getType()) continue;
 
     // Collect existential types.
     // FIXME: We'd prefer to keep what the user wrote here.
     SmallVector<ProtocolDecl *, 4> protocols;
     if (inherited.getType()->isExistentialType(protocols)) {
       allProtocols.insert(protocols.begin(), protocols.end());
+      continue;
     }
   }
+
+  // If we enumerated any dependencies, we can't complete this request.
+  if (anyDependencies)
+    return;
 
   // FIXME: Hack to deal with recursion elsewhere.
   if (protocol->isInheritedProtocolsValid())
