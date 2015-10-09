@@ -276,7 +276,7 @@ class GlobalDeadStoreEliminationImpl {
   void processStoreInst(SILInstruction *Inst);
 
   /// Process Instructions. Extract MemLocations from SIL Unknown Memory Inst.
-  void processUnknownMemInst(SILInstruction *Inst);
+  void processUnknownReadMemInst(SILInstruction *Inst);
 
   /// Check whether the instruction invalidate any MemLocations due to change in
   /// its MemLocation Base.
@@ -443,7 +443,7 @@ void GlobalDeadStoreEliminationImpl::processRead(SILInstruction *I, BBState *S,
   // If we cant figure out the Base or Projection Path for the read instruction,
   // process it as an unknown memory instruction for now.
   if (!L.isValid()) {
-    processUnknownMemInst(I);
+    processUnknownReadMemInst(I);
     return;
   }
 
@@ -572,7 +572,7 @@ void GlobalDeadStoreEliminationImpl::processStoreInst(SILInstruction *I) {
   processWrite(I, getBBLocState(I), Val, Mem);
 }
 
-void GlobalDeadStoreEliminationImpl::processUnknownMemInst(SILInstruction *I) {
+void GlobalDeadStoreEliminationImpl::processUnknownReadMemInst(SILInstruction *I) {
   // We do not know what this instruction does or the memory that it *may*
   // touch. Hand it to alias analysis to see whether we need to invalidate
   // any MemLocation.
@@ -600,8 +600,8 @@ void GlobalDeadStoreEliminationImpl::processInstruction(SILInstruction *I) {
     processLoadInst(I);
   } else if (isa<StoreInst>(I)) {
     processStoreInst(I);
-  } else if (I->mayReadOrWriteMemory()) {
-    processUnknownMemInst(I);
+  } else if (I->mayReadFromMemory()) {
+    processUnknownReadMemInst(I);
   }
 
   // Check whether this instruction will invalidate any other MemLocations.
