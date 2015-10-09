@@ -20,6 +20,12 @@
     (set
      (make-local-variable 'parse-sexp-ignore-comments) t)))
 
+;; Create mode-specific variables
+(defcustom swift-basic-offset 2
+  "Default indentation width for Swift source"
+  :type 'integer)
+
+
 ;; Create mode-specific tables.
 (defvar swift-mode-syntax-table nil
   "Syntax table used while in SWIFT mode.")
@@ -154,7 +160,7 @@
       (skip-syntax-forward " ")
       (setq target-column
             (if (or (equal (char-after) ?\#) (looking-at "//:")) 0
-              (* 2
+              (* swift-basic-offset
                  (- indent-level
                     (cond ((= (char-syntax (or (char-after) ?\X)) ?\))
                            1)
