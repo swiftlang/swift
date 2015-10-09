@@ -58,7 +58,7 @@ void parseVersionString(StringRef VersionString,
       Loc = Loc.getAdvancedLoc(1);
     if (clang::isDigit(c)) {
       OS << c;
-    } else if (c == '.' && digits.str().size()) {
+    } else if (c == '.' && OS.str().size()) {
       OS.str().getAsInteger(10, Component);
       Components.push_back(Component);
       digits.clear();
@@ -70,7 +70,7 @@ void parseVersionString(StringRef VersionString,
         llvm_unreachable("Invalid character in _compiler_version build configuration");
     }
   }
-  if (digits.str().size()) {
+  if (OS.str().size()) {
     OS.str().getAsInteger(10, Component);
     Components.push_back(Component);
   }
