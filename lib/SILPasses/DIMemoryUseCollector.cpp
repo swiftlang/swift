@@ -384,7 +384,7 @@ namespace {
   class ElementUseCollector {
     const DIMemoryObjectInfo &TheMemory;
     SmallVectorImpl<DIMemoryUse> &Uses;
-    SmallVectorImpl<SILBasicBlock*> &FailureBBs;
+    SmallVectorImpl<TermInst*> &FailableInits;
     SmallVectorImpl<SILInstruction*> &Releases;
     
     /// This is true if definite initialization has finished processing assign
@@ -406,11 +406,11 @@ namespace {
   public:
     ElementUseCollector(const DIMemoryObjectInfo &TheMemory,
                         SmallVectorImpl<DIMemoryUse> &Uses,
-                        SmallVectorImpl<SILBasicBlock*> &FailureBBs,
+                        SmallVectorImpl<TermInst*> &FailableInits,
                         SmallVectorImpl<SILInstruction*> &Releases,
                         bool isDefiniteInitFinished)
       : TheMemory(TheMemory), Uses(Uses),
-        FailureBBs(FailureBBs), Releases(Releases),
+        FailableInits(FailableInits), Releases(Releases),
         isDefiniteInitFinished(isDefiniteInitFinished) {
     }
 
@@ -454,6 +454,8 @@ namespace {
   private:
     void collectUses(SILValue Pointer, unsigned BaseEltNo);
     void collectContainerUses(SILValue Container, SILValue Pointer);
+    void recordFailureBB(TermInst *TI, SILBasicBlock *BB);
+    void recordFailableInitCall(SILInstruction *I);
     void collectClassSelfUses();
     void collectDelegatingClassInitSelfUses();
     void collectDelegatingValueTypeInitSelfUses();
@@ -866,6 +868,52 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   }
 }
 
+/// recordFailureBB - we have to detect if the self box contents were consumed.
+/// Do this by checking for a store into the self box in the success branch.
+/// Once we rip this out of SILGen, DI will be able to figure this out in a
+/// more logical manner.
+void ElementUseCollector::recordFailureBB(TermInst *TI,
+                                          SILBasicBlock *BB) {
+  for (auto &II : *BB)
+    if (auto *SI = dyn_cast<StoreInst>(&II)) {
+      if (SI->getDest() == TheMemory.MemoryInst) {
+        FailableInits.push_back(TI);
+        return;
+      }
+    }
+}
+
+/// recordFailableInitCall - If I is a call of a throwing or failable
+/// initializer, add the actual conditional (try_apply or cond_br) to
+/// the set for dataflow analysis.
+void ElementUseCollector::recordFailableInitCall(SILInstruction *I) {
+  // If we have a store to self inside the normal BB, we have a 'real'
+  // try_apply. Otherwise, this is a 'try? self.init()' or similar,
+  // and there is a store after.
+  if (auto *TAI = dyn_cast<TryApplyInst>(I)) {
+    recordFailureBB(TAI, TAI->getNormalBB());
+    return;
+  }
+
+  if (auto *AI = dyn_cast<ApplyInst>(I)) {
+    // See if this is an optional initializer.
+    for (auto UI : AI->getUses()) {
+      SILInstruction *User = UI->getUser();
+
+      if (!isa<SelectEnumInst>(User) && !isa<SelectEnumAddrInst>(User))
+        continue;
+      
+      if (!User->hasOneUse())
+        continue;
+      
+      User = User->use_begin()->getUser();
+      if (auto *CBI = dyn_cast<CondBranchInst>(User)) {
+        recordFailureBB(CBI, CBI->getTrueBB());
+        return;
+      }
+    }
+  }
+}
 
 /// collectClassSelfUses - Collect all the uses of a 'self' pointer in a class
 /// constructor.  The memory object has class type.
@@ -1150,6 +1198,7 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
         // We remember the applyinst as the super.init site, not the upcast.
         Uses.push_back(DIMemoryUse(AI, DIUseKind::SuperInit,
                                    0, TheMemory.NumElements));
+        recordFailableInitCall(AI);
         continue;
       }
 
@@ -1158,9 +1207,7 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     DIUseKind Kind = DIUseKind::Load;
     if (isa<FullApplySite>(User) && isSelfInitUse(User)) {
       Kind = DIUseKind::SelfInit;
-    
-      if (auto *TAI = dyn_cast<TryApplyInst>(User))
-        FailureBBs.push_back(TAI->getErrorBB());
+      recordFailableInitCall(User);
     }
 
     // If this is a ValueMetatypeInst, check to see if it's part of a
@@ -1261,10 +1308,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         if (auto *UCI = dyn_cast<UpcastInst>(User))
           if (auto *subAI = isSuperInitUse(UCI)) {
             Uses.push_back(DIMemoryUse(subAI, DIUseKind::SuperInit, 0, 1));
-            
-            if (auto *TAI = dyn_cast<TryApplyInst>(subAI))
-              FailureBBs.push_back(TAI->getErrorBB());
-
+            recordFailableInitCall(subAI);
             continue;
           }
 
@@ -1279,9 +1323,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         // call in a delegating initializer.
         if (isa<FullApplySite>(User) && isSelfInitUse(User)) {
           Kind = DIUseKind::SelfInit;
-
-          if (auto *TAI = dyn_cast<TryApplyInst>(User))
-            FailureBBs.push_back(TAI->getErrorBB());
+          recordFailableInitCall(User);
         }
 
         // If this is a ValueMetatypeInst, check to see if it's part of a
@@ -1387,9 +1429,9 @@ void ElementUseCollector::collectDelegatingValueTypeInitSelfUses() {
 /// and storing the information found into the Uses and Releases lists.
 void swift::collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                                      SmallVectorImpl<DIMemoryUse> &Uses,
-                                     SmallVectorImpl<SILBasicBlock*> &FailureBBs,
+                                     SmallVectorImpl<TermInst*> &FailableInits,
                                      SmallVectorImpl<SILInstruction*> &Releases,
                                      bool isDIFinished) {
-  ElementUseCollector(MemoryInfo, Uses, FailureBBs, Releases, isDIFinished)
+  ElementUseCollector(MemoryInfo, Uses, FailableInits, Releases, isDIFinished)
       .collectFrom();
 }

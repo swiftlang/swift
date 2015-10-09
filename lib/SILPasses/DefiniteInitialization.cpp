@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/Basic/Fallthrough.h"
@@ -399,9 +400,9 @@ namespace {
 
     /// Mark the block as a failure path, indicating the self value has been
     /// consumed.
-    void markFailure() {
-      LocalSelfConsumed = DIKind::Yes;
-      OutSelfConsumed = DIKind::Yes;
+    void markFailure(bool partial) {
+      LocalSelfConsumed = (partial ? DIKind::Partial : DIKind::Yes);
+      OutSelfConsumed = LocalSelfConsumed;
     }
 
     /// If true, we're not done with our dataflow analysis yet.
@@ -430,7 +431,7 @@ namespace {
     DIMemoryObjectInfo TheMemory;
 
     SmallVectorImpl<DIMemoryUse> &Uses;
-    SmallVectorImpl<SILBasicBlock *> &FailureBBs;
+    SmallVectorImpl<TermInst *> &FailableInits;
     SmallVectorImpl<SILInstruction *> &Releases;
     std::vector<ConditionalDestroy> ConditionalDestroys;
 
@@ -460,7 +461,7 @@ namespace {
   public:
     LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                     SmallVectorImpl<DIMemoryUse> &Uses,
-                    SmallVectorImpl<SILBasicBlock *> &FailureBBs,
+                    SmallVectorImpl<TermInst *> &FailableInits,
                     SmallVectorImpl<SILInstruction*> &Releases);
 
     void doIt();
@@ -519,10 +520,10 @@ namespace {
 
 LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                                  SmallVectorImpl<DIMemoryUse> &Uses,
-                                 SmallVectorImpl<SILBasicBlock*> &FailureBBs,
+                                 SmallVectorImpl<TermInst*> &FailableInits,
                                  SmallVectorImpl<SILInstruction*> &Releases)
   : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory), Uses(Uses),
-    FailureBBs(FailureBBs), Releases(Releases) {
+    FailableInits(FailableInits), Releases(Releases) {
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -548,8 +549,13 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
   }
 
   // Mark blocks where the self value has been consumed.
-  for (auto *bb : FailureBBs) {
-    getBlockInfo(bb).markFailure();
+  for (auto *I : FailableInits) {
+    auto *bb = I->getSuccessors()[1].getBB();
+
+    // Horrible hack. Failing inits create critical edges, where all
+    // 'return nil's end up. We'll split the edge later.
+    bool criticalEdge = isCriticalEdge(I, 1);
+    getBlockInfo(bb).markFailure(criticalEdge);
   }
 
   // If isn't really a use, but we account for the alloc_box/mark_uninitialized
@@ -1573,7 +1579,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
       diagnose(Module, loc, diag::must_call_super_init_failable_init, isThrow);
   }
 
-  // If it is all 'no' then we can handle is specially without conditional code.
+  // If it is all 'no' then we can handle it specially without conditional code.
   if (Availability.isAllNo()) {
     processUninitializedRelease(Release, false, Release);
     deleteDeadRelease(ReleaseID);
@@ -1883,7 +1889,8 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
         Releases.push_back(DA);
 
-      // Set up the uninitialized release block.
+      // Set up the uninitialized release block. Free the self value in
+      // convenience initializers, otherwise there's nothing to do.
       if (TheMemory.isDelegatingInit()) {
         assert(NumMemoryElements == 1);
         processUninitializedRelease(Release, false, DeallocBlock->begin());
@@ -1894,10 +1901,7 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 
     // If we're in a designated initializer, the elements of the memory
     // represent instance variables -- after destroying them, we have to
-    // destroy the class instance itself. In a delegating initializer,
-    // the sole element of the memory represents the self instance itself,
-    // so if the self instance was fully initialized and we destroyed it
-    // above, don't double-free the memory here.
+    // destroy the class instance itself.
     if (!TheMemory.isDelegatingInit())
       processUninitializedRelease(Release, false, B.getInsertionPoint());
 
@@ -2124,11 +2128,11 @@ getSelfConsumedAtInst(SILInstruction *Inst) {
 
   getOutSelfConsumed(InstBB, Result);
 
-  // If the result element wasn't computed, we must be analyzing code within
+  // If the result wasn't computed, we must be analyzing code within
   // an unreachable cycle that is not dominated by "TheMemory".  Just force
-  // the unset element to yes so that clients don't have to handle this.
+  // the result to unconsumed so that clients don't have to handle this.
   if (!Result.hasValue())
-    Result = DIKind::Yes;
+    Result = DIKind::No;
 
   return *Result;
 }
@@ -2176,13 +2180,13 @@ static bool processMemoryObject(SILInstruction *I) {
 
   // Set up the datastructure used to collect the uses of the allocation.
   SmallVector<DIMemoryUse, 16> Uses;
-  SmallVector<SILBasicBlock*, 1> FailureBBs;
+  SmallVector<TermInst*, 1> FailableInits;
   SmallVector<SILInstruction*, 4> Releases;
 
   // Walk the use list of the pointer, collecting them into the Uses array.
-  collectDIElementUsesFrom(MemInfo, Uses, FailureBBs, Releases, false);
+  collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, false);
 
-  LifetimeChecker(MemInfo, Uses, FailureBBs, Releases).doIt();
+  LifetimeChecker(MemInfo, Uses, FailableInits, Releases).doIt();
   return true;
 }
 

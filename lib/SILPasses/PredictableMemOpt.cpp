@@ -975,11 +975,11 @@ static bool optimizeMemoryAllocations(SILFunction &Fn) {
 
       // Set up the datastructure used to collect the uses of the allocation.
       SmallVector<DIMemoryUse, 16> Uses;
-      SmallVector<SILBasicBlock*, 1> FailureBBs;
+      SmallVector<TermInst*, 1> FailableInits;
       SmallVector<SILInstruction*, 4> Releases;
       
       // Walk the use list of the pointer, collecting them.
-      collectDIElementUsesFrom(MemInfo, Uses, FailureBBs, Releases, true);
+      collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, true);
       
       Changed |= AllocOptimize(Inst, Uses, Releases).doIt();
       
