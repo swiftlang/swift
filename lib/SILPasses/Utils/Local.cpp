@@ -216,6 +216,43 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
   return FullApplySite();
 }
 
+/// Check if two tuple types are compatible, i.e. have the same
+/// number of elements and same type of elements. Optional
+/// names of elements are not taken into account.
+static bool
+isCompatibleTupleTypes(SILType FromSILTy, SILType ToSILTy, SILModule &M) {
+  // For now, handle only tuple types.
+  TupleType *FromTupleTy = dyn_cast<TupleType>(FromSILTy.getSwiftRValueType());
+  if (!FromTupleTy)
+    return false;
+  TupleType *ToTupleTy = dyn_cast<TupleType>(ToSILTy.getSwiftRValueType());
+  if (!ToTupleTy)
+    return false;
+  if (FromTupleTy->getNumElements() != ToTupleTy->getNumElements())
+    return false;
+  for (unsigned i = 0, e = FromTupleTy->getNumElements(); i < e; ++i) {
+    if (FromSILTy.getTupleElementType(i) != ToSILTy.getTupleElementType(i))
+      return false;
+  }
+
+  assert(SILType::canUnsafeCastValue(FromSILTy, ToSILTy, M) &&
+          "Types should be layout compatible");
+  return true;
+}
+
+/// Checks if two SIL types are layout compatible.
+static bool
+isLayoutCompatibleTypes(SILType FromSILTy, SILType ToSILTy, SILModule &M) {
+  // For now, handle only tuple types.
+  return isCompatibleTupleTypes(FromSILTy, ToSILTy, M);
+}
+
+static bool
+isLayoutCompatibleTypes(CanType FromTy, CanType ToTy, SILModule &M) {
+  auto FromSILTy = SILType::getPrimitiveObjectType(FromTy);
+  auto ToSILTy = SILType::getPrimitiveObjectType(FromTy);
+  return isLayoutCompatibleTypes(FromSILTy, ToSILTy, M);
+}
 
 /// Insert instructions to cast a value of tuple type from
 /// \p SrcTupleTy into \p DstTupleTy.
@@ -280,6 +317,7 @@ SILValue swift::castReturnValue(SILBuilder &B, SILValue ReturnValue,
   bool WrapOptionalResult = false;
   OptionalTypeKind OTK;
   OptionalTypeKind AI_OTK;
+  auto &M = B.getModule();
 
   auto ResultValue = ReturnValue;
 
@@ -294,6 +332,17 @@ SILValue swift::castReturnValue(SILBuilder &B, SILValue ReturnValue,
   if (!OptionalAIType && !OptionalReturnType
       && ExpectedReturnTy.isSuperclassOf(ReturnTy)) {
     return B.createUpcast(Loc, ResultValue, ExpectedReturnTy);
+  }
+
+  if (!OptionalAIType && !OptionalReturnType
+      && isLayoutCompatibleTypes(ReturnTy, ExpectedReturnTy, M)) {
+    // Both types are layout compatible.
+    // So, cast one of them into the other one.
+    if (auto ExpectedTupleTy =
+          dyn_cast<TupleType>(ReturnTy.getSwiftRValueType()))
+      return castTupleReturnType(M, Loc, ResultValue, ReturnTy,
+                                 ExpectedReturnTy, B);
+    return B.createUncheckedBitCast(Loc, ResultValue, ExpectedReturnTy);
   }
 
   // Return type if not an optional, but the expected type is an optional
@@ -321,6 +370,14 @@ SILValue swift::castReturnValue(SILBuilder &B, SILValue ReturnValue,
     // Both types have the same optionality and one of them
     // is the superclass of the other.
     return B.createUpcast(Loc, ResultValue, ExpectedReturnTy);
+  }
+
+  if (OptionalReturnType && OptionalAIType
+      && isLayoutCompatibleTypes(OptionalReturnType, OptionalAIType, M)) {
+    // Both types have the same optionality.
+    // Both types are layout compatible types.
+    // So, cast one of them into the other one.
+    return B.createUncheckedBitCast(Loc, ResultValue, ExpectedReturnTy);
   }
 
   if (OptionalReturnType == ExpectedReturnTy.getSwiftRValueType()) {
