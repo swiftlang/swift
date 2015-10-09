@@ -26,6 +26,7 @@
 namespace swift {
 
 class ClassDecl;
+class EnumDecl;
 class ExtensionDecl;
 class TypeDecl;
 

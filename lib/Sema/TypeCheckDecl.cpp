@@ -233,19 +233,8 @@ void TypeChecker::resolveSuperclass(ClassDecl *classDecl) {
 }
 
 void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
-  // If we've already recorded a raw type, we're done.
-  if (enumDecl->hasRawType())
-    return;
-
-  // Resolve the types in the inheritance clause.
-  resolveInheritanceClause(enumDecl);
-
-  // Loop through the inheritance clause looking for a class type.
-  for (const auto &inherited : enumDecl->getInherited()) {
-    if (!inherited.getType()->isExistentialType()) {
-      enumDecl->setRawType(inherited.getType());
-    }
-  }
+  IterativeTypeChecker ITC(*this);
+  ITC.satisfy(TypeCheckRequest(TypeCheckRequest::TypeCheckRawType, enumDecl));
 }
 
 void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {

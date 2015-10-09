@@ -3014,7 +3014,14 @@ public:
 /// to get the declared type ("Bool" or "Optional" in the above example).
 class EnumDecl : public NominalTypeDecl {
   SourceLoc EnumLoc;
-  Type RawType;
+
+  struct {
+    /// The raw type and a bit to indicate whether the
+    /// raw was computed yet or not.
+    llvm::PointerIntPair<Type, 1, bool> RawType;
+  } LazySemanticInfo;
+
+  friend class IterativeTypeChecker;
 
 public:
   EnumDecl(SourceLoc EnumLoc, Identifier Name, SourceLoc NameLoc,
@@ -3076,13 +3083,19 @@ public:
   }
   
   /// Determine whether this enum declares a raw type in its inheritance clause.
-  bool hasRawType() const { return (bool)RawType; }
+  bool hasRawType() const {
+    return (bool)LazySemanticInfo.RawType.getPointer();
+  }
   /// Retrieve the declared raw type of the enum from its inheritance clause,
   /// or null if it has none.
-  Type getRawType() const { return RawType; }
+  Type getRawType() const {
+    return LazySemanticInfo.RawType.getPointer();
+  }
 
   /// Set the raw type of the enum from its inheritance clause.
-  void setRawType(Type rawType) { RawType = rawType; }
+  void setRawType(Type rawType) {
+    LazySemanticInfo.RawType.setPointerAndInt(rawType, true);
+  }
   
   /// True if the enum has cases, and none of those cases have associated values.
   ///
@@ -3201,8 +3214,7 @@ public:
 
   /// Set the superclass of this class.
   void setSuperclass(Type superclass) {
-    LazySemanticInfo.Superclass.setPointer(superclass);
-    LazySemanticInfo.Superclass.setInt(true);
+    LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
   }
 
   /// Retrieve the status of circularity checking for class inheritance.

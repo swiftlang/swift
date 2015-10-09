@@ -160,3 +160,55 @@ void IterativeTypeChecker::satisfyTypeCheckSuperclass(ClassDecl *classDecl) {
   // Set the superclass type.
   classDecl->setSuperclass(superclassType);
 }
+
+//----------------------------------------------------------------------------//
+// Raw type handling
+//----------------------------------------------------------------------------//
+bool IterativeTypeChecker::isTypeCheckRawTypeSatisfied(EnumDecl *payload) {
+  return payload->LazySemanticInfo.RawType.getInt();
+}
+
+void IterativeTypeChecker::enumerateDependenciesOfTypeCheckRawType(
+       EnumDecl *payload,
+       llvm::function_ref<void(TypeCheckRequest)> fn) {
+  // The raw type should be the first inherited type. However, so
+  // long as we see already-resolved types that refer to protocols,
+  // skip over them to keep looking for a misplaced raw type. The
+  // actual error will be diagnosed when we perform full semantic
+  // analysis on the enum itself.
+  auto inheritedClause = payload->getInherited();
+  for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
+    TypeLoc &inherited = inheritedClause[i];
+
+    // If this inherited type has not been resolved, we depend on it.
+    if (!inherited.getType()) {
+      fn(TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
+                          { payload, i }));
+      return;
+    }
+
+    // If this resolved inherited type is existential, keep going.
+    if (inherited.getType()->isExistentialType()) continue;
+
+    break;
+  }
+}
+
+void IterativeTypeChecker::satisfyTypeCheckRawType(EnumDecl *enumDecl) {
+  // Loop through the inheritance clause looking for a non-existential
+  // nominal type.
+  Type rawType;
+  for (const auto &inherited : enumDecl->getInherited()) {
+    if (!inherited.getType()) break;
+
+    // Skip existential types.
+    if (inherited.getType()->isExistentialType()) continue;
+
+    // Record this raw type.
+    rawType = inherited.getType();
+    break;
+  }
+
+  // Set the raw type.
+  enumDecl->setRawType(rawType);
+}
