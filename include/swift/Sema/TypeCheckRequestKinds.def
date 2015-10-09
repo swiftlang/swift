@@ -38,6 +38,20 @@ TYPE_CHECK_REQUEST_PAYLOAD(Class, ClassDecl *)
 TYPE_CHECK_REQUEST_PAYLOAD(Enum, EnumDecl *)
 TYPE_CHECK_REQUEST_PAYLOAD(InheritedClauseEntry, std::pair<llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned>)
 TYPE_CHECK_REQUEST_PAYLOAD(Protocol, ProtocolDecl *)
+TYPE_CHECK_REQUEST_PAYLOAD(TypeLookup, std::pair<Type, DeclName>)
+TYPE_CHECK_REQUEST_PAYLOAD(DeclContextLookup, std::pair<DeclContext *, DeclName>)
+
+/// Ensure that we can perform qualified name lookup into the given
+/// type for the given name.
+TYPE_CHECK_REQUEST(QualifiedLookupInType, TypeLookup)
+
+/// Ensure that we can perform qualified name lookup into the given
+/// declaration context for the given name.
+TYPE_CHECK_REQUEST(QualifiedLookupInDeclContext, DeclContextLookup)
+
+/// Ensure that we can perform unqualified name lookup into the given
+/// declaration context for the given name.
+TYPE_CHECK_REQUEST(UnqualifiedLookupInDeclContext, DeclContextLookup)
 
 /// Perform type checking on an entry in the inherited clause of a
 /// type or extension.
@@ -49,7 +63,7 @@ TYPE_CHECK_REQUEST(TypeCheckSuperclass, Class)
 /// Perform type checking on the raw type of a particular enum.
 TYPE_CHECK_REQUEST(TypeCheckRawType, Enum)
 
-/// Compute the set of inherited protocols for a given protocl
+/// Compute the set of inherited protocols for a given protocol.
 TYPE_CHECK_REQUEST(InheritedProtocols, Protocol)
 
 #undef TYPE_CHECK_REQUEST_PAYLOAD
