@@ -103,8 +103,9 @@ _TWoFC3foo3bar3basFSiSi ---> witness table offset for bar.bas(Int) -> Int
 _TWvdvC3foo3bar3basSi ---> direct field offset for bar.bas
 _TWvivC3foo3bar3basSi ---> indirect field offset for bar.bas
 _TWPC3foo3barS_8barrables ---> protocol witness table for bar
-_TWZC3foo3barS_8barrableS_ ---> lazy protocol witness table accessor for bar
-_TWzC3foo3barS_8barrableS_ ---> lazy protocol witness table template for bar
+_TWaC3foo3barS_8barrableS_ ---> protocol witness table accessor for bar
+_TWlC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table accessor for type bar and conformance bar
+_TWLC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table cache variable for type bar and conformance bar
 _TWDC3foo3barS_8barrableS_ ---> dependent protocol witness table generator for bar
 _TWdC3foo3barS_8barrableS_ ---> dependent protocol witness table template for bar
 _TFSCg5greenVSC5Color ---> green.getter

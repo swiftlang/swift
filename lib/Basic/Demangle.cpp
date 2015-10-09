@@ -585,15 +585,23 @@ private:
         DEMANGLE_CHILD_OR_RETURN(witnessTable, ProtocolConformance);
         return witnessTable;
       }
-      if (Mangled.nextIf('Z')) {
+      if (Mangled.nextIf('l')) {
         auto accessor =
           NodeFactory::create(Node::Kind::LazyProtocolWitnessTableAccessor);
+        DEMANGLE_CHILD_OR_RETURN(accessor, Type);
         DEMANGLE_CHILD_OR_RETURN(accessor, ProtocolConformance);
         return accessor;
       }
-      if (Mangled.nextIf('z')) {
+      if (Mangled.nextIf('L')) {
+        auto accessor =
+          NodeFactory::create(Node::Kind::LazyProtocolWitnessTableCacheVariable);
+        DEMANGLE_CHILD_OR_RETURN(accessor, Type);
+        DEMANGLE_CHILD_OR_RETURN(accessor, ProtocolConformance);
+        return accessor;
+      }
+      if (Mangled.nextIf('a')) {
         auto tableTemplate =
-          NodeFactory::create(Node::Kind::LazyProtocolWitnessTableTemplate);
+          NodeFactory::create(Node::Kind::ProtocolWitnessTableAccessor);
         DEMANGLE_CHILD_OR_RETURN(tableTemplate, ProtocolConformance);
         return tableTemplate;
       }
@@ -2361,7 +2369,7 @@ private:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
     case Node::Kind::LazyProtocolWitnessTableAccessor:
-    case Node::Kind::LazyProtocolWitnessTableTemplate:
+    case Node::Kind::LazyProtocolWitnessTableCacheVariable:
     case Node::Kind::LocalDeclName:
     case Node::Kind::PrivateDeclName:
     case Node::Kind::MaterializeForSet:
@@ -2385,6 +2393,7 @@ private:
     case Node::Kind::ProtocolList:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
+    case Node::Kind::ProtocolWitnessTableAccessor:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::Setter:
@@ -3132,11 +3141,19 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     print(pointer->getFirstChild());
     return;
   case Node::Kind::LazyProtocolWitnessTableAccessor:
-    Printer << "lazy protocol witness table accessor for ";
-    print(pointer->getFirstChild());
+    Printer << "lazy protocol witness table accessor for type ";
+    print(pointer->getChild(0));
+    Printer << " and conformance ";
+    print(pointer->getChild(1));
     return;
-  case Node::Kind::LazyProtocolWitnessTableTemplate:
-    Printer << "lazy protocol witness table template for ";
+  case Node::Kind::LazyProtocolWitnessTableCacheVariable:
+    Printer << "lazy protocol witness table cache variable for type ";
+    print(pointer->getChild(0));
+    Printer << " and conformance ";
+    print(pointer->getChild(1));
+    return;
+  case Node::Kind::ProtocolWitnessTableAccessor:
+    Printer << "protocol witness table accessor for ";
     print(pointer->getFirstChild());
     return;
   case Node::Kind::ProtocolWitnessTable:

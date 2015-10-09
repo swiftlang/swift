@@ -161,10 +161,8 @@ class ProtocolInfo {
 
 public:
   const ConformanceInfo &getConformance(IRGenModule &IGM,
-                                        CanType concreteType,
-                                        const TypeInfo &concreteTI,
                                         ProtocolDecl *protocol,
-                                        const ProtocolConformance &conf) const;
+                                        const ProtocolConformance *conf) const;
 
   unsigned getNumWitnesses() const {
     return NumWitnesses;

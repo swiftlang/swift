@@ -268,18 +268,100 @@ namespace {
 
 } // end anonymous namespace
 
+/// Is there anything about the given conformance that requires witness
+/// tables to be dependently-generated?
+static bool isDependentConformance(IRGenModule &IGM,
+                             const NormalProtocolConformance *conformance,
+                                   ResilienceScope resilienceScope) {
+  // If the conforming type isn't dependent, this is never true.
+  if (!conformance->getDeclContext()->isGenericContext())
+    return false;
 
+  // Check whether any of the associated types are dependent.
+  if (conformance->forEachTypeWitness(nullptr,
+        [&](AssociatedTypeDecl *requirement, const Substitution &sub,
+            TypeDecl *explicitDecl) -> bool {
+          // RESILIENCE: this could be an opaque conformance
+          return sub.getReplacement()->hasArchetype();
+         })) {
+    return true;
+  }
+
+  // Check whether any of the associated types are dependent.
+  for (auto &entry : conformance->getInheritedConformances()) {
+    if (isDependentConformance(IGM, entry.second->getRootNormalConformance(),
+                               resilienceScope)) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 /// Detail about how an object conforms to a protocol.
 class irgen::ConformanceInfo {
   friend class ProtocolInfo;
 public:
   virtual ~ConformanceInfo() {}
-  virtual llvm::Value *getTable(IRGenFunction &IGF) const = 0;
+  virtual llvm::Value *getTable(IRGenFunction &IGF,
+                                CanType conformingType) const = 0;
   /// Try to get this table as a constant pointer.  This might just
   /// not be supportable at all.
-  virtual llvm::Constant *tryGetConstantTable(IRGenModule &IGM) const = 0;
+  virtual llvm::Constant *tryGetConstantTable(IRGenModule &IGM,
+                                              CanType conformingType) const = 0;
 };
+
+static llvm::Value *
+emitWitnessTableAccessorCall(IRGenFunction &IGF,
+                             const NormalProtocolConformance *conformance,
+                             CanType conformingType) {
+  auto accessor =
+    IGF.IGM.getAddrOfWitnessTableAccessFunction(conformance, NotForDefinition);
+
+  // If the conforming type is generic, the accessor takes the metatype
+  // as an argument.
+  llvm::CallInst *call;
+  if (conformance->getDeclContext()->isGenericContext()) {
+    auto metadata = IGF.emitTypeMetadataRef(conformingType);
+    call = IGF.Builder.CreateCall(accessor, {metadata});
+  } else {
+    call = IGF.Builder.CreateCall(accessor, {});
+  }
+
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotAccessMemory();
+  call->setDoesNotThrow();
+
+  return call;
+}
+
+/// Fetch the lazy access function for the given conformance of the
+/// given type.
+static llvm::Function *
+getWitnessTableLazyAccessFunction(IRGenModule &IGM,
+                                  const NormalProtocolConformance *conformance,
+                                  CanType conformingType) {
+  assert(!conformingType->hasArchetype());
+  llvm::Function *accessor =
+    IGM.getAddrOfWitnessTableLazyAccessFunction(conformance, conformingType,
+                                                ForDefinition);
+
+  // If we're not supposed to define the accessor, or if we already
+  // have defined it, just return the pointer.
+  if (!accessor->empty())
+    return accessor;
+
+  // Okay, define the accessor.
+  auto cacheVariable = cast<llvm::GlobalVariable>(
+    IGM.getAddrOfWitnessTableLazyCacheVariable(conformance, conformingType,
+                                               ForDefinition));
+  emitLazyCacheAccessFunction(IGM, accessor, cacheVariable,
+                              [&](IRGenFunction &IGF) -> llvm::Value* {
+    return emitWitnessTableAccessorCall(IGF, conformance, conformingType);
+  });
+
+  return accessor;
+}
 
 namespace {
 
@@ -292,12 +374,48 @@ public:
   DirectConformanceInfo(const NormalProtocolConformance *C)
     : RootConformance(C) {}
 
-  llvm::Value *getTable(IRGenFunction &IGF) const override {
+  llvm::Value *getTable(IRGenFunction &IGF,
+                        CanType conformingType) const override {
     return IGF.IGM.getAddrOfWitnessTable(RootConformance);
   }
 
-  llvm::Constant *tryGetConstantTable(IRGenModule &IGM) const override {
+  llvm::Constant *tryGetConstantTable(IRGenModule &IGM,
+                                      CanType conformingType) const override {
     return IGM.getAddrOfWitnessTable(RootConformance);
+  }
+};
+
+/// Conformance info for a witness table that is (or may be) dependent.
+class AccessorConformanceInfo : public ConformanceInfo {
+  friend class ProtocolInfo;
+
+  const NormalProtocolConformance *Conformance;
+public:
+  AccessorConformanceInfo(const NormalProtocolConformance *C)
+    : Conformance(C) {}
+
+  llvm::Value *getTable(IRGenFunction &IGF, CanType type) const override {
+    // If the conformance isn't generic, or we're looking up a dependent
+    // type, we don't want to / can't cache the result.
+    if (!Conformance->getDeclContext()->isGenericContext() ||
+        type->hasArchetype()) {
+      return emitWitnessTableAccessorCall(IGF, Conformance, type);
+    }
+
+    // Otherwise, call a lazy-cache function.
+    auto accessor =
+      getWitnessTableLazyAccessFunction(IGF.IGM, Conformance, type);
+    llvm::CallInst *call = IGF.Builder.CreateCall(accessor, {});
+    call->setCallingConv(IGF.IGM.RuntimeCC);
+    call->setDoesNotAccessMemory();
+    call->setDoesNotThrow();
+
+    return call;
+  }
+
+  llvm::Constant *tryGetConstantTable(IRGenModule &IGM,
+                                      CanType conformingType) const override {
+    return nullptr;
   }
 };
 
@@ -1547,10 +1665,9 @@ namespace {
       const ProtocolConformance *astConf
         = Conformance.getInheritedConformance(baseProto);
       const ConformanceInfo &conf =
-        basePI.getConformance(IGM, ConcreteType, ConcreteTI,
-                              baseProto, *astConf);
+        basePI.getConformance(IGM, baseProto, astConf);
 
-      llvm::Constant *baseWitness = conf.tryGetConstantTable(IGM);
+      llvm::Constant *baseWitness = conf.tryGetConstantTable(IGM, ConcreteType);
       assert(baseWitness && "couldn't get a constant table!");
       Table.push_back(asOpaquePtr(IGM, baseWitness));
     }
@@ -1874,23 +1991,31 @@ ProtocolInfo::~ProtocolInfo() {
 
 /// Find the conformance information for a protocol.
 const ConformanceInfo &
-ProtocolInfo::getConformance(IRGenModule &IGM, CanType concreteType,
-                             const TypeInfo &concreteTI,
-                             ProtocolDecl *protocol,
-                             const ProtocolConformance &conformance) const {
+ProtocolInfo::getConformance(IRGenModule &IGM, ProtocolDecl *protocol,
+                             const ProtocolConformance *conformance) const {
+  // Drill down to the root normal conformance.
+  auto normalConformance = conformance->getRootNormalConformance();
+
   // Check whether we've already cached this.
-  auto it = Conformances.find(&conformance);
+  auto it = Conformances.find(normalConformance);
   if (it != Conformances.end()) return *it->second;
 
-  // Drill down to the root normal conformance.
-  auto normalConformance = conformance.getRootNormalConformance();
+  ConformanceInfo *info;
 
-  // Emit a direct-referencing conformance.
-  // FIXME: For some conformances we need to do lazy initialization or runtime
-  // instantiation.
-  ConformanceInfo *info = new DirectConformanceInfo(normalConformance);
-  auto res = Conformances.insert(std::make_pair(&conformance, info));
-  return *res.first->second;
+  // If the conformance is dependent in any way, we need to unique it.
+  // TODO: maybe this should apply whenever it's out of the module?
+  // TODO: actually enable this
+  if ((false) &&
+      isDependentConformance(IGM, normalConformance, ResilienceScope::Local)) {
+    info = new AccessorConformanceInfo(normalConformance);
+
+  // Otherwise, we can use a direct-referencing conformance.
+  } else {
+    info = new DirectConformanceInfo(normalConformance);
+  }
+
+  Conformances.insert({normalConformance, info});
+  return *info;
 }
 
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
@@ -2997,9 +3122,8 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
 
   // All other source types should be concrete enough that we have conformance
   // info for them.
-  auto &conformanceI = protoI.getConformance(IGF.IGM, srcType,
-                                             srcTI, proto, *conformance);
-  return conformanceI.getTable(IGF);
+  auto &conformanceI = protoI.getConformance(IGF.IGM, proto, conformance);
+  return conformanceI.getTable(IGF, srcType);
 }
 
 /// Emit the witness table references required for the given type

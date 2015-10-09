@@ -104,8 +104,9 @@ _TWoFC3foo3bar3basFSiSi ---> witness table offset for foo.bar.bas (Swift.Int) ->
 _TWvdvC3foo3bar3basSi ---> direct field offset for foo.bar.bas : Swift.Int
 _TWvivC3foo3bar3basSi ---> indirect field offset for foo.bar.bas : Swift.Int
 _TWPC3foo3barS_8barrables ---> protocol witness table for foo.bar : foo.barrable in Swift
-_TWZC3foo3barS_8barrableS_ ---> lazy protocol witness table accessor for foo.bar : foo.barrable in foo
-_TWzC3foo3barS_8barrableS_ ---> lazy protocol witness table template for foo.bar : foo.barrable in foo
+_TWaC3foo3barS_8barrableS_ ---> protocol witness table accessor for foo.bar : foo.barrable in foo
+_TWlC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table accessor for type foo.bar and conformance foo.bar : foo.barrable in foo
+_TWLC3foo3barS0_S_8barrableS_ ---> lazy protocol witness table cache variable for type foo.bar and conformance foo.bar : foo.barrable in foo
 _TWDC3foo3barS_8barrableS_ ---> dependent protocol witness table generator for foo.bar : foo.barrable in foo
 _TWdC3foo3barS_8barrableS_ ---> dependent protocol witness table template for foo.bar : foo.barrable in foo
 _TFSCg5greenVSC5Color ---> __C.green.getter : __C.Color
