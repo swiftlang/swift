@@ -242,3 +242,45 @@ func driver2(d: D2) -> Int32 {
   return d.boo()
 }
 
+class AA {
+}
+
+class BB : AA {
+}
+
+class CCC {
+  @inline(never)
+  func foo(b: BB) -> (AA, AA) {
+    return (b, b)
+  }
+}
+
+class DDD : CCC {
+  @inline(never)
+  override func foo(b: BB) -> (BB, BB) {
+    return (b, b)
+  }
+}
+
+
+class EEE : CCC {
+  @inline(never)
+  override func foo(b: BB) -> (AA, AA) {
+    return (b, b)
+  }
+}
+
+// Check that the method DDD.foo is not devirtualized, because the optimizer cannot handle the casting the return type
+// correctly yet, i.e. it cannot cast (BBB, BBB) into (AAA, AAA)
+// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return37testDevirtOfMethodReturningTupleTypesFTCS_3CCC1bCS_2BB_TCS_2AAS2__
+// CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $CCC
+// CHECK-NOT: checked_cast_br [exact] %{{.*}} : $CCC to $DDD
+// CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $EEE
+// CHECK-NOT: checked_cast_br [exact] %{{.*}} : $CCC to $DDD
+// CHECK: class_method
+// CHECK: }
+func testDevirtOfMethodReturningTupleTypes(c: CCC, b: BB) -> (AA, AA) {
+  return c.foo(b)
+}
+
+

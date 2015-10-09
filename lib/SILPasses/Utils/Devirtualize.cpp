@@ -320,6 +320,36 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
       return false;
   }
 
+  // Check if the optimizer knows how to cast the return type.
+  CanSILFunctionType SubstCalleeType = GenCalleeType;
+  if (GenCalleeType->isPolymorphic())
+    SubstCalleeType =
+        GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
+
+  // If we have a direct return type, make sure we use the subst callee return
+  // type. If we have an indirect return type, AI's return type of the empty
+  // tuple should be ok.
+  SILType ReturnType = AI.getType();
+  if (!SubstCalleeType->hasIndirectResult()) {
+    ReturnType = SubstCalleeType->getSILResult();
+  }
+
+  // Accessors could return a tuple where one of the elements is of a function
+  // type, which may refer to a subclass instead of a superclass in its
+  // signature.
+  // These function types are ABI-compatible between the subclass and a
+  // superclass.
+  if (auto *FD = dyn_cast<FuncDecl>(CMI->getMember().getDecl())) {
+    if (FD->isAccessor()) {
+      if (isa<TupleType>(ReturnType.getSwiftRValueType())) {
+        return true;
+      }
+    }
+  }
+
+  if (!canCastReturnValue(Mod, ReturnType, AI.getType()))
+      return false;
+
   return true;
 }
 

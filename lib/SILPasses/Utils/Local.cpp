@@ -342,9 +342,6 @@ bool swift::canCastReturnValue(SILModule &M, SILType ReturnTy,
           ReturnTy)) {
     // The function returns a non-optional result.
     // We need to wrap it into an optional.
-    auto OptType =
-        OptionalType::get(AI_OTK, ReturnTy.getSwiftRValueType()).
-                      getCanonicalTypeOrNull();
     OptionalReturnType = ReturnTy.getSwiftRValueType();
 
     if (OptionalAIType == OptionalReturnType) {
