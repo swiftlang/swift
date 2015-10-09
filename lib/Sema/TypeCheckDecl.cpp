@@ -238,7 +238,8 @@ void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
 }
 
 void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {
-  checkInheritanceClause(protocol);
+  IterativeTypeChecker ITC(*this);
+  ITC.satisfy(TypeCheckRequest(TypeCheckRequest::InheritedProtocols, protocol));
 }
 
 void TypeChecker::resolveInheritanceClause(
@@ -5870,8 +5871,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     finalizeGenericParamList(builder, gp, proto, *this);
 
     // Record inherited protocols.
-    IterativeTypeChecker ITC(*this);
-    ITC.satisfy(TypeCheckRequest(TypeCheckRequest::InheritedProtocols, proto));
+    resolveInheritedProtocols(proto);
 
     validateAttributes(*this, D);
 
@@ -6363,8 +6363,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
 ArrayRef<ProtocolDecl *>
 TypeChecker::getDirectConformsTo(ProtocolDecl *proto) {
-  IterativeTypeChecker ITC(*this);
-  ITC.satisfy(TypeCheckRequest(TypeCheckRequest::InheritedProtocols, proto));
+  resolveInheritedProtocols(proto);
   return proto->getInheritedProtocols(nullptr);
 }
 
