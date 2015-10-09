@@ -35,6 +35,11 @@
 #endif
 
 TYPE_CHECK_REQUEST_PAYLOAD(Class, ClassDecl *)
+TYPE_CHECK_REQUEST_PAYLOAD(InheritedClauseEntry, std::pair<llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned>)
+
+/// Perform type checking on an entry in the inherited clause of a
+/// type or extension.
+TYPE_CHECK_REQUEST(TypeCheckInheritedClauseEntry, InheritedClauseEntry)
 
 /// Perform type checking on the superclass of a particular class.
 TYPE_CHECK_REQUEST(TypeCheckSuperclass, Class)

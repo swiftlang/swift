@@ -49,6 +49,30 @@ void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
   // If the request has already been satisfied, we're done.
   if (isSatisfied(request)) return;
 
+  // Make sure all of the dependencies have been satisfied before continuing.
+  while (true) {
+    // Enumerate all of the dependencies of this request and capture
+    // those that have not been satisfied.
+    SmallVector<TypeCheckRequest, 4> unsatisfied;
+    enumerateDependenciesOf(request, [&](TypeCheckRequest dependency) {
+      // If the dependency has already been satisfied, there's nothing to do.
+      if (isSatisfied(dependency)) return;
+
+      // Record the unsatisfied dependency.
+      unsatisfied.push_back(dependency);
+    });
+
+    // If all dependencies were satisfied, we're done.
+    if (unsatisfied.empty()) break;
+
+    // Recurse to satisfy any unsatisfied dependencies.
+    // FIXME: Don't recurse in the iterative type checker, silly!
+    for (auto dependency: unsatisfied) {
+      satisfy(dependency);
+    }
+  }
+
+  // Satisfy this request.
   switch (request.getKind()) {
 #define TYPE_CHECK_REQUEST(Request,PayloadName)                         \
   case TypeCheckRequest::Request:                                       \

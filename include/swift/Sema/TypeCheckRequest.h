@@ -18,11 +18,16 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_REQUEST_H
 #define SWIFT_SEMA_TYPE_CHECK_REQUEST_H
 
+#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/PointerUnion.h"
 #include <cassert>
+#include <utility>
 
 namespace swift {
 
 class ClassDecl;
+class ExtensionDecl;
+class TypeDecl;
 
 /// A request to the type checker to compute some particular kind of
 /// information.
@@ -37,7 +42,9 @@ struct TypeCheckRequest {
 
 private:
   /// The payload of the request, which differs based on the request kind.
-  union {
+  union PayloadType {
+    PayloadType() { }
+
 #define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...) \
     __VA_ARGS__ PayloadName;
 

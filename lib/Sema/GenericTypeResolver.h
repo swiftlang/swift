@@ -18,6 +18,7 @@
 #define SWIFT_SEMA_GENERICTYPERESOLVER_H
 
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceLoc.h"
 
 namespace swift {
@@ -25,6 +26,7 @@ namespace swift {
 class ArchetypeBuilder;
 class AssociatedTypeDecl;
 class Identifier;
+class TypeChecker;
 
 /// Abstract class that resolves references into generic types during
 /// type resolution.
