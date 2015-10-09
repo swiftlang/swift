@@ -1812,7 +1812,23 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
                                               getSwiftRValueType());
   if (!TargetFnTy || !TargetFnTy->hasErrorResult())
     return false;
-  
+
+  // Check if the converted function type has the same number of arguments.
+  // Currently this is always the case, but who knows what convert_function can
+  // do in the future?
+  unsigned numParams = OrigFnTy->getParameters().size();
+  if (TargetFnTy->getParameters().size() != numParams)
+    return false;
+
+  // Check that the argument types are matching.
+  // TODO: Instead of bailing out in case of a mismatch we should insert casts
+  // as we do for the return type.
+  for (unsigned Idx = 0; Idx < numParams; Idx++) {
+    if (OrigFnTy->getParameters()[Idx].getSILType() !=
+        TargetFnTy->getParameters()[Idx].getSILType())
+      return false;
+  }
+
   // Look through the conversions and find the real callee.
   Callee = getActualCallee(CFI->getConverted());
   CalleeType = Callee.getType();

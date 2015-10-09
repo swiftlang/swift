@@ -2228,5 +2228,29 @@ bb2(%10 : $ErrorType):
   unreachable
 }
 
+// Check that we don't crash on this. Currently we just don't allow the replacement
+// if the argument types of the converted function types do not match.
+// TODO: Change the checks when we allow this and insert a cast for the argument.
+// CHECK-LABEL: try_apply_with_apply_of_cast_argument
+// CHECK: try_apply {{%[0-9]+}}
+// CHECK: return
+sil @try_apply_with_apply_of_cast_argument: $@convention(method) (@owned CC) -> @owned BB {
+bb0(%0 : $CC):
+  %3 = function_ref @takeBB : $@convention(thin) (@owned BB) -> @owned BB
+  %6 = convert_function %3 : $@convention(thin) (@owned BB) -> @owned BB to $@convention(thin) (@owned CC) -> (@owned BB, @error ErrorType)
+  try_apply %6(%0) : $@convention(thin) (@owned CC) -> (@owned BB, @error ErrorType), normal bb1, error bb2
+
+bb1(%8 : $BB):
+  return %8 : $BB
+
+bb2(%10 : $ErrorType):
+  // Prevent that the conversion is done because the error block is empty and unreachable.
+  %12 = function_ref @unknown : $@convention(thin) () -> ()
+  apply %12() : $@convention(thin) () -> ()
+  unreachable
+}
 
 sil [noinline] @initCC : $@convention(thin) (@thick CC.Type) -> @owned @callee_owned (@owned EE) -> @owned CC
+
+sil [noinline] @takeBB : $@convention(thin) (@owned BB) -> @owned BB
+
