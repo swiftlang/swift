@@ -3170,11 +3170,18 @@ class ClassDecl : public NominalTypeDecl {
   class ObjCMethodLookupTable;
 
   SourceLoc ClassLoc;
-  Type Superclass;
   ObjCMethodLookupTable *ObjCMethodLookup = nullptr;
 
   /// Create the Objective-C member lookup table.
   void createObjCMethodLookup();
+
+  struct {
+    /// The superclass type and a bit to indicate whether the
+    /// superclass was computed yet or not.
+    llvm::PointerIntPair<Type, 1, bool> Superclass;
+  } LazySemanticInfo;
+
+  friend class IterativeTypeChecker;
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -3187,13 +3194,16 @@ public:
   }
 
   /// Determine whether this class has a superclass.
-  bool hasSuperclass() const { return (bool)Superclass; }
+  bool hasSuperclass() const { return (bool)getSuperclass(); }
 
   /// Retrieve the superclass of this class, or null if there is no superclass.
-  Type getSuperclass() const { return Superclass; }
+  Type getSuperclass() const { return LazySemanticInfo.Superclass.getPointer(); }
 
   /// Set the superclass of this class.
-  void setSuperclass(Type superclass) { Superclass = superclass; }
+  void setSuperclass(Type superclass) {
+    LazySemanticInfo.Superclass.setPointer(superclass);
+    LazySemanticInfo.Superclass.setInt(true);
+  }
 
   /// Retrieve the status of circularity checking for class inheritance.
   CircularityCheck getCircularityCheck() const {

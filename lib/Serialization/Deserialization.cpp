@@ -2729,8 +2729,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     theClass->setAddedImplicitInitializers();
     if (isImplicit)
       theClass->setImplicit();
-    if (superclassID)
-      theClass->setSuperclass(getType(superclassID));
+    theClass->setSuperclass(getType(superclassID));
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
     if (foreign)

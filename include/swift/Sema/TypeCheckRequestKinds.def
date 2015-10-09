@@ -1,0 +1,43 @@
+//===-- TypeCheckRequestKinds.def - Type Checking Request Kinds -*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+
+// This file defines the kinds of TypeCheckRequests that can occur. It
+// designed to be included multiple times with different definition of
+// the TYPE_CHECK_REQUEST(Request,Payload) macro, whose parameters
+// are:
+//
+//   Request: The request kind.
+//   Payload: The payload type.
+//
+//
+//===----------------------------------------------------------------------===//
+
+#if !defined(TYPE_CHECK_REQUEST) && !defined(TYPE_CHECK_REQUEST_PAYLOAD)
+#  error define at least one of TYPE_CHECK_REQUEST or TYPE_CHECK_REQUEST_PAYLOAD
+#endif
+
+#ifndef TYPE_CHECK_REQUEST
+#  define TYPE_CHECK_REQUEST(Request,Payload)
+#endif
+
+#ifndef TYPE_CHECK_REQUEST_PAYLOAD
+#  define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName, ...)
+#endif
+
+TYPE_CHECK_REQUEST_PAYLOAD(Class, ClassDecl *)
+
+/// Perform type checking on the superclass of a particular class.
+TYPE_CHECK_REQUEST(TypeCheckSuperclass, Class)
+
+#undef TYPE_CHECK_REQUEST_PAYLOAD
+#undef TYPE_CHECK_REQUEST

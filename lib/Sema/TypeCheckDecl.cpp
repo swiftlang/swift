@@ -32,6 +32,7 @@
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/Basic/Defer.h"
@@ -226,21 +227,9 @@ static void addImplicitConformances(
 static void validateAttributes(TypeChecker &TC, Decl *VD);
 
 void TypeChecker::resolveSuperclass(ClassDecl *classDecl) {
-  // If we've already recorded a superclass, we're done.
-  if (classDecl->hasSuperclass())
-    return;
-
-  validateDecl(classDecl);
-
-  // Resolve the types in the inheritance clause.
-  resolveInheritanceClause(classDecl);
-
-  // Loop through the inheritance clause looking for a class type.
-  for (const auto &inherited : classDecl->getInherited()) {
-    if (inherited.getType()->getClassOrBoundGenericClass()) {
-      classDecl->setSuperclass(inherited.getType());
-    }
-  }
+  IterativeTypeChecker ITC(*this);
+  ITC.satisfy(TypeCheckRequest(TypeCheckRequest::TypeCheckSuperclass,
+                               classDecl));
 }
 
 void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
@@ -593,16 +582,15 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     return;
   }
 
-  if (superclassTy) {
-    if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
-      classDecl->setSuperclass(superclassTy);
-      resolveImplicitConstructors(
-                                  superclassTy->getClassOrBoundGenericClass());
-    } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
-      enumDecl->setRawType(superclassTy);
-    } else {
-      assert(isa<AbstractTypeParamDecl>(decl));
-    }
+  // Set the superclass.
+  if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
+    classDecl->setSuperclass(superclassTy);
+    if (superclassTy)
+      resolveImplicitConstructors(superclassTy->getClassOrBoundGenericClass());
+  } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
+    enumDecl->setRawType(superclassTy);
+  } else {
+    assert(!superclassTy || isa<AbstractTypeParamDecl>(decl));
   }
 }
 

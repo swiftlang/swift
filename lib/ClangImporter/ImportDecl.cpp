@@ -5304,14 +5304,16 @@ namespace {
 
       // If this Objective-C class has a supertype, import it.
       SmallVector<TypeLoc, 4> inheritedTypes;
+      Type superclassType;
       if (auto objcSuper = decl->getSuperClass()) {
         auto super = cast_or_null<ClassDecl>(Impl.importDecl(objcSuper));
         if (!super)
           return nullptr;
 
-        result->setSuperclass(super->getDeclaredType());
-        inheritedTypes.push_back(TypeLoc::withoutLoc(super->getDeclaredType()));
+        superclassType = super->getDeclaredType();
+        inheritedTypes.push_back(TypeLoc::withoutLoc(superclassType));
       }
+      result->setSuperclass(superclassType);
 
       // Import protocols this class conforms to.
       importObjCProtocols(result, decl->getReferencedProtocols(),

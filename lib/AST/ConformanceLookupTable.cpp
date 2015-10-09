@@ -737,6 +737,10 @@ DeclContext *ConformanceLookupTable::getConformingContext(
     if (!visited.insert(classDecl).second)
       return nullptr;
 
+    // If we had a circular dependency, the superclass may not exist.
+    if (!classDecl->getSuperclass())
+      return nullptr;
+        
     auto superclassDecl
       = classDecl->getSuperclass()->getClassOrBoundGenericClass();
 

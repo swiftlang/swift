@@ -1,0 +1,100 @@
+//===--- TypeCheckRequest.h - Type Checking Request -------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines the TypeCheckRequest type, which describes a request
+//  to the type checker to compute certain information.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_SEMA_TYPE_CHECK_REQUEST_H
+#define SWIFT_SEMA_TYPE_CHECK_REQUEST_H
+
+#include <cassert>
+
+namespace swift {
+
+class ClassDecl;
+
+/// A request to the type checker to compute some particular kind of
+/// information.
+struct TypeCheckRequest {
+  /// Describes the kind of request.
+  enum Kind : uint8_t {
+#define TYPE_CHECK_REQUEST(Request,Payload) \
+    Request,
+
+#include "swift/Sema/TypeCheckRequestKinds.def"
+  } TheKind;
+
+private:
+  /// The payload of the request, which differs based on the request kind.
+  union {
+#define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...) \
+    __VA_ARGS__ PayloadName;
+
+#include "swift/Sema/TypeCheckRequestKinds.def"
+  } Payload;
+
+  /// Describes the kind of payload expected.
+  ///
+  /// The enumerators in this enumeration type are expected to map 1-1 to the
+  /// fields of the \c Payload union.
+  enum class PayloadKind {
+#define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...)     \
+    PayloadName,
+
+#include "swift/Sema/TypeCheckRequestKinds.def"
+  };
+
+  /// Determine the payload kind for the given type check request kind.
+  static PayloadKind getPayloadKind(Kind kind) {
+    switch (kind) {
+#define TYPE_CHECK_REQUEST(Request,PayloadName) \
+    case Request:                               \
+      return PayloadKind::PayloadName;
+
+#include "swift/Sema/TypeCheckRequestKinds.def"
+    }
+  }
+
+public:
+  // The payload types.
+#define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...)     \
+  typedef __VA_ARGS__ PayloadName##PayloadType;
+
+#include "swift/Sema/TypeCheckRequestKinds.def"
+  
+  // Constructors.
+#define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...)                     \
+  TypeCheckRequest(Kind kind, __VA_ARGS__ payload) : TheKind(kind) {    \
+    assert(getPayloadKind(kind) == PayloadKind::PayloadName);           \
+    Payload.PayloadName = payload;                                      \
+  }
+
+#include "swift/Sema/TypeCheckRequestKinds.def"
+  
+  /// Determine the kind of type check request.
+  Kind getKind() const { return TheKind; }
+
+  // Payload retrieval.
+#define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...)                     \
+  __VA_ARGS__ get##PayloadName##Payload() {                             \
+    assert(getPayloadKind(TheKind) == PayloadKind::PayloadName);        \
+    return Payload.PayloadName;                                         \
+  }
+
+#include "swift/Sema/TypeCheckRequestKinds.def"
+};
+
+}
+
+#endif /* SWIFT_SEMA_TYPE_CHECK_REQUEST_H */

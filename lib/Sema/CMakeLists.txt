@@ -16,6 +16,8 @@ add_swift_library(swiftSema
   DerivedConformanceEquatableHashable.cpp
   DerivedConformanceErrorType.cpp
   DerivedConformanceRawRepresentable.cpp
+  IterativeTypeChecker.cpp
+  ITCDecl.cpp
   MiscDiagnostics.cpp
   OverloadChoice.cpp
   PlaygroundTransform.cpp
