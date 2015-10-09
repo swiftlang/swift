@@ -19,6 +19,7 @@ add_swift_library(swiftSema
   IterativeTypeChecker.cpp
   ITCDecl.cpp
   ITCNameLookup.cpp
+  ITCType.cpp
   MiscDiagnostics.cpp
   OverloadChoice.cpp
   PlaygroundTransform.cpp

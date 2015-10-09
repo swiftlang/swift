@@ -40,6 +40,7 @@ TYPE_CHECK_REQUEST_PAYLOAD(InheritedClauseEntry, std::pair<llvm::PointerUnion<Ty
 TYPE_CHECK_REQUEST_PAYLOAD(Protocol, ProtocolDecl *)
 TYPE_CHECK_REQUEST_PAYLOAD(TypeLookup, std::pair<Type, DeclName>)
 TYPE_CHECK_REQUEST_PAYLOAD(DeclContextLookup, std::pair<DeclContext *, DeclName>)
+TYPE_CHECK_REQUEST_PAYLOAD(TypeResolution, std::tuple<TypeRepr *, DeclContext *, unsigned>)
 
 /// Ensure that we can perform qualified name lookup into the given
 /// type for the given name.
@@ -65,6 +66,10 @@ TYPE_CHECK_REQUEST(TypeCheckRawType, Enum)
 
 /// Compute the set of inherited protocols for a given protocol.
 TYPE_CHECK_REQUEST(InheritedProtocols, Protocol)
+
+/// Partially resolve a type, forming enough of its structure to make
+/// structural queries but not determining correctness.
+TYPE_CHECK_REQUEST(ResolveTypeRepr, TypeResolution)
 
 #undef TYPE_CHECK_REQUEST_PAYLOAD
 #undef TYPE_CHECK_REQUEST

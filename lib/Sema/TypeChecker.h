@@ -293,7 +293,7 @@ public:
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
-enum TypeResolutionFlags {
+enum TypeResolutionFlags : unsigned {
   /// Whether to allow unspecified types within a pattern.
   TR_AllowUnspecifiedTypes = 0x01,
 
@@ -361,6 +361,10 @@ enum TypeResolutionFlags {
   /// Whether we are in the inheritance clause of a nominal type declaration
   /// or extension.
   TR_InheritanceClause = 0x80000,
+
+  /// Whether we should resolve only the structure of the resulting
+  /// type rather than its complete semantic properties.
+  TR_ResolveStructure = 0x100000,
 };
 
 /// Option set describing how type resolution should work.
@@ -688,7 +692,9 @@ public:
   Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *fromDC,
                             TypeResolutionOptions options,
                             bool isSpecialized,
-                            GenericTypeResolver *resolver = nullptr);
+                            GenericTypeResolver *resolver = nullptr,
+                            UnsatisfiedDependency *unsatisfiedDependency
+                              = nullptr);
 
   /// \brief Apply generic arguments to the given type.
   ///

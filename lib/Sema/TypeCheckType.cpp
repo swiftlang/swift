@@ -184,14 +184,41 @@ void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
   }
 }
 
-Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
-                                       DeclContext *fromDC,
-                                       TypeResolutionOptions options,
-                                       bool isSpecialized,
-                                       GenericTypeResolver *resolver) {
+Type TypeChecker::resolveTypeInContext(
+       TypeDecl *typeDecl,
+       DeclContext *fromDC,
+       TypeResolutionOptions options,
+       bool isSpecialized,
+       GenericTypeResolver *resolver,
+       UnsatisfiedDependency *unsatisfiedDependency) {
   PartialGenericTypeToArchetypeResolver defaultResolver(*this);
   if (!resolver)
     resolver = &defaultResolver;
+
+  // Validate enough of the declaration to determine its structure.
+  if (options.contains(TR_ResolveStructure)) {
+    // FIXME: This should have its own TypeCheckRequest kind.
+    if (auto typeAlias = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      // For typealiases, resolve the underlying type.
+      TypeLoc underlyingTypeLoc = typeAlias->getUnderlyingTypeLoc();
+      if (underlyingTypeLoc.getTypeRepr() &&
+          !underlyingTypeLoc.wasValidated()) {
+        TypeResolutionOptions innerOptions;
+        if (!typeAlias->getDeclContext()->isTypeContext())
+          innerOptions |= TR_GlobalTypeAlias;
+        if (typeAlias->getFormalAccess() == Accessibility::Private)
+          innerOptions |= TR_KnownNonCascadingDependency;
+        if (unsatisfiedDependency &&
+            (*unsatisfiedDependency)(
+              requestResolveTypeRepr(
+                std::make_tuple(
+                  typeAlias->getUnderlyingTypeLoc().getTypeRepr(),
+                  typeAlias->getDeclContext(),
+                  static_cast<unsigned>(innerOptions)))))
+          return nullptr;
+      }
+    }
+  }
 
   // If we found a generic parameter, map to the archetype if there is one.
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
@@ -217,6 +244,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
 
         case DeclContextKind::NominalTypeDecl:
           // If this is our nominal type, return its type within its context.
+          // FIXME: Just produce the type structure when TR_ResolveStructure.
           if (cast<NominalTypeDecl>(dc) == nominal)
             return resolver->resolveTypeOfContext(nominal);
           continue;
@@ -224,6 +252,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
         case DeclContextKind::ExtensionDecl:
           // If this is an extension of our nominal type, return the type
           // within the context of its extension.
+          // FIXME: Just produce the type structure when TR_ResolveStructure.
           if (cast<ExtensionDecl>(dc)->getExtendedType()->getAnyNominal()
                 == nominal)
             return resolver->resolveTypeOfContext(dc);
@@ -245,6 +274,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
   // substitution is needed.
   DeclContext *ownerDC = typeDecl->getDeclContext();
   if (!ownerDC->isTypeContext()) {
+    // FIXME: Just produce the type structure when TR_ResolveStructure.
     return typeDecl->getDeclaredType();
   }
 
@@ -453,9 +483,14 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *dc,
                             ArrayRef<TypeRepr *> genericArgs,
                             TypeResolutionOptions options,
-                            GenericTypeResolver *resolver) {
+                            GenericTypeResolver *resolver,
+                            UnsatisfiedDependency *unsatisfiedDependency) {
   assert(dc && "No declaration context for type resolution?");
-  TC.validateDecl(typeDecl);
+
+  if (!options.contains(TR_ResolveStructure)) {
+    // Validate the declaration.
+    TC.validateDecl(typeDecl);
+  }
 
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
@@ -467,8 +502,9 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   if (!type)
     return ErrorType::get(TC.Context);
 
-  if (type->is<UnboundGenericType>() &&
-      genericArgs.empty() && !options.contains(TR_AllowUnboundGenerics)) {
+  if (type->is<UnboundGenericType>() && genericArgs.empty() &&
+      !options.contains(TR_AllowUnboundGenerics) &&
+      !options.contains(TR_ResolveStructure)) {
     diagnoseUnboundGenericType(TC, type, loc);
     return ErrorType::get(TC.Context);
   }
@@ -486,7 +522,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
     }
   }
 
-  if (!genericArgs.empty()) {
+  if (!genericArgs.empty() && !options.contains(TR_ResolveStructure)) {
     // Apply the generic arguments to the type.
     type = applyGenericTypeReprArgs(TC, type, loc, dc, genericArgs,
                                     options.contains(TR_GenericSignature),
@@ -523,7 +559,8 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                 SourceRange parentRange,
                                 ComponentIdentTypeRepr *comp,
                                 TypeResolutionOptions options,
-                                GenericTypeResolver *resolver) {
+                                GenericTypeResolver *resolver,
+                                UnsatisfiedDependency *unsatisfiedDependency) {
   // Unqualified lookup case.
   if (parentType.isNull()) {
     // Attempt to refer to 'Self' within a non-protocol nominal
@@ -535,7 +572,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       // Retrieve the nominal type and resolve it within this context.
       assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
       auto type = resolveTypeDecl(tc, nominal, comp->getIdLoc(), dc, { },
-                                  options, resolver);
+                                  options, resolver, unsatisfiedDependency);
       if (type->is<ErrorType>())
         return type;
 
@@ -634,7 +671,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
 
     // Resolve the type declaration within this context.
     return resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
-                           genericArgs, options, resolver);
+                           genericArgs, options, resolver,
+                           unsatisfiedDependency);
   }
 
   // Resolve the first component, which is the only one that requires
@@ -753,7 +791,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
       genericArgs = genComp->getGenericArgs();
     Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
-                                DC, genericArgs, options, resolver);
+                                DC, genericArgs, options, resolver,
+                                unsatisfiedDependency);
     if (type->is<ErrorType>())
       return type;
 
@@ -798,7 +837,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       return ErrorType::get(TC.Context);
 
     return diagnoseUnknownType(TC, DC, nullptr, SourceRange(), comp, options,
-                               resolver);
+                               resolver, unsatisfiedDependency);
   }
 
   comp->setValue(currentDecl);
@@ -967,7 +1006,7 @@ static Type resolveNestedIdentTypeComponent(
     }
 
     Type ty = diagnoseUnknownType(TC, DC, parentTy, parentRange, comp, options,
-                                  resolver);
+                                  resolver, unsatisfiedDependency);
     if (!ty || ty->is<ErrorType>()) {
       return ErrorType::get(TC.Context);
     }

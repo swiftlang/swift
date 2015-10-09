@@ -34,6 +34,7 @@ class EnumDecl;
 class ExtensionDecl;
 class ProtocolDecl;
 class TypeDecl;
+class TypeRepr;
 
 /// A request to the type checker to compute some particular kind of
 /// information.
