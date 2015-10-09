@@ -424,7 +424,8 @@ public:
       
     // See if the repr resolves to a type.
     Type ty = TC.resolveIdentifierType(DC, repr, TR_AllowUnboundGenerics,
-                                       /*diagnoseErrors*/false, &resolver);
+                                       /*diagnoseErrors*/false, &resolver,
+                                       nullptr);
     
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
@@ -503,7 +504,8 @@ public:
     
     // See first if the entire repr resolves to a type.
     Type ty = TC.resolveIdentifierType(DC, repr, TR_AllowUnboundGenerics,
-                                       /*diagnoseErrors*/false, &resolver);
+                                       /*diagnoseErrors*/false, &resolver,
+                                       nullptr);
     
     // If we got a fully valid type, then this is a nominal type pattern.
     // FIXME: Only when experimental patterns are enabled for now.
@@ -577,7 +579,8 @@ public:
     // See first if the entire repr resolves to a type.
     Type enumTy = TC.resolveIdentifierType(DC, prefixRepr,
                                            TR_AllowUnboundGenerics,
-                                           /*diagnoseErrors*/false, &resolver);
+                                           /*diagnoseErrors*/false, &resolver,
+                                           nullptr);
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal());
     if (!enumDecl)
       return nullptr;

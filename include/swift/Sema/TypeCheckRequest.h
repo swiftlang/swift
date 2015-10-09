@@ -108,6 +108,11 @@ public:
 #include "swift/Sema/TypeCheckRequestKinds.def"
 };
 
+/// A callback used to check whether a particular dependency of this
+/// operation has been satisfied. If so, it returns \c false. If not,
+/// the dependency will be recorded and this operation returns \c true.
+typedef llvm::function_ref<bool(TypeCheckRequest)> UnsatisfiedDependency;
+
 }
 
 #endif /* SWIFT_SEMA_TYPE_CHECK_REQUEST_H */

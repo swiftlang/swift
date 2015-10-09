@@ -17,6 +17,7 @@
 #ifndef TYPECHECKING_H
 #define TYPECHECKING_H
 
+#include "swift/Sema/TypeCheckRequest.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Availability.h"
@@ -591,7 +592,8 @@ public:
                              IdentTypeRepr *IdType,
                              TypeResolutionOptions options,
                              bool diagnoseErrors,
-                             GenericTypeResolver *resolver);
+                             GenericTypeResolver *resolver,
+                             UnsatisfiedDependency *unsatisfiedDependency);
   
   /// Bind an UnresolvedDeclRefExpr by performing name lookup and
   /// returning the resultant expression.  Context is the DeclContext used
@@ -647,10 +649,14 @@ public:
   /// \param resolver A resolver for generic types. If none is supplied, this
   /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
   ///
+  /// \param unsatisfiedDependency When non-null, used to check whether
+  /// dependencies have been satisfied appropriately.
+  ///
   /// \returns a well-formed type or an ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR, DeclContext *DC,
                    TypeResolutionOptions options,
-                   GenericTypeResolver *resolver = nullptr);
+                   GenericTypeResolver *resolver = nullptr,
+                   UnsatisfiedDependency *unsatisfiedDependency = nullptr);
 
   void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
 

@@ -599,14 +599,18 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
 
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
+///
+/// \returns Either the resolved type or a null type, the latter of
+/// which indicates that some dependencies were unsatisfied.
 static Type
 resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                   ComponentIdentTypeRepr *comp,
                                   TypeResolutionOptions options,
                                   bool diagnoseErrors,
-                                  GenericTypeResolver *resolver) {
+                                  GenericTypeResolver *resolver,
+                                  UnsatisfiedDependency *unsatisfiedDependency){
   // Short-circuiting.
-  if (comp->isInvalid()) return nullptr;
+  if (comp->isInvalid()) return ErrorType::get(TC.Context);
 
   // If the component has already been bound to a declaration, handle
   // that now.
@@ -619,7 +623,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         TC.diagnose(VD, diag::use_non_type_value_prev, VD->getName());
       }
 
-      return nullptr;
+      comp->setInvalid();
+      return ErrorType::get(TC.Context);
     }
 
     // Retrieve the generic arguments, if there are any.
@@ -667,7 +672,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       if (matchingParam != genericParams->end()) {
         comp->setValue(*matchingParam);
         return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                                 diagnoseErrors, resolver);
+                                                 diagnoseErrors, resolver,
+                                                 unsatisfiedDependency);
       }
     }
 
@@ -678,6 +684,15 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         TC.Context.SourceMgr.rangeContainsTokenLoc(
           genericParams->getTrailingWhereClauseSourceRange(),
           comp->getIdLoc())) {
+      // We need to be able to perform qualified lookup into the given
+      // declaration context.
+      if (unsatisfiedDependency &&
+          (*unsatisfiedDependency)(
+            TypeCheckRequest(
+              TypeCheckRequest::QualifiedLookupInDeclContext,
+              { DC, comp->getIdentifier() })))
+        return nullptr;
+
       auto nominal = DC->isNominalTypeOrNominalTypeExtensionContext();
       SmallVector<ValueDecl *, 4> decls;
       if (DC->lookupQualified(nominal->getDeclaredInterfaceType(),
@@ -690,7 +705,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
           if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
             comp->setValue(assocType);
             return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                                     diagnoseErrors, resolver);
+                                                     diagnoseErrors, resolver,
+                                                     unsatisfiedDependency);
           }
         }
       }
@@ -702,6 +718,14 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     // The remaining lookups will be in the parent context.
     lookupDC = DC->getParent();
   }
+
+  // We need to be able to perform unqualified lookup into the given
+  // declaration context.
+  if (unsatisfiedDependency &&
+      (*unsatisfiedDependency)(
+        TypeCheckRequest(TypeCheckRequest::UnqualifiedLookupInDeclContext,
+                         { DC, comp->getIdentifier() })))
+    return nullptr;
 
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::OnlyTypes;
@@ -764,7 +788,9 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
         TC.diagnose(result.Decl, diag::found_candidate);
       }
     }
-    return nullptr;
+
+    comp->setInvalid();
+    return ErrorType::get(TC.Context);
   }
 
   // If we found nothing, complain and give ourselves a chance to recover.
@@ -772,7 +798,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
     if (!diagnoseErrors)
-      return nullptr;
+      return ErrorType::get(TC.Context);
 
     return diagnoseUnknownType(TC, DC, nullptr, SourceRange(), comp, options,
                                resolver);
@@ -792,9 +818,10 @@ static Type resolveNestedIdentTypeComponent(
               ComponentIdentTypeRepr *comp,
               TypeResolutionOptions options,
               bool diagnoseErrors,
-              GenericTypeResolver *resolver) {
+              GenericTypeResolver *resolver,
+              UnsatisfiedDependency *unsatisfiedDependency) {
   // Short-circuiting.
-  if (comp->isInvalid()) return nullptr;
+  if (comp->isInvalid()) return ErrorType::get(TC.Context);
 
   // If a declaration has already been bound, use it.
   if (ValueDecl *decl = comp->getBoundDecl()) {
@@ -808,7 +835,8 @@ static Type resolveNestedIdentTypeComponent(
                     decl->getName());
       }
 
-      return nullptr;
+      comp->setInvalid();
+      return ErrorType::get(TC.Context);
     }
 
     Type memberType;
@@ -844,6 +872,7 @@ static Type resolveNestedIdentTypeComponent(
         return nullptr;
       }
 
+      // FIXME: Establish that we need a type witness.
       return conformance->getTypeWitness(assocType, &TC).getReplacement();
     } else {
       // Otherwise, simply substitute the parent type into the member.
@@ -852,9 +881,8 @@ static Type resolveNestedIdentTypeComponent(
                                               /*isTypeReference=*/true);
     }
 
-    // If we had an error, fail.
-    if (memberType->is<ErrorType>())
-      return nullptr;
+    // Propagate failure.
+    if (!memberType || memberType->is<ErrorType>()) return memberType;
 
     // If there are generic arguments, apply them now.
     if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
@@ -864,8 +892,8 @@ static Type resolveNestedIdentTypeComponent(
                      options.contains(TR_GenericSignature),
                      resolver);
 
-      if (memberType->is<ErrorType>())
-        return memberType;
+      // Propagate failure.
+      if (!memberType || memberType->is<ErrorType>()) return memberType;
     }
 
     // We're done.
@@ -905,6 +933,13 @@ static Type resolveNestedIdentTypeComponent(
     isKnownNonCascading = isa<AbstractFunctionDecl>(DC);
   }
 
+  // We need to be able to perform qualified lookup into the given type.
+  if (unsatisfiedDependency &&
+      (*unsatisfiedDependency)(
+        TypeCheckRequest(TypeCheckRequest::QualifiedLookupInType,
+                         { parentTy, comp->getIdentifier() })))
+    return nullptr;
+
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isKnownNonCascading)
     lookupOptions |= NameLookupFlags::KnownPrivate;
@@ -921,7 +956,7 @@ static Type resolveNestedIdentTypeComponent(
       TC.diagnoseAmbiguousMemberType(parentTy, parentRange,
                                      comp->getIdentifier(), comp->getIdLoc(),
                                      memberTypes);
-    return nullptr;
+    return ErrorType::get(TC.Context);
   }
 
   // If we didn't find anything, complain.
@@ -932,13 +967,13 @@ static Type resolveNestedIdentTypeComponent(
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
     if (!diagnoseErrors) {
-      return nullptr;
+      return ErrorType::get(TC.Context);
     }
 
     Type ty = diagnoseUnknownType(TC, DC, parentTy, parentRange, comp, options,
                                   resolver);
-    if (ty->is<ErrorType>()) {
-      return nullptr;
+    if (!ty || ty->is<ErrorType>()) {
+      return ErrorType::get(TC.Context);
     }
 
     recovered = true;
@@ -954,7 +989,7 @@ static Type resolveNestedIdentTypeComponent(
       TC.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
                   comp->getIdentifier());
 
-    return nullptr;
+    return ErrorType::get(TC.Context);
   }
 
   // If there are generic arguments, apply them now.
@@ -973,45 +1008,34 @@ static Type resolveIdentTypeComponent(
               ArrayRef<ComponentIdentTypeRepr *> components,
               TypeResolutionOptions options,
               bool diagnoseErrors,
-              GenericTypeResolver *resolver) {
+              GenericTypeResolver *resolver,
+              UnsatisfiedDependency *unsatisfiedDependency) {
   auto comp = components.back();
 
   // The first component uses unqualified lookup.
   auto parentComps = components.slice(0, components.size()-1);
   if (parentComps.empty()) {
-    Type type = resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                                  diagnoseErrors, resolver);
-    if (!type || type->is<ErrorType>()) {
-      comp->setInvalid();
-      return ErrorType::get(TC.Context);
-    }
-
-    return type;
+    return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
+                                             diagnoseErrors, resolver,
+                                             unsatisfiedDependency);
   }
 
   // All remaining components use qualified lookup.
 
   // Resolve the parent type.
   Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, options,
-                                            diagnoseErrors, resolver);
-  if (parentTy->is<ErrorType>()) {
-    comp->setInvalid();
-    return parentTy;
-  }
+                                            diagnoseErrors, resolver,
+                                            unsatisfiedDependency);
+  if (!parentTy || parentTy->is<ErrorType>()) return parentTy;
 
   // Resolve the nested type.
   SourceRange parentRange(parentComps.front()->getIdLoc(),
                           parentComps.back()->getSourceRange().End);
-  Type memberTy = resolveNestedIdentTypeComponent(TC, DC, parentTy,
-                                                  parentRange, comp,
-                                                  options, diagnoseErrors,
-                                                  resolver);
-  if (!memberTy || memberTy->is<ErrorType>()) {
-    comp->setInvalid();
-    return ErrorType::get(TC.Context);
-  }
-
-  return memberTy;
+  return resolveNestedIdentTypeComponent(TC, DC, parentTy,
+                                         parentRange, comp,
+                                         options, diagnoseErrors,
+                                         resolver,
+                                         unsatisfiedDependency);
 }
 
 // FIXME: Merge this with diagAvailability in MiscDiagnostics.cpp.
@@ -1119,18 +1143,21 @@ static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
 }
 
 /// \brief Returns a valid type or ErrorType in case of an error.
-Type TypeChecker::resolveIdentifierType(DeclContext *DC,
-                                        IdentTypeRepr *IdType,
-                                        TypeResolutionOptions options,
-                                        bool diagnoseErrors,
-                                        GenericTypeResolver *resolver) {
+Type TypeChecker::resolveIdentifierType(
+       DeclContext *DC,
+       IdentTypeRepr *IdType,
+       TypeResolutionOptions options,
+       bool diagnoseErrors,
+       GenericTypeResolver *resolver,
+       UnsatisfiedDependency *unsatisfiedDependency) {
   assert(resolver && "Missing generic type resolver");
 
   auto ComponentRange = IdType->getComponentRange();
   auto Components = llvm::makeArrayRef(ComponentRange.begin(),
                                        ComponentRange.end());
   Type result = resolveIdentTypeComponent(*this, DC, Components, options, 
-                                          diagnoseErrors, resolver);
+                                          diagnoseErrors, resolver,
+                                          unsatisfiedDependency);
   if (auto moduleTy = result->getAs<ModuleType>()) {
     if (diagnoseErrors) {
       auto moduleName = moduleTy->getModule()->getName();
@@ -1191,11 +1218,14 @@ namespace {
     ASTContext &Context;
     DeclContext *DC;
     GenericTypeResolver *Resolver;
-
+    swift::UnsatisfiedDependency *UnsatisfiedDependency;
   public:
     TypeResolver(TypeChecker &tc, DeclContext *DC,
-                 GenericTypeResolver *resolver)
-      : TC(tc), Context(tc.Context), DC(DC), Resolver(resolver) {
+                 GenericTypeResolver *resolver,
+                 swift::UnsatisfiedDependency *unsatisfiedDependency)
+      : TC(tc), Context(tc.Context), DC(DC), Resolver(resolver),
+        UnsatisfiedDependency(unsatisfiedDependency)
+    {
       assert(resolver);
     }
 
@@ -1255,7 +1285,8 @@ namespace {
 
 Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
                               TypeResolutionOptions options,
-                              GenericTypeResolver *resolver) {
+                              GenericTypeResolver *resolver,
+                              UnsatisfiedDependency *unsatisfiedDependency) {
   PrettyStackTraceTypeRepr stackTrace(Context, "resolving", TyR);
 
   // Make sure we always have a resolver to use.
@@ -1263,7 +1294,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   if (!resolver)
     resolver = &defaultResolver;
 
-  TypeResolver typeResolver(*this, DC, resolver);
+  TypeResolver typeResolver(*this, DC, resolver, unsatisfiedDependency);
   return typeResolver.resolveType(TyR, options);
 }
 
@@ -1294,7 +1325,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent:
     return TC.resolveIdentifierType(DC, cast<IdentTypeRepr>(repr), options,
-                                    /*diagnoseErrors*/ true, Resolver);
+                                    /*diagnoseErrors*/ true, Resolver,
+                                    UnsatisfiedDependency);
 
   case TypeReprKind::Function:
     if (!(options & TR_SILType))
@@ -1311,8 +1343,9 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
     return resolveOptionalType(cast<OptionalTypeRepr>(repr), options);
 
   case TypeReprKind::ImplicitlyUnwrappedOptional:
-    return resolveImplicitlyUnwrappedOptionalType(cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr),
-                                        options);
+    return resolveImplicitlyUnwrappedOptionalType(
+             cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr),
+             options);
 
   case TypeReprKind::Tuple:
     return resolveTupleType(cast<TupleTypeRepr>(repr), options);
@@ -1322,8 +1355,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   case TypeReprKind::ProtocolComposition:
     return resolveProtocolCompositionType(
-                                    cast<ProtocolCompositionTypeRepr>(repr),
-                                          options);
+             cast<ProtocolCompositionTypeRepr>(repr),
+             options);
 
   case TypeReprKind::Metatype:
     return resolveMetatypeType(cast<MetatypeTypeRepr>(repr), options);
@@ -1374,6 +1407,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           // unavailable references, though.
           auto instanceOptions = options - TR_SILType | TR_AllowUnavailable;
           auto instanceTy = resolveType(base, instanceOptions);
+          if (!instanceTy || instanceTy->is<ErrorType>())
+            return instanceTy;
 
           // Check for @thin.
           if (attrs.has(TAK_thin)) {
@@ -1536,6 +1571,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                        attrs.has(TAK_noreturn));
       
       ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
+      if (!ty | ty->is<ErrorType>()) return ty;
     } else {
       FunctionType::Representation rep;
       if (attrs.hasConvention()) {
@@ -1604,6 +1640,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                     fnRepr->throws());
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
+      if (!ty | ty->is<ErrorType>()) return ty;
     }
 
     for (auto i : FunctionAttrs)
@@ -1620,10 +1657,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   // If we didn't build the type differently above, build it normally now.
   if (!ty) ty = resolveType(repr, options);
-  if (ty->is<ErrorType>()) {
-    repr->setInvalid();
-    return ty;
-  }
+  if (!ty | ty->is<ErrorType>()) return ty;
 
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
@@ -1681,16 +1715,11 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                                           FunctionType::ExtInfo extInfo) {
   Type inputTy = resolveType(repr->getArgsTypeRepr(),
                              options | TR_ImmediateFunctionInput);
-  if (inputTy->is<ErrorType>()) {
-    repr->setInvalid();
-    return inputTy;
-  }
+  if (!inputTy || inputTy->is<ErrorType>()) return inputTy;
+
   Type outputTy = resolveType(repr->getResultTypeRepr(),
                               options | TR_FunctionResult);
-  if (outputTy->is<ErrorType>()) {
-    repr->setInvalid();
-    return outputTy;
-  }
+  if (!outputTy || outputTy->is<ErrorType>()) return outputTy;
 
   extInfo = extInfo.withThrows(repr->throws());
   
@@ -1745,6 +1774,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
       auto param = resolveSILParameter(elt,options | TR_ImmediateFunctionInput);
       params.push_back(param);
+      if (!param.getType()) return nullptr;
+
       if (param.getType()->is<ErrorType>())
         hasError = true;
     }
@@ -1752,6 +1783,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     SILParameterInfo param = resolveSILParameter(repr->getArgsTypeRepr(),
                                            options | TR_ImmediateFunctionInput);
     params.push_back(param);
+    if (!param.getType()) return nullptr;
+
     if (param.getType()->is<ErrorType>())
       hasError = true;
   }
@@ -1760,6 +1793,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   Optional<SILResultInfo> errorResult;
   {
     // For now, resolveSILResults only returns a single ordinary result.
+    // FIXME: Deal with unsatisfied dependencies.
     SmallVector<SILResultInfo, 1> ordinaryResults;
     if (resolveSILResults(repr->getResultTypeRepr(),
                           options | TR_FunctionResult,
@@ -1776,7 +1810,6 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   }
 
   if (hasError) {
-    repr->setInvalid();
     return ErrorType::get(Context);
   }
 
@@ -1870,6 +1903,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     type = resolveType(repr, options);
   }
 
+  if (!type) return SILParameterInfo(CanType(), convention);
   if (hadError) type = ErrorType::get(Context);
   return SILParameterInfo(type->getCanonicalType(), convention);
 }
@@ -1919,10 +1953,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
   }
 
   // Propagate type-resolution errors out.
-  if (type->is<ErrorType>()) {
-    repr->setInvalid();
-    return true;
-  }
+  if (!type || type->is<ErrorType>()) return true;
 
   assert(!isErrorResult || convention == ResultConvention::Owned);
   SILResultInfo resolvedResult(type->getCanonicalType(), convention);
@@ -1996,10 +2027,7 @@ bool TypeResolver::resolveSILResults(TypeRepr *repr,
 Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
                                     TypeResolutionOptions options) {
   Type ty = resolveType(cast<InOutTypeRepr>(repr)->getBase(), options);
-  if (ty->is<ErrorType>()) {
-    repr->setInvalid();
-    return ty;
-  }
+  if (!ty || ty->is<ErrorType>()) return ty;
 
   if (!(options & TR_FunctionInput) &&
       !(options & TR_ImmediateFunctionInput)) {
@@ -2015,10 +2043,7 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
                                     TypeResolutionOptions options) {
   // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), withoutContext(options));
-  if (baseTy->is<ErrorType>()) {
-    repr->setInvalid();
-    return baseTy;
-  }
+  if (!baseTy || baseTy->is<ErrorType>()) return baseTy;
   
   if (ExprHandle *sizeEx = repr->getSize()) {
     // FIXME: We don't support fixed-length arrays yet.
@@ -2039,16 +2064,10 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                          TypeResolutionOptions options) {
   // FIXME: diagnose non-materializability of key/value type?
   Type keyTy = resolveType(repr->getKey(), withoutContext(options));
-  if (keyTy->is<ErrorType>()) {
-    repr->setInvalid();
-    return keyTy;
-  }
+  if (!keyTy || keyTy->is<ErrorType>()) return keyTy;
 
   Type valueTy = resolveType(repr->getValue(), withoutContext(options));
-  if (valueTy->is<ErrorType>()) {
-    repr->setInvalid();
-    return valueTy;
-  }
+  if (!valueTy || valueTy->is<ErrorType>()) return valueTy;
   
   if (auto dictTy = TC.getDictionaryType(repr->getBrackets().Start, keyTy, 
                                          valueTy)) {
@@ -2074,16 +2093,10 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
   // The T in T? is a generic type argument and therefore always an AST type.
   // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), withoutContext(options));
-  if (baseTy->is<ErrorType>()) {
-    repr->setInvalid();
-    return baseTy;
-  }
+  if (!baseTy || baseTy->is<ErrorType>()) return baseTy;
 
   auto optionalTy = TC.getOptionalType(repr->getQuestionLoc(), baseTy);
-  if (!optionalTy) {
-    repr->setInvalid();
-    return ErrorType::get(Context);
-  }
+  if (!optionalTy) return ErrorType::get(Context);
 
   return optionalTy;
 }
@@ -2094,10 +2107,7 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   // The T in T! is a generic type argument and therefore always an AST type.
   // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), withoutContext(options));
-  if (baseTy->is<ErrorType>()) {
-    repr->setInvalid();
-    return baseTy;
-  }
+  if (!baseTy || baseTy->is<ErrorType>()) return baseTy;
 
   auto uncheckedOptionalTy =
     TC.getImplicitlyUnwrappedOptionalType(repr->getExclamationLoc(), baseTy);
@@ -2121,17 +2131,13 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   for (auto tyR : repr->getElements()) {
     if (NamedTypeRepr *namedTyR = dyn_cast<NamedTypeRepr>(tyR)) {
       Type ty = resolveType(namedTyR->getTypeRepr(), elementOptions);
-      if (ty->is<ErrorType>()) {
-        repr->setInvalid();
-        return ty;
-      }
+      if (!ty || ty->is<ErrorType>()) return ty;
+
       elements.push_back(TupleTypeElt(ty, namedTyR->getName()));
     } else {
       Type ty = resolveType(tyR, elementOptions);
-      if (ty->is<ErrorType>()) {
-        repr->setInvalid();
-        return ty;
-      }
+      if (!ty || ty->is<ErrorType>()) return ty;
+
       elements.push_back(TupleTypeElt(ty));
     }
   }
@@ -2179,10 +2185,8 @@ Type TypeResolver::resolveProtocolCompositionType(
   SmallVector<Type, 4> ProtocolTypes;
   for (auto tyR : repr->getProtocols()) {
     Type ty = TC.resolveType(tyR, DC, withoutContext(options), Resolver);
-    if (ty->is<ErrorType>()) {
-      repr->setInvalid();
-      return ty;
-    }
+    if (!ty || ty->is<ErrorType>()) return ty;
+
     if (!ty->isExistentialType()) {
       TC.diagnose(tyR->getStartLoc(), diag::protocol_composition_not_protocol,
                   ty);
@@ -2198,10 +2202,7 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
                                        TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
   Type ty = resolveType(repr->getBase(), withoutContext(options));
-  if (ty->is<ErrorType>()) {
-    repr->setInvalid();
-    return ty;
-  }
+  if (!ty || ty->is<ErrorType>()) return ty;
 
   Optional<MetatypeRepresentation> storedRepr;
   
@@ -2216,9 +2217,10 @@ Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
   return buildMetatypeType(repr, ty, storedRepr);
 }
 
-Type TypeResolver::buildMetatypeType(MetatypeTypeRepr *repr,
-                                     Type instanceType,
-                                     Optional<MetatypeRepresentation> storedRepr) {
+Type TypeResolver::buildMetatypeType(
+       MetatypeTypeRepr *repr,
+       Type instanceType,
+       Optional<MetatypeRepresentation> storedRepr) {
   if (instanceType->isAnyExistentialType()) {
     // TODO: diagnose invalid representations?
     return ExistentialMetatypeType::get(instanceType, storedRepr);
@@ -2231,10 +2233,7 @@ Type TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
                                        TypeResolutionOptions options) {
   // The instance type of a metatype is always abstract, not SIL-lowered.
   Type ty = resolveType(repr->getBase(), withoutContext(options));
-  if (ty->is<ErrorType>()) {
-    repr->setInvalid();
-    return ty;
-  }
+  if (!ty || ty->is<ErrorType>()) return ty;
 
   Optional<MetatypeRepresentation> storedRepr;
   
@@ -2249,9 +2248,10 @@ Type TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
   return buildProtocolType(repr, ty, storedRepr);
 }
 
-Type TypeResolver::buildProtocolType(ProtocolTypeRepr *repr,
-                                     Type instanceType,
-                                     Optional<MetatypeRepresentation> storedRepr) {
+Type TypeResolver::buildProtocolType(
+       ProtocolTypeRepr *repr,
+       Type instanceType,
+       Optional<MetatypeRepresentation> storedRepr) {
   if (!instanceType->isAnyExistentialType()) {
     TC.diagnose(repr->getProtocolLoc(), diag::dot_protocol_on_non_existential,
                 instanceType);
