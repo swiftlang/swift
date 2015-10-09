@@ -35,7 +35,7 @@
 /// convergence.
 ///
 /// At the core of DSE, there is the MemLocation class. a MemLocation is an
-/// abstraction of an object field in program. It consists of a base and a 
+/// abstraction of an object field in program. It consists of a base and a
 /// projection path to the field accessed.
 ///
 /// When a load or store instruction is encountered, the memory is broken down
@@ -293,7 +293,8 @@ class GlobalDeadStoreEliminationImpl {
   /// In this case, DSE can not remove the x.a = 13 inside the loop.
   ///
   /// To do this, when the algorithm reaches the beginning of the basic block in
-  /// the loop it will need to invalidate the MemLocation in the WriteSetOut. i.e.
+  /// the loop it will need to invalidate the MemLocation in the WriteSetOut.
+  /// i.e.
   /// the base of the MemLocation is changed.
   ///
   /// If not, on the second iteration, the intersection of the successors of
@@ -310,8 +311,8 @@ class GlobalDeadStoreEliminationImpl {
 public:
   /// Constructor.
   GlobalDeadStoreEliminationImpl(SILFunction *F, SILModule *M,
-                                SILPassManager *PM, AliasAnalysis *AA)
-      : Mod(M), F(F), PM(PM), AA(AA)  {}
+                                 SILPassManager *PM, AliasAnalysis *AA)
+      : Mod(M), F(F), PM(PM), AA(AA) {}
 
   /// Compute the kill set for the basic block. return true if the store set
   /// changes.
@@ -329,7 +330,7 @@ public:
   /// Create the value or address extraction based on the give Base and
   /// projection path.
   SILValue createExtract(SILValue VA, Optional<ProjectionPath> &Path,
-                             SILInstruction *Inst, bool IsValExtract);
+                         SILInstruction *Inst, bool IsValExtract);
 };
 
 } // end anonymous namespace
@@ -343,7 +344,8 @@ GlobalDeadStoreEliminationImpl::getMemLocationBit(const MemLocation &Loc) {
   // point.
   //
   auto Iter = LocToBitIndex.find(Loc);
-  assert(Iter != LocToBitIndex.end() && "MemLocation should have been enumerated");
+  assert(Iter != LocToBitIndex.end() &&
+         "MemLocation should have been enumerated");
   return Iter->second;
 }
 
@@ -381,8 +383,8 @@ void GlobalDeadStoreEliminationImpl::mergeSuccessorsWriteIn(SILBasicBlock *BB) {
   }
 }
 
-void
-GlobalDeadStoreEliminationImpl::invalidateMemLocationBase(SILInstruction *I) {
+void GlobalDeadStoreEliminationImpl::invalidateMemLocationBase(
+    SILInstruction *I) {
   BBState *S = getBBLocState(I);
   // If this instruction defines the base of a location, then we need to
   // invalidate any locations with the same base.
@@ -398,7 +400,8 @@ GlobalDeadStoreEliminationImpl::invalidateMemLocationBase(SILInstruction *I) {
 void GlobalDeadStoreEliminationImpl::updateWriteSetForRead(SILInstruction *I,
                                                            BBState *S,
                                                            unsigned bit) {
-  // Remove any may/must-aliasing stores to the MemLocation, as they cant be used
+  // Remove any may/must-aliasing stores to the MemLocation, as they cant be
+  // used
   // to kill any upward visible stores due to the intefering load.
   for (unsigned i = 0; i < S->WriteSetOut.size(); ++i) {
     if (!S->isTrackingMemLocation(i))
@@ -456,11 +459,9 @@ void GlobalDeadStoreEliminationImpl::processRead(SILInstruction *I, BBState *S,
   }
 }
 
-SILValue
-GlobalDeadStoreEliminationImpl::createExtract(SILValue Base,
-                                              Optional<ProjectionPath> &Path,
-                                              SILInstruction *Inst,
-                                              bool IsValExt) {
+SILValue GlobalDeadStoreEliminationImpl::createExtract(
+    SILValue Base, Optional<ProjectionPath> &Path, SILInstruction *Inst,
+    bool IsValExt) {
   // If we found a projection path, but there are no projections, then the two
   // loads must be the same, return PrevLI.
   if (!Path || Path->empty())
@@ -474,12 +475,12 @@ GlobalDeadStoreEliminationImpl::createExtract(SILValue Base,
   // Construct the path!
   for (auto PI = Path->rbegin(), PE = Path->rend(); PI != PE; ++PI) {
     if (IsValExt) {
-      LastExtract = PI->createValueProjection(Builder, Inst->getLoc(),
-                                              LastExtract).get();
+      LastExtract =
+          PI->createValueProjection(Builder, Inst->getLoc(), LastExtract).get();
       continue;
     }
-    LastExtract = PI->createAddrProjection(Builder, Inst->getLoc(),
-                                            LastExtract).get();
+    LastExtract =
+        PI->createAddrProjection(Builder, Inst->getLoc(), LastExtract).get();
   }
 
   // Return the last extract we created.
@@ -487,17 +488,19 @@ GlobalDeadStoreEliminationImpl::createExtract(SILValue Base,
 }
 
 void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
-                                                  SILValue Val,
-                                                  SILValue Mem) {
-  // Construct a MemLocation to represent the memory written by this instruction.
+                                                  SILValue Val, SILValue Mem) {
+  // Construct a MemLocation to represent the memory written by this
+  // instruction.
   MemLocation L(Mem);
 
-  // If we cant figure out the Base or Projection Path for the store instruction,
+  // If we cant figure out the Base or Projection Path for the store
+  // instruction,
   // simply ignore it for now.
   if (!L.isValid())
     return;
 
-  // Expand the given Mem into individual fields and process them as separate writes.
+  // Expand the given Mem into individual fields and process them as separate
+  // writes.
   bool Dead = true;
   MemLocationList Locs;
   MemLocation::expand(L, &I->getModule(), Locs);
@@ -519,7 +522,8 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
     return;
   }
 
-  // Partial dead store - stores to some locations are dead, but not all. This is
+  // Partial dead store - stores to some locations are dead, but not all. This
+  // is
   // a partially dead store. Also at this point we know what locations are dead.
   if (V.any()) {
     // Take out locations that are dead.
@@ -572,7 +576,8 @@ void GlobalDeadStoreEliminationImpl::processStoreInst(SILInstruction *I) {
   processWrite(I, getBBLocState(I), Val, Mem);
 }
 
-void GlobalDeadStoreEliminationImpl::processUnknownReadMemInst(SILInstruction *I) {
+void GlobalDeadStoreEliminationImpl::processUnknownReadMemInst(
+    SILInstruction *I) {
   // We do not know what this instruction does or the memory that it *may*
   // touch. Hand it to alias analysis to see whether we need to invalidate
   // any MemLocation.
