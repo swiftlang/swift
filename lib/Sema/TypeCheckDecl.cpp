@@ -3171,9 +3171,6 @@ public:
       // need to propagate recursive properties now.
       TAD->getAliasType()->setRecursiveProperties(
                        TAD->getUnderlyingType()->getRecursiveProperties());
-
-      if (!isa<ProtocolDecl>(TAD->getDeclContext()))
-        TC.checkInheritanceClause(TAD);
     }
 
     if (IsSecondPass)
@@ -3537,6 +3534,7 @@ public:
       checkAccessibility(TC, PD);
       for (auto member : PD->getMembers())
         checkAccessibility(TC, member);
+      TC.checkInheritanceClause(PD);
       return;
     }
 
@@ -5871,7 +5869,10 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     checkGenericParamList(&builder, gp, proto->getDeclContext());
     finalizeGenericParamList(builder, gp, proto, *this);
 
-    checkInheritanceClause(D);
+    // Record inherited protocols.
+    IterativeTypeChecker ITC(*this);
+    ITC.satisfy(TypeCheckRequest(TypeCheckRequest::InheritedProtocols, proto));
+
     validateAttributes(*this, D);
 
     // Set the underlying type of each of the associated types to the
@@ -6362,7 +6363,8 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
 ArrayRef<ProtocolDecl *>
 TypeChecker::getDirectConformsTo(ProtocolDecl *proto) {
-  checkInheritanceClause(proto);
+  IterativeTypeChecker ITC(*this);
+  ITC.satisfy(TypeCheckRequest(TypeCheckRequest::InheritedProtocols, proto));
   return proto->getInheritedProtocols(nullptr);
 }
 

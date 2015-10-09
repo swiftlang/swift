@@ -28,6 +28,7 @@ namespace swift {
 class ClassDecl;
 class EnumDecl;
 class ExtensionDecl;
+class ProtocolDecl;
 class TypeDecl;
 
 /// A request to the type checker to compute some particular kind of

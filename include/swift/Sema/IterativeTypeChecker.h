@@ -20,6 +20,7 @@
 #define SWIFT_SEMA_ITERATIVE_TYPE_CHECKER_H
 
 #include "swift/Sema/TypeCheckRequest.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -53,6 +54,15 @@ class IterativeTypeChecker {
 
 public:
   IterativeTypeChecker(TypeChecker &tc) : TC(tc) { }
+
+  ASTContext &getASTContext() const;
+
+  DiagnosticEngine &getDiags() const;
+
+  template<typename ...ArgTypes>
+  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
+    return getDiags().diagnose(std::forward<ArgTypes>(Args)...);
+  }
 
   /// Determine whether the given request has already been satisfied.
   bool isSatisfied(TypeCheckRequest request);

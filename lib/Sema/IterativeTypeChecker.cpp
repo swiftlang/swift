@@ -16,9 +16,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TypeChecker.h"
 #include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/AST/Decl.h"
 using namespace swift;
+
+ASTContext &IterativeTypeChecker::getASTContext() const {
+  return TC.Context;
+}
+
+DiagnosticEngine &IterativeTypeChecker::getDiags() const {
+  return getASTContext().Diags;
+}
 
 /// Determine whether the given request has already been satisfied.
 bool IterativeTypeChecker::isSatisfied(TypeCheckRequest request) {

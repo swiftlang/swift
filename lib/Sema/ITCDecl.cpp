@@ -25,7 +25,8 @@ using namespace swift;
 //----------------------------------------------------------------------------//
 // Inheritance clause handling
 //----------------------------------------------------------------------------//
-static std::tuple<TypeResolutionOptions, DeclContext *, MutableArrayRef<TypeLoc>>
+static std::tuple<TypeResolutionOptions, DeclContext *,
+                  MutableArrayRef<TypeLoc>>
 decomposeInheritedClauseDecl(
   llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) {
   TypeResolutionOptions options;
@@ -110,7 +111,7 @@ void IterativeTypeChecker::satisfyTypeCheckInheritedClauseEntry(
   // FIXME: Recursion into existing type checker.
   PartialGenericTypeToArchetypeResolver resolver(TC);
   if (TC.validateType(*inherited, dc, options, &resolver)) {
-    inherited->setInvalidType(TC.Context);
+    inherited->setInvalidType(getASTContext());
   }
 }
 
@@ -211,4 +212,72 @@ void IterativeTypeChecker::satisfyTypeCheckRawType(EnumDecl *enumDecl) {
 
   // Set the raw type.
   enumDecl->setRawType(rawType);
+}
+
+//----------------------------------------------------------------------------//
+// Inherited protocols
+//----------------------------------------------------------------------------//
+bool IterativeTypeChecker::isInheritedProtocolsSatisfied(ProtocolDecl *payload){
+  return payload->isInheritedProtocolsValid();
+}
+
+void IterativeTypeChecker::enumerateDependenciesOfInheritedProtocols(
+       ProtocolDecl *payload,
+       llvm::function_ref<void(TypeCheckRequest)> fn) {
+  // Computing the set of inherited protocols depends on the complete
+  // inheritance clause.
+  // FIXME: Technically, we only need very basic name binding.
+  auto inheritedClause = payload->getInherited();
+  for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
+    TypeLoc &inherited = inheritedClause[i];
+
+    // If this inherited type has not been resolved, we depend on it.
+    if (!inherited.getType()) {
+      fn(TypeCheckRequest(TypeCheckRequest::TypeCheckInheritedClauseEntry,
+                          { payload, i }));
+    }
+  }
+}
+
+void IterativeTypeChecker::satisfyInheritedProtocols(ProtocolDecl *protocol) {
+  // Gather all of the existential types in the inherited list.
+  // Loop through the inheritance clause looking for a non-existential
+  // nominal type.
+  llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
+  for (const auto &inherited : protocol->getInherited()) {
+    if (!inherited.getType()) continue;
+
+    // Collect existential types.
+    // FIXME: We'd prefer to keep what the user wrote here.
+    SmallVector<ProtocolDecl *, 4> protocols;
+    if (inherited.getType()->isExistentialType(protocols)) {
+      allProtocols.insert(protocols.begin(), protocols.end());
+    }
+  }
+
+  // FIXME: Hack to deal with recursion elsewhere.
+  if (protocol->isInheritedProtocolsValid())
+    return;
+
+  // Check for circular inheritance.
+  // FIXME: The diagnostics here should be improved.
+  bool diagnosedCircularity = false;
+  for (unsigned i = 0, n = allProtocols.size(); i != n; /*in loop*/) {
+    if (allProtocols[i] == protocol ||
+        allProtocols[i]->inheritsFrom(protocol)) {
+      if (!diagnosedCircularity) {
+        diagnose(protocol,
+                 diag::circular_protocol_def, protocol->getName().str());
+        diagnosedCircularity = true;
+      }
+
+      allProtocols.remove(allProtocols[i]);
+      --n;
+      continue;
+    }
+
+    ++i;
+  }
+
+  protocol->setInheritedProtocols(getASTContext().AllocateCopy(allProtocols));
 }
