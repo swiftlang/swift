@@ -10,37 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 //
-
 // This file defines the kinds of TypeCheckRequests that can occur. It
-// designed to be included multiple times with different definition of
+// designed to be included multiple times with different definitions of
 // the TYPE_CHECK_REQUEST(Request,Payload) macro, whose parameters
 // are:
 //
 //   Request: The request kind.
 //   Payload: The payload type.
 //
-//
 //===----------------------------------------------------------------------===//
 
-#if !defined(TYPE_CHECK_REQUEST) && !defined(TYPE_CHECK_REQUEST_PAYLOAD)
-#  error define at least one of TYPE_CHECK_REQUEST or TYPE_CHECK_REQUEST_PAYLOAD
+#if !defined(TYPE_CHECK_REQUEST)
+#  error define TYPE_CHECK_REQUEST before including this file
 #endif
-
-#ifndef TYPE_CHECK_REQUEST
-#  define TYPE_CHECK_REQUEST(Request,Payload)
-#endif
-
-#ifndef TYPE_CHECK_REQUEST_PAYLOAD
-#  define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName, ...)
-#endif
-
-TYPE_CHECK_REQUEST_PAYLOAD(Class, ClassDecl *)
-TYPE_CHECK_REQUEST_PAYLOAD(Enum, EnumDecl *)
-TYPE_CHECK_REQUEST_PAYLOAD(InheritedClauseEntry, std::pair<llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned>)
-TYPE_CHECK_REQUEST_PAYLOAD(Protocol, ProtocolDecl *)
-TYPE_CHECK_REQUEST_PAYLOAD(DeclContextLookup, DeclContextLookupInfo)
-TYPE_CHECK_REQUEST_PAYLOAD(TypeResolution, std::tuple<TypeRepr *, DeclContext *, unsigned>)
-TYPE_CHECK_REQUEST_PAYLOAD(TypeDeclResolution, TypeDecl *)
 
 /// Ensure that we can perform qualified name lookup into the given
 /// declaration context for the given name.
@@ -71,5 +53,4 @@ TYPE_CHECK_REQUEST(ResolveTypeRepr, TypeResolution)
 /// resolution stage.
 TYPE_CHECK_REQUEST(ResolveTypeDecl, TypeDeclResolution)
 
-#undef TYPE_CHECK_REQUEST_PAYLOAD
 #undef TYPE_CHECK_REQUEST

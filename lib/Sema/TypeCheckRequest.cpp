@@ -100,6 +100,6 @@ bool swift::operator==(const TypeCheckRequest &x, const TypeCheckRequest &y) {
 #define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...)                     \
   case TypeCheckRequest::PayloadKind::PayloadName:                      \
     return x.get##PayloadName##Payload() == y.get##PayloadName##Payload();
-#include "swift/Sema/TypeCheckRequestKinds.def"
+#include "swift/Sema/TypeCheckRequestPayloads.def"
   }
 }

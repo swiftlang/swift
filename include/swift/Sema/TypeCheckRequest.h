@@ -74,7 +74,7 @@ private:
 #define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...) \
     __VA_ARGS__ PayloadName;
 
-#include "swift/Sema/TypeCheckRequestKinds.def"
+#include "swift/Sema/TypeCheckRequestPayloads.def"
   } Payload;
 
   /// Describes the kind of payload expected.
@@ -85,7 +85,7 @@ private:
 #define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...)     \
     PayloadName,
 
-#include "swift/Sema/TypeCheckRequestKinds.def"
+#include "swift/Sema/TypeCheckRequestPayloads.def"
   };
 
   /// Determine the payload kind for the given type check request kind.
@@ -104,7 +104,7 @@ public:
 #define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...)     \
   typedef __VA_ARGS__ PayloadName##PayloadType;
 
-#include "swift/Sema/TypeCheckRequestKinds.def"
+#include "swift/Sema/TypeCheckRequestPayloads.def"
   
   // Constructors.
 #define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...)                     \
@@ -113,7 +113,7 @@ public:
     Payload.PayloadName = payload;                                      \
   }
 
-#include "swift/Sema/TypeCheckRequestKinds.def"
+#include "swift/Sema/TypeCheckRequestPayloads.def"
   
   /// Determine the kind of type check request.
   Kind getKind() const { return TheKind; }
@@ -125,7 +125,7 @@ public:
     return Payload.PayloadName;                                         \
   }
 
-#include "swift/Sema/TypeCheckRequestKinds.def"
+#include "swift/Sema/TypeCheckRequestPayloads.def"
 
   /// Retrieve the location at which this request was initiated.
   SourceLoc getLoc() const;
