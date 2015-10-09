@@ -72,9 +72,6 @@
 using namespace swift;
 using swift::MemLocation;
 
-static llvm::cl::opt<bool> EnableGDSE("sil-enable-global-dse",
-                                      llvm::cl::init(true), llvm::cl::Hidden);
-
 STATISTIC(NumDeadStores, "Number of dead stores removed");
 STATISTIC(NumPartialDeadStores, "Number of partial dead stores removed");
 
@@ -662,9 +659,6 @@ public:
 
   /// The entry point to the transformation.
   void run() override {
-    if (!EnableGDSE)
-      return;
-
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     SILFunction *F = getFunction();
     DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName() << " ***\n");

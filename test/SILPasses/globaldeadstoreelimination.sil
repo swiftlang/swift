@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -global-dead-store-elim -sil-enable-global-dse -enable-sil-verify-all | FileCheck %s
+// RUN: %target-sil-opt %s -global-dead-store-elim -enable-sil-verify-all | FileCheck %s
 
 sil_stage canonical
 
