@@ -1221,3 +1221,35 @@ bb0:
   dealloc_stack %0#0 : $*@local_storage S8        // id: %13
   return %12 : $()                                // id: %14
 }
+
+/// Make sure we do not remove the first store as there is no way to prove
+/// %0 and %1 can not alias here.
+///
+/// CHECK-LABEL: NoDeadStoreWithInterferingLoad
+/// CHECK: store
+/// CHECK: load
+/// CHECK: store
+sil hidden @NoDeadStoreWithInterferingLoad : $@convention(thin) (@owned foo, @owned foo) -> () {
+bb0(%0 : $foo, %1 : $foo):
+  debug_value %0 : $foo  // let x                   // id: %2
+  debug_value %1 : $foo  // let a                   // id: %3
+  %4 = integer_literal $Builtin.Int64, 10         // user: %5
+  %5 = struct $Int (%4 : $Builtin.Int64)          // user: %7
+  %6 = ref_element_addr %0 : $foo, #foo.a             // user: %7
+  store %5 to %6 : $*Int                          // id: %7
+  %8 = tuple ()
+  %9 = integer_literal $Builtin.Int64, 12         // user: %10
+  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %12
+  %11 = ref_element_addr %1 : $foo, #foo.a            // user: %12
+  %99 = load %11 : $*Int                        // id: %12
+  %13 = tuple ()
+  %14 = integer_literal $Builtin.Int64, 10        // user: %15
+  %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
+  %16 = ref_element_addr %0 : $foo, #foo.a            // user: %17
+  store %15 to %16 : $*Int                        // id: %17
+  %18 = tuple ()
+  strong_release %1 : $foo                          // id: %19
+  strong_release %0 : $foo                          // id: %20
+  %21 = tuple ()                                  // user: %22
+  return %21 : $()                                // id: %22
+}
