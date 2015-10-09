@@ -104,7 +104,6 @@ namespace swift {
 namespace irgen {
   class Address;
   class ClangTypeConverter;
-  class DebugTypeInfo;
   class EnumImplStrategy;
   class ExplosionSchema;
   class FixedTypeInfo;
@@ -714,17 +713,6 @@ public:
                                        ForDefinition_t forDefinition);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      ForDefinition_t forDefinition);
-  llvm::Function *getAddrOfWitnessTableAccessFunction(
-                                           const NormalProtocolConformance *C,
-                                               ForDefinition_t forDefinition);
-  llvm::Function *getAddrOfWitnessTableLazyAccessFunction(
-                                           const NormalProtocolConformance *C,
-                                               CanType conformingType,
-                                               ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfWitnessTableLazyCacheVariable(
-                                           const NormalProtocolConformance *C,
-                                               CanType conformingType,
-                                               ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
                                         llvm::Type *definitionTy = nullptr);
   Address getAddrOfObjCISAMask();
@@ -735,26 +723,7 @@ public:
   // if there is no generic context.
   ArchetypeBuilder &getContextArchetypes();
 
-  enum class DirectOrGOT {
-    Direct, GOT,
-  };
-
 private:
-  llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,
-                                        Alignment alignment,
-                                        llvm::Type *definitionType,
-                                        llvm::Type *defaultType,
-                                        DebugTypeInfo debugType);
-  llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,
-                                        Alignment alignment,
-                                        ForDefinition_t forDefinition,
-                                        llvm::Type *defaultType,
-                                        DebugTypeInfo debugType);
-
-  std::pair<llvm::Constant *, DirectOrGOT>
-  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
-                                       llvm::Type *defaultType);
-
   void emitLazyPrivateDefinitions();
 
 //--- Global context emission --------------------------------------------------

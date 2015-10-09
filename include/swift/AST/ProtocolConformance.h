@@ -158,11 +158,8 @@ public:
   /// protocol conformance.
   ///
   /// The function object should accept an \c AssociatedTypeDecl* for the
-  /// requirement followed by the \c Substitution for the witness and a
-  /// (possibly null) \c TypeDecl* that explicitly declared the type.
-  /// It should return true to indicate an early exit.
-  ///
-  /// \returns true if the function ever returned true
+  /// requirement followed by the \c Substitution for the witness. It should
+  /// return true to indicate an early exit.
   template<typename F>
   bool forEachTypeWitness(LazyResolver *resolver, F f) const {
     const ProtocolDecl *protocol = getProtocol();

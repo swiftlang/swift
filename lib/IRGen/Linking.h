@@ -59,11 +59,9 @@ enum class TypeMetadataAddress {
 /// levels, each of which potentially creates a different top-level
 /// function.
 class LinkEntity {
-  /// ValueDecl*, SILFunction*, or TypeBase*, depending on Kind.
+  /// ValueDecl*, SILFunction*, ProtocolConformance*, or TypeBase*,
+  /// depending on Kind.
   void *Pointer;
-
-  /// ProtocolConformance*, depending on Kind.
-  void *SecondaryPointer;
 
   /// A hand-rolled bitfield with the following layout:
   unsigned Data;
@@ -84,6 +82,10 @@ class LinkEntity {
     // These fields appear in the TypeMetadata kind.
     MetadataAddressShift = 8, MetadataAddressMask = 0x0300,
     IsPatternShift = 10, IsPatternMask = 0x0400,
+    
+    // This field appears in ProtocolConformance kinds.
+    ConformanceLinkageShift = 8, ConformanceLinkageMask = 0x0700,
+    ConformanceFragilityShift = 11, ConformanceFragilityMask = 0x0800
   };
 #define LINKENTITY_SET_FIELD(field, value) (value << field##Shift)
 #define LINKENTITY_GET_FIELD(value, field) ((value & field##Mask) >> field##Shift)
@@ -128,34 +130,25 @@ class LinkEntity {
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
-    /// A direct protocol witness table. The secondary pointer is a
-    /// ProtocolConformance*.
+    /// A direct protocol witness table. The pointer is a ProtocolConformance*.
     DirectProtocolWitnessTable,
-
-    /// A witness accessor function. The secondary pointer is a
-    /// ProtocolConformance*.
-    ProtocolWitnessTableAccessFunction,
     
-    /// A dependent protocol witness table instantiation function. The
-    /// secondary pointer is a ProtocolConformance*.
+    /// A lazy protocol witness accessor function. The pointer is a
+    /// ProtocolConformance*.
+    LazyProtocolWitnessTableAccessor,
+    
+    /// A template for lazy protocol witness table initialization. The pointer
+    /// is a ProtocolConformance*.
+    LazyProtocolWitnessTableTemplate,
+    
+    /// A dependent protocol witness table instantiation function. The pointer
+    /// is a ProtocolConformance*.
     DependentProtocolWitnessTableGenerator,
     
     /// A template for dependent protocol witness table instantiation. The
-    /// secondary pointer is a ProtocolConformance*.
+    /// pointer is a ProtocolConformance*.
     DependentProtocolWitnessTableTemplate,
-
-    // These are both type kinds and protocol-conformance kinds.
-
-    /// A lazy protocol witness accessor function. The pointer is a
-    /// canonical TypeBase*, and the secondary pointer is a
-    /// ProtocolConformance*.
-    ProtocolWitnessTableLazyAccessFunction,
-
-    /// A lazy protocol witness cache variable. The pointer is a
-    /// canonical TypeBase*, and the secondary pointer is a
-    /// ProtocolConformance*.
-    ProtocolWitnessTableLazyCacheVariable,
-        
+    
     // Everything following this is a type kind.
 
     /// A value witness for a type.
@@ -205,12 +198,12 @@ class LinkEntity {
     return k <= Kind::Other;
   }
   static bool isTypeKind(Kind k) {
-    return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
+    return k >= Kind::ValueWitness;
   }
   
   static bool isProtocolConformanceKind(Kind k) {
     return k >= Kind::DirectProtocolWitnessTable
-      && k <= Kind::ProtocolWitnessTableLazyCacheVariable;
+      && k <= Kind::DependentProtocolWitnessTableTemplate;
   }
 
   void setForDecl(Kind kind, 
@@ -218,31 +211,32 @@ class LinkEntity {
                   unsigned uncurryLevel) {
     assert(isDeclKind(kind));
     Pointer = decl;
-    SecondaryPointer = nullptr;
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
          | LINKENTITY_SET_FIELD(ExplosionLevel, unsigned(explosionKind))
          | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
   }
 
-  void setForProtocolConformance(Kind kind, const ProtocolConformance *c) {
-    assert(isProtocolConformanceKind(kind) && !isTypeKind(kind));
-    Pointer = nullptr;
-    SecondaryPointer = const_cast<void*>(static_cast<const void*>(c));
-    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
-  }
+  void setForProtocolConformance(Kind kind,
+                                 ProtocolConformance *c,
+                                 IRGenModule &IGM) {
+    assert(isProtocolConformanceKind(kind));
 
-  void setForProtocolConformanceAndType(Kind kind, const ProtocolConformance *c,
-                                        CanType type) {
-    assert(isProtocolConformanceKind(kind) && isTypeKind(kind));
-    Pointer = type.getPointer();
-    SecondaryPointer = const_cast<void*>(static_cast<const void*>(c));
-    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
+    SILLinkage linkage = SILLinkage::PublicExternal;
+    unsigned isFragile = 0;
+    auto wt = IGM.SILMod->lookUpWitnessTable(c);
+    if (wt.first) {
+      linkage = wt.first->getLinkage();
+      isFragile = wt.first->isFragile() ? 1 : 0;
+    }
+    Pointer = c;
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
+         | LINKENTITY_SET_FIELD(ConformanceLinkage, unsigned(linkage))
+         | LINKENTITY_SET_FIELD(ConformanceFragility, isFragile);
   }
 
   void setForType(Kind kind, CanType type) {
     assert(isTypeKind(kind));
     Pointer = type.getPointer();
-    SecondaryPointer = nullptr;
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
@@ -269,7 +263,6 @@ public:
   static LinkEntity forFieldOffset(VarDecl *decl, bool isIndirect) {
     LinkEntity entity;
     entity.Pointer = decl;
-    entity.SecondaryPointer = nullptr;
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::FieldOffset))
                 | LINKENTITY_SET_FIELD(IsIndirect, unsigned(isIndirect));
     return entity;
@@ -299,7 +292,6 @@ public:
                                     bool isPattern) {
     LinkEntity entity;
     entity.Pointer = concreteType.getPointer();
-    entity.SecondaryPointer = nullptr;
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::TypeMetadata))
                 | LINKENTITY_SET_FIELD(MetadataAddress, unsigned(addr))
                 | LINKENTITY_SET_FIELD(IsPattern, unsigned(isPattern));
@@ -362,7 +354,6 @@ public:
   {
     LinkEntity entity;
     entity.Pointer = F;
-    entity.SecondaryPointer = nullptr;
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILFunction));
     return entity;
   }
@@ -370,53 +361,26 @@ public:
   static LinkEntity forSILGlobalVariable(SILGlobalVariable *G) {
     LinkEntity entity;
     entity.Pointer = G;
-    entity.SecondaryPointer = nullptr;
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILGlobalVariable));
     return entity;
   }
   
-  static LinkEntity
-  forDirectProtocolWitnessTable(const ProtocolConformance *C) {
+  static LinkEntity forDirectProtocolWitnessTable(ProtocolConformance *C,
+                                                  IRGenModule &IGM) {
     LinkEntity entity;
-    entity.setForProtocolConformance(Kind::DirectProtocolWitnessTable, C);
+    entity.setForProtocolConformance(Kind::DirectProtocolWitnessTable,
+                                     C, IGM);
     return entity;
   }
-
-  static LinkEntity
-  forProtocolWitnessTableAccessFunction(const ProtocolConformance *C) {
-    LinkEntity entity;
-    entity.setForProtocolConformance(Kind::ProtocolWitnessTableAccessFunction,
-                                     C);
-    return entity;
-  }
-
-  static LinkEntity
-  forProtocolWitnessTableLazyAccessFunction(const ProtocolConformance *C,
-                                            CanType type) {
-    LinkEntity entity;
-    entity.setForProtocolConformanceAndType(
-             Kind::ProtocolWitnessTableLazyAccessFunction, C, type);
-    return entity;
-  }
-
-  static LinkEntity
-  forProtocolWitnessTableLazyCacheVariable(const ProtocolConformance *C,
-                                           CanType type) {
-    LinkEntity entity;
-    entity.setForProtocolConformanceAndType(
-             Kind::ProtocolWitnessTableLazyCacheVariable, C, type);
-    return entity;
-  }
-
 
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
-  SILLinkage getLinkage(IRGenModule &IGM, ForDefinition_t isDefinition) const;
+  SILLinkage getLinkage(ForDefinition_t isDefinition) const;
   
   /// Returns true if this function or global variable may be inlined into
   /// another module.
   ///
-  bool isFragile(IRGenModule &IGM) const;
+  bool isFragile() const;
 
   ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
@@ -433,9 +397,21 @@ public:
     return reinterpret_cast<SILGlobalVariable*>(Pointer);
   }
   
-  const ProtocolConformance *getProtocolConformance() const {
+  ProtocolConformance *getProtocolConformance() const {
     assert(isProtocolConformanceKind(getKind()));
-    return reinterpret_cast<ProtocolConformance*>(SecondaryPointer);
+    return reinterpret_cast<ProtocolConformance*>(Pointer);
+  }
+  
+  SILLinkage getProtocolConformanceLinkage() const {
+    assert(isProtocolConformanceKind(getKind()));
+    
+    return SILLinkage(LINKENTITY_GET_FIELD(Data, ConformanceLinkage));
+  }
+  
+  bool isProtocolConformanceFragile() const {
+    assert(isProtocolConformanceKind(getKind()));
+    
+    return LINKENTITY_GET_FIELD(Data, ConformanceFragility) != 0;
   }
   
   ResilienceExpansion getResilienceExpansion() const {
@@ -520,7 +496,6 @@ public:
 
   llvm::GlobalVariable *createVariable(IRGenModule &IGM,
                                   llvm::Type *objectType,
-                                  Alignment alignment,
                                   DebugTypeInfo DebugType=DebugTypeInfo(),
                                   Optional<SILLocation> DebugLoc = None,
                                   StringRef DebugName = StringRef());
@@ -537,26 +512,21 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
   static LinkEntity getEmptyKey() {
     LinkEntity entity;
     entity.Pointer = nullptr;
-    entity.SecondaryPointer = nullptr;
     entity.Data = 0;
     return entity;
   }
   static LinkEntity getTombstoneKey() {
     LinkEntity entity;
     entity.Pointer = nullptr;
-    entity.SecondaryPointer = nullptr;
     entity.Data = 1;
     return entity;
   }
   static unsigned getHashValue(const LinkEntity &entity) {
     return DenseMapInfo<void*>::getHashValue(entity.Pointer)
-         ^ DenseMapInfo<void*>::getHashValue(entity.SecondaryPointer)
          ^ entity.Data;
   }
   static bool isEqual(const LinkEntity &LHS, const LinkEntity &RHS) {
-    return LHS.Pointer == RHS.Pointer &&
-           LHS.SecondaryPointer == RHS.SecondaryPointer &&
-           LHS.Data == RHS.Data;
+    return LHS.Pointer == RHS.Pointer && LHS.Data == RHS.Data;
   }
 };
 

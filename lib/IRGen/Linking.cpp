@@ -186,26 +186,18 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleProtocolConformance(getProtocolConformance());
     return;
 
-  //   global ::= 'Wa' protocol-conformance
-  case Kind::ProtocolWitnessTableAccessFunction:
-    buffer << "_TWa";
-    mangler.mangleProtocolConformance(getProtocolConformance());
-    return;
-
-  //   global ::= 'Wl' type protocol-conformance
-  case Kind::ProtocolWitnessTableLazyAccessFunction:
-    buffer << "_TWl";
-    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
-    mangler.mangleProtocolConformance(getProtocolConformance());
-    return;
-
-  //   global ::= 'WL' type protocol-conformance
-  case Kind::ProtocolWitnessTableLazyCacheVariable:
-    buffer << "_TWL";
-    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+  //   global ::= 'WZ' protocol-conformance
+  case Kind::LazyProtocolWitnessTableAccessor:
+    buffer << "_TWZ";
     mangler.mangleProtocolConformance(getProtocolConformance());
     return;
       
+  //   global ::= 'Wz' protocol-conformance
+  case Kind::LazyProtocolWitnessTableTemplate:
+    buffer << "_TWz";
+    mangler.mangleProtocolConformance(getProtocolConformance());
+    return;
+  
   //   global ::= 'WD' protocol-conformance
   case Kind::DependentProtocolWitnessTableGenerator:
     buffer << "_TWD";

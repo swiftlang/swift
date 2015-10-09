@@ -692,19 +692,14 @@ void Remangler::mangleProtocolWitnessTable(Node *node) {
   mangleSingleChildNode(node); // protocol conformance
 }
 
-void Remangler::mangleProtocolWitnessTableAccessor(Node *node) {
-  Out << "Wa";
+void Remangler::mangleLazyProtocolWitnessTableAccessor(Node *node) {
+  Out << "WZ";
   mangleSingleChildNode(node); // protocol conformance
 }
 
-void Remangler::mangleLazyProtocolWitnessTableAccessor(Node *node) {
-  Out << "Wl";
-  mangleChildNodes(node); // type, protocol conformance
-}
-
-void Remangler::mangleLazyProtocolWitnessTableCacheVariable(Node *node) {
-  Out << "WL";
-  mangleChildNodes(node); // type, protocol conformance
+void Remangler::mangleLazyProtocolWitnessTableTemplate(Node *node) {
+  Out << "Wz";
+  mangleSingleChildNode(node); // protocol conformance
 }
 
 void Remangler::mangleDependentProtocolWitnessTableGenerator(Node *node) {

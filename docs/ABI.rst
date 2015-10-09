@@ -730,9 +730,8 @@ Globals
   global ::= 'Wo' entity                 // witness table offset
   global ::= 'Wv' directness entity      // field offset
   global ::= 'WP' protocol-conformance   // protocol witness table
-  global ::= 'Wa' protocol-conformance   // protocol witness table accessor
-  global ::= 'Wl' type protocol-conformance // lazy protocol witness table accessor
-  global ::= 'WL' protocol-conformance   // lazy protocol witness table cache variable
+  global ::= 'WZ' protocol-conformance   // lazy protocol witness table accessor
+  global ::= 'Wz' protocol-conformance   // lazy protocol witness table template
   global ::= 'WD' protocol-conformance   // dependent proto witness table generator
   global ::= 'Wd' protocol-conformance   // dependent proto witness table template
   global ::= entity                      // some identifiable thing
