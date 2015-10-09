@@ -93,7 +93,7 @@ FullApplySite findApplyFromDevirtualizedResult(SILInstruction *I);
 /// This may happen e.g. when:
 /// - a type of the return value is a subclass of the expected return type.
 /// - actual return type and expected return type differ in optionality.
-SILValue castReturnValue(SILBuilder &B, SILValue ReturnValue, SILLocation Loc,
+SILValue castReturnValue(SILBuilder &B, SILLocation Loc, SILValue ReturnValue,
                          SILType ReturnTy, SILType ExpectedReturnTy);
 
 /// Cast a return value which has a tuple type into a different

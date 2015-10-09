@@ -1893,7 +1893,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     auto Loc = TAI->getLoc();
     auto *NormalBB = TAI->getNormalBB();
 
-    auto CastedReturnValue = castReturnValue(Builder, NewAI, Loc,
+    auto CastedReturnValue = castReturnValue(Builder, Loc, NewAI,
                                              ReturnTy, OrigReturnTy);
 
     Builder.createBranch(Loc, NormalBB, { CastedReturnValue });

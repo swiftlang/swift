@@ -468,7 +468,7 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
     }
   }
 
-  auto CastedReturnSILValue = castReturnValue(B, ResultValue, NewAI.getLoc(),
+  auto CastedReturnSILValue = castReturnValue(B, NewAI.getLoc(), ResultValue,
                                               ReturnType, AI.getType());
 
   DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");

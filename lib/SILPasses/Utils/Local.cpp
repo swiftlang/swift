@@ -304,8 +304,11 @@ swift::castTupleReturnType(SILModule &M, SILLocation Loc, SILValue Value,
 /// This may happen e.g. when:
 /// - a type of the return value is a subclass of the expected return type.
 /// - actual return type and expected return type differ in optionality.
-SILValue swift::castReturnValue(SILBuilder &B, SILValue ReturnValue,
-                                SILLocation Loc,
+/// - a type of the return value is tuple and the expected type is a tuple,
+///   but the labels of elements are different and/or some of the
+///   elements types of the return value are subclasses of the expected value.
+SILValue swift::castReturnValue(SILBuilder &B, SILLocation Loc,
+                                SILValue ReturnValue,
                                 SILType ReturnTy, SILType ExpectedReturnTy) {
   // No conversion is needed if types are the same.
   if (ReturnTy == ExpectedReturnTy)
