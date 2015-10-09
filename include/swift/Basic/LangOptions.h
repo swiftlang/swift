@@ -31,7 +31,6 @@ namespace swift {
   /// provide compiler debugging facilities.
   class LangOptions {
   public:
-    
     /// \brief Whether we are debugging the constraint solver.
     ///
     /// This option enables verbose debugging output from the constraint
@@ -41,7 +40,10 @@ namespace swift {
     /// \brief Specific solution attempt for which the constraint
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
-    
+
+    /// \brief Enable the iterative type checker.
+    bool IterativeTypeChecker = false;
+
     /// Debug the generic signatures computed by the archetype builder.
     bool DebugGenericSignatures = false;
 
