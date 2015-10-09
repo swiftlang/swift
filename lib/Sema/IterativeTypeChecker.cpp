@@ -19,6 +19,8 @@
 #include "TypeChecker.h"
 #include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSema.h"
+#include "swift/Basic/Defer.h"
 using namespace swift;
 
 ASTContext &IterativeTypeChecker::getASTContext() const {
@@ -53,9 +55,36 @@ bool IterativeTypeChecker::isSatisfied(TypeCheckRequest request) {
   }
 }
 
+bool IterativeTypeChecker::breakCycle(TypeCheckRequest request) {
+  switch (request.getKind()) {
+#define TYPE_CHECK_REQUEST(Request,PayloadName)                         \
+  case TypeCheckRequest::Request:                                       \
+    return breakCycleFor##Request(request.get##PayloadName##Payload());
+
+#include "swift/Sema/TypeCheckRequestKinds.def"
+  }  
+}
+
 void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
   // If the request has already been satisfied, we're done.
   if (isSatisfied(request)) return;
+
+  // Check for circular dependencies in our requests.
+  // FIXME: This stack operation is painfully inefficient.
+  auto existingRequest = std::find(ActiveRequests.rbegin(),
+                                   ActiveRequests.rend(),
+                                   request);
+  if (existingRequest != ActiveRequests.rend()) {
+    auto first = existingRequest.base();
+    --first;
+    diagnoseCircularReference(llvm::makeArrayRef(&*first,
+                                                 &*ActiveRequests.end()));
+    return;
+  }
+
+  // Add this request to the stack of active requests.
+  ActiveRequests.push_back(request);
+  defer([&] { ActiveRequests.pop_back(); });
 
   while (true) {
     // Process this requirement, enumerating dependencies if anything else needs
@@ -81,4 +110,34 @@ void IterativeTypeChecker::satisfy(TypeCheckRequest request) {
       satisfy(dependency);
     }
   }
+}
+
+//----------------------------------------------------------------------------//
+// Diagnostics
+//----------------------------------------------------------------------------//
+void IterativeTypeChecker::diagnoseCircularReference(
+       ArrayRef<TypeCheckRequest> requests) {
+  bool isFirst = true;
+  for (const auto &request : requests) {
+    diagnose(request.getLoc(),
+             isFirst ? diag::circular_reference
+                     : diag::circular_reference_through);
+
+    isFirst = false;
+  }
+
+  // Now try to break the cycle.
+#ifndef NDEBUG
+  bool brokeCycle = false;
+#endif
+  for (const auto &request : reverse(requests)) {
+    if (breakCycle(request)) {
+#ifndef NDEBUG
+      brokeCycle = true;
+#endif
+      break;
+    }
+  }
+
+  assert(brokeCycle && "Will the cycle be unbroken?");
 }

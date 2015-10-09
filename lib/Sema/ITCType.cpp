@@ -78,3 +78,10 @@ void IterativeTypeChecker::processResolveTypeRepr(
   // when given an UnsatisfiedDependency.
   TC.resolveType(typeRepr, dc, options, nullptr, &unsatisfiedDependency);
 }
+
+bool IterativeTypeChecker::breakCycleForResolveTypeRepr(
+       std::tuple<TypeRepr *, DeclContext *, unsigned> payload) {
+  std::get<0>(payload)->setInvalid();
+  return true;
+}
+

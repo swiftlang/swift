@@ -34,6 +34,7 @@ add_swift_library(swiftSema
   TypeCheckPattern.cpp
   TypeCheckProtocol.cpp
   TypeCheckREPL.cpp
+  TypeCheckRequest.cpp
   TypeCheckStmt.cpp
   TypeCheckType.cpp
   LINK_LIBRARIES

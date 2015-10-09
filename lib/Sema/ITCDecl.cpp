@@ -79,13 +79,13 @@ decomposeInheritedClauseEntry(
   return std::make_tuple(options, dc, &inheritanceClause[entry.second]);
 }
 
-bool IterativeTypeChecker::isTypeCheckInheritedClauseEntrySatisfied(
+bool IterativeTypeChecker::isResolveInheritedClauseEntrySatisfied(
        TypeCheckRequest::InheritedClauseEntryPayloadType payload) {
   TypeLoc &inherited = *std::get<2>(decomposeInheritedClauseEntry(payload));
   return !inherited.getType().isNull();
 }
 
-void IterativeTypeChecker::processTypeCheckInheritedClauseEntry(
+void IterativeTypeChecker::processResolveInheritedClauseEntry(
        TypeCheckRequest::InheritedClauseEntryPayloadType payload,
        UnsatisfiedDependency unsatisfiedDependency) {
   TypeResolutionOptions options;
@@ -107,6 +107,13 @@ void IterativeTypeChecker::processTypeCheckInheritedClauseEntry(
   if (TC.validateType(*inherited, dc, options, &resolver)) {
     inherited->setInvalidType(getASTContext());
   }
+}
+
+bool IterativeTypeChecker::breakCycleForResolveInheritedClauseEntry(
+       TypeCheckRequest::InheritedClauseEntryPayloadType payload) {
+  std::get<2>(decomposeInheritedClauseEntry(payload))
+    ->setInvalidType(getASTContext());
+  return true;
 }
 
 //----------------------------------------------------------------------------//
@@ -131,7 +138,7 @@ void IterativeTypeChecker::processTypeCheckSuperclass(
 
     // If this inherited type has not been resolved, we depend on it.
     if (unsatisfiedDependency(
-          requestTypeCheckInheritedClauseEntry({ classDecl, i }))) {
+          requestResolveInheritedClauseEntry({ classDecl, i }))) {
       return;
     }
 
@@ -147,6 +154,12 @@ void IterativeTypeChecker::processTypeCheckSuperclass(
 
   // Set the superclass type.
   classDecl->setSuperclass(superclassType);
+}
+
+bool IterativeTypeChecker::breakCycleForTypeCheckSuperclass(
+       ClassDecl *classDecl) {
+  classDecl->setSuperclass(ErrorType::get(getASTContext()));
+  return true;
 }
 
 //----------------------------------------------------------------------------//
@@ -171,7 +184,7 @@ void IterativeTypeChecker::processTypeCheckRawType(
 
     // We depend on having resolved the inherited type.
     if (unsatisfiedDependency(
-          requestTypeCheckInheritedClauseEntry({ enumDecl, i }))) {
+          requestResolveInheritedClauseEntry({ enumDecl, i }))) {
       return;
     }
 
@@ -185,6 +198,11 @@ void IterativeTypeChecker::processTypeCheckRawType(
 
   // Set the raw type.
   enumDecl->setRawType(rawType);
+}
+
+bool IterativeTypeChecker::breakCycleForTypeCheckRawType(EnumDecl *enumDecl) {
+  enumDecl->setRawType(ErrorType::get(getASTContext()));
+  return true;
 }
 
 //----------------------------------------------------------------------------//
@@ -208,7 +226,7 @@ void IterativeTypeChecker::processInheritedProtocols(
 
     // We depend on having resolved the inherited type.
     if (unsatisfiedDependency(
-          requestTypeCheckInheritedClauseEntry({ protocol, i }))) {
+          requestResolveInheritedClauseEntry({ protocol, i }))) {
       anyDependencies = true;
       continue;
     }
@@ -231,7 +249,8 @@ void IterativeTypeChecker::processInheritedProtocols(
     return;
 
   // Check for circular inheritance.
-  // FIXME: The diagnostics here should be improved.
+  // FIXME: The diagnostics here should be improved... and this should probably
+  // be handled by the normal cycle detection.
   bool diagnosedCircularity = false;
   for (unsigned i = 0, n = allProtocols.size(); i != n; /*in loop*/) {
     if (allProtocols[i] == protocol ||
@@ -251,4 +270,81 @@ void IterativeTypeChecker::processInheritedProtocols(
   }
 
   protocol->setInheritedProtocols(getASTContext().AllocateCopy(allProtocols));
+}
+
+bool IterativeTypeChecker::breakCycleForInheritedProtocols(
+       ProtocolDecl *protocol) {
+  // FIXME: We'd like to drop just the problematic protocols, not
+  // everything.
+  protocol->setInheritedProtocols({});
+  return true;
+}
+
+//----------------------------------------------------------------------------//
+// Resolve a type declaration
+//----------------------------------------------------------------------------//
+bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
+  if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+    // If the underlying type was validated, we're done.
+    return typeAliasDecl->getUnderlyingTypeLoc().wasValidated();
+  }
+
+  if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(typeDecl)) {
+    // FIXME: Deal with these.
+    return typeParam->getArchetype();
+  }
+
+  // Module types are always fully resolved.
+  if (auto module = dyn_cast<ModuleDecl>(typeDecl))
+    return true;
+
+  // Nominal types.
+  auto nominal = cast<NominalTypeDecl>(typeDecl);
+  return !nominal->getDeclaredType().isNull();
+}
+
+void IterativeTypeChecker::processResolveTypeDecl(
+       TypeDecl *typeDecl,
+       UnsatisfiedDependency unsatisfiedDependency) {
+  if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+    if (typeAliasDecl->getDeclContext()->isModuleScopeContext()) {
+      // FIXME: This is silly.
+      if (!typeAliasDecl->hasType())
+        typeAliasDecl->computeType();
+      
+      TypeResolutionOptions options;
+      options |= TR_GlobalTypeAlias;
+      if (typeAliasDecl->getFormalAccess() == Accessibility::Private)
+        options |= TR_KnownNonCascadingDependency;
+
+      // Note: recursion into old type checker is okay when passing in an
+      // unsatisfied-dependency callback.
+      if (TC.validateType(typeAliasDecl->getUnderlyingTypeLoc(),
+                          typeAliasDecl->getDeclContext(),
+                          options, nullptr, &unsatisfiedDependency)) {
+        typeAliasDecl->setInvalid();
+        typeAliasDecl->overwriteType(ErrorType::get(TC.Context));
+        typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
+      }
+      
+      return;
+    }
+
+    // Fall through.
+  }
+
+  // FIXME: Recursion into the old type checker.
+  TC.validateDecl(typeDecl);
+}
+
+bool IterativeTypeChecker::breakCycleForResolveTypeDecl(TypeDecl *typeDecl) {
+  if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+    typeAliasDecl->setInvalid();
+    typeAliasDecl->overwriteType(ErrorType::get(TC.Context));
+    typeAliasDecl->getUnderlyingTypeLoc().setInvalidType(getASTContext());
+    return true;
+  }
+
+  // FIXME: Generalize this.
+  return false;
 }

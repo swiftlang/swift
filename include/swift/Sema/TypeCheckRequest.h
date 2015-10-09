@@ -36,9 +36,28 @@ class ProtocolDecl;
 class TypeDecl;
 class TypeRepr;
 
+/// Describes the information needed to perform name lookup into a
+/// declaration context.
+struct DeclContextLookupInfo {
+  DeclContext *DC;
+  DeclName Name;
+  SourceLoc Loc;
+
+  friend bool operator==(const DeclContextLookupInfo &x,
+                         const DeclContextLookupInfo &y) {
+    return x.DC == y.DC && x.Name == y.Name;
+  }
+
+  friend bool operator!=(const DeclContextLookupInfo &x,
+                         const DeclContextLookupInfo &y) {
+    return !(x == y);
+  }
+};
+
 /// A request to the type checker to compute some particular kind of
 /// information.
-struct TypeCheckRequest {
+class TypeCheckRequest {
+public:
   /// Describes the kind of request.
   enum Kind : uint8_t {
 #define TYPE_CHECK_REQUEST(Request,Payload) \
@@ -101,12 +120,24 @@ public:
 
   // Payload retrieval.
 #define TYPE_CHECK_REQUEST_PAYLOAD(PayloadName,...)                     \
-  __VA_ARGS__ get##PayloadName##Payload() {                             \
+  __VA_ARGS__ get##PayloadName##Payload() const {                       \
     assert(getPayloadKind(TheKind) == PayloadKind::PayloadName);        \
     return Payload.PayloadName;                                         \
   }
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
+
+  /// Retrieve the location at which this request was initiated.
+  SourceLoc getLoc() const;
+
+  /// Retrieve the declaration to which this request was anchored.
+  ///
+  /// A request is anchored on a declaration if the request is
+  /// specifically about that declaration, e.g., the superclass of a
+  /// class or some inheritance clause entry of a type.
+  Decl *getAnchor() const;
+
+  friend bool operator==(const TypeCheckRequest &x, const TypeCheckRequest &y);
 };
 
 /// A callback used to check whether a particular dependency of this
@@ -122,6 +153,12 @@ inline TypeCheckRequest request##Request(                                      \
   return TypeCheckRequest(TypeCheckRequest::Request, payload);                 \
 }
 #include "swift/Sema/TypeCheckRequestKinds.def"
+
+/// Compare two type checking requests for equality.
+bool operator==(const TypeCheckRequest &x, const TypeCheckRequest &y);
+inline bool operator!=(const TypeCheckRequest &x, const TypeCheckRequest &y) {
+  return !(x == y);
+}
 
 }
 

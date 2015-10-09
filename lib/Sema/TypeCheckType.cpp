@@ -195,30 +195,10 @@ Type TypeChecker::resolveTypeInContext(
   if (!resolver)
     resolver = &defaultResolver;
 
-  // Validate enough of the declaration to determine its structure.
-  if (options.contains(TR_ResolveStructure)) {
-    // FIXME: This should have its own TypeCheckRequest kind.
-    if (auto typeAlias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      // For typealiases, resolve the underlying type.
-      TypeLoc underlyingTypeLoc = typeAlias->getUnderlyingTypeLoc();
-      if (underlyingTypeLoc.getTypeRepr() &&
-          !underlyingTypeLoc.wasValidated()) {
-        TypeResolutionOptions innerOptions;
-        if (!typeAlias->getDeclContext()->isTypeContext())
-          innerOptions |= TR_GlobalTypeAlias;
-        if (typeAlias->getFormalAccess() == Accessibility::Private)
-          innerOptions |= TR_KnownNonCascadingDependency;
-        if (unsatisfiedDependency &&
-            (*unsatisfiedDependency)(
-              requestResolveTypeRepr(
-                std::make_tuple(
-                  typeAlias->getUnderlyingTypeLoc().getTypeRepr(),
-                  typeAlias->getDeclContext(),
-                  static_cast<unsigned>(innerOptions)))))
-          return nullptr;
-      }
-    }
-  }
+  // If we have a callback to report dependencies, do so.
+  if (unsatisfiedDependency &&
+      (*unsatisfiedDependency)(requestResolveTypeDecl(typeDecl)))
+    return nullptr;
 
   // If we found a generic parameter, map to the archetype if there is one.
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
@@ -487,7 +467,11 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             UnsatisfiedDependency *unsatisfiedDependency) {
   assert(dc && "No declaration context for type resolution?");
 
-  if (!options.contains(TR_ResolveStructure)) {
+  // If we have a callback to report dependencies, do so.
+  if (unsatisfiedDependency) {
+    if ((*unsatisfiedDependency)(requestResolveTypeDecl(typeDecl)))
+      return nullptr;
+  } else {
     // Validate the declaration.
     TC.validateDecl(typeDecl);
   }
@@ -726,7 +710,8 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       // declaration context.
       if (unsatisfiedDependency &&
           (*unsatisfiedDependency)(
-            requestQualifiedLookupInDeclContext({ DC, comp->getIdentifier() })))
+            requestQualifiedLookupInDeclContext({ DC, comp->getIdentifier(),
+                                                  comp->getIdLoc() })))
         return nullptr;
 
       auto nominal = DC->isNominalTypeOrNominalTypeExtensionContext();
@@ -759,7 +744,9 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // declaration context.
   if (unsatisfiedDependency &&
       (*unsatisfiedDependency)(
-        requestUnqualifiedLookupInDeclContext({ DC, comp->getIdentifier() })))
+        requestUnqualifiedLookupInDeclContext({ lookupDC, 
+                                                comp->getIdentifier(),
+                                                comp->getIdLoc() })))
     return nullptr;
 
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
@@ -793,7 +780,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
                                 DC, genericArgs, options, resolver,
                                 unsatisfiedDependency);
-    if (type->is<ErrorType>())
+    if (!type || type->is<ErrorType>())
       return type;
 
     // If this is the first result we found, record it.
@@ -970,10 +957,21 @@ static Type resolveNestedIdentTypeComponent(
   }
 
   // We need to be able to perform qualified lookup into the given type.
-  if (unsatisfiedDependency &&
-      (*unsatisfiedDependency)(
-        requestQualifiedLookupInType({ parentTy, comp->getIdentifier() })))
-    return nullptr;
+  if (unsatisfiedDependency) {
+    DeclContext *dc;
+    if (auto parentNominal = parentTy->getAnyNominal())
+      dc = parentNominal;
+    else if (auto parentModule = parentTy->getAs<ModuleType>())
+      dc = parentModule->getModule();
+    else
+      dc = nullptr;
+
+    if (dc &&
+        (*unsatisfiedDependency)(
+          requestQualifiedLookupInDeclContext({ dc, comp->getIdentifier(),
+                                                comp->getIdLoc() })))
+      return nullptr;
+  }
 
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isKnownNonCascading)
@@ -1193,6 +1191,8 @@ Type TypeChecker::resolveIdentifierType(
   Type result = resolveIdentTypeComponent(*this, DC, Components, options, 
                                           diagnoseErrors, resolver,
                                           unsatisfiedDependency);
+  if (!result) return nullptr;
+
   if (auto moduleTy = result->getAs<ModuleType>()) {
     if (diagnoseErrors) {
       auto moduleName = moduleTy->getModule()->getName();
@@ -1228,7 +1228,8 @@ Type TypeChecker::resolveIdentifierType(
 
 bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
                                TypeResolutionOptions options,
-                               GenericTypeResolver *resolver) {
+                               GenericTypeResolver *resolver,
+                               UnsatisfiedDependency *unsatisfiedDependency) {
   // FIXME: Verify that these aren't circular and infinite size.
   
   // If we've already validated this type, don't do so again.
@@ -1236,7 +1237,15 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     return Loc.isError();
 
   if (Loc.getType().isNull()) {
-    Loc.setType(resolveType(Loc.getTypeRepr(), DC, options, resolver), true);
+    auto type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
+                            unsatisfiedDependency);
+    if (!type) {
+      // If a dependency went unsatisfied, just return false.
+      if (unsatisfiedDependency) return false;
+
+      type = ErrorType::get(Context);
+    }
+    Loc.setType(type, true);
     return Loc.isError();
   }
 
@@ -1606,7 +1615,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                        attrs.has(TAK_noreturn));
       
       ty = resolveSILFunctionType(fnRepr, options, extInfo, calleeConvention);
-      if (!ty | ty->is<ErrorType>()) return ty;
+      if (!ty || ty->is<ErrorType>()) return ty;
     } else {
       FunctionType::Representation rep;
       if (attrs.hasConvention()) {
@@ -1675,7 +1684,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                     fnRepr->throws());
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
-      if (!ty | ty->is<ErrorType>()) return ty;
+      if (!ty || ty->is<ErrorType>()) return ty;
     }
 
     for (auto i : FunctionAttrs)
@@ -1692,7 +1701,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   // If we didn't build the type differently above, build it normally now.
   if (!ty) ty = resolveType(repr, options);
-  if (!ty | ty->is<ErrorType>()) return ty;
+  if (!ty || ty->is<ErrorType>()) return ty;
 
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {

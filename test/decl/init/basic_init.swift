@@ -10,7 +10,7 @@ class C {
 	init() {}
 }
 
-typealias t = t // expected-error {{type alias 't' circularly references itself}}
+typealias t = t // expected-error {{circular reference}}
 
 
 

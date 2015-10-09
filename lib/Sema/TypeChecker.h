@@ -623,7 +623,8 @@ public:
   /// \returns true if type validation failed, or false otherwise.
   bool validateType(TypeLoc &Loc, DeclContext *DC,
                     TypeResolutionOptions options = None,
-                    GenericTypeResolver *resolver = nullptr);
+                    GenericTypeResolver *resolver = nullptr,
+                    UnsatisfiedDependency *unsatisfiedDependency = nullptr);
 
   /// Check for unsupported protocol types in the given declaration.
   void checkUnsupportedProtocolType(Decl *decl);

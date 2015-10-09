@@ -22,6 +22,7 @@
 #include "swift/Sema/TypeCheckRequest.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"
 
 namespace swift {
@@ -39,20 +40,35 @@ class IterativeTypeChecker {
   /// introduces recursion and should be eliminated.
   TypeChecker &TC;
 
+  /// A stack of the currently-active requests.
+  SmallVector<TypeCheckRequest, 4> ActiveRequests;
+
   // Declare the is<request kind>Satisfied predicates,
   // enumerateDependenciesOf<request kind> functions, and
   // satisfy<request kind> functions.
-#define TYPE_CHECK_REQUEST(Request,PayloadName)                         \
-  bool is##Request##Satisfied(                                          \
-         TypeCheckRequest::PayloadName##PayloadType payload);           \
-  void process##Request(                                                \
-         TypeCheckRequest::PayloadName##PayloadType payload,            \
-         UnsatisfiedDependency unsatisfiedDependency);
+#define TYPE_CHECK_REQUEST(Request,PayloadName)               \
+  bool is##Request##Satisfied(                                \
+         TypeCheckRequest::PayloadName##PayloadType payload); \
+  void process##Request(                                      \
+         TypeCheckRequest::PayloadName##PayloadType payload,  \
+         UnsatisfiedDependency unsatisfiedDependency);        \
+  bool breakCycleFor##Request(                                \
+         TypeCheckRequest::PayloadName##PayloadType payload);
 
 #include "swift/Sema/TypeCheckRequestKinds.def"
 
   void process(TypeCheckRequest request,
                UnsatisfiedDependency unsatisfiedDependency);
+
+  /// Attempt to break a cyclic reference for this request after
+  /// diagnosing it.
+  ///
+  /// \returns true if the cycle could be broken by this request, and
+  /// false if it couldn't be broken by altering this request.
+  bool breakCycle(TypeCheckRequest request);
+
+  /// Diagnose a reference cycle.
+  void diagnoseCircularReference(ArrayRef<TypeCheckRequest> requests);
 
 public:
   IterativeTypeChecker(TypeChecker &tc) : TC(tc) { }

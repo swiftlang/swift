@@ -252,7 +252,7 @@ void TypeChecker::resolveInheritanceClause(
   }
 
   for (unsigned i = 0; i != numInherited; ++i) {
-    ITC.satisfy(requestTypeCheckInheritedClauseEntry({ decl, i }));
+    ITC.satisfy(requestResolveInheritedClauseEntry({ decl, i }));
   }
 }
 
@@ -3133,7 +3133,7 @@ public:
       if (!TAD->hasUnderlyingType()) {
         TAD->setInvalid();
         TAD->overwriteType(ErrorType::get(TC.Context));
-        TAD->getUnderlyingTypeLoc().setType(ErrorType::get(TC.Context));
+        TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
         
         TC.diagnose(TAD->getLoc(), diag::circular_type_alias, TAD->getName());
       }
@@ -3154,11 +3154,14 @@ public:
       if (TAD->getFormalAccess() == Accessibility::Private)
         options |= TR_KnownNonCascadingDependency;
       
-      if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD->getDeclContext(),
-                          options)) {
+      if (TAD->getDeclContext()->isModuleScopeContext()) {
+        IterativeTypeChecker ITC(TC);
+        ITC.satisfy(requestResolveTypeDecl(TAD));
+      } else if (TC.validateType(TAD->getUnderlyingTypeLoc(),
+                                 TAD->getDeclContext(), options)) {
         TAD->setInvalid();
         TAD->overwriteType(ErrorType::get(TC.Context));
-        TAD->getUnderlyingTypeLoc().setType(ErrorType::get(TC.Context));
+        TAD->getUnderlyingTypeLoc().setInvalidType(TC.Context);
       } else if (TAD->getDeclContext()->isGenericContext()) {
         TAD->setInterfaceType(
           TC.getInterfaceTypeFromInternalType(TAD->getDeclContext(),
@@ -5707,14 +5710,19 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     // Type aliases may not have an underlying type yet.
     auto typeAlias = cast<TypeAliasDecl>(D);
 
-    // Compute the declared type.
-    if (!typeAlias->hasType())
-      typeAlias->computeType();
+    if (typeAlias->getDeclContext()->isModuleScopeContext()) {
+      IterativeTypeChecker ITC(*this);
+      ITC.satisfy(requestResolveTypeDecl(typeAlias));
+    } else {
+      // Compute the declared type.
+      if (!typeAlias->hasType())
+        typeAlias->computeType();
 
-    if (typeAlias->getUnderlyingTypeLoc().getTypeRepr() &&
-        !typeAlias->getUnderlyingTypeLoc().wasValidated())
-      typeCheckDecl(typeAlias, true);
-    
+      if (typeAlias->getUnderlyingTypeLoc().getTypeRepr() &&
+          !typeAlias->getUnderlyingTypeLoc().wasValidated())
+        typeCheckDecl(typeAlias, true);
+    }
+
     break;
   }
 

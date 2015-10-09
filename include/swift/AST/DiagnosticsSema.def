@@ -2645,6 +2645,14 @@ WARNING(extraneous_default_args_in_call, sema_tcd, none,
         "call to %0 has extraneous arguments that could use defaults", 
         (DeclName))
 
+//------------------------------------------------------------------------------
+// Circular reference diagnostics
+//------------------------------------------------------------------------------
+ERROR(circular_reference, sema_tcd, none,
+      "circular reference", ())
+NOTE(circular_reference_through, sema_tcd, none,
+     "through reference here", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
