@@ -243,51 +243,18 @@ void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {
 
 void TypeChecker::resolveInheritanceClause(
        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) {
-  // FIXME: Add a cached bit so this isn't O(n) in repeated calls.
-  TypeResolutionOptions options;
-  DeclContext *dc;
-  MutableArrayRef<TypeLoc> inheritanceClause;
-  if (auto typeDecl = decl.dyn_cast<TypeDecl *>()) {
-    inheritanceClause = typeDecl->getInherited();
-    if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
-      dc = nominal;
-      options |= TR_GenericSignature | TR_InheritanceClause;      
-    } else {
-      dc = typeDecl->getDeclContext();
-
-      if (isa<GenericTypeParamDecl>(typeDecl)) {
-        // For generic parameters, we want name lookup to look at just the
-        // signature of the enclosing entity.
-        if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-          dc = nominal;
-          options |= TR_GenericSignature;
-        } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-          dc = ext;
-          options |= TR_GenericSignature;
-        } else if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
-          dc = func;
-          options |= TR_GenericSignature;
-        } else if (!dc->isModuleScopeContext()) {
-          // Skip the generic parameter's context entirely.
-          dc = dc->getParent();
-        }
-      }
-    }
+  IterativeTypeChecker ITC(*this);
+  unsigned numInherited;
+  if (auto ext = decl.dyn_cast<ExtensionDecl *>()) {
+    numInherited = ext->getInherited().size();
   } else {
-    auto ext = decl.get<ExtensionDecl *>();
-    inheritanceClause = ext->getInherited();
-    dc = ext;
-    options |= TR_GenericSignature | TR_InheritanceClause;
+    numInherited = decl.get<TypeDecl *>()->getInherited().size();
   }
 
-  /// Check the inheritance clause of a type declaration or extension thereof.
-  PartialGenericTypeToArchetypeResolver resolver(*this);
-
-  for (auto &inherited : inheritanceClause) {
-    if (validateType(inherited, dc, options, &resolver)) {
-      inherited.setInvalidType(Context);
-      continue;
-    }
+  for (unsigned i = 0; i != numInherited; ++i) {
+    ITC.satisfy(TypeCheckRequest(
+                  TypeCheckRequest::TypeCheckInheritedClauseEntry,
+                   { decl, i }));
   }
 }
 
