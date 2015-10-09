@@ -779,7 +779,7 @@ class RLEBBForwarder {
 
   /// This is a list of memlocations that have available values. Eventually,
   /// AvailLocs should replace Stores and Loads.
-  llvm::SmallMapVector<MemLocation, SILValue, 8> AvailLocs;
+  llvm::SmallMapVector<unsigned, SILValue, 8> AvailLocs;
 
 public:
   RLEBBForwarder() = default;
@@ -1293,6 +1293,7 @@ bool RLEBBForwarder::tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI) {
       return true;
     }
 
+#if 0
     // Otherwise check if LI's operand partially aliases PrevLI's operand. If
     // so, see if LI has any uses which could use PrevLI instead of LI
     // itself. If LI has no uses after this is completed, delete it and return
@@ -1305,6 +1306,7 @@ bool RLEBBForwarder::tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI) {
     if (Ctx.getAA()->isPartialAlias(LI->getOperand(), Addr)) {
       tryToSubstitutePartialAliasLoad(Addr, Value, LI);
     }
+#endif
   }
 
   return false;
@@ -1312,16 +1314,16 @@ bool RLEBBForwarder::tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI) {
 
 void RLEBBForwarder::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I){
   auto *AA = Ctx.getAA();
-  llvm::SmallVector<MemLocation, 8> LocDeleteList;
+  llvm::SmallVector<unsigned, 8> LocDeleteList;
   for (auto &X : AvailLocs) {
-    if (!AA->mayWriteToMemory(I, X.first.getBase()))
+    if (!AA->mayWriteToMemory(I, Ctx.getMemLocation(X.first).getBase()))
       continue;
     LocDeleteList.push_back(X.first);
   }
 
   if (LocDeleteList.size()) {
     DEBUG(llvm::dbgs() << "        MemLocation no longer being tracked:\n");
-    for (MemLocation &V : LocDeleteList) {
+    for (unsigned V : LocDeleteList) {
       AvailLocs.erase(V);
     }
   }
@@ -1343,7 +1345,7 @@ void RLEBBForwarder::processStoreInst(RLEContext &Ctx, StoreInst *SI) {
   MemLocationList Locs;
   MemLocation::expand(L, &SI->getModule(), Locs);
   for (auto &X : Locs) {
-    AvailLocs[X] = SILValue();
+    AvailLocs[Ctx.getMemLocationBit(X)] = SILValue();
   } 
 }
 
@@ -1361,12 +1363,11 @@ void RLEBBForwarder::processLoadInst(RLEContext &Ctx, LoadInst *LI) {
   MemLocationList Locs;
   MemLocation::expand(L, &LI->getModule(), Locs);
   for (auto &X : Locs) {
-    AvailLocs[X] = SILValue();
+    AvailLocs[Ctx.getMemLocationBit(X)] = SILValue();
   } 
 }
 
 bool RLEBBForwarder::tryToForwardLoad(RLEContext &Ctx, LoadInst *LI) {
-
   if (tryToForwardLoadsToLoad(Ctx, LI))
     return true;
 
@@ -1413,7 +1414,6 @@ bool RLEBBForwarder::optimize(RLEContext &Ctx) {
     if (auto *LI = dyn_cast<LoadInst>(Inst)) {
       // Keep track of the available value this load generates.
       processLoadInst(Ctx, LI);
-
       Changed |= tryToForwardLoad(Ctx, LI);
       continue;
     }
@@ -1508,7 +1508,7 @@ void RLEBBForwarder::mergePredecessorState(RLEBBForwarder &OtherState) {
     DEBUG(llvm::dbgs() << "        All loads still being tracked!\n");
   }
 
-  llvm::SmallVector<MemLocation, 8> LocDeleteList;
+  llvm::SmallVector<unsigned, 8> LocDeleteList;
   DEBUG(llvm::dbgs() << "            Initial AvailLocs:\n");
   for (auto &P : AvailLocs) {
     auto Iter = OtherState.AvailLocs.find(P.first);
@@ -1519,7 +1519,7 @@ void RLEBBForwarder::mergePredecessorState(RLEBBForwarder &OtherState) {
 
   if (LocDeleteList.size()) {
     DEBUG(llvm::dbgs() << "        MemLocation no longer being tracked:\n");
-    for (MemLocation &V : LocDeleteList) {
+    for (unsigned V : LocDeleteList) {
       AvailLocs.erase(V);
     }
   } else {
@@ -1638,9 +1638,6 @@ RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA, PostDominanceInfo *PDI
     BBIDToForwarderMap[count].init(BB);
   }
 
-  // Walk over the function and find all the locations accessed by
-  // this function.
-  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex);
 }
 
 MemLocation &RLEContext::getMemLocation(const unsigned index) {
@@ -1661,12 +1658,33 @@ unsigned RLEContext::getMemLocationBit(const MemLocation &Loc) {
   // point.
   //
   auto Iter = LocToBitIndex.find(Loc);
-  assert(Iter != LocToBitIndex.end() && "MemLocation should have been enumerated");
-  return Iter->second;
+
+  // We might need to add locations to the vault, as locations with different
+  // bases can be created because of base replacement as a result of load
+  // forwarding.
+  //
+  // %270 = load %234#1 : $*MyKey
+  // %273 = load %234#1 : $*MyKey
+  //
+  // If %270 is forwarded to (replace) %273, we would end up with a new
+  // MemLocation with a different base, but same projection path as before.
+  //
+  if (Iter != LocToBitIndex.end()) 
+    return Iter->second;
+
+  LocToBitIndex[Loc] = MemLocationVault.size();
+  MemLocationVault.push_back(Loc);
+  return getMemLocationBit(Loc);
 }
 
 bool
 RLEContext::runIteration() {
+  // Walk over the function and find all the locations accessed by
+  // this function.
+  MemLocationVault.clear();
+  LocToBitIndex.clear();
+  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex);
+
   bool Changed = false;
   for (SILBasicBlock *BB : ReversePostOrder) {
     auto IDIter = BBToBBIDMap.find(BB);
