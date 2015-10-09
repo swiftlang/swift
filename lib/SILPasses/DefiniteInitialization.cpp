@@ -75,12 +75,13 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
 
 /// InsertCFGDiamond - Insert a CFG diamond at the position specified by the
 /// SILBuilder, with a conditional branch based on "Cond".  This returns the
-/// true, false, and continuation block.  If FalseBB is passed in as a null
-/// pointer, then only the true block is created - a CFG triangle instead of a
-/// diamond.
+/// true, false, and continuation block.  If createTrueBB or createFalseBB is
+/// false, then only one of the two blocks is created - a CFG triangle instead
+/// of a diamond.
 ///
 /// The SILBuilder is left at the start of the ContBB block.
 static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
+                             bool createTrueBB,
                              bool createFalseBB,
                              SILBasicBlock *&TrueBB,
                              SILBasicBlock *&FalseBB,
@@ -91,13 +92,20 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
   // Start by splitting the current block.
   ContBB = StartBB->splitBasicBlock(B.getInsertionPoint());
   
-  // Create the true block.
-  TrueBB = new (Module) SILBasicBlock(StartBB->getParent());
-  B.moveBlockTo(TrueBB, ContBB);
-  B.setInsertionPoint(TrueBB);
-  B.createBranch(Loc, ContBB);
+  // Create the true block if requested.
+  SILBasicBlock *TrueDest;
+  if (!createTrueBB) {
+    TrueDest = ContBB;
+    TrueBB = nullptr;
+  } else {
+    TrueDest = new (Module) SILBasicBlock(StartBB->getParent());
+    B.moveBlockTo(TrueDest, ContBB);
+    B.setInsertionPoint(TrueDest);
+    B.createBranch(Loc, ContBB);
+    TrueBB = TrueDest;
+  }
   
-  // If the client wanted a false BB, create it too.
+  // Create the false block if requested.
   SILBasicBlock *FalseDest;
   if (!createFalseBB) {
     FalseDest = ContBB;
@@ -113,7 +121,7 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
   // Now that we have our destinations, insert a conditional branch on the
   // condition.
   B.setInsertionPoint(StartBB);
-  B.createCondBranch(Loc, Cond, TrueBB, FalseDest);
+  B.createCondBranch(Loc, Cond, TrueDest, FalseDest);
   
   B.setInsertionPoint(ContBB, ContBB->begin());
 }
@@ -422,7 +430,8 @@ namespace {
     DIMemoryObjectInfo TheMemory;
 
     SmallVectorImpl<DIMemoryUse> &Uses;
-    SmallVectorImpl<SILInstruction*> &Releases;
+    SmallVectorImpl<SILBasicBlock *> &FailureBBs;
+    SmallVectorImpl<SILInstruction *> &Releases;
     std::vector<ConditionalDestroy> ConditionalDestroys;
 
     llvm::SmallDenseMap<SILBasicBlock*, LiveOutBlockState, 32> PerBlockInfo;
@@ -433,8 +442,16 @@ namespace {
 
     /// This is true when there is an ambiguous store, which may be an init or
     /// assign, depending on the CFG path.
-    bool HasConditionalInitAssignOrDestroys = false;
+    bool HasConditionalInitAssign = false;
+
+    /// This is true when there is an ambiguous destroy, which may be a release
+    /// of a fully-initialized or a partially-initialized value.
+    bool HasConditionalDestroy = false;
     
+    /// This is true when there is a destroy on a path where the self value may
+    /// have been consumed, in which case there is nothing to do.
+    bool HasConditionalSelfConsumed = false;
+
     // Keep track of whether we've emitted an error.  We only emit one error per
     // location as a policy decision.
     std::vector<SourceLoc> EmittedErrorLocs;
@@ -473,8 +490,10 @@ namespace {
     void updateInstructionForInitState(DIMemoryUse &InstInfo);
 
 
-    void processUninitializedRelease(unsigned ReleaseID,
+    void processUninitializedRelease(SILInstruction *Release,
+                                     bool consumed,
                                      SILBasicBlock::iterator InsertPt);
+    void deleteDeadRelease(unsigned ReleaseID);
 
     void processNonTrivialRelease(unsigned ReleaseID);
 
@@ -503,7 +522,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                                  SmallVectorImpl<SILBasicBlock*> &FailureBBs,
                                  SmallVectorImpl<SILInstruction*> &Releases)
   : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory), Uses(Uses),
-    Releases(Releases) {
+    FailureBBs(FailureBBs), Releases(Releases) {
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -786,7 +805,9 @@ void LifetimeChecker::doIt() {
   // based on the control flow path reaching them, then insert dynamic control
   // logic and CFG diamonds to handle this.
   SILValue ControlVariable;
-  if (HasConditionalInitAssignOrDestroys && TheMemory.getNumMemoryElements())
+  if (HasConditionalInitAssign ||
+      HasConditionalDestroy ||
+      HasConditionalSelfConsumed)
     ControlVariable = handleConditionalInitAssign();
   if (!ConditionalDestroys.empty())
     handleConditionalDestroys(ControlVariable);
@@ -871,7 +892,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     // we can insert a single control variable for the memory object for the
     // whole function.
     if (!InstInfo.onlyTouchesTrivialElements(TheMemory))
-      HasConditionalInitAssignOrDestroys = true;
+      HasConditionalInitAssign = true;
     return;
   }
   
@@ -1435,11 +1456,9 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &InstInfo) {
   assert(isa<StoreInst>(Inst) && "Unknown store instruction!");
 }
 
-void LifetimeChecker::processUninitializedRelease(unsigned ReleaseID,
+void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
+                                                  bool consumed,
                                              SILBasicBlock::iterator InsertPt) {
-  SILInstruction *Release = Releases[ReleaseID];
-  SILInstruction *Dealloc = nullptr;
-
   // If this is an early release in a class, we need to emit a dealloc_ref to
   // free the memory.  If this is a derived class, we may have to do a load of
   // the 'self' box to get the class reference.
@@ -1456,21 +1475,27 @@ void LifetimeChecker::processUninitializedRelease(unsigned ReleaseID,
     if (isa<AllocBoxInst>(Pointer))
       Pointer = SILValue(Pointer.getDef(), 1);
 
-    if (Pointer.getType().isAddress())
-      Pointer = B.createLoad(Release->getLoc(), Pointer);
-    Dealloc = B.createDeallocRef(Release->getLoc(), Pointer,
-                                 DeallocRefInst::Constructor);
+    if (!consumed) {
+      if (Pointer.getType().isAddress())
+        Pointer = B.createLoad(Release->getLoc(), Pointer);
+      B.createDeallocRef(Release->getLoc(), Pointer,
+                         DeallocRefInst::Constructor);
+    }
     
     // dealloc_box the self box is necessary.
-    if (isa<AllocBoxInst>(Release->getOperand(0))) {
-      auto DB = B.createDeallocBox(Release->getLoc(), Pointer.getType(),
-                                   Release->getOperand(0));
+    if (auto *ABI = dyn_cast<AllocBoxInst>(Release->getOperand(0))) {
+      auto DB = B.createDeallocBox(Release->getLoc(),
+                                   ABI->getElementType(),
+                                   ABI);
       Releases.push_back(DB);
     }
   }
+}
 
+void LifetimeChecker::deleteDeadRelease(unsigned ReleaseID) {
+  SILInstruction *Release = Releases[ReleaseID];
   Release->eraseFromParent();
-  Releases[ReleaseID] = Dealloc;
+  Releases[ReleaseID] = nullptr;
   if (isa<DestroyAddrInst>(Release)) {
     SILValue Addr = Release->getOperand(0);
     if (auto *AddrI = dyn_cast<SILInstruction>(Addr))
@@ -1550,13 +1575,15 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
 
   // If it is all 'no' then we can handle is specially without conditional code.
   if (Availability.isAllNo()) {
-    processUninitializedRelease(ReleaseID, Release);
+    processUninitializedRelease(Release, false, Release);
+    deleteDeadRelease(ReleaseID);
     return;
   }
   
   // If any elements are conditionally live, we need to emit conditional logic.
-  if (Availability.hasAny(DIKind::Partial))
-    HasConditionalInitAssignOrDestroys = true;
+  if (Availability.hasAny(DIKind::Partial) &&
+      TheMemory.getNumMemoryElements())
+    HasConditionalDestroy = true;
 
   // Otherwise, it is partially live, save it for later processing.
   ConditionalDestroys.push_back({ ReleaseID, Availability, SelfConsumed });
@@ -1583,6 +1610,71 @@ static Identifier getTruncateToI1Function(SILType IntSILTy, ASTContext &C) {
   return C.getIdentifier(NameStr);
 }
 
+/// Set a bit in the control variable at the current insertion point.
+static void updateControlVariable(SILLocation Loc,
+                                  const APInt &Bitmask,
+                                  SILValue ControlVariable,
+                                  Identifier &OrFn,
+                                  SILBuilder &B) {
+  SILType IVType = ControlVariable.getType().getObjectType();
+
+  // Get the integer constant.
+  SILValue MaskVal = B.createIntegerLiteral(Loc, IVType, Bitmask);
+  
+  // If the mask is all ones, do a simple store, otherwise do a
+  // load/or/store sequence to mask in the bits.
+  if (!Bitmask.isAllOnesValue()) {
+    SILValue Tmp = B.createLoad(Loc, ControlVariable);
+    if (!OrFn.get())
+      OrFn = getBinaryFunction("or", IVType, B.getASTContext());
+      
+    SILValue Args[] = { Tmp, MaskVal };
+    MaskVal = B.createBuiltin(Loc, OrFn, IVType, {}, Args);
+  }
+
+  B.createStore(Loc, MaskVal, ControlVariable);
+}
+
+/// Test a bit in the control variable at the current insertion point.
+static SILValue testControlVariable(SILLocation Loc,
+                                    unsigned Elt,
+                                    SILValue ControlVariableAddr,
+                                    SILValue &ControlVariable,
+                                    Identifier &ShiftRightFn,
+                                    Identifier &TruncateFn,
+                                    SILBuilder &B) {
+  if (!ControlVariable)
+    ControlVariable = B.createLoad(Loc, ControlVariableAddr);
+
+  SILValue CondVal = ControlVariable;
+  CanBuiltinIntegerType IVType = CondVal.getType().castTo<BuiltinIntegerType>();
+
+  // If this memory object has multiple tuple elements, we need to make sure
+  // to test the right one.
+  if (IVType->getFixedWidth() == 1)
+    return CondVal;
+
+  // Shift the mask down to this element.
+  if (Elt != 0) {
+    if (!ShiftRightFn.get())
+      ShiftRightFn = getBinaryFunction("lshr", CondVal.getType(),
+                                       B.getASTContext());
+    SILValue Amt = B.createIntegerLiteral(Loc, CondVal.getType(), Elt);
+    SILValue Args[] = { CondVal, Amt };
+    
+    CondVal = B.createBuiltin(Loc, ShiftRightFn,
+                              CondVal.getType(), {},
+                              Args);
+  }
+  
+  if (!TruncateFn.get())
+    TruncateFn = getTruncateToI1Function(CondVal.getType(),
+                                         B.getASTContext());
+  return B.createBuiltin(Loc, TruncateFn,
+                         SILType::getBuiltinIntegerType(1, B.getASTContext()),
+                         {}, CondVal);
+}
+
 /// handleConditionalInitAssign - This memory object has some stores
 /// into (some element of) it that is either an init or an assign based on the
 /// control flow path through the function, or have a destroy event that happens
@@ -1601,7 +1693,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
                             TheMemory.getFunction().getDebugScope());
   SILType IVType =
     SILType::getBuiltinIntegerType(NumMemoryElements, Module.getASTContext());
-  auto *Alloc = B.createAllocStack(Loc, IVType);
+  auto *ControlVariableBox = B.createAllocStack(Loc, IVType);
   
   // Find all the return blocks in the function, inserting a dealloc_stack
   // before the return.
@@ -1609,15 +1701,15 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     auto *Term = BB.getTerminator();
     if (isa<ReturnInst>(Term) || isa<ThrowInst>(Term)) {
       B.setInsertionPoint(Term);
-      B.createDeallocStack(Loc, Alloc->getContainerResult());
+      B.createDeallocStack(Loc, ControlVariableBox->getContainerResult());
     }
   }
   
   // Before the memory allocation, store zero in the control variable.
   B.setInsertionPoint(TheMemory.MemoryInst->getNextNode());
-  SILValue AllocAddr = SILValue(Alloc, 1);
+  SILValue ControlVariableAddr = SILValue(ControlVariableBox, 1);
   auto Zero = B.createIntegerLiteral(Loc, IVType, 0);
-  B.createStore(Loc, Zero, AllocAddr);
+  B.createStore(Loc, Zero, ControlVariableAddr);
   
   Identifier OrFn;
 
@@ -1628,6 +1720,8 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     
     // Ignore deleted uses.
     if (Use.Inst == nullptr) continue;
+    
+    B.setInsertionPoint(Use.Inst);
     
     // Only full initializations make something live.  inout uses, escapes, and
     // assignments only happen when some kind of init made the element live.
@@ -1645,23 +1739,9 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       // need to update the bitvector.
       if (Use.onlyTouchesTrivialElements(TheMemory))
         continue;
-      
-      // Get the integer constant.
-      B.setInsertionPoint(Use.Inst);
-      APInt Bitmask = Use.getElementBitmask(NumMemoryElements);
-      SILValue MaskVal = B.createIntegerLiteral(Loc, IVType, Bitmask);
 
-      // If the mask is all ones, do a simple store, otherwise do a
-      // load/or/store sequence to mask in the bits.
-      if (!Bitmask.isAllOnesValue()) {
-        SILValue Tmp = B.createLoad(Loc, AllocAddr);
-        if (!OrFn.get())
-          OrFn = getBinaryFunction("or", Tmp.getType(), B.getASTContext());
-        
-        SILValue Args[] = { Tmp, MaskVal };
-        MaskVal = B.createBuiltin(Loc, OrFn, Tmp.getType(), {}, Args);
-      }
-      B.createStore(Loc, MaskVal, AllocAddr);
+      APInt Bitmask = Use.getElementBitmask(NumMemoryElements);
+      updateControlVariable(Loc, Bitmask, ControlVariableAddr, OrFn, B);
       continue;
     }
 
@@ -1673,15 +1753,13 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     // element precise.
     if (Use.onlyTouchesTrivialElements(TheMemory))
       continue;
-    
-    B.setInsertionPoint(Use.Inst);
 
     // If this is the interesting case, we need to generate a CFG diamond for
     // each element touched, destroying any live elements so that the resulting
     // store is always an initialize.  This disambiguates the dynamic
     // uncertainty with a runtime check.
-    SILValue Bitmask = B.createLoad(Loc, AllocAddr);
-    
+    SILValue ControlVariable;
+
     // If we have multiple tuple elements, we'll have to do some shifting and
     // truncating of the mask value.  These values cache the function_ref so we
     // don't emit multiple of them.
@@ -1692,31 +1770,13 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     // initialization.
     for (unsigned Elt = Use.FirstElement, e = Elt+Use.NumElements;
          Elt != e; ++Elt) {
-      B.setInsertionPoint(Use.Inst);
-      SILValue CondVal = Bitmask;
-      if (NumMemoryElements != 1) {
-        // Shift the mask down to this element.
-        if (Elt != 0) {
-          if (!ShiftRightFn.get())
-            ShiftRightFn = getBinaryFunction("lshr", Bitmask.getType(),
-                                             B.getASTContext());
-          SILValue Amt = B.createIntegerLiteral(Loc, Bitmask.getType(), Elt);
-          SILValue Args[] = { CondVal, Amt };
-          CondVal = B.createBuiltin(Loc, ShiftRightFn, Bitmask.getType(),
-          {}, Args);
-        }
-        
-        if (!TruncateFn.get())
-          TruncateFn = getTruncateToI1Function(Bitmask.getType(),
-                                               B.getASTContext());
-        CondVal = B.createBuiltin(Loc, TruncateFn,
-                                  SILType::getBuiltinIntegerType(1,
-                                                             B.getASTContext()),
-                                  {}, CondVal);
-      }
+      auto CondVal = testControlVariable(Loc, Elt, ControlVariableAddr,
+                                         ControlVariable, ShiftRightFn, TruncateFn,
+                                         B);
       
       SILBasicBlock *TrueBB, *FalseBB, *ContBB;
       InsertCFGDiamond(CondVal, Loc, B,
+                       /*createTrueBB=*/true,
                        /*createFalseBB=*/false,
                        TrueBB, FalseBB, ContBB);
 
@@ -1725,6 +1785,8 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       SILValue EltPtr = TheMemory.emitElementAddress(Elt, Loc, B);
       if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
         Releases.push_back(DA);
+
+      B.setInsertionPoint(ContBB->begin());
     }
     
     // Finally, now that we know the value is uninitialized on all paths, it is
@@ -1741,7 +1803,7 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
     --i;
   }
 
-  return AllocAddr;
+  return ControlVariableAddr;
 }
 
 /// Process any destroy_addr and strong_release instructions that are invoked on
@@ -1763,7 +1825,10 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     auto *Release = Releases[CDElt.ReleaseID];
     auto Loc = Release->getLoc();
     auto &Availability = CDElt.Availability;
+    SILValue ControlVariable;
     
+    B.setInsertionPoint(Release);
+
     // If the memory is not-fully initialized at the destroy_addr, then there
     // can be multiple issues: we could have some tuple elements initialized and
     // some not, or we could have a control flow sensitive situation where the
@@ -1775,7 +1840,6 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     // uninitialized, or partially initialized.  The first two cases are simple
     // to handle, whereas the partial case requires dynamic codegen based on the
     // liveness bitmask.
-    SILValue LoadedMask;
     for (unsigned Elt = 0; Elt != NumMemoryElements; ++Elt) {
       switch (Availability.get(Elt)) {
       case DIKind::No:
@@ -1790,7 +1854,6 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       case DIKind::Yes:
         // If an element is known to be initialized, then we can strictly
         // destroy its value at releases position.
-        B.setInsertionPoint(Release);
         SILValue EltPtr = TheMemory.emitElementAddress(Elt, Loc, B);
         if (auto *DA = B.emitDestroyAddrAndFold(Release->getLoc(), EltPtr))
           Releases.push_back(DA);
@@ -1803,39 +1866,14 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       
       // Insert a load of the liveness bitmask and split the CFG into a diamond
       // right before the destroy_addr, if we haven't already loaded it.
-      B.setInsertionPoint(Release);
-      if (!LoadedMask)
-        LoadedMask = B.createLoad(Loc, ControlVariableAddr);
-      SILValue CondVal = LoadedMask;
-      
-      // If this memory object has multiple tuple elements, we need to make sure
-      // to test the right one.
-      if (NumMemoryElements != 1) {
-        // Shift the mask down to this element.
-        if (Elt != 0) {
-          if (!ShiftRightFn.get())
-            ShiftRightFn = getBinaryFunction("lshr", CondVal.getType(),
-                                             B.getASTContext());
-          SILValue Amt = B.createIntegerLiteral(Loc, CondVal.getType(), Elt);
-          SILValue Args[] = { CondVal, Amt };
-          
-          CondVal = B.createBuiltin(Loc, ShiftRightFn,
-                                    CondVal.getType(), {},
-                                    Args);
-        }
-        
-        if (!TruncateFn.get())
-          TruncateFn = getTruncateToI1Function(CondVal.getType(),
-                                               B.getASTContext());
-        CondVal = B.createBuiltin(Loc, TruncateFn,
-                                  SILType::getBuiltinIntegerType(1,
-                                                             B.getASTContext()),
-                                  {}, CondVal);
-      }
+      auto CondVal = testControlVariable(Loc, Elt, ControlVariableAddr,
+                                         ControlVariable, ShiftRightFn, TruncateFn,
+                                         B);
       
       SILBasicBlock *ReleaseBlock, *DeallocBlock, *ContBlock;
 
       InsertCFGDiamond(CondVal, Loc, B,
+                       /*createTrueBB=*/true,
                        /*createFalseBB=*/TheMemory.isDelegatingInit(),
                        ReleaseBlock, DeallocBlock, ContBlock);
 
@@ -1848,8 +1886,10 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       // Set up the uninitialized release block.
       if (TheMemory.isDelegatingInit()) {
         assert(NumMemoryElements == 1);
-        processUninitializedRelease(CDElt.ReleaseID, DeallocBlock->begin());
+        processUninitializedRelease(Release, false, DeallocBlock->begin());
       }
+
+      B.setInsertionPoint(ContBlock->begin());
     }
 
     // If we're in a designated initializer, the elements of the memory
@@ -1859,7 +1899,11 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     // so if the self instance was fully initialized and we destroyed it
     // above, don't double-free the memory here.
     if (!TheMemory.isDelegatingInit())
-      processUninitializedRelease(CDElt.ReleaseID, B.getInsertionPoint());
+      processUninitializedRelease(Release, false, B.getInsertionPoint());
+
+    // We've split up the release into zero or more primitive operations,
+    // delete it now.
+    deleteDeadRelease(CDElt.ReleaseID);
   }
 }
 
