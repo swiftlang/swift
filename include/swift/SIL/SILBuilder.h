@@ -434,6 +434,15 @@ public:
     return insert(new (F.getModule()) UncheckedRefCastInst(Loc, Op, Ty));
   }
   
+  UncheckedRefCastAddrInst *
+  createUncheckedRefCastAddr(SILLocation loc,
+                             SILValue src, CanType sourceType,
+                             SILValue dest, CanType targetType) {
+    return insert(new (F.getModule())
+                  UncheckedRefCastAddrInst(loc, src, sourceType,
+                                           dest, targetType));
+  }
+
   UncheckedAddrCastInst *createUncheckedAddrCast(SILLocation Loc, SILValue Op,
                                                SILType Ty) {
     return insert(new (F.getModule()) UncheckedAddrCastInst(Loc, Op, Ty));

@@ -721,6 +721,7 @@ public:
   void visitAddressToPointerInst(AddressToPointerInst *i);
   void visitPointerToAddressInst(PointerToAddressInst *i);
   void visitUncheckedRefCastInst(UncheckedRefCastInst *i);
+  void visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *i);
   void visitUncheckedAddrCastInst(UncheckedAddrCastInst *i);
   void visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *i);
   void visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *i);
@@ -3552,6 +3553,17 @@ void IRGenSILFunction::visitUncheckedRefCastInst(
                                              swift::UncheckedRefCastInst *i) {
   auto &ti = getTypeInfo(i->getType());
   emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0), ti);
+}
+
+// TODO: Although runtime checks are not required, we get them anyway when
+// asking the runtime to perform this cast. If this is a performance impact, we
+// can add a CheckedCastMode::Unchecked.
+void IRGenSILFunction::
+visitUncheckedRefCastAddrInst(swift::UncheckedRefCastAddrInst *i) {
+  Address dest = getLoweredAddress(i->getDest());
+  Address src = getLoweredAddress(i->getSrc());
+  emitCheckedCast(*this, src, i->getSourceType(), dest, i->getTargetType(),
+                  i->getConsumptionKind(), CheckedCastMode::Unconditional);
 }
 
 void IRGenSILFunction::visitUncheckedAddrCastInst(

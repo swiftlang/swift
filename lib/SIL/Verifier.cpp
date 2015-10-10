@@ -2154,6 +2154,13 @@ public:
     require(AI->getType().isHeapObjectReferenceType(),
             "unchecked_ref_cast result must be a heap object reference");
   }
+
+  void checkUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *AI) {
+    require(AI->getSrc().getType().isAddress(),
+            "unchecked_ref_cast_addr operand must be an address");
+    require(AI->getDest().getType().isAddress(),
+            "unchecked_ref_cast_addr result must be an address");
+  }
   
   void checkUncheckedAddrCastInst(UncheckedAddrCastInst *AI) {
     require(AI->getOperand().getType().isAddress(),

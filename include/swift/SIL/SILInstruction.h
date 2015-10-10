@@ -1529,6 +1529,46 @@ class UncheckedRefCastInst
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
+/// Converts a heap object reference to a different type without any runtime
+/// checks. This is a variant of UncheckedRefCast that works on address types,
+/// thus encapsulates an implicit load and take of the reference followed by a
+/// store and initialization of a new reference.
+class UncheckedRefCastAddrInst : public SILInstruction {
+  enum {
+    /// the value being stored
+    Src,
+    /// the lvalue being stored to
+    Dest
+  };
+  FixedOperandList<2> Operands;
+  CanType SourceType;
+  CanType TargetType;
+public:
+UncheckedRefCastAddrInst(SILLocation loc,
+                         SILValue src, CanType srcType,
+                         SILValue dest, CanType targetType);
+
+  CastConsumptionKind getConsumptionKind() const {
+    return CastConsumptionKind::TakeAlways;
+  }
+
+  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  /// Returns the formal type of the source value.
+  CanType getSourceType() const { return SourceType; }
+
+  /// Returns the formal target type.
+  CanType getTargetType() const { return TargetType; }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::UncheckedRefCastAddrInst;
+  }
+};
+
 class UncheckedAddrCastInst
   : public UnaryInstructionBase<ValueKind::UncheckedAddrCastInst,
                                 ConversionInst>

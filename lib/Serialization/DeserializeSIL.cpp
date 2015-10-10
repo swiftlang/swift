@@ -1683,6 +1683,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                     successBB, failureBB);
     break;
   }
+  case ValueKind::UncheckedRefCastAddrInst: {
+    CanType sourceType = MF->getType(ListOfValues[0])->getCanonicalType();
+    SILType srcAddrTy = getSILType(MF->getType(ListOfValues[3]),
+                                   (SILValueCategory)ListOfValues[4]);
+    SILValue src = getLocalValue(ListOfValues[1], ListOfValues[2], srcAddrTy);
+
+    CanType targetType = MF->getType(ListOfValues[5])->getCanonicalType();
+    SILType destAddrTy =
+      getSILType(MF->getType(TyID), (SILValueCategory) TyCategory);
+    SILValue dest = getLocalValue(ListOfValues[6], ListOfValues[7], destAddrTy);
+
+    ResultVal = Builder.createUncheckedRefCastAddr(Loc, src, sourceType,
+                                                   dest, targetType);
+    break;
+  }
   case ValueKind::InitBlockStorageHeaderInst: {
     assert(ListOfValues.size() == 6 &&
            "expected 6 values for InitBlockStorageHeader");

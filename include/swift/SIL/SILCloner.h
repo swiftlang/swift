@@ -760,6 +760,20 @@ visitUncheckedRefCastInst(UncheckedRefCastInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::
+visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *Inst) {
+  SILLocation OpLoc = getOpLocation(Inst->getLoc());
+  SILValue SrcValue = getOpValue(Inst->getSrc());
+  SILValue DestValue = getOpValue(Inst->getDest());
+  CanType SrcType = getOpASTType(Inst->getSourceType());
+  CanType TargetType = getOpASTType(Inst->getTargetType());
+  doPostProcess(Inst, getBuilder().
+                createUncheckedRefCastAddr(OpLoc, SrcValue, SrcType,
+                                           DestValue, TargetType));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
 visitUncheckedAddrCastInst(UncheckedAddrCastInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createUncheckedAddrCast(getOpLocation(Inst->getLoc()),

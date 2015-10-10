@@ -1279,6 +1279,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("unchecked_ref_bit_cast", ValueKind::UncheckedRefBitCastInst)
     .Case("unchecked_bitwise_cast", ValueKind::UncheckedBitwiseCastInst)
     .Case("unchecked_ref_cast", ValueKind::UncheckedRefCastInst)
+    .Case("unchecked_ref_cast_addr", ValueKind::UncheckedRefCastAddrInst)
     .Case("unchecked_take_enum_data_addr", ValueKind::UncheckedTakeEnumDataAddrInst)
     .Case("thick_to_objc_metatype", ValueKind::ThickToObjCMetatypeInst)
     .Case("thin_function_to_pointer", ValueKind::ThinFunctionToPointerInst)
@@ -2083,9 +2084,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       
   // Indirect checked conversion instructions.
   case ValueKind::UnconditionalCheckedCastAddrInst:
-  case ValueKind::CheckedCastAddrBranchInst: {
+  case ValueKind::CheckedCastAddrBranchInst:
+  case ValueKind::UncheckedRefCastAddrInst: {
     CastConsumptionKind consumptionKind;
-    {
+    if (Opcode == ValueKind::UncheckedRefCastAddrInst)
+      consumptionKind = CastConsumptionKind::TakeAlways;
+    else {
       Identifier consumptionKindToken;
       SourceLoc consumptionKindLoc;
       if (parseSILIdentifier(consumptionKindToken, consumptionKindLoc,
@@ -2096,7 +2100,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                                    consumptionKind))
         return true;
     }
-
     auto parseFormalTypeAndValue = [&](CanType &formalType,
                                        SILValue &value) -> bool {
       return (parseASTType(formalType) ||
@@ -2112,7 +2115,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseFormalTypeAndValue(targetType, destAddr))
       return true;
 
-    if (Opcode == ValueKind::UnconditionalCheckedCastAddrInst) {
+    if (Opcode == ValueKind::UncheckedRefCastAddrInst) {
+      ResultVal = B.createUncheckedRefCastAddr(InstLoc,
+                                               sourceAddr, sourceType,
+                                               destAddr, targetType);
+      break;
+    } else if (Opcode == ValueKind::UnconditionalCheckedCastAddrInst) {
       ResultVal = B.createUnconditionalCheckedCastAddr(InstLoc,
                                                        consumptionKind,
                                                        sourceAddr, sourceType,

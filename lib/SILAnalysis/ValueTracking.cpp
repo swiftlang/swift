@@ -123,6 +123,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::ObjCMetatypeToObjectInst:
   case ValueKind::ObjCToThickMetatypeInst:
   case ValueKind::UncheckedRefCastInst:
+  case ValueKind::UncheckedRefCastAddrInst:
   case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UncheckedTrivialBitCastInst:
   case ValueKind::UncheckedRefBitCastInst:

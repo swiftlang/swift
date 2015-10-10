@@ -3479,14 +3479,39 @@ unchecked_ref_cast
 
   sil-instruction ::= 'unchecked_ref_cast' sil-operand 'to' sil-type
 
-  %1 = unchecked_ref_cast %0 : $C to $D
-  // %0 must be of heap object reference type $C
-  // $D must be a heap object reference type
-  // %1 will be of type $D
+  %1 = unchecked_ref_cast %0 : $A to $B
+  // %0 must be an object of type $A
+  // $A must be a type with retainable pointer representation
+  // %1 will be of type $B
+  // $B must be a type with retainable pointer representation
 
-Converts a heap object reference to another heap object reference type.
-This conversion is unchecked, and it is undefined behavior if the
-destination type is not a valid type for the heap object.
+Converts a heap object reference to another heap object reference
+type. This conversion is unchecked, and it is undefined behavior if
+the destination type is not a valid type for the heap object. The heap
+object reference on either side of the cast may be a class
+existential, and may be wrapped in one level of Optional.
+
+unchecked_ref_cast_addr
+```````````````````````
+::
+
+  sil-instruction ::= 'unchecked_ref_cast_addr'
+                      sil-type 'in' sil-operand 'to'
+                      sil-type 'in' sil-operand
+
+  unchecked_ref_cast_addr $A in %0 : $*A to $B in %1 : $*B
+  // %0 must be the address of an object of type $A
+  // $A must be a type with retainable pointer representation
+  // %1 must be the address of storage for an object of type $B
+  // $B must be a retainable pointer representation
+
+Loads a heap object reference from an address and stores it at the
+address of another uninitialized heap object reference. The loaded
+reference is always taken, and the stored reference is
+initialized. This conversion is unchecked, and it is undefined
+behavior if the destination type is not a valid type for the heap
+object. The heap object reference on either side of the cast may be a
+class existential, and may be wrapped in one level of Optional.
 
 unchecked_addr_cast
 ```````````````````

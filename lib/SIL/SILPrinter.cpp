@@ -922,6 +922,11 @@ public:
   void visitUncheckedRefCastInst(UncheckedRefCastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_ref_cast");
   }
+  void visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *CI) {
+    *this << "unchecked_ref_cast_addr "
+       << ' '    << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
+       << " to " << CI->getTargetType() << " in " << getIDAndType(CI->getDest());
+  }
   void visitUncheckedAddrCastInst(UncheckedAddrCastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_addr_cast");
   }

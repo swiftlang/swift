@@ -269,6 +269,7 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   case ValueKind::AddressToPointerInst:
   case ValueKind::PointerToAddressInst:
   case ValueKind::UncheckedRefCastInst:
+  case ValueKind::UncheckedRefCastAddrInst:
   case ValueKind::UncheckedAddrCastInst:
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RawPointerToRefInst:

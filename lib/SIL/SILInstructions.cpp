@@ -477,6 +477,15 @@ CopyAddrInst::CopyAddrInst(SILLocation Loc, SILValue SrcLValue, SILValue DestLVa
 {
 }
 
+UncheckedRefCastAddrInst::
+UncheckedRefCastAddrInst(SILLocation loc,
+                         SILValue src, CanType srcType,
+                         SILValue dest, CanType targetType)
+  : SILInstruction(ValueKind::UncheckedRefCastAddrInst, loc),
+    Operands(this, src, dest), 
+    SourceType(srcType), TargetType(targetType) {
+}
+
 UnconditionalCheckedCastAddrInst::
 UnconditionalCheckedCastAddrInst(SILLocation loc,
                                  CastConsumptionKind consumption,

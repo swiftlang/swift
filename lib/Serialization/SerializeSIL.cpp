@@ -1103,6 +1103,25 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              llvm::makeArrayRef(listOfValues));
     break;
   }
+  case ValueKind::UncheckedRefCastAddrInst: {
+    auto CI = cast<UncheckedRefCastAddrInst>(&SI);
+    ValueID listOfValues[] = {
+      S.addTypeRef(CI->getSourceType()),
+      addValueRef(CI->getSrc()),
+      CI->getSrc().getResultNumber(),
+      S.addTypeRef(CI->getSrc().getType().getSwiftRValueType()),
+      (unsigned)CI->getSrc().getType().getCategory(),
+      S.addTypeRef(CI->getTargetType()),
+      addValueRef(CI->getDest()),
+      CI->getDest().getResultNumber()
+    };
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+             S.addTypeRef(CI->getDest().getType().getSwiftRValueType()),
+             (unsigned)CI->getDest().getType().getCategory(),
+             llvm::makeArrayRef(listOfValues));
+    break;
+  }
 
   case ValueKind::AssignInst:
   case ValueKind::CopyAddrInst:
