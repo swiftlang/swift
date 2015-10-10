@@ -1541,12 +1541,15 @@ public:
 /// thus encapsulates an implicit load and take of the reference followed by a
 /// store and initialization of a new reference.
 class UncheckedRefCastAddrInst : public SILInstruction {
+public:
   enum {
     /// the value being stored
     Src,
     /// the lvalue being stored to
     Dest
   };
+
+private:
   FixedOperandList<2> Operands;
   CanType SourceType;
   CanType TargetType;

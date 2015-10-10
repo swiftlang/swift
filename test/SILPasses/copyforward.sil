@@ -474,3 +474,21 @@ bb0(%0 : $*T, %1 : $*T):
   %t = tuple ()
   return %t : $()
 }
+
+// CHECK-LABEL: forward_unchecked_ref_cast_addr
+// CHECK: unchecked_ref_cast_addr
+// CHECK-NOT: copy_addr
+// CHECK: return
+sil hidden @forward_unchecked_ref_cast_addr : $@convention(thin) (@out AClass, @in AnyObject) -> () {
+bb0(%0 : $*AClass, %1 : $*AnyObject):
+  %3 = alloc_stack $AnyObject                     // user: %10
+  %4 = alloc_stack $AnyObject                     // user: %9
+  %5 = alloc_stack $AClass                        // users: %6, %7, %8
+  unchecked_ref_cast_addr  AnyObject in %1 : $*AnyObject to AClass in %5#1 : $*AClass // id: %6
+  copy_addr [take] %5#1 to [initialization] %0 : $*AClass // id: %7
+  dealloc_stack %5#0 : $*@local_storage AClass    // id: %8
+  dealloc_stack %4#0 : $*@local_storage AnyObject // id: %9
+  dealloc_stack %3#0 : $*@local_storage AnyObject // id: %10
+  %11 = tuple ()                                  // user: %12
+  return %11 : $()                                // id: %12
+}

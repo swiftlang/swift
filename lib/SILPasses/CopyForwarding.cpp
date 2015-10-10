@@ -323,6 +323,13 @@ public:
     UncheckedTakeEnumDataAddrInst *UserInst) {
     llvm_unreachable("illegal deinitialization");
   }
+  bool visitUncheckedRefCastAddrInst(
+    UncheckedRefCastAddrInst *UserInst) {
+    if (UserInst->getDest() == Address) {
+      Oper = &UserInst->getAllOperands()[UncheckedRefCastAddrInst::Dest];
+    }
+    return true;
+  }
   bool visitDebugValueAddrInst(DebugValueAddrInst *UserInst) {
     Oper = &UserInst->getOperandRef();
     return false;
