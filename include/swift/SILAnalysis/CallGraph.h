@@ -399,6 +399,18 @@ public:
     return getCallGraphNode(F)->getPartialCallerEdges();
   }
 
+  // Call graph queries on call sites.
+
+  bool isCalleeSetComplete(FullApplySite FAS) {
+    return getCallGraphEdge(FAS)->isCalleeSetComplete();
+  }
+
+  /// Return a callee set that is known to be complete.
+  CallGraphEdge::CalleeSetType
+  getCompleteCalleeSet(FullApplySite FAS) const {
+    return getCallGraphEdge(FAS)->getCompleteCalleeSet();
+  }
+
   // Printing/dumping functionality.
 
   void print(llvm::raw_ostream &OS);

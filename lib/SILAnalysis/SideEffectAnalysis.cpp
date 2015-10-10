@@ -369,19 +369,17 @@ void SideEffectAnalysis::getEffectsOfApply(FunctionEffects &ApplyEffects,
   if (getSemanticEffects(ApplyEffects, FAS))
     return;
 
-  if (CallGraphEdge *Edge = CG.getCallGraphEdge(FAS)) {
-    if (Edge->isCalleeSetComplete()) {
-      // We can see all the callees. So we just merge the effects from all of
-      // them.
-      auto CalleeSet = Edge->getCompleteCalleeSet();
-      for (auto *Node : CalleeSet) {
-        auto *E = getFunctionEffects(Node->getFunction(), isRecomputing);
-        ApplyEffects.mergeFrom(*E);
-      }
-      return;
-    }
+  if (!CG.isCalleeSetComplete(FAS)) {
+    ApplyEffects.setWorstEffects();
+    return;
   }
-  ApplyEffects.setWorstEffects();
+
+  // We can see all the callees. So we just merge the effects from all of
+  // them.
+  for (auto *Node : CG.getCompleteCalleeSet(FAS)) {
+    auto *E = getFunctionEffects(Node->getFunction(), isRecomputing);
+    ApplyEffects.mergeFrom(*E);
+  }
 }
 
 void SideEffectAnalysis::initialize(SILPassManager *PM) {
