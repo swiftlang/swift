@@ -1528,7 +1528,6 @@ class UncheckedRefCastInst
   UncheckedRefCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 
-  // Allow reference casting of heap objects and class existentials.
 public:
   // Only reference cast heap objects with single pointer representation.
   static bool canRefCastType(SILType Ty) {

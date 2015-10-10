@@ -304,6 +304,45 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
 }
 
 SILInstruction *
+SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
+  SILType SrcTy = URCI->getSrc().getType();
+  if (!SrcTy.isLoadable(URCI->getModule()))
+    return nullptr;
+
+  SILType DestTy = URCI->getDest().getType();
+  if (!DestTy.isLoadable(URCI->getModule()))
+    return nullptr;
+
+  // After promoting unchecked_ref_cast_addr to unchecked_ref_cast, the SIL
+  // verifier will assert that the loadable source and dest type of reference
+  // castable. If the static types are invalid, avoid promotion. The runtime
+  // will then report a failure if this cast is ever executed.
+  if (!UncheckedRefCastInst::canRefCastType(SrcTy)
+      || !UncheckedRefCastInst::canRefCastType(DestTy))
+    return nullptr;
+ 
+  // Casting from class existential to heap object is handled implicitly by
+  // unchecked_ref_cast (IRGen assumes layout compatibility).
+  //
+  // TODO: handle casting to a loadable existential by generating
+  // init_existential_ref. Until then, only promote to a heap object dest.
+  if (!DestTy.isHeapObjectReferenceType())
+    return nullptr;
+
+  SILLocation Loc = URCI->getLoc();
+  SILDebugScope *Scope = URCI->getDebugScope();
+  LoadInst *load = Builder.createLoad(Loc, URCI->getSrc());
+  load->setDebugScope(Scope);
+  auto *cast = Builder.createUncheckedRefCast(Loc, load,
+                                               DestTy.getObjectType());
+  cast->setDebugScope(Scope);
+  StoreInst *store = Builder.createStore(Loc, cast, URCI->getDest());
+  store->setDebugScope(Scope);
+
+  return eraseInstFromFunction(*URCI);
+}
+
+SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
   CastOpt.optimizeUnconditionalCheckedCastAddrInst(UCCAI);
@@ -412,8 +451,8 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
                                                  UBCI->getOperand(),
                                                  UBCI->getType());
 
-  if (UBCI->getType().canBitCastAsSingleRef()
-      && UBCI->getOperand().getType().canBitCastAsSingleRef())
+  if (UncheckedRefBitCastInst::canRefBitCastToType(UBCI->getOperand().getType())
+      && UncheckedRefBitCastInst::canRefBitCastFromType(UBCI->getType()))
     return Builder.createUncheckedRefBitCast(UBCI->getLoc(),
                                              UBCI->getOperand(),
                                              UBCI->getType());
