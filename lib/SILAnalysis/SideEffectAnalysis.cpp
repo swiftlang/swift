@@ -264,9 +264,7 @@ void SideEffectAnalysis::analyzeFunction(SILFunction *F,
   if (FE->mergeFrom(NewEffects)) {
     // The effects have changed. We also have to recompute the effects of all
     // callers.
-    auto *Node = CG.getCallGraphNode(F);
-    auto &CallerSet = Node->getPartialCallerEdges();
-    for (CallGraphEdge *CallerEdge : CallerSet) {
+    for (auto *CallerEdge : CG.getPartialCallerEdges(F)) {
       SILFunction *Caller = CallerEdge->getApply().getFunction();
       WorkList.insert(Caller);
     }

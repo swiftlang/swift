@@ -383,12 +383,23 @@ public:
 
   void markCallerEdgesOfCalleesIncomplete(FullApplySite AI);
 
+  // Call graph queries on functions.
+
   /// May this function bind dynamic Self at one of its call sites?
   bool mayBindDynamicSelf(SILFunction *F) const {
     auto *Node = getCallGraphNode(F);
     assert(Node && "Expected call graph node for function!");
     return Node->mayBindDynamicSelf();
   }
+
+  /// Get the known set of call graph edges that represent possible
+  /// calls into a function.
+  const llvm::SmallPtrSetImpl<CallGraphEdge *> &
+  getPartialCallerEdges(SILFunction *F) const {
+    return getCallGraphNode(F)->getPartialCallerEdges();
+  }
+
+  // Printing/dumping functionality.
 
   void print(llvm::raw_ostream &OS);
   void printStats(llvm::raw_ostream &OS);
