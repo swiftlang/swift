@@ -403,6 +403,11 @@ public:
     return getCallGraphEdge(FAS)->getCompleteCalleeSet();
   }
 
+  /// Is this call site known to call exactly one single function?
+  bool hasSingleCallee(FullApplySite FAS) const {
+    return getCallGraphEdge(FAS)->hasSingleCallee();
+  }
+
   // Printing/dumping functionality.
 
   void print(llvm::raw_ostream &OS);
