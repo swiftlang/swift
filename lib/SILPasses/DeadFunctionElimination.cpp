@@ -380,14 +380,11 @@ public:
 
     CallGraph *CG = CGA->getCallGraphOrNull();
 
-    // First drop all references so that we don't get problems with non-null
+    // First drop all references so that we don't get problems with non-zero
     // reference counts of dead functions.
-    for (SILFunction &F : *Module) {
-      if (!isAlive(&F)) {
-        CallGraphEditor(CG).removeAllCalleeEdgesFrom(&F);
-        F.dropAllReferences();
-      }
-    }
+    for (SILFunction &F : *Module)
+      if (!isAlive(&F))
+        CallGraphEditor(CG).dropAllReferences(&F);
 
     // Next step: delete all dead functions.
     bool NeedUpdate = false;
@@ -396,9 +393,8 @@ public:
       if (!isAlive(F)) {
         DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
         NumDeadFunc++;
-        CallGraphEditor(CG).removeCallGraphNode(F);
+        CallGraphEditor(CG).eraseFunction(F);
         NeedUpdate = true;
-        Module->eraseFunction(F);
         CGA->lockInvalidation();
         DFEPass->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
         CGA->unlockInvalidation();
@@ -482,10 +478,9 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
     Blocks.clear();
     assert(F->isExternalDeclaration() &&
            "Function should be an external declaration");
-    if (F->getRefCount() == 0) {
-      Module->eraseFunction(F);
-      CallGraphEditor(CG).removeCallGraphNode(F);
-    }
+    if (F->getRefCount() == 0)
+      CallGraphEditor(CG).eraseFunction(F);
+
     NumEliminatedExternalDefs++;
     return true;
   }

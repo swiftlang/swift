@@ -524,6 +524,19 @@ public:
     if (CG)
       CG->computeClassMethodCallees();
   }
+
+  /// Drops all references in function and removes the references to
+  /// instructions in the function from the call graph.
+  void dropAllReferences(SILFunction *F) {
+    F->dropAllReferences();
+
+    if (CG)
+      CallGraphEditor(CG).removeAllCalleeEdgesFrom(F);
+  }
+
+  /// Erase the function from the module and any references to it from
+  /// the call graph.
+  void eraseFunction(SILFunction *F);
 };
 
 class CallGraphLinkerEditor {

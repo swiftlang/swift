@@ -14,6 +14,9 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/DemangleWrappers.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -796,6 +799,14 @@ void CallGraphEditor::updatePartialApplyUses(swift::ApplySite AI) {
     if (auto FAS = FullApplySite::isa(Use->getUser()))
       replaceApplyWithNew(FAS, FAS);
   }
+}
+
+void CallGraphEditor::eraseFunction(SILFunction *F) {
+  auto &M = F->getModule();
+  M.eraseFunction(F);
+
+  if (CG)
+    removeCallGraphNode(F);
 }
 
 //===----------------------------------------------------------------------===//
