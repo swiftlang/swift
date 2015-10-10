@@ -477,14 +477,17 @@ namespace {
                                       unsigned NumElts);
     DIKind getSelfConsumedAtInst(SILInstruction *Inst);
 
-    bool isInitializedAtUse(const DIMemoryUse &Use, bool *SuperInitDone = 0);
+    bool isInitializedAtUse(const DIMemoryUse &Use,
+                            bool *SuperInitDone = 0,
+                            bool *FailedSelfUse = 0);
 
     void handleStoreUse(unsigned UseID);
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
 
     void handleLoadUseFailure(const DIMemoryUse &InstInfo,
-                              bool IsSuperInitComplete);
+                              bool IsSuperInitComplete,
+                              bool FailedSelfUse);
 
     void handleSuperInitUse(const DIMemoryUse &InstInfo);
     void handleSelfInitUse(DIMemoryUse &InstInfo);
@@ -773,10 +776,10 @@ void LifetimeChecker::doIt() {
 
     case DIUseKind::IndirectIn:
     case DIUseKind::Load: {
-      bool IsSuperInitComplete;
+      bool IsSuperInitComplete, FailedSelfUse;
       // If the value is not definitively initialized, emit an error.
-      if (!isInitializedAtUse(Use, &IsSuperInitComplete))
-        handleLoadUseFailure(Use, IsSuperInitComplete);
+      if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse))
+        handleLoadUseFailure(Use, IsSuperInitComplete, FailedSelfUse);
       break;
     }
 
@@ -822,6 +825,14 @@ void LifetimeChecker::doIt() {
 
 void LifetimeChecker::handleStoreUse(unsigned UseID) {
   DIMemoryUse &InstInfo = Uses[UseID];
+
+  if (getSelfConsumedAtInst(InstInfo.Inst) != DIKind::No) {
+    // FIXME: more specific diagnostics here, handle this case gracefully below.
+    diagnose(Module, InstInfo.Inst->getLoc(),
+             diag::self_inside_catch_superselfinit,
+             (unsigned)TheMemory.isDelegatingInit());
+    return;
+  }
 
   // Determine the liveness state of the element that we care about.
   auto Liveness = getLivenessAtInst(InstInfo.Inst, InstInfo.FirstElement,
@@ -908,9 +919,19 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
 }
 
 void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
+  bool IsSuperInitDone, FailedSelfUse;
+
   // inout uses are generally straight-forward: the memory must be initialized
   // before the "address" is passed as an l-value.
-  if (!isInitializedAtUse(Use)) {
+  if (!isInitializedAtUse(Use, &IsSuperInitDone, &FailedSelfUse)) {
+    if (FailedSelfUse) {
+      // FIXME: more specific diagnostics here, handle this case gracefully below.
+      diagnose(Module, Use.Inst->getLoc(),
+               diag::self_inside_catch_superselfinit,
+               (unsigned)TheMemory.isDelegatingInit());
+      return;
+    }
+
     auto diagID = diag::variable_inout_before_initialized;
     
     if (isa<AddressToPointerInst>(Use.Inst))
@@ -1001,10 +1022,20 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
 void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
   // The value must be fully initialized at all escape points.  If not, diagnose
   // the error.
-  if (isInitializedAtUse(Use))
+  bool IsSuperInitDone, FailedSelfUse;
+
+  if (isInitializedAtUse(Use, &IsSuperInitDone, &FailedSelfUse))
     return;
 
   auto Inst = Use.Inst;
+
+  if (FailedSelfUse) {
+    // FIXME: more specific diagnostics here, handle this case gracefully below.
+    diagnose(Module, Inst->getLoc(),
+             diag::self_inside_catch_superselfinit,
+             (unsigned)TheMemory.isDelegatingInit());
+    return;
+  }
 
   // This is a use of an uninitialized value.  Emit a diagnostic.
   if (TheMemory.isDelegatingInit()) {
@@ -1086,8 +1117,17 @@ static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
 /// initialization of the type.
 ///
 void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
-                                           bool IsSuperInitComplete) {
+                                           bool IsSuperInitComplete,
+                                           bool FailedSelfUse) {
   SILInstruction *Inst = Use.Inst;
+  
+  if (FailedSelfUse) {
+    // FIXME: more specific diagnostics here, handle this case gracefully below.
+    diagnose(Module, Inst->getLoc(),
+             diag::self_inside_catch_superselfinit,
+             (unsigned)TheMemory.isDelegatingInit());
+    return;
+  }
 
   // If this is a load with a single user that is a return (and optionally a
   // retain_value for non-trivial structs/enums), then this is a return in the
@@ -1331,6 +1371,14 @@ void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
   // This is an apply or try_apply.
   auto *Inst = InstInfo.Inst;
 
+  if (getSelfConsumedAtInst(Inst) != DIKind::No) {
+    // FIXME: more specific diagnostics here, handle this case gracefully below.
+    diagnose(Module, Inst->getLoc(),
+             diag::self_inside_catch_superselfinit,
+             (unsigned)TheMemory.isDelegatingInit());
+    return;
+  }
+
   // Determine the liveness states of the memory object, including the
   // super.init state.
   AvailabilitySet Liveness = getLivenessAtInst(Inst, 0, TheMemory.NumElements);
@@ -1370,6 +1418,14 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
   auto *Inst = InstInfo.Inst;
 
   assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
+  
+  if (getSelfConsumedAtInst(Inst) != DIKind::No) {
+    // FIXME: more specific diagnostics here, handle this case gracefully below.
+    diagnose(Module, Inst->getLoc(),
+             diag::self_inside_catch_superselfinit,
+             (unsigned)TheMemory.isDelegatingInit());
+    return;
+  }
 
   // Determine the self.init state.  self.init() calls require that self.init
   // has not already been called. If it has, reject the program.
@@ -2141,19 +2197,28 @@ getSelfConsumedAtInst(SILInstruction *Inst) {
 /// whether all of the elements touched by the instruction are definitely
 /// initialized at this point or not.
 bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
-                                         bool *SuperInitDone) {
+                                         bool *SuperInitDone,
+                                         bool *FailedSelfUse) {
+  if (FailedSelfUse) *FailedSelfUse = false;
+  if (SuperInitDone) *SuperInitDone = true;
+  
+  // If the self.init() or super.init() call threw an error and
+  // we caught it, self is no longer available.
+  if (getSelfConsumedAtInst(Use.Inst) != DIKind::No) {
+    if (FailedSelfUse) *FailedSelfUse = true;
+    return false;
+  }
+
   // Determine the liveness states of the elements that we care about.
   AvailabilitySet Liveness =
     getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
 
   // If the client wants to know about super.init, check to see if we failed
   // it or some other element.
-  if (SuperInitDone) {
-    *SuperInitDone = true;
-    if (Use.FirstElement+Use.NumElements == TheMemory.NumElements &&
-        TheMemory.isAnyDerivedClassSelf() &&
-        Liveness.get(Liveness.size()-1) != DIKind::Yes)
-      *SuperInitDone = false;
+  if (Use.FirstElement+Use.NumElements == TheMemory.NumElements &&
+      TheMemory.isAnyDerivedClassSelf() &&
+      Liveness.get(Liveness.size()-1) != DIKind::Yes) {
+    if (SuperInitDone) *SuperInitDone = false;
   }
 
   // Check all the results.

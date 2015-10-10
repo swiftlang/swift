@@ -1340,3 +1340,51 @@ final class DerivedClass : BaseClass {
   }
 }
 
+func something(x: Int) {}
+
+func something(inout x: Int) {}
+
+func something(x: AnyObject) {}
+
+func something(x: Any.Type) {}
+
+// <rdar://problem/22946400> DI needs to diagnose self usages in error block
+//
+// FIXME: crappy QoI
+class ErrantClass {
+  let x: Int
+  var y: Int
+
+  init() throws {
+    x = 10
+    y = 10
+  }
+
+  convenience init(invalidEscape: ()) {
+    do {
+      try self.init()
+    } catch {}
+  } // expected-error {{'self' used inside 'catch' block containing self.init call}}
+
+  convenience init(invalidAccess: ()) throws {
+    do {
+      try self.init()
+    } catch let e {
+      something(x) // expected-error {{'self' used inside 'catch' block containing self.init call}}
+      something(self.x) // expected-error {{'self' used inside 'catch' block containing self.init call}}
+
+      something(y) // expected-error {{'self' used inside 'catch' block containing self.init call}}
+      something(self.y) // expected-error {{'self' used inside 'catch' block containing self.init call}}
+
+      something(&y) // expected-error {{'self' used inside 'catch' block containing self.init call}}
+      something(&self.y) // expected-error {{'self' used inside 'catch' block containing self.init call}}
+
+      something(self) // expected-error {{'self' used inside 'catch' block containing self.init call}}
+
+      // FIXME: not diagnosed
+      something(self.dynamicType)
+
+      throw e
+    }
+  }
+}
