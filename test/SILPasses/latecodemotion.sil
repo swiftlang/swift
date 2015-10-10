@@ -1600,7 +1600,7 @@ bb2:
 sil @sink_retain_over_switch_enum_cast : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   retain_value %0 : $Builtin.NativeObject
-  %1 = unchecked_ref_bit_cast %0 : $Builtin.NativeObject to $FakeOptional<Builtin.NativeObject>
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt.1, %0 : $Builtin.NativeObject
   switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
 
 bb1:

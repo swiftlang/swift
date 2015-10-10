@@ -138,7 +138,7 @@ func convOptionalLoadable(l1: Loadable? -> Loadable) {
 }
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oGSqV19function_conversion8Loadable__oS0__XFo_oGSQS0___oGSqS0___ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<Loadable>, @owned @callee_owned (@owned Optional<Loadable>) -> @owned Loadable) -> @owned Optional<Loadable>
-// CHECK:         unchecked_ref_bit_cast %0 : $ImplicitlyUnwrappedOptional<Loadable> to $Optional<Loadable>
+// CHECK:         unchecked_bitwise_cast %0 : $ImplicitlyUnwrappedOptional<Loadable> to $Optional<Loadable>
 // CHECK-NEXT:    apply %1(%2)
 // CHECK-NEXT:    enum $Optional<Loadable>
 // CHECK-NEXT:    return

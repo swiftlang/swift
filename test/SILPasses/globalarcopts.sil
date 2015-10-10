@@ -1265,25 +1265,27 @@ bb0(%0 : $S):
   cond_br undef, bb1, bb2
 
 bb1:
-  %1 = unchecked_ref_bit_cast %0 : $S to $@box Builtin.Int32
-  strong_retain %1 : $@box Builtin.Int32
-  br bb3
-
-bb2:
-  %2 = unchecked_ref_bit_cast %0 : $S to $@box Builtin.Int32
+  %1 = struct_extract %0 : $S, #S.x
+  %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $@box Builtin.Int32
   strong_retain %2 : $@box Builtin.Int32
   br bb3
 
-bb3:
-  %3 = unchecked_ref_bit_cast %0 : $S to $@box Builtin.Int32
-  %4 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
-  apply %4(%3) : $@convention(thin) (@box Builtin.Int32) -> ()
-  apply %4(%3) : $@convention(thin) (@box Builtin.Int32) -> ()
-  strong_release %3 : $@box Builtin.Int32
-  %5 = tuple()
-  return %5 : $()
-}
+bb2:
+  %3 = struct_extract %0 : $S, #S.x
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $@box Builtin.Int32
+  strong_retain %4 : $@box Builtin.Int32
+  br bb3
 
+bb3:
+  %5 = struct_extract %0 : $S, #S.x
+  %6 = unchecked_ref_cast %5 : $Builtin.NativeObject to $@box Builtin.Int32
+  %7 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %7(%6) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %7(%6) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %6 : $@box Builtin.Int32
+  %11 = tuple()
+  return %11 : $()
+}
 
 // CHECK-LABEL: sil @strip_off_layout_compatible_typed_geps : $@convention(thin) (S, FakeOptional<Builtin.NativeObject>) -> () {
 // CHECK-NOT: strong_retain

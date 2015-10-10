@@ -341,10 +341,8 @@ ManagedValue Transform::transform(ManagedValue v,
       SILValue result = v.getValue();
       if (v.getType().isAddress())
         result = SGF.B.createUncheckedAddrCast(Loc, result, loweredResultTy);
-      else if (expectedTL.isTrivial())
-        result = SGF.B.createUncheckedTrivialBitCast(Loc, result, loweredResultTy);
       else
-        result = SGF.B.createUncheckedRefBitCast(Loc, result, loweredResultTy);
+        result = SGF.B.createUncheckedBitCast(Loc, result, loweredResultTy);
       return ManagedValue(result, v.getCleanup());
     }
 

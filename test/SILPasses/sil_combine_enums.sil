@@ -222,9 +222,9 @@ public enum Y {
 }
 
 // Verify that we do not optimize
-//   (unchecked_enum_data (unchecked_ref_bit_cast V : $X to $Y), #Case)
+//   (unchecked_enum_data (unchecked_bitwise_cast V : $X to $Y), #Case)
 // where Case holds of a payload of type P into:
-//   (unchecked_ref_bit_cast V : $X to $P)
+//   (unchecked_ref_cast V : $X to $P)
 // even for single-payload enums, since we cannot know the layouts of
 // the types involved, and we'll generate a trap at IRGen-time if the
 // bitcasted types are not the same size.
@@ -233,8 +233,8 @@ public enum Y {
 sil @keep_unchecked_enum_data : $@convention(thin) (@owned X, @owned T) -> @owned T {
 // CHECK: bb0
 bb0(%0 : $X, %1 : $T):
-// CHECK: [[CAST:%.*]] = unchecked_ref_bit_cast %0 : $X to $Y
-  %4 = unchecked_ref_bit_cast %0 : $X to $Y
+// CHECK: [[CAST:%.*]] = unchecked_bitwise_cast %0 : $X to $Y
+  %4 = unchecked_bitwise_cast %0 : $X to $Y
   switch_enum %4 : $Y, case #Y.None!enumelt: bb1, case #Y.Some!enumelt.1: bb2
 
 // CHECK: bb1

@@ -267,6 +267,19 @@ bool SILType::canUnsafeCastValue(SILType fromType, SILType toType,
   return false;
 }
 
+// Reference cast from representations with single pointer low bits.
+// Only reference cast to simple single pointer representations.
+//
+// TODO: handle casting to a loadable existential by generating
+// init_existential_ref. Until then, only promote to a heap object dest.
+bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
+  OptionalTypeKind otk;
+  auto fromTy = unwrapAnyOptionalType(operTy, M, otk);
+  auto toTy = unwrapAnyOptionalType(resultTy, M, otk);
+  return (fromTy.isHeapObjectReferenceType() || fromTy.isClassExistentialType())
+    && toTy.isHeapObjectReferenceType();
+}
+
 SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
   assert(field->getDeclContext() == getNominalOrBoundGenericNominal());
   AbstractionPattern origFieldTy = M.Types.getAbstractionPattern(field);

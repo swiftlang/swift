@@ -450,8 +450,8 @@ func autorelease(o: O) {
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    strong_retain %0 : $C
 // CHECK-NEXT:    unchecked_trivial_bit_cast %0 : $C to $Builtin.Word
-// CHECK-NEXT:    unchecked_ref_bit_cast %0 : $C to $D
-// CHECK-NEXT:    unchecked_ref_bit_cast %0 : $C to $Optional<C>
+// CHECK-NEXT:    unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT:    unchecked_ref_cast %0 : $C to $Optional<C>
 // CHECK-NEXT:    unchecked_bitwise_cast %1 : $Builtin.Word to $C
 // CHECK-NEXT:    strong_retain %{{.*}} : $C
 // CHECK-NOT:     strong_retain
@@ -748,7 +748,7 @@ func refcast_punknown_any(o: PUnknown) -> AnyObject {
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins18refcast_pclass_anyFPS_6PClass_Ps9AnyObject_
-// CHECK: unchecked_ref_bit_cast %0 : $PClass to $AnyObject
+// CHECK: unchecked_ref_cast %0 : $PClass to $AnyObject
 // CHECK-NEXT: return
 func refcast_pclass_any(o: PClass) -> AnyObject {
   return Builtin.castReference(o)

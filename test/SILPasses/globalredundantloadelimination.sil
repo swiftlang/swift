@@ -306,12 +306,13 @@ bb0(%0 : $*IntPtr):
 // CHECK: bb0([[INPUT:%[0-9]+]]
 // CHECK-NEXT: [[LOCAL:%[0-9]+]] = alloc_stack
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Builtin.Int32
-// CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $B
+// CHECK: unchecked_ref_cast [[INPUT]] : $Optional<B> to $B
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Builtin.RawPointer
-// CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $Builtin.NativeObject
+
+// CHECK: unchecked_ref_cast [[INPUT]] : $Optional<B> to $Builtin.NativeObject
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.Int32>
 // CHECK: unchecked_trivial_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.RawPointer>
-// CHECK: unchecked_ref_bit_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.NativeObject>
+// CHECK: unchecked_ref_cast [[INPUT]] : $Optional<B> to $Optional<Builtin.NativeObject>
 // CHECK: return
 sil @store_to_load_forward_unchecked_addr_cast_class : $@convention(thin) (Optional<B>) -> () {
 bb0(%0 : $Optional<B>):

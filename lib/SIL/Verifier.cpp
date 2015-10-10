@@ -2145,14 +2145,11 @@ public:
   void checkUncheckedRefCastInst(UncheckedRefCastInst *AI) {
     require(AI->getOperand().getType().isObject(),
             "unchecked_ref_cast operand must be a value");
-    require(AI->getOperand().getType().isHeapObjectReferenceType() ||
-            AI->getOperand().getType().isClassExistentialType(),
-            "unchecked_ref_cast operand must be a heap object reference or "
-            "class existential");
     require(AI->getType().isObject(),
             "unchecked_ref_cast result must be an object");
-    require(AI->getType().isHeapObjectReferenceType(),
-            "unchecked_ref_cast result must be a heap object reference");
+    require(SILType::canRefCast(AI->getOperand().getType(), AI->getType(),
+                                AI->getModule()),
+            "unchecked_ref_cast requires a heap object reference type");
   }
 
   void checkUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *AI) {

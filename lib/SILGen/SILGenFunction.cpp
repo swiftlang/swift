@@ -459,7 +459,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                                NSStringFromClass->getType(),
                                SILType::getPrimitiveObjectType(OptNSStringTy),
                                {}, metaTy);
-    SILValue iuoptName = B.createUncheckedRefBitCast(mainClass, optName,
+    SILValue iuoptName = B.createUncheckedBitCast(mainClass, optName,
                               SILType::getPrimitiveObjectType(IUOptNSStringTy));
 
     // Call UIApplicationMain.

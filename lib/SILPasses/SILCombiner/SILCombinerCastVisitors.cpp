@@ -36,9 +36,19 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   //
   // (ref_to_raw_pointer (unchecked_ref_cast x))
   //    -> (ref_to_raw_pointer x)
-  if (auto *ROPI = dyn_cast<UncheckedRefCastInst>(RRPI->getOperand())) {
-    RRPI->setOperand(ROPI->getOperand());
-    return ROPI->use_empty() ? eraseInstFromFunction(*ROPI) : nullptr;
+  if (auto *URCI = dyn_cast<UncheckedRefCastInst>(RRPI->getOperand())) {
+    // (ref_to_raw_pointer (unchecked_ref_cast x))
+    //    -> (ref_to_raw_pointer x)
+    if (URCI->getOperand().getType().getSwiftType()
+        ->isAnyClassReferenceType()) {
+      RRPI->setOperand(URCI->getOperand());
+      return URCI->use_empty() ? eraseInstFromFunction(*URCI) : nullptr;
+    }
+    // (ref_to_raw_pointer (unchecked_ref_cast x))
+    //    -> (unchecked_trivial_bit_cast x)
+    return Builder.createUncheckedTrivialBitCast(RRPI->getLoc(),
+                                                 URCI->getOperand(),
+                                                 RRPI->getType());
   }
 
   // (ref_to_raw_pointer (open_existential_ref (init_existential_ref x))) ->
@@ -315,26 +325,19 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
 
   // After promoting unchecked_ref_cast_addr to unchecked_ref_cast, the SIL
   // verifier will assert that the loadable source and dest type of reference
-  // castable. If the static types are invalid, avoid promotion. The runtime
-  // will then report a failure if this cast is ever executed.
-  if (!UncheckedRefCastInst::canRefCastType(SrcTy)
-      || !UncheckedRefCastInst::canRefCastType(DestTy))
+  // castable. If the static types are invalid, simply avoid promotion, that way
+  // the runtime will then report a failure if this cast is ever executed.
+  if (!SILType::canRefCast(SrcTy.getObjectType(), DestTy.getObjectType(),
+                           URCI->getModule()))
     return nullptr;
  
-  // Casting from class existential to heap object is handled implicitly by
-  // unchecked_ref_cast (IRGen assumes layout compatibility).
-  //
-  // TODO: handle casting to a loadable existential by generating
-  // init_existential_ref. Until then, only promote to a heap object dest.
-  if (!DestTy.isHeapObjectReferenceType())
-    return nullptr;
-
   SILLocation Loc = URCI->getLoc();
   SILDebugScope *Scope = URCI->getDebugScope();
   LoadInst *load = Builder.createLoad(Loc, URCI->getSrc());
   load->setDebugScope(Scope);
-  auto *cast = Builder.createUncheckedRefCast(Loc, load,
-                                               DestTy.getObjectType());
+  auto *cast = Builder.tryCreateUncheckedRefCast(Loc, load,
+                                                 DestTy.getObjectType());
+  assert(cast && "SILBuilder cannot handle reference-castable types");
   cast->setDebugScope(Scope);
   StoreInst *store = Builder.createStore(Loc, cast, URCI->getDest());
   store->setDebugScope(Scope);
@@ -451,11 +454,9 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
                                                  UBCI->getOperand(),
                                                  UBCI->getType());
 
-  if (UncheckedRefBitCastInst::canRefBitCastToType(UBCI->getOperand().getType())
-      && UncheckedRefBitCastInst::canRefBitCastFromType(UBCI->getType()))
-    return Builder.createUncheckedRefBitCast(UBCI->getLoc(),
-                                             UBCI->getOperand(),
-                                             UBCI->getType());
+  if (auto refCast = Builder.tryCreateUncheckedRefCast(
+        UBCI->getLoc(), UBCI->getOperand(), UBCI->getType()))
+    return refCast;
 
   return nullptr;
 }

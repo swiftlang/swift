@@ -42,6 +42,18 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   return SILType::getPrimitiveObjectType(appliedFnType);
 }
 
+// If legal, create an unchecked_ref_cast from the given operand and result
+// type, otherwise return null.
+SILInstruction *SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc,
+                                                      SILValue Op,
+                                                      SILType ResultTy) {
+  auto &M = F.getModule();
+  if (!SILType::canRefCast(Op.getType(), ResultTy, M))
+    return nullptr;
+
+  return insert(new (M) UncheckedRefCastInst(Loc, Op, ResultTy));
+}
+
 // Create the appropriate cast instruction based on result type.
 SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
                                                    SILValue Op,
@@ -50,8 +62,8 @@ SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
   if (Ty.isTrivial(M))
     return insert(new (M) UncheckedTrivialBitCastInst(Loc, Op, Ty));
 
-  if (Op.getType().canBitCastAsSingleRef() && Ty.canBitCastAsSingleRef())
-    return insert(new (M) UncheckedRefBitCastInst(Loc, Op, Ty));
+  if (auto refCast = tryCreateUncheckedRefCast(Loc, Op, Ty))
+    return refCast;  
 
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.

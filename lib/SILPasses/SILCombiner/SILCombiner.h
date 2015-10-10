@@ -237,7 +237,6 @@ public:
   visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI);
   SILInstruction *visitSelectEnumInst(SelectEnumInst *EIT);
   SILInstruction *visitSelectEnumAddrInst(SelectEnumAddrInst *EIT);
-  SILInstruction *visitStructExtractInst(StructExtractInst *SEI);
   SILInstruction *visitAllocExistentialBoxInst(AllocExistentialBoxInst *S);
   SILInstruction *visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI);
   SILInstruction *visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI);

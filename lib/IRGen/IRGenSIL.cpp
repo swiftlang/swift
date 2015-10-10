@@ -3535,14 +3535,16 @@ static void emitPointerCastInst(IRGenSILFunction &IGF,
   // The input may have witness tables or other additional data, but the class
   // reference is always first.
   from.claimAll();
-  
+
   auto schema = ti.getSchema();
   assert(schema.size() == 1
          && schema[0].isScalar()
          && "pointer schema is not a single scalar?!");
   auto castToType = schema[0].getScalarType();
-  
-  ptrValue = IGF.Builder.CreateBitCast(ptrValue, castToType);
+
+  // A retainable pointer representation may be wrapped in an optional, so we
+  // need to provide inttoptr/ptrtoint in addition to bitcast.
+  ptrValue = IGF.Builder.CreateBitOrPointerCast(ptrValue, castToType);
   
   Explosion to;
   to.add(ptrValue);

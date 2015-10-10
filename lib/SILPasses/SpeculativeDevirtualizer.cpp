@@ -558,9 +558,9 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   if (LastCCBI && SubTypeValue == LastCCBI->getOperand()) {
     // Remove last checked_cast_br, because it will always succeed.
     SILBuilderWithScope<1> B(LastCCBI);
-    auto CastedValue = B.createUncheckedRefBitCast(LastCCBI->getLoc(),
-                                                   LastCCBI->getOperand(),
-                                                   LastCCBI->getCastType());
+    auto CastedValue = B.createUncheckedBitCast(LastCCBI->getLoc(),
+                                                LastCCBI->getOperand(),
+                                                LastCCBI->getCastType());
     B.createBranch(LastCCBI->getLoc(), LastCCBI->getSuccessBB(), {CastedValue});
     LastCCBI->eraseFromParent();
     return true;

@@ -506,26 +506,16 @@ emitBuiltinCastReference(SILGenFunction &gen,
   auto &toTL = gen.getTypeLowering(toTy);
   assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
 
-  if (fromTL.isLoadable() || toTL.isLoadable()) {
-    if (UncheckedRefCastInst::canRefCastType(fromTL.getLoweredType())
-        && UncheckedRefCastInst::canRefCastType(toTL.getLoweredType())) {
+  if (fromTL.isLoadable() || toTL.isLoadable()) { 
+    if (auto refCast = gen.B.tryCreateUncheckedRefCast(loc, args[0].getValue(),
+                                                       toTL.getLoweredType())) {
       // Create a reference cast, forwarding the cleanup.
       // The cast takes the source reference.
-      auto &in = args[0];
-      SILValue out = gen.B.createUncheckedRefCast(loc, in.getValue(),
-                                              toTL.getLoweredType());
-      return ManagedValue(out, in.getCleanup());
-    }
-    if (UncheckedRefBitCastInst::canRefBitCastFromType(fromTL.getLoweredType())
-        && UncheckedRefBitCastInst::canRefBitCastToType(toTL.getLoweredType()))
-    {
-      auto &in = args[0];
-      SILValue out = gen.B.createUncheckedRefBitCast(loc, in.getValue(),
-                                                     toTL.getLoweredType());
-      return ManagedValue(out, in.getCleanup());
+      return ManagedValue(refCast, args[0].getCleanup());
     }
   }
-  // If casting between address-only types, cast the address.
+  // We are either casting between address-only types, or cannot promote to a
+  // cast of reference values.
   //
   // If the from/to types are invalid, then use a cast that will fail at
   // runtime. We cannot catch these errors with SIL verification because they
@@ -609,9 +599,9 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
   SILValue out = gen.B.createUncheckedBitCast(loc, in.getValue(),
                                               toTL.getLoweredType());
 
-  // If the cast reduces to unchecked_ref_bit_cast, then the source and dest
+  // If the cast reduces to unchecked_ref_cast, then the source and dest
   // have identical cleanup, so just forward the cleanup as an optimization.
-  if (isa<UncheckedRefBitCastInst>(out))
+  if (isa<UncheckedRefCastInst>(out))
     return ManagedValue(out, in.getCleanup());
 
   // Otherwise leave the original cleanup and retain the cast value.

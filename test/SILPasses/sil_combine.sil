@@ -1536,12 +1536,12 @@ bb0:
 }
 
 // CHECK-LABEL: sil @bitcast_round_trips : $@convention(thin) (Builtin.NativeObject, Builtin.RawPointer) -> (Builtin.NativeObject, Builtin.RawPointer) {
-// CHECK-NOT: unchecked_ref_bit_cast
+// CHECK-NOT: unchecked_ref_cast
 // CHECK-NOT: unchecked_trivial_bit_cast
 sil @bitcast_round_trips : $@convention(thin) (Builtin.NativeObject, Builtin.RawPointer) -> (Builtin.NativeObject, Builtin.RawPointer) {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.RawPointer):
-  %2 = unchecked_ref_bit_cast %0 : $Builtin.NativeObject to $Optional<Builtin.NativeObject>
-  %3 = unchecked_ref_bit_cast %2 : $Optional<Builtin.NativeObject> to $Builtin.NativeObject
+  %2 = unchecked_ref_cast %0 : $Builtin.NativeObject to $Optional<Builtin.NativeObject>
+  %3 = unchecked_ref_cast %2 : $Optional<Builtin.NativeObject> to $Builtin.NativeObject
   %4 = unchecked_trivial_bit_cast %1 : $Builtin.RawPointer to $Builtin.Word
   %5 = unchecked_trivial_bit_cast %4 : $Builtin.Word to $Builtin.RawPointer
   %6 = tuple(%3 : $Builtin.NativeObject, %5 : $Builtin.RawPointer)
@@ -1549,14 +1549,14 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.RawPointer):
 }
 
 // CHECK-LABEL: sil @bitcast_combines : $@convention(thin) (Builtin.NativeObject, Builtin.RawPointer) -> (B, Optional<Builtin.Word>) {
-// CHECK: unchecked_ref_bit_cast
-// CHECK-NOT: unchecked_ref_bit_cast
+// CHECK: unchecked_ref_cast
+// CHECK-NOT: unchecked_bit_cast
 // CHECK: unchecked_trivial_bit_cast
 // CHECK-NOT: unchecked_trivial_bit_cast
 sil @bitcast_combines : $@convention(thin) (Builtin.NativeObject, Builtin.RawPointer) -> (B, Optional<Builtin.Word>) {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.RawPointer):
-  %2 = unchecked_ref_bit_cast %0 : $Builtin.NativeObject to $Optional<Builtin.NativeObject>
-  %3 = unchecked_ref_bit_cast %2 : $Optional<Builtin.NativeObject> to $B
+  %2 = unchecked_ref_cast %0 : $Builtin.NativeObject to $Optional<Builtin.NativeObject>
+  %3 = unchecked_ref_cast %2 : $Optional<Builtin.NativeObject> to $B
   %4 = unchecked_trivial_bit_cast %1 : $Builtin.RawPointer to $Builtin.Word
   %5 = unchecked_trivial_bit_cast %4 : $Builtin.Word to $Optional<Builtin.Word>
   %6 = tuple(%3 : $B, %5 : $Optional<Builtin.Word>)
@@ -1567,7 +1567,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.RawPointer):
 // CHECK-NEXT: bb0
 // CHECK-NEXT: unchecked_bitwise_cast
 // CHECK-NEXT: unchecked_trivial_bit_cast
-// CHECK-NEXT: unchecked_ref_bit_cast
+// CHECK-NEXT: unchecked_ref_cast
 sil @bitwise_combines : $@convention(thin) (Builtin.NativeObject, Builtin.RawPointer) -> (Optional<Builtin.NativeObject>, Builtin.RawPointer, Optional<Builtin.NativeObject>) {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.RawPointer):
   // combine
@@ -1870,19 +1870,6 @@ bb0(%0 : $ZZZ):
 
 sil [_semantics "array.uninitialized"] @_allocate_uninitialized_ZZZ : $@convention(thin) (Builtin.Word) -> @owned (Array<ZZZ>, Builtin.RawPointer)
 
-// CHECK-LABEL: sil @merge_structextract_and_ref_bitcasts : $@convention(thin) (Builtin.NativeObject) -> Builtin.NativeObject {
-// CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject):
-// CHECK-NEXT: [[CAST:%.*]] = unchecked_ref_bit_cast [[ARG]]
-// CHECK-NEXT: [[DATA:%.*]] = unchecked_enum_data [[CAST]]
-// CHECK-NEXT: return [[DATA]]
-sil @merge_structextract_and_ref_bitcasts : $@convention(thin) (Builtin.NativeObject) -> Builtin.NativeObject {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = unchecked_ref_bit_cast %0 : $Builtin.NativeObject to $PointerStorage
-  %2 = struct_extract %1 : $PointerStorage, #PointerStorage.ptr
-  %3 = unchecked_enum_data %2 : $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt.1
-  return %3 : $Builtin.NativeObject
-}
-
 struct FakeInt16 {
   var val : Builtin.Int16
 }
@@ -2020,13 +2007,13 @@ bb0(%0: $Builtin.NativeObject):
 // CHECK-LABEL:     sil @collapse_to_unchecked_trivial_bit_cast
 // CHECK:           bb0([[Ref:%.*]]: $Optional<MyClass>):
 // CHECK:             unchecked_trivial_bit_cast [[Ref]]
-// CHECK-NOT:         unchecked_ref_bit_cast
+// CHECK-NOT:         unchecked_ref_cast
 // CHECK-NOT:         ref_to_raw_pointer
 // CHECK:             return
-// (ref_to_raw_pointer (unchecked_ref_bit_cast x)) -> (unchecked_trivial_bit_cast x)
+// (ref_to_raw_pointer (unchecked_ref_cast x)) -> (unchecked_trivial_bit_cast x)
 sil @collapse_to_unchecked_trivial_bit_cast : $@convention(thin) (Optional<MyClass>) -> (Builtin.RawPointer) {
 bb0(%0 : $Optional<MyClass>):
-  %1 = unchecked_ref_bit_cast %0 : $Optional<MyClass> to $Builtin.NativeObject
+  %1 = unchecked_ref_cast %0 : $Optional<MyClass> to $Builtin.NativeObject
   %2 = ref_to_raw_pointer %1 : $Builtin.NativeObject to $Builtin.RawPointer
   return %2 : $Builtin.RawPointer
 }

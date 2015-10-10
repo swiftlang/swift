@@ -190,14 +190,14 @@ bb0(%0 : $Builtin.NativeObject):
   // CHECK: apply [[DYNAMIC]]
 }
 
-// CHECK-LABEL: sil [noinline] @_TF5casts22unchecked_ref_bit_castFCS_1ET_
-sil [noinline] @_TF5casts22unchecked_ref_bit_castFCS_1ET_ : $@convention(thin) (@owned E) -> () {
+// CHECK-LABEL: sil [noinline] @_TF5casts22unchecked_ref_castFCS_1ET_
+sil [noinline] @_TF5casts22unchecked_ref_castFCS_1ET_ : $@convention(thin) (@owned E) -> () {
 // CHECK: bb0
 bb0(%0 : $E):
   // CHECK: strong_retain %0
   strong_retain %0 : $E
-  // CHECK: [[CAST:%.*]] = unchecked_ref_bit_cast %0 : $E to $F
-  %3 = unchecked_ref_bit_cast %0 : $E to $F
+  // CHECK: [[CAST:%.*]] = unchecked_ref_cast %0 : $E to $F
+  %3 = unchecked_ref_cast %0 : $E to $F
   // CHECK-NOT: class_method
   %4 = class_method %3 : $F, #F.foo!1 : F -> () -> () , $@convention(method) (@guaranteed F) -> ()
   %5 = apply %4(%3) : $@convention(method) (@guaranteed F) -> ()

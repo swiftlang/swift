@@ -2365,8 +2365,8 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
   if (mayLieAboutNonOptionalReturn(E->getSubExpr())) {
     auto result = SGF.emitRValueAsSingleValue(E->getSubExpr());
     auto optType = SGF.getLoweredLoadableType(E->getType());
-    SILValue bitcast = SGF.B.createUncheckedRefBitCast(E, result.getValue(),
-                                                       optType);
+    SILValue bitcast = SGF.B.createUncheckedBitCast(E, result.getValue(),
+                                                    optType);
     ManagedValue bitcastMV = ManagedValue(bitcast, result.getCleanup());
     return RValue(SGF, E, bitcastMV);
   }
@@ -2814,9 +2814,9 @@ static bool emitOptimizedOptionalEvaluation(OptionalEvaluationExpr *E,
                                                    optTL.getLoweredType());
     else
       // The optional object type is the same, so we assume the optional types
-      // are layout identical, allowing the use of unchecked_ref_bit_cast.
-      result = SGF.B.createUncheckedRefBitCast(E, subMV.forward(SGF),
-                                               optTL.getLoweredType());
+      // are layout identical, allowing the use of unchecked bit casts.
+      result = SGF.B.createUncheckedBitCast(E, subMV.forward(SGF),
+                                            optTL.getLoweredType());
     LoadableResult = result;
     return true;
   }

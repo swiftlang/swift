@@ -297,3 +297,37 @@ bb0(%0 : $*U, %1 : $*T):
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: define i64 @unchecked_ref_cast_class_optional
+// CHECK: ptrtoint %C5casts1A* %0 to i64
+// CHECK-NEXT: ret i64
+sil @unchecked_ref_cast_class_optional : $@convention(thin) (@owned A) -> @owned Optional<AnyObject> {
+bb0(%0 : $A):
+  %2 = unchecked_ref_cast %0 : $A to $Optional<AnyObject>
+  return %2 : $Optional<AnyObject>
+}
+
+// CHECK-LABEL: define i64 @unchecked_ref_cast_optional_optional
+// CHECK: ret i64 %0
+sil @unchecked_ref_cast_optional_optional : $@convention(thin) (@owned Optional<A>) -> @owned Optional<AnyObject> {
+bb0(%0 : $Optional<A>):
+  %2 = unchecked_ref_cast %0 : $Optional<A> to $Optional<AnyObject>
+  return %2 : $Optional<AnyObject>
+}
+
+// CHECK-LABEL: define i64 @unchecked_ref_cast_proto_optional
+// CHECK: ptrtoint %objc_object* %0 to i64
+// CHECK-NEXT: ret i64
+sil @unchecked_ref_cast_proto_optional : $@convention(thin) (@owned CP) -> @owned Optional<AnyObject> {
+bb0(%0 : $CP):
+  %2 = unchecked_ref_cast %0 : $CP to $Optional<AnyObject>
+  return %2 : $Optional<AnyObject>
+}
+
+// CHECK-LABEL: define i64 @unchecked_ref_cast_optionalproto_optional
+// CHECK: ret i64 %0
+sil @unchecked_ref_cast_optionalproto_optional : $@convention(thin) (@owned Optional<CP>) -> @owned Optional<AnyObject> {
+bb0(%0 : $Optional<CP>):
+  %2 = unchecked_ref_cast %0 : $Optional<CP> to $Optional<AnyObject>
+  return %2 : $Optional<AnyObject>
+}

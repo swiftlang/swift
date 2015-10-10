@@ -15,7 +15,7 @@ public protocol NativeProto {}
 
 // CHECK-LABEL: sil @promote_super : $@convention(thin) <T where T : Base> (@owned AnyObject) -> @owned T {
 // CHECK: bb0(%0 : $AnyObject):
-// CHECK: unchecked_ref_bit_cast %{{.*}} : $AnyObject to $T
+// CHECK: unchecked_ref_cast %{{.*}} : $AnyObject to $T
 sil @promote_super : $@convention(thin) <T where T : Base> (@owned AnyObject) -> @owned T {
 bb0(%0 : $AnyObject):
   %1 = alloc_stack $AnyObject
@@ -28,7 +28,7 @@ bb0(%0 : $AnyObject):
 
 // CHECK-LABEL: sil @promote_anyobject : $@convention(thin) <T where T : AnyObject> (@owned AnyObject) -> @owned T {
 // CHECK: bb0(%0 : $AnyObject):
-// CHECK: unchecked_ref_bit_cast %{{.*}} : $AnyObject to $T
+// CHECK: unchecked_ref_cast %{{.*}} : $AnyObject to $T
 sil @promote_anyobject : $@convention(thin) <T where T : AnyObject> (@owned AnyObject) -> @owned T {
 bb0(%0 : $AnyObject):
   %1 = alloc_stack $AnyObject
@@ -41,7 +41,7 @@ bb0(%0 : $AnyObject):
 
 // CHECK-LABEL: sil @promote_objc : $@convention(thin) <T where T : ObjCProto> (@owned AnyObject) -> @owned T {
 // CHECK: bb0(%0 : $AnyObject):
-// CHECK: unchecked_ref_bit_cast %{{.*}} : $AnyObject to $T
+// CHECK: unchecked_ref_cast %{{.*}} : $AnyObject to $T
 sil @promote_objc : $@convention(thin) <T where T : ObjCProto> (@owned AnyObject) -> @owned T {
 bb0(%0 : $AnyObject):
   %1 = alloc_stack $AnyObject
@@ -54,7 +54,7 @@ bb0(%0 : $AnyObject):
 
 // CHECK-LABEL: sil @promote_objcproto : $@convention(thin) (@owned AnyObject) -> @owned ObjCProto {
 // CHECK: bb0(%0 : $AnyObject):
-// CHECK: unchecked_ref_bit_cast %{{.*}} : $AnyObject to $ObjCProto
+// CHECK: unchecked_ref_cast %{{.*}} : $AnyObject to $ObjCProto
 sil @promote_objcproto : $@convention(thin) (@owned AnyObject) -> @owned ObjCProto {
 bb0(%0 : $AnyObject):
   %1 = alloc_stack $AnyObject
@@ -84,9 +84,9 @@ class B {}
 
 // CHECK-LABEL: sil @load_unchecked_addr_cast_to_unchecked_ref_cast_load : $@convention(thin) (@inout Optional<B>) -> (Builtin.NativeObject, Optional<Builtin.NativeObject>) {
 // CHECK-NOT: unchecked_addr_cast
-// CHECK: unchecked_ref_bit_cast
+// CHECK: unchecked_ref_cast
 // CHECK-NOT: unchecked_addr_cast
-// CHECK: unchecked_ref_bit_cast
+// CHECK: unchecked_ref_cast
 // CHECK-NOT: unchecked_addr_cast
 sil @load_unchecked_addr_cast_to_unchecked_ref_cast_load : $@convention(thin) (@inout Optional<B>) -> (Builtin.NativeObject, Optional<Builtin.NativeObject>) {
 bb0(%0 : $*Optional<B>):

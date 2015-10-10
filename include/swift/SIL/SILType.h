@@ -390,7 +390,11 @@ public:
   /// reflexive. `fromType` may be larger than the given type and still be
   /// castable. It is the caller's responsibility to ensure that the overlapping
   /// fields are layout compatible.
-  static bool canUnsafeCastValue(SILType fromType, SILType toType, SILModule &M);
+  static bool canUnsafeCastValue(SILType fromType, SILType toType,
+                                 SILModule &M);
+
+  /// True if `operTy` can be cast by single-reference value into `resultTy`.
+  static bool canRefCast(SILType operTy, SILType resultTy, SILModule &M);
 
   /// True if the type is block-pointer-compatible, meaning it either is a block
   /// or is an Optional or ImplicitlyUnwrappedOptional with a block payload.
@@ -477,6 +481,17 @@ public:
   /// ImplicitlyUnwrappedOptional<T>; otherwise, return the null type.
   SILType getAnyOptionalObjectType(SILModule &SILMod,
                                    OptionalTypeKind &OTK) const;
+
+  /// Unwraps one level of optional type.
+  /// Returns the lowered T if the given type is Optional<T> or IUO<T>.
+  /// Otherwise directly returns the given type.
+  static SILType unwrapAnyOptionalType(SILType Ty, SILModule &SILMod,
+                                       OptionalTypeKind &OTK) {
+    if (auto unwrappedTy = Ty.getAnyOptionalObjectType(SILMod, OTK))
+      return unwrappedTy;
+
+    return Ty;
+  };
 
   /// Classify this type as an optional type.
   OptionalTypeKind getOptionalTypeKind() const;

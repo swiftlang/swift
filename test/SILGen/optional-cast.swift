@@ -129,7 +129,7 @@ func opt_to_opt_trivial(x: Int?) -> Int! {
 // CHECK-LABEL: sil hidden @_TF4main20opt_to_opt_referenceFGSQCS_1C_GSqS0__
 // CHECK-NEXT:  bb0(%0 : $ImplicitlyUnwrappedOptional<C>):
 // CHECK-NEXT:  debug_value %0 : $ImplicitlyUnwrappedOptional<C>  // let x
-// CHECK-NEXT:  %2 = unchecked_ref_bit_cast %0 : $ImplicitlyUnwrappedOptional<C> to $Optional<C>
+// CHECK-NEXT:  %2 = unchecked_ref_cast %0 : $ImplicitlyUnwrappedOptional<C> to $Optional<C>
 // CHECK-NEXT:  return %2 : $Optional<C>
 // CHECK-NEXT:}
 func opt_to_opt_reference(x : C!) -> C? { return x }

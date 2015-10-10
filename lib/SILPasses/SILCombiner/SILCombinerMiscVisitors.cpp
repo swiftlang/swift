@@ -30,38 +30,6 @@
 using namespace swift;
 using namespace swift::PatternMatch;
 
-SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
-  // If our operand has archetypes or our field is not trivial, do not do
-  // anything.
-  SILValue Op = SEI->getOperand();
-  SILType OpType = Op.getType();
-  if (OpType.hasArchetype() || OpType.isTrivial(SEI->getModule()))
-    return nullptr;
-
-  // (struct_extract (unchecked_ref_bit_cast X->Y x) #z)
-  //    ->
-  // (unchecked_ref_bit_cast X->Z x)
-  //
-  // Where #z is a Z typed field of single field struct Y.
-  auto *URBCI = dyn_cast<UncheckedRefBitCastInst>(Op);
-  if (!URBCI)
-    return nullptr;
-
-  // If we only have one stored property, then we are layout compatible with
-  // that property and can perform the operation.
-  StructDecl *S = SEI->getStructDecl();
-  auto R = S->getStoredProperties();
-  auto B = R.begin();
-  if (B == R.end())
-    return nullptr;
-  ++B;
-  if (B != R.end())
-    return nullptr;
-
-  return Builder.createUncheckedRefBitCast(SEI->getLoc(), URBCI->getOperand(),
-                                           SEI->getType());
-}
-
 SILInstruction*
 SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
 

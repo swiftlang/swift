@@ -417,7 +417,7 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses18FailableClassModelS_27IUOFailableClassRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSQq__
   // CHECK: [[FUNC:%.*]] = function_ref @_TFC9witnesses18FailableClassModelCfMS0_FT3fooSi_GSqS0__
   // CHECK: [[INNER:%.*]] = apply [[FUNC]](%0, %1)
-  // CHECK: [[OUTER:%.*]] = unchecked_ref_bit_cast [[INNER]] : $Optional<FailableClassModel> to $ImplicitlyUnwrappedOptional<FailableClassModel>
+  // CHECK: [[OUTER:%.*]] = unchecked_ref_cast [[INNER]] : $Optional<FailableClassModel> to $ImplicitlyUnwrappedOptional<FailableClassModel>
   // CHECK: return [[OUTER]] : $ImplicitlyUnwrappedOptional<FailableClassModel>
   init?(foo: Int) {}
 }
@@ -433,7 +433,7 @@ final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassR
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSqq__
   // CHECK: [[FUNC:%.*]] = function_ref @_TFC9witnesses21IUOFailableClassModelCfMS0_FT3fooSi_GSQS0__
   // CHECK: [[INNER:%.*]] = apply [[FUNC]](%0, %1)
-  // CHECK: [[OUTER:%.*]] = unchecked_ref_bit_cast [[INNER]] : $ImplicitlyUnwrappedOptional<IUOFailableClassModel> to $Optional<IUOFailableClassModel>
+  // CHECK: [[OUTER:%.*]] = unchecked_ref_cast [[INNER]] : $ImplicitlyUnwrappedOptional<IUOFailableClassModel> to $Optional<IUOFailableClassModel>
   // CHECK: return [[OUTER]] : $Optional<IUOFailableClassModel>
 }
 

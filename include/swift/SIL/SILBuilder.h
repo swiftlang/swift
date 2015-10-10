@@ -466,11 +466,6 @@ public:
     return insert(new (F.getModule()) UncheckedBitwiseCastInst(Loc, Op, Ty));
   }
   
-  // Create the appropriate cast instruction based on result type.
-  SILInstruction *createUncheckedBitCast(SILLocation Loc,
-                                         SILValue Op,
-                                         SILType Ty);
-
   RefToBridgeObjectInst *createRefToBridgeObject(SILLocation Loc,
                                                  SILValue Ref,
                                                  SILValue Bits) {
@@ -1042,6 +1037,21 @@ public:
     return insert(new (F.getModule())
                     ProjectBoxInst(loc, valueTy, boxOperand));
   }
+
+  //===--------------------------------------------------------------------===//
+  // Unchecked cast helpers
+  //===--------------------------------------------------------------------===//
+
+  // Create an UncheckedRefCast if the source and dest types are legal,
+  // otherwise return null.
+  // Unwrap or wrap optional types as needed.
+  SILInstruction *tryCreateUncheckedRefCast(SILLocation Loc, SILValue Op,
+                                            SILType ResultTy);
+
+  // Create the appropriate cast instruction based on result type.
+  SILInstruction *createUncheckedBitCast(SILLocation Loc,
+                                         SILValue Op,
+                                         SILType Ty);
 
   //===--------------------------------------------------------------------===//
   // Runtime failure

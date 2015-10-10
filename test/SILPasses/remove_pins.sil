@@ -205,7 +205,7 @@ bb0(%0 : $*MyArray<MyInt>):
   %8 = tuple(%6 : $Optional<Builtin.NativeObject>, %7 : $Builtin.Int1)
   %9 = tuple_extract %8 : $(Optional<Builtin.NativeObject>, Builtin.Int1), 0
   strong_unpin %9 : $Optional<Builtin.NativeObject>
-  %10 = unchecked_ref_bit_cast %9 : $Optional<Builtin.NativeObject> to $Builtin.NativeObject
+  %10 = unchecked_ref_cast %9 : $Optional<Builtin.NativeObject> to $Builtin.NativeObject
   %11 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> Bool
   %12 = apply %11(%10) : $ @convention(thin) (Builtin.NativeObject) -> Bool
   return %12 : $Bool
