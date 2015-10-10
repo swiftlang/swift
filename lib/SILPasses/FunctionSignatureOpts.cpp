@@ -422,8 +422,8 @@ class FunctionAnalyzer {
   /// The function that we are analyzing.
   SILFunction *F;
 
-  /// This function's call graph node.
-  CallGraphNode *FNode;
+  /// The call graph for the module.
+  CallGraph &CG;
 
   /// Did we ascertain that we can optimize this function?
   bool ShouldOptimize;
@@ -444,8 +444,8 @@ public:
 
   FunctionAnalyzer(llvm::BumpPtrAllocator &Allocator,
                    RCIdentityFunctionInfo *RCIA,
-                   SILFunction *F, CallGraphNode *FNode)
-    : Allocator(Allocator), RCIA(RCIA), F(F), FNode(FNode),
+                   SILFunction *F, CallGraph &CG)
+    : Allocator(Allocator), RCIA(RCIA), F(F), CG(CG),
       ShouldOptimize(false), HaveModifiedSelfArgument(false), ArgDescList() {}
 
   /// Analyze the given function.
@@ -471,7 +471,7 @@ public:
   bool isArgumentABIRequired(SILArgument *Arg) {
     // This implicitly asserts that a function binding dynamic self has a self
     // metadata argument or object from which self metadata can be obtained.
-    return FNode->mayBindDynamicSelf() && (F->getSelfMetadataArgument() == Arg);
+    return CG.mayBindDynamicSelf(F) && (F->getSelfMetadataArgument() == Arg);
   }
 
 private:
@@ -875,7 +875,6 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
                           RCIdentityFunctionInfo *RCIA,
                           SILFunction *F,
                           CallGraph &CG,
-                          CallGraphNode *FNode,
                         const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallSites,
                           bool CallerSetIsComplete,
                           std::vector<SILFunction *> &DeadFunctions) {
@@ -889,7 +888,7 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   llvm::SmallVector<ArgumentDescriptor, 8> Arguments;
 
   // Analyze function arguments. If there is no work to be done, exit early.
-  FunctionAnalyzer Analyzer(BPA, RCIA, F, FNode);
+  FunctionAnalyzer Analyzer(BPA, RCIA, F, CG);
   if (!Analyzer.analyze()) {
     DEBUG(llvm::dbgs() << "    Has no optimizable arguments... "
                           "bailing...\n");
@@ -1065,7 +1064,7 @@ public:
 
         // Otherwise, try to optimize the function signature of F.
         Changed |= optimizeFunctionSignature(Allocator, RCIA->get(F), F, CG,
-                                             FNode, CallSites,
+                                             CallSites,
                                              CallerSetIsComplete,
                                              DeadFunctions);
       }

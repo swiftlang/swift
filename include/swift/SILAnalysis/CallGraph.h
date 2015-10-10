@@ -383,6 +383,13 @@ public:
 
   void markCallerEdgesOfCalleesIncomplete(FullApplySite AI);
 
+  /// May this function bind dynamic Self at one of its call sites?
+  bool mayBindDynamicSelf(SILFunction *F) const {
+    auto *Node = getCallGraphNode(F);
+    assert(Node && "Expected call graph node for function!");
+    return Node->mayBindDynamicSelf();
+  }
+
   void print(llvm::raw_ostream &OS);
   void printStats(llvm::raw_ostream &OS);
   void dump();
