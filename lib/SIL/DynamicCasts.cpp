@@ -409,7 +409,7 @@ swift::classifyDynamicCast(Module *M,
     assert(!target.isAnyExistentialType());
     Optional<Type> ObjCTy = M->getASTContext().getBridgedToObjC(
         M, target, nullptr);
-    if (ObjCTy) {
+    if (ObjCTy && ObjCTy.getValue()) {
       // If the bridged ObjC type is known, check if
       // source type can be cast into it.
       return classifyDynamicCast(M, source,
@@ -424,7 +424,7 @@ swift::classifyDynamicCast(Module *M,
     assert(!source.isAnyExistentialType());
     Optional<Type> ObjCTy = M->getASTContext().getBridgedToObjC(
         M, source, nullptr);
-    if (ObjCTy) {
+    if (ObjCTy && ObjCTy.getValue()) {
       // If the bridged ObjC type is known, check if
       // this type can be cast into target type.
       return classifyDynamicCast(M,

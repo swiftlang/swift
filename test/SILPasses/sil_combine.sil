@@ -2793,3 +2793,22 @@ bb0:
   %2 = builtin "cmp_eq_Int1024"(%0 : $Builtin.Int1024, %1 : $Builtin.Int1024) : $Builtin.Int1
   return %2 : $Builtin.Int1
 }
+
+// Check that it does not creash the compiler.
+// Int is ObjC-bridgeable in this case, but its conformance is not know, 
+// because Foundation is not imported yet.
+// Therefore the cast may sucseed from the compiler point of view.
+// CHECK-LABEL: sil @cast_of_class_to_int
+// CHECK: unconditional_checked_cast_addr
+// CHECK: return
+sil @cast_of_class_to_int : $@convention(thin) (C) -> Int {
+bb0(%0 : $C):
+  %1 = alloc_stack $Int
+  %2 = alloc_stack $C
+  store %0 to %2#1 : $*C
+  unconditional_checked_cast_addr take_always C in %2#1 : $*C to Int in %1#1 : $*Int 
+  %4 = load %1#1 : $*Int
+  dealloc_stack %2#0 : $*@local_storage C
+  dealloc_stack %1#0 : $*@local_storage Int
+  return %4 : $Int
+}
