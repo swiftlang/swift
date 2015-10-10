@@ -31,7 +31,7 @@ enforceable.
 This document specifies a comprehensive set of primitives and their
 semantics. These primitives are the optimizer's interface to function
 effects. They should be sufficient to express any analysis or
-annotation supported by the compiler that express a function's affect
+annotation supported by the compiler that express a function's effect
 on program state.
 
 Within the optimizer, SILEffectsAnalysis deduces function effects
@@ -89,8 +89,11 @@ The effects on a particular state are:
 These should all be interpreted as effects that "may"
 happen. e.g. maywrite, or mayretain.
 
-[TODO] We currently distinguish between retain and capture, which I
-cannot yet justify.
+[TODO] Within the optimizer we sometimes refer to "retain" as an
+effect.  "capture" is really a more general term that encompasses any
+retain_value operation, so we'll likely standardize on that term. We
+don't have a more general term for "release", which refers to any
+release_value operation.
 
 When referring to unspecified state, I will use the syntax
 ``@effects(no<effectname>)``. When referring to state reachable via an
