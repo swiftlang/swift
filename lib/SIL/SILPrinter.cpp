@@ -933,9 +933,6 @@ public:
   void visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_trivial_bit_cast");
   }
-  void visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_ref_bit_cast");
-  }
   void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),
                                  "unchecked_bitwise_cast");

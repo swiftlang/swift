@@ -1593,20 +1593,6 @@ class UncheckedTrivialBitCastInst
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
   
-/// Convert a value to a layout-compatible type with equivalent
-/// "reference semantics identity", that is, a type for which retain_value and
-/// release_value have equivalent effects to retaining or releasing the original
-/// value.
-class UncheckedRefBitCastInst
-  : public UnaryInstructionBase<ValueKind::UncheckedRefBitCastInst,
-                                ConversionInst>
-{
-  friend class SILBuilder;
-
-  UncheckedRefBitCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty) {}
-};
-
 /// Bitwise copy a value into another value of the same size or smaller.
 class UncheckedBitwiseCastInst
   : public UnaryInstructionBase<ValueKind::UncheckedBitwiseCastInst,

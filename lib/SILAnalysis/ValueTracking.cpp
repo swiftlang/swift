@@ -126,7 +126,6 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::UncheckedRefCastAddrInst:
   case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UncheckedTrivialBitCastInst:
-  case ValueKind::UncheckedRefBitCastInst:
   case ValueKind::UncheckedBitwiseCastInst:
   case ValueKind::MarkDependenceInst:
   case ValueKind::OpenExistentialAddrInst:

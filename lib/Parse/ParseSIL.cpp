@@ -1276,7 +1276,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("unchecked_enum_data", ValueKind::UncheckedEnumDataInst)
     .Case("unchecked_addr_cast", ValueKind::UncheckedAddrCastInst)
     .Case("unchecked_trivial_bit_cast", ValueKind::UncheckedTrivialBitCastInst)
-    .Case("unchecked_ref_bit_cast", ValueKind::UncheckedRefBitCastInst)
     .Case("unchecked_bitwise_cast", ValueKind::UncheckedBitwiseCastInst)
     .Case("unchecked_ref_cast", ValueKind::UncheckedRefCastInst)
     .Case("unchecked_ref_cast_addr", ValueKind::UncheckedRefCastAddrInst)
@@ -1959,7 +1958,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UncheckedTrivialBitCastInst:
-  case ValueKind::UncheckedRefBitCastInst:
   case ValueKind::UncheckedBitwiseCastInst:
   case ValueKind::UpcastInst:
   case ValueKind::AddressToPointerInst:
@@ -2004,9 +2002,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::UncheckedTrivialBitCastInst:
       ResultVal = B.createUncheckedTrivialBitCast(InstLoc, Val, Ty);
-      break;
-    case ValueKind::UncheckedRefBitCastInst:
-      ResultVal = B.createUncheckedRefBitCast(InstLoc, Val, Ty);
       break;
     case ValueKind::UncheckedBitwiseCastInst:
       ResultVal = B.createUncheckedBitwiseCast(InstLoc, Val, Ty);

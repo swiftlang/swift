@@ -794,16 +794,6 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::
-visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *Inst) {
-  doPostProcess(Inst,
-    getBuilder().createUncheckedRefBitCast(getOpLocation(Inst->getLoc()),
-                                           getOpValue(Inst->getOperand()),
-                                           getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::
 visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createUncheckedBitwiseCast(getOpLocation(Inst->getLoc()),

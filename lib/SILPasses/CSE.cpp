@@ -98,10 +98,6 @@ public:
         llvm::hash_combine_range(Operands.begin(), Operands.end()));
   }
 
-  hash_code visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
-  }
-
   hash_code visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *X) {
     return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
   }
@@ -653,7 +649,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
     case ValueKind::EnumInst:
     case ValueKind::UncheckedEnumDataInst:
     case ValueKind::IsNonnullInst:
-    case ValueKind::UncheckedRefBitCastInst:
     case ValueKind::UncheckedTrivialBitCastInst:
     case ValueKind::UncheckedBitwiseCastInst:
     case ValueKind::RefToRawPointerInst:

@@ -3544,23 +3544,6 @@ Bitcasts an object of type ``A`` to be of same sized or smaller type
 for bitcasting among trivial types, but more importantly is a one way
 bitcast from non-trivial types to trivial types.
 
-unchecked_ref_bit_cast
-``````````````````````
-::
-
-  sil-instruction ::= 'unchecked_ref_bit_cast' sil-operand 'to' sil-type
-
-  %1 = unchecked_ref_bit_cast %0 : $Optional<Builtin.NativeObject> to $Builtin.NativeObject
-  // %0 must be an object.
-  // %1 must be an object that is trivial iff %0 is trivial and is non-trivial iff %0 is non-trivial.
-
-Bitcasts an object of type ``A`` to be of same sized type ``B`` with
-the constraint that ``A`` and ``B`` must both either be trivial or
-non-trivial. This enables the optimizer to know that the bitcast does
-not perform an unsafe operation that would require the optimizer to
-consider the operand and the output of the bitcast as objects with
-different ARC identities.
-
 unchecked_bitwise_cast
 ``````````````````````
 ::

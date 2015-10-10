@@ -103,7 +103,7 @@ static bool isArrayEltStore(StoreInst *SI) {
   // %43 = struct_element_addr %42 : $*_ArrayBuffer<Int>, #_ArrayBuffer._storage
   // %44 = struct_element_addr %43 : $*_BridgeStorage
   // %45 = load %44 : $*Builtin.BridgeObject
-  // %46 = unchecked_ref_bit_cast %45 : $... to $_ContiguousArrayStorageBase
+  // %46 = unchecked_ref_cast %45 : $... to $_ContiguousArrayStorageBase
   // %47 = unchecked_ref_cast %46 : $... to $Builtin.NativeObject
   // %48 = struct_extract %41 : $..., #UnsafeMutablePointer._rawValue
   // %49 = pointer_to_address %48 : $Builtin.RawPointer to $*Int

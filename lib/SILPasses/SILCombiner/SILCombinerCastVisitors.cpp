@@ -33,9 +33,6 @@ using namespace swift::PatternMatch;
 SILInstruction *
 SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   // Ref to raw pointer consumption of other ref casts.
-  //
-  // (ref_to_raw_pointer (unchecked_ref_cast x))
-  //    -> (ref_to_raw_pointer x)
   if (auto *URCI = dyn_cast<UncheckedRefCastInst>(RRPI->getOperand())) {
     // (ref_to_raw_pointer (unchecked_ref_cast x))
     //    -> (ref_to_raw_pointer x)
@@ -57,14 +54,6 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
     if (auto *IER = dyn_cast<InitExistentialRefInst>(OER->getOperand()))
       return Builder.createRefToRawPointer(RRPI->getLoc(), IER->getOperand(),
                                            RRPI->getType());
-
-  // (ref_to_raw_pointer (unchecked_ref_bit_cast x))
-  //    -> (unchecked_trivial_bit_cast x)
-  if (auto *URBCI = dyn_cast<UncheckedRefBitCastInst>(RRPI->getOperand())) {
-    return Builder.createUncheckedTrivialBitCast(RRPI->getLoc(),
-                                                 URBCI->getOperand(),
-                                                 RRPI->getType());
-  }
 
   return nullptr;
 }
@@ -396,20 +385,6 @@ visitRawPointerToRefInst(RawPointerToRefInst *RawToRef) {
 
 SILInstruction *
 SILCombiner::
-visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI) {
-  // (unchecked_ref_bit_cast Y->Z (unchecked_ref_bit_cast X->Y x))
-  //   ->
-  // (unchecked_ref_bit_cast X->Z x)
-  if (auto *Op = dyn_cast<UncheckedRefBitCastInst>(URBCI->getOperand())) {
-    return Builder.createUncheckedRefBitCast(URBCI->getLoc(), Op->getOperand(),
-                                             URBCI->getType());
-  }
-
-  return nullptr;
-}
-
-SILInstruction *
-SILCombiner::
 visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
   // (unchecked_trivial_bit_cast Y->Z
   //                                 (unchecked_trivial_bit_cast X->Y x))
@@ -423,10 +398,10 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
   }
 
   // (unchecked_trivial_bit_cast Y->Z
-  //                                 (unchecked_ref_bit_cast X->Y x))
+  //                                 (unchecked_ref_cast X->Y x))
   //   ->
   // (unchecked_trivial_bit_cast X->Z x)
-  if (auto *URBCI = dyn_cast<UncheckedRefBitCastInst>(Op)) {
+  if (auto *URBCI = dyn_cast<UncheckedRefCastInst>(Op)) {
     return Builder.createUncheckedTrivialBitCast(UTBCI->getLoc(),
                                                  URBCI->getOperand(),
                                                  UTBCI->getType());

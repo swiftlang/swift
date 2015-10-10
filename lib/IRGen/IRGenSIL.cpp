@@ -723,7 +723,6 @@ public:
   void visitUncheckedRefCastInst(UncheckedRefCastInst *i);
   void visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *i);
   void visitUncheckedAddrCastInst(UncheckedAddrCastInst *i);
-  void visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *i);
   void visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *i);
   void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *i);
   void visitRefToRawPointerInst(RefToRawPointerInst *i);
@@ -3684,18 +3683,6 @@ void IRGenSILFunction::visitUncheckedTrivialBitCastInst(
   Explosion out;
   
   emitValueBitwiseCast(*this, i->getLoc().getSourceLoc(),
-            in,  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType())),
-            out, cast<LoadableTypeInfo>(getTypeInfo(i->getType())));
-  
-  setLoweredExplosion(SILValue(i, 0), out);
-}
-
-void IRGenSILFunction::visitUncheckedRefBitCastInst(
-                                      swift::UncheckedRefBitCastInst *i) {
-  Explosion in = getLoweredExplosion(i->getOperand());
-  Explosion out;
-  
-  emitValueBitCast(*this, i->getLoc().getSourceLoc(),
             in,  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType())),
             out, cast<LoadableTypeInfo>(getTypeInfo(i->getType())));
   

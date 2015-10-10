@@ -2175,19 +2175,6 @@ public:
             "unchecked_trivial_bit_cast must produce a value of trivial type");
   }
 
-  void checkUncheckedRefBitCastInst(UncheckedRefBitCastInst *BI) {
-    require(BI->getOperand().getType().isObject(),
-            "unchecked_ref_bit_cast must operate on a value");
-    require(BI->getType().isObject(),
-            "unchecked_ref_bit_cast must produce a value");
-
-    auto &M = F.getModule();
-    require(BI->getOperand().getType().isTrivial(M)
-              == BI->getType().isTrivial(M),
-            "unchecked_ref_bit_cast cannot change the reference count semantics"
-            " of the value");
-  }
-
   void checkUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *BI) {
     require(BI->getOperand().getType().isObject(),
             "unchecked_bitwise_cast must operate on a value");

@@ -49,7 +49,6 @@ namespace {
     SILValue visitUnownedToRefInst(UnownedToRefInst *URI);
     SILValue visitRefToUnmanagedInst(RefToUnmanagedInst *RUI);
     SILValue visitUnmanagedToRefInst(UnmanagedToRefInst *URI);
-    SILValue visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI);
     SILValue visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI);
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
@@ -390,21 +389,6 @@ InstSimplifier::visitUnmanagedToRefInst(UnmanagedToRefInst *URI) {
   if (auto *RUI = dyn_cast<RefToUnmanagedInst>(URI->getOperand()))
     if (RUI->getOperand().getType() == URI->getType())
       return RUI->getOperand();
-
-  return SILValue();
-}
-
-SILValue
-InstSimplifier::
-visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI) {
-  // (unchecked_ref_bit_cast X->X x) -> x
-  if (URBCI->getOperand().getType() == URBCI->getType())
-    return URBCI->getOperand();
-
-  // (unchecked_ref_bit_cast Y->X (unchecked_ref_bit_cast X->Y x)) -> x
-  if (auto *Op = dyn_cast<UncheckedRefBitCastInst>(URBCI->getOperand()))
-    if (Op->getOperand().getType() == URBCI->getType())
-      return Op->getOperand();
 
   return SILValue();
 }

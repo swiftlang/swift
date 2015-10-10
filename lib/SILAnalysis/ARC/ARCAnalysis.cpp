@@ -274,7 +274,6 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RawPointerToRefInst:
   case ValueKind::UnconditionalCheckedCastInst:
-  case ValueKind::UncheckedRefBitCastInst:
   case ValueKind::UncheckedBitwiseCastInst:
     return true;
 

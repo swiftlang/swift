@@ -489,10 +489,6 @@ namespace {
       return true;
     }
 
-    bool visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *RHS) {
-      return true;
-    }
-
     bool visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *RHS) {
       return true;
     }

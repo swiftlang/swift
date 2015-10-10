@@ -230,8 +230,6 @@ public:
   SILInstruction *visitStrongReleaseInst(StrongReleaseInst *SRI);
   SILInstruction *visitCondBranchInst(CondBranchInst *CBI);
   SILInstruction *
-  visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI);
-  SILInstruction *
   visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
   SILInstruction *
   visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI);

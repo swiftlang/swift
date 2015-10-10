@@ -454,12 +454,6 @@ public:
     return insert(new (F.getModule()) UncheckedTrivialBitCastInst(Loc, Op, Ty));
   }
 
-  UncheckedRefBitCastInst *createUncheckedRefBitCast(SILLocation Loc,
-                                                     SILValue Op,
-                                                     SILType Ty) {
-    return insert(new (F.getModule()) UncheckedRefBitCastInst(Loc, Op, Ty));
-  }
-
   UncheckedBitwiseCastInst *createUncheckedBitwiseCast(SILLocation Loc,
                                            SILValue Op,
                                            SILType Ty) {

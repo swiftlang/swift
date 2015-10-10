@@ -629,7 +629,6 @@ static bool isTransitiveSafeUser(SILInstruction *I) {
   case ValueKind::StructInst:
   case ValueKind::TupleInst:
   case ValueKind::EnumInst:
-  case ValueKind::UncheckedRefBitCastInst:
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::UncheckedBitwiseCastInst:
     assert(I->getNumTypes() == 1 && "We assume these are unary");
@@ -735,7 +734,7 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   // This use looks something like:
   //
   //   %57 = load %56 : $*Builtin.BridgeObject from Array<Int>
-  //   %58 = unchecked_ref_bit_cast %57 : $Builtin.BridgeObject to
+  //   %58 = unchecked_ref_cast %57 : $Builtin.BridgeObject to
   //   $_ContiguousArray
   //   %59 = unchecked_ref_cast %58 : $_ContiguousArrayStorageBase to
   //   $Builtin.NativeObject
@@ -744,8 +743,8 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   //   %61 = pointer_to_address %60 : $Builtin.RawPointer to $*Int
   //   %62 = mark_dependence %61 : $*Int on %59 : $Builtin.NativeObject
   //
-  // The struct_extract, unchecked_ref_bit_cast, unchecked_ref_cast are handled
-  // below in the "Transitive SafeArrayElementUse" code.
+  // The struct_extract, unchecked_ref_cast is handled below in the
+  // "Transitive SafeArrayElementUse" code.
   if (isa<MarkDependenceInst>(UseInst))
     return true;
 

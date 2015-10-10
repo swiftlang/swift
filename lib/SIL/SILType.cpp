@@ -460,25 +460,6 @@ SILType SILType::getAnyOptionalObjectType(SILModule &M,
   return SILType();
 }
 
-/// Return true of this type is the size of a single reference and holds a
-/// single reference ignoring spare bits.
-bool SILType::canBitCastAsSingleRef() const {
-  CanType objType = getSwiftRValueType();
-  // Unwrap one level of Optional or ImplicitlyUnwrappedOptional.
-  if (CanType optionalType = objType.getAnyOptionalObjectType())
-    objType = optionalType;
-
-  if (auto protocol = dyn_cast<ProtocolType>(objType)) {
-    return protocol->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)
-      || protocol->getDecl()->isObjC();
-  }
-  return objType->mayHaveSuperclass()
-    || objType.isObjCExistentialType()
-    || isa<BuiltinNativeObjectType>(objType)
-    || isa<BuiltinBridgeObjectType>(objType)
-    || isa<BuiltinUnknownObjectType>(objType);
-}
-
 /// True if the given type value is nonnull, and the represented type is NSError
 /// or CFError, the error classes for which we support "toll-free" bridging to
 /// ErrorType existentials.
