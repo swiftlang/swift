@@ -114,14 +114,6 @@ public:
     return Result;
   }
 
-  /// Add the given function to the set of functions that we could
-  /// call from this call site.
-  void addCallee(CallGraphNode *Node) {
-    assert(!isCalleeSetComplete() &&
-           "Attempting to add another callee to a complete call set!");
-    CalleeSet.getPointer().get<CalleeSetType *>()->insert(Node);
-  }
-
   /// Return whether the call set is known to be complete.
   bool isCalleeSetComplete() const {
     return CalleeSet.getInt();
