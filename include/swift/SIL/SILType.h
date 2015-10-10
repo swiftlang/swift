@@ -383,7 +383,7 @@ public:
 
   /// True if the given type has at least the size and alignment of a native
   /// pointer.
-  static bool isPointerSizeAndAligned(CanType t);
+  bool isPointerSizeAndAligned();
 
   /// True if the layout of `fromType` is known to cover the layout of
   /// `totype`. This is conservatively imprecise and is not
@@ -456,7 +456,8 @@ public:
   /// generate it.
   ArrayRef<Substitution> gatherAllSubstitutions(SILModule &M);
 
-  /// Return true if this type references a "ref" type.
+  /// Return true if this type references a "ref" type that has a single pointer
+  /// representation. Class existentials do not always qualify.
   bool isHeapObjectReferenceType() const;
 
   /// Return the SILType corresponding to the underlying type of the given

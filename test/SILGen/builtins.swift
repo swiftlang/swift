@@ -719,3 +719,43 @@ func isUnique_native(inout ref: Builtin.BridgeObject) -> Bool {
 func isUniqueOrPinned_native(inout ref: Builtin.BridgeObject) -> Bool {
   return _getBool(Builtin.isUniqueOrPinned_native(&ref))
 }
+
+// ----------------------------------------------------------------------------
+// Builtin.castReference
+// ----------------------------------------------------------------------------
+
+class A {}
+protocol PUnknown {}
+protocol PClass : class {}
+
+// CHECK-LABEL: sil hidden @_TF8builtins19refcast_generic_anyurFq_Ps9AnyObject_
+// CHECK: unchecked_ref_cast_addr  T in %{{.*}}#1 : $*T to AnyObject in %{{.*}}#1 : $*AnyObject
+func refcast_generic_any<T>(o: T) -> AnyObject {
+  return Builtin.castReference(o)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins17refcast_class_anyFCS_1APs9AnyObject_
+// CHECK: unchecked_ref_cast %0 : $A to $AnyObject
+// CHECK-NEXT: return
+func refcast_class_any(o: A) -> AnyObject {
+  return Builtin.castReference(o)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins20refcast_punknown_anyFPS_8PUnknown_Ps9AnyObject_
+// CHECK: unchecked_ref_cast_addr PUnknown in %{{.*}}#1 : $*PUnknown to AnyObject in %{{.*}}#1 : $*AnyObject
+func refcast_punknown_any(o: PUnknown) -> AnyObject {
+  return Builtin.castReference(o)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins18refcast_pclass_anyFPS_6PClass_Ps9AnyObject_
+// CHECK: unchecked_ref_bit_cast %0 : $PClass to $AnyObject
+// CHECK-NEXT: return
+func refcast_pclass_any(o: PClass) -> AnyObject {
+  return Builtin.castReference(o)
+}
+
+// CHECK-LABEL: sil hidden @_TF8builtins20refcast_any_punknownFPs9AnyObject_PS_8PUnknown_
+// CHECK: unchecked_ref_cast_addr AnyObject in %{{.*}}#1 : $*AnyObject to PUnknown in %{{.*}}#1 : $*PUnknown
+func refcast_any_punknown(o: AnyObject) -> PUnknown {
+  return Builtin.castReference(o)
+}

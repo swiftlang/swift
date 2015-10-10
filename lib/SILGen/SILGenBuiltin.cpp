@@ -489,6 +489,78 @@ static ManagedValue emitBuiltinCondFail(SILGenFunction &gen,
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
 }
 
+/// Specialized emitter for Builtin.castReference.
+static ManagedValue
+emitBuiltinCastReference(SILGenFunction &gen,
+                         SILLocation loc,
+                         ArrayRef<Substitution> substitutions,
+                         ArrayRef<ManagedValue> args,
+                         CanFunctionType formalApplyType,
+                         SGFContext C) {
+  assert(args.size() == 1 && "castReference should be given one argument");
+  assert(substitutions.size() == 2 && "castReference should have two subs");
+
+  auto fromTy = substitutions[0].getReplacement();
+  auto toTy = substitutions[1].getReplacement();
+  auto &fromTL = gen.getTypeLowering(fromTy);
+  auto &toTL = gen.getTypeLowering(toTy);
+  assert(!fromTL.isTrivial() && !toTL.isTrivial() && "expected ref type");
+
+  if (fromTL.isLoadable() || toTL.isLoadable()) {
+    if (UncheckedRefCastInst::canRefCastType(fromTL.getLoweredType())
+        && UncheckedRefCastInst::canRefCastType(toTL.getLoweredType())) {
+      // Create a reference cast, forwarding the cleanup.
+      // The cast takes the source reference.
+      auto &in = args[0];
+      SILValue out = gen.B.createUncheckedRefCast(loc, in.getValue(),
+                                              toTL.getLoweredType());
+      return ManagedValue(out, in.getCleanup());
+    }
+    if (UncheckedRefBitCastInst::canRefBitCastFromType(fromTL.getLoweredType())
+        && UncheckedRefBitCastInst::canRefBitCastToType(toTL.getLoweredType()))
+    {
+      auto &in = args[0];
+      SILValue out = gen.B.createUncheckedRefBitCast(loc, in.getValue(),
+                                                     toTL.getLoweredType());
+      return ManagedValue(out, in.getCleanup());
+    }
+  }
+  // If casting between address-only types, cast the address.
+  //
+  // If the from/to types are invalid, then use a cast that will fail at
+  // runtime. We cannot catch these errors with SIL verification because they
+  // may legitimately occur during code specialization on dynamically
+  // unreachable paths.
+  //
+  // TODO: For now, we leave invalid casts in address form so that the runtime
+  // will trap. We could emit a noreturn call here instead which would provide
+  // more information to the optimizer.
+  SILValue srcVal = args[0].forward(gen);
+  SILValue fromAddr;
+  if (fromTL.isLoadable()) {
+    // Move the loadable value into a "source temp".  Since the source and
+    // dest are RC identical, store the reference into the source temp without
+    // a retain. The cast will load the reference from the source temp and
+    // store it into a dest temp effectively forwarding the cleanup.
+    fromAddr = gen.emitTemporaryAllocation(loc, srcVal.getType());
+    gen.B.createStore(loc, srcVal, fromAddr);
+  } else {
+    // The cast loads directly from the source address.
+    fromAddr = srcVal;
+  }
+  // Create a "dest temp" to hold the reference after casting it.
+  SILValue toAddr = gen.emitTemporaryAllocation(loc, toTL.getLoweredType());
+  gen.B.createUncheckedRefCastAddr(loc, fromAddr, fromTy->getCanonicalType(),
+                                   toAddr, toTy->getCanonicalType());
+  // Forward it along and register a cleanup.
+  if (toTL.isAddressOnly())
+    return gen.emitManagedBufferWithCleanup(toAddr);
+
+  // Load the destination value.
+  auto result = gen.B.createLoad(loc, toAddr);
+  return gen.emitManagedRValueWithCleanup(result);
+}
+
 /// Specialized emitter for Builtin.reinterpretCast.
 static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
                                          SILLocation loc,
@@ -505,7 +577,7 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
   // If casting between address-only types, cast the address.
   if (!fromTL.isLoadable() || !toTL.isLoadable()) {
     SILValue fromAddr;
-    
+
     // If the from value is loadable, move it to a buffer.
     if (fromTL.isLoadable()) {
       fromAddr = gen.emitTemporaryAllocation(loc, args[0].getValue().getType());
@@ -513,7 +585,6 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
     } else {
       fromAddr = args[0].getValue();
     }
-    
     auto toAddr = gen.B.createUncheckedAddrCast(loc, fromAddr,
                                       toTL.getLoweredType().getAddressType());
     

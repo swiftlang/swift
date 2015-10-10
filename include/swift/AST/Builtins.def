@@ -264,6 +264,10 @@ BUILTIN_SIL_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
 /// Bridging to/from a raw pointer does not imply a retain.
 BUILTIN_SIL_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
 
+/// castReference has type T -> U.
+/// T and U must be convertible to AnyObject.
+BUILTIN_SIL_OPERATION(CastReference, "castReference", Special)
+
 /// reinterpretCast has type T -> U.
 BUILTIN_SIL_OPERATION(ReinterpretCast, "reinterpretCast", Special)
 

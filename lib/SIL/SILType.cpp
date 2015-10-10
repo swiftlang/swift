@@ -77,19 +77,13 @@ std::string SILType::getAsString() const {
   return OS.str();
 }
 
-bool SILType::isPointerSizeAndAligned(CanType t) {
-  if (t->isBridgeableObjectType()
-      || t->is<BuiltinNativeObjectType>()
-      || t->is<BuiltinBridgeObjectType>()
-      || t->is<BuiltinUnknownObjectType>()
-      || t->is<BuiltinRawPointerType>()) {
+bool SILType::isPointerSizeAndAligned() {
+  auto &C = getASTContext();
+  if (isHeapObjectReferenceType()
+      || getSwiftRValueType()->isEqual(C.TheRawPointerType)) {
     return true;
   }
-  if (auto protocol = dyn_cast<ProtocolType>(t)) {
-    return protocol->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)
-      || protocol->getDecl()->isObjC();
-  }
-  if (auto intTy = dyn_cast<BuiltinIntegerType>(t))
+  if (auto intTy = dyn_cast<BuiltinIntegerType>(getSwiftRValueType()))
     return intTy->getWidth().isPointerWidth();
 
   return false;
@@ -211,11 +205,13 @@ static bool canUnsafeCastEnum(SILType fromType, EnumDecl *fromEnum,
 static bool canUnsafeCastScalars(SILType fromType, SILType toType,
                                  SILModule &M) {
   CanType fromCanTy = fromType.getSwiftRValueType();
-  CanType toCanTy = toType.getSwiftRValueType();
-  bool isToPointer = SILType::isPointerSizeAndAligned(toCanTy);
+  bool isToPointer = toType.isPointerSizeAndAligned();
 
   unsigned LeastFromWidth = 0;
-  if (SILType::isPointerSizeAndAligned(fromCanTy)
+  // Like UnsafeRefBitCast, allow class existentials to be truncated to
+  // single-pointer references. Unlike UnsafeRefBitCast, this also supports raw
+  // pointers and words.
+  if (fromType.isPointerSizeAndAligned()
       || fromCanTy.isAnyClassReferenceType()) {
 
     // Allow casting from a value that contains an aligned pointer into another
@@ -234,7 +230,8 @@ static bool canUnsafeCastScalars(SILType fromType, SILType toType,
   if (isToPointer) {
     GreatestToWidth = BuiltinIntegerWidth::pointer().getGreatestWidth();
 
-  } else if (auto toIntTy = dyn_cast<BuiltinIntegerType>(toCanTy)) {
+  } else if (auto toIntTy = dyn_cast<BuiltinIntegerType>(
+               toType.getSwiftRValueType())) {
     if (toIntTy->isFixedWidth())
       GreatestToWidth = toIntTy->getFixedWidth();
   }

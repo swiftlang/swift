@@ -2183,9 +2183,7 @@ public:
             "unchecked_ref_bit_cast must operate on a value");
     require(BI->getType().isObject(),
             "unchecked_ref_bit_cast must produce a value");
-    
-    // TODO: A deeper comparison of the source and destination types to ensure
-    // they're reference-counting-identical.
+
     auto &M = F.getModule();
     require(BI->getOperand().getType().isTrivial(M)
               == BI->getType().isTrivial(M),

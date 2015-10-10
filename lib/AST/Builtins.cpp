@@ -790,6 +790,16 @@ static ValueDecl *getCastFromBridgeObjectOperation(ASTContext &C,
   }
 }
 
+static ValueDecl *getCastReferenceOperation(ASTContext &ctx,
+                                            Identifier name) {
+  // <T, U> T -> U
+  // SILGen and IRGen check additional constraints during lowering.
+  GenericSignatureBuilder builder(ctx, 2);
+  builder.addParameter(makeGenericParam(0));
+  builder.setResult(makeGenericParam(1));
+  return builder.build(name);
+}
+
 static ValueDecl *getReinterpretCastOperation(ASTContext &ctx,
                                               Identifier name) {
   // <T, U> T -> U
@@ -1516,6 +1526,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getCastFromBridgeObjectOperation(Context, Id, BV);
       
+  case BuiltinValueKind::CastReference:
+    if (!Types.empty()) return nullptr;
+    return getCastReferenceOperation(Context, Id);
+
   case BuiltinValueKind::ReinterpretCast:
     if (!Types.empty()) return nullptr;
     return getReinterpretCastOperation(Context, Id);

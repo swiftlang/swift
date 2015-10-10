@@ -1527,6 +1527,13 @@ class UncheckedRefCastInst
 
   UncheckedRefCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
+
+  // Allow reference casting of heap objects and class existentials.
+public:
+  // Only reference cast heap objects with single pointer representation.
+  static bool canRefCastType(SILType Ty) {
+    return Ty.isHeapObjectReferenceType();
+  }
 };
 
 /// Converts a heap object reference to a different type without any runtime
@@ -1602,6 +1609,16 @@ class UncheckedRefBitCastInst
 
   UncheckedRefBitCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
+
+public:
+  // Reference bitcast from representations with single pointer low bits.
+  static bool canRefBitCastFromType(SILType Ty) {
+    return Ty.isHeapObjectReferenceType() || Ty.isClassExistentialType();
+  }
+  // Only reference bitcast to simple single pointer representations.
+  static bool canRefBitCastToType(SILType Ty) {
+    return Ty.isHeapObjectReferenceType();
+  }
 };
 
 /// Bitwise copy a value into another value of the same size or smaller.
