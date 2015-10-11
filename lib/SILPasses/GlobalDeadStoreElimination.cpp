@@ -137,6 +137,9 @@ constexpr unsigned MaxPartialDeadStoreCountLimit = 1;
 ///
 class BBState {
 public:
+  /// The basic block this BBState represents.
+  SILBasicBlock *BB;
+
   /// A bit vector for which the ith bit represents the ith MemLocation in
   /// MemLocationVault. If the bit is set, then the location currently has an
   /// upward visible store.
@@ -145,9 +148,6 @@ public:
   /// If WriteSetIn changes while processing a basicblock, then all its
   /// predecessors needs to be rerun.
   llvm::BitVector WriteSetIn;
-
-  /// The basic block this BBState represents.
-  SILBasicBlock *BB;
 
   /// The dead stores in the current basic block.
   llvm::DenseSet<SILInstruction *> DeadStores;
