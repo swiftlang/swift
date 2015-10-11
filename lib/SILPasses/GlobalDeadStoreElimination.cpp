@@ -407,10 +407,12 @@ void DSEContext::updateWriteSetForRead(SILInstruction *I, BBState *S,
   // Remove any may/must-aliasing stores to the MemLocation, as they cant be
   // used
   // to kill any upward visible stores due to the intefering load.
+  MemLocation &R = MemLocationVault[bit];
   for (unsigned i = 0; i < S->WriteSetOut.size(); ++i) {
     if (!S->isTrackingMemLocation(i))
       continue;
-    if (!MemLocationVault[i].isMayAliasMemLocation(MemLocationVault[bit], AA))
+    MemLocation &L = MemLocationVault[i];
+    if (!L.isMayAliasMemLocation(R, AA))
       continue;
     DEBUG(llvm::dbgs() << "Loc Removal: " << MemLocationVault[i].getBase()
                        << "Instruction: " << *I << "\n");
@@ -422,11 +424,13 @@ bool DSEContext::updateWriteSetForWrite(SILInstruction *I, BBState *S,
                                         unsigned bit) {
   // If a tracked store must aliases with this store, then this store is dead.
   bool IsDead = false;
+  MemLocation &R = MemLocationVault[bit];
   for (unsigned i = 0; i < S->WriteSetOut.size(); ++i) {
     if (!S->isTrackingMemLocation(i))
       continue;
     // If 2 locations may alias, we can still keep both stores.
-    if (!MemLocationVault[i].isMustAliasMemLocation(MemLocationVault[bit], AA))
+    MemLocation &L = MemLocationVault[i];
+    if (!L.isMustAliasMemLocation(R, AA))
       continue;
     IsDead = true;
     // No need to check the rest of the upward visible stores as this store
@@ -554,7 +558,7 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   // Partial dead store - stores to some locations are dead, but not all. This
   // is a partially dead store. Also at this point we know what locations are
   // dead.
-  llvm::DenseSet<MemLocation> LocsAlive;
+  llvm::DenseSet<MemLocation> Alives;
   if (V.any()) {
     // Take out locations that are dead.
     for (unsigned i = 0; i < V.size(); ++i) {
@@ -562,14 +566,14 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
         continue;
       // We are already tracking all the stores to this Mem as dead.
       S->stopTrackingMemLocation(i);
-      LocsAlive.insert(Locs[i]);
+      Alives.insert(Locs[i]);
     }
 
     // Try to create as few aggregated stores as possible out of the locations.
-    MemLocation::reduce(L, Mod, LocsAlive);
+    MemLocation::reduce(L, Mod, Alives);
 
     // Oops, we have too many smaller stores generated, bail out.
-    if (LocsAlive.size() > MaxPartialDeadStoreCountLimit)
+    if (Alives.size() > MaxPartialDeadStoreCountLimit)
       return;
 
     // Locations here have a projection path from their Base, but this
@@ -579,13 +583,13 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
     SILValue B = Locs[0].getBase();
     Optional<ProjectionPath> BP = ProjectionPath::getAddrProjectionPath(B, Mem);
     // Strip off the projection path from base to the accessed field.
-    for (auto &X : LocsAlive) {
+    for (auto &X : Alives) {
       X.subtractPaths(BP);
     }
 
     // Create the individual stores that are alive.
     SILBuilderWithScope<16> Builder(I);
-    for (auto &X : LocsAlive) {
+    for (auto &X : Alives) {
       SILValue Value = createExtract(Val, X.getPath(), I, true);
       SILValue Addr = createExtract(Mem, X.getPath(), I, false);
       Builder.createStore(Addr.getLoc().getValue(), Value, Addr);
