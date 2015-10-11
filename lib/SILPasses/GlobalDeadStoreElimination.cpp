@@ -326,7 +326,7 @@ public:
   bool processBasicBlock(SILBasicBlock *BB, bool PDSE = false);
 
   /// Intersect the successor live-ins.
-  void mergeSuccessorsWriteIn(SILBasicBlock *BB);
+  void mergeSuccessorStates(SILBasicBlock *BB);
 
   /// Update the BBState based on the given instruction.
   void processInstruction(SILInstruction *I, bool PDSE);
@@ -358,7 +358,7 @@ unsigned DSEContext::getMemLocationBit(const MemLocation &Loc) {
 bool DSEContext::processBasicBlock(SILBasicBlock *BB, bool PDSE) {
   // Intersect in the successor live-ins. A store is dead if it is not read from
   // any path to the end of the program. Thus an intersection.
-  mergeSuccessorsWriteIn(BB);
+  mergeSuccessorStates(BB);
 
   // Process instructions in post-order fashion.
   for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
@@ -370,7 +370,7 @@ bool DSEContext::processBasicBlock(SILBasicBlock *BB, bool PDSE) {
   return getBBLocState(BB)->updateWriteSetIn();
 }
 
-void DSEContext::mergeSuccessorsWriteIn(SILBasicBlock *BB) {
+void DSEContext::mergeSuccessorStates(SILBasicBlock *BB) {
   // First, clear the WriteSetOut for the current basicblock.
   BBState *C = getBBLocState(BB);
   C->clearMemLocations();
