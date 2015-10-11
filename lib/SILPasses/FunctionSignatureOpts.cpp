@@ -876,7 +876,6 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
                           SILFunction *F,
                           CallGraph &CG,
                         const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallSites,
-                          bool CallerSetIsComplete,
                           std::vector<SILFunction *> &DeadFunctions) {
   DEBUG(llvm::dbgs() << "Optimizing Function Signature of " << F->getName()
                      << "\n");
@@ -919,6 +918,11 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   if (F->getModule().lookUpFunction(NewFName))
     return false;
 
+  // Check whether we know all the callers to the function. We must do
+  // this before moving the function body, because in that process we
+  // also remove any knowledge of the function from the call graph.
+  bool allCallersKnown = CG.allCallersKnown(F);
+
   // Otherwise, move F over to NewF.
   SILFunction *NewF =
     moveFunctionBodyToNewFunctionWithName(F, CG, NewFName, Analyzer);
@@ -940,9 +944,9 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   // appropriate given the form of function signature optimization performed.
   rewriteApplyInstToCallNewFunction(Analyzer, NewF, CG, CallSites);
 
-  // Now that we have rewritten all apply insts that referenced the old
-  // function, if the caller set was complete, delete the old function.
-  if (CallerSetIsComplete) {
+  // If we know all call sites to this function we can remove it since
+  // we've rewritten all of them to call the new function.
+  if (allCallersKnown) {
     DeadFunctions.push_back(F);
   }
 
@@ -1058,14 +1062,9 @@ public:
         if (CallSites.empty())
           continue;
 
-        // Check if we know the callgraph is complete with respect to this
-        // function. In such a case, we don't need to generate the thunk.
-        bool CallerSetIsComplete = FNode->isCallerEdgesComplete();
-
         // Otherwise, try to optimize the function signature of F.
         Changed |= optimizeFunctionSignature(Allocator, RCIA->get(F), F, CG,
                                              CallSites,
-                                             CallerSetIsComplete,
                                              DeadFunctions);
       }
     }

@@ -391,6 +391,11 @@ public:
     return getCallGraphNode(F)->getPartialCallerEdges();
   }
 
+  /// Do we know all the callers of this function?
+  bool allCallersKnown(SILFunction *F) const {
+    return getCallGraphNode(F)->isCallerEdgesComplete();
+  }
+
   // Call graph queries on call sites.
 
   bool isCalleeSetComplete(FullApplySite FAS) {
