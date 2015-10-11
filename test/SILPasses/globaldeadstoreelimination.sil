@@ -1253,3 +1253,37 @@ bb0(%0 : $foo, %1 : $foo):
   %21 = tuple ()                                  // user: %22
   return %21 : $()                                // id: %22
 }
+
+// Remove the dead stores in the entry block as the store in bb2
+// kills them. This test how the optimistic data flow works.
+//
+// CHECK-LABEL: DeadStoreAcrossLoopSimpleStruct
+// CHECK: bb0:
+// CHECK-NOT: store
+// CHECK: br
+sil hidden @DeadStoreAcrossLoopSimpleStruct : $@convention(thin) (Bool, Int) -> () {
+bb0(%0 : $Bool, %1 : $Int):
+  %2 = alloc_stack $S1                            // users: %6, %9, %16, %19
+  %3 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
+  %4 = metatype $@thin S1.Type                    // user: %5
+  %5 = apply %3(%4) : $@convention(thin) (@thin S1.Type) -> S1 // user: %6
+  store %5 to %2#1 : $*S1                         // id: %6
+  %7 = integer_literal $Builtin.Int64, 2          // user: %8
+  %8 = struct $Int (%7 : $Builtin.Int64)          // user: %10
+  %9 = struct_element_addr %2#1 : $*S1, #S1.a     // user: %10
+  store %8 to %9 : $*Int                          // id: %10
+  br bb1                                          // id: %11
+
+bb1:                                              // Preds: bb0 bb1
+  %12 = struct_extract %0 : $Bool, #Bool.value    // user: %13
+  cond_br %12, bb1, bb2                           // id: %13
+
+bb2:                                              // Preds: bb1
+  %14 = integer_literal $Builtin.Int64, 2         // user: %15
+  %15 = struct $Int (%14 : $Builtin.Int64)        // user: %17
+  %16 = struct_element_addr %2#1 : $*S1, #S1.a    // user: %17
+  store %15 to %16 : $*Int                        // id: %17
+  %18 = tuple ()                                  // user: %20
+  dealloc_stack %2#0 : $*@local_storage S1        // id: %19
+  return %18 : $()                                // id: %20
+}

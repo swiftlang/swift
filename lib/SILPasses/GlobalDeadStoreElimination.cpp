@@ -114,16 +114,6 @@ const unsigned MaxPartialDeadStoreCountLimit = 1;
 /// initialized to the intersection of WriteSetIns of all successors of the
 /// basic block.
 ///
-/// TODO: The initial state of WriteSetIn should be all 1's. Otherwise the
-/// dataflow solution will be too conservative in case of loops.
-/// consider this case, the dead store by var a = 10 before the loop will not
-/// be eliminated if the WriteSetIn is set to 0 initially. However, we can only
-/// eliminate the dead stores after the data flow stablizes.
-///
-///   var a = 10
-///   for _ in 0...1024 {}
-///   a = 10
-///
 /// Initially WriteSetIn is empty. After the basic block is processed, if its
 /// WriteSetOut is different from WriteSetIn, WriteSetIn is initialized to the
 /// value of WriteSetOut and the data flow is rerun.
@@ -132,8 +122,8 @@ const unsigned MaxPartialDeadStoreCountLimit = 1;
 ///
 /// 1. When a store instruction is encountered, the stored location is tracked.
 ///
-/// 2. When a load instruction is encountered, remove the loaded location from
-///    the WriteSetOut.
+/// 2. When a load instruction is encountered, remove the loaded location and
+///    any location it may alias with from the WriteSetOut.
 ///
 /// 3. When an instruction reads or writes to memory in an unknown way, the
 ///    WriteSetOut is cleared.
@@ -158,8 +148,21 @@ public:
   /// Constructors.
   BBState() : BB(nullptr) {}
   BBState(SILBasicBlock *B, unsigned lcnt) : BB(B) {
-    WriteSetIn.resize(lcnt);
-    WriteSetOut.resize(lcnt);
+    // The initial state of WriteSetIn should be all 1's. Otherwise the
+    // dataflow solution could be too conservative.
+    //
+    // consider this case, the dead store by var a = 10 before the loop will not
+    // be eliminated if the WriteSetIn is set to 0 initially.
+    //
+    //   var a = 10
+    //   for _ in 0...1024 {}
+    //   a = 10
+    //
+    // However, by doing so, we can only eliminate the dead stores after the
+    // data flow stablizes.
+    //
+    WriteSetIn.resize(lcnt, true);
+    WriteSetOut.resize(lcnt, false);
   }
 
   /// Check whether the WriteSetIn has changed. If it does, we need to
@@ -264,13 +267,13 @@ class GlobalDeadStoreEliminationImpl {
   /// There is a write to a location, expand the location into individual fields
   /// before processing them.
   void processWrite(SILInstruction *Inst, BBState *State, SILValue Val,
-                    SILValue Mem);
+                    SILValue Mem, bool PDSE);
 
   /// Process Instructions. Extract MemLocations from SIL LoadInst.
   void processLoadInst(SILInstruction *Inst);
 
   /// Process Instructions. Extract MemLocations from SIL StoreInst.
-  void processStoreInst(SILInstruction *Inst);
+  void processStoreInst(SILInstruction *Inst, bool PDSE);
 
   /// Process Instructions. Extract MemLocations from SIL Unknown Memory Inst.
   void processUnknownReadMemInst(SILInstruction *Inst);
@@ -313,13 +316,13 @@ public:
 
   /// Compute the kill set for the basic block. return true if the store set
   /// changes.
-  bool processBasicBlock(SILBasicBlock *BB);
+  bool processBasicBlock(SILBasicBlock *BB, bool PDSE = false);
 
   /// Intersect the successor live-ins.
   void mergeSuccessorsWriteIn(SILBasicBlock *BB);
 
   /// Update the BBState based on the given instruction.
-  void processInstruction(SILInstruction *I);
+  void processInstruction(SILInstruction *I, bool PDSE);
 
   /// Entry point for global dead store elimination.
   void run();
@@ -346,14 +349,15 @@ GlobalDeadStoreEliminationImpl::getMemLocationBit(const MemLocation &Loc) {
   return Iter->second;
 }
 
-bool GlobalDeadStoreEliminationImpl::processBasicBlock(SILBasicBlock *BB) {
+bool GlobalDeadStoreEliminationImpl::processBasicBlock(SILBasicBlock *BB,
+                                                       bool PDSE) {
   // Intersect in the successor live-ins. A store is dead if it is not read from
   // any path to the end of the program. Thus an intersection.
   mergeSuccessorsWriteIn(BB);
 
   // Process instructions in post-order fashion.
   for (auto I = BB->rbegin(), E = BB->rend(); I != E; ++I) {
-    processInstruction(&(*I));
+    processInstruction(&(*I), PDSE);
   }
 
   // If WriteSetIn changes, then keep iterating until reached a fixed
@@ -446,7 +450,7 @@ void GlobalDeadStoreEliminationImpl::processRead(SILInstruction *I, BBState *S,
   //      %3 = load %2 : $*Int
   //
   // Base will point to %1, but not %2. Projection path will indicate which
-  // field is accessed. 
+  // field is accessed.
   //
   // This will make comparison between locations easier. This eases the
   // implementation of intersection operator in the data flow.
@@ -497,7 +501,8 @@ SILValue GlobalDeadStoreEliminationImpl::createExtract(
 }
 
 void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
-                                                  SILValue Val, SILValue Mem) {
+                                                  SILValue Val, SILValue Mem,
+                                                  bool PDSE) {
   // Construct a MemLocation to represent the memory read by this instruction.
   // NOTE: The base will point to the actual object this inst is accessing,
   // not this particular field.
@@ -507,7 +512,7 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
   //      store %3 to %2 : $*Int
   //
   // Base will point to %1, but not %2. Projection path will indicate which
-  // field is accessed. 
+  // field is accessed.
   //
   // This will make comparison between locations easier. This eases the
   // implementation of intersection operator in the data flow.
@@ -532,6 +537,10 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
     Dead &= V.test(idx);
     ++idx;
   }
+
+  // Data flow has not stablized, do not perform the DSE just yet.
+  if (!PDSE)
+    return;
 
   // Fully dead store - stores to all the components are dead, therefore this
   // instruction is dead.
@@ -564,7 +573,8 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
       return;
 
     // Locations here have a projection path from their Base, but this
-    // particular instruction may not be accessing the base, so we need to *rebase*
+    // particular instruction may not be accessing the base, so we need to
+    // *rebase*
     // the locations w.r.t. to the current instruction.
     SILValue B = Locs[0].getBase();
     Optional<ProjectionPath> BP = ProjectionPath::getAddrProjectionPath(B, Mem);
@@ -594,11 +604,12 @@ void GlobalDeadStoreEliminationImpl::processLoadInst(SILInstruction *I) {
   processRead(I, getBBLocState(I), Mem);
 }
 
-void GlobalDeadStoreEliminationImpl::processStoreInst(SILInstruction *I) {
+void GlobalDeadStoreEliminationImpl::processStoreInst(SILInstruction *I,
+                                                      bool PDSE) {
   // Storing a loadable type.
   SILValue Val = cast<StoreInst>(I)->getSrc();
   SILValue Mem = cast<StoreInst>(I)->getDest();
-  processWrite(I, getBBLocState(I), Val, Mem);
+  processWrite(I, getBBLocState(I), Val, Mem, PDSE);
 }
 
 void GlobalDeadStoreEliminationImpl::processUnknownReadMemInst(
@@ -616,7 +627,8 @@ void GlobalDeadStoreEliminationImpl::processUnknownReadMemInst(
   }
 }
 
-void GlobalDeadStoreEliminationImpl::processInstruction(SILInstruction *I) {
+void GlobalDeadStoreEliminationImpl::processInstruction(SILInstruction *I,
+                                                        bool PDSE) {
   // If this instruction has side effects, but is inert from a store
   // perspective, skip it.
   if (isDeadStoreInertInstruction(I))
@@ -629,7 +641,7 @@ void GlobalDeadStoreEliminationImpl::processInstruction(SILInstruction *I) {
   if (isa<LoadInst>(I)) {
     processLoadInst(I);
   } else if (isa<StoreInst>(I)) {
-    processStoreInst(I);
+    processStoreInst(I, PDSE);
   } else if (I->mayReadFromMemory()) {
     processUnknownReadMemInst(I);
   }
@@ -665,6 +677,12 @@ void GlobalDeadStoreEliminationImpl::run() {
       Changed |= processBasicBlock(BB);
     }
   } while (Changed);
+
+  // The data flow has stablized, run one last iteration over all the basic
+  // blocks and try to remove dead stores.
+  for (SILBasicBlock *BB : PO->getPostOrder()) {
+    processBasicBlock(BB, true);
+  }
 
   // Finally, delete the dead stores.
   for (SILBasicBlock *BB : PO->getPostOrder()) {
