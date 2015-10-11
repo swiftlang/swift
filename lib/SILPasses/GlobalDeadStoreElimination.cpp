@@ -222,7 +222,7 @@ void BBState::intersect(const BBState &Succ) {
 
 namespace {
 
-class GlobalDeadStoreEliminationImpl {
+class DSEContext {
   /// The module we are currently processing.
   SILModule *Mod;
 
@@ -317,8 +317,8 @@ class GlobalDeadStoreEliminationImpl {
 
 public:
   /// Constructor.
-  GlobalDeadStoreEliminationImpl(SILFunction *F, SILModule *M,
-                                 SILPassManager *PM, AliasAnalysis *AA)
+  DSEContext(SILFunction *F, SILModule *M, SILPassManager *PM,
+             AliasAnalysis *AA)
       : Mod(M), F(F), PM(PM), AA(AA) {}
 
   /// Compute the kill set for the basic block. return true if the store set
@@ -342,8 +342,7 @@ public:
 
 } // end anonymous namespace
 
-unsigned
-GlobalDeadStoreEliminationImpl::getMemLocationBit(const MemLocation &Loc) {
+unsigned DSEContext::getMemLocationBit(const MemLocation &Loc) {
   // Return the bit position of the given Loc in the MemLocationVault. The bit
   // position is then used to set/reset the bitvector kept by each BBState.
   //
@@ -356,8 +355,7 @@ GlobalDeadStoreEliminationImpl::getMemLocationBit(const MemLocation &Loc) {
   return Iter->second;
 }
 
-bool GlobalDeadStoreEliminationImpl::processBasicBlock(SILBasicBlock *BB,
-                                                       bool PDSE) {
+bool DSEContext::processBasicBlock(SILBasicBlock *BB, bool PDSE) {
   // Intersect in the successor live-ins. A store is dead if it is not read from
   // any path to the end of the program. Thus an intersection.
   mergeSuccessorsWriteIn(BB);
@@ -372,7 +370,7 @@ bool GlobalDeadStoreEliminationImpl::processBasicBlock(SILBasicBlock *BB,
   return getBBLocState(BB)->updateWriteSetIn();
 }
 
-void GlobalDeadStoreEliminationImpl::mergeSuccessorsWriteIn(SILBasicBlock *BB) {
+void DSEContext::mergeSuccessorsWriteIn(SILBasicBlock *BB) {
   // First, clear the WriteSetOut for the current basicblock.
   BBState *C = getBBLocState(BB);
   C->clearMemLocations();
@@ -391,8 +389,7 @@ void GlobalDeadStoreEliminationImpl::mergeSuccessorsWriteIn(SILBasicBlock *BB) {
   }
 }
 
-void GlobalDeadStoreEliminationImpl::invalidateMemLocationBase(
-    SILInstruction *I) {
+void DSEContext::invalidateMemLocationBase(SILInstruction *I) {
   BBState *S = getBBLocState(I);
   // If this instruction defines the base of a location, then we need to
   // invalidate any locations with the same base.
@@ -405,9 +402,8 @@ void GlobalDeadStoreEliminationImpl::invalidateMemLocationBase(
   }
 }
 
-void GlobalDeadStoreEliminationImpl::updateWriteSetForRead(SILInstruction *I,
-                                                           BBState *S,
-                                                           unsigned bit) {
+void DSEContext::updateWriteSetForRead(SILInstruction *I, BBState *S,
+                                       unsigned bit) {
   // Remove any may/must-aliasing stores to the MemLocation, as they cant be
   // used
   // to kill any upward visible stores due to the intefering load.
@@ -422,9 +418,8 @@ void GlobalDeadStoreEliminationImpl::updateWriteSetForRead(SILInstruction *I,
   }
 }
 
-bool GlobalDeadStoreEliminationImpl::updateWriteSetForWrite(SILInstruction *I,
-                                                            BBState *S,
-                                                            unsigned bit) {
+bool DSEContext::updateWriteSetForWrite(SILInstruction *I, BBState *S,
+                                        unsigned bit) {
   // If a tracked store must aliases with this store, then this store is dead.
   bool IsDead = false;
   for (unsigned i = 0; i < S->WriteSetOut.size(); ++i) {
@@ -446,8 +441,7 @@ bool GlobalDeadStoreEliminationImpl::updateWriteSetForWrite(SILInstruction *I,
   return IsDead;
 }
 
-void GlobalDeadStoreEliminationImpl::processRead(SILInstruction *I, BBState *S,
-                                                 SILValue Mem) {
+void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem) {
   // Construct a MemLocation to represent the memory read by this instruction.
   // NOTE: The base will point to the actual object this inst is accessing,
   // not this particular field.
@@ -479,9 +473,9 @@ void GlobalDeadStoreEliminationImpl::processRead(SILInstruction *I, BBState *S,
   }
 }
 
-SILValue GlobalDeadStoreEliminationImpl::createExtract(
-    SILValue Base, Optional<ProjectionPath> &Path, SILInstruction *Inst,
-    bool IsValExt) {
+SILValue DSEContext::createExtract(SILValue Base,
+                                   Optional<ProjectionPath> &Path,
+                                   SILInstruction *Inst, bool IsValExt) {
   // If we found a projection path, but there are no projections, then the two
   // loads must be the same, return PrevLI.
   if (!Path || Path->empty())
@@ -507,9 +501,8 @@ SILValue GlobalDeadStoreEliminationImpl::createExtract(
   return LastExtract;
 }
 
-void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
-                                                  SILValue Val, SILValue Mem,
-                                                  bool PDSE) {
+void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
+                              SILValue Mem, bool PDSE) {
   // Construct a MemLocation to represent the memory read by this instruction.
   // NOTE: The base will point to the actual object this inst is accessing,
   // not this particular field.
@@ -605,22 +598,20 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
   }
 }
 
-void GlobalDeadStoreEliminationImpl::processLoadInst(SILInstruction *I) {
+void DSEContext::processLoadInst(SILInstruction *I) {
   // Loading a loadable type.
   SILValue Mem = cast<LoadInst>(I)->getOperand();
   processRead(I, getBBLocState(I), Mem);
 }
 
-void GlobalDeadStoreEliminationImpl::processStoreInst(SILInstruction *I,
-                                                      bool PDSE) {
+void DSEContext::processStoreInst(SILInstruction *I, bool PDSE) {
   // Storing a loadable type.
   SILValue Val = cast<StoreInst>(I)->getSrc();
   SILValue Mem = cast<StoreInst>(I)->getDest();
   processWrite(I, getBBLocState(I), Val, Mem, PDSE);
 }
 
-void GlobalDeadStoreEliminationImpl::processUnknownReadMemInst(
-    SILInstruction *I) {
+void DSEContext::processUnknownReadMemInst(SILInstruction *I) {
   // We do not know what this instruction does or the memory that it *may*
   // touch. Hand it to alias analysis to see whether we need to invalidate
   // any MemLocation.
@@ -634,8 +625,7 @@ void GlobalDeadStoreEliminationImpl::processUnknownReadMemInst(
   }
 }
 
-void GlobalDeadStoreEliminationImpl::processInstruction(SILInstruction *I,
-                                                        bool PDSE) {
+void DSEContext::processInstruction(SILInstruction *I, bool PDSE) {
   // If this instruction has side effects, but is inert from a store
   // perspective, skip it.
   if (isDeadStoreInertInstruction(I))
@@ -657,7 +647,7 @@ void GlobalDeadStoreEliminationImpl::processInstruction(SILInstruction *I,
   invalidateMemLocationBase(I);
 }
 
-void GlobalDeadStoreEliminationImpl::run() {
+void DSEContext::run() {
   // Walk over the function and find all the locations accessed by
   // this function.
   MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex);
@@ -716,7 +706,7 @@ public:
     SILFunction *F = getFunction();
     DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName() << " ***\n");
 
-    GlobalDeadStoreEliminationImpl DSE(F, &F->getModule(), PM, AA);
+    DSEContext DSE(F, &F->getModule(), PM, AA);
     DSE.run();
   }
 };
