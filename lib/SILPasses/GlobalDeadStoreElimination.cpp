@@ -47,6 +47,13 @@
 /// minimum number of stores possible using the reduce function. This is done
 /// so that we do not bloat SIL IR.
 ///
+/// TODO: Handle same value store in DSE, currently handled in RLE.
+///
+/// e.g.
+/// %0 = load %A
+/// ... nothing happens in middle and the %A contains the value of %0.
+/// store %0 to %A  <---- no need to do this store.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-dead-store-opt"
