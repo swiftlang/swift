@@ -106,7 +106,7 @@ namespace {
 /// If a large store is broken down to too many smaller stores, bail out.
 /// Currently, we only do partial dead store if we can form a single contiguous
 /// non-dead store.
-const unsigned MaxPartialDeadStoreCountLimit = 1;
+constexpr unsigned MaxPartialDeadStoreCountLimit = 1;
 
 /// BBState summarizes how MemLocations are used in a basic block.
 ///
