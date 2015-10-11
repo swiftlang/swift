@@ -1,4 +1,4 @@
-///===---- LoadStoreOpts.cpp - SIL Load/Store Optimizations Forwarding -----===//
+///===- LoadStoreOpts.cpp - SIL Load/Store Optimizations Forwarding -------===//
 ///
 /// This source file is part of the Swift.org open source project
 ///
@@ -35,17 +35,17 @@
 /// 3. Performing a RPO walk over the control flow graph, tracking any
 /// MemLocations that are read from or stored into in each basic block. The
 /// read or stored value, kept in a map (gen-set) from MemLocation <-> MemValue,
-/// becomes the avalable value for the MemLocation. 
+/// becomes the avalable value for the MemLocation.
 ///
 /// 4. An optimistic iterative intersection-based dataflow is performed on the
 /// gen sets until convergence.
 ///
 /// At the core of RLE, there is the MemLocation class. a MemLocation is an
-/// abstraction of an object field in program. It consists of a base and a 
+/// abstraction of an object field in program. It consists of a base and a
 /// projection path to the field accessed.
 ///
 /// In SIL, one can access an aggregate as a whole, i.e. store to a struct with
-/// 2 Int fields. A store like this will generate 2 *indivisible* MemLocations, 
+/// 2 Int fields. A store like this will generate 2 *indivisible* MemLocations,
 /// 1 for each field and in addition to keeping a list of MemLocation, RLE also
 /// keeps their available MemValues. We call it *indivisible* because it can not
 /// be broken down to more MemLocations.
@@ -90,6 +90,7 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILPasses/Transforms.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/None.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/MapVector.h"
@@ -102,11 +103,11 @@ using namespace swift;
 
 /// Disable dead store elimination.
 static llvm::cl::opt<bool> DisableGDSE("sil-disable-loadstore-dse",
-                                      llvm::cl::init(true), llvm::cl::Hidden);
+                                       llvm::cl::init(true), llvm::cl::Hidden);
 
-STATISTIC(NumSameValueStores,"Number of same value stores removed");
-STATISTIC(NumDeadStores,     "Number of dead stores removed");
-STATISTIC(NumDupLoads,       "Number of dup loads removed");
+STATISTIC(NumSameValueStores, "Number of same value stores removed");
+STATISTIC(NumDeadStores, "Number of dead stores removed");
+STATISTIC(NumDupLoads, "Number of dup loads removed");
 STATISTIC(NumForwardedLoads, "Number of loads forwarded");
 
 //===----------------------------------------------------------------------===//
@@ -147,152 +148,147 @@ static SILType getForwardingTypeForLS(const SILInstruction *I) {
   return getForwardingValueForLS(I).getType();
 }
 
-
 //===----------------------------------------------------------------------===//
 //                                  LSValue
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-  /// This class represents either a single value or a covering of values that
-  /// we can load forward from via the introdution of a SILArgument. This
-  /// enables us to treat the case of having one value or multiple values and
-  /// load and store cases all at once abstractly and cleanly.
-  class LSValue {
-    /// The "parent" basic block which this LSValue originated in.
-    ///
-    /// In the case where we are tracking one value this is the BB in which the
-    /// actual value originated. In the case in which we are tracking a covering
-    /// set of loads, this is the BB where if we forward this load value, we
-    /// will need to insert a SILArgument.
-    SILBasicBlock *ParentBB;
+/// This class represents either a single value or a covering of values that
+/// we can load forward from via the introdution of a SILArgument. This
+/// enables us to treat the case of having one value or multiple values and
+/// load and store cases all at once abstractly and cleanly.
+class LSValue {
+  /// The "parent" basic block which this LSValue originated in.
+  ///
+  /// In the case where we are tracking one value this is the BB in which the
+  /// actual value originated. In the case in which we are tracking a covering
+  /// set of loads, this is the BB where if we forward this load value, we
+  /// will need to insert a SILArgument.
+  SILBasicBlock *ParentBB;
 
-    /// The individual inst or covering inst set that this LSValue represents.
-    llvm::TinyPtrVector<SILInstruction *> Insts;
+  /// The individual inst or covering inst set that this LSValue represents.
+  llvm::TinyPtrVector<SILInstruction *> Insts;
 
-    /// The lazily computed value that can be used to forward this LSValue.
-    ///
-    /// In the case where we have a single value this is always initialized. In
-    /// the case where we are handling a covering set, this is initially null
-    /// and when we insert the PHI node, this is set to the SILArgument which
-    /// represents the PHI node.
-    ///
-    /// In the case where we are dealing with loads this is the loaded value or
-    /// a phi derived from a covering set of loaded values. In the case where we
-    /// are dealing with stores, this is the value that is stored or a phi of
-    /// such values.
-    SILValue ForwardingValue;
+  /// The lazily computed value that can be used to forward this LSValue.
+  ///
+  /// In the case where we have a single value this is always initialized. In
+  /// the case where we are handling a covering set, this is initially null
+  /// and when we insert the PHI node, this is set to the SILArgument which
+  /// represents the PHI node.
+  ///
+  /// In the case where we are dealing with loads this is the loaded value or
+  /// a phi derived from a covering set of loaded values. In the case where we
+  /// are dealing with stores, this is the value that is stored or a phi of
+  /// such values.
+  SILValue ForwardingValue;
 
-  public:
-    LSValue(SILInstruction *NewInst)
-    : ParentBB(NewInst->getParent()), Insts(NewInst),
-    ForwardingValue(getForwardingValueForLS(NewInst)) {}
+public:
+  LSValue(SILInstruction *NewInst)
+      : ParentBB(NewInst->getParent()), Insts(NewInst),
+        ForwardingValue(getForwardingValueForLS(NewInst)) {}
 
-    LSValue(SILBasicBlock *NewParentBB, ArrayRef<SILInstruction *> NewInsts);
-    LSValue(SILBasicBlock *NewParentBB, ArrayRef<LoadInst *> NewInsts);
-    LSValue(SILBasicBlock *NewParentBB, ArrayRef<StoreInst *> NewInsts);
+  LSValue(SILBasicBlock *NewParentBB, ArrayRef<SILInstruction *> NewInsts);
+  LSValue(SILBasicBlock *NewParentBB, ArrayRef<LoadInst *> NewInsts);
+  LSValue(SILBasicBlock *NewParentBB, ArrayRef<StoreInst *> NewInsts);
 
-    bool operator==(const LSValue &Other) const;
+  bool operator==(const LSValue &Other) const;
 
-    void addValue(SILInstruction *I) {
-      Insts.push_back(I);
+  void addValue(SILInstruction *I) { Insts.push_back(I); }
+
+  /// Return the SILValue necessary for forwarding the given LSValue.
+  ///
+  /// *NOTE* This will create a PHI node if we have not created one yet if we
+  /// have a covering set.
+  SILValue getForwardingValue();
+
+  /// Returns true if Inst may write to the instructions that make up this
+  /// LSValue.
+  bool aliasingWrite(AliasAnalysis *AA, SILInstruction *Inst) const {
+    // If we have a single inst, just get the forwarding value and compare if
+    // they alias.
+    if (isSingleInst())
+      return AA->mayWriteToMemory(Inst, getAddressForLS(getInst()));
+
+    // Otherwise, loop over all of our forwaring insts and return true if any
+    // of them alias Inst.
+    for (auto &I : getInsts())
+      if (AA->mayWriteToMemory(Inst, getAddressForLS(I)))
+        return true;
+    return false;
+  }
+
+  bool aliasingRead(AliasAnalysis *AA, SILInstruction *Inst) const {
+    // If we have a single inst, just get the forwarding value and compare if
+    // they alias.
+    if (isSingleInst())
+      return AA->mayReadFromMemory(Inst, getAddressForLS(getInst()));
+
+    // Otherwise, loop over all of our forwaring insts and return true if any
+    // of them alias Inst.
+    for (auto &I : getInsts())
+      if (AA->mayReadFromMemory(Inst, getAddressForLS(I)))
+        return true;
+    return false;
+  }
+
+  /// Returns the set of insts represented by this LSValue.
+  ArrayRef<SILInstruction *> getInsts() const { return Insts; }
+
+  /// Returns true if the value contains the instruction \p Inst.
+  bool containsInst(SILInstruction *Inst) const {
+    for (SILInstruction *I : Insts) {
+      if (I == Inst)
+        return true;
     }
-
-    /// Return the SILValue necessary for forwarding the given LSValue.
-    ///
-    /// *NOTE* This will create a PHI node if we have not created one yet if we
-    /// have a covering set.
-    SILValue getForwardingValue();
-
-    /// Returns true if Inst may write to the instructions that make up this
-    /// LSValue.
-    bool aliasingWrite(AliasAnalysis *AA, SILInstruction *Inst) const {
-      // If we have a single inst, just get the forwarding value and compare if
-      // they alias.
-      if (isSingleInst())
-        return AA->mayWriteToMemory(Inst, getAddressForLS(getInst()));
-
-      // Otherwise, loop over all of our forwaring insts and return true if any
-      // of them alias Inst.
-      for (auto &I : getInsts())
-        if (AA->mayWriteToMemory(Inst, getAddressForLS(I)))
-          return true;
-      return false;
-    }
-
-    bool aliasingRead(AliasAnalysis *AA, SILInstruction *Inst) const {
-      // If we have a single inst, just get the forwarding value and compare if
-      // they alias.
-      if (isSingleInst())
-        return AA->mayReadFromMemory(Inst, getAddressForLS(getInst()));
-
-      // Otherwise, loop over all of our forwaring insts and return true if any
-      // of them alias Inst.
-      for (auto &I : getInsts())
-        if (AA->mayReadFromMemory(Inst, getAddressForLS(I)))
-          return true;
-      return false;
-    }
-
-    /// Returns the set of insts represented by this LSValue.
-    ArrayRef<SILInstruction *> getInsts() const { return Insts; }
-
-    /// Returns true if the value contains the instruction \p Inst.
-    bool containsInst(SILInstruction *Inst) const {
-      for (SILInstruction *I : Insts) {
-        if (I == Inst)
-          return true;
-      }
-      return false;
-    }
+    return false;
+  }
 
 #ifndef NDEBUG
-    friend raw_ostream &operator<<(raw_ostream &os, const LSValue &Val) {
-      os << "value in bb" << Val.ParentBB->getDebugID() << ": " <<
-      Val.ForwardingValue;
-      for (SILInstruction *I : Val.Insts) {
-        os << "             " << *I;
-      }
-      return os;
+  friend raw_ostream &operator<<(raw_ostream &os, const LSValue &Val) {
+    os << "value in bb" << Val.ParentBB->getDebugID() << ": "
+       << Val.ForwardingValue;
+    for (SILInstruction *I : Val.Insts) {
+      os << "             " << *I;
     }
+    return os;
+  }
 #endif
 
-  protected:
-    /// Returns true if this LSValue represents a singular inst instruction.
-    bool isSingleInst() const { return Insts.size() == 1; }
+protected:
+  /// Returns true if this LSValue represents a singular inst instruction.
+  bool isSingleInst() const { return Insts.size() == 1; }
 
-    /// Returns true if this LSValue represents a covering set of insts.
-    bool isCoveringInst() const { return Insts.size() > 1; }
+  /// Returns true if this LSValue represents a covering set of insts.
+  bool isCoveringInst() const { return Insts.size() > 1; }
 
-    /// Returns a singular inst if we are tracking a singular inst. Asserts
-    /// otherwise.
-    SILInstruction *getInst() const {
-      assert(isSingleInst() && "Can only getLoad() if this is a singular load");
-      return Insts[0];
-    }
-  };
+  /// Returns a singular inst if we are tracking a singular inst. Asserts
+  /// otherwise.
+  SILInstruction *getInst() const {
+    assert(isSingleInst() && "Can only getLoad() if this is a singular load");
+    return Insts[0];
+  }
+};
 
 } // end anonymous namespace
 
 LSValue::LSValue(SILBasicBlock *NewParentBB,
                  ArrayRef<SILInstruction *> NewInsts)
-: ParentBB(NewParentBB), Insts(), ForwardingValue() {
+    : ParentBB(NewParentBB), Insts(), ForwardingValue() {
   std::copy(NewInsts.begin(), NewInsts.end(), Insts.begin());
   // Sort Insts so we can trivially compare two LSValues.
   std::sort(Insts.begin(), Insts.end());
 }
 
-LSValue::LSValue(SILBasicBlock *NewParentBB,
-                 ArrayRef<LoadInst *> NewInsts)
-: ParentBB(NewParentBB), Insts(), ForwardingValue() {
+LSValue::LSValue(SILBasicBlock *NewParentBB, ArrayRef<LoadInst *> NewInsts)
+    : ParentBB(NewParentBB), Insts(), ForwardingValue() {
   std::copy(NewInsts.begin(), NewInsts.end(), Insts.begin());
   // Sort Insts so we can trivially compare two LSValues.
   std::sort(Insts.begin(), Insts.end());
 }
 
-LSValue::LSValue(SILBasicBlock *NewParentBB,
-                 ArrayRef<StoreInst *> NewInsts)
-: ParentBB(NewParentBB), Insts(), ForwardingValue() {
+LSValue::LSValue(SILBasicBlock *NewParentBB, ArrayRef<StoreInst *> NewInsts)
+    : ParentBB(NewParentBB), Insts(), ForwardingValue() {
   std::copy(NewInsts.begin(), NewInsts.end(), Insts.begin());
   // Sort Insts so we can trivially compare two LSValues.
   std::sort(Insts.begin(), Insts.end());
@@ -359,19 +355,19 @@ bool LSValue::operator==(const LSValue &Other) const {
 
 namespace {
 
-  /// This class represents either a single value that we can load forward or a
-  /// covering of values that we could load forward from via the introdution of
-  /// a SILArgument. This enables us to treat both cases the same during our
-  /// transformations in an abstract way.
-  class LSLoad : public LSValue {
-  public:
-    /// TODO: Add constructor to TinyPtrVector that takes in an individual
-    LSLoad(LoadInst *NewLoad) : LSValue(NewLoad) {}
+/// This class represents either a single value that we can load forward or a
+/// covering of values that we could load forward from via the introdution of
+/// a SILArgument. This enables us to treat both cases the same during our
+/// transformations in an abstract way.
+class LSLoad : public LSValue {
+public:
+  /// TODO: Add constructor to TinyPtrVector that takes in an individual
+  LSLoad(LoadInst *NewLoad) : LSValue(NewLoad) {}
 
-    /// TODO: Add constructor to TinyPtrVector that takes in an ArrayRef.
-    LSLoad(SILBasicBlock *NewParentBB, ArrayRef<LoadInst *> NewLoads)
-    : LSValue(NewParentBB, NewLoads) {}
-  };
+  /// TODO: Add constructor to TinyPtrVector that takes in an ArrayRef.
+  LSLoad(SILBasicBlock *NewParentBB, ArrayRef<LoadInst *> NewLoads)
+      : LSValue(NewParentBB, NewLoads) {}
+};
 
 } // end anonymous namespace
 
@@ -381,53 +377,53 @@ namespace {
 
 namespace {
 
-  /// This structure represents either a single value or a covering of values
-  /// that we could use in we can dead store elimination or store forward via
-  /// the introdution of a SILArgument. This enables us to treat both cases the
-  /// same during our transformations in an abstract way.
-  class LSStore : public LSValue {
-    /// Set to true if this LSStore has been read from by some instruction so it
-    /// must be live.
-    ///
-    /// This allows us to know that the LSStore can not be deleted, but can
-    /// still be forwarded from.
-    bool HasReadDependence = false;
+/// This structure represents either a single value or a covering of values
+/// that we could use in we can dead store elimination or store forward via
+/// the introdution of a SILArgument. This enables us to treat both cases the
+/// same during our transformations in an abstract way.
+class LSStore : public LSValue {
+  /// Set to true if this LSStore has been read from by some instruction so it
+  /// must be live.
+  ///
+  /// This allows us to know that the LSStore can not be deleted, but can
+  /// still be forwarded from.
+  bool HasReadDependence = false;
 
-  public:
-    LSStore(StoreInst *NewStore) : LSValue(NewStore) {}
+public:
+  LSStore(StoreInst *NewStore) : LSValue(NewStore) {}
 
-    LSStore(SILBasicBlock *NewParentBB, ArrayRef<StoreInst *> NewStores)
-    : LSValue(NewParentBB, NewStores) {}
+  LSStore(SILBasicBlock *NewParentBB, ArrayRef<StoreInst *> NewStores)
+      : LSValue(NewParentBB, NewStores) {}
 
-    /// Delete the store or set of stores that this LSStore represents.
-    void deleteDeadValue() {
-      for (SILInstruction *I : getInsts()) {
-        I->eraseFromParent();
+  /// Delete the store or set of stores that this LSStore represents.
+  void deleteDeadValue() {
+    for (SILInstruction *I : getInsts()) {
+      I->eraseFromParent();
+    }
+  }
+
+  /// Returns true if I post dominates all of the stores that we are tracking.
+  bool postdominates(PostDominanceInfo *PDI, SILInstruction *I) {
+    for (SILInstruction *Stores : getInsts()) {
+      if (!PDI->properlyDominates(I, Stores)) {
+        return false;
       }
     }
+    return true;
+  }
 
-    /// Returns true if I post dominates all of the stores that we are tracking.
-    bool postdominates(PostDominanceInfo *PDI, SILInstruction *I) {
-      for (SILInstruction *Stores : getInsts()) {
-        if (!PDI->properlyDominates(I, Stores)) {
-          return false;
-        }
-      }
-      return true;
-    }
-    
-    void setHasReadDependence() { HasReadDependence = true; }
-    bool hasReadDependence() const { return HasReadDependence; }
+  void setHasReadDependence() { HasReadDependence = true; }
+  bool hasReadDependence() const { return HasReadDependence; }
 
-    bool mayWriteToMemory(AliasAnalysis *AA, SILInstruction *Inst) {
-      for (auto &I : getInsts()) {
-        if (AA->mayWriteToMemory(I, getAddressForLS(Inst)))
-          return true;
-      }
-      return false;
+  bool mayWriteToMemory(AliasAnalysis *AA, SILInstruction *Inst) {
+    for (auto &I : getInsts()) {
+      if (AA->mayWriteToMemory(I, getAddressForLS(Inst)))
+        return true;
     }
-  };
-  
+    return false;
+  }
+};
+
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
@@ -486,8 +482,7 @@ private:
                                           SILValue InstOp);
 
   SILValue forwardAddrToUncheckedCastToLd(SILValue Address,
-                                          SILValue StoredValue,
-                                          LoadInst *LI);
+                                          SILValue StoredValue, LoadInst *LI);
 
   bool initializeWithUncheckedAddrCast(SILValue Address, LoadInst *LI,
                                        UncheckedAddrCastInst *InputUADCI);
@@ -495,10 +490,8 @@ private:
 
 } // end anonymous namespace
 
-bool
-ForwardingAnalysis::
-initializeWithUncheckedAddrCast(SILValue Address, LoadInst *LI,
-                                UncheckedAddrCastInst *InputUADCI) {
+bool ForwardingAnalysis::initializeWithUncheckedAddrCast(
+    SILValue Address, LoadInst *LI, UncheckedAddrCastInst *InputUADCI) {
   assert(LI->getOperand().stripAddressProjections() == InputUADCI &&
          "We assume that the UADCI is the load's address stripped of "
          "address projections.");
@@ -546,8 +539,7 @@ initializeWithUncheckedAddrCast(SILValue Address, LoadInst *LI,
 
 ForwardingAnalysis::ForwardingAnalysis(AliasAnalysis *AA, SILValue Address,
                                        LoadInst *LI)
-    : Result(ForwardingAnalysisResult::Failure),
-      UADCI(nullptr), Path() {
+    : Result(ForwardingAnalysisResult::Failure), UADCI(nullptr), Path() {
 
   // First if we have a store + unchecked_addr_cast + load, try to forward the
   // value the store using a bitcast.
@@ -559,7 +551,7 @@ ForwardingAnalysis::ForwardingAnalysis(AliasAnalysis *AA, SILValue Address,
   // Attempt to find the projection path from Address -> Load->getOperand().
   // If we failed to find the path, return an empty value early.
   Path = std::move(
-    ProjectionPath::getAddrProjectionPath(Address, LI->getOperand()));
+      ProjectionPath::getAddrProjectionPath(Address, LI->getOperand()));
   if (!Path)
     return;
   Result = ForwardingAnalysisResult::Normal;
@@ -568,10 +560,8 @@ ForwardingAnalysis::ForwardingAnalysis(AliasAnalysis *AA, SILValue Address,
 /// Given an unchecked_addr_cast with various address projections using it,
 /// rewrite the forwarding stored value to a bitcast + the relevant extract
 /// operations.
-SILValue
-ForwardingAnalysis::
-forwardAddrToUncheckedCastToLd(SILValue Address, SILValue StoredValue,
-                               LoadInst *LI) {
+SILValue ForwardingAnalysis::forwardAddrToUncheckedCastToLd(
+    SILValue Address, SILValue StoredValue, LoadInst *LI) {
   assert(UADCI && "UADCI is assumed to be non-null here");
 
   // Construct the relevant bitcast.
@@ -585,8 +575,7 @@ forwardAddrToUncheckedCastToLd(SILValue Address, SILValue StoredValue,
 
   // Then try to construct an extract path from the UADCI to the Address.
   SILValue ExtractPath =
-    forwardAddrToLdWithExtractPath(UADCI, CastValue,
-                                   LI, LI->getOperand());
+      forwardAddrToLdWithExtractPath(UADCI, CastValue, LI, LI->getOperand());
 
   assert(ExtractPath && "Already checked the feasibility.");
   assert(ExtractPath.getType() == LI->getType().getObjectType() &&
@@ -595,9 +584,8 @@ forwardAddrToUncheckedCastToLd(SILValue Address, SILValue StoredValue,
   return ExtractPath;
 }
 
-SILValue
-ForwardingAnalysis::forward(SILValue Addr, SILValue StoredValue,
-                                LoadInst *LI) {
+SILValue ForwardingAnalysis::forward(SILValue Addr, SILValue StoredValue,
+                                     LoadInst *LI) {
   assert(canForward() && "Can not forward if analysis failed");
 
   // First if we have a store + unchecked_addr_cast + load, try to forward the
@@ -617,10 +605,9 @@ ForwardingAnalysis::forward(SILValue Addr, SILValue StoredValue,
 /// Given the already emitted load PrevLI, see if we can find a projection
 /// address path to LI. If we can, emit the corresponding aggregate projection
 /// insts and return the last such inst.
-SILValue
-ForwardingAnalysis::
-forwardAddrToLdWithExtractPath(SILValue Address, SILValue StoredValue,
-                               SILInstruction *Inst, SILValue InstOp) {
+SILValue ForwardingAnalysis::forwardAddrToLdWithExtractPath(
+    SILValue Address, SILValue StoredValue, SILInstruction *Inst,
+    SILValue InstOp) {
   // If we found a projection path, but there are no projections, then the two
   // loads must be the same, return PrevLI.
   if (!Path || Path->empty())
@@ -633,8 +620,8 @@ forwardAddrToLdWithExtractPath(SILValue Address, SILValue StoredValue,
 
   // Construct the path!
   for (auto PI = Path->rbegin(), PE = Path->rend(); PI != PE; ++PI) {
-    LastExtract = PI->createValueProjection(Builder, Inst->getLoc(),
-                                            LastExtract).get();
+    LastExtract =
+        PI->createValueProjection(Builder, Inst->getLoc(), LastExtract).get();
   }
 
   // Return the last extract we created.
@@ -647,7 +634,7 @@ forwardAddrToLdWithExtractPath(SILValue Address, SILValue StoredValue,
 
 namespace {
 
-class RLEBBForwarder;
+class BBState;
 class LSStore;
 
 /// This class stores global state that we use when processing and also drives
@@ -677,24 +664,24 @@ class RLEContext {
 
   /// A map from each BasicBlock to its index in the BBIDToForwarderMap.
   ///
-  /// TODO: Each block does not need its own RLEBBForwarder instance. Only
+  /// TODO: Each block does not need its own BBState instance. Only
   /// the set of reaching loads and stores is specific to the block.
   llvm::DenseMap<SILBasicBlock *, unsigned> BBToBBIDMap;
 
-  /// A "map" from a BBID (which is just an index) to an RLEBBForwarder.
-  std::vector<RLEBBForwarder> BBIDToForwarderMap;
+  /// A "map" from a BBID (which is just an index) to an BBState.
+  std::vector<BBState> BBIDToForwarderMap;
 
 public:
   RLEContext(SILFunction *F, AliasAnalysis *AA, PostDominanceInfo *PDI,
-            PostOrderFunctionInfo::reverse_range RPOT);
+             PostOrderFunctionInfo::reverse_range RPOT);
 
   RLEContext(const RLEContext &) = delete;
   RLEContext(RLEContext &&) = default;
   ~RLEContext() = default;
 
-  bool runIteration();
+  bool run();
 
-  /// Remove all LSValues from all RLEBBForwarders which contain the load/store
+  /// Remove all LSValues from all BBStates which contain the load/store
   /// instruction \p I.
   void stopTrackingInst(SILInstruction *I);
 
@@ -720,7 +707,7 @@ public:
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
-//                               RLEBBForwarder
+//                               BBState
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -761,7 +748,7 @@ namespace {
 ///
 /// With these in mind, we have the following invariants:
 /// 1. All pointers that have available stored values should be no-alias.
-class RLEBBForwarder {
+class BBState {
 
   /// The basic block that we are optimizing.
   SILBasicBlock *BB;
@@ -777,18 +764,44 @@ class RLEBBForwarder {
   /// of the loop below.
   llvm::SmallMapVector<SILValue, LSLoad, 8> Loads;
 
+  /// If AvailLocsIn changes while processing a basicblock, then all its
+  /// predecessors needs to be rerun.
+  llvm::BitVector AvailLocsIn;
+
+  /// A bit vector for which the ith bit represents the ith MemLocation in
+  /// MemLocationVault. If the bit is set, then the location currently has an
+  /// upward visible store.
+  llvm::BitVector AvailLocsOut;
+
   /// This is a list of memlocations that have available values. Eventually,
   /// AvailLocs should replace Stores and Loads.
-  llvm::SmallMapVector<MemLocation, SILValue, 8> AvailLocs;
+  llvm::SmallMapVector<unsigned, SILValue, 8> AvailLocs;
 
-public:
-  RLEBBForwarder() = default;
-
-  void init(SILBasicBlock *NewBB) {
-    BB = NewBB;
+  /// Check whether the AvailLocsOut has changed. If it does, we need to
+  /// re-iterate to reach fixed point.
+  bool updateAvailLocsOut() {
+    bool Changed = (AvailLocsIn != AvailLocsOut);
+    AvailLocsOut = AvailLocsIn;
+    return Changed;
   }
 
-  bool optimize(RLEContext &Ctx);
+  /// BitVector manipulation fucntions.
+  void startTrackingMemLocation(unsigned bit) { AvailLocsIn.set(bit); }
+  void stopTrackingMemLocation(unsigned bit) { AvailLocsIn.reset(bit); }
+  bool isTrackingMemLocation(unsigned bit) { return AvailLocsIn.test(bit); }
+
+public:
+  BBState() = default;
+
+  void init(SILBasicBlock *NewBB, unsigned bitcnt) {
+    BB = NewBB;
+    AvailLocsIn.resize(bitcnt, false);
+    AvailLocsOut.resize(bitcnt, true);
+  }
+
+  bool optimize(RLEContext &Ctx, bool PF = false);
+
+  void performRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem);
 
   SILBasicBlock *getBB() const { return BB; }
 
@@ -817,9 +830,9 @@ public:
   }
 
   /// Merge in the states of all predecessors.
-  void mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
-                                             unsigned> &BBToBBIDMap,
-                              std::vector<RLEBBForwarder> &BBIDToForwarderMap);
+  void
+  mergePredecessorStates(llvm::DenseMap<SILBasicBlock *, unsigned> &BBToBBIDMap,
+                         std::vector<BBState> &BBIDToForwarderMap);
 
   /// Clear all state in the BB optimizer.
   void clear() {
@@ -836,9 +849,9 @@ public:
     // the read dependence bit set.
     auto *AA = Ctx.getAA();
     for (auto &P : Stores) {
-      assert((!P.second.aliasingWrite(AA, LI) ||
-              P.second.hasReadDependence()) &&
-             "Found aliasing store without read dependence");
+      assert(
+          (!P.second.aliasingWrite(AA, LI) || P.second.hasReadDependence()) &&
+          "Found aliasing store without read dependence");
     }
 #endif
 
@@ -908,19 +921,18 @@ public:
   /// includes from stores and loads.
   bool tryToForwardLoad(RLEContext &Ctx, LoadInst *LI);
 
-  /// Process Instruction which writes to memory in an unknown way. 
+  /// Process Instruction which writes to memory in an unknown way.
   void processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I);
 
   /// Process Instructions. Extract MemLocations from SIL LoadInst.
-  void processLoadInst(RLEContext &Ctx, LoadInst *LI);
+  void processLoadInst(RLEContext &Ctx, LoadInst *LI, bool PF);
 
   /// Process Instructions. Extract MemLocations from SIL StoreInst.
   void processStoreInst(RLEContext &Ctx, StoreInst *SI);
 
 private:
-
   /// Merge in the state of an individual predecessor.
-  void mergePredecessorState(RLEBBForwarder &OtherState);
+  void mergePredecessorState(BBState &OtherState);
 
   bool tryToSubstitutePartialAliasLoad(SILValue PrevAddr, SILValue PrevValue,
                                        LoadInst *LI);
@@ -929,7 +941,21 @@ private:
 
   bool tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI);
 
-  void verify(RLEContext &Ctx);
+  /// MemLocation read has been extracted, expanded and mapped to the bit
+  /// position in the bitvector. process it using the bit position.
+  bool updateAvailLocForRead(RLEContext &Ctx, unsigned Bit, bool PF);
+
+  /// MemLocation written has been extracted, expanded and mapped to the bit
+  /// position in the bitvector. process it using the bit position.
+  void updateAvailLocForWrite(RLEContext &Ctx, unsigned Bit);
+
+  /// There is a read to a location, expand the location into individual fields
+  /// before processing them.
+  void processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem, bool PF);
+
+  /// There is a write to a location, expand the location into individual fields
+  /// before processing them.
+  void processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem);
 };
 
 #ifndef NDEBUG
@@ -948,8 +974,7 @@ inline raw_ostream &operator<<(raw_ostream &os,
 
 } // end anonymous namespace
 
-void RLEBBForwarder::deleteStoreMappedToAddress(RLEContext &Ctx,
-                                               SILValue Addr) {
+void BBState::deleteStoreMappedToAddress(RLEContext &Ctx, SILValue Addr) {
   auto SIIter = Stores.find(Addr);
   if (SIIter == Stores.end())
     return;
@@ -961,9 +986,7 @@ void RLEBBForwarder::deleteStoreMappedToAddress(RLEContext &Ctx,
   for (auto *SI : SIIter->second.getInsts())
     InstsToDelete.push_back(SI);
 
-  auto UpdateFun = [&](SILInstruction *DeadI) {
-    Ctx.stopTrackingInst(DeadI);
-  };
+  auto UpdateFun = [&](SILInstruction *DeadI) { Ctx.stopTrackingInst(DeadI); };
 
   // Delete the instructions.
   for (auto *I : InstsToDelete)
@@ -973,20 +996,14 @@ void RLEBBForwarder::deleteStoreMappedToAddress(RLEContext &Ctx,
          "Addr should be removed during deleting the store instruction");
 }
 
-void
-RLEBBForwarder::
-deleteUntrackedInstruction(RLEContext &Ctx, SILInstruction *I) {
+void BBState::deleteUntrackedInstruction(RLEContext &Ctx, SILInstruction *I) {
   DEBUG(llvm::dbgs() << "        Deleting all instructions recursively from: "
                      << *I);
-  auto UpdateFun = [&](SILInstruction *DeadI) {
-    Ctx.stopTrackingInst(DeadI);
-  };
+  auto UpdateFun = [&](SILInstruction *DeadI) { Ctx.stopTrackingInst(DeadI); };
   recursivelyDeleteTriviallyDeadInstructions(I, true, UpdateFun);
 }
 
-void
-RLEBBForwarder::
-invalidateAliasingLoads(RLEContext &Ctx, SILInstruction *Inst) {
+void BBState::invalidateAliasingLoads(RLEContext &Ctx, SILInstruction *Inst) {
   AliasAnalysis *AA = Ctx.getAA();
   llvm::SmallVector<SILValue, 4> InvalidatedLoadList;
   for (auto &P : Loads)
@@ -995,15 +1012,13 @@ invalidateAliasingLoads(RLEContext &Ctx, SILInstruction *Inst) {
 
   for (SILValue LIOp : InvalidatedLoadList) {
     DEBUG(llvm::dbgs() << "        Found an instruction that writes to memory"
-          " such that a load operand is invalidated:"
-          << LIOp);
+                          " such that a load operand is invalidated:"
+                       << LIOp);
     stopTrackingAddress(LIOp);
   }
 }
 
-void
-RLEBBForwarder::
-invalidateWriteToStores(RLEContext &Ctx, SILInstruction *Inst) {
+void BBState::invalidateWriteToStores(RLEContext &Ctx, SILInstruction *Inst) {
   AliasAnalysis *AA = Ctx.getAA();
   llvm::SmallVector<SILValue, 4> InvalidatedStoreList;
   for (auto &P : Stores)
@@ -1012,13 +1027,13 @@ invalidateWriteToStores(RLEContext &Ctx, SILInstruction *Inst) {
 
   for (SILValue SIOp : InvalidatedStoreList) {
     DEBUG(llvm::dbgs() << "        Found an instruction that writes to memory"
-          " such that a store is invalidated:" << SIOp);
+                          " such that a store is invalidated:"
+                       << SIOp);
     stopTrackingAddress(SIOp);
   }
 }
 
-void RLEBBForwarder::invalidateReadFromStores(RLEContext &Ctx,
-                                             SILInstruction *Inst) {
+void BBState::invalidateReadFromStores(RLEContext &Ctx, SILInstruction *Inst) {
   AliasAnalysis *AA = Ctx.getAA();
   for (auto &P : Stores) {
     if (!P.second.aliasingRead(AA, Inst))
@@ -1031,7 +1046,7 @@ void RLEBBForwarder::invalidateReadFromStores(RLEContext &Ctx,
   }
 }
 
-void RLEBBForwarder::trackStoreInst(RLEContext &Ctx, StoreInst *SI) {
+void BBState::trackStoreInst(RLEContext &Ctx, StoreInst *SI) {
   // Invalidate any load that we can not prove does not read from the stores
   // destination.
   invalidateAliasingLoads(Ctx, SI);
@@ -1044,7 +1059,7 @@ void RLEBBForwarder::trackStoreInst(RLEContext &Ctx, StoreInst *SI) {
   startTrackingStore(Ctx, SI);
 }
 
-bool RLEBBForwarder::tryToEliminateDeadStores(RLEContext &Ctx, StoreInst *SI) {
+bool BBState::tryToEliminateDeadStores(RLEContext &Ctx, StoreInst *SI) {
   PostDominanceInfo *PDI = Ctx.getPDI();
   AliasAnalysis *AA = Ctx.getAA();
 
@@ -1116,8 +1131,9 @@ bool RLEBBForwarder::tryToEliminateDeadStores(RLEContext &Ctx, StoreInst *SI) {
     // tracking the new store, though.
     if (!IsStoreToSameLocation) {
       StoresToStopTracking.push_back(P.first);
-      DEBUG(llvm::dbgs() << "        Found an aliasing store... But we don't "
-            "know that it must alias... Can't remove it but will track it.");
+      DEBUG(llvm::dbgs()
+            << "        Found an aliasing store... But we don't "
+               "know that it must alias... Can't remove it but will track it.");
       continue;
     }
 
@@ -1130,8 +1146,9 @@ bool RLEBBForwarder::tryToEliminateDeadStores(RLEContext &Ctx, StoreInst *SI) {
     // opts, this is not necessary, so skip it.
     if (!P.second.postdominates(PDI, SI)) {
       StoresToStopTracking.push_back(P.first);
-      DEBUG(llvm::dbgs() << "        Found dead store... That we don't "
-            "postdominate... Can't remove it but will track it.");
+      DEBUG(
+          llvm::dbgs() << "        Found dead store... That we don't "
+                          "postdominate... Can't remove it but will track it.");
       continue;
     }
 
@@ -1154,9 +1171,9 @@ bool RLEBBForwarder::tryToEliminateDeadStores(RLEContext &Ctx, StoreInst *SI) {
 
 /// See if there is an extract path from LI that we can replace with PrevLI. If
 /// we delete all uses of LI this way, delete LI.
-bool RLEBBForwarder::tryToSubstitutePartialAliasLoad(SILValue PrevLIAddr,
-                                                    SILValue PrevLIValue,
-                                                    LoadInst *LI) {
+bool BBState::tryToSubstitutePartialAliasLoad(SILValue PrevLIAddr,
+                                              SILValue PrevLIValue,
+                                              LoadInst *LI) {
   bool Changed = false;
 
   // Since LI and PrevLI partially alias and we know that PrevLI is smaller than
@@ -1205,7 +1222,7 @@ static SILValue fixPhiPredBlocks(ArrayRef<SILInstruction *> Stores,
                                  SILBasicBlock *Dest) {
   assert(!Stores.empty() && "Can not fix phi pred for multiple blocks");
   assert(Stores.size() ==
-         (unsigned)std::distance(Dest->pred_begin(), Dest->pred_end()) &&
+             (unsigned)std::distance(Dest->pred_begin(), Dest->pred_end()) &&
          "Multiple store forwarding size mismatch");
   SILSSAUpdater Updater;
 
@@ -1220,7 +1237,7 @@ static SILValue fixPhiPredBlocks(ArrayRef<SILInstruction *> Stores,
 /// Attempt to forward available values from stores to this load. If we do not
 /// perform store -> load forwarding, all stores which we failed to forward from
 /// which may alias the load will have the read dependency bit set on them.
-bool RLEBBForwarder::tryToForwardStoresToLoad(RLEContext &Ctx, LoadInst *LI) {
+bool BBState::tryToForwardStoresToLoad(RLEContext &Ctx, LoadInst *LI) {
   // The list of stores that this load conservatively depends on. If we do not
   // eliminate the load from some store, we need to set the read dependency bit
   // on all stores that may alias the load.
@@ -1272,7 +1289,7 @@ bool RLEBBForwarder::tryToForwardStoresToLoad(RLEContext &Ctx, LoadInst *LI) {
 
 /// Try to forward a previously seen load to this load. We allow for multiple
 /// loads to be tracked from the same value.
-bool RLEBBForwarder::tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI) {
+bool BBState::tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI) {
   // Search the previous loads and replace the current load or one of the
   // current loads uses with one of the previous loads.
   for (auto &P : Loads) {
@@ -1286,7 +1303,7 @@ bool RLEBBForwarder::tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI) {
     if (FA.canForward()) {
       SILValue Result = FA.forward(Addr, Value, LI);
       DEBUG(llvm::dbgs() << "        Replacing with previous load: "
-            << *Result);
+                         << *Result);
       SILValue(LI).replaceAllUsesWith(Result);
       deleteUntrackedInstruction(Ctx, LI);
       NumDupLoads++;
@@ -1310,67 +1327,124 @@ bool RLEBBForwarder::tryToForwardLoadsToLoad(RLEContext &Ctx, LoadInst *LI) {
   return false;
 }
 
-void RLEBBForwarder::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I){
-  auto *AA = Ctx.getAA();
-  llvm::SmallVector<MemLocation, 8> LocDeleteList;
-  for (auto &X : AvailLocs) {
-    if (!AA->mayWriteToMemory(I, X.first.getBase()))
+void BBState::performRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {}
+
+bool BBState::updateAvailLocForRead(RLEContext &Ctx, unsigned bit, bool PF) {
+  // Perform the forwarding here.
+  if (PF)
+    return isTrackingMemLocation(bit);
+
+  // We are not tracking any values right now. Simply mark this location
+  // has an available value.
+  startTrackingMemLocation(bit);
+  return false;
+}
+
+void BBState::updateAvailLocForWrite(RLEContext &Ctx, unsigned bit) {
+  // This is a store, invalidate any location that this location may alias.
+  // as their value can no longer be forwarded.
+  llvm::SmallVector<unsigned, 8> LocDeleteList;
+  for (unsigned i = 0; i < AvailLocsIn.size(); ++i) {
+    if (!isTrackingMemLocation(i))
       continue;
-    LocDeleteList.push_back(X.first);
+    MemLocation &R = Ctx.getMemLocation(bit);
+    MemLocation &L = Ctx.getMemLocation(i);
+    if (!L.isMayAliasMemLocation(R, Ctx.getAA()))
+      continue;
+    // MayAlias.
+    LocDeleteList.push_back(i);
   }
 
-  if (LocDeleteList.size()) {
-    DEBUG(llvm::dbgs() << "        MemLocation no longer being tracked:\n");
-    for (MemLocation &V : LocDeleteList) {
-      AvailLocs.erase(V);
-    }
+  for (auto i : LocDeleteList) {
+    stopTrackingMemLocation(i);
+    AvailLocs.erase(i);
   }
 }
 
-void RLEBBForwarder::processStoreInst(RLEContext &Ctx, StoreInst *SI) {
+void BBState::processWrite(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   // Initialize the memory location.
-  MemLocation L(cast<StoreInst>(SI)->getDest());
+  MemLocation L(Mem);
 
-  // If we cant figure out the Base or Projection Path for the read instruction,
-  // process it as an unknown memory instruction for now.
+  // If we cant figure out the Base or Projection Path for the write,
+  // process it as an unknown memory instruction.
   if (!L.isValid()) {
-    processUnknownWriteInst(Ctx, SI);
+    processUnknownWriteInst(Ctx, I);
     return;
   }
 
   // Expand the given Mem into individual fields and process them as
   // separate reads.
   MemLocationList Locs;
-  MemLocation::expand(L, &SI->getModule(), Locs);
+  MemLocation::expand(L, &I->getModule(), Locs);
   for (auto &X : Locs) {
-    AvailLocs[X] = SILValue();
-  } 
+    updateAvailLocForWrite(Ctx, Ctx.getMemLocationBit(X));
+  }
 }
 
-void RLEBBForwarder::processLoadInst(RLEContext &Ctx, LoadInst *LI) {
+void BBState::processRead(RLEContext &Ctx, SILInstruction *I, SILValue Mem,
+                          bool PF) {
   // Initialize the memory location.
-  MemLocation L(cast<LoadInst>(LI)->getOperand());
+  MemLocation L(Mem);
 
-  // If we cant figure out the Base or Projection Path for the read instruction,
-  // simply ignore it for now.
+  // If we cant figure out the Base or Projection Path for the read, simply
+  // ignore it for now.
   if (!L.isValid())
     return;
 
   // Expand the given Mem into individual fields and process them as
   // separate reads.
+  bool CanForward = true;
   MemLocationList Locs;
-  MemLocation::expand(L, &LI->getModule(), Locs);
+  MemLocation::expand(L, &I->getModule(), Locs);
   for (auto &X : Locs) {
-    AvailLocs[X] = SILValue();
-  } 
+    CanForward |= updateAvailLocForRead(Ctx, Ctx.getMemLocationBit(X), PF);
+  }
+
+  // We do not have everything.
+  if (!CanForward)
+    return;
+
+  // Forward value to the load.
+  performRLE(Ctx, I, Mem);
+  ++NumForwardedLoads;
 }
 
-bool RLEBBForwarder::tryToForwardLoad(RLEContext &Ctx, LoadInst *LI) {
+void BBState::processStoreInst(RLEContext &Ctx, StoreInst *SI) {
+  processWrite(Ctx, SI, SI->getDest());
+}
+
+void BBState::processLoadInst(RLEContext &Ctx, LoadInst *LI, bool PF) {
+  processRead(Ctx, LI, LI->getOperand(), PF);
+}
+
+void BBState::processUnknownWriteInst(RLEContext &Ctx, SILInstruction *I) {
+  llvm::SmallVector<unsigned, 8> LocDeleteList;
+  for (unsigned i = 0; i < AvailLocsIn.size(); ++i) {
+    if (!isTrackingMemLocation(i))
+      continue;
+    // Invalidate any location this instruction may write to.
+    auto *AA = Ctx.getAA();
+    MemLocation &R = Ctx.getMemLocation(i);
+    if (!AA->mayWriteToMemory(I, R.getBase()))
+      continue;
+    // MayAlias.
+    LocDeleteList.push_back(i);
+  }
+
+  for (auto i : LocDeleteList) {
+    stopTrackingMemLocation(i);
+    AvailLocs.erase(i);
+  }
+}
+
+bool BBState::tryToForwardLoad(RLEContext &Ctx, LoadInst *LI) {
+#if 0
   if (tryToForwardLoadsToLoad(Ctx, LI))
     return true;
 
   if (tryToForwardStoresToLoad(Ctx, LI))
     return true;
+#endif
 
   startTrackingLoad(Ctx, LI);
 
@@ -1381,38 +1455,24 @@ bool RLEBBForwarder::tryToForwardLoad(RLEContext &Ctx, LoadInst *LI) {
 
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
-bool RLEBBForwarder::optimize(RLEContext &Ctx) {
+bool BBState::optimize(RLEContext &Ctx, bool PF) {
   auto II = BB->begin(), E = BB->end();
   bool Changed = false;
   while (II != E) {
-    // Make sure that all of our invariants have been maintained. This is a noop
-    // when asserts are disabled.
-    verify(Ctx);
-
     SILInstruction *Inst = II++;
     DEBUG(llvm::dbgs() << "    Visiting: " << *Inst);
 
-    // This is a StoreInst. Let's see if we can remove the previous stores.
+    // This is a StoreInst, try to see whether it clobbers any forwarding
+    // value.
     if (auto *SI = dyn_cast<StoreInst>(Inst)) {
-      // Keep track of the available value this store generates.
       processStoreInst(Ctx, SI);
-
-      // If DSE is disabled, merely update states w.r.t. this store, but do not
-      // try to get rid of the store.
-      if (DisableGDSE) {
-        trackStoreInst(Ctx, SI);
-        continue;
-      }
-      Changed |= tryToEliminateDeadStores(Ctx, SI);
       continue;
     }
 
     // This is a LoadInst. Let's see if we can find a previous loaded, stored
     // value to use instead of this load.
     if (auto *LI = dyn_cast<LoadInst>(Inst)) {
-      // Keep track of the available value this load generates.
-      processLoadInst(Ctx, LI);
-      Changed |= tryToForwardLoad(Ctx, LI);
+      processLoadInst(Ctx, LI, PF);
       continue;
     }
 
@@ -1429,95 +1489,43 @@ bool RLEBBForwarder::optimize(RLEContext &Ctx) {
       continue;
     }
 
-    // All other instructions that read from the memory location of the store
-    // act as a read dependency on the store meaning that the store can no
-    // longer be dead.
-    if (Inst->mayReadFromMemory()) {
-      invalidateReadFromStores(Ctx, Inst);
-    }
-
     // If we have an instruction that may write to memory and we can not prove
     // that it and its operands can not alias a load we have visited, invalidate
     // that load.
     if (Inst->mayWriteToMemory()) {
       // Invalidate all the aliasing location.
       processUnknownWriteInst(Ctx, Inst);
-
-      // Invalidate any load that we can not prove does not read from one of the
-      // writing instructions operands.
-      invalidateAliasingLoads(Ctx, Inst);
-
-      // Invalidate our store if Inst writes to the destination location.
-      invalidateWriteToStores(Ctx, Inst);
     }
   }
 
   DEBUG(llvm::dbgs() << "    Final State\n");
   DEBUG(llvm::dbgs() << "        Tracking Load Ops:\n";
-        for (auto &P : Loads) {
-          llvm::dbgs() << "            " << P;
-        });
+        for (auto &P
+             : Loads) { llvm::dbgs() << "            " << P; });
 
   DEBUG(llvm::dbgs() << "        Tracking Store Ops:\n";
-        for (auto &P : Stores) {
-          llvm::dbgs() << "            " << P;
-        });
+        for (auto &P
+             : Stores) { llvm::dbgs() << "            " << P; });
 
-  return Changed;
+  // The basic block is finished, see whether there is a change in the AvailLocs
+  // set.
+  return updateAvailLocsOut();
 }
 
-void RLEBBForwarder::mergePredecessorState(RLEBBForwarder &OtherState) {
+void BBState::mergePredecessorState(BBState &OtherState) {
   // Merge in the predecessor state.
-  DEBUG(llvm::dbgs() << "        Initial Stores:\n");
-  llvm::SmallVector<SILValue, 8> DeleteList;
-  for (auto &P : Stores) {
-    DEBUG(llvm::dbgs() << "            " << *P.first);
-    auto Iter = OtherState.Stores.find(P.first);
-    if (Iter != OtherState.Stores.end() && P.second == Iter->second)
+  llvm::SmallVector<unsigned, 8> LocDeleteList;
+  for (unsigned i = 0; i < AvailLocsIn.size(); ++i) {
+    if (OtherState.AvailLocsOut[i])
       continue;
-    DeleteList.push_back(P.first);
-  }
-
-  if (DeleteList.size()) {
-    DEBUG(llvm::dbgs() << "        Stores no longer being tracked:\n");
-    for (SILValue V : DeleteList) {
-      Stores.erase(V);
-    }
-    DeleteList.clear();
-  } else {
-    DEBUG(llvm::dbgs() << "        All stores still being tracked!\n");
-  }
-
-  DEBUG(llvm::dbgs() << "            Initial Loads:\n");
-  for (auto &P : Loads) {
-    DEBUG(llvm::dbgs() << "            " << P.first);
-    auto Iter = OtherState.Loads.find(P.first);
-    if (Iter != OtherState.Loads.end() && P.second == Iter->second)
-      continue;
-    DeleteList.push_back(P.first);
-  }
-
-  if (DeleteList.size()) {
-    DEBUG(llvm::dbgs() << "        Loads no longer being tracked:\n");
-    for (SILValue V : DeleteList) {
-      Loads.erase(V);
-    }
-  } else {
-    DEBUG(llvm::dbgs() << "        All loads still being tracked!\n");
-  }
-
-  llvm::SmallVector<MemLocation, 8> LocDeleteList;
-  DEBUG(llvm::dbgs() << "            Initial AvailLocs:\n");
-  for (auto &P : AvailLocs) {
-    auto Iter = OtherState.AvailLocs.find(P.first);
-    if (Iter != OtherState.AvailLocs.end())
-      continue;
-    LocDeleteList.push_back(P.first);
+    // If this location does not have an available value, then clear it.
+    stopTrackingMemLocation(i);
+    LocDeleteList.push_back(i);
   }
 
   if (LocDeleteList.size()) {
     DEBUG(llvm::dbgs() << "        MemLocation no longer being tracked:\n");
-    for (MemLocation &V : LocDeleteList) {
+    for (unsigned V : LocDeleteList) {
       AvailLocs.erase(V);
     }
   } else {
@@ -1525,11 +1533,9 @@ void RLEBBForwarder::mergePredecessorState(RLEBBForwarder &OtherState) {
   }
 }
 
-void
-RLEBBForwarder::
-mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
-                                      unsigned> &BBToBBIDMap,
-                       std::vector<RLEBBForwarder> &BBIDToForwarderMap) {
+void BBState::mergePredecessorStates(
+    llvm::DenseMap<SILBasicBlock *, unsigned> &BBToBBIDMap,
+    std::vector<BBState> &BBIDToForwarderMap) {
   // Clear the state if the basic block has no predecessor.
   if (BB->getPreds().begin() == BB->getPreds().end()) {
     clear();
@@ -1542,10 +1548,9 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
   // predecessor's state and merge in states of other predecessors.
   //
   SILBasicBlock *TheBB = getBB();
-  bool HasSelfCycle = std::any_of(BB->pred_begin(), BB->pred_end(),
-                                  [&TheBB](SILBasicBlock *Pred) -> bool {
-                                    return Pred == TheBB;
-                                  });
+  bool HasSelfCycle = std::any_of(
+      BB->pred_begin(), BB->pred_end(),
+      [&TheBB](SILBasicBlock *Pred) -> bool { return Pred == TheBB; });
 
   // For each predecessor of BB...
   for (auto Pred : BB->getPreds()) {
@@ -1561,50 +1566,23 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
     if (I == BBToBBIDMap.end())
       continue;
 
-    RLEBBForwarder &Other = BBIDToForwarderMap[I->second];
+    BBState &Other = BBIDToForwarderMap[I->second];
 
-    // If we have not had at least one predecessor, initialize RLEBBForwarder
+    // If we have not had at least one predecessor, initialize BBState
     // with the state of the initial predecessor.
     // If BB is also a predecessor of itself, we should not initialize.
     if (!HasAtLeastOnePred && !HasSelfCycle) {
       DEBUG(llvm::dbgs() << "    Initializing with pred: " << I->second
                          << "\n");
-      Stores = Other.Stores;
-      Loads = Other.Loads;
       AvailLocs = Other.AvailLocs;
-
-      DEBUG(llvm::dbgs() << "        Tracking Loads:\n";
-            for (auto &P : Loads) {
-              llvm::dbgs() << "            " << P;
-            });
-
-      DEBUG(llvm::dbgs() << "        Tracking Stores:\n";
-            for (auto &P : Stores) {
-              llvm::dbgs() << "            " << P;
-            });
+      AvailLocsIn = Other.AvailLocsOut;
     } else if (Pred != BB) {
-      DEBUG(llvm::dbgs() << "    Merging with pred  bb" << Pred->getDebugID() <<
-            "\n");
+      DEBUG(llvm::dbgs() << "    Merging with pred  bb" << Pred->getDebugID()
+                         << "\n");
       mergePredecessorState(Other);
     }
     HasAtLeastOnePred = true;
   }
-}
-
-void RLEBBForwarder::verify(RLEContext &Ctx) {
-#ifndef NDEBUG
-  llvm::SmallVector<SILValue, 8> Values;
-  auto *AA = Ctx.getAA();
-
-  for (auto &P : Stores) {
-    for (auto V : Values) {
-      for (SILInstruction *SI : P.second.getInsts()) {
-        assert(!AA->mayWriteToMemory(SI, V) && "Found overlapping stores");
-      }
-    }
-    Values.push_back(P.first);
-  }
-#endif
 }
 
 //===----------------------------------------------------------------------===//
@@ -1625,17 +1603,22 @@ roundPostOrderSize(PostOrderFunctionInfo::reverse_range R) {
   return unsigned(SizeRoundedToPow2);
 }
 
-RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA, PostDominanceInfo *PDI,
-                     PostOrderFunctionInfo::reverse_range RPOT)
+RLEContext::RLEContext(SILFunction *F, AliasAnalysis *AA,
+                       PostDominanceInfo *PDI,
+                       PostOrderFunctionInfo::reverse_range RPOT)
     : F(F), AA(AA), PDI(PDI), ReversePostOrder(RPOT),
       BBToBBIDMap(roundPostOrderSize(RPOT)),
       BBIDToForwarderMap(roundPostOrderSize(RPOT)) {
+
+  // Walk over the function and find all the locations accessed by
+  // this function.
+  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex);
+
   for (SILBasicBlock *BB : ReversePostOrder) {
     unsigned count = BBToBBIDMap.size();
     BBToBBIDMap[BB] = count;
-    BBIDToForwarderMap[count].init(BB);
+    BBIDToForwarderMap[count].init(BB, MemLocationVault.size());
   }
-
 }
 
 MemLocation &RLEContext::getMemLocation(const unsigned index) {
@@ -1667,7 +1650,7 @@ unsigned RLEContext::getMemLocationBit(const MemLocation &Loc) {
   // If %270 is forwarded to (replace) %273, we would end up with a new
   // MemLocation with a different base, but same projection path as before.
   //
-  if (Iter != LocToBitIndex.end()) 
+  if (Iter != LocToBitIndex.end())
     return Iter->second;
 
   LocToBitIndex[Loc] = MemLocationVault.size();
@@ -1675,41 +1658,56 @@ unsigned RLEContext::getMemLocationBit(const MemLocation &Loc) {
   return getMemLocationBit(Loc);
 }
 
-bool
-RLEContext::runIteration() {
+bool RLEContext::run() {
   // Walk over the function and find all the locations accessed by
   // this function.
   MemLocationVault.clear();
   LocToBitIndex.clear();
   MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex);
 
+  bool LastIteration = false;
   bool Changed = false;
-  for (SILBasicBlock *BB : ReversePostOrder) {
-    auto IDIter = BBToBBIDMap.find(BB);
-    assert(IDIter != BBToBBIDMap.end() && "We just constructed this!?");
-    unsigned ID = IDIter->second;
-    RLEBBForwarder &Forwarder = BBIDToForwarderMap[ID];
-    assert(Forwarder.getBB() == BB && "We just constructed this!?");
+  do {
+    Changed = false;
+    for (SILBasicBlock *BB : ReversePostOrder) {
+      auto IDIter = BBToBBIDMap.find(BB);
+      assert(IDIter != BBToBBIDMap.end() && "We just constructed this!?");
+      unsigned ID = IDIter->second;
+      BBState &Forwarder = BBIDToForwarderMap[ID];
+      assert(Forwarder.getBB() == BB && "We just constructed this!?");
 
-    DEBUG(llvm::dbgs() << "Visiting bb" << BB->getDebugID() << "\n");
+      DEBUG(llvm::dbgs() << "Visiting bb" << BB->getDebugID() << "\n");
 
-    // Merge the predecessors. After merging, RLEBBForwarder now contains
-    // lists of stores|loads that reach the beginning of the basic block
-    // along all paths.
-    Forwarder.mergePredecessorStates(BBToBBIDMap, BBIDToForwarderMap);
+      // Merge the predecessors. After merging, BBState now contains
+      // lists of stores|loads that reach the beginning of the basic block
+      // along all paths.
+      Forwarder.mergePredecessorStates(BBToBBIDMap, BBIDToForwarderMap);
 
-    // Remove dead stores, merge duplicate loads, and forward stores to
-    // loads. We also update lists of stores|loads to reflect the end
-    // of the basic block.
-    Changed |= Forwarder.optimize(*this);
-  }
+      // Merge duplicate loads, and forward stores to
+      // loads. We also update lists of stores|loads to reflect the end
+      // of the basic block.
+      Changed |= Forwarder.optimize(*this, LastIteration);
+    }
+
+    if (LastIteration) {
+      int *a = nullptr;
+      *a = 10;
+      assert(!Changed && "There must be no changes in the last iteration");
+    }
+
+    // Do the last iteration of the data flow.
+    if (!Changed && !LastIteration) {
+      LastIteration = true;
+      continue;
+    }
+  } while (Changed);
 
   return Changed;
 }
 
 void RLEContext::stopTrackingInst(SILInstruction *I) {
   if (auto *SI = dyn_cast<StoreInst>(I)) {
-  } else if (! isa<LoadInst>(I)) {
+  } else if (!isa<LoadInst>(I)) {
     return;
   }
 
@@ -1729,7 +1727,7 @@ void RLEContext::stopTrackingInst(SILInstruction *I) {
     auto IDIter = BBToBBIDMap.find(WorkBB);
     if (IDIter == BBToBBIDMap.end())
       continue;
-    RLEBBForwarder &F = BBIDToForwarderMap[IDIter->second];
+    BBState &F = BBIDToForwarderMap[IDIter->second];
 
     // Remove the LSValue if it contains I. If not, we don't have to continue
     // with the successors.
@@ -1757,7 +1755,7 @@ class GlobalRedundantLoadElimination : public SILFunctionTransform {
     SILFunction *F = getFunction();
 
     DEBUG(llvm::dbgs() << "***** Redundant Load Elimination on function: "
-          << F->getName() << " *****\n");
+                       << F->getName() << " *****\n");
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
@@ -1765,9 +1763,7 @@ class GlobalRedundantLoadElimination : public SILFunctionTransform {
 
     RLEContext Ctx(F, AA, PDT, PO->getReversePostOrder());
 
-    bool Changed = false;
-    while (Ctx.runIteration())
-      Changed = true;
+    bool Changed = Ctx.run();
 
     if (Changed)
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
