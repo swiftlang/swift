@@ -466,8 +466,6 @@ class BaseThrowingInit : HasThrowingInit {
 // CHECK-NEXT: assign %1 to [[T1]]
 //   Super delegation.
 // CHECK-NEXT: [[T0:%.*]] = load [[MARKED_BOX]]
-// CHECK-NEXT: [[T1:%.*]] = null_class $BaseThrowingInit
-// CHECK-NEXT: store [[T1]] to [[MARKED_BOX]]
 // CHECK-NEXT: [[T2:%.*]] = upcast [[T0]] : $BaseThrowingInit to $HasThrowingInit
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[T3:%.*]] = function_ref @_TFC6errors15HasThrowingInitcfMS0_FzT5valueSi_S0_

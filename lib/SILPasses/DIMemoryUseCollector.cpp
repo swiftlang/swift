@@ -1251,8 +1251,15 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
     if (isa<StoreInst>(User) && UI->getOperandNumber() == 1)
       continue;
 
+    // For class initializers, the assign into the self box is captured as
+    // a SelfInit or SuperInit elsewhere.
+    if (TheMemory.isClassInitSelf() &&
+        isa<AssignInst>(User) && UI->getOperandNumber() == 1)
+      continue;
+
     // Stores *to* the allocation are writes.  If the value being stored is a
-    // call to self.init()... then we have a self.init call.
+    // call to self.init()... then we have a self.init call. This case only
+    // comes up for struct and enum initializers.
     if (auto *AI = dyn_cast<AssignInst>(User)) {
       if (auto *AssignSource = dyn_cast<SILInstruction>(AI->getOperand(0)))
         if (isSelfInitUse(AssignSource)) {

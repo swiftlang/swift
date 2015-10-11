@@ -978,7 +978,7 @@ bb2:
 // <rdar://problem/21991742> DI miscompiles this testcase into a double free
 class MyClass3 {
 }
-sil @selfinit_myclass3 : $@convention(thin) () -> @owned MyClass3
+sil @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
 
 // CHECK-LABEL: sil hidden @test_conditional_destroy_class_delegating_init
 sil hidden @test_conditional_destroy_class_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
@@ -994,13 +994,14 @@ bb0(%0 : $Builtin.Int1):
 
 // CHECK: [[SUCCESS]]:
 bb1:
-  %9 = function_ref @selfinit_myclass3 : $@convention(thin) () -> @owned MyClass3
-  %10 = apply %9() : $@convention(thin) () -> @owned MyClass3
-  assign %10 to %3 : $*MyClass3
+  %4 = load %3 : $*MyClass3
+  %5 = function_ref @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
+  %6 = apply %5(%4) : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
+  store %6 to %3 : $*MyClass3
 
-// CHECK: [[NEW_SELF:%[0-9]+]] = apply {{.*}}()  : $@convention(thin) () -> @owned MyClass3
-// CHECK-NEXT:  [[SET:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK:  [[SET:%[0-9]+]] = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:  store [[SET]] to [[CONTROL]]#1 : $*Builtin.Int1
+// CHECK: [[NEW_SELF:%[0-9]+]] = apply {{.*}}({{.*}})  : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
 // CHECK-NEXT:  store [[NEW_SELF]] to [[SELF_BOX]]#1 : $*MyClass3
 
 // CHECK-NEXT:  br [[CHECK:bb[0-9]+]]
@@ -1025,6 +1026,6 @@ bb2:
 
   destroy_addr %3 : $*MyClass3
   dealloc_stack %2#0 : $*@local_storage MyClass3
-  %15 = tuple ()
-  return %15 : $()
+  %7 = tuple ()
+  return %7 : $()
 }

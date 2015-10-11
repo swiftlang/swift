@@ -360,8 +360,6 @@ class D: C {
   // CHECK-NEXT:    store [[SELF]] to [[SELF_ADDR]]
   // CHECK-NOT:     [[SELF_ADDR]]
   // CHECK:         [[SELF1:%.*]] = load [[SELF_ADDR]]
-  // CHECK-NEXT:    null_class
-  // CHECK-NEXT:    store
   // CHECK-NEXT:    [[SUPER1:%.*]] = upcast [[SELF1]]
   // CHECK-NOT:     [[SELF_ADDR]]
   // CHECK-NOT:     [[SELF1]]

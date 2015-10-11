@@ -276,42 +276,6 @@ func emptyStructTest() {
   useEmptyStruct(g.1)
 }
 
-// These are tests for values that are only initialized on some path through the
-// CFG.
-func partialInit() {
-
-  // Value of trivial type.
-  func trivial(ni : Int) {
-    var n = ni
-    while (n > 0) {
-      --n
-      var x : Int
-      if (n > 2) { continue }
-      x = 1
-      _ = x
-    }
-  }
-  
-  // Tuple with only some elements specified.
-  func trivial_tuple() {
-    var a : (Int, Int)
-    a.1 = 1
-    _ = a.1
-  }
-
-
-  func tuple_test(cond : Bool) {
-    var x : (SomeClass, SomeClass)
-
-    if cond {
-      x.0 = SomeClass()
-    } else {
-      x.1 = SomeClass()
-      _ = x.1
-    }
-  }
-}
-
 func takesTuplePair(inout a : (SomeClass, SomeClass)) {}
 
 // This tests cases where an store might be an init or assign based on control
@@ -370,22 +334,6 @@ enum NotInitializedGenericUnion<T> {
   case X
 }
 
-
-func tuple_test() -> Int {
-  var t : (Int, Int)
-
-  t.1 = 4
-
-  for _ in 0..<45 {
-  }
-
-  t.0 = 1
-
-  for _ in 0..<45 {
-  }
-  
-  return t.1+t.0  // No diagnostic, everything is fully initialized.
-}
 
 class SomeDerivedClass : SomeClass {
   var y : Int
@@ -888,49 +836,6 @@ struct rdar18414728Struct {
 }
 
 
-// <rdar://problem/17207456> Unable to access dynamicType of an object in a class initializer that isn't done
-func use(a : Any) {}
-
-class rdar17207456Base {
-  var x: Int
-
-  init() {
-    use(self.dynamicType)
-    x = 0
-  }
-
-  convenience init(a : Int) {
-    use(self.dynamicType)
-    self.init()
-  }
-}
-
-class rdar17207456Derived : rdar17207456Base {
-  override init() {
-    use(self.dynamicType)
-    super.init()
-  }
-
-  convenience init(a : Int) {
-    use(self.dynamicType)
-    self.init()
-  }
-}
-
-struct rdar17207456Struct {
-  var x: Int
-
-  init() {
-    use(self.dynamicType)
-    x = 0
-  }
-
-  init(a : Int) {
-    use(self.dynamicType)
-    self.init()
-  }
-}
-
 extension Int {
   mutating func mutate() {}
   func inspect() {}
@@ -1211,33 +1116,6 @@ func testReassignment() {
   _ = c
 }
 
-
-// super and self.init should work in the presence of error handling constructs.
-// <rdar://problem/20850517> throwing initializers that call super.init trigger DI errors about not having called super.init
-class BaseClassEH {
-  required init() throws {}
-
-  convenience init(a : Int) throws {
-    try self.init()
-  }
-
-  convenience init(a2 : Int) {
-    try! self.init()
-  }
-}
-
-class DerivedClassEH : BaseClassEH {
-  required init() throws {
-    try super.init()
-  }
-  convenience init(a : Int) throws {
-    try self.init()
-  }
-
-  convenience init(a2 : Int) {
-    try! self.init()
-  }
-}
 
 // <rdar://problem/21003797> too-early throw in an init produces "must be initialized before returning nil" diagnostic
 func throwAndReturnsInt() throws -> Int { return 42 }

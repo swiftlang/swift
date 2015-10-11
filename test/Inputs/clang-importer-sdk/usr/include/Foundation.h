@@ -238,6 +238,7 @@ NSString *NSStringToNSString(NSString *str);
 @property(setter=assignGuard:) id guard;
 
 + (instancetype)hiveWithQueen:(Bee *)queen;
++ (instancetype)hiveWithFlakyQueen:(Bee *)queen error:(NSError **)error;
 
 - (instancetype)visit;
 @end

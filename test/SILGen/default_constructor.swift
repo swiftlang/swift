@@ -51,8 +51,6 @@ class F : E { }
 // CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself]
 // CHECK-NEXT: store [[ORIGSELF]] to [[SELF]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
-// CHECK-NEXT: [[SELFNULL:%[0-9]+]] = null_class $F
-// CHECK-NEXT: store [[SELFNULL]] to [[SELF]] : $*F
 // CHECK-NEXT: [[E:%[0-9]]] = upcast [[SELFP]] : $F to $E
 // CHECK: [[E_CTOR:%[0-9]+]] = function_ref @_TFC19default_constructor1EcfMS0_FT_S0_ : $@convention(method) (@owned E) -> @owned E
 // CHECK-NEXT: [[ESELF:%[0-9]]] = apply [[E_CTOR]]([[E]]) : $@convention(method) (@owned E) -> @owned E

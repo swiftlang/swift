@@ -324,19 +324,28 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     // perform a load to get the rvalue.
     if (auto Result = emitLValueForDecl(loc, var, refType,
                                         AccessKind::Read, semantics)) {
-      IsTake_t takes;
+      bool guaranteedValid = false;
+      
+      // We should only end up in this path for local and global variables,
+      // i.e. ones whose lifetime is assured for the duration of the evaluation.
+      // Therefore, if the variable is a constant, the value is guaranteed
+      // valid as well.
+      if (var->isLet())
+        guaranteedValid = true;
+
       // 'self' may need to be taken during an 'init' delegation.
-      if (var->getName() == getASTContext().Id_self) {
+      if (!C.isGuaranteedPlusZeroOk() &&
+          var->getName() == getASTContext().Id_self) {
         switch (SelfInitDelegationState) {
         case NormalSelf:
           // Don't consume self.
-          takes = IsNotTake;
           break;
         
         case WillConsumeSelf:
           // Consume self, and remember we did so.
-          takes = IsTake;
           SelfInitDelegationState = DidConsumeSelf;
+          C = SGFContext::AllowGuaranteedPlusZero;
+          guaranteedValid = true;
           break;
             
         case DidConsumeSelf:
@@ -344,33 +353,15 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
           // the call to 'super.init' or 'self.init' involves instance variables.
           // Just borrow the previous self value, since it will be guaranteed
           // up until the 'super.init' or 'self.init' call.
-          return ManagedValue::forUnmanaged(SelfInitDelegationValue);
+          C = SGFContext::AllowGuaranteedPlusZero;
+          guaranteedValid = true;
+          break;
         }
-      } else {
-        takes = IsNotTake;
       }
 
-      // We should only end up in this path for local and global variables,
-      // i.e. ones whose lifetime is assured for the duration of the evaluation.
-      // Therefore, if the variable is a constant, the value is guaranteed
-      // valid as well.
-      auto value = emitLoad(loc, Result.getLValueAddress(),
-                            getTypeLowering(refType), C, takes,
-                            /*guaranteed*/ var->isLet());
-
-      // In a class self.init or super.init situation, the self value will 'take'
-      // the value out of the box, leaving it as an unowned reference in an
-      // otherwise valid box.  We need to null it out so that a release of the box
-      // (e.g. on an error path of a failable init) will not do an extra release of
-      // the bit pattern in the box.
-      if (takes == IsTake) {
-        auto Zero = B.createNullClass(loc, Result.getType().getObjectType());
-        B.createStore(loc, Zero, Result.getValue());
-
-        SelfInitDelegationValue = value.getValue();
-      }
-
-      return value;
+      return emitLoad(loc, Result.getLValueAddress(),
+                      getTypeLowering(refType), C, IsNotTake,
+                      guaranteedValid);
     }
 
     // For local decls, use the address we allocated or the value if we have it.

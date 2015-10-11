@@ -151,8 +151,6 @@ class VeryErrorProne : ErrorProne {
 // CHECK:      [[BOX:%.*]] = alloc_box $VeryErrorProne
 // CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[BOX]]#1
 // CHECK:      [[T0:%.*]] = load [[MARKED_BOX]]
-// CHECK:      [[T3:%.*]] = null_class $VeryErrorProne
-// CHECK-NEXT: store [[T3]] to [[MARKED_BOX]]
 // CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $VeryErrorProne to $ErrorProne
 // CHECK-NEXT: [[T2:%.*]] = super_method [volatile] [[T0]] : $VeryErrorProne, #ErrorProne.init!initializer.1.foreign : ErrorProne.Type -> (one: AnyObject?) throws -> ErrorProne , $@convention(objc_method) (Optional<AnyObject>, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @owned ErrorProne) -> @owned Optional<ErrorProne>
 // CHECK:      {{$}}

@@ -15,8 +15,6 @@ class SomeDerivedClass : Parent {
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT_S0_ : $@convention(method) (@owned SomeDerivedClass) -> @owned SomeDerivedClass
 // CHECK: integer_literal $Builtin.Int2048, 42
 // CHECK: [[SELFLOAD:%[0-9]+]] = load [[SELF:%[0-9]+]] : $*SomeDerivedClass
-// CHECK-NEXT: [[SELFNULL:%[0-9]+]] = null_class $SomeDerivedClass
-// CHECK-NEXT: store [[SELFNULL]] to [[SELF]] : $*SomeDerivedClass
 // CHECK-NEXT: [[PARENT:%[0-9]+]] = upcast [[SELFLOAD]] : $SomeDerivedClass to $Parent
 // CHECK-NEXT: function_ref auto_generated_super_init_call.Parent.init
 // CHECK-NEXT: [[INITCALL1:%[0-9]+]] = function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_
@@ -44,8 +42,6 @@ class SomeDerivedClass : Parent {
 // CHECK-LABEL: sil hidden @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1bSb_S0_ : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
 // CHECK: bb4:
 // CHECK: [[SELFLOAD:%[0-9]+]] = load [[SELF:%[0-9]+]] : $*SomeDerivedClass
-// CHECK-NEXT: [[SELFNULL:%[0-9]+]] = null_class $SomeDerivedClass
-// CHECK-NEXT: store [[SELFNULL]] to [[SELF]] : $*SomeDerivedClass
 // CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK-NEXT: apply
 // CHECK-NEXT: unchecked_ref_cast
