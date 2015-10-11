@@ -1258,7 +1258,7 @@ bb0(%0 : $foo, %1 : $foo):
 // kills them. This test how the optimistic data flow works.
 //
 // CHECK-LABEL: DeadStoreAcrossLoopSimpleStruct
-// CHECK: bb0:
+// CHECK: bb0
 // CHECK-NOT: store
 // CHECK: br
 sil hidden @DeadStoreAcrossLoopSimpleStruct : $@convention(thin) (Bool, Int) -> () {
