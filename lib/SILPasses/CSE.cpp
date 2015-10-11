@@ -334,9 +334,6 @@ public:
   hash_code visitIsNonnullInst(IsNonnullInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
   }
-  hash_code visitNullClassInst(NullClassInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getType());
-  }
 
   hash_code visitThinFunctionToPointerInst(ThinFunctionToPointerInst *X) {
     return llvm::hash_combine(X->getKind(), X->getOperand(), X->getType());
@@ -636,7 +633,6 @@ bool CSE::canHandle(SILInstruction *Inst) {
     case ValueKind::TupleExtractInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::MetatypeInst:
-    case ValueKind::NullClassInst:
     case ValueKind::ValueMetatypeInst:
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::ObjCProtocolInst:

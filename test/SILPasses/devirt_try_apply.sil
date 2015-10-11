@@ -224,8 +224,6 @@ bb0(%0 : $Derived1):
   %3 = upcast %0 : $Derived1 to $Base
 
   %4 = function_ref @_TFC16devirt_try_apply4BasecfMS0_FT_S0_ : $@convention(method) (@owned Base) -> @owned Base
-  %5 = null_class $Derived1
-  store %5 to %1#1 : $*Derived1
   %7 = apply %4(%3) : $@convention(method) (@owned Base) -> @owned Base
   %8 = unchecked_ref_cast %7 : $Base to $Derived1
   store %8 to %1#1 : $*Derived1
@@ -316,8 +314,6 @@ bb0(%0 : $Derived2):
   %3 = upcast %0 : $Derived2 to $Base
 
   %4 = function_ref @_TFC16devirt_try_apply4BasecfMS0_FT_S0_ : $@convention(method) (@owned Base) -> @owned Base
-  %5 = null_class $Derived2
-  store %5 to %1#1 : $*Derived2
   %7 = apply %4(%3) : $@convention(method) (@owned Base) -> @owned Base
   %8 = unchecked_ref_cast %7 : $Base to $Derived2
   store %8 to %1#1 : $*Derived2
@@ -431,8 +427,6 @@ bb0(%0 : $CP2):
   %3 = upcast %0 : $CP2 to $CP1
 
   %4 = function_ref @_TFC16devirt_try_apply3CP1cfMS0_FT_S0_ : $@convention(method) (@owned CP1) -> @owned CP1
-  %5 = null_class $CP2
-  store %5 to %1#1 : $*CP2
   %7 = apply %4(%3) : $@convention(method) (@owned CP1) -> @owned CP1
   %8 = unchecked_ref_cast %7 : $CP1 to $CP2
   store %8 to %1#1 : $*CP2

@@ -1009,7 +1009,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case ValueKind::MetatypeInst:
-  case ValueKind::NullClassInst:
     writeOneTypeLayout(SI.getKind(), SI.getType(0));
     break;
   case ValueKind::ObjCProtocolInst: {

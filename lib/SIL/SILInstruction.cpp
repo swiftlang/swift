@@ -561,10 +561,6 @@ namespace {
       return true;
     }
       
-    bool visitNullClassInst(NullClassInst *RHS) {
-      return true;
-    }
-
     bool visitBridgeObjectToRefInst(BridgeObjectToRefInst *X) {
       return true;
     }

@@ -994,10 +994,6 @@ public:
     *this << "is_nonnull " << getIDAndType(I->getOperand());
   }
   
-  void visitNullClassInst(NullClassInst *I) {
-    *this << "null_class " << I->getType();
-  }
-
   void visitRetainValueInst(RetainValueInst *I) {
     *this << "retain_value " << getIDAndType(I->getOperand());
   }

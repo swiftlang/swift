@@ -1822,27 +1822,6 @@ class IsNonnullInst : public UnaryInstructionBase<ValueKind::IsNonnullInst> {
 };
   
 
-/// Produce a null value for a (non-nullable!) class reference, for use in
-/// class rebinding.  This is a horrible hack.
-class NullClassInst : public SILInstruction {
-  friend class SILBuilder;
-
-  NullClassInst(SILLocation Loc, SILType ResultTy)
-    : SILInstruction(ValueKind::NullClassInst, Loc, ResultTy) {}
-
-public:
-  /// getType() is ok since this has a single result.
-  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
-  
-  ArrayRef<Operand> getAllOperands() const { return {}; }
-  MutableArrayRef<Operand> getAllOperands() { return {}; }
-  
-  static bool classof(const ValueBase *V) {
-    return V->getKind() == ValueKind::NullClassInst;
-  }
-};
-  
-
 /// Perform an unconditional checked cast that aborts if the cast fails.
 class UnconditionalCheckedCastInst
   : public UnaryInstructionBase<ValueKind::UnconditionalCheckedCastInst,

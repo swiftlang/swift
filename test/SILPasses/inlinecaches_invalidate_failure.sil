@@ -68,8 +68,6 @@ bb0(%0 : $Foo2):
   %3 = upcast %0 : $Foo2 to $Foo                  // user: %7
   // function_ref test.Foo.init (test.Foo.Type)() -> test.Foo
   %4 = function_ref @_TFC4test3FoocfMS0_FT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo // user: %7
-  %5 = null_class $Foo2                           // user: %6
-  store %5 to %1#1 : $*Foo2                       // id: %6
   %7 = apply %4(%3) : $@convention(method) (@owned Foo) -> @owned Foo // user: %8
   %8 = unchecked_ref_cast %7 : $Foo to $Foo2      // users: %9, %11
   store %8 to %1#1 : $*Foo2                       // id: %9
@@ -86,8 +84,6 @@ bb0(%0 : $@thick Foo2.Type):
   %4 = upcast %1 : $Foo2 to $Foo                  // user: %8
   // function_ref test.Foo.init (test.Foo.Type)() -> test.Foo
   %5 = function_ref @_TFC4test3FoocfMS0_FT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo // user: %8
-  %6 = null_class $Foo2                           // user: %7
-  store %6 to %2#1 : $*Foo2                       // id: %7
   %8 = apply %5(%4) : $@convention(method) (@owned Foo) -> @owned Foo // user: %9
   %9 = unchecked_ref_cast %8 : $Foo to $Foo2      // users: %10, %12
   store %9 to %2#1 : $*Foo2                       // id: %10

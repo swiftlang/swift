@@ -925,15 +925,6 @@ SILCloner<ImplClass>::visitIsNonnullInst(IsNonnullInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitNullClassInst(NullClassInst *Inst) {
-  doPostProcess(Inst,
-                getBuilder().createNullClass(getOpLocation(Inst->getLoc()),
-                                             getOpType(Inst->getType())));
-}
-
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
                                           UnconditionalCheckedCastInst *Inst) {
   SILLocation OpLoc = getOpLocation(Inst->getLoc());

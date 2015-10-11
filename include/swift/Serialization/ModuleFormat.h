@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 218; // Last change: removed unchecked_ref_bit_cast
+const uint16_t VERSION_MINOR = 219; // Last change: remove null_class
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;

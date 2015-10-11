@@ -1319,13 +1319,6 @@ entry(%0 : $Class1):
   return %3 : $()
 }
 
-sil @null_class : $@convention(thin) () -> Class1 {
-entry:
-  %m = null_class $Class1
-  return %m : $Class1
-}
-
-
 
 sil @thin_convention : $@convention(thin) () -> ()
 sil @c_convention : $@convention(c) () -> ()

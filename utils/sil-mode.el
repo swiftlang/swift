@@ -125,7 +125,6 @@
                     "objc_existential_metatype_to_object"
                     "word_to_bridge_object"
                     "is_nonnull"
-                    "null_class"
                     )
                   'words) . font-lock-keyword-face)
    ;; Value Buffer

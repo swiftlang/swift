@@ -216,7 +216,6 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(UnconditionalCheckedCastInst, ConversionInst, None)
     VALUE_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
   INST(IsNonnullInst, SILInstruction, None)
-  INST(NullClassInst, SILInstruction, None)
   INST(UnconditionalCheckedCastAddrInst, SILInstruction, MayHaveSideEffects)
   INST(UncheckedRefCastAddrInst, SILInstruction, MayHaveSideEffects)
 
