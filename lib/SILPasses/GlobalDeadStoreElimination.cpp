@@ -438,6 +438,18 @@ bool GlobalDeadStoreEliminationImpl::updateWriteSetForWrite(SILInstruction *I,
 void GlobalDeadStoreEliminationImpl::processRead(SILInstruction *I, BBState *S,
                                                  SILValue Mem) {
   // Construct a MemLocation to represent the memory read by this instruction.
+  // NOTE: The base will point to the actual object this inst is accessing,
+  // not this particular field.
+  //
+  // e.g. %1 = alloc_stack $S
+  //      %2 = struct_element_addr %1, #a
+  //      %3 = load %2 : $*Int
+  //
+  // Base will point to %1, but not %2. Projection path will indicate which
+  // field is accessed. 
+  //
+  // This will make comparison between locations easier. This eases the
+  // implementation of intersection operator in the data flow.
   MemLocation L(Mem);
 
   // If we cant figure out the Base or Projection Path for the read instruction,
@@ -486,8 +498,19 @@ SILValue GlobalDeadStoreEliminationImpl::createExtract(
 
 void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
                                                   SILValue Val, SILValue Mem) {
-  // Construct a MemLocation to represent the memory written by this
-  // instruction.
+  // Construct a MemLocation to represent the memory read by this instruction.
+  // NOTE: The base will point to the actual object this inst is accessing,
+  // not this particular field.
+  //
+  // e.g. %1 = alloc_stack $S
+  //      %2 = struct_element_addr %1, #a
+  //      store %3 to %2 : $*Int
+  //
+  // Base will point to %1, but not %2. Projection path will indicate which
+  // field is accessed. 
+  //
+  // This will make comparison between locations easier. This eases the
+  // implementation of intersection operator in the data flow.
   MemLocation L(Mem);
 
   // If we cant figure out the Base or Projection Path for the store
@@ -520,30 +543,35 @@ void GlobalDeadStoreEliminationImpl::processWrite(SILInstruction *I, BBState *S,
   }
 
   // Partial dead store - stores to some locations are dead, but not all. This
-  // is
-  // a partially dead store. Also at this point we know what locations are dead.
+  // is a partially dead store. Also at this point we know what locations are
+  // dead.
+  llvm::DenseSet<MemLocation> LocsAlive;
   if (V.any()) {
     // Take out locations that are dead.
-    llvm::DenseSet<MemLocation> LocsAlive;
-    SILValue B = Locs[0].getBase();
-    Optional<ProjectionPath> BP = ProjectionPath::getAddrProjectionPath(B, Mem);
     for (unsigned i = 0; i < V.size(); ++i) {
       if (V.test(i))
         continue;
       // We are already tracking all the stores to this Mem as dead.
       S->stopTrackingMemLocation(i);
-      // Strip off the projection path from base to the accessed field.
-      Locs[i].subtractPaths(BP);
       LocsAlive.insert(Locs[i]);
     }
 
-    // Try to create as few aggregated stores as possible out of these
-    // locations.
+    // Try to create as few aggregated stores as possible out of the locations.
     MemLocation::reduce(L, Mod, LocsAlive);
 
     // Oops, we have too many smaller stores generated, bail out.
     if (LocsAlive.size() > MaxPartialDeadStoreCountLimit)
       return;
+
+    // Locations here have a projection path from their Base, but this
+    // particular instruction may not be accessing the base, so we need to *rebase*
+    // the locations w.r.t. to the current instruction.
+    SILValue B = Locs[0].getBase();
+    Optional<ProjectionPath> BP = ProjectionPath::getAddrProjectionPath(B, Mem);
+    // Strip off the projection path from base to the accessed field.
+    for (auto &X : LocsAlive) {
+      X.subtractPaths(BP);
+    }
 
     // Create the individual stores that are alive.
     SILBuilderWithScope<16> Builder(I);
