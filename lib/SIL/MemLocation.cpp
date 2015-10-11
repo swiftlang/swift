@@ -20,6 +20,20 @@ using namespace swift;
 //                                  Memory Location
 //===----------------------------------------------------------------------===//
 
+// The base here will point to the actual object this inst is accessing,
+// not this particular field.
+//
+// e.g. %1 = alloc_stack $S
+//      %2 = struct_element_addr %1, #a
+//      store %3 to %2 : $*Int
+//
+// Base will point to %1, but not %2. Projection path will indicate which
+// field is accessed.
+//
+// This will make comparison between locations easier and this eases the
+// implementation of intersection operator in the data flow. e.g. if
+// MemLocation are available from multiple paths in the CFG and they are
+// accessed in different ways
 void MemLocation::initialize(SILValue Dest) {
   Base = getUnderlyingObject(Dest);
   Path = ProjectionPath::getAddrProjectionPath(Base, Dest);
