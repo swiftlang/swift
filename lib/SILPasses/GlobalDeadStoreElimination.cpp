@@ -223,14 +223,11 @@ void BBState::intersect(const BBState &Succ) {
 namespace {
 
 class GlobalDeadStoreEliminationImpl {
-  /// Map every basic block to its location state.
-  llvm::DenseMap<SILBasicBlock *, BBState> BBToLocState;
+  /// The module we are currently processing.
+  SILModule *Mod;
 
   /// The function we are currently processing.
   SILFunction *F;
-
-  /// The module we are currently processing.
-  SILModule *Mod;
 
   /// Pass manager, used to get various analysis.
   SILPassManager *PM;
@@ -240,6 +237,9 @@ class GlobalDeadStoreEliminationImpl {
 
   /// Allocator.
   llvm::BumpPtrAllocator BPA;
+
+  /// Map every basic block to its location state.
+  llvm::DenseMap<SILBasicBlock *, BBState> BBToLocState;
 
   /// Keeps all the locations for the current function. The BitVector in each
   /// BBState is then laid on top of it to keep track of which MemLocation
