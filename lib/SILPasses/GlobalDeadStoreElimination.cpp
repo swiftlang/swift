@@ -477,34 +477,6 @@ void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem) {
   }
 }
 
-SILValue DSEContext::createExtract(SILValue Base,
-                                   Optional<ProjectionPath> &Path,
-                                   SILInstruction *Inst, bool IsValExt) {
-  // If we found a projection path, but there are no projections, then the two
-  // loads must be the same, return PrevLI.
-  if (!Path || Path->empty())
-    return Base;
-
-  // Ok, at this point we know that we can construct our aggregate projections
-  // from our list of address projections.
-  SILValue LastExtract = Base;
-  SILBuilder Builder(Inst);
-
-  // Construct the path!
-  for (auto PI = Path->rbegin(), PE = Path->rend(); PI != PE; ++PI) {
-    if (IsValExt) {
-      LastExtract =
-          PI->createValueProjection(Builder, Inst->getLoc(), LastExtract).get();
-      continue;
-    }
-    LastExtract =
-        PI->createAddrProjection(Builder, Inst->getLoc(), LastExtract).get();
-  }
-
-  // Return the last extract we created.
-  return LastExtract;
-}
-
 void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
                               SILValue Mem, bool PDSE) {
   // Construct a MemLocation to represent the memory read by this instruction.
@@ -649,6 +621,34 @@ void DSEContext::processInstruction(SILInstruction *I, bool PDSE) {
 
   // Check whether this instruction will invalidate any other MemLocations.
   invalidateMemLocationBase(I);
+}
+
+SILValue DSEContext::createExtract(SILValue Base,
+                                   Optional<ProjectionPath> &Path,
+                                   SILInstruction *Inst, bool IsValExt) {
+  // If we found a projection path, but there are no projections, then the two
+  // loads must be the same, return PrevLI.
+  if (!Path || Path->empty())
+    return Base;
+
+  // Ok, at this point we know that we can construct our aggregate projections
+  // from our list of address projections.
+  SILValue LastExtract = Base;
+  SILBuilder Builder(Inst);
+
+  // Construct the path!
+  for (auto PI = Path->rbegin(), PE = Path->rend(); PI != PE; ++PI) {
+    if (IsValExt) {
+      LastExtract =
+          PI->createValueProjection(Builder, Inst->getLoc(), LastExtract).get();
+      continue;
+    }
+    LastExtract =
+        PI->createAddrProjection(Builder, Inst->getLoc(), LastExtract).get();
+  }
+
+  // Return the last extract we created.
+  return LastExtract;
 }
 
 void DSEContext::run() {
