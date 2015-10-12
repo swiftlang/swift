@@ -43,8 +43,43 @@
   SWIFT_MAKE_VERSION_STRING(SWIFT_VERSION_MAJOR, SWIFT_VERSION_MINOR)
 #endif
 
+#if __has_include("LLVMRevision.inc")
+# include "LLVMRevision.inc"
+#endif
+#if __has_include("ClangRevision.inc")
+# include "ClangRevision.inc"
+#endif
+#if __has_include("SwiftRevision.inc")
+# include "SwiftRevision.inc"
+#endif
+
 namespace swift {
 namespace version {
+
+/// Print a string of the form "LLVM xxxxx, Clang yyyyy, Swift zzzzz",
+/// where each placeholder is the revision for the associated repository.
+static void printFullRevisionString(raw_ostream &out) {
+  // Abitrarily truncate to 10 characters. This should be enough to unique
+  // Git hashes for the time being, and certainly enough for SVN revisions,
+  // while keeping the version string from being ridiculously long.
+#if defined(LLVM_REVISION)
+  out << "LLVM " << StringRef(LLVM_REVISION).slice(0, 10);
+# if defined(CLANG_REVISION) || defined(SWIFT_REVISION)
+  out << ", ";
+# endif
+#endif
+
+#if defined(CLANG_REVISION)
+  out << "Clang " << StringRef(CLANG_REVISION).slice(0, 10);
+# if defined(SWIFT_REVISION)
+  out << ", ";
+# endif
+#endif
+
+#if defined(SWIFT_REVISION)
+  out << "Swift " << StringRef(SWIFT_REVISION).slice(0, 10);
+#endif
+}
 
 void parseVersionString(StringRef VersionString,
                         SmallVectorImpl<unsigned> &Components,
@@ -81,13 +116,13 @@ CompilerVersion::CompilerVersion(const StringRef VersionString,
   parseVersionString(VersionString, Components, Loc, Diags);
 }
 
-#ifdef SWIFT_COMPILER_VERSION
 
 CompilerVersion::CompilerVersion() {
+#ifdef SWIFT_COMPILER_VERSION
   parseVersionString(TOSTR(SWIFT_COMPILER_VERSION), Components, SourceLoc(),
                      nullptr);
-}
 #endif
+}
 
 std::string CompilerVersion::str() const {
   std::string VersionString;
@@ -131,12 +166,20 @@ std::pair<unsigned, unsigned> getSwiftNumericVersion() {
 std::string getSwiftFullVersion() {
   std::string buf;
   llvm::raw_string_ostream OS(buf);
+
 #ifdef SWIFT_VENDOR
   OS << SWIFT_VENDOR " ";
 #endif
+
   OS << "Swift version " SWIFT_VERSION_STRING;
-#ifdef SWIFT_COMPILER_VERSION
+
+#if defined(SWIFT_COMPILER_VERSION)
   OS << " (" TOSTR(SWIFT_COMPILER_VERSION) ")";
+#elif defined(LLVM_REVISION) || defined(CLANG_REVISION) || \
+      defined(SWIFT_REVISION)
+  OS << " (";
+  printFullRevisionString(OS);
+  OS << ")";
 #endif
   return OS.str();
 }
