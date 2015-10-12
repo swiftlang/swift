@@ -1824,8 +1824,10 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
   // TODO: Instead of bailing out in case of a mismatch we should insert casts
   // as we do for the return type.
   for (unsigned Idx = 0; Idx < numParams; Idx++) {
-    if (OrigFnTy->getParameters()[Idx].getSILType() !=
-        TargetFnTy->getParameters()[Idx].getSILType())
+    if (!canCastValueToABICompatibleType(
+          TAI->getModule(),
+          OrigFnTy->getParameters()[Idx].getSILType(),
+          TargetFnTy->getParameters()[Idx].getSILType()))
       return false;
   }
 
@@ -1870,16 +1872,39 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 
     auto CalleeFnTy = cast<SILFunctionType>(CalleeType.getSwiftRValueType());
 
-    auto ReturnTy = CalleeFnTy->getSILResult();
-    auto OrigReturnTy = TAI->getNormalBB()->getBBArg(0)->getType();
+    auto ResultTy = CalleeFnTy->getSILResult();
+    auto OrigResultTy = TAI->getNormalBB()->getBBArg(0)->getType();
 
     // Bail if the cast between the actual and expected return types cannot
     // be handled.
-    if (!canCastReturnValue(TAI->getModule(), ReturnTy, OrigReturnTy))
+    if (!canCastValueToABICompatibleType(TAI->getModule(),
+                                         ResultTy, OrigResultTy))
       return false;
 
+    SILBuilderWithScope<1> Builder(TAI);
+
+    auto TargetFnTy = dyn_cast<SILFunctionType>(
+                        CalleeType.getSwiftRValueType());
+    if (TargetFnTy->isPolymorphic()) {
+      TargetFnTy = TargetFnTy->substGenericArgs(TAI->getModule(),
+          TAI->getModule().getSwiftModule(), TAI->getSubstitutions());
+    }
+
+    auto OrigFnTy = dyn_cast<SILFunctionType>(
+        TAI->getCallee().getType().getSwiftRValueType());
+    if (OrigFnTy->isPolymorphic()) {
+      OrigFnTy = OrigFnTy->substGenericArgs(TAI->getModule(),
+          TAI->getModule().getSwiftModule(), TAI->getSubstitutions());
+    }
+
     SmallVector<SILValue, 8> Args;
-    for (auto Arg : TAI->getArguments()) {
+    for (int i = 0, e = TAI->getNumArguments(); i < e; ++i) {
+      auto Arg = TAI->getArgument(i);
+      // Cast argument if required.
+      Arg = castValueToABICompatibleType(&Builder, TAI->getLoc(), Arg,
+                                         OrigFnTy->getParameterSILTypes()[i],
+                                         TargetFnTy->getParameterSILTypes()[i]).
+                                         getValue();
       Args.push_back(Arg);
     }
 
@@ -1887,10 +1912,9 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     assert (CalleeFnTy->getParameters().size() == Args.size() &&
             "The number of arguments should match");
 
-    SILBuilderWithScope<1> Builder(TAI);
     ApplyInst *NewAI = Builder.createApply(TAI->getLoc(), Callee,
                                            CalleeType,
-                                           ReturnTy,
+                                           ResultTy,
                                            TAI->getSubstitutions(),
                                            Args, CalleeFnTy->hasErrorResult());
 
@@ -1899,10 +1923,11 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     auto Loc = TAI->getLoc();
     auto *NormalBB = TAI->getNormalBB();
 
-    auto CastedReturnValue = castReturnValue(Builder, Loc, NewAI,
-                                             ReturnTy, OrigReturnTy);
+    auto CastedResult = castValueToABICompatibleType(&Builder, Loc, NewAI,
+                                                     ResultTy, OrigResultTy)
+                                                    .getValue();
 
-    Builder.createBranch(Loc, NormalBB, { CastedReturnValue });
+    Builder.createBranch(Loc, NormalBB, { CastedResult });
     TAI->eraseFromParent();
     return true;
   }

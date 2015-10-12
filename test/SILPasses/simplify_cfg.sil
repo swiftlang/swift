@@ -2228,11 +2228,14 @@ bb2(%10 : $ErrorType):
   unreachable
 }
 
-// Check that we don't crash on this. Currently we just don't allow the replacement
+// Check that we don't crash on this, because we perform casting
 // if the argument types of the converted function types do not match.
-// TODO: Change the checks when we allow this and insert a cast for the argument.
 // CHECK-LABEL: try_apply_with_apply_of_cast_argument
-// CHECK: try_apply {{%[0-9]+}}
+// CHECK-NOT: try_apply {{%[0-9]+}}
+// CHECK: convert_function
+// CHECK: upcast
+// CHECK: apply
+// CHECK-NOT: try_apply
 // CHECK: return
 sil @try_apply_with_apply_of_cast_argument: $@convention(method) (@owned CC) -> @owned BB {
 bb0(%0 : $CC):

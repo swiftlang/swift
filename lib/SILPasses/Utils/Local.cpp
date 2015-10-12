@@ -216,284 +216,6 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
   return FullApplySite();
 }
 
-/// Check if two tuple types are compatible, i.e. have the same
-/// number of elements and same type of elements. Optional
-/// names of elements are not taken into account.
-static bool
-isCompatibleTupleTypes(SILType FromSILTy, SILType ToSILTy, SILModule &M) {
-  // For now, handle only tuple types.
-  TupleType *FromTupleTy = dyn_cast<TupleType>(FromSILTy.getSwiftRValueType());
-  if (!FromTupleTy)
-    return false;
-  TupleType *ToTupleTy = dyn_cast<TupleType>(ToSILTy.getSwiftRValueType());
-  if (!ToTupleTy)
-    return false;
-  if (FromTupleTy->getNumElements() != ToTupleTy->getNumElements())
-    return false;
-  for (unsigned i = 0, e = FromTupleTy->getNumElements(); i < e; ++i) {
-    if (FromSILTy.getTupleElementType(i) != ToSILTy.getTupleElementType(i))
-      return false;
-  }
-
-  assert(SILType::canUnsafeCastValue(FromSILTy, ToSILTy, M) &&
-          "Types should be layout compatible");
-  return true;
-}
-
-/// Checks if two SIL types are layout compatible.
-static bool
-isLayoutCompatibleTypes(SILType FromSILTy, SILType ToSILTy, SILModule &M) {
-  // For now, handle only tuple types.
-  return isCompatibleTupleTypes(FromSILTy, ToSILTy, M);
-}
-
-static bool
-isLayoutCompatibleTypes(CanType FromTy, CanType ToTy, SILModule &M) {
-  auto FromSILTy = SILType::getPrimitiveObjectType(FromTy);
-  auto ToSILTy = SILType::getPrimitiveObjectType(FromTy);
-  return isLayoutCompatibleTypes(FromSILTy, ToSILTy, M);
-}
-
-/// Insert instructions to cast a value of tuple type from
-/// \p SrcTupleTy into \p DstTupleTy.
-/// Returns the SILInstruction performing the cast.
-SILInstruction *
-swift::castTupleReturnType(SILModule &M, SILLocation Loc, SILValue Value,
-                           SILType SrcTupleTy, SILType DstTupleTy,
-                           SILBuilder &B) {
-  auto SrcTy = cast<TupleType>(SrcTupleTy.getSwiftRValueType());
-  auto DstTy = cast<TupleType>(DstTupleTy.getSwiftRValueType());
-  SmallVector<SILValue, 4> TupleElements;
-  auto TupleElementTypes = SrcTy.getElementTypes();
-  unsigned NumElements = SrcTy->getElements().size();
-  for (unsigned i = 0; i < NumElements; ++i) {
-    auto EltTy = TupleElementTypes[i];
-    auto ExtractedElt = B.createTupleExtract(Loc, Value, i);
-    OptionalTypeKind OTK;
-    auto OptionalEltTy =
-        EltTy.getCanonicalTypeOrNull()->getAnyOptionalObjectType(OTK);
-    if (!OptionalEltTy
-        || !isa<FunctionType>(OptionalEltTy.getCanonicalTypeOrNull())) {
-      // No need to convert this parameter
-      TupleElements.push_back(ExtractedElt);
-      continue;
-    }
-
-    // Dereference the optional value
-    auto *SomeDecl = B.getASTContext().getOptionalSomeDecl(OTK);
-    auto FuncPtr = B.createUncheckedEnumData(Loc, ExtractedElt,
-        SomeDecl);
-
-    auto AIOptionalEltTy =
-        DstTy.getElementType(i).getCanonicalTypeOrNull()
-                                  ->getAnyOptionalObjectType();
-    auto SILAIOptionalEltTy = M.Types.getLoweredType(
-        AIOptionalEltTy);
-    auto ConvertedFuncPtr = B.createConvertFunction(Loc, FuncPtr,
-        SILAIOptionalEltTy);
-
-    TupleElements.push_back(
-        B.createOptionalSome(Loc, ConvertedFuncPtr, OTK,
-            SILType::getPrimitiveObjectType(DstTy.getElementType(i))));
-  }
-
-  return B.createTuple(Loc, DstTupleTy, TupleElements);
-}
-
-/// Checks if casting of a return value can be handled by the optimizer.
-/// NOTE: canCastReturnValue and castReturnValue should be always kept in sync!
-///       In the ideal case, the optimizer should be able to handle any such
-///       casts, but until we are there, be more selective.
-bool swift::canCastReturnValue(SILModule &M, SILType ReturnTy,
-                               SILType ExpectedReturnTy) {
-  // No conversion is needed if types are the same.
-  if (ReturnTy == ExpectedReturnTy)
-    return true;
-
-  // Check if the return type is an optional of the apply_inst type
-  // or the other way around
-  bool UnwrapOptionalResult = false;
-  bool WrapOptionalResult = false;
-  OptionalTypeKind OTK;
-  OptionalTypeKind AI_OTK;
-
-  // Eventually, the return type should be casted into the original
-  // expected type.
-  auto OptionalReturnType =
-      ReturnTy.getSwiftRValueType().getAnyOptionalObjectType(OTK);
-
-  auto OptionalAIType =
-      ExpectedReturnTy.getSwiftRValueType().getAnyOptionalObjectType(AI_OTK);
-
-  if (!OptionalAIType && !OptionalReturnType
-      && ExpectedReturnTy.isSuperclassOf(ReturnTy)) {
-    return true;
-  }
-
-  if (!OptionalAIType && !OptionalReturnType
-      && isLayoutCompatibleTypes(ReturnTy, ExpectedReturnTy, M)) {
-    return true;
-  }
-
-  // Return type if not an optional, but the expected type is an optional
-  // and the first one is the subclass of the second one.
-  if (OptionalAIType && !OptionalReturnType
-      && SILType::getPrimitiveObjectType(OptionalAIType).isSuperclassOf(
-          ReturnTy)) {
-    // The function returns a non-optional result.
-    // We need to wrap it into an optional.
-    OptionalReturnType = ReturnTy.getSwiftRValueType();
-
-    if (OptionalAIType == OptionalReturnType) {
-      return true;
-    }
-  }
-
-  if (OptionalReturnType && OptionalAIType
-      && SILType::getPrimitiveObjectType(OptionalAIType).isSuperclassOf(
-           SILType::getPrimitiveObjectType(OptionalReturnType))) {
-    // Both types have the same optionality and one of them
-    // is the superclass of the other.
-    return true;
-  }
-
-  if (OptionalReturnType && OptionalAIType
-      && isLayoutCompatibleTypes(OptionalReturnType, OptionalAIType, M)) {
-    // Both types have the same optionality.
-    // Both types are layout compatible types.
-    // So, cast one of them into the other one.
-    return true;
-  }
-
-  if (OptionalReturnType == ExpectedReturnTy.getSwiftRValueType()) {
-    UnwrapOptionalResult = true;
-  }
-
-  if (OptionalAIType == ReturnTy.getSwiftRValueType()) {
-    WrapOptionalResult = true;
-  }
-
-  // Only addresses and refs can have their types changed due to
-  // covariant return types or contravariant argument types."
-  return (ReturnTy.isAddress() || ReturnTy.isHeapObjectReferenceType()
-          || UnwrapOptionalResult || WrapOptionalResult);
-}
-
-/// Cast a return value into expected type if necessary.
-/// This may happen e.g. when:
-/// - a type of the return value is a subclass of the expected return type.
-/// - actual return type and expected return type differ in optionality.
-/// - a type of the return value is tuple and the expected type is a tuple,
-///   but the labels of elements are different and/or some of the
-///   elements types of the return value are subclasses of the expected value.
-SILValue swift::castReturnValue(SILBuilder &B, SILLocation Loc,
-                                SILValue ReturnValue,
-                                SILType ReturnTy, SILType ExpectedReturnTy) {
-  // No conversion is needed if types are the same.
-  if (ReturnTy == ExpectedReturnTy)
-    return ReturnValue;
-
-  // Check if the return type is an optional of the apply_inst type
-  // or the other way around
-  bool UnwrapOptionalResult = false;
-  bool WrapOptionalResult = false;
-  OptionalTypeKind OTK;
-  OptionalTypeKind AI_OTK;
-  auto &M = B.getModule();
-
-  auto ResultValue = ReturnValue;
-
-  // Eventually, the return type should be casted into the original
-  // expected type.
-  auto OptionalReturnType =
-      ReturnTy.getSwiftRValueType().getAnyOptionalObjectType(OTK);
-
-  auto OptionalAIType =
-      ExpectedReturnTy.getSwiftRValueType().getAnyOptionalObjectType(AI_OTK);
-
-  if (!OptionalAIType && !OptionalReturnType
-      && ExpectedReturnTy.isSuperclassOf(ReturnTy)) {
-    return B.createUpcast(Loc, ResultValue, ExpectedReturnTy);
-  }
-
-  if (!OptionalAIType && !OptionalReturnType
-      && isLayoutCompatibleTypes(ReturnTy, ExpectedReturnTy, M)) {
-    // Both types are layout compatible.
-    // So, cast one of them into the other one.
-    if (auto ExpectedTupleTy =
-          dyn_cast<TupleType>(ReturnTy.getSwiftRValueType()))
-      return castTupleReturnType(M, Loc, ResultValue, ReturnTy,
-                                 ExpectedReturnTy, B);
-    return B.createUncheckedBitCast(Loc, ResultValue, ExpectedReturnTy);
-  }
-
-  // Return type if not an optional, but the expected type is an optional
-  // and the first one is the subclass of the second one.
-  if (OptionalAIType && !OptionalReturnType
-      && SILType::getPrimitiveObjectType(OptionalAIType).isSuperclassOf(
-          ReturnTy)) {
-    // The function returns a non-optional result.
-    // We need to wrap it into an optional.
-    auto OptType =
-        OptionalType::get(AI_OTK, ReturnTy.getSwiftRValueType()).
-                      getCanonicalTypeOrNull();
-    ResultValue = B.createOptionalSome(Loc, ResultValue, AI_OTK,
-        SILType::getPrimitiveObjectType(OptType));
-    OptionalReturnType = ReturnTy.getSwiftRValueType();
-
-    if (OptionalAIType == OptionalReturnType) {
-      return ResultValue;
-    }
-  }
-
-  if (OptionalReturnType && OptionalAIType
-      && SILType::getPrimitiveObjectType(OptionalAIType).isSuperclassOf(
-          SILType::getPrimitiveObjectType(OptionalReturnType))) {
-    // Both types have the same optionality and one of them
-    // is the superclass of the other.
-    return B.createUpcast(Loc, ResultValue, ExpectedReturnTy);
-  }
-
-  if (OptionalReturnType && OptionalAIType
-      && isLayoutCompatibleTypes(OptionalReturnType, OptionalAIType, M)) {
-    // Both types have the same optionality.
-    // Both types are layout compatible types.
-    // So, cast one of them into the other one.
-    return B.createUncheckedBitCast(Loc, ResultValue, ExpectedReturnTy);
-  }
-
-  if (OptionalReturnType == ExpectedReturnTy.getSwiftRValueType()) {
-    UnwrapOptionalResult = true;
-  }
-
-  if (OptionalAIType == ReturnTy.getSwiftRValueType()) {
-    WrapOptionalResult = true;
-  }
-
-  assert((ReturnTy.isAddress() || ReturnTy.isHeapObjectReferenceType()
-          || UnwrapOptionalResult || WrapOptionalResult)
-          && "Only addresses and refs can have their types changed due to "
-             "covariant return types or contravariant argument types.");
-
-  if (UnwrapOptionalResult) {
-    // The function returns an optional result.
-    // We need to extract the actual result from the optional.
-    auto *SomeDecl = B.getASTContext().getOptionalSomeDecl(OTK);
-    return B.createUncheckedEnumData(Loc, ResultValue, SomeDecl);
-  }
-
-  if (WrapOptionalResult) {
-    // The function returns a non-optional result.
-    // We need to wrap it into an optional.
-    return B.createOptionalSome(Loc, ResultValue, AI_OTK, ExpectedReturnTy);
-  }
-  if (ReturnTy.isAddress()) {
-    return B.createUncheckedAddrCast(Loc, ResultValue, ExpectedReturnTy);
-  }
-
-  return B.createUncheckedRefCast(Loc, ResultValue, ExpectedReturnTy);
-}
-
 // Replace a dead apply with a new instruction that computes the same
 // value, and delete the old apply.
 void swift::replaceDeadApply(ApplySite Old, SILInstruction *New) {
@@ -645,6 +367,249 @@ void swift::removeDeadBlock(SILBasicBlock *BB) {
   // Now that the BB is empty, eliminate it.
   BB->eraseFromParent();
 }
+
+/// Cast a value into the expected, ABI compatible type if necessary.
+/// This may happen e.g. when:
+/// - a type of the return value is a subclass of the expected return type.
+/// - actual return type and expected return type differ in optionality.
+/// - both types are tuple-types and some of the elements need to be casted.
+///
+/// If CheckOnly flag is set, then this function only checks if the
+/// required casting is possible. If it is not possible, then None
+/// is returned.
+///
+/// If CheckOnly is not set, then a casting code is generated and the final
+/// casted value is returned.
+///
+/// NOTE: We intentionally combine the checking of the cast's handling possibility
+/// and the transformation performing the cast in the same function, to avoid
+/// any divergence between the check and the implementation in the future.
+///
+/// NOTE: The implementation of this function is very closely related to the
+/// rules checked by SILVerifier::requireABICompatibleFunctionTypes.
+Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
+                                             SILValue Value,
+                                             SILType SrcTy, SILType DestTy,
+                                             bool CheckOnly) {
+
+  // No cast is required if types are the same.
+  if (SrcTy == DestTy)
+    return Value;
+
+  SILValue CastedValue;
+
+  auto &M = B->getModule();
+  OptionalTypeKind SrcOTK;
+  OptionalTypeKind DestOTK;
+
+  // Check if src and dest types are optional.
+  auto OptionalSrcTy = SrcTy.getSwiftRValueType()
+                            .getAnyOptionalObjectType(SrcOTK);
+  auto OptionalDestTy = DestTy.getSwiftRValueType()
+                              .getAnyOptionalObjectType(DestOTK);
+
+  // If both types are classes and dest is the superclass of src,
+  // simply perform an upcast.
+  if (SrcTy.getSwiftRValueType()->mayHaveSuperclass() &&
+      DestTy.getSwiftRValueType()->mayHaveSuperclass() &&
+      DestTy.isSuperclassOf(SrcTy)) {
+    if (CheckOnly)
+      return Value;
+    CastedValue = B->createUpcast(Loc, Value, DestTy);
+    return CastedValue;
+  }
+
+  SILType OptionalSrcLoweredTy;
+  SILType OptionalDestLoweredTy;
+
+  if (OptionalSrcTy)
+    OptionalSrcLoweredTy = M.Types.getLoweredType(OptionalSrcTy);
+
+  if (OptionalDestTy)
+    OptionalDestLoweredTy = M.Types.getLoweredType(OptionalDestTy);
+
+  // Both types are optional.
+  if (OptionalDestTy && OptionalSrcTy) {
+    // If both wrapped types are classes and dest is the superclass of src,
+    // simply perform an upcast.
+    if (OptionalDestTy->mayHaveSuperclass() &&
+        OptionalSrcTy->mayHaveSuperclass() &&
+        OptionalDestLoweredTy.isSuperclassOf(OptionalSrcLoweredTy)) {
+      // Insert upcast.
+      if (CheckOnly)
+        return Value;
+      CastedValue = B->createUpcast(Loc, Value, DestTy);
+      return CastedValue;
+    }
+
+    if (CheckOnly)
+      return castValueToABICompatibleType(B, Loc, Value,
+          OptionalSrcLoweredTy,
+          OptionalDestLoweredTy, CheckOnly);
+
+    // Unwrap the original optional value.
+    auto *SomeDecl = B->getASTContext().getOptionalSomeDecl(SrcOTK);
+    SILValue UnwrappedValue =  B->createUncheckedEnumData(Loc, Value,
+                                                          SomeDecl);
+    // Cast the unwrapped value.
+    auto CastedUnwrappedValue =
+        castValueToABICompatibleType(B, Loc, UnwrappedValue,
+                                     OptionalSrcLoweredTy,
+                                     OptionalDestLoweredTy).getValue();
+    // Wrap into optional.
+    CastedValue =  B->createOptionalSome(Loc, CastedUnwrappedValue,
+                                        DestOTK, DestTy);
+    return CastedValue;
+  }
+
+  // Src is optional, but dest is not optional.
+  if (OptionalSrcTy && !OptionalDestTy) {
+    if (CheckOnly)
+      return castValueToABICompatibleType(B, Loc, Value,
+                                          OptionalSrcLoweredTy,
+                                          DestTy, CheckOnly);
+    // Unwrap the original optional value.
+    auto *SomeDecl = B->getASTContext().getOptionalSomeDecl(SrcOTK);
+    SILValue UnwrappedValue =  B->createUncheckedEnumData(Loc, Value,
+                                                          SomeDecl);
+
+    // Cast the unwrapped value.
+    return castValueToABICompatibleType(B, Loc, UnwrappedValue,
+                                        OptionalSrcLoweredTy,
+                                        DestTy);
+  }
+
+  // Src is not optional, but dest is optional.
+  if (!OptionalSrcTy && OptionalDestTy) {
+    auto OptionalSrcCanTy = OptionalType::get(DestOTK,
+        SrcTy.getSwiftRValueType()).getCanonicalTypeOrNull();
+    auto LoweredOptionalSrcType = M.Types.getLoweredType(OptionalSrcCanTy);
+    if (CheckOnly)
+      return castValueToABICompatibleType(B, Loc, Value,
+                                          LoweredOptionalSrcType, DestTy,
+                                          CheckOnly);
+
+    // Wrap the source value into an optional first.
+    SILValue WrappedValue = B->createOptionalSome(Loc, Value,
+                                                  DestOTK,
+                                                  LoweredOptionalSrcType);
+    // Cast the wrapped value.
+    return castValueToABICompatibleType(B, Loc, WrappedValue,
+                                        WrappedValue.getType(),
+                                        DestTy);
+  }
+
+  // Both types are not optional.
+  if (SrcTy.getSwiftRValueType()->mayHaveSuperclass() &&
+      DestTy.getSwiftRValueType()->mayHaveSuperclass()) {
+    if (CheckOnly)
+      return Value;
+
+    if (DestTy.isSuperclassOf(SrcTy)) {
+      // Insert upcast.
+      CastedValue = B->createUpcast(Loc, Value, DestTy);
+      return CastedValue;
+    }
+
+    // Cast the reference.
+    CastedValue = B->createUncheckedBitCast(Loc, Value, DestTy);
+    return CastedValue;
+  }
+
+  // If B.Type needs to be casted to A.Type and
+  // A is a superclass of B, then it can be done by means
+  // of a simple upcast.
+  if (isa<AnyMetatypeType>(SrcTy.getSwiftRValueType()) &&
+      isa<AnyMetatypeType>(DestTy.getSwiftRValueType()) &&
+      SrcTy.isClassOrClassMetatype() && DestTy.isClassOrClassMetatype() &&
+      DestTy.getMetatypeInstanceType(M).isSuperclassOf(
+          SrcTy.getMetatypeInstanceType(M))) {
+    if (CheckOnly)
+      return Value;
+    CastedValue = B->createUpcast(Loc, Value, DestTy);
+    return CastedValue;
+  }
+
+  if (SrcTy.isAddress() && DestTy.isAddress()) {
+    if (CheckOnly)
+      return Value;
+    CastedValue = B->createUncheckedAddrCast(Loc, Value, DestTy);
+    return CastedValue;
+  }
+
+  if (SrcTy.isHeapObjectReferenceType() && DestTy.isHeapObjectReferenceType()) {
+    if (CheckOnly)
+      return Value;
+    CastedValue = B->createUncheckedRefCast(Loc, Value, DestTy);
+    return CastedValue;
+  }
+
+  // Handle tuple types.
+  // Extract elements, cast each of them, create a new tuple.
+  if (auto tup = SrcTy.getAs<TupleType>()) {
+    SmallVector<CanType, 1> aElements, bElements;
+    auto atypes = tup.getElementTypes();
+    aElements.append(atypes.begin(), atypes.end());
+    auto btypes = DestTy.getAs<TupleType>().getElementTypes();
+    bElements.append(btypes.begin(), btypes.end());
+
+    if (CheckOnly && aElements.size() != bElements.size())
+      return None;
+
+    assert (aElements.size() == bElements.size() &&
+          "Tuple types should have the same number of elements");
+
+    SmallVector<SILValue, 8> ExpectedTuple;
+    for (unsigned i : indices(aElements)) {
+      auto aa = M.Types.getLoweredType(aElements[i]),
+           bb = M.Types.getLoweredType(bElements[i]);
+
+      if (CheckOnly) {
+        if (!castValueToABICompatibleType(B, Loc, Value, aa, bb, CheckOnly).hasValue())
+          return None;
+        continue;
+      }
+
+      SILValue Element = B->createTupleExtract(Loc, Value, i);
+      // Cast the value if necessary.
+      Element = castValueToABICompatibleType(B, Loc, Element, aa, bb).getValue();
+      ExpectedTuple.push_back(Element);
+    }
+
+    if (CheckOnly)
+      return Value;
+
+    CastedValue = B->createTuple(Loc, DestTy, ExpectedTuple);
+    return CastedValue;
+  }
+
+  // Function types are interchangeable if they're also ABI-compatible.
+  if (auto aFunc = SrcTy.getAs<SILFunctionType>()) {
+    if (auto bFunc = DestTy.getAs<SILFunctionType>()) {
+      if (CheckOnly)
+        return Value;
+      // Insert convert_function.
+      CastedValue = B->createConvertFunction(Loc, Value, DestTy);
+      return CastedValue;
+    }
+  }
+
+  if (CheckOnly)
+    return None;
+  llvm_unreachable("Unknown combination of types for casting");
+  return SILValue();
+}
+
+bool swift::canCastValueToABICompatibleType(SILModule &M,
+                                            SILType SrcTy, SILType DestTy) {
+  SILBuilder B(*M.begin());
+  SILLocation Loc = ArtificialUnreachableLocation();
+  auto Result = castValueToABICompatibleType(&B, Loc, SILValue(),
+                                             SrcTy, DestTy,
+                                             /* CheckOnly */ true);
+  return Result.hasValue();
+}
+
 
 //===----------------------------------------------------------------------===//
 //                       String Concatenation Optimizer

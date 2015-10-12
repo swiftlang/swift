@@ -334,20 +334,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
     ReturnType = SubstCalleeType->getSILResult();
   }
 
-  // Accessors could return a tuple where one of the elements is of a function
-  // type, which may refer to a subclass instead of a superclass in its
-  // signature.
-  // These function types are ABI-compatible between the subclass and a
-  // superclass.
-  if (auto *FD = dyn_cast<FuncDecl>(CMI->getMember().getDecl())) {
-    if (FD->isAccessor()) {
-      if (isa<TupleType>(ReturnType.getSwiftRValueType())) {
-        return true;
-      }
-    }
-  }
-
-  if (!canCastReturnValue(Mod, ReturnType, AI.getType()))
+  if (!canCastValueToABICompatibleType(Mod, ReturnType, AI.getType()))
       return false;
 
   return true;
@@ -405,24 +392,24 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
   auto ParamTypes = SubstCalleeType->getParameterSILTypes();
 
   for (unsigned i = 0, e = Args.size() - 1; i != e; ++i)
-    NewArgs.push_back(conditionallyCastAddr(B, AI.getLoc(), Args[i],
-                                            ParamTypes[i]));
+    NewArgs.push_back(castValueToABICompatibleType(&B, AI.getLoc(), Args[i],
+                                                   Args[i].getType(),
+                                                   ParamTypes[i]).getValue());
 
   // Add the self argument, upcasting if required because we're
   // calling a base class's method.
   auto SelfParamTy = SubstCalleeType->getSelfParameter().getSILType();
-  if (ClassOrMetatypeType == SelfParamTy)
-    NewArgs.push_back(ClassOrMetatype);
-  else
-    NewArgs.push_back(B.createUpcast(AI.getLoc(), ClassOrMetatype,
-                                     SelfParamTy));
+  NewArgs.push_back(castValueToABICompatibleType(&B, AI.getLoc(),
+                                                 ClassOrMetatype,
+                                                 ClassOrMetatypeType,
+                                                 SelfParamTy).getValue());
 
   // If we have a direct return type, make sure we use the subst callee return
   // type. If we have an indirect return type, AI's return type of the empty
   // tuple should be ok.
-  SILType ReturnType = AI.getType();
+  SILType ResultTy = AI.getType();
   if (!SubstCalleeType->hasIndirectResult()) {
-    ReturnType = SubstCalleeType->getSILResult();
+    ResultTy = SubstCalleeType->getSILResult();
   }
 
   SILType SubstCalleeSILType =
@@ -434,7 +421,7 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
   SILValue ResultValue;
 
   if (!isa<TryApplyInst>(AI)) {
-    NewAI = B.createApply(AI.getLoc(), FRI, SubstCalleeSILType, ReturnType,
+    NewAI = B.createApply(AI.getLoc(), FRI, SubstCalleeSILType, ResultTy,
                           Subs, NewArgs, cast<ApplyInst>(AI)->isNonThrowing());
     ResultValue = SILValue(NewAI.getInstruction(), 0);
   } else {
@@ -442,7 +429,7 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
     // Always create a new BB for normal and error BBs.
     // This avoids creation of critical edges.
     ResultBB = B.getFunction().createBasicBlock();
-    ResultBB->createBBArg(ReturnType);
+    ResultBB->createBBArg(ResultTy);
     NormalBB = TAI->getNormalBB();
 
     auto *ErrorBB = B.getFunction().createBasicBlock();
@@ -460,57 +447,19 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
   }
 
   // Check if any casting is required for the return value.
-
-  SILInstruction *CastedReturnValue = NewAI.getInstruction();
-
-  if (ReturnType == AI.getType()) {
-    DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
-    NumClassDevirt++;
-    if (NormalBB) {
-      B.createBranch(NewAI.getLoc(), NormalBB, { ResultBB->getBBArg(0) });
-    }
-    return CastedReturnValue;
-  }
-
-  // If our return type differs from AI's return type, then we know that we have
-  // a covariant return type. Cast it before we RAUW. This can not happen
-
-
-  // Accessors could return a tuple where one of the elements is of a function
-  // type, which may refer to a subclass instead of a superclass in its
-  // signature.
-  // These function types are ABI-compatible between the subclass and a
-  // superclass. To make the SIL type system happy, insert a conversion between
-  // the function types and reconstruct the tuple.
-  if (auto *FD = dyn_cast<FuncDecl>(CMI->getMember().getDecl())) {
-    if (FD->isAccessor()) {
-      if (isa<TupleType>(ReturnType.getSwiftRValueType())) {
-        assert(isa<ApplyInst>(NewAI) && "should be an apply_inst");
-        CastedReturnValue = castTupleReturnType(Mod, AI.getLoc(), ResultValue,
-                                                ReturnType, AI.getType(), B);
-        if (NormalBB) {
-          B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnValue });
-        }
-        DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
-        NumClassDevirt++;
-        return CastedReturnValue;
-      }
-    }
-  }
-
-  auto CastedReturnSILValue = castReturnValue(B, NewAI.getLoc(), ResultValue,
-                                              ReturnType, AI.getType());
+  ResultValue = castValueToABICompatibleType(&B, NewAI.getLoc(), ResultValue,
+                                             ResultTy, AI.getType()).getValue();
 
   DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
   NumClassDevirt++;
 
   if (NormalBB) {
-    B.createBranch(NewAI.getLoc(), NormalBB, { CastedReturnSILValue });
+    B.createBranch(NewAI.getLoc(), NormalBB, { ResultValue });
     return NewAI.getInstruction();
   }
 
-  assert(isa<SILInstruction>(CastedReturnSILValue));
-  return cast<SILInstruction>(CastedReturnSILValue);
+  assert(isa<SILInstruction>(ResultValue));
+  return cast<SILInstruction>(ResultValue);
 }
 
 SILInstruction *swift::tryDevirtualizeClassMethod(FullApplySite AI,

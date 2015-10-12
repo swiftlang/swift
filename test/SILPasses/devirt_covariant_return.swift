@@ -92,9 +92,9 @@ func doSomethingWithB<T>(b : B<T>) {
 struct S {}
 
 func driver() -> () {
-  var b = B<S>()
-  var b2 = B2<S>()
-  var b3 = B3<S>()
+  let b = B<S>()
+  let b2 = B2<S>()
+  let b3 = B3<S>()
 
   WhatShouldIDo(b)
   WhatShouldIDo(b2)
@@ -152,7 +152,7 @@ final class C2:C {
 // CHECK-NOT: class_method
 // CHECK-NOT: function_ref
 // CHECK: return
-func driver1(var c: C1) -> Int32 {
+func driver1(let c: C1) -> Int32 {
   return c.doSomething().getValue()
 }
 
@@ -166,7 +166,7 @@ func driver1(var c: C1) -> Int32 {
 // CHECK: enum $Optional
 // CHECK-NEXT: upcast
 // CHECK: return
-func driver3(var c: C) -> Int32 {
+func driver3(let c: C) -> Int32 {
   return c.doSomething()!.getValue()
 }
 
@@ -189,11 +189,11 @@ public class Bear {
 
 final class PolarBear: Bear {
 
-  override public init?(fail: Bool) {
+  override init?(fail: Bool) {
     super.init(fail: fail)
   }
 
-  public init?(chainFailure: Bool, failAfter: Bool) {
+  init?(chainFailure: Bool, failAfter: Bool) {
     super.init(fail: chainFailure)
     if failAfter { return nil }
   }
@@ -270,13 +270,12 @@ class EEE : CCC {
   }
 }
 
-// Check that the method DDD.foo is not devirtualized, because the optimizer cannot handle the casting the return type
-// correctly yet, i.e. it cannot cast (BBB, BBB) into (AAA, AAA)
+// Check that c.foo() is devirtualized, because the optimizer can handle the casting the return type
+// correctly, i.e. it can cast (BBB, BBB) into (AAA, AAA)
 // CHECK-LABEL: sil hidden @_TF23devirt_covariant_return37testDevirtOfMethodReturningTupleTypesFTCS_3CCC1bCS_2BB_TCS_2AAS2__
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $CCC
-// CHECK-NOT: checked_cast_br [exact] %{{.*}} : $CCC to $DDD
+// CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $DDD
 // CHECK: checked_cast_br [exact] %{{.*}} : $CCC to $EEE
-// CHECK-NOT: checked_cast_br [exact] %{{.*}} : $CCC to $DDD
 // CHECK: class_method
 // CHECK: }
 func testDevirtOfMethodReturningTupleTypes(c: CCC, b: BB) -> (AA, AA) {
@@ -284,3 +283,39 @@ func testDevirtOfMethodReturningTupleTypes(c: CCC, b: BB) -> (AA, AA) {
 }
 
 
+class AAAA {
+}
+
+class BBBB : AAAA {
+}
+
+class CCCC {
+  let a: BBBB
+  var foo : (AAAA, AAAA) {
+    @inline(never)
+    get {
+      return (a, a)
+    }
+  }
+  init(x: BBBB) { a = x }
+}
+
+class DDDD : CCCC {
+  override var foo : (BBBB, BBBB) {
+    @inline(never)
+    get {
+      return (a, a)
+    }
+  }
+}
+
+// Check that c.foo OSX 10.9 be devirtualized, because the optimizer can handle the casting the return type
+// correctly, i.e. it cannot cast (BBBB, BBBB) into (AAAA, AAAA)
+// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return38testDevirtOfMethodReturningTupleTypes2FCS_4CCCCTCS_4AAAAS1__
+// CHECK: checked_cast_br [exact] %{{.*}} : $CCCC to $CCCC
+// CHECK: checked_cast_br [exact] %{{.*}} : $CCCC to $DDDD
+// CHECK: class_method
+// CHECK: }
+func testDevirtOfMethodReturningTupleTypes2(c: CCCC) -> (AAAA, AAAA) {
+  return c.foo
+}

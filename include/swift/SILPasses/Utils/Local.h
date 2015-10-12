@@ -89,32 +89,27 @@ void eraseUsesOfValue(SILValue V);
 
 FullApplySite findApplyFromDevirtualizedResult(SILInstruction *I);
 
-/// Checks if casting of a return value can be handled by the optimizer.
-bool canCastReturnValue(SILModule &M, SILType ReturnTy,
-                        SILType ExpectedReturnTy);
-
-/// Cast a return value into expected type if necessary.
+/// Cast a value into the expected, ABI compatible type if necessary.
 /// This may happen e.g. when:
 /// - a type of the return value is a subclass of the expected return type.
 /// - actual return type and expected return type differ in optionality.
-SILValue castReturnValue(SILBuilder &B, SILLocation Loc, SILValue ReturnValue,
-                         SILType ReturnTy, SILType ExpectedReturnTy);
-
-/// Cast a return value which has a tuple type into a different
-/// layout compatible tuple type.
-/// This may be required e.g. in the following cases:
-/// - if tuple elements have the same types, but differ in their labels.
-/// - if one of the tuple elements is of a function type,
-///   which may refer to a subclass instead of a superclass in its signature.
-///   These function types are ABI-compatible between the subclass and a
-///   superclass.
+/// - both types are tuple-types and some of the elements need to be casted.
 ///
-/// To make the SIL type system happy, cast between tuple types by
-/// reconstructing a tuple of the target type from elements of the tuple
-/// of the source type. Cast elements during reconstruction, if required.
-SILInstruction *castTupleReturnType(SILModule &M, SILLocation Loc,
-                                    SILValue Value, SILType SrcTupleType,
-                                    SILType DstTupleType, SILBuilder &B);
+/// If CheckOnly flag is set, then this function only checks if the
+/// required casting is possible. If it is not possible, then None
+/// is returned.
+/// If CheckOnly is not set, then a casting code is generated and the final
+/// casted value is returned.
+Optional<SILValue> castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
+                                                SILValue Value,
+                                                SILType SrcTy,
+                                                SILType DestTy,
+                                                bool CheckOnly = false);
+
+/// Check if the optimizer can cast a value into the expected,
+/// ABI compatible type if necessary.
+bool canCastValueToABICompatibleType(SILModule &M,
+                                     SILType SrcTy, SILType DestTy);
 
 /// Replace an apply with an instruction that produces the same value,
 /// then delete the apply and the instructions that produce its callee
