@@ -147,11 +147,10 @@ void MemLocation::getFirstLevelMemLocations(MemLocationList &Locs,
 }
 
 void MemLocation::expand(MemLocation &Base, SILModule *Mod,
-                         MemLocationList &Locs,
-                         bool OnlyLeafNode) {
+                         MemLocationList &Locs) {
   // Perform a BFS to expand the given type into locations each of which
   // contains 1 field from the type.
-  MemLocation::BreadthFirstList(Base, Mod, Locs, false);
+  MemLocation::BreadthFirstList(Base, Mod, Locs, true);
 }
 
 void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
@@ -164,7 +163,7 @@ void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
   // parents. This guarantees that at the point the parent is processed, its 
   // children have been processed already.
   MemLocationList AllLocs;
-  MemLocation::BreadthFirstList(Base, Mod, AllLocs, true);
+  MemLocation::BreadthFirstList(Base, Mod, AllLocs, false);
   for (auto I = AllLocs.rbegin(), E = AllLocs.rend(); I != E; ++I) {
     // If this is a class reference type, we have reached end of the type tree.
     if (I->getType().getClassOrBoundGenericClass())

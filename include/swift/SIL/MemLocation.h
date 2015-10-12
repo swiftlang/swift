@@ -174,8 +174,7 @@ public:
   /// In SIL, we can have a store to an aggregate and loads from its individual
   /// fields. Therefore, we expand all the operations on aggregates onto
   /// individual fields.
-  static void expand(MemLocation &Base, SILModule *Mod, MemLocationList &F,
-                     bool OnlyLeafNode = true);
+  static void expand(MemLocation &Base, SILModule *Mod, MemLocationList &F);
 
   /// Given a set of locations derived from the same base, try to merge/reduce
   /// them into smallest number of MemLocations possible.
