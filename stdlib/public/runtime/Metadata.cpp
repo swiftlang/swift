@@ -981,7 +981,7 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
                                   const ValueWitnessTable *proposedWitnesses) {
   // Bypass the cache for the empty tuple. We might reasonably get called
   // by generic code, like a demangler that produces type objects.
-  if (numElements == 0) return &_TMdT_;
+  if (numElements == 0) return &_TMT_;
 
   // Search the cache.
 

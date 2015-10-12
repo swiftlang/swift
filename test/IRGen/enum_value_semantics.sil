@@ -78,7 +78,7 @@ import Builtin
 // CHECK:   %swift.type* null
 // CHECK: }
 
-// CHECK: @_TMPdO20enum_value_semantics18GenericFixedLayout = global {{[{].*\* [}]}} {
+// CHECK: @_TMPO20enum_value_semantics18GenericFixedLayout = global {{[{].*\* [}]}} {
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @{{[a-z0-9_]+}},
 // CHECK:   i32 48, i16 1, i16 8,
 // CHECK:   [16 x i8*] zeroinitializer,

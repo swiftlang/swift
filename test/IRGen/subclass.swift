@@ -35,7 +35,7 @@
 // CHECK:   i64 ([[B]]*)* @_TFC8subclass1B1ffS0_FT_Si,
 // CHECK:   [[A]]* ([[TYPE]]*)* @_TZFC8subclass1A1gfMS0_FT_S0_
 // CHECK: }
-// CHECK: @objc_classes = internal global [2 x i8*] [i8* {{.*}} @_TMdC8subclass1A {{.*}}, i8* {{.*}} @_TMdC8subclass1B {{.*}}], section "__DATA, __objc_classlist, regular, no_dead_strip", align 8
+// CHECK: @objc_classes = internal global [2 x i8*] [i8* {{.*}} @_TMC8subclass1A {{.*}}, i8* {{.*}} @_TMC8subclass1B {{.*}}], section "__DATA, __objc_classlist, regular, no_dead_strip", align 8
 
 class A {
   var x = 0

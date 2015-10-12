@@ -205,7 +205,7 @@
 // CHECK-64:    @_PROPERTIES__TtC13objc_subclass10SwiftGizmo
 // CHECK-64:  }, section "__DATA, __objc_const", align 8
 
-// CHECK-NOT: @_TMdCSo13SwiftGizmo = {{.*NSObject}}
+// CHECK-NOT: @_TMCSo13SwiftGizmo = {{.*NSObject}}
 
 // CHECK: @_INSTANCE_METHODS__TtC13objc_subclass12GenericGizmo
 
@@ -268,9 +268,9 @@
 // CHECK-64: ] }
 
 
-// CHECK: @objc_classes = internal global [2 x i8*] [i8* bitcast (%swift.type* @_TMdC13objc_subclass10SwiftGizmo to i8*), i8* bitcast (%swift.type* @_TMdC13objc_subclass11SwiftGizmo2 to i8*)], section "__DATA, __objc_classlist, regular, no_dead_strip", align [[WORD_SIZE_IN_BYTES]]
+// CHECK: @objc_classes = internal global [2 x i8*] [i8* bitcast (%swift.type* @_TMC13objc_subclass10SwiftGizmo to i8*), i8* bitcast (%swift.type* @_TMC13objc_subclass11SwiftGizmo2 to i8*)], section "__DATA, __objc_classlist, regular, no_dead_strip", align [[WORD_SIZE_IN_BYTES]]
 
-// CHECK: @objc_non_lazy_classes = internal global [1 x i8*] [i8* bitcast (%swift.type* @_TMdC13objc_subclass11SwiftGizmo2 to i8*)], section "__DATA, __objc_nlclslist, regular, no_dead_strip", align [[WORD_SIZE_IN_BYTES]]
+// CHECK: @objc_non_lazy_classes = internal global [1 x i8*] [i8* bitcast (%swift.type* @_TMC13objc_subclass11SwiftGizmo2 to i8*)], section "__DATA, __objc_nlclslist, regular, no_dead_strip", align [[WORD_SIZE_IN_BYTES]]
 
 import Foundation
 import gizmo

@@ -80,11 +80,10 @@ _TFC3foo3barCfMS0_FT_S0_ ---> bar.__allocating_init() -> bar
 _TFC3foo3barcfMS0_FT_S0_ ---> bar.init() -> bar
 _TFC3foo3barD ---> bar.__deallocating_deinit
 _TFC3foo3bard ---> bar.deinit
-_TMPdC3foo3bar ---> direct generic type metadata pattern for bar
-_TMPiC3foo3bar ---> indirect generic type metadata pattern for bar
+_TMPC3foo3bar ---> generic type metadata pattern for bar
 _TMnC3foo3bar ---> nominal type descriptor for bar
 _TMmC3foo3bar ---> metaclass for bar
-_TMdC3foo3bar ---> direct type metadata for bar
+_TMC3foo3bar ---> type metadata for bar
 _TwalC3foo3bar ---> allocateBuffer for bar
 _TwcaC3foo3bar ---> assignWithCopy for bar
 _TwtaC3foo3bar ---> assignWithTake for bar
@@ -133,7 +132,7 @@ _T ---> _T
 _TTo ---> _TTo
 _TC ---> _TC
 _TM ---> _TM
-_TMd ---> _TMd
+_TM ---> _TM
 _TW ---> _TW
 _TWV ---> _TWV
 _TWo ---> _TWo

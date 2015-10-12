@@ -21,13 +21,13 @@ import Builtin
 // --       field names
 // CHECK:   i8* getelementptr inbounds ([3 x i8], [3 x i8]* [[SINGLEDYNAMIC_FIELDS]], i64 0, i64 0),
 // --       generic metadata pattern
-// CHECK:   @_TMPdV15generic_structs13SingleDynamic
+// CHECK:   @_TMPV15generic_structs13SingleDynamic
 // --       generic parameter vector offset
 // CHECK:   i32 4,
 // --       generic parameter count, primary counts; generic parameter witness counts
 // CHECK:   i32 1, i32 1, i32 0
 // CHECK: }
-// CHECK: @_TMPdV15generic_structs13SingleDynamic = global {{[{].*\* [}]}} {
+// CHECK: @_TMPV15generic_structs13SingleDynamic = global {{[{].*\* [}]}} {
 // -- template header
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[SINGLE_DYNAMIC_CREATE_METADATA:@create_generic_metadata[0-9]*]],
 // CHECK:   i32 240, i16 1, i16 8, [{{[0-9]+}} x i8*] zeroinitializer,
@@ -63,14 +63,14 @@ import Builtin
 // --       field names
 // CHECK:   i8* getelementptr inbounds ([5 x i8], [5 x i8]* [[DYNAMICWITHREQUIREMENTS_FIELDS]], i64 0, i64 0),
 // --       generic metadata pattern
-// CHECK:   @_TMPdV15generic_structs23DynamicWithRequirements
+// CHECK:   @_TMPV15generic_structs23DynamicWithRequirements
 // --       generic parameter vector offset
 // CHECK:   i32 5,
 // --       generic parameter count; primary count; generic parameter witness counts
 // CHECK:   i32 3, i32 2, i32 1, i32 1, i32 0
 // CHECK: }
 
-// CHECK: @_TMPdV15generic_structs23DynamicWithRequirements = global { {{.*}}* } {
+// CHECK: @_TMPV15generic_structs23DynamicWithRequirements = global { {{.*}}* } {
 // -- field offset vector; generic parameter vector
 // CHECK:   i64 0, i64 0, %swift.type* null, %swift.type* null, %swift.type* null, i8** null, i8** null,
 // CHECK: }

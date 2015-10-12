@@ -105,18 +105,18 @@ func unlump3<T>(x: (T, Int, T)) -> Int { return x.1 }
 func tuple_existentials() {
   // Empty tuple:
   var a : Any = ()
-  // CHECK: store %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMdT_, i32 0, i32 1),
+  // CHECK: store %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @_TMT_, i32 0, i32 1),
 
   // 2 element tuple
   var t2 = (1,2.0)
   a = t2
-  // CHECK: call %swift.type* @swift_getTupleTypeMetadata2({{.*}}@_TMdSi{{.*}},{{.*}}@_TMdSd{{.*}}, i8* null, i8** null)
+  // CHECK: call %swift.type* @swift_getTupleTypeMetadata2({{.*}}@_TMSi{{.*}},{{.*}}@_TMSd{{.*}}, i8* null, i8** null)
 
 
   // 3 element tuple
   var t3 = ((),(),())
   a = t3
-  // CHECK: call %swift.type* @swift_getTupleTypeMetadata3({{.*}}@_TMdT_{{.*}},{{.*}}@_TMdT_{{.*}},{{.*}}@_TMdT_{{.*}}, i8* null, i8** null)
+  // CHECK: call %swift.type* @swift_getTupleTypeMetadata3({{.*}}@_TMT_{{.*}},{{.*}}@_TMT_{{.*}},{{.*}}@_TMT_{{.*}}, i8* null, i8** null)
 
   // 4 element tuple
   var t4 = (1,2,3,4)

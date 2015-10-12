@@ -8,7 +8,7 @@
 
 import local_types_helper
 
-// CHECK-DAG: @_TMdVF18local_types_helper4testFT_T_L_1S = external hidden global %swift.type
+// CHECK-DAG: @_TMVF18local_types_helper4testFT_T_L_1S = external hidden global %swift.type
 
 public func singleFunc() {
   // CHECK-DAG: @_TWVVF11local_types10singleFuncFT_T_L_16SingleFuncStruct = hidden constant

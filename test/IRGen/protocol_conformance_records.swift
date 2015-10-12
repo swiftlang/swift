@@ -47,7 +47,7 @@ class NativeClassType: Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
 // -- generic metadata pattern
-// CHECK:           @_TMPdV28protocol_conformance_records17NativeGenericType
+// CHECK:           @_TMPV28protocol_conformance_records17NativeGenericType
 // -- witness table
 // CHECK:           @_TWPurGV28protocol_conformance_records17NativeGenericTypeq__S_8RuncibleS_
 // -- flags 0x04: unique direct generic metadata pattern
@@ -61,7 +61,7 @@ struct NativeGenericType<T>: Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
 // -- type metadata
-// CHECK:           @_TMdVSC6NSRect
+// CHECK:           @_TMVSC6NSRect
 // -- witness table
 // CHECK:           @_TWPVSC6NSRect28protocol_conformance_records8Runcible
 // -- flags 0x02: nonunique direct metadata
@@ -90,7 +90,7 @@ extension Gizmo: Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
 // -- type metadata
-// CHECK:           @got._TMdSi
+// CHECK:           @got._TMSi
 // -- witness table
 // CHECK:           @_TWPSi28protocol_conformance_records8Runcible
 // -- flags 0x01: unique direct metadata

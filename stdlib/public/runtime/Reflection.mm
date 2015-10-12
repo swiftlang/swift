@@ -656,19 +656,19 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
 
 #if SWIFT_OBJC_INTEROP  
 
-extern "C" const Metadata _TMdSb; // Bool
-extern "C" const Metadata _TMdSi; // Int
-extern "C" const Metadata _TMdSu; // UInt
-extern "C" const Metadata _TMdSf; // Float
-extern "C" const Metadata _TMdSd; // Double
-extern "C" const Metadata _TMdVs4Int8;
-extern "C" const Metadata _TMdVs5Int16;
-extern "C" const Metadata _TMdVs5Int32;
-extern "C" const Metadata _TMdVs5Int64;
-extern "C" const Metadata _TMdVs5UInt8;
-extern "C" const Metadata _TMdVs6UInt16;
-extern "C" const Metadata _TMdVs6UInt32;
-extern "C" const Metadata _TMdVs6UInt64;
+extern "C" const Metadata _TMSb; // Bool
+extern "C" const Metadata _TMSi; // Int
+extern "C" const Metadata _TMSu; // UInt
+extern "C" const Metadata _TMSf; // Float
+extern "C" const Metadata _TMSd; // Double
+extern "C" const Metadata _TMVs4Int8;
+extern "C" const Metadata _TMVs5Int16;
+extern "C" const Metadata _TMVs5Int32;
+extern "C" const Metadata _TMVs5Int64;
+extern "C" const Metadata _TMVs5UInt8;
+extern "C" const Metadata _TMVs6UInt16;
+extern "C" const Metadata _TMVs6UInt32;
+extern "C" const Metadata _TMVs6UInt64;
   
 // Set to 1 to enable reflection of objc ivars.
 #define REFLECT_OBJC_IVARS 0
@@ -679,39 +679,39 @@ extern "C" const Metadata _TMdVs6UInt64;
 static const Metadata *getMetadataForEncoding(const char *encoding) {
   switch (*encoding) {
   case 'c': // char
-    return &_TMdVs4Int8;
+    return &_TMVs4Int8;
   case 's': // short
-    return &_TMdVs5Int16;
+    return &_TMVs5Int16;
   case 'i': // int
-    return &_TMdVs5Int32;
+    return &_TMVs5Int32;
   case 'l': // long
-    return &_TMdSi;
+    return &_TMSi;
   case 'q': // long long
-    return &_TMdVs5Int64;
+    return &_TMVs5Int64;
       
   case 'C': // unsigned char
-    return &_TMdVs5UInt8;
+    return &_TMVs5UInt8;
   case 'S': // unsigned short
-    return &_TMdVs6UInt16;
+    return &_TMVs6UInt16;
   case 'I': // unsigned int
-    return &_TMdVs6UInt32;
+    return &_TMVs6UInt32;
   case 'L': // unsigned long
-    return &_TMdSu;
+    return &_TMSu;
   case 'Q': // unsigned long long
-    return &_TMdVs6UInt64;
+    return &_TMVs6UInt64;
       
   case 'B': // _Bool
-    return &_TMdSb;
+    return &_TMSb;
       
   case '@': { // Class
     // TODO: Better metadata?
-    const OpaqueMetadata *M = &_TMdBO;
+    const OpaqueMetadata *M = &_TMBO;
     return &M->base;
   }
       
   default: // TODO
     // Return 'void' as the type of fields we don't understand.
-    return &_TMdT_;
+    return &_TMT_;
   }
 }
 #endif
@@ -924,46 +924,46 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
 // Addresses of the type metadata and Mirror witness tables for the primitive
 // mirrors.
 extern "C" const Metadata OpaqueMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVs13_OpaqueMirror");
+  __asm__(UNDERSCORE "_TMVs13_OpaqueMirror");
 extern "C" const MirrorWitnessTable OpaqueMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVs13_OpaqueMirrors11_MirrorTypes");
 extern "C" const Metadata TupleMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVs12_TupleMirror");
+  __asm__(UNDERSCORE "_TMVs12_TupleMirror");
 extern "C" const MirrorWitnessTable TupleMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVs12_TupleMirrors11_MirrorTypes");
 
 extern "C" const Metadata StructMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVs13_StructMirror");
+  __asm__(UNDERSCORE "_TMVs13_StructMirror");
 extern "C" const MirrorWitnessTable StructMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVs13_StructMirrors11_MirrorTypes");
 
 extern "C" const Metadata EnumMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVs11_EnumMirror");
+  __asm__(UNDERSCORE "_TMVs11_EnumMirror");
 extern "C" const MirrorWitnessTable EnumMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVs11_EnumMirrors11_MirrorTypes");
 
 extern "C" const Metadata ClassMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVs12_ClassMirror");
+  __asm__(UNDERSCORE "_TMVs12_ClassMirror");
 extern "C" const MirrorWitnessTable ClassMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVs12_ClassMirrors11_MirrorTypes");
 
 extern "C" const Metadata ClassSuperMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVs17_ClassSuperMirror");
+  __asm__(UNDERSCORE "_TMVs17_ClassSuperMirror");
 extern "C" const MirrorWitnessTable ClassSuperMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVs17_ClassSuperMirrors11_MirrorTypes");
 
 extern "C" const Metadata MetatypeMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVs15_MetatypeMirror");
+  __asm__(UNDERSCORE "_TMVs15_MetatypeMirror");
 extern "C" const MirrorWitnessTable MetatypeMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVs15_MetatypeMirrors11_MirrorTypes");
   
 #if SWIFT_OBJC_INTEROP
 extern "C" const Metadata ObjCMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVs11_ObjCMirror");
+  __asm__(UNDERSCORE "_TMVs11_ObjCMirror");
 extern "C" const MirrorWitnessTable ObjCMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVs11_ObjCMirrors11_MirrorTypes");
 extern "C" const Metadata ObjCSuperMirrorMetadata
-  __asm__(UNDERSCORE "_TMdVs16_ObjCSuperMirror");
+  __asm__(UNDERSCORE "_TMVs16_ObjCSuperMirror");
 extern "C" const MirrorWitnessTable ObjCSuperMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVs16_ObjCSuperMirrors11_MirrorTypes");
 #endif
@@ -1072,13 +1072,13 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
 #if SWIFT_OBJC_INTEROP
     // If this is the Builtin.UnknownObject type, use the dynamic type of the
     // object reference.
-    if (T == &_TMdBO.base) {
+    if (T == &_TMBO.base) {
       return getImplementationForClass(Value);
     }
 #endif
     // If this is the Builtin.NativeObject type, and the heap object is a
     // class instance, use the dynamic type of the object reference.
-    if (T == &_TMdBo.base) {
+    if (T == &_TMBo.base) {
       const HeapObject *obj
         = *reinterpret_cast<const HeapObject * const*>(Value);
       if (obj->metadata->getKind() == MetadataKind::Class)

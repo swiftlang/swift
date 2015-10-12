@@ -26,13 +26,13 @@ import gizmo
 // --       field names
 // CHECK:   i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
 // --       generic metadata pattern
-// CHECK:   @_TMPdC15generic_classes11RootGeneric
+// CHECK:   @_TMPC15generic_classes11RootGeneric
 // --       generic parameter vector offset
 // CHECK:   i32 9,
 // --       generic parameter count, primary count, witness table counts
 // CHECK:   i32 1, i32 1, i32 0
 // CHECK: }
-// CHECK: @_TMPdC15generic_classes11RootGeneric = global { {{.*}}* } } {
+// CHECK: @_TMPC15generic_classes11RootGeneric = global { {{.*}}* } } {
 // --       template fill function
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[CREATE_ROOTGENERIC:@create_generic_metadata[0-9]*]],
 // --       nominal type descriptor
@@ -86,7 +86,7 @@ import gizmo
 // CHECK:   {{.*}}* @_TMnC15generic_classes14RootNonGeneric,
 // CHECK: }
 
-// CHECK: @_TMPdC15generic_classes22GenericInheritsGeneric = global { {{.*}}* } } {
+// CHECK: @_TMPC15generic_classes22GenericInheritsGeneric = global { {{.*}}* } } {
 // --       template fill function
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[CREATE_GENERICINHERITSGENERIC:@create_generic_metadata[.0-9]*]],
 // --       RootGeneric vtable
@@ -103,7 +103,7 @@ import gizmo
 // CHECK:   i64 0
 // CHECK: }
 
-// CHECK: @_TMPdC15generic_classes25GenericInheritsNonGeneric
+// CHECK: @_TMPC15generic_classes25GenericInheritsNonGeneric
 
 class RootGeneric<T> {
   var x : UInt8
@@ -326,7 +326,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   %B = bitcast i8* [[T1]] to %swift.type*
 //   Construct the superclass.
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %A to i8*
-// CHECK:   [[SUPER:%.*]] = call %swift.type* @swift_getGenericMetadata1(%swift.type_pattern* {{.*}} @_TMPdC15generic_classes11RootGeneric {{.*}}, i8* [[T0]])
+// CHECK:   [[SUPER:%.*]] = call %swift.type* @swift_getGenericMetadata1(%swift.type_pattern* {{.*}} @_TMPC15generic_classes11RootGeneric {{.*}}, i8* [[T0]])
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[SUPER]] to %objc_class*
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[T0]])
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**

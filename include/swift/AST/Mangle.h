@@ -141,8 +141,8 @@ public:
                               ResilienceExpansion expansion);
 
   void mangleFieldOffsetFull(const ValueDecl *decl, bool isIndirect);
-  void mangleTypeMetadataFull(CanType ty, bool isPattern, bool isIndirect);
-  void mangleTypeFullDirectMetadataFull(CanType ty);
+  void mangleTypeMetadataFull(CanType ty, bool isPattern);
+  void mangleTypeFullMetadataFull(CanType ty);
   void mangleGlobalVariableFull(const VarDecl *decl);
   
   /// Mangles globalinit_token and globalinit_func, which are used to

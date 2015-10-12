@@ -583,7 +583,7 @@ void Remangler::mangleVTableAttribute(Node *node) {
 
 void Remangler::mangleGenericTypeMetadataPattern(Node *node) {
   Out << "MP";
-  mangleChildNodes(node); // directness, type
+  mangleSingleChildNode(node); // type
 }
 
 void Remangler::mangleTypeMetadataAccessFunction(Node *node) {
@@ -608,7 +608,7 @@ void Remangler::mangleNominalTypeDescriptor(Node *node) {
 
 void Remangler::mangleTypeMetadata(Node *node) {
   Out << "M";
-  mangleChildNodes(node); // directness, type
+  mangleSingleChildNode(node); // type
 }
 
 void Remangler::mangleFullTypeMetadata(Node *node) {

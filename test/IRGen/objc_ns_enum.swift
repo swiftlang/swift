@@ -10,11 +10,11 @@ import gizmo
 
 // CHECK: @_TWVOSC16NSRuncingOptions = linkonce_odr hidden constant
 // CHECK: @_TMnOSC16NSRuncingOptions = linkonce_odr hidden constant
-// CHECK: @_TMdOSC16NSRuncingOptions = linkonce_odr hidden global
+// CHECK: @_TMOSC16NSRuncingOptions = linkonce_odr hidden global
 // CHECK: @_TWPOSC28NeverActuallyMentionedByNames9Equatable5gizmo = linkonce_odr hidden constant
 
 // CHECK-LABEL: define i32 @main
-// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMdOSC16NSRuncingOptions {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
+// CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @_TMOSC16NSRuncingOptions {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
 // CHECK: define hidden i16 @_TF12objc_ns_enum22imported_enum_inject_aFT_OSC16NSRuncingOptions()
 // CHECK:   ret i16 123

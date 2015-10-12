@@ -80,11 +80,10 @@ _TFC3foo3barCfMS0_FT_S0_ ---> foo.bar.__allocating_init (foo.bar.Type)() -> foo.
 _TFC3foo3barcfMS0_FT_S0_ ---> foo.bar.init (foo.bar.Type)() -> foo.bar
 _TFC3foo3barD ---> foo.bar.__deallocating_deinit
 _TFC3foo3bard ---> foo.bar.deinit
-_TMPdC3foo3bar ---> direct generic type metadata pattern for foo.bar
-_TMPiC3foo3bar ---> indirect generic type metadata pattern for foo.bar
+_TMPC3foo3bar ---> generic type metadata pattern for foo.bar
 _TMnC3foo3bar ---> nominal type descriptor for foo.bar
 _TMmC3foo3bar ---> metaclass for foo.bar
-_TMdC3foo3bar ---> direct type metadata for foo.bar
+_TMC3foo3bar ---> type metadata for foo.bar
 _TMfC3foo3bar ---> full type metadata for foo.bar
 _TwalC3foo3bar ---> allocateBuffer value witness for foo.bar
 _TwcaC3foo3bar ---> assignWithCopy value witness for foo.bar
@@ -134,7 +133,7 @@ _T ---> _T
 _TTo ---> _TTo
 _TC ---> _TC
 _TM ---> _TM
-_TMd ---> _TMd
+_TM ---> _TM
 _TW ---> _TW
 _TWV ---> _TWV
 _TWo ---> _TWo

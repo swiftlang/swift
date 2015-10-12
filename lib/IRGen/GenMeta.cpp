@@ -181,11 +181,6 @@ static void emitPolymorphicParametersFromArray(IRGenFunction &IGF,
   }
 }
 
-static bool isMetadataIndirect(IRGenModule &IGM, NominalTypeDecl *theDecl) {
-  // FIXME
-  return false;
-}
-
 /// Attempts to return a constant heap metadata reference for a
 /// nominal type.
 llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
@@ -205,10 +200,7 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
     if (!hasKnownSwiftMetadata(IGM, theClass))
       return IGM.getAddrOfObjCClass(theClass, NotForDefinition);
 
-  if (isMetadataIndirect(IGM, theDecl))
-    return nullptr;
-
-  return IGM.getAddrOfTypeMetadata(type, false, false);
+  return IGM.getAddrOfTypeMetadata(type, false);
 }
 
 /// Emit a reference to an ObjC class.  In general, the only things
@@ -281,20 +273,9 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
       return cache;
   }
 
-  bool isIndirect = isMetadataIndirect(IGF.IGM, theDecl);
-
   // Grab a reference to the metadata or metadata template.
   CanType declaredType = theDecl->getDeclaredType()->getCanonicalType();
-  llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(declaredType,
-                                                        isIndirect, isPattern);
-
-  // If it's indirected, go ahead and load the true value to use.
-  // TODO: startup performance might force this to be some sort of
-  // lazy check.
-  if (isIndirect) {
-    auto addr = Address(metadata, IGF.IGM.getPointerAlignment());
-    metadata = IGF.Builder.CreateLoad(addr, "metadata.direct");
-  }
+  llvm::Value *metadata = IGF.IGM.getAddrOfTypeMetadata(declaredType,isPattern);
 
   // If we don't have generic parameters, that's all we need.
   if (!generics) {
@@ -517,7 +498,6 @@ namespace {
 
     llvm::Value *emitDirectMetadataRef(CanType type) {
       return IGF.IGM.getAddrOfTypeMetadata(type,
-                                           /*indirect*/ false,
                                            /*pattern*/ false);
     }
 
@@ -1004,8 +984,7 @@ static void emitDirectTypeMetadataInitialization(IRGenFunction &IGF,
   return;
 
 initialize_super:
-  auto classMetadata = IGF.IGM.getAddrOfTypeMetadata(type, /*indirect*/false,
-                                                     /*pattern*/ false);
+  auto classMetadata = IGF.IGM.getAddrOfTypeMetadata(type, /*pattern*/ false);
   // Get the superclass metadata.
   auto superMetadata = IGF.emitTypeMetadataRef(superclass->getCanonicalType());
   
@@ -1165,9 +1144,7 @@ namespace {
     EmitTypeMetadataRefForLayout(IRGenFunction &IGF) : IGF(IGF) {}
 
     llvm::Value *emitDirectMetadataRef(CanType type) {
-      return IGF.IGM.getAddrOfTypeMetadata(type,
-                                           /*indirect*/ false,
-                                           /*pattern*/ false);
+      return IGF.IGM.getAddrOfTypeMetadata(type, /*pattern*/ false);
     }
 
     /// For most types, we can just emit the usual metadata.
@@ -1860,7 +1837,6 @@ namespace {
       
       addWord(IGM.getAddrOfTypeMetadata(ntd->getDeclaredType()
                                           ->getCanonicalType(),
-                                        /*indirect*/ false,
                                         /*pattern*/ true));
     }
     

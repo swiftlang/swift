@@ -11,7 +11,7 @@ import Swift
 // CHECK: [[C:%C13generic_types1C]] = type
 // CHECK: [[D:%C13generic_types1D]] = type
 
-// CHECK: @_TMPdC13generic_types1A = global [[A_METADATA_T:{.*\* } }]] {
+// CHECK: @_TMPC13generic_types1A = global [[A_METADATA_T:{.*\* } }]] {
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[A_METADATA_CREATE:@[a-z0-9_]+]],
 // CHECK:   i32 336,
 // CHECK:   i16 1,
@@ -35,7 +35,7 @@ import Swift
 // CHECK:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
 // CHECK:   %C13generic_types1A* (i64, %C13generic_types1A*)* @_TFC13generic_types1AcurfMGS0_q__FT1ySi_GS0_q__
 // CHECK: }
-// CHECK: @_TMPdC13generic_types1B = global [[B_METADATA_T:{.* } }]] {
+// CHECK: @_TMPC13generic_types1B = global [[B_METADATA_T:{.* } }]] {
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[B_METADATA_CREATE:@[a-z0-9_.]+]],
 // CHECK:   i32 328,
 // CHECK:   i16 1,
@@ -57,7 +57,7 @@ import Swift
 // CHECK:   i32 16,
 // CHECK:   %swift.type* null
 // CHECK: }
-// CHECK: @_TMPdC13generic_types1C = global [[C_METADATA_T:{.*\* } }]] {
+// CHECK: @_TMPC13generic_types1C = global [[C_METADATA_T:{.*\* } }]] {
 // CHECK:   void ([[C]]*)* @_TFC13generic_types1CD,
 // CHECK:   i8** @_TWVBo,
 // CHECK:   i64 0,
@@ -67,7 +67,7 @@ import Swift
 // CHECK:   i64 1,
 // CHECK:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
 // CHECK: }
-// CHECK: @_TMPdC13generic_types1D = global [[D_METADATA_T:{.*\* } }]] {
+// CHECK: @_TMPC13generic_types1D = global [[D_METADATA_T:{.*\* } }]] {
 // CHECK:   void ([[D]]*)* @_TFC13generic_types1DD,
 // CHECK:   i8** @_TWVBo,
 // CHECK:   i64 0,

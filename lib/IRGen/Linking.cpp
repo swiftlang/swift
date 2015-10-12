@@ -122,21 +122,18 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
   //   global ::= 'MP' directness type            // type metadata pattern
   case Kind::TypeMetadata:
     switch (getMetadataAddress()) {
-    case TypeMetadataAddress::DirectFullMetadata:
-      mangler.mangleTypeFullDirectMetadataFull(getType());
+    case TypeMetadataAddress::FullMetadata:
+      mangler.mangleTypeFullMetadataFull(getType());
       break;
-    case TypeMetadataAddress::Indirect:
-    case TypeMetadataAddress::Direct:
-      mangler.mangleTypeMetadataFull(getType(), isMetadataPattern(),
-                         getMetadataAddress() == TypeMetadataAddress::Indirect);
+    case TypeMetadataAddress::AddressPoint:
+      mangler.mangleTypeMetadataFull(getType(), isMetadataPattern());
       break;
     }
     return;
 
   //   global ::= 'M' directness type             // type metadata
   case Kind::ForeignTypeMetadataCandidate:
-    mangler.mangleTypeMetadataFull(getType(), /*isPattern=*/false,
-                                   /*indirect=*/false);
+    mangler.mangleTypeMetadataFull(getType(), /*isPattern=*/false);
     return;
 
   //   global ::= 'Mm' type                       // class metaclass

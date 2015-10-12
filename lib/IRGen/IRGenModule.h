@@ -691,8 +691,7 @@ public:
                                         llvm::Constant *init,
                                         llvm::StringRef section = {});
 
-  llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
-                                        bool isIndirect, bool isPattern);
+  llvm::Constant *getAddrOfTypeMetadata(CanType concreteType, bool isPattern);
   llvm::Function *getAddrOfTypeMetadataAccessFunction(CanType type,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,

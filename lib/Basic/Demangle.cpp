@@ -493,7 +493,6 @@ private:
       if (Mangled.nextIf('P')) {
         auto pattern =
             NodeFactory::create(Node::Kind::GenericTypeMetadataPattern);
-        DEMANGLE_CHILD_AS_NODE_OR_RETURN(pattern, Directness);
         DEMANGLE_CHILD_OR_RETURN(pattern, Type);
         return pattern;
       }
@@ -525,7 +524,6 @@ private:
         return metadata;
       }
       auto metadata = NodeFactory::create(Node::Kind::TypeMetadata);
-      DEMANGLE_CHILD_AS_NODE_OR_RETURN(metadata, Directness);
       DEMANGLE_CHILD_OR_RETURN(metadata, Type);
       return metadata;
     }
@@ -3219,9 +3217,8 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   }
   case Node::Kind::GenericTypeMetadataPattern:
-    print(pointer->getChild(0)); // directness
     Printer << "generic type metadata pattern for ";
-    print(pointer->getChild(1));
+    print(pointer->getChild(0));
     return;
   case Node::Kind::Metaclass:
     Printer << "metaclass for ";
@@ -3232,9 +3229,8 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     print(pointer->getChild(0));
     return;
   case Node::Kind::TypeMetadata:
-    print(pointer->getChild(0)); // directness
     Printer << "type metadata for ";
-    print(pointer->getChild(1));
+    print(pointer->getChild(0));
     return;
   case Node::Kind::TypeMetadataAccessFunction:
     Printer << "type metadata accessor for ";

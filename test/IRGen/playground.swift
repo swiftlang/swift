@@ -20,5 +20,5 @@ anchor()
 // CHECK:       }
 
 // CHECK-LABEL: define private void @runtime_registration
-// CHECK:         call void @swift_instantiateObjCClass({{.*}} @_TMdC10playground1C
+// CHECK:         call void @swift_instantiateObjCClass({{.*}} @_TMC10playground1C
 

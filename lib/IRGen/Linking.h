@@ -46,9 +46,8 @@ class IRGenModule;
 
 /// Selector for type metadata symbol kinds.
 enum class TypeMetadataAddress {
-  Direct,
-  DirectFullMetadata,
-  Indirect,
+  AddressPoint,
+  FullMetadata,
 };
 
 /// A link entity is some sort of named declaration, combined with all

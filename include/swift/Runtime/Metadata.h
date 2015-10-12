@@ -1103,17 +1103,17 @@ struct OpaqueMetadata {
 // The "Int" metadata are used for arbitrary POD data with the
 // matching characteristics.
 typedef FullMetadata<OpaqueMetadata> FullOpaqueMetadata;
-extern "C" const FullOpaqueMetadata _TMdBi8_;      // Builtin.Int8
-extern "C" const FullOpaqueMetadata _TMdBi16_;     // Builtin.Int16
-extern "C" const FullOpaqueMetadata _TMdBi32_;     // Builtin.Int32
-extern "C" const FullOpaqueMetadata _TMdBi64_;     // Builtin.Int64
-extern "C" const FullOpaqueMetadata _TMdBi128_;    // Builtin.Int128
-extern "C" const FullOpaqueMetadata _TMdBi256_;    // Builtin.Int256
-extern "C" const FullOpaqueMetadata _TMdBo;        // Builtin.NativeObject
-extern "C" const FullOpaqueMetadata _TMdBb;        // Builtin.BridgeObject
-extern "C" const FullOpaqueMetadata _TMdBB;        // Builtin.UnsafeValueBuffer
+extern "C" const FullOpaqueMetadata _TMBi8_;      // Builtin.Int8
+extern "C" const FullOpaqueMetadata _TMBi16_;     // Builtin.Int16
+extern "C" const FullOpaqueMetadata _TMBi32_;     // Builtin.Int32
+extern "C" const FullOpaqueMetadata _TMBi64_;     // Builtin.Int64
+extern "C" const FullOpaqueMetadata _TMBi128_;    // Builtin.Int128
+extern "C" const FullOpaqueMetadata _TMBi256_;    // Builtin.Int256
+extern "C" const FullOpaqueMetadata _TMBo;        // Builtin.NativeObject
+extern "C" const FullOpaqueMetadata _TMBb;        // Builtin.BridgeObject
+extern "C" const FullOpaqueMetadata _TMBB;        // Builtin.UnsafeValueBuffer
 #if SWIFT_OBJC_INTEROP
-extern "C" const FullOpaqueMetadata _TMdBO;        // Builtin.UnknownObject
+extern "C" const FullOpaqueMetadata _TMBO;        // Builtin.UnknownObject
 #endif
 
 /// The prefix on a heap metadata.
@@ -1802,7 +1802,7 @@ struct TupleTypeMetadata : public Metadata {
 };
   
 /// The standard metadata for the empty tuple type.
-extern "C" const FullMetadata<TupleTypeMetadata> _TMdT_;
+extern "C" const FullMetadata<TupleTypeMetadata> _TMT_;
 
 struct ProtocolDescriptor;
   

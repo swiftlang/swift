@@ -971,11 +971,10 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
 
   case Kind::TypeMetadata:
     switch (getMetadataAddress()) {
-    case TypeMetadataAddress::DirectFullMetadata:
+    case TypeMetadataAddress::FullMetadata:
       // The full metadata object is private to the containing module.
       return SILLinkage::Private;
-    case TypeMetadataAddress::Direct:
-    case TypeMetadataAddress::Indirect:
+    case TypeMetadataAddress::AddressPoint:
       return getSILLinkage(getTypeLinkage(getType()), forDefinition);
     }
 
@@ -1739,7 +1738,7 @@ getTypeEntityForProtocolConformanceRecord(IRGenModule &IGM,
     typeKind = ProtocolConformanceTypeKind::UniqueGenericPattern;
     entity = LinkEntity::forTypeMetadata(
                          bgt->getDecl()->getDeclaredType()->getCanonicalType(),
-                         TypeMetadataAddress::Direct,
+                         TypeMetadataAddress::AddressPoint,
                          /*isPattern*/ true);
     defaultTy = IGM.TypeMetadataPatternStructTy;
     defaultPtrTy = IGM.TypeMetadataPatternPtrTy;
@@ -1758,7 +1757,7 @@ getTypeEntityForProtocolConformanceRecord(IRGenModule &IGM,
       if (hasKnownSwiftMetadata(IGM, clas))
         entity = LinkEntity::forTypeMetadata(
                          conformingType,
-                         TypeMetadataAddress::Direct,
+                         TypeMetadataAddress::AddressPoint,
                          /*isPattern*/ false);
       else
         entity = LinkEntity::forObjCClass(clas);
@@ -1778,7 +1777,7 @@ getTypeEntityForProtocolConformanceRecord(IRGenModule &IGM,
       typeKind = ProtocolConformanceTypeKind::UniqueDirectType;
       entity = LinkEntity::forTypeMetadata(
                        conformingType,
-                       TypeMetadataAddress::Direct,
+                       TypeMetadataAddress::AddressPoint,
                        /*isPattern*/ false);
       defaultTy = IGM.TypeMetadataStructTy;
       defaultPtrTy = IGM.TypeMetadataPtrTy;
@@ -2020,15 +2019,15 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   Alignment alignment = getPointerAlignment();
 
   if (isPattern) {
-    addrKind = TypeMetadataAddress::Direct;
+    addrKind = TypeMetadataAddress::AddressPoint;
     defaultVarTy = TypeMetadataPatternStructTy;
     adjustmentIndex = MetadataAdjustmentIndex::None;
   } else if (concreteType->getClassOrBoundGenericClass()) {
-    addrKind = TypeMetadataAddress::DirectFullMetadata;
+    addrKind = TypeMetadataAddress::FullMetadata;
     defaultVarTy = FullHeapMetadataStructTy;
     adjustmentIndex = MetadataAdjustmentIndex::Class;
   } else {
-    addrKind = TypeMetadataAddress::DirectFullMetadata;
+    addrKind = TypeMetadataAddress::FullMetadata;
     defaultVarTy = FullTypeMetadataStructTy;
     adjustmentIndex = MetadataAdjustmentIndex::ValueType;
   }
@@ -2055,8 +2054,8 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
 
   // For concrete metadata, declare the alias to its address point.
   auto directEntity = LinkEntity::forTypeMetadata(concreteType,
-                                                  TypeMetadataAddress::Direct,
-                                                  /*isPattern*/ false);
+                                              TypeMetadataAddress::AddressPoint,
+                                              /*isPattern*/ false);
 
   llvm::Constant *addr = var;
   // Do an adjustment if necessary.
@@ -2127,7 +2126,6 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
 ///   - otherwise it will be adjusted to the canonical address point
 ///     for a type metadata and it will have type TypeMetadataPtrTy.
 llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
-                                                   bool isIndirect,
                                                    bool isPattern) {
   assert(isPattern || !isa<UnboundGenericType>(concreteType));
 
@@ -2182,17 +2180,10 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     dispatcher.addLazyTypeMetadata(concreteType);
   }
 
-  // When indirect, this is always a pointer variable and has no
-  // adjustment.
-  if (isIndirect) {
-    adjustmentIndex = 0;
-  }
-
   LinkEntity entity
     = ObjCClass ? LinkEntity::forObjCClass(ObjCClass)
                 : LinkEntity::forTypeMetadata(concreteType,
-                                     isIndirect ? TypeMetadataAddress::Indirect
-                                                : TypeMetadataAddress::Direct,
+                                     TypeMetadataAddress::AddressPoint,
                                      isPattern);
 
   auto DbgTy = ObjCClass 

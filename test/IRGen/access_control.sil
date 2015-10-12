@@ -25,7 +25,7 @@ func local() {
   // CHECK: @_TMfVF14access_control5localFT_T_L_11LocalStruct = internal constant
 }
 
-// CHECK: @_TMdV14access_control12PublicStruct = alias
-// CHECK: @_TMdV14access_control14InternalStruct = alias
-// CHECK: @_TMdV14access_controlP33_8F630B0A1EEF3ED34B761E3ED76C95A813PrivateStruct = hidden alias
-// CHECK: @_TMdVF14access_control5localFT_T_L_11LocalStruct = hidden alias
+// CHECK: @_TMV14access_control12PublicStruct = alias
+// CHECK: @_TMV14access_control14InternalStruct = alias
+// CHECK: @_TMV14access_controlP33_8F630B0A1EEF3ED34B761E3ED76C95A813PrivateStruct = hidden alias
+// CHECK: @_TMVF14access_control5localFT_T_L_11LocalStruct = hidden alias

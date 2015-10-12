@@ -421,7 +421,7 @@ llvm::Constant *IRGenModule::getEmptyTupleMetadata() {
     return EmptyTupleMetadata;
 
   return EmptyTupleMetadata =
-    Module.getOrInsertGlobal("_TMdT_", FullTypeMetadataStructTy);
+    Module.getOrInsertGlobal("_TMT_", FullTypeMetadataStructTy);
 }
 
 llvm::Constant *IRGenModule::getObjCEmptyCachePtr() {

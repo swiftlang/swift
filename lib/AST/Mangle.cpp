@@ -1750,17 +1750,15 @@ void Mangler::mangleFieldOffsetFull(const ValueDecl *decl, bool isIndirect) {
   mangleEntity(decl, ResilienceExpansion::Minimal, 0);
 }
 
-void Mangler::mangleTypeFullDirectMetadataFull(CanType ty) {
+void Mangler::mangleTypeFullMetadataFull(CanType ty) {
   Buffer << "_TMf";
   mangleType(ty, ResilienceExpansion::Minimal, 0);
 }
 
-void Mangler::mangleTypeMetadataFull(CanType ty, bool isPattern,
-                                     bool isIndirect) {
+void Mangler::mangleTypeMetadataFull(CanType ty, bool isPattern) {
   Buffer << "_TM";
   if (isPattern)
     Buffer << 'P';
-  mangleDirectness(isIndirect);
   mangleType(ty, ResilienceExpansion::Minimal, 0);
 }
 

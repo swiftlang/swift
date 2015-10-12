@@ -117,23 +117,23 @@ func makeGenericMetatypes() {
 }
 
 // CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes6OneArgVS_3Foo_() [[NOUNWIND_READNONE_OPT:#[0-9]+]]
-// CHECK:   call %swift.type* @swift_getGenericMetadata1(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes6OneArg {{.*}}, i8* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
+// CHECK:   call %swift.type* @swift_getGenericMetadata1(%swift.type_pattern* {{.*}} @_TMPV17generic_metatypes6OneArg {{.*}}, i8* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
 // CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes7TwoArgsVS_3FooCS_3Bar_() [[NOUNWIND_READNONE_OPT]]
 // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
-// CHECK: call %swift.type* @swift_getGenericMetadata2(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes7TwoArgs {{.*}}, i8* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, i8* [[T1]]) [[NOUNWIND_READNONE]]
+// CHECK: call %swift.type* @swift_getGenericMetadata2(%swift.type_pattern* {{.*}} @_TMPV17generic_metatypes7TwoArgs {{.*}}, i8* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, i8* [[T1]]) [[NOUNWIND_READNONE]]
 
 // CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes9ThreeArgsVS_3FooCS_3BarS1__() [[NOUNWIND_READNONE_OPT]]
 // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
-// CHECK: call %swift.type* @swift_getGenericMetadata3(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes9ThreeArgs {{.*}}, i8* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, i8* [[T1]], i8* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}) [[NOUNWIND_READNONE]]
+// CHECK: call %swift.type* @swift_getGenericMetadata3(%swift.type_pattern* {{.*}} @_TMPV17generic_metatypes9ThreeArgs {{.*}}, i8* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, i8* [[T1]], i8* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}) [[NOUNWIND_READNONE]]
 
 // CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes8FourArgsVS_3FooCS_3BarS1_S2__() [[NOUNWIND_READNONE_OPT]]
 // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
 // CHECK: [[T2:%.*]] = bitcast %swift.type* [[T0]] to i8*
 // CHECK: [[T3:%.*]] = bitcast %swift.type* [[T0]] to i8*
-// CHECK: call %swift.type* @swift_getGenericMetadata4(%swift.type_pattern* {{.*}} @_TMPdV17generic_metatypes8FourArgs {{.*}}, i8* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, i8* [[T2]], i8* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, i8* [[T3]]) [[NOUNWIND_READNONE]]
+// CHECK: call %swift.type* @swift_getGenericMetadata4(%swift.type_pattern* {{.*}} @_TMPV17generic_metatypes8FourArgs {{.*}}, i8* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, i8* [[T2]], i8* {{.*}} @_TMfV17generic_metatypes3Foo, {{.*}}, i8* [[T3]]) [[NOUNWIND_READNONE]]
 
 // CHECK: define linkonce_odr hidden %swift.type* @_TMaGV17generic_metatypes8FiveArgsVS_3FooCS_3BarS1_S2_S1__() [[NOUNWIND_READNONE_OPT]]
 // CHECK:   [[BUFFER:%.*]] = alloca [[BUFFER_T:.*]], align

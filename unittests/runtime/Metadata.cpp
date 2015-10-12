@@ -273,7 +273,7 @@ FullMetadata<ClassMetadata> MetadataTest2 = {
 TEST(MetadataTest, getMetatypeMetadata) {
   auto inst1 = RaceTest_ExpectEqual<const MetatypeMetadata *>(
     [&]() -> const MetatypeMetadata * {
-      auto inst = swift_getMetatypeMetadata(&_TMdBi64_.base);
+      auto inst = swift_getMetatypeMetadata(&_TMBi64_.base);
 
       EXPECT_EQ(sizeof(void*), inst->getValueWitnesses()->size);
       return inst;
@@ -281,7 +281,7 @@ TEST(MetadataTest, getMetatypeMetadata) {
 
   auto inst2 = RaceTest_ExpectEqual<const MetatypeMetadata *>(
     [&]() -> const MetatypeMetadata * {
-      auto inst = swift_getMetatypeMetadata(&_TMdBi32_.base);
+      auto inst = swift_getMetatypeMetadata(&_TMBi32_.base);
 
       EXPECT_EQ(sizeof(void*), inst->getValueWitnesses()->size);
       return inst;
@@ -310,8 +310,8 @@ TEST(MetadataTest, getMetatypeMetadata) {
     });
 
   // After all this, the instance type fields should still be valid.
-  ASSERT_EQ(&_TMdBi64_.base, inst1->InstanceType);
-  ASSERT_EQ(&_TMdBi32_.base, inst2->InstanceType);
+  ASSERT_EQ(&_TMBi64_.base, inst1->InstanceType);
+  ASSERT_EQ(&_TMBi32_.base, inst2->InstanceType);
   ASSERT_EQ(&MetadataTest2, inst3->InstanceType);
   ASSERT_EQ(inst3, inst4->InstanceType);
   ASSERT_EQ(inst1, inst5->InstanceType);
