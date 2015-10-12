@@ -1033,41 +1033,33 @@ public:
     std::vector<SILFunction *> DeadFunctions;
     DeadFunctions.reserve(128);
 
-    // We process functions in Bottom Up SCC Order. Even though we do not
-    // technically need the SCCs, it is more efficient to iterate over the SCCs
-    // and get the CallGraphNodes rather than get a list of functions from the
-    // Nodes and then lookup the Nodes again.
-    for (auto *SCC : CG.getBottomUpSCCOrder()) {
-      for (auto *FNode : SCC->SCCNodes) {
-        SILFunction *F = FNode->getFunction();
+    for (auto *F : CG.getBottomUpFunctionOrder()) {
+      // Don't optimize functions that are marked with the opt.never
+      // attribute.
+      if (!F->shouldOptimize())
+        continue;
 
-        // Don't optimize functions that are marked with the opt.never
-        // attribute.
-        if (!F->shouldOptimize())
-          continue;
+      // Check the signature of F to make sure that it is a function that we
+      // can
+      // specialize. These are conditions independent of the call graph.
+      if (!canSpecializeFunction(F))
+        continue;
 
-        // Check the signature of F to make sure that it is a function that we
-        // can
-        // specialize. These are conditions independent of the call graph.
-        if (!canSpecializeFunction(F))
-          continue;
+      // Now that we have our call graph, grab the CallSites of F.
+      auto &CallSites = CG.getPartialCallerEdges(F);
 
-        // Now that we have our call graph, grab the CallSites of F.
-        auto &CallSites = CG.getPartialCallerEdges(F);
+      // If this function is not called anywhere, for now don't do anything.
+      //
+      // TODO: If it is public, it may still make sense to specialize since if
+      // we link in the public function in another module, we may be able to
+      // inline it and access the specialized version.
+      if (CallSites.empty())
+        continue;
 
-        // If this function is not called anywhere, for now don't do anything.
-        //
-        // TODO: If it is public, it may still make sense to specialize since if
-        // we link in the public function in another module, we may be able to
-        // inline it and access the specialized version.
-        if (CallSites.empty())
-          continue;
-
-        // Otherwise, try to optimize the function signature of F.
-        Changed |= optimizeFunctionSignature(Allocator, RCIA->get(F), F, CG,
-                                             CallSites,
-                                             DeadFunctions);
-      }
+      // Otherwise, try to optimize the function signature of F.
+      Changed |= optimizeFunctionSignature(Allocator, RCIA->get(F), F, CG,
+                                           CallSites,
+                                           DeadFunctions);
     }
 
     while (!DeadFunctions.empty()) {
