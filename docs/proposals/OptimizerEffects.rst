@@ -122,6 +122,9 @@ CoW Optimization Requirements
    sent out to the list.  As Andrew points out this can be recast in
    terms @effects attributes and argument attributes.
 
+   [arnold] Scroll down to the Swift-level attributes proposal for a swift level
+   syntax proposal.
+
 Copy-on-write type effects proposal
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -506,12 +509,260 @@ while ``(empty) arg`` implies may-capture but not may-release.
 
 Maybe the answer is to indeed add a ``@no_release_type_of_argument`` attribute?
 
+[arnold] As Andy points out this can be nicely expressed using a polymorphic
+effects system.
+
+Swift-level attributes proposal
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A copy-on-write (COW) type is implemented in terms of a struct and a set of
+storage objects referenced by this struct. The set of storage objects can
+further provide storage for subobjects.::
+
+  class ArrayStorage<T> {
+    func getElement(index: Int) -> T {} // Return a 'subobject'.
+  }
+
+  struct Array<T> {
+    var storage: ArrayStorage // Storage object
+  }
+
+In the following we will list a set of function attributes that can be used to
+describe properties of methods of such a data structure to facilitate
+optimization.
+
+A COW type implements value semantics by delaying the copy of storage of the
+type until modification.
+
+An instance of a struct is in a uniqued state if changes to the set of storage
+objects can only be observed by method calls on references to the instance of
+the struct (versus by method calls on other instances). Typically, one would
+implement this behavior by checking whether the references to the storage
+objects are uniquely referenced and copying the storage objects on modification
+if they are not. In the following we refer to the memory holding the instance
+of the struct and the set of storage objects as the self state. Non-self state
+below refers to the state of the rest of the program not including the self
+state.
+
+``@make_unique``
+
+  A method marked ``@make_unique`` changes the state of the instance of the COW
+  type (``self``) to the uniqued state. It must do so without changing or
+  depending on non-self state or changing the self-state (other than the change
+  to a uniqued state). It must be an idempotent operation.::
+
+    struct Array<T> {
+      var storage: ArrayStorage
+
+      @makeunique
+      mutating func makeUnique() {
+        if (isUniquelyReferenced(&storage))
+          return
+        storage = storage.copy()
+      }
+
+  Note: In terms of low-level SIL attributes such a method will be marked:::
+
+    @effects(argonly)
+    @selfeffects(make_unique)
+    func makeUnique() {}
+
+``@preserve_unique``
+
+  A method marked ``@preserve_unique`` must guarantee to not change the
+  uniqueness state of ``self`` from a unique state to a not unique state.  An
+  example of a violation of this guarantee would be to store ``self`` in a
+  global variable.
+  The method must not return a storage object or address there-of that could be
+  used to change the uniqueness state of ``self``. An example of a violation of
+  this guarantee would be a method that returns a storage object.::
+
+    struct Array<T> {
+      var storage: ArrayStorage
+
+      @preserve_unique
+      mutating func replaceRange<
+        C: CollectionType where C.Generator.Element == T
+      >(
+        subRange: Range<Int>, with newElements: C
+      ) { ... }
+
+      // We could also mark the following function as @preserve_unique
+      // but we have an attribute for this function that better describes it
+      // allowing for more optimization. (See @get_subobject)
+      @preserve_unique
+      func getElement(index: Int) -> T {
+        return storage.elementAt(index)
+      }
+    }
+
+  Note: In terms of low-leve SIL attributes such a method will be marked:::
+
+    @self_effects(preserve_unique, nocapture, norelease)
+    func replaceRange<> {}
+
+``@get_subobject``
+
+  A method marked ``@get_subobject`` must fullfill all of ``@preserve_unique``'s
+  guarantees. Furthermore, it must return a 'subobject' that is stored by the
+  set of storage objects or a value stored in the CoW struct itself. It must be
+  guaranteed that the 'subobject' returned is kept alive as long the current
+  value of the 'self' object is alive. Neither the self state nor the non-self
+  state is changed and the method must not depend on non-self state.::
+
+    struct Array<T> {
+      var storage: ArrayStorage
+      var size : Int
+
+      @get_subobject
+      func getElement(index: Int) -> T {
+        return storage.elementAt(index)
+      }
+
+      @get_subobject
+      func getSize() -> Int {
+        return size
+      }
+
+  Note: In terms of low-level SIL attributes such a method will be marked:::
+
+    @effects(argonly)
+    @selfeffects(preserve_unique, nowrite, nocapture, norelease,
+                 projects_subobject)
+    func getElement(index: Int) -> T {}
+
+.. note::
+
+  For the standard library's data types ``@get_subobject`` guarantees are too
+  strong. An array can use an NSArray as its storage (it is in a bridged state)
+  in which case we can't make assumptions on effects on non-self state. For this
+  purpose we introduce a variant of the attribute above whose statement about
+  global effects are predicated on the array being in a non-bridged state.
+
+``@get_subobject_non_bridged``
+
+  A method marked ``@get_subobject`` must fullfill all of ``@preserve_unique``'s
+  guarantees. Furthermore, it must return a 'subobject' that is stored by the
+  set of storage objects or a value stored in the CoW struct itself. It must be
+  guaranteed that the 'subobject' returned is kept alive as long the current
+  value of the 'self' object is alive. The self state is not changed. The non-self
+  state is not changed and the method must not depend on non-self state if the
+  ``self`` is in a non-bridged state. In a bridged state the optimizer will
+  assume that subsequent calls on the same 'self' object to return the
+  same value however it will not assume anything about effects on non-self
+  state.::
+
+    struct Array<T> {
+      var storage: BridgedArrayStorage
+      var size : Int
+
+      @get_subobject
+      func getElement(index: Int) -> T {
+        return storage.elementAt(index)
+      }
+
+      @get_subobject
+      func getSize() -> Int {
+        return size
+      }
+
+  Note: In terms of low-level SIL attributes such a method will be marked:::
+
+    @nonbridged_effects(argonly)
+    @selfeffects(preserve_unique, nowrite, nocapture, norelease,
+                 projects_subobject)
+    func getElement(index: Int) -> T {}
+
+
+``@get_subobject_addr``
+
+  A method marked ``@get_subobject_addr`` must fullfill all of
+  ``@preserve_unique``'s guarantees. Furthermore, it must return the address of
+  a 'subobject' that is stored by the set of storage objects. It is guaranteed
+  that the 'subobject' at the address returned is kept alive as long the current
+  value of the 'self' object is alive. Neither the self state nor the non-self
+  state is changed and the method must not depend on non-self state.::
+
+    struct Array<T> {
+      var storage: ArrayStorage
+
+      @get_subobject_addr
+      func getElementAddr(index: Int) -> UnsafeMutablePointer<T> {
+        return storage.elementAddrAt(index)
+      }
+
+  Note: In terms of low-level SIL attributes such a method will be marked:::
+
+    @effects(argonly)
+    @selfeffects(preserve_unique, nowrite, nocapture, norelease,
+                 projects_subobject_addr)
+    func getElementAddr(index: Int) -> T {}
+
+``@initialize_subobject``
+
+  A method marked ``@initialize_subobject`` must fullfill all of
+  ``@preserve_unique``'s guarantees. The method must only store its arguments
+  into *uninitialized* storage. The only effect to non-self state is the capture
+  of the method's arguments.::
+
+    struct Array<T> {
+      var storage: ArrayStorage
+
+      @initialize_subobject
+      func appendAssumingUniqueStorage(elt: T) {
+        storage.append(elt)
+      }
+    }
+
+  Note: In terms of low-level SIL attributes such a method will be marked:::
+
+    @effects(argonly)
+    @selfeffects(preserve_unique, nocapture, norelease)
+    func appendElementAssumingUnique(@norelease @nowrite elt: T) {}
+
+.. note::
+
+   [arnold] We would like to express something like ``@set_subobject``, too.
+   However, we probably want to delay this until we have a polymorphic effects
+   type system.
+
+``@set_subject``
+
+  A method marked ``@initialize_subobject`` must fullfill all of
+  ``@preserve_unique``'s guarantees. The method must only store its arguments
+  into *initialized* storage. The only effect to non-self state is the capture
+  of the method's arguments and the release of objects of the method arguments'
+  types.::
+
+    struct Array<T> {
+      var storage: ArrayStorage
+
+      @set_suobject
+      func setElement(elt: T, atIndex: Int) {
+        storage.set(elt, atIndex)
+      }
+    }
+
+
+.. note::
+
+   [arnold] As Andy points out, this would be best expressed using an effect
+   type system.
+
+
+  Note: In terms of low-level SIL attributes such a method will be marked:::
+
+    @effects(argonly, T.release)
+    @selfeffects(preserve_unique, nocapture)
+    func setElement(@nowrite e: T, index: Int) {
+    }
 
 Examples of Optimization Using Effects Primitives
 -------------------------------------------------
 
 CoW optimization: [Let's copy over examples from Arnold's proposal]
-[See Copy-on-write proposal above]
+
+[See the Copy-on-write proposal above]
 
 String initialization: [TBD]
 
