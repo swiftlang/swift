@@ -61,7 +61,7 @@ private:
   bool passModulePathElements(ArrayRef<ImportDecl::AccessPathElement> Path,
                               const clang::Module *ClangMod);
 
-  bool passReference(ValueDecl *D, SourceLoc Loc);
+  bool passReference(ValueDecl *D, Type Ty, SourceLoc Loc);
   bool passReference(ModuleEntity Mod, std::pair<Identifier, SourceLoc> IdLoc);
 
   bool passSubscriptReference(ValueDecl *D, SourceLoc Loc, bool IsOpenBracket);
@@ -200,14 +200,14 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
       if (!passReference(ModuleEntity(module), std::make_pair(module->getName(), E->getLoc())))
         return { false, nullptr };
-    } else if (!passReference(DRE->getDecl(), E->getLoc())) {
+    } else if (!passReference(DRE->getDecl(), DRE->getType(), E->getLoc())) {
       return { false, nullptr };
     }
   } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(E)) {
     // Visit in source order.
     if (!MRE->getBase()->walk(*this))
       return { false, nullptr };
-    if (!passReference(MRE->getMember().getDecl(), E->getLoc()))
+    if (!passReference(MRE->getMember().getDecl(), MRE->getType(), E->getLoc()))
       return { false, nullptr };
 
     // We already visited the children.
@@ -216,7 +216,8 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     return { false, E };
 
   } else if (auto OtherCtorE = dyn_cast<OtherConstructorDeclRefExpr>(E)) {
-    if (!passReference(OtherCtorE->getDecl(), OtherCtorE->getConstructorLoc()))
+    if (!passReference(OtherCtorE->getDecl(), OtherCtorE->getType(),
+                       OtherCtorE->getConstructorLoc()))
       return { false, nullptr };
 
   } else if (SubscriptExpr *SE = dyn_cast<SubscriptExpr>(E)) {
@@ -280,7 +281,7 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
         return passReference(ModD, std::make_pair(IdT->getIdentifier(),
                                                   IdT->getIdLoc()));
 
-      return passReference(VD, IdT->getIdLoc());
+      return passReference(VD, Type(), IdT->getIdLoc());
     }
   }
   return true;
@@ -331,7 +332,7 @@ bool SemaAnnotator::handleImports(ImportDecl *Import) {
 
   auto Decls = Import->getDecls();
   if (Decls.size() == 1) {
-    if (!passReference(Decls.front(), Import->getEndLoc()))
+    if (!passReference(Decls.front(), Type(), Import->getEndLoc()))
       return false;
   }
 
@@ -363,7 +364,7 @@ bool SemaAnnotator::passSubscriptReference(ValueDecl *D, SourceLoc Loc,
   return Continue;
 }
 
-bool SemaAnnotator::passReference(ValueDecl *D, SourceLoc Loc) {
+bool SemaAnnotator::passReference(ValueDecl *D, Type Ty, SourceLoc Loc) {
   unsigned NameLen = D->getName().getLength();
   TypeDecl *CtorTyRef = nullptr;
 
@@ -379,7 +380,7 @@ bool SemaAnnotator::passReference(ValueDecl *D, SourceLoc Loc) {
 
   CharSourceRange Range = (Loc.isValid()) ? CharSourceRange(Loc, NameLen)
                                           : CharSourceRange();
-  bool Continue = SEWalker.visitDeclReference(D, Range, CtorTyRef);
+  bool Continue = SEWalker.visitDeclReference(D, Range, CtorTyRef, Ty);
   if (!Continue)
     Cancelled = true;
   return Continue;
@@ -450,13 +451,18 @@ bool SourceEntityWalker::walk(DeclContext *DC) {
   return DC->walkContext(Annotator);
 }
 
+bool SourceEntityWalker::visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                                            TypeDecl *CtorTyRef, Type T) {
+  return true;
+}
+
 bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
                                                  CharSourceRange Range,
                                                  bool IsOpenBracket) {
   // Most of the clients treat subscript reference the same way as a
   // regular reference when called on the open open bracket and
   // ignore the closing one.
-  return IsOpenBracket ? visitDeclReference(D, Range, nullptr) : true;
+  return IsOpenBracket ? visitDeclReference(D, Range, nullptr, Type()) : true;
 }
 
 bool SourceEntityWalker::visitCallArgName(Identifier Name,

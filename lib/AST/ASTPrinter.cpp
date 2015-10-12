@@ -69,6 +69,27 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
   return Builder.str();
 }
 
+bool ASTPrinter::printTypeInterface(Type Ty, llvm::raw_ostream &OS) {
+  if (!Ty)
+    return false;
+  PrintOptions Options = PrintOptions::printInterface();
+  Options.printExtensionContentAsMembers = [](const ExtensionDecl *ED) {
+    return true;
+  };
+  if (auto ND = Ty->getRValueType()->getNominalOrBoundGenericNominal()) {
+    ND->print(OS, Options);
+    return true;
+  }
+  return false;
+}
+
+bool ASTPrinter::printTypeInterface(Type Ty, std::string &Buffer) {
+  llvm::raw_string_ostream OS(Buffer);
+  auto Result = printTypeInterface(Ty, OS);
+  OS.str();
+  return Result;
+}
+
 void ASTPrinter::anchor() {}
 
 void ASTPrinter::printIndent() {
@@ -352,7 +373,8 @@ private:
   bool shouldPrintPattern(const Pattern *P);
   void printPatternType(const Pattern *P);
   void printAccessors(AbstractStorageDecl *ASD);
-  void printMembers(DeclRange members, bool needComma = false);
+  void printMembersOfDecl(Decl * NTD, bool needComma = false);
+  void printMembers(ArrayRef<Decl *> members, bool needComma = false);
   void printNominalDeclName(NominalTypeDecl *decl);
   void printInherited(const Decl *decl,
                       ArrayRef<TypeLoc> inherited,
@@ -641,6 +663,11 @@ void PrintAST::printPatternType(const Pattern *P) {
 }
 
 bool PrintAST::shouldPrint(const Decl *D) {
+  if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
+    if (Options.printExtensionContentAsMembers(ED))
+      return false;
+  }
+
   if (Options.SkipDeinit && isa<DestructorDecl>(D)) {
     return false;
   }
@@ -885,7 +912,26 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   Printer << "}";
 }
 
-void PrintAST::printMembers(DeclRange members, bool needComma) {
+void PrintAST::printMembersOfDecl(Decl *D, bool needComma) {
+  llvm::SmallVector<Decl *, 3> Members;
+  auto AddDeclFunc = [&](DeclRange Range) {
+    for (auto RD : Range)
+      Members.push_back(RD);
+  };
+
+  if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+    AddDeclFunc(Ext->getMembers());
+  } else if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
+    AddDeclFunc(NTD->getMembers());
+    for (auto Ext : NTD->getExtensions()) {
+      if (Options.printExtensionContentAsMembers(Ext))
+        AddDeclFunc(Ext->getMembers());
+    }
+  }
+  printMembers(Members, needComma);
+}
+
+void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
   Printer << " {";
   Printer.printNewline();
   {
@@ -1146,7 +1192,7 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
     printWhereClause(GPs->getRequirements());
   }
   if (Options.TypeDefinitions) {
-    printMembers(decl->getMembers());
+    printMembersOfDecl(decl);
   }
 }
 
@@ -1274,7 +1320,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
     });
   printInherited(decl);
   if (Options.TypeDefinitions) {
-    printMembers(decl->getMembers());
+    printMembersOfDecl(decl);
   }
 }
 
@@ -1290,7 +1336,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
     });
   printInherited(decl);
   if (Options.TypeDefinitions) {
-    printMembers(decl->getMembers());
+    printMembersOfDecl(decl);
   }
 }
 
@@ -1308,7 +1354,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
   printInherited(decl);
 
   if (Options.TypeDefinitions) {
-    printMembers(decl->getMembers());
+    printMembersOfDecl(decl);
   }
 }
 
@@ -1341,7 +1387,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 
   printInherited(decl, explicitClass);
   if (Options.TypeDefinitions) {
-    printMembers(decl->getMembers());
+    printMembersOfDecl(decl);
   }
 }
 

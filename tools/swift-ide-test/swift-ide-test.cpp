@@ -86,6 +86,7 @@ enum class ActionType {
   PrintModuleImports,
   PrintUSRs,
   PrintLocalTypes,
+  PrintTypeInterface,
   TestCreateCompilerInvocation,
   CompilerInvocationFromModule,
   GenerateModuleAPIDescription,
@@ -192,6 +193,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
            clEnumValN(ActionType::DiffModuleAPI,
                       "diff-module-api",
                       "Compare machine-readable descriptions of module API"),
+           clEnumValN(ActionType::PrintTypeInterface,
+                      "print-type-interface",
+                      "Print type-specific interface decl"),
            clEnumValEnd));
 
 static llvm::cl::opt<std::string>
@@ -458,6 +462,8 @@ static llvm::cl::list<std::string>
 HeaderToPrint("header-to-print",
               llvm::cl::desc("Header filename to print swift interface for"));
 
+static llvm::cl::opt<std::string>
+LineColumnPair("pos", llvm::cl::desc("Line:Column pair"));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -1162,14 +1168,14 @@ private:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef) override {
+                          TypeDecl *CtorTyRef, Type Ty) override {
     annotateSourceEntity({ Range, D, CtorTyRef, /*IsRef=*/true });
     return true;
   }
 
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override {
-    return visitDeclReference(D, Range, nullptr);
+    return visitDeclReference(D, Range, nullptr, Type());
   }
 
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
@@ -2216,6 +2222,52 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
   return ExitCode;
 }
 
+
+//============================================================================//
+// Print type interfaces.
+//============================================================================//
+static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
+                                const StringRef FileName,
+                                const StringRef LCPair) {
+  auto Pair = parseLineCol(LCPair);
+  if (!Pair.hasValue())
+    return 1;
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.addInputFilename(FileName);
+  CompilerInstance CI;
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performSema();
+  SourceFile *SF = nullptr;
+  unsigned BufID = CI.getInputBufferIDs().back();
+  for (auto Unit : CI.getMainModule()->getFiles()) {
+    SF = dyn_cast<SourceFile>(Unit);
+    if (SF)
+      break;
+  }
+  assert(SF && "no source file?");
+  SemaLocResolver Resolver(*SF);
+  SourceManager &SM = SF->getASTContext().SourceMgr;
+  auto Offset = SM.resolveFromLineCol(BufID, Pair.getValue().first,
+                                      Pair.getValue().second);
+  if (!Offset.hasValue()) {
+    llvm::errs() << "Cannot resolve source location.\n";
+    return 1;
+  }
+  SourceLoc Loc = Lexer::getLocForStartOfToken(SM, BufID, Offset.getValue());
+  auto SemaT = Resolver.resolve(Loc);
+  if (SemaT.isInvalid()) {
+    llvm::errs() << "Cannot find sema token at the given location.\n";
+    return 1;
+  }
+  if (SemaT.Ty.isNull()) {
+    llvm::errs() << "Cannot get type of the sema token.\n";
+    return 1;
+  }
+  ASTPrinter::printTypeInterface(SemaT.Ty, llvm::outs());
+  return 0;
+}
+
 //============================================================================//
 // Print USRs
 //============================================================================//
@@ -2633,6 +2685,11 @@ int main(int argc, char *argv[]) {
 
   case ActionType::PrintUSRs:
     ExitCode = doPrintUSRs(InitInvok, options::SourceFilename);
+    break;
+  case ActionType::PrintTypeInterface:
+    ExitCode = doPrintTypeInterface(InitInvok,
+                                    options::SourceFilename,
+                                    options::LineColumnPair);
     break;
   }
 

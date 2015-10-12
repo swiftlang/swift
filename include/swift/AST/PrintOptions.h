@@ -19,6 +19,7 @@
 namespace swift {
 class GenericParamList;
 class CanType;
+class ExtensionDecl;
 enum DeclAttrKind : unsigned;
 
 /// Options for printing AST nodes.
@@ -155,6 +156,11 @@ struct PrintOptions {
     MatchSource,
     BothAlways,
   };
+
+  /// Whether to print the content of an extension decl inside the type decl where it
+  /// extends from.
+  std::function<bool(const ExtensionDecl *)> printExtensionContentAsMembers =
+    [] (const ExtensionDecl *) { return false; };
 
   /// How to print the keyword argument and parameter name in functions.
   ArgAndParamPrintingMode ArgAndParamPrinting =

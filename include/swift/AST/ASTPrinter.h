@@ -22,6 +22,7 @@ namespace swift {
   class Decl;
   class ModuleEntity;
   class TypeDecl;
+  class Type;
 
 /// Describes the context in which a name is being printed, which
 /// affects the keywords that need to be escaped.
@@ -98,6 +99,8 @@ public:
 
   /// To sanitize a malformatted utf8 string to a well-formatted one.
   static std::string sanitizeUtf8(StringRef Text);
+  static bool printTypeInterface(Type Ty, std::string &Result);
+  static bool printTypeInterface(Type Ty, llvm::raw_ostream &Out);
 
 private:
   virtual void anchor();

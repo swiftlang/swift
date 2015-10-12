@@ -33,6 +33,7 @@ namespace swift {
   class TypeDecl;
   class Stmt;
   class Expr;
+  class Type;
 
 namespace ide {
 
@@ -87,7 +88,7 @@ public:
   /// \c ConstructorDecl, to point to the type declaration that the source
   /// refers to.
   virtual bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                                  TypeDecl *CtorTyRef) { return true; }
+                                  TypeDecl *CtorTyRef, Type T);
 
   /// This method is called when a ValueDecl for a subscript is referenced in
   /// source. If it returns false, the remaining traversal is terminated

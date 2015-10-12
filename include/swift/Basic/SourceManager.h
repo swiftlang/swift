@@ -24,7 +24,6 @@ namespace swift {
 /// \brief This class manages and owns source buffers.
 class SourceManager {
   llvm::SourceMgr LLVMSourceMgr;
-
   unsigned CodeCompletionBufferID = 0U;
   unsigned CodeCompletionOffset;
 
@@ -210,6 +209,16 @@ public:
 
   /// Verifies that all buffers are still valid.
   void verifyAllBuffers() const;
+
+  /// Translate line and column pair to the offset.
+  llvm::Optional<unsigned> resolveFromLineCol(unsigned BufferId, unsigned Line,
+                                              unsigned Col) const;
+
+  SourceLoc getLocForLineCol(unsigned BufferId, unsigned Line, unsigned Col) const {
+    auto Offset = resolveFromLineCol(BufferId, Line, Col);
+    return Offset.hasValue() ? getLocForOffset(BufferId, Offset.getValue()) :
+                               SourceLoc();
+  }
 
 private:
   const VirtualFile *getVirtualFile(SourceLoc Loc) const;

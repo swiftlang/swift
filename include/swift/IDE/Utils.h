@@ -14,6 +14,9 @@
 #define SWIFT_IDE_UTILS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/ASTPrinter.h"
+#include "swift/IDE/SourceEntityWalker.h"
 #include "llvm/ADT/StringRef.h"
 #include <memory>
 #include <string>
@@ -35,6 +38,13 @@ namespace swift {
   class ValueDecl;
   class ASTContext;
   class CompilerInvocation;
+  class SourceFile;
+  class TypeDecl;
+  class SourceLoc;
+  class Type;
+  class Decl;
+  class ClangNode;
+  class ClangImporter;
 
 namespace ide {
 struct SourceCompleteResult {
@@ -101,7 +111,72 @@ std::unique_ptr<llvm::MemoryBuffer>
   replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
                       bool *HadPlaceholder = nullptr);
 
+void getLocationInfo(const ValueDecl *VD,
+                     llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
+                     StringRef &Filename);
 
+void getLocationInfoForClangNode(ClangNode ClangNode,
+                                 ClangImporter *Importer,
+       llvm::Optional<std::pair<unsigned, unsigned>> &DeclarationLoc,
+                                 StringRef &Filename);
+
+Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
+
+class XMLEscapingPrinter : public StreamPrinter {
+  public:
+  XMLEscapingPrinter(raw_ostream &OS) : StreamPrinter(OS){};
+  void printText(StringRef Text) override;
+  void printXML(StringRef Text);
+};
+
+struct SemaToken {
+  ValueDecl *ValueD = nullptr;
+  TypeDecl *CtorTyRef = nullptr;
+  ModuleEntity Mod;
+  SourceLoc Loc;
+  bool IsRef = true;
+  bool IsKeywordArgument = false;
+  Type Ty;
+
+  SemaToken() = default;
+  SemaToken(ValueDecl *ValueD, TypeDecl *CtorTyRef, SourceLoc Loc, bool IsRef,
+            Type Ty) : ValueD(ValueD), CtorTyRef(CtorTyRef), Loc(Loc),
+            IsRef(IsRef), Ty(Ty) { }
+  SemaToken(ModuleEntity Mod, SourceLoc Loc) : Mod(Mod), Loc(Loc) { }
+
+  bool isValid() const { return ValueD != nullptr || Mod; }
+  bool isInvalid() const { return !isValid(); }
+};
+
+class SemaLocResolver : public SourceEntityWalker {
+  SourceFile &SrcFile;
+  SourceLoc LocToResolve;
+  SemaToken SemaTok;
+
+public:
+  explicit SemaLocResolver(SourceFile &SrcFile) : SrcFile(SrcFile) { }
+  SemaToken resolve(SourceLoc Loc);
+  SourceManager &getSourceMgr() const;
+private:
+  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
+  bool walkToDeclPost(Decl *D) override;
+  bool walkToStmtPre(Stmt *S) override;
+  bool walkToStmtPost(Stmt *S) override;
+  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
+                          TypeDecl *CtorTyRef, Type T) override;
+  bool visitCallArgName(Identifier Name, CharSourceRange Range,
+                        ValueDecl *D) override;
+  bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override;
+  bool rangeContainsLoc(SourceRange Range) const {
+    return getSourceMgr().rangeContainsTokenLoc(Range, LocToResolve);
+  }
+  bool isDone() const { return SemaTok.isValid(); }
+  bool tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
+                  SourceLoc Loc, bool IsRef, Type Ty = Type());
+  bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
+  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+                               bool IsOpenBracket) override;
+};
 } // namespace ide
 } // namespace swift
 

@@ -280,3 +280,36 @@ void CharSourceRange::print(raw_ostream &OS, const SourceManager &SM,
 void CharSourceRange::dump(const SourceManager &SM) const {
   print(llvm::errs(), SM);
 }
+
+llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
+                                                           unsigned Line,
+                                                           unsigned Col) const {
+  if (Line == 0 || Col == 0) {
+    return None;
+  }
+  auto InputBuf = getLLVMSourceMgr().getMemoryBuffer(BufferId);
+  const char *Ptr = InputBuf->getBufferStart();
+  const char *End = InputBuf->getBufferEnd();
+  const char *LineStart = Ptr;
+  for (; Ptr < End; ++Ptr) {
+    if (*Ptr == '\n') {
+      --Line;
+      if (Line == 0)
+        break;
+      LineStart = Ptr+1;
+    }
+  }
+  if (Line != 0) {
+    return None;
+  }
+  Ptr = LineStart;
+  for (; Ptr < End; ++Ptr) {
+    --Col;
+    if (Col == 0)
+      return Ptr - InputBuf->getBufferStart();
+    if (*Ptr == '\n')
+      break;
+  }
+  return None;
+}
+

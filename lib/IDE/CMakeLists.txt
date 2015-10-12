@@ -7,6 +7,7 @@ add_swift_library(swiftIDE
   SourceEntityWalker.cpp
   SyntaxModel.cpp
   Utils.cpp
+  SwiftSourceDocInfo.cpp
   LINK_LIBRARIES
     swiftFrontend
     swiftClangImporter
