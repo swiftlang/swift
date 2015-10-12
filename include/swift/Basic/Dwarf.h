@@ -20,6 +20,8 @@
 #include "llvm/Support/Dwarf.h"
 
 namespace swift {
+  /// The DWARF version emitted by the Swift compiler.
+  const unsigned DWARFVersion = 3;
   static const char MachOASTSegmentName[] = "__SWIFT";
   static const char MachOASTSectionName[] = "__ast";
   static const char ELFASTSectionName[] = ".swift_ast";

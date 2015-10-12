@@ -58,8 +58,9 @@ func foo(var a: Int64, var _ b: Int64) -> Int64 {
      }
 }
 
+// CHECK-DAG: ![[FILE_CWD:[0-9]+]] = !DIFile(filename: "{{.*}}DebugInfo/basic.swift", directory: "{{.*}}")
 // CHECK-DAG: ![[MAINFILE:[0-9]+]] = !DIFile(filename: "basic.swift", directory: "{{.*}}DebugInfo")
-// CHECK-DAG: !DICompileUnit({{.*}}file: ![[MAINFILE]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}} flags: "{{[^"]*}}-emit-ir
+// CHECK-DAG: !DICompileUnit(language: DW_LANG_Swift, file: ![[FILE_CWD]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}} flags: "{{[^"]*}}-emit-ir
 // CHECK-DAG: !DISubprogram(name: "main"
 
 // Function type for foo.
@@ -73,4 +74,4 @@ func foo(var a: Int64, var _ b: Int64) -> Int64 {
 // CHECK-DAG:  i32 2, !"Dwarf Version", i32 3}
 
 // Debug Info Version
-// CHECK-DAG:  i32 1, !"Debug Info Version", i32
+// CHECK-DAG:  i32 2, !"Debug Info Version", i32

@@ -1047,6 +1047,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       CompilerInvocation::buildDWARFDebugFlags(Opts.DWARFDebugFlags,
                                                RenderedArgs, SDKPath,
                                                ResourceDir);
+      // TODO: Should we support -fdebug-compilation-dir?
+      llvm::SmallString<256> cwd;
+      llvm::sys::fs::current_path(cwd);
+      Opts.DebugCompilationDir = cwd.str();
     }
   }
 

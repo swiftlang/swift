@@ -92,7 +92,6 @@ static unsigned getSizeInBits(const llvm::DILocalVariable *Var,
   return getSizeInBits(Ty, Map);
 }
 
-
 IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
                                ClangImporter &CI,
                                IRGenModule &IGM,
@@ -114,29 +113,17 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
          && "no debug info should be generated");
   StringRef SourceFileName = SF ? SF->getFilename() :
                                   StringRef(Opts.MainInputFilename);
-  StringRef Dir, Filename;
-  if (SourceFileName.empty()) {
-    Filename = "<unknown>";
-    Dir = getCurrentDirname();
-  } else {
-    // Separate path and filename.
-    Filename = BumpAllocatedString(llvm::sys::path::filename(SourceFileName));
-    llvm::SmallString<512> Path(SourceFileName);
-    llvm::sys::path::remove_filename(Path);
-    llvm::sys::fs::make_absolute(Path);
-    llvm::SmallString<512> NPath;
-    llvm::sys::path::native(Twine(Path), NPath);
-    Dir = BumpAllocatedString(NPath);
+  StringRef Dir;
+  llvm::SmallString<256> AbsMainFile;
+  if (SourceFileName.empty())
+    AbsMainFile = "<unknown>";
+  else {
+    AbsMainFile = SourceFileName;
+    llvm::sys::fs::make_absolute(AbsMainFile);
   }
-  // The fallback file.
-  MainFilename = Dir;
-  llvm::sys::path::append(MainFilename, Filename);
-  MainFile = getOrCreateFile(MainFilename.c_str());
 
   unsigned Lang = llvm::dwarf::DW_LANG_Swift;
-
-  StringRef Producer = BumpAllocatedString(version::getSwiftFullVersion());
-
+  StringRef Producer = version::getSwiftFullVersion();
   bool IsOptimized = Opts.Optimize;
   StringRef Flags = Opts.DWARFDebugFlags;
   unsigned Major, Minor;
@@ -145,12 +132,15 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
 
   // No split DWARF on Darwin.
   StringRef SplitName = StringRef();
-  TheCU = DBuilder.
-    createCompileUnit(Lang, Filename, Dir, Producer, IsOptimized,
-                      Flags, RuntimeVersion, SplitName,
-                      Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables
-                      ? llvm::DIBuilder::LineTablesOnly
-                      : llvm::DIBuilder::FullDebug);
+  // Note that File + Dir need not result in a valid path.
+  // Clang is doing the same thing here.
+  TheCU = DBuilder.createCompileUnit(
+      Lang, AbsMainFile, Opts.DebugCompilationDir, Producer, IsOptimized,
+      Flags, RuntimeVersion, SplitName,
+      Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables
+          ? llvm::DIBuilder::LineTablesOnly
+          : llvm::DIBuilder::FullDebug);
+  MainFile = getOrCreateFile(BumpAllocatedString(AbsMainFile).data());
 
   if (auto *MainFunc = IGM.SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)) {
     IsLibrary = false;
@@ -167,8 +157,9 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   }
 
   // Create a module for the current compile unit.
+  llvm::sys::path::remove_filename(AbsMainFile);
   MainModule =
-      getOrCreateModule(Opts.ModuleName, TheCU, Opts.ModuleName, MainFilename);
+      getOrCreateModule(Opts.ModuleName, TheCU, Opts.ModuleName, AbsMainFile);
   DBuilder.createImportedModule(MainFile, MainModule, 1);
 }
 
@@ -450,22 +441,22 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
   return DScope;
 }
 
-/// getCurrentDirname - Return the current working directory.
-StringRef IRGenDebugInfo::getCurrentDirname() {
-  // FIXME: Clang has a global option to set the compilation
-  // directory. Do we have something similar for swift?
-
-  if (!CWDName.empty())
-    return CWDName;
-  llvm::SmallString<256> CWD;
-  llvm::sys::fs::current_path(CWD);
-  return BumpAllocatedString(CWD.str());
-}
-
 /// getOrCreateFile - Translate filenames into DIFiles.
 llvm::DIFile *IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   if (!Filename)
     return MainFile;
+
+  if (MainFile) {
+    SmallString<256> AbsMainFile, ThisFile;
+    AbsMainFile = Filename;
+    llvm::sys::fs::make_absolute(AbsMainFile);
+    llvm::sys::path::append(ThisFile, MainFile->getDirectory(),
+                            MainFile->getFilename());
+    if (ThisFile == AbsMainFile) {
+      DIFileCache[Filename] = llvm::TrackingMDNodeRef(MainFile);
+      return MainFile;
+    }
+  }
 
   // Look in the cache first.
   auto CachedFile = DIFileCache.find(Filename);
@@ -477,10 +468,10 @@ llvm::DIFile *IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   }
 
   // Create a new one.
-  StringRef File = BumpAllocatedString(llvm::sys::path::filename(Filename));
+  StringRef File = llvm::sys::path::filename(Filename);
   llvm::SmallString<512> Path(Filename);
   llvm::sys::path::remove_filename(Path);
-  llvm::DIFile *F = DBuilder.createFile(File, BumpAllocatedString(Path));
+  llvm::DIFile *F = DBuilder.createFile(File, Path);
 
   // Cache it.
   DIFileCache[Filename] = llvm::TrackingMDNodeRef(F);
@@ -797,7 +788,7 @@ IRGenDebugInfo::getOrCreateModule(ModuleDecl::ImportedModule M) {
 llvm::DIModule *IRGenDebugInfo::getOrCreateModule(StringRef Key,
                                                   llvm::DIScope *Parent,
                                                   StringRef Name,
-                                                  StringRef Filename) {
+                                                  StringRef IncludePath) {
   // Look in the cache first.
   auto Val = DIModuleCache.find(Key);
   if (Val != DIModuleCache.end())
@@ -805,8 +796,6 @@ llvm::DIModule *IRGenDebugInfo::getOrCreateModule(StringRef Key,
 
   StringRef ConfigMacros;
   StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
-  SmallString<256> IncludePath(Filename);
-  llvm::sys::path::remove_filename(IncludePath);
   auto M =
       DBuilder.createModule(Parent, Name, ConfigMacros, IncludePath, Sysroot);
   DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});

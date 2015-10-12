@@ -18,6 +18,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/Basic/Dwarf.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CharInfo.h"
@@ -81,14 +82,31 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.Optimize ? 3 : 0;
   CGO.DisableFPElim = Opts.DisableFPElim;
+  switch (Opts.DebugInfoKind) {
+  case IRGenDebugInfoKind::None:
+    CGO.setDebugInfo(clang::CodeGenOptions::DebugInfoKind::NoDebugInfo);
+    break;
+  case IRGenDebugInfoKind::LineTables:
+    CGO.setDebugInfo(clang::CodeGenOptions::DebugInfoKind::DebugLineTablesOnly);
+    break;
+ case IRGenDebugInfoKind::Normal:
+    CGO.setDebugInfo(clang::CodeGenOptions::DebugInfoKind::FullDebugInfo);
+    break;
+  }
+  if (Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
+    CGO.DebugCompilationDir = Opts.DebugCompilationDir;
+    CGO.DwarfVersion = swift::DWARFVersion;
+    CGO.DwarfDebugFlags = Opts.DWARFDebugFlags;
+  }
+
   auto &HSI = Importer->getClangPreprocessor()
-    .getHeaderSearchInfo().getHeaderSearchOpts();
+                  .getHeaderSearchInfo()
+                  .getHeaderSearchOpts();
   auto &PPO = Importer->getClangPreprocessor().getPreprocessorOpts();
   auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
                                                 ModuleName, HSI, PPO, CGO,
                                                 LLVMContext);
   ClangCodeGen->Initialize(ClangContext);
-
   return ClangCodeGen;
 }
 

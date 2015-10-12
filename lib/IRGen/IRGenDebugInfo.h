@@ -89,7 +89,6 @@ class IRGenDebugInfo {
   TrackingDIRefMap DIRefMap;
   llvm::SmallPtrSet<const llvm::DIType *, 16> IndirectEnumCases;
 
-  llvm::SmallString<256> MainFilename;
   llvm::BumpPtrAllocator DebugInfoNames;
   StringRef CWDName;               /// The current working directory.
   llvm::DICompileUnit *TheCU = nullptr; /// The current compilation unit.
@@ -234,9 +233,6 @@ public:
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                         StringRef Name);
 
-  /// Return the native, absolute path to the main file.
-  StringRef getMainFilename() const { return MainFilename; }
-
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder() { return DBuilder; }
 
@@ -255,7 +251,6 @@ private:
   llvm::DIScope *getOrCreateContext(DeclContext *DC);
   llvm::MDNode *createInlinedAt(SILDebugScope *Scope);
 
-  StringRef getCurrentDirname();
   llvm::DIFile *getOrCreateFile(const char *Filename);
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI);
   StringRef getName(const FuncDecl &FD);
@@ -275,7 +270,7 @@ private:
   llvm::DIFile *getFile(llvm::DIScope *Scope);
   llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule M);
   llvm::DIModule *getOrCreateModule(StringRef Key, llvm::DIScope *Parent,
-                                    StringRef Name, StringRef Filename);
+                                    StringRef Name, StringRef IncludePath);
   llvm::DIScope *getModule(StringRef MangledName);
   llvm::DINodeArray getStructMembers(NominalTypeDecl *D, Type BaseTy,
                                      llvm::DIScope *Scope, llvm::DIFile *File,

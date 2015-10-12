@@ -60,7 +60,11 @@ public:
   std::string MainInputFilename;
   std::vector<std::string> OutputFilenames;
   std::string ModuleName;
-  // The command line string that is to be stored in the DWARF debug info.
+
+  /// The compilation directory for the debug info.
+  std::string DebugCompilationDir;
+
+  /// The command line string that is to be stored in the DWARF debug info.
   std::string DWARFDebugFlags;
 
   /// The libraries and frameworks specified on the command line.
