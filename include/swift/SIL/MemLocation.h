@@ -163,6 +163,12 @@ public:
   /// Print MemLocation.
   void print() const;
 
+  /// Given the MemLocation Base, expand every leaf nodes in the type tree.
+  /// Include the intermediate nodes if OnlyLeafNode is false.
+  static void BreadthFirstList(MemLocation &Base, SILModule *Mod,
+                               MemLocationList &F,
+                               bool OnlyLeafNode);
+
   /// Expand this location to all individual fields it contains.
   ///
   /// In SIL, we can have a store to an aggregate and loads from its individual
