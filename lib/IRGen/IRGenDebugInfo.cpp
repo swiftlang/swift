@@ -123,7 +123,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   }
 
   unsigned Lang = llvm::dwarf::DW_LANG_Swift;
-  StringRef Producer = version::getSwiftFullVersion();
+  std::string Producer = version::getSwiftFullVersion();
   bool IsOptimized = Opts.Optimize;
   StringRef Flags = Opts.DWARFDebugFlags;
   unsigned Major, Minor;
