@@ -682,7 +682,8 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
   for (const CallGraphEdge *Edge : CallEdges) {
     const FullApplySite FAS = Edge->getApply();
 
-    if (!CG.hasSingleCallee(FAS)) continue;
+    if (!CG.hasSingleCallee(FAS))
+      continue;
 
     // Don't optimize functions that are marked with the opt.never attribute.
     if (FAS.getFunction()->shouldOptimize() &&

@@ -23,8 +23,8 @@ using namespace swift;
 //                                 LoopRegion
 //===----------------------------------------------------------------------===//
 
-LoopRegion::BBTy *LoopRegion::getBB() const {
-  return Ptr.get<BBTy *>();
+LoopRegion::BlockTy *LoopRegion::getBlock() const {
+  return Ptr.get<BlockTy *>();
 }
 
 LoopRegion::LoopTy *LoopRegion::getLoop() const {
@@ -46,7 +46,7 @@ void LoopRegion::dumpName() const {
 }
 
 void LoopRegion::printName(llvm::raw_ostream &os) const {
-  if (isBB()) {
+  if (isBlock()) {
     os << "BB" << getID();
     return;
   }
@@ -62,7 +62,7 @@ void LoopRegion::printName(llvm::raw_ostream &os) const {
 void LoopRegion::print(llvm::raw_ostream &os, bool isShort) const {
   os << "(region id:" << ID;
   os << " kind:";
-  if (isBB()) {
+  if (isBlock()) {
     os << "bb  ";
   } else if (isLoop()) {
     os << "loop";
@@ -107,9 +107,8 @@ LoopRegionFunctionInfo::LoopRegionFunctionInfo(FunctionTy *F,
 // Block Region Initialization
 //
 
-void LoopRegionFunctionInfo::
-initializeBlockRegionSuccessors(BBTy *BB, RegionTy *BBRegion,
-                                PostOrderFunctionInfo *PI) {
+void LoopRegionFunctionInfo::initializeBlockRegionSuccessors(
+    BlockTy *BB, RegionTy *BBRegion, PostOrderFunctionInfo *PI) {
   for (auto &SuccIter : BB->getSuccessors()) {
     unsigned SuccRPOIndex = *PI->getRPONumber(SuccIter.getBB());
     auto *SuccRegion = createRegion(SuccIter.getBB(), SuccRPOIndex);
@@ -121,11 +120,10 @@ initializeBlockRegionSuccessors(BBTy *BB, RegionTy *BBRegion,
   }
 }
 
-void LoopRegionFunctionInfo::
-markIrreducibleLoopPredecessorsOfNonLoopHeader(BBTy *NonHeaderBB,
-                                               RegionTy *NonHeaderBBRegion,
-                                               PostOrderFunctionInfo *PI) {
-  for (BBTy *Pred : NonHeaderBB->getPreds()) {
+void LoopRegionFunctionInfo::markIrreducibleLoopPredecessorsOfNonLoopHeader(
+    BlockTy *NonHeaderBB, RegionTy *NonHeaderBBRegion,
+    PostOrderFunctionInfo *PI) {
+  for (BlockTy *Pred : NonHeaderBB->getPreds()) {
     // If we do not have an RPO number for a predecessor, it is because the
     // predecessor is unreachable and a pass did not clean up after
     // itself. Just ignore it, it will be cleaned up by simplify-cfg.
@@ -163,7 +161,7 @@ void
 LoopRegionFunctionInfo::
 markMultipleLoopLatchLoopBackEdges(RegionTy *LoopHeaderRegion, LoopTy *Loop,
                                    PostOrderFunctionInfo *PI) {
-  llvm::SmallVector<BBTy *, 4> Latches;
+  llvm::SmallVector<BlockTy *, 4> Latches;
   Loop->getLoopLatches(Latches);
   assert(Latches.size() > 1 &&
          "Assumed that this loop had multiple loop latches");
@@ -183,7 +181,7 @@ void LoopRegionFunctionInfo::initializeBlockRegions(PostOrderFunctionInfo *PI,
   //
   // We use the RPO number of a BB as its Index in our data structures.
   for (auto P : PI->getEnumeratedReversePostOrder()) {
-    BBTy *BB = P.first;
+    BlockTy *BB = P.first;
     unsigned RPOIndex = P.second;
     auto *BBRegion = createRegion(BB, RPOIndex);
     assert(BBRegion && "Create region fail to create a BB?");
@@ -204,7 +202,7 @@ void LoopRegionFunctionInfo::initializeBlockRegions(PostOrderFunctionInfo *PI,
     auto *ParentRegion = Loop? getRegion(Loop) : getRegion(F);
 
     // Add BBRegion to the ParentRegion.
-    ParentRegion->addBBSubregion(BBRegion);
+    ParentRegion->addBlockSubregion(BBRegion);
 
     // Determine if this basic block is part of an irreducible loop by looking
     // at all blocks that are:
@@ -517,7 +515,7 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
     os << ")\n";
 
     os << "    (subregs";
-    if (!R->isBB()) {
+    if (!R->isBlock()) {
       // Go through the subregions.
       for (unsigned SID : R->getSubregions()) {
         os << "\n        ";
@@ -692,12 +690,12 @@ struct DOTGraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
       OSS << " Unknown CF Head";
     if (Node->Region->isUnknownControlFlowEdgeTail())
       OSS << " Unknown CF Tail";
-    if (!Node->Region->isBB())
+    if (!Node->Region->isBlock())
       return OSS.str();
     OSS << "\n";
     std::string Tmp1;
     raw_string_ostream OSS2(Tmp1);
-    OSS2 << *Node->Region->getBB();
+    OSS2 << *Node->Region->getBlock();
     std::string OutStr = OSS2.str();
     if (OutStr[0] == '\n')
       OutStr.erase(OutStr.begin());

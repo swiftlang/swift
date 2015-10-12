@@ -21,9 +21,9 @@
 /// basic blocks, and the top level function. This is meant to provide a
 /// function level pointer for summarizing information.
 ///
-/// 2. For each Region, if it has subregions (i.e. is not a BB), an RPO ordering
-/// of the Subregions are provided. Loops in this RPO ordering have the RPO
-/// number of their header.
+/// 2. For each Region, if it has subregions (i.e. is not a Block), an RPO
+/// ordering of the Subregions are provided. Loops in this RPO ordering have the
+/// RPO number of their header.
 ///
 /// 3. Natural loops are defined by the loops that SILLoopInfo can find. Thus it
 /// is useful to be able to know about loops that are not able to be found by
@@ -35,8 +35,8 @@
 /// - LoopRegion::isUnknownControlFlowEdgeHead().
 /// - LoopRegion::isUnknownControlFlowEdgeTail().
 ///
-/// We also mark BBs with multiple backedges with such markers and rely on loop
-/// canonicalization to handle them.
+/// We also mark Blocks with multiple backedges with such markers and rely on
+/// loop canonicalization to handle them.
 ///
 /// Algorithm
 /// =========
@@ -45,33 +45,33 @@
 /// the CFG once and reuse the information that is already provided via the loop
 /// info analysis and the post order analysis.
 ///
-/// We begin by visiting each BB in RPO order. During this RPO traversal, we:
+/// We begin by visiting each block in RPO order. During this RPO traversal, we:
 ///
-/// 1. Create LoopRegions for each BB and wire up each BBs predecessor and
-/// successor BBs as predecessors/successors of the BB.
+/// 1. Create LoopRegions for each block and wire up each block's predecessor
+/// and successor blocks as predecessors/successors of the block's region.
 ///
-/// 2. Detect any backedges that are unknown to SILLoopInfo and mark the BBs
+/// 2. Detect any backedges that are unknown to SILLoopInfo and mark the blocks
 /// that form the head/tail of the backedge as unknown control flow boundaries.
 ///
-/// 3. We lookup/create the region for the innermost loop that contains the BB
-/// and add the BB as a subregion of that loop.
+/// 3. We lookup/create the region for the innermost loop that contains the
+/// block and add the block's region as a subregion of that loop.
 ///
 /// Then we perform a postorder DFS of the loop nest. The postorder provides the
 /// inductive rule that all loops will be visited after all of their subloops
-/// hae been visited. If a Loop has no subloops (i.e. all subregions are BBs),
-/// we do nothing. Otherwise, if the loop does have subloops, we visit each
-/// subloop and do the following:
+/// hae been visited. If a Loop has no subloops (i.e. all subregions are
+/// blocks), we do nothing. Otherwise, if the loop does have subloops, we visit
+/// each subloop and do the following:
 ///
 /// 1. The region data structure of the header of the subloop still is the
-/// successor of its predecessor outside of the subloop in the various BB
+/// successor of its predecessor outside of the subloop in the various block
 /// datastructures. Rewire those regions to consider the loop to be their
 /// successor instead and make each of those regions on of the predecessors of
 /// the subloop. Then clear the predecessor list of the subloop's header
 /// region. The header should have no predecessor edges after this operation
 /// completes.
 ///
-/// 2. For each of the exiting blocks of the subloop (that is the BBs inside the
-/// loop that leave the subloop), we perform a similar operation as with the
+/// 2. For each of the exiting blocks of the subloop (that is the blocks inside
+/// the loop that leave the subloop), we perform a similar operation as with the
 /// header, replacing the predecessor edge in the exiting blocks successors with
 /// an edge pointing at the subloop instead of at the exiting block and
 /// vis-a-versa. After this is complete, the exiting blocks should have no
@@ -114,11 +114,12 @@ class LoopRegionFunctionInfo;
 class LoopRegion {
 
   /// This is a data structure that is an unsigned integer with a top bit flag
-  /// that says whether it is an RPO ID for a BB Region or is an RPO ID of the
-  /// header BB of a Loop Region that used as a placeholder to ensure that the
-  /// Loop is visited in the proper RPO order. When the placeholder flag is hit,
-  /// the subloop array should be searched for the pair that has that flag as a
-  /// first element. The loop's flag will be the second element of the pair.
+  /// that says whether it is an RPO ID for a Block Region or is an RPO ID of
+  /// the header Block of a Loop Region that used as a placeholder to ensure
+  /// that the Loop is visited in the proper RPO order. When the placeholder
+  /// flag is hit, the subloop array should be searched for the pair that has
+  /// that flag as a first element. The loop's flag will be the second element
+  /// of the pair.
   struct LoopRegionID {
     static constexpr unsigned IDBitSize = (sizeof(unsigned) * CHAR_BIT) - 1;
     static constexpr unsigned MaxID = (unsigned(1) << IDBitSize) - 1;
@@ -138,11 +139,11 @@ class LoopRegion {
   struct SubregionData;
 
 public:
-  /// We operate in terms of FunctionTy, LoopTy, and BBTy so that this can
+  /// We operate in terms of FunctionTy, LoopTy, and BlockTy so that this can
   /// potentially be ported to LLVM in the future.
   using FunctionTy = SILFunction;
   using LoopTy = SILLoop;
-  using BBTy = SILBasicBlock;
+  using BlockTy = SILBasicBlock;
 
   /// An iterator that knows how to iterate over the subregion indices of a
   /// region.
@@ -284,7 +285,7 @@ public:
 private:
   /// A pointer to one of a Loop, Basic Block, or Function represented by this
   /// region.
-  llvm::PointerUnion3<FunctionTy *, LoopTy *, BBTy *> Ptr;
+  llvm::PointerUnion3<FunctionTy *, LoopTy *, BlockTy *> Ptr;
 
   /// The ID of this region.
   unsigned ID;
@@ -318,10 +319,10 @@ private:
   /// about subregions of a loop.
   ///
   /// We tail allocate this onto LoopRegions for loops/functions so that in the
-  /// case of having a BB, we do not have any memory size overhead of these
+  /// case of having a Block, we do not have any memory size overhead of these
   /// SmallVectors, but at the same time have reasonable memory performance. In
   /// the case of loops this overhead is acceptable since we shouldn't have many
-  /// loops (compared to BBs).
+  /// loops (compared to Blocks).
   struct SubregionData {
     /// The RPO number of the header block of this loop or function. This is
     /// used as the RPO number for the whole region.
@@ -359,7 +360,7 @@ private:
     unsigned size() const { return Subregions.size(); }
     bool empty() const { return Subregions.empty(); }
 
-    void addBBSubregion(LoopRegion *R) {
+    void addBlockSubregion(LoopRegion *R) {
       assert(R->ID <= LoopRegionID::MaxID && "Unrepresentable ID");
       Subregions.push_back(LoopRegionID(R->ID, false));
     }
@@ -383,12 +384,12 @@ private:
   };
 
   SubregionData &getSubregionData() {
-    assert(!isBB() && "BBs do not have subregion data");
+    assert(!isBlock() && "BBs do not have subregion data");
     return reinterpret_cast<SubregionData &>(*(this + 1));
   }
 
   const SubregionData &getSubregionData() const {
-    assert(!isBB() && "BBs do not have subregion data");
+    assert(!isBlock() && "BBs do not have subregion data");
     return reinterpret_cast<const SubregionData &>(*(this + 1));
   }
 
@@ -413,7 +414,7 @@ public:
   /// We use tail allocation of the extra data for loops so we do not incur the
   /// memory cost of large SmallVectors for BBs.
   subregion_iterator subregion_begin() {
-    if (isBB())
+    if (isBlock())
       return subregion_iterator();
     return getSubregionData().begin();
   }
@@ -421,7 +422,7 @@ public:
   /// This is the end equivalent of subregion_begin(). Please see comment on
   /// subregion_begin().
   subregion_iterator subregion_end() {
-    if (isBB())
+    if (isBlock())
       return subregion_iterator();
     return getSubregionData().end();
   }
@@ -466,11 +467,11 @@ public:
   bool succ_empty() const { return Succs.empty(); }
   unsigned succ_size() const { return Succs.size(); }
 
-  BBTy *getBB() const;
+  BlockTy *getBlock() const;
   LoopTy *getLoop() const;
   FunctionTy *getFunction() const;
 
-  bool isBB() const { return Ptr.is<BBTy *>(); }
+  bool isBlock() const { return Ptr.is<BlockTy *>(); }
   bool isLoop() const { return Ptr.is<LoopTy *>(); }
   bool isFunction() const { return Ptr.is<FunctionTy *>(); }
 
@@ -500,7 +501,7 @@ public:
   unsigned getParentID() const { return *ParentID; }
 
   unsigned getRPONumber() const {
-    if (isBB())
+    if (isBlock())
       return getID();
     return getSubregionData().RPONumOfHeaderBlock;
   }
@@ -547,7 +548,7 @@ private:
         IsUnknownControlFlowEdgeHead(false),
         IsUnknownControlFlowEdgeTail(false) {}
 
-  LoopRegion(BBTy *BB, unsigned Idx)
+  LoopRegion(BlockTy *BB, unsigned Idx)
       : Ptr(BB), ID(Idx), ParentID(), Preds(), Succs(),
         IsUnknownControlFlowEdgeHead(false),
         IsUnknownControlFlowEdgeTail(false) {}
@@ -559,7 +560,7 @@ private:
 
   void setParent(LoopRegion *PR) {
     assert(!isFunction() && "Functions can not be subregions");
-    assert(!PR->isBB() && "BB regions can not be parents of a region");
+    assert(!PR->isBlock() && "BB regions can not be parents of a region");
     ParentID = PR->getID();
   }
 
@@ -575,17 +576,17 @@ private:
     sortUnique(Succs);
   }
 
-  void addBBSubregion(LoopRegion *R) {
-    assert(!isBB() && "Blocks can not have subregions");
-    assert(R->isBB() && "Assumed R was a basic block");
+  void addBlockSubregion(LoopRegion *R) {
+    assert(!isBlock() && "Blocks can not have subregions");
+    assert(R->isBlock() && "Assumed R was a basic block");
     R->setParent(this);
-    getSubregionData().addBBSubregion(R);
+    getSubregionData().addBlockSubregion(R);
   }
 
   void addLoopSubregion(LoopRegion *L, LoopRegion *Header) {
-    assert(!isBB() && "Blocks can not have subregions");
+    assert(!isBlock() && "Blocks can not have subregions");
     assert(L->isLoop() && "Assumed L was a loop");
-    assert(Header->isBB() && "Assumed Header was a loop");
+    assert(Header->isBlock() && "Assumed Header was a loop");
     L->setParent(this);
     getSubregionData().addLoopSubregion(L, Header);
   }
@@ -594,7 +595,7 @@ private:
 
 class LoopRegionFunctionInfo {
   using RegionTy = LoopRegion;
-  using BBTy = SILBasicBlock;
+  using BlockTy = SILBasicBlock;
   using LoopInfoTy = SILLoopInfo;
   using LoopTy = SILLoop;
   using FunctionTy = SILFunction;
@@ -612,7 +613,7 @@ class LoopRegionFunctionInfo {
   /// with the BB.
   ///
   /// *NOTE* This ID is *also* the function level RPO number of the BB.
-  llvm::DenseMap<BBTy *, unsigned> BBToIDMap;
+  llvm::DenseMap<BlockTy *, unsigned> BBToIDMap;
 
   /// A map from a Loop to the ID in the IDToRegionMap of the Region associated
   /// with the loop.
@@ -672,7 +673,7 @@ public:
     return IDToRegionMap[RegionID];
   }
 
-  RegionTy *getRegion(BBTy *BB) const {
+  RegionTy *getRegion(BlockTy *BB) const {
     assert(AllBBRegionsCreated && "All BB Regions have not been created yet?!");
     // Check if we have allocated a region for this BB. If so, just return it.
     auto Iter = BBToIDMap.find(BB);
@@ -732,7 +733,7 @@ public:
   void viewLoopRegions() const;
 
 private:
-  RegionTy *createRegion(BBTy *BB, unsigned RPONum) {
+  RegionTy *createRegion(BlockTy *BB, unsigned RPONum) {
     assert(!AllBBRegionsCreated && "All BB Regions have been created?!");
     // Check if we have allocated a region for this BB. If so, just return it.
     auto Iter = BBToIDMap.find(BB);
@@ -793,7 +794,7 @@ private:
   /// This helper routine for a given block, creates successor edges in between
   /// the block's region and all of the regions associated with the block's
   /// successor blocks.
-  void initializeBlockRegionSuccessors(BBTy *BB, RegionTy *BBRegion,
+  void initializeBlockRegionSuccessors(BlockTy *BB, RegionTy *BBRegion,
                                        PostOrderFunctionInfo *PI);
 
   /// This helper method goes through the predecessors of the basic block \p
@@ -806,7 +807,7 @@ private:
   ///
   /// TODO: This needs a better name.
   void
-  markIrreducibleLoopPredecessorsOfNonLoopHeader(BBTy *NonHeaderBB,
+  markIrreducibleLoopPredecessorsOfNonLoopHeader(BlockTy *NonHeaderBB,
                                                  RegionTy *NonHeaderBBRegion,
                                                  PostOrderFunctionInfo *PI);
 
