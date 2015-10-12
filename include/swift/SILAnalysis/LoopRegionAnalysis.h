@@ -147,7 +147,8 @@ public:
 
   /// An iterator that knows how to iterate over the subregion indices of a
   /// region.
-  class subregion_iterator {
+  class subregion_iterator :
+    public std::iterator<std::bidirectional_iterator_tag, unsigned> {
     friend struct SubregionData;
     llvm::SmallVectorImpl<LoopRegionID>::iterator InnerIter;
     const llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> *Subloops;
@@ -173,7 +174,7 @@ public:
     using reference = unsigned;
     using pointer = void;
     using iterator_category = std::bidirectional_iterator_tag;
-    using difference_type = void;
+    using difference_type = int;
 
     /// Construct a subregion_iterator suitable for use with a basic block. It
     /// does not contain any data and can only be compared against another
@@ -228,59 +229,7 @@ public:
     }
     bool operator!=(subregion_iterator rhs) const { return !(*this == rhs); }
   };
-
-  /// A reverse iterator version of subregion_iterator. See subregion_iterator
-  /// for more information.
-  class subregion_reverse_iterator {
-    friend struct SubregionData;
-
-    llvm::SmallVectorImpl<LoopRegionID>::reverse_iterator InnerIter;
-    const llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> &Subloops;
-
-    subregion_reverse_iterator(
-        llvm::SmallVectorImpl<LoopRegionID>::reverse_iterator iter,
-        const llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> &subloops)
-        : InnerIter(iter), Subloops(subloops) {}
-
-  public:
-    using value_type = unsigned;
-    using reference = unsigned;
-    using pointer = void;
-    using iterator_category = std::bidirectional_iterator_tag;
-    using difference_type = void;
-
-    unsigned operator*() const {
-      auto ID = *InnerIter;
-      if (!ID.IsLoop)
-        return ID.ID;
-      for (auto &p : Subloops) {
-        if (p.first == ID.ID) {
-          return p.second;
-        }
-      }
-      llvm_unreachable("Out of sync subloops array?!");
-    }
-    subregion_reverse_iterator &operator++() {
-      InnerIter++;
-      return *this;
-    }
-    subregion_reverse_iterator operator++(int) {
-      return subregion_reverse_iterator(InnerIter++, Subloops);
-    }
-    subregion_reverse_iterator &operator--() {
-      InnerIter--;
-      return *this;
-    }
-    subregion_reverse_iterator operator--(int) {
-      return subregion_reverse_iterator(InnerIter--, Subloops);
-    }
-    bool operator==(subregion_reverse_iterator rhs) {
-      return InnerIter == rhs.InnerIter;
-    }
-    bool operator!=(subregion_reverse_iterator rhs) {
-      return InnerIter != rhs.InnerIter;
-    }
-  };
+  using subregion_reverse_iterator = std::reverse_iterator<subregion_iterator>;
 
 private:
   /// A pointer to one of a Loop, Basic Block, or Function represented by this
@@ -351,10 +300,10 @@ private:
       return subregion_iterator(Subregions.end(), &Subloops);
     }
     subregion_reverse_iterator rbegin() {
-      return subregion_reverse_iterator(Subregions.rbegin(), Subloops);
+      return subregion_reverse_iterator(begin());
     }
     subregion_reverse_iterator rend() {
-      return subregion_reverse_iterator(Subregions.rend(), Subloops);
+      return subregion_reverse_iterator(end());
     }
 
     unsigned size() const { return Subregions.size(); }
