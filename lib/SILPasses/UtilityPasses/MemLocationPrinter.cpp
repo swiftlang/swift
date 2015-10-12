@@ -59,10 +59,10 @@ DebugMemLocationKinds("ml", llvm::cl::desc("MemLocation Kinds:"),
 
 namespace {
 
-/// Dumps the alias relations between all instructions of a function.
 class MemLocationDumper : public SILFunctionTransform {
 
-  void testExpansion(SILFunction &Fn) {
+  /// Dumps the expansions of memory locations accessed in the function.
+  void dumpExpansion(SILFunction &Fn) {
     MemLocationList Locs;
     for (auto &BB : Fn) {
       for (auto &II : BB) {
@@ -94,7 +94,7 @@ class MemLocationDumper : public SILFunctionTransform {
     SILFunction &Fn = *getFunction();
     llvm::outs() << "@" << Fn.getName() << "\n";
     if (DebugMemLocationKinds == MLKind::OnlyExpansion) {
-      testExpansion(Fn);
+      dumpExpansion(Fn);
       return;
     }
   }
