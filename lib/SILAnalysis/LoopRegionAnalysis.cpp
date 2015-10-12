@@ -104,6 +104,72 @@ LoopRegionFunctionInfo::LoopRegionFunctionInfo(FunctionTy *F,
 }
 
 //===---
+// Region Creation Functions
+//
+
+LoopRegionFunctionInfo::RegionTy *
+LoopRegionFunctionInfo::getRegion(BlockTy *BB) const {
+  assert(AllBBRegionsCreated && "All BB Regions have not been created yet?!");
+  // Check if we have allocated a region for this BB. If so, just return it.
+  auto Iter = BBToIDMap.find(BB);
+  if (Iter != BBToIDMap.end()) {
+    return IDToRegionMap[Iter->second];
+  }
+  llvm_unreachable("Unknown BB?!");
+}
+
+LoopRegionFunctionInfo::RegionTy *
+LoopRegionFunctionInfo::getRegion(FunctionTy *F) const {
+  if (FunctionRegionID.hasValue()) {
+    return IDToRegionMap[FunctionRegionID.getValue()];
+  }
+
+  auto &Self = const_cast<LoopRegionFunctionInfo &>(*this);
+  unsigned Idx = IDToRegionMap.size();
+  unsigned NumBytes = sizeof(RegionTy) + sizeof(LoopRegion::SubregionData);
+  void *Memory = Self.Allocator.Allocate(NumBytes, alignof(RegionTy));
+  auto *R = new (Memory) RegionTy(F, Idx);
+  new ((void *)&R[1]) LoopRegion::SubregionData();
+  Self.IDToRegionMap.push_back(R);
+  Self.FunctionRegionID = Idx;
+  return R;
+}
+
+LoopRegionFunctionInfo::RegionTy *
+LoopRegionFunctionInfo::getRegion(LoopTy *Loop) const {
+  auto Iter = LoopToIDMap.find(Loop);
+  if (Iter != LoopToIDMap.end()) {
+    return IDToRegionMap[Iter->second];
+  }
+
+  auto &Self = const_cast<LoopRegionFunctionInfo &>(*this);
+  unsigned Idx = IDToRegionMap.size();
+  unsigned NumBytes = sizeof(RegionTy) + sizeof(LoopRegion::SubregionData);
+  void *Memory = Self.Allocator.Allocate(NumBytes, alignof(RegionTy));
+  auto *R = new (Memory) RegionTy(Loop, Idx);
+  new ((void *)&R[1]) LoopRegion::SubregionData();
+  Self.IDToRegionMap.push_back(R);
+  Self.LoopToIDMap[Loop] = Idx;
+  return R;
+}
+
+LoopRegionFunctionInfo::RegionTy *
+LoopRegionFunctionInfo::createRegion(BlockTy *BB, unsigned RPONum) {
+  assert(!AllBBRegionsCreated && "All BB Regions have been created?!");
+  // Check if we have allocated a region for this BB. If so, just return it.
+  auto Iter = BBToIDMap.find(BB);
+  if (Iter != BBToIDMap.end()) {
+    return IDToRegionMap[Iter->second];
+  }
+
+  unsigned Idx = RPONum;
+  auto *R = new (Allocator) RegionTy(BB, RPONum);
+  IDToRegionMap[RPONum] = R;
+  BBToIDMap[BB] = Idx;
+  return R;
+}
+
+//===---
 // Block Region Initialization
 //
 
