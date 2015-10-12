@@ -923,6 +923,49 @@ aliasing reference after optimization, which the user cannot
 control. The user must ensure that the program behaves identically in
 either case apart from its performance characteristics.
 
+Pure Value Types and SIL optimizations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The benefit of having pure value types is that optimizations can treat such
+types as if they were Swift value types, like struct. Member functions of pure
+value types can be annotated with effects, like ``readnone`` for ``getElement``,
+even if the underlying implementation of ``getElement`` reads memory from the
+type's storage.
+
+The compiler can do more optimistic optimizations for pure value types without
+the need of sophisticated alias or escape analysis.
+
+Consider this example.::
+
+    func add(arr: Array<Int>, i: Int) -> Int {
+      let e1 = arr[i]
+      unknownFunction()
+      let e2 = arr[i]
+    }
+
+This code is generated to something like::
+
+    func add(arr: Array<Int>, i: Int) -> Int {
+      let e1 = getElement(i, arr)
+      unknownFunction()
+      let e2 = getElement(i, arr)
+      return e1 + e2
+    }
+
+Now if the compiler can assume that Array is a pure value type and ``getElement``
+has a defined effect of ``readnone``, it can CSE the two calls. This is because
+the arguments, including the ``arr`` itself, are the same for both calls.
+
+Even if ``unknownFunction`` modifies an array which references the same storage
+as ``arr``, CoW semantics will force ``unknownFunction`` to make a copy of the
+storage and the storage of ``arr`` will not be modified.
+
+Pure value types can only considered pure on high-level SIL, before effects
+and semantics functions are inlined. For an example see below.
+
+[TBD] Effects like ``readnone`` would have another impact on high-level SIL
+than on low-level SIL. We have to decide how we want to handle this.
+
 Recognizing Value Types
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -932,23 +975,104 @@ effects. This is the crux of the difficulty in defining the CoW
 effects. Consequently, communicating purity to the compiler will
 require some function annotations and/or type constraints.
 
-Erik suggested that a CoW-implemented value type have its storage
-annotated. The compiler can then defer inlining methods that expose
-the storage (this is a generalization of the current Array
-design). The compiler would need to treat calls to those
-implementation methods as an optimization boundary until it
-effectively lowers value types. After value type lowering, the
-compiler would no longer be able to consider those CoW types as value
-types anywhere in the code. I think this would simplify optimization
-of nonmutating operations on CoW types; however, most of Arnold's work
-has been to support optimization across mutating CoW operations, which
-will still require highly complex logic.
+A CoW type consits of a top-level value type, most likely a struct, and a
+referenced storage, which may be shared between multiple instances of the CoW
+type.
+
+[TBD] Is there any difference between a 'CoW type' and a 'pure value type'?
+E.g. can there be CoW types which are not pure value types or vice versa?
+
+The important thing for a pure value type is that all functions which change
+the state are defined as mutating, even if they don't mutate the top-level
+struct but only the referenced storage.
+
+.. note::
+
+  For CoW data types this is required anyway, because any state-changing
+  function will have to unique the storage and thus be able to replace the
+  storage reference in the top-level struct.
+
+Let's assume we have a setElement function in Array.::
+
+    mutating func setElement(i: Int, e: Element) {
+      storage[i] = e
+    }
+
+Let's replace the call to ``unknownFunction`` with a set of the i'th element
+in our example.
+The mutating function forces the array to be placed onto the stack and reloaded
+after the mutating function. This lets the second ``getElement`` function get
+another array parameter which prevents CSE of the two ``getElement`` calls.
+Shown in this swift-SIL pseudo code::
+
+    func add(var arr: Array<Int>, i: Int) -> Int {
+      let e1 = getElement(i, arr)
+      store arr to stack_array
+      setElement(i, 0, &stack_array)
+      let arr2 = load from stack_array
+      let e2 = getElement(i, arr2)     // arr2 is another value than arr
+      return e1 + e2
+    }
+
+Another important requirement for pure value types is that all functions,
+which directly access the storage, are not inlined during high-level SIL.
+Optimizations like code motion could move a store to the storage over a
+``readnone getElement``.::
+
+    func add(var arr: Array<Int>, i: Int) -> Int {
+      let e1 = getElement(i, arr)
+      store arr to stack_array
+      stack_array.storage[i] = 0          // (1)
+      let arr2 = load from stack_array    // (2)
+      let e2 = getElement(i, arr2)        // (3)
+      return e1 + e2
+    }
+
+Store (1) and load (2) do not alias and (3) is defined as ``readnone``. So (1)
+could be moved over (3).
+
+Currently inlining is prevented in high-level SIL for all functions which
+have an semantics or effect attribute. Therefore we could say that the
+implementor of a pure value type has to define effects on all member functions
+which eventually can access or modify the storage.
+
+To help the user to fulfill this contract, the compiler can check if some
+effects annotations are missing.
+For this, the storage properties of a pure value type should be annotated.
+The compiler can check if all call graph paths
+from the type's member functions to storage accessing functions contain at
+least one function with defined effects.
+Example::
+
+    struct Array {
+
+      @cow_storage var storage
+
+      @effect(...)
+      func getElement() { return storage.get() }
+
+      @effect(...)
+      func checkSubscript() { ... }
+
+      subscript { get {          // OK
+        checkSubscript()
+        return getElement()
+      } }
+
+      func getSize() {
+          return storage.size()  // Error!
+      }
+    }
+
+[TBD] What if a storage property is public. What if a non member function
+accesses the storage.
 
 As discussed above, CoW types will often be generic, making the
 effects of an operation on the CoW type dependent on the effects of
 destroying an object of the element type.
 
-TODO: Need more clarity and examples
+[erik] This is not the case if CoW types are always passed as guaranteed
+to the effects functions.
 
 Inferring Function Purity
 ~~~~~~~~~~~~~~~~~~~~~~~~~
