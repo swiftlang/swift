@@ -58,8 +58,8 @@ func callproto(p: MyProto) {
 
 // Check if the DI filename is correct and not "<unknown>".
 
-// CHECK-MAINLL: DICompileUnit{{.*}} file: [[F:![0-9]+]]
-// CHECK-MAINLL: [[F]] = !DIFile(filename: "main.swift", directory: "{{.*}}IRGen/Inputs/multithread_module")
+// CHECK-MAINLL: DICompileUnit(language: DW_LANG_Swift, file: [[F:![0-9]+]]
+// CHECK-MAINLL: [[F]] = !DIFile(filename: "{{.*}}IRGen/Inputs/multithread_module/main.swift", directory: "{{.*}}")
 
-// CHECK-MODULELL: DICompileUnit{{.*}} file: [[F:![0-9]+]]
-// CHECK-MODULELL: [[F]] = !DIFile(filename: "multithread_module.swift", directory: "{{.*}}IRGen")
+// CHECK-MODULELL: DICompileUnit(language: DW_LANG_Swift, file: [[F:![0-9]+]]
+// CHECK-MODULELL: [[F]] = !DIFile(filename: "{{.*}}IRGen/multithread_module.swift", directory: "{{.*}}")
