@@ -308,41 +308,14 @@ class CallGraph {
   unsigned EdgeOrdinal;
 
 public:
+#ifndef NDEBUG
+  friend struct OrderedCallGraph;
+#endif
+
   friend class CallGraphEditor;
 
   CallGraph(SILModule *M, bool completeModule);
   ~CallGraph();
-
-  // Query funtions for getting nodes and edges from the call graph.
-
-  CallGraphNode *getCallGraphNode(SILFunction *F) const {
-    return const_cast<CallGraph *>(this)->getCallGraphNode(F);
-  }
-
-  CallGraphNode *getCallGraphNode(SILFunction *F) {
-    auto *CGN = tryGetCallGraphNode(F);
-    assert(CGN && "Expected call graph node for function!");
-    return CGN;
-  }
-
-  CallGraphEdge *getCallGraphEdge(FullApplySite AI) {
-    auto Found = ApplyToEdgeMap.find(AI);
-    if (Found == ApplyToEdgeMap.end())
-      return nullptr;
-
-    assert(Found->second && "Unexpected null call graph edge in map!");
-    return Found->second;
-  }
-
-  CallGraphEdge *getCallGraphEdge(FullApplySite AI) const {
-    return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
-  }
-
-  CallGraphEdge::CalleeSetType *
-  tryGetCalleeSetForClassMethod(SILDeclRef Decl);
-
-  CallGraphEdge::CalleeSetType *
-  getOrCreateCalleeSetForClassMethod(SILDeclRef Decl);
 
   // Functions for getting bottom-up lists of SCCs or functions in the
   // call graph.
@@ -430,6 +403,38 @@ public:
 
   void verify(SILFunction *F) const;
 private:
+  // Query funtions for getting nodes and edges from the call graph.
+
+  CallGraphNode *getCallGraphNode(SILFunction *F) const {
+    return const_cast<CallGraph *>(this)->getCallGraphNode(F);
+  }
+
+  CallGraphNode *getCallGraphNode(SILFunction *F) {
+    auto *CGN = tryGetCallGraphNode(F);
+    assert(CGN && "Expected call graph node for function!");
+    return CGN;
+  }
+
+  CallGraphEdge *getCallGraphEdge(FullApplySite AI) {
+    auto Found = ApplyToEdgeMap.find(AI);
+    if (Found == ApplyToEdgeMap.end())
+      return nullptr;
+
+    assert(Found->second && "Unexpected null call graph edge in map!");
+    return Found->second;
+  }
+
+  CallGraphEdge *getCallGraphEdge(FullApplySite AI) const {
+    return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
+  }
+
+  CallGraphEdge::CalleeSetType *
+  tryGetCalleeSetForClassMethod(SILDeclRef Decl);
+
+  CallGraphEdge::CalleeSetType *
+  getOrCreateCalleeSetForClassMethod(SILDeclRef Decl);
+
+
   CallGraphNode *tryGetCallGraphNode(SILFunction *F) const {
     return const_cast<CallGraph *>(this)->tryGetCallGraphNode(F);
   }
