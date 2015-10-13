@@ -3241,6 +3241,37 @@ public:
   Kind getKind() const { return ThisKind; }
 };
 
+/// Deallocate memory for a reference type instance from a failure path of a
+/// constructor.
+///
+/// The instance is assumed to have been partially initialized, with the
+/// initialized portion being all instance variables in classes that are more
+/// derived than the given metatype.
+///
+/// The metatype value can either be the static self type (in a designated
+/// initializer) or a dynamic self type (in a convenience initializer).
+class DeallocPartialRefInst : public DeallocationInst {
+  friend class SILBuilder;
+
+private:
+  FixedOperandList<2> Operands;
+
+  DeallocPartialRefInst(SILLocation Loc, SILValue Operand, SILValue Metatype)
+    : DeallocationInst(ValueKind::DeallocPartialRefInst, Loc),
+      Operands(this, Operand, Metatype) {}
+
+public:
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  
+  SILValue getInstance() const { return getOperand(0); }
+  SILValue getMetatype() const { return getOperand(1); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::DeallocPartialRefInst;
+  }
+};
+
 /// Deallocate memory allocated for a unsafe value buffer.
 class DeallocValueBufferInst :
   public UnaryInstructionBase<ValueKind::DeallocValueBufferInst,

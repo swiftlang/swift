@@ -1321,6 +1321,23 @@ public:
     require(DI->getOperand().getType().getClassOrBoundGenericClass(),
             "Operand of dealloc_ref must be of class type");
   }
+  void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
+    require(DPRI->getInstance().getType().isObject(),
+            "First operand of dealloc_partial_ref must be object");
+    auto class1 = DPRI->getInstance().getType().getClassOrBoundGenericClass();
+    require(class1,
+            "First operand of dealloc_partial_ref must be of class type");
+    require(DPRI->getMetatype().getType().is<MetatypeType>(),
+            "Second operand of dealloc_partial_ref must be a metatype");
+    auto class2 = DPRI->getMetatype().getType().castTo<MetatypeType>()
+        ->getInstanceType()->getClassOrBoundGenericClass();
+    require(class2,
+            "Second operand of dealloc_partial_ref must be a class metatype");
+    while (class1 != class2) {
+      class1 = class1->getSuperclass()->getClassOrBoundGenericClass();
+      require(class1, "First operand not superclass of second instance type");
+    }
+  }
 
   void checkAllocBoxInst(AllocBoxInst *AI) {
     // TODO: Allow the box to be typed, but for staging purposes, only require

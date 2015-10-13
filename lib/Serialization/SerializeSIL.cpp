@@ -925,12 +925,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     FuncsToDeclare.insert(ReferencedFunction);
     break;
   }
+  case ValueKind::DeallocPartialRefInst:
   case ValueKind::MarkDependenceInst:
   case ValueKind::IndexAddrInst:
   case ValueKind::IndexRawPointerInst: {
     SILValue operand, operand2;
     unsigned Attr = 0;
-    if (SI.getKind() == ValueKind::IndexRawPointerInst) {
+    if (SI.getKind() == ValueKind::DeallocPartialRefInst) {
+      const DeallocPartialRefInst *DPRI = cast<DeallocPartialRefInst>(&SI);
+      operand = DPRI->getInstance();
+      operand2 = DPRI->getMetatype();
+    } else if (SI.getKind() == ValueKind::IndexRawPointerInst) {
       const IndexRawPointerInst *IRP = cast<IndexRawPointerInst>(&SI);
       operand = IRP->getBase();
       operand2 = IRP->getIndex();

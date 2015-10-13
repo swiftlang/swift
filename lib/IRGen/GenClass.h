@@ -82,6 +82,12 @@ namespace irgen {
                              llvm::Value *selfValue,
                              ClassDeallocationKind kind);
 
+  /// Emit class deallocation.
+  void emitPartialClassDeallocation(IRGenFunction &IGF,
+                                    SILType selfType,
+                                    llvm::Value *selfValue,
+                                    llvm::Value *metadataValue);
+
   /// Emit the constant fragile instance size of the class, or null if the class
   /// does not have fixed layout. For resilient classes this does not
   /// correspond to the runtime alignment of instances of the class.

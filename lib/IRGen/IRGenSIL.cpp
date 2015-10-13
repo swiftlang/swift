@@ -708,6 +708,7 @@ public:
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocBoxInst(DeallocBoxInst *i);
   void visitDeallocRefInst(DeallocRefInst *i);
+  void visitDeallocPartialRefInst(DeallocPartialRefInst *i);
 
   void visitCopyAddrInst(CopyAddrInst *i);
   void visitDestroyAddrInst(DestroyAddrInst *i);
@@ -3410,6 +3411,16 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
     break;
   }
   emitClassDeallocation(*this, classType, selfValue, kind);
+}
+
+void IRGenSILFunction::visitDeallocPartialRefInst(swift::DeallocPartialRefInst *i) {
+  Explosion self = getLoweredExplosion(i->getInstance());
+  auto selfValue = self.claimNext();
+  Explosion metadata = getLoweredExplosion(i->getMetatype());
+  auto metadataValue = metadata.claimNext();
+  auto classType = i->getInstance()->getType(0);
+
+  emitPartialClassDeallocation(*this, classType, selfValue, metadataValue);
 }
 
 void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {

@@ -60,6 +60,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::DeallocBoxInst:
   case ValueKind::DeallocExistentialBoxInst:
   case ValueKind::DeallocRefInst:
+  case ValueKind::DeallocPartialRefInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::DeallocValueBufferInst:
   case ValueKind::DebugValueAddrInst:

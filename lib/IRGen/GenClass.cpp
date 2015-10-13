@@ -718,6 +718,21 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
   emitDeallocateClassInstance(IGF, selfValue, size, alignMask, kind);
 }
 
+void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
+                                         SILType selfType,
+                                         llvm::Value *selfValue,
+                                         llvm::Value *metadataValue) {
+  auto *theClass = selfType.getClassOrBoundGenericClass();
+
+  llvm::Value *size, *alignMask;
+  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
+                              size, alignMask);
+
+  selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.RefCountedPtrTy);
+  emitDeallocatePartialClassInstance(IGF, selfValue, metadataValue,
+                                     size, alignMask);
+}
+
 llvm::Constant *irgen::tryEmitClassConstantFragileInstanceSize(
                                                         IRGenModule &IGM,
                                                         ClassDecl *Class) {

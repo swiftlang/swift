@@ -1755,10 +1755,40 @@ dealloc_ref
   dealloc_ref %0 : $T
   // $T must be a class type
 
-Deallocates a class type instance, bypassing the reference counting
-mechanism. The instance must have a retain count of one. The type of
-the operand must match the allocated type exactly, or else undefined
-behavior results.
+Deallocates an uninitialized class type instance, bypassing the reference
+counting mechanism.
+
+The type of the operand must match the allocated type exactly, or else
+undefined behavior results.
+
+The instance must have a retain count of one.
+
+This does not destroy stored properties of the instance. The contents
+of stored properties must be fully uninitialized at the time
+``dealloc_ref`` is applied.
+
+dealloc_partial_ref
+```````````````````
+::
+
+  sil-instruction ::= 'dealloc_partial_ref' sil-operand sil-metatype
+
+  dealloc_partial_ref %0 : $T, %1 : $U.Type
+  // $T must be a class type
+  // $T must be a subclass of U
+
+Deallocates a partially-initialized class type instance, bypassing
+the reference counting mechanism.
+
+The type of the operand must be a supertype of the allocated type, or
+else undefined behavior results.
+
+The instance must have a retain count of one.
+
+All stored properties in classes more derived than the given metatype
+value must be initialized, and all other stored properties must be
+uninitialized. The initialized stored properties are destroyed before
+deallocating the memory for the instance.
 
 This does not destroy the reference type instance. The contents of the
 heap object must have been fully uninitialized or destroyed before

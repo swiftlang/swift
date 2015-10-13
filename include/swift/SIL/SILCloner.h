@@ -1430,6 +1430,15 @@ SILCloner<ImplClass>::visitDeallocRefInst(DeallocRefInst *Inst) {
 }
 
 template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitDeallocPartialRefInst(DeallocPartialRefInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createDeallocPartialRef(getOpLocation(Inst->getLoc()),
+                                         getOpValue(Inst->getInstance()),
+                                         getOpValue(Inst->getMetatype())));
+}
+
+template<typename ImplClass>
 void SILCloner<ImplClass>::visitDeallocValueBufferInst(
                                               DeallocValueBufferInst *inst) {
   doPostProcess(inst,

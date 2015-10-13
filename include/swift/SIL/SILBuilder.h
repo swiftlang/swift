@@ -981,6 +981,13 @@ public:
                                    DeallocRefInst::Kind kind) {
     return insert(new (F.getModule()) DeallocRefInst(loc, operand, kind));
   }
+  DeallocPartialRefInst *createDeallocPartialRef(SILLocation loc,
+                                                 SILValue operand,
+                                                 SILValue metatype) {
+    return insert(new (F.getModule()) DeallocPartialRefInst(loc,
+                                                            operand,
+                                                            metatype));
+  }
   DeallocBoxInst *createDeallocBox(SILLocation loc, SILType eltType,
                                    SILValue operand) {
     return insert(new (F.getModule()) DeallocBoxInst(loc, eltType, operand));

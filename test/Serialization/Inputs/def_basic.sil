@@ -218,7 +218,8 @@ bb0(%0 : $@thick NSObject.Type):
   %1 = thick_to_objc_metatype %0 : $@thick NSObject.Type to $@objc_metatype NSObject.Type
   // CHECK: %2 = alloc_ref_dynamic [objc] %1 : $@objc_metatype NSObject.Type, $NSObject
   %2 = alloc_ref_dynamic [objc] %1 : $@objc_metatype NSObject.Type, $NSObject
-  dealloc_ref [constructor] %2 : $NSObject
+  %3 = value_metatype $@thick NSObject.Type, %2 : $NSObject
+  dealloc_partial_ref %2 : $NSObject, %3 : $@thick NSObject.Type
 
   %void = tuple ()
   return %void : $()
@@ -641,6 +642,16 @@ bb0:
   %0 = alloc_ref $Class1
   // CHECK: dealloc_ref [constructor] %{{.*}} : $Class1
   dealloc_ref [constructor] %0 : $Class1
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil public_external [fragile] @test_dealloc_partial_ref
+sil [fragile] @test_dealloc_partial_ref : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Class1
+  %1 = metatype $@thick Class1.Type
+  dealloc_partial_ref %0 : $Class1, %1 : $@thick Class1.Type
   %2 = tuple ()
   return %2 : $()
 }
@@ -1320,6 +1331,7 @@ bb0:
   %79 = function_ref @test_super_method : $@convention(method) (@guaranteed Bas) -> Bas
   %81 = function_ref @test_builtin_func_ref : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
   %83 = function_ref @test_dealloc_ref : $@convention(thin) () -> ()
+  %84 = function_ref @test_dealloc_partial_ref : $@convention(thin) () -> ()
   %85 = function_ref @test_dealloc_box : $@convention(thin) () -> ()
   %87 = function_ref @closure_test : $@convention(thin) () -> ()
   %97 = function_ref @test_switch_union : $@convention(thin) (MaybePair) -> ()

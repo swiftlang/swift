@@ -679,6 +679,16 @@ bb0:
   return %2 : $()
 }
 
+// CHECK-LABEL: sil @test_dealloc_partial_ref
+sil @test_dealloc_partial_ref : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Class1
+  %1 = metatype $@thick Class1.Type
+  dealloc_partial_ref %0 : $Class1, %1 : $@thick Class1.Type
+  %2 = tuple ()
+  return %2 : $()
+}
+
 // CHECK-LABEL: sil @test_dealloc_box
 sil @test_dealloc_box : $@convention(thin) () -> () {
 bb0:

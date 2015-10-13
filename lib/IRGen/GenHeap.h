@@ -112,6 +112,13 @@ void emitDeallocateClassInstance(IRGenFunction &IGF,
                                  llvm::Value *size,
                                  llvm::Value *alignMask,
                                  ClassDeallocationKind kind);
+  
+/// Emit a partial class instance deallocation from a failing constructor.
+void emitDeallocatePartialClassInstance(IRGenFunction &IGF,
+                                        llvm::Value *object,
+                                        llvm::Value *metadata,
+                                        llvm::Value *size,
+                                        llvm::Value *alignMask);
 
 /// Allocate a boxed value.
 OwnedAddress

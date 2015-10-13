@@ -1195,6 +1195,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("dealloc_box", ValueKind::DeallocBoxInst)
     .Case("dealloc_existential_box", ValueKind::DeallocExistentialBoxInst)
     .Case("dealloc_ref", ValueKind::DeallocRefInst)
+    .Case("dealloc_partial_ref", ValueKind::DeallocPartialRefInst)
     .Case("dealloc_stack", ValueKind::DeallocStackInst)
     .Case("dealloc_value_buffer", ValueKind::DeallocValueBufferInst)
     .Case("debug_value", ValueKind::DebugValueInst)
@@ -2354,6 +2355,16 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
 
     ResultVal = B.createDeallocRef(InstLoc, Val, Kind);
+    break;
+  }
+  case ValueKind::DeallocPartialRefInst: {
+    SILValue Metatype, Instance;
+    if (parseTypedValueRef(Instance) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseTypedValueRef(Metatype))
+      return true;
+
+    ResultVal = B.createDeallocPartialRef(InstLoc, Instance, Metatype);
     break;
   }
   case ValueKind::DeallocBoxInst:

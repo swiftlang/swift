@@ -1252,6 +1252,12 @@ public:
     }
     *this << getIDAndType(DI->getOperand());
   }
+  void visitDeallocPartialRefInst(DeallocPartialRefInst *DPI) {
+    *this << "dealloc_partial_ref ";
+    *this << getIDAndType(DPI->getInstance());
+    *this << ", ";
+    *this << getIDAndType(DPI->getMetatype());
+  }
   void visitDeallocValueBufferInst(DeallocValueBufferInst *DVBI) {
     *this << "dealloc_value_buffer " << DVBI->getValueType()
        << " in " << getIDAndType(DVBI->getOperand());

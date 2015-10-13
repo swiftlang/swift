@@ -231,6 +231,10 @@ namespace {
       return true;
     }
 
+    bool visitDeallocPartialRefInst(const DeallocPartialRefInst *RHS) {
+      return true;
+    }
+
     bool visitAllocRefInst(const AllocRefInst *RHS) {
       return true;
     }
