@@ -596,7 +596,7 @@ state.
       }
     }
 
-  Note: In terms of low-leve SIL attributes such a method will be marked:::
+  Note: In terms of low-level SIL attributes such a method will be marked:::
 
     @self_effects(preserve_unique, nocapture, norelease)
     func replaceRange<> {}
@@ -737,7 +737,7 @@ state.
     struct Array<T> {
       var storage: ArrayStorage
 
-      @set_suobject
+      @set_subobject
       func setElement(elt: T, atIndex: Int) {
         storage.set(elt, atIndex)
       }
