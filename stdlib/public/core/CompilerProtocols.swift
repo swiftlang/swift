@@ -33,7 +33,7 @@ public protocol RawRepresentable {
   ///
   /// Every distinct value of `self` has a corresponding unique
   /// value of `RawValue`, but `RawValue` may have representations
-  /// that do not correspond to an value of `Self`.
+  /// that do not correspond to a value of `Self`.
   typealias RawValue
 
   /// Convert from a value of `RawValue`, yielding `nil` iff
