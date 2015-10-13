@@ -233,7 +233,7 @@ public func _unsafeReferenceCast<T, U>(x: T, _: U.Type) -> U {
 @warn_unused_result
 public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
-  return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(x))
+  return Builtin.castReference(x)
 }
 
 /// - Returns: `nonEmpty!`.
