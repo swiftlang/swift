@@ -319,3 +319,37 @@ class DDDD : CCCC {
 func testDevirtOfMethodReturningTupleTypes2(c: CCCC) -> (AAAA, AAAA) {
   return c.foo
 }
+
+public class F {
+  @inline(never)
+  public func foo() -> (F?, Int)? {
+    return (F(), 1)
+  }
+}
+
+public class G: F {
+  @inline(never)
+  override public func foo() -> (G?, Int)? {
+    return (G(), 2)
+  }
+}
+
+public class H: F {
+  @inline(never)
+  override public func foo() -> (H?, Int)? {
+    return nil
+  }
+}
+
+// Check devirtualization of methods with optional results, where
+// optional results need to be casted.
+// CHECK-LABEL: sil @{{.*}}testOverridingMethodWithOptionalResult
+// CHECK: checked_cast_br [exact] %{{.*}} : $F to $F
+// CHECK: checked_cast_br [exact] %{{.*}} : $F to $G
+// CHECK: switch_enum
+// CHECK: checked_cast_br [exact] %{{.*}} : $F to $H
+// CHECK: switch_enum
+public func testOverridingMethodWithOptionalResult(f: F) -> (F?, Int)? {
+  return f.foo()
+}
+

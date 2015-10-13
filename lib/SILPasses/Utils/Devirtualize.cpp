@@ -364,8 +364,8 @@ static SILValue conditionallyCastAddr(SILBuilderWithScope<16> &B,
 /// \p ClassOrMetatype is a class value or metatype value that is the
 ///    self argument of the apply we will devirtualize.
 /// return the result value of the new ApplyInst if created one or null.
-SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
-                                               SILValue ClassOrMetatype) {
+DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
+                                                     SILValue ClassOrMetatype) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
 
   SILModule &Mod = AI.getModule();
@@ -455,17 +455,21 @@ SILInstruction *swift::devirtualizeClassMethod(FullApplySite AI,
 
   if (NormalBB) {
     B.createBranch(NewAI.getLoc(), NormalBB, { ResultValue });
-    return NewAI.getInstruction();
+    return std::make_pair(NewAI.getInstruction(), NewAI);
   }
 
-  assert(isa<SILInstruction>(ResultValue));
-  return cast<SILInstruction>(ResultValue);
+  // We need to return a pair of values here:
+  // - the first one is the actual result of the devirtualized call, possibly
+  //   casted into an appropriate type. This SILValue may be a BB arg, if it
+  //   was a cast between optional types.
+  // - the second one is the new apply site.
+  return std::make_pair(ResultValue.getDef(), NewAI);
 }
 
-SILInstruction *swift::tryDevirtualizeClassMethod(FullApplySite AI,
-                                             SILValue ClassInstance) {
+DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
+                                                   SILValue ClassInstance) {
   if (!canDevirtualizeClassMethod(AI, ClassInstance.getType()))
-    return nullptr;
+    return std::make_pair(nullptr, FullApplySite());
   return devirtualizeClassMethod(AI, ClassInstance);
 }
 
@@ -545,7 +549,7 @@ static FullApplySite devirtualizeWitnessMethod(FullApplySite AI, SILFunction *F,
 /// In the cases where we can statically determine the function that
 /// we'll call to, replace an apply of a witness_method with an apply
 /// of a function_ref, returning the new apply.
-static SILInstruction *tryDevirtualizeWitnessMethod(FullApplySite AI) {
+static DevirtualizationResult tryDevirtualizeWitnessMethod(FullApplySite AI) {
   SILFunction *F;
   ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;
@@ -557,9 +561,10 @@ static SILInstruction *tryDevirtualizeWitnessMethod(FullApplySite AI) {
                                                 WMI->getMember());
 
   if (!F)
-    return nullptr;
+    return std::make_pair(nullptr, FullApplySite());
 
-  return devirtualizeWitnessMethod(AI, F, Subs).getInstruction();
+  auto Result = devirtualizeWitnessMethod(AI, F, Subs);
+  return std::make_pair(Result.getInstruction(), Result);
 }
 
 //===----------------------------------------------------------------------===//
@@ -584,7 +589,7 @@ static bool isKnownFinal(SILModule &M, SILDeclRef Member) {
 
 /// Attempt to devirtualize the given apply if possible, and return a
 /// new instruction in that case, or nullptr otherwise.
-SILInstruction *swift::tryDevirtualizeApply(FullApplySite AI) {
+DevirtualizationResult swift::tryDevirtualizeApply(FullApplySite AI) {
   DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI.getInstruction());
 
   // Devirtualize apply instructions that call witness_method instructions:
@@ -622,5 +627,5 @@ SILInstruction *swift::tryDevirtualizeApply(FullApplySite AI) {
       return tryDevirtualizeClassMethod(AI, Instance);
   }
 
-  return nullptr;
+  return std::make_pair(nullptr, FullApplySite());
 }

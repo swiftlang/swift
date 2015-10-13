@@ -314,10 +314,14 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       auto *ApplyBlock = InnerAI.getParent();
 
-      if (auto *NewInst = tryDevirtualizeApply(InnerAI)) {
+      auto NewInstPair = tryDevirtualizeApply(InnerAI);
+      if (auto *NewInst = NewInstPair.first) {
         replaceDeadApply(InnerAI, NewInst);
-        I = SILBasicBlock::iterator(NewInst);
-        auto NewAI = findApplyFromDevirtualizedResult(NewInst);
+        if (auto II = dyn_cast<SILInstruction>(NewInst))
+          I = II;
+        else
+          I = NewInst->getParentBB()->begin();
+        auto NewAI = NewInstPair.second;
         if (!NewAI)
           continue;
 

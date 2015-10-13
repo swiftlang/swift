@@ -218,7 +218,7 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILInstruction *I) {
 
 // Replace a dead apply with a new instruction that computes the same
 // value, and delete the old apply.
-void swift::replaceDeadApply(ApplySite Old, SILInstruction *New) {
+void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
   auto *OldApply = Old.getInstruction();
   if (!isa<TryApplyInst>(OldApply))
     OldApply->replaceAllUsesWith(New);
@@ -449,6 +449,20 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
 
     // Unwrap the original optional value.
     auto *SomeDecl = B->getASTContext().getOptionalSomeDecl(SrcOTK);
+    auto *NoneBB = B->getFunction().createBasicBlock();
+    auto *SomeBB = B->getFunction().createBasicBlock();
+    auto *CurBB = B->getInsertionPoint()->getParent();
+
+    auto *ContBB = CurBB->splitBasicBlock(B->getInsertionPoint());
+    ContBB->createBBArg(DestTy,nullptr);
+
+    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
+    CaseBBs.push_back(std::make_pair(SomeDecl, SomeBB));
+    B->setInsertionPoint(CurBB);
+    B->createSwitchEnum(Loc, Value, NoneBB, CaseBBs);
+
+    // Handle the Some case.
+    B->setInsertionPoint(SomeBB);
     SILValue UnwrappedValue =  B->createUncheckedEnumData(Loc, Value,
                                                           SomeDecl);
     // Cast the unwrapped value.
@@ -459,24 +473,16 @@ Optional<SILValue> swift::castValueToABICompatibleType(SILBuilder *B, SILLocatio
     // Wrap into optional.
     CastedValue =  B->createOptionalSome(Loc, CastedUnwrappedValue,
                                         DestOTK, DestTy);
+    B->createBranch(Loc, ContBB, {CastedValue});
+
+    // Handle the None case.
+    B->setInsertionPoint(NoneBB);
+    CastedValue = B->createOptionalNone(Loc, DestTy);
+    B->createBranch(Loc, ContBB, {CastedValue});
+    B->setInsertionPoint(ContBB->begin());
+
+    CastedValue = ContBB->getBBArg(0);
     return CastedValue;
-  }
-
-  // Src is optional, but dest is not optional.
-  if (OptionalSrcTy && !OptionalDestTy) {
-    if (CheckOnly)
-      return castValueToABICompatibleType(B, Loc, Value,
-                                          OptionalSrcLoweredTy,
-                                          DestTy, CheckOnly);
-    // Unwrap the original optional value.
-    auto *SomeDecl = B->getASTContext().getOptionalSomeDecl(SrcOTK);
-    SILValue UnwrappedValue =  B->createUncheckedEnumData(Loc, Value,
-                                                          SomeDecl);
-
-    // Cast the unwrapped value.
-    return castValueToABICompatibleType(B, Loc, UnwrappedValue,
-                                        OptionalSrcLoweredTy,
-                                        DestTy);
   }
 
   // Src is not optional, but dest is optional.

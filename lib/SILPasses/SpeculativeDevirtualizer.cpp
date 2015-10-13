@@ -231,9 +231,9 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   NumTargetsPredicted++;
 
   // Devirtualize the apply instruction on the identical path.
-  auto *NewInst = devirtualizeClassMethod(IdenAI, DownCastedClassInstance);
-  assert(NewInst && "Expected to be able to devirtualize apply!");
-  replaceDeadApply(IdenAI, NewInst);
+  auto NewInstPair = devirtualizeClassMethod(IdenAI, DownCastedClassInstance);
+  assert(NewInstPair.first && "Expected to be able to devirtualize apply!");
+  replaceDeadApply(IdenAI, NewInstPair.first);
 
   // Sink class_method instructions down to their single user.
   if (CMI->hasOneUse())
@@ -402,10 +402,10 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     // try to devirtualize it completely.
     ClassHierarchyAnalysis::ClassList Subs;
     if (isDefaultCaseKnown(CHA, AI, CD, Subs)) {
-      auto *NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue);
-      if (NewInst)
-        replaceDeadApply(AI, NewInst);
-      return NewInst;
+      auto NewInstPair = tryDevirtualizeClassMethod(AI, SubTypeValue);
+      if (NewInstPair.first)
+        replaceDeadApply(AI, NewInstPair.first);
+      return NewInstPair.second.getInstruction();
     }
 
     DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for class " <<
@@ -565,9 +565,9 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     LastCCBI->eraseFromParent();
     return true;
   }
-  auto *NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue);
-  assert(NewInst && "Expected to be able to devirtualize apply!");
-  replaceDeadApply(AI, NewInst);
+  auto NewInstPair = tryDevirtualizeClassMethod(AI, SubTypeValue);
+  assert(NewInstPair.first && "Expected to be able to devirtualize apply!");
+  replaceDeadApply(AI, NewInstPair.first);
 
   return true;
 }

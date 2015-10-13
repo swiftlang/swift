@@ -846,11 +846,11 @@ static bool isProfitableInColdBlock(SILFunction *Callee) {
 FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
                                                             FullApplySite Apply,
                                                                 CallGraph &CG) {
-  auto NewInst = tryDevirtualizeApply(Apply);
-  if (!NewInst)
+  auto NewInstPair = tryDevirtualizeApply(Apply);
+  if (!NewInstPair.second)
     return FullApplySite();
 
-  auto NewAI = findApplyFromDevirtualizedResult(NewInst);
+  auto NewAI = NewInstPair.second;
   CallGraphEditor(&CG).replaceApplyWithNew(Apply, NewAI);
 
   // In cases where devirtualization results in having to
@@ -866,7 +866,7 @@ FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
   if (OriginMap.count(Apply))
     OriginMap[NewAI] = OriginMap[Apply];
   RemovedApplies.insert(Apply);
-  replaceDeadApply(Apply, NewInst);
+  replaceDeadApply(Apply, NewInstPair.first);
 
   return NewAI;
 }

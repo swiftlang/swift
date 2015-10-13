@@ -30,14 +30,25 @@
 #include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
+/// A pair representing results of devirtualization.
+///  - The first element is the value representing the result of the
+///    devirtualized call.
+///  - The second element is the new apply/try_apply instruction.
+/// If no devirtualization was possible, the pair:
+/// <nullptr, FullApplySite()> is returned.
+///
+/// Two elements are required, because a result of the new devirtualized
+/// apply/try_apply instruction (second element) eventually needs to be
+/// casted to produce a properly typed value (first element).
+typedef std::pair<ValueBase *, FullApplySite> DevirtualizationResult;
 
-SILInstruction *tryDevirtualizeApply(FullApplySite AI);
+DevirtualizationResult tryDevirtualizeApply(FullApplySite AI);
 bool isClassWithUnboundGenericParameters(SILType C, SILModule &M);
 bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType);
-SILInstruction *devirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance);
-SILInstruction *tryDevirtualizeClassMethod(FullApplySite AI,
-                                           SILValue ClassInstance);
-
+DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,
+                                               SILValue ClassInstance);
+DevirtualizationResult tryDevirtualizeClassMethod(FullApplySite AI,
+                                                  SILValue ClassInstance);
 }
 
 #endif

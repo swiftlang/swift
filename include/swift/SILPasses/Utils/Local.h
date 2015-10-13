@@ -114,7 +114,7 @@ bool canCastValueToABICompatibleType(SILModule &M,
 /// Replace an apply with an instruction that produces the same value,
 /// then delete the apply and the instructions that produce its callee
 /// if possible.
-void replaceDeadApply(ApplySite Old, SILInstruction *New);
+void replaceDeadApply(ApplySite Old, ValueBase *New);
 
 /// \brief Return true if the substitution map contains a
 /// substitution that is an unbound generic type.
