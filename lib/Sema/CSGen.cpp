@@ -2786,9 +2786,8 @@ bool swift::typeCheckUnresolvedExpr(DeclContext &DC,
                                     Expr *E, Expr *Parent,
                                     SmallVectorImpl<Type> &PossibleTypes) {
   ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
-  auto *TypeChecker = static_cast<class TypeChecker*>(DC.getASTContext().
-                                                      getLazyResolver());
-  ConstraintSystem CS(*TypeChecker, &DC, Options);
+  auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
+  ConstraintSystem CS(*TC, &DC, Options);
   InferUnresolvedMemberConstraintGenerator MCG(E, CS);
   ConstraintWalker cw(MCG);
   Parent->walk(cw);
@@ -2807,9 +2806,9 @@ Type swift::checkMemberType(DeclContext &DC, Type BaseTy,
   if (Names.empty())
     return BaseTy;
   ConstraintSystemOptions Options = ConstraintSystemFlags::AllowFixes;
-  auto *TypeChecker = static_cast<class TypeChecker*>(DC.getASTContext().
-                                                      getLazyResolver());
-  ConstraintSystem CS(*TypeChecker, &DC, Options);
+  auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
+  assert(TC && "Expected a type resolver");
+  ConstraintSystem CS(*TC, &DC, Options);
   auto Loc = CS.getConstraintLocator(nullptr);
 
   Type Ty = BaseTy;
@@ -2829,4 +2828,72 @@ Type swift::checkMemberType(DeclContext &DC, Type BaseTy,
     return OS.getValue().typeBindings[Ty->getAs<TypeVariableType>()];
   }
   return Type();
+}
+
+bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
+                               const ExtensionDecl *ED) {
+
+  // We need to make sure the extension is about the give type decl.
+  bool FoundExtension = false;
+  if (auto ND = BaseTy->getNominalOrBoundGenericNominal()) {
+    for (auto ET : ND->getExtensions()) {
+      if (ET == ED) {
+        FoundExtension = true;
+        break;
+      }
+    }
+  }
+  assert(FoundExtension && "Cannot find the extension.");
+  ConstraintSystemOptions Options;
+
+  std::unique_ptr<TypeChecker> CreatedTC;
+  // If the current ast context has no type checker, create one for it.
+  auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
+  if (!TC) {
+    CreatedTC.reset(new TypeChecker(DC.getASTContext()));
+    TC = CreatedTC.get();
+  }
+
+  // Build substitution map for the given type.
+  SmallVector<Type, 3> Scratch;
+  auto genericArgs = BaseTy->getAllGenericArgs(Scratch);
+  TypeSubstitutionMap substitutions;
+  auto genericParams = BaseTy->getNominalOrBoundGenericNominal()->getGenericParamTypes();
+  assert(genericParams.size() == genericArgs.size());
+  for (unsigned i = 0, n = genericParams.size(); i != n; ++i) {
+    auto gp = genericParams[i]->getCanonicalType()->castTo<GenericTypeParamType>();
+    substitutions[gp] = genericArgs[i];
+  }
+  ConstraintSystem CS(*TC, &DC, Options);
+  auto Loc = CS.getConstraintLocator(nullptr);
+  if (ED->getGenericRequirements().empty())
+    return true;
+  auto createMemberConstraint = [&](Requirement &Req, ConstraintKind Kind) {
+
+    // Use the substitution map of the given type to substitute the parameter of
+    // the extension.
+    auto First = Req.getFirstType().subst(ED->getParentModule(), substitutions,
+      SubstFlags::IgnoreMissing);
+
+    // Add constraints accordingly.
+    CS.addConstraint(Constraint::create(CS, Kind, First, Req.getSecondType(),
+                                        DeclName(), Loc));
+  };
+
+  // For every requirement, add a constraint.
+  for (auto Req : ED->getGenericRequirements()) {
+    switch(Req.getKind()) {
+      case RequirementKind::Conformance:
+        createMemberConstraint(Req, ConstraintKind::ConformsTo);
+        break;
+      case RequirementKind::SameType:
+        createMemberConstraint(Req, ConstraintKind::Equal);
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Having a solution implies the extension's requirements have been fulfilled.
+  return CS.solveSingle().hasValue();
 }
