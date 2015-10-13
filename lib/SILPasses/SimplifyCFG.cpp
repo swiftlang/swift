@@ -1821,8 +1821,6 @@ static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
     return false;
 
   // Check that the argument types are matching.
-  // TODO: Instead of bailing out in case of a mismatch we should insert casts
-  // as we do for the return type.
   for (unsigned Idx = 0; Idx < numParams; Idx++) {
     if (!canCastValueToABICompatibleType(
           TAI->getModule(),
