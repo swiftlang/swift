@@ -652,7 +652,7 @@ public:
   bool empty() const { return IDToRegionMap.empty(); }
   RegionTy *getTopLevelRegion() { return getRegion(F); }
 
-  SILFunction *getFunction() const { return F; }
+  FunctionTy *getFunction() const { return F; }
 
   void dump() const;
   void print(llvm::raw_ostream &os) const;
