@@ -333,19 +333,6 @@ public:
     return BottomUpFunctionOrder;
   }
 
-  // Functions for editing an existing call graph.
-
-  void addEdgesForApply(FullApplySite AI) {
-    addEdgesForApply(AI, getCallGraphNode(AI.getFunction()));
-  }
-
-  /// Removes a node from the graph. The node must not have any
-  /// caller or callee edges.
-  void removeNode(CallGraphNode *Node);
-
-  void removeEdge(CallGraphEdge *Edge);
-  void removeEdgesForApply(FullApplySite AI);
-
   // Call graph queries on functions.
 
   /// May this function bind dynamic Self at one of its call sites?
@@ -401,6 +388,19 @@ public:
 
   void verify(SILFunction *F) const;
 private:
+  // Functions for editing an existing call graph.
+
+  void addEdgesForApply(FullApplySite AI) {
+    addEdgesForApply(AI, getCallGraphNode(AI.getFunction()));
+  }
+
+  /// Removes a node from the graph. The node must not have any
+  /// caller or callee edges.
+  void removeNode(CallGraphNode *Node);
+
+  void removeEdge(CallGraphEdge *Edge);
+  void removeEdgesForApply(FullApplySite AI);
+
   // Query funtions for getting nodes and edges from the call graph.
 
   CallGraphNode *getCallGraphNode(SILFunction *F) const {
