@@ -590,19 +590,25 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
   return false;
 }
 
-/// Determine whether the given class has any instance variables that
-/// need to be destroyed.
-static bool requiresIVarDestruction(SILGenModule &SGM, ClassDecl *cd) {
+bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
   for (Decl *member : cd->getMembers()) {
     VarDecl *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 
-    const TypeLowering &ti = SGM.Types.getTypeLowering(vd->getType());
+    const TypeLowering &ti = Types.getTypeLowering(vd->getType());
     if (!ti.isTrivial())
       return true;
   }
 
   return false;
+}
+
+bool SILGenModule::requiresIVarDestroyer(ClassDecl *cd) {
+  // Only needed if we have non-trivial ivars, we're not a root class, and
+  // the superclass is not @objc.
+  return (hasNonTrivialIVars(cd) &&
+          cd->getSuperclass() &&
+          !cd->getSuperclass()->getClassOrBoundGenericClass()->hasClangNode());
 }
 
 /// TODO: This needs a better name.
@@ -638,7 +644,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
   }
 
   // Emit the ivar destroyer, if needed.
-  if (requiresIVarDestruction(*this, cd)) {
+  if (hasNonTrivialIVars(cd)) {
     SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer,
                              SILDeclRef::ConstructAtBestResilienceExpansion,
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
@@ -653,6 +659,19 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
 
 void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   emitAbstractFuncDecl(dd);
+  
+  // Emit the ivar destroyer, if needed.
+  if (requiresIVarDestroyer(cd)) {
+    SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer,
+                             SILDeclRef::ConstructAtBestResilienceExpansion,
+                             SILDeclRef::ConstructAtNaturalUncurryLevel,
+                             /*isForeign=*/false);
+    SILFunction *f = getFunction(ivarDestroyer, ForDefinition);
+    preEmitFunction(ivarDestroyer, dd, f, dd);
+    PrettyStackTraceSILFunction X("silgen emitDestructor ivar destroyer", f);
+    SILGenFunction(*this, *f).emitIVarDestroyer(ivarDestroyer);
+    postEmitFunction(ivarDestroyer, f);
+  }
 
   // If the class would use the Objective-C allocator, only emit -dealloc.
   if (usesObjCAllocator(cd)) {

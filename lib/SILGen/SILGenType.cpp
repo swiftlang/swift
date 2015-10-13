@@ -311,7 +311,12 @@ public:
     if (dd->getParent()->isClassOrClassExtensionContext() == theClass) {
       // Add the deallocating destructor to the vtable just for the purpose
       // that it is referenced and cannot be eliminated by dead function removal.
+      // In reality, the deallocating destructor is referenced directly from
+      // the HeapMetadata for the class.
       addEntry(SILDeclRef(dd, SILDeclRef::Kind::Deallocator));
+
+      if (SGM.requiresIVarDestroyer(theClass))
+        addEntry(SILDeclRef(theClass, SILDeclRef::Kind::IVarDestroyer));
     }
   }
 

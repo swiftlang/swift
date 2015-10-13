@@ -680,10 +680,10 @@ public:
                                         ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
                                          llvm::Type *definitionType = nullptr);
-  Optional<llvm::Function*> getAddrOfObjCIVarInitDestroy(
-                              ClassDecl *cd,
-                              bool isDestroyer,
-                              ForDefinition_t forDefinition);
+  Optional<llvm::Function*> getAddrOfIVarInitDestroy(ClassDecl *cd,
+                                                     bool isDestroyer,
+                                                     bool isForeign,
+                                                     ForDefinition_t forDefinition);
   llvm::GlobalValue *defineTypeMetadata(CanType concreteType,
                                         bool isIndirect,
                                         bool isPattern,

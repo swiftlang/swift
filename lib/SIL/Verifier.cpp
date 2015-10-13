@@ -2999,8 +2999,14 @@ void SILVTable::verify(const SILModule &M) const {
     assert((!isa<FuncDecl>(decl)
             || !cast<FuncDecl>(decl)->isObservingAccessor())
            && "observing accessors shouldn't have vtable entries");
-    
-    auto theClass = dyn_cast_or_null<ClassDecl>(decl->getDeclContext());
+
+    // For ivar destroyers, the decl is the class itself.
+    ClassDecl *theClass;
+    if (entry.first.kind == SILDeclRef::Kind::IVarDestroyer)
+      theClass = dyn_cast<ClassDecl>(decl);
+    else
+      theClass = dyn_cast<ClassDecl>(decl->getDeclContext());
+
     assert(theClass && "vtable entry must refer to a class member");
 
     // The class context must be the vtable's class, or a superclass thereof.

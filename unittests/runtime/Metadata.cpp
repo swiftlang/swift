@@ -267,7 +267,7 @@ TEST(MetadataTest, getGenericMetadata) {
 
 FullMetadata<ClassMetadata> MetadataTest2 = {
   { { nullptr }, { &_TWVBo } },
-  { { { MetadataKind::Class } }, nullptr, 0, ClassFlags(), nullptr, 0, 0, 0, 0, 0 }
+  { { { MetadataKind::Class } }, nullptr, 0, ClassFlags(), nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 TEST(MetadataTest, getMetatypeMetadata) {
@@ -521,7 +521,7 @@ struct {
   { &Global1, &Global3, &Global2, &Global3 },
   { { { &destroySuperclass }, { &_TWVBo } },
     { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
-      0, 0, 0, sizeof(SuperclassWithPrefix),
+      nullptr, 0, 0, 0, sizeof(SuperclassWithPrefix),
       sizeof(SuperclassWithPrefix.Prefix) + sizeof(HeapMetadataHeader) } }
 };
 ClassMetadata * const SuperclassWithPrefix_AddressPoint =
@@ -553,7 +553,8 @@ struct {
   },
   { { { &destroySubclass }, { &_TWVBo } },
     { { { MetadataKind::Class } }, nullptr, /*rodata*/ 1, ClassFlags(), nullptr,
-      0, 0, 0, sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix),
+      nullptr, 0, 0, 0,
+      sizeof(GenericSubclass.Pattern) + sizeof(GenericSubclass.Suffix),
       sizeof(HeapMetadataHeader) } },
   { &Global2, &Global1, &Global2 }
 };

@@ -2879,6 +2879,18 @@ namespace {
     void addNominalTypeDescriptor() {
       addWord(ClassNominalTypeDescriptorBuilder(IGM, Target).emit());
     }
+    
+    void addIVarDestroyer() {
+      auto dtorFunc = IGM.getAddrOfIVarInitDestroy(Target,
+                                                   /*isDestroyer=*/ true,
+                                                   /*isForeign=*/ false,
+                                                   NotForDefinition);
+      if (dtorFunc) {
+        addWord(*dtorFunc);
+      } else {
+        addWord(llvm::ConstantPointerNull::get(IGM.FunctionPtrTy));
+      }
+    }
 
     void addParentMetadataRef(ClassDecl *forClass) {
       // FIXME: this is wrong for multiple levels of generics; we need

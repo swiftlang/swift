@@ -1323,7 +1323,8 @@ irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM, ClassDecl *cd,
                                          bool isDestroyer) {
   // Check whether we have an implementation.
   Optional<llvm::Function*> objcImpl 
-    = IGM.getAddrOfObjCIVarInitDestroy(cd, isDestroyer, NotForDefinition);
+    = IGM.getAddrOfIVarInitDestroy(cd, isDestroyer, /*isForeign=*/ true,
+                                   NotForDefinition);
   if (!objcImpl)
     return None;
 

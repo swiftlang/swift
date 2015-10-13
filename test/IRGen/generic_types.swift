@@ -13,7 +13,7 @@ import Swift
 
 // CHECK: @_TMPC13generic_types1A = global [[A_METADATA_T:{.*\* } }]] {
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[A_METADATA_CREATE:@[a-z0-9_]+]],
-// CHECK:   i32 336,
+// CHECK:   i32 344,
 // CHECK:   i16 1,
 // CHECK:   i16 16,
 // CHECK:   [{{[0-9]+}} x i8*] zeroinitializer,
@@ -29,7 +29,7 @@ import Swift
 // CHECK:   i32 24,
 // CHECK:   i16 7,
 // CHECK:   i16 0,
-// CHECK:   i32 144,
+// CHECK:   i32 152,
 // CHECK:   i32 16,
 // CHECK:   %swift.type* null,
 // CHECK:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
@@ -37,7 +37,7 @@ import Swift
 // CHECK: }
 // CHECK: @_TMPC13generic_types1B = global [[B_METADATA_T:{.* } }]] {
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[B_METADATA_CREATE:@[a-z0-9_.]+]],
-// CHECK:   i32 328,
+// CHECK:   i32 336,
 // CHECK:   i16 1,
 // CHECK:   i16 16,
 // CHECK:   [{{[0-9]+}} x i8*] zeroinitializer,
@@ -53,7 +53,7 @@ import Swift
 // CHECK:   i32 24,
 // CHECK:   i16 7,
 // CHECK:   i16 0,
-// CHECK:   i32 136,
+// CHECK:   i32 144,
 // CHECK:   i32 16,
 // CHECK:   %swift.type* null
 // CHECK: }
@@ -86,7 +86,7 @@ import Swift
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 9
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 10
 // CHECK:   store i8* [[T0]], i8** [[T1]], align 8
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }
@@ -99,7 +99,7 @@ import Swift
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, %objc_class* [[SUPER]])
 // CHECK:   [[SELF_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %T to i8*
-// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 9
+// CHECK:   [[T1:%.*]] = getelementptr inbounds i8*, i8** [[SELF_ARRAY]], i32 10
 // CHECK:   store i8* [[T0]], i8** [[T1]], align 8
 // CHECK:   ret %swift.type* [[METADATA]]
 // CHECK: }

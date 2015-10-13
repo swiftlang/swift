@@ -2274,16 +2274,17 @@ llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,
 }
 
 /// Fetch the declaration of the ivar initializer for the given class.
-Optional<llvm::Function*> IRGenModule::getAddrOfObjCIVarInitDestroy(
+Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
                             ClassDecl *cd,
                             bool isDestroyer,
+                            bool isForeign,
                             ForDefinition_t forDefinition) {
   SILDeclRef silRef(cd, 
                     isDestroyer? SILDeclRef::Kind::IVarDestroyer
                                : SILDeclRef::Kind::IVarInitializer, 
                     ResilienceExpansion::Minimal,
                     SILDeclRef::ConstructAtNaturalUncurryLevel, 
-                    /*isForeign=*/true);
+                    isForeign);
 
   llvm::SmallString<64> ivarInitDestroyNameBuffer;
   auto name = silRef.mangle(ivarInitDestroyNameBuffer);

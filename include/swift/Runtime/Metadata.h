@@ -1292,6 +1292,8 @@ struct NominalTypeDescriptor {
   // followed by additional fields.
 };
 
+typedef void (*ClassIVarDestroyer)(HeapObject *);
+
 /// The structure of all class metadata.  This structure is embedded
 /// directly within the class's heap metadata structure and therefore
 /// cannot be extended without an ABI break.
@@ -1305,6 +1307,7 @@ struct ClassMetadata : public HeapMetadata {
                           uintptr_t data,
                           ClassFlags flags,
                           const NominalTypeDescriptor *description,
+                          ClassIVarDestroyer ivarDestroyer,
                           uintptr_t size, uintptr_t addressPoint,
                           uintptr_t alignMask,
                           uintptr_t classSize, uintptr_t classAddressPoint)
@@ -1313,7 +1316,7 @@ struct ClassMetadata : public HeapMetadata {
       Flags(flags), InstanceAddressPoint(addressPoint),
       InstanceSize(size), InstanceAlignMask(alignMask),
       Reserved(0), ClassSize(classSize), ClassAddressPoint(classAddressPoint),
-      Description(description) {}
+      Description(description), IVarDestroyer(ivarDestroyer) {}
 
   /// The metadata for the superclass.  This is null for the root class.
   const ClassMetadata *SuperClass;
@@ -1373,6 +1376,10 @@ private:
   /// dynamically.
   const NominalTypeDescriptor *Description;
 
+  /// A function for destroying instance variables, used to clean up
+  /// after an early return from a constructor.
+  ClassIVarDestroyer IVarDestroyer;
+
   // After this come the class members, laid out as follows:
   //   - class members for the superclass (recursively)
   //   - metadata reference for the parent, if applicable
@@ -1385,6 +1392,11 @@ public:
     assert(isTypeMetadata());
     assert(!isArtificialSubclass());
     return Description;
+  }
+
+  ClassIVarDestroyer getIVarDestroyer() const {
+    assert(isTypeMetadata());
+    return IVarDestroyer;
   }
 
   /// Is this class an artificial subclass, such as one dynamically

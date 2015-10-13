@@ -180,7 +180,16 @@ public:
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType,
                                            IsFragile_t Fragile);
+
+  /// Determine whether the given class has any instance variables that
+  /// need to be destroyed.
+  bool hasNonTrivialIVars(ClassDecl *cd);
   
+  /// Determine whether we need to emit an ivar destroyer for the given class.
+  /// An ivar destroyer is needed if a superclass of this class may define a
+  /// failing designated initializer.
+  bool requiresIVarDestroyer(ClassDecl *cd);
+
   //===--------------------------------------------------------------------===//
   // Visitors for top-level forms
   //===--------------------------------------------------------------------===//

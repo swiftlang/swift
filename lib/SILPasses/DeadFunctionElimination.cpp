@@ -294,17 +294,22 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     // Check vtable methods.
     for (SILVTable &vTable : Module->getVTableList()) {
       for (auto &entry : vTable.getEntries()) {
+        // Destructors are alive because they are called from swift_release
+        if (entry.first.kind == SILDeclRef::Kind::Deallocator ||
+            entry.first.kind == SILDeclRef::Kind::IVarDestroyer) {
+          ensureAlive(entry.second);
+          continue;
+        }
+
         SILFunction *F = entry.second;
         auto *fd = cast<AbstractFunctionDecl>(entry.first.getDecl());
         fd = getBase(fd);
         MethodInfo *mi = getMethodInfo(fd);
         addImplementingFunction(mi, F, vTable.getClass());
 
-        if (// Destructors are alive because they are called from swift_release
-            entry.first.isDestructor()
-            // A conservative approach: if any of the overridden functions is
+        if (// A conservative approach: if any of the overridden functions is
             // visible externally, we mark the whole method as alive.
-            || isPossiblyUsedExternally(F->getLinkage(), Module->isWholeModule())
+            isPossiblyUsedExternally(F->getLinkage(), Module->isWholeModule())
             // We also have to check the method declaration's accessibility.
             // Needed if it's a public base method declared in another
             // compilation unit (for this we have no SILFunction).

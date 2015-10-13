@@ -8,7 +8,7 @@ func markUsed<T>(t: T) {}
 func baseClassVtablesIncludeImplicitInits() {
   // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17vtable_multi_file8Subclass()
   // CHECK: [[T1:%.*]] = bitcast %swift.type* [[T0]] to { i8*, i64, i64 } (%swift.type*)**
-  // CHECK: [[T2:%.*]] = getelementptr inbounds { i8*, i64, i64 } (%swift.type*)*, { i8*, i64, i64 } (%swift.type*)** [[T1]], i64 10
+  // CHECK: [[T2:%.*]] = getelementptr inbounds { i8*, i64, i64 } (%swift.type*)*, { i8*, i64, i64 } (%swift.type*)** [[T1]], i64 11
   // CHECK: load { i8*, i64, i64 } (%swift.type*)*, { i8*, i64, i64 } (%swift.type*)** [[T2]]
   markUsed(Subclass.classProp)
 }

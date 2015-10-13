@@ -22,13 +22,13 @@ import gizmo
 // --       num fields
 // CHECK:   i32 3,
 // --       field offset vector offset
-// CHECK:   i32 14,
+// CHECK:   i32 15,
 // --       field names
 // CHECK:   i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
 // --       generic metadata pattern
 // CHECK:   @_TMPC15generic_classes11RootGeneric
 // --       generic parameter vector offset
-// CHECK:   i32 9,
+// CHECK:   i32 10,
 // --       generic parameter count, primary count, witness table counts
 // CHECK:   i32 1, i32 1, i32 0
 // CHECK: }
@@ -61,7 +61,7 @@ import gizmo
 // --       num fields
 // CHECK:   i32 3,
 // --       -- field offset vector offset
-// CHECK:   i32 10,
+// CHECK:   i32 11,
 // --       field names
 // CHECK:   i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[ROOTGENERIC_FIELDS]], i64 0, i64 0),
 // --       no generic metadata pattern
@@ -236,7 +236,7 @@ entry(%c : $RootGeneric<F>):
 // RootGeneric.y has dependent layout; load the offset from the metadata
 // CHECK-LABEL: define void @RootGeneric_concrete_fragile_dependent_member_access_y
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
-// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_METADATA_ARRAY]], i64 15
+// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_METADATA_ARRAY]], i64 16
 // CHECK:   [[Y_OFFSET_PTR:%.*]] = load i8**, i8*** [[Y_OFFSET_ADDR]], align 8
 // CHECK:   [[Y_OFFSET:%.*]] = ptrtoint i8** [[Y_OFFSET_PTR]] to i64
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
@@ -252,7 +252,7 @@ entry(%z : $*F, %c : $RootGeneric<F>):
 
 // CHECK-LABEL: define void @RootGeneric_subst_concrete_fragile_dependent_member_access_y
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
-// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_METADATA_ARRAY]], i64 15
+// CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_METADATA_ARRAY]], i64 16
 // CHECK:   [[Y_OFFSET_PTR:%.*]] = load i8**, i8*** [[Y_OFFSET_ADDR]], align 8
 // CHECK:   [[Y_OFFSET:%.*]] = ptrtoint i8** [[Y_OFFSET_PTR]] to i64
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
@@ -269,7 +269,7 @@ entry(%z : $*Int, %c : $RootGeneric<Int>):
 // RootGeneric.z has dependent layout; load the offset from the metadata
 // CHECK-LABEL: define i8 @RootGeneric_concrete_fragile_dependent_member_access_z
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
-// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_METADATA_ARRAY]], i64 16
+// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_METADATA_ARRAY]], i64 17
 // CHECK:   [[Z_OFFSET_PTR:%.*]] = load i8**, i8*** [[Z_OFFSET_ADDR]], align 8
 // CHECK:   [[Z_OFFSET:%.*]] = ptrtoint i8** [[Z_OFFSET_PTR]] to i64
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
@@ -284,7 +284,7 @@ entry(%c : $RootGeneric<F>):
 
 // CHECK-LABEL: define i8 @RootGeneric_subst_concrete_fragile_dependent_member_access_z
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i8***
-// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_METADATA_ARRAY]], i64 16
+// CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_METADATA_ARRAY]], i64 17
 // CHECK:   [[Z_OFFSET_PTR:%.*]] = load i8**, i8*** [[Z_OFFSET_ADDR]], align 8
 // CHECK:   [[Z_OFFSET:%.*]] = ptrtoint i8** [[Z_OFFSET_PTR]] to i64
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
@@ -332,29 +332,29 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 //   Put the generic arguments in their correct positions.
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %A to i8*
-// CHECK:   [[A_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i32 17
+// CHECK:   [[A_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i32 18
 // CHECK:   store i8* [[T0]], i8** [[A_ADDR]], align 8
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %B to i8*
-// CHECK:   [[B_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i32 18
+// CHECK:   [[B_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY:%.*]], i32 19
 // CHECK:   store i8* [[T0]], i8** [[B_ADDR]], align 8
 //   Set up the isa.
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
 // CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 0
 // CHECK:   [[T1:%.*]] = bitcast i8** [[T0]] to %objc_class**
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 24
+// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 25
 // CHECK:   [[METACLASS:%.*]] = bitcast i8** [[T0]] to %objc_class*
 // CHECK:   store %objc_class* [[METACLASS]], %objc_class** [[T1]], align 8
 //   Set up the instance rodata pointer.
 // CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 4
 // CHECK:   [[T1:%.*]] = bitcast i8** [[T0]] to i64*
-// CHECK:   [[RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 29
+// CHECK:   [[RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 30
 // CHECK:   [[T2:%.*]] = ptrtoint i8** [[RODATA]] to i64
 // CHECK:   [[T3:%.*]] = or i64 [[T2]], 1
 // CHECK:   store i64 [[T3]], i64* [[T1]], align 8
 //   Set up the class rodata pointer.
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 28
+// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 29
 // CHECK:   [[T1:%.*]] = bitcast i8** [[T0]] to i64*
-// CHECK:   [[META_RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 38
+// CHECK:   [[META_RODATA:%.*]] = getelementptr inbounds i8*, i8** [[METADATA_ARRAY]], i32 39
 // CHECK:   [[T2:%.*]] = ptrtoint i8** [[META_RODATA]] to i64
 // CHECK:   store i64 [[T2]], i64* [[T1]], align 8
 //   Set up the rodatas.
@@ -380,19 +380,19 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[SUPER_ARRAY:%.*]] = bitcast %swift.type* [[SUPER]] to i64*
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
 //    - the superclass's generic args
-// CHECK:   [[SUPER_T_ADDR:%.*]] = getelementptr inbounds i64, i64* [[SUPER_ARRAY]], i32 9
-// CHECK:   [[SELF_T_ADDR:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 9
+// CHECK:   [[SUPER_T_ADDR:%.*]] = getelementptr inbounds i64, i64* [[SUPER_ARRAY]], i32 10
+// CHECK:   [[SELF_T_ADDR:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 10
 // CHECK:   [[T:%.*]] = load i64, i64* [[SUPER_T_ADDR]], align 8
 // CHECK:   store i64 [[T]], i64* [[SELF_T_ADDR]], align 8
 //    - the super field offsets
-// CHECK:   [[SUPER_BASE_VEC:%.*]] = getelementptr inbounds i64, i64* [[SUPER_ARRAY]], i32 14
-// CHECK:   [[SELF_BASE_VEC:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 14
+// CHECK:   [[SUPER_BASE_VEC:%.*]] = getelementptr inbounds i64, i64* [[SUPER_ARRAY]], i32 15
+// CHECK:   [[SELF_BASE_VEC:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 15
 // CHECK:   [[SELF_BASE_VEC_I8:%.*]] = bitcast i64* [[SELF_BASE_VEC]] to i8*
 // CHECK:   [[SUPER_BASE_VEC_I8:%.*]] = bitcast i64* [[SUPER_BASE_VEC]] to i8*
 // CHECK:   call void @llvm.memcpy.p0i8.p0i8.i64(i8* [[SELF_BASE_VEC_I8]], i8* [[SUPER_BASE_VEC_I8]], i64 24, i32 8, i1 false)
 //   Initialize our own dependent field offsets.
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
-// CHECK:   [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 22
+// CHECK:   [[OFFSETS:%.*]] = getelementptr inbounds i64, i64* [[METADATA_ARRAY]], i32 23
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* %B to i8***
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[T1]], align 8

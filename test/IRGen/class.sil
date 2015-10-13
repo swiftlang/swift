@@ -57,9 +57,10 @@ sil_vtable C {}
 // \ CHECK:   i32 16,
 // \ CHECK:   i16 7,
 // \ CHECK:   i16 0,
-// \ CHECK:   i32 104,
+// \ CHECK:   i32 112,
 // \ CHECK:   i32 16,
 // \ CHECK:   {{.*}}* @_TMnC5class1D,
+// \ CHECK:   i8* null,
 // \ CHECK:   i32 (i16, i8, [[D_CLASS]]*)* @_TFC5class1D8multiplyfS0_fT1xBi8__FT1yBi16__Bi32_
 // \ CHECK: }
 

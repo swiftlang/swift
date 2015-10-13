@@ -70,7 +70,8 @@ public:
     asImpl().addClassSize();
     asImpl().addClassAddressPoint();
     asImpl().addNominalTypeDescriptor();
-    
+    asImpl().addIVarDestroyer();
+
     // Class members.
     addClassMembers(Target);
   }
@@ -233,6 +234,7 @@ protected:
 public:
   void addMetadataFlags() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
+  void addIVarDestroyer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addDestructorFunction() { addPointer(); }
   void addParentMetadataRef(ClassDecl *forClass) { addPointer(); }
