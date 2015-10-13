@@ -117,26 +117,25 @@ class LoopRegionFunctionInfo;
 class LoopRegion {
 
   /// This is a data structure that is an unsigned integer with a top bit flag
-  /// that says whether it is an RPO ID for a Block Region or is an RPO ID of
-  /// the header Block of a Loop Region that used as a placeholder to ensure
-  /// that the Loop is visited in the proper RPO order. When the placeholder
-  /// flag is hit, the subloop array should be searched for the pair that has
-  /// that flag as a first element. The loop's flag will be the second element
-  /// of the pair.
-  struct LoopRegionID {
+  /// that says whether it is an RPO ID for a BB Region or is an RPO ID of the
+  /// header BB of a Loop Region that used as a placeholder to ensure that the
+  /// Loop is visited in the proper RPO order. When the placeholder flag is hit,
+  /// the subloop array should be searched for the pair that has that flag as a
+  /// first element. The loop's flag will be the second element of the pair.
+  struct SubregionID {
     static constexpr unsigned IDBitSize = (sizeof(unsigned) * CHAR_BIT) - 1;
     static constexpr unsigned MaxID = (unsigned(1) << IDBitSize) - 1;
     unsigned IsLoop : 1;
     unsigned ID : IDBitSize;
 
-    LoopRegionID(unsigned id, bool isloop) {
+    SubregionID(unsigned id, bool isloop) {
       IsLoop = unsigned(isloop);
       ID = id;
     }
-    bool operator<(const LoopRegionID &Other) const { return ID < Other.ID; }
+    bool operator<(const SubregionID &Other) const { return ID < Other.ID; }
   };
   /// These checks are just for performance.
-  static_assert(IsTriviallyCopyable<LoopRegionID>::value,
+  static_assert(IsTriviallyCopyable<SubregionID>::value,
                 "Expected trivially copyable type");
 
   struct SubregionData;
@@ -153,7 +152,7 @@ public:
   class subregion_iterator :
     public std::iterator<std::bidirectional_iterator_tag, unsigned> {
     friend struct SubregionData;
-    llvm::SmallVectorImpl<LoopRegionID>::iterator InnerIter;
+    llvm::SmallVectorImpl<SubregionID>::iterator InnerIter;
     const llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> *Subloops;
 
     /// A flag that says that this iterator is an invalid iterator belonging to
@@ -168,7 +167,7 @@ public:
     unsigned IsInvalid : 1;
 
     subregion_iterator(
-        llvm::SmallVectorImpl<LoopRegionID>::iterator iter,
+        llvm::SmallVectorImpl<SubregionID>::iterator iter,
         const llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> *subloops)
         : InnerIter(iter), Subloops(subloops), IsInvalid(false) {}
 
@@ -289,7 +288,7 @@ private:
     /// subregions of this region. What is key to notice is that a loop is
     /// represented by the RPO number of its header. We use an auxillary map to
     /// map the preheader's RPO number to the loop's ID.
-    llvm::SmallVector<LoopRegionID, 16> Subregions;
+    llvm::SmallVector<SubregionID, 16> Subregions;
 
     /// A map from RPO number of a subregion loop's preheader to a subloop
     /// regions id. This is neccessary since we represent a loop in the
@@ -313,13 +312,13 @@ private:
     bool empty() const { return Subregions.empty(); }
 
     void addBlockSubregion(LoopRegion *R) {
-      assert(R->ID <= LoopRegionID::MaxID && "Unrepresentable ID");
-      Subregions.push_back(LoopRegionID(R->ID, false));
+      assert(R->ID <= SubregionID::MaxID && "Unrepresentable ID");
+      Subregions.push_back(SubregionID(R->ID, false));
     }
 
     void addLoopSubregion(LoopRegion *L, LoopRegion *Header) {
-      assert(Header->ID <= LoopRegionID::MaxID && "Unrepresentable ID");
-      Subregions.push_back(LoopRegionID(Header->ID, true));
+      assert(Header->ID <= SubregionID::MaxID && "Unrepresentable ID");
+      Subregions.push_back(SubregionID(Header->ID, true));
       Subloops.push_back({Header->ID, L->ID});
     }
 
