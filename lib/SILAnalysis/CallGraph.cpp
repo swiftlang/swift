@@ -642,6 +642,8 @@ void CallGraph::dumpStats() {
 #endif
 }
 
+namespace {
+
 /// Finds SCCs in the call graph. Our call graph has an unconventional
 /// form where each edge of the graph is really a multi-edge that can
 /// point to multiple call graph nodes in the case where we can call
@@ -709,6 +711,8 @@ public:
     }
   }
 };
+
+} // end anonymous namespace
 
 void CallGraph::clearBottomUpSCCOrder() {
   for (auto *SCC : BottomUpSCCOrder)
@@ -928,6 +932,8 @@ void CallGraph::verify(SILFunction *F) const {
 
 #ifndef NDEBUG
 
+namespace swift {
+
 /// Another representation of the call graph using sorted vectors instead of
 /// sets. Used for viewing the callgraph as dot file with llvm::ViewGraph.
 struct OrderedCallGraph {
@@ -1012,6 +1018,8 @@ OrderedCallGraph::OrderedCallGraph(CallGraph *CG) {
     }
   }
 }
+
+} // end swift namespace
 
 namespace llvm {
 
