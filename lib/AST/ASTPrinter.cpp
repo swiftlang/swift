@@ -32,7 +32,6 @@
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Config.h"
-#include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
@@ -73,14 +72,13 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
 bool ASTPrinter::printTypeInterface(Type Ty, llvm::raw_ostream &OS) {
   if (!Ty)
     return false;
-  Ty = Ty->getRValueType();
   PrintOptions Options = PrintOptions::printInterface();
-   if (auto ND = Ty->getNominalOrBoundGenericNominal()) {
-     Options.printExtensionContentAsMembers = [&](const ExtensionDecl *ED) {
-       return isExtensionApplied(*ND->getDeclContext(), Ty, ED);
-     };
-     ND->print(OS, Options);
-     return true;
+  Options.printExtensionContentAsMembers = [](const ExtensionDecl *ED) {
+    return true;
+  };
+  if (auto ND = Ty->getRValueType()->getNominalOrBoundGenericNominal()) {
+    ND->print(OS, Options);
+    return true;
   }
   return false;
 }

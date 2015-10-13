@@ -27,7 +27,6 @@ namespace swift {
   class Decl;
   class Expr;
   class LazyResolver;
-  class ExtensionDecl;
 
   /// \brief Typecheck a declaration parsed during code completion.
   ///
@@ -49,13 +48,6 @@ namespace swift {
   /// to infer the type of BaseType.Name1.Name2.Name3
   /// \returns Resolved type on success, nullptr on error.
   Type checkMemberType(DeclContext &DC, Type BaseTy, ArrayRef<Identifier> Names);
-
-
-  /// \brief Given a type and an extension to the original type decl of that type,
-  /// decide if the extension has been applied, i.e. if the requirements of the
-  /// extension have been fulfilled.
-  /// \returns True on applied, false on not applied.
-  bool isExtensionApplied(DeclContext &DC, Type Ty, const ExtensionDecl *ED);
 
   /// \brief Return the type of an expression parsed during code completion, or
   /// None on error.
