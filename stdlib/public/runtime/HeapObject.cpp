@@ -462,6 +462,32 @@ extern "C" void swift_deallocUninitializedClassInstance(HeapObject *object,
   swift_deallocClassInstance(object, allocatedSize, allocatedAlignMask);
 }
 
+/// Variant of the above used in constructor failure paths.
+extern "C" void swift_deallocPartialClassInstance(HeapObject *object,
+                                                  HeapMetadata const *metadata,
+                                                  size_t allocatedSize,
+                                                  size_t allocatedAlignMask) {
+  if (!object)
+    return;
+
+  // Destroy ivars
+  auto *objectMetadata = object->metadata;
+  while (objectMetadata != metadata) {
+    auto classMetadata = objectMetadata->getClassObject();
+    assert(classMetadata && "Not a class?");
+    if (auto fn = classMetadata->getIVarDestroyer())
+      fn(object);
+    objectMetadata = classMetadata->SuperClass;
+    assert(objectMetadata && "Given metatype not a superclass of object type?");
+  }
+
+  // The strong reference count should be +1 -- tear down the object
+  bool shouldDeallocate = object->refCount.decrementShouldDeallocate();
+  assert(shouldDeallocate);
+  (void) shouldDeallocate;
+  swift_deallocClassInstance(object, allocatedSize, allocatedAlignMask);
+}
+
 #if !defined(__APPLE__)
 static inline void memset_pattern8(void *b, const void *pattern8, size_t len) {
   char *ptr = static_cast<char *>(b);

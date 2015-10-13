@@ -296,6 +296,25 @@ extern "C" void swift_deallocUninitializedClassInstance(HeapObject *object,
                                                         size_t allocatedSize,
                                                         size_t allocatedAlignMask);
 
+/// Deallocate the given memory after destroying instance variables.
+///
+/// Destroys instance variables in classes more derived than the given metatype.
+///
+/// It must have been returned by swift_allocObject, possibly used as an
+/// Objective-C class instance, and the strong reference must be equal to 1.
+///
+/// \param object - may be null
+/// \param type - most derived class whose instance variables do not need to
+///   be destroyed
+/// \param allocatedSize - the allocated size of the object from the
+///   program's perspective, i.e. the value
+/// \param allocatedAlignMask - the alignment requirement that was passed
+///   to allocObject
+extern "C" void swift_deallocPartialClassInstance(HeapObject *object,
+                                                  const HeapMetadata *type,
+                                                  size_t allocatedSize,
+                                                  size_t allocatedAlignMask);
+
 /// Deallocate the given memory allocated by swift_allocBox; it was returned
 /// by swift_allocBox but is otherwise in an unknown state. The given Metadata
 /// pointer must be the same metadata pointer that was passed to swift_allocBox
