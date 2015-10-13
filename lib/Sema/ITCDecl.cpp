@@ -295,7 +295,7 @@ bool IterativeTypeChecker::isResolveTypeDeclSatisfied(TypeDecl *typeDecl) {
   }
 
   // Module types are always fully resolved.
-  if (auto module = dyn_cast<ModuleDecl>(typeDecl))
+  if (typeDecl->getKind() == DeclKind::Module)
     return true;
 
   // Nominal types.

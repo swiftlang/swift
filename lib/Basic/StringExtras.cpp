@@ -721,8 +721,6 @@ static bool omitNeedlessWordsMatchingFirstArgumentLabel(
 
 /// Determine whether the given word indicates a boolean result.
 static bool nameIndicatesBooleanResult(StringRef name) {
-  bool isFirstWord = true;
-
   for (auto word: camel_case::getWords(name)) {
     // Auxiliary verbs indicate Boolean results.
     if (getPartOfSpeech(word) == PartOfSpeech::AuxiliaryVerb)
