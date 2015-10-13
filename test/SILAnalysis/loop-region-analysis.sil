@@ -32,21 +32,21 @@ sil @no_return_func : $@convention(thin) @noreturn () -> ()
 // CHECK:         (preds)
 // CHECK:         (succs)
 // CHECK:         (subregs
-// CHECK:          (region id:0 kind:bb
-// CHECK:          (region id:4 kind:loop
-// CHECK:          (region id:2 kind:bb
+// CHECK:          (region id:0)
+// CHECK:          (region id:4)
+// CHECK:          (region id:2)
 // CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:3
 // CHECK:         (preds
-// CHECK:          (region id:4 kind:loop
+// CHECK:          (region id:4)
 // CHECK:         (succs)
 // CHECK:         (subregs)
 // CHECK: (region id:4 kind:loop ucfh:false ucft:false parent:3
 // CHECK:         (preds
-// CHECK:          (region id:0 kind:bb
+// CHECK:          (region id:0)
 // CHECK:         (succs
-// CHECK:          (region id:2 kind:bb
+// CHECK:          (region id:2)
 // CHECK:         (subregs
-// CHECK:          (region id:1 kind:bb
+// CHECK:          (region id:1)
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:4
 // CHECK:         (preds)
 // CHECK:         (succs)
@@ -54,7 +54,7 @@ sil @no_return_func : $@convention(thin) @noreturn () -> ()
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:3
 // CHECK:         (preds)
 // CHECK:         (succs
-// CHECK:          (region id:4 kind:loop
+// CHECK:          (region id:4)
 // CHECK:         (subregs)
 sil @one_natural_self_loop : $@convention(thin) () -> () {
 bb0:
@@ -1124,21 +1124,21 @@ bb5:
 // CHECK:     (subregs))
 // CHECK: (region id:2 kind:bb   ucfh:true  ucft:true  parent:8
 // CHECK:     (preds
-// CHECK:         (region id:1 kind:bb   ucfh:false ucft:false)
-// CHECK:         (region id:3 kind:bb   ucfh:true  ucft:true ))
+// CHECK:         (region id:1)
+// CHECK:         (region id:3)
 // CHECK:     (succs
-// CHECK:         (region id:3 kind:bb   ucfh:true  ucft:true ))
+// CHECK:         (region id:3)
 // CHECK:     (subregs))
 // CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:8
 // CHECK:     (preds)
 // CHECK:     (succs
-// CHECK:         (region id:2 kind:bb   ucfh:true  ucft:true )
-// CHECK:         (region id:4 kind:bb   ucfh:true  ucft:true ))
+// CHECK:         (region id:2)
+// CHECK:         (region id:4)
 // CHECK:     (subregs))
 // CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:7
 // CHECK:     (preds)
 // CHECK:     (succs
-// CHECK:         (region id:8 kind:loop ucfh:false ucft:false))
+// CHECK:         (region id:8)
 // CHECK:     (subregs))
 sil @natural_loop_containing_irreducible_loop : $@convention(thin) () -> () {
 bb0:

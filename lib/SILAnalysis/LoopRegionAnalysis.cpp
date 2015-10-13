@@ -61,6 +61,10 @@ void LoopRegion::printName(llvm::raw_ostream &os) const {
 
 void LoopRegion::print(llvm::raw_ostream &os, bool isShort) const {
   os << "(region id:" << ID;
+  if (isShort) {
+    os << ")";
+    return;
+  }
   os << " kind:";
   if (isBlock()) {
     os << "bb  ";
@@ -74,8 +78,6 @@ void LoopRegion::print(llvm::raw_ostream &os, bool isShort) const {
 
   os << " ucfh:" << (IsUnknownControlFlowEdgeHead? "true " : "false")
      << " ucft:" << (IsUnknownControlFlowEdgeTail? "true " : "false");
-  if (isShort)
-    os << ")";
 }
 
 llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &os, LoopRegion &LR) {
