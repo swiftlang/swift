@@ -6,9 +6,13 @@
 
 import ObjCIRExtras
 
-func test() {
-  _ = SwiftNameTest()
+func test(i: Int) {
+  let t = SwiftNameTest()
   
+  t.theMethod(number: i)
+
+  _ = t.renamedSomeProp
+
   // We only see these two warnings because Clang can catch the other invalid
   // cases, and marks the attribute as invalid ahead of time.
   

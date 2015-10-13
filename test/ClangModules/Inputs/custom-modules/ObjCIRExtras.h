@@ -1,6 +1,5 @@
 @import Foundation;
-
-#define SWIFT_NAME(X) __attribute__((swift_name(#X)))
+@import SwiftName;
 
 @interface PointerWrapper
 @property void * __null_unspecified voidPtr;
@@ -27,6 +26,10 @@
 + (instancetype)testW:(id)x out:(id *)outObject SWIFT_NAME(ww(_:));
 + (instancetype)test SWIFT_NAME(test(a:b:));
 + (instancetype)test:(id)x more:(id)y SWIFT_NAME(test());
+
+- (void)methodInt:(NSInteger)value SWIFT_NAME(theMethod(number:));
+
+@property (readonly) int someProp SWIFT_NAME(renamedSomeProp);
 @end
 
 @interface SwiftNameTestError : NSObject
@@ -52,4 +55,7 @@
 
 @interface SwiftNameTestErrorSub : SwiftNameTestError
 @end
+
+int global_int SWIFT_NAME(GlobalInt);
+
 #pragma clang assume_nonnull end

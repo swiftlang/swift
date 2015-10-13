@@ -735,8 +735,8 @@ public:
   /// \param removePrefix The prefix to remove from the Clang name to produce
   /// the Swift name. If the Clang name does not start with this prefix,
   /// nothing is removed.
-  Identifier importName(clang::DeclarationName name,
-                        StringRef removePrefix = "");
+  Identifier importDeclName(clang::DeclarationName name,
+                            StringRef removePrefix = "");
 
   /// Import an Objective-C selector.
   ObjCSelector importSelector(clang::Selector selector);
@@ -1039,7 +1039,9 @@ public:
                           ArrayRef<const clang::ParmVarDecl *> params,
                           bool isVariadic, bool isNoReturn,
                           bool isFromSystemModule,
-                          SmallVectorImpl<Pattern*> &bodyPatterns);
+                          bool hasCustomName,
+                          SmallVectorImpl<Pattern*> &bodyPatterns,
+                          DeclName &name);
 
   Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                           bool isFromSystemModule);

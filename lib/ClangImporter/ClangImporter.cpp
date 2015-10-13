@@ -1250,8 +1250,8 @@ ClangImporter::Implementation::exportName(Identifier name) {
 }
 
 Identifier
-ClangImporter::Implementation::importName(clang::DeclarationName name,
-                                          StringRef removePrefix) {
+ClangImporter::Implementation::importDeclName(clang::DeclarationName name,
+                                              StringRef removePrefix) {
   // FIXME: At some point, we'll be able to import operators as well.
   if (!name || name.getNameKind() != clang::DeclarationName::Identifier)
     return Identifier();
@@ -1271,7 +1271,15 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
 Identifier
 ClangImporter::Implementation::importName(const clang::NamedDecl *D,
                                           StringRef removePrefix) {
-  Identifier result = importName(D->getDeclName(), removePrefix);
+  if (auto *nameAttr = D->getAttr<clang::SwiftNameAttr>()) {
+    StringRef customName = nameAttr->getName();
+    if (Lexer::isIdentifier(customName))
+      return SwiftContext.getIdentifier(customName);
+
+    return Identifier();
+  }
+
+  Identifier result = importDeclName(D->getDeclName(), removePrefix);
   if (result.empty())
     return result;
 
@@ -2558,7 +2566,7 @@ void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
     for (auto I = ClangPP.macro_begin(), E = ClangPP.macro_end(); I != E; ++I) {
       if (!I->first->hasMacroDefinition())
         continue;
-      auto Name = Impl.importName(I->first);
+      auto Name = Impl.importDeclName(I->first);
       if (Name.empty())
         continue;
       if (auto *Imported = Impl.importMacro(

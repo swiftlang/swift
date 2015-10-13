@@ -1071,7 +1071,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
 /// generated name will most likely be unique.
 static Identifier getClangDeclName(ClangImporter::Implementation &Impl,
                                    const clang::TagDecl *decl) {
-  if (decl->getDeclName())
+  if (decl->getDeclName() || decl->hasAttr<clang::SwiftNameAttr>())
     return Impl.importName(decl);
   else if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
     return Impl.importName(typedefForAnon);
@@ -2720,6 +2720,22 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // Determine the name of the function.
+      DeclName name;
+      bool hasCustomName;
+      if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
+        name = parseDeclName(customNameAttr->getName());
+        hasCustomName = true;
+      }
+
+      if (!name) {
+        name = Impl.importName(decl);
+        hasCustomName = false;
+      }
+
+      if (!name)
+        return nullptr;
+
       // Import the function type. If we have parameters, make sure their names
       // get into the resulting function type.
       SmallVector<Pattern *, 4> bodyPatterns;
@@ -2730,21 +2746,21 @@ namespace {
                                           decl->isVariadic(),
                                           decl->isNoReturn(),
                                           isInSystemModule(dc),
-                                          bodyPatterns);
+                                          hasCustomName,
+                                          bodyPatterns,
+                                          name);
       if (!type)
         return nullptr;
 
       auto resultTy = type->castTo<FunctionType>()->getResult();
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
-      // Form the name of the function.
-      auto baseName = Impl.importName(decl);
-      if (baseName.empty())
-        return nullptr;
-
-      llvm::SmallVector<Identifier, 2> 
-        argNames(bodyPatterns[0]->numTopLevelVariables(), Identifier());
-      DeclName name(Impl.SwiftContext, baseName, argNames);
+      // If we had no argument labels to start with, add empty labels now.
+      if (name.isSimpleName()) {
+        llvm::SmallVector<Identifier, 2>
+          argNames(bodyPatterns[0]->numTopLevelVariables(), Identifier());
+        name = DeclName(Impl.SwiftContext, name.getBaseName(), argNames);
+      }
 
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
@@ -5143,7 +5159,7 @@ namespace {
                                    name,
                                    None);
       result->computeType();
-      addObjCAttribute(result, Impl.importName(decl->getDeclName()));
+      addObjCAttribute(result, Impl.importDeclName(decl->getDeclName()));
 
       if (declaredNative)
         markMissingSwiftDecl(result);
@@ -5228,7 +5244,7 @@ namespace {
         result->setSuperclass(Type());
         result->setCheckedInheritanceClause();
         result->setAddedImplicitInitializers(); // suppress all initializers
-        addObjCAttribute(result, Impl.importName(decl->getDeclName()));
+        addObjCAttribute(result, Impl.importDeclName(decl->getDeclName()));
         Impl.registerExternalDecl(result);
         return result;
       };
@@ -5297,7 +5313,7 @@ namespace {
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setCircularityCheck(CircularityCheck::Checked);
       result->setAddedImplicitInitializers();
-      addObjCAttribute(result, Impl.importName(decl->getDeclName()));
+      addObjCAttribute(result, Impl.importDeclName(decl->getDeclName()));
 
       if (declaredNative)
         markMissingSwiftDecl(result);

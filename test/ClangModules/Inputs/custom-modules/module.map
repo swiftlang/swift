@@ -129,3 +129,7 @@ module Requires {
   module Swift { requires swift }
   module NotSwift { requires !swift }
 }
+
+module SwiftName {
+  header "SwiftName.h"
+}

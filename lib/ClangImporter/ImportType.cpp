@@ -1322,7 +1322,9 @@ Type ClangImporter::Implementation::importFunctionType(
        ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic, bool isNoReturn,
        bool isFromSystemModule,
-       SmallVectorImpl<Pattern*> &bodyPatterns) {
+       bool hasCustomName,
+       SmallVectorImpl<Pattern*> &bodyPatterns,
+       DeclName &name) {
 
   // Cannot import variadic types.
   if (isVariadic)
@@ -1376,6 +1378,7 @@ Type ClangImporter::Implementation::importFunctionType(
   SmallVector<TuplePatternElt, 4> bodyPatternElts;
   unsigned index = 0;
   llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
+  ArrayRef<Identifier> argNames = name.getArgumentNames();
   for (auto param : params) {
     auto paramTy = param->getType();
     if (paramTy->isVoidType()) {
@@ -1418,8 +1421,10 @@ Type ClangImporter::Implementation::importFunctionType(
     // Figure out the name for this parameter.
     Identifier bodyName = importName(param);
 
-    // Note: C functions never have argument names.
+    // Retrieve the argument name.
     Identifier name;
+    if (index < argNames.size())
+      name = argNames[index];
 
     // Compute the pattern to put into the body.
     Pattern *bodyPattern;
