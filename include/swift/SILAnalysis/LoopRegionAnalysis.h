@@ -35,8 +35,11 @@
 /// - LoopRegion::isUnknownControlFlowEdgeHead().
 /// - LoopRegion::isUnknownControlFlowEdgeTail().
 ///
-/// We also mark Blocks with multiple backedges with such markers and rely on
-/// loop canonicalization to handle them.
+/// 4. Only loops with single back edges are supported by this analysis. If such
+/// a loop is detected, we mark the head, tail of the edge as irreducible
+/// control flow boundaries. To handle such loops, we rely on loop
+/// canonicalization to transform the multiple backedge loops into multiple
+/// loops with singular backedges or by merging the backedge blocks.
 ///
 /// Algorithm
 /// =========
