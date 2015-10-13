@@ -613,9 +613,13 @@ struct LoopRegionFunctionInfoGrapherWrapper {
   std::vector<LoopRegionWrapper> Data;
 };
 
+struct alledge_iterator;
+
 struct LoopRegionWrapper {
   LoopRegionFunctionInfoGrapherWrapper &FuncInfo;
   LoopRegion *Region;
+  alledge_iterator begin();
+  alledge_iterator end();
 };
 
 /// An iterator on Regions that first iterates over subregions and then over
@@ -669,6 +673,15 @@ struct alledge_iterator
 
 } // end anonymous namespace
 
+alledge_iterator LoopRegionWrapper::begin() {
+  return alledge_iterator(this, Region->subregion_begin(),
+                          Region->succ_begin());
+}
+
+alledge_iterator LoopRegionWrapper::end() {
+  return alledge_iterator(this, Region->subregion_end(), Region->succ_end());
+}
+
 namespace llvm {
 template <> struct GraphTraits<LoopRegionWrapper> {
   using NodeType = LoopRegionWrapper;
@@ -676,14 +689,8 @@ template <> struct GraphTraits<LoopRegionWrapper> {
 
   static NodeType *getEntryNode(NodeType *BB) { return BB; }
 
-  static ChildIteratorType child_begin(NodeType *N) {
-    return alledge_iterator{N, N->Region->subregion_begin(),
-                            N->Region->succ_begin()};
-  }
-  static ChildIteratorType child_end(NodeType *N) {
-    return alledge_iterator{N, N->Region->subregion_end(),
-                            N->Region->succ_end()};
-  }
+  static ChildIteratorType child_begin(NodeType *N) { return N->begin(); }
+  static ChildIteratorType child_end(NodeType *N) { return N->end(); }
 };
 
 template <>
