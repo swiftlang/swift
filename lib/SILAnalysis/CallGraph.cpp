@@ -364,17 +364,6 @@ void CallGraph::removeEdgesForApply(FullApplySite AI) {
   removeEdge(ApplyToEdgeMap[AI]);
 }
 
-void CallGraph::markCallerEdgesOfCalleesIncomplete(FullApplySite AI) {
-  auto *Edge = getCallGraphEdge(AI);
-
-  // We are not guaranteed to have an edge for every apply.
-  if (!Edge)
-    return;
-
-  for (auto *Node : Edge->getPartialCalleeSet())
-    Node->markCallerEdgesIncomplete();
-}
-
 void CallGraph::addEdges(SILFunction *F) {
   auto *CallerNode = getOrAddCallGraphNode(F);
 

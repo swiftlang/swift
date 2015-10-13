@@ -346,8 +346,6 @@ public:
   void removeEdge(CallGraphEdge *Edge);
   void removeEdgesForApply(FullApplySite AI);
 
-  void markCallerEdgesOfCalleesIncomplete(FullApplySite AI);
-
   // Call graph queries on functions.
 
   /// May this function bind dynamic Self at one of its call sites?
