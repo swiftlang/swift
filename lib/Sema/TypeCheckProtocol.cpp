@@ -2392,7 +2392,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   // If there was an invalid witness that might have worked, just
   // suppress the diagnostic entirely. This stops the diagnostic cascade.
   // FIXME: We could do something crazy, like try to fix up the witness.
-  if (invalidWitness || (numViable == 0 && anyFromUnconstrainedExtension)) {
+  if (invalidWitness ||
+      (numViable == 0 && anyFromUnconstrainedExtension &&
+       Conformance->isInvalid())) {
     return ResolveWitnessResult::ExplicitFailed;
   }
 

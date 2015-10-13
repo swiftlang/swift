@@ -77,7 +77,7 @@ struct P5Conformer : P5 { // expected-error {{does not conform}}
 protocol P6Base {
   typealias Foo
   func foo()
-  func bar() -> Foo
+  func bar() -> Foo // expected-note{{protocol requires function 'bar()' }}
 }
 extension P6Base {
 }
@@ -85,9 +85,17 @@ protocol P6 : P6Base {
   typealias Bar // expected-note {{protocol requires nested type 'Bar'}}
 }
 extension P6 {
-  func bar() -> Bar? { return nil }
+  func bar() -> Bar? { return nil } // expected-note{{candidate has non-matching type}}
 }
 
-struct P6Conformer : P6 { // expected-error {{does not conform}}
+struct P6Conformer : P6 { // expected-error 2 {{does not conform}}
   func foo() {}
+}
+
+// rdar://problem/23033862
+// expected-error@+2{{type 'A' does not conform to protocol 'OptionSetType'}}
+// expected-error@+1{{type 'A' does not conform to protocol 'RawRepresentable'}}
+struct A: OptionSetType {
+    let rawValue = 0
+    init() { } // expected-note 2{{candidate has non-matching type '()'}}
 }
