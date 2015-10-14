@@ -89,6 +89,56 @@ LoopRegion::SuccRange LoopRegion::getSuccs() {
   auto Range = InnerSuccRange(Succs.begin(), Succs.end());
   return SuccRange(Range, SuccessorID::ToLiveSucc());
 }
+
+LoopRegion::LocalSuccRange LoopRegion::getLocalSuccs() {
+  auto Range = InnerSuccRange(Succs.begin(), Succs.end());
+  return LocalSuccRange(Range, SuccessorID::ToLiveLocalSucc());
+}
+
+LoopRegion::NonLocalSuccRange LoopRegion::getNonLocalSuccs() {
+  auto Range = InnerSuccRange(Succs.begin(), Succs.end());
+  return NonLocalSuccRange(Range, SuccessorID::ToLiveNonLocalSucc());
+}
+
+/// Replace OldSuccID by NewSuccID, just deleting OldSuccID if what NewSuccID
+/// is already in the list.
+void LoopRegion::replaceSucc(unsigned OldSuccID, unsigned NewSuccID,
+                             bool IsNonLocal) {
+  auto NewSucc = SuccessorID(NewSuccID, IsNonLocal);
+  bool FoundResult = false;
+
+  DEBUG(llvm::dbgs() << "                Replacing " << OldSuccID << " with "
+                     << NewSuccID << ":" << (IsNonLocal ? "nonlocal" : "local")
+                     << "\n");
+  bool AlreadyHaveSucc = std::count(Succs.begin(), Succs.end(), NewSucc);
+  for (auto &SuccID : Succs) {
+    DEBUG(llvm::dbgs() << "                    Visiting Succ: " << SuccID.ID
+                       << "; " << (SuccID.IsDead ? "dead" : "live") << " "
+                       << (SuccID.IsNonLocal ? "nonlocal" : "local") << "\n");
+    // If SuccID.ID equals NewSuccID, then we know that we already have a
+    if (SuccID.ID != OldSuccID) {
+      DEBUG(llvm::dbgs() << "                        Succ does not equal old "
+                            "succ id, skipping!\n");
+      continue;
+    }
+
+    if (AlreadyHaveSucc) {
+      DEBUG(llvm::dbgs() << "                        Already have a version of "
+                            "this successor, marking this as dead");
+      FoundResult = true;
+      SuccID.IsDead = true;
+      continue;
+    }
+
+    DEBUG(llvm::dbgs() << "                        Do not have a version of "
+                          "this successor, replacing.\n");
+    SuccID = NewSucc;
+    FoundResult = true;
+  }
+
+  assert(FoundResult && "Did not find any successor entries for old succ?!");
+}
+
 //===----------------------------------------------------------------------===//
 //                           LoopRegionFunctionInfo
 //===----------------------------------------------------------------------===//
@@ -124,6 +174,32 @@ void LoopRegionFunctionInfo::verify() {
     auto End = UniqueSuccList.end();
     assert(End == std::unique(UniqueSuccList.begin(), UniqueSuccList.end()) &&
            "Expected UniqueSuccList to not have any duplicate elements");
+
+    // If this node does not have a parent, it should have no non-local
+    // successors.
+    if (!R->ParentID.hasValue()) {
+      auto NLSuccs = R->getNonLocalSuccs();
+      assert(NLSuccs.begin() == NLSuccs.end() &&
+             "Can not have non local "
+             "successors without a parent node");
+      continue;
+    }
+
+    // If this node /does/ have a parent, make sure that all non-local
+    // successors point to a successor in the parent and match whether or not it
+    // is dead.
+    auto *ParentRegion = getRegion(*R->ParentID);
+    unsigned NumParentSuccs = ParentRegion->succ_size();
+    for (LoopRegion::SuccessorID ID : R->Succs) {
+      // Skip local successors. We are not verifying anything here.
+      if (!ID.IsNonLocal)
+        continue;
+      assert(ID.ID < NumParentSuccs && "Non local successor pointing off the "
+                                       "parent node successor list?!");
+      assert(ParentRegion->Succs[ID.ID].IsDead == ID.IsDead &&
+             "non-local successor edge sources should have the same liveness "
+             "properties as non-local successor edge targets");
+    }
   }
 #endif
 }
@@ -381,11 +457,11 @@ LoopRegionFunctionInfo::RegionTy *
 LoopRegionFunctionInfo::
 rewriteLoopHeaderPredecessors(LoopTy *SubLoop, RegionTy *SubLoopRegion) {
   auto *SubLoopHeaderRegion = getRegion(SubLoop->getHeader());
-  DEBUG(llvm::dbgs() << "        Header: " << SubLoopHeaderRegion->getID()
-        << "\n");
+  assert(SubLoopHeaderRegion->isBlock() && "A header must always be a block");
 
-  DEBUG(llvm::dbgs() << "        Rewiring Header Predecessors to be Loop "
-        "Preds.\n");
+  DEBUG(llvm::dbgs()
+        << "        Header: " << SubLoopHeaderRegion->getID() << "\n"
+        << "        Rewiring Header Predecessors to be Loop Preds.\n");
 
   if (SubLoopHeaderRegion->IsUnknownControlFlowEdgeHead)
     SubLoopRegion->IsUnknownControlFlowEdgeHead = true;
@@ -396,14 +472,19 @@ rewriteLoopHeaderPredecessors(LoopTy *SubLoop, RegionTy *SubLoopRegion) {
     DEBUG(llvm::dbgs() << "            " << PredRegion->getID() << "\n");
     if (!SubLoopRegion->containsSubregion(PredRegion)) {
       DEBUG(llvm::dbgs() << "            Not in loop... Replacing...\n");
-      PredRegion->replaceSucc(SubLoopHeaderRegion->ID, SubLoopRegion->ID);
+      // This is always a local edge since non-local edges can only have loops
+      // as end points.
+      PredRegion->replaceSucc(SubLoopHeaderRegion->ID, SubLoopRegion->ID,
+                              /*IsNonLocal*/ false);
+      propagateLivenessDownNonLocalSuccessorEdges(PredRegion);
       SubLoopRegion->addPred(PredRegion);
       continue;
     }
 
     DEBUG(llvm::dbgs() << "            Is in loop... Erasing...\n");
     // We are abusing the fact that a block can only be a local successor.
-    PredRegion->removeSucc(SubLoopHeaderRegion->getID());
+    PredRegion->removeLocalSucc(SubLoopHeaderRegion->getID());
+    propagateLivenessDownNonLocalSuccessorEdges(PredRegion);
   }
   SubLoopHeaderRegion->Preds.clear();
 
@@ -463,7 +544,9 @@ rewriteLoopExitingBlockSuccessors(LoopTy *Loop, RegionTy *LRegion) {
     DEBUG(llvm::dbgs() << "        Exiting Region: "
           << ExitingRegion->getID() << "\n");
     for (auto SuccID : ExitingRegion->getSuccs()) {
-      DEBUG(llvm::dbgs() << "            Succ: " << SuccID.ID << "\n");
+      DEBUG(llvm::dbgs() << "            Succ: " << SuccID.ID
+                         << ". IsNonLocal: "
+                         << (SuccID.IsNonLocal ? "true" : "false") << "\n");
 
       auto *SuccRegion = getRegion(SuccID.ID);
       if (!LRegion->containsSubregion(SuccRegion)) {
@@ -471,8 +554,12 @@ rewriteLoopExitingBlockSuccessors(LoopTy *Loop, RegionTy *LRegion) {
         SuccRegion->replacePred(ExitingRegion->ID, LRegion->ID);
         if (ExitingRegion->IsUnknownControlFlowEdgeTail)
           LRegion->IsUnknownControlFlowEdgeTail = true;
-        LRegion->addSucc(SuccRegion);
-        ExitingRegion->removeSucc(SuccRegion->getID());
+        // If the successor region is already in this LRegion this returns that
+        // regions index. Otherwise it returns a new index.
+        unsigned Index = LRegion->addSucc(SuccRegion);
+        ExitingRegion->replaceSucc(SuccRegion->getID(), Index,
+                                   /*IsNonLocal*/ true);
+        propagateLivenessDownNonLocalSuccessorEdges(ExitingRegion);
         continue;
       }
 
@@ -551,6 +638,46 @@ initializeFunctionRegion(iterator_range<LoopInfoTy::iterator> SubLoops) {
   initializeLoopFunctionRegion(getRegion(F), SubLoops);
 }
 
+/// Recursively visit all the descendents of Parent. If there is a non-local
+/// successor edge path that points to a dead edge in Parent, mark the
+/// descendent non-local successor edge as dead.
+void LoopRegionFunctionInfo::
+propagateLivenessDownNonLocalSuccessorEdges(LoopRegion *Parent) {
+  llvm::SmallVector<LoopRegion *, 4> Worklist;
+  Worklist.push_back(Parent);
+
+  while (Worklist.size()) {
+    LoopRegion *R = Worklist.pop_back_val();
+    for (unsigned SubregionID : R->getSubregions()) {
+      LoopRegion *Subregion = getRegion(SubregionID);
+      bool ShouldVisit = false;
+      for (auto &SuccID : Subregion->Succs) {
+        // If the successor is already dead, skip it. We should have viisted all
+        // its children when we marked it as dead.
+        if (SuccID.IsDead)
+          continue;
+
+        // We do not care about local IDs, we only process non-local IDs.
+        if (!SuccID.IsNonLocal)
+          continue;
+
+        // Finally if the non-local successor edge points to a parent successor
+        // that is not dead continue.
+        if (!R->Succs[SuccID.ID].IsDead)
+          continue;
+
+        // Ok, we found a target! Mark is as dead and make sure that we visit
+        // the subregion's children.
+        ShouldVisit = true;
+        SuccID.IsDead = unsigned(true);
+      }
+
+      if (ShouldVisit)
+        Worklist.push_back(Subregion);
+    }
+  }
+}
+
 void LoopRegionFunctionInfo::dump() const {
   print(llvm::outs());
   llvm::outs() << "\n";
@@ -603,8 +730,8 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
     // TODO: Investigate why std::copy does not work here. I tried to use a
     // std::copy here, but ran into miscompile issues with
     // OptionalTransformRange.
-    for (LoopRegion::SuccessorID I : R->getSuccs()) {
-      SuccIndices.push_back(I.ID);
+    for (unsigned I : R->getLocalSuccs()) {
+      SuccIndices.push_back(I);
     }
     std::sort(SuccIndices.begin(), SuccIndices.end());
     auto ARef = ArrayRef<unsigned>(SuccIndices);
@@ -625,7 +752,18 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
         RegionWorklist.push_back({R, Subregion});
       }
     }
-    os << "))\n\n";
+    os << ")\n";
+
+    SuccIndices.clear();
+    for (unsigned I : R->getNonLocalSuccs()) {
+      SuccIndices.push_back(I);
+    }
+    std::sort(SuccIndices.begin(), SuccIndices.end());
+    os << "    (non-local-succs";
+    for (unsigned I : SuccIndices) {
+      os << "\n        (parentindex:" << I << ")";
+    }
+    os << "))\n";
   }
 }
 
@@ -651,6 +789,12 @@ struct alledge_iterator;
 struct LoopRegionWrapper {
   LoopRegionFunctionInfoGrapherWrapper &FuncInfo;
   LoopRegion *Region;
+
+  LoopRegionWrapper *getParent() const {
+    unsigned ParentIndex = Region->getParentID();
+    return &FuncInfo.Data[ParentIndex];
+  }
+
   alledge_iterator begin();
   alledge_iterator end();
 };
@@ -681,6 +825,12 @@ struct alledge_iterator
     return SubregionIter != Wrapper->Region->subregion_end();
   }
 
+  bool isNonLocalEdge() const {
+    if (isSubregion())
+      return false;
+    return SuccIter->IsNonLocal;
+  }
+
   Optional<unsigned> getSuccIndex() const {
     if (isSubregion())
       return None;
@@ -695,6 +845,10 @@ struct alledge_iterator
     if (SubregionIter != Wrapper->Region->subregion_end()) {
       return &Wrapper->FuncInfo.Data[*SubregionIter];
     }
+    // If we have a non-local id, just return the parent region's data.
+    if (SuccIter->IsNonLocal)
+      return &Wrapper->FuncInfo.Data[Wrapper->Region->getParentID()];
+    // Otherwise return the data associated with this successor.
     return &Wrapper->FuncInfo.Data[SuccIter->ID];
   }
 
@@ -882,9 +1036,25 @@ struct DOTGraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
       return getCompleteNodeLabel(Node, Graph);
   }
 
+  static bool hasEdgeDestLabels() { return true; }
+
+  static unsigned numEdgeDestLabels(LoopRegionWrapper *Node) {
+    return std::distance(Node->begin(), Node->end());
+  }
+
+  static std::string getEdgeDestLabel(LoopRegionWrapper *Node, unsigned i) {
+    alledge_iterator Iter = Node->begin();
+    std::advance(Iter, i);
+    return getEdgeSourceLabel(Node, Iter);
+  }
+
   static std::string getEdgeSourceLabel(LoopRegionWrapper *Node,
                                         alledge_iterator I) {
-    return "";
+    if (I.isNonLocalEdge())
+      return "NLSuc";
+    if (I.isSubregion())
+      return "Sub";
+    return "LSuc";
   }
 
   /// If you want to override the dot attributes printed for a particular
@@ -893,8 +1063,31 @@ struct DOTGraphTraits<LoopRegionFunctionInfoGrapherWrapper *>
   getEdgeAttributes(const LoopRegionWrapper *Node, alledge_iterator EI,
                     const LoopRegionFunctionInfoGrapherWrapper *Graph) {
     if (EI.isSubregion())
-      return "color=red,style=dashed";
+      return "color=red";
+    if (EI.isNonLocalEdge())
+      return "color=blue";
     return "";
+  }
+
+  static bool edgeTargetsEdgeSource(const LoopRegionWrapper *Node,
+                                    alledge_iterator I) {
+    return I.isNonLocalEdge();
+  }
+
+  /// If edgeTargetsEdgeSource returns true, this method is called to determine
+  /// which outgoing edge of Node is the target of this edge.
+  ///
+  /// Currently this can only happen given a non-local edge in which case we
+  /// want the non-local edge to point at its parent's successor edge.
+  static alledge_iterator getEdgeTarget(LoopRegionWrapper *Node,
+                                        alledge_iterator I) {
+    assert(I.isNonLocalEdge() && "This should only be called given a non "
+                                 "local edge");
+    auto *ParentRegion = Node->getParent();
+    auto SuccIter = ParentRegion->Region->succ_begin();
+    std::advance(SuccIter, I.SuccIter->ID);
+    return alledge_iterator(ParentRegion, ParentRegion->Region->subregion_end(),
+                            SuccIter);
   }
 };
 } // end llvm namespace

@@ -73,12 +73,24 @@
 /// region. The header should have no predecessor edges after this operation
 /// completes.
 ///
-/// 2. For each of the exiting blocks of the subloop (that is the blocks inside
-/// the loop that leave the subloop), we perform a similar operation as with the
-/// header, replacing the predecessor edge in the exiting blocks successors with
-/// an edge pointing at the subloop instead of at the exiting block and
-/// vis-a-versa. After this is complete, the exiting blocks should have no
-/// successor edges going outside the loop.
+/// 2. For each of the exiting regions of the subloop (that is the regions
+/// inside the loop that leave the subloop):
+///
+///   a. Replace each predecessor edge in the exiting block's successors with an
+///   edge pointing at the subloop instead of at the exiting block and
+///   vis-a-versa.
+///
+///   b. Introduce a loop-escape edge from the exiting regions that associates
+///   the specific successor number of the region with the loop successor edge
+///   that we just created. By using this indirection, if the loop is an inner
+///   loop and further acts as an exit from an outer loop, the region's
+///   successor edge will be able to be used to traverse from the region ->
+///   inner loop -> outer loop successor. (i).
+///
+/// After this is complete, the exiting blocks should have no successor edges
+/// going outside the loop. For each of the removed edges additionally we
+/// introduce an "exiting edge". The reason this is necessary is to make it
+/// easier to handle exits through
 ///
 /// 3. If the loop has multiple back edges, mark each of the backedges as
 /// unknown control flow boundaries.
@@ -89,6 +101,15 @@
 /// treated from a dataflow perspective as its own separate function with only
 /// one caller, the parent loop region (or the top level function), enabling
 /// extremely aggressive operations (or even outlining).
+///
+/// (i).  The reason why this is important is to be able to handle exits to
+/// trapping code. Trapping code will always be associated with the outer most
+/// loop since it is an exit from all of the loops. Yet in ARC we need to be
+/// able to find that region from For certain optimizations like ARC, we need to
+/// be able to ignore these successor regions. By tracing up the loop nest
+/// hierarchy by these loop exits, we can find the unreachable regions in the
+/// parent and ignore them. This also allows us to be more precise about
+/// hoisting retains/releases and avoid hoisting into such regions.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -149,24 +170,24 @@ public:
   using BlockTy = SILBasicBlock;
 
   /// A tagged data structure that stores in its bottom bit whether or not the
-  /// successor edge is dead. This ensures
+  /// successor edge is non-local (implying it goes through the parent region).
   struct SuccessorID {
-    static constexpr unsigned NumTaggedBits = 1;
+    static constexpr unsigned NumTaggedBits = 2;
     static constexpr unsigned IDBitSize =
         (sizeof(unsigned) * CHAR_BIT) - NumTaggedBits;
     static constexpr unsigned MaxID = (unsigned(1) << IDBitSize) - 1;
 
     unsigned IsDead : 1;
+    unsigned IsNonLocal : 1;
     unsigned ID : IDBitSize;
 
-    SuccessorID(unsigned id) : IsDead(unsigned(false)), ID(id) {}
+    SuccessorID(unsigned id, bool isnonlocal)
+        : IsDead(unsigned(false)), IsNonLocal(unsigned(isnonlocal)), ID(id) {}
 
     bool operator<(const SuccessorID &Other) const { return ID < Other.ID; }
     bool operator==(const SuccessorID &Other) const {
-      bool Result = ID == Other.ID;
-      assert((!Result || (IsDead == Other.IsDead)) &&
-             "Can not have an equal ID without IsDead being equal as well");
-      return Result;
+      return ID == Other.ID && IsNonLocal == Other.IsNonLocal &&
+             IsDead == Other.IsDead;
     }
 
     struct ToLiveSucc {
@@ -177,6 +198,25 @@ public:
       }
     };
 
+    struct ToLiveLocalSucc {
+      Optional<unsigned> operator()(SuccessorID ID) const {
+        if (ID.IsDead)
+          return None;
+        if (ID.IsNonLocal)
+          return None;
+        return ID.ID;
+      }
+    };
+
+    struct ToLiveNonLocalSucc {
+      Optional<unsigned> operator()(SuccessorID ID) const {
+        if (ID.IsDead)
+          return None;
+        if (!ID.IsNonLocal)
+          return None;
+        return ID.ID;
+      }
+    };
   };
   /// These checks are just for performance.
   static_assert(IsTriviallyCopyable<SuccessorID>::value,
@@ -453,8 +493,8 @@ public:
     return std::find(subregion_begin(), End, R->getID()) != End;
   }
 
-  using pred_iterator = llvm::SmallVectorImpl<unsigned>::iterator;
-  using pred_const_iterator = llvm::SmallVectorImpl<unsigned>::const_iterator;
+  using pred_iterator = decltype(Preds)::iterator;
+  using pred_const_iterator = decltype(Preds)::const_iterator;
 
   pred_iterator pred_begin() { return Preds.begin(); }
   pred_iterator pred_end() { return Preds.end(); }
@@ -473,7 +513,13 @@ public:
   unsigned succ_size() const { return Succs.size(); }
 
   using SuccRange = FilterRange<InnerSuccRange, SuccessorID::ToLiveSucc>;
+  using LocalSuccRange =
+      OptionalTransformRange<InnerSuccRange, SuccessorID::ToLiveLocalSucc>;
+  using NonLocalSuccRange =
+      OptionalTransformRange<InnerSuccRange, SuccessorID::ToLiveNonLocalSucc>;
   SuccRange getSuccs();
+  LocalSuccRange getLocalSuccs();
+  NonLocalSuccRange getNonLocalSuccs();
 
   BlockTy *getBlock() const;
   LoopTy *getLoop() const;
@@ -529,17 +575,9 @@ public:
     llvm_unreachable("Replacing OldPredID that is not a predecessor?");
   }
 
-  void replaceSucc(unsigned OldSuccID, unsigned NewSuccID) {
-    bool FoundResult;
-    (void)FoundResult;
-    for (auto &SuccID : Succs) {
-      if (SuccID.ID != OldSuccID)
-        continue;
-      SuccID = SuccessorID(NewSuccID);
-      FoundResult = true;
-    }
-    assert(FoundResult && "Did not find any successor entries for old succ?!");
-  }
+  /// Replace OldSuccID by NewSuccID, just deleting OldSuccID if what NewSuccID
+  /// is already in the list.
+  void replaceSucc(unsigned OldSuccID, unsigned NewSuccID, bool IsNonLocal);
 
   void dump() const;
   void print(llvm::raw_ostream &os, bool insertSpaces = false) const;
@@ -580,7 +618,7 @@ private:
     // First check if we already have this successor's id in our list. If we do,
     // just return the index of that ID so that we do not have duplicate
     // successors.
-    SuccessorID SuccID = {Successor->getID()};
+    SuccessorID SuccID = {Successor->getID(), false};
     for (unsigned i : indices(Succs))
       if (Succs[i] == SuccID)
         return i;
@@ -597,9 +635,10 @@ private:
   /// Due to the creation of up-edges during loop region construction, we can
   /// never actually remove successors. Instead we mark successors as being dead
   /// and ignore such values when iterating.
-  void removeSucc(unsigned ID) {
+  void removeLocalSucc(unsigned ID) {
     for (auto &S : Succs) {
       if (S.ID == ID) {
+        assert(!S.IsNonLocal);
         S.IsDead = unsigned(true);
       }
     }
@@ -813,6 +852,11 @@ private:
   markMultipleLoopLatchLoopBackEdges(RegionTy *LoopHeaderRegion,
                                      LoopTy *L,
                                      PostOrderFunctionInfo *PI);
+
+  /// Recursively visit all the descendents of Parent. If there is a non-local
+  /// successor edge path that points to a dead edge in Parent, mark the
+  /// descendent non-local successor edge as dead.
+  void propagateLivenessDownNonLocalSuccessorEdges(LoopRegion *Parent);
 };
 
 class LoopRegionAnalysis : public FunctionAnalysisBase<LoopRegionFunctionInfo> {
