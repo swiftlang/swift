@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// This protocol is an implementation detail of `Strideable`; do
-/// not use it directly.
-public protocol _Strideable {
+/// Conforming types are notionally continuous, one-dimensional
+/// values that can be offset and measured.
+public protocol Strideable : Comparable {
   // FIXME: We'd like to name this type "Distance" but for
   // <rdar://problem/17619038>
   /// A type that can represent the distance between two values of `Self`.
@@ -39,42 +39,14 @@ public protocol _Strideable {
   func advancedBy(n: Stride) -> Self
 }
 
+
 /// Compare two `Strideable`s.
-public func < <T : _Strideable>(x: T, y: T) -> Bool {
+public func < <T : Strideable>(x: T, y: T) -> Bool {
   return x.distanceTo(y) > 0
 }
 
-public func == <T : _Strideable>(x: T, y: T) -> Bool {
+public func == <T : Strideable>(x: T, y: T) -> Bool {
   return x.distanceTo(y) == 0
-}
-
-/// Conforming types are notionally continuous, one-dimensional
-/// values that can be offset and measured.
-public protocol Strideable : Comparable, _Strideable {
-  // FIXME: We'd like to name this type "Distance" but for
-  // <rdar://problem/17619038>
-  /// A type that can represent the distance between two values of `Self`.
-  typealias Stride : SignedNumberType
-
-  /// Returns a stride `x` such that `self.advancedBy(x)` approximates
-  /// `other`.
-  ///
-  /// - Complexity: O(1).
-  ///
-  /// - SeeAlso: `RandomAccessIndexType`'s `distanceTo`, which provides a
-  ///   stronger semantic guarantee.
-  @warn_unused_result
-  func distanceTo(other: Self) -> Stride
-
-  /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
-  /// `n`.
-  ///
-  /// - Complexity: O(1).
-  ///
-  /// - SeeAlso: `RandomAccessIndexType`'s `advancedBy`, which
-  ///   provides a stronger semantic guarantee.
-  @warn_unused_result
-  func advancedBy(n: Stride) -> Self
 }
 
 @warn_unused_result
