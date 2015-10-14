@@ -72,7 +72,7 @@ set(SWIFT_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Swift compiler")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "compiler;clang-builtin-headers;clang-resource-dir-symlink;arclite-symlink;stdlib;stdlib-experimental;sdk-overlay;editor-integration;lang-docs;tools;testsuite-tools;dev")
+    "compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;arclite-symlink;stdlib;stdlib-experimental;sdk-overlay;editor-integration;lang-docs;tools;testsuite-tools;dev")
 
 # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING

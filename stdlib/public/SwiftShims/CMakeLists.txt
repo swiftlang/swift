@@ -122,3 +122,10 @@ swift_install_in_component(clang-resource-dir-symlink
     DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift/install-tmp/install-tmp/clang"
     DESTINATION "lib/swift")
 
+# Possibly install Clang headers under Clang's resource directory in case we
+# need to use a different version of the headers than the installed Clang. This
+# should be used in conjunction with clang-resource-dir-symlink.
+swift_install_in_component(clang-builtin-headers-in-clang-resource-dir
+    DIRECTORY "${SWIFT_PATH_TO_CLANG_BUILD}/lib/clang"
+    DESTINATION "lib"
+    PATTERN "*.h")
