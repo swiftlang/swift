@@ -5,10 +5,6 @@
 import Foundation
 import AppKit
 
-func renameFirst(vc: NSViewController) {
-  vc.dismissAnimated(true) // expected-warning{{dismissAnimated' could be named 'dismiss(animated:)'}}{{6-21=dismiss}}{{22-22=animated: }}
-}
-
 func dropDefaultedNil(array: NSArray, sel: Selector,
        body: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)?) {
   array.makeObjectsPerformSelector(sel, withObject: nil) // expected-warning{{'makeObjectsPerformSelector(_:withObject:)' could be named 'makeObjectsPerform(_:withObject:)'}}{{9-35=makeObjectsPerform}}
@@ -20,7 +16,7 @@ func dropDefaultedNil(array: NSArray, sel: Selector,
 func dropDefaultedOptionSet(array: NSArray) {
   array.enumerateObjectsWithOptions([]) { obj, idx, stop in print("foo") } // expected-warning{{'enumerateObjectsWithOptions(_:usingBlock:)' could be named 'enumerateObjects(withOptions:usingBlock:)'}}{{9-36=enumerateObjects}}{{36-40=}}
   array.enumerateObjectsWithOptions([], usingBlock: { obj, idx, stop in print("foo") }) // expected-warning{{'enumerateObjectsWithOptions(_:usingBlock:)' could be named 'enumerateObjects(withOptions:usingBlock:)'}}{{9-36=enumerateObjects}}{{37-41=}}
-  array.enumerateObjectsWhileOrderingPizza(true, withOptions: [], usingBlock: { obj, idx, stop in print("foo") }) // expected-warning{{'enumerateObjectsWhileOrderingPizza(_:withOptions:usingBlock:)' could be named 'enumerateObjectsWhileOrdering(pizza:withOptions:usingBlock:)'}}{{48-65=}}{{44-44=pizza: }}
+  array.enumerateObjectsWhileOrderingPizza(true, withOptions: [], usingBlock: { obj, idx, stop in print("foo") }) // expected-warning{{call to 'enumerateObjectsWhileOrderingPizza(_:withOptions:usingBlock:)' has extraneous arguments that could use defaults}}{{48-65=}}
 }
 
 func dropDefaultedWithoutRename(domain: String, code: Int, array: NSArray) {

@@ -133,8 +133,7 @@
 // Don't introduce default arguments for lone parameters to setters.
 // CHECK-FOUNDATION: func setDefaultEnumerationOptions(_: NSEnumerationOptions)
 
-// Introducing argument labels without pruning.
-// CHECK-FOUNDATION: func normalizingXMLPreservingComments(preserve _: Bool)
+// CHECK-FOUNDATION: func normalizingXMLPreservingComments(_: Bool)
 
 // Collection element types.
 // CHECK-FOUNDATION: func adding(_: AnyObject) -> Set<NSObject>
@@ -183,18 +182,14 @@
 // beginning and the end of a property.
 // CHECK-APPKIT: var flattening: NSBezierPath { get }
 
-// Introducing argument labels and pruning the base name.
-// CHECK-APPKIT: func dismiss(animated _: Bool)
+// CHECK-APPKIT: func dismissAnimated(_: Bool)
 
-// Introducing argument labels and pruning the base name with a preposition.
-// CHECK-APPKIT: func shouldCollapseAutoExpandedItems(forDeposited _: Bool) -> Bool
+// CHECK-APPKIT: func shouldCollapseAutoExpandedItemsForDeposited(_: Bool) -> Bool
 
 // Introducing argument labels and pruning the base name.
-// CHECK-APPKIT: func rectForCancelButton(whenCentered _: Bool)
+// CHECK-APPKIT: func rectForCancelButtonWhenCentered(_: Bool)
 
-// Introducing argument labels and pruning the base name by splitting
-// at "and".
-// CHECK-APPKIT: func openUntitledDocument(display _: Bool)
+// CHECK-APPKIT: func openUntitledDocumentAndDisplay(_: Bool)
 
 // Don't strip due to weak type information.
 // CHECK-APPKIT: func setContentHuggingPriority(_: NSLayoutPriority)
