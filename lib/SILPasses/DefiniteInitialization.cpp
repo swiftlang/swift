@@ -478,8 +478,8 @@ namespace {
     DIKind getSelfConsumedAtInst(SILInstruction *Inst);
 
     bool isInitializedAtUse(const DIMemoryUse &Use,
-                            bool *SuperInitDone = 0,
-                            bool *FailedSelfUse = 0);
+                            bool *SuperInitDone = nullptr,
+                            bool *FailedSelfUse = nullptr);
 
     void handleStoreUse(unsigned UseID);
     void handleInOutUse(const DIMemoryUse &Use);
@@ -828,6 +828,9 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
 
   if (getSelfConsumedAtInst(InstInfo.Inst) != DIKind::No) {
     // FIXME: more specific diagnostics here, handle this case gracefully below.
+    if (!shouldEmitError(InstInfo.Inst))
+      return;
+
     diagnose(Module, InstInfo.Inst->getLoc(),
              diag::self_inside_catch_superselfinit,
              (unsigned)TheMemory.isDelegatingInit());
@@ -926,6 +929,9 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
   if (!isInitializedAtUse(Use, &IsSuperInitDone, &FailedSelfUse)) {
     if (FailedSelfUse) {
       // FIXME: more specific diagnostics here, handle this case gracefully below.
+      if (!shouldEmitError(Use.Inst))
+        return;
+      
       diagnose(Module, Use.Inst->getLoc(),
                diag::self_inside_catch_superselfinit,
                (unsigned)TheMemory.isDelegatingInit());
@@ -1031,6 +1037,9 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 
   if (FailedSelfUse) {
     // FIXME: more specific diagnostics here, handle this case gracefully below.
+    if (!shouldEmitError(Inst))
+      return;
+    
     diagnose(Module, Inst->getLoc(),
              diag::self_inside_catch_superselfinit,
              (unsigned)TheMemory.isDelegatingInit());
@@ -1123,6 +1132,9 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   
   if (FailedSelfUse) {
     // FIXME: more specific diagnostics here, handle this case gracefully below.
+    if (!shouldEmitError(Inst))
+      return;
+    
     diagnose(Module, Inst->getLoc(),
              diag::self_inside_catch_superselfinit,
              (unsigned)TheMemory.isDelegatingInit());
@@ -1373,6 +1385,9 @@ void LifetimeChecker::handleSuperInitUse(const DIMemoryUse &InstInfo) {
 
   if (getSelfConsumedAtInst(Inst) != DIKind::No) {
     // FIXME: more specific diagnostics here, handle this case gracefully below.
+    if (!shouldEmitError(Inst))
+      return;
+    
     diagnose(Module, Inst->getLoc(),
              diag::self_inside_catch_superselfinit,
              (unsigned)TheMemory.isDelegatingInit());
@@ -1421,6 +1436,9 @@ void LifetimeChecker::handleSelfInitUse(DIMemoryUse &InstInfo) {
   
   if (getSelfConsumedAtInst(Inst) != DIKind::No) {
     // FIXME: more specific diagnostics here, handle this case gracefully below.
+    if (!shouldEmitError(Inst))
+      return;
+    
     diagnose(Module, Inst->getLoc(),
              diag::self_inside_catch_superselfinit,
              (unsigned)TheMemory.isDelegatingInit());

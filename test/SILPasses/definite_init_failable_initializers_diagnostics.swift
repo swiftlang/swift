@@ -49,14 +49,13 @@ class ErrantClass : ErrantBaseClass {
     do {
       try super.init()
     } catch {}
-  // FIXME: diagnostic emitted twice
-  } // expected-error 2{{'self' used inside 'catch' block containing super.init call}}
+  } // expected-error {{'self' used inside 'catch' block reachable from super.init call}}
 
   convenience init(invalidEscapeConvenience: ()) {
     do {
       try self.init()
     } catch {}
-  } // expected-error {{'self' used inside 'catch' block containing self.init call}}
+  } // expected-error {{'self' used inside 'catch' block reachable from self.init call}}
 
   init(noEscapeDesignated: ()) throws {
     x = 10
@@ -80,16 +79,16 @@ class ErrantClass : ErrantBaseClass {
     do {
       try self.init()
     } catch let e {
-      something(x) // expected-error {{'self' used inside 'catch' block containing self.init call}}
-      something(self.x) // expected-error {{'self' used inside 'catch' block containing self.init call}}
+      something(x) // expected-error {{'self' used inside 'catch' block reachable from self.init call}}
+      something(self.x) // expected-error {{'self' used inside 'catch' block reachable from self.init call}}
 
-      something(y) // expected-error {{'self' used inside 'catch' block containing self.init call}}
-      something(self.y) // expected-error {{'self' used inside 'catch' block containing self.init call}}
+      something(y) // expected-error {{'self' used inside 'catch' block reachable from self.init call}}
+      something(self.y) // expected-error {{'self' used inside 'catch' block reachable from self.init call}}
 
-      something(&y) // expected-error {{'self' used inside 'catch' block containing self.init call}}
-      something(&self.y) // expected-error {{'self' used inside 'catch' block containing self.init call}}
+      something(&y) // expected-error {{'self' used inside 'catch' block reachable from self.init call}}
+      something(&self.y) // expected-error {{'self' used inside 'catch' block reachable from self.init call}}
 
-      something(self) // expected-error {{'self' used inside 'catch' block containing self.init call}}
+      something(self) // expected-error {{'self' used inside 'catch' block reachable from self.init call}}
 
       // FIXME: not diagnosed
       something(self.dynamicType)
