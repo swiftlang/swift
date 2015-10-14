@@ -346,7 +346,7 @@ public:
     return getCallGraphEdge(FAS)->isCalleeSetComplete();
   }
 
-  /// Return a callee set that is known to be complete.
+  /// Return the callee set for the given call site.
   CallGraphEdge::CalleeSetType
   getCalleeSet(FullApplySite FAS) const {
     return getCallGraphEdge(FAS)->getCalleeSet();
