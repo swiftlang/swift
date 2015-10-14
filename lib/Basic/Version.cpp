@@ -87,27 +87,82 @@ void parseVersionString(StringRef VersionString,
                         DiagnosticEngine *Diags) {
   SmallString<16> digits;
   llvm::raw_svector_ostream OS(digits);
-  unsigned Component;
-  for (auto c : VersionString) {
-    if (Loc.isValid())
-      Loc = Loc.getAdvancedLoc(1);
-    if (clang::isDigit(c)) {
-      OS << c;
-    } else if (c == '.' && OS.str().size()) {
-      OS.str().getAsInteger(10, Component);
-      Components.push_back(Component);
-      digits.clear();
-    } else {
-      Components.clear();
-      if (Diags)
-        Diags->diagnose(Loc, diag::invalid_character_in_compiler_version);
-      else
-        llvm_unreachable("Invalid character in _compiler_version build configuration");
+
+  SmallVector<std::pair<StringRef, SourceRange>, 5> SplitComponents;
+  // Skip over quote character in string literal
+  SourceLoc Start = Loc.isValid() ? Loc.getAdvancedLoc(1) : Loc;
+  SourceLoc End = Start;
+
+  // Split the version string into tokens separated by the '.' character.
+  while (!VersionString.empty()) {
+    StringRef SplitComponent, Rest;
+    std::tie(SplitComponent, Rest) = VersionString.split('.');
+
+    if (Loc.isValid()) {
+      End = End.getAdvancedLoc(SplitComponent.size());
     }
+    auto Range = Loc.isValid() ? SourceRange(Start, End) : SourceRange();
+    if (Loc.isValid())
+      End = End.getAdvancedLoc(1);
+    Start = End;
+    SplitComponents.push_back({SplitComponent, Range});
+    VersionString = Rest;
   }
-  if (OS.str().size()) {
-    OS.str().getAsInteger(10, Component);
-    Components.push_back(Component);
+
+  unsigned ComponentNumber;
+
+  for (size_t i = 0; i < SplitComponents.size(); ++i) {
+    StringRef SplitComponent;
+    SourceRange Range;
+    std::tie(SplitComponent, Range) = SplitComponents[i];
+
+    // Version components can't be empty.
+    if (SplitComponent.empty()) {
+      if (Diags)
+        Diags->diagnose(Range.Start, diag::empty_compiler_version_component);
+      else
+        llvm_unreachable("Found empty compiler version component");
+      continue;
+    }
+
+    // The second version component isn't used for comparison.
+    if (i == 1) {
+      if (Loc.isValid()) {
+        // If parsing from source code, the second component must be a '*',
+        // to make it clear that this component isn't used for comparison.
+        if (SplitComponent.equals("*")) {
+          Components.push_back(0);
+          continue;
+        }
+        if (Diags) {
+          Diags->diagnose(Range.Start, diag::unused_compiler_version_component)
+            .fixItReplaceChars(Range.Start, Range.End, "*");
+          Components.push_back(0);
+          continue;
+        }
+      }
+
+      // This version string is not from source code, so it must be a valid
+      // numerical version component, as it would've been passed in from
+      // build automation.
+      if (!SplitComponent.getAsInteger(10, ComponentNumber)) {
+        Components.push_back(ComponentNumber);
+        continue;
+      } else {
+        llvm_unreachable("Invalid character in _compiler_version build configuration");
+      }
+    }
+
+    // All other version components must be numbers.
+    if (!SplitComponent.getAsInteger(10, ComponentNumber)) {
+      Components.push_back(ComponentNumber);
+      continue;
+    } else if (Diags) {
+      Diags->diagnose(Range.Start,
+                      diag::compiler_version_component_not_number);
+    } else {
+      llvm_unreachable("Invalid character in _compiler_version build configuration");
+    }
   }
 }
 
@@ -119,7 +174,7 @@ CompilerVersion::CompilerVersion(const StringRef VersionString,
 
 CompilerVersion::CompilerVersion() {
 #ifdef SWIFT_COMPILER_VERSION
-  parseVersionString(TOSTR(SWIFT_COMPILER_VERSION), Components, SourceLoc(),
+  parseVersionString(SWIFT_COMPILER_VERSION, Components, SourceLoc(),
                      nullptr);
 #endif
 }
@@ -174,7 +229,7 @@ std::string getSwiftFullVersion() {
   OS << "Swift version " SWIFT_VERSION_STRING;
 
 #if defined(SWIFT_COMPILER_VERSION)
-  OS << " (" TOSTR(SWIFT_COMPILER_VERSION) ")";
+  OS << " (" SWIFT_COMPILER_VERSION ")";
 #elif defined(LLVM_REVISION) || defined(CLANG_REVISION) || \
       defined(SWIFT_REVISION)
   OS << " (";

@@ -1201,8 +1201,12 @@ ERROR(unsupported_config_conditional_expression_type,parsing,none,
 ERROR(unsupported_config_integer,parsing,none,
       "'%0' is not a valid configuration option, use '%1'",
       (StringRef, StringRef))
-ERROR(invalid_character_in_compiler_version,parsing,none,
-      "invalid character in compiler version string", ())
+ERROR(compiler_version_component_not_number,parsing,none,
+      "compiler version component is not a number", ())
+WARNING(unused_compiler_version_component,parsing,none,
+			"the second version component is not used for comparison", ())
+ERROR(empty_compiler_version_component,parsing,none,
+			"found empty compiler version component", ())
 ERROR(empty_compiler_version_string,parsing,none,
       "compiler version requirement is empty", ())
 ERROR(cannot_combine_compiler_version,parsing,none,
