@@ -495,7 +495,8 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
            "root protocol type given for non-root archetype");
     auto parentTy = parent->getType(builder);
     if (!parentTy)
-      return NestedType::forConcreteType(ErrorType::get(mod.getASTContext()));
+      return NestedType::forConcreteType(
+               ErrorType::get(builder.getASTContext()));
 
     ParentArchetype = parentTy.getAsArchetype();
     if (!ParentArchetype) {
@@ -509,7 +510,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
         return representative->ArchetypeOrConcreteType;
       }
 
-      LazyResolver *resolver = mod.getASTContext().getLazyResolver();
+      LazyResolver *resolver = builder.getLazyResolver();
       assert(resolver && "need a lazy resolver");
       (void) resolver;
 
@@ -519,7 +520,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
       Type memberType = depMemberType->substBaseType(
                           &mod,
                           parent->ArchetypeOrConcreteType.getAsConcreteType(),
-                          mod.getASTContext().getLazyResolver());
+                          builder.getLazyResolver());
       if (auto memberPA = builder.resolveArchetype(memberType)) {
         // If the member type maps to an archetype, resolve that archetype.
         if (memberPA->getRepresentative() != getRepresentative()) {
@@ -552,7 +553,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   }
 
   auto arch
-    = ArchetypeType::getNew(mod.getASTContext(), ParentArchetype,
+    = ArchetypeType::getNew(builder.getASTContext(), ParentArchetype,
                             assocTypeOrProto, getName(), Protos,
                             Superclass, isRecursive());
 
@@ -561,7 +562,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   // Collect the set of nested types of this archetype, and put them into
   // the archetype itself.
   if (!NestedTypes.empty()) {
-    mod.getASTContext().registerLazyArchetype(arch, builder, this);
+    builder.getASTContext().registerLazyArchetype(arch, builder, this);
     SmallVector<std::pair<Identifier, NestedType>, 4> FlatNestedTypes;
     for (auto Nested : NestedTypes) {
       bool anyNotRenamed = false;
@@ -577,12 +578,12 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
       FlatNestedTypes.push_back({ Nested.first, NestedType() });
     }
-    arch->setNestedTypes(mod.getASTContext(), FlatNestedTypes);
+    arch->setNestedTypes(builder.getASTContext(), FlatNestedTypes);
 
     // Force the resolution of the nested types.
     (void)arch->getNestedTypes();
 
-    mod.getASTContext().unregisterLazyArchetype(arch);
+    builder.getASTContext().unregisterLazyArchetype(arch);
   }
 
   return NestedType::forArchetype(arch);
@@ -972,9 +973,8 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   if (!Concrete->is<ArchetypeType>()) {
     for (auto conforms : T->getConformsTo()) {
       auto protocol = conforms.first;
-      auto conformance = Mod.lookupConformance(
-                           Concrete, protocol,
-                           Mod.getASTContext().getLazyResolver());
+      auto conformance = Mod.lookupConformance(Concrete, protocol,
+                                               getLazyResolver());
       if (conformance.getInt() == ConformanceKind::DoesNotConform) {
         Diags.diagnose(Source.getLoc(),
                        diag::requires_generic_param_same_type_does_not_conform,
