@@ -116,402 +116,6 @@ unspecified state.
 CoW Optimization Requirements
 -----------------------------
 
-.. note::
-
-   [arnold] The following proposal is still worded using the syntax I
-   sent out to the list.  As Andrew points out this can be recast in
-   terms @effects attributes and argument attributes.
-
-   [arnold] Scroll down to the Swift-level attributes proposal for a swift level
-   syntax proposal.
-
-Copy-on-write type effects proposal
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A copy-on-write (COW) type is implemented in terms of a struct and a set of
-storage objects referenced by this struct. The set of storage objects can
-further provide storage for subobjects.::
-
-  class ArrayStorage<T> {
-    func getElement(index: Int) -> T {} // Return a 'subobject'.
-  } // Storage object.
-
-  struct Array<T> {
-    var storage: ArrayStorage
-  }
-
-The following effects attributes can be used to describe properties of methods
-of such a datastructure to facilitate optimization.
-
-An instance of a struct is in a uniqued state if changes to the set of storage
-objects can only be observed by method calls on references to the instance of
-the struct (versus by method calls on other instances). Typically, one would
-implement this behavior by checking whether the references to the storage
-objects are uniquely referenced and copying the storage objects on modification
-if they are not.  In the following we refer to the memory holding the instance
-of the struct and the set of storage objects as the self state. Global state
-below refers to the state of the rest of the program not including the self
-state.
-
-makeunique
-
-Using ``@effects(makeunique)`` on a method implies that the method makes the
-self object referenced by the self argument unique without externally visible
-side-effects and without depending on global state. It is readnone with respect
-to global state.
-
-Example::
-
-  struct Array<T> {
-    var storage: ArrayStorage
-
-    @effects(makeunique)
-    func makeUnique() {
-      if (isUniquelyReferenced(&storage))
-        return
-      storage = storage.copy()
-    }
-
-preserveunique
-
-Using ``@effects(preserveunique)`` on a method implies that the method preserves
-the uniqueness state of the self argument.
-
-Example:::
-
-  struct Array<T> {
-    var storage: ArrayStorage
-
-    @effects(preserveunique, captureonly)
-    appendAssumingUnique(captureonly e: T) {
-      storage.append(e)
-    }
-
-noaliasingprojectsubobject
-
-Using ``@effects(noaliasingprojectsubobject)`` on a method implies the method
-returns a 'subobject' that is stored by the set of storage objects. It is
-guaranteed that the 'subobject' returned is kept alive as long the current value
-of the 'self' object is alive. Capturing the returned 'subobject' does not
-capture the 'self' object.
-
-Example:::
-
-  struct Array<T> {
-    var storage: ArrayStorage
-
-    @effects(preserveunique, noaliasingprojectsubobject,
-             readnone_global_nonbridged, readonly_self)
-    getElement(index: Int) -> T {
-      // Returns a 'subobject'.
-      return storage.elementAt(index)
-    }
-
-noaliasingprojectsubobjectaddr
-
-Using ``@effects(noaliasingprojectsubobjectaddr)`` on a method implies the
-method returns the address of a 'subobject' that is stored by the set of storage
-objects. It is guaranteed that the 'subobject' at the returned address is kept
-alive as long the current value of the 'self' object is alive.  A store to the
-address of the returned 'subobject' is guaranteed not to change the uniqueness
-state of the 'self' object. Capturing the value obtained by loading the returned
-'subobject' address does not capture the 'self' object.
-
-Example:::
-
-  struct Array<T> {
-    var storage: ArrayStorage
-
-    @effects(preserveunique, noaliasingprojectsubobjectaddr, readnone_global,
-             readonly_self)
-    getElementAddress(index: Int) -> UnsafeMutablePointer<T> {
-      return storage.elementAddressAt(index)
-    }
-
-
-.. note::
-
-   [Andy] I'd like to rename the annotations shown below. The names
-   should probably reflect the typical usage rather attempt to
-   describe the semantics. The semantics are defined by mapping these
-   names to a set of primitive effects.
-    
-argonlyglobaleffects
-
-The method does not have any global side effect and does not read global state
-other than the effects described by attributes on the method's arguments listed
-below.
-
-Argument attributes:
-
-  ``@capture``: the method captures this argument.
-
-  ``@release``: the method will release an element of the type of this argument
-
-Example:::
-
-  struct Array<T> {
-    var storage: ArrayStorage
-
-    @effects(preserveunique, argonlyglobaleffects)
-    func appendAssumingUnique(@capture e: T) {
-      storage.append(e)
-    }
-
-    @effects(preserveunique, argonlyglobaleffects)
-    func setElement(@capture @release e: T, index: Int) {
-      storage.set(e, index)
-    }
-
-readnone_global
-
-The method is guaranteed not to change or depend on global state, it may read
-or modify the self state.
-
-Example:::
-
-  struct Array<T> {
-    var storage: ArrayStorage
-
-    @effects(preserveunique, noaliasingprojectsubobjectaddr, readnone_global,
-             readonly_self)
-    func getElementAddress(index: Int) -> UnsafeMutablePointer<T> {
-      storage.elementAddressAt(index)
-    }
-
-readnone_global_nonbridged
-
-The method is guaranteed not to change or depend on global state, it may read
-or modify the self state if the self object can be shown (by the optimizer) to
-not be in a bridged state.
-
-Example:::
-
-  struct Array<T> {
-    var storage: ArrayStorage
-
-    @effects(preserveunique, noaliasingprojectsubobject,
-             readnone_global_nonbridged, readonly_self)
-    func getElement(index: Int) -> T {
-      if storage.isObjC {
-        return storage.getElementObjC(index)
-      } else {
-        return storage.elementAddressAt(index).value
-      }
-
-
-readonly_self
-
-The method only reads from self state. It may read or write global state.
-
-Example:::
-
-  struct Array<T> {
-    var storage: ArrayStorage
-
-    @effects(preserveunique, readnone_global, readonly_self)
-    func count() -> Int {
-      storage.count
-    }
-
-Motivation
-~~~~~~~~~~
-
-Why do we need ``makeunique``, ``preserveunique``, and
-``noaliasingprojectsubobjectaddr``?
-
-The optimizer wants to hoist functions that make a COW type instance unique out
-of loops. In order to do that it has to prove that uniqueness is preserved by
-all operations in the loop.
-
-Marking methods as ``makeunique``/``preserveunique`` allows the optimizer to
-reason about the behavior of the method calls.
-
-Example:::
-
-  struct Array<T> {
-    var storage: ArrayStorage<T>
-
-    @effects(makeunique)
-    func makeUnique() {
-      if (isUniquelyReferenced(&storage))
-       return;
-      storage = storage.copy()
-    }
-
-    @effects(preserveunique, noaliasingprojectsubobjectaddr, readnone_global)
-    func getElementAddr(index: Int) -> UnsafeMutablePointer<T> {
-      return storage.elementAddrAt(index)
-    }
-
-    subscript(index: Int) -> UnsafeMutablePointer<T> {
-      mutableAddressor {
-        makeUnique()
-        return getElementAddr(index)
-      }
-    }
-  }
-
-When the optimizer optimizes a loop:::
-
-  func memset(inout A: [Int], value: Int) {
-    for i in 0 .. A.size {
-      A[i] = value
-      f()
-    }
-  }
-
-It will see the following calls. @effect methods are not inlined.::
-
-  func memset(inout A: [Int], value: Int) {
-    for i in 0 .. A.size {
-      makeUnique(&A)
-      addr = getElementAddr(i, &A)
-      addr.memory = value
-      f()
-    }
-  }
-
-In order to hoist the 'makeUnique' call, the optimizer needs to be able to
-reason that neither 'getElementAddr', nor the store to the address returned can
-change the uniqueness state of 'A'. Furthermore, it knows because 'A' is marked
-inout that in a program without inout violations f cannot hold a reference to
-the object named by 'A' and therefore cannot modify it.
-
-Why do we need ``argonlyglobaleffects``, ``readnone_global``?
-
-We want to be able to hoist ``makeunique`` calls when the array is not identfied
-by a unique name::
-
-  class AClass {
-    var array: [Int]
-  }
-
-  func copy(a : AClass, b : AClass) {
-    for i in min(a.size, b.size) {
-       a.array.append(b.array[i])
-    }
-  }
-
-In such a case we would like to reason that:::
-
-  = b.array[i]
-
-cannot changed the uniqueness of the instance of array 'a' assuming 'a' !=== 'b'.
-We can do so because 'getElement' is marked readnone_global.
-
-Further we would like to reason that:::
-
-  a.array.append
-
-cannot change the uniqueness state of the instance of array 'b'. We can conclude
-so because the element passed to appendAssumingUnique is of type Int.  A trivial
-type like Int is not retained when it is captured and therefore cannot change
-the uniqueness state of any array.::
-
-  for i in 0 .. b.size {
-    tmp = getElement(b.array, i)
-    makeUnique(&a.array)
-    // @effects(argonlyglobaleffects)
-    appendAssumingUnique(&a.array, @capture tmp)
-  }
-
-What if the element type would a non-trivial type? Let's assume it is a
-non-trivial struct type. In this case we know that 'getElement' the 'subobject'
-cannot be used to capture b.array. However the return subobject could be a
-semantic copy of a.array. It is still valid to hoist here because before we
-append we make a.array unique and preserve the semantic copy.
-
-We can construct a very similar example where we cannot hoist makeUnique. If we
-replace 'getElement' with a 'setElement'. 'setElement' will capture its argument
-and further releases an element of type T ::
-
- @effects(argonlyglobaleffects)
- func setElement(@capture @release e: T, index: Int) {
-   storage->setElement(e, index)
- }
-
-Depending on 'T''s type a destructor can be invoked by the release on 'e'. The
-destructor can have arbitrary side-effects. Therefore, it is not valid to hoist
-the makeUnique in the code without proving that 'T's destructor cannot change
-the uniqueness state. This is trivial for trivial types but requires a more
-sophisticated analysis for class types (and in general cannot be disproved). In
-following example we can only hoist makeUnique if we can prove that  elt's, and
-elt2's destructor can't change the uniqueness state of the arrays.::
-
- for i in 0 ..< min(a.size, b.size) {
-   makeUnique(&b.array)
-   setElement(&b.array, i, elt)
-   makeUnique(&a.array)
-   setElement(&a.array, i, elt2)
- }
-
-In the the following loop it is not safe to hoist the makeUnique(&a)
-call even for trivial types. 'appendAssumingUnique' captures its argument 'a'
-which forces a copy on 'a' on every iteration of the loop.::
-
-  for i in 0 .. a.size {
-    makeUnique(&a)
-    setElement(&a, 0, 1)
-    makeUnique(&b)
-    appendAssumingUnique(&b, a)
-  }
-
-To support this reasoning we need to know when a function captures its
-arguments and when a function might release an object and of which type.
-
-Why do we need readonly_self?
-
-This will allow us to remove redundant calls to readonly methods on
-COW type instances assuming we can prove that the array instance is not
-changed in between them.::
-
-  func f(a: [Int]) {
-   //@effects(readnone_global, readonly_self)
-   count(a)
-   //@effects(readnone_global, readonly_self)
-   count(a)
-  }
-
-Mapping to effects primitives
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For each term in Arnold's proposal, here is a typical mapping to effects
-primitives:
-
-``argonlyglobaleffects``:
-
-  @effects(argonly); @nowrite @norelease arg
-
-``readnone_global[_nonbridged]``: 
-
-  @nonbridged_effects(argonly); @nowrite @nocapture self
-
-``readonly_self``:
-
-  @effects(argonly); @nowrite @nocapture self
-
-[arnold] The @effects(argonlyglobaleffects) '@release arg' from the proposal
-cannot be expressed using the primitives outline so far because we want it to
-say that we may release an object of the type of the argument.
-
-A function argument annotated with @capture only versus a function argument
-annotated with @capture and @release expresses the distinction between:::
-
-   copy_addr [init] some_dest, arg // retains arg
-   copy_addr some_dest,arg  // retains arg, releases some_dest
-
-We could express this using positive argument effects: ``@captureinit`` vs ``@capture``.
-
-Using a negative forumlation is a lot less intuitive though and not safe in case
-of omission.  ``@noinitcapture arg`` would imply may-capture and may-release
-while ``(empty) arg`` implies may-capture but not may-release.
-
-Maybe the answer is to indeed add a ``@no_release_type_of_argument`` attribute?
-
-[arnold] As Andy points out this can be nicely expressed using a polymorphic
-effects system.
-
 Swift-level attributes proposal
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -645,18 +249,18 @@ state.
   guarantees. Furthermore, it must return a 'subobject' that is stored by the
   set of storage objects or a value stored in the CoW struct itself. It must be
   guaranteed that the 'subobject' returned is kept alive as long the current
-  value of the 'self' object is alive. The self state is not changed. The non-self
-  state is not changed and the method must not depend on non-self state if the
-  ``self`` is in a non-bridged state. In a bridged state the optimizer will
-  assume that subsequent calls on the same 'self' object to return the
-  same value however it will not assume anything about effects on non-self
-  state.::
+  value of the 'self' object is alive. The self state is not changed. The
+  non-self state is not changed and the method must not depend on non-self state
+  if the ``self`` is in a non-bridged state. In a bridged state the optimizer
+  will assume that subsequent calls on the same 'self' object to return the same
+  value and that consecutive calls are idempotent however it will not assume
+  anything beyond this about effects on non-self state.::
 
     struct Array<T> {
       var storage: BridgedArrayStorage
       var size : Int
 
-      @get_subobject
+      @get_subobject_non_bridged
       func getElement(index: Int) -> T {
         return storage.elementAt(index)
       }
@@ -726,9 +330,9 @@ state.
    However, we probably want to delay this until we have a polymorphic effects
    type system.
 
-``@set_subject``
+``@set_subobject``
 
-  A method marked ``@initialize_subobject`` must fullfill all of
+  A method marked ``@set_subobject`` must fullfill all of
   ``@preserve_unique``'s guarantees. The method must only store its arguments
   into *initialized* storage. The only effect to non-self state is the capture
   of the method's arguments and the release of objects of the method arguments'
@@ -756,6 +360,165 @@ state.
     @selfeffects(preserve_unique, nocapture)
     func setElement(@nowrite e: T, index: Int) {
     }
+
+Motivation
+~~~~~~~~~~
+
+Why do we need ``makeunique``, ``preserveunique``?
+
+The optimizer wants to hoist functions that make a COW type instance unique out
+of loops. In order to do that it has to prove that uniqueness is preserved by
+all operations in the loop.
+
+Marking methods as ``makeunique``/``preserveunique`` allows the optimizer to
+reason about the behavior of the method calls.
+
+Example:::
+
+  struct Array<T> {
+    var storage: ArrayStorage<T>
+
+    @makeunique
+    func makeUnique() {
+      if (isUniquelyReferenced(&storage))
+       return;
+      storage = storage.copy()
+    }
+
+    @preserveunique
+    func getElementAddr(index: Int) -> UnsafeMutablePointer<T> {
+      return storage.elementAddrAt(index)
+    }
+
+    subscript(index: Int) -> UnsafeMutablePointer<T> {
+      mutableAddressor {
+        makeUnique()
+        return getElementAddr(index)
+      }
+    }
+  }
+
+When the optimizer optimizes a loop:::
+
+  func memset(inout A: [Int], value: Int) {
+    for i in 0 .. A.size {
+      A[i] = value
+      f()
+    }
+  }
+
+It will see the following calls because methods with attributes are not inlined.::
+
+  func memset(inout A: [Int], value: Int) {
+    for i in 0 .. A.size {
+      makeUnique(&A)
+      addr = getElementAddr(i, &A)
+      addr.memory = value
+      f()
+    }
+  }
+
+In order to hoist the 'makeUnique' call, the optimizer needs to be able to
+reason that neither 'getElementAddr', nor the store to the address returned can
+change the uniqueness state of 'A'. Furthermore, it knows because 'A' is marked
+inout that in a program without inout violations f cannot hold a reference to
+the object named by 'A' and therefore cannot modify it.
+
+Why do we need ``@get_subobject``, ``@initialize_subobject``, and
+``@set_subobject``?
+
+We want to be able to hoist ``makeunique`` calls when the array is not identfied
+by a unique name.::
+
+  class AClass {
+    var array: [Int]
+  }
+
+  func copy(a : AClass, b : AClass) {
+    for i in min(a.size, b.size) {
+       a.array.append(b.array[i])
+    }
+  }
+
+In such a case we would like to reason that:::
+
+  = b.array[i]
+
+cannot changed the uniqueness of the instance of array 'a.array' assuming 'a' !=== 'b'.
+We can do so because 'getElement' is marked ``@get_subobject`` and so does not
+modify non-self state.
+
+Further we would like to reason that:::
+
+  a.array.append
+
+cannot change the uniqueness state of the instance of array 'a.array' accross
+iterations. We can conclude so because ``appendAssumingUnique``'s side-effects
+guarantee that no destructor can run - it's only side-effect is that ``tmp``
+is captured and initializes storage in the array - these are the only
+side-effects according to ``@initialize_subobject``.::
+
+  for i in 0 .. b.size {
+    // @get_subobject
+    tmp = getElement(b.array, i)
+    makeUnique(&a.array)
+    // @initialize_subobject
+    appendAssumingUnique(&a.array, tmp)
+  }
+
+
+We can construct a very similar example where we cannot hoist makeUnique. If we
+replace 'getElement' with a 'setElement'. 'setElement' will capture its argument
+and further releases an element of type T - these are the only side-effects
+according to ``@set_subobject``::
+
+ @set_subobject
+ func setElement(e: T, index: Int) {
+   storage->setElement(e, index)
+ }
+
+Depending on 'T''s type a destructor can be invoked by the release of 'T'. The
+destructor can have arbitrary side-effects. Therefore, it is not valid to hoist
+the makeUnique in the code without proving that 'T's destructor cannot change
+the uniqueness state. This is trivial for trivial types but requires a more
+sophisticated analysis for class types (and in general cannot be disproved). In
+following example we can only hoist makeUnique if we can prove that  elt's, and
+elt2's destructor can't change the uniqueness state of the arrays.::
+
+ for i in 0 ..< min(a.size, b.size) {
+   makeUnique(&b.array)
+   setElement(&b.array, elt, i)
+   makeUnique(&a.array)
+   setElement(&a.array, elt2, i)
+ }
+
+In the the following loop it is not safe to hoist the makeUnique(&a)
+call even for trivial types. 'appendAssumingUnique' captures its argument 'a'
+which forces a copy on 'a' on every iteration of the loop.::
+
+  for i in 0 .. a.size {
+    makeUnique(&a)
+    setElement(&a, 0, i)
+    makeUnique(&b)
+    appendAssumingUnique(&b, a)
+  }
+
+To support this reasoning we need to know when a function captures its
+arguments and when a function might release an object and of which type.
+
+``@get_subobject`` and value-type behavior
+
+Furthermore, methods marked with ``@get_subobject`` will allow us to remove
+redundant calls to read-only like methods on COW type instances assuming we can
+prove that the instance is not changed in between them.::
+
+  func f(a: [Int]) {
+   @get_subobject
+   count(a)
+   @get_subobject
+   count(a)
+  }
+
 
 Examples of Optimization Using Effects Primitives
 -------------------------------------------------
