@@ -1962,8 +1962,7 @@ void ArchetypeType::resolveNestedType(
   auto &ctx = const_cast<ArchetypeType *>(this)->getASTContext();
   auto lazyArchetype = ctx.getLazyArchetype(this);
   nested.second = lazyArchetype.second->getNestedType(nested.first,
-                                                      *lazyArchetype.first,
-                                                      nullptr)
+                                                      *lazyArchetype.first)
                     ->getType(*lazyArchetype.first);
 }
 

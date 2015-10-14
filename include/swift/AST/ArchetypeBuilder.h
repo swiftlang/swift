@@ -417,9 +417,8 @@ class ArchetypeBuilder::PotentialArchetype {
   /// the concrete type.
   unsigned RecursiveConcreteType : 1;
 
-  /// The references to this nested type that occur in the source code
-  /// that were unresolved (at least at some point).
-  llvm::TinyPtrVector<ComponentIdentTypeRepr *> UnresolvedReferences;
+  /// Whether we have renamed this (nested) type due to typo correction.
+  unsigned Renamed : 1;
 
   /// The equivalence class of this potential archetype.
   llvm::TinyPtrVector<PotentialArchetype *> EquivalenceClass;
@@ -429,7 +428,7 @@ class ArchetypeBuilder::PotentialArchetype {
   PotentialArchetype(PotentialArchetype *Parent, Identifier Name)
     : ParentOrParam(Parent), NameOrAssociatedType(Name), Representative(this),
       IsRecursive(false), Invalid(false), SubstitutingConcreteType(false),
-      RecursiveConcreteType(false)
+      RecursiveConcreteType(false), Renamed(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
@@ -439,7 +438,8 @@ class ArchetypeBuilder::PotentialArchetype {
   PotentialArchetype(PotentialArchetype *Parent, AssociatedTypeDecl *AssocType)
     : ParentOrParam(Parent), NameOrAssociatedType(AssocType), 
       Representative(this), IsRecursive(false), Invalid(false),
-      SubstitutingConcreteType(false), RecursiveConcreteType(false)
+      SubstitutingConcreteType(false), RecursiveConcreteType(false),
+      Renamed(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
@@ -452,7 +452,7 @@ class ArchetypeBuilder::PotentialArchetype {
     : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
       NameOrAssociatedType(Name), Representative(this), IsRecursive(false),
       Invalid(false), SubstitutingConcreteType(false),
-      RecursiveConcreteType(false)
+      RecursiveConcreteType(false), Renamed(false)
   {
     EquivalenceClass.push_back(this);
   }
@@ -554,8 +554,7 @@ public:
 
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name,
-                                    ArchetypeBuilder &builder,
-                                    ComponentIdentTypeRepr *reference);
+                                    ArchetypeBuilder &builder);
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype.
@@ -589,9 +588,15 @@ public:
 
   void setInvalid() { Invalid = true; }
 
-  /// Return the list of unresolved references to this associated type.
-  ArrayRef<ComponentIdentTypeRepr *> getUnresolvedReferences() const {
-    return UnresolvedReferences;
+  /// Determine whether this archetype was renamed due to typo
+  /// correction. If so, \c getName() retrieves the new name.
+  bool wasRenamed() { return Renamed; }
+
+  /// Note that this potential archetype was renamed (due to typo
+  /// correction), providing the new name.
+  void setRenamed(Identifier newName) {
+    NameOrAssociatedType = newName;
+    Renamed = true;
   }
 
   /// Whether this potential archetype makes a better archetype anchor than

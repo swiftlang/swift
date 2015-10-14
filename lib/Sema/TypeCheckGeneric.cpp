@@ -31,7 +31,7 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      SourceRange baseRange,
                                      ComponentIdentTypeRepr *ref) {
   return Builder.resolveArchetype(baseTy)->getRepresentative()
-           ->getNestedType(ref->getIdentifier(), Builder, ref)
+           ->getNestedType(ref->getIdentifier(), Builder)
            ->getDependentType(Builder, true);
 }
 
@@ -40,7 +40,7 @@ Type DependentGenericTypeResolver::resolveSelfAssociatedType(
        DeclContext *DC,
        AssociatedTypeDecl *assocType) {
   return Builder.resolveArchetype(selfTy)->getRepresentative()
-           ->getNestedType(assocType->getName(), Builder, nullptr)
+           ->getNestedType(assocType->getName(), Builder)
            ->getDependentType(Builder, true);
 }
 
@@ -146,19 +146,34 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   assert(basePA && "Missing potential archetype for base");
   basePA = basePA->getRepresentative();
 
+  // Retrieve the potential archetype for the nested type.
+  auto nestedPA = basePA->getNestedType(ref->getIdentifier(), Builder);
+
+  // If this potential archetype was renamed due to typo correction,
+  // complain and fix it.
+  if (nestedPA->wasRenamed()) {
+    auto newName = nestedPA->getName();
+    TC.diagnose(ref->getIdLoc(), diag::invalid_member_type_suggest,
+                baseTy, ref->getIdentifier(), newName)
+      .fixItReplace(ref->getIdLoc(), newName.str());
+    ref->overwriteIdentifier(newName);
+
+    // Go get the actual nested type.
+    nestedPA = basePA->getNestedType(newName, Builder);
+    assert(!nestedPA->wasRenamed());
+  }
+
   // If the nested type has been resolved to an associated type, use it.
-  if (auto dependentPA = basePA->getNestedType(ref->getIdentifier(),
-                                               Builder, nullptr)) {
-    if (auto assocType = dependentPA->getResolvedAssociatedType()) {
-      return DependentMemberType::get(baseTy, assocType, TC.Context);
-    }
+  if (auto assocType = nestedPA->getResolvedAssociatedType()) {
+    return DependentMemberType::get(baseTy, assocType, TC.Context);
   }
 
   Identifier name = ref->getIdentifier();
   SourceLoc nameLoc = ref->getIdLoc();
 
   // Check whether the name can be found in the superclass.
-  // FIXME: The archetype builder could do this, too.
+  // FIXME: The archetype builder should be doing this and mapping down to a
+  // concrete type.
   if (auto superclassTy = basePA->getSuperclass()) {
     if (auto lookup = TC.lookupMemberType(DC, superclassTy, name)) {
       if (lookup.isAmbiguous()) {
@@ -182,7 +197,7 @@ Type CompleteGenericTypeResolver::resolveSelfAssociatedType(Type selfTy,
        DeclContext *DC,
        AssociatedTypeDecl *assocType) {
   return Builder.resolveArchetype(selfTy)->getRepresentative()
-           ->getNestedType(assocType->getName(), Builder, nullptr)
+           ->getNestedType(assocType->getName(), Builder)
            ->getDependentType(Builder, false);
 }
 
@@ -524,7 +539,8 @@ static void collectRequirements(ArchetypeBuilder &builder,
     else if (auto secondPA = req.second.dyn_cast<PotentialArchetype*>())
       secondType = secondPA->getDependentType(builder, false);
 
-    if (firstType->is<ErrorType>() || secondType->is<ErrorType>())
+    if (firstType->is<ErrorType>() || secondType->is<ErrorType>() ||
+        firstType->isEqual(secondType))
       continue;
 
     requirements.push_back(Requirement(RequirementKind::SameType,

@@ -251,7 +251,6 @@ void ArchetypeBuilder::PotentialArchetype::resolveAssociatedType(
   assert(builder.Impl->NumUnresolvedNestedTypes > 0 &&
          "Mismatch in number of unresolved nested types");
   --builder.Impl->NumUnresolvedNestedTypes;
-  UnresolvedReferences.clear();
 }
 
 bool ArchetypeBuilder::PotentialArchetype::addConformance(
@@ -363,20 +362,14 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
 
 auto ArchetypeBuilder::PotentialArchetype::getNestedType(
        Identifier nestedName,
-       ArchetypeBuilder &builder,
-       ComponentIdentTypeRepr *reference) -> PotentialArchetype * {
+       ArchetypeBuilder &builder) -> PotentialArchetype * {
   // Retrieve the nested type from the representation of this set.
   if (Representative != this)
-    return getRepresentative()->getNestedType(nestedName, builder, reference);
+    return getRepresentative()->getNestedType(nestedName, builder);
 
   llvm::TinyPtrVector<PotentialArchetype *> &nested = NestedTypes[nestedName];
     
   if (!nested.empty()) {
-    // If we haven't resolved this associated type yet, add the reference.
-    if (reference && !nested.front()->getResolvedAssociatedType()) {
-      nested.front()->UnresolvedReferences.push_back(reference);
-    }
-
     return nested.front();
   }
 
@@ -411,8 +404,6 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
   if (nested.empty()) {
     nested.push_back(new PotentialArchetype(this, nestedName));
     ++builder.Impl->NumUnresolvedNestedTypes;
-    if (reference)
-      nested.back()->UnresolvedReferences.push_back(reference);
   }
 
   return nested.front();
@@ -573,6 +564,17 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     mod.getASTContext().registerLazyArchetype(arch, builder, this);
     SmallVector<std::pair<Identifier, NestedType>, 4> FlatNestedTypes;
     for (auto Nested : NestedTypes) {
+      bool anyNotRenamed = false;
+      for (auto NestedPA : Nested.second) {
+        if (!NestedPA->wasRenamed()) {
+          anyNotRenamed = true;
+          break;
+        }
+      }
+
+      if (!anyNotRenamed)
+        continue;
+
       FlatNestedTypes.push_back({ Nested.first, NestedType() });
     }
     arch->setNestedTypes(mod.getASTContext(), FlatNestedTypes);
@@ -598,6 +600,11 @@ Type ArchetypeBuilder::PotentialArchetype::getDependentType(
     if (auto assocType = getResolvedAssociatedType())
       return DependentMemberType::get(parentType, assocType, builder.Context);
 
+    // If typo correction renamed this type, get the renamed type.
+    if (wasRenamed())
+      return parent->getNestedType(getName(), builder)
+               ->getDependentType(builder, allowUnresolved);
+    
     // If we don't allow unresolved dependent member types, fail.
     if (!allowUnresolved)
       return ErrorType::get(builder.Context);
@@ -696,7 +703,7 @@ auto ArchetypeBuilder::resolveArchetype(Type type) -> PotentialArchetype * {
     if (!base)
       return nullptr;
 
-    return base->getNestedType(dependentMember->getName(), *this, nullptr);
+    return base->getNestedType(dependentMember->getName(), *this);
   }
 
   return nullptr;
@@ -791,7 +798,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   for (auto Member : Proto->getMembers()) {
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
-      auto AssocPA = T->getNestedType(AssocType->getName(), *this, nullptr);
+      auto AssocPA = T->getNestedType(AssocType->getName(), *this);
       if (AssocPA != T) {
         if (addAbstractTypeParamRequirements(AssocType, AssocPA,
                                              RequirementSource::Protocol,
@@ -859,8 +866,10 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   auto T2Param = T2->getRootParam();
   unsigned T1Depth = T1->getNestingDepth();
   unsigned T2Depth = T2->getNestingDepth();
-  if (std::make_tuple(T2Param->getDepth(), T2Param->getIndex(), T2Depth)
-        < std::make_tuple(T1Param->getDepth(), T1Param->getIndex(), T1Depth))
+  if (std::make_tuple(T2->wasRenamed(), T2Param->getDepth(),
+                      T2Param->getIndex(), T2Depth)
+        < std::make_tuple(T1->wasRenamed(), T1Param->getDepth(),
+                          T1Param->getIndex(), T1Depth))
     std::swap(T1, T2);
 
   // Don't allow two generic parameters to be equivalent, because then we
@@ -901,14 +910,10 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   for (auto equiv : T2->EquivalenceClass)
     T1->EquivalenceClass.push_back(equiv);
 
-  // Add unresolved references.
-  T1->UnresolvedReferences.insert(T1->UnresolvedReferences.end(),
-                                  T2->UnresolvedReferences.begin(),
-                                  T2->UnresolvedReferences.end());
-  T2->UnresolvedReferences.clear();
-
-  // Record this same-type requirement.
-  Impl->SameTypeRequirements.push_back({ OrigT1, OrigT2 });
+  if (!T1->wasRenamed() && !T2->wasRenamed()) {
+    // Record this same-type requirement.
+    Impl->SameTypeRequirements.push_back({ OrigT1, OrigT2 });
+  }
 
   // FIXME: superclass requirements!
 
@@ -920,7 +925,7 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   // Recursively merge the associated types of T2 into T1.
   RequirementSource inferredSource(RequirementSource::Inferred, SourceLoc());
   for (auto T2Nested : T2->NestedTypes) {
-    auto T1Nested = T1->getNestedType(T2Nested.first, *this, nullptr);
+    auto T1Nested = T1->getNestedType(T2Nested.first, *this);
     if (addSameTypeRequirementBetweenArchetypes(T1Nested,
                                                 T2Nested.second.front(),
                                                 inferredSource))
@@ -1427,6 +1432,8 @@ static Identifier typoCorrectNestedType(
     }
   }
 
+  // FIXME: Look through the superclass.
+
   // If we didn't find any matches at all, fail.
   if (bestMatches.empty())
     return Identifier();
@@ -1449,46 +1456,25 @@ bool ArchetypeBuilder::finalize(SourceLoc loc) {
     visitPotentialArchetypes([&](PotentialArchetype *pa) {
       // We only care about nested types that haven't been resolved.
       if (pa->getParent() == nullptr || pa->getResolvedAssociatedType() ||
-          pa->getRepresentative() != pa ||
           /* FIXME: Should be able to handle this earlier */pa->getSuperclass())
         return;
 
-      assert(!pa->getUnresolvedReferences().empty() &&
-             "Missing unresolved references?");
-
       // Try to typo correct to a nested type name.
       Identifier correction = typoCorrectNestedType(pa);
-      SourceLoc diagLoc = pa->getUnresolvedReferences().front()->getIdLoc();
-
-      // Typo correction failed; a diagnostic will be emitted later.
       if (correction.empty()) {
         invalid = true;
+        pa->setInvalid();
         return;
       }
 
-      // Typo correction succeeded; emit Fix-Its and update the
-      // component ids.
-      auto diag = Diags.diagnose(diagLoc, diag::invalid_member_type_suggest,
-                                 pa->getParent()->getDependentType(*this,
-                                                                   true),
-                                 pa->getName(),
-                                 correction);
-
-      for (auto comp : pa->getUnresolvedReferences()) {
-        diag.fixItReplace(comp->getIdLoc(), correction.str());
-        comp->overwriteIdentifier(correction);
-      }
-
+      // Set the typo-corrected name.
+      pa->setRenamed(correction);
+      
       // Resolve the associated type and merge the potential archetypes.
-      pa->setInvalid();
-      auto replacement = pa->getParent()->getNestedType(correction, *this,
-                                                        nullptr);
-      pa->resolveAssociatedType(replacement->getResolvedAssociatedType(),
-                                *this);
+      auto replacement = pa->getParent()->getNestedType(correction, *this);
       addSameTypeRequirementBetweenArchetypes(
         pa, replacement,
-        RequirementSource(RequirementSource::Protocol, diagLoc));
-
+        RequirementSource(RequirementSource::Inferred, SourceLoc()));
     });
   }
 
@@ -1616,8 +1602,9 @@ void ArchetypeBuilder::enumerateRequirements(llvm::function_ref<
     // If this is not the representative, produce a same-type
     // constraint to the representative.
     if (archetype->getRepresentative() != archetype) {
-      f(RequirementKind::SameType, archetype, archetype->getRepresentative(),
-        archetype->getSameTypeSource());
+      if (!archetype->wasRenamed())
+        f(RequirementKind::SameType, archetype, archetype->getRepresentative(),
+          archetype->getSameTypeSource());
       return;
     }
 
