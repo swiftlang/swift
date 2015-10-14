@@ -1,415 +1,363 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+import StdlibUnittest
+
+var FailableInitTestSuite = TestSuite("FailableInit")
+
 class Canary {
-  deinit { print("died") }
-}
+  static var count: Int = 0
 
-struct GuineaPig {
-  let canary: Canary
-
-  init() { canary = Canary() }
-
-  init?(fail: Bool) {
-    canary = Canary()
-    if fail { return nil }
+  init() {
+    Canary.count++
   }
 
-  init?(failBefore: Bool) {
-    if failBefore { return nil }
-    canary = Canary()
-  }
-
-  init?(delegateFailure: Bool, failBefore: Bool, failAfter: Bool) {
-    if failBefore { return nil }
-    self.init(fail: delegateFailure)
-    if failAfter { return nil }
-  }
-
-  init?(alwaysFail: Void) {
-    return nil
-  }
-
-  init(forceNeverFail: ()) {
-    self.init(fail: false)!
+  deinit {
+    Canary.count--
   }
 }
-
-// CHECK: it's alive
-if let x = GuineaPig(fail: false) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-// CHECK-NEXT: died
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-if let y = GuineaPig(fail: true) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: it's alive
-// CHECK-NEXT: died
-if let a = GuineaPig(failBefore: false) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: it's dead
-if let b = GuineaPig(failBefore: true) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: it's dead
-if let c = GuineaPig(alwaysFail: ()) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: it's dead
-if let d = GuineaPig(delegateFailure: false, failBefore: true, failAfter: false) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-if let e = GuineaPig(delegateFailure: true, failBefore: false, failAfter: false) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-if let f = GuineaPig(delegateFailure: false, failBefore: false, failAfter: true) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-// CHECK-NEXT: it's alive
-// CHECK-NEXT: died
-if let g = GuineaPig(delegateFailure: false, failBefore: false, failAfter: false) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-struct Chimera {
-  let canary: Canary
-  let guineaPig: GuineaPig
-
-  init?(failBefore: Bool) {
-    if failBefore { return nil }
-    canary = Canary()
-    guineaPig = GuineaPig()
-  }
-
-  init?(failBetween: Bool) {
-    canary = Canary()
-    if failBetween { return nil }
-    guineaPig = GuineaPig()
-  }
-
-  init?(failAfter: Bool) {
-    canary = Canary()
-    guineaPig = GuineaPig()
-    if failAfter { return nil }
-  }
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: died
-_ = GuineaPig(forceNeverFail: ())
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: it's dead
-if let q = Chimera(failBefore: true) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: it's alive
-// CHECK-NEXT: died
-// CHECK-NEXT: died
-if let r = Chimera(failBefore: false) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-if let s = Chimera(failBetween: true) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: it's alive
-// CHECK-NEXT: died
-// CHECK-NEXT: died
-if let t = Chimera(failBetween: false) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: died
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-if let u = Chimera(failAfter: true) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: it's alive
-// CHECK-NEXT: died
-// CHECK-NEXT: died
-if let v = Chimera(failAfter: false) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
 
 class Bear {
   let x: Canary
 
-  init?(fail: Bool) {
+  /* Designated */
+  init(n: Int) {
     x = Canary()
-    if fail { return nil }
   }
 
-  convenience init?(delegateFailure: Bool, failAfter: Bool) {
-    self.init(fail: delegateFailure)
-    if failAfter { return nil }
+  init?(n: Int, before: Bool) {
+    if before {
+      return nil
+    }
+    self.x = Canary()
+  }
+
+  init?(n: Int, after: Bool) {
+    self.x = Canary()
+    if after {
+      return nil
+    }
+  }
+
+  init?(n: Int, before: Bool, after: Bool) {
+    if before {
+      return nil
+    }
+    self.x = Canary()
+    if after {
+      return nil
+    }
+  }
+
+  /* Convenience */
+  convenience init?(before: Bool) {
+    if before {
+      return nil
+    }
+    self.init(n: 0)
+  }
+
+  convenience init?(during: Bool) {
+    self.init(n: 0, after: during)
+  }
+
+  convenience init?(before: Bool, during: Bool) {
+    if before {
+      return nil
+    }
+    self.init(n: 0, after: during)
+  }
+
+  convenience init?(after: Bool) {
+    self.init(n: 0)
+    if after {
+      return nil
+    }
+  }
+
+  convenience init?(before: Bool, after: Bool) {
+    if before {
+      return nil
+    }
+    self.init(n: 0)
+    if after {
+      return nil
+    }
+  }
+
+  convenience init?(during: Bool, after: Bool) {
+    self.init(n: 0, after: during)
+    if after {
+      return nil
+    }
+  }
+
+  convenience init?(before: Bool, during: Bool, after: Bool) {
+    if before {
+      return nil
+    }
+    self.init(n: 0, after: during)
+    if after {
+      return nil
+    }
+  }
+
+  /* Exotic */
+  convenience init!(IUO: Bool) {
+    self.init(before: IUO)
+  }
+
+  convenience init(force: Bool) {
+    self.init(before: force)!
   }
 }
 
-final class PolarBear: Bear {
+class PolarBear : Bear {
   let y: Canary
 
-  override init?(fail: Bool) {
-    y = Canary()
-    super.init(fail: fail)
+  /* Designated */
+  override init(n: Int) {
+    self.y = Canary()
+    super.init(n: n)
   }
 
-  init?(chainFailure: Bool, failAfter: Bool) {
-    y = Canary()
-    super.init(fail: chainFailure)
-    if failAfter { return nil }
+  override init?(n: Int, before: Bool) {
+    if before {
+      return nil
+    }
+    self.y = Canary()
+    super.init(n: n)
   }
-}
 
-// CHECK-NEXT: it's alive
-// CHECK-NEXT: died
-if let ba = Bear(fail: false) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
+  init?(n: Int, during: Bool) {
+    self.y = Canary()
+    super.init(n: n, before: during)
+  }
 
-print("--") // CHECK-NEXT: --
+  init?(n: Int, before: Bool, during: Bool) {
+    self.y = Canary()
+    if before {
+      return nil
+    }
+    super.init(n: n, before: during)
+  }
 
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-if let bb = Bear(fail: true) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
+  override init?(n: Int, after: Bool) {
+    self.y = Canary()
+    super.init(n: n)
+    if after {
+      return nil
+    }
+  }
 
-print("--") // CHECK-NEXT: --
+  init?(n: Int, during: Bool, after: Bool) {
+    self.y = Canary()
+    super.init(n: n, before: during)
+    if after {
+      return nil
+    }
+  }
 
-// CHECK-NEXT: it's alive
-// CHECK-NEXT: died
-if let bc = Bear(delegateFailure: false, failAfter: false) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
+  override init?(n: Int, before: Bool, after: Bool) {
+    if before {
+      return nil
+    }
+    self.y = Canary()
+    super.init(n: n)
+    if after {
+      return nil
+    }
+  }
 
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-if let bd = Bear(delegateFailure: false, failAfter: true) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-if let bd = Bear(delegateFailure: true, failAfter: true) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: it's alive
-// CHECK-NEXT: died
-// CHECK-NEXT: died
-if let be = PolarBear(chainFailure: false, failAfter: false) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: died
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-if let bf = PolarBear(chainFailure: false, failAfter: true) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-// CHECK-NEXT: died
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-if let bf = PolarBear(chainFailure: true, failAfter: true) {
-  print("it's alive")
-} else {
-  print("it's dead")
-}
-
-print("--") // CHECK-NEXT: --
-
-protocol FailableOnDemand {
-  init?(fail: Bool)
-}
-
-extension GuineaPig: FailableOnDemand {}
-extension PolarBear: FailableOnDemand {}
-
-struct IUOGuineaPig : FailableOnDemand {
-  let canary: Canary
-
-  init() { canary = Canary() }
-
-  init!(fail: Bool) {
-    canary = Canary()
-    if fail { return nil }
+  init?(n: Int, before: Bool, during: Bool, after: Bool) {
+    if before {
+      return nil
+    }
+    self.y = Canary()
+    super.init(n: n, before: during)
+    if after {
+      return nil
+    }
   }
 }
 
-final class IUOPolarBear: Bear, FailableOnDemand {
+class GuineaPig<T> : Bear {
+  let y: Canary
+  let t: T
+
+  init?(t: T, during: Bool) {
+    self.y = Canary()
+    self.t = t
+    super.init(n: 0, before: during)
+  }
+}
+
+struct Chimera {
+  let x: Canary
   let y: Canary
 
-  override init!(fail: Bool) {
+  init?(before: Bool) {
+    if before {
+      return nil
+    }
+    x = Canary()
     y = Canary()
-    super.init(fail: fail)
+  }
+
+  init?(during: Bool) {
+    x = Canary()
+    if during {
+      return nil
+    }
+    y = Canary()
+  }
+
+  init?(before: Bool, during: Bool) {
+    if before {
+      return nil
+    }
+    x = Canary()
+    if during {
+      return nil
+    }
+    y = Canary()
+  }
+
+  init?(after: Bool) {
+    x = Canary()
+    y = Canary()
+    if after {
+      return nil
+    }
+  }
+
+  init?(before: Bool, after: Bool) {
+    if before {
+      return nil
+    }
+    x = Canary()
+    y = Canary()
+    if after {
+      return nil
+    }
+  }
+
+  init?(during: Bool, after: Bool) {
+    x = Canary()
+    if during {
+      return nil
+    }
+    y = Canary()
+    if after {
+      return nil
+    }
+  }
+
+  init?(before: Bool, during: Bool, after: Bool) {
+    if before {
+      return nil
+    }
+    x = Canary()
+    if during {
+      return nil
+    }
+    y = Canary()
+    if after {
+      return nil
+    }
   }
 }
 
-func tryInitFail<T: FailableOnDemand>(_: T.Type, fail: Bool) {
-  if let x = T(fail: fail) {
-    print("it's alive")
-    _fixLifetime(x)
-  } else {
-    print("it's dead")
+func mustFail<T>(f: () -> T?) {
+  if f() != nil {
+    preconditionFailure("Didn't fail")
   }
 }
 
-// CHECK-NEXT: it's alive
-// CHECK-NEXT: died
-tryInitFail(GuineaPig.self, fail: false)
+FailableInitTestSuite.test("FailableInitFailure_Root") {
+  mustFail { Bear(n: 0, before: true) }
+  mustFail { Bear(n: 0, after: true) }
+  mustFail { Bear(n: 0, before: true, after: false) }
+  mustFail { Bear(n: 0, before: false, after: true) }
 
-print("--") // CHECK-NEXT: --
+  expectEqual(0, Canary.count)
+}
 
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-tryInitFail(GuineaPig.self, fail: true)
+FailableInitTestSuite.test("FailableInitFailure_Derived") {
+  mustFail { PolarBear(n: 0, before: true) }
+  mustFail { PolarBear(n: 0, during: true) }
+  mustFail { PolarBear(n: 0, before: true, during: false) }
+  mustFail { PolarBear(n: 0, before: false, during: true) }
+  mustFail { PolarBear(n: 0, after: true) }
+  mustFail { PolarBear(n: 0, during: true, after: false) }
+  mustFail { PolarBear(n: 0, during: false, after: true) }
+  mustFail { PolarBear(n: 0, before: true, after: false) }
+  mustFail { PolarBear(n: 0, before: false, after: true) }
+  mustFail { PolarBear(n: 0, before: true, during: false, after: false) }
+  mustFail { PolarBear(n: 0, before: false, during: true, after: false) }
+  mustFail { PolarBear(n: 0, before: false, during: false, after: true) }
 
-print("--") // CHECK-NEXT: --
+  expectEqual(0, Canary.count)
+}
 
-// CHECK-NEXT: it's alive
-// CHECK-NEXT: died
-// CHECK-NEXT: died
-tryInitFail(PolarBear.self, fail: false)
+FailableInitTestSuite.test("DesignatedInitFailure_DerivedGeneric") {
+  mustFail { GuineaPig<Canary>(t: Canary(), during: true) }
 
-print("--") // CHECK-NEXT: --
+  expectEqual(0, Canary.count)
+}
 
-// CHECK-NEXT: died
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-tryInitFail(PolarBear.self, fail: true)
+FailableInitTestSuite.test("ConvenienceInitFailure_Root") {
+  mustFail { Bear(before: true) }
+  mustFail { Bear(during: true) }
+  mustFail { Bear(before: true, during: false) }
+  mustFail { Bear(before: false, during: true) }
+  mustFail { Bear(after: true) }
+  mustFail { Bear(before: true, after: false) }
+  mustFail { Bear(before: false, after: true) }
+  mustFail { Bear(during: true, after: false) }
+  mustFail { Bear(during: false, after: true) }
+  mustFail { Bear(before: true, during: false, after: false) }
+  mustFail { Bear(before: false, during: true, after: false) }
+  mustFail { Bear(before: false, during: false, after: true) }
 
-// CHECK-NEXT: it's alive
-tryInitFail(IUOGuineaPig.self, fail: false)
-// CHECK-NEXT: died
+  _ = Bear(IUO: false)
+  _ = Bear(force: false)
 
-print("--") // CHECK-NEXT: --
+  expectEqual(0, Canary.count)
+}
 
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-tryInitFail(IUOGuineaPig.self, fail: true)
+FailableInitTestSuite.test("ConvenienceInitFailure_Derived") {
+  mustFail { PolarBear(before: true) }
+  mustFail { PolarBear(during: true) }
+  mustFail { PolarBear(before: true, during: false) }
+  mustFail { PolarBear(before: false, during: true) }
+  mustFail { PolarBear(after: true) }
+  mustFail { PolarBear(before: true, after: false) }
+  mustFail { PolarBear(before: false, after: true) }
+  mustFail { PolarBear(during: true, after: false) }
+  mustFail { PolarBear(during: false, after: true) }
+  mustFail { PolarBear(before: true, during: false, after: false) }
+  mustFail { PolarBear(before: false, during: true, after: false) }
+  mustFail { PolarBear(before: false, during: false, after: true) }
 
-print("--") // CHECK-NEXT: --
+  expectEqual(0, Canary.count)
+}
 
-// CHECK-NEXT: it's alive
-// CHECK-NEXT: died
-// CHECK-NEXT: died
-tryInitFail(IUOPolarBear.self, fail: false)
+FailableInitTestSuite.test("InitFailure_Struct") {
+  mustFail { Chimera(before: true) }
+  mustFail { Chimera(during: true) }
+  mustFail { Chimera(before: true, during: false) }
+  mustFail { Chimera(before: false, during: true) }
+  mustFail { Chimera(after: true) }
+  mustFail { Chimera(before: true, after: false) }
+  mustFail { Chimera(before: false, after: true) }
+  mustFail { Chimera(during: true, after: false) }
+  mustFail { Chimera(during: false, after: true) }
+  mustFail { Chimera(before: true, during: false, after: false) }
+  mustFail { Chimera(before: false, during: true, after: false) }
+  mustFail { Chimera(before: false, during: false, after: true) }
 
-print("--") // CHECK-NEXT: --
+  expectEqual(0, Canary.count)
+}
 
-// CHECK-NEXT: died
-// CHECK-NEXT: died
-// CHECK-NEXT: it's dead
-tryInitFail(IUOPolarBear.self, fail: true)
-
-// CHECK-NEXT: done
-print("done")
-
-
+runAllTests()

@@ -1623,47 +1623,6 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   if (Availability.isAllYes() && SelfConsumed == DIKind::No)
     return;
 
-  // Right now we don't fully support cleaning up a partially initialized object
-  // after a failure.  Handle this by only allowing an early 'return nil' in an
-  // initializer after all properties are initialized or in a convenience init.
-  if (!Availability.isAllYes() &&
-      TheMemory.isClassInitSelf() &&
-      !TheMemory.isDelegatingInit()) {
-    SILLocation loc = Release->getLoc();
-
-    // The release is generally a cleanup in a failure block, and is usually the
-    // first instruction in the block.  For better QoI, try to rewind back up
-    // the CFG a bit to find a source location that is better.
-    if (loc.getKind() == SILLocation::CleanupKind) {
-      SILBasicBlock *SILBB = Release->getParent();
-      for (auto pred : SILBB->getPreds()) {
-        // Pick the terminator of any predecessor who doesn't have all members
-        // initialized.
-        if (!getLivenessAtInst(pred->getTerminator(), 0, TheMemory.NumElements)
-            .isAllYes())
-          loc = pred->getTerminator()->getLoc();
-      }
-    }
-
-    // Determine if this early exit is because of 'throw' or 'return nil'.
-    bool isThrow = isa<ThrowInst>(Release->getParent()->getTerminator());
-
-    // All members must be initialized (including the base class, if
-    // present).
-    diagnose(Module, loc, diag::object_not_fully_initialized_before_failure,
-             isThrow);
-    
-    // Note each of the members that isn't initialized.
-    DIMemoryUse Use(Release, DIUseKind::Load, 0, TheMemory.NumElements);
-    noteUninitializedMembers(Use);
-    
-    // If we're tracking the state of super.init (i.e., in a derived class)
-    // then report on failure to call super.init as well.
-    if (TheMemory.isAnyDerivedClassSelf() &&
-        Availability.get(Availability.size()-1) != DIKind::Yes)
-      diagnose(Module, loc, diag::must_call_super_init_failable_init, isThrow);
-  }
-
   // If it is all 'no' then we can handle it specially without conditional code.
   if (Availability.isAllNo() && SelfConsumed == DIKind::No) {
     processUninitializedRelease(Release, false, Release);

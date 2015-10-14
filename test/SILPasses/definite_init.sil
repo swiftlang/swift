@@ -719,13 +719,13 @@ sil @selfinit_delegate : $@convention(thin) (@out MyStruct2, @thin MyStruct2.Typ
 }
 
 class RootClassWithNontrivialStoredProperties {
-  var x, y: SomeClass // expected-note {{'self.x' not initialized}}  expected-note 2 {{'self.y' not initialized}}
+  var x, y: SomeClass
 
   init()
 }
 
 class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStoredProperties {
-  var a, b: SomeClass // expected-note {{'self.a' not initialized}} // expected-note 2 {{'self.b' not initialized}}
+  var a, b: SomeClass
   override init()
 }
 
@@ -736,7 +736,7 @@ class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStored
 sil @test_root_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $RootClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
-  strong_release %4 : $RootClassWithNontrivialStoredProperties  // expected-error {{all stored properties of a class instance must be initialized before returning nil from an initializer}}
+  strong_release %4 : $RootClassWithNontrivialStoredProperties
 
   %13 = tuple ()
   return %13 : $()
@@ -759,7 +759,7 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
   %2 = ref_element_addr %4 : $RootClassWithNontrivialStoredProperties, #RootClassWithNontrivialStoredProperties.x
   assign %1 to %2 : $*SomeClass
 
-  strong_release %4 : $RootClassWithNontrivialStoredProperties  // expected-error {{all stored properties of a class instance must be initialized before returning nil from an initializer}}
+  strong_release %4 : $RootClassWithNontrivialStoredProperties
 
   %13 = tuple ()
   return %13 : $()
@@ -780,8 +780,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [derivedself] %1#1 : $*DerivedClassWithNontrivialStoredProperties
   store %0 to %4 : $*DerivedClassWithNontrivialStoredProperties
 
-  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
-  // expected-note@-1 {{super.init must be called before returning nil}}
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
   dealloc_stack %1#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()
@@ -816,8 +815,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
   %10 = ref_element_addr %9 : $DerivedClassWithNontrivialStoredProperties, #DerivedClassWithNontrivialStoredProperties.a
   assign %8 to %10 : $*SomeClass
 
-  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties // expected-error{{all stored properties of a class instance must be initialized before returning nil from an initializer}}
-  // expected-note@-1 {{super.init must be called before returning nil}}
+  destroy_addr %4 : $*DerivedClassWithNontrivialStoredProperties
   dealloc_stack %1#0 : $*@local_storage DerivedClassWithNontrivialStoredProperties
 
   %13 = tuple ()

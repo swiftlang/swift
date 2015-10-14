@@ -1117,47 +1117,6 @@ func testReassignment() {
 }
 
 
-// <rdar://problem/21003797> too-early throw in an init produces "must be initialized before returning nil" diagnostic
-func throwAndReturnsInt() throws -> Int { return 42 }
-
-class ThrowingInitializer {
-  let property: Int // expected-note {{'self.property' not initialized}}
-
-  init() throws {
-    property = try throwAndReturnsInt() // expected-error {{all stored properties of a class instance must be initialized before throwing from an initializer}}
-  }
-}
-
-class DerivedThrowingInitializer : ThrowingInitializer {
-  var property2: Int?
-
-  override init() throws {
-    // expected-note @+1 {{super.init must be called before throwing}}
-    property2 = try throwAndReturnsInt()  // expected-error {{all stored properties of a class instance must be initialized before throwing from an initializer}}
-
-    try super.init()
-  }
-
-  // Throwing + failable init #1
-  init!(a : Float) throws {
-    // expected-note @+1 {{super.init must be called before throwing}}
-    property2 = try throwAndReturnsInt()  // expected-error {{all stored properties of a class instance must be initialized before throwing from an initializer}}
-
-    try super.init()
-  }
-
-  // Throwing + failable init #1
-  init!(a : Int) throws {
-    // expected-note @+2 {{super.init must be called before returning nil}}
-    // expected-error @+1 {{all stored properties of a class instance must be initialized before returning nil from an initializer}}
-    if a == 17 { return nil }
-
-    property2 = 16
-
-    try super.init()
-  }
-}
-
 // <rdar://problem/21295093> Swift protocol cannot implement default initializer
 protocol ProtocolInitTest {
   init()
@@ -1201,68 +1160,4 @@ func test22436880() {
   let x: Int
   x = 1
   bug22436880(&x) // expected-error {{immutable value 'x' may not be passed inout}}
-}
-
-// <rdar://problem/19267795> failable initializers that call noreturn function produces bogus diagnostics
-class FailableInitThatFailsReallyHard {
-  init?() {   // no diagnostics generated.
-    fatalError("bad")
-  }
-}
-
-
-class BaseClass {}
-final class DerivedClass : BaseClass {
-  init(x : ()) {
-    fatalError("bad")  // no diagnostics.
-  }
-}
-
-func something(x: Int) {}
-
-func something(inout x: Int) {}
-
-func something(x: AnyObject) {}
-
-func something(x: Any.Type) {}
-
-// <rdar://problem/22946400> DI needs to diagnose self usages in error block
-//
-// FIXME: crappy QoI
-class ErrantClass {
-  let x: Int
-  var y: Int
-
-  init() throws {
-    x = 10
-    y = 10
-  }
-
-  convenience init(invalidEscape: ()) {
-    do {
-      try self.init()
-    } catch {}
-  } // expected-error {{'self' used inside 'catch' block containing self.init call}}
-
-  convenience init(invalidAccess: ()) throws {
-    do {
-      try self.init()
-    } catch let e {
-      something(x) // expected-error {{'self' used inside 'catch' block containing self.init call}}
-      something(self.x) // expected-error {{'self' used inside 'catch' block containing self.init call}}
-
-      something(y) // expected-error {{'self' used inside 'catch' block containing self.init call}}
-      something(self.y) // expected-error {{'self' used inside 'catch' block containing self.init call}}
-
-      something(&y) // expected-error {{'self' used inside 'catch' block containing self.init call}}
-      something(&self.y) // expected-error {{'self' used inside 'catch' block containing self.init call}}
-
-      something(self) // expected-error {{'self' used inside 'catch' block containing self.init call}}
-
-      // FIXME: not diagnosed
-      something(self.dynamicType)
-
-      throw e
-    }
-  }
 }

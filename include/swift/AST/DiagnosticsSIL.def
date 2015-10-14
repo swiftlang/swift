@@ -171,14 +171,6 @@ ERROR(assignment_to_immutable_value,sil_analysis,none,
       "immutable value '%0' may not be assigned to",
       (StringRef))
 
-ERROR(object_not_fully_initialized_before_failure,sil_analysis,none,
-      "all stored properties of a class instance must be initialized before "
-      "%select{returning nil|throwing}0 from an initializer", (bool))
-
-NOTE(must_call_super_init_failable_init,sil_analysis,none,
-      "super.init must be called before %select{returning nil|throwing}0",
-      (bool))
-
 
 // Control flow diagnostics.
 ERROR(missing_return,sil_analysis,none,

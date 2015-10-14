@@ -1,6 +1,21 @@
 Latest
 ------
 
+* Designated class initializers declared as failable or throwing may now
+  return nil or throw an error, respectively, before the object has been
+  fully initialized. For example:
+
+  class Widget : Gadget {
+    let complexity: Int
+
+    init(complexity: Int, elegance: Int) throws {
+      if complexity > 3 { throw WidgetError.TooComplex }
+      self.complexity = complexity
+
+      try super.init(elegance: elegance)
+    }
+  }
+
 * All slice types now have removeFirst() and removeLast() methods.
 
 * ArraySlice.removeFirst() now preserves element indices.
