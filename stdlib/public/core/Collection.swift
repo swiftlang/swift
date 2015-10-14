@@ -658,7 +658,8 @@ public protocol MutableCollectionType : MutableIndexable, CollectionType {
   // FIXME: should be constrained to MutableCollectionType
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
-  typealias SubSequence/*: MutableCollectionType*/ = MutableSlice<Self>
+  typealias SubSequence : CollectionType /*: MutableCollectionType*/
+    = MutableSlice<Self>
 
   /// Access the element at `position`.
   ///
