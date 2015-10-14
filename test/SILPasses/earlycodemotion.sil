@@ -1568,5 +1568,33 @@ bb2(%9 : $fuzz):
   return %12 : $Bool                              // id: %14 
 }
 
+// Make sure retain instruction is not sunk across copy_addr inst, as copy_addr
+// may decrement the refcount of %0 here.
+//
+// CHECK-LABEL: retain_blocked_by_copyaddr
+// CHECK: bb0
+// CHECK-NEXT: retain_value
+sil hidden @retain_blocked_by_copyaddr : $@convention(thin) <T> (@out T, @in T, B) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $B):
+  retain_value %2 : $B
+  copy_addr [take] %1 to %0 : $*T // id: %3
+  %4 = tuple ()                                   // user: %5
+  return %4 : $()                                 // id: %5
+}
 
+// Make sure retain instruction is sunk across copy_addr inst, as copy_addr
+// dest is initialized.
+//
+// CHECK-LABEL: retain_not_blocked_by_copyaddrinit
+// CHECK: bb0
+// CHECK-NEXT: copy_addr 
+// CHECK-NEXT: tuple 
+// CHECK-NEXT: retain_value
+sil hidden @retain_not_blocked_by_copyaddrinit : $@convention(thin) <T> (@out T, @in T, B) -> () {
+bb0(%0 : $*T, %1 : $*T, %2 : $B):
+  retain_value %2 : $B
+  copy_addr [take] %1 to [initialization] %0 : $*T // id: %3
+  %4 = tuple ()                                   // user: %5
+  return %4 : $()                                 // id: %5
+}
 
