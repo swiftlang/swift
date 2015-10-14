@@ -1046,7 +1046,7 @@ public:
         continue;
 
       // Now that we have our call graph, grab the CallSites of F.
-      auto &CallSites = CG.getPartialCallerEdges(F);
+      auto &CallSites = CG.getCallerEdges(F);
 
       // If this function is not called anywhere, for now don't do anything.
       //

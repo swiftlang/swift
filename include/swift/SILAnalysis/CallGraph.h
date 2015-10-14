@@ -96,14 +96,8 @@ public:
 
   FullApplySite getApply() { return TheApply; }
 
-  /// Return a callee set that is known to be complete.
-  CalleeSetType getCompleteCalleeSet() const {
-    assert(isCalleeSetComplete() && "Attempt to get an incomplete call set!");
-    return getPartialCalleeSet();
-  }
-
-  /// Return a callee set that is not known to be complete.
-  CalleeSetType getPartialCalleeSet() const {
+  /// Return the callee set.
+  CalleeSetType getCalleeSet() const {
     if (CalleeSet.getPointer().is<CalleeSetType *>())
       return *CalleeSet.getPointer().get<CalleeSetType *>();
 
@@ -198,17 +192,9 @@ public:
     return Function;
   }
 
-  /// Get the complete set of edges associated with call sites that can call
-  /// into this function.
-  const llvm::SmallPtrSetImpl<CallGraphEdge *> &getCompleteCallerEdges() const {
-    assert(isCallerEdgesComplete() &&
-           "Attempt to get an incomplete caller set!");
-    return CallerEdges;
-  }
-
   /// Get the known set of call graph edges that represent possible
   /// calls into this function.
-  const llvm::SmallPtrSetImpl<CallGraphEdge *> &getPartialCallerEdges() const {
+  const llvm::SmallPtrSetImpl<CallGraphEdge *> &getCallerEdges() const {
     return CallerEdges;
   }
 
@@ -232,7 +218,7 @@ public:
   /// Is this call graph node for a function that we can trivially
   /// know is dead?
   bool isTriviallyDead() const {
-    return isCallerEdgesComplete() && getCompleteCallerEdges().empty();
+    return isCallerEdgesComplete() && getCallerEdges().empty();
   }
 
   unsigned getOrdinal() const {
@@ -345,8 +331,8 @@ public:
   /// Get the known set of call graph edges that represent possible
   /// calls into a function.
   const llvm::SmallPtrSetImpl<CallGraphEdge *> &
-  getPartialCallerEdges(SILFunction *F) const {
-    return getCallGraphNode(F)->getPartialCallerEdges();
+  getCallerEdges(SILFunction *F) const {
+    return getCallGraphNode(F)->getCallerEdges();
   }
 
   /// Do we know all the callers of this function?
@@ -362,8 +348,8 @@ public:
 
   /// Return a callee set that is known to be complete.
   CallGraphEdge::CalleeSetType
-  getCompleteCalleeSet(FullApplySite FAS) const {
-    return getCallGraphEdge(FAS)->getCompleteCalleeSet();
+  getCalleeSet(FullApplySite FAS) const {
+    return getCallGraphEdge(FAS)->getCalleeSet();
   }
 
   /// Is this call site known to call exactly one single function?

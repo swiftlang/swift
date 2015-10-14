@@ -308,7 +308,7 @@ void CallGraph::addEdgesForApply(FullApplySite Apply,
   CallerNode->addCalleeEdge(Edge);
 
   llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
-  orderCallees(Edge->getPartialCalleeSet(), OrderedNodes);
+  orderCallees(Edge->getCalleeSet(), OrderedNodes);
 
   for (auto *CalleeNode : OrderedNodes)
     CalleeNode->addCallerEdge(Edge);
@@ -320,7 +320,7 @@ void CallGraph::addEdgesForApply(FullApplySite Apply,
 
 void CallGraph::removeEdge(CallGraphEdge *Edge) {
   // Remove the edge from all the potential callee call graph nodes.
-  auto CalleeSet = Edge->getPartialCalleeSet();
+  auto CalleeSet = Edge->getCalleeSet();
   for (auto *CalleeNode : CalleeSet)
     CalleeNode->removeCallerEdge(Edge);
 
@@ -339,7 +339,7 @@ void CallGraph::removeEdge(CallGraphEdge *Edge) {
 }
 
 void CallGraph::removeNode(CallGraphNode *Node) {
-  assert(Node->getPartialCallerEdges().size() == 0 &&
+  assert(Node->getCallerEdges().size() == 0 &&
          "Node to delete must not have any caller edges");
   assert(Node->getCalleeEdges().size() == 0 &&
          "Node to delete must not have any callee edges");
@@ -434,7 +434,7 @@ void CallGraphEdge::print(llvm::raw_ostream &OS, int Indent) {
 
   printFlag(OS, "All callees known", isCalleeSetComplete(), Indent);
 
-  auto CalleeSet = getPartialCalleeSet();
+  auto CalleeSet = getCalleeSet();
   if (CalleeSet.empty())
     return;
 
@@ -493,7 +493,7 @@ void CallGraphNode::print(llvm::raw_ostream &OS) {
     OS << "\n";
   }
 
-  auto &CallerEdges = getPartialCallerEdges();
+  auto &CallerEdges = getCallerEdges();
   if (!CallerEdges.empty()) {
     OS << CallGraphFileCheckPrefix <<
       (!isCallerEdgesComplete() ? "Known " : "");
@@ -591,12 +591,12 @@ void CallGraph::printStats(llvm::raw_ostream &OS) {
     auto *Node = getCallGraphNode(F);
     if (Node) {
       CallSitesPerFunction.increment(Node->getCalleeEdges().size());
-      CallersPerFunction.increment(Node->getPartialCallerEdges().size());
+      CallersPerFunction.increment(Node->getCallerEdges().size());
 
       CountCallSites += Node->getCalleeEdges().size();
 
       for (auto *Edge : Node->getCalleeEdges())
-        CalleesPerCallSite.increment(Edge->getPartialCalleeSet().size());
+        CalleesPerCallSite.increment(Edge->getCalleeSet().size());
     } else {
       OS << "!!! Missing node for " << F->getName() << "!!!";
     }
@@ -673,7 +673,7 @@ public:
 
     for (auto *ApplyEdge : OrderedEdges) {
       llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
-      orderCallees(ApplyEdge->getPartialCalleeSet(), OrderedNodes);
+      orderCallees(ApplyEdge->getCalleeSet(), OrderedNodes);
 
       for (auto *CalleeNode : OrderedNodes) {
         if (DFSNum.find(CalleeNode) == DFSNum.end()) {
@@ -898,16 +898,16 @@ void CallGraph::verify(SILFunction *F) const {
     assert(Edge->getApply().getFunction() == F &&
            "Apply in callee set that is not in the callee function?!");
 
-    for (auto *CalleeNode : Edge->getPartialCalleeSet()) {
-      auto &CallerEdges = CalleeNode->getPartialCallerEdges();
+    for (auto *CalleeNode : Edge->getCalleeSet()) {
+      auto &CallerEdges = CalleeNode->getCallerEdges();
       assert(std::find(CallerEdges.begin(), CallerEdges.end(), Edge) !=
                CallerEdges.end() &&
              "Edge not in caller set of callee");
     }
   }
   // 2.) Check that the caller edges have this node in their callee sets.
-  for (auto *Edge : Node->getPartialCallerEdges()) {
-    auto CalleeSet = Edge->getPartialCalleeSet();
+  for (auto *Edge : Node->getCallerEdges()) {
+    auto CalleeSet = Edge->getCalleeSet();
     assert(std::find(CalleeSet.begin(), CalleeSet.end(), Node) !=
              CalleeSet.end() &&
            "Node not in callee set of caller edge");
@@ -997,7 +997,7 @@ OrderedCallGraph::OrderedCallGraph(CallGraph *CG) {
     ONode.NumCallSites = OrderedEdges.size();
     for (auto *CGEdge : OrderedEdges) {
       llvm::SmallVector<CallGraphNode *, 4> OrderedCallees;
-      orderCallees(CGEdge->getPartialCalleeSet(), OrderedCallees);
+      orderCallees(CGEdge->getCalleeSet(), OrderedCallees);
 
       for (auto *CalleeNode : OrderedCallees) {
         auto *OrderedChild = NodeMap[CalleeNode];
