@@ -59,13 +59,14 @@ def main():
         description="""
 repositories.
 
-By default, updates your checkouts of Swift, SourceKit and LLDB.""")
+By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     parser.add_argument("-a", "--all",
-        help="update your checkouts of LLVM, Clang and Swift, SourceKit and LLDB",
+        help="also update checkouts of llbuild, LLVM, and Clang",
         action="store_true")
     args = parser.parse_args()
 
     if args.all:
+        update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llbuild"))
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "llvm"))
         update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "clang"))
 
@@ -75,6 +76,7 @@ By default, updates your checkouts of Swift, SourceKit and LLDB.""")
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "SourceKit"))
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "cmark"))
     update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "lldb"))
+    update_working_copy(os.path.join(SWIFT_SOURCE_ROOT, "swiftpm"))
 
     return 0
 
