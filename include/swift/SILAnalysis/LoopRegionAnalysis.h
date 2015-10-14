@@ -96,13 +96,14 @@
 #define SWIFT_SILANALYSIS_LOOPNESTANALYSIS_H
 
 #include "swift/SILAnalysis/Analysis.h"
+#include "swift/Basic/Range.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/LoopAnalysis.h"
 #include "swift/SILPasses/PassManager.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/Basic/Range.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
@@ -146,6 +147,40 @@ public:
   using FunctionTy = SILFunction;
   using LoopTy = SILLoop;
   using BlockTy = SILBasicBlock;
+
+  /// A tagged data structure that stores in its bottom bit whether or not the
+  /// successor edge is dead. This ensures
+  struct SuccessorID {
+    static constexpr unsigned NumTaggedBits = 1;
+    static constexpr unsigned IDBitSize =
+        (sizeof(unsigned) * CHAR_BIT) - NumTaggedBits;
+    static constexpr unsigned MaxID = (unsigned(1) << IDBitSize) - 1;
+
+    unsigned IsDead : 1;
+    unsigned ID : IDBitSize;
+
+    SuccessorID(unsigned id) : IsDead(unsigned(false)), ID(id) {}
+
+    bool operator<(const SuccessorID &Other) const { return ID < Other.ID; }
+    bool operator==(const SuccessorID &Other) const {
+      bool Result = ID == Other.ID;
+      assert((!Result || (IsDead == Other.IsDead)) &&
+             "Can not have an equal ID without IsDead being equal as well");
+      return Result;
+    }
+
+    struct ToLiveSucc {
+      Optional<SuccessorID> operator()(SuccessorID ID) const {
+        if (ID.IsDead)
+          return None;
+        return ID;
+      }
+    };
+
+  };
+  /// These checks are just for performance.
+  static_assert(IsTriviallyCopyable<SuccessorID>::value,
+                "Expected trivially copyable type");
 
   /// An iterator that knows how to iterate over the subregion indices of a
   /// region.
@@ -247,8 +282,26 @@ private:
   /// The IDs of the predecessor regions of this region.
   llvm::SmallVector<unsigned, 4> Preds;
 
-  /// The IDs of the successor regions of this region.
-  llvm::SmallVector<unsigned, 4> Succs;
+  /// The IDs of the local and non-local successor regions of this region.
+  ///
+  /// Let R1 be this region. A local successor of R1 is a region R2 for which
+  /// the inner most parent region that contains R2 is the same as the inner
+  /// most parent region that contains R1. A local successor is represented by
+  /// its real ID. A non-local successor is represented by the index of the
+  /// non-local successor in this region's parent's successor list.
+  ///
+  /// Discussion: The reason that we have this separate representation is so
+  /// that if the non-local exit is to a block in a grand+-ancestor region of
+  /// this BB, we can represent each jump as individual non-local edges in
+  /// between loops.
+  ///
+  /// *NOTE* This list is not sorted, but can not have any duplicate
+  /// elements. We have a check in LoopRegionFunctionInfo::verify to make sure
+  /// that this stays true. The reason why this is necessary is that subregions
+  /// of a loop, may have a non-local successor edge pointed at this region's
+  /// successor edge. If we were to sort these edges, we would need to update
+  /// those subregion edges as well which is strictly not necessary.
+  llvm::SmallVector<SuccessorID, 4> Succs;
 
   /// True if this region the head of an edge that results from control flow
   /// that we do not handle.
@@ -345,6 +398,7 @@ private:
   }
 
   friend class LoopRegionFunctionInfo;
+  using InnerSuccRange = IteratorRange<decltype(Succs)::iterator>;
 
 public:
   /// These will assert if this is not a loop region. If this is a loop region,
@@ -409,14 +463,17 @@ public:
   bool pred_empty() const { return Preds.empty(); }
   unsigned pred_size() const { return Preds.size(); }
 
-  using succ_iterator = llvm::SmallVectorImpl<unsigned>::iterator;
-  using succ_const_iterator = llvm::SmallVectorImpl<unsigned>::const_iterator;
+  using succ_iterator = decltype(Succs)::iterator;
+  using succ_const_iterator = decltype(Succs)::const_iterator;
   succ_iterator succ_begin() { return Succs.begin(); }
   succ_iterator succ_end() { return Succs.end(); }
   succ_const_iterator succ_begin() const { return Succs.begin(); }
   succ_const_iterator succ_end() const { return Succs.end(); }
   bool succ_empty() const { return Succs.empty(); }
   unsigned succ_size() const { return Succs.size(); }
+
+  using SuccRange = FilterRange<InnerSuccRange, SuccessorID::ToLiveSucc>;
+  SuccRange getSuccs();
 
   BlockTy *getBlock() const;
   LoopTy *getLoop() const;
@@ -473,19 +530,15 @@ public:
   }
 
   void replaceSucc(unsigned OldSuccID, unsigned NewSuccID) {
-    for (unsigned i : indices(Succs)) {
-      if (Succs[i] != OldSuccID)
+    bool FoundResult;
+    (void)FoundResult;
+    for (auto &SuccID : Succs) {
+      if (SuccID.ID != OldSuccID)
         continue;
-      Succs[i] = NewSuccID;
-      // This may not be necessary. I am just being conservative for now and it
-      // shouldn't be expensive.
-      //
-      // TODO: Investigate if this can be removed.
-      sortUnique(Succs);
-      return;
+      SuccID = SuccessorID(NewSuccID);
+      FoundResult = true;
     }
-    llvm_unreachable("Attempting to replace a successor that is not a "
-                     "succesor?!");
+    assert(FoundResult && "Did not find any successor entries for old succ?!");
   }
 
   void dump() const;
@@ -521,10 +574,35 @@ private:
     sortUnique(Preds);
   }
 
-  void addSucc(LoopRegion *LNR) {
+  unsigned addSucc(LoopRegion *Successor) {
     assert(!isFunction() && "Functions can not have successors");
-    Succs.push_back(LNR->ID);
-    sortUnique(Succs);
+
+    // First check if we already have this successor's id in our list. If we do,
+    // just return the index of that ID so that we do not have duplicate
+    // successors.
+    SuccessorID SuccID = {Successor->getID()};
+    for (unsigned i : indices(Succs))
+      if (Succs[i] == SuccID)
+        return i;
+
+    // Otherwise, add the new SuccID to our SuccList.
+    unsigned Index = Succs.size();
+    Succs.push_back(SuccID);
+    return Index;
+  }
+
+  /// Set the IsDead flag on all successors of this region that have an id \p
+  /// ID.
+  ///
+  /// Due to the creation of up-edges during loop region construction, we can
+  /// never actually remove successors. Instead we mark successors as being dead
+  /// and ignore such values when iterating.
+  void removeSucc(unsigned ID) {
+    for (auto &S : Succs) {
+      if (S.ID == ID) {
+        S.IsDead = unsigned(true);
+      }
+    }
   }
 
   void addBlockSubregion(LoopRegion *R) {
@@ -656,6 +734,7 @@ public:
   void dump() const;
   void print(llvm::raw_ostream &os) const;
   void viewLoopRegions() const;
+  void verify();
 
 private:
   RegionTy *createRegion(BlockTy *BB, unsigned RPONum);

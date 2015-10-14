@@ -85,6 +85,10 @@ llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &os, LoopRegion &LR) {
   return os;
 }
 
+LoopRegion::SuccRange LoopRegion::getSuccs() {
+  auto Range = InnerSuccRange(Succs.begin(), Succs.end());
+  return SuccRange(Range, SuccessorID::ToLiveSucc());
+}
 //===----------------------------------------------------------------------===//
 //                           LoopRegionFunctionInfo
 //===----------------------------------------------------------------------===//
@@ -103,6 +107,25 @@ LoopRegionFunctionInfo::LoopRegionFunctionInfo(FunctionTy *F,
   initializeBlockRegions(PI, LI);
   initializeLoopRegions(LI);
   initializeFunctionRegion(LI->getTopLevelLoops());
+#ifndef NDEBUG
+  verify();
+#endif
+}
+
+void LoopRegionFunctionInfo::verify() {
+#ifndef NDEBUG
+  llvm::SmallVector<LoopRegion::SuccessorID, 8> UniqueSuccList;
+  for (auto *R : IDToRegionMap) {
+    UniqueSuccList.clear();
+    // Make sure that our region has a successor list without duplicates. We do
+    // not care if the successor lists are sorted, just that they are unique.
+    std::copy(R->Succs.begin(), R->Succs.end(), UniqueSuccList.end());
+    std::sort(UniqueSuccList.begin(), UniqueSuccList.end());
+    auto End = UniqueSuccList.end();
+    assert(End == std::unique(UniqueSuccList.begin(), UniqueSuccList.end()) &&
+           "Expected UniqueSuccList to not have any duplicate elements");
+  }
+#endif
 }
 
 //===---
@@ -379,10 +402,8 @@ rewriteLoopHeaderPredecessors(LoopTy *SubLoop, RegionTy *SubLoopRegion) {
     }
 
     DEBUG(llvm::dbgs() << "            Is in loop... Erasing...\n");
-    auto Iter =
-      std::remove(PredRegion->Succs.begin(), PredRegion->Succs.end(),
-                  SubLoopHeaderRegion->ID);
-    PredRegion->Succs.erase(Iter);
+    // We are abusing the fact that a block can only be a local successor.
+    PredRegion->removeSucc(SubLoopHeaderRegion->getID());
   }
   SubLoopHeaderRegion->Preds.clear();
 
@@ -408,6 +429,11 @@ getExitingRegions(LoopRegionFunctionInfo *LRFI,
     }
     ExitingRegions.push_back(Region);
   }
+
+  // We can have a loop subregion that has multiple exiting edges from the
+  // current loop. We do not want to visit that loop subregion multiple
+  // times. So we unique the exiting region list.
+  sortUnique(ExitingRegions);
 }
 
 /// For each exiting block:
@@ -432,23 +458,21 @@ rewriteLoopExitingBlockSuccessors(LoopTy *Loop, RegionTy *LRegion) {
   llvm::SmallVector<RegionTy *, 8> ExitingRegions;
   getExitingRegions(this, Loop, LRegion, ExitingRegions);
 
-  llvm::SmallVector<unsigned, 8> SuccsToDelete;
   DEBUG(llvm::dbgs() << "    Visiting Exit Blocks...\n");
   for (auto *ExitingRegion : ExitingRegions) {
-    SuccsToDelete.clear();
-
     DEBUG(llvm::dbgs() << "        Exiting Region: "
           << ExitingRegion->getID() << "\n");
-    for (unsigned SuccID : ExitingRegion->Succs) {
-      DEBUG(llvm::dbgs() << "            Succ: " << SuccID << "\n");
-      auto *SuccRegion = getRegion(SuccID);
+    for (auto SuccID : ExitingRegion->getSuccs()) {
+      DEBUG(llvm::dbgs() << "            Succ: " << SuccID.ID << "\n");
+
+      auto *SuccRegion = getRegion(SuccID.ID);
       if (!LRegion->containsSubregion(SuccRegion)) {
         DEBUG(llvm::dbgs() << "            Is not a subregion, replacing.\n");
         SuccRegion->replacePred(ExitingRegion->ID, LRegion->ID);
-        LRegion->addSucc(SuccRegion);
         if (ExitingRegion->IsUnknownControlFlowEdgeTail)
           LRegion->IsUnknownControlFlowEdgeTail = true;
-        SuccsToDelete.push_back(SuccID);
+        LRegion->addSucc(SuccRegion);
+        ExitingRegion->removeSucc(SuccRegion->getID());
         continue;
       }
 
@@ -465,18 +489,6 @@ rewriteLoopExitingBlockSuccessors(LoopTy *Loop, RegionTy *LRegion) {
         std::remove(SuccRegion->Preds.begin(), SuccRegion->Preds.end(),
                     ExitingRegion->getID());
       SuccRegion->Preds.erase(Iter);
-      SuccsToDelete.push_back(SuccID);
-    }
-
-    if (SuccsToDelete.empty())
-      continue;
-
-    // This remove loop makes me very unhappy, but hopefully these will be small
-    // in general. If not, there are things that we can do here.
-    for (unsigned SuccID : SuccsToDelete) {
-      auto Start = ExitingRegion->Succs.begin(),
-           End = ExitingRegion->Succs.end();
-      ExitingRegion->Succs.erase(std::remove(Start, End, SuccID));
     }
   }
 }
@@ -551,6 +563,16 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
   // Initialize the worklist with the function level region.
   RegionWorklist.push_back({nullptr, getRegion(F)});
 
+  // Vector that we use to sort our local successor indices to make our output
+  // deterministic.
+  //
+  // In general, we can not sort our successor indices in the loop region data
+  // stucture due to the potential presence of non-local edges in subregions
+  // (see the large comment above LoopRegion::Succs). But ignoring that
+  // possibility, we would like to print out successors in sorted order to make
+  // our output deterministic against compiler changes.
+  llvm::SmallVector<unsigned, 4> SuccIndices;
+
   // Then go to town...
   while (RegionWorklist.size()) {
     LoopRegion *Parent, *R;
@@ -575,7 +597,18 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
     os << ")\n";
 
     os << "    (succs";
-    for (unsigned SID : R->Succs) {
+
+    // To make our output deterministic, we sort local successor indices.
+    SuccIndices.clear();
+    // TODO: Investigate why std::copy does not work here. I tried to use a
+    // std::copy here, but ran into miscompile issues with
+    // OptionalTransformRange.
+    for (LoopRegion::SuccessorID I : R->getSuccs()) {
+      SuccIndices.push_back(I.ID);
+    }
+    std::sort(SuccIndices.begin(), SuccIndices.end());
+    auto ARef = ArrayRef<unsigned>(SuccIndices);
+    for (unsigned SID : SuccIndices) {
       os << "\n        ";
       LoopRegion *SuccRegion = getRegion(SID);
       SuccRegion->print(os, true);
@@ -633,23 +666,47 @@ struct alledge_iterator
   alledge_iterator(LoopRegionWrapper *w,
                    swift::LoopRegion::subregion_iterator subregioniter,
                    LoopRegion::succ_iterator succiter)
-      : Wrapper(w), SubregionIter(subregioniter), SuccIter(succiter) {}
+      : Wrapper(w), SubregionIter(subregioniter), SuccIter(succiter) {
+
+    // Prime the successor iterator so that we skip over any initial dead
+    // successor edges.
+    //
+    // TODO: Refactor this to use a FilterRange.
+    for (auto SuccEnd = Wrapper->Region->succ_end();
+         SuccIter->IsDead && SuccIter != SuccEnd; ++SuccIter) {
+    }
+  }
 
   bool isSubregion() const {
     return SubregionIter != Wrapper->Region->subregion_end();
+  }
+
+  Optional<unsigned> getSuccIndex() const {
+    if (isSubregion())
+      return None;
+    // Since we have a bidirectional iterator, this will perform increments
+    // until we get to SuccIter. This is the behavior we want so that we ensure
+    // that we skip over any dead successor edges. We are just performing
+    // graphing, so performance is not a concern.
+    return std::distance(Wrapper->Region->succ_begin(), SuccIter);
   }
 
   LoopRegionWrapper *operator*() const {
     if (SubregionIter != Wrapper->Region->subregion_end()) {
       return &Wrapper->FuncInfo.Data[*SubregionIter];
     }
-    return &Wrapper->FuncInfo.Data[*SuccIter];
+    return &Wrapper->FuncInfo.Data[SuccIter->ID];
   }
+
   alledge_iterator &operator++() {
     if (SubregionIter != Wrapper->Region->subregion_end()) {
       SubregionIter++;
     } else {
-      SuccIter++;
+      // Make sure that we skip past any dead successors.
+      auto End = Wrapper->Region->succ_end();
+      do {
+        SuccIter++;
+      } while (SuccIter->IsDead && SuccIter != End);
     }
     return *this;
   }
@@ -657,7 +714,9 @@ struct alledge_iterator
     if (SubregionIter != Wrapper->Region->subregion_end()) {
       return alledge_iterator{Wrapper, SubregionIter++, SuccIter};
     }
-    return alledge_iterator{Wrapper, SubregionIter, SuccIter++};
+    auto NewIter = *this;
+    ++NewIter;
+    return NewIter;
   }
   bool operator==(alledge_iterator rhs) {
     if (Wrapper->Region != rhs.Wrapper->Region)
