@@ -405,7 +405,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
       auto NewInstPair = tryDevirtualizeClassMethod(AI, SubTypeValue);
       if (NewInstPair.first)
         replaceDeadApply(AI, NewInstPair.first);
-      return NewInstPair.second.getInstruction();
+      return NewInstPair.second.getInstruction() != nullptr;
     }
 
     DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for class " <<
