@@ -71,12 +71,6 @@ FUNCTION(DeallocClassInstance,  swift_deallocClassInstance, RuntimeCC,
          ARGS(RefCountedPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind))
 
-// void swift_deallocUninitializedClassInstance(HeapObject *obj, size_t size, size_t alignMask);
-FUNCTION(DeallocUninitializedClassInstance,  swift_deallocUninitializedClassInstance, RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy, SizeTy, SizeTy),
-         ATTRS(NoUnwind))
-
 // void swift_deallocPartialClassInstance(HeapObject *obj, HeapMetadata *type, size_t size, size_t alignMask);
 FUNCTION(DeallocPartialClassInstance,  swift_deallocPartialClassInstance, RuntimeCC,
          RETURNS(VoidTy),

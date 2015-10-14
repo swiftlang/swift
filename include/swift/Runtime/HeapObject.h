@@ -281,21 +281,6 @@ extern "C" void swift_deallocClassInstance(HeapObject *object,
                                            size_t allocatedSize,
                                            size_t allocatedAlignMask);
 
-/// Deallocate the given memory.
-///
-/// It must have been returned by swift_allocObject, possibly used as an
-/// Objective-C class instance, and the strong reference must be equal to 1,
-/// but otherwise the object is in an unknown state.
-///
-/// \param object - may be null
-/// \param allocatedSize - the allocated size of the object from the
-///   program's perspective, i.e. the value
-/// \param allocatedAlignMask - the alignment requirement that was passed
-///   to allocObject
-extern "C" void swift_deallocUninitializedClassInstance(HeapObject *object,
-                                                        size_t allocatedSize,
-                                                        size_t allocatedAlignMask);
-
 /// Deallocate the given memory after destroying instance variables.
 ///
 /// Destroys instance variables in classes more derived than the given metatype.

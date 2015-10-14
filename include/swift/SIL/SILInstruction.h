@@ -3223,22 +3223,9 @@ class DeallocRefInst :
                               /*HAS_RESULT*/ false> {
   friend class SILBuilder;
 
-public:
-  enum Kind {
-    /// The uninitialized object has a strong reference count of 1.
-    Constructor,
-
-    /// The destroyed object has a strong reference count of 0.
-    Destructor
-  };
 private:
-  Kind ThisKind;
-
-  DeallocRefInst(SILLocation Loc, SILValue Operand, Kind Kind)
-    : UnaryInstructionBase(Loc, Operand), ThisKind(Kind) {}
-
-public:
-  Kind getKind() const { return ThisKind; }
+  DeallocRefInst(SILLocation Loc, SILValue Operand)
+    : UnaryInstructionBase(Loc, Operand) {}
 };
 
 /// Deallocate memory for a reference type instance from a failure path of a

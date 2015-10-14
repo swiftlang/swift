@@ -34,7 +34,7 @@ bb0(%0 : $TrivialDestructor):
 
   // Calling dealloc ref on self should not disrupt elimination of the
   // alloc_ref.
-  dealloc_ref [destructor] %0 : $TrivialDestructor
+  dealloc_ref %0 : $TrivialDestructor
 
   %7 = tuple()
   return %7 : $()
@@ -193,7 +193,7 @@ bb0(%0 : $NonTrivialDestructor):
   %1 = ref_element_addr %0 : $NonTrivialDestructor, #NonTrivialDestructor.ptr
   %2 = load %1 : $*Builtin.NativeObject
   strong_retain %2 : $Builtin.NativeObject
-  dealloc_ref [destructor] %0 : $NonTrivialDestructor
+  dealloc_ref %0 : $NonTrivialDestructor
   %3 = tuple()
   return %3 : $()
 }
@@ -226,8 +226,8 @@ sil @_TFC4main17NonTrivialDestructor2D : $@convention(method) (@owned NonTrivial
 bb0(%0 : $NonTrivialDestructor2):
   %1 = ref_element_addr %0 : $NonTrivialDestructor2, #NonTrivialDestructor2.ptr
   %2 = load %1 : $*NonTrivialDestructor
-  dealloc_ref [destructor] %2 : $NonTrivialDestructor
-  dealloc_ref [destructor] %0 : $NonTrivialDestructor2
+  dealloc_ref %2 : $NonTrivialDestructor
+  dealloc_ref %0 : $NonTrivialDestructor2
   %3 = tuple()
   return %3 : $()
 }
@@ -259,7 +259,7 @@ bb0(%0 : $NonTrivialDestructor3):
   %2 = load %1 : $*Builtin.NativeObject
   %3 = function_ref @ptr_user : $@convention(thin) (Builtin.NativeObject) -> ()
   apply %3 (%2) : $@convention(thin) (Builtin.NativeObject) -> ()
-  dealloc_ref [destructor] %0 : $NonTrivialDestructor3
+  dealloc_ref %0 : $NonTrivialDestructor3
   %4 = tuple()
   return %4 : $()
 }
@@ -287,7 +287,7 @@ class NonTrivialObjCDestructor {
 // Make sure we do not handle objc_methods
 sil @_TFC4main17NonTrivialObjCDestructorD : $@convention(objc_method) (@owned NonTrivialObjCDestructor) -> () {
 bb0(%0 : $NonTrivialObjCDestructor):
-  dealloc_ref [destructor] %0 : $NonTrivialObjCDestructor
+  dealloc_ref %0 : $NonTrivialObjCDestructor
   %1 = tuple()
   return %1 : $()
 }

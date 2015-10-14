@@ -1241,16 +1241,7 @@ public:
     *this << "dealloc_stack " << getIDAndType(DI->getOperand());
   }
   void visitDeallocRefInst(DeallocRefInst *DI) {
-    *this << "dealloc_ref ";
-    switch (DI->getKind()) {
-    case DeallocRefInst::Constructor:
-      *this << "[constructor] ";
-      break;
-    case DeallocRefInst::Destructor:
-      *this << "[destructor] ";
-      break;
-    }
-    *this << getIDAndType(DI->getOperand());
+    *this << "dealloc_ref " << getIDAndType(DI->getOperand());
   }
   void visitDeallocPartialRefInst(DeallocPartialRefInst *DPI) {
     *this << "dealloc_partial_ref ";

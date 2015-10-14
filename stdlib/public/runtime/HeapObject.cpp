@@ -451,18 +451,6 @@ void swift::swift_deallocClassInstance(HeapObject *object,
 }
 
 /// Variant of the above used in constructor failure paths.
-extern "C" void swift_deallocUninitializedClassInstance(HeapObject *object,
-                                                        size_t allocatedSize,
-                                                        size_t allocatedAlignMask) {
-  if (!object)
-    return;
-  bool shouldDeallocate = object->refCount.decrementShouldDeallocate();
-  assert(shouldDeallocate);
-  (void) shouldDeallocate;
-  swift_deallocClassInstance(object, allocatedSize, allocatedAlignMask);
-}
-
-/// Variant of the above used in constructor failure paths.
 extern "C" void swift_deallocPartialClassInstance(HeapObject *object,
                                                   HeapMetadata const *metadata,
                                                   size_t allocatedSize,

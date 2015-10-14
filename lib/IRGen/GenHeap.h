@@ -100,18 +100,12 @@ void emitDeallocateHeapObject(IRGenFunction &IGF,
                               llvm::Value *object,
                               llvm::Value *size,
                               llvm::Value *alignMask);
-  
-enum class ClassDeallocationKind : unsigned char {
-  DestructorPlusZero,
-  ConstructorPlusOne
-};
 
 /// Emit a class instance deallocation.
 void emitDeallocateClassInstance(IRGenFunction &IGF,
                                  llvm::Value *object,
                                  llvm::Value *size,
-                                 llvm::Value *alignMask,
-                                 ClassDeallocationKind kind);
+                                 llvm::Value *alignMask);
   
 /// Emit a partial class instance deallocation from a failing constructor.
 void emitDeallocatePartialClassInstance(IRGenFunction &IGF,

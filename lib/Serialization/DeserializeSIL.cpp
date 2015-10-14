@@ -1059,11 +1059,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case ValueKind::DeallocRefInst: {
     auto Ty = MF->getType(TyID);
-    auto Kind = (DeallocRefInst::Kind)Attr;
     ResultVal = Builder.createDeallocRef(Loc,
         getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)),
-                      Kind);
+                      getSILType(Ty, (SILValueCategory)TyCategory)));
     break;
   }
   case ValueKind::DeallocPartialRefInst: {

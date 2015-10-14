@@ -463,7 +463,7 @@ class Foo<T> {
   // CHECK:   [[DESTROYING_REF:%[0-9]+]] = function_ref @_TFC8lifetime3Food : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
   // CHECK-NEXT:   [[RESULT_SELF:%[0-9]+]] = apply [[DESTROYING_REF]]<T>([[SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = unchecked_ref_cast [[RESULT_SELF]] : $Builtin.NativeObject to $Foo<T>
-  // CHECK-NEXT:   dealloc_ref [destructor] [[SELF]] : $Foo<T>
+  // CHECK-NEXT:   dealloc_ref [[SELF]] : $Foo<T>
   // CHECK-NEXT:   [[RESULT:%[0-9]+]] = tuple ()
   // CHECK-NEXT:   return [[RESULT]] : $()
   // CHECK-LABEL: sil hidden @_TFC8lifetime3Food : $@convention(method) <T> (@guaranteed Foo<T>) -> @owned Builtin.NativeObject

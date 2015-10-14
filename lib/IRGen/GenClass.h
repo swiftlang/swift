@@ -79,8 +79,7 @@ namespace irgen {
 
   /// Emit class deallocation.
   void emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
-                             llvm::Value *selfValue,
-                             ClassDeallocationKind kind);
+                             llvm::Value *selfValue);
 
   /// Emit class deallocation.
   void emitPartialClassDeallocation(IRGenFunction &IGF,

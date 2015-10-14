@@ -3401,16 +3401,7 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
   Explosion self = getLoweredExplosion(i->getOperand());
   auto selfValue = self.claimNext();
   auto classType = i->getOperand()->getType(0);
-  ClassDeallocationKind kind;
-  switch (i->getKind()) {
-  case DeallocRefInst::Constructor:
-    kind = ClassDeallocationKind::ConstructorPlusOne;
-    break;
-  case DeallocRefInst::Destructor:
-    kind = ClassDeallocationKind::DestructorPlusZero;
-    break;
-  }
-  emitClassDeallocation(*this, classType, selfValue, kind);
+  emitClassDeallocation(*this, classType, selfValue);
 }
 
 void IRGenSILFunction::visitDeallocPartialRefInst(swift::DeallocPartialRefInst *i) {
