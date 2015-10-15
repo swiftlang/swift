@@ -623,6 +623,9 @@ void CallGraph::printStats(llvm::raw_ostream &OS) {
 
   OS << CallGraphFileCheckPrefix << "Bump pointer allocated memory (bytes): " <<
     Allocator.getTotalMemory() << "\n";
+
+  OS << CallGraphFileCheckPrefix << "Number of callee sets allocated: " <<
+    CalleeSets.size() << "\n";
 }
 
 void CallGraph::dumpStats() {
