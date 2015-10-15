@@ -134,7 +134,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
                                       SILType toType, CheckedCastMode mode) {
   // Emit the value we're casting from.
   if (from->getType() != IGF.IGM.Int8PtrTy)
-    from = IGF.Builder.CreateBitCast(from, IGF.IGM.Int8PtrTy);
+    from = IGF.Builder.CreateBitOrPointerCast(from, IGF.IGM.Int8PtrTy);
 
   // Emit a reference to the metadata and figure out what cast
   // function to use.

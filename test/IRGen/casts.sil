@@ -220,6 +220,23 @@ nay:
   unreachable
 }
 
+// CHECK-LABEL: define %C5casts1A* @checked_downcast_optional(i64) {{.*}} {
+// CHECK:         [[OBJ_PTR:%.*]] = inttoptr i64 %0 to i8*
+// CHECK:         [[METADATA:%.*]] = call %swift.type* @_TMaC5casts1A()
+// CHECK:         [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
+// CHECK:         [[RESULT_PTR:%.*]] = call i8* @swift_dynamicCastClass(i8* [[OBJ_PTR]], i8* [[METADATA_PTR]])
+// CHECK:         [[RESULT:%.*]] = bitcast i8* [[RESULT_PTR]] to %C5casts1A*
+// CHECK:         [[COND:%.*]] = icmp ne %C5casts1A* [[RESULT]], null
+// CHECK:         br i1 [[COND]]
+sil @checked_downcast_optional : $@convention(thin) (Optional<A>) -> @owned A {
+entry(%a : $Optional<A>):
+  checked_cast_br %a : $Optional<A> to $A, yea, nay
+yea(%aa : $A):
+  return %aa : $A
+nay:
+  unreachable
+}
+
 // CHECK-LABEL: define void @checked_metatype_to_object_casts
 sil @checked_metatype_to_object_casts : $@convention(thin) <T> (@thick Any.Type) -> () {
 entry(%e : $@thick Any.Type):
