@@ -71,6 +71,11 @@ set(SWIFT_VENDOR "" CACHE STRING
 set(SWIFT_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Swift compiler")
 
+# Indicate whether Swift should attempt to use the gold linker.
+# This is not used on Darwin.
+set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
+    "Enable using the gold linker when available")
+
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
     "compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;arclite-symlink;stdlib;stdlib-experimental;sdk-overlay;editor-integration;lang-docs;tools;testsuite-tools;dev")
 

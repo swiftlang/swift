@@ -1037,6 +1037,18 @@ function(_add_swift_library_single target name)
       ${SWIFTLIB_SINGLE_USE_INTERNAL_SDK}
       link_flags)
 
+  # Handle gold linker flags for shared libraries.
+  if(SWIFT_ENABLE_GOLD_LINKER AND SWIFTLIB_SINGLE_SHARED)
+    if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX")
+      # Extend the link_flags for the gold linker so long as this
+      # isn't the standard library.  The standard library uses a
+      # linker script that isn't supported by the gold linker.
+      if(NOT SWIFTLIB_SINGLE_IS_STDLIB)
+        list(APPEND link_flags "-fuse-ld=gold")
+      endif()
+    endif()
+  endif()
+
   # Configure plist creation for OS X.
   set(PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
   if(APPLE AND SWIFTLIB_SINGLE_IS_STDLIB)
@@ -1620,6 +1632,12 @@ function(_add_swift_executable_single name)
     list(APPEND link_flags
         "-Xlinker" "-rpath"
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+  endif()
+
+  if(SWIFT_ENABLE_GOLD_LINKER AND
+     ( "${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX" ) )
+    # Extend the link_flags for the gold linker.
+    list(APPEND link_flags "-fuse-ld=gold")
   endif()
 
   # Find the names of dependency library targets.
