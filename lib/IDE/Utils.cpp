@@ -203,7 +203,14 @@ static std::string adjustClangTriple(StringRef TripleStr) {
   case llvm::Triple::SubArchType::ARMSubArch_v7k:
     OS << "armv7k"; break;
   default:
-    OS << Triple.getArchName(); break;
+    // Adjust i386-macosx to x86_64 because there is no Swift stdlib for i386.
+    if ((Triple.getOS() == llvm::Triple::MacOSX ||
+      Triple.getOS() == llvm::Triple::Darwin) && Triple.getArch() == llvm::Triple::x86) {
+      OS << "x86_64";
+    } else {
+      OS << Triple.getArchName();
+    }
+    break;
   }
   OS << '-' << Triple.getVendorName() << '-' << Triple.getOSName();
   OS.flush();
