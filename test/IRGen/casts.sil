@@ -221,7 +221,7 @@ nay:
 }
 
 // CHECK-LABEL: define %C5casts1A* @checked_downcast_optional({{(i32|i64)}}) {{.*}} {
-// CHECK:         [[OBJ_PTR:%.*]] = inttoptr i64 %0 to i8*
+// CHECK:         [[OBJ_PTR:%.*]] = inttoptr {{(i32|i64)}} %0 to i8*
 // CHECK:         [[METADATA:%.*]] = call %swift.type* @_TMaC5casts1A()
 // CHECK:         [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
 // CHECK:         [[RESULT_PTR:%.*]] = call i8* @swift_dynamicCastClass(i8* [[OBJ_PTR]], i8* [[METADATA_PTR]])
