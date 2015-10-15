@@ -9,13 +9,13 @@ func dropDefaultedNil(array: NSArray, sel: Selector,
        body: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)?) {
   array.makeObjectsPerformSelector(sel, withObject: nil) // expected-warning{{'makeObjectsPerformSelector(_:withObject:)' could be named 'makeObjectsPerform(_:withObject:)'}}{{9-35=makeObjectsPerform}}
   array.makeObjectsPerformSelector(sel, withObject: nil, withObject: nil) // expected-warning{{'makeObjectsPerformSelector(_:withObject:withObject:)' could be named 'makeObjectsPerform(_:withObject:withObject:)'}}{{9-35=makeObjectsPerform}}
-  array.enumerateObjectsRandomlyWithBlock(nil) // expected-warning{{'enumerateObjectsRandomlyWithBlock' could be named 'enumerateObjectsRandomly(withBlock:)'}}{{9-42=enumerateObjectsRandomly}}{{43-46=}}
-  array.enumerateObjectsRandomlyWithBlock(body) // expected-warning{{'enumerateObjectsRandomlyWithBlock' could be named 'enumerateObjectsRandomly(withBlock:)'}}{{9-42=enumerateObjectsRandomly}}{{43-43=withBlock: }}
+  array.enumerateObjectsRandomlyWithBlock(nil) // expected-warning{{'enumerateObjectsRandomlyWithBlock' could be named 'enumerateObjectsRandomly(block:)'}}{{9-42=enumerateObjectsRandomly}}{{43-46=}}
+  array.enumerateObjectsRandomlyWithBlock(body) // expected-warning{{'enumerateObjectsRandomlyWithBlock' could be named 'enumerateObjectsRandomly(block:)'}}{{9-42=enumerateObjectsRandomly}}{{43-43=block: }}
 }
 
 func dropDefaultedOptionSet(array: NSArray) {
-  array.enumerateObjectsWithOptions([]) { obj, idx, stop in print("foo") } // expected-warning{{'enumerateObjectsWithOptions(_:usingBlock:)' could be named 'enumerateObjects(withOptions:usingBlock:)'}}{{9-36=enumerateObjects}}{{36-40=}}
-  array.enumerateObjectsWithOptions([], usingBlock: { obj, idx, stop in print("foo") }) // expected-warning{{'enumerateObjectsWithOptions(_:usingBlock:)' could be named 'enumerateObjects(withOptions:usingBlock:)'}}{{9-36=enumerateObjects}}{{37-41=}}
+  array.enumerateObjectsWithOptions([]) { obj, idx, stop in print("foo") } // expected-warning{{'enumerateObjectsWithOptions(_:usingBlock:)' could be named 'enumerateObjects(options:usingBlock:)'}}{{9-36=enumerateObjects}}{{36-40=}}
+  array.enumerateObjectsWithOptions([], usingBlock: { obj, idx, stop in print("foo") }) // expected-warning{{'enumerateObjectsWithOptions(_:usingBlock:)' could be named 'enumerateObjects(options:usingBlock:)'}}{{9-36=enumerateObjects}}{{37-41=}}
   array.enumerateObjectsWhileOrderingPizza(true, withOptions: [], usingBlock: { obj, idx, stop in print("foo") }) // expected-warning{{call to 'enumerateObjectsWhileOrderingPizza(_:withOptions:usingBlock:)' has extraneous arguments that could use defaults}}{{48-65=}}
 }
 
@@ -29,6 +29,6 @@ func dontDropUnnamedSetterArg(str: NSString) {
 }
 
 func renameTrailingClosure(array: NSArray) {
-  array.enumerateObjectsWithNullableBlock { _, _, _ in print("foo") } // expected-warning{{enumerateObjectsWithNullableBlock' could be named 'enumerateObjects(withNullableBlock:)' [-Womit-needless-words]}}{{9-42=enumerateObjects}}
+  array.enumerateObjectsWithNullableBlock { _, _, _ in print("foo") } // expected-warning{{enumerateObjectsWithNullableBlock' could be named 'enumerateObjects(nullableBlock:)' [-Womit-needless-words]}}{{9-42=enumerateObjects}}
 }
 

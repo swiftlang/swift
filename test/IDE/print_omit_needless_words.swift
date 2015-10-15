@@ -36,8 +36,10 @@
 // Note: Class -> "Class"
 // CHECK-OBJECTIVEC: func isKindOf(aClass: AnyClass) -> Bool
 
-// Note: Pointer-to-struct name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func copy(withZone _: NSZone = nil) -> AnyObject!
+// Note: Pointer-to-struct name matching; "with" splits the first
+// piece, then the "with" is dropped.
+//
+// CHECK-FOUNDATION: func copy(zone _: NSZone = nil) -> AnyObject!
 
 // Note: Objective-C type parameter names.
 // CHECK-FOUNDATION: func objectFor(_: NSCopying) -> AnyObject?
@@ -65,7 +67,7 @@
 // CHECK-FOUNDATION: func subtract(_: Int32) -> NSNumber
 
 // Note: multi-word enum name matching; "with" splits the first piece.
-// CHECK-FOUNDATION: func someMethod(withDeprecatedOptions _: NSDeprecatedOptions = [])
+// CHECK-FOUNDATION: func someMethod(deprecatedOptions _: NSDeprecatedOptions = [])
 
 // Note: class name matching; don't drop "With".
 // CHECK-FOUNDATION: class func withString(_: String!) -> Self!
@@ -110,10 +112,10 @@
 
 // Note: usingBlock -> body
 // CHECK-FOUNDATION: func enumerateObjectsUsing(_: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
-// CHECK-FOUNDATION: func enumerateObjects(withOptions _: NSEnumerationOptions = [], usingBlock: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
+// CHECK-FOUNDATION: func enumerateObjects(options _: NSEnumerationOptions = [], usingBlock: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)!)
 
 // Note: WithBlock -> body, nullable closures default to nil.
-// CHECK-FOUNDATION: func enumerateObjectsRandomly(withBlock _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
+// CHECK-FOUNDATION: func enumerateObjectsRandomly(block _: ((AnyObject!, Int, UnsafeMutablePointer<ObjCBool>) -> Void)? = nil)
 
 // Note: id<Proto> treated as "Proto".
 // CHECK-FOUNDATION: func doSomethingWith(_: NSCopying)

@@ -773,6 +773,15 @@ bool swift::omitNeedlessWords(StringRef &baseName,
             size_t pos = name.rfind(newArgName);
             newArgName = name.substr(pos);
           }
+
+          // If there is a leading "with" on the first argument, drop it.
+          if (newArgName.size() > 4 &&
+              camel_case::sameWordIgnoreFirstCase(
+                camel_case::getFirstWord(newArgName),
+                "with")) {
+            newArgName = newArgName.substr(4);
+          }
+
           argNames[0] = toLowercaseWord(newArgName, scratch);
 
           // Update the base name by splitting at the preposition.
