@@ -77,7 +77,7 @@ set(SWIFT_ENABLE_GOLD_LINKER FALSE CACHE BOOL
     "Enable using the gold linker when available")
 
 set(_SWIFT_KNOWN_INSTALL_COMPONENTS
-    "compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;arclite-symlink;stdlib;stdlib-experimental;sdk-overlay;editor-integration;lang-docs;tools;testsuite-tools;dev")
+    "compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;clang-libclang;arclite-symlink;stdlib;stdlib-experimental;sdk-overlay;editor-integration;lang-docs;tools;testsuite-tools;dev")
 
 # Set the SWIFT_INSTALL_COMPONENTS variable to the default value if it is not passed in via -D
 set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_KNOWN_INSTALL_COMPONENTS}" CACHE STRING
@@ -584,6 +584,11 @@ endif()
 if(SWIFT_INCLUDE_DOCS)
   add_subdirectory(docs)
 endif()
+
+swift_install_in_component(clang-libclang
+  FILES "${LLVM_LIBRARY_OUTPUT_INTDIR}/libclang.dylib"
+        "${LLVM_LIBRARY_OUTPUT_INTDIR}/libclang.${SWIFT_LIBCLANG_LIBRARY_VERSION}${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  DESTINATION "lib")
 
 # Add a documentation target so that documentation shows up in the
 # Xcode project.
