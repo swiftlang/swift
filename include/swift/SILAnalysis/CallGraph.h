@@ -188,7 +188,7 @@ public:
 
   ~CallGraphNode() = default;
 
-  SILFunction *getFunction() {
+  SILFunction *getFunction() const {
     return Function;
   }
 
