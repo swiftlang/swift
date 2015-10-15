@@ -26,9 +26,9 @@ namespace swift {
 /// values of a different type.
 template <class Orig, class Projected, Projected (&Project)(const Orig &)>
 class ArrayRefView {
-  ArrayRef<Orig> Array;
+  llvm::ArrayRef<Orig> Array;
 public:
-  ArrayRefView(ArrayRef<Orig> array) : Array(array) {}
+  ArrayRefView(llvm::ArrayRef<Orig> array) : Array(array) {}
 
   class iterator {
     friend class ArrayRefView<Orig,Projected,Project>;
