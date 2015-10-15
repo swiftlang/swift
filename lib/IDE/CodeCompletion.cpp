@@ -953,19 +953,19 @@ class ArchetypeTransformer {
   DeclContext *DC;
   Type BaseTy;
   llvm::DenseMap<TypeBase *, Type> Cache;
-  llvm::DenseMap<Identifier, Type> TypeParams;
+  TypeSubstitutionMap Map;
 
 public:
-  ArchetypeTransformer(DeclContext *DC, Type Ty) : DC(DC),
-                                                   BaseTy(Ty->getRValueType()){
-    if (!BaseTy->getNominalOrBoundGenericNominal())
+  ArchetypeTransformer(DeclContext *DC, Type Ty) : DC(DC), BaseTy(Ty->getRValueType()){
+    auto D = BaseTy->getNominalOrBoundGenericNominal();
+    if (!D)
       return;
-    SmallVector<swift::Substitution, 3> Scrach;
-    for (auto Sub : BaseTy->getDesugaredType()->gatherAllSubstitutions(
-                      DC->getParentModule(), Scrach,
-                      DC->getASTContext().getLazyResolver())) {
-      if (Sub.getReplacement()->isCanonical())
-        TypeParams[Sub.getArchetype()->getName()] = Sub.getReplacement();
+    SmallVector<Type, 3> Scrach;
+    auto Params = D->getGenericParamTypes();
+    auto Args = BaseTy->getAllGenericArgs(Scrach);
+    assert(Params.size() == Args.size());
+    for (unsigned I = 0, N = Params.size(); I < N; I ++) {
+      Map[Params[I]->getCanonicalType()->castTo<GenericTypeParamType>()] = Args[I];
     }
   }
 
@@ -994,9 +994,8 @@ public:
             Result =  MT;
           }
         }
-      } else if (TypeParams.count(RootArc->getName()) != 0 &&
-                 !RootArc->getParent()) {
-        Result = TypeParams[RootArc->getName()];
+      } else {
+        Result = Ty.subst(DC->getParentModule(), Map, SubstFlags::IgnoreMissing);
       }
 
       auto ATT = dyn_cast<ArchetypeType>(Result.getPointer());
