@@ -284,17 +284,6 @@ static void orderEdges(const llvm::SmallPtrSetImpl<CallGraphEdge *> &Edges,
             });
 }
 
-static void orderCallees(const CallGraphEdge::CalleeSetType &Callees,
-                         llvm::SmallVectorImpl<CallGraphNode *> &OrderedNodes) {
-  for (auto *Node : Callees)
-    OrderedNodes.push_back(Node);
-
-  std::sort(OrderedNodes.begin(), OrderedNodes.end(),
-            [](CallGraphNode *left, CallGraphNode *right) {
-              return left->getOrdinal() < right->getOrdinal();
-            });
-}
-
 void CallGraph::addEdgesForApply(FullApplySite Apply,
                                  CallGraphNode *CallerNode) {
   CallerNode->MayBindDynamicSelf |=
@@ -307,10 +296,7 @@ void CallGraph::addEdgesForApply(FullApplySite Apply,
   ApplyToEdgeMap[Apply] = Edge;
   CallerNode->addCalleeEdge(Edge);
 
-  llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
-  orderCallees(Edge->getCalleeSet(), OrderedNodes);
-
-  for (auto *CalleeNode : OrderedNodes)
+  for (auto *CalleeNode : Edge->getCalleeSet())
     CalleeNode->addCallerEdge(Edge);
 
   // TODO: Compute this from the call graph itself after stripping
@@ -434,17 +420,13 @@ void CallGraphEdge::print(llvm::raw_ostream &OS, int Indent) {
 
   printFlag(OS, "All callees known", isCalleeSetComplete(), Indent);
 
-  auto CalleeSet = getCalleeSet();
-  if (CalleeSet.empty())
+  if (getCalleeSet().empty())
     return;
-
-  llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
-  orderCallees(CalleeSet, OrderedNodes);
 
   bool First = true;
   indent(OS, Indent);
   OS << CallGraphFileCheckPrefix << "Known callees:\n";
-  for (auto *Callee : OrderedNodes) {
+  for (auto *Callee : getCalleeSet()) {
     if (!First)
       OS << "\n";
     First = false;
@@ -675,10 +657,7 @@ public:
     orderEdges(Node->getCalleeEdges(), OrderedEdges);
 
     for (auto *ApplyEdge : OrderedEdges) {
-      llvm::SmallVector<CallGraphNode *, 4> OrderedNodes;
-      orderCallees(ApplyEdge->getCalleeSet(), OrderedNodes);
-
-      for (auto *CalleeNode : OrderedNodes) {
+      for (auto *CalleeNode : ApplyEdge->getCalleeSet()) {
         if (DFSNum.find(CalleeNode) == DFSNum.end()) {
           DFS(CalleeNode);
           MinDFSNum[Node] = std::min(MinDFSNum[Node], MinDFSNum[CalleeNode]);
@@ -999,10 +978,7 @@ OrderedCallGraph::OrderedCallGraph(CallGraph *CG) {
 
     ONode.NumCallSites = OrderedEdges.size();
     for (auto *CGEdge : OrderedEdges) {
-      llvm::SmallVector<CallGraphNode *, 4> OrderedCallees;
-      orderCallees(CGEdge->getCalleeSet(), OrderedCallees);
-
-      for (auto *CalleeNode : OrderedCallees) {
+      for (auto *CalleeNode : CGEdge->getCalleeSet()) {
         auto *OrderedChild = NodeMap[CalleeNode];
         assert(OrderedChild);
         ONode.Children.push_back(Edge(CGEdge, OrderedChild));

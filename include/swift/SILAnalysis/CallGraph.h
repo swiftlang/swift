@@ -19,6 +19,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -43,7 +44,7 @@ class CallGraphNode;
 class CallGraphEdge {
 public:
   // TODO: Consider increasing SmallSize when we handle method calls.
-  typedef llvm::SmallPtrSet<CallGraphNode *, 2> CalleeSetType;
+  typedef llvm::SmallSetVector<CallGraphNode *, 2> CalleeSetType;
 
 private:
   // The call site represented by this call graph edge.
