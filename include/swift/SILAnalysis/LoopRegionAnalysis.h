@@ -589,8 +589,9 @@ private:
 
   void addPred(LoopRegion *LNR) {
     assert(!isFunction() && "Functions can not have predecessors");
+    if (std::count(pred_begin(), pred_end(), LNR->getID()))
+      return;
     Preds.push_back(LNR->ID);
-    sortUnique(Preds);
   }
 
   unsigned addSucc(LoopRegion *Successor) {
@@ -611,18 +612,17 @@ private:
   }
 
   void replacePred(unsigned OldPredID, unsigned NewPredID) {
-    for (unsigned i : indices(Preds)) {
-      if (Preds[i] != OldPredID)
-        continue;
-      Preds[i] = NewPredID;
-      // This may not be necessary. I am just being conservative for now and it
-      // shouldn't be expensive.
-      //
-      // TODO: Investigate if this can be removed.
-      sortUnique(Preds);
+    // Check if we already have NewPred in our list. If so, we just delete
+    // OldPredID.
+    if (std::count(Preds.begin(), Preds.end(), NewPredID)) {
+      // If this becomes a performance issue due to copying/moving/etc (which it
+      // most likely will not), just use the marked dead model like successor
+      // does.
+      auto Iter = std::remove(Preds.begin(), Preds.end(), OldPredID);
+      Preds.erase(Iter);
       return;
     }
-    llvm_unreachable("Replacing OldPredID that is not a predecessor?");
+    std::replace(Preds.begin(), Preds.end(), OldPredID, NewPredID);
   }
 
   /// Replace OldSuccID by NewSuccID, just deleting OldSuccID if what NewSuccID

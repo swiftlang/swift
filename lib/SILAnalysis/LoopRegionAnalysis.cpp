@@ -164,16 +164,31 @@ LoopRegionFunctionInfo::LoopRegionFunctionInfo(FunctionTy *F,
 
 void LoopRegionFunctionInfo::verify() {
 #ifndef NDEBUG
+  llvm::SmallVector<unsigned, 8> UniquePredList;
   llvm::SmallVector<LoopRegion::SuccessorID, 8> UniqueSuccList;
   for (auto *R : IDToRegionMap) {
-    UniqueSuccList.clear();
-    // Make sure that our region has a successor list without duplicates. We do
-    // not care if the successor lists are sorted, just that they are unique.
-    std::copy(R->Succs.begin(), R->Succs.end(), UniqueSuccList.end());
-    std::sort(UniqueSuccList.begin(), UniqueSuccList.end());
-    auto End = UniqueSuccList.end();
-    assert(End == std::unique(UniqueSuccList.begin(), UniqueSuccList.end()) &&
-           "Expected UniqueSuccList to not have any duplicate elements");
+    // Make sure that our region has successor/pred lists without duplicates. We
+    // do not care if the successor or predecessor lists are sorted, just that
+    // they are unique.
+    {
+      assert(UniqueSuccList.empty());
+      std::copy(R->Succs.begin(), R->Succs.end(), UniqueSuccList.end());
+      std::sort(UniqueSuccList.begin(), UniqueSuccList.end());
+      auto End = UniqueSuccList.end();
+      assert(End == std::unique(UniqueSuccList.begin(), UniqueSuccList.end()) &&
+             "Expected UniqueSuccList to not have any duplicate elements");
+      UniqueSuccList.clear();
+    }
+
+    {
+      assert(UniquePredList.empty());
+      std::copy(R->Preds.begin(), R->Preds.end(), UniquePredList.end());
+      std::sort(UniquePredList.begin(), UniquePredList.end());
+      auto End = UniquePredList.end();
+      assert(End == std::unique(UniquePredList.begin(), UniquePredList.end()) &&
+             "Expected UniquePredList to not have any duplicate elements");
+      UniquePredList.clear();
+    }
 
     // If this node does not have a parent, it should have no non-local
     // successors.
@@ -690,15 +705,10 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
   // Initialize the worklist with the function level region.
   RegionWorklist.push_back({nullptr, getRegion(F)});
 
-  // Vector that we use to sort our local successor indices to make our output
-  // deterministic.
-  //
-  // In general, we can not sort our successor indices in the loop region data
-  // stucture due to the potential presence of non-local edges in subregions
-  // (see the large comment above LoopRegion::Succs). But ignoring that
-  // possibility, we would like to print out successors in sorted order to make
-  // our output deterministic against compiler changes.
-  llvm::SmallVector<unsigned, 4> SuccIndices;
+  // Vectors that we use to sort our local successor/predecessor indices to make
+  // our output deterministic.
+  llvm::SmallVector<unsigned, 4> SortedPreds;
+  llvm::SmallVector<unsigned, 4> SortedSuccs;
 
   // Then go to town...
   while (RegionWorklist.size()) {
@@ -715,8 +725,12 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
     os << "\n";
 
     // Print predecessors.
+    SortedPreds.clear();
+    for (unsigned Pred : R->Preds)
+      SortedPreds.push_back(Pred);
+    std::sort(SortedPreds.begin(), SortedPreds.end());
     os << "    (preds";
-    for (unsigned SID : R->Preds) {
+    for (unsigned SID : SortedPreds) {
       os << "\n        ";
       LoopRegion *PredRegion = getRegion(SID);
       PredRegion->print(os, true);
@@ -726,16 +740,16 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
     os << "    (succs";
 
     // To make our output deterministic, we sort local successor indices.
-    SuccIndices.clear();
+    SortedSuccs.clear();
     // TODO: Investigate why std::copy does not work here. I tried to use a
     // std::copy here, but ran into miscompile issues with
     // OptionalTransformRange.
     for (unsigned I : R->getLocalSuccs()) {
-      SuccIndices.push_back(I);
+      SortedSuccs.push_back(I);
     }
-    std::sort(SuccIndices.begin(), SuccIndices.end());
-    auto ARef = ArrayRef<unsigned>(SuccIndices);
-    for (unsigned SID : SuccIndices) {
+    std::sort(SortedSuccs.begin(), SortedSuccs.end());
+    auto ARef = ArrayRef<unsigned>(SortedSuccs);
+    for (unsigned SID : SortedSuccs) {
       os << "\n        ";
       LoopRegion *SuccRegion = getRegion(SID);
       SuccRegion->print(os, true);
@@ -754,13 +768,13 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
     }
     os << ")\n";
 
-    SuccIndices.clear();
+    SortedSuccs.clear();
     for (unsigned I : R->getNonLocalSuccs()) {
-      SuccIndices.push_back(I);
+      SortedSuccs.push_back(I);
     }
-    std::sort(SuccIndices.begin(), SuccIndices.end());
+    std::sort(SortedSuccs.begin(), SortedSuccs.end());
     os << "    (non-local-succs";
-    for (unsigned I : SuccIndices) {
+    for (unsigned I : SortedSuccs) {
       os << "\n        (parentindex:" << I << ")";
     }
     os << "))\n";
