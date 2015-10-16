@@ -48,20 +48,18 @@ namespace version {
 /// Z: [0 - 999]
 /// a: [0 - 999]
 /// b: [0 - 999]
-class CompilerVersion {
+class Version {
   llvm::SmallVector<uint64_t, 5> Components;
 public:
-  /// Create a version from the currently defined SWIFT_COMPILER_VERSION.
-  ///
-  /// If SWIFT_COMPILER_VERSION is undefined, this will always compare greater
+  /// Create the empty compiler version - this always compares greater
   /// or equal to any other CompilerVersion, as in the case of building Swift
   /// from latest sources outside of a build/integration/release context.
-  CompilerVersion();
+  Version() = default;
 
   /// Create a version from a string in source code.
   ///
   /// Must include only groups of digits separated by a dot.
-  CompilerVersion(const llvm::StringRef VersionString, SourceLoc Loc,
+  Version(const llvm::StringRef VersionString, SourceLoc Loc,
                   DiagnosticEngine *Diags);
 
   /// Return a printable string representation of the version.
@@ -90,9 +88,27 @@ public:
   bool empty() const {
     return Components.empty();
   }
+
+  /// Parse a _compiler_version build configuration from source code.
+  static Version parseCompilerVersionString(StringRef VersionString,
+                                                    SourceLoc Loc,
+                                                    DiagnosticEngine *Diags);
+
+  /// Parse a generic version string of the format [0-9]+(.[0-9]+)*
+  ///
+  /// Version components can be any unsigned 64-bit number.
+  static Version parseVersionString(StringRef VersionString,
+                                            SourceLoc Loc,
+                                            DiagnosticEngine *Diags);
+
+  /// Returns a version from the currently defined SWIFT_COMPILER_VERSION.
+  ///
+  /// If SWIFT_COMPILER_VERSION is undefined, this will return the empty
+  /// compiler version.
+  static Version getCurrentCompilerVersion();
 };
 
-bool operator>=(const CompilerVersion &lhs, const CompilerVersion &rhs);
+bool operator>=(const Version &lhs, const Version &rhs);
 
 /// Retrieves the numeric {major, minor} Swift version.
 std::pair<unsigned, unsigned> getSwiftNumericVersion();

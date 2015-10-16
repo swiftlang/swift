@@ -81,29 +81,12 @@ static void printFullRevisionString(raw_ostream &out) {
 #endif
 }
 
-void parseVersionString(StringRef VersionString,
-                        SmallVectorImpl<uint64_t> &Components,
-                        SourceLoc Loc,
-                        DiagnosticEngine *Diags) {
-  SmallString<16> digits;
-  llvm::raw_svector_ostream OS(digits);
-
-  SmallVector<std::pair<StringRef, SourceRange>, 5> SplitComponents;
-  // Skip over quote character in string literal
+void splitVersionComponents(
+  SmallVectorImpl<std::pair<StringRef, SourceRange>> &SplitComponents,
+                            StringRef &VersionString, SourceLoc Loc,
+                            DiagnosticEngine *Diags) {
   SourceLoc Start = Loc.isValid() ? Loc.getAdvancedLoc(1) : Loc;
   SourceLoc End = Start;
-
-  auto checkVersionComponent = [&](unsigned Component, SourceRange Range) {
-    unsigned limit = Components.size() == 0 ? 9223371 : 999;
-
-    if (Component > limit) {
-      if (Diags)
-        Diags->diagnose(Range.Start,
-                        diag::compiler_version_component_out_of_range, limit);
-      else
-        llvm_unreachable("Compiler version component out of range");
-    }
-  };
 
   // Split the version string into tokens separated by the '.' character.
   while (!VersionString.empty()) {
@@ -120,8 +103,31 @@ void parseVersionString(StringRef VersionString,
     SplitComponents.push_back({SplitComponent, Range});
     VersionString = Rest;
   }
+}
 
-  unsigned ComponentNumber;
+Version Version::parseCompilerVersionString(
+  StringRef VersionString, SourceLoc Loc, DiagnosticEngine *Diags) {
+
+  Version CV;
+  SmallString<16> digits;
+  llvm::raw_svector_ostream OS(digits);
+  SmallVector<std::pair<StringRef, SourceRange>, 5> SplitComponents;
+
+  auto checkVersionComponent = [&](unsigned Component, SourceRange Range) {
+    unsigned limit = CV.Components.size() == 0 ? 9223371 : 999;
+
+    if (Component > limit) {
+      if (Diags)
+        Diags->diagnose(Range.Start,
+                        diag::compiler_version_component_out_of_range, limit);
+      else
+        llvm_unreachable("Compiler version component out of range");
+    }
+  };
+
+  splitVersionComponents(SplitComponents, VersionString, Loc, Diags);
+
+  uint64_t ComponentNumber;
 
   for (size_t i = 0; i < SplitComponents.size(); ++i) {
     StringRef SplitComponent;
@@ -139,37 +145,23 @@ void parseVersionString(StringRef VersionString,
 
     // The second version component isn't used for comparison.
     if (i == 1) {
-      if (Loc.isValid()) {
-        // If parsing from source code, the second component must be a '*',
-        // to make it clear that this component isn't used for comparison.
-        if (SplitComponent.equals("*")) {
-          Components.push_back(0);
-          continue;
-        }
+      if (!SplitComponent.equals("*")) {
         if (Diags) {
           Diags->diagnose(Range.Start, diag::unused_compiler_version_component)
-            .fixItReplaceChars(Range.Start, Range.End, "*");
-          Components.push_back(0);
-          continue;
+          .fixItReplaceChars(Range.Start, Range.End, "*");
+        } else {
+          llvm_unreachable("Expected * for second compiler version component");
         }
       }
 
-      // This version string is not from source code, so it must be a valid
-      // numerical version component, as it would've been passed in from
-      // build automation.
-      if (!SplitComponent.getAsInteger(10, ComponentNumber)) {
-        checkVersionComponent(ComponentNumber, Range);
-        Components.push_back(ComponentNumber);
-        continue;
-      } else {
-        llvm_unreachable("Invalid character in _compiler_version build configuration");
-      }
+      CV.Components.push_back(0);
+      continue;
     }
 
     // All other version components must be numbers.
     if (!SplitComponent.getAsInteger(10, ComponentNumber)) {
       checkVersionComponent(ComponentNumber, Range);
-      Components.push_back(ComponentNumber);
+      CV.Components.push_back(ComponentNumber);
       continue;
     } else if (Diags) {
       Diags->diagnose(Range.Start,
@@ -179,29 +171,70 @@ void parseVersionString(StringRef VersionString,
     }
   }
 
-  if (Components.size() > 5) {
+  if (CV.Components.size() > 5) {
     if (Diags) {
       Diags->diagnose(Loc, diag::compiler_version_too_many_components);
     } else {
       llvm_unreachable("Compiler version must not have more than 5 components");
     }
   }
+
+  return CV;
 }
 
-CompilerVersion::CompilerVersion(const StringRef VersionString,
-                                 SourceLoc Loc, DiagnosticEngine *Diags) {
-  parseVersionString(VersionString, Components, Loc, Diags);
+Version Version::parseVersionString(StringRef VersionString,
+                                                    SourceLoc Loc,
+                                                    DiagnosticEngine *Diags) {
+  Version CV;
+  SmallString<16> digits;
+  llvm::raw_svector_ostream OS(digits);
+  SmallVector<std::pair<StringRef, SourceRange>, 5> SplitComponents;
+  // Skip over quote character in string literal
+
+  splitVersionComponents(SplitComponents, VersionString, Loc, Diags);
+
+  uint64_t ComponentNumber;
+
+  for (size_t i = 0; i < SplitComponents.size(); ++i) {
+    StringRef SplitComponent;
+    SourceRange Range;
+    std::tie(SplitComponent, Range) = SplitComponents[i];
+
+    // Version components can't be empty.
+    if (SplitComponent.empty()) {
+      if (Diags)
+        Diags->diagnose(Range.Start, diag::empty_compiler_version_component);
+      else
+        llvm_unreachable("Found empty compiler version component");
+      continue;
+    }
+
+    // All other version components must be numbers.
+    if (!SplitComponent.getAsInteger(10, ComponentNumber)) {
+      CV.Components.push_back(ComponentNumber);
+      continue;
+    } else if (Diags) {
+      Diags->diagnose(Range.Start,
+                      diag::compiler_version_component_not_number);
+    } else {
+      llvm_unreachable("Invalid character in _compiler_version build configuration");
+    }
+  }
+
+  return CV;
 }
 
 
-CompilerVersion::CompilerVersion() {
+Version Version::getCurrentCompilerVersion() {
 #ifdef SWIFT_COMPILER_VERSION
-  parseVersionString(TOSTR(SWIFT_COMPILER_VERSION), Components, SourceLoc(),
-                     nullptr);
+  return Version::parseCompilerVersionString(
+    TOSTR(SWIFT_COMPILER_VERSION), Components, SourceLoc(), nullptr);
+#else
+  return Version();
 #endif
 }
 
-std::string CompilerVersion::str() const {
+std::string Version::str() const {
   std::string VersionString;
   llvm::raw_string_ostream OS(VersionString);
   for (auto i = Components.begin(); i != Components.end(); i++) {
@@ -212,7 +245,7 @@ std::string CompilerVersion::str() const {
   return OS.str();
 }
 
-std::string CompilerVersion::preprocessorDefinition() const {
+std::string Version::preprocessorDefinition() const {
   SmallString<64> define("-D__SWIFT_COMPILER_VERSION=");
   llvm::raw_svector_ostream OS(define);
   uint64_t versionConstant = 0;
@@ -233,8 +266,8 @@ std::string CompilerVersion::preprocessorDefinition() const {
   return OS.str().str();
 }
 
-bool operator>=(const class CompilerVersion &lhs,
-                const class CompilerVersion &rhs) {
+bool operator>=(const class Version &lhs,
+                const class Version &rhs) {
 
   // The empty compiler version represents the latest possible version,
   // usually built from the source repository.
@@ -244,11 +277,6 @@ bool operator>=(const class CompilerVersion &lhs,
   auto n = std::min(lhs.size(), rhs.size());
 
   for (size_t i = 0; i < n; ++i) {
-    // Skip the second component for comparison - this is just an internal
-    // compiler variant.
-    if (i == 1)
-      continue;
-
     if (lhs[i] < rhs[i])
       return false;
     else if (lhs[i] > rhs[i])

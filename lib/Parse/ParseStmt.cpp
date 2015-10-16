@@ -1577,10 +1577,11 @@ ConfigParserState Parser::evaluateConfigConditionExpr(Expr *configExpr) {
           diagnose(CE->getLoc(), diag::empty_compiler_version_string);
           return ConfigParserState::error();
         }
-        auto versionRequirement = version::CompilerVersion(SLE->getValue(),
-                                                           SLE->getLoc(),
-                                                           &Diags);
-        auto thisVersion = version::CompilerVersion();
+        auto versionRequirement =
+          version::Version::parseCompilerVersionString(SLE->getValue(),
+                                                       SLE->getLoc(),
+                                                       &Diags);
+        auto thisVersion = version::Version::getCurrentCompilerVersion();
         auto VersionNewEnough = thisVersion >= versionRequirement;
         return ConfigParserState(VersionNewEnough,
                                  ConfigExprKind::CompilerVersion);

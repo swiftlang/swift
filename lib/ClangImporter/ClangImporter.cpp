@@ -342,10 +342,10 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
     // Get the version of this compiler and pass it to
     // C/Objective-C declarations.
-    version::CompilerVersion version;
-    if (!version.empty()) {
+    auto V = version::Version::getCurrentCompilerVersion();
+    if (!V.empty()) {
       invocationArgStrs.insert(invocationArgStrs.end(), {
-        version.preprocessorDefinition(),
+        V.preprocessorDefinition(),
       });
     }
   } else {
