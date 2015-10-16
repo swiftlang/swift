@@ -342,7 +342,7 @@ class Foo {
   // arm64-tvos: ret i1 [[TOOBJCBOOL]]
 
   // i386-watchos: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {{.*}} {
-  // i386-watchos: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 4
+  // i386-watchos: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negate:)", align 4
   // i386-watchos: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 ([[RECEIVER:.*]]*, i8*, i1)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i1 zeroext %0)
   // i386-watchos: ret i1 [[NEG]]
   //
@@ -360,19 +360,6 @@ class Foo {
   // armv7k-watchos: [[NEG:%[0-9]+]] = call i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1
   // armv7k-watchos: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
   // armv7k-watchos: ret i1 [[TOOBJCBOOL]]
-  //
-  // i386-watchos: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {{.*}} {
-  // i386-watchos: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 %0)
-  // i386-watchos: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 4
-  // i386-watchos: [[NEG:%[0-9]+]] = call signext i8 bitcast (void ()* @objc_msgSend to i8 ([[RECEIVER:.*]]*, i8*, i8)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i8 signext [[TOOBJCBOOL]])
-  // i386-watchos: [[TOBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool{{.*}}(i8 [[NEG]])
-  // i386-watchos: ret i1 [[TOBOOL]]
-  //
-  // i386-watchos: define hidden signext i8 @_TToFC8abitypes3Foo7negate2{{.*}}(i8*, i8*, i8 signext)
-  // i386-watchos: [[TOBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBool
-  // i386-watchos: [[NEG:%[0-9]+]] = call i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1 [[TOBOOL]]
-  // i386-watchos: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
-  // i386-watchos: ret i8 [[TOOBJCBOOL]]
   //
   dynamic func negate2(b: Bool) -> Bool {
     var g = Gadget()

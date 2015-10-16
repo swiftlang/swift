@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
+// XFAIL: OS=watchos
 
 import StdlibUnittest
 import CoreAudio

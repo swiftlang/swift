@@ -71,12 +71,18 @@ func setFoo(f: Foo, var s: String) {
 func getZim(f: Foo) -> Bool {
   return f.zim()
 }
-// CHECK-i386-LABEL: sil hidden @_TF13objc_bridging6getZim
-// CHECK-i386:   [[OBJC_BOOL:%.*]] = apply {{.*}} : $@convention(objc_method) (Foo) -> ObjCBool
-// CHECK-i386:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@convention(thin) (ObjCBool) -> Bool
-// CHECK-i386:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@convention(thin) (ObjCBool) -> Bool
-// CHECK-i386:   return [[SWIFT_BOOL]] : $Bool
-// CHECK-i386: }
+
+// CHECK-ios-i386-LABEL: sil hidden @_TF13objc_bridging6getZim
+// CHECK-ios-i386:   [[OBJC_BOOL:%.*]] = apply {{.*}} : $@convention(objc_method) (Foo) -> ObjCBool
+// CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @swift_ObjCBoolToBool : $@convention(thin) (ObjCBool) -> Bool
+// CHECK-ios-i386:   [[SWIFT_BOOL:%.*]] = apply [[CONVERT]]([[OBJC_BOOL]]) : $@convention(thin) (ObjCBool) -> Bool
+// CHECK-ios-i386:   return [[SWIFT_BOOL]] : $Bool
+// CHECK-ios-i386: }
+
+// CHECK-watchos-i386-LABEL: sil hidden @_TF13objc_bridging6getZim
+// CHECK-watchos-i386:   [[BOOL:%.*]] = apply {{.*}} : $@convention(objc_method) (Foo) -> Bool
+// CHECK-watchos-i386:   return [[BOOL]] : $Bool
+// CHECK-watchos-i386: }
 
 // CHECK-macosx-x86_64-LABEL: sil hidden @_TF13objc_bridging6getZim
 // CHECK-macosx-x86_64:   [[OBJC_BOOL:%.*]] = apply {{.*}} : $@convention(objc_method) (Foo) -> ObjCBool
@@ -391,11 +397,11 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // Check that type lowering preserves the bool/BOOL distinction when bridging
 // imported C functions.
 
-// CHECK-i386-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
-// CHECK-i386:         function_ref @useBOOL : $@convention(c) (ObjCBool) -> ()
-// CHECK-i386:         function_ref @useBool : $@convention(c) (Bool) -> ()
-// CHECK-i386:         function_ref @getBOOL : $@convention(c) () -> ObjCBool
-// CHECK-i386:         function_ref @getBool : $@convention(c) () -> Bool
+// CHECK-ios-i386-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
+// CHECK-ios-i386:         function_ref @useBOOL : $@convention(c) (ObjCBool) -> ()
+// CHECK-ios-i386:         function_ref @useBool : $@convention(c) (Bool) -> ()
+// CHECK-ios-i386:         function_ref @getBOOL : $@convention(c) () -> ObjCBool
+// CHECK-ios-i386:         function_ref @getBool : $@convention(c) () -> Bool
 
 // CHECK-macosx-x86_64-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
 // CHECK-macosx-x86_64:         function_ref @useBOOL : $@convention(c) (ObjCBool) -> ()
@@ -403,10 +409,16 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // CHECK-macosx-x86_64:         function_ref @getBOOL : $@convention(c) () -> ObjCBool
 // CHECK-macosx-x86_64:         function_ref @getBool : $@convention(c) () -> Bool
 
-// FIXME: no distinction on x86_64 and arm64, since SILGen looks at the
-// underlying Clang decl of the bridged decl to decide whether it needs
+// FIXME: no distinction on x86_64, arm64 or watchos-i386, since SILGen looks
+// at the underlying Clang decl of the bridged decl to decide whether it needs
 // bridging.
 //
+// CHECK-watchos-i386-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
+// CHECK-watchos-i386:         function_ref @useBOOL : $@convention(c) (Bool) -> ()
+// CHECK-watchos-i386:         function_ref @useBool : $@convention(c) (Bool) -> ()
+// CHECK-watchos-i386:         function_ref @getBOOL : $@convention(c) () -> Bool
+// CHECK-watchos-i386:         function_ref @getBool : $@convention(c) () -> Bool
+
 // CHECK-ios-x86_64-LABEL: sil hidden @_TF13objc_bridging5boolsFSbTSbSb_
 // CHECK-ios-x86_64:         function_ref @useBOOL : $@convention(c) (Bool) -> ()
 // CHECK-ios-x86_64:         function_ref @useBool : $@convention(c) (Bool) -> ()
