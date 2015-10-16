@@ -209,57 +209,56 @@ public struct ${Self}<Element>
   public subscript(index: Int) -> Element {
 %if Self == 'Array':
     get {
-      let isNativeTypeChecked = _getArrayPropertyIsNativeTypeChecked()
-      _checkSubscript(
-        index, wasNativeTypeChecked: isNativeTypeChecked)
-      return _getElement(
-        index, wasNativeTypeChecked: isNativeTypeChecked)
+      // This call may be hoisted or eliminated by the optimizer.  If
+      // there is an inout violation, this value may be stale so needs to be 
+      // checked again below.
+      let wasNativeTypeChecked = _hoistableIsNativeTypeChecked()
+      
+      // Make sure the index is in range and wasNativeTypeChecked is
+      // still valid.
+      _checkSubscript(index, wasNativeTypeChecked: wasNativeTypeChecked)
+
+      return _getElement(index, wasNativeTypeChecked: wasNativeTypeChecked)
     }
-    // on non-Objective-C, this should just be NativeOwner for all other
-    // cases, including ArraySlice.
+%elif Self == 'ContiguousArray':
+    addressWithNativeOwner {
+      _checkSubscript_native(index)
+      return (
+        UnsafePointer(_buffer.subscriptBaseAddress + index),
+        Builtin.castToNativeObject(_buffer.owner))
+    }
 %else:
-   // Workaround for gyb bug
-%  Owner = 'NativeOwner' if Self == 'ContiguousArray' else 'Owner'
-%  Result = 'Native' if Self == 'ContiguousArray' else 'Unknown'
-    addressWith${Owner} {
-      _checkSubscript(index, wasNative: true)
-      return (UnsafePointer(_buffer.subscriptBaseAddress + index),
-              Builtin.castTo${Result}Object(_buffer.owner))
+    addressWithOwner {
+      _checkSubscript_native(index)
+      return (
+        UnsafePointer(_buffer.subscriptBaseAddress + index),
+        Builtin.castToUnknownObject(_buffer.owner))
     }
 %end
     mutableAddressWithPinnedNativeOwner {
-      _makeMutableAndUniqueOrPinned()
-      // When an array was made mutable we know it is a backed by a native array
-      // buffer.
-      _checkSubscript(index, wasNative: true)
-
-      // We are hiding the access to '_buffer.owner' behind a semantic function
-      // to help the compiler hoist uniqueness checks in the case of class or
-      // objective c existential typed array elements. In the value typed case
-      // the extra call to _getOwner hinders optimization so we perform a check
-      // and select based on the element type below.
-      return (_getElementAddress(index),
-              Builtin.tryPin(
-                !_isClassOrObjCExistential(Element.self) ?
-                  Builtin.castToNativeObject(_buffer.owner) : _getOwner()))
+      _makeMutableAndUniqueOrPinned() // makes the array native, too
+      _checkSubscript_native(index)   
+      return (_getElementAddress(index), Builtin.tryPin(_getOwner_native()))
     }
   }
 #else
   /// Access the `index`th element. Reading is O(1).  Writing is
   /// ${O1}.
   public subscript(index: Int) -> Element {
+    
     addressWithNativeOwner {
-      _checkSubscript(index, wasNative: true)
-      return (UnsafePointer(_buffer.subscriptBaseAddress + index),
-              Builtin.castToNativeObject(_buffer.owner))
+      _checkSubscript_native(index)
+      return (
+        UnsafePointer(_buffer.subscriptBaseAddress + index),
+        Builtin.castToNativeObject(_buffer.owner))
     }
+    
     mutableAddressWithPinnedNativeOwner {
       _makeMutableAndUniqueOrPinned()
-      // When an array was made mutable we know it is a backed by a native array
-      // buffer.
-      _checkSubscript(index, wasNative: true)
-      return (_getElementAddress(index),
-              Builtin.tryPin(Builtin.castToNativeObject(_buffer.owner)))
+      _checkSubscript_native(index)
+      return (
+        _getElementAddress(index),
+        Builtin.tryPin(_getOwner_native()))
     }
   }
 #endif
@@ -291,12 +290,14 @@ public struct ${Self}<Element>
    return _buffer.arrayPropertyIsNative
   }
 
-  /// Returns true if the array is native and does not need a deferred type
-  /// check.
+  /// Returns true if the array is native and does not need a deferred
+  /// type check.  May be hoisted by the optimizer, which means its
+  /// results may be stale by the time they are used if there is an
+  /// inout violation in user code.
   @warn_unused_result
   @_semantics("array.props.isNativeTypeChecked")
   public // @testable
-  func _getArrayPropertyIsNativeTypeChecked() -> Bool {
+  func _hoistableIsNativeTypeChecked() -> Bool {
    return _buffer.arrayPropertyIsNativeTypeChecked
   }
 
@@ -314,10 +315,28 @@ public struct ${Self}<Element>
   /// - Requires: The array has a native buffer.
   @warn_unused_result
   @_semantics("array.owner")
-  internal func _getOwner() -> Builtin.NativeObject {
+  internal func _getOwnerWithSemanticLabel_native() -> Builtin.NativeObject {
     return Builtin.castToNativeObject(_buffer.nativeOwner)
   }
 
+  /// - Requires: The array has a native buffer.
+  @warn_unused_result
+  @inline(__always)
+  internal func _getOwner_native() -> Builtin.NativeObject {
+#if _runtime(_ObjC)
+    if _isClassOrObjCExistential(Element.self) {
+      // We are hiding the access to '_buffer.owner' behind
+      // _getOwner() to help the compiler hoist uniqueness checks in
+      // the case of class or objective c existential typed array
+      // elements. 
+      return _getOwnerWithSemanticLabel_native()
+    }
+#endif
+    // In the value typed case the extra call to
+    // _getOwnerWithSemanticLabel_native hinders optimization.
+    return Builtin.castToNativeObject(_buffer.owner)
+  }
+  
   // Don't inline copyBuffer - this would inline the copy loop into the current
   // path preventing retains/releases to be matched accross that region.
   @inline(never)
@@ -346,14 +365,13 @@ public struct ${Self}<Element>
 
   /// Check that the given `index` is valid for subscripting, i.e. `0
   /// ≤ index < count`.
-  @_semantics("array.check_subscript")
-  public // @testable
-  func _checkSubscript(index: Int, wasNative: Bool) {
-#if ${'_runtime(_ObjC)' if Self == 'Array' else 'false'}
-    _buffer._checkInoutAndNativeBounds(index, wasNative: wasNative)
-#else
+  @inline(__always)
+  internal func _checkSubscript_native(index: Int) {
+% if Self != 'Array':
     _buffer._checkValidSubscript(index)
-#endif
+% else:
+    _checkSubscript(index, wasNativeTypeChecked: true)
+% end
   }
 
 % if Self == 'Array':
@@ -363,8 +381,8 @@ public struct ${Self}<Element>
   public // @testable
   func _checkSubscript(index: Int, wasNativeTypeChecked: Bool) {
 #if _runtime(_ObjC)
-    _buffer._checkInoutAndNativeTypeCheckedBounds(index,
-          wasNativeTypeChecked: wasNativeTypeChecked)
+    _buffer._checkInoutAndNativeTypeCheckedBounds(
+      index, wasNativeTypeChecked: wasNativeTypeChecked)
 #else
     _buffer._checkValidSubscript(index)
 #endif
