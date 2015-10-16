@@ -30,6 +30,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
@@ -338,6 +339,15 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       // Request new APIs from CoreImage.
       "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=1",
     });
+
+    // Get the version of this compiler and pass it to
+    // C/Objective-C declarations.
+    version::CompilerVersion version;
+    if (!version.empty()) {
+      invocationArgStrs.insert(invocationArgStrs.end(), {
+        version.preprocessorDefinition(),
+      });
+    }
   } else {
     invocationArgStrs.insert(invocationArgStrs.end(), {
       // Non-Darwin platforms don't use the Objective-C runtime, so they can

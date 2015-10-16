@@ -49,7 +49,7 @@ namespace version {
 /// a: [0 - 999]
 /// b: [0 - 999]
 class CompilerVersion {
-  llvm::SmallVector<unsigned, 5> Components;
+  llvm::SmallVector<uint64_t, 5> Components;
 public:
   /// Create a version from the currently defined SWIFT_COMPILER_VERSION.
   ///
@@ -66,6 +66,16 @@ public:
 
   /// Return a printable string representation of the version.
   std::string str() const;
+
+  /// Return a string to be used as an internal preprocessor define.
+  ///
+  /// Assuming the project version is at most X.Y.Z.a.b, the integral constant
+  /// representing the version is:
+  ///
+  /// X*1000*1000*1000 + Z*1000*1000 + a*1000 + b
+  ///
+  /// The second version component is not used.
+  std::string preprocessorDefinition() const;
 
   /// Return the ith version component.
   unsigned operator[](size_t i) const {

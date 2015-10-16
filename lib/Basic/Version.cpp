@@ -82,7 +82,7 @@ static void printFullRevisionString(raw_ostream &out) {
 }
 
 void parseVersionString(StringRef VersionString,
-                        SmallVectorImpl<unsigned> &Components,
+                        SmallVectorImpl<uint64_t> &Components,
                         SourceLoc Loc,
                         DiagnosticEngine *Diags) {
   SmallString<16> digits;
@@ -210,6 +210,27 @@ std::string CompilerVersion::str() const {
       OS << '.';
   }
   return OS.str();
+}
+
+std::string CompilerVersion::preprocessorDefinition() const {
+  SmallString<64> define("-D__SWIFT_COMPILER_VERSION=");
+  llvm::raw_svector_ostream OS(define);
+  uint64_t versionConstant = 0;
+
+  auto NumComponents = Components.size();
+
+  if (NumComponents > 0)
+    versionConstant += Components[0] * 1000 * 1000 * 1000;
+  // Component 2 is not used.
+  if (NumComponents > 2)
+    versionConstant += Components[2] * 1000 * 1000;
+  if (NumComponents > 3)
+    versionConstant += Components[3] * 1000;
+  if (NumComponents > 4)
+    versionConstant += Components[4];
+
+  OS << versionConstant;
+  return OS.str().str();
 }
 
 bool operator>=(const class CompilerVersion &lhs,
