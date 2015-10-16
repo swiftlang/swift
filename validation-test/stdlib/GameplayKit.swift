@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
-// XFAIL: OS=watchos
+// UNSUPPORTED: OS=watchos
 
 import StdlibUnittest
 import GameplayKit
