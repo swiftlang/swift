@@ -228,7 +228,7 @@ Version Version::parseVersionString(StringRef VersionString,
 Version Version::getCurrentCompilerVersion() {
 #ifdef SWIFT_COMPILER_VERSION
   return Version::parseCompilerVersionString(
-    TOSTR(SWIFT_COMPILER_VERSION), Components, SourceLoc(), nullptr);
+    TOSTR(SWIFT_COMPILER_VERSION), SourceLoc(), nullptr);
 #else
   return Version();
 #endif
