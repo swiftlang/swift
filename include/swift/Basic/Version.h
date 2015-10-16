@@ -90,14 +90,14 @@ public:
   }
 
   /// Parse a _compiler_version build configuration from source code.
-  static Version parseCompilerVersionString(StringRef VersionString,
+  static Version parseCompilerVersionString(llvm::StringRef VersionString,
                                                     SourceLoc Loc,
                                                     DiagnosticEngine *Diags);
 
   /// Parse a generic version string of the format [0-9]+(.[0-9]+)*
   ///
   /// Version components can be any unsigned 64-bit number.
-  static Version parseVersionString(StringRef VersionString,
+  static Version parseVersionString(llvm::StringRef VersionString,
                                             SourceLoc Loc,
                                             DiagnosticEngine *Diags);
 
