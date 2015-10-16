@@ -32,6 +32,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_27 | FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_28 | FileCheck %s -check-prefix=UNRESOLVED_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_29 | FileCheck %s -check-prefix=UNRESOLVED_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_30 | FileCheck %s -check-prefix=UNRESOLVED_2
 
 enum SomeEnum1 {
   case South
@@ -226,3 +227,5 @@ func f() -> SomeEnum1 {
 let TopLevelVar1 = OptionSetTaker7([.#^UNRESOLVED_28^#], Op2: [.Option4])
 
 let TopLevelVar2 = OptionSetTaker1([.#^UNRESOLVED_29^#])
+
+let TopLevelVar3 = OptionSetTaker7([.Option1], Op2: [.#^UNRESOLVED_30^#])

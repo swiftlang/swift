@@ -2259,7 +2259,7 @@ namespace {
       return resultTy;
     }
     
-    Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
+    virtual Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
@@ -2772,6 +2772,12 @@ public:
 
   Type visitCodeCompletionExpr(CodeCompletionExpr *Expr) override {
     return createFreeTypeVariableType(Expr);
+  }
+
+  Type visitImplicitConversionExpr(ImplicitConversionExpr *Expr) override {
+    // We override this function to avoid assertion failures. Typically, we do have
+    // a type-checked AST when trying to infer the types of unresolved members.
+    return Expr->getType();
   }
 
   void collectResolvedType(Solution &S, SmallVectorImpl<Type> &PossibleTypes) {
