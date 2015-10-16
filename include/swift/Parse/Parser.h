@@ -70,6 +70,7 @@ class Parser {
   void operator=(const Parser&) = delete;
 
   bool IsInputIncomplete = false;
+  SourceLoc DelayedDeclEnd;
 
 public:
   SourceManager &SourceMgr;

@@ -1707,7 +1707,9 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
 
   // Consume the code completion token, if there is one.
   consumeIf(tok::code_complete);
-  SourceLoc EndLoc = Tok.getLoc();
+  SourceLoc EndLoc = DelayedDeclEnd.isValid() &&
+                     SourceMgr.isBeforeInBuffer(Tok.getLoc(), DelayedDeclEnd) ?
+                       DelayedDeclEnd : Tok.getLoc();
   State->delayDecl(PersistentParserState::DelayedDeclKind::Decl, Flags.toRaw(),
                    CurDeclContext, { BeginLoc, EndLoc },
                    BeginParserPosition.PreviousLoc);
@@ -3770,8 +3772,12 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       
       // If we are doing second pass of code completion, we don't want to
       // suddenly cut off parsing and throw away the declaration.
-      if (init.hasCodeCompletion() && isCodeCompletionFirstPass())
+      if (init.hasCodeCompletion() && isCodeCompletionFirstPass()) {
+
+        // Register the end of the init as the end of the delayed parsing.
+        DelayedDeclEnd = init.get() ? init.get()->getEndLoc() : SourceLoc();
         return makeParserCodeCompletionStatus();
+      }
 
       if (init.isNull())
         return makeParserError();
