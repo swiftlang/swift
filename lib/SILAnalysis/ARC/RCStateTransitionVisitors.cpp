@@ -19,29 +19,39 @@
 
 using namespace swift;
 
+namespace {
+
+using ARCBBState = ARCSequenceDataflowEvaluator::ARCBBState;
+
+} // end anonymous namespace
+
 //===----------------------------------------------------------------------===//
 //                      BottomUpRCStateTransitionVisitor
 //===----------------------------------------------------------------------===//
 
-BottomUpDataflowRCStateVisitor::BottomUpDataflowRCStateVisitor(
-    RCIdentityFunctionInfo *RCFI, ARCBBState &BBState,
+template <class ARCState>
+BottomUpDataflowRCStateVisitor<ARCState>::BottomUpDataflowRCStateVisitor(
+    RCIdentityFunctionInfo *RCFI, ARCState &State,
     bool FreezeOwnedArgEpilogueReleases,
     ConsumedArgToEpilogueReleaseMatcher &ERM,
     IncToDecStateMapTy &IncToDecStateMap)
-    : RCFI(RCFI), BBState(BBState),
+    : RCFI(RCFI), DataflowState(State),
       FreezeOwnedArgEpilogueReleases(FreezeOwnedArgEpilogueReleases),
       EpilogueReleaseMatcher(ERM), IncToDecStateMap(IncToDecStateMap) {}
 
-BottomUpDataflowRCStateVisitor::DataflowResult
-BottomUpDataflowRCStateVisitor::visitAutoreleasePoolCall(ValueBase *V) {
-  BBState.clear();
+template <class ARCState>
+typename BottomUpDataflowRCStateVisitor<ARCState>::DataflowResult
+BottomUpDataflowRCStateVisitor<ARCState>::
+visitAutoreleasePoolCall(ValueBase *V) {
+  DataflowState.clear();
 
   // We just cleared our BB State so we have no more possible effects.
   return DataflowResult(RCStateTransitionDataflowResultKind::NoEffects);
 }
 
-BottomUpDataflowRCStateVisitor::DataflowResult
-BottomUpDataflowRCStateVisitor::visitStrongDecrement(ValueBase *V) {
+template <class ARCState>
+typename BottomUpDataflowRCStateVisitor<ARCState>::DataflowResult
+BottomUpDataflowRCStateVisitor<ARCState>::visitStrongDecrement(ValueBase *V) {
   auto *I = dyn_cast<SILInstruction>(V);
   if (!I)
     return DataflowResult();
@@ -55,7 +65,7 @@ BottomUpDataflowRCStateVisitor::visitStrongDecrement(ValueBase *V) {
       EpilogueReleaseMatcher.isReleaseMatchedToArgument(I))
     return DataflowResult(Op);
 
-  BottomUpRefCountState &State = BBState.getBottomUpRefCountState(Op);
+  BottomUpRefCountState &State = DataflowState.getBottomUpRefCountState(Op);
   bool NestingDetected = State.initWithMutatorInst(I);
 
   // If we are running with 'frozen' owned arg releases, check if we have a
@@ -72,15 +82,16 @@ BottomUpDataflowRCStateVisitor::visitStrongDecrement(ValueBase *V) {
   return DataflowResult(Op, NestingDetected);
 }
 
-BottomUpDataflowRCStateVisitor::DataflowResult
-BottomUpDataflowRCStateVisitor::visitStrongIncrement(ValueBase *V) {
+template <class ARCState>
+typename BottomUpDataflowRCStateVisitor<ARCState>::DataflowResult
+BottomUpDataflowRCStateVisitor<ARCState>::visitStrongIncrement(ValueBase *V) {
   auto *I = dyn_cast<SILInstruction>(V);
   if (!I)
     return DataflowResult();
 
   // Look up the state associated with its operand...
   SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
-  BottomUpRefCountState &RefCountState = BBState.getBottomUpRefCountState(Op);
+  auto &RefCountState = DataflowState.getBottomUpRefCountState(Op);
 
   DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT!\n");
 
@@ -116,27 +127,32 @@ BottomUpDataflowRCStateVisitor::visitStrongIncrement(ValueBase *V) {
 //                       TopDownDataflowRCStateVisitor
 //===----------------------------------------------------------------------===//
 
-TopDownDataflowRCStateVisitor::TopDownDataflowRCStateVisitor(
-    RCIdentityFunctionInfo *RCFI, ARCBBState &BBState,
+template <class ARCState>
+TopDownDataflowRCStateVisitor<ARCState>::TopDownDataflowRCStateVisitor(
+    RCIdentityFunctionInfo *RCFI, ARCState &DataflowState,
     DecToIncStateMapTy &DecToIncStateMap)
-    : RCFI(RCFI), BBState(BBState), DecToIncStateMap(DecToIncStateMap) {}
+    : RCFI(RCFI), DataflowState(DataflowState),
+      DecToIncStateMap(DecToIncStateMap) {}
 
-TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::visitAutoreleasePoolCall(ValueBase *V) {
-  BBState.clear();
+template <class ARCState>
+typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
+TopDownDataflowRCStateVisitor<ARCState>::
+visitAutoreleasePoolCall(ValueBase *V) {
+  DataflowState.clear();
   // We just cleared our BB State so we have no more possible effects.
   return DataflowResult(RCStateTransitionDataflowResultKind::NoEffects);
 }
 
-TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::visitStrongDecrement(ValueBase *V) {
+template <class ARCState>
+typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
+TopDownDataflowRCStateVisitor<ARCState>::visitStrongDecrement(ValueBase *V) {
   auto *I = dyn_cast<SILInstruction>(V);
   if (!I)
     return DataflowResult();
 
   // Look up the state associated with I's operand...
   SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
-  TopDownRefCountState &RefCountState = BBState.getTopDownRefCountState(Op);
+  auto &RefCountState = DataflowState.getTopDownRefCountState(Op);
 
   DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT!\n");
 
@@ -169,8 +185,9 @@ TopDownDataflowRCStateVisitor::visitStrongDecrement(ValueBase *V) {
   return DataflowResult(Op);
 }
 
-TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::visitStrongIncrement(ValueBase *V) {
+template <class ARCState>
+typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
+TopDownDataflowRCStateVisitor<ARCState>::visitStrongIncrement(ValueBase *V) {
   auto *I = dyn_cast<SILInstruction>(V);
   if (!I)
     return DataflowResult();
@@ -178,7 +195,7 @@ TopDownDataflowRCStateVisitor::visitStrongIncrement(ValueBase *V) {
   // Map the increment's operand to a newly initialized or reinitialized ref
   // count state and continue...
   SILValue Op = RCFI->getRCIdentityRoot(I->getOperand(0));
-  TopDownRefCountState &State = BBState.getTopDownRefCountState(Op);
+  auto &State = DataflowState.getTopDownRefCountState(Op);
   bool NestingDetected = State.initWithMutatorInst(I);
 
   DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "
@@ -189,8 +206,10 @@ TopDownDataflowRCStateVisitor::visitStrongIncrement(ValueBase *V) {
   return DataflowResult(Op, NestingDetected);
 }
 
-TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::visitStrongEntranceArgument(SILArgument *Arg) {
+template <class ARCState>
+typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
+TopDownDataflowRCStateVisitor<ARCState>::
+visitStrongEntranceArgument(SILArgument *Arg) {
   DEBUG(llvm::dbgs() << "VISITING ENTRANCE ARGUMENT: " << *Arg);
 
   if (!Arg->hasConvention(ParameterConvention::Direct_Owned)) {
@@ -200,14 +219,16 @@ TopDownDataflowRCStateVisitor::visitStrongEntranceArgument(SILArgument *Arg) {
 
   DEBUG(llvm::dbgs() << "    Initializing state.\n");
 
-  TopDownRefCountState &State = BBState.getTopDownRefCountState(Arg);
+  auto &State = DataflowState.getTopDownRefCountState(Arg);
   State.initWithArg(Arg);
 
   return DataflowResult();
 }
 
-TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::visitStrongEntranceApply(ApplyInst *AI) {
+template <class ARCState>
+typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
+TopDownDataflowRCStateVisitor<ARCState>::
+visitStrongEntranceApply(ApplyInst *AI) {
   DEBUG(llvm::dbgs() << "VISITING ENTRANCE APPLY: " << *AI);
 
   // We should have checked earlier that AI has an owned result value. To
@@ -218,43 +239,49 @@ TopDownDataflowRCStateVisitor::visitStrongEntranceApply(ApplyInst *AI) {
   // Otherwise, return a dataflow result containing a +1.
   DEBUG(llvm::dbgs() << "    Initializing state.\n");
 
-  TopDownRefCountState &State = BBState.getTopDownRefCountState(AI);
+  auto &State = DataflowState.getTopDownRefCountState(AI);
   State.initWithEntranceInst(AI, AI);
 
   return DataflowResult(AI);
 }
 
-
-TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::visitStrongEntranceAllocRef(AllocRefInst *ARI) {
+template <class ARCState>
+typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
+TopDownDataflowRCStateVisitor<ARCState>::
+visitStrongEntranceAllocRef(AllocRefInst *ARI) {
   // Alloc refs always introduce new references at +1.
-  TopDownRefCountState &State = BBState.getTopDownRefCountState(ARI);
+  TopDownRefCountState &State = DataflowState.getTopDownRefCountState(ARI);
   State.initWithEntranceInst(ARI, ARI);
 
   return DataflowResult(ARI);
 }
 
-TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::
+template <class ARCState>
+typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
+TopDownDataflowRCStateVisitor<ARCState>::
 visitStrongEntranceAllocRefDynamic(AllocRefDynamicInst *ARI) {
   // Alloc ref dynamic always introduce references at +1.
-  TopDownRefCountState &State = BBState.getTopDownRefCountState(ARI);
+  auto &State = DataflowState.getTopDownRefCountState(ARI);
   State.initWithEntranceInst(ARI, ARI);
 
   return DataflowResult(ARI);
 }
 
-TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::visitStrongAllocBox(AllocBoxInst *ABI) {
+template <class ARCState>
+typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
+TopDownDataflowRCStateVisitor<ARCState>::
+visitStrongAllocBox(AllocBoxInst *ABI) {
   // Alloc box introduces a ref count of +1 on its container.
   SILValue Container = ABI->getContainerResult();
-  TopDownRefCountState &State = BBState.getTopDownRefCountState(Container);
+  auto &State = DataflowState.getTopDownRefCountState(Container);
   State.initWithEntranceInst(ABI, Container);
   return DataflowResult(Container);
 }
 
-TopDownDataflowRCStateVisitor::DataflowResult
-TopDownDataflowRCStateVisitor::visitStrongEntrance(ValueBase *V) {
+template <class ARCState>
+typename TopDownDataflowRCStateVisitor<ARCState>::DataflowResult
+TopDownDataflowRCStateVisitor<ARCState>::
+visitStrongEntrance(ValueBase *V) {
   if (auto *Arg = dyn_cast<SILArgument>(V))
     return visitStrongEntranceArgument(Arg);
 
@@ -272,3 +299,14 @@ TopDownDataflowRCStateVisitor::visitStrongEntrance(ValueBase *V) {
 
   return DataflowResult();
 }
+
+//===----------------------------------------------------------------------===//
+//                           Template Instantiation
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+template class BottomUpDataflowRCStateVisitor<ARCBBState>;
+template class TopDownDataflowRCStateVisitor<ARCBBState>;
+
+} // end swift namespace

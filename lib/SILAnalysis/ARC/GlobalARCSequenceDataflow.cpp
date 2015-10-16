@@ -60,8 +60,8 @@ static bool processBBTopDown(
 
   bool NestingDetected = false;
 
-  TopDownDataflowRCStateVisitor DataflowVisitor(RCIA, BBState,
-                                                DecToIncStateMap);
+  TopDownDataflowRCStateVisitor<ARCBBState> DataflowVisitor(
+      RCIA, BBState, DecToIncStateMap);
 
   // If the current BB is the entry BB, initialize a state corresponding to each
   // of its owned parameters. This enables us to know that if we see a retain
@@ -247,9 +247,9 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
 
   bool NestingDetected = false;
 
-  BottomUpDataflowRCStateVisitor
-    DataflowVisitor(RCIA, BBState, FreezeOwnedArgEpilogueReleases,
-                    ConsumedArgToReleaseMap, IncToDecStateMap);
+  BottomUpDataflowRCStateVisitor<ARCBBState> DataflowVisitor(
+      RCIA, BBState, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
+      IncToDecStateMap);
 
   // For each terminator instruction I in BB visited in reverse...
   for (auto II = std::next(BB.rbegin()), IE = BB.rend(); II != IE;) {

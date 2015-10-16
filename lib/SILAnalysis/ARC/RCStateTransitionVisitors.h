@@ -19,7 +19,7 @@
 #ifndef SWIFT_SILANALYSIS_RCSTATETRANSITIONVISITORS_H
 #define SWIFT_SILANALYSIS_RCSTATETRANSITIONVISITORS_H
 
-#include "GlobalARCSequenceDataflow.h"
+#include "ARCBBState.h"
 #include "RCStateTransition.h"
 #include "swift/Basic/BlotMapVector.h"
 
@@ -102,24 +102,24 @@ namespace swift {
 /// A visitor for performing the bottom up dataflow depending on the
 /// RCState. Enables behavior to be cleanly customized depending on the
 /// RCStateTransition associated with an instruction.
+template <class ARCState>
 class BottomUpDataflowRCStateVisitor
-    : public RCStateTransitionKindVisitor<BottomUpDataflowRCStateVisitor,
+    : public RCStateTransitionKindVisitor<BottomUpDataflowRCStateVisitor<ARCState>,
                                           RCStateTransitionDataflowResult> {
   /// A local typedef to make things cleaner.
   using DataflowResult = RCStateTransitionDataflowResult;
-  using ARCBBState = ARCSequenceDataflowEvaluator::ARCBBState;
   using IncToDecStateMapTy =
       BlotMapVector<SILInstruction *, BottomUpRefCountState>;
 
   RCIdentityFunctionInfo *RCFI;
-  ARCBBState &BBState;
+  ARCState &DataflowState;
   bool FreezeOwnedArgEpilogueReleases;
   ConsumedArgToEpilogueReleaseMatcher &EpilogueReleaseMatcher;
   BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap;
 
 public:
   BottomUpDataflowRCStateVisitor(RCIdentityFunctionInfo *RCFI,
-                                 ARCBBState &BBState,
+                                 ARCState &DataflowState,
                                  bool FreezeOwnedArgEpilogueReleases,
                                  ConsumedArgToEpilogueReleaseMatcher &ERM,
                                  IncToDecStateMapTy &IncToDecStateMap);
@@ -139,22 +139,22 @@ namespace swift {
 /// A visitor for performing the bottom up dataflow depending on the
 /// RCState. Enables behavior to be cleanly customized depending on the
 /// RCStateTransition associated with an instruction.
+template <class ARCState>
 class TopDownDataflowRCStateVisitor
-    : public RCStateTransitionKindVisitor<TopDownDataflowRCStateVisitor,
+    : public RCStateTransitionKindVisitor<TopDownDataflowRCStateVisitor<ARCState>,
                                           RCStateTransitionDataflowResult> {
   /// A local typedef to make things cleaner.
   using DataflowResult = RCStateTransitionDataflowResult;
-  using ARCBBState = ARCSequenceDataflowEvaluator::ARCBBState;
   using DecToIncStateMapTy =
       BlotMapVector<SILInstruction *, TopDownRefCountState>;
 
   RCIdentityFunctionInfo *RCFI;
-  ARCBBState &BBState;
+  ARCState &DataflowState;
   DecToIncStateMapTy &DecToIncStateMap;
 
 public:
   TopDownDataflowRCStateVisitor(RCIdentityFunctionInfo *RCFI,
-                                ARCBBState &BBState,
+                                ARCState &State,
                                 DecToIncStateMapTy &DecToIncStateMap);
   DataflowResult visitAutoreleasePoolCall(ValueBase *V);
   DataflowResult visitStrongDecrement(ValueBase *V);
@@ -168,6 +168,20 @@ private:
   DataflowResult visitStrongEntranceAllocRefDynamic(AllocRefDynamicInst *ARI);
   DataflowResult visitStrongAllocBox(AllocBoxInst *ABI);
 };
+
+} // end swift namespace
+
+//===----------------------------------------------------------------------===//
+//                       Forward Template Declarations
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+extern template class BottomUpDataflowRCStateVisitor<
+    ARCSequenceDataflowEvaluator::ARCBBState>;
+
+extern template class TopDownDataflowRCStateVisitor<
+    ARCSequenceDataflowEvaluator::ARCBBState>;
 
 } // end swift namespace
 
