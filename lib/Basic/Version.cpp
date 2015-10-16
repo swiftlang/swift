@@ -93,6 +93,18 @@ void parseVersionString(StringRef VersionString,
   SourceLoc Start = Loc.isValid() ? Loc.getAdvancedLoc(1) : Loc;
   SourceLoc End = Start;
 
+  auto checkVersionComponent = [&](unsigned Component, SourceRange Range) {
+    unsigned limit = Components.size() == 0 ? 9223371 : 999;
+
+    if (Component > limit) {
+      if (Diags)
+        Diags->diagnose(Range.Start,
+                        diag::compiler_version_component_out_of_range, limit);
+      else
+        llvm_unreachable("Compiler version component out of range");
+    }
+  };
+
   // Split the version string into tokens separated by the '.' character.
   while (!VersionString.empty()) {
     StringRef SplitComponent, Rest;
@@ -146,6 +158,7 @@ void parseVersionString(StringRef VersionString,
       // numerical version component, as it would've been passed in from
       // build automation.
       if (!SplitComponent.getAsInteger(10, ComponentNumber)) {
+        checkVersionComponent(ComponentNumber, Range);
         Components.push_back(ComponentNumber);
         continue;
       } else {
@@ -155,6 +168,7 @@ void parseVersionString(StringRef VersionString,
 
     // All other version components must be numbers.
     if (!SplitComponent.getAsInteger(10, ComponentNumber)) {
+      checkVersionComponent(ComponentNumber, Range);
       Components.push_back(ComponentNumber);
       continue;
     } else if (Diags) {
@@ -162,6 +176,14 @@ void parseVersionString(StringRef VersionString,
                       diag::compiler_version_component_not_number);
     } else {
       llvm_unreachable("Invalid character in _compiler_version build configuration");
+    }
+  }
+
+  if (Components.size() > 5) {
+    if (Diags) {
+      Diags->diagnose(Loc, diag::compiler_version_too_many_components);
+    } else {
+      llvm_unreachable("Compiler version must not have more than 5 components");
     }
   }
 }

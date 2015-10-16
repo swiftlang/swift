@@ -37,6 +37,17 @@ namespace version {
 /// For comparison, if a `CompilerVersion` contains more than one
 /// version component, the second one is ignored for comparison,
 /// as it represents a compiler variant with no defined ordering.
+///
+/// A CompilerVersion must have no more than five components and must fit in a
+/// 64-bit unsigned integer representation.
+///
+/// Assuming a maximal version component layout of X.Y.Z.a.b,
+/// X, Y, Z, a, b are integers with the following (inclusive) ranges:
+/// X: [0 - 9223371]
+/// Y: [0 - 999]
+/// Z: [0 - 999]
+/// a: [0 - 999]
+/// b: [0 - 999]
 class CompilerVersion {
   llvm::SmallVector<unsigned, 5> Components;
 public:

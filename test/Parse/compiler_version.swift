@@ -1,6 +1,6 @@
 // RUN: %target-parse-verify-swift
 
-#if _compiler_version("999999.*.999999.999999.999999")
+#if _compiler_version("999.*.999.999.999")
   let w = 1
 #else
   // This shouldn't emit any diagnostics.
@@ -61,4 +61,19 @@
 #endif
 
 #if _compiler_version("700.0.100") // expected-warning {{the second version component is not used for comparison}}
+#endif
+
+#if _compiler_version("700.*.1.1.1.1") // expected-error {{compiler version must not have more than five components}}
+#endif
+
+#if _compiler_version("9223372.*.1.1.1") // expected-error {{compiler version component out of range: must be in [0, 9223371]}}
+#endif
+
+#if _compiler_version("700.*.1000.1.1") // expected-error {{compiler version component out of range: must be in [0, 999]}}
+#endif
+
+#if _compiler_version("700.*.1.1000.1") // expected-error {{compiler version component out of range: must be in [0, 999]}}
+#endif
+
+#if _compiler_version("700.*.1.1.1000") // expected-error {{compiler version component out of range: must be in [0, 999]}}
 #endif
