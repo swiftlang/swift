@@ -31,7 +31,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_26 | FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_27 | FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_28 | FileCheck %s -check-prefix=UNRESOLVED_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_29 | FileCheck %s -check-prefix=UNRESOLVED_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_29 | FileCheck %s -check-prefix=UNRESOLVED_1
 
 enum SomeEnum1 {
   case South
@@ -81,7 +81,7 @@ func OptionSetTaker6(Op1: SomeOptions1, Op2: SomeOptions2) {}
 
 func OptionSetTaker6(Op1: SomeOptions2, Op2: SomeOptions1) {}
 
-func OptionSetTaker7(Op1: SomeOptions2, Op2: SomeOptions1) -> Int {return 0}
+func OptionSetTaker7(Op1: SomeOptions1, Op2: SomeOptions2) -> Int {return 0}
 
 func EnumTaker1(E : SomeEnum1) {}
 
@@ -223,6 +223,6 @@ func f() -> SomeEnum1 {
   return .#^UNRESOLVED_27^#
 }
 
-let TopLevelVar1 = OptionSetTaker7([.#^UNRESOLVED_28^#], [.Option4])
+let TopLevelVar1 = OptionSetTaker7([.#^UNRESOLVED_28^#], Op2: [.Option4])
 
-let TopLevelVar2 = OptionSetTaker7([.Option1], [.#^UNRESOLVED_29^#])
+let TopLevelVar2 = OptionSetTaker1([.#^UNRESOLVED_29^#])
