@@ -99,7 +99,7 @@
 // CHECK-FOUNDATION: func withString(_: String) -> String
 
 // Note: Not splitting on "With".
-// CHECK-FOUNDATION: func URLWithAddedString(_: String) -> NSURL?
+// CHECK-FOUNDATION: func urlWithAddedString(_: String) -> NSURL?
 
 // Note: CalendarUnits is not a set of "Options".
 // CHECK-FOUNDATION: class func forCalendarUnits(_: NSCalendarUnit) -> String!

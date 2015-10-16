@@ -659,6 +659,32 @@ static bool nameIndicatesBooleanResult(StringRef name) {
   return false;
 }
 
+/// A form of toLowercaseWord that also lowercases acronyms.
+static StringRef toLowercaseWordAndAcronym(StringRef string,
+                                           StringScratchSpace &scratch) {
+  if (string.empty())
+    return string;
+
+  // Already lowercase.
+  if (!clang::isUppercase(string[0]))
+    return string;
+
+  // Lowercase until we hit the end there is an uppercase letter
+  // followed by a non-uppercase letter.
+  llvm::SmallString<32> scratchStr;
+  for (unsigned i = 0, n = string.size(); i != n; ++i) {
+    // If the next character is not uppercase, stop.
+    if (i < n - 1 && !clang::isUppercase(string[i+1])) {
+      scratchStr.append(string.substr(i));
+      break;
+    }
+
+    scratchStr.push_back(clang::toLowercase(string[i]));
+  }
+
+  return scratch.copyString(scratchStr);
+}
+
 bool swift::omitNeedlessWords(StringRef &baseName,
                               MutableArrayRef<StringRef> argNames,
                               StringRef firstParamName,
@@ -669,6 +695,26 @@ bool swift::omitNeedlessWords(StringRef &baseName,
                               bool isProperty,
                               StringScratchSpace &scratch) {
   bool anyChanges = false;
+
+  /// Local function that lowercases all of the base names and
+  /// argument names before returning.
+  auto lowercaseAcronymsForReturn = [&] {
+    StringRef newBaseName = toLowercaseWordAndAcronym(baseName, scratch);
+    if (baseName.data() != newBaseName.data()) {
+      baseName = newBaseName;
+      anyChanges = true;
+    }
+
+    for (StringRef &argName : argNames) {
+      StringRef newArgName = toLowercaseWordAndAcronym(argName, scratch);
+      if (argName.data() != newArgName.data()) {
+        argName = newArgName;
+        anyChanges = true;
+      }
+    }
+
+    return anyChanges;
+  };
 
   // If the result type matches the context, remove the context type from the
   // prefix of the name.
@@ -706,7 +752,7 @@ bool swift::omitNeedlessWords(StringRef &baseName,
       anyChanges = true;
     }
 
-    return anyChanges;
+    return lowercaseAcronymsForReturn();
   }
 
   // Omit needless words based on parameter types.
@@ -802,5 +848,5 @@ bool swift::omitNeedlessWords(StringRef &baseName,
     }
   }
 
-  return anyChanges;
+  return lowercaseAcronymsForReturn();
 }
