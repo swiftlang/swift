@@ -227,7 +227,7 @@ public:
   class subregion_iterator :
     public std::iterator<std::bidirectional_iterator_tag, unsigned> {
     friend struct SubregionData;
-    llvm::SmallVectorImpl<SubregionID>::const_iterator InnerIter;
+    llvm::SmallVectorImpl<SubregionID>::iterator InnerIter;
     const llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> *Subloops;
 
     /// A flag that says that this iterator is an invalid iterator belonging to
@@ -242,7 +242,7 @@ public:
     unsigned IsInvalid : 1;
 
     subregion_iterator(
-        llvm::SmallVectorImpl<SubregionID>::const_iterator iter,
+        llvm::SmallVectorImpl<SubregionID>::iterator iter,
         const llvm::SmallVectorImpl<std::pair<unsigned, unsigned>> *subloops)
         : InnerIter(iter), Subloops(subloops), IsInvalid(false) {}
 
@@ -388,16 +388,16 @@ private:
     /// Subregions array by the RPO number of its header.
     llvm::SmallVector<std::pair<unsigned, unsigned>, 2> Subloops;
 
-    subregion_iterator begin() const {
+    subregion_iterator begin() {
       return subregion_iterator(Subregions.begin(), &Subloops);
     }
-    subregion_iterator end() const {
+    subregion_iterator end() {
       return subregion_iterator(Subregions.end(), &Subloops);
     }
-    subregion_reverse_iterator rbegin() const {
+    subregion_reverse_iterator rbegin() {
       return subregion_reverse_iterator(begin());
     }
-    subregion_reverse_iterator rend() const {
+    subregion_reverse_iterator rend() {
       return subregion_reverse_iterator(end());
     }
 
@@ -458,7 +458,7 @@ public:
   ///
   /// We use tail allocation of the extra data for loops so we do not incur the
   /// memory cost of large SmallVectors for BBs.
-  subregion_iterator subregion_begin() const {
+  subregion_iterator subregion_begin() {
     if (isBlock())
       return subregion_iterator();
     return getSubregionData().begin();
@@ -466,7 +466,7 @@ public:
 
   /// This is the end equivalent of subregion_begin(). Please see comment on
   /// subregion_begin().
-  subregion_iterator subregion_end() const {
+  subregion_iterator subregion_end() {
     if (isBlock())
       return subregion_iterator();
     return getSubregionData().end();
@@ -474,36 +474,39 @@ public:
 
   bool subregions_empty() const { return getSubregionData().empty(); }
   unsigned subregions_size() const { return getSubregionData().size(); }
-  subregion_reverse_iterator subregion_rbegin() const {
+  subregion_reverse_iterator subregion_rbegin() {
     return getSubregionData().rbegin();
   }
-  subregion_reverse_iterator subregion_rend() const {
+  subregion_reverse_iterator subregion_rend() {
     return getSubregionData().rend();
   }
-  llvm::iterator_range<subregion_iterator> getSubregions() const {
+  llvm::iterator_range<subregion_iterator> getSubregions() {
     return {subregion_begin(), subregion_end()};
   }
-  llvm::iterator_range<subregion_reverse_iterator>
-  getReverseSubregions() const {
+  llvm::iterator_range<subregion_reverse_iterator> getReverseSubregions() {
     return {subregion_rbegin(), subregion_rend()};
   }
 
   /// Returns true if \p R is an immediate subregion of this region.
-  bool containsSubregion(LoopRegion *R) const {
+  bool containsSubregion(LoopRegion *R) {
     auto End = subregion_end();
     return std::find(subregion_begin(), End, R->getID()) != End;
   }
 
-  using const_pred_iterator = decltype(Preds)::const_iterator;
-  const_pred_iterator pred_begin() const { return Preds.begin(); }
-  const_pred_iterator pred_end() const { return Preds.end(); }
+  using pred_iterator = decltype(Preds)::iterator;
+  using pred_const_iterator = decltype(Preds)::const_iterator;
+
+  pred_iterator pred_begin() { return Preds.begin(); }
+  pred_iterator pred_end() { return Preds.end(); }
+  pred_const_iterator pred_begin() const { return Preds.begin(); }
+  pred_const_iterator pred_end() const { return Preds.end(); }
   bool pred_empty() const { return Preds.empty(); }
   unsigned pred_size() const { return Preds.size(); }
-  iterator_range<const_pred_iterator> getPreds() const {
-    return {pred_begin(), pred_end()};
-  }
 
+  using succ_iterator = decltype(Succs)::iterator;
   using succ_const_iterator = decltype(Succs)::const_iterator;
+  succ_iterator succ_begin() { return Succs.begin(); }
+  succ_iterator succ_end() { return Succs.end(); }
   succ_const_iterator succ_begin() const { return Succs.begin(); }
   succ_const_iterator succ_end() const { return Succs.end(); }
   bool succ_empty() const { return Succs.empty(); }
