@@ -560,25 +560,6 @@ public:
     return getSubregionData().RPONumOfHeaderBlock;
   }
 
-  void replacePred(unsigned OldPredID, unsigned NewPredID) {
-    for (unsigned i : indices(Preds)) {
-      if (Preds[i] != OldPredID)
-        continue;
-      Preds[i] = NewPredID;
-      // This may not be necessary. I am just being conservative for now and it
-      // shouldn't be expensive.
-      //
-      // TODO: Investigate if this can be removed.
-      sortUnique(Preds);
-      return;
-    }
-    llvm_unreachable("Replacing OldPredID that is not a predecessor?");
-  }
-
-  /// Replace OldSuccID by NewSuccID, just deleting OldSuccID if what NewSuccID
-  /// is already in the list.
-  void replaceSucc(unsigned OldSuccID, unsigned NewSuccID, bool IsNonLocal);
-
   void dump() const;
   void print(llvm::raw_ostream &os, bool insertSpaces = false) const;
   void dumpName() const;
@@ -628,6 +609,25 @@ private:
     Succs.push_back(SuccID);
     return Index;
   }
+
+  void replacePred(unsigned OldPredID, unsigned NewPredID) {
+    for (unsigned i : indices(Preds)) {
+      if (Preds[i] != OldPredID)
+        continue;
+      Preds[i] = NewPredID;
+      // This may not be necessary. I am just being conservative for now and it
+      // shouldn't be expensive.
+      //
+      // TODO: Investigate if this can be removed.
+      sortUnique(Preds);
+      return;
+    }
+    llvm_unreachable("Replacing OldPredID that is not a predecessor?");
+  }
+
+  /// Replace OldSuccID by NewSuccID, just deleting OldSuccID if what NewSuccID
+  /// is already in the list.
+  void replaceSucc(unsigned OldSuccID, unsigned NewSuccID, bool IsNonLocal);
 
   /// Set the IsDead flag on all successors of this region that have an id \p
   /// ID.
