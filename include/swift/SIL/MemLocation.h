@@ -36,6 +36,9 @@ namespace swift {
 //===----------------------------------------------------------------------===//
 /// Forward declaration.
 class MemLocation;
+
+/// Type declarations.
+using MemLocationSet = llvm::DenseSet<MemLocation>;
 using MemLocationList = llvm::SmallVector<MemLocation, 8>;
 
 class MemLocation {
@@ -98,10 +101,12 @@ public:
     return HC;
   }
 
-  /// Returns the type of the MemLocation.
+  /// Returns the type of the object the MemLocation represents.
   SILType getType() const {
+    // Base might be a address type, e.g. from alloc_stack of struct,
+    // enum or tuples.
     if (Path.getValue().empty())
-      return Base.getType();
+      return Base.getType().getObjectType();
     return Path.getValue().front().getType();
   }
 
@@ -163,23 +168,24 @@ public:
   /// Print MemLocation.
   void print() const;
 
-  /// Given the MemLocation Base, expand every leaf nodes in the type tree.
-  /// Include the intermediate nodes if OnlyLeafNode is false.
-  static void BreadthFirstList(MemLocation &Base, SILModule *Mod,
-                               MemLocationList &F,
-                               bool OnlyLeafNode);
+  ///============================/// 
+  ///       static functions.    ///
+  ///============================/// 
+
+  /// Given Base and 2 ProjectionPaths, create a MemLocation out of them.
+  static MemLocation createMemLocation(SILValue Base, ProjectionPath &P1,
+                                       ProjectionPath &P2);
 
   /// Expand this location to all individual fields it contains.
   ///
   /// In SIL, we can have a store to an aggregate and loads from its individual
   /// fields. Therefore, we expand all the operations on aggregates onto
-  /// individual fields.
-  static void expand(MemLocation &Base, SILModule *Mod, MemLocationList &F);
+  /// individual fields and process them separately.
+  static void expand(MemLocation &Base, SILModule *Mod, MemLocationList &Locs);
 
   /// Given a set of locations derived from the same base, try to merge/reduce
   /// them into smallest number of MemLocations possible.
-  static void reduce(MemLocation &Base, SILModule *Mod,
-                     llvm::DenseSet<MemLocation> &Locs);
+  static void reduce(MemLocation &Base, SILModule *Mod, MemLocationSet &Locs);
 
   /// Enumerate the given Mem MemLocation.
   static void enumerateMemLocation(SILModule *M, SILValue Mem,

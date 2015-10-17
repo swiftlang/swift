@@ -504,7 +504,7 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   // writes.
   bool Dead = true;
   MemLocationList Locs;
-  MemLocation::expand(L, &I->getModule(), Locs);
+  MemLocation::expand(L, Mod, Locs);
   llvm::BitVector V(Locs.size());
   unsigned idx = 0;
   for (auto &E : Locs) {
@@ -575,13 +575,11 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
 }
 
 void DSEContext::processLoadInst(SILInstruction *I) {
-  // Loading a loadable type.
   SILValue Mem = cast<LoadInst>(I)->getOperand();
   processRead(I, getBBLocState(I), Mem);
 }
 
 void DSEContext::processStoreInst(SILInstruction *I, bool PDSE) {
-  // Storing a loadable type.
   SILValue Val = cast<StoreInst>(I)->getSrc();
   SILValue Mem = cast<StoreInst>(I)->getDest();
   processWrite(I, getBBLocState(I), Val, Mem, PDSE);

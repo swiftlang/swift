@@ -32,6 +32,8 @@
 namespace swift {
 
 class SILBuilder;
+class ProjectionPath;
+using ProjectionPathList = llvm::SmallVector<Optional<ProjectionPath>, 8>;
 
 /// Extract an integer index from a SILValue.
 ///
@@ -416,6 +418,12 @@ public:
 
   static Optional<ProjectionPath>
   subtractPaths(const ProjectionPath &LHS, const ProjectionPath &RHS);
+
+  /// Given the SILType Base, expand every leaf nodes in the type tree.
+  /// Include the intermediate nodes if OnlyLeafNode is false.
+  static void BreadthFirstEnumTypeProjection(SILType BaseType, SILModule *Mod,
+                                             ProjectionPathList &P,
+                                             bool OnlyLeafNode);
 
   /// Returns true if the two paths have a non-empty symmetric difference.
   ///

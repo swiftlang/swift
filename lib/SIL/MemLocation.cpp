@@ -30,18 +30,16 @@ using namespace swift;
 // Base will point to %1, but not %2. Projection path will indicate which
 // field is accessed.
 //
-// This will make comparison between locations easier and this eases the
-// implementation of intersection operator in the data flow. e.g. if
-// MemLocation are available from multiple paths in the CFG and they are
-// accessed in different ways
+// Creating a canonicalized view on memory locations will make comparison
+// between locations easier and also eases the implementation of intersection
+// operator in the data flow. e.g. if MemLocation are available from multiple
+// paths in the CFG and they are accessed in different ways
 void MemLocation::initialize(SILValue Dest) {
   Base = getUnderlyingObject(Dest);
   Path = ProjectionPath::getAddrProjectionPath(Base, Dest);
 }
 
-void MemLocation::print() const {
-  llvm::outs() << *this;
-}
+void MemLocation::print() const { llvm::outs() << *this; }
 
 bool MemLocation::hasIdenticalProjectionPath(const MemLocation &RHS) const {
   // If both Paths have no value, then the 2 locations are different.
@@ -60,66 +58,16 @@ bool MemLocation::hasIdenticalProjectionPath(const MemLocation &RHS) const {
   return true;
 }
 
-void MemLocation::BreadthFirstList(MemLocation &B, SILModule *Mod,
-                                   MemLocationList &Locs,
-                                   bool OnlyLeafNode) {
-  // Perform a BFS to expand the given type into locations each of which
-  // contains 1 field from the type.
-  MemLocationList Worklist;
-  llvm::SmallVector<Projection, 8> Projections;
-
-  Worklist.push_back(B);
-  while (!Worklist.empty()) {
-    // Get the next level projections based on current location's type.
-    MemLocation L = Worklist.pop_back_val();
-
-    // If this is a class type, we have reached the end of the type
-    // tree for this memory location.
-    //
-    // We do not push its next level projection into the worklist,
-    // if we do that, we could run into an infinite loop, e.g. 
-    //
-    //   class SelfLoop {
-    //     var p : SelfLoop
-    //   }
-    //
-    //   struct XYZ {
-    //     var x : Int
-    //     var y : SelfLoop
-    //   }
-    //
-    // The worklist would never be empty in this case !.
-    //
-    if (L.getType().getClassOrBoundGenericClass()) {
-      Locs.push_back(L);
-      continue;
-    }
-
-    Projections.clear();
-    Projection::getFirstLevelProjections(L.getType(), *Mod, Projections);
-
-    // Reached the end of the projection tree, this field can not be expanded
-    // anymore.
-    if (Projections.empty()) {
-      Locs.push_back(L);
-      continue;
-    }
-
-    // Keep the intermediate nodes as well.
-    if (!OnlyLeafNode)
-      Locs.push_back(L);
-
-    // Keep expanding the location.
-    for (auto &P : Projections) {
-      ProjectionPath X;
-      X.append(P);
-      X.append(L.getPath().getValue());
-      MemLocation Next(L.getBase(), X);
-      Worklist.push_back(Next);
-    }
-  }
+bool MemLocation::isMustAliasMemLocation(const MemLocation &RHS,
+                                         AliasAnalysis *AA) {
+  // If the bases are not must-alias, the locations may not alias.
+  if (!AA->isMustAlias(Base, RHS.getBase()))
+    return false;
+  // If projection paths are different, then the locations can not alias.
+  if (!hasIdenticalProjectionPath(RHS))
+    return false;
+  return true;
 }
-
 
 bool MemLocation::isMayAliasMemLocation(const MemLocation &RHS,
                                         AliasAnalysis *AA) {
@@ -131,6 +79,15 @@ bool MemLocation::isMayAliasMemLocation(const MemLocation &RHS,
   if (hasNonEmptySymmetricPathDifference(RHS))
     return false;
   return true;
+}
+
+MemLocation MemLocation::createMemLocation(SILValue Base,
+                                           ProjectionPath &P1,
+                                           ProjectionPath &P2) {
+  ProjectionPath T;
+  T.append(P1);
+  T.append(P2);
+  return MemLocation(Base, T);
 }
 
 void MemLocation::getFirstLevelMemLocations(MemLocationList &Locs,
@@ -148,33 +105,52 @@ void MemLocation::getFirstLevelMemLocations(MemLocationList &Locs,
 
 void MemLocation::expand(MemLocation &Base, SILModule *Mod,
                          MemLocationList &Locs) {
-  // Perform a BFS to expand the given type into locations each of which
-  // contains 1 field from the type.
-  MemLocation::BreadthFirstList(Base, Mod, Locs, true);
+  // To expand a memory location to its indivisible parts, we first get the
+  // projection paths from the accessed type to each indivisible field, i.e.
+  // leaf nodes, then we append these projection paths to the Base.
+  ProjectionPathList Paths;
+  ProjectionPath::BreadthFirstEnumTypeProjection(Base.getType(), Mod, Paths,
+                                                 true);
+
+  // Construct the MemLocation by appending the projection path from the
+  // accessed node to the leaf nodes.
+  for (auto &X : Paths) {
+    Locs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
+                                                  Base.getPath().getValue()));
+  }
 }
 
 void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
-                         llvm::DenseSet<MemLocation> &Locs) {
-  // Nothing to merge.
-  if (Locs.empty())
-    return;
-
+                         MemLocationSet &Locs) {
   // Get all the nodes in the projection tree, then go from leaf nodes to their
   // parents. This guarantees that at the point the parent is processed, its 
   // children have been processed already.
-  MemLocationList AllLocs;
-  MemLocation::BreadthFirstList(Base, Mod, AllLocs, false);
-  for (auto I = AllLocs.rbegin(), E = AllLocs.rend(); I != E; ++I) {
+  MemLocationList ALocs;
+  ProjectionPathList Paths;
+  ProjectionPath::BreadthFirstEnumTypeProjection(Base.getType(), Mod, Paths,
+                                                 false);
+
+  // Construct the MemLocation by appending the projection path from the
+  // accessed node to the leaf nodes.
+  for (auto &X : Paths) {
+    ALocs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
+                                                   Base.getPath().getValue()));
+  }
+
+  for (auto I = ALocs.rbegin(), E = ALocs.rend(); I != E; ++I) {
+    MemLocationList FirstLevel;
+    I->getFirstLevelMemLocations(FirstLevel, Mod);
+    // Reached the end of the projection tree, this field can not be expanded
+    // anymore.
+    if (FirstLevel.empty())
+      continue;
+
     // If this is a class reference type, we have reached end of the type tree.
     if (I->getType().getClassOrBoundGenericClass())
       continue;
 
-    MemLocationList FirstLevel;
-    I->getFirstLevelMemLocations(FirstLevel, Mod);
-
-    if (FirstLevel.empty())
-      continue;
-
+    // This is NOT a leaf node, check whether all its first level children are
+    // alive.
     bool Alive = true;
     for (auto &X : FirstLevel) {
       if (Locs.find(X) != Locs.end())
@@ -189,17 +165,6 @@ void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
       Locs.insert(*I);
     }
   }
-}
-
-bool MemLocation::isMustAliasMemLocation(const MemLocation &RHS,
-                                         AliasAnalysis *AA) {
-  // If the bases are not must-alias, the locations may not alias.
-  if (!AA->isMustAlias(Base, RHS.getBase()))
-    return false;
-  // If projection paths are different, then the locations can not alias.
-  if (!hasIdenticalProjectionPath(RHS))
-    return false;
-  return true;
 }
 
 void
@@ -244,5 +209,3 @@ MemLocation::enumerateMemLocations(SILFunction &F,
     }
   }
 }
-
-

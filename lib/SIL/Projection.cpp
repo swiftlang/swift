@@ -582,6 +582,76 @@ ProjectionPath::subtractPaths(const ProjectionPath &LHS, const ProjectionPath &R
   return P;
 }
 
+void
+ProjectionPath::BreadthFirstEnumTypeProjection(SILType B, SILModule *Mod,
+                                               ProjectionPathList &Paths,
+                                               bool OnlyLeafNode) {
+  // Perform a BFS to expand the given type into projectionpath each of 
+  // which contains 1 field from the type.
+  ProjectionPathList Worklist;
+  llvm::SmallVector<Projection, 8> Projections;
+
+  // Push an empty projection path to get started.
+  SILType Ty;
+  ProjectionPath P;
+  Worklist.push_back(std::move(P));
+  do {
+    // Get the next level projections based on current projection's type.
+    Optional<ProjectionPath> PP = Worklist.pop_back_val();
+    // Get the current type to process, the very first projection path will be
+    // empty.
+    Ty = PP.getValue().empty() ? B : PP.getValue().front().getType();
+
+    // Get the first level projection of the current type.
+    Projections.clear();
+    Projection::getFirstLevelProjections(Ty, *Mod, Projections);
+
+    // Reached the end of the projection tree, this field can not be expanded
+    // anymore.
+    if (Projections.empty()) {
+      Paths.push_back(std::move(PP.getValue()));
+      continue;
+    }
+
+    // If this is a class type, we also have reached the end of the type
+    // tree for this type.
+    //
+    // We do not push its next level projection into the worklist,
+    // if we do that, we could run into an infinite loop, e.g.
+    //
+    //   class SelfLoop {
+    //     var p : SelfLoop
+    //   }
+    //
+    //   struct XYZ {
+    //     var x : Int
+    //     var y : SelfLoop
+    //   }
+    //
+    // The worklist would never be empty in this case !.
+    //
+    if (Ty.getClassOrBoundGenericClass()) {
+      Paths.push_back(std::move(PP.getValue()));
+      continue;
+    }
+
+    // This is NOT a leaf node, keep the intermediate nodes as well.
+    if (!OnlyLeafNode)
+      Paths.push_back(std::move(PP.getValue()));
+
+    // Keep expanding the location.
+    for (auto &P : Projections) {
+      ProjectionPath X;
+      X.append(P);
+      X.append(PP.getValue());
+      Worklist.push_back(std::move(X));
+    }
+    // Keep iterating if the worklist is not empty.
+  } while (!Worklist.empty());
+}
+
+
+
 //===----------------------------------------------------------------------===//
 //                             ProjectionTreeNode
 //===----------------------------------------------------------------------===//
