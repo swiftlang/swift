@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_CALLGRAPH_H
 #define SWIFT_SIL_CALLGRAPH_H
 
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/Support/Allocator.h"
@@ -42,22 +43,75 @@ static inline bool canHaveIndirectUses(SILFunction *F) {
 class CallGraphNode;
 
 class CallGraphEdge {
+  // FIXME: this should be private
 public:
   // TODO: Consider increasing SmallSize when we handle method calls.
-  typedef llvm::SmallSetVector<CallGraphNode *, 2> CalleeSetType;
+  typedef llvm::SmallSetVector<CallGraphNode *, 2> CallGraphNodeSet;
+  typedef llvm::PointerIntPair<CallGraphNodeSet *, 1> CalleeSet;
 
-private:
+public:
+  // Representation of the callees that this call site can call into.
+  class Callees {
+    friend class CallGraphEdge;
+
+    static SILFunction *getFunctionFromNode(CallGraphNode *const &Node);
+
+    typedef llvm::PointerUnion<CallGraphNode *, CalleeSet> CalleeStorage;
+    typedef ArrayRefView<CallGraphNode *,
+                         SILFunction *,
+                         getFunctionFromNode> CalleeFunctionView;
+
+    CalleeStorage TheCallees;
+
+    explicit Callees(CallGraphNode *Node) : TheCallees(Node) {}
+    explicit Callees(CalleeSet TheCallees) : TheCallees(TheCallees) {}
+
+  public:
+    CalleeFunctionView::iterator begin() {
+      return getFunctionView().begin();
+    }
+
+    CalleeFunctionView::iterator end() {
+      return getFunctionView().end();
+    }
+
+    bool canCallArbitraryFunction() {
+      if (TheCallees.is<CalleeSet>())
+        return TheCallees.get<CalleeSet>().getInt();
+
+      if (TheCallees.get<CallGraphNode *>())
+        return false;
+
+      // We use nullptr to represent the case where we have no
+      // information about the callees.
+      return true;
+    }
+
+  private:
+    CalleeFunctionView getFunctionView() {
+      // Make a view over the entire callee set.
+      if (TheCallees.is<CalleeSet>()) {
+        auto *Set = TheCallees.get<CalleeSet>().getPointer();
+        return llvm::makeArrayRef(Set->begin(),
+                                  Set->end());
+      }
+
+      auto *Node = TheCallees.get<CallGraphNode *>();
+      // Create a singleton view.
+      if (Node)
+        return llvm::makeArrayRef(TheCallees.getAddrOfPtr1(), 1);
+
+      // Create an empty view.
+      return llvm::makeArrayRef((CallGraphNode **) nullptr, 0);
+    }
+  };
+
+
   // The call site represented by this call graph edge.
   FullApplySite TheApply;
 
-  typedef llvm::PointerUnion<CallGraphNode *,
-                             CalleeSetType *> CalleeSetImplType;
-
-  // The set of functions potentially called from this call site. This
-  // might include functions that are not actually callable based on
-  // dynamic types. If the int bit is non-zero, the set is complete in
-  // the sense that no function outside the set could be called.
-  llvm::PointerIntPair<CalleeSetImplType, 1> CalleeSet;
+  // The set of things we know this apply can call into.
+  Callees CallsiteCallees;
 
   // A unique identifier for this edge based on the order in which it
   // was created relative to other edges.
@@ -67,9 +121,7 @@ public:
   /// Create a call graph edge for a call site with a single known
   /// callee.
   CallGraphEdge(FullApplySite TheApply, CallGraphNode *Node, unsigned Ordinal)
-    : TheApply(TheApply),
-      CalleeSet(Node, true),
-      Ordinal(Ordinal) {
+    : TheApply(TheApply), CallsiteCallees(Node), Ordinal(Ordinal) {
     assert(Node != nullptr && "Expected non-null callee node!");
   }
 
@@ -77,16 +129,16 @@ public:
   /// currently able to determine the callees.
   CallGraphEdge(FullApplySite TheApply, unsigned Ordinal)
     : TheApply(TheApply),
-      CalleeSet((CallGraphNode *) nullptr, false),
+      CallsiteCallees((CallGraphNode *) nullptr),
       Ordinal(Ordinal) {
   }
 
   /// Create a call graph edge for a call site where we will fill in
   /// the set of potentially called functions later.
-  CallGraphEdge(FullApplySite TheApply, CalleeSetType * const KnownCallees,
-                bool Complete, unsigned Ordinal)
+  CallGraphEdge(FullApplySite TheApply, CalleeSet KnownCallees,
+                unsigned Ordinal)
     : TheApply(TheApply),
-      CalleeSet(KnownCallees, Complete),
+      CallsiteCallees(KnownCallees),
       Ordinal(Ordinal) {
   }
 
@@ -98,26 +150,29 @@ public:
   FullApplySite getApply() { return TheApply; }
 
   /// Return the callee set.
-  CalleeSetType getCalleeSet() const {
-    if (CalleeSet.getPointer().is<CalleeSetType *>())
-      return *CalleeSet.getPointer().get<CalleeSetType *>();
+  CallGraphNodeSet getCalleeSet() const {
+    auto TheCallees = CallsiteCallees.TheCallees;
+    if (TheCallees.is<CalleeSet>())
+      return *TheCallees.get<CalleeSet>().getPointer();
 
-    CalleeSetType Result;
-    if (auto *Node = CalleeSet.getPointer().get<CallGraphNode *>())
+    CallGraphNodeSet Result;
+    if (auto *Node = TheCallees.get<CallGraphNode *>()) {
+      assert(Node &&
+             "Cannot get callee set for callsite with no known callees!");
       Result.insert(Node);
+    }
 
     return Result;
   }
 
-  /// Return whether the call set is known to be complete.
-  bool isCalleeSetComplete() const {
-    return CalleeSet.getInt();
+  Callees getCallees() const {
+    return CallsiteCallees;
   }
 
   /// Return true if this edge represents a call to potentially any
   /// arbitrary function with an appropriate signature.
   bool canCallArbitraryFunction() const {
-    return !isCalleeSetComplete();
+    return getCallees().canCallArbitraryFunction();
   }
 
   /// The apply has a complete callee set, and it's of size one. In
@@ -129,17 +184,17 @@ public:
 
   /// Gets the single callee if the apply has one.
   CallGraphNode *getSingleCalleeOrNull() const {
-    if (!isCalleeSetComplete())
+    if (canCallArbitraryFunction())
       return nullptr;
 
-    if (CalleeSet.getPointer().is<CallGraphNode *>())
-      return CalleeSet.getPointer().get<CallGraphNode *>();
+    if (CallsiteCallees.TheCallees.is<CallGraphNode *>())
+      return CallsiteCallees.TheCallees.get<CallGraphNode *>();
 
-    auto *CS = CalleeSet.getPointer().get<CalleeSetType *>();
-    if (CS->size() != 1)
+    auto CS = CallsiteCallees.TheCallees.get<CalleeSet>();
+    if (CS.getPointer()->size() != 1)
       return nullptr;
 
-    return *CS->begin();
+    return *CS.getPointer()->begin();
   }
 
   unsigned getOrdinal() const {
@@ -283,7 +338,7 @@ class CallGraph {
   /// Map from function decls for methods to sets of CallGraphNodes
   /// representing functions that can be reached via that decl.
   llvm::DenseMap<AbstractFunctionDecl *,
-                 CallGraphEdge::CalleeSetType *> CalleeSets;
+                 CallGraphEdge::CalleeSet> CalleeSets;
 
   /// An allocator used by the callgraph.
   llvm::BumpPtrAllocator Allocator;
@@ -343,14 +398,19 @@ public:
 
   // Call graph queries on call sites.
 
-  bool isCalleeSetComplete(FullApplySite FAS) {
-    return getCallGraphEdge(FAS)->isCalleeSetComplete();
+  bool canCallArbitraryFunction(FullApplySite FAS) {
+    return getCallGraphEdge(FAS)->canCallArbitraryFunction();
   }
 
   /// Return the callee set for the given call site.
-  CallGraphEdge::CalleeSetType
+  CallGraphEdge::CallGraphNodeSet
   getCalleeSet(FullApplySite FAS) const {
     return getCallGraphEdge(FAS)->getCalleeSet();
+  }
+
+  /// Return the callees for the given call site.
+  CallGraphEdge::Callees getCallees(FullApplySite FAS) const {
+    return getCallGraphEdge(FAS)->getCallees();
   }
 
   /// Is this call site known to call exactly one single function?
@@ -413,12 +473,8 @@ private:
     return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
   }
 
-  CallGraphEdge::CalleeSetType *
-  tryGetCalleeSetForClassMethod(SILDeclRef Decl);
-
-  CallGraphEdge::CalleeSetType *
-  getOrCreateCalleeSetForClassMethod(SILDeclRef Decl);
-
+  CallGraphEdge::CalleeSet tryGetCalleeSetForClassMethod(SILDeclRef Decl);
+  CallGraphEdge::CalleeSet getOrCreateCalleeSetForClassMethod(SILDeclRef Decl);
 
   CallGraphNode *tryGetCallGraphNode(SILFunction *F) const {
     return const_cast<CallGraph *>(this)->tryGetCallGraphNode(F);

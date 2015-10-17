@@ -113,10 +113,10 @@ void CallGraph::computeClassMethodCalleesForClass(ClassDecl *CD) {
     // overrides by inserting the call graph node for the function
     // that this method invokes.
     do {
-      auto *CalleeSet = getOrCreateCalleeSetForClassMethod(Method);
-      assert(CalleeSet && "Unexpected null callee set!");
+      auto TheCalleeSet = getOrCreateCalleeSetForClassMethod(Method);
+      assert(TheCalleeSet.getPointer() && "Unexpected null callee set!");
 
-      CalleeSet->insert(Node);
+      TheCalleeSet.getPointer()->insert(Node);
       Method = Method.getOverriddenVTableEntry();
     } while (Method);
   }
@@ -125,11 +125,11 @@ void CallGraph::computeClassMethodCalleesForClass(ClassDecl *CD) {
 /// Incrementally compute the callees for each method of each class
 /// that we have a VTable for.
 void CallGraph::computeClassMethodCallees() {
-
   // Remove contents of old callee sets - in case we are updating the sets.
   for (auto Iter : CalleeSets) {
-    auto *CalleeSet = Iter.second;
-    CalleeSet->clear();
+    auto *TheCalleeSet = Iter.second.getPointer();
+    Iter.second.setInt(false);
+    TheCalleeSet->clear();
   }
 
   for (auto &VTable : M.getVTableList())
@@ -151,7 +151,7 @@ CallGraphNode *CallGraph::addCallGraphNode(SILFunction *F) {
   return Node;
 }
 
-CallGraphEdge::CalleeSetType *
+CallGraphEdge::CalleeSet
 CallGraph::tryGetCalleeSetForClassMethod(SILDeclRef Decl) {
   auto *AFD = cast<AbstractFunctionDecl>(Decl.getDecl());
 
@@ -159,21 +159,32 @@ CallGraph::tryGetCalleeSetForClassMethod(SILDeclRef Decl) {
   if (Found != CalleeSets.end())
     return Found->second;
 
-  return nullptr;
+  return CallGraphEdge::CalleeSet(nullptr, true);
 }
 
-CallGraphEdge::CalleeSetType *
+CallGraphEdge::CalleeSet
 CallGraph::getOrCreateCalleeSetForClassMethod(SILDeclRef Decl) {
-  if (auto *ExistingSet = tryGetCalleeSetForClassMethod(Decl))
+  auto ExistingSet = tryGetCalleeSetForClassMethod(Decl);
+  if (ExistingSet.getPointer())
     return ExistingSet;
 
   auto *AFD = cast<AbstractFunctionDecl>(Decl.getDecl());
-  auto *CalleeSet = new (Allocator) CallGraphEdge::CalleeSetType;
-  CalleeSets.insert(std::make_pair(AFD, CalleeSet));
+  auto *NodeSet = new (Allocator) CallGraphEdge::CallGraphNodeSet;
 
-  return CalleeSet;
+  // Allocate a new callee set, with the default that we assume this
+  // decl could result in calling arbitrary functions with matching
+  // signatures. We'll refine this when we compute the actual set of
+  // callees.
+  CallGraphEdge::CalleeSet TheCalleeSet(NodeSet, true);
+  CalleeSets.insert(std::make_pair(AFD, TheCalleeSet));
+
+  return TheCalleeSet;
 }
 
+SILFunction *
+CallGraphEdge::Callees::getFunctionFromNode(CallGraphNode *const &Node) {
+  return Node->getFunction();
+}
 
 CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
                                                      SILValue Callee) {
@@ -250,17 +261,16 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
   case ValueKind::ClassMethodInst: {
     auto *CMI = cast<ClassMethodInst>(Callee);
 
-    auto *CalleeSet = tryGetCalleeSetForClassMethod(CMI->getMember());
+    auto CalleeSet = tryGetCalleeSetForClassMethod(CMI->getMember());
 
     // FIXME: Review the cases where we are not currently generating
     //        callee sets.
-    if (!CalleeSet)
+    if (!CalleeSet.getPointer())
       return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
 
-    bool Complete = false;
+    // TODO: Determine whether the callee set is complete.
 
-    return new (Allocator) CallGraphEdge(Apply, CalleeSet, Complete,
-                                         EdgeOrdinal++);
+    return new (Allocator) CallGraphEdge(Apply, CalleeSet, EdgeOrdinal++);
   }
 
   case ValueKind::SuperMethodInst:
@@ -418,7 +428,7 @@ void CallGraphEdge::print(llvm::raw_ostream &OS, int Indent) {
   OS << CallGraphFileCheckPrefix << "Call site #" << Ordinal << ": ";
   OS << *getApply().getInstruction();
 
-  printFlag(OS, "All callees known", isCalleeSetComplete(), Indent);
+  printFlag(OS, "Unknown callees", canCallArbitraryFunction(), Indent);
 
   if (getCalleeSet().empty())
     return;
@@ -819,7 +829,7 @@ void CallGraph::verify() const {
 
   // Verify the callee sets.
   for (auto Iter : CalleeSets) {
-    auto *CalleeSet = Iter.second;
+    auto *CalleeSet = Iter.second.getPointer();
     for (CallGraphNode *Node : *CalleeSet) {
       SILFunction *F = Node->getFunction();
       assert(tryGetCallGraphNode(F) &&
@@ -853,7 +863,7 @@ void CallGraph::verify(SILFunction *F) const {
       assert(ApplyToEdgeMap.lookup(FAS) == Edge &&
              "Edge is not in ApplyToEdgeMap");
 
-      if (Edge->isCalleeSetComplete()) {
+      if (!Edge->canCallArbitraryFunction()) {
         // In the trivial case that we call a known function, check if we have
         // exactly one callee in the edge.
         SILValue Callee = FAS.getCallee();
@@ -1077,7 +1087,7 @@ namespace llvm {
                                          OrderedCallGraph::child_iterator I,
                                          const OrderedCallGraph *Graph) {
       CallGraphEdge *Edge = I.baseIter->CGEdge;
-      if (!Edge->isCalleeSetComplete())
+      if (Edge->canCallArbitraryFunction())
         return "color=\"red\"";
       return "";
     }

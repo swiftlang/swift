@@ -369,15 +369,15 @@ void SideEffectAnalysis::getEffectsOfApply(FunctionEffects &ApplyEffects,
   if (getSemanticEffects(ApplyEffects, FAS))
     return;
 
-  if (!CG.isCalleeSetComplete(FAS)) {
+  if (CG.canCallArbitraryFunction(FAS)) {
     ApplyEffects.setWorstEffects();
     return;
   }
 
   // We can see all the callees. So we just merge the effects from all of
   // them.
-  for (auto *Node : CG.getCalleeSet(FAS)) {
-    auto *E = getFunctionEffects(Node->getFunction(), isRecomputing);
+  for (auto *F : CG.getCallees(FAS)) {
+    auto *E = getFunctionEffects(F, isRecomputing);
     ApplyEffects.mergeFrom(*E);
   }
 }

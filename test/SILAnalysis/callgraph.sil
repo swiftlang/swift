@@ -28,7 +28,7 @@ bb0:
 // CHECK: Call sites:
 
 // CHECK: Call site #0:   %1 = apply %0() : $@convention(thin) () -> ()
-// CHECK: All callees known: yes
+// CHECK: Unknown callees: no
 // CHECK: Known callees:
 // CHECK: Name: private_bottom
 // CHECK: Demangled: private_bottom
@@ -54,7 +54,7 @@ bb0:
 // CHECK: Call sites:
 
 // CHECK: Call site #1:   %1 = apply %0() : $@convention(thin) () -> ()
-// CHECK: All callees known: yes
+// CHECK: Unknown callees: no
 // CHECK: Known callees:
 // CHECK: Name: private_middle
 // CHECK: Demangled: private_middle
@@ -94,7 +94,7 @@ bb0:
 // CHECK: Call sites:
 
 // CHECK: Call site #2:   %1 = apply %0() : $@convention(thin) () -> ()
-// CHECK: All callees known: yes
+// CHECK: Unknown callees: no
 // CHECK: Known callees:
 // CHECK: Name: internal_bottom
 // CHECK: Demangled: internal_bottom
@@ -123,7 +123,7 @@ bb0:
 // CHECK: Call sites:
 
 // CHECK: Call site #3:   %1 = apply %0() : $@convention(thin) () -> ()
-// CHECK: All callees known: yes
+// CHECK: Unknown callees: no
 // CHECK: Known callees:
 // CHECK: Name: internal_middle
 // CHECK: Demangled: internal_middle
@@ -160,7 +160,7 @@ bb0:
 // CHECK: Call sites:
 
 // CHECK: Call site #4:   %1 = apply %0() : $@convention(thin) () -> ()
-// CHECK: All callees known: yes
+// CHECK: Unknown callees: no
 // CHECK: Known callees:
 // CHECK: Name: public_bottom
 // CHECK: Demangled: public_bottom
@@ -186,7 +186,7 @@ bb0:
 // CHECK: Call sites:
 
 // CHECK: Call site #5:   %1 = apply %0() : $@convention(thin) () -> ()
-// CHECK: All callees known: yes
+// CHECK: Unknown callees: no
 // CHECK: Known callees:
 // CHECK: Name: public_middle
 // CHECK: Demangled: public_middle
