@@ -1,0 +1,67 @@
+// RUN: %target-sil-opt %s -memlocation-dump -ml=only-type-expansion | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+struct Int {
+  var value : Builtin.Int64
+}
+
+struct Int64 {
+  var value : Builtin.Int64
+}
+
+struct Bool {
+  var value : Builtin.Int1
+}
+
+struct S1 {
+  var a: Int
+  var b: Int
+  init(a: Int, b: Int)
+  init()
+}
+
+struct S2 {
+  var a: Int
+  var b: S1
+  init(a: Int, b: S1)
+  init()
+}
+
+sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
+sil @S2_init : $@convention(thin) (@thin S2.Type) -> S2
+
+// CHECK-LABEL: @test_struct_type_expansion
+// CHECK:  store
+// CHECK-NEXT: Int64
+// CHECK-NEXT: Int
+// CHECK-NEXT: Int64
+// CHECK-NEXT: Int
+// CHECK: store
+// CHECK-NEXT: Int64
+// CHECK-NEXT: Int
+// CHECK-NEXT: S1
+// CHECK-NEXT: Int64
+// CHECK-NEXT: Int
+// CHECK-NEXT: S1
+// CHECK-NEXT: Int64
+// CHECK-NEXT: Int
+sil hidden @test_struct_type_expansion : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S1  // var a                   // users: %5, %12
+  %1 = alloc_stack $S2  // var b                  // users: %9, %11
+  %2 = function_ref @S1_init : $@convention(thin) (@thin S1.Type) -> S1 // user: %4
+  %3 = metatype $@thin S1.Type                     // user: %4
+  %4 = apply %2(%3) : $@convention(thin) (@thin S1.Type) -> S1 // user: %5
+  store %4 to %0#1 : $*S1                          // id: %5
+  %6 = function_ref @S2_init : $@convention(thin) (@thin S2.Type) -> S2 // user: %8
+  %7 = metatype $@thin S2.Type                    // user: %8
+  %8 = apply %6(%7) : $@convention(thin) (@thin S2.Type) -> S2 // user: %9
+  store %8 to %1#1 : $*S2                         // id: %9
+  %10 = tuple ()                                  // user: %13
+  dealloc_stack %1#0 : $*@local_storage S2        // id: %11
+  dealloc_stack %0#0 : $*@local_storage S1        // id: %12
+  return %10 : $()                                // id: %13
+}

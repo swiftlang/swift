@@ -17,6 +17,7 @@
 
 #define DEBUG_TYPE "sil-memlocation-dumper"
 #include "swift/SILPasses/Passes.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/MemLocation.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
@@ -36,7 +37,8 @@ namespace {
 enum class MLKind : unsigned {
   OnlyExpansion=0,
   OnlyReduction=1,
-  All=2,
+  OnlyTypeExpansion=2,
+  All=3,
 };
 
 } // end anonymous namespace
@@ -50,6 +52,9 @@ DebugMemLocationKinds("ml", llvm::cl::desc("MemLocation Kinds:"),
                               clEnumValN(MLKind::OnlyReduction,
                                          "only-reduction",
                                          "only-reduction"),
+                              clEnumValN(MLKind::OnlyTypeExpansion,
+                                         "only-type-expansion",
+                                         "only-type-expansion"),
                               clEnumValN(MLKind::All,
                                          "all",
                                          "all"),
@@ -90,11 +95,53 @@ class MemLocationDumper : public SILFunctionTransform {
     llvm::outs() << "\n";
   }
 
+
+  /// Dumps the expansions of SILType accessed in the function.
+  /// This tests the BreadthFirstEnumTypeProjection function, which is
+  /// a function used extensively in expand and reduce functions. 
+  ///
+  /// We test it to catch any suspicious things in the earliest point.
+  ///
+  void dumpTypeExpansion(SILFunction &Fn) {
+    SILModule *M = &Fn.getModule();
+    ProjectionPathList PPList;
+    for (auto &BB : Fn) {
+      for (auto &II : BB) {
+        if (auto *LI = dyn_cast<LoadInst>(&II)) {
+           SILValue V = LI->getOperand();
+           // This is an address type, take it object type.
+           SILType Ty = V.getType().getObjectType();
+           ProjectionPath::BreadthFirstEnumTypeProjection(Ty, M, PPList, true);
+        } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
+           SILValue V = SI->getDest();
+           // This is an address type, take it object type.
+           SILType Ty = V.getType().getObjectType();
+           ProjectionPath::BreadthFirstEnumTypeProjection(Ty, M, PPList, true);
+        } else {
+           continue;
+        }
+
+        unsigned Counter = 0;
+        llvm::outs() << II;
+        for (auto &T : PPList) {
+          llvm::outs() << "#" << Counter++ << " " << T.getValue(); 
+        }
+        PPList.clear();
+      }
+    }
+    llvm::outs() << "\n";
+  }
+
   void run() override {
     SILFunction &Fn = *getFunction();
     llvm::outs() << "@" << Fn.getName() << "\n";
     if (DebugMemLocationKinds == MLKind::OnlyExpansion) {
       dumpExpansion(Fn);
+      return;
+    }
+
+    if (DebugMemLocationKinds == MLKind::OnlyTypeExpansion) {
+      dumpTypeExpansion(Fn);
       return;
     }
   }
