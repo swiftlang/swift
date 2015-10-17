@@ -2,7 +2,7 @@
 // RUN: %swift -target armv7k-apple-watchos2 -S -primary-file %s -module-name test_v7k | FileCheck -check-prefix=V7K %s
 
 // REQUIRES: OS=watchos
-// REQUIRES: CPU=armv7
+// REQUIRES: CPU=armv7k
 
 // CHECK-LABEL: define hidden float @_TF8test_v7k9addFloats{{.*}}(float, float)
 // CHECK: fadd float %0, %1
