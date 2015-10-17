@@ -30,8 +30,14 @@ struct S2 {
   init()
 }
 
+class C1 {
+   deinit 
+  init()
+}
+
 sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
 sil @S2_init : $@convention(thin) (@thin S2.Type) -> S2
+sil @C1_init : $@convention(thin) (@thick C1.Type) -> @owned C1
 
 // CHECK-LABEL: @test_struct_type_expansion
 // CHECK:  store
@@ -65,3 +71,25 @@ bb0:
   dealloc_stack %0#0 : $*@local_storage S1        // id: %12
   return %10 : $()                                // id: %13
 }
+
+
+// Make sure we do not expand the reference type.
+//
+// CHECK-LABEL: test_class_stack_slot
+// CHECK: store 
+// CHECK-NOT: var
+// CHECK: store
+sil hidden @test_class_stack_slot : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $C1  // var a                  // users: %4, %7
+  %1 = function_ref @C1_init : $@convention(thin) (@thick C1.Type) -> @owned C1 // user: %3
+  %2 = metatype $@thick C1.Type                   // user: %3
+  %3 = apply %1(%2) : $@convention(thin) (@thick C1.Type) -> @owned C1 // users: %4, %5
+  store %3 to %0#1 : $*C1                         // id: %4
+  store %3 to %0#1 : $*C1                         // id: %4
+  strong_release %3 : $C1                         // id: %5
+  %6 = tuple ()                                   // user: %8
+  dealloc_stack %0#0 : $*@local_storage C1        // id: %7
+  return %6 : $()                                 // id: %8
+}
+

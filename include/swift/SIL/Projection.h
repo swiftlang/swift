@@ -510,6 +510,8 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, Projection &P) {
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, ProjectionPath &P) {
   for (auto &X : P)
     OS << X << "\n";
+  if (P.empty())
+    OS << "\n";
   return OS;
 }
 

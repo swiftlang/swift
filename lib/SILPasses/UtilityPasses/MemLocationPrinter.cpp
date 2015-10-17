@@ -116,6 +116,7 @@ class MemLocationPrinter : public SILFunctionTransform {
         for (auto &T : PPList) {
           llvm::outs() << "#" << Counter++ << " " << T.getValue();
         }
+       
         PPList.clear();
       }
     }
