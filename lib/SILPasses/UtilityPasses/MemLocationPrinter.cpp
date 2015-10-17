@@ -1,4 +1,4 @@
-//===---- MemLocationDumper.cpp - Dump all memory locations in program ----===//
+//===--- MemLocationPrinter.cpp - Dump all memory locations in program ---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -35,39 +35,29 @@ using namespace swift;
 namespace {
 
 enum class MLKind : unsigned {
-  OnlyExpansion=0,
-  OnlyReduction=1,
-  OnlyTypeExpansion=2,
-  All=3,
+  OnlyExpansion = 0,
+  OnlyReduction = 1,
+  OnlyTypeExpansion = 2,
+  All = 3,
 };
 
 } // end anonymous namespace
 
-static llvm::cl::opt<MLKind>
-DebugMemLocationKinds("ml", llvm::cl::desc("MemLocation Kinds:"),
-             llvm::cl::init(MLKind::All),
-             llvm::cl::values(clEnumValN(MLKind::OnlyExpansion,
-                                         "only-expansion",
-                                         "only-expansion"),
-                              clEnumValN(MLKind::OnlyReduction,
-                                         "only-reduction",
-                                         "only-reduction"),
-                              clEnumValN(MLKind::OnlyTypeExpansion,
-                                         "only-type-expansion",
-                                         "only-type-expansion"),
-                              clEnumValN(MLKind::All,
-                                         "all",
-                                         "all"),
-                              clEnumValEnd));
-
-
+static llvm::cl::opt<MLKind> MemLocationKinds(
+    "ml", llvm::cl::desc("MemLocation Kinds:"), llvm::cl::init(MLKind::All),
+    llvm::cl::values(
+        clEnumValN(MLKind::OnlyExpansion, "only-expansion", "only-expansion"),
+        clEnumValN(MLKind::OnlyReduction, "only-reduction", "only-reduction"),
+        clEnumValN(MLKind::OnlyTypeExpansion, "only-type-expansion",
+                   "only-type-expansion"),
+        clEnumValN(MLKind::All, "all", "all"), clEnumValEnd));
 
 namespace {
 
-class MemLocationDumper : public SILFunctionTransform {
+class MemLocationPrinter : public SILFunctionTransform {
 
   /// Dumps the expansions of memory locations accessed in the function.
-  void dumpExpansion(SILFunction &Fn) {
+  void printMemExpansion(SILFunction &Fn) {
     MemLocationList Locs;
     for (auto &BB : Fn) {
       for (auto &II : BB) {
@@ -87,7 +77,7 @@ class MemLocationDumper : public SILFunctionTransform {
 
       unsigned Counter = 0;
       for (auto &Loc : Locs) {
-        llvm::outs() << "#" << Counter++ << Loc; 
+        llvm::outs() << "#" << Counter++ << Loc;
       }
 
       Locs.clear();
@@ -95,36 +85,36 @@ class MemLocationDumper : public SILFunctionTransform {
     llvm::outs() << "\n";
   }
 
-
   /// Dumps the expansions of SILType accessed in the function.
   /// This tests the BreadthFirstEnumTypeProjection function, which is
-  /// a function used extensively in expand and reduce functions. 
+  /// a function used extensively in expand and reduce functions.
   ///
   /// We test it to catch any suspicious things in the earliest point.
   ///
-  void dumpTypeExpansion(SILFunction &Fn) {
+  void printTypeExpansion(SILFunction &Fn) {
     SILModule *M = &Fn.getModule();
     ProjectionPathList PPList;
     for (auto &BB : Fn) {
       for (auto &II : BB) {
         if (auto *LI = dyn_cast<LoadInst>(&II)) {
-           SILValue V = LI->getOperand();
-           // This is an address type, take it object type.
-           SILType Ty = V.getType().getObjectType();
-           ProjectionPath::BreadthFirstEnumTypeProjection(Ty, M, PPList, true);
+          SILValue V = LI->getOperand();
+          // This is an address type, take it object type.
+          SILType Ty = V.getType().getObjectType();
+          ProjectionPath::BreadthFirstEnumTypeProjection(Ty, M, PPList, true);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
-           SILValue V = SI->getDest();
-           // This is an address type, take it object type.
-           SILType Ty = V.getType().getObjectType();
-           ProjectionPath::BreadthFirstEnumTypeProjection(Ty, M, PPList, true);
+          SILValue V = SI->getDest();
+          // This is an address type, take it object type.
+          SILType Ty = V.getType().getObjectType();
+          ProjectionPath::BreadthFirstEnumTypeProjection(Ty, M, PPList, true);
         } else {
-           continue;
+          // Not interested in these instructions yet.
+          continue;
         }
 
         unsigned Counter = 0;
         llvm::outs() << II;
         for (auto &T : PPList) {
-          llvm::outs() << "#" << Counter++ << " " << T.getValue(); 
+          llvm::outs() << "#" << Counter++ << " " << T.getValue();
         }
         PPList.clear();
       }
@@ -135,14 +125,15 @@ class MemLocationDumper : public SILFunctionTransform {
   void run() override {
     SILFunction &Fn = *getFunction();
     llvm::outs() << "@" << Fn.getName() << "\n";
-    if (DebugMemLocationKinds == MLKind::OnlyExpansion) {
-      dumpExpansion(Fn);
-      return;
-    }
-
-    if (DebugMemLocationKinds == MLKind::OnlyTypeExpansion) {
-      dumpTypeExpansion(Fn);
-      return;
+    switch (MemLocationKinds) {
+    case MLKind::OnlyExpansion:
+      printMemExpansion(Fn);
+      break;
+    case MLKind::OnlyTypeExpansion:
+      printTypeExpansion(Fn);
+      break;
+    default:
+      break;
     }
   }
 
@@ -151,6 +142,6 @@ class MemLocationDumper : public SILFunctionTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createMemLocationDumper() {
-  return new MemLocationDumper();
+SILTransform *swift::createMemLocationPrinter() {
+  return new MemLocationPrinter();
 }
