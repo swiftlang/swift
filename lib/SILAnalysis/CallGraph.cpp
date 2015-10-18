@@ -263,8 +263,9 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
 
     auto CalleeSet = tryGetCalleeSetForClassMethod(CMI->getMember());
 
-    // FIXME: Review the cases where we are not currently generating
-    //        callee sets.
+    // We don't know the callees in cases where the method isn't
+    // present in a vtable, so create a call graph edge with no known
+    // callees.
     if (!CalleeSet.getPointer())
       return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
 
