@@ -685,7 +685,7 @@ public:
       CallGraphNode *Popped;
       do {
         Popped = DFSStack.pop_back_val();
-        SCC->SCCNodes.push_back(Popped);
+        SCC->SCCNodes.push_back(Popped->getFunction());
       } while (Popped != Node);
 
       TheSCCs.push_back(SCC);
@@ -722,8 +722,8 @@ void CallGraph::computeBottomUpFunctionOrder() {
   computeBottomUpSCCOrder();
 
   for (auto *SCC : BottomUpSCCOrder)
-    for (auto *Node : SCC->SCCNodes)
-      BottomUpFunctionOrder.push_back(Node->getFunction());
+    for (auto *Fn : SCC->SCCNodes)
+      BottomUpFunctionOrder.push_back(Fn);
 }
 
 //===----------------------------------------------------------------------===//

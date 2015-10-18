@@ -314,9 +314,7 @@ private:
 };
 
 struct CallGraphSCC {
-  /// The CallGraphSCC does not own these CallGraphNodes. They are owned by the
-  /// CallGraph itself where they are allocated via a bump ptr allocator.
-  llvm::SmallVector<CallGraphNode *, 1> SCCNodes;
+  llvm::SmallVector<SILFunction *, 1> SCCNodes;
 };
 
 class CallGraph {
