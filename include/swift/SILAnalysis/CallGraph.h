@@ -22,6 +22,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
 #include <utility>
@@ -314,7 +315,7 @@ private:
 };
 
 struct CallGraphSCC {
-  llvm::SmallVector<SILFunction *, 1> SCCNodes;
+  llvm::TinyPtrVector<SILFunction *> SCCNodes;
 };
 
 class CallGraph {
