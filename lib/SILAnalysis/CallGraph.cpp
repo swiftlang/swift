@@ -172,9 +172,8 @@ CallGraph::getOrCreateCalleeSetForClassMethod(SILDeclRef Decl) {
   auto *NodeSet = new (Allocator) CallGraphEdge::CallGraphNodeSet;
 
   // Allocate a new callee set, with the default that we assume this
-  // decl could result in calling arbitrary functions with matching
-  // signatures. We'll refine this when we compute the actual set of
-  // callees.
+  // decl could result in calling unknown functions. We'll refine this
+  // when we compute the actual set of callees.
   CallGraphEdge::CalleeSet TheCalleeSet(NodeSet, true);
   CalleeSets.insert(std::make_pair(AFD, TheCalleeSet));
 
@@ -429,7 +428,7 @@ void CallGraphEdge::print(llvm::raw_ostream &OS, int Indent) {
   OS << CallGraphFileCheckPrefix << "Call site #" << Ordinal << ": ";
   OS << *getApply().getInstruction();
 
-  printFlag(OS, "Unknown callees", canCallArbitraryFunction(), Indent);
+  printFlag(OS, "Unknown callees", canCallUnknownFunction(), Indent);
 
   if (getCalleeSet().empty())
     return;
@@ -864,7 +863,7 @@ void CallGraph::verify(SILFunction *F) const {
       assert(ApplyToEdgeMap.lookup(FAS) == Edge &&
              "Edge is not in ApplyToEdgeMap");
 
-      if (!Edge->canCallArbitraryFunction()) {
+      if (!Edge->canCallUnknownFunction()) {
         // In the trivial case that we call a known function, check if we have
         // exactly one callee in the edge.
         SILValue Callee = FAS.getCallee();
@@ -1088,7 +1087,7 @@ namespace llvm {
                                          OrderedCallGraph::child_iterator I,
                                          const OrderedCallGraph *Graph) {
       CallGraphEdge *Edge = I.baseIter->CGEdge;
-      if (Edge->canCallArbitraryFunction())
+      if (Edge->canCallUnknownFunction())
         return "color=\"red\"";
       return "";
     }

@@ -76,7 +76,7 @@ public:
       return getFunctionView().end();
     }
 
-    bool canCallArbitraryFunction() {
+    bool canCallUnknownFunction() {
       if (TheCallees.is<CalleeSet>())
         return TheCallees.get<CalleeSet>().getInt();
 
@@ -170,10 +170,10 @@ public:
     return CallsiteCallees;
   }
 
-  /// Return true if this edge represents a call to potentially any
-  /// arbitrary function with an appropriate signature.
-  bool canCallArbitraryFunction() const {
-    return getCallees().canCallArbitraryFunction();
+  /// Return true if this edge represents a call that could reach an
+  /// unknown function with a matching signature.
+  bool canCallUnknownFunction() const {
+    return getCallees().canCallUnknownFunction();
   }
 
   /// The apply has a complete callee set, and it's of size one. In
@@ -185,7 +185,7 @@ public:
 
   /// Gets the single callee if the apply has one.
   CallGraphNode *getSingleCalleeOrNull() const {
-    if (canCallArbitraryFunction())
+    if (canCallUnknownFunction())
       return nullptr;
 
     if (CallsiteCallees.TheCallees.is<CallGraphNode *>())
@@ -397,8 +397,8 @@ public:
 
   // Call graph queries on call sites.
 
-  bool canCallArbitraryFunction(FullApplySite FAS) {
-    return getCallGraphEdge(FAS)->canCallArbitraryFunction();
+  bool canCallUnknownFunction(FullApplySite FAS) {
+    return getCallGraphEdge(FAS)->canCallUnknownFunction();
   }
 
   /// Return the callee set for the given call site.

@@ -369,7 +369,7 @@ void SideEffectAnalysis::getEffectsOfApply(FunctionEffects &ApplyEffects,
   if (getSemanticEffects(ApplyEffects, FAS))
     return;
 
-  if (CG.canCallArbitraryFunction(FAS)) {
+  if (CG.canCallUnknownFunction(FAS)) {
     ApplyEffects.setWorstEffects();
     return;
   }
