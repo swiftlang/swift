@@ -30,6 +30,10 @@ class SILLoopInfo;
 /// Create a single preheader and single latch block.
 bool canonicalizeLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI);
 
+/// Canonicalize all loops in the function F for which \p LI contains loop
+/// information. We update loop info and dominance info while we do this.
+bool canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI);
+
 } // end swift namespace
 
 #endif

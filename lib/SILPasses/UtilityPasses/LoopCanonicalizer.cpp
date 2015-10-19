@@ -37,38 +37,16 @@ class LoopCanonicalizer : public SILFunctionTransform {
                        << "\n");
 
     auto *LA = PM->getAnalysis<SILLoopAnalysis>();
-    auto *DA = PM->getAnalysis<DominanceAnalysis>();
     auto *LI = LA->get(F);
-    auto *DT = DA->get(F);
 
     if (LI->empty()) {
       DEBUG(llvm::dbgs() << "    No loops to canonicalize!\n");
       return;
     }
 
-    bool Changed = false;
-    std::vector<SILLoop *> Worklist;
-
-    for (auto *L : LI->getTopLevelLoops())
-      Worklist.push_back(L);
-
-    while (Worklist.size()) {
-      auto *L = Worklist.back();
-      Worklist.pop_back();
-
-      // We currently do not perform loop canonicalizations that introduce new
-      // loops, so this will be safe. When that occurs, this pass will need to
-      // be updated.
-      for (auto *SubLoop : L->getSubLoops())
-        Worklist.push_back(SubLoop);
-
-      if (canonicalizeLoop(L, DT, LI)) {
-        DEBUG(llvm::dbgs() << "    Canonicalized: " << *L);
-        Changed = true;
-      }
-    }
-
-    if (Changed) {
+    auto *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *DI = DA->get(F);
+    if (canonicalizeAllLoops(DI, LI)) {
       // We preserve loop info and the dominator tree.
       DA->lockInvalidation();
       LA->lockInvalidation();

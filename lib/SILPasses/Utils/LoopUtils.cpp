@@ -210,3 +210,29 @@ bool swift::canonicalizeLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI) {
 
   return ChangedCFG;
 }
+
+bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
+  // Visit the loop nest hierarchy bottom up.
+  bool MadeChange = false;
+  llvm::SmallVector<std::pair<SILLoop *, bool>, 16> Worklist;
+  for (auto *L : LI->getTopLevelLoops())
+    Worklist.push_back({L, L->empty()});
+
+  while (Worklist.size()) {
+    SILLoop *L;
+    bool VisitedAlready;
+    std::tie(L, VisitedAlready) = Worklist.pop_back_val();
+
+    if (!VisitedAlready) {
+      Worklist.push_back({L, true});
+      for (auto *Subloop : L->getSubLoopRange()) {
+        Worklist.push_back({Subloop, Subloop->empty()});
+      }
+      continue;
+    }
+
+    MadeChange |= canonicalizeLoop(L, DT, LI);
+  }
+
+  return MadeChange;
+}
