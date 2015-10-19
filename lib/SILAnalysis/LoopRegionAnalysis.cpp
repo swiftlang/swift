@@ -85,17 +85,17 @@ llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &os, LoopRegion &LR) {
   return os;
 }
 
-LoopRegion::SuccRange LoopRegion::getSuccs() {
+LoopRegion::SuccRange LoopRegion::getSuccs() const {
   auto Range = InnerSuccRange(Succs.begin(), Succs.end());
   return SuccRange(Range, SuccessorID::ToLiveSucc());
 }
 
-LoopRegion::LocalSuccRange LoopRegion::getLocalSuccs() {
+LoopRegion::LocalSuccRange LoopRegion::getLocalSuccs() const {
   auto Range = InnerSuccRange(Succs.begin(), Succs.end());
   return LocalSuccRange(Range, SuccessorID::ToLiveLocalSucc());
 }
 
-LoopRegion::NonLocalSuccRange LoopRegion::getNonLocalSuccs() {
+LoopRegion::NonLocalSuccRange LoopRegion::getNonLocalSuccs() const {
   auto Range = InnerSuccRange(Succs.begin(), Succs.end());
   return NonLocalSuccRange(Range, SuccessorID::ToLiveNonLocalSucc());
 }
@@ -171,23 +171,26 @@ void LoopRegionFunctionInfo::verify() {
     // do not care if the successor or predecessor lists are sorted, just that
     // they are unique.
     {
-      assert(UniqueSuccList.empty());
-      std::copy(R->Succs.begin(), R->Succs.end(), UniqueSuccList.end());
+      UniqueSuccList.clear();
+      for (auto SuccID : R->Succs) {
+        UniqueSuccList.push_back(SuccID);
+      }
       std::sort(UniqueSuccList.begin(), UniqueSuccList.end());
       auto End = UniqueSuccList.end();
       assert(End == std::unique(UniqueSuccList.begin(), UniqueSuccList.end()) &&
              "Expected UniqueSuccList to not have any duplicate elements");
-      UniqueSuccList.clear();
     }
 
     {
-      assert(UniquePredList.empty());
-      std::copy(R->Preds.begin(), R->Preds.end(), UniquePredList.end());
+      UniquePredList.clear();
+      for (unsigned PredID : R->Preds) {
+        UniquePredList.push_back(PredID);
+      }
+      std::copy(R->Preds.begin(), R->Preds.end(), UniquePredList.begin());
       std::sort(UniquePredList.begin(), UniquePredList.end());
       auto End = UniquePredList.end();
       assert(End == std::unique(UniquePredList.begin(), UniquePredList.end()) &&
              "Expected UniquePredList to not have any duplicate elements");
-      UniquePredList.clear();
     }
 
     // If this node does not have a parent, it should have no non-local
@@ -818,12 +821,12 @@ struct LoopRegionWrapper {
 struct alledge_iterator
     : std::iterator<std::forward_iterator_tag, LoopRegionWrapper> {
   LoopRegionWrapper *Wrapper;
-  swift::LoopRegion::subregion_iterator SubregionIter;
-  LoopRegion::succ_iterator SuccIter;
+  LoopRegion::subregion_iterator SubregionIter;
+  LoopRegion::const_succ_iterator SuccIter;
 
   alledge_iterator(LoopRegionWrapper *w,
                    swift::LoopRegion::subregion_iterator subregioniter,
-                   LoopRegion::succ_iterator succiter)
+                   LoopRegion::const_succ_iterator succiter)
       : Wrapper(w), SubregionIter(subregioniter), SuccIter(succiter) {
 
     // Prime the successor iterator so that we skip over any initial dead
