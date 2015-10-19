@@ -215,6 +215,17 @@ void LoopRegionFunctionInfo::verify() {
       assert(ParentRegion->Succs[ID.ID].IsDead == ID.IsDead &&
              "non-local successor edge sources should have the same liveness "
              "properties as non-local successor edge targets");
+      // Make sure that we can look up the local region corresponding to this
+      // region's successor.
+      auto *OtherR = getRegionForNonLocalSuccessor(R, ID.ID);
+      (void)OtherR;
+
+      // If R and OtherR are blocks, then OtherR should be a successor of the
+      // real block.
+      if (R->isBlock() && OtherR->isBlock())
+        assert(R->getBlock()->isSuccessor(OtherR->getBlock()) &&
+               "Expected either R was not a block or OtherR was a CFG level "
+               "successor of R.");
     }
   }
 #endif
@@ -699,11 +710,14 @@ LoopRegionFunctionInfo::
 getRegionForNonLocalSuccessor(const LoopRegion *Child, unsigned SuccID) const {
   const LoopRegion *Iter = Child;
   LoopRegion::SuccessorID Succ = {0, 0};
+
   do {
     Iter = getRegion(Iter->getParentID());
     Succ = Iter->Succs[SuccID];
+    SuccID = Succ.ID;
   } while (Succ.IsNonLocal);
-  return getRegion(Succ.ID);
+
+  return getRegion(SuccID);
 }
 
 void LoopRegionFunctionInfo::dump() const {

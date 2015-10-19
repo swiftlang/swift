@@ -227,6 +227,14 @@ public:
     return *succ_begin();
   }
 
+  /// \brief Returns true if \p BB is a successor of this block.
+  bool isSuccessor(SILBasicBlock *BB) const {
+    for (auto &Succ : getSuccessors())
+      if (Succ.getBB() == BB)
+        return true;
+    return false;
+  }
+
   using pred_iterator = SILSuccessorIterator;
 
   bool pred_empty() const { return PredList == nullptr; }
