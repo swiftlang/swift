@@ -28,6 +28,8 @@ class AliasAnalysis;
 class PostOrderAnalysis;
 class RCIdentityAnalysis;
 class RCIdentityFunctionInfo;
+class LoopRegionFunctionInfo;
+class SILLoopInfo;
 class SILFunction;
 
 } // end namespace swift
@@ -124,10 +126,10 @@ struct ARCMatchingSetComputationContext;
 
 /// Create an opaque arc mutation set computation context for SILFunction F
 /// using AliasAnalysis AA.
-ARCMatchingSetComputationContext *
-createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
-                                       PostOrderAnalysis *POTA,
-                                       RCIdentityFunctionInfo *RCIA);
+ARCMatchingSetComputationContext *createARCMatchingSetComputationContext(
+    SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POTA,
+    LoopRegionFunctionInfo *LRFI, SILLoopInfo *SLI,
+    RCIdentityFunctionInfo *RCIA, bool EnableLoopARC = false);
 
 /// Destroy the context.
 void

@@ -16,11 +16,14 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SILPasses/Utils/LoopUtils.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
+#include "swift/SILAnalysis/LoopRegionAnalysis.h"
+#include "swift/SILAnalysis/LoopAnalysis.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -33,6 +36,8 @@ using namespace swift;
 
 STATISTIC(NumRefCountOpsMoved, "Total number of increments moved");
 STATISTIC(NumRefCountOpsRemoved, "Total number of increments removed");
+
+llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 //                                Code Motion
@@ -142,8 +147,8 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
 //===----------------------------------------------------------------------===//
 
 static bool processFunction(SILFunction &F, bool FreezePostDomRelease,
-                            AliasAnalysis *AA,
-                            PostOrderAnalysis *POTA,
+                            AliasAnalysis *AA, PostOrderAnalysis *POTA,
+                            LoopRegionFunctionInfo *LRFI, SILLoopInfo *LI,
                             RCIdentityFunctionInfo *RCIA) {
   // GlobalARCOpts seems to be taking up a lot of compile time when running on
   // globalinit_func. Since that is not *that* interesting from an ARC
@@ -160,7 +165,8 @@ static bool processFunction(SILFunction &F, bool FreezePostDomRelease,
   // Construct our context once. A context contains the RPOT as well as maps
   // that contain state for each BB in F. This is a major place where the
   // optimizer allocates memory in one large chunk.
-  auto *Ctx =  createARCMatchingSetComputationContext(F, AA, POTA, RCIA);
+  auto *Ctx = createARCMatchingSetComputationContext(F, AA, POTA, LRFI, LI,
+                                                     RCIA, EnableLoopARC);
 
   // If Ctx is null, we failed to initialize and can not do anything so just
   // return false.
@@ -172,7 +178,7 @@ static bool processFunction(SILFunction &F, bool FreezePostDomRelease,
 
   // Until we do not remove any instructions or have nested increments,
   // decrements...
-  while(true) {
+  while (true) {
     // Compute matching sets of increments, decrements, and their insertion
     // points.
     //
@@ -220,11 +226,32 @@ class GlobalARCOpts : public SILFunctionTransform {
     if (!getOptions().EnableARCOptimizations)
       return;
 
+    auto *LA = getAnalysis<SILLoopAnalysis>();
+    auto *LI = LA->get(getFunction());
+
+    // Canonicalize the loops, invalidating if we need to.
+    if (EnableLoopARC) {
+      auto *DA = getAnalysis<DominanceAnalysis>();
+      auto *DI = DA->get(getFunction());
+
+      if (canonicalizeAllLoops(DI, LI)) {
+        // We preserve loop info and the dominator tree.
+        DA->lockInvalidation();
+        LA->lockInvalidation();
+        PM->invalidateAnalysis(getFunction(),
+                               SILAnalysis::PreserveKind::Nothing);
+        DA->unlockInvalidation();
+        LA->unlockInvalidation();
+      }
+    }
+
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
-    auto *RCIA = getAnalysis<RCIdentityAnalysis>()->get(getFunction());
-    if (processFunction(*getFunction(), false, AA, POTA, RCIA)) {
-      processFunction(*getFunction(), true, AA, POTA, RCIA);
+    auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(getFunction());
+    auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(getFunction());
+
+    if (processFunction(*getFunction(), false, AA, POTA, LRFI, LI, RCFI)) {
+      processFunction(*getFunction(), true, AA, POTA, LRFI, LI, RCFI);
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
     }
   }
