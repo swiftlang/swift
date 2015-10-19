@@ -248,7 +248,10 @@ class GlobalARCOpts : public SILFunctionTransform {
     auto *AA = getAnalysis<AliasAnalysis>();
     auto *POTA = getAnalysis<PostOrderAnalysis>();
     auto *RCFI = getAnalysis<RCIdentityAnalysis>()->get(getFunction());
-    auto *LRFI = getAnalysis<LoopRegionAnalysis>()->get(getFunction());
+    LoopRegionFunctionInfo *LRFI = nullptr;
+
+    if (EnableLoopARC)
+      LRFI = getAnalysis<LoopRegionAnalysis>()->get(getFunction());
 
     if (processFunction(*getFunction(), false, AA, POTA, LRFI, LI, RCFI)) {
       processFunction(*getFunction(), true, AA, POTA, LRFI, LI, RCFI);
