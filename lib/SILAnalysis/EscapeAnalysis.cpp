@@ -1,5 +1,4 @@
-
-//===---------- SideEffectAnalysis.cpp - SIL Side Effect Analysis ---------===//
+//===-------------- EscapeAnalysis.cpp - SIL Escape Analysis --------------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- SideEffectOpt.cpp - Test the side effect analysis ----------------===//
+//===-- UpdateSideEffects.cpp - Computes side effect and escape analysis --===//
 //
 // This source file is part of the Swift.org open source project
 //

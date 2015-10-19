@@ -1,4 +1,4 @@
-//===------ SideEffectAnalysis.h - SIL Side Effect Analysis -*- C++ -*-----===//
+//===----------- EscapeAnalysis.h - SIL Escape Analysis -*- C++ -*---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -64,7 +64,7 @@ class EscapeAnalysis : public SILAnalysis {
     /// value, an object reference or any value-type (struct, enum, etc.) which
     /// contains a reference. If a value-type (e.g. a struct) contains multiple
     /// references, it is treated as a single "pointer" which may point to any
-    // of the referenced objects.
+    /// of the referenced objects.
     Value,
     
     /// Represents the "memory content" to which a pointer points to.
