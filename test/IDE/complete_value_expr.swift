@@ -56,6 +56,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_5 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_5
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_6 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_6
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_7 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_8 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_8
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_9 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_9
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_10 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_10
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_11 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_11
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_FUNCTION_CALL_12 | FileCheck %s -check-prefix=INSIDE_FUNCTION_CALL_12
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_VARARG_FUNCTION_CALL_1 | FileCheck %s -check-prefix=INSIDE_VARARG_FUNCTION_CALL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INSIDE_VARARG_FUNCTION_CALL_2 | FileCheck %s -check-prefix=INSIDE_VARARG_FUNCTION_CALL_2
@@ -821,6 +826,36 @@ func testInsideFunctionCall7() {
 // FIXME: we should print the non-API param name rdar://20962472
 // INSIDE_FUNCTION_CALL_7: Pattern/ExprSpecific: ['(']{#(Int, Int)#})[#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_7: End completions
+}
+
+func testInsideFunctionCall8(var x: FooStruct) {
+  x.instanceFunc0(#^INSIDE_FUNCTION_CALL_8^#)
+// Since we already have '()', there is no pattern to complete.
+// INSIDE_FUNCTION_CALL_8-NOT: Pattern/{{.*}}:
+}
+func testInsideFunctionCall9(var x: FooStruct) {
+  x.instanceFunc1(#^INSIDE_FUNCTION_CALL_9^#)
+// Annotated ')'
+// INSIDE_FUNCTION_CALL_9: Begin completions
+// INSIDE_FUNCTION_CALL_9-DAG: Pattern/ExprSpecific: ['(']{#Int#}[')'][#Void#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_9-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_9: End completions
+}
+func testInsideFunctionCall10(var x: FooStruct) {
+  x.instanceFunc2(#^INSIDE_FUNCTION_CALL_10^#)
+// Annotated ')'
+// INSIDE_FUNCTION_CALL_10: Begin completions
+// INSIDE_FUNCTION_CALL_10-DAG: Pattern/ExprSpecific: ['(']{#Int#}, {#b: &Double#}[')'][#Void#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_10-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
+// INSIDE_FUNCTION_CALL_10: End completions
+}
+func testInsideFunctionCall11(var x: FooStruct) {
+  x.instanceFunc2(#^INSIDE_FUNCTION_CALL_11^#,
+// INSIDE_FUNCTION_CALL_11-NOT: Pattern/{{.*}}:
+}
+func testInsideFunctionCall12(var x: FooStruct) {
+  x.instanceFunc2(#^INSIDE_FUNCTION_CALL_12^#<#placeholder#>
+// INSIDE_FUNCTION_CALL_12-NOT: Pattern/{{.*}}:
 }
 
 func testInsideVarargFunctionCall1() {

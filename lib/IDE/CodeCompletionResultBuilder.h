@@ -39,6 +39,7 @@ class CodeCompletionResultBuilder {
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
   ArrayRef<Type> ExpectedTypes;
+  bool Cancelled = false;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -73,6 +74,10 @@ public:
 
   ~CodeCompletionResultBuilder() {
     finishResult();
+  }
+
+  void cancel() {
+    Cancelled = true;
   }
 
   void setNumBytesToErase(unsigned N) {
@@ -143,6 +148,11 @@ public:
   void addLeftParen() {
     addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::LeftParen, "(");
+  }
+
+  void addAnnotatedRightParen() {
+    addRightParen();
+    getLastChunk().setIsAnnotation();
   }
 
   void addRightParen() {

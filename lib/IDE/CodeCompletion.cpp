@@ -621,7 +621,8 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
 }
 
 void CodeCompletionResultBuilder::finishResult() {
-  Sink.Results.push_back(takeResult());
+  if (!Cancelled)
+    Sink.Results.push_back(takeResult());
 }
 
 
@@ -782,6 +783,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   int AttrParamIndex;
   bool IsInSil;
   bool HasSpace = false;
+  bool HasRParen = false;
+  bool ShouldCompleteCallPatternAfterParen = true;
   Optional<DeclKind> AttTargetDK;
 
   SmallVector<StringRef, 3> ParsedKeywords;
@@ -1084,6 +1087,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   unsigned NumBytesToEraseForOptionalUnwrap = 0;
 
   bool HaveLParen = false;
+  bool HaveRParen = false;
   bool IsSuperRefExpr = false;
   bool IsDynamicLookup = false;
   bool HaveLeadingSpace = false;
@@ -1208,6 +1212,10 @@ public:
 
   void setHaveLParen(bool Value) {
     HaveLParen = Value;
+  }
+
+  void setHaveRParen(bool Value) {
+    HaveRParen = Value;
   }
 
   void setIsSuperRefExpr() {
@@ -1527,7 +1535,8 @@ public:
     return false;
   }
 
-  void addParamPatternFromFunction(CodeCompletionResultBuilder &Builder,
+  // Returns true if any content was added to Builder.
+  bool addParamPatternFromFunction(CodeCompletionResultBuilder &Builder,
                                    const AnyFunctionType *AFT,
                                    const AbstractFunctionDecl *AFD,
                                    bool includeDefaultArgs = true) {
@@ -1543,6 +1552,8 @@ public:
       if (!BodyPatterns.empty())
         BodyTuple = dyn_cast<TuplePattern>(BodyPatterns.front());
     }
+
+    bool modifiedBuilder = false;
 
     // Do not desugar AFT->getInput(), as we want to treat (_: (a,b)) distinctly
     // from (a,b) for code-completion.
@@ -1585,6 +1596,7 @@ public:
         } else {
           Builder.addCallParameter(Name, ParamType, TupleElt.isVararg());
         }
+        modifiedBuilder = true;
         NeedComma = true;
       }
     } else {
@@ -1594,6 +1606,8 @@ public:
         // Only unwrap the paren sugar, if it exists.
         T = PT->getUnderlyingType();
       }
+
+      modifiedBuilder = true;
       if (BodyTuple) {
         auto ParamPat = BodyTuple->getElement(0).getPattern();
         Builder.addCallParameter(Identifier(), ParamPat->getBodyName(), T,
@@ -1601,6 +1615,8 @@ public:
       } else
         Builder.addCallParameter(Identifier(), T, /*IsVarArg*/false);
     }
+
+    return modifiedBuilder;
   }
 
   static void addThrows(CodeCompletionResultBuilder &Builder,
@@ -1626,9 +1642,19 @@ public:
       else
         Builder.addAnnotatedLeftParen();
 
-      addParamPatternFromFunction(Builder, AFT, AFD, includeDefaultArgs);
+      bool anyParam = addParamPatternFromFunction(Builder, AFT, AFD, includeDefaultArgs);
 
-      Builder.addRightParen();
+      if (HaveLParen && HaveRParen && !anyParam) {
+        // Empty result, don't add it.
+        Builder.cancel();
+        return;
+      }
+
+      if (!HaveRParen)
+        Builder.addRightParen();
+      else
+        Builder.addAnnotatedRightParen();
+
       addThrows(Builder, AFT, AFD);
 
       addTypeAnnotation(Builder, AFT->getResult());
@@ -1804,10 +1830,20 @@ public:
       else
         Builder.addAnnotatedLeftParen();
 
-      addParamPatternFromFunction(Builder, ConstructorType, CD,
+      bool anyParam = addParamPatternFromFunction(Builder, ConstructorType, CD,
                                   includeDefaultArgs);
 
-      Builder.addRightParen();
+      if (HaveLParen && HaveRParen && !anyParam) {
+        // Empty result, don't add it.
+        Builder.cancel();
+        return;
+      }
+
+      if (!HaveRParen)
+        Builder.addRightParen();
+      else
+        Builder.addAnnotatedRightParen();
+
       addThrows(Builder, ConstructorType, CD);
 
       addTypeAnnotation(Builder,
@@ -3205,6 +3241,20 @@ void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E,
   ParsedExpr = E;
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = static_cast<CodeCompletionExpr*>(CodeCompletionE);
+
+  // Lookahead one token to decide what kind of call completions to provide.
+  // When it appears that there is already code for the call present, just
+  // complete values and/or argument labels.  Otherwise give the entire call
+  // pattern.
+  Token next = P.peekToken();
+  if (next.isAtStartOfLine()) {
+    ShouldCompleteCallPatternAfterParen = true;
+  } else if (next.is(tok::r_paren)) {
+    HasRParen = true;
+    ShouldCompleteCallPatternAfterParen = true;
+  } else {
+    ShouldCompleteCallPatternAfterParen = false;
+  }
 }
 
 void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
@@ -3767,8 +3817,17 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (TypeAnalyzer.Analyze(PossibleTypes)) {
       Lookup.setExpectedTypes(PossibleTypes);
     }
-    if (ExprType)
-      Lookup.getValueExprCompletions(*ExprType);
+
+    if (ExprType) {
+      if (ShouldCompleteCallPatternAfterParen) {
+        Lookup.setHaveRParen(HasRParen);
+        Lookup.getValueExprCompletions(*ExprType);
+      } else {
+        // FIXME: we should do a call-arg completion here to get possible
+        // labels.  For now, just fallthough to get values.
+      }
+    }
+
     if (!Lookup.FoundFunctionCalls ||
         (Lookup.FoundFunctionCalls &&
          Lookup.FoundFunctionsWithoutFirstKeyword)) {

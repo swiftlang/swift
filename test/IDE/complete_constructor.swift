@@ -22,6 +22,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE5 | FileCheck %s -check-prefix=INIT_FROM_METATYPE4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE6 | FileCheck %s -check-prefix=INIT_FROM_METATYPE6
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_RPAREN_1 | FileCheck %s -check-prefix=HAVE_RPAREN_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_RPAREN_2 | FileCheck %s -check-prefix=HAVE_RPAREN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAVE_COMMA_1 | FileCheck %s -check-prefix=HAVE_COMMA_1
+
 func freeFunc() {}
 
 //===---
@@ -215,4 +219,21 @@ struct ExplicitConstructorsDerived3 {
   }
 // INIT_FROM_METATYPE6: Decl[Constructor]/CurrNominal:      init()[#ExplicitConstructorsDerived3#]{{; name=.+$}}
 // INIT_FROM_METATYPE6: Decl[Constructor]/CurrNominal:      init({#a: Int#})[#ExplicitConstructorsDerived3#]{{; name=.+$}}
+}
+
+func testHaveRParen1() {
+  ImplicitConstructors1(#^HAVE_RPAREN_1^#)
+// HAVE_RPAREN_1-NOT: Decl[Constructor]
+}
+
+func testHaveRParen2() {
+  ImplicitConstructors2(#^HAVE_RPAREN_2^#)
+// HAVE_RPAREN_2-NOT: Decl[Constructor]
+// HAVE_RPAREN_2:     Decl[Constructor]/CurrNominal: ['(']{#instanceVar: Int#}[')'][#ImplicitConstructors2#]{{; name=.+$}}
+// HAVE_RPAREN_2-NOT: Decl[Constructor]
+}
+
+func testHaveComma1() {
+  ExplicitConstructors1(#^HAVE_COMMA_1^#,
+// HAVE_COMMA_1-NOT: Decl[Constructor]
 }
