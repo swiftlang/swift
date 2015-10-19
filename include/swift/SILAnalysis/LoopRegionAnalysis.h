@@ -189,6 +189,9 @@ public:
       return ID == Other.ID && IsNonLocal == Other.IsNonLocal &&
              IsDead == Other.IsDead;
     }
+    bool operator!=(const SuccessorID &Other) const {
+      return !(*this == Other);
+    }
 
     struct ToLiveSucc {
       Optional<SuccessorID> operator()(SuccessorID ID) const {
