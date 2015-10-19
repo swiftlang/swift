@@ -770,8 +770,11 @@ public:
   const_iterator end() const { return IDToRegionMap.end(); }
   unsigned size() const { return IDToRegionMap.size(); }
   bool empty() const { return IDToRegionMap.empty(); }
-  RegionTy *getTopLevelRegion() const { return getRegion(F); }
+  llvm::iterator_range<const_iterator> getRegions() const {
+    return {begin(), end()};
+  }
 
+  RegionTy *getTopLevelRegion() const { return getRegion(F); }
   FunctionTy *getFunction() const { return F; }
 
   void dump() const;

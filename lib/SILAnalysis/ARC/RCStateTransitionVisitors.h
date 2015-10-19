@@ -20,6 +20,7 @@
 #define SWIFT_SILANALYSIS_RCSTATETRANSITIONVISITORS_H
 
 #include "ARCBBState.h"
+#include "ARCRegionState.h"
 #include "RCStateTransition.h"
 #include "swift/Basic/BlotMapVector.h"
 
@@ -179,9 +180,11 @@ namespace swift {
 
 extern template class BottomUpDataflowRCStateVisitor<
     ARCSequenceDataflowEvaluator::ARCBBState>;
+extern template class BottomUpDataflowRCStateVisitor<ARCRegionState>;
 
 extern template class TopDownDataflowRCStateVisitor<
     ARCSequenceDataflowEvaluator::ARCBBState>;
+extern template class TopDownDataflowRCStateVisitor<ARCRegionState>;
 
 } // end swift namespace
 

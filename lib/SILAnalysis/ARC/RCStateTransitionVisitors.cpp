@@ -307,6 +307,8 @@ visitStrongEntrance(ValueBase *V) {
 namespace swift {
 
 template class BottomUpDataflowRCStateVisitor<ARCBBState>;
+template class BottomUpDataflowRCStateVisitor<ARCRegionState>;
 template class TopDownDataflowRCStateVisitor<ARCBBState>;
+template class TopDownDataflowRCStateVisitor<ARCRegionState>;
 
 } // end swift namespace
