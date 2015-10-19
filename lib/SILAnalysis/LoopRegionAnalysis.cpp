@@ -172,9 +172,8 @@ void LoopRegionFunctionInfo::verify() {
     // they are unique.
     {
       UniqueSuccList.clear();
-      for (auto SuccID : R->Succs) {
-        UniqueSuccList.push_back(SuccID);
-      }
+      std::copy(R->Succs.begin(), R->Succs.end(),
+                std::back_inserter(UniqueSuccList));
       std::sort(UniqueSuccList.begin(), UniqueSuccList.end());
       auto End = UniqueSuccList.end();
       assert(End == std::unique(UniqueSuccList.begin(), UniqueSuccList.end()) &&
@@ -183,10 +182,7 @@ void LoopRegionFunctionInfo::verify() {
 
     {
       UniquePredList.clear();
-      for (unsigned PredID : R->Preds) {
-        UniquePredList.push_back(PredID);
-      }
-      std::copy(R->Preds.begin(), R->Preds.end(), UniquePredList.begin());
+      std::copy(R->Preds.begin(), R->Preds.end(), std::back_inserter(UniquePredList));
       std::sort(UniquePredList.begin(), UniquePredList.end());
       auto End = UniquePredList.end();
       assert(End == std::unique(UniquePredList.begin(), UniquePredList.end()) &&
@@ -744,14 +740,10 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
 
     // To make our output deterministic, we sort local successor indices.
     SortedSuccs.clear();
-    // TODO: Investigate why std::copy does not work here. I tried to use a
-    // std::copy here, but ran into miscompile issues with
-    // OptionalTransformRange.
-    for (unsigned I : R->getLocalSuccs()) {
-      SortedSuccs.push_back(I);
-    }
+    auto LSuccRange = R->getLocalSuccs();
+    std::copy(LSuccRange.begin(), LSuccRange.end(),
+              std::back_inserter(SortedSuccs));
     std::sort(SortedSuccs.begin(), SortedSuccs.end());
-    auto ARef = ArrayRef<unsigned>(SortedSuccs);
     for (unsigned SID : SortedSuccs) {
       os << "\n        ";
       LoopRegion *SuccRegion = getRegion(SID);
@@ -772,9 +764,9 @@ void LoopRegionFunctionInfo::print(raw_ostream &os) const {
     os << ")\n";
 
     SortedSuccs.clear();
-    for (unsigned I : R->getNonLocalSuccs()) {
-      SortedSuccs.push_back(I);
-    }
+    auto NonLSuccs = R->getNonLocalSuccs();
+    std::copy(NonLSuccs.begin(), NonLSuccs.end(),
+              std::back_inserter(SortedSuccs));
     std::sort(SortedSuccs.begin(), SortedSuccs.end());
     os << "    (non-local-succs";
     for (unsigned I : SortedSuccs) {
