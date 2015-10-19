@@ -2158,6 +2158,7 @@ namespace {
     CanGenericSignature Generics;
 
     std::vector<Source> Sources;
+    bool DidUseLastSource = false;
 
     llvm::DenseMap<FulfillmentKey, Fulfillment> Fulfillments;
 
@@ -2271,17 +2272,15 @@ namespace {
                                CanType type, IsExact_t isExact) {
       if (!isInterestingTypeForFulfillments(type)) return;
 
-      // Remember how many fulfillments we currently have.
-      auto numFulfillments = Fulfillments.size();
-
       // Prospectively add a source.
       Sources.emplace_back(kind, paramIndex, type);
+      DidUseLastSource = false;
 
       // Consider the source.
       considerType(type, MetadataPath(), isExact);
 
-      // If we didn't add anything, remove the source.
-      if (Fulfillments.size() == numFulfillments)
+      // If the last source was not used in any fulfillments, remove it.
+      if (!DidUseLastSource)
         Sources.pop_back();
     }
 
@@ -2522,10 +2521,12 @@ namespace {
         if (path.cost() < it->second.Path.cost()) {
           it->second.SourceIndex = sourceIndex;
           it->second.Path = std::move(path);
+          DidUseLastSource = true;
         }
       } else {
         Fulfillments.insert(std::make_pair(key, 
                                    Fulfillment(sourceIndex, std::move(path))));
+        DidUseLastSource = true;
       }
     }
   };
