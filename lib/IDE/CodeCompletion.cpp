@@ -3247,7 +3247,7 @@ void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E,
   // complete values and/or argument labels.  Otherwise give the entire call
   // pattern.
   Token next = P.peekToken();
-  if (next.isAtStartOfLine()) {
+  if (next.isAtStartOfLine() || next.is(tok::eof)) {
     ShouldCompleteCallPatternAfterParen = true;
   } else if (next.is(tok::r_paren)) {
     HasRParen = true;
