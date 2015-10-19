@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "update-sea"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILAnalysis/SideEffectAnalysis.h"
+#include "swift/SILAnalysis/EscapeAnalysis.h"
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/Support/CommandLine.h"
@@ -25,10 +26,17 @@ namespace {
 llvm::cl::opt<bool> PrintSideEffects("sil-print-side-effects",
                  llvm::cl::desc("Print the result of the side-effect analysis"),
                  llvm::cl::init(false));
+
+llvm::cl::opt<bool> PrintEscapes("sil-print-escapes",
+                 llvm::cl::desc("Print the result of the escape analysis"),
+                 llvm::cl::init(false));
 #endif
 
-/// Recomputes the side-effect information for all functions in the module.
-/// For details see SideEffectAnalysis.
+
+/// Recomputes the side-effect and escape information for all functions in the
+/// module. For details see SideEffectAnalysis and EscapeAnalysis.
+/// TODO: Consider having separate passes for SideEffectAnalysis and
+/// EscapeAnalysis.
 class UpdateSideEffects : public SILModuleTransform {
 
   void run() override {
@@ -38,6 +46,9 @@ class UpdateSideEffects : public SILModuleTransform {
     auto *SEA = PM->getAnalysis<SideEffectAnalysis>();
     SEA->recompute();
 
+    auto *EA = PM->getAnalysis<EscapeAnalysis>();
+    EA->recompute();
+
 #ifndef NDEBUG
     if (PrintSideEffects) {
       llvm::outs() << "Side effects of module\n";
@@ -45,6 +56,15 @@ class UpdateSideEffects : public SILModuleTransform {
         llvm::outs() << "  sil @" << F.getName() << '\n';
         const auto &Effects = SEA->getEffects(&F);
         llvm::outs() << "    <" << Effects << ">\n";
+      }
+    }
+    if (PrintEscapes) {
+      llvm::outs() << "Escape information of module\n";
+      for (auto &F : *getModule()) {
+        if (!F.isExternalDeclaration()) {
+          auto *ConnectionGraph = EA->getConnectionGraph(&F);
+          ConnectionGraph->print(llvm::outs());
+        }
       }
     }
 #endif

@@ -14,6 +14,7 @@ add_swift_library(swiftSILAnalysis
   CFG.cpp
   ArraySemantic.cpp
   SideEffectAnalysis.cpp
+  EscapeAnalysis.cpp
   LoopRegionAnalysis.cpp
   MemoryBehavior.cpp
   LINK_LIBRARIES swiftSILPassesUtils)
