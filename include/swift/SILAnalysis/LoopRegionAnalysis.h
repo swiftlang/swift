@@ -742,6 +742,9 @@ public:
     return IDToRegionMap[RegionID];
   }
 
+  RegionTy *getRegionForNonLocalSuccessor(const LoopRegion *Child,
+                                          unsigned SuccID) const;
+
   /// Look up the region associated with this block and return it. Asserts if
   /// the block does not have a region associated with it.
   ///

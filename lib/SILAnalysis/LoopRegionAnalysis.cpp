@@ -692,6 +692,18 @@ propagateLivenessDownNonLocalSuccessorEdges(LoopRegion *Parent) {
   }
 }
 
+LoopRegionFunctionInfo::RegionTy *
+LoopRegionFunctionInfo::
+getRegionForNonLocalSuccessor(const LoopRegion *Child, unsigned SuccID) const {
+  const LoopRegion *Iter = Child;
+  LoopRegion::SuccessorID Succ = {0, 0};
+  do {
+    Iter = getRegion(Iter->getParentID());
+    Succ = Iter->Succs[SuccID];
+  } while (Succ.IsNonLocal);
+  return getRegion(Succ.ID);
+}
+
 void LoopRegionFunctionInfo::dump() const {
   print(llvm::outs());
   llvm::outs() << "\n";
