@@ -475,9 +475,13 @@ public:
   bool subregions_empty() const { return getSubregionData().empty(); }
   unsigned subregions_size() const { return getSubregionData().size(); }
   subregion_reverse_iterator subregion_rbegin() const {
+    if (isBlock())
+      return subregion_reverse_iterator();
     return getSubregionData().rbegin();
   }
   subregion_reverse_iterator subregion_rend() const {
+    if (isBlock())
+      return subregion_reverse_iterator();
     return getSubregionData().rend();
   }
   llvm::iterator_range<subregion_iterator> getSubregions() const {
