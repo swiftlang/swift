@@ -291,6 +291,9 @@ class EscapeAnalysis : public SILAnalysis {
     /// Backlink to the graph's function.
     SILFunction *F;
 
+    /// Backlink to the parent escape analysis.
+    EscapeAnalysis *EA;
+
     /// Mapping from pointer SIL values to nodes in the graph. Such a value can
     /// never be a projection, because in case of projection-instruction the
     /// based operand value is used instead.
@@ -362,7 +365,7 @@ class EscapeAnalysis : public SILAnalysis {
 
   public:
     /// Constructs a connection graph for a function.
-    ConnectionGraph(SILFunction *F) : F(F) {
+    ConnectionGraph(SILFunction *F, EscapeAnalysis *EA) : F(F), EA(EA) {
     }
 
     void setValid() { Valid = true; }
@@ -500,12 +503,21 @@ private:
   
   /// The allocator for the connection graphs in Function2ConGraph.
   llvm::SpecificBumpPtrAllocator<ConnectionGraph> Allocator;
-  
+
+  /// Cache for isPointer().
+  llvm::DenseMap<SILType, bool> isPointerCache;
+
+  SILModule *M;
+
   /// This analysis depends on the call graph.
   CallGraphAnalysis *CGA;
   
   /// If false, nothing has changed between two recompute() calls.
   bool shouldRecompute;
+
+  /// Returns true if \p V is a "pointer" value.
+  /// See EscapeAnalysis::NodeType::Value.
+  bool isPointer(ValueBase *V);
 
   /// Builds the connection graph for a function, but does not handle applys to
   /// known callees. This is done afterwards by mergeAllCallees.
@@ -527,7 +539,7 @@ private:
 
 public:
   EscapeAnalysis(SILModule *M) :
-    SILAnalysis(AnalysisKind::Escape), CGA(nullptr), shouldRecompute(true) {
+    SILAnalysis(AnalysisKind::Escape), M(M), CGA(nullptr), shouldRecompute(true) {
   }
 
   static bool classof(const SILAnalysis *S) {
@@ -540,7 +552,7 @@ public:
   ConnectionGraph *getConnectionGraph(SILFunction *F) {
     ConnectionGraph *&CG = Function2ConGraph[F];
     if (!CG) {
-      CG = new (Allocator.Allocate()) ConnectionGraph(F);
+      CG = new (Allocator.Allocate()) ConnectionGraph(F, this);
     }
     return CG;
   }

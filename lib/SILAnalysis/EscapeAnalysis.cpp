@@ -29,7 +29,6 @@ static bool isProjection(ValueBase *V) {
     case ValueKind::TupleElementAddrInst:
     case ValueKind::RefElementAddrInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
-    case ValueKind::PointerToAddressInst:
     case ValueKind::StructExtractInst:
     case ValueKind::TupleExtractInst:
     case ValueKind::UncheckedEnumDataInst:
@@ -48,45 +47,6 @@ static ValueBase *skipProjections(ValueBase *V) {
   llvm_unreachable("there is no escape from an infinite loop");
 }
 
-/// Returns true if the type \p Ty is a reference or transitively contains one,
-/// i.e. if it is a "pointer" type.
-static bool isOrContainsReference(SILType Ty, SILModule &Mod) {
-  if (Ty.hasReferenceSemantics())
-    return true;
-
-  if (auto *Str = Ty.getStructOrBoundGenericStruct()) {
-    for (auto *Field : Str->getStoredProperties()) {
-      if (isOrContainsReference(Ty.getFieldType(Field, Mod), Mod))
-        return true;
-    }
-    return false;
-  }
-  if (auto TT = Ty.getAs<TupleType>()) {
-    for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
-      if (isOrContainsReference(Ty.getTupleElementType(i), Mod))
-        return true;
-    }
-    return false;
-  }
-  if (auto En = Ty.getEnumOrBoundGenericEnum()) {
-    for (auto *ElemDecl : En->getAllElements()) {
-      if (ElemDecl->hasArgumentType() &&
-          isOrContainsReference(Ty.getEnumElementType(ElemDecl, Mod), Mod))
-        return true;
-    }
-    return false;
-  }
-  return false;
-}
-
-/// Returns true if \p V is a "pointer" value.
-/// See EscapeAnalysis::NodeType::Value.
-static bool isPointer(ValueBase *V, SILModule &Mod) {
-  assert(V->hasValue());
-  SILType Ty = V->getType(0);
-  return Ty.isAddress() || Ty.isLocalStorage() || isOrContainsReference(Ty, Mod);
-}
-
 EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::getNode(ValueBase *V) {
   if (isa<FunctionRefInst>(V))
     return nullptr;
@@ -94,7 +54,7 @@ EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::getNode(ValueBase *V) {
   if (!V->hasValue())
     return nullptr;
 
-  if (!isPointer(V, F->getModule()))
+  if (!EA->isPointer(V))
     return nullptr;
 
   V = skipProjections(V);
@@ -832,6 +792,50 @@ static bool linkBBArgs(SILBasicBlock *BB) {
   return true;
 }
 
+/// Returns true if the type \p Ty is a reference or transitively contains
+/// a reference, i.e. if it is a "pointer" type.
+static bool isOrContainsReference(SILType Ty, SILModule *Mod) {
+  if (Ty.hasReferenceSemantics())
+    return true;
+
+  if (auto *Str = Ty.getStructOrBoundGenericStruct()) {
+    for (auto *Field : Str->getStoredProperties()) {
+      if (isOrContainsReference(Ty.getFieldType(Field, *Mod), Mod))
+        return true;
+    }
+    return false;
+  }
+  if (auto TT = Ty.getAs<TupleType>()) {
+    for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
+      if (isOrContainsReference(Ty.getTupleElementType(i), Mod))
+        return true;
+    }
+    return false;
+  }
+  if (auto En = Ty.getEnumOrBoundGenericEnum()) {
+    for (auto *ElemDecl : En->getAllElements()) {
+      if (ElemDecl->hasArgumentType() &&
+          isOrContainsReference(Ty.getEnumElementType(ElemDecl, *Mod), Mod))
+        return true;
+    }
+    return false;
+  }
+  return false;
+}
+
+bool EscapeAnalysis::isPointer(ValueBase *V) {
+  assert(V->hasValue());
+  SILType Ty = V->getType(0);
+  auto Iter = isPointerCache.find(Ty);
+  if (Iter != isPointerCache.end())
+    return Iter->second;
+
+  bool IP = (Ty.isAddress() || Ty.isLocalStorage() ||
+             isOrContainsReference(Ty, M));
+  isPointerCache[Ty] = IP;
+  return IP;
+}
+
 void EscapeAnalysis::buildConnectionGraph(SILFunction *F,
                                           ConnectionGraph *ConGraph) {
   ConGraph->setValid();
@@ -934,7 +938,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       }
       return;
     case ValueKind::LoadInst:
-      if (isPointer(I, ConGraph->getFunction()->getModule())) {
+      if (isPointer(I)) {
         CGNode *AddrNode = ConGraph->getNode(cast<LoadInst>(I)->getOperand());
         CGNode *PointsTo = ConGraph->getContentNode(AddrNode);
         if (CGNode *ValueNode = ConGraph->getNodeOrNull(I)) {
@@ -981,7 +985,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
             // first field node as result node.
             ConGraph->setNode(I, FieldNode);
             ResultNode = FieldNode;
-            assert(isPointer(I, ConGraph->getFunction()->getModule()));
+            assert(isPointer(I));
           } else {
             ConGraph->defer(ResultNode, FieldNode);
           }
