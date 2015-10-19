@@ -152,6 +152,8 @@ LoopRegionFunctionInfo::LoopRegionFunctionInfo(FunctionTy *F,
 #else
       IDToRegionMap(PI->size()) {
 #endif
+  if (F->isExternalDeclaration())
+    return;
   DEBUG(llvm::dbgs() << "**** LOOP REGION FUNCTION INFO ****\n");
   DEBUG(llvm::dbgs() << "Analyzing function: " << F->getName() << "\n");
   initializeBlockRegions(PI, LI);
