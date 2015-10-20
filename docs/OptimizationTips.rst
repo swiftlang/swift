@@ -329,6 +329,55 @@ declaration is in the same file as the invocation of the generic. *NOTE* The
 standard library is a special case. Definitions in the standard library are
 visible in all modules and available for specialization.
 
+Advice: Allow the compiler to perform generic specialization
+----------------------------------------------------------------------
+
+The compiler can only specialize generic code if the call site and the callee
+function are located in the same compilation unit. One trick that we can use to
+allow compiler to optimize the callee function is to write code that performs a
+type check in the same compilation unit as the callee function. The code behind
+the type check then re-dispatches the call to the generic function - but this
+time it has the type information. In the code sample below we've inserted a type
+check into the function "play_a_game" and made the code run hundreds of times
+faster.
+
+::
+
+  //Framework.swift:
+
+  protocol Pingable { func ping() -> Self }
+  protocol Playable { func play() }
+
+  extension Int : Pingable {
+    func ping() -> Int { return self + 1 }
+  }
+
+  class Game<T : Pingable> : Playable {
+    var t : T
+
+    init (_ v : T) {t = v}
+
+    func play() {
+      for _ in 0...100_000_000 { t = t.ping() }
+    }
+  }
+
+  func play_a_game(game : Playable ) {
+    // This check allows the optimizer to specialize the
+    // generic call 'play'
+    if let z = game as? Game<Int> {
+      z.play()
+    } else {
+      game.play()
+    }
+  }
+
+  /// -------------- >8
+
+  // Application.swift:
+
+  play_a_game(Game(10))
+
 
 Unsafe code
 ===========
