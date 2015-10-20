@@ -8,6 +8,10 @@ struct Int {
   var value : Builtin.Int64
 }
 
+struct Int32{
+  var value : Builtin.Int32
+}
+
 struct Int64 {
   var value : Builtin.Int64
 }
@@ -59,6 +63,12 @@ struct S5 {
 struct S6 {
   var tuple: (Int, Int)
 }
+
+enum Example {
+  case A(Int64)
+  case B(Int32)
+}
+
 
 sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
 sil @S2_init : $@convention(thin) (@thin S2.Type) -> S2
@@ -319,4 +329,33 @@ bb0:
   %6 = tuple ()                                   // user: %8
   dealloc_stack %0#0 : $*@local_storage S6        // id: %7
   return %6 : $()                                 // id: %8
+}
+
+/// Given an enum type, we expands it into nothing as its meaningless to call
+/// getStoredProperties on enum without specifying the tag. Enum is sort of
+/// like union in C, i.e. its memory can be interpreted differently depending
+/// on the chosen tag.
+///
+/// CHECK-LABEL: enum_test 
+/// CHECK: #0  store
+/// CHECK-NOT: Int64 
+/// CHECK-NOT: Int32
+/// CHECK: #1  store
+/// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
+/// CHECK-NEXT: Field Type: var value: Int64
+sil hidden @enum_test : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Example  // var example       // users: %5, %11
+  %1 = alloc_stack $Int  // var a                 // users: %8, %10
+  %2 = integer_literal $Builtin.Int64, 10         // user: %3
+  %3 = struct $Int64 (%2 : $Builtin.Int64)        // user: %4
+  %4 = enum $Example, #Example.A!enumelt.1, %3 : $Int64 // user: %5
+  store %4 to %0#1 : $*Example                    // id: %5
+  %6 = integer_literal $Builtin.Int64, 10         // user: %7
+  %7 = struct $Int (%6 : $Builtin.Int64)          // user: %8
+  store %7 to %1#1 : $*Int                        // id: %8
+  %9 = tuple ()                                   // user: %12
+  dealloc_stack %1#0 : $*@local_storage Int       // id: %10
+  dealloc_stack %0#0 : $*@local_storage Example   // id: %11
+  return %9 : $()                                 // id: %12
 }
