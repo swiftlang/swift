@@ -59,6 +59,9 @@ class MemLocationPrinter : public SILFunctionTransform {
   /// Dumps the expansions of memory locations accessed in the function.
   /// This tests the expand function in MemLocation class.
   ///
+  /// We test it to catch any suspicious things when memory location is
+  /// expanded, i.e. base is traced back and aggregate is expanded
+  /// properly.
   void printMemExpansion(SILFunction &Fn) {
     MemLocation L;
     MemLocationList Locs;
