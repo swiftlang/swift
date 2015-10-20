@@ -94,7 +94,7 @@ void MemLocation::getFirstLevelMemLocations(MemLocationList &Locs,
                                             SILModule *Mod) {
   SILType Ty = getType();
   llvm::SmallVector<Projection, 8> Out;
-  Projection::getFirstLevelProjections(Ty, *Mod, Out);
+  Projection::getFirstLevelAddrProjections(Ty, *Mod, Out);
   for (auto &X : Out) {
     ProjectionPath P;
     P.append(X);
@@ -106,8 +106,13 @@ void MemLocation::getFirstLevelMemLocations(MemLocationList &Locs,
 void MemLocation::expand(MemLocation &Base, SILModule *Mod,
                          MemLocationList &Locs) {
   // To expand a memory location to its indivisible parts, we first get the
-  // projection paths from the accessed type to each indivisible field, i.e.
-  // leaf nodes, then we append these projection paths to the Base.
+  // address projection paths from the accessed type to each indivisible field,
+  // i.e. leaf nodes, then we append these projection paths to the Base.
+  //
+  // NOTE: we get the address projection because the Base memory location is
+  // initialized with address projection paths. By keeping it consistent makes
+  // it easier to implement the getType function for MemLocation.
+  //
   ProjectionPathList Paths;
   ProjectionPath::BreadthFirstEnumTypeProjection(Base.getType(), Mod, Paths,
                                                  true);

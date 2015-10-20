@@ -468,6 +468,13 @@ void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem) {
     return;
   }
 
+  // Make sure that the MemLocation getType() returns the same type as the
+  // loaded type.
+  if (auto *LI = dyn_cast<LoadInst>(I)) {
+    assert(LI->getOperand().getType().getObjectType() == L.getType() &&
+           "MemLocation returns different type");
+  }
+
   // Expand the given Mem into individual fields and process them as
   // separate reads.
   MemLocationList Locs;
@@ -499,6 +506,13 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   // simply ignore it for now.
   if (!L.isValid())
     return;
+
+  // Make sure that the MemLocation getType() returns the same type as the
+  // stored type.
+  if (auto *SI = dyn_cast<StoreInst>(I)) {
+    assert(SI->getDest().getType().getObjectType() == L.getType() && 
+           "MemLocation returns different type");
+  }
 
   // Expand the given Mem into individual fields and process them as separate
   // writes.

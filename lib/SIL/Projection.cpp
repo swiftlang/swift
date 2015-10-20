@@ -315,6 +315,36 @@ SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
   return SILValue();
 }
 
+void Projection::getFirstLevelAddrProjections(
+    SILType Ty, SILModule &Mod, llvm::SmallVectorImpl<Projection> &Out) {
+  if (auto *S = Ty.getStructOrBoundGenericStruct()) {
+    for (auto *V : S->getStoredProperties()) {
+      Out.push_back(Projection(ProjectionKind::Struct,
+                               Ty.getFieldType(V, Mod).getAddressType(),
+                               V, getIndexForValueDecl(V)));
+    }
+    return;
+  }
+
+  if (auto TT = Ty.getAs<TupleType>()) {
+    for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
+      Out.push_back(Projection(ProjectionKind::Tuple,
+                               Ty.getTupleElementType(i).getAddressType(),
+                               nullptr, i));
+    }
+    return;
+  }
+
+  if (auto *C = Ty.getClassOrBoundGenericClass()) {
+    for (auto *V : C->getStoredProperties()) {
+      Out.push_back(Projection(ProjectionKind::Class,
+                               Ty.getFieldType(V, Mod).getAddressType(),
+                               V, getIndexForValueDecl(V)));
+    }
+    return;
+  }
+}
+
 void Projection::getFirstLevelProjections(
     SILType Ty, SILModule &Mod, llvm::SmallVectorImpl<Projection> &Out) {
   if (auto *S = Ty.getStructOrBoundGenericStruct()) {
@@ -604,7 +634,7 @@ ProjectionPath::BreadthFirstEnumTypeProjection(SILType B, SILModule *Mod,
 
     // Get the first level projection of the current type.
     Projections.clear();
-    Projection::getFirstLevelProjections(Ty, *Mod, Projections);
+    Projection::getFirstLevelAddrProjections(Ty, *Mod, Projections);
 
     // Reached the end of the projection tree, this field can not be expanded
     // anymore.

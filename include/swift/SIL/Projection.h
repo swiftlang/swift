@@ -311,6 +311,12 @@ public:
   static void getFirstLevelProjections(SILType V, SILModule &Mod,
                                        llvm::SmallVectorImpl<Projection> &Out);
 
+
+  /// Given a specific SILType, return all first level address projections if
+  /// it is an aggregate.
+  static void getFirstLevelAddrProjections(SILType V, SILModule &Mod,
+                                        llvm::SmallVectorImpl<Projection> &Out);
+
   /// Form an aggregate of type BaseType using the SILValue Values. Returns the
   /// aggregate on success if this is a case we handle or an empty SILValue
   /// otherwise.
@@ -500,10 +506,16 @@ static inline llvm::hash_code hash_value(const Projection &P) {
 }
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, Projection &P) {
-  if (P.isNominalKind()) 
+  // Print the projection type first.
+  OS << "Address Projection Type: ";
+  OS << P.getType() << "\n";
+  if (P.isNominalKind()) { 
+    OS << "Field Type: ";
     P.getDecl()->print(OS);
-  else 
+  } else {
+    OS << "Index: ";
     OS << P.getIndex();
+  }
   return OS;
 }
 

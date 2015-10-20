@@ -107,7 +107,7 @@ public:
     // enum or tuples.
     if (Path.getValue().empty())
       return Base.getType().getObjectType();
-    return Path.getValue().front().getType();
+    return Path.getValue().front().getType().getObjectType();
   }
 
   /// Returns whether the memory location has been initialized properly.
