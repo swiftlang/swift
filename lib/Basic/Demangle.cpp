@@ -1085,7 +1085,18 @@ private:
     type->addChild(proto);
     return type;
   }
-  
+
+  NodePointer demangleProtocolNameGivenContext(NodePointer context) {
+    NodePointer name = demangleDeclName();
+    if (!name) return nullptr;
+
+    auto proto = NodeFactory::create(Node::Kind::Protocol);
+    proto->addChild(std::move(context));
+    proto->addChild(std::move(name));
+    Substitutions.push_back(proto);
+    return proto;
+  }
+
   NodePointer demangleProtocolNameImpl() {
     // There's an ambiguity in <protocol> between a substitution of
     // the protocol and a substitution of the protocol's context, so
@@ -1100,27 +1111,13 @@ private:
       if (sub->getKind() != Node::Kind::Module)
         return nullptr;
 
-      NodePointer name = demangleDeclName();
-      if (!name) return nullptr;
-
-      auto proto = NodeFactory::create(Node::Kind::Protocol);
-      proto->addChild(std::move(sub));
-      proto->addChild(std::move(name));
-      Substitutions.push_back(proto);
-      return proto;
+      return demangleProtocolNameGivenContext(sub);
     }
 
     if (Mangled.nextIf('s')) {
       NodePointer stdlib = NodeFactory::create(Node::Kind::Module, STDLIB_NAME);
 
-      NodePointer name = demangleDeclName();
-      if (!name) return nullptr;
-
-      auto proto = NodeFactory::create(Node::Kind::Protocol);
-      proto->addChild(std::move(stdlib));
-      proto->addChild(std::move(name));
-      Substitutions.push_back(proto);
-      return proto;
+      return demangleProtocolNameGivenContext(stdlib);
     }
 
     return demangleDeclarationName(Node::Kind::Protocol);
@@ -1436,25 +1433,10 @@ private:
     
     return makeArchetypeRef(index);
   }
-  
-  NodePointer demangleDependentType() {
-    // A dependent member type begins with a non-index, non-'d' character.
-    auto c = Mangled.peek();
-    if (c != 'd' && c != '_' && !isdigit(c)) {
-      NodePointer baseType = demangleType();
-      if (!baseType) return nullptr;
-      NodePointer protocol = demangleProtocolName();
-      if (!protocol) return nullptr;
-      NodePointer depTy = demangleIdentifier(Node::Kind::DependentMemberType);
-      if (!depTy) return nullptr;
-      
-      depTy->addChild(baseType);
-      depTy->addChild(protocol);
-      return depTy;
-    }
-    
-    // Otherwise, we have a generic parameter.
+
+  NodePointer demangleGenericParamIndex() {
     Node::IndexType depth, index;
+
     if (Mangled.nextIf('d')) {
       if (!demangleIndex(depth))
         return nullptr;
@@ -1466,7 +1448,7 @@ private:
       if (!demangleIndex(index))
         return nullptr;
     }
-    
+
     DemanglerPrinter Name;
     if (depth == 0) {
       Name << archetypeName(index);
@@ -1480,10 +1462,113 @@ private:
                                        std::move(Name.str()));
     paramTy->addChild(NodeFactory::create(Node::Kind::Index, depth));
     paramTy->addChild(NodeFactory::create(Node::Kind::Index, index));
-    
+
     return paramTy;
   }
+
+  NodePointer demangleDependentMemberTypeName(NodePointer base) {
+    assert(base->getKind() == Node::Kind::Type
+           && "base should be a type");
+    NodePointer assocTy;
+
+    if (Mangled.nextIf('S')) {
+      assocTy = demangleSubstitutionIndex();
+      if (assocTy->getKind() != Node::Kind::DependentAssociatedTypeRef)
+        return nullptr;
+    } else {
+      NodePointer protocol = nullptr;
+      if (Mangled.nextIf('P')) {
+        protocol = demangleProtocolName();
+        if (!protocol) return nullptr;
+      }
+
+      // TODO: If the protocol name was elided from the assoc type mangling,
+      // we could try to fish it out of the generic signature constraints on the
+      // base.
+      assocTy = demangleIdentifier(Node::Kind::DependentAssociatedTypeRef);
+      if (!assocTy) return nullptr;
+      if (protocol)
+        assocTy->addChild(protocol);
+
+      Substitutions.push_back(assocTy);
+    }
+
+    NodePointer depTy = NodeFactory::create(Node::Kind::DependentMemberType);
+    depTy->addChild(base);
+    depTy->addChild(assocTy);
+    return depTy;
+  }
+
+  NodePointer demangleAssociatedTypeSimple() {
+    // Demangle the base type.
+    auto base = demangleGenericParamIndex();
+    if (!base)
+      return nullptr;
+
+    NodePointer nodeType = NodeFactory::create(Node::Kind::Type);
+    nodeType->addChild(base);
+
+    // Demangle the associated type name.
+    return demangleDependentMemberTypeName(nodeType);
+  }
   
+  NodePointer demangleAssociatedTypeCompound() {
+    // Demangle the base type.
+    auto base = demangleGenericParamIndex();
+    if (!base)
+      return nullptr;
+
+    // Demangle the associated type chain.
+    while (!Mangled.nextIf('_')) {
+      NodePointer nodeType = NodeFactory::create(Node::Kind::Type);
+      nodeType->addChild(base);
+      
+      base = demangleDependentMemberTypeName(nodeType);
+      if (!base)
+        return nullptr;
+    }
+
+    return base;
+  }
+  
+  NodePointer demangleDependentType() {
+    if (!Mangled)
+      return nullptr;
+
+    // A dependent member type begins with a non-index, non-'d' character.
+    auto c = Mangled.peek();
+    if (c != 'd' && c != '_' && !isdigit(c)) {
+      NodePointer baseType = demangleType();
+      if (!baseType) return nullptr;
+      return demangleDependentMemberTypeName(baseType);
+    }
+    
+    // Otherwise, we have a generic parameter.
+    return demangleGenericParamIndex();
+  }
+
+  NodePointer demangleConstrainedTypeImpl() {
+    // The constrained type can only be a generic parameter or an associated
+    // type thereof. The 'q' introducer is thus left off of generic params.
+    if (Mangled.nextIf('w')) {
+      return demangleAssociatedTypeSimple();
+    }
+    if (Mangled.nextIf('W')) {
+      return demangleAssociatedTypeCompound();
+    }
+    return demangleGenericParamIndex();
+  }
+
+  NodePointer demangleConstrainedType() {
+    auto type = demangleConstrainedTypeImpl();
+    if (!type)
+      return nullptr;
+
+    NodePointer nodeType = NodeFactory::create(Node::Kind::Type);
+    nodeType->addChild(type);
+    return nodeType;
+  }
+
   NodePointer demangleGenericSignature() {
     assert(ArchetypeCounts.empty() && "already some generic context?!");
 
@@ -1523,7 +1608,7 @@ private:
     if (!Mangled.nextIf('R'))
       return nullptr;
     
-    while (!Mangled.nextIf('_')) {
+    while (!Mangled.nextIf('r')) {
       NodePointer reqt = demangleGenericRequirement();
       if (!reqt) return nullptr;
       sig->addChild(reqt);
@@ -1547,38 +1632,58 @@ private:
   }
   
   NodePointer demangleGenericRequirement() {
-    if (Mangled.nextIf('d')) {
-      NodePointer type = demangleType();
-      if (!type) return nullptr;
-      NodePointer requirement = demangleType();
-      if (!requirement) return nullptr;
-      auto reqt = NodeFactory::create(
-          Node::Kind::DependentGenericConformanceRequirement);
-      reqt->addChild(type);
-      reqt->addChild(requirement);
-      return reqt;
-    }
+    NodePointer constrainedType = demangleConstrainedType();
+    if (!constrainedType)
+      return nullptr;
     if (Mangled.nextIf('z')) {
-      NodePointer first = demangleType();
-      if (!first) return nullptr;
       NodePointer second = demangleType();
       if (!second) return nullptr;
       auto reqt = NodeFactory::create(
           Node::Kind::DependentGenericSameTypeRequirement);
-      reqt->addChild(first);
+      reqt->addChild(constrainedType);
       reqt->addChild(second);
       return reqt;
     }
-    // Any other introducer indicates a protocol constraint.
-    NodePointer first = demangleType();
-    if (!first) return nullptr;
-    NodePointer protocol = demangleProtocolName();
-    if (!protocol) return nullptr;
-    
+
+    // Base class constraints are introduced by a class type mangling, which
+    // will begin with either 'C' or 'S'.
+    if (!Mangled)
+      return nullptr;
+    NodePointer constraint;
+
+    auto next = Mangled.peek();
+
+    if (next == 'C') {
+      constraint = demangleType();
+      if (!constraint) return nullptr;
+    } else if (next == 'S') {
+      // A substitution may be either the module name of a protocol or a full
+      // type name.
+      NodePointer typeName;
+      Mangled.next();
+      NodePointer sub = demangleSubstitutionIndex();
+      if (!sub) return nullptr;
+      if (sub->getKind() == Node::Kind::Protocol
+          || sub->getKind() == Node::Kind::Class) {
+        typeName = sub;
+      } else if (sub->getKind() == Node::Kind::Module) {
+        typeName = demangleProtocolNameGivenContext(sub);
+        if (!typeName)
+          return nullptr;
+      } else {
+        return nullptr;
+      }
+      constraint = NodeFactory::create(Node::Kind::Type);
+      constraint->addChild(typeName);
+    } else {
+      constraint = demangleProtocolName();
+      if (!constraint)
+        return nullptr;
+    }
     auto reqt = NodeFactory::create(
-                            Node::Kind::DependentGenericConformanceRequirement);
-    reqt->addChild(first);
-    reqt->addChild(protocol);
+                          Node::Kind::DependentGenericConformanceRequirement);
+    reqt->addChild(constrainedType);
+    reqt->addChild(constraint);
     return reqt;
   }
   
@@ -1915,6 +2020,12 @@ private:
     }
     if (c == 'q') {
       return demangleDependentType();
+    }
+    if (c == 'w') {
+      return demangleAssociatedTypeSimple();
+    }
+    if (c == 'W') {
+      return demangleAssociatedTypeCompound();
     }
     if (c == 'R') {
       NodePointer inout = NodeFactory::create(Node::Kind::InOut);
@@ -2323,6 +2434,7 @@ private:
     case Node::Kind::Deallocator:
     case Node::Kind::DeclContext:
     case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::DependentAssociatedTypeRef:
     case Node::Kind::DependentGenericSignature:
     case Node::Kind::DependentGenericParamCount:
     case Node::Kind::DependentGenericConformanceRequirement:
@@ -3552,7 +3664,13 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::DependentMemberType: {
     NodePointer base = pointer->getChild(0);
     print(base);
-    Printer << '.' << pointer->getText();
+    Printer << '.';
+    NodePointer assocTy = pointer->getChild(1);
+    print(assocTy);
+    return;
+  }
+  case Node::Kind::DependentAssociatedTypeRef: {
+    Printer << pointer->getText();
     return;
   }
   case Node::Kind::ThrowsAnnotation: {

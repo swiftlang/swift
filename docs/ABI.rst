@@ -939,11 +939,13 @@ Types
 
 
   type ::= 'u' generic-signature type        // generic type
-  type ::= 'q' index                         // dependent generic parameter
-                                             //   with depth = 0, idx = N
-  type ::= 'qd' index index                  // dependent generic parameter
-                                             //   with depth = M+1, idx = N
-  type ::= 'q' type protocol identifier      // associated type
+  type ::= 'q' generic-param-index           // dependent generic parameter
+  type ::= 'q' type assoc-type-name          // associated type of non-generic param
+  type ::= 'w' generic-param-index assoc-type-name // associated type
+  type ::= 'W' generic-param-index assoc-type-name+ '_' // associated type at depth
+
+  generic-param-index ::= index              // depth = 0,   idx = N
+  generic-param-index ::= 'd' index index    // depth = M+1, idx = N
 
 ``<type>`` never begins or ends with a number.
 ``<type>`` never begins with an underscore.
@@ -954,6 +956,17 @@ Note that protocols mangle differently as types and as contexts. A protocol
 context always consists of a single protocol name and so mangles without a
 trailing underscore. A protocol type can have zero, one, or many protocol bounds
 which are juxtaposed and terminated with a trailing underscore.
+
+::
+
+  assoc-type-name ::= ('P' protocol-name)? identifier
+  assoc-type-name ::= substitution
+
+Associated types use an abbreviated mangling when the base generic parameter
+or associated type is constrained by a single protocol requirement. The
+associated type in this case can be referenced unambiguously by name alone.
+If the base has multiple conformance constraints, then the protocol name is
+mangled in to disambiguate.
 
 ::
 
@@ -1001,19 +1014,25 @@ Generics
 
   protocol-conformance ::= ('u' generic-signature)? type protocol module
 
-``<protocol-conformance>`` refers to a type's conformance to a protocol. The named
-module is the one containing the extension or type declaration that declared
-the conformance.
+``<protocol-conformance>`` refers to a type's conformance to a protocol. The
+named module is the one containing the extension or type declaration that
+declared the conformance.
 
 ::
 
-  generic-signature ::= (generic-param-count+)? 'R' requirement* '_'
-  generic-signature ::= (generic-param-count+)? 'r' // no requirements
+  generic-signature ::= (generic-param-count+)? ('R' requirement*)? 'r'
   generic-param-count ::= 'z'       // zero parameters
   generic-param-count ::= index     // N+1 parameters
-  requirement ::= type protocol     // protocol requirement
-  requirement ::= 'd' type type     // 'd'erived class requirement
-  requirement ::= 'z' type type     // 'z'ame-type requirement
+  requirement ::= type-param protocol-name // protocol requirement
+  requirement ::= type-param type          // base class requirement
+                                           // type starts with [CS]
+  requirement ::= type-param 'z' type      // 'z'ame-type requirement
+
+  // Special type mangling for type params that saves the initial 'q' on
+  // generic params
+  type-param ::= generic-param-index       // generic parameter
+  type-param ::= 'w' generic-param-index assoc-type-name // associated type
+  type-param ::= 'W' generic-param-index assoc-type-name+ '_'
 
 A generic signature begins by describing the number of generic parameters at
 each depth of the signature, followed by the requirements. As a special case,

@@ -192,7 +192,7 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
     y = T()
   }
 
-// CHECK-LABEL: sil hidden @_TFV35definite_init_failable_initializers22FailableAddrOnlyStructCuRq_S_9Pachyderm_fMGS0_q__FT24failBeforeInitializationT__GSqGS0_q___
+// CHECK-LABEL: sil hidden @_TFV35definite_init_failable_initializers22FailableAddrOnlyStructC{{.*}}24failBeforeInitialization
 // CHECK:       bb0(%0 : $*Optional<FailableAddrOnlyStruct<T>>, %1 : $@thin FailableAddrOnlyStruct<T>.Type):
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
 // CHECK:         br bb1
@@ -206,7 +206,7 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
     return nil
   }
 
-// CHECK-LABEL: sil hidden @_TFV35definite_init_failable_initializers22FailableAddrOnlyStructCuRq_S_9Pachyderm_fMGS0_q__FT30failAfterPartialInitializationT__GSqGS0_q___
+// CHECK-LABEL: sil hidden @_TFV35definite_init_failable_initializers22FailableAddrOnlyStructC{{.*}}failAfterPartialInitialization
 // CHECK:       bb0(%0 : $*Optional<FailableAddrOnlyStruct<T>>, %1 : $@thin FailableAddrOnlyStruct<T>.Type):
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
 // CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
@@ -230,7 +230,7 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
     return nil
   }
 
-// CHECK-LABEL: sil hidden @_TFV35definite_init_failable_initializers22FailableAddrOnlyStructCuRq_S_9Pachyderm_fMGS0_q__FT27failAfterFullInitializationT__GSqGS0_q___
+// CHECK-LABEL: sil hidden @_TFV35definite_init_failable_initializers22FailableAddrOnlyStructC{{.*}}failAfterFullInitialization
 // CHECK:       bb0(%0 : $*Optional<FailableAddrOnlyStruct<T>>, %1 : $@thin FailableAddrOnlyStruct<T>.Type):
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
 // CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1

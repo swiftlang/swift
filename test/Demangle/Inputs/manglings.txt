@@ -56,9 +56,14 @@ _TtuzrFT_T_ ---> <> () -> ()
 _Ttu__rFq_qd__ ---> <A><B> (A) -> B
 _Ttu_z_rFq_qd0__ ---> <A><><B> (A) -> B
 _Ttu0_rFq_q0_ ---> <A, B> (A) -> B
-_TtuRq_s8Runcible_Fq_qq_S_5Mince ---> <A where A: Swift.Runcible> (A) -> A.Mince
-_TtuRdq_Cs22AbstractRuncingFactory_Fq_q_ ---> <A where A: Swift.AbstractRuncingFactory> (A) -> A
-_TtuRq_s8Runciblezqq_S_5Minceq__Fq_q_ ---> <A where A: Swift.Runcible, A.Mince == A> (A) -> A
+_TtuR_s8RunciblerFq_w_5Mince ---> <A where A: Swift.Runcible> (A) -> A.Mince
+_TtuR_s8RunciblerFq_W_5Mince6Quince_ ---> <A where A: Swift.Runcible> (A) -> A.Mince.Quince
+_TtuR_s8Runcible_s8FungiblerFq_w_PS_5Mince ---> <A where A: Swift.Runcible, A: Swift.Fungible> (A) -> A.Mince
+_TtuR_Cs22AbstractRuncingFactoryrFq_q_ ---> <A where A: Swift.AbstractRuncingFactory> (A) -> A
+_TtuR_s8Runciblew_5Mincezq_rFq_q_ ---> <A where A: Swift.Runcible, A.Mince == A> (A) -> A
+_TtuR_s8RuncibleW_5Mince6Quince_zq_rFq_q_ ---> <A where A: Swift.Runcible, A.Mince.Quince == A> (A) -> A
+_Ttu0_R_s8Runcible0_S_w_5Minces8Fungiblew0_S0_S1_rFq_q0_ ---> <A, B where A: Swift.Runcible, B: Swift.Runcible, A.Mince: Swift.Fungible, B.Mince: Swift.Fungible> (A) -> B
+_Ttu0_R_3Foo3Bar_CS_3Bas0_S0_0_S1_rT_ ---> <A, B where A: Foo.Bar, A: Foo.Bas, B: Foo.Bar, B: Foo.Bas> ()
 _Tv3foo3barSi ---> foo.bar : Swift.Int
 _TF3fooau3barSi ---> foo.bar.unsafeMutableAddressor : Swift.Int
 _TF3foolu3barSi ---> foo.bar.unsafeAddressor : Swift.Int
@@ -217,13 +222,13 @@ _TTSg5XMtBi32____TFVs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapa
 _TFIZvV8mangling10HasVarInit5stateSbiu_KT_Sb ---> static mangling.HasVarInit.(state : Swift.Bool).(variable initialization expression).(implicit closure #1)
 _TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContextu__rFGS0_q__Fqd__T_L_3fooFTQd__Q__T_ ---> interface_type_mangling.GenericTypeContext.(closureInGenericContext <A><B> (interface_type_mangling.GenericTypeContext<A>) -> (B) -> ()).(foo #1) (A, B) -> ()
 _TFFV23interface_type_mangling18GenericTypeContextg31closureInGenericPropertyContextq_L_3fooFT_Q_ ---> interface_type_mangling.GenericTypeContext.(closureInGenericPropertyContext.getter : A).(foo #1) () -> A
-_TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_FS1_23closureInGenericContextu__Rq_S1__fq_Fqd__T_ ---> protocol witness for interface_type_mangling.GenericWitnessTest.closureInGenericContext <A><B where A: interface_type_mangling.GenericWitnessTest> (A)(B) -> () in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
-_TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_FS1_g31closureInGenericPropertyContextqq_S1_3Tee ---> protocol witness for interface_type_mangling.GenericWitnessTest.closureInGenericPropertyContext.getter : A.Tee in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
-_TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_FS1_16twoParamsAtDepthu_0_Rq_S1__fq_FTqd__1yqd_0__T_ ---> protocol witness for interface_type_mangling.GenericWitnessTest.twoParamsAtDepth <A><B, C where A: interface_type_mangling.GenericWitnessTest> (A)(B, y : C) -> () in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
+_TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_FS1_23closureInGenericContextu__R_S1_rfq_Fqd__T_ ---> protocol witness for interface_type_mangling.GenericWitnessTest.closureInGenericContext <A><B where A: interface_type_mangling.GenericWitnessTest> (A)(B) -> () in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
+_TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_FS1_g31closureInGenericPropertyContextw_3Tee ---> protocol witness for interface_type_mangling.GenericWitnessTest.closureInGenericPropertyContext.getter : A.Tee in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
+_TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_FS1_16twoParamsAtDepthu_0_R_S1_rfq_FTqd__1yqd_0__T_ ---> protocol witness for interface_type_mangling.GenericWitnessTest.twoParamsAtDepth <A><B, C where A: interface_type_mangling.GenericWitnessTest> (A)(B, y : C) -> () in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
 _TFC3red11BaseClassEHcfMS0_FzT1aSi_S0_ ---> red.BaseClassEH.init (red.BaseClassEH.Type)(a : Swift.Int) throws -> red.BaseClassEH
 _TF4red23foofSifT1ySi_FT1zSi_Si ---> red2.foo (Swift.Int)(y : Swift.Int)(z : Swift.Int) -> Swift.Int
-_TFe27mangling_generic_extensionsRq_S_8Runcible_VS_3Foog1aSi ---> ext.mangling_generic_extensions.mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.a.getter : Swift.Int
-_TFe27mangling_generic_extensionsRq_S_8Runcible_VS_3Foog1bq_ ---> ext.mangling_generic_extensions.mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.b.getter : A
+_TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1aSi ---> ext.mangling_generic_extensions.mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.a.getter : Swift.Int
+_TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1bq_ ---> ext.mangling_generic_extensions.mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.b.getter : A
 _TTRXFo_iT__iT_zoPs9ErrorType__XFo__dT_zoPS___ ---> reabstraction thunk helper from @callee_owned (@in ()) -> (@out (), @error @owned Swift.ErrorType) to @callee_owned () -> (@unowned (), @error @owned Swift.ErrorType)
 _TFE1a ---> _TFE1a
 _TF21$__lldb_module_for_E0au3$E0Ps9ErrorType_ ---> $__lldb_module_for_E0.$E0.unsafeMutableAddressor : Swift.ErrorType

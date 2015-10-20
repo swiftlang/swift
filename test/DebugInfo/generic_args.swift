@@ -29,7 +29,7 @@ aFunction(AClass(),AnotherClass(),"aFunction")
 struct Wrapper<T: AProtocol> {
 
   init<U: AProtocol>(from : Wrapper<U>) {
-  // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "Wrapper",{{.*}} identifier: "_TtGV12generic_args7WrapperQq_FS0_cu__Rq_S_9AProtocolqd__S1__FMGS0_q__FT4fromGS0_qd____GS0_q___")
+  // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "Wrapper",{{.*}} identifier: "_TtGV12generic_args7WrapperQq_FS0_cu__R_S_9AProtocold__S1_rFMGS0_q__FT4fromGS0_qd____GS0_q___")
     var wrapped = from
     wrapped = from
     _ = wrapped

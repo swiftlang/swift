@@ -190,6 +190,15 @@ static VarDecl *findFirstVariable(PatternBindingDecl *binding) {
   llvm_unreachable("pattern-binding bound no variables?");
 }
 
+CanGenericSignature Mangler::getCanonicalSignatureOrNull(GenericSignature *sig,
+                                                         ModuleDecl &M) {
+
+  if (!sig)
+    return nullptr;
+  Mod = &M;
+  return sig->getCanonicalManglingSignature(M);
+}
+
 void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
   switch (ctx->getContextKind()) {
   case DeclContextKind::Module:
@@ -261,7 +270,9 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
       }
     }
     mangleNominalType(decl, ResilienceExpansion::Minimal, shouldBind,
-                      ExtD->getGenericParams());
+                    getCanonicalSignatureOrNull(ExtD->getGenericSignature(),
+                                                *ExtD->getParentModule()),
+                    ExtD->getGenericParams());
     return;
   }
 
@@ -335,8 +346,11 @@ void Mangler::mangleModule(const Module *module) {
 /// Bind the generic parameters from the given list and its parents.
 ///
 /// \param mangle if true, also emit the mangling for a 'generics'
-void Mangler::bindGenericParameters(const GenericParamList *genericParams,
+void Mangler::bindGenericParameters(CanGenericSignature sig,
+                                    const GenericParamList *genericParams,
                                     bool mangle = false) {
+  if (sig)
+    CurGenericSignature = sig;
   assert(genericParams);
   SmallVector<const GenericParamList *, 2> paramLists;
   
@@ -390,7 +404,7 @@ void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
          "expecting canonical types when not mangling for the debugger");
 
   // FIXME: Prefix?
-  bindGenericParameters(genericParams, /*mangle*/ true);
+  bindGenericParameters(nullptr, genericParams, /*mangle*/ true);
 
   if (mangleAsFunction)
     mangleFunctionType(dyn_cast<AnyFunctionType>(T.getPointer()), explosion,
@@ -466,13 +480,14 @@ void Mangler::mangleDeclName(const ValueDecl *decl) {
 }
 
 static void bindAllGenericParameters(Mangler &mangler,
+                                     CanGenericSignature sig,
                                      GenericParamList *generics) {
   if (!generics) {
     mangler.resetArchetypesDepth();
     return;
   }
-  bindAllGenericParameters(mangler, generics->getOuterParameters());
-  mangler.bindGenericParameters(generics, /*mangle*/ false);
+  bindAllGenericParameters(mangler, nullptr, generics->getOuterParameters());
+  mangler.bindGenericParameters(sig, generics, /*mangle*/ false);
 }
 
 void Mangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
@@ -487,7 +502,11 @@ void Mangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   // Move up to the innermost generic context.
   while (DC && !DC->isInnermostContextGeneric()) DC = DC->getParent();
   if (DC && BindGenericParams)
-    bindAllGenericParameters(*this, DC->getGenericParamsOfContext());
+    bindAllGenericParameters(*this,
+                             getCanonicalSignatureOrNull(
+                               DC->getGenericSignatureOfContext(),
+                               *DC->getParentModule()),
+                             DC->getGenericParamsOfContext());
   DeclCtx = DC;
 
   mangleType(Ty, ResilienceExpansion::Minimal, /*uncurry*/ 0);
@@ -568,7 +587,11 @@ void Mangler::mangleDeclTypeForDebugger(const ValueDecl *decl) {
       while (DC->isTypeContext())
         DC = DC->getParent();
     }
-    bindAllGenericParameters(*this, DC->getGenericParamsOfContext());
+    bindAllGenericParameters(*this,
+                             getCanonicalSignatureOrNull(
+                               DC->getGenericSignatureOfContext(),
+                               *DC->getParentModule()),
+                             DC->getGenericParamsOfContext());
   }
 
   mangleDeclType(decl, ResilienceExpansion::Minimal, /*uncurry*/ 0);
@@ -605,11 +628,12 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
 
   Type type = decl->getInterfaceType();
 
-  CanGenericSignature sig;
   initialParamDepth = 0;
+  CanGenericSignature sig;
   if (auto gft = type->getAs<GenericFunctionType>()) {
     assert(Mod);
     sig = gft->getGenericSignature()->getCanonicalManglingSignature(*Mod);
+    CurGenericSignature = sig;
     genericParams = sig->getGenericParams();
     requirements = sig->getRequirements();
 
@@ -681,7 +705,8 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();
-  Type type = getDeclTypeForMangling(decl, genericParams, initialParamDepth,
+  Type type = getDeclTypeForMangling(decl,
+                                     genericParams, initialParamDepth,
                                      requirements, requirementsBuf);
 
   // Mangle the generic signature, if any.
@@ -698,10 +723,25 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
       && !decl->getInterfaceType()->is<ErrorType>()) {
     if (const auto context = dyn_cast<DeclContext>(decl)) {
       if (auto params = context->getGenericParamsOfContext()) {
-        bindAllGenericParameters(*this, params);
+        bindAllGenericParameters(*this, nullptr, params);
       }
     }
   }
+}
+
+void Mangler::mangleConstrainedType(CanType type,
+                                    ResilienceExpansion expansion) {
+  // The type constrained by a generic requirement should always be a
+  // generic parameter or associated type thereof. Assuming this lets us save
+  // an introducer character in the common case when a generic parameter is
+  // constrained.
+  assert(isa<DependentMemberType>(type) || isa<GenericTypeParamType>(type));
+
+  if (auto gp = dyn_cast<GenericTypeParamType>(type)) {
+    mangleGenericParamIndex(gp);
+    return;
+  }
+  mangleType(type, expansion, 0);
 }
 
 void Mangler::mangleGenericSignatureParts(
@@ -709,7 +749,6 @@ void Mangler::mangleGenericSignatureParts(
                                         unsigned initialParamDepth,
                                         ArrayRef<Requirement> requirements,
                                         ResilienceExpansion expansion) {
-
   // Mangle the number of parameters.
   unsigned depth = 0;
   unsigned count = 0;
@@ -765,12 +804,12 @@ mangle_requirements:
         // efficiently.
         // TODO: We could golf this a little more by assuming the first type
         // is a dependent type.
-        mangleType(reqt.getFirstType()->getCanonicalType(), expansion, 0);
+        mangleConstrainedType(reqt.getFirstType()->getCanonicalType(),
+                              expansion);
         mangleProtocolName(protocols[0]);
         break;
       }
-      Buffer << 'd';
-      mangleType(reqt.getFirstType()->getCanonicalType(), expansion, 0);
+      mangleConstrainedType(reqt.getFirstType()->getCanonicalType(), expansion);
       mangleType(reqt.getSecondType()->getCanonicalType(), expansion, 0);
       break;
     }
@@ -780,26 +819,23 @@ mangle_requirements:
         Buffer << 'R';
         didMangleRequirement = true;
       }
+      mangleConstrainedType(reqt.getFirstType()->getCanonicalType(), expansion);
       Buffer << 'z';
-      mangleType(reqt.getFirstType()->getCanonicalType(), expansion, 0);
       mangleType(reqt.getSecondType()->getCanonicalType(), expansion, 0);
       break;
     }
   }
-  // Special mangling for no requirements.
-  if (!didMangleRequirement)
-    Buffer << 'r';
-  else
-    Buffer << '_';
+  // Mark end of requirements.
+  Buffer << 'r';
 }
 
 void Mangler::mangleGenericSignature(const GenericSignature *sig,
                                      ResilienceExpansion expansion) {
   assert(Mod);
-  sig = sig->getCanonicalManglingSignature(*Mod);
-
-  mangleGenericSignatureParts(sig->getGenericParams(), 0,
-                              sig->getRequirements(),
+  auto canSig = sig->getCanonicalManglingSignature(*Mod);
+  CurGenericSignature = canSig;
+  mangleGenericSignatureParts(canSig->getGenericParams(), 0,
+                              canSig->getRequirements(),
                               expansion);
 }
 
@@ -815,6 +851,37 @@ static void mangleMetatypeRepresentation(raw_ostream &Buffer,
   case MetatypeRepresentation::ObjC:
     Buffer << 'o';
   }
+}
+
+void Mangler::mangleGenericParamIndex(GenericTypeParamType *paramTy) {
+  if (paramTy->getDepth() > 0) {
+    Buffer << 'd';
+    Buffer << Index(paramTy->getDepth() - 1);
+  }
+  Buffer << Index(paramTy->getIndex());
+}
+
+void Mangler::mangleAssociatedTypeName(DependentMemberType *dmt,
+                                       bool canAbbreviate) {
+  auto assocTy = dmt->getAssocType();
+
+  if (tryMangleSubstitution(assocTy))
+    return;
+
+
+  // If the base type is known to have a single protocol conformance
+  // in the current generic context, then we don't need to disambiguate the
+  // associated type name by protocol.
+  // FIXME: We ought to be able to get to the generic signature from a
+  // dependent type, but can't yet. Shouldn't need this side channel.
+  if (!canAbbreviate || !CurGenericSignature || !Mod
+      || CurGenericSignature->getConformsTo(dmt->getBase(), *Mod).size() > 1) {
+    Buffer << 'P';
+    mangleProtocolName(assocTy->getProtocol());
+  }
+  mangleIdentifier(assocTy->getName());
+
+  addSubstitution(assocTy);
 }
 
 /// Mangle a type into the buffer.
@@ -1246,7 +1313,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
         GenericParams = DC->getGenericParamsOfContext();
       } while (!GenericParams);
 
-      bindGenericParameters(GenericParams);
+      bindGenericParameters(nullptr, GenericParams);
       it = Archetypes.find(archetype);
     }
     auto &info = it->second;
@@ -1301,21 +1368,47 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     Buffer << 'q';
     // FIXME: Notion of depth is reversed from that for archetypes.
     auto paramTy = cast<GenericTypeParamType>(tybase);
-    if (paramTy->getDepth() > 0) {
-      Buffer << 'd';
-      Buffer << Index(paramTy->getDepth() - 1);
-    }
-    Buffer << Index(paramTy->getIndex());
+    mangleGenericParamIndex(paramTy);
     return;
   }
 
   case TypeKind::DependentMember: {
-    Buffer << 'q';
-
     auto memTy = cast<DependentMemberType>(tybase);
+    auto base = memTy->getBase()->getCanonicalType();
+
+    // type ::= 'w' generic-param-index associated-type-name
+    // 't_0_0.Member'
+    if (auto gpBase = dyn_cast<GenericTypeParamType>(base)) {
+      Buffer << 'w';
+      mangleGenericParamIndex(gpBase);
+      mangleAssociatedTypeName(memTy, /*canAbbreviate*/ true);
+      return;
+    }
+
+    // type ::= 'W' generic-param-index associated-type-name+ '_'
+    // 't_0_0.Member.Member...'
+    SmallVector<DependentMemberType*, 2> path;
+    path.push_back(memTy);
+    while (auto dmBase = dyn_cast<DependentMemberType>(base)) {
+      path.push_back(dmBase);
+      base = dmBase.getBase();
+    }
+    if (auto gpRoot = dyn_cast<GenericTypeParamType>(base)) {
+      Buffer << 'W';
+      mangleGenericParamIndex(gpRoot);
+      for (auto *member : reversed(path)) {
+        mangleAssociatedTypeName(member, /*canAbbreviate*/ true);
+      }
+      Buffer << '_';
+      return;
+    }
+
+    // type ::= 'q' type associated-type-name
+    // Dependent members of non-generic-param types are not canonical, but
+    // we may still want to mangle them for debugging or indexing purposes.
+    Buffer << 'q';
     mangleType(memTy->getBase(), explosion, 0);
-    mangleProtocolName(memTy->getAssocType()->getProtocol());
-    mangleIdentifier(memTy->getAssocType()->getName());
+    mangleAssociatedTypeName(memTy, /*canAbbreviate*/false);
     return;
   }
 
@@ -1391,13 +1484,19 @@ static char getSpecifierForNominalType(const NominalTypeDecl *decl) {
 void Mangler::mangleNominalType(const NominalTypeDecl *decl,
                                 ResilienceExpansion explosion,
                                 BindGenerics shouldBind,
+                                CanGenericSignature extGenericSig,
                                 const GenericParamList *extGenericParams) {
   auto bindGenericsIfDesired = [&] {
     if (shouldBind == BindGenerics::All) {
       const GenericParamList *generics =
           extGenericParams ? extGenericParams : decl->getGenericParams();
+      auto sig = extGenericSig
+                ? extGenericSig
+                : getCanonicalSignatureOrNull(decl->getGenericSignature(),
+                                              *decl->getParentModule());
       if (generics)
-        bindGenericParameters(generics, /*mangle*/ false);
+        bindGenericParameters(sig,
+                              generics, /*mangle*/ false);
     }
   };
 

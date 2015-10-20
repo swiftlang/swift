@@ -41,26 +41,26 @@ func class_init_partial_apply(c: C.Type) {
 // CHECK-LABEL: sil shared @_TFC18partial_apply_init1CCFMS0_FT8requiredSd_S0_
 // CHECK:         class_method %0 : $@thick C.Type, #C.init!allocator.1
 
-// CHECK-LABEL: sil hidden @_TF18partial_apply_init28archetype_init_partial_applyuRdq_CS_1Cq_S_1P_FMq_T_
+// CHECK-LABEL: sil hidden @_TF18partial_apply_init28archetype_init_partial_applyuR_CS_1C_S_1PrFMq_T_
 func archetype_init_partial_apply<T: C where T: P>(t: T.Type) {
   // Archetype initializations are always dynamic, whether applied to the type or a metatype.
   // CHECK: function_ref @_TFC18partial_apply_init1CCFMS0_FT8requiredSd_S0_
   let requiredT: Double -> T = T.init
-  // CHECK: function_ref @_TFP18partial_apply_init1PCuRq_S0__FMq_FT5protoSS_q_
+  // CHECK: function_ref @_TFP18partial_apply_init1PCuR_S0_rFMq_FT5protoSS_q_
   let protoT: String -> T = T.init
-  // CHECK: function_ref @_TFE18partial_apply_initPS_1PCuRq_S0__FMq_FT8protoExtSf_q_
+  // CHECK: function_ref @_TFE18partial_apply_initPS_1PCuR_S0_rFMq_FT8protoExtSf_q_
   let protoExtT: Float -> T = T.init
 
   // CHECK: function_ref @_TFC18partial_apply_init1CCFMS0_FT8requiredSd_S0_
   let requiredM: Double -> T = t.init
-  // CHECK: function_ref @_TFP18partial_apply_init1PCuRq_S0__FMq_FT5protoSS_q_
+  // CHECK: function_ref @_TFP18partial_apply_init1PCuR_S0_rFMq_FT5protoSS_q_
   let protoM: String -> T = t.init
-  // CHECK: function_ref @_TFE18partial_apply_initPS_1PCuRq_S0__FMq_FT8protoExtSf_q_
+  // CHECK: function_ref @_TFE18partial_apply_initPS_1PCuR_S0_rFMq_FT8protoExtSf_q_
   let protoExtM: Float -> T = t.init
 }
 
-// CHECK-LABEL: sil shared @_TFP18partial_apply_init1PCuRq_S0__FMq_FT5protoSS_q_
+// CHECK-LABEL: sil shared @_TFP18partial_apply_init1PCuR_S0_rFMq_FT5protoSS_q_
 // CHECK:         witness_method $Self, #P.init!allocator.1
-// CHECK-LABEL: sil shared @_TFE18partial_apply_initPS_1PCuRq_S0__FMq_FT8protoExtSf_q_
-// CHECK:         function_ref @_TFE18partial_apply_initPS_1PCuRq_S0__fMq_FT8protoExtSf_q_
+// CHECK-LABEL: sil shared @_TFE18partial_apply_initPS_1PCuR_S0_rFMq_FT8protoExtSf_q_
+// CHECK:         function_ref @_TFE18partial_apply_initPS_1PCuR_S0_rfMq_FT8protoExtSf_q_
 

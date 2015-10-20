@@ -6,5 +6,5 @@
 func foo<T: AnyObject>(x: T) -> T { return x }
 
 // CHECK-LABEL: define hidden %objc_object* @_TF23generic_class_anyobject3barFPs9AnyObject_PS0__(%objc_object*)
-// CHECK:         call %objc_object* @_TF23generic_class_anyobject3foouRq_s9AnyObject_Fq_q_
+// CHECK:         call %objc_object* @_TF23generic_class_anyobject3foouR_s9AnyObjectrFq_q_
 func bar(x: AnyObject) -> AnyObject { return foo(x) }

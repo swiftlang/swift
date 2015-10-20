@@ -70,7 +70,7 @@ class GenericClass {
 protocol Prot {
   // CHECK: [[@LINE+1]]:13 s:P14swift_ide_test4Prot5Blarg{{$}}
   typealias Blarg
-  // CHECK: [[@LINE+1]]:8 s:FP14swift_ide_test4Prot8protMethuRq_S0__Fq_Fqq_S0_5Blargqq_S0_5Blarg{{$}}
+  // CHECK: [[@LINE+1]]:8 s:FP14swift_ide_test4Prot8protMethuR_S0_rFq_Fw_5Blargw_S1_{{$}}
   func protMeth(x: Blarg) -> Blarg
   // CHECK: [[@LINE+2]]:7 s:vP14swift_ide_test4Prot17protocolProperty1Si{{$}}
   // CHECK: [[@LINE+1]]:32 s:FP14swift_ide_test4Protg17protocolProperty1Si{{$}}
@@ -87,7 +87,7 @@ class SubCls : MyCls, Prot {
   var protocolProperty1 = 0
 }
 
-// CHECK: [[@LINE+1]]:6 s:F14swift_ide_test5genFnuRq_S_4Protqq_S0_5BlargS_5Prot2_Fq_Si{{$}}
+// CHECK: [[@LINE+1]]:6 s:F14swift_ide_test5genFnuR_S_4Protw_5BlargS_5Prot2rFq_Si{{$}}
 func genFn<T : Prot where T.Blarg : Prot2>(p : T) -> Int {}
 
 // CHECK: [[@LINE+1]]:6 s:F14swift_ide_test3barFSiTSiSf_{{$}}

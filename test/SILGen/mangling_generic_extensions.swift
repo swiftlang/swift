@@ -21,24 +21,24 @@ extension Foo {
   func zim() { }
   // NO-SELF-LABEL: sil hidden @_TFV27mangling_generic_extensions3Foo4zangu_rfqd__T_
   func zang<U>(_: U) { }
-  // NO-SELF-LABEL: sil hidden @_TFV27mangling_generic_extensions3Foo4zungu_Rqd__S_8Runciblezq_qqd__S1_3Hat_fqd__T_
+  // NO-SELF-LABEL: sil hidden @_TFV27mangling_generic_extensions3Foo4zungu_Rd__S_8Runcible_zwd__3Hatrfqd__T_
   func zung<U: Runcible where U.Hat == T>(_: U) { }
 }
 
 extension Foo where T: Runcible {
   // A constrained extension always uses the extension mangling.
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRq_S_8Runcible_VS_3Foog1aSi
+  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1aSi
   var a: Int { return 0 }
 
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRq_S_8Runcible_VS_3Foog1bq_
+  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1bq_
   var b: T { get { } }
 }
 
 extension Foo where T: Runcible, T.Spoon: Runcible {
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRq_S_8Runcibleqq_S0_5SpoonS0__VS_3Foog1aSi
+  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsR_S_8Runciblew_5SpoonS0_rVS_3Foog1aSi
   var a: Int { return 0 }
 
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRq_S_8Runcibleqq_S0_5SpoonS0__VS_3Foog1bq_
+  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsR_S_8Runciblew_5SpoonS0_rVS_3Foog1bq_
   var b: T { get { } }
 }
 
@@ -49,13 +49,13 @@ extension Foo where T: Runcible, T.Spoon: Runcible {
 // declaration, so we would no longer want to use the extension mangling
 // in unconstrained cases.
 extension Runcible {
-  // CHECK-LABEL: sil hidden @_TFE27mangling_generic_extensionsPS_8Runcible5runceuRq_S0__fq_FT_T_
+  // CHECK-LABEL: sil hidden @_TFE27mangling_generic_extensionsPS_8Runcible5runceuR_S0_rfq_FT_T_
   // NO-SELF-LABEL: sil hidden @_TFE27mangling_generic_extensionsPS_8Runcible5runcefT_T_
   func runce() {}
 }
 
 extension Runcible where Self.Spoon == Self.Hat {
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRq_S_8Runciblezqq_S0_3Hatqq_S0_5Spoon_S0_5runceuRq_S0_zqq_S0_3Hatqq_S0_5Spoon_fq_FT_T_
-  // NO-SELF-LABEL: sil hidden @_TFe27mangling_generic_extensionsRq_S_8Runciblezqq_S0_3Hatqq_S0_5Spoon_S0_5runcefT_T_
+  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsR_S_8Runciblew_3Hatzw_5SpoonrS0_5runceuR_S0_w_S1_zw_S2_rfq_FT_T_
+  // NO-SELF-LABEL: sil hidden @_TFe27mangling_generic_extensionsR_S_8Runciblew_3Hatzw_5SpoonrS0_5runcefT_T_
   func runce() {}
 }

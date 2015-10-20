@@ -60,14 +60,14 @@ optional(x: .None)
 
 var pair : (Int, Double) = makePair(a: 1, b: 2.5)
 
-// SIL:   [[DIFFERENT_A:%.+]] = function_ref @_TF8def_func9differentuRq_s9Equatable_FT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
-// SIL:   [[DIFFERENT_B:%.+]] = function_ref @_TF8def_func9differentuRq_s9Equatable_FT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// SIL:   [[DIFFERENT_A:%.+]] = function_ref @_TF8def_func9differentuR_s9EquatablerFT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// SIL:   [[DIFFERENT_B:%.+]] = function_ref @_TF8def_func9differentuR_s9EquatablerFT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
 
 different(a: 1, b: 2)
 different(a: false, b: false)
 
-// SIL:   [[DIFFERENT2_A:%.+]] = function_ref @_TF8def_func10different2uRq_s9Equatable_FT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
-// SIL:   [[DIFFERENT2_B:%.+]] = function_ref @_TF8def_func10different2uRq_s9Equatable_FT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// SIL:   [[DIFFERENT2_A:%.+]] = function_ref @_TF8def_func10different2uR_s9EquatablerFT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// SIL:   [[DIFFERENT2_B:%.+]] = function_ref @_TF8def_func10different2uR_s9EquatablerFT1aq_1bq__Sb : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
 different2(a: 1, b: 2)
 different2(a: false, b: false)
 
@@ -81,7 +81,7 @@ struct IntWrapper2 : Wrapped {
   func getValue() -> Int { return 2 }
 }
 
-// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_TF8def_func16differentWrappedu0_Rq_S_7Wrappedq0_S0_zqq_S0_5Valueqq0_S0_5Value_FT1aq_1bq0__Sb : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_0.Value : Equatable, τ_0_0.Value == τ_0_1.Value> (@in τ_0_0, @in τ_0_1) -> Bool
+// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_TF8def_func16differentWrappedu0_R_S_7Wrapped0_S0_w_5Valuezw0_S1_rFT1aq_1bq0__Sb : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_0.Value : Equatable, τ_0_0.Value == τ_0_1.Value> (@in τ_0_0, @in τ_0_1) -> Bool
 
 differentWrapped(a: IntWrapper1(), b: IntWrapper2())
 

@@ -10,7 +10,7 @@ struct X {}
 
 // Ensure that the protocol witness for requirements with same-type constraints
 // is set correctly. <rdar://problem/16369105>
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV17witness_same_type3FooS_7FooableS_FS1_3foou__Rq_S1_qd__S1_zqq_S1_3Barqqd__S1_3Bar_fq_FT1xqd___qq_S1_3Bar : $@convention(witness_method) <T where T : Fooable, T.Bar == X> (@out X, @in T, @in_guaranteed Foo) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV17witness_same_type3FooS_7FooableS_FS1_3foou__R_S1_d__S1_w_3Barzwd__S2_rfq_FT1xqd___w_S2_ : $@convention(witness_method) <T where T : Fooable, T.Bar == X> (@out X, @in T, @in_guaranteed Foo) -> ()
 struct Foo: Fooable {
   typealias Bar = X
 
@@ -18,7 +18,7 @@ struct Foo: Fooable {
 }
 
 // rdar://problem/19049566
-// CHECK-LABEL: sil [transparent] [thunk] @_TTWu0_Rq_s12SequenceTypezq0_qqq_S_9Generators13GeneratorType7Element_GV17witness_same_type14LazySequenceOfq_q0__S_S1_FS_8generateuRq_S__fq_FT_qq_S_9Generator
+// CHECK-LABEL: sil [transparent] [thunk] @_TTWu0_R_s12SequenceType0_zW_9Generator7Element_rGV17witness_same_type14LazySequenceOfq_q0__S_S2_FS_8generateuR_S_rfq_FT_w_S0_
 public struct LazySequenceOf<SS : SequenceType, A where SS.Generator.Element == A> : SequenceType {
 	public func generate() -> AnyGenerator<A> { 
     var opt: AnyGenerator<A>?

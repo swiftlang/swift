@@ -152,7 +152,7 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK-NEXT: enum $Optional<OptionalResultInheritor>, #Optional.Some!enumelt.1, [[T4]]
 
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
-// CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PS_FS1_1fuRq_S1__fq_FT_q_
+// CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PS_FS1_1fuR_S1_rfq_FT_q_
 
 // CHECK-LABEL: sil_witness_table hidden X: CP module dynamic_self {
-// CHECK: method #CP.f!1: @_TTWC12dynamic_self1XS_2CPS_FS1_1fuRq_S1__fq_FT_q_
+// CHECK: method #CP.f!1: @_TTWC12dynamic_self1XS_2CPS_FS1_1fuR_S1_rfq_FT_q_

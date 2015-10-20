@@ -19,7 +19,7 @@ class Phoûx : NSObject, Fooable {
 }
 
 // witness for Foo.foo uses the foreign-to-native thunk:
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWCSo3Foo14objc_witnesses7FooableS0_FS1_3foouRq_S1__fq_FT_GSQSS_
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWCSo3Foo14objc_witnesses7FooableS0_FS1_3foouR_S1_rfq_FT_GSQSS_
 // CHECK:         function_ref @_TTOFCSo3Foo3foofS_FT_GSQSS_
 
 // *NOTE* We have an extra copy here for the time being right
@@ -41,7 +41,7 @@ protocol Bells {
 extension Gizmo : Bells {
 }
 
-// CHECK: sil hidden [transparent] [thunk] @_TTWCSo5Gizmo14objc_witnesses5BellsS0_FS1_CuRq_S1__fMq_FT7bellsOnSi_q_
+// CHECK: sil hidden [transparent] [thunk] @_TTWCSo5Gizmo14objc_witnesses5BellsS0_FS1_CuR_S1_rfMq_FT7bellsOnSi_q_
 // CHECK: bb0([[SELF:%[0-9]+]] : $*Gizmo, [[I:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick Gizmo.Type):
 
 // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFCSo5GizmoCfMS_FT7bellsOnSi_GSQS__ : $@convention(thin) (Int, @thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>

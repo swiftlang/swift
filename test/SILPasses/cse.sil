@@ -1115,7 +1115,7 @@ bb0(%0 : $*T):
   return %4 : $()                                 // id: %6
 }
 
-// CHECK-LABEL: _TF1p3foouRq_S_9Reachable_FTq_1aSi_T_
+// CHECK-LABEL: sil hidden @_TF1p3foouRq_S_9Reachable_FTq_1aSi_T_
 // CHECK-NEXT:      bb0(%0 : $*T, %1 : $Int):
 // CHECK-NEXT:      witness_method
 // CHECK-NEXT:      apply

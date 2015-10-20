@@ -1045,7 +1045,7 @@ void ProtocolType::canonicalizeProtocols(
     // Check whether we've seen this protocol before.
     auto knownPos = known.find(protocols[I]);
     
-    // If we have not seen this protocol before, record it's index.
+    // If we have not seen this protocol before, record its index.
     if (knownPos == known.end()) {
       known[protocols[I]] = I;
       stack.push_back(protocols[I]);

@@ -58,9 +58,9 @@ protocol ImpedanceType {
 
 extension CCImpedance: ImpedanceType {}
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4realqq_S1_9Component
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4realw_9Component
 // CHECK-LABEL: sil shared [transparent] @_TFVSC11CCImpedanceg4realSd
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4imagqq_S1_9Component
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4imagw_9Component
 // CHECK-LABEL: sil shared [transparent] @_TFVSC11CCImpedanceg4imagSd
 
 class MyMagnetism : CCMagnetismModel {

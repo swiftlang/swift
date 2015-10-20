@@ -528,7 +528,7 @@ protocol AlwaysInline {
 // CHECK-LABEL: sil hidden [always_inline] @_TFV9functions19AlwaysInlinedMember13alwaysInlinedfS0_FT_T_ : $@convention(method) (AlwaysInlinedMember) -> () {
 
 // protocol witness for functions.AlwaysInline.alwaysInlined <A : functions.AlwaysInline>(functions.AlwaysInline.Self)() -> () in conformance functions.AlwaysInlinedMember : functions.AlwaysInline in functions
-// CHECK-LABEL: sil hidden [transparent] [thunk] [always_inline] @_TTWV9functions19AlwaysInlinedMemberS_12AlwaysInlineS_FS1_13alwaysInlineduRq_S1__fq_FT_T_ : $@convention(witness_method) (@in_guaranteed AlwaysInlinedMember) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] [always_inline] @_TTWV9functions19AlwaysInlinedMemberS_12AlwaysInlineS_FS1_13alwaysInlineduR_S1_rfq_FT_T_ : $@convention(witness_method) (@in_guaranteed AlwaysInlinedMember) -> () {
 struct AlwaysInlinedMember : AlwaysInline {
   @inline(__always)
   func alwaysInlined() {}

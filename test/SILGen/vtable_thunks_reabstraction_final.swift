@@ -29,7 +29,7 @@ class NongenericSub: GenericSuper<Int>, Fooable {
   }
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC33vtable_thunks_reabstraction_final13NongenericSubS_7FooableS_FS1_3foouRq_S1__fq_FSiGSqSi_
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC33vtable_thunks_reabstraction_final13NongenericSubS_7FooableS_FS1_3foouR_S1_rfq_FSiGSqSi_
 // CHECK:         class_method {{%.*}} : $NongenericSub, #NongenericSub.foo!1 {{.*}}, $@convention(method) (@out Optional<Int>, @in Int, @guaranteed NongenericSub) -> ()
 
 class GenericSub<U: AnyObject>: GenericSuper<U>, Barrable {
@@ -42,7 +42,7 @@ class GenericSub<U: AnyObject>: GenericSuper<U>, Barrable {
   }
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWuRq_s9AnyObject_GC33vtable_thunks_reabstraction_final10GenericSubq__S0_8BarrableS0_FS2_3foouRq_S2__fq_Fqq_S2_3BarGSqqq_S2_3Bar_
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWuR_s9AnyObjectrGC33vtable_thunks_reabstraction_final10GenericSubq__S0_8BarrableS0_FS2_3foouR_S2_rfq_Fw_3BarGSqw_S3__
 // CHECK:         class_method {{%.*}} : $GenericSub<U>, #GenericSub.foo!1 {{.*}}, $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (@out Optional<τ_0_0>, @in τ_0_0, @guaranteed GenericSub<τ_0_0>) -> ()
 
 class C {}

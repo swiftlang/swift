@@ -10,7 +10,7 @@ struct Box {
 }
 
 extension P1 {
-  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P16extP1auRq_S0__fq_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P16extP1auR_S0_rfq_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $*Self):
   final func extP1a() {
     // CHECK: [[WITNESS:%[0-9]+]] = witness_method $Self, #P1.reqP1a!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
@@ -19,10 +19,10 @@ extension P1 {
     // CHECK: return
   }
 
-  // CHECK-LABEL: sil @_TFE19protocol_extensionsPS_2P16extP1buRq_S0__fq_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
+  // CHECK-LABEL: sil @_TFE19protocol_extensionsPS_2P16extP1buR_S0_rfq_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $*Self):
   public final func extP1b() {
-    // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P16extP1auRq_S0__fq_FT_T_ : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
+    // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P16extP1auR_S0_rfq_FT_T_ : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     // CHECK-NEXT: apply [[FN]]<Self>([[SELF]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     extP1a()
     // CHECK: return
@@ -39,7 +39,7 @@ extension P1 {
   final func callSubscript() -> Int {
     // But here we have to do a witness method call:
 
-    // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P113callSubscriptuRq_S0__fq_FT_Si
+    // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P113callSubscriptuR_S0_rfq_FT_Si
     // CHECK-NEXT: bb0(%0 : $*Self):
     // CHECK: witness_method $Self, #P1.subscript!getter.1
     // CHECK: return
@@ -99,7 +99,7 @@ func inout_func(inout n: Int) {}
 // CHECK-NEXT: bb0([[M:%[0-9]+]] : $MetaHolder, [[DD:%[0-9]+]] : $@thick D.Type, [[D:%[0-9]+]] : $D):
 func testD(m: MetaHolder, dd: D.Type, d: D) {
   // CHECK: [[D2:%[0-9]+]] = alloc_box $D
-  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P111returnsSelfuRq_S0__fq_FT_q_
+  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P111returnsSelfuR_S0_rfq_FT_q_
   // CHECK: [[DCOPY:%[0-9]+]] = alloc_stack $D
   // CHECK: store [[D]] to [[DCOPY]]#1 : $*D
   // CHECK: [[RESULT:%[0-9]+]] = alloc_stack $D
@@ -500,12 +500,12 @@ extension P1 {
 // CHECK: bb0([[P:%[0-9]+]] : $*P1, [[B:%[0-9]+]] : $Bool, [[I:%[0-9]+]] : $Int64):
 func testExistentials1(p1: P1, b: Bool, i: Int64) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]])
-  // CHECK: [[F1:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P12f1uRq_S0__fq_FT_T_
+  // CHECK: [[F1:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P12f1uR_S0_rfq_FT_T_
   // CHECK: apply [[F1]]<@opened([[UUID]]) P1>([[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
   p1.f1()
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[CURRIED1:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P18curried1uRq_S0__fq_fSbFVs5Int64T_
+  // CHECK: [[CURRIED1:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P18curried1uR_S0_rfq_fSbFVs5Int64T_
   // CHECK: [[CURRIED1]]<@opened([[UUID]]) P1>([[I]], [[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Int64, Bool, @in_guaranteed τ_0_0) -> ()
   p1.curried1(b)(i)
 
@@ -533,7 +533,7 @@ func testExistentials2(p1: P1) {
   // CHECK: [[P1A:%[0-9]+]] = alloc_box $P1
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[P1AINIT:%[0-9]+]] = init_existential_addr [[P1A]]#1 : $*P1, $@opened([[UUID2:".*"]]) P1
-  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P111returnsSelfuRq_S0__fq_FT_q_
+  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P111returnsSelfuR_S0_rfq_FT_q_
   // CHECK: apply [[FN]]<@opened([[UUID]]) P1>([[P1AINIT]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
   var p1a: P1 = p1.returnsSelf()
 }
@@ -680,7 +680,7 @@ protocol InitRequirement {
 }
 
 extension InitRequirement {
-  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_15InitRequirementCuRq_S0__fMq_FT1dCS_1D_q_ : $@convention(thin) <Self where Self : InitRequirement> (@out Self, @owned D, @thick Self.Type) -> ()
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_15InitRequirementCuR_S0_rfMq_FT1dCS_1D_q_ : $@convention(thin) <Self where Self : InitRequirement> (@out Self, @owned D, @thick Self.Type) -> ()
   // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   init(d: D) {
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@out τ_0_0, @owned C, @thick τ_0_0.Type) -> ()
@@ -689,8 +689,8 @@ extension InitRequirement {
     self.init(c: d)
   }
 
-  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_15InitRequirementCuRq_S0__fMq_FT2d2CS_1D_q_
-  // CHECK:         function_ref @_TFE19protocol_extensionsPS_15InitRequirementCuRq_S0__fMq_FT1dCS_1D_q_
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_15InitRequirementCuR_S0_rfMq_FT2d2CS_1D_q_
+  // CHECK:         function_ref @_TFE19protocol_extensionsPS_15InitRequirementCuR_S0_rfMq_FT1dCS_1D_q_
   init(d2: D) {
     self.init(d: d2)
   }
@@ -701,7 +701,7 @@ protocol ClassInitRequirement: class {
 }
 
 extension ClassInitRequirement {
-  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_20ClassInitRequirementCuRq_S0__fMq_FT1dCS_1D_q_ : $@convention(thin) <Self where Self : ClassInitRequirement> (@owned D, @thick Self.Type) -> @owned Self
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_20ClassInitRequirementCuR_S0_rfMq_FT1dCS_1D_q_ : $@convention(thin) <Self where Self : ClassInitRequirement> (@owned D, @thick Self.Type) -> @owned Self
   // CHECK:       bb0([[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #ClassInitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : ClassInitRequirement> (@owned C, @thick τ_0_0.Type) -> @owned τ_0_0
   // CHECK:         [[ARG_UP:%.*]] = upcast [[ARG]]
@@ -723,7 +723,7 @@ func foo(t: ObjCInitRequirement.Type, c: OC) -> ObjCInitRequirement {
 }
 
 extension ObjCInitRequirement {
-  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_19ObjCInitRequirementCuRq_S0__fMq_FT1dCS_2OD_q_ : $@convention(thin) <Self where Self : ObjCInitRequirement> (@owned OD, @thick Self.Type) -> @owned Self
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_19ObjCInitRequirementCuR_S0_rfMq_FT1dCS_2OD_q_ : $@convention(thin) <Self where Self : ObjCInitRequirement> (@owned OD, @thick Self.Type) -> @owned Self
   // CHECK:       bb0([[ARG:%.*]] : $OD, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   // CHECK:         [[OBJC_SELF_TYPE:%.*]] = thick_to_objc_metatype [[SELF_TYPE]]
   // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic [objc] [[OBJC_SELF_TYPE]] : $@objc_metatype Self.Type, $Self
@@ -745,7 +745,7 @@ class ObjCInitClass {
 protocol ProtoDelegatesToObjC { }
 
 extension ProtoDelegatesToObjC where Self : ObjCInitClass {
-  // CHECK-LABEL: sil hidden @_TFe19protocol_extensionsRdq_CS_13ObjCInitClassq_S_20ProtoDelegatesToObjC_S1_CuRdq_S0_q_S1__fMq_FT6stringSS_q_
+  // CHECK-LABEL: sil hidden @_TFe19protocol_extensionsR_CS_13ObjCInitClass_S_20ProtoDelegatesToObjCrS1_CuR_S0__S1_rfMq_FT6stringSS_q_
   // CHECK: bb0([[STR:%[0-9]+]] : $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $Self
@@ -770,7 +770,7 @@ class RequiredInitClass {
 protocol ProtoDelegatesToRequired { }
 
 extension ProtoDelegatesToRequired where Self : RequiredInitClass {
-  // CHECK-LABEL: sil hidden @_TFe19protocol_extensionsRdq_CS_17RequiredInitClassq_S_24ProtoDelegatesToRequired_S1_CuRdq_S0_q_S1__fMq_FT6stringSS_q_ 
+  // CHECK-LABEL: sil hidden @_TFe19protocol_extensionsR_CS_17RequiredInitClass_S_24ProtoDelegatesToRequiredrS1_CuR_S0__S1_rfMq_FT6stringSS_q_ 
   // CHECK: bb0([[STR:%[0-9]+]] : $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
   // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $Self
@@ -796,18 +796,18 @@ protocol P2 {
 }
 
 extension P2 {
-  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P22f1uRq_S0__fq_Fqq_S0_1AT_
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P22f1uR_S0_rfq_Fw_1AT_
   // CHECK: witness_method $Self, #P2.f2!1
-  // CHECK: function_ref @_TFE19protocol_extensionsPS_2P22f3uRq_S0__fq_Fqq_S0_1AT_
+  // CHECK: function_ref @_TFE19protocol_extensionsPS_2P22f3uR_S0_rfq_Fw_1AT_
   // CHECK: return
   func f1(a: A) {
     f2(a)
     f3(a)
   }
 
-  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P22f2uRq_S0__fq_Fqq_S0_1AT_
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P22f2uR_S0_rfq_Fw_1AT_
   // CHECK: witness_method $Self, #P2.f1!1
-  // CHECK: function_ref @_TFE19protocol_extensionsPS_2P22f3uRq_S0__fq_Fqq_S0_1AT_
+  // CHECK: function_ref @_TFE19protocol_extensionsPS_2P22f3uR_S0_rfq_Fw_1AT_
   // CHECK: return
   func f2(a: A) {
     f1(a)
@@ -816,7 +816,7 @@ extension P2 {
 
   func f3(a: A) {}
 
-  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P22f4uRq_S0__fq_FT_T_
+  // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P22f4uR_S0_rfq_FT_T_
   // CHECK: witness_method $Self, #P2.f1!1
   // CHECK: witness_method $Self, #P2.f2!1
   // CHECK: return

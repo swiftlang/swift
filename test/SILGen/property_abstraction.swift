@@ -118,12 +118,12 @@ protocol Factory {
 func setBuilder<F: Factory where F.Product == MyClass>(inout factory: F) {
   factory.builder = { return MyClass() }
 }
-// CHECK: sil hidden @_TF20property_abstraction10setBuilderuRq_S_7Factoryzqq_S0_7ProductCS_7MyClass_FRq_T_ : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
+// CHECK: sil hidden @_TF20property_abstraction10setBuilderuR_S_7Factoryw_7ProductzCS_7MyClassrFRq_T_ : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
 // CHECK: bb0(%0 : $*F):
 // CHECK:   [[FACTORY:%.*]] = alloc_box $F
-// CHECK:   [[F0:%.*]] = function_ref @_TFF20property_abstraction10setBuilderuRq_S_7Factoryzqq_S0_7ProductCS_7MyClass_FRq_T_U_FT_S1_ : $@convention(thin) () -> @owned MyClass
+// CHECK:   [[F0:%.*]] = function_ref @_TFF20property_abstraction10setBuilderuR_S_7Factoryw_7ProductzCS_7MyClassrFRq_T_U_FT_S2_ : $@convention(thin) () -> @owned MyClass
 // CHECK:   [[F1:%.*]] = thin_to_thick_function [[F0]]
 // CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
-// CHECK:   [[REABSTRACTOR:%.*]] = function_ref @_TTRGRq_20property_abstraction7Factoryzqq_S0_7ProductCS_7MyClass_XFo__oS1__XFo__iS1__
+// CHECK:   [[REABSTRACTOR:%.*]] = function_ref @_TTRGR_20property_abstraction7Factoryw_7ProductzCS_7MyClassrXFo__oS2__XFo__iS2__
 // CHECK:   [[F2:%.*]] = partial_apply [[REABSTRACTOR]]<F>([[F1]])
 // CHECK:   apply [[SETTER]]<F, MyClass>([[F2]], [[FACTORY]]#1)

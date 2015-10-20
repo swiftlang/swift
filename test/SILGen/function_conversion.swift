@@ -366,14 +366,14 @@ func convFuncExistential(f1: Any -> Int -> Int) {
 
 // ==== Class-bound archetype upcast
 
-// CHECK-LABEL: sil hidden @_TF19function_conversion29convClassBoundArchetypeUpcastuRdq_CS_6Parent_FFS0_Tq_VS_7Trivial_T_
+// CHECK-LABEL: sil hidden @_TF19function_conversion29convClassBoundArchetypeUpcastuR_CS_6ParentrFFS0_Tq_VS_7Trivial_T_
 func convClassBoundArchetypeUpcast<T : Parent>(f1: Parent -> (T, Trivial)) {
-// CHECK:         function_ref @_TTRGRdq_C19function_conversion6Parent_XFo_oS0__oTq_VS_7Trivial__XFo_oq__oTS0_GSqS1____
+// CHECK:         function_ref @_TTRGR_C19function_conversion6ParentrXFo_oS0__oTq_VS_7Trivial__XFo_oq__oTS0_GSqS1____
 // CHECK:         partial_apply
   let _: T -> (Parent, Trivial?) = f1
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGRdq_C19function_conversion6Parent_XFo_oS0__oTq_VS_7Trivial__XFo_oq__oTS0_GSqS1____ : $@convention(thin) <T where T : Parent> (@owned T, @owned @callee_owned (@owned Parent) -> @owned (T, Trivial)) -> @owned (Parent, Optional<Trivial>)
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGR_C19function_conversion6ParentrXFo_oS0__oTq_VS_7Trivial__XFo_oq__oTS0_GSqS1____ : $@convention(thin) <T where T : Parent> (@owned T, @owned @callee_owned (@owned Parent) -> @owned (T, Trivial)) -> @owned (Parent, Optional<Trivial>)
 // CHECK:         upcast %0 : $T to $Parent
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    tuple_extract
@@ -383,14 +383,14 @@ func convClassBoundArchetypeUpcast<T : Parent>(f1: Parent -> (T, Trivial)) {
 // CHECK-NEXT:    tuple
 // CHECK-NEXT:    return
 
-// CHECK-LABEL: sil hidden @_TF19function_conversion37convClassBoundMetatypeArchetypeUpcastuRdq_CS_6Parent_FFMS0_TMq_VS_7Trivial_T_
+// CHECK-LABEL: sil hidden @_TF19function_conversion37convClassBoundMetatypeArchetypeUpcastuR_CS_6ParentrFFMS0_TMq_VS_7Trivial_T_
 func convClassBoundMetatypeArchetypeUpcast<T : Parent>(f1: Parent.Type -> (T.Type, Trivial)) {
-// CHECK:         function_ref @_TTRGRdq_C19function_conversion6Parent_XFo_dXMTS0__dTXMTq_VS_7Trivial__XFo_dXMTq__dTXMTS0_GSqS1____
+// CHECK:         function_ref @_TTRGR_C19function_conversion6ParentrXFo_dXMTS0__dTXMTq_VS_7Trivial__XFo_dXMTq__dTXMTS0_GSqS1____
 // CHECK:         partial_apply
   let _: T.Type -> (Parent.Type, Trivial?) = f1
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGRdq_C19function_conversion6Parent_XFo_dXMTS0__dTXMTq_VS_7Trivial__XFo_dXMTq__dTXMTS0_GSqS1____ : $@convention(thin) <T where T : Parent> (@thick T.Type, @owned @callee_owned (@thick Parent.Type) -> (@thick T.Type, Trivial)) -> (@thick Parent.Type, Optional<Trivial>)
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRGR_C19function_conversion6ParentrXFo_dXMTS0__dTXMTq_VS_7Trivial__XFo_dXMTq__dTXMTS0_GSqS1____ : $@convention(thin) <T where T : Parent> (@thick T.Type, @owned @callee_owned (@thick Parent.Type) -> (@thick T.Type, Trivial)) -> (@thick Parent.Type, Optional<Trivial>)
 // CHECK:         upcast %0 : $@thick T.Type to $@thick Parent.Type
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    tuple_extract

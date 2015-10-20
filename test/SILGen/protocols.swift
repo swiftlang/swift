@@ -379,7 +379,7 @@ protocol ExistentialProperty {
 func testExistentialPropertyRead<T: ExistentialProperty>(inout t: T) {
     let b = t.p.b
 }
-// CHECK-LABEL: sil hidden @_TF9protocols27testExistentialPropertyReaduRq_S_19ExistentialProperty_FRq_T_
+// CHECK-LABEL: sil hidden @_TF9protocols27testExistentialPropertyReaduR_S_19ExistentialPropertyrFRq_T_
 // CHECK:      [[T:%.*]] = alloc_box $T
 // CHECK:      copy_addr %0 to [initialization] [[T]]#1 : $*T
 // CHECK:      [[P_TEMP:%.*]] = alloc_stack $PropertyWithGetterSetter

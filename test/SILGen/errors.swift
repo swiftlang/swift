@@ -203,7 +203,7 @@ protocol Doomed {
   func check() throws
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors12DoomedStructS_6DoomedS_FS1_5checkuRq_S1__fq_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedStruct) -> @error ErrorType
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors12DoomedStructS_6DoomedS_FS1_5checkuR_S1_rfq_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedStruct) -> @error ErrorType
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedStruct
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
 // CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*DoomedStruct
@@ -220,7 +220,7 @@ struct DoomedStruct : Doomed {
   func check() throws {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors11DoomedClassS_6DoomedS_FS1_5checkuRq_S1__fq_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedClass) -> @error ErrorType {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors11DoomedClassS_6DoomedS_FS1_5checkuR_S1_rfq_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedClass) -> @error ErrorType {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
 // CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*DoomedClass
@@ -239,7 +239,7 @@ class DoomedClass : Doomed {
   func check() throws {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors11HappyStructS_6DoomedS_FS1_5checkuRq_S1__fq_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyStruct) -> @error ErrorType
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors11HappyStructS_6DoomedS_FS1_5checkuR_S1_rfq_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyStruct) -> @error ErrorType
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyStruct
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
 // CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*HappyStruct
@@ -251,7 +251,7 @@ struct HappyStruct : Doomed {
   func check() {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors10HappyClassS_6DoomedS_FS1_5checkuRq_S1__fq_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyClass) -> @error ErrorType
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors10HappyClassS_6DoomedS_FS1_5checkuR_S1_rfq_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyClass) -> @error ErrorType
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
 // CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*HappyClass
@@ -484,7 +484,7 @@ protocol Buildable {
 func supportFirstStructure<B: Buildable>(inout b: B) throws {
   try b.firstStructure.support()
 }
-// CHECK-LABEL: sil hidden @_TF6errors21supportFirstStructureuRq_S_9Buildable_FzRq_T_ : $@convention(thin) <B where B : Buildable, B.Structure : Supportable> (@inout B) -> @error ErrorType {
+// CHECK-LABEL: sil hidden @_TF6errors21supportFirstStructureuR_S_9BuildablerFzRq_T_ : $@convention(thin) <B where B : Buildable, B.Structure : Supportable> (@inout B) -> @error ErrorType {
 // CHECK: [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
 // CHECK: [[MATBUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK: [[BUFFER:%.*]] = alloc_stack $B.Structure
@@ -514,7 +514,7 @@ func supportFirstStructure<B: Buildable>(inout b: B) throws {
 func supportStructure<B: Buildable>(inout b: B, name: String) throws {
   try b[name].support()
 }
-// CHECK-LABEL: sil hidden @_TF6errors16supportStructureuRq_S_9Buildable_FzTRq_4nameSS_T_
+// CHECK-LABEL: sil hidden @_TF6errors16supportStructureuR_S_9BuildablerFzTRq_4nameSS_T_
 // CHECK: [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
 // CHECK: retain_value [[INDEX:%1]] : $String
 // CHECK: [[MATBUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer

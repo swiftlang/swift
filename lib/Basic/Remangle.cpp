@@ -19,6 +19,7 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Punycode.h"
+#include "swift/Basic/Range.h"
 #include "swift/Basic/UUID.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
@@ -311,6 +312,9 @@ namespace {
     bool trySubstitution(Node *node, SubstitutionEntry &entry);
     void addSubstitution(const SubstitutionEntry &entry);
     void resetSubstitutions();
+
+    void mangleDependentGenericParamIndex(Node *node);
+    void mangleConstrainedType(Node *node);
   };
 }
 
@@ -1298,7 +1302,7 @@ mangle_requirements:
   
   Out << 'R';
   mangleNodes(i, e); // generic requirements
-  Out << '_';
+  Out << 'r';
 }
 
 void Remangler::mangleDependentGenericParamCount(Node *node) {
@@ -1306,23 +1310,33 @@ void Remangler::mangleDependentGenericParamCount(Node *node) {
 }
 
 void Remangler::mangleDependentGenericConformanceRequirement(Node *node) {
+  mangleConstrainedType(node->getChild(0).get());
   // If the constraint represents a protocol, use the shorter mangling.
   if (node->getNumChildren() == 2
       && node->getChild(1)->getKind() == Node::Kind::Type
       && node->getChild(1)->getNumChildren() == 1
       && node->getChild(1)->getChild(0)->getKind() == Node::Kind::Protocol) {
-    mangle(node->getChild(0).get());
     mangleProtocolWithoutPrefix(node->getChild(1)->getChild(0).get());
     return;
   }
 
-  Out << 'd';
-  mangleChildNodes(node); // type, type
+  mangle(node->getChild(1).get());
 }
 
 void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
+  mangleConstrainedType(node->getChild(0).get());
   Out << 'z';
-  mangleChildNodes(node); // type, type
+  mangle(node->getChild(1).get());
+}
+
+void Remangler::mangleConstrainedType(Node *node) {
+  if (node->getFirstChild()->getKind()
+        == Node::Kind::DependentGenericParamType) {
+    // Can be mangled without an introducer.
+    mangleDependentGenericParamIndex(node->getFirstChild().get());
+  } else {
+    mangle(node);
+  }
 }
 
 void Remangler::mangleGenerics(Node *node) {
@@ -1431,22 +1445,60 @@ void Remangler::mangleAssociatedTypeRef(Node *node) {
 }
 
 void Remangler::mangleDependentMemberType(Node *node) {
-  Out << 'q';
-  mangleChildNode(node, 0); // base type
-  mangleProtocolWithoutPrefix(node->getChild(1).get()); // protocol
-  mangleIdentifier(node->getText(), OperatorKind::NotOperator); // assoc type name
+  std::vector<Node *> members;
+  Node *base = node;
+  do {
+    members.push_back(base);
+    base = base->getFirstChild()->getFirstChild().get();
+  } while (base->getKind() == Node::Kind::DependentMemberType);
+
+  assert(base->getKind() == Node::Kind::DependentGenericParamType
+         && "dependent members not based on a generic param are non-canonical"
+            " and shouldn't need remangling");
+  assert(members.size() >= 1);
+  if (members.size() == 1) {
+    Out << 'w';
+    mangleDependentGenericParamIndex(base);
+    mangle(members[0]->getChild(1).get());
+  } else {
+    Out << 'W';
+    mangleDependentGenericParamIndex(base);
+
+    for (auto *member : reversed(members)) {
+      mangle(member->getChild(1).get());
+    }
+    Out << '_';
+  }
 }
 
-void Remangler::mangleDependentGenericParamType(Node *node) {
-  Out << 'q';
+void Remangler::mangleDependentAssociatedTypeRef(Node *node) {
+  SubstitutionEntry entry;
+  if (trySubstitution(node, entry)) return;
+
+  if (node->getNumChildren() > 0) {
+    Out << 'P';
+    mangleProtocolWithoutPrefix(node->getFirstChild().get());
+  }
+  mangleIdentifier(node);
+
+  addSubstitution(entry);
+}
+
+void Remangler::mangleDependentGenericParamIndex(Node *node) {
   auto depth = node->getChild(0)->getIndex();
   auto index = node->getChild(1)->getIndex();
-  
+
   if (depth != 0) {
     Out << 'd';
     mangleIndex(depth - 1);
   }
   mangleIndex(index);
+
+}
+
+void Remangler::mangleDependentGenericParamType(Node *node) {
+  Out << 'q';
+  mangleDependentGenericParamIndex(node);
 }
 
 void Remangler::mangleIndex(Node *node) {

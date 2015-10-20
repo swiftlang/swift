@@ -16,6 +16,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ResilienceExpansion.h"
 
 namespace swift {
@@ -46,6 +47,7 @@ class Mangler {
   raw_ostream &Buffer;
   llvm::DenseMap<const void *, unsigned> Substitutions;
   llvm::DenseMap<const ArchetypeType *, ArchetypeInfo> Archetypes;
+  CanGenericSignature CurGenericSignature;
   unsigned ArchetypesDepth = 0;
   ModuleDecl *Mod = nullptr;
   const DeclContext *DeclCtx = nullptr;
@@ -124,6 +126,7 @@ public:
   void mangleNominalType(const NominalTypeDecl *decl,
                          ResilienceExpansion expansion,
                          BindGenerics shouldBind,
+                         CanGenericSignature extGenericSig = nullptr,
                          const GenericParamList *extGenericParams = nullptr);
   void mangleProtocolDecl(const ProtocolDecl *protocol);
   void mangleType(Type type, ResilienceExpansion expansion,
@@ -131,7 +134,8 @@ public:
   void mangleDirectness(bool isIndirect);
   void mangleProtocolName(const ProtocolDecl *protocol);
   void mangleProtocolConformance(const ProtocolConformance *conformance);
-  void bindGenericParameters(const GenericParamList *genericParams,
+  void bindGenericParameters(CanGenericSignature sig,
+                             const GenericParamList *genericParams,
                              bool mangleParameters);
   void addSubstitution(const void *ptr);
 
@@ -194,8 +198,16 @@ private:
                               unsigned &initialParamIndex,
                               ArrayRef<Requirement> &requirements,
                               SmallVectorImpl<Requirement> &requirementsBuf);
+
+  void mangleGenericParamIndex(GenericTypeParamType *paramTy);
+  void mangleAssociatedTypeName(DependentMemberType *dmt,
+                                bool canAbbreviate);
+  void mangleConstrainedType(CanType type,
+                             ResilienceExpansion expansion);
+  CanGenericSignature getCanonicalSignatureOrNull(GenericSignature *sig,
+                                                  ModuleDecl &M);
 };
-  
+
 } // end namespace Mangle
 } // end namespace swift
 
