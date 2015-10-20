@@ -56,12 +56,17 @@ struct S5 {
   init()
 }
 
+struct S6 {
+  var tuple: (Int, Int)
+}
+
 sil @S1_init : $@convention(thin) (@thin S1.Type) -> S1
 sil @S2_init : $@convention(thin) (@thin S2.Type) -> S2
 sil @C1_init : $@convention(thin) (@thick C1.Type) -> @owned C1
 sil @S3_init : $@convention(thin) (@thin S3.Type) -> @owned S3
 sil @S4_init : $@convention(thin) (@thin S4.Type) -> @owned S4 
 sil @S5_init : $@convention(thin) (@thin S5.Type) -> @owned S5
+sil @S6_init : $@convention(thin) (@thin S6.Type) -> S6 
 
 // CHECK-LABEL: @test_struct_type_expansion
 // CHECK: #0  store
@@ -287,5 +292,31 @@ bb0:
   release_value %3 : $S5                          // id: %5
   %6 = tuple ()                                   // user: %8
   dealloc_stack %0#0 : $*@local_storage S5        // id: %7
+  return %6 : $()                                 // id: %8
+}
+
+/// CHECK-LABEL: tuple_inside_struct
+/// CHECK: #0 store
+/// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
+/// CHECK-NEXT: Field Type: var value: Int64
+/// CHECK-NEXT: Address Projection Type: $*Int
+/// CHECK-NEXT: Index: 1
+/// CHECK-NEXT: Address Projection Type: $*(Int, Int)
+/// CHECK-NEXT: Field Type: var tuple: (Int, Int)
+/// CHECK-NEXT: Address Projection Type: $*Builtin.Int64
+/// CHECK-NEXT: Field Type: var value: Int64
+/// CHECK-NEXT: Address Projection Type: $*Int
+/// CHECK-NEXT: Index: 0
+/// CHECK-NEXT: Address Projection Type: $*(Int, Int)
+/// CHECK-NEXT: Field Type: var tuple: (Int, Int)
+sil hidden @tuple_inside_struct : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S6  // var x                  // users: %4, %7
+  %1 = function_ref @S6_init : $@convention(thin) (@thin S6.Type) -> S6 // user: %3
+  %2 = metatype $@thin S6.Type                    // user: %3
+  %3 = apply %1(%2) : $@convention(thin) (@thin S6.Type) ->  S6 // users: %4, %5
+  store %3 to %0#1 : $*S6                         // id: %4
+  %6 = tuple ()                                   // user: %8
+  dealloc_stack %0#0 : $*@local_storage S6        // id: %7
   return %6 : $()                                 // id: %8
 }
