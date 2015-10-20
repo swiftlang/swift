@@ -93,8 +93,6 @@ class MemLocationPrinter : public SILFunctionTransform {
     llvm::outs() << "\n";
   }
 
-
-
   /// Dumps the expansions of memory locations accessed in the function.
   /// This tests the expand function in MemLocation class.
   ///
@@ -133,15 +131,69 @@ class MemLocationPrinter : public SILFunctionTransform {
     llvm::outs() << "\n";
   }
 
+  /// Dumps the reductions of set of memory locations.
+  ///
+  /// This function first calls expand on a memory location. It then calls
+  /// reduce, in hope to get the original memory location back.
+  ///
+  void printMemReduction(SILFunction &Fn) {
+    MemLocation L;
+    MemLocationList Locs;
+    llvm::DenseSet<MemLocation> SLocs;
+    unsigned Counter = 0;
+    for (auto &BB : Fn) {
+      for (auto &II : BB) {
+   
+        // Expand it first.
+        //
+        if (auto *LI = dyn_cast<LoadInst>(&II)) {
+          L.initialize(LI->getOperand());
+          if (!L.isValid())
+            continue;
+          MemLocation::expand(L, &Fn.getModule(), Locs);
+        } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
+          L.initialize(SI->getDest());
+          if (!L.isValid())
+            continue;
+          MemLocation::expand(L, &Fn.getModule(), Locs);
+        } else {
+          // Not interested in these instructions yet.
+          continue;
+        }
+
+        // Try to reduce it.
+        //
+        // Add into the set in reverse order, Reduction should not care
+        // about the order of the memory locations in the set.
+        for (auto I = Locs.rbegin(); I != Locs.rend(); ++I) {
+          SLocs.insert(*I);
+        }
+        // This should get the original (unexpanded) location back.
+        MemLocation::reduce(L, &Fn.getModule(), SLocs);
+        llvm::outs() << "#" << Counter++ << II;
+        for (auto &Loc : SLocs) {
+          llvm::outs() << Loc;
+        }
+        L.reset();
+        Locs.clear();
+        SLocs.clear();
+      }
+    }
+    llvm::outs() << "\n";
+  }
+
   void run() override {
     SILFunction &Fn = *getFunction();
     llvm::outs() << "@" << Fn.getName() << "\n";
     switch (MemLocationKinds) {
+    case MLKind::OnlyTypeExpansion:
+      printTypeExpansion(Fn);
+      break;
     case MLKind::OnlyExpansion:
       printMemExpansion(Fn);
       break;
-    case MLKind::OnlyTypeExpansion:
-      printTypeExpansion(Fn);
+    case MLKind::OnlyReduction:
+      printMemReduction(Fn);
       break;
     default:
       break;
