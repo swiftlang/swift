@@ -94,6 +94,7 @@ class MemLocationPrinter : public SILFunctionTransform {
   void printTypeExpansion(SILFunction &Fn) {
     SILModule *M = &Fn.getModule();
     ProjectionPathList PPList;
+    unsigned Counter = 0;
     for (auto &BB : Fn) {
       for (auto &II : BB) {
         if (auto *LI = dyn_cast<LoadInst>(&II)) {
@@ -111,10 +112,9 @@ class MemLocationPrinter : public SILFunctionTransform {
           continue;
         }
 
-        unsigned Counter = 0;
-        llvm::outs() << II;
+        llvm::outs() << "#" << Counter++ << II;
         for (auto &T : PPList) {
-          llvm::outs() << "#" << Counter++ << " " << T.getValue();
+          llvm::outs() << T.getValue();
         }
        
         PPList.clear();
