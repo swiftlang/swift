@@ -334,10 +334,12 @@ class CallGraph {
   /// A vector of functions in bottom up function order.
   llvm::SmallVector<SILFunction *, 32> BottomUpFunctionOrder;
 
+  typedef llvm::DenseMap<AbstractFunctionDecl *,
+                         CallGraphEdge::CalleeSet> CalleeSetMap;
+
   /// Map from function decls for methods to sets of CallGraphNodes
   /// representing functions that can be reached via that decl.
-  llvm::DenseMap<AbstractFunctionDecl *,
-                 CallGraphEdge::CalleeSet> CalleeSets;
+  CalleeSetMap CalleeSetCache;
 
   /// An allocator used by the callgraph.
   llvm::BumpPtrAllocator Allocator;
@@ -472,8 +474,7 @@ private:
     return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
   }
 
-  CallGraphEdge::CalleeSet tryGetCalleeSetForClassMethod(SILDeclRef Decl);
-  CallGraphEdge::CalleeSet getOrCreateCalleeSetForClassMethod(SILDeclRef Decl);
+  CallGraphEdge::CalleeSet &getOrCreateCalleeSetForClassMethod(SILDeclRef Decl);
 
   CallGraphNode *tryGetCallGraphNode(SILFunction *F) const {
     return const_cast<CallGraph *>(this)->tryGetCallGraphNode(F);

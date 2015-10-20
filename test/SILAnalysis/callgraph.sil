@@ -199,18 +199,436 @@ bb0:
 }
 
 
+private class private_base {
+  func foo()
+}
+
+private class private_derived : private_base {
+  override func foo()
+}
+
+@inline(never) private func call_private(b: private_base)
+
+class internal_base {
+  func foo()
+  private func bar()
+}
+
+class internal_derived : internal_base {
+  override func foo()
+  override func bar()
+}
+
+@inline(never) func call_internal(b: internal_base)
+
+public class public_base {
+  func foo()
+  public func bar()
+  private func baz()
+}
+
+public class public_derived : public_base {
+  override func foo()
+  public override func bar()
+  public override func baz()
+}
+
+
+// CHECK: Function #10: private_base_foo
+// CHECK: Demangled: private_base_foo
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: call_private
+// CHECK: Demangled: call_private
+
+sil private @private_base_foo : $@convention(method) (@guaranteed private_base) -> () {
+bb0(%0 : $private_base):
+  debug_value %0 : $private_base
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #11: private_derived_foo
+// CHECK: Demangled: private_derived_foo
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: call_private
+// CHECK: Demangled: call_private
+
+
+sil private @private_derived_foo : $@convention(method) (@guaranteed private_derived) -> () {
+bb0(%0 : $private_derived):
+  debug_value %0 : $private_derived
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #12: call_private
+// CHECK: Demangled: call_private
+// CHECK: Trivially dead: yes
+// CHECK: All callers known: yes
+// CHECK: Binds self: no
+// CHECK: Call sites:
+
+// CHECK: Call site #6:   %3 = apply %2(%0) : $@convention(method) (@guaranteed private_base) -> ()
+// CHECK: Unknown callees: no
+// CHECK: Known callees:
+// CHECK: Name: private_base_foo
+// CHECK: Demangled: private_base_foo
+
+// CHECK: Name: private_derived_foo
+// CHECK: Demangled: private_derived_foo
+
+
+sil private [noinline] @call_private : $@convention(thin) (@owned private_base) -> () {
+bb0(%0 : $private_base):
+  debug_value %0 : $private_base
+  %2 = class_method %0 : $private_base, #private_base.foo!1 : private_base -> () -> () , $@convention(method) (@guaranteed private_base) -> ()
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed private_base) -> ()
+  strong_release %0 : $private_base
+  %5 = tuple ()
+  return %5 : $()
+}
+
+
+// CHECK: Function #13: internal_base_foo
+// CHECK: Demangled: internal_base_foo
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: call_internal
+// CHECK: Demangled: call_internal
+
+
+sil hidden @internal_base_foo : $@convention(method) (@guaranteed internal_base) -> () {
+bb0(%0 : $internal_base):
+  debug_value %0 : $internal_base
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #14: internal_base_bar
+// CHECK: Demangled: internal_base_bar
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: call_internal
+// CHECK: Demangled: call_internal
+
+
+sil private @internal_base_bar : $@convention(method) (@guaranteed internal_base) -> () {
+bb0(%0 : $internal_base):
+  debug_value %0 : $internal_base
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #15: internal_derived_foo
+// CHECK: Demangled: internal_derived_foo
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: call_internal
+// CHECK: Demangled: call_internal
+
+
+sil hidden @internal_derived_foo : $@convention(method) (@guaranteed internal_derived) -> () {
+bb0(%0 : $internal_derived):
+  debug_value %0 : $internal_derived
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #16: internal_derived_bar
+// CHECK: Demangled: internal_derived_bar
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: call_internal
+// CHECK: Demangled: call_internal
+
+
+sil hidden @internal_derived_bar : $@convention(method) (@guaranteed internal_derived) -> () {
+bb0(%0 : $internal_derived):
+  debug_value %0 : $internal_derived
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #17: call_internal
+// CHECK: Demangled: call_internal
+// CHECK-NOWMO: Trivially dead: no
+// CHECK-NOWMO: All callers known: no
+// CHECK-WMO: Trivially dead: yes
+// CHECK-WMO: All callers known: yes
+// CHECK: Binds self: no
+// CHECK: Call sites:
+
+// CHECK: Call site #7:   %3 = apply %2(%0) : $@convention(method) (@guaranteed internal_base) -> ()
+// CHECK-NOWMO: Unknown callees: yes
+// CHECK-WMO: Unknown callees: no
+// CHECK: Known callees:
+// CHECK: Name: internal_base_foo
+// CHECK: Demangled: internal_base_foo
+
+// CHECK: Name: internal_derived_foo
+// CHECK: Demangled: internal_derived_foo
+
+// CHECK: Call site #8:   %5 = apply %4(%0) : $@convention(method) (@guaranteed internal_base) -> ()
+// CHECK-NOWMO: Unknown callees: yes
+// CHECK-WMO: Unknown callees: no
+// CHECK: Known callees:
+// CHECK: Name: internal_base_bar
+// CHECK: Demangled: internal_base_bar
+
+// CHECK: Name: internal_derived_bar
+// CHECK: Demangled: internal_derived_bar
+
+
+sil hidden [noinline] @call_internal : $@convention(thin) (@owned internal_base) -> () {
+bb0(%0 : $internal_base):
+  debug_value %0 : $internal_base
+  %2 = class_method %0 : $internal_base, #internal_base.foo!1 : internal_base -> () -> () , $@convention(method) (@guaranteed internal_base) -> ()
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed internal_base) -> ()
+  %4 = class_method %0 : $internal_base, #internal_base.bar!1 : internal_base -> () -> () , $@convention(method) (@guaranteed internal_base) -> ()
+  %5 = apply %4(%0) : $@convention(method) (@guaranteed internal_base) -> ()
+  strong_release %0 : $internal_base
+  %7 = tuple ()
+  return %7 : $()
+}
+
+
+// CHECK: Function #18: public_base_foo
+// CHECK: Demangled: public_base_foo
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: call_public
+// CHECK: Demangled: call_public
+
+
+sil hidden @public_base_foo : $@convention(method) (@guaranteed public_base) -> () {
+bb0(%0 : $public_base):
+  debug_value %0 : $public_base
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #19: public_base_bar
+// CHECK: Demangled: public_base_bar
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: call_public
+// CHECK: Demangled: call_public
+
+
+sil @public_base_bar : $@convention(method) (@guaranteed public_base) -> () {
+bb0(%0 : $public_base):
+  debug_value %0 : $public_base
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #20: public_base_baz
+// CHECK: Demangled: public_base_baz
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: call_public
+// CHECK: Demangled: call_public
+
+
+sil private @public_base_baz : $@convention(method) (@guaranteed public_base) -> () {
+bb0(%0 : $public_base):
+  debug_value %0 : $public_base
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #21: public_derived_foo
+// CHECK: Demangled: public_derived_foo
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: call_public
+// CHECK: Demangled: call_public
+
+
+sil hidden @public_derived_foo : $@convention(method) (@guaranteed public_derived) -> () {
+bb0(%0 : $public_derived):
+  debug_value %0 : $public_derived
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #22: public_derived_bar
+// CHECK: Demangled: public_derived_bar
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: call_public
+// CHECK: Demangled: call_public
+
+
+sil @public_derived_bar : $@convention(method) (@guaranteed public_derived) -> () {
+bb0(%0 : $public_derived):
+  debug_value %0 : $public_derived
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #23: public_derived_baz
+// CHECK: Demangled: public_derived_baz
+// CHECK: Trivially dead: no
+// CHECK: All callers known: no
+// CHECK: Binds self: no
+// CHECK: Known Callers:
+
+// CHECK: Name: call_public
+// CHECK: Demangled: call_public
+
+
+sil @public_derived_baz : $@convention(method) (@guaranteed public_derived) -> () {
+bb0(%0 : $public_derived):
+  debug_value %0 : $public_derived
+  %2 = tuple ()
+  return %2 : $()
+}
+
+
+// CHECK: Function #24: call_public
+// CHECK: Demangled: call_public
+// CHECK-NOWMO: Trivially dead: no
+// CHECK-NOWMO: All callers known: no
+// CHECK-WMO: Trivially dead: yes
+// CHECK-WMO: All callers known: yes
+// CHECK: Binds self: no
+// CHECK: Call sites:
+
+// CHECK: Call site #9:   %3 = apply %2(%0) : $@convention(method) (@guaranteed public_base) -> ()
+// CHECK-NOWMO: Unknown callees: yes
+// CHECK-WMO: Unknown callees: no
+// CHECK: Known callees:
+// CHECK: Name: public_base_foo
+// CHECK: Demangled: public_base_foo
+
+// CHECK: Name: public_derived_foo
+// CHECK: Demangled: public_derived_foo
+
+// CHECK: Call site #10:   %5 = apply %4(%0) : $@convention(method) (@guaranteed public_base) -> ()
+// CHECK: Unknown callees: yes
+// CHECK: Known callees:
+// CHECK: Name: public_base_bar
+// CHECK: Demangled: public_base_bar
+
+// CHECK: Name: public_derived_bar
+// CHECK: Demangled: public_derived_bar
+
+// CHECK: Call site #11:   %7 = apply %6(%0) : $@convention(method) (@guaranteed public_base) -> ()
+// CHECK: Unknown callees: yes
+// CHECK: Known callees:
+// CHECK: Name: public_base_baz
+// CHECK: Demangled: public_base_baz
+
+// CHECK: Name: public_derived_baz
+// CHECK: Demangled: public_derived_baz
+
+
+sil hidden [noinline] @call_public : $@convention(thin) (@owned public_base) -> () {
+bb0(%0 : $public_base):
+  debug_value %0 : $public_base
+  %2 = class_method %0 : $public_base, #public_base.foo!1 : public_base -> () -> () , $@convention(method) (@guaranteed public_base) -> ()
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed public_base) -> ()
+  %4 = class_method %0 : $public_base, #public_base.bar!1 : public_base -> () -> () , $@convention(method) (@guaranteed public_base) -> ()
+  %5 = apply %4(%0) : $@convention(method) (@guaranteed public_base) -> ()
+  %6 = class_method %0 : $public_base, #public_base.baz!1 : public_base -> () -> () , $@convention(method) (@guaranteed public_base) -> ()
+  %7 = apply %6(%0) : $@convention(method) (@guaranteed public_base) -> ()
+  strong_release %0 : $public_base
+  %9 = tuple ()
+  return %9 : $()
+}
+
+sil_vtable private_base {
+  #private_base.foo!1: private_base_foo
+}
+
+sil_vtable private_derived {
+  #private_base.foo!1: private_derived_foo
+}
+
+sil_vtable internal_base {
+  #internal_base.foo!1: internal_base_foo
+  #internal_base.bar!1: internal_base_bar
+}
+
+sil_vtable internal_derived {
+  #internal_base.foo!1: internal_derived_foo
+  #internal_base.bar!1: internal_derived_bar
+}
+
+sil_vtable public_base {
+  #public_base.foo!1: public_base_foo
+  #public_base.bar!1: public_base_bar
+  #public_base.baz!1: public_base_baz
+}
+
+sil_vtable public_derived {
+  #public_base.foo!1: public_derived_foo
+  #public_base.bar!1: public_derived_bar
+  #public_base.baz!1: public_derived_baz
+}
+
 // CHECK: *** Call Graph Statistics ***
-// CHECK: Number of call graph nodes: 9
-// CHECK: Number of call graph edges: 6
+// CHECK: Number of call graph nodes: 24
+// CHECK: Number of call graph edges: 12
 // CHECK: Histogram of number of call sites per function:
-// CHECK: 0: 3
-// CHECK: 1: 6
+// CHECK: 0: 15
+// CHECK: 1: 7
+// CHECK: 2: 1
+// CHECK: 3: 1
 
 // CHECK: Histogram of number of callees per call site:
 // CHECK: 1: 6
+// CHECK: 2: 6
 
 // CHECK: Histogram of number of callers per function:
-// CHECK: 0: 3
-// CHECK: 1: 6
+// CHECK: 0: 6
+// CHECK: 1: 18
 
-// CHECK: Bump pointer allocated memory (bytes): 4096
+// CHECK: Bump pointer allocated memory (bytes): 8192
