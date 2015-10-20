@@ -4,6 +4,9 @@
 // RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-module -source-filename %s -module-to-print=Foo -function-definitions=false -print-regular-comments > %t/Foo.printed.txt
 // RUN: diff -u %S/Inputs/mock-sdk/Foo.printed.txt %t/Foo.printed.txt
 
+// RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-interface -print-module -source-filename %s -module-to-print=Foo -function-definitions=false -print-regular-comments > %t/Foo.interface.printed.txt
+// RUN: FileCheck %s -check-prefix=INTERFACE1 < %t/Foo.interface.printed.txt
+
 // RUN: %target-swift-ide-test(mock-sdk: -F %S/Inputs/mock-sdk) -print-module -source-filename %s -module-to-print=Foo -function-definitions=false -prefer-type-repr=true -module-print-submodules > %t/Foo.printed.recursive.txt
 // RUN: diff -u %S/Inputs/mock-sdk/Foo.printed.recursive.txt %t/Foo.printed.recursive.txt
 
@@ -141,3 +144,6 @@
 // FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *)
 // FOUNDATION-NEXT: {{^}}  var someProperty: AnnotatedFrameworkClass
 }
+
+// INTERFACE1-NOT: unavailable
+// INTERFACE1-NOT: This comment should not show without decl.

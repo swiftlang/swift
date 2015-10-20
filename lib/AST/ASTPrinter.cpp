@@ -371,7 +371,7 @@ public:
   void printWhereClause(ArrayRef<RequirementRepr> requirements);
 
 private:
-  bool shouldPrint(const Decl *D);
+  bool shouldPrint(const Decl *D, bool Notify = false);
   bool shouldPrintPattern(const Pattern *P);
   void printPatternType(const Pattern *P);
   void printAccessors(AbstractStorageDecl *ASD);
@@ -420,7 +420,7 @@ public:
   using ASTVisitor::visit;
 
   bool visit(Decl *D) {
-    if (!shouldPrint(D))
+    if (!shouldPrint(D, true))
       return false;
 
     Printer.callPrintDeclPre(D);
@@ -664,33 +664,39 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
-bool PrintAST::shouldPrint(const Decl *D) {
+bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
+  auto SkipDecl = [&] () {
+    if (Notify)
+      Printer.avoidPrintDeclPost(D);
+    return false;
+  };
+
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
-      return false;
+      return SkipDecl();
   }
 
   if (Options.SkipDeinit && isa<DestructorDecl>(D)) {
-    return false;
+    return SkipDecl();
   }
 
   if (Options.SkipImplicit && D->isImplicit())
-    return false;
+    return SkipDecl();
 
   if (Options.SkipUnavailable &&
       D->getAttrs().isUnavailable(D->getASTContext()))
-    return false;
+    return SkipDecl();
 
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (Options.AccessibilityFilter > Accessibility::Private &&
         VD->hasAccessibility() &&
         VD->getFormalAccess() < Options.AccessibilityFilter)
-      return false;
+      return SkipDecl();
   }
 
   if (Options.SkipPrivateStdlibDecls && D->isPrivateStdlibDecl())
-      return false;
+      return SkipDecl();
 
   if (Options.SkipEmptyExtensionDecls && isa<ExtensionDecl>(D)) {
     auto Ext = cast<ExtensionDecl>(D);
@@ -705,7 +711,7 @@ bool PrintAST::shouldPrint(const Decl *D) {
         }
       }
       if (!HasMemberToPrint)
-        return false;
+        return SkipDecl();
     }
   }
 
@@ -718,7 +724,7 @@ bool PrintAST::shouldPrint(const Decl *D) {
       if (ShouldPrint)
         return true;
     }
-    return false;
+    return SkipDecl();
   }
 
   return true;
@@ -941,7 +947,7 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
     for (auto i = members.begin(), iEnd = members.end(); i != iEnd; ++i) {
       auto member = *i;
 
-      if (!shouldPrint(member))
+      if (!shouldPrint(member, true))
         continue;
 
       if (!member->shouldPrintInContext(Options))

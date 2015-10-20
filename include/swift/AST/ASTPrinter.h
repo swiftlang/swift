@@ -47,6 +47,8 @@ public:
 
   virtual void printText(StringRef Text) = 0;
 
+  /// Called after the printer decides not to print D.
+  virtual void avoidPrintDeclPost(const Decl *D) {};
   /// Called before printing of a declaration.
   virtual void printDeclPre(const Decl *D) {}
   /// Called before printing at the point which would be considered the location

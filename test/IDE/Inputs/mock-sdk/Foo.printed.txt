@@ -277,7 +277,7 @@ class FooUnavailableMembers : FooClassBase {
   class func unavailableMembersWithInt(i: Int32) -> Self!
   
   @available(*, unavailable, message="x")
-  func unavailable()
+  func unavailable() // This comment should not show without decl. rdar://20092567
   @available(*, unavailable, message="Not available in Swift")
   func swiftUnavailable()
   @available(*, deprecated, message="x")
@@ -324,4 +324,15 @@ extension FooRepeatedMembers {
 }
 
 extension FooRepeatedMembers {
+}
+
+enum SCNFilterMode : Int {
+  init?(rawValue: Int)
+  var rawValue: Int { get }
+  
+  case None
+  case Nearest
+  case Linear
+  @available(*, unavailable)
+  case SCNNoFiltering // This comment should not show without decl.
 }

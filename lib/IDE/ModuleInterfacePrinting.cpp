@@ -47,7 +47,7 @@ public:
 private:
   void printDeclPre(const Decl *D) override;
   void printDeclPost(const Decl *D) override;
-
+  void avoidPrintDeclPost(const Decl *D) override;
   // Forwarding implementations.
 
   void printText(StringRef Text) override {
@@ -517,6 +517,29 @@ void swift::ide::printHeaderInterface(
     if (D->print(Printer, AdjustedOptions))
       Printer << "\n";
   }
+}
+
+void ClangCommentPrinter::avoidPrintDeclPost(const Decl *D) {
+  auto CD = D->getClangDecl();
+  if (!CD)
+    return;
+  const auto &Ctx = ClangLoader.getClangASTContext();
+  const auto &SM = Ctx.getSourceManager();
+  auto EndLoc = CD->getSourceRange().getEnd();
+  if (EndLoc.isInvalid())
+    return;
+  clang::FileID FID = SM.getFileID(EndLoc);
+  if (FID.isInvalid())
+    return;
+  auto Loc = EndLoc;
+
+  for (unsigned Line = SM.getSpellingLineNumber(EndLoc);
+       Loc.isValid() && SM.getSpellingLineNumber(Loc) == Line;
+       Loc = Loc.getLocWithOffset(1));
+  if (Loc.isInvalid())
+    return;
+  if (SM.getFileOffset(Loc) > getResumeOffset(FID))
+    setResumeOffset(FID, SM.getFileOffset(Loc));
 }
 
 void ClangCommentPrinter::printDeclPre(const Decl *D) {

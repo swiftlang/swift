@@ -241,7 +241,7 @@ struct _InternalStruct {
 @interface FooUnavailableMembers : FooClassBase
 + (instancetype)unavailableMembersWithInt:(int)i;
 
-- (void)unavailable __attribute__((unavailable("x")));
+- (void)unavailable __attribute__((unavailable("x"))); // This comment should not show without decl. rdar://20092567
 - (void)swiftUnavailable __attribute__((annotate("swift1_unavailable")));
 - (void)deprecated __attribute__((deprecated("x")));
 
@@ -281,5 +281,12 @@ void FooCFTypeRelease(FooCFTypeRef);
 @property int repeatedPropertyFromCategory;
 - (void)repeatedMethodFromCategory;
 @end
+
+typedef NS_ENUM(long, SCNFilterMode) {
+    SCNFilterModeNone = 0,
+    SCNFilterModeNearest = 1,
+    SCNFilterModeLinear = 2,
+    SCNNoFiltering       __attribute__((unavailable(""))) = 3, // This comment should not show without decl.
+};
 
 #endif /* ! __FOO_H__ */

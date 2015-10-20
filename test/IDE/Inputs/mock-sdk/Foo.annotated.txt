@@ -268,3 +268,12 @@ func <loc>FooCFTypeRelease(_: <ref:Class>FooCFType</ref>!)</loc></decl>
 }</decl>
 <decl:Extension>extension <ref:Class><loc>FooRepeatedMembers</ref></loc> {
 }</decl>
+<decl:Enum>enum <loc>SCNFilterMode</loc> : <ref:Struct>Int</ref> {
+  <decl:Constructor><loc>init?(rawValue: <ref:Struct>Int</ref>)</loc></decl>
+  <decl:Var>var <loc>rawValue</loc>: <ref:Struct>Int</ref> { get }</decl>
+  <decl:EnumElement>case <loc>None</loc></decl>
+  <decl:EnumElement>case <loc>Nearest</loc></decl>
+  <decl:EnumElement>case <loc>Linear</loc></decl>
+  <decl:EnumElement>@available(*, unavailable)
+  case <loc>SCNNoFiltering</loc></decl>
+}</decl>
