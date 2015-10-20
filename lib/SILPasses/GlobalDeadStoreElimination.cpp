@@ -336,6 +336,9 @@ public:
 
   /// Create the value or address extraction based on the give Base and
   /// projection path.
+  /// 
+  /// TODO: Use the createExtract in LoadStoreValue in MemLocation.
+  ///
   SILValue createExtract(SILValue VA, Optional<ProjectionPath> &Path,
                          SILInstruction *Inst, bool IsValExtract);
 };
