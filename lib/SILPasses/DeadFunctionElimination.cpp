@@ -141,7 +141,7 @@ protected:
   /// protocol method.
   static bool canHaveSameImplementation(FuncDecl *FD, ClassDecl *MethodCl,
                                         ClassDecl *ImplCl) {
-    if (!MethodCl || !ImplCl)
+    if (!FD || !MethodCl || !ImplCl)
       return true;
 
     // All implementations of derived classes may be called.
