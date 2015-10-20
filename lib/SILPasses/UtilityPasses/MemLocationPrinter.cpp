@@ -57,8 +57,11 @@ namespace {
 class MemLocationPrinter : public SILFunctionTransform {
 
   /// Dumps the expansions of memory locations accessed in the function.
+  /// This tests the expand function in MemLocation class.
+  ///
   void printMemExpansion(SILFunction &Fn) {
     MemLocationList Locs;
+    unsigned Counter = 0;
     for (auto &BB : Fn) {
       for (auto &II : BB) {
         MemLocation L;
@@ -72,15 +75,17 @@ class MemLocationPrinter : public SILFunctionTransform {
           if (!L.isValid())
             continue;
           MemLocation::expand(L, &Fn.getModule(), Locs);
+        } else {
+          // Not interested in these instructions yet.
+          continue;
         }
-      }
 
-      unsigned Counter = 0;
-      for (auto &Loc : Locs) {
-        llvm::outs() << "#" << Counter++ << Loc;
+        llvm::outs() << "#" << Counter++ << II;
+        for (auto &Loc : Locs) {
+          llvm::outs() << Loc;
+        }
+        Locs.clear();
       }
-
-      Locs.clear();
     }
     llvm::outs() << "\n";
   }
@@ -116,7 +121,6 @@ class MemLocationPrinter : public SILFunctionTransform {
         for (auto &T : PPList) {
           llvm::outs() << T.getValue();
         }
-       
         PPList.clear();
       }
     }

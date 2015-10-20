@@ -74,7 +74,8 @@ sil @S4_init : $@convention(thin) (@thin S4.Type) -> S4
 sil @S5_init : $@convention(thin) (@thin S5.Type) -> S5
 
 // CHECK-LABEL: @stack_store
-// CHECK: alloc_stack
+// CHECK: #0 store
+// CHECK-NEXT: alloc_stack
 sil @stack_store : $@convention(thin) () -> () {
   %1 = alloc_stack $Builtin.Int64
   %9 = integer_literal $Builtin.Int64, 0
@@ -85,8 +86,10 @@ sil @stack_store : $@convention(thin) () -> () {
 }
 
 // CHECK-LABEL: @store_after_store
-// CHECK: #0  [[RET0:%.+]] = alloc_box
-// CHECK: #1  [[RET0:%.+]] = alloc_box
+// CHECK: #0 store
+// CHECK-NEXT: [[RET0:%.+]] = alloc_box
+// CHECK: #1 store
+// CHECK-NEXT: [[RET0:%.+]] = alloc_box
 sil @store_after_store : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $B
@@ -97,12 +100,14 @@ bb0(%0 : $B):
 }
 
 // CHECK-LABEL: @store_after_store_struct
-// CHECK: #0  [[RET0:%.+]] = alloc_stack
+// CHECK: #0 store
+// CHECK-NEXT: [[RET0:%.+]] = alloc_stack
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
 // CHECK-NEXT: Field Type: var a: Int
-// CHECK: #1  [[RET0:%.+]] = alloc_stack
+// CHECK: #1 store
+// CHECK-NEXT: [[RET0:%.+]] = alloc_stack
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
@@ -122,6 +127,7 @@ sil @store_after_store_struct : $@convention(thin) () -> () {
 // Make sure all the structs get expanded correctly.
 //
 // CHECK-LABEL: @many_struct_allocs
+// CHECK: #0 store
 // CHECK-NEXT: alloc_stack $S2
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
@@ -132,6 +138,7 @@ sil @store_after_store_struct : $@convention(thin) () -> () {
 // CHECK-NEXT: Field Type: var value: Int64
 // CHECK-NEXT: Address Projection Type: $*Int
 // CHECK-NEXT: Field Type: var a: Int
+// CHECK: #1 store
 // CHECK-NEXT: alloc_stack $S3
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
@@ -165,6 +172,7 @@ sil @store_after_store_struct : $@convention(thin) () -> () {
 // CHECK-NEXT: Field Type: var a: Int
 // CHECK-NEXT: Address Projection Type: $*S2
 // CHECK-NEXT: Field Type: var a: S2
+// CHECK: #2 store
 // CHECK-NEXT: alloc_stack $S4
 // CHECK-NEXT: Address Projection Type: $*Builtin.Int64
 // CHECK-NEXT: Field Type: var value: Int64
@@ -277,7 +285,8 @@ bb0:
 }
 
 // CHECK-LABEL: self_loop 
-// CHECK: alloc_stack $S5                            // users: %4, %7
+// CHECK: #0 store
+// CHECK-NEXT: alloc_stack $S5                            // users: %4, %7
 // CHECK-NEXT: Address Projection Type: $*SelfLoop
 // CHECK-NEXT: Field Type: var a: SelfLoop
 sil hidden @self_loop : $@convention(thin) () -> () {
