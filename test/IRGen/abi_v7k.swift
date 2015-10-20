@@ -2,7 +2,6 @@
 // RUN: %swift -target armv7k-apple-watchos2 -S -primary-file %s -module-name test_v7k | FileCheck -check-prefix=V7K %s
 
 // REQUIRES: OS=watchos
-// REQUIRES: CPU=armv7k
 
 // CHECK-LABEL: define hidden float @_TF8test_v7k9addFloats{{.*}}(float, float)
 // CHECK: fadd float %0, %1
@@ -138,10 +137,14 @@ func testClike8(t: Int, x: CLike8) -> Int {
 
 // layout of the enum: the tag bit is set for the no-data cases, which are then
 // assigned values in the data area of the enum in declaration order
-// CHECK-LABEL: define hidden double @_TF8test_v7k11testSingleP{{.*}}(i64, i1)
-// CHECK: switch i1
-// CHECK: switch i64 [[ID:%[0-9]+]]
-// CHECK: bitcast i64 [[ID]] to double
+// CHECK-LABEL: define hidden double @_TF8test_v7k11testSingleP{{.*}}(i32, i32, i1)
+// CHECK: br i1
+// CHECK: switch i32 [[ID:%[0-9]+]]
+// CHECK: [[FIRST:%[0-9]+]] = zext i32 %0 to i64
+// CHECK: [[SECOND:%[0-9]+]] = zext i32 %1 to i64
+// CHECK: [[TEMP:%[0-9]+]] = shl i64 [[SECOND]], 32
+// CHECK: [[RESULT:%[0-9]+]] = or i64 [[FIRST]], [[TEMP]]
+// CHECK: bitcast i64 [[RESULT]] to double
 // CHECK: phi double [ 0.000000e+00, {{.*}} ]
 // V7K-LABEL: __TF8test_v7k11testSingleP
 // V7K: tst     r2, #1
@@ -160,9 +163,12 @@ func testSingleP(x: SinglePayload) -> Double {
   }
 }
 
-// CHECK-LABEL: define hidden double @_TF8test_v7k10testMultiP{{.*}}(i64, i2)
-// CHECK: [[ID:%[0-9]+]] = trunc i64 %0 to i32
-// CHECK: bitcast i64 %0 to double
+// CHECK-LABEL: define hidden double @_TF8test_v7k10testMultiP{{.*}}(i32, i32, i2)
+// CHECK: [[FIRST:%[0-9]+]] = zext i32 %0 to i64
+// CHECK: [[SECOND:%[0-9]+]] = zext i32 %1 to i64
+// CHECK: [[TEMP:%[0-9]+]] = shl i64 [[SECOND]], 32
+// CHECK: [[RESULT:%[0-9]+]] = or i64 [[FIRST]], [[TEMP]]
+// CHECK: bitcast i64 [[RESULT]] to double
 // CHECK: sitofp i32 {{.*}} to double 
 // CHECK: phi double [ 0.000000e+00, {{.*}} ]
 // CHECK: ret double
@@ -244,7 +250,7 @@ struct MyRect4 {
    s = MySize(w: 1.0, h: 2.0)
   }
 }
-// CHECK-LABEL: define hidden void @_TF8test_v7k8testRet2{{.*}}(%V8test_v7k6MyRect* noalias sret, double, i32) 
+// CHECK-LABEL: define hidden void @_TF8test_v7k8testRet2{{.*}}(%V8test_v7k6MyRect* noalias nocapture sret, double, i32)
 // V7K-LABEL: __TF8test_v7k8testRet2
 // sret in r0, double in d0, i32 in r1
 // V7K: vmov [[ID:s[0-9]+]], r1
@@ -268,20 +274,20 @@ func testRet3() -> MyRect2 {
 }
 
 // Returning tuple?: (Int x 6)?
-// CHECK-LABEL: define hidden { i192, i1 } @_TF8test_v7k7minMax2{{.*}}(i32, i32)
+// CHECK-LABEL: define hidden void @_TF8test_v7k7minMax2{{.*}}({{%Sq.*}} noalias nocapture sret, i32, i32)
 // V7K-LABEL: __TF8test_v7k7minMax2
-// We will indirectly return {i192, i1} with the address in r0, input parameters will be in r1 and r2
+// We will indirectly return an optional with the address in r0, input parameters will be in r1 and r2
 // V7K: cmp r1, r2
 // V7K: str r0, [sp, [[IDX:#[0-9]+]]]
 // V7K: ldr [[R0_RELOAD:r[0-9]+]], [sp, [[IDX]]]
 // V7K: str {{.*}}, [{{.*}}[[R0_RELOAD]]]
 // V7K: str {{.*}}, [{{.*}}[[R0_RELOAD]], #4]
-// V7K: and {{.*}}, {{.*}}, #1
-// V7K: strb {{.*}}, [{{.*}}[[R0_RELOAD]], #24]
 // V7K: str {{.*}}, [{{.*}}[[R0_RELOAD]], #8]
 // V7K: str {{.*}}, [{{.*}}[[R0_RELOAD]], #12]
 // V7K: str {{.*}}, [{{.*}}[[R0_RELOAD]], #16]
 // V7K: str {{.*}}, [{{.*}}[[R0_RELOAD]], #20]
+// V7K: and {{.*}}, {{.*}}, #1
+// V7K: strb {{.*}}, [{{.*}}[[R0_RELOAD]], #24]
 func minMax2(x : Int, y : Int) -> (min: Int, max: Int, min2: Int, max2: Int, min3: Int, max3: Int)? {
     if x == y {
       return nil
@@ -296,7 +302,7 @@ func minMax2(x : Int, y : Int) -> (min: Int, max: Int, min2: Int, max2: Int, min
 }
 
 // Returning struct?: {Int x 6}?
-// CHECK-LABEL: define hidden { i192, i1 } @_TF8test_v7k7minMax3{{.*}}(i32, i32)
+// CHECK-LABEL: define hidden void @_TF8test_v7k7minMax3{{.*}}({{%Sq.*}} noalias nocapture sret, i32, i32)
 // V7K-LABEL: __TF8test_v7k7minMax3
 struct Ret {
   var min:Int
@@ -319,15 +325,16 @@ func minMax3(x : Int, y : Int) -> Ret? {
 }
 
 // Passing struct: Int8, MyPoint x 10, MySize * 10
-// CHECK-LABEL: define hidden double @_TF8test_v7k8testRet5{{.*}}(i8, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double, double)
+// CHECK-LABEL: define hidden double @_TF8test_v7k8testRet5{{.*}}(%V8test_v7k7MyRect3* noalias nocapture dereferenceable(328))
 // V7K-LABEL: __TF8test_v7k8testRet5
-// V7K: vldr [[REG:d[0-9]+]], [sp, #224]
-// V7K: sxtb [[TMP:r[0-9]+]], r0
-// V7K: vmov [[TMP2:s[0-9]+]], [[TMP]]
+// V7K: ldrb [[TMP1:r[0-9]+]], [r0]
+// V7K: vldr [[REG1:d[0-9]+]], [r0, #8]
+// V7K: vldr [[REG2:d[0-9]+]], [r0]
+// V7K: sxtb r0, [[TMP1]]
+// V7K: vmov [[TMP2:s[0-9]+]], r0
 // V7K: vcvt.f64.s32 [[INTPART:d[0-9]+]], [[TMP2]]
-// V7K: vadd.f64 [[TMP3:d[0-9]+]], [[INTPART]], d0
-// V7K: vadd.f64 d0, [[TMP3]], [[REG]]
-// Backend will allocate r.t in r0, r.p.x in d0, r.s9.w on stack.
+// V7K: vadd.f64 [[TMP3:d[0-9]+]], [[INTPART]], [[REG1]]
+// V7K: vadd.f64 d0, [[TMP3]], [[REG2]]
 struct MyRect3 {
   var t: Int8
   var p: MyPoint
