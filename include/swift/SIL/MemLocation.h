@@ -155,6 +155,13 @@ public:
   /// construct the projection path to the field accessed.
   void initialize(SILValue val);
 
+  /// Reset the memory location, i.e. clear base and path. 
+  void reset() {
+    Base = SILValue();
+    Path.reset();
+    Kind = NormalKey;
+  }
+
   /// Get the first level locations based on this location's first level
   /// projection.
   void getFirstLevelMemLocations(MemLocationList &Locs, SILModule *Mod);

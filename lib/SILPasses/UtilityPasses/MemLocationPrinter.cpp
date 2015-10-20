@@ -60,11 +60,11 @@ class MemLocationPrinter : public SILFunctionTransform {
   /// This tests the expand function in MemLocation class.
   ///
   void printMemExpansion(SILFunction &Fn) {
+    MemLocation L;
     MemLocationList Locs;
     unsigned Counter = 0;
     for (auto &BB : Fn) {
       for (auto &II : BB) {
-        MemLocation L;
         if (auto *LI = dyn_cast<LoadInst>(&II)) {
           L.initialize(LI->getOperand());
           if (!L.isValid())
@@ -84,6 +84,7 @@ class MemLocationPrinter : public SILFunctionTransform {
         for (auto &Loc : Locs) {
           llvm::outs() << Loc;
         }
+        L.reset();
         Locs.clear();
       }
     }
