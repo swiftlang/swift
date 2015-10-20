@@ -1,19 +1,19 @@
-//===--- MemLocationPrinter.cpp - Dump all memory locations in program ---===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
-//
-// This pass dumps all the memory locations accessed in the function, as well
-// as their expansions.
-//
-//===----------------------------------------------------------------------===//
+///===--- MemLocationPrinter.cpp - Dump all memory locations in program ---===//
+///
+/// This source file is part of the Swift.org open source project
+///
+/// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+/// Licensed under Apache License v2.0 with Runtime Library Exception
+///
+/// See http://swift.org/LICENSE.txt for license information
+/// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+///
+///===---------------------------------------------------------------------===//
+///
+/// This pass tests type expansion, memlocation expansion and memlocation
+/// reduction.
+///
+///===---------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-memlocation-dumper"
 #include "swift/SILPasses/Passes.h"
@@ -56,6 +56,45 @@ namespace {
 
 class MemLocationPrinter : public SILFunctionTransform {
 
+  /// Dumps the expansions of SILType accessed in the function.
+  /// This tests the BreadthFirstEnumTypeProjection function, which is
+  /// a function used extensively in expand and reduce functions.
+  ///
+  /// We test it to catch any suspicious things in the earliest point.
+  ///
+  void printTypeExpansion(SILFunction &Fn) {
+    SILModule *M = &Fn.getModule();
+    ProjectionPathList PPList;
+    unsigned Counter = 0;
+    for (auto &BB : Fn) {
+      for (auto &II : BB) {
+        if (auto *LI = dyn_cast<LoadInst>(&II)) {
+          SILValue V = LI->getOperand();
+          // This is an address type, take it object type.
+          SILType Ty = V.getType().getObjectType();
+          ProjectionPath::BreadthFirstEnumTypeProjection(Ty, M, PPList, true);
+        } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
+          SILValue V = SI->getDest();
+          // This is an address type, take it object type.
+          SILType Ty = V.getType().getObjectType();
+          ProjectionPath::BreadthFirstEnumTypeProjection(Ty, M, PPList, true);
+        } else {
+          // Not interested in these instructions yet.
+          continue;
+        }
+
+        llvm::outs() << "#" << Counter++ << II;
+        for (auto &T : PPList) {
+          llvm::outs() << T.getValue();
+        }
+        PPList.clear();
+      }
+    }
+    llvm::outs() << "\n";
+  }
+
+
+
   /// Dumps the expansions of memory locations accessed in the function.
   /// This tests the expand function in MemLocation class.
   ///
@@ -89,43 +128,6 @@ class MemLocationPrinter : public SILFunctionTransform {
         }
         L.reset();
         Locs.clear();
-      }
-    }
-    llvm::outs() << "\n";
-  }
-
-  /// Dumps the expansions of SILType accessed in the function.
-  /// This tests the BreadthFirstEnumTypeProjection function, which is
-  /// a function used extensively in expand and reduce functions.
-  ///
-  /// We test it to catch any suspicious things in the earliest point.
-  ///
-  void printTypeExpansion(SILFunction &Fn) {
-    SILModule *M = &Fn.getModule();
-    ProjectionPathList PPList;
-    unsigned Counter = 0;
-    for (auto &BB : Fn) {
-      for (auto &II : BB) {
-        if (auto *LI = dyn_cast<LoadInst>(&II)) {
-          SILValue V = LI->getOperand();
-          // This is an address type, take it object type.
-          SILType Ty = V.getType().getObjectType();
-          ProjectionPath::BreadthFirstEnumTypeProjection(Ty, M, PPList, true);
-        } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
-          SILValue V = SI->getDest();
-          // This is an address type, take it object type.
-          SILType Ty = V.getType().getObjectType();
-          ProjectionPath::BreadthFirstEnumTypeProjection(Ty, M, PPList, true);
-        } else {
-          // Not interested in these instructions yet.
-          continue;
-        }
-
-        llvm::outs() << "#" << Counter++ << II;
-        for (auto &T : PPList) {
-          llvm::outs() << T.getValue();
-        }
-        PPList.clear();
       }
     }
     llvm::outs() << "\n";
