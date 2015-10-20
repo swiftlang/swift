@@ -1144,7 +1144,7 @@ private:
     // context ::= module
     // context ::= entity
     // context ::= 'E' module context (extension defined in a different module)
-    // context ::= 'e' generic-signature module context (generic extension)
+    // context ::= 'e' module context generic-signature (constrained extension)
     if (!Mangled) return nullptr;
     if (Mangled.nextIf('E')) {
       NodePointer ext = NodeFactory::create(Node::Kind::Extension);
@@ -1158,17 +1158,17 @@ private:
     }
     if (Mangled.nextIf('e')) {
       NodePointer ext = NodeFactory::create(Node::Kind::Extension);
+      NodePointer def_module = demangleModule();
+      if (!def_module) return nullptr;
       NodePointer sig = demangleGenericSignature();
       // The generic context is currently re-specified by the type mangling.
       // If we ever remove 'self' from manglings, we should stop resetting the
       // context here.
       resetGenericContext();
       if (!sig) return nullptr;
-      NodePointer def_module = demangleModule();
-      if (!def_module) return nullptr;
       NodePointer type = demangleContext();
       if (!type) return nullptr;
-      
+
       ext->addChild(def_module);
       ext->addChild(type);
       ext->addChild(sig);

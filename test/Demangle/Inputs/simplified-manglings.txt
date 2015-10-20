@@ -221,7 +221,7 @@ _TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_
 _TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_FS1_16twoParamsAtDepthu_0_Rq_S1__fq_FTqd__1yqd_0__T_ ---> protocol witness for GenericWitnessTest.twoParamsAtDepth<A><B, C where ...>(B, y : C) -> () in conformance <A> GenericTypeContext<A>
 _TFC3red11BaseClassEHcfMS0_FzT1aSi_S0_ ---> BaseClassEH.init(a : Int) throws -> BaseClassEH
 _TF4red23foofSifT1ySi_FT1zSi_Si ---> foo(Int)(y : Int)(z : Int) -> Int
-_TFeRq_27mangling_generic_extensions8Runcible_S_VS_3Foog1aSi ---> Foo<A where ...>.a.getter
-_TFeRq_27mangling_generic_extensions8Runcible_S_VS_3Foog1bq_ ---> Foo<A where ...>.b.getter
+_TFe27mangling_generic_extensionsRq_S_8Runcible_VS_3Foog1aSi ---> Foo<A where ...>.a.getter
+_TFe27mangling_generic_extensionsRq_S_8Runcible_VS_3Foog1bq_ ---> Foo<A where ...>.b.getter
 _TTRXFo_iT__iT_zoPs9ErrorType__XFo__dT_zoPS___ ---> thunk
 _TFE1a ---> _TFE1a

@@ -745,7 +745,7 @@ class ObjCInitClass {
 protocol ProtoDelegatesToObjC { }
 
 extension ProtoDelegatesToObjC where Self : ObjCInitClass {
-  // CHECK-LABEL: sil hidden @_TFeRdq_C19protocol_extensions13ObjCInitClassq_S_20ProtoDelegatesToObjC_S_S1_CuRdq_S0_q_S1__fMq_FT6stringSS_q_
+  // CHECK-LABEL: sil hidden @_TFe19protocol_extensionsRdq_CS_13ObjCInitClassq_S_20ProtoDelegatesToObjC_S1_CuRdq_S0_q_S1__fMq_FT6stringSS_q_
   // CHECK: bb0([[STR:%[0-9]+]] : $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $Self
@@ -770,7 +770,7 @@ class RequiredInitClass {
 protocol ProtoDelegatesToRequired { }
 
 extension ProtoDelegatesToRequired where Self : RequiredInitClass {
-  // CHECK-LABEL: sil hidden @_TFeRdq_C19protocol_extensions17RequiredInitClassq_S_24ProtoDelegatesToRequired_S_S1_CuRdq_S0_q_S1__fMq_FT6stringSS_q_ 
+  // CHECK-LABEL: sil hidden @_TFe19protocol_extensionsRdq_CS_17RequiredInitClassq_S_24ProtoDelegatesToRequired_S1_CuRdq_S0_q_S1__fMq_FT6stringSS_q_ 
   // CHECK: bb0([[STR:%[0-9]+]] : $String, [[SELF_META:%[0-9]+]] : $@thick Self.Type):
   init(string: String) {
   // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $Self

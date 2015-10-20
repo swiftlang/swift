@@ -15,4 +15,4 @@ public extension P where Foo == DefaultFoo<Self> {
   }
 }
 
-// CHECK: define void @_TFeRq_21same_type_constraints1Pzqq_S0_3FooGVS_10DefaultFooq___S_S0_3foouRq_S0_zqq_S0_3FooGS1_q___fq_FT_GS1_q__
+// CHECK: define void @_TFe21same_type_constraintsRq_S_1Pzqq_S0_3FooGVS_10DefaultFooq___S0_3foouRq_S0_zqq_S0_3FooGS1_q___fq_FT_GS1_q__

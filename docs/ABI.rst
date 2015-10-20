@@ -864,6 +864,7 @@ Declaration Contexts
   module ::= identifier                      // module name
   module ::= known-module                    // abbreviation
   extension ::= 'E' module entity
+  extension ::= 'e' module generic-signature entity
 
 These manglings identify the enclosing context in which an entity was declared,
 such as its enclosing module, function, or nominal type.
@@ -872,7 +873,8 @@ An ``extension`` mangling is used whenever an entity's declaration context is
 an extension *and* the entity being extended is in a different module. In this
 case the extension's module is mangled first, followed by the entity being
 extended. If the extension and the extended entity are in the same module, the
-plain ``entity`` mangling is preferred.
+plain ``entity`` mangling is preferred. If the extension is constrained, the
+constraints on the extension are mangled in its generic signature.
 
 When mangling the context of a local entity within a constructor or
 destructor, the non-allocating or non-deallocating variant is used.

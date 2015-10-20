@@ -1402,11 +1402,13 @@ void Remangler::mangleExtension(Node *node, EntityContext &ctx) {
   assert(node->getNumChildren() == 2 || node->getNumChildren() == 3);
   if (node->getNumChildren() == 3) {
     Out << 'e';
-    mangleDependentGenericSignature(node->begin()[2].get()); // generic sig
   } else {
     Out << 'E';
   }
   mangleEntityContext(node->begin()[0].get(), ctx); // module
+  if (node->getNumChildren() == 3) {
+    mangleDependentGenericSignature(node->begin()[2].get()); // generic sig
+  }
   mangleEntityContext(node->begin()[1].get(), ctx); // context
 }
 

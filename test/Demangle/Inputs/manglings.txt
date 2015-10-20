@@ -222,8 +222,8 @@ _TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_
 _TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_FS1_16twoParamsAtDepthu_0_Rq_S1__fq_FTqd__1yqd_0__T_ ---> protocol witness for interface_type_mangling.GenericWitnessTest.twoParamsAtDepth <A><B, C where A: interface_type_mangling.GenericWitnessTest> (A)(B, y : C) -> () in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
 _TFC3red11BaseClassEHcfMS0_FzT1aSi_S0_ ---> red.BaseClassEH.init (red.BaseClassEH.Type)(a : Swift.Int) throws -> red.BaseClassEH
 _TF4red23foofSifT1ySi_FT1zSi_Si ---> red2.foo (Swift.Int)(y : Swift.Int)(z : Swift.Int) -> Swift.Int
-_TFeRq_27mangling_generic_extensions8Runcible_S_VS_3Foog1aSi ---> ext.mangling_generic_extensions.mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.a.getter : Swift.Int
-_TFeRq_27mangling_generic_extensions8Runcible_S_VS_3Foog1bq_ ---> ext.mangling_generic_extensions.mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.b.getter : A
+_TFe27mangling_generic_extensionsRq_S_8Runcible_VS_3Foog1aSi ---> ext.mangling_generic_extensions.mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.a.getter : Swift.Int
+_TFe27mangling_generic_extensionsRq_S_8Runcible_VS_3Foog1bq_ ---> ext.mangling_generic_extensions.mangling_generic_extensions.Foo<A where A: mangling_generic_extensions.Runcible>.b.getter : A
 _TTRXFo_iT__iT_zoPs9ErrorType__XFo__dT_zoPS___ ---> reabstraction thunk helper from @callee_owned (@in ()) -> (@out (), @error @owned Swift.ErrorType) to @callee_owned () -> (@unowned (), @error @owned Swift.ErrorType)
 _TFE1a ---> _TFE1a
 _TF21$__lldb_module_for_E0au3$E0Ps9ErrorType_ ---> $__lldb_module_for_E0.$E0.unsafeMutableAddressor : Swift.ErrorType
