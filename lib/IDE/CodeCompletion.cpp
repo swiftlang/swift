@@ -2868,18 +2868,18 @@ public:
     return true;
   }
 
-  static bool collectArgumentExpectatation(DeclContext &DC, CallExpr *CallE,
-                                           Expr *CCExpr,
-                                           std::vector<Type> &ExpectedTypes) {
+  static bool
+  collectArgumentExpectatation(DeclContext &DC, CallExpr *CallE, Expr *CCExpr,
+                               std::vector<Type> &ExpectedTypes,
+                               std::vector<StringRef> &ExpectedNames) {
     SmallVector<Type, 2> PossibleTypes;
     unsigned Position;
     bool HasName;
-    std::vector<StringRef> ExpectedNames;
     if (collectPossibleArgTypes(DC, CallE, CCExpr, PossibleTypes, Position,
                                 HasName, true)) {
       collectArgumentExpection(Position, HasName, PossibleTypes,
                                CCExpr->getStartLoc(), ExpectedTypes, ExpectedNames);
-      return !ExpectedTypes.empty();
+      return !ExpectedTypes.empty() || !ExpectedNames.empty();
     }
     return false;
   }
@@ -3607,14 +3607,19 @@ public:
         return false;
   }) {}
 
-  void analyzeExpr(Expr *Parent, llvm::function_ref<void(Type)> Callback) {
+  void analyzeExpr(Expr *Parent, llvm::function_ref<void(Type)> Callback,
+                   SmallVectorImpl<StringRef> &PossibleNames) {
     switch (Parent->getKind()) {
       case ExprKind::Call: {
         std::vector<Type> PotentialTypes;
-        CompletionLookup::collectArgumentExpectatation(*DC, cast<CallExpr>(Parent),
-                                                       ParsedExpr, PotentialTypes);
+        std::vector<StringRef> ExpectedNames;
+        CompletionLookup::collectArgumentExpectatation(
+            *DC, cast<CallExpr>(Parent), ParsedExpr, PotentialTypes,
+            ExpectedNames);
         for (Type Ty : PotentialTypes)
           Callback(Ty);
+        for (auto name : ExpectedNames)
+          PossibleNames.push_back(name);
         break;
       }
       case ExprKind::Assign: {
@@ -3677,6 +3682,11 @@ public:
   }
 
   bool Analyze(llvm::SmallVectorImpl<Type> &PossibleTypes) {
+    SmallVector<StringRef, 1> PossibleNames;
+    return Analyze(PossibleTypes, PossibleNames) && !PossibleTypes.empty();
+  }
+  bool Analyze(SmallVectorImpl<Type> &PossibleTypes,
+               SmallVectorImpl<StringRef> &PossibleNames) {
     // We cannot analyze without target.
     if (!ParsedExpr)
       return false;
@@ -3690,13 +3700,13 @@ public:
     for (auto It = Finder.Ancestors.rbegin(); It != Finder.Ancestors.rend();
          ++ It) {
       if (auto Parent = It->dyn_cast<Expr *>()) {
-        analyzeExpr(Parent, Callback);
+        analyzeExpr(Parent, Callback, PossibleNames);
       } else if (auto Parent = It->dyn_cast<Stmt *>()) {
         analyzeStmt(Parent, Callback);
       } else if (auto Parent = It->dyn_cast<Decl *>()) {
         analyzeDecl(Parent, Callback);
       }
-      if (!PossibleTypes.empty())
+      if (!PossibleTypes.empty() || !PossibleNames.empty())
         return true;
     }
     return false;
@@ -3811,10 +3821,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::PostfixExprParen: {
     Lookup.setHaveLParen(true);
+
     CodeCompletionTypeContextAnalyzer TypeAnalyzer(CurDeclContext,
                                                    CodeCompleteTokenExpr);
-    llvm::SmallVector<Type, 2> PossibleTypes;
-    if (TypeAnalyzer.Analyze(PossibleTypes)) {
+    SmallVector<Type, 2> PossibleTypes;
+    SmallVector<StringRef, 2> PossibleNames;
+    if (TypeAnalyzer.Analyze(PossibleTypes, PossibleNames)) {
       Lookup.setExpectedTypes(PossibleTypes);
     }
 
@@ -3823,8 +3835,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         Lookup.setHaveRParen(HasRParen);
         Lookup.getValueExprCompletions(*ExprType);
       } else {
-        // FIXME: we should do a call-arg completion here to get possible
-        // labels.  For now, just fallthough to get values.
+        // Add argument labels, then fallthough to get values.
+        Lookup.addArgNameCompletionResults(PossibleNames);
       }
     }
 

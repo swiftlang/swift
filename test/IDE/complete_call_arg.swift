@@ -30,6 +30,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG6 | FileCheck %s -check-prefix=FARG6
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG7 | FileCheck %s -check-prefix=EXPECT_OINT
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_1 | FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_2 | FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_3 | FileCheck %s -check-prefix=FIRST_ARG_NAME_3
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -323,3 +327,18 @@ class C4 {
 // FARG6-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringOpGen()[#String?#]
 // FARG6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalIntTaker({#(i1): Int#}, {#i2: Int#})[#Void#]
 // FARG6-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: InternalStringTaker({#(s1): String#}, {#s2: String#})[#Void#]
+
+func firstArg(arg1 arg1: Int, arg2: Int) {}
+func testArg1Name1() {
+  firstArg(#^FIRST_ARG_NAME_1^#
+}
+// Skip the RParen, since it will be annotated in the second test.
+// FIRST_ARG_NAME_PATTERN: ['(']{#arg1: Int#}, {#arg2: Int#}
+func testArg2Name1() {
+  firstArg(#^FIRST_ARG_NAME_2^#)
+}
+
+func testArg2Name3() {
+  firstArg(#^FIRST_ARG_NAME_3^#,
+}
+// FIRST_ARG_NAME_3: Keyword/ExprSpecific: arg1: [#Argument name#]
