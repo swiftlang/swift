@@ -34,6 +34,10 @@ class LinkedNode {
 struct MyError : ErrorType {
 }
 
+final class ErrorClass : ErrorType {
+}
+
+
 // Sanity check with a simple function.
 
 // CHECK-LABEL: CG of test_simple
@@ -591,3 +595,18 @@ bb1(%7 : $(Pointer, Pointer)):
   %9 = struct_extract %8 : $Pointer, #Pointer.y
   return %9 : $Y
 }
+
+// We don't handle existentials currently.
+// Check that we don't crash on this.
+
+// CHECK-LABEL: CG of test_unknown_store
+// CHECK-NEXT:    Arg %0 Esc: G, A0, Succ: 
+// CHECK-NEXT:  End
+sil @test_unknown_store : $@convention(thin) (@owned ErrorClass) -> () {
+bb0(%0 : $ErrorClass):
+  %2 = alloc_existential_box $ErrorType, $ErrorClass
+  store %0 to %2#1 : $*ErrorClass
+  %4 = tuple ()
+  return %4 : $()
+}
+

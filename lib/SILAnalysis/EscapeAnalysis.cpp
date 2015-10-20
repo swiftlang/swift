@@ -940,6 +940,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case ValueKind::LoadInst:
       if (isPointer(I)) {
         CGNode *AddrNode = ConGraph->getNode(cast<LoadInst>(I)->getOperand());
+        if (!AddrNode) {
+          // A load from an address we don't handle -> be conservative.
+          CGNode *ValueNode = ConGraph->getNode(I);
+          ValueNode->setEscapesGlobal();
+          return;
+        }
         CGNode *PointsTo = ConGraph->getContentNode(AddrNode);
         if (CGNode *ValueNode = ConGraph->getNodeOrNull(I)) {
           // We already have a node for the loaded value. Create a defer edge
@@ -953,10 +959,15 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     case ValueKind::StoreInst:
       if (CGNode *ValueNode = ConGraph->getNode(cast<StoreInst>(I)->getSrc())) {
-        // Create a defer-edge from the content to the stored value.
         CGNode *AddrNode = ConGraph->getNode(cast<StoreInst>(I)->getDest());
-        CGNode *PointsTo = ConGraph->getContentNode(AddrNode);
-        ConGraph->defer(PointsTo, ValueNode);
+        if (AddrNode) {
+          // Create a defer-edge from the content to the stored value.
+          CGNode *PointsTo = ConGraph->getContentNode(AddrNode);
+          ConGraph->defer(PointsTo, ValueNode);
+        } else {
+          // A store to an address we don't handle -> be conservative.
+          ValueNode->setEscapesGlobal();
+        }
       }
       return;
     case ValueKind::PartialApplyInst: {
