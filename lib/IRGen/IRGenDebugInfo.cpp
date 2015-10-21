@@ -683,7 +683,7 @@ llvm::DISubprogram *IRGenDebugInfo::emitFunction(
   auto Params = Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables
     ? nullptr
     : createParameterTypes(SILTy, DeclCtx);
-  llvm::DISubroutineType *DIFnTy = DBuilder.createSubroutineType(File, Params);
+  llvm::DISubroutineType *DIFnTy = DBuilder.createSubroutineType(Params);
   llvm::MDNode *TemplateParameters = nullptr;
   llvm::DISubprogram *Decl = nullptr;
 
@@ -1689,7 +1689,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
     // Functions are actually stored as a Pointer or a FunctionPairTy:
     // { i8*, %swift.refcounted* }
-    auto FnTy = DBuilder.createSubroutineType(MainFile, Params, Flags);
+    auto FnTy = DBuilder.createSubroutineType(Params, Flags);
     auto DITy = createPointerSizedStruct(Scope, MangledName, FnTy,
                                          MainFile, 0, Flags, MangledName);
     DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
