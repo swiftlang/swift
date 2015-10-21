@@ -251,7 +251,9 @@ public struct _StringCore {
   /// the Cocoa String buffer, if any, or .None.
   public var cocoaBuffer: _CocoaStringType? {
     if hasCocoaBuffer {
-      return _unsafeReferenceCast(_owner, Optional<_CocoaStringType>.self)
+      return _owner.map {
+        unsafeBitCast($0, _CocoaStringType.self)
+      }
     }
     return nil
   }

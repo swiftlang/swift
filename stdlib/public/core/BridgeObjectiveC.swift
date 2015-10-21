@@ -143,7 +143,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 @warn_unused_result
 public func _bridgeToObjectiveC<T>(x: T) -> AnyObject? {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return _unsafeReferenceCast(x, AnyObject.self)
+    return unsafeBitCast(x, AnyObject.self)
   }
   return _bridgeNonVerbatimToObjectiveC(x)
 }
@@ -162,7 +162,7 @@ public func _bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
 func _bridgeToObjectiveCUnconditionalAutorelease<T>(x: T) -> AnyObject
 {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return _unsafeReferenceCast(x, AnyObject.self)
+    return unsafeBitCast(x, AnyObject.self)
   }
   guard let bridged = _bridgeNonVerbatimToObjectiveC(x) else {
     _preconditionFailure(
@@ -375,8 +375,9 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
     @transparent nonmutating set {
       _debugPrecondition(!_isNull)
       // Autorelease the object reference.
-      Builtin.retain(_unsafeReferenceCast(newValue, AnyObject.self))
-      Builtin.autorelease(_unsafeReferenceCast(newValue, AnyObject.self))
+      typealias OptionalAnyObject = AnyObject?
+      Builtin.retain(unsafeBitCast(newValue, OptionalAnyObject.self))
+      Builtin.autorelease(unsafeBitCast(newValue, OptionalAnyObject.self))
       // Trivially assign it as a COpaquePointer; the pointer references an
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.

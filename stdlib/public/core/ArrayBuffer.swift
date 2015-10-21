@@ -350,7 +350,7 @@ extension _ArrayBuffer {
     if _fastPath(wasNativeTypeChecked) {
       return _nativeTypeChecked[i]
     }
-    return _unsafeReferenceCast(_getElementSlowPath(i), Element.self)
+    return unsafeBitCast(_getElementSlowPath(i), Element.self)
   }
 
   @inline(never)

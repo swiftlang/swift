@@ -2163,27 +2163,10 @@ public:
   }
 
   void checkUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *AI) {
-    auto srcTy = AI->getSrc().getType();
-    auto destTy = AI->getDest().getType();
-    require(srcTy.isAddress(),
+    require(AI->getSrc().getType().isAddress(),
             "unchecked_ref_cast_addr operand must be an address");
-    require(destTy.isAddress(),
+    require(AI->getDest().getType().isAddress(),
             "unchecked_ref_cast_addr result must be an address");
-    // These checks statically ensures that _unsafeReferenceCast is only used on
-    // reference types.
-    OptionalTypeKind otk;
-    if (!srcTy.isAddress()) {
-      auto fromTy = SILType::unwrapAnyOptionalType(srcTy, AI->getModule(), otk);
-      require(fromTy.isHeapObjectReferenceType()
-              || fromTy.isClassExistentialType(),
-              "unchecked_ref_cast_addr operand must be a reference type");
-    }
-    if (!destTy.isAddress()) {
-      auto toTy = SILType::unwrapAnyOptionalType(destTy, AI->getModule(), otk);
-      require(toTy.isHeapObjectReferenceType()
-              || toTy.isClassExistentialType(),
-              "unchecked_ref_cast_addr result must be a reference type");
-    }
   }
   
   void checkUncheckedAddrCastInst(UncheckedAddrCastInst *AI) {

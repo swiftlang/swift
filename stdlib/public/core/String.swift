@@ -473,7 +473,7 @@ extension String : Hashable {
 #endif
     // FIXME(performance): constructing a temporary NSString is extremely
     // wasteful and inefficient.
-    let cocoaString = _unsafeReferenceCast(
+    let cocoaString = unsafeBitCast(
       self._bridgeToObjectiveCImpl(), _NSStringCoreType.self)
 
     // If we have an ASCII string, we do not need to normalize.

@@ -206,16 +206,17 @@ public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
   return UnsafePointer(Builtin.bridgeToRawPointer(object))
 }
 
-/// Converts a reference of type `T` to a reference of type `U` after
-/// unwrapping one level of Optional.
+/// Converts a reference of type `T` to a reference of type `U`.
 ///
-/// Unwrapped `T` and `U` must be convertible to AnyObject. They may
-/// be either a class or a class protocol. Either T, U, or both may be
-/// optional references.
+/// `T` and `U` must be convertible to AnyObject. They may be either a
+/// class or a class protocol.
 @transparent
 @warn_unused_result
 public func _unsafeReferenceCast<T, U>(x: T, _: U.Type) -> U {
-  return Builtin.castReference(x)
+  _debugPrecondition(x is AnyObject, "invalid unsafeReferenceCast")
+  let u: U = Builtin.castReference(x)
+  _debugPrecondition(u is AnyObject, "invalid unsafeReferenceCast")
+  return u
 }
 
 /// - returns: `x as T`.
