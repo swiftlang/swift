@@ -967,10 +967,6 @@ static bool performGeneralOptimizations(Function &F, ARCEntryPointBuilder &B,
 //                            SwiftARCOpt Pass
 //===----------------------------------------------------------------------===//
 
-namespace llvm {
-  void initializeSwiftARCOptPass(PassRegistry&);
-}
-
 char SwiftARCOpt::ID = 0;
 
 INITIALIZE_PASS_BEGIN(SwiftARCOpt,

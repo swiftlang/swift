@@ -20,6 +20,8 @@ namespace llvm {
 
   void initializeSwiftAAWrapperPassPass(PassRegistry &);
   void initializeSwiftRCIdentityPass(PassRegistry &);
+  void initializeSwiftARCOptPass(PassRegistry &);
+  void initializeSwiftARCContractPass(PassRegistry &);
 }
 
 namespace swift {

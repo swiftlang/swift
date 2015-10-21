@@ -335,10 +335,6 @@ bool SwiftARCContract::runOnFunction(Function &F) {
   return SwiftARCContractImpl(F, RC).run();
 }
 
-namespace llvm {
-  void initializeSwiftARCContractPass(PassRegistry&);
-}
-
 char SwiftARCContract::ID = 0;
 INITIALIZE_PASS_BEGIN(SwiftARCContract,
                       "swift-arc-contract", "Swift ARC contraction",
