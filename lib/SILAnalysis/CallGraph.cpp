@@ -17,6 +17,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILWitnessTable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -57,7 +58,7 @@ CallGraph::CallGraph(SILModule *Mod, bool completeModule)
 
   // Now compute the sets of call graph nodes any given class method
   // decl could target.
-  computeClassMethodCallees();
+  computeMethodCallees();
 
   // Add edges for each function in the worklist. We capture the
   // initial functions in the module up-front into this worklist
@@ -115,7 +116,7 @@ void CallGraph::computeClassMethodCalleesForClass(ClassDecl *CD) {
     // overrides by inserting the call graph node for the function
     // that this method invokes.
     do {
-      auto &TheCalleeSet = getOrCreateCalleeSetForClassMethod(Method);
+      auto &TheCalleeSet = getOrCreateCalleeSetForMethod(Method);
       assert(TheCalleeSet.getPointer() && "Unexpected null callee set!");
 
       TheCalleeSet.getPointer()->insert(Node);
@@ -127,9 +128,37 @@ void CallGraph::computeClassMethodCalleesForClass(ClassDecl *CD) {
   }
 }
 
-/// Incrementally compute the callees for each method of each class
-/// that we have a VTable for.
-void CallGraph::computeClassMethodCallees() {
+void
+CallGraph::computeWitnessMethodCalleesForWitnessTable(SILWitnessTable &WTable) {
+  auto *Conformance = WTable.getConformance();
+
+  for (const SILWitnessTable::Entry &Entry : WTable.getEntries()) {
+    if (Entry.getKind() != SILWitnessTable::Method)
+      continue;
+
+    auto &WitnessEntry = Entry.getMethodWitness();
+    auto Requirement = WitnessEntry.Requirement;
+    auto *WitnessFn = WitnessEntry.Witness;
+    // Dead function elimination nulls out entries for functions it removes.
+    if (!WitnessFn)
+      continue;
+
+    auto *Node = getOrAddCallGraphNode(WitnessFn);
+
+    auto &TheCalleeSet = getOrCreateCalleeSetForMethod(Requirement);
+    assert(TheCalleeSet.getPointer() && "Unexpected null callee set!");
+
+    TheCalleeSet.getPointer()->insert(Node);
+
+    // FIXME: For now, conservatively assume that unknown functions
+    //        can be called from any witness_method call site.
+    TheCalleeSet.setInt(true);
+  }
+}
+
+/// Compute the callees for each method that appears in a VTable or
+/// Witness Table.
+void CallGraph::computeMethodCallees() {
   // Remove contents of old callee sets - in case we are updating the sets.
   for (auto Iter : CalleeSetCache) {
     auto *TheCalleeSet = Iter.second.getPointer();
@@ -139,6 +168,9 @@ void CallGraph::computeClassMethodCallees() {
 
   for (auto &VTable : M.getVTableList())
     computeClassMethodCalleesForClass(VTable.getClass());
+
+  for (auto &WTable : M.getWitnessTableList())
+    computeWitnessMethodCalleesForWitnessTable(WTable);
 }
 
 CallGraphNode *CallGraph::addCallGraphNode(SILFunction *F) {
@@ -157,7 +189,7 @@ CallGraphNode *CallGraph::addCallGraphNode(SILFunction *F) {
 }
 
 CallGraphEdge::CalleeSet &
-CallGraph::getOrCreateCalleeSetForClassMethod(SILDeclRef Decl) {
+CallGraph::getOrCreateCalleeSetForMethod(SILDeclRef Decl) {
   auto *AFD = cast<AbstractFunctionDecl>(Decl.getDecl());
   auto Found = CalleeSetCache.find(AFD);
   if (Found != CalleeSetCache.end())
@@ -242,19 +274,30 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
     ArrayRef<Substitution> Subs;
     SILWitnessTable *WT;
 
+    // Attempt to find a specific callee for the given conformance and member.
     std::tie(CalleeFn, WT, Subs) =
       WMI->getModule().lookUpFunctionInWitnessTable(WMI->getConformance(),
                                                     WMI->getMember());
 
-    if (!CalleeFn)
-      return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
+    if (CalleeFn) {
+      if (CalleeFn->isExternalDeclaration())
+        M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
+                       CallGraphLinkerEditor(this).getCallback());
 
-    if (CalleeFn->isExternalDeclaration())
-      M.linkFunction(CalleeFn, SILModule::LinkingMode::LinkAll,
-                     CallGraphLinkerEditor(this).getCallback());
+      auto *CalleeNode = getOrAddCallGraphNode(CalleeFn);
+      return new (Allocator) CallGraphEdge(Apply, CalleeNode, EdgeOrdinal++);
+    }
 
-    auto *CalleeNode = getOrAddCallGraphNode(CalleeFn);
-    return new (Allocator) CallGraphEdge(Apply, CalleeNode, EdgeOrdinal++);
+    // Lookup the previously computed callee set if we didn't find a
+    // specific callee.
+    auto *AFD = cast<AbstractFunctionDecl>(WMI->getMember().getDecl());
+
+    auto Found = CalleeSetCache.find(AFD);
+    if (Found != CalleeSetCache.end())
+      return new (Allocator) CallGraphEdge(Apply, Found->second, EdgeOrdinal++);
+
+    // Otherwise default to an edge with unknown callees.
+    return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
   }
 
   case ValueKind::ClassMethodInst: {

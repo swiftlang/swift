@@ -16,6 +16,7 @@
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILWitnessTable.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -474,7 +475,7 @@ private:
     return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
   }
 
-  CallGraphEdge::CalleeSet &getOrCreateCalleeSetForClassMethod(SILDeclRef Decl);
+  CallGraphEdge::CalleeSet &getOrCreateCalleeSetForMethod(SILDeclRef Decl);
 
   CallGraphNode *tryGetCallGraphNode(SILFunction *F) const {
     return const_cast<CallGraph *>(this)->tryGetCallGraphNode(F);
@@ -495,8 +496,10 @@ private:
     return addCallGraphNode(F);
   }
 
-  void computeClassMethodCallees();
+  void computeMethodCallees();
   void computeClassMethodCalleesForClass(ClassDecl *CD);
+  void computeWitnessMethodCalleesForWitnessTable(SILWitnessTable &WTable);
+
   CallGraphNode *addCallGraphNode(SILFunction *F);
   void addEdges(SILFunction *F);
   CallGraphEdge *makeCallGraphEdgeForCallee(FullApplySite Apply,
@@ -573,7 +576,7 @@ public:
   /// deleted.
   void updateCalleeSets() {
     if (CG)
-      CG->computeClassMethodCallees();
+      CG->computeMethodCallees();
   }
 
   /// Drops all references in function and removes the references to
