@@ -3523,10 +3523,12 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
   llvm::SmallString<32> classSymbol;
   LinkEntity::forObjCClass(classDecl).mangle(classSymbol);
   
-  auto metadataTy = cast<llvm::PointerType>(metadata->getType());
-  
   // Create the alias.
-  llvm::GlobalAlias::create(metadataTy,
+  auto *metadataTy = cast<llvm::PointerType>(metadata->getType());
+
+  // Create the alias.
+  llvm::GlobalAlias::create(metadataTy->getElementType(),
+                            metadataTy->getAddressSpace(),
                             metadata->getLinkage(), classSymbol.str(),
                             metadata, IGM.getModule());
 }

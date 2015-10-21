@@ -2079,10 +2079,10 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   }
 
   LinkInfo link = LinkInfo::get(*this, directEntity, ForDefinition);
-  auto alias = llvm::GlobalAlias::create(
-                                     cast<llvm::PointerType>(addr->getType()),
-                                     link.getLinkage(),
-                                     link.getName(), addr, &Module);
+  auto *ptrTy = cast<llvm::PointerType>(addr->getType());
+  auto *alias = llvm::GlobalAlias::create(
+      ptrTy->getElementType(), ptrTy->getAddressSpace(), link.getLinkage(),
+      link.getName(), addr, &Module);
   alias->setVisibility(link.getVisibility());
 
   // The full metadata is used based on the visibility of the address point,
