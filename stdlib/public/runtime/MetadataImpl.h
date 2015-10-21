@@ -60,9 +60,8 @@ namespace metadataimpl {
 /// null under the language semantics, which eliminates an unnecessary
 /// null check that the compiler would otherwise have to insert.
 /// (C++ is dumb.)
-LLVM_ATTRIBUTE_ALWAYS_INLINE
 void *operator new(size_t size, void *ptr,
-                   swift::metadataimpl::InPlace_t _) { return ptr; }
+                   swift::metadataimpl::InPlace_t _);
 
 namespace swift {
 namespace metadataimpl {
