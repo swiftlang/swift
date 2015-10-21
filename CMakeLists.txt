@@ -70,6 +70,8 @@ set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
 set(SWIFT_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Swift compiler")
+set(CLANG_COMPILER_VERSION "" CACHE STRING
+    "The internal version of the Clang compiler")
 
 # Indicate whether Swift should attempt to use the gold linker.
 # This is not used on Darwin.

@@ -128,15 +128,16 @@ endif()
 set(SWIFT_COMPILER_VERSION "" CACHE STRING
     "The string that identifies the SCM commit(s) for this build")
 
-if(NOT "${CLANG_REPOSITORY_STRING}" STREQUAL "")
-  set(SWIFT_COMPILER_VERSION
-      "${SWIFT_COMPILER_VERSION} ${CLANG_REPOSITORY_STRING}")
-endif()
-
-message(STATUS "Swift repository string: ${SWIFT_COMPILER_VERSION}")
+message(STATUS "Swift compiler version: ${SWIFT_COMPILER_VERSION}")
+message(STATUS "Embedded clang compiler version: ${CLANG_COMPILER_VERSION}")
 
 if(SWIFT_COMPILER_VERSION)
   set_property(SOURCE Version.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
-    " -DSWIFT_COMPILER_VERSION=\"${SWIFT_COMPILER_VERSION}\"")
+    " -DSWIFT_COMPILER_VERSION=\"\\\"${SWIFT_COMPILER_VERSION}\\\"\"")
+endif()
+
+if(CLANG_COMPILER_VERSION)
+  set_property(SOURCE Version.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+    " -DCLANG_COMPILER_VERSION=\"\\\"${CLANG_COMPILER_VERSION}\\\"\"")
 endif()
 

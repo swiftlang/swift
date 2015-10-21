@@ -227,8 +227,8 @@ Version Version::parseVersionString(StringRef VersionString,
 
 Version Version::getCurrentCompilerVersion() {
 #ifdef SWIFT_COMPILER_VERSION
-  return Version::parseCompilerVersionString(
-    TOSTR(SWIFT_COMPILER_VERSION), SourceLoc(), nullptr);
+  return Version::parseVersionString(
+    SWIFT_COMPILER_VERSION, SourceLoc(), nullptr);
 #else
   return Version();
 #endif
@@ -300,7 +300,11 @@ std::string getSwiftFullVersion() {
   OS << "Swift version " SWIFT_VERSION_STRING;
 
 #if defined(SWIFT_COMPILER_VERSION)
-  OS << " (" TOSTR(SWIFT_COMPILER_VERSION) ")";
+  OS << " (swiftlang-" SWIFT_COMPILER_VERSION;
+#if defined(CLANG_COMPILER_VERSION)
+  OS << " clang-" CLANG_COMPILER_VERSION;
+#endif
+  OS << ")";
 #elif defined(LLVM_REVISION) || defined(CLANG_REVISION) || \
       defined(SWIFT_REVISION)
   OS << " (";
