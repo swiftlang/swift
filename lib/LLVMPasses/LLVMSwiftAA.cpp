@@ -12,24 +12,20 @@
 
 #include "swift/LLVMPasses/Passes.h"
 #include "LLVMARCOpts.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/IR/LegacyPassManager.h" 
 #include "llvm/IR/Module.h"
 
 using namespace llvm;
-using swift::SwiftAliasAnalysis;
+using swift::SwiftAAResult;
+using swift::SwiftAAWrapperPass;
 
-// Register this pass...
-char SwiftAliasAnalysis::ID = 0;
-INITIALIZE_AG_PASS(SwiftAliasAnalysis, AliasAnalysis, "swift-aa",
-                   "Swift Alias Analysis", false, true, false)
+//===----------------------------------------------------------------------===//
+//                           Alias Analysis Result
+//===----------------------------------------------------------------------===//
 
-bool SwiftAliasAnalysis::doInitialization(Module &M) {
-  InitializeAliasAnalysis(this, &M.getDataLayout());
-  return true;
-}
-
-llvm::ModRefInfo
-SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS,
-                                  const llvm::MemoryLocation &Loc) {
+llvm::ModRefInfo SwiftAAResult::getModRefInfo(llvm::ImmutableCallSite CS,
+                                              const llvm::MemoryLocation &Loc) {
   // We know the mod-ref behavior of various runtime functions.
   switch (classifyInstruction(*CS.getInstruction())) {
   case RT_AllocObject:
@@ -57,10 +53,44 @@ SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS,
     break;
   }
 
-  return AliasAnalysis::getModRefInfo(CS, Loc);
+  return AAResultBase::getModRefInfo(CS, Loc);
 }
 
-llvm::ImmutablePass *swift::createSwiftAliasAnalysisPass() {
-  initializeSwiftAliasAnalysisPass(*PassRegistry::getPassRegistry());
-  return new SwiftAliasAnalysis();
+//===----------------------------------------------------------------------===//
+//                        Alias Analysis Wrapper Pass
+//===----------------------------------------------------------------------===//
+
+char SwiftAAWrapperPass::ID = 0;
+INITIALIZE_PASS_BEGIN(SwiftAAWrapperPass, "swift-aa",
+                      "Swift Alias Analysis", false, true)
+INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
+INITIALIZE_PASS_END(SwiftAAWrapperPass, "swift-aa",
+                    "Swift Alias Analysis", false, true)
+
+SwiftAAWrapperPass::SwiftAAWrapperPass() : ImmutablePass(ID) {
+  initializeSwiftAAWrapperPassPass(*PassRegistry::getPassRegistry());
+}
+
+bool SwiftAAWrapperPass::doInitialization(Module &M) {
+  Result.reset(new SwiftAAResult(
+      getAnalysis<TargetLibraryInfoWrapperPass>().getTLI()));
+  return false;
+}
+
+bool SwiftAAWrapperPass::doFinalization(Module &M) {
+  Result.reset();
+  return false;
+}
+
+void SwiftAAWrapperPass::getAnalysisUsage(AnalysisUsage &AU) const {
+  AU.setPreservesAll();
+  AU.addRequired<TargetLibraryInfoWrapperPass>();
+}
+
+//===----------------------------------------------------------------------===//
+//                           Top Level Entry Point
+//===----------------------------------------------------------------------===//
+
+llvm::ImmutablePass *swift::createSwiftAAWrapperPass() {
+  return new SwiftAAWrapperPass();
 }

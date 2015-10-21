@@ -21,7 +21,7 @@ namespace llvm {
 namespace swift {
   llvm::FunctionPass *createSwiftARCOptPass();
   llvm::FunctionPass *createSwiftARCContractPass();
-  llvm::ImmutablePass *createSwiftAliasAnalysisPass();
+  llvm::ImmutablePass *createSwiftAAWrapperPass();
   llvm::ImmutablePass *createSwiftRCIdentityPass();
 } // end namespace swift
 

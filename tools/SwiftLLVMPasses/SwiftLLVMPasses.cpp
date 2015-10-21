@@ -14,7 +14,7 @@
 
 using namespace llvm;
 
-static RegisterPass<swift::SwiftAliasAnalysis>
+static RegisterPass<swift::SwiftAAWrapperPass>
   AA("swift-aa", "Swift Alias Analysis", false, true);
 static RegisterPass<swift::SwiftRCIdentity>
   RC("swift-rc-identity", "Swift RC Identity Analysis", false, true);

@@ -976,7 +976,7 @@ char SwiftARCOpt::ID = 0;
 INITIALIZE_PASS_BEGIN(SwiftARCOpt,
                       "swift-arc-optimize", "Swift ARC optimization",
                       false, false)
-INITIALIZE_PASS_DEPENDENCY(SwiftAliasAnalysis)
+INITIALIZE_PASS_DEPENDENCY(SwiftAAWrapperPass)
 INITIALIZE_PASS_DEPENDENCY(SwiftRCIdentity)
 INITIALIZE_PASS_END(SwiftARCOpt,
                     "swift-arc-optimize", "Swift ARC optimization",
@@ -993,7 +993,7 @@ SwiftARCOpt::SwiftARCOpt() : FunctionPass(ID) {
 
 
 void SwiftARCOpt::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
-  AU.addRequired<SwiftAliasAnalysis>();
+  AU.addRequiredID(&SwiftAAWrapperPass::ID);
   AU.addRequired<SwiftRCIdentity>();
   AU.setPreservesCFG();
 }

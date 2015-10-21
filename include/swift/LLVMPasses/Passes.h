@@ -18,32 +18,41 @@
 #include "llvm/Pass.h"
 
 namespace llvm {
-  void initializeSwiftAliasAnalysisPass(PassRegistry&);
+  void initializeSwiftAAWrapperPassPass(PassRegistry&);
   void initializeSwiftRCIdentityPass(PassRegistry&);
 } // end namespace llvm
 
 namespace swift {
-  class SwiftAliasAnalysis : public llvm::ImmutablePass, public llvm::AliasAnalysis {
+
+  struct SwiftAAResult : llvm::AAResultBase<SwiftAAResult> {
+    friend llvm::AAResultBase<SwiftAAResult>;
+
+    explicit SwiftAAResult(const llvm::TargetLibraryInfo &TLI)
+        : AAResultBase(TLI) {}
+    SwiftAAResult(SwiftAAResult &&Arg)
+        : AAResultBase(std::move(Arg)) {}
+
+    bool invalidate(llvm::Function &,
+                    const llvm::PreservedAnalyses &) { return false; }
+
+    using AAResultBase::getModRefInfo;
+    llvm::ModRefInfo getModRefInfo(llvm::ImmutableCallSite CS,
+                                   const llvm::MemoryLocation &Loc);
+  };
+
+  class SwiftAAWrapperPass : public llvm::ImmutablePass {
+    std::unique_ptr<SwiftAAResult> Result;
+
   public:
     static char ID; // Class identification, replacement for typeinfo
-    SwiftAliasAnalysis() : ImmutablePass(ID) {}
-    
-  private:
-    bool doInitialization(llvm::Module &M) override;
+    SwiftAAWrapperPass();
 
-    virtual void *getAdjustedAnalysisPointer(const void *PI) override {
-      if (PI == &AliasAnalysis::ID)
-        return static_cast<AliasAnalysis *>(this);
-      return this;
-    }
-    
-    void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
-      AU.setPreservesAll();
-      AliasAnalysis::getAnalysisUsage(AU);
-    }
-    
-    virtual llvm::ModRefInfo getModRefInfo(llvm::ImmutableCallSite CS,
-                                     const llvm::MemoryLocation &Loc) override;
+    SwiftAAResult &getResult() { return *Result; }
+    const SwiftAAResult &getResult() const { return *Result; }
+
+    bool doInitialization(llvm::Module &M) override;
+    bool doFinalization(llvm::Module &M) override;
+    void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
   };
 
   class SwiftRCIdentity : public llvm::ImmutablePass {

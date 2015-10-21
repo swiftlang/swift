@@ -25,6 +25,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/LLVMPasses/PassesFwd.h"
+#include "swift/LLVMPasses/Passes.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/Bitcode/ReaderWriter.h"
@@ -46,6 +47,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetSubtargetInfo.h"
 #include "llvm/Transforms/Instrumentation.h"
@@ -175,8 +177,14 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
 
   // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
   // the swift AA pass after the other ones.
-  if (!Opts.DisableLLVMARCOpts)
-    FunctionPasses.add(createSwiftAliasAnalysisPass());
+  if (!Opts.DisableLLVMARCOpts) {
+    FunctionPasses.add(createSwiftAAWrapperPass());
+    FunctionPasses.add(createExternalAAWrapperPass([](Pass &P, Function &,
+                                                      AAResults &AAR) {
+      if (auto *WrapperPass = P.getAnalysisIfAvailable<SwiftAAWrapperPass>())
+        AAR.addAAResult(WrapperPass->getResult());
+    }));
+  }
 
   // Run the function passes.
   FunctionPasses.doInitialization();
@@ -193,8 +201,14 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
 
   // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
   // the swift AA pass after the other ones.
-  if (!Opts.DisableLLVMARCOpts)
-    ModulePasses.add(createSwiftAliasAnalysisPass());
+  if (!Opts.DisableLLVMARCOpts) {
+    ModulePasses.add(createSwiftAAWrapperPass());
+    ModulePasses.add(createExternalAAWrapperPass([](Pass &P, Function &,
+                                                    AAResults &AAR) {
+      if (auto *WrapperPass = P.getAnalysisIfAvailable<SwiftAAWrapperPass>())
+        AAR.addAAResult(WrapperPass->getResult());
+    }));
+  }
 
   // If we're generating a profile, add the lowering pass now.
   if (Opts.GenerateProfile)
