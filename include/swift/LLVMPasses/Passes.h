@@ -17,11 +17,6 @@
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Pass.h"
 
-namespace llvm {
-  void initializeSwiftAAWrapperPassPass(PassRegistry&);
-  void initializeSwiftRCIdentityPass(PassRegistry&);
-} // end namespace llvm
-
 namespace swift {
 
   struct SwiftAAResult : llvm::AAResultBase<SwiftAAResult> {

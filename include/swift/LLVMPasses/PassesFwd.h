@@ -16,6 +16,10 @@
 namespace llvm {
   class FunctionPass;
   class ImmutablePass;
+  class PassRegistry;
+
+  void initializeSwiftAAWrapperPassPass(PassRegistry &);
+  void initializeSwiftRCIdentityPass(PassRegistry &);
 }
 
 namespace swift {
