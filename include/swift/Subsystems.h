@@ -30,6 +30,7 @@ namespace llvm {
   class MemoryBuffer;
   class Module;
   class TargetOptions;
+  class TargetMachine;
 }
 
 namespace swift {
@@ -243,6 +244,12 @@ namespace swift {
                                                     StringRef ModuleName,
                                                  llvm::LLVMContext &LLVMContext,
                                                     unsigned StartElem = 0);
+
+  /// Given an already created LLVM module, construct a pass pipeline and run
+  /// the Swift LLVM Pipeline upon it. This does not cause the module to be
+  /// printed. Only optimized.
+  void performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
+                                llvm::TargetMachine *TargetMachine);
 
   /// Wrap a serialized module inside a swift ast section in an object file.
   void createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
