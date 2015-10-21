@@ -523,6 +523,11 @@ private:
         DEMANGLE_CHILD_OR_RETURN(metadata, Type);
         return metadata;
       }
+      if (Mangled.nextIf('p')) {
+        auto metadata = NodeFactory::create(Node::Kind::ProtocolDescriptor);
+        DEMANGLE_CHILD_OR_RETURN(metadata, ProtocolName);
+        return metadata;
+      }
       auto metadata = NodeFactory::create(Node::Kind::TypeMetadata);
       DEMANGLE_CHILD_OR_RETURN(metadata, Type);
       return metadata;
@@ -2500,6 +2505,7 @@ private:
     case Node::Kind::PostfixOperator:
     case Node::Kind::PrefixOperator:
     case Node::Kind::ProtocolConformance:
+    case Node::Kind::ProtocolDescriptor:
     case Node::Kind::ProtocolList:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
@@ -3335,6 +3341,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::Metaclass:
     Printer << "metaclass for ";
     print(pointer->getFirstChild());
+    return;
+  case Node::Kind::ProtocolDescriptor:
+    Printer << "protocol descriptor for ";
+    print(pointer->getChild(0));
     return;
   case Node::Kind::FullTypeMetadata:
     Printer << "full type metadata for ";

@@ -620,6 +620,11 @@ void Remangler::mangleFullTypeMetadata(Node *node) {
   mangleChildNodes(node); // type
 }
 
+void Remangler::mangleProtocolDescriptor(Node *node) {
+  Out << "Mp";
+  mangleProtocolWithoutPrefix(node->begin()[0].get());
+}
+
 void Remangler::manglePartialApplyForwarder(Node *node) {
   Out << "PA__T";
   mangleSingleChildNode(node); // global

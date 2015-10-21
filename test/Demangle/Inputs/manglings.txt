@@ -232,3 +232,4 @@ _TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1bq_ ---> ext.mangling_ge
 _TTRXFo_iT__iT_zoPs9ErrorType__XFo__dT_zoPS___ ---> reabstraction thunk helper from @callee_owned (@in ()) -> (@out (), @error @owned Swift.ErrorType) to @callee_owned () -> (@unowned (), @error @owned Swift.ErrorType)
 _TFE1a ---> _TFE1a
 _TF21$__lldb_module_for_E0au3$E0Ps9ErrorType_ ---> $__lldb_module_for_E0.$E0.unsafeMutableAddressor : Swift.ErrorType
+_TMps10Comparable ---> protocol descriptor for Swift.Comparable
