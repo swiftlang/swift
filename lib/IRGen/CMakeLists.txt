@@ -36,6 +36,8 @@ add_swift_library(swiftIRGen
   LINK_LIBRARIES
     swiftAST
     swiftLLVMPasses
+    swiftSIL
+    swiftSILGen
 
     # Clang dependencies.
     # FIXME: Clang should really export these in some reasonable manner.
