@@ -3941,7 +3941,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::AssignmentRHS : {
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    Lookup.setExpectedTypes(AssignmentExpr->getDest()->getType()->getRValueType());
+    if (auto destType = AssignmentExpr->getDest()->getType())
+      Lookup.setExpectedTypes(destType->getRValueType());
     Lookup.getValueCompletionsInDeclContext(Loc, DefaultFilter);
     break;
   }

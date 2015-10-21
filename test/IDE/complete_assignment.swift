@@ -18,6 +18,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_16 | FileCheck %s -check-prefix=ASSIGN_16
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_17 | FileCheck %s -check-prefix=ASSIGN_17
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_18 | FileCheck %s -check-prefix=ASSIGN_18
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ASSIGN_19 | FileCheck %s -check-prefix=ASSIGN_19
 
 class C1 {
 var I1 = 1
@@ -278,3 +279,14 @@ func f2() {
 // ASSIGN_18-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: VoidGen()[#Void#]
 // ASSIGN_18-DAG: Decl[InstanceVar]/CurrNominal:      InternalC2[#C1.C2#]
 }
+
+
+class Test19 {
+  func test() {
+    let t = true
+    prop = #^ASSIGN_19^#
+  }
+  var prop: Bool
+}
+// rdar://23111219
+// ASSIGN_19: Decl[LocalVar]/Local/TypeRelation[Identical]: t[#Bool#]
