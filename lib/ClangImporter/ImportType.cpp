@@ -284,9 +284,19 @@ namespace {
       case clang::BuiltinType::OCLImage1dBuffer:
       case clang::BuiltinType::OCLImage2d:
       case clang::BuiltinType::OCLImage2dArray:
+      case clang::BuiltinType::OCLImage2dDepth:
+      case clang::BuiltinType::OCLImage2dArrayDepth:
+      case clang::BuiltinType::OCLImage2dMSAA:
+      case clang::BuiltinType::OCLImage2dArrayMSAA:
+      case clang::BuiltinType::OCLImage2dMSAADepth:
+      case clang::BuiltinType::OCLImage2dArrayMSAADepth:
       case clang::BuiltinType::OCLImage3d:
-      case clang::BuiltinType::OCLEvent:
       case clang::BuiltinType::OCLSampler:
+      case clang::BuiltinType::OCLEvent:
+      case clang::BuiltinType::OCLClkEvent:
+      case clang::BuiltinType::OCLQueue:
+      case clang::BuiltinType::OCLNDRange:
+      case clang::BuiltinType::OCLReserveID:
         return Type();
 
       // OpenMP types that don't have Swift equivalents.
