@@ -183,6 +183,11 @@ __attribute__((availability(ios,introduced=8.0)))
 typedef __INT32_TYPE__ int32_t;
 
 @interface NSNumber : NSValue
++ (NSNumber *)numberWithInt:(int)value;
++ (NSNumber *)numberWithInteger:(NSInteger)value;
++ (NSNumber *)numberWithUnsignedInteger:(NSUInteger)value;
++ (NSNumber *)numberWithDouble:(double)value;
+
 - (NSNumber *)initWithInteger:(NSInteger)value;
 - (NSNumber *)initWithUnsignedInteger:(NSUInteger)value;
 - (NSNumber *)initWithDouble:(double)value;

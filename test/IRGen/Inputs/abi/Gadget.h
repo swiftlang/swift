@@ -73,3 +73,12 @@ static inline One makeOne(float f, float s) {
 static inline float MyRect_Area(struct MyRect rect) {
   return rect.width * rect.height;
 }
+
+// @literals inside static inline function
+static inline void* giveMeASelector(void) {
+  return @selector(init);
+}
+
+static inline NSNumber *giveMeANumber(void) {
+  return @42;
+}
