@@ -141,7 +141,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   internal var _heapBufferBridged: HeapBufferStorage? {
     if let ref =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
-      return unsafeBitCast(ref, HeapBufferStorage.self)
+      return _unsafeReferenceCast(ref, HeapBufferStorage.self)
     }
     return nil
   }

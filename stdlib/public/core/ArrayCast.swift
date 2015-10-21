@@ -82,8 +82,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
         let bridged: AnyObject? = _bridgeToObjectiveC(value)
         _precondition(
           bridged != nil, "array element cannot be bridged to Objective-C")
-        // FIXME: should be an unsafeDowncast, but for <rdar://problem/18638230>
-        p++.initialize(unsafeBitCast(bridged!, TargetElement.self))
+        p++.initialize(_unsafeReferenceCast(bridged!, TargetElement.self))
       }
     }
     return Array(_ArrayBuffer(buf, shiftedToStartIndex: 0))
@@ -158,7 +157,7 @@ ElementwiseBridging:
   repeat {
     for object: SourceElement in source {
       let value = Swift._conditionallyBridgeFromObjectiveC(
-        unsafeBitCast(object, AnyObject.self), TargetElement.self)
+        _unsafeReferenceCast(object, AnyObject.self), TargetElement.self)
       if _slowPath(value == nil) {
         break ElementwiseBridging
       }

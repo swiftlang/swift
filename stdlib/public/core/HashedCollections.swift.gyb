@@ -795,7 +795,7 @@ public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>)
 
   var builder = _SetBuilder<BaseValue>(count: source.count)
   for member in source {
-    builder.add(member: unsafeBitCast(member, BaseValue.self))
+    builder.add(member: _unsafeReferenceCast(member, BaseValue.self))
   }
   return builder.take()
 }
@@ -825,7 +825,7 @@ public func _setBridgeToObjectiveC<SwiftValue, ObjCValue>(
       let bridged: AnyObject? = _bridgeToObjectiveC(member)
       _precondition(bridged != nil,
       "set member cannot be bridged to Objective-C")
-      bridgedMember = unsafeBitCast(bridged!, ObjCValue.self)
+      bridgedMember = _unsafeReferenceCast(bridged!, ObjCValue.self)
     }
     result.insert(bridgedMember)
   }
@@ -1330,7 +1330,7 @@ public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
 
   var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
   for (k, v) in source {
-    result[unsafeBitCast(k, BaseKey.self)] = unsafeBitCast(v, BaseValue.self)
+    result[_unsafeReferenceCast(k, BaseKey.self)] = _unsafeReferenceCast(v, BaseValue.self)
   }
   return result
 }
@@ -1376,7 +1376,7 @@ public func _dictionaryBridgeToObjectiveC<
     } else {
       let bridged: AnyObject? = _bridgeToObjectiveC(key)
       _precondition(bridged != nil, "dictionary key cannot be bridged to Objective-C")
-      bridgedKey = unsafeBitCast(bridged!, ObjCKey.self)
+      bridgedKey = _unsafeReferenceCast(bridged!, ObjCKey.self)
     }
 
     // Bridge the value
@@ -1387,7 +1387,7 @@ public func _dictionaryBridgeToObjectiveC<
       let bridged: AnyObject? = _bridgeToObjectiveC(value)
       _precondition(bridged != nil,
           "dictionary value cannot be bridged to Objective-C")
-      bridgedValue = unsafeBitCast(bridged!, ObjCValue.self)
+      bridgedValue = _unsafeReferenceCast(bridged!, ObjCValue.self)
     }
 
     result[bridgedKey] = bridgedValue

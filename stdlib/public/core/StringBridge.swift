@@ -28,7 +28,7 @@ func _stdlib_binary_CFStringCreateCopy(
 ) -> _CocoaStringType {
   let result = _swift_stdlib_CFStringCreateCopy(nil, source)
   Builtin.release(result)
-  return unsafeBitCast(result, _CocoaStringType.self)
+  return _unsafeReferenceCast(result, _CocoaStringType.self)
 }
 
 public // @testable
@@ -60,7 +60,7 @@ func _cocoaStringToSwiftString_NonASCII(
     count: length,
     elementShift: 1,
     hasCocoaBuffer: true,
-    owner: unsafeBitCast(cfImmutableValue, Optional<AnyObject>.self)))
+    owner: _unsafeReferenceCast(cfImmutableValue, AnyObject.self)))
 }
 
 /// Loading Foundation initializes these function variables
@@ -150,7 +150,7 @@ extension String {
     // Treat it as a CF object because presumably that's what these
     // things tend to be, and CF has a fast path that avoids
     // objc_msgSend
-    let cfValue = unsafeBitCast(_cocoaString, _CocoaStringType.self)
+    let cfValue = _unsafeReferenceCast(_cocoaString, _CocoaStringType.self)
 
     // "copy" it into a value to be sure nobody will modify behind
     // our backs.  In practice, when value is already immutable, this
@@ -180,7 +180,7 @@ extension String {
       count: length,
       elementShift: isUTF16 ? 1 : 0,
       hasCocoaBuffer: true,
-      owner: unsafeBitCast(cfImmutableValue, Optional<AnyObject>.self))
+      owner: _unsafeReferenceCast(cfImmutableValue, AnyObject.self))
   }
 }
 
