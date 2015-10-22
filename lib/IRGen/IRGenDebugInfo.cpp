@@ -231,7 +231,8 @@ static Location getStartLocation(SourceManager &SM,
 /// \brief Return the debug location from a SILLocation.
 static Location getDebugLocation(SourceManager &SM,
                                  Optional<SILLocation> OptLoc) {
-  if (!OptLoc) return {};
+  if (!OptLoc || OptLoc->isInPrologue())
+    return {};
   return getLoc(SM, OptLoc->getDebugSourceLoc());
 }
 
@@ -327,10 +328,6 @@ bool IRGenDebugInfo::lineNumberIsSane(IRBuilder &Builder, unsigned Line) {
 
 void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
                                    Optional<SILLocation> Loc) {
-  // In LLVM IR, the function prologue has neither location nor scope.
-  if (Loc && Loc->isInPrologue())
-    return;
-
   assert(DS && "empty scope");
   auto *Scope = getOrCreateScope(DS);
   if (!Scope)

@@ -10,7 +10,7 @@
 // CHECK: define {{.*}}_TF16debug_value_addr4testurFq_T_
 // CHECK: entry:
 // CHECK-NEXT: %[[TADDR:.*]] = alloca
-// CHECK: store %swift.opaque* %0, %swift.opaque** %[[TADDR:.*]],
+// CHECK: store %swift.opaque* %0, %swift.opaque** %[[TADDR:.*]], align
 // CHECK-NEXT: call void @llvm.dbg.declare({{.*}}%[[TADDR]]
 
 struct S<T> {

@@ -1016,6 +1016,8 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   Address cache(cacheVariable, IGM.getPointerAlignment());
 
   IRGenFunction IGF(IGM, accessor);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, IGF.CurFn);
 
   // Okay, first thing, check the cache variable.
   //

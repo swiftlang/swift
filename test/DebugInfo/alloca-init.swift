@@ -6,10 +6,10 @@ class A {
   var a : A?
   // CHECK: define {{.*}}1AcfMS0_FT_S0_
   init() {
-    // This store should be part of the function prologue.
-    // CHECK:   store {{.*}} %0, {{.*}}, align
-    // CHECK-NOT: !dbg
-    // CHECK: call {{.*}}llvm.dbg.declare
+    // This store that sets up the stack slot should be on line 0 so
+    // the debugger may skip ahead.
+    // CHECK:   store {{.*}} %0, {{.*}}, !dbg ![[DBG:[0-9]+]]
+    // CHECK: ![[DBG]] = {{.*}}line: 0
     markUsed("Hi")
   }
 }

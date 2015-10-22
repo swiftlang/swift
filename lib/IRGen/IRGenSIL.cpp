@@ -1584,27 +1584,25 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 
       // Function argument handling.
       if (InEntryBlock && !ArgsEmitted) {
-        if (!I.getLoc().isInPrologue()) {
-          if (I.getLoc().getSourceLoc().isValid()) {
-            // This is the first non-prologue instruction in the entry
-            // block.  The function prologue is where the stack frame is
-            // set up and storage for local variables and function
-            // arguments is initialized.  We need to emit the debug info
-            // for the function arguments after the function prologue,
-            // after the initialization.
-            if (!DS)
-              DS = CurSILFn->getDebugScope();
-            IGM.DebugInfo->clearLoc(Builder);
-            emitFunctionArgDebugInfo(BB);
-            IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
-            ArgsEmitted = true;
-          } else {
-            // There may be instructions without a valid location
-            // following the prologue. We need to associate them at
-            // least with the function scope or LLVM won't know were
-            // the prologue ends.
-            IGM.DebugInfo->setCurrentLoc(Builder, CurSILFn->getDebugScope());
-          }
+        if (!I.getLoc().isInPrologue() && I.getLoc().getSourceLoc().isValid()) {
+          // This is the first non-prologue instruction in the entry
+          // block.  The function prologue is where the stack frame is
+          // set up and storage for local variables and function
+          // arguments is initialized.  We need to emit the debug info
+          // for the function arguments after the function prologue,
+          // after the initialization.
+          if (!DS)
+            DS = CurSILFn->getDebugScope();
+          IGM.DebugInfo->clearLoc(Builder);
+          emitFunctionArgDebugInfo(BB);
+          IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
+          ArgsEmitted = true;
+        } else {
+          // There may be instructions without a valid location
+          // following the prologue. We need to associate them at
+          // least with the function scope or LLVM won't know were
+          // the prologue ends.
+          IGM.DebugInfo->setCurrentLoc(Builder, CurSILFn->getDebugScope());
         }
       }
     }

@@ -182,13 +182,17 @@ public:
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType elementType, bool objc){
-    Loc.markAsPrologue();
+    // AllocRefInsts expand to function calls and can therefore not be
+    // counted towards the function prologue.
+    assert(!Loc.isInPrologue());
     return insert(new (F.getModule()) AllocRefInst(Loc, elementType, F, objc));
   }
 
   AllocRefDynamicInst *createAllocRefDynamic(SILLocation loc, SILValue operand,
                                              SILType type, bool objc) {
-    loc.markAsPrologue();
+    // AllocRefDynamicInsts expand to function calls and can therefore
+    // not be counted towards the function prologue.
+    assert(!loc.isInPrologue());
     return insert(new (F.getModule()) AllocRefDynamicInst(loc, operand, type, 
                                                           objc));
   }
