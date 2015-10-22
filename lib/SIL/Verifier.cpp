@@ -2163,10 +2163,16 @@ public:
   }
 
   void checkUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *AI) {
-    require(AI->getSrc().getType().isAddress(),
+    auto srcTy = AI->getSrc().getType();
+    auto destTy = AI->getDest().getType();
+    require(srcTy.isAddress(),
             "unchecked_ref_cast_addr operand must be an address");
-    require(AI->getDest().getType().isAddress(),
+    require(destTy.isAddress(),
             "unchecked_ref_cast_addr result must be an address");
+    // The static src/dest types cannot be checked here even if they are
+    // loadable. unchecked_ref_cast_addr may accept nonreference static types
+    // (as a result of specialization). These cases will never be promoted to
+    // value bitcast, thus will cause the subsequent runtime cast to fail.
   }
   
   void checkUncheckedAddrCastInst(UncheckedAddrCastInst *AI) {
