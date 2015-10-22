@@ -1,9 +1,0 @@
-#!/bin/bash
-#
-# This is a wrapper around llvm's opt command line tool that automatically
-# performs the necessary work to access swift's llvm passes.
-#
-
-set -e
-"@OPT@" -load "@SWIFT_LLVM_DYLIB@" "$@"
-
