@@ -4,6 +4,9 @@
 // XFAIL: interpret
 // XFAIL: linux
 
+// radar://23218844
+// XFAIL: swift_test_mode_optimize
+
 import StdlibUnittest
 import Foundation
 
