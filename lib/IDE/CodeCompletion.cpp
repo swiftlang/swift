@@ -2310,9 +2310,14 @@ public:
         NumBytesToEraseForOptionalUnwrap = 0;
       }
       if (NumBytesToEraseForOptionalUnwrap <=
-          CodeCompletionResult::MaxNumBytesToErase)
-        lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                                 TypeResolver.get());
+          CodeCompletionResult::MaxNumBytesToErase) {
+        if (auto *TT = Unwrapped->getAs<TupleType>()) {
+          getTupleExprCompletions(TT);
+        } else {
+          lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
+                                   TypeResolver.get());
+        }
+      }
     } else if (Type Unwrapped = ExprType->getImplicitlyUnwrappedOptionalObjectType()) {
       lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
                                TypeResolver.get());

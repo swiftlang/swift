@@ -49,6 +49,12 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_CAST_AS_RESULT_1 > %t.opt.txt
 // RUN: FileCheck %s -check-prefix=OPT_NO_DOT_OBJCCLASS < %t.opt.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_1 | FileCheck %s -check-prefix=OPT_TUPLE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_2 | FileCheck %s -check-prefix=OPT_TUPLE_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_3 | FileCheck %s -check-prefix=OPT_TUPLE_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_4 | FileCheck %s -check-prefix=OPT_TUPLE_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-objc-attr-requires-foundation-module -code-completion-token=OPT_TUPLE_5 | FileCheck %s -check-prefix=OPT_TUPLE_5
+
 //===---
 //===--- Test code completion for stdlib Optional<T> type.
 //===---
@@ -197,3 +203,33 @@ func testAnyObject7(a: AnyObject) {
 func testAnyObject8(a: AnyObject) {
   (a as? ObjcClass)#^OPT_CAST_AS_RESULT_1^#
 }
+
+func testOptionalTuple1(a: (Int, String)?) {
+  a#^OPT_TUPLE_1^#
+}
+// OPT_TUPLE_1: Pattern/CurrNominal:                ?.0[#Int#]
+// OPT_TUPLE_1: Pattern/CurrNominal:                ?.1[#String#]
+
+func testOptionalTuple2(a: (Int, String)?) {
+  a.#^OPT_TUPLE_2^#
+}
+// OPT_TUPLE_2: Pattern/CurrNominal/Erase[1]:       ?.0[#Int#]
+// OPT_TUPLE_2: Pattern/CurrNominal/Erase[1]:       ?.1[#String#]
+
+func testOptionalTuple3(a: (Int, String)?) {
+  a?#^OPT_TUPLE_3^#
+}
+// OPT_TUPLE_3: Pattern/CurrNominal:                .0[#Int#]
+// OPT_TUPLE_3: Pattern/CurrNominal:                .1[#String#]
+
+func testOptionalTuple4(a: (x: Int, y: String)?) {
+  a#^OPT_TUPLE_4^#
+}
+// OPT_TUPLE_4: Pattern/CurrNominal:                ?.x[#Int#]
+// OPT_TUPLE_4: Pattern/CurrNominal:                ?.y[#String#]
+
+func testOptionalTuple5(a: (x: Int, y: String)?) {
+  a.#^OPT_TUPLE_5^#
+}
+// OPT_TUPLE_5: Pattern/CurrNominal/Erase[1]:       ?.x[#Int#]
+// OPT_TUPLE_5: Pattern/CurrNominal/Erase[1]:       ?.y[#String#]
