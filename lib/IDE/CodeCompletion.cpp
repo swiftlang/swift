@@ -3461,7 +3461,7 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink) {
   // Same: Swift.BooleanLiteralType.
   AddKeyword("false", "Bool");
   AddKeyword("true", "Bool");
-
+  AddKeyword("#available", "Bool");
   AddKeyword("__DSO_HANDLE__", "UnsafeMutablePointer<Void>");
 
   CodeCompletionResultBuilder Builder(Sink,
