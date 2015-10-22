@@ -817,7 +817,7 @@ ParserResult<Pattern> Parser::parsePattern() {
     } else {
       // In an always immutable context, `var` is not allowed.
       if (alwaysImmutable)
-        diagnose(varLoc, diag::variable_in_for_in_always_constant)
+        diagnose(varLoc, diag::var_not_allowed_in_for_in)
         .fixItRemove(varLoc);
     }
     

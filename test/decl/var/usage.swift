@@ -176,7 +176,7 @@ func testFixitsInStatementsWithPatterns(a : Int?) {
     _ = b2
   }
 
-  for var b in [42] {   // expected-error {{variable bound in a for-in statement is always a constant}} {{7-11=}}
+  for var b in [42] {   // expected-error {{'var' is not allowed in a for-in statement}} {{7-11=}}
     b = 42
     _ = b
   }
