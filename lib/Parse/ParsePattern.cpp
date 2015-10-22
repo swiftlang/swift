@@ -795,32 +795,44 @@ ParserResult<Pattern> Parser::parsePattern() {
     // identifier.
     consumeToken(tok::code_complete);
     return nullptr;
-    
+
   case tok::kw_var:
   case tok::kw_let: {
-    bool isLet = Tok.is(tok::kw_let);
+    bool isLetKeyword = Tok.is(tok::kw_let);
+    bool alwaysImmutable = InVarOrLetPattern == IVOLP_AlwaysImmutable;
+    bool implicitlyImmutable = InVarOrLetPattern == IVOLP_ImplicitlyImmutable;
     SourceLoc varLoc = consumeToken();
-    
+
     // 'var' and 'let' patterns shouldn't nest.
     if (InVarOrLetPattern == IVOLP_InLet ||
         InVarOrLetPattern == IVOLP_InVar)
-      diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLet));
-    
-    // 'let' isn't valid inside an implicitly immutable context, but var is.
-    if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
-      diagnose(varLoc, diag::let_pattern_in_immutable_context);
+      diagnose(varLoc, diag::var_pattern_in_var, unsigned(isLetKeyword));
+
+    if (isLetKeyword) {
+      // 'let' isn't valid inside an implicitly immutable or always
+      // immutable context.
+      if (alwaysImmutable || implicitlyImmutable)
+        diagnose(varLoc, diag::let_pattern_in_immutable_context)
+          .fixItRemove(varLoc);
+    } else {
+      // In an always immutable context, `var` is not allowed.
+      if (alwaysImmutable)
+        diagnose(varLoc, diag::variable_in_for_in_always_constant)
+        .fixItRemove(varLoc);
+    }
     
     // In our recursive parse, remember that we're in a var/let pattern.
     llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-    T(InVarOrLetPattern, isLet ? IVOLP_InLet : IVOLP_InVar);
+    T(InVarOrLetPattern, isLetKeyword ? IVOLP_InLet : IVOLP_InVar);
     
     ParserResult<Pattern> subPattern = parsePattern();
     if (subPattern.hasCodeCompletion())
       return makeParserCodeCompletionResult<Pattern>();
     if (subPattern.isNull())
       return nullptr;
-    return makeParserResult(new (Context) VarPattern(varLoc, isLet,
-                                                     subPattern.get()));
+    return makeParserResult(new (Context) VarPattern(varLoc,
+      isLetKeyword || alwaysImmutable,
+      subPattern.get()));
   }
       
   default:

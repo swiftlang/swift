@@ -27,17 +27,17 @@ case (var a, a): // expected-error {{use of unresolved identifier 'a'}}
 
 protocol P { func p() }
 
-class B : P { 
-  init() {} 
+class B : P {
+  init() {}
   func p() {}
   func b() {}
 }
 class D : B {
-  override init() { super.init() } 
+  override init() { super.init() }
   func d() {}
 }
 class E {
-  init() {} 
+  init() {}
   func e() {}
 }
 
@@ -165,9 +165,9 @@ case x ?? 42: break // match value
 default: break
 }
 
-for (var x) in 0...100 {}
-for var x in 0...100 {}  // rdar://20167543
-for (let x) in 0...100 {} // expected-error {{'let' pattern cannot appear nested in an already immutable context}}
+for (var x) in 0...100 {} // expected-error {{variable bound in a for-in statement is always a constant}}
+for var x in 0...100 {}  // expected-error {{variable bound in a for-in statement is always a constant}}
+for (let x) in 0...100 {} // expected-error {{'let' pattern is already in an immutable context}}
 
 var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
 let (var z) = 42  // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}

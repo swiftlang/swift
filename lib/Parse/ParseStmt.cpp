@@ -2241,9 +2241,9 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
     // if desired by using a 'var' pattern.
     assert(InVarOrLetPattern == IVOLP_NotInVarOrLet &&
            "for-each loops cannot exist inside other patterns");
-    InVarOrLetPattern = IVOLP_ImplicitlyImmutable;
+    InVarOrLetPattern = IVOLP_AlwaysImmutable;
     pattern = parseTypedPattern();
-    assert(InVarOrLetPattern == IVOLP_ImplicitlyImmutable);
+    assert(InVarOrLetPattern == IVOLP_AlwaysImmutable);
     InVarOrLetPattern = IVOLP_NotInVarOrLet;
   }
   
