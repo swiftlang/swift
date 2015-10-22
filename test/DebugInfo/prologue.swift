@@ -6,7 +6,7 @@ func markUsed<T>(t: T) {}
 
 // CHECK: .file [[F:[0-9]+]] "{{.*}}prologue.swift"
 func bar<T, U>(x: T, y: U) { markUsed("bar") }
-// CHECK: __TF8prologue3baru0_rFTq_1yq0__T_:
+// CHECK: _TF8prologue3baru0_rFTq_1yq0__T_:
 // CHECK: .loc	[[F]] 0 0 prologue_end
 // Make sure there is no allocation happening between the end of
 // prologue and the beginning of the function body.
