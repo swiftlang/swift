@@ -23,6 +23,8 @@ namespace swift {
   class ModuleEntity;
   class TypeDecl;
   class Type;
+  class Pattern;
+  struct PrintOptions;
 
 /// Describes the context in which a name is being printed, which
 /// affects the keywords that need to be escaped.
@@ -118,6 +120,9 @@ public:
 
   void printText(StringRef Text) override;
 };
+
+bool shouldPrint(const Decl *D, PrintOptions &Options);
+bool shouldPrintPattern(const Pattern *P, PrintOptions &Options);
 
 } // namespace swift
 

@@ -649,12 +649,16 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
   }
 }
 
-bool PrintAST::shouldPrintPattern(const Pattern *P) {
+bool swift::shouldPrintPattern(const Pattern *P, PrintOptions &Options) {
   bool ShouldPrint = false;
   P->forEachVariable([&](VarDecl *VD) {
-    ShouldPrint |= shouldPrint(VD);
+    ShouldPrint |= shouldPrint(VD, Options);
   });
   return ShouldPrint;
+}
+
+bool PrintAST::shouldPrintPattern(const Pattern *P) {
+  return swift::shouldPrintPattern(P, Options);
 }
 
 void PrintAST::printPatternType(const Pattern *P) {
@@ -664,39 +668,33 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
-bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
-  auto SkipDecl = [&] () {
-    if (Notify)
-      Printer.avoidPrintDeclPost(D);
-    return false;
-  };
-
+bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
-      return SkipDecl();
+      return false;
   }
 
   if (Options.SkipDeinit && isa<DestructorDecl>(D)) {
-    return SkipDecl();
+    return false;
   }
 
   if (Options.SkipImplicit && D->isImplicit())
-    return SkipDecl();
+    return false;
 
   if (Options.SkipUnavailable &&
       D->getAttrs().isUnavailable(D->getASTContext()))
-    return SkipDecl();
+    return false;
 
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (Options.AccessibilityFilter > Accessibility::Private &&
         VD->hasAccessibility() &&
         VD->getFormalAccess() < Options.AccessibilityFilter)
-      return SkipDecl();
+      return false;
   }
 
   if (Options.SkipPrivateStdlibDecls && D->isPrivateStdlibDecl())
-      return SkipDecl();
+    return false;
 
   if (Options.SkipEmptyExtensionDecls && isa<ExtensionDecl>(D)) {
     auto Ext = cast<ExtensionDecl>(D);
@@ -705,13 +703,13 @@ bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
     if (Ext->getLocalProtocols().empty()) {
       bool HasMemberToPrint = false;
       for (auto Member : Ext->getMembers()) {
-        if (shouldPrint(Member)) {
+        if (shouldPrint(Member, Options)) {
           HasMemberToPrint = true;
           break;
         }
       }
       if (!HasMemberToPrint)
-        return SkipDecl();
+        return false;
     }
   }
 
@@ -720,14 +718,20 @@ bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
   if (auto *PD = dyn_cast<PatternBindingDecl>(D)) {
     auto ShouldPrint = false;
     for (auto entry : PD->getPatternList()) {
-      ShouldPrint |= shouldPrintPattern(entry.getPattern());
+      ShouldPrint |= shouldPrintPattern(entry.getPattern(), Options);
       if (ShouldPrint)
         return true;
     }
-    return SkipDecl();
+    return false;
   }
-
   return true;
+}
+
+bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
+  auto Result = swift::shouldPrint(D, Options);
+  if (!Result && Notify)
+    Printer.avoidPrintDeclPost(D);
+  return Result;
 }
 
 static bool isAccessorAssumedNonMutating(FuncDecl *accessor) {

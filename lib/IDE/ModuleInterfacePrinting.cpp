@@ -215,9 +215,6 @@ void swift::ide::printSubmoduleInterface(
   // Separate the declarations that we are going to print into different
   // buckets.
   for (Decl *D : Decls) {
-    // If requested, skip unavailable declarations.
-    if (Options.SkipUnavailable && D->getAttrs().isUnavailable(SwiftContext))
-      continue;
 
     // Skip declarations that are not accessible.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -338,6 +335,11 @@ void swift::ide::printSubmoduleInterface(
     PrinterToUse = &RegularCommentPrinter;
 
   auto PrintDecl = [&](Decl *D) -> bool {
+    ASTPrinter &Printer = *PrinterToUse;
+    if (!shouldPrint(D, AdjustedOptions)) {
+      Printer.avoidPrintDeclPost(D);
+      return false;
+    }
     if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
       // Clang extensions (categories) are always printed in source order.
       // Swift extensions are printed with their associated type unless it's
@@ -349,7 +351,6 @@ void swift::ide::printSubmoduleInterface(
       }
     }
 
-    ASTPrinter &Printer = *PrinterToUse;
     if (D->print(Printer, AdjustedOptions)) {
       Printer << "\n";
       if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -366,6 +367,10 @@ void swift::ide::printSubmoduleInterface(
 
           // Print Ext and add sub-types of Ext.
           for (auto Ext : NTD->getExtensions()) {
+            if (!shouldPrint(Ext, AdjustedOptions)) {
+              Printer.avoidPrintDeclPost(Ext);
+              continue;
+            }
             if (Ext->hasClangNode())
               continue; // will be printed in its source location, see above.
             Printer << "\n";
@@ -489,10 +494,6 @@ void swift::ide::printHeaderInterface(
 
   SmallVector<Decl *, 32> ClangDecls;
   auto headerReceiver = [&](Decl *D) {
-    // If requested, skip unavailable declarations.
-    if (Options.SkipUnavailable && D->getAttrs().isUnavailable(Ctx))
-      return;
-
     ClangDecls.push_back(D);
   };
 
@@ -514,6 +515,10 @@ void swift::ide::printHeaderInterface(
 
   for (auto *D : ClangDecls) {
     ASTPrinter &Printer = *PrinterToUse;
+    if (!shouldPrint(D, AdjustedOptions)) {
+      Printer.avoidPrintDeclPost(D);
+      continue;
+    }
     if (D->print(Printer, AdjustedOptions))
       Printer << "\n";
   }
