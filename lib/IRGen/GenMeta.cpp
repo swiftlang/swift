@@ -1019,6 +1019,9 @@ void irgen::emitLazyCacheAccessFunction(IRGenModule &IGM,
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(IGF, IGF.CurFn);
 
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
+
   // Okay, first thing, check the cache variable.
   //
   // Conceptually, this needs to establish memory ordering with the
