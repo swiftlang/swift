@@ -37,7 +37,7 @@ using namespace swift;
 STATISTIC(NumRefCountOpsMoved, "Total number of increments moved");
 STATISTIC(NumRefCountOpsRemoved, "Total number of increments removed");
 
-llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(false));
+llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(true));
 
 //===----------------------------------------------------------------------===//
 //                                Code Motion
