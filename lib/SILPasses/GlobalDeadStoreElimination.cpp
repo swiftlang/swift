@@ -553,9 +553,12 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
     for (unsigned i = 0; i < V.size(); ++i) {
       if (V.test(i))
         continue;
-      // We are already tracking all the stores to this Mem as dead.
-      S->stopTrackingMemLocation(i);
+      // This location is alive.
       Alives.insert(Locs[i]);
+      // We are already tracking all the stores as dead reverse that for these
+      // locations. Otherwise, store contained in Alives will be considered
+      // dead when they are processed.
+      S->stopTrackingMemLocation(getMemLocationBit(Locs[i]));
     }
 
     // Try to create as few aggregated stores as possible out of the locations.

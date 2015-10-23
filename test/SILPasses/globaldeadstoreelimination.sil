@@ -1195,6 +1195,31 @@ bb0:
   return %9 : $()                                 // id: %11
 }
 
+/// Make sure we do perform partial dead store for the first store.
+/// we have a case which partial dead store miscompiles a program,
+/// in that case the bitvector is not tracked correctly and we end
+/// up deleting the entire larger store, store %3 to %0#1 : $*S3 in
+/// this case. 
+///
+/// CHECK-LABEL : PartialDeadStoreInSimpleSmallStruct
+/// CHECK: apply 
+/// CHECK-NEXT: struct_extract 
+sil hidden @PartialDeadStoreInSimpleSmallStruct : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S3  // var a                  // users: %4, %7, %10
+  %1 = function_ref @S3_init : $@convention(thin) (@thin S3.Type) -> S3 // user: %3
+  %2 = metatype $@thin S3.Type                    // user: %3
+  %3 = apply %1(%2) : $@convention(thin) (@thin S3.Type) -> S3 // user: %4
+  store %3 to %0#1 : $*S3                         // id: %4
+  %5 = integer_literal $Builtin.Int64, 10         // user: %6
+  %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
+  %7 = struct_element_addr %0#1 : $*S3, #S3.a     // user: %8
+  store %6 to %7 : $*Int                          // id: %8
+  %9 = tuple ()                                   // user: %11
+  dealloc_stack %0#0 : $*@local_storage S3        // id: %10
+  return %9 : $()                                 // id: %11
+}
+
 /// Make sure we do not hang in this test case. Test for Location::expand.
 /// expand should stop on class type. Also need to get rid of the partial
 /// dead store.
