@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -global-arc-opts %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc -global-arc-opts %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -global-arc-opts %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -global-arc-opts %s | FileCheck %s
 
 import Builtin
 import Swift

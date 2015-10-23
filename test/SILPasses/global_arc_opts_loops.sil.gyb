@@ -2,8 +2,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: %gyb %s > %t/global-arc-opts-loops.sil
-// RUN: %target-sil-opt -enable-sil-verify-all -global-arc-opts %t/global-arc-opts-loops.sil | FileCheck %t/global-arc-opts-loops.sil
-// RUN: %target-sil-opt -enable-sil-verify-all -global-arc-opts -enable-loop-arc %t/global-arc-opts-loops.sil | FileCheck %t/global-arc-opts-loops.sil
+// RUN: %target-sil-opt -enable-sil-verify-all -global-arc-opts %t/global-arc-opts-loops.sil -enable-loop-arc=0 | FileCheck %t/global-arc-opts-loops.sil
+// RUN: %target-sil-opt -enable-sil-verify-all -global-arc-opts -enable-loop-arc=1 %t/global-arc-opts-loops.sil | FileCheck %t/global-arc-opts-loops.sil
 
 %# Ignore the following admonition; it applies to the resulting .sil
 %# test file only.
