@@ -243,6 +243,9 @@ public:
   ASTContext &getASTContext() const { return TheSwiftModule->getASTContext(); }
   SourceManager &getSourceManager() const { return getASTContext().SourceMgr; }
 
+  /// Returns true if this is the swift stdlib module.
+  bool isStdlibModule() const { return getSwiftModule()->isStdlibModule(); }
+
   /// Get the Swift DeclContext associated with this SIL module.
   ///
   /// All AST declarations within this context are assumed to have been fully
