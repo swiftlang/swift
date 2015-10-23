@@ -117,6 +117,7 @@
 #define SWIFT_SILANALYSIS_LOOPNESTANALYSIS_H
 
 #include "swift/SILAnalysis/Analysis.h"
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
@@ -177,10 +178,16 @@ public:
         (sizeof(unsigned) * CHAR_BIT) - NumTaggedBits;
     static constexpr unsigned MaxID = (unsigned(1) << IDBitSize) - 1;
 
+  private:
     unsigned IsDead : 1;
+
+  public:
     unsigned IsNonLocal : 1;
     unsigned ID : IDBitSize;
 
+    SuccessorID(unsigned rawValue)
+        : IsDead(rawValue & 1), IsNonLocal((rawValue & 2) >> 1),
+          ID(rawValue >> 2) {}
     SuccessorID(unsigned id, bool isnonlocal)
         : IsDead(unsigned(false)), IsNonLocal(unsigned(isnonlocal)), ID(id) {}
 
@@ -193,35 +200,35 @@ public:
       return !(*this == Other);
     }
 
+    unsigned asInt() const { return *reinterpret_cast<const unsigned *>(this); }
+
     struct ToLiveSucc {
-      Optional<SuccessorID> operator()(SuccessorID ID) const {
-        if (ID.IsDead)
-          return None;
+      Optional<SuccessorID> operator()(Optional<SuccessorID> ID) const {
         return ID;
       }
     };
 
     struct ToLiveLocalSucc {
-      Optional<unsigned> operator()(SuccessorID ID) const {
-        if (ID.IsDead)
+      Optional<unsigned> operator()(Optional<SuccessorID> ID) const {
+        if (!ID)
           return None;
-        if (ID.IsNonLocal)
+        if ((*ID).IsNonLocal)
           return None;
-        return ID.ID;
+        return (*ID).ID;
       }
     };
 
     struct ToLiveNonLocalSucc {
-      Optional<unsigned> operator()(SuccessorID ID) const {
-        if (ID.IsDead)
+      Optional<unsigned> operator()(Optional<SuccessorID> ID) const {
+        if (!ID)
           return None;
-        if (!ID.IsNonLocal)
+        if (!(*ID).IsNonLocal)
           return None;
-        return ID.ID;
+        return (*ID).ID;
       }
     };
   };
-  /// These checks are just for performance.
+  // These checks are just for performance.
   static_assert(IsTriviallyCopyable<SuccessorID>::value,
                 "Expected trivially copyable type");
 
@@ -344,7 +351,7 @@ private:
   /// of a loop, may have a non-local successor edge pointed at this region's
   /// successor edge. If we were to sort these edges, we would need to update
   /// those subregion edges as well which is strictly not necessary.
-  llvm::SmallVector<SuccessorID, 4> Succs;
+  SmallBlotSetVector<SuccessorID, 8> Succs;
 
   /// True if this region the head of an edge that results from control flow
   /// that we do not handle.
@@ -516,7 +523,8 @@ public:
   bool succ_empty() const { return Succs.empty(); }
   unsigned succ_size() const { return Succs.size(); }
 
-  using SuccRange = FilterRange<InnerSuccRange, SuccessorID::ToLiveSucc>;
+  using SuccRange =
+      OptionalTransformRange<InnerSuccRange, SuccessorID::ToLiveSucc>;
   using LocalSuccRange =
       OptionalTransformRange<InnerSuccRange, SuccessorID::ToLiveLocalSucc>;
   using NonLocalSuccRange =
@@ -600,19 +608,7 @@ private:
 
   unsigned addSucc(LoopRegion *Successor) {
     assert(!isFunction() && "Functions can not have successors");
-
-    // First check if we already have this successor's id in our list. If we do,
-    // just return the index of that ID so that we do not have duplicate
-    // successors.
-    SuccessorID SuccID = {Successor->getID(), false};
-    for (unsigned i : indices(Succs))
-      if (Succs[i] == SuccID)
-        return i;
-
-    // Otherwise, add the new SuccID to our SuccList.
-    unsigned Index = Succs.size();
-    Succs.push_back(SuccID);
-    return Index;
+    return Succs.insert(SuccessorID(Successor->getID(), false));
   }
 
   void replacePred(unsigned OldPredID, unsigned NewPredID) {
@@ -631,7 +627,7 @@ private:
 
   /// Replace OldSuccID by NewSuccID, just deleting OldSuccID if what NewSuccID
   /// is already in the list.
-  void replaceSucc(unsigned OldSuccID, unsigned NewSuccID, bool IsNonLocal);
+  void replaceSucc(SuccessorID OldSucc, SuccessorID NewSucc);
 
   /// Set the IsDead flag on all successors of this region that have an id \p
   /// ID.
@@ -639,14 +635,7 @@ private:
   /// Due to the creation of up-edges during loop region construction, we can
   /// never actually remove successors. Instead we mark successors as being dead
   /// and ignore such values when iterating.
-  void removeLocalSucc(unsigned ID) {
-    for (auto &S : Succs) {
-      if (S.ID == ID) {
-        assert(!S.IsNonLocal);
-        S.IsDead = unsigned(true);
-      }
-    }
-  }
+  void removeLocalSucc(unsigned ID) { Succs.erase(SuccessorID(ID, false)); }
 
   void addBlockSubregion(LoopRegion *R) {
     assert(!isBlock() && "Blocks can not have subregions");
@@ -664,6 +653,37 @@ private:
   }
 
 };
+
+} // end swift namespace
+
+namespace llvm {
+
+raw_ostream &operator<<(raw_ostream &os, swift::LoopRegion &LR);
+raw_ostream &operator<<(raw_ostream &os, swift::LoopRegion::SuccessorID &S);
+
+template <> struct DenseMapInfo<swift::LoopRegion::SuccessorID> {
+  using Type = swift::LoopRegion::SuccessorID;
+
+  static_assert(sizeof(Type) == sizeof(unsigned),
+                "Expected SuccessorID to be the size of an unsigned!");
+  static inline Type getEmptyKey() {
+    return Type(DenseMapInfo<unsigned>::getEmptyKey());
+  }
+  static inline Type getTombstoneKey() {
+    return Type(DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+  static unsigned getHashValue(const swift::LoopRegion::SuccessorID Val) {
+    return DenseMapInfo<unsigned>::getHashValue(Val.asInt());
+  }
+  static bool isEqual(const swift::LoopRegion::SuccessorID LHS,
+                      const swift::LoopRegion::SuccessorID RHS) {
+    return LHS == RHS;
+  }
+};
+
+} // end llvm namespace
+
+namespace swift {
 
 class LoopRegionFunctionInfo {
   using RegionTy = LoopRegion;
@@ -898,9 +918,5 @@ public:
 };
 
 } // end namespace swift
-
-namespace llvm {
-raw_ostream &operator<<(raw_ostream &os, swift::LoopRegion &LR);
-}
 
 #endif
