@@ -3047,12 +3047,8 @@ public:
       != ParsedKeywords.end();
   }
 
-  void addMethodOverride(const FuncDecl *FD, DeclVisibilityKind Reason) {
-    CodeCompletionResultBuilder Builder(
-        Sink,
-        CodeCompletionResult::ResultKind::Declaration,
-        SemanticContextKind::Super, {});
-    Builder.setAssociatedDecl(FD);
+  void addValueOverride(const ValueDecl *VD, DeclVisibilityKind Reason,
+                        CodeCompletionResultBuilder &Builder) {
 
     class DeclNameOffsetLocatorPrinter : public StreamPrinter {
     public:
@@ -3076,7 +3072,7 @@ public:
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(DAK_NoReturn);
       Options.PrintOverrideKeyword = false;
-      FD->print(Printer, Options);
+      VD->print(Printer, Options);
       NameOffset = Printer.NameOffset.getValue();
     }
 
@@ -3088,20 +3084,36 @@ public:
                                    ->getExtendedType()
                                    ->getAnyNominal()
                                    ->getFormalAccess();
-    // If the developer has not input "func", we need to add necessary keywords
-    if (!isKeywordSpecified("func")) {
-      if (!isKeywordSpecified("private") &&
-          !isKeywordSpecified("public") &&
-          !isKeywordSpecified("internal"))
-        Builder.addAccessControlKeyword(std::min(FD->getFormalAccess(),
-                                                 AccessibilityOfContext));
 
-      if (Reason == DeclVisibilityKind::MemberOfSuper &&
-          !isKeywordSpecified("override"))
-        Builder.addOverrideKeyword();
+    bool missingDeclIntroducer =
+        isa<FuncDecl>(VD) && !isKeywordSpecified("func");
+    bool missingAccess = !isKeywordSpecified("private") &&
+                         !isKeywordSpecified("public") &&
+                         !isKeywordSpecified("internal");
+    bool missingOverride = Reason == DeclVisibilityKind::MemberOfSuper &&
+                           !isKeywordSpecified("override");
+
+    if (missingDeclIntroducer && missingAccess)
+      Builder.addAccessControlKeyword(
+          std::min(VD->getFormalAccess(), AccessibilityOfContext));
+
+    // FIXME: if we're missing 'override', but have the decl introducer we
+    // should delete it and re-add both in the correct order.
+    if (missingDeclIntroducer && missingOverride)
+      Builder.addOverrideKeyword();
+
+    if (missingDeclIntroducer)
       Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
-    }
+
     Builder.addTextChunk(DeclStr.str().substr(NameOffset));
+  }
+
+  void addMethodOverride(const FuncDecl *FD, DeclVisibilityKind Reason) {
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        SemanticContextKind::Super, {});
+    Builder.setAssociatedDecl(FD);
+    addValueOverride(FD, Reason, Builder);
     Builder.addBraceStmtWithCursor();
   }
 
