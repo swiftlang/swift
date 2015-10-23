@@ -3033,14 +3033,18 @@ class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   const DeclContext *CurrDeclContext;
   SmallVectorImpl<StringRef> &ParsedKeywords;
 
+  bool hasFuncIntroducer = false;
+  bool hasVarIntroducer = false;
+
 public:
-  CompletionOverrideLookup(CodeCompletionResultSink &Sink,
-                           ASTContext &Ctx,
+  CompletionOverrideLookup(CodeCompletionResultSink &Sink, ASTContext &Ctx,
                            const DeclContext *CurrDeclContext,
                            SmallVectorImpl<StringRef> &ParsedKeywords)
       : Sink(Sink), TypeResolver(createLazyResolver(Ctx)),
-        CurrDeclContext(CurrDeclContext),
-        ParsedKeywords(ParsedKeywords){}
+        CurrDeclContext(CurrDeclContext), ParsedKeywords(ParsedKeywords) {
+    hasFuncIntroducer = isKeywordSpecified("func");
+    hasVarIntroducer = isKeywordSpecified("var") || isKeywordSpecified("let");
+  }
 
   bool isKeywordSpecified(StringRef Word) {
     return std::find(ParsedKeywords.begin(), ParsedKeywords.end(), Word)
@@ -3072,6 +3076,7 @@ public:
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(DAK_NoReturn);
       Options.PrintOverrideKeyword = false;
+      Options.PrintPropertyAccessors = false;
       VD->print(Printer, Options);
       NameOffset = Printer.NameOffset.getValue();
     }
@@ -3085,8 +3090,7 @@ public:
                                    ->getAnyNominal()
                                    ->getFormalAccess();
 
-    bool missingDeclIntroducer =
-        isa<FuncDecl>(VD) && !isKeywordSpecified("func");
+    bool missingDeclIntroducer = !hasVarIntroducer && !hasFuncIntroducer;
     bool missingAccess = !isKeywordSpecified("private") &&
                          !isKeywordSpecified("public") &&
                          !isKeywordSpecified("internal");
@@ -3115,6 +3119,14 @@ public:
     Builder.setAssociatedDecl(FD);
     addValueOverride(FD, Reason, Builder);
     Builder.addBraceStmtWithCursor();
+  }
+
+  void addVarOverride(const VarDecl *VD, DeclVisibilityKind Reason) {
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Declaration,
+        SemanticContextKind::Super, {});
+    Builder.setAssociatedDecl(VD);
+    addValueOverride(VD, Reason, Builder);
   }
 
   void addConstructor(const ConstructorDecl *CD) {
@@ -3148,6 +3160,8 @@ public:
     if (!D->hasType())
       TypeResolver->resolveDeclSignature(D);
 
+    bool hasIntroducer = hasFuncIntroducer || hasVarIntroducer;
+
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
       // We can override operators as members.
       if (FD->isBinaryOperator() || FD->isUnaryOperator())
@@ -3157,8 +3171,15 @@ public:
       if (FD->isAccessor())
         return;
 
-      addMethodOverride(FD, Reason);
+      if (!hasIntroducer || hasFuncIntroducer)
+        addMethodOverride(FD, Reason);
       return;
+    }
+
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      if (!hasIntroducer || hasVarIntroducer) {
+        addVarOverride(VD, Reason);
+      }
     }
 
     if (auto *CD = dyn_cast<ConstructorDecl>(D)) {

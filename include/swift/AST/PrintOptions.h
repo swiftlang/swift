@@ -36,6 +36,9 @@ struct PrintOptions {
   /// \brief Whether to print '{ get set }' on readwrite computed properties.
   bool PrintGetSetOnRWProperties = true;
 
+  /// \brief Whether to print *any* accessors on properties.
+  bool PrintPropertyAccessors = true;
+
   /// \brief Whether to print the accessors of a property abstractly,
   /// i.e. always as get and set rather than the specific accessors
   /// actually used to implement the property.

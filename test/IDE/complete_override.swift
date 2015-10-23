@@ -90,6 +90,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD3 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=OMIT_KEYWORD3< %t.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD4 -code-completion-keywords=false | FileCheck %s -check-prefix=OMIT_KEYWORD4
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAS_THROWING -code-completion-keywords=false | FileCheck %s -check-prefix=HAS_THROWING
 
 @objc
@@ -114,6 +116,8 @@ protocol ProtocolA {
 // WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional() {|}{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceMethod]/Super: @noreturn func protoAFuncWithAttr() {|}{{; name=.+$}}
+// WITH_PA-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: Int{{; name=.+$}}
+// WITH_PA-DAG: Decl[InstanceVar]/Super:    var protoAVarRO: Int{{; name=.+$}}
 // WITH_PA: End completions
 
 struct TagPB {}
@@ -132,6 +136,8 @@ protocol ProtocolB : ProtocolA {
 // WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceMethod]/Super: @noreturn func protoAFuncWithAttr() {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoBFunc() {|}{{; name=.+$}}
+// WITH_PB-DAG: Decl[InstanceVar]/Super:    var protoBVarRW: Int{{; name=.+$}}
+// WITH_PB-DAG: Decl[InstanceVar]/Super:    var protoBVarRO: Int{{; name=.+$}}
 // WITH_PB: End completions
 
 struct TagPE {}
@@ -148,6 +154,8 @@ protocol ProtocolE {
 // WITH_PE: Begin completions
 // WITH_PE-DAG: Decl[Constructor]/Super:    init(fromProtocolE: Int) {|}{{; name=.+$}}
 // WITH_PE-DAG: Decl[InstanceMethod]/Super: func protoEFunc() {|}{{; name=.+$}}
+// WITH_PE-DAG: Decl[InstanceVar]/Super:    var protoEVarRW: Int{{; name=.+$}}
+// WITH_PE-DAG: Decl[InstanceVar]/Super:    var protoEVarRO: Int{{; name=.+$}}
 // WITH_PE: End completions
 
 @noreturn @asmname("exit")
@@ -177,6 +185,8 @@ class BaseA {
 // WITH_BA-DAG: Decl[InstanceMethod]/Super: override func baseAFunc(foo x: Int) {|}{{; name=.+$}}
 // WITH_BA-DAG: Decl[InstanceMethod]/Super: override func baseAFunc2(foo x: Int) {|}{{; name=.+$}}
 // WITH_BA-DAG: Decl[InstanceMethod]/Super: override @noreturn func baseAFuncWithAttr() {|}{{; name=.+$}}
+// WITH_BA-DAG: Decl[InstanceVar]/Super:    override var baseAVarRW: Int{{; name=.+$}}
+// WITH_BA-DAG: Decl[InstanceVar]/Super:    override var baseAVarRO: Int{{; name=.+$}}
 // WITH_BA: End completions
 
 class BaseB : BaseA {
@@ -198,6 +208,10 @@ class BaseB : BaseA {
 // WITH_BB-DAG: Decl[InstanceMethod]/Super: override @noreturn func baseAFuncWithAttr() {|}{{; name=.+$}}
 // WITH_BB-DAG: Decl[Constructor]/Super:    init(fromBaseB: Int) {|}{{; name=.+$}}
 // WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseBFunc() {|}{{; name=.+$}}
+// WITH_BB-DAG: Decl[InstanceVar]/Super:    override var baseAVarRW: Int{{; name=.+$}}
+// WITH_BB-DAG: Decl[InstanceVar]/Super:    override var baseAVarRO: Int{{; name=.+$}}
+// WITH_BB-DAG: Decl[InstanceVar]/Super:    override var baseBVarRW: Int{{; name=.+$}}
+// WITH_BB-DAG: Decl[InstanceVar]/Super:    override var baseBVarRO: Int{{; name=.+$}}
 // WITH_BB: End completions
 
 class BaseE : ProtocolE {
@@ -222,6 +236,10 @@ class BaseE : ProtocolE {
 // WITH_BE-DAG: Decl[InstanceMethod]/Super: override func protoEFunc() {|}{{; name=.+$}}
 // WITH_BE-DAG: Decl[Constructor]/Super:    init(fromBaseE: Int) {|}{{; name=.+$}}
 // WITH_BE-DAG: Decl[InstanceMethod]/Super: override func baseEFunc() {|}{{; name=.+$}}
+// WITH_BE-DAG: Decl[InstanceVar]/Super:    override var protoEVarRW: Int{{; name=.+$}}
+// WITH_BE-DAG: Decl[InstanceVar]/Super:    override var protoEVarRO: Int{{; name=.+$}}
+// WITH_BE-DAG: Decl[InstanceVar]/Super:    override var baseEVarRW: Int{{; name=.+$}}
+// WITH_BE-DAG: Decl[InstanceVar]/Super:    override var baseEVarRO: Int{{; name=.+$}}
 // WITH_BE: End completions
 
 class ProtocolEImpl /* : ProtocolE but does not implement the protocol */ {
@@ -237,6 +255,8 @@ class ProtocolEImpl /* : ProtocolE but does not implement the protocol */ {
 // WITH_PEI: Begin completions
 // WITH_PEI-DAG: Decl[Constructor]/Super:    init(fromProtocolE: Int) {|}{{; name=.+$}}
 // WITH_PEI-DAG: Decl[InstanceMethod]/Super: override func protoEFunc() {|}{{; name=.+$}}
+// WITH_PEI-DAG: Decl[InstanceVar]/Super:    override var protoEVarRW: Int{{; name=.+$}}
+// WITH_PEI-DAG: Decl[InstanceVar]/Super:    override var protoEVarRO: Int{{; name=.+$}}
 // WITH_PEI: End completions
 
 // NO_ERRORS_UP_TO_HERE
@@ -246,7 +266,7 @@ class TestClass_PA : ProtocolA {
 
   #^CLASS_PA^#
 }
-// CLASS_PA: Begin completions, 4 items
+// CLASS_PA: Begin completions, 6 items
 
 class TestClass_PA_Ext {
   func ERROR1() {}
@@ -260,22 +280,22 @@ extension TestClass_PA_Ext : ProtocolA {
 class TestClass_PB : ProtocolB {
   #^CLASS_PB^#
 }
-// CLASS_PB: Begin completions, 6 items
+// CLASS_PB: Begin completions, 10 items
 
 class TestClass_PA_PB : ProtocolA, ProtocolB {
   #^CLASS_PA_PB^#
 }
-// CLASS_PA_PB: Begin completions, 6 items
+// CLASS_PA_PB: Begin completions, 10 items
 
 class TestClass_BA : BaseA {
   #^CLASS_BA^#
 }
-// CLASS_BA: Begin completions, 5 items
+// CLASS_BA: Begin completions, 7 items
 
 class TestClass_BA_PA : BaseA, ProtocolA {
   #^CLASS_BA_PA^#
 }
-// CLASS_BA_PA: Begin completions, 9 items
+// CLASS_BA_PA: Begin completions, 13 items
 
 class TestClass_BA_PA_Ext : BaseA {
   #^CLASS_BA_PA_EXT1^#
@@ -288,27 +308,27 @@ extension TestClass_BA_PA_Ext : ProtocolA {
 class TestClass_BA_PB : BaseA, ProtocolB {
   #^CLASS_BA_PB^#
 }
-// CLASS_BA_PB: Begin completions, 10 items
+// CLASS_BA_PB: Begin completions, 16 items
 
 class TestClass_BB : BaseB {
   #^CLASS_BB^#
 }
-// CLASS_BB: Begin completions, 5 items
+// CLASS_BB: Begin completions, 9 items
 
 class TestClass_BE : BaseE {
   #^CLASS_BE^#
 }
-// CLASS_BE: Begin completions, 4 items
+// CLASS_BE: Begin completions, 8 items
 
 class TestClass_BE_PA : BaseE, ProtocolA {
   #^CLASS_BE_PA^#
 }
-// CLASS_BE_PA: Begin completions, 8 items
+// CLASS_BE_PA: Begin completions, 14 items
 
 class TestClass_BE_PA_PE : BaseE, ProtocolA, ProtocolE {
   #^CLASS_BE_PA_PE^#
 }
-// CLASS_BE_PA_PE: Begin completions, 8 items
+// CLASS_BE_PA_PE: Begin completions, 14 items
 
 class TestClass_BE_PA_PE_Ext : BaseE {
   #^CLASS_BE_PA_PE_EXT1^#
@@ -320,7 +340,7 @@ extension TestClass_BE_PA_PE_Ext : ProtocolA, ProtocolE {
 class TestClass_PEI_PE : ProtocolEImpl, ProtocolE {
   #^CLASS_PEI_PE^#
 }
-// CLASS_PEI_PE: Begin completions, 2 items
+// CLASS_PEI_PE: Begin completions, 4 items
 
 class OuterNominal : ProtocolA {
   class Inner {
@@ -339,6 +359,8 @@ class OmitKW1 : ProtocolA {
 //OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         func protoAFunc() {|}; name=protoAFunc(){{$}}
 //OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         func protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
 //OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         @noreturn func protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+// OMIT_KEYWORD1-DAG:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD1: End completions
 
 class OmitKW2 : ProtocolA {
   override func#^OMIT_KEYWORD2^#
@@ -349,6 +371,8 @@ class OmitKW2 : ProtocolA {
 //OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
 //OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
 //OMIT_KEYWORD2-DAG:     Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+// OMIT_KEYWORD2-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD2: End completions
 
 class OmitKW3 : ProtocolA {
   func#^OMIT_KEYWORD3^#
@@ -359,6 +383,16 @@ class OmitKW3 : ProtocolA {
 //OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
 //OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
 //OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+// OMIT_KEYWORD3-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD3: End completions
+
+class OmitKW4: ProtocolA {
+  var #^OMIT_KEYWORD4^#
+}
+
+// OMIT_KEYWORD4-NOT:    Decl[InstanceMethod]
+// OMIT_KEYWORD4:        Decl[InstanceVar]/Super: protoAVarRW: Int{{; name=.+$}}
+// OMIT_KEYWORD4-NOT:    Decl[InstanceMethod]
 
 protocol HasThrowingProtocol {
   func foo() throws

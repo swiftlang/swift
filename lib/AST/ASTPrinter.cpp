@@ -786,6 +786,9 @@ static StringRef getMutableAddressorLabel(FuncDecl *addressor) {
 }
 
 void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
+  if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
+    return;
+
   auto storageKind = ASD->getStorageKind();
 
   // Never print anything for stored properties.

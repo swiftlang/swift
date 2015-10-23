@@ -790,10 +790,11 @@ ParserResult<Pattern> Parser::parsePattern() {
   }
     
   case tok::code_complete:
-    // Just eat the token and return an error status, *not* the code completion
-    // status.  We can not code complete anything here -- we expect an
-    // identifier.
-    consumeToken(tok::code_complete);
+    if (!CurDeclContext->isNominalTypeOrNominalTypeExtensionContext()) {
+      // This cannot be an overridden property, so just eat the token. We cannot
+      // code complete anything here -- we expect an identifier.
+      consumeToken(tok::code_complete);
+    }
     return nullptr;
 
   case tok::kw_var:

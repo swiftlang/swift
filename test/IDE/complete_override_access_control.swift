@@ -101,7 +101,7 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
   #^TEST_PUBLIC_ABC^#
 }
 
-// TEST_PRIVATE_ABC: Begin completions, 12 items
+// TEST_PRIVATE_ABC: Begin completions, 18 items
 // TEST_PRIVATE_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFunc(x: TagPA) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
@@ -114,9 +114,15 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoCFunc(x: TagPC) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
 // TEST_PRIVATE_ABC-DAG: Decl[InstanceMethod]/Super: private @noreturn func protoCFuncWithCttr(x: TagPC) {|}{{; name=.+$}}
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    private var protoAVarRW: TagPA
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    private var protoAVarRO: TagPA
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    private var protoBVarRW: TagPB
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    private var protoBVarRO: TagPB
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    private var protoCVarRW: TagPC
+// TEST_PRIVATE_ABC-DAG: Decl[InstanceVar]/Super:    private var protoCVarRO: TagPC
 // TEST_PRIVATE_ABC: End completions
 
-// TEST_INTERNAL_ABC: Begin completions, 12 items
+// TEST_INTERNAL_ABC: Begin completions, 18 items
 // TEST_INTERNAL_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFunc(x: TagPA) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
@@ -129,9 +135,15 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFunc(x: TagPC) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
 // TEST_INTERNAL_ABC-DAG: Decl[InstanceMethod]/Super: @noreturn func protoCFuncWithCttr(x: TagPC) {|}{{; name=.+$}}
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    private var protoAVarRW: TagPA
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    private var protoAVarRO: TagPA
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRW: TagPB
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRO: TagPB
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoCVarRW: TagPC
+// TEST_INTERNAL_ABC-DAG: Decl[InstanceVar]/Super:    var protoCVarRO: TagPC
 // TEST_INTERNAL_ABC: End completions
 
-// TEST_PUBLIC_ABC: Begin completions, 12 items
+// TEST_PUBLIC_ABC: Begin completions, 18 items
 // TEST_PUBLIC_ABC-DAG: Decl[Constructor]/Super:    init(fromProtocolA: TagPA) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFunc(x: TagPA) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: private func protoAFuncOptional(x: TagPA) {|}{{; name=.+$}}
@@ -144,6 +156,12 @@ public class TestPublicABC : ProtocolAPrivate, ProtocolBInternal, ProtocolCPubli
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public func protoCFunc(x: TagPC) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public func protoCFuncOptional(x: TagPC) {|}{{; name=.+$}}
 // TEST_PUBLIC_ABC-DAG: Decl[InstanceMethod]/Super: public @noreturn func protoCFuncWithCttr(x: TagPC) {|}{{; name=.+$}}
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    private var protoAVarRW: TagPA
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    private var protoAVarRO: TagPA
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRW: TagPB
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    var protoBVarRO: TagPB
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    public var protoCVarRW: TagPC
+// TEST_PUBLIC_ABC-DAG: Decl[InstanceVar]/Super:    public var protoCVarRO: TagPC
 // TEST_PUBLIC_ABC: End completions
 
 private class TestPrivateDE : ProtocolDPrivate, ProtocolEPublic {
