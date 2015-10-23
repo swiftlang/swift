@@ -1603,13 +1603,17 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
   }
 
   ForDefinition_t forDefinition = (ForDefinition_t) (definitionType != nullptr);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+
+  // Clang may have defined the variable already.
+  if (auto existing = Module.getNamedGlobal(link.getName()))
+    return getElementBitCast(existing, defaultType);
 
   // If we're not defining the object now, forward declare it with the default
   // type.
   if (!definitionType) definitionType = defaultType;
 
   // Create the variable.
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   auto var = link.createVariable(*this, definitionType, alignment, debugType);
 
   // If we have an existing entry, destroy it, replacing it with the

@@ -82,3 +82,7 @@ static inline void* giveMeASelector(void) {
 static inline NSNumber *giveMeANumber(void) {
   return @42;
 }
+
+static inline Class giveMeAMetaclass(void) {
+  return [NSString class];
+}
