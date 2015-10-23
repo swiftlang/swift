@@ -485,7 +485,8 @@ public:
   /// Useful for dumping the module when running in a debugger.
   /// Warning: no error handling is done. Fails with an assert if the file
   /// cannot be opened.
-  void dump(const char *FileName, bool Verbose = false) const;
+  void dump(const char *FileName, bool Verbose = false,
+            bool PrintASTDecls = false) const;
 
   /// Pretty-print the module to the designated stream.
   ///

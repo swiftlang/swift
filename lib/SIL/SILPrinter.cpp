@@ -1641,10 +1641,11 @@ void SILModule::dump(bool Verbose) const {
   print(llvm::errs(), Verbose);
 }
 
-void SILModule::dump(const char *FileName, bool Verbose) const {
+void SILModule::dump(const char *FileName, bool Verbose,
+                     bool PrintASTDecls) const {
   std::error_code EC;
   llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::F_None);
-  print(os, Verbose);
+  print(os, Verbose, getSwiftModule(), false, PrintASTDecls);
 }
 
 static void printSILGlobals(llvm::raw_ostream &OS, bool Verbose,
