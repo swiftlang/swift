@@ -11,6 +11,10 @@ class models, and what it would take to merge the two as much as possible. The
 format of each section lays out the differences between Swift and Objective-C,
 then describes what needs to happen for a user to mix the two seamlessly.
 
+.. warning:: This document was used in planning Swift 1.0; it has not been kept
+  up to date and does not describe the current or planned behavior of Swift.
+
+
 .. contents::
 
 Terminology used in this document:

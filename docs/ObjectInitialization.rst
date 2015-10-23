@@ -1,6 +1,9 @@
 Object Initialization
 =====================
 
+.. warning:: This document is incomplete and not up-to-date; it currently
+  describes the initialization model from Swift 1.0.
+
 .. contents::
 
 Introduction

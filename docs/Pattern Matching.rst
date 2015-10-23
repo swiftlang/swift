@@ -4,6 +4,10 @@
 Pattern Matching
 ================
 
+.. warning:: This document was used in designing the pattern-matching features
+  of Swift 1.0. It has not been kept to date and does not describe the current
+  or planned behavior of Swift.
+
 Elimination rules
 -----------------
 

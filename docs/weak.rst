@@ -12,6 +12,9 @@ references, including various designs in other languages, and proposes
 several new core language features and a more sophisticated runtime
 support feature which can be exploited in the standard library.
 
+.. warning:: This document was used in planning Swift 1.0; it has not been kept
+  up to date and does not describe the current or planned behavior of Swift.
+
 Reference Graphs
 ================
 

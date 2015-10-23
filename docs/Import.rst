@@ -1,5 +1,8 @@
 :orphan:
 
+.. warning:: This document represents an early proposal for ``import`` syntax and
+  has not been kept up to date.
+
 IMPORT SYNTAX
 =============
 ::

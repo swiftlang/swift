@@ -9,6 +9,9 @@ A `module` is the primary unit of code sharing in Swift. This document
 describes the experience of using modules in Swift: what they are and what they
 provide for the user.
 
+.. warning:: This document has not been updated since the initial design in
+  Swift 1.0.
+
 .. contents:: :local:
 
 

@@ -4,6 +4,9 @@
 Resilience
 ==========
 
+.. warning:: This is a very early design document discussing the feature of
+  Resilience. It should not be taken as a plan of record.
+
 Introduction
 ------------
 

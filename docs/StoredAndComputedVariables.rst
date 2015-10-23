@@ -4,6 +4,10 @@
 Stored and Computed Variables
 =============================
 
+.. warning:: This document has not been updated since the initial design in
+  Swift 1.0.
+
+
 Variables are declared using the ``var`` keyword. These declarations are valid
 at the top level, within types, and within code bodies, and are respectively
 known as *global variables,* *member variables,* and *local variables.*

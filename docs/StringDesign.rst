@@ -97,6 +97,9 @@ Swift String Design
    * is being delivered in installments.  Content still to come is
      outlined in `Coming Installments`_.
 
+.. warning:: This document was used in planning Swift 1.0; it has not been kept
+  up to date and does not describe the current or planned behavior of Swift.
+
 .. contents:: 
    :depth: 3
               
