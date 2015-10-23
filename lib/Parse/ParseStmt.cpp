@@ -1082,8 +1082,10 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
   SmallVector<StmtConditionElement, 4> result;
 
   if (Tok.is(tok::pound) && peekToken().is(tok::code_complete)) {
+    auto PoundPos = consumeToken();
+    auto CodeCompletionPos = consumeToken();
     auto Expr = new (Context) CodeCompletionExpr(CharSourceRange(SourceMgr,
-      consumeToken(), consumeToken()));
+      PoundPos, CodeCompletionPos));
     if (CodeCompletion) {
       CodeCompletion->completeAfterPound(Expr);
     }

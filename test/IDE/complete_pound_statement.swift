@@ -24,17 +24,17 @@
 // PLATFORM1: Keyword/None:                       OSX[#Platform#]; name=OSX{{$}}
 
 class C1 {
-	func foo() {
-		if ##^AVAIL1^# {
-		}
-	}
+  func foo() {
+    if ##^AVAIL1^# {
+    }
+  }
 }
 
 class C2 {
-	func foo() {
-		guard ##^AVAIL2^# {
-		}
-	}
+  func foo() {
+    guard ##^AVAIL2^# {
+    }
+  }
 }
 
 // AVAILABLE: Keyword/ExprSpecific:               available({#Platform...#}, *); name=available(Platform..., *)
