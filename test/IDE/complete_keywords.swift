@@ -124,7 +124,6 @@
 // KW_DECL_STMT-DAG: Keyword/None: __COLUMN__[#Int#]{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: false[#Bool#]{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: true[#Bool#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: #available[#Bool#]{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/CurrModule: nil{{; name=.+$}}
 // KW_DECL_STMT: End completions
 

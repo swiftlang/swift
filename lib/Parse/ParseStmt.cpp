@@ -1081,6 +1081,16 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
 
   SmallVector<StmtConditionElement, 4> result;
 
+  if (Tok.is(tok::pound) && peekToken().is(tok::code_complete)) {
+    auto Expr = new (Context) CodeCompletionExpr(CharSourceRange(SourceMgr,
+      consumeToken(), consumeToken()));
+    if (CodeCompletion) {
+      CodeCompletion->completeAfterPound(Expr);
+    }
+    result.push_back(Expr);
+    Status.setHasCodeCompletion();
+  }
+
   // Parse a leading #available condition if present.
   if (Tok.is(tok::pound_available)) {
     auto res = parseStmtConditionPoundAvailable();

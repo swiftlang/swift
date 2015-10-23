@@ -2,6 +2,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLATFORM2 | FileCheck %s -check-prefix=PLATFORM1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLATFORM3 | FileCheck %s -check-prefix=PLATFORM1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PLATFORM4 | FileCheck %s -check-prefix=PLATFORM1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAIL1 | FileCheck %s -check-prefix=AVAILABLE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AVAIL2 | FileCheck %s -check-prefix=AVAILABLE
+
 {
   if #available(#^PLATFORM1^#
 }
@@ -19,3 +22,19 @@
 // PLATFORM1: Keyword/None:                       tvOS[#Platform#]; name=tvOS{{$}}
 // PLATFORM1: Keyword/None:                       watchOS[#Platform#]; name=watchOS{{$}}
 // PLATFORM1: Keyword/None:                       OSX[#Platform#]; name=OSX{{$}}
+
+class C1 {
+	func foo() {
+		if ##^AVAIL1^# {
+		}
+	}
+}
+
+class C2 {
+	func foo() {
+		guard ##^AVAIL2^# {
+		}
+	}
+}
+
+// AVAILABLE: Keyword/ExprSpecific:               available({#Platform...#}, *); name=available(Platform..., *)

@@ -243,6 +243,16 @@ public:
                      CallParameterColon, ": ");
   }
 
+  void addSystemParam(StringRef Annotation, bool IsVarArg = false) {
+    CurrentNestingLevel++;
+    addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
+                     Annotation);
+    if (IsVarArg)
+      addEllipsis();
+    CurrentNestingLevel--;
+  }
+
   void addCallParameter(Identifier Name, Identifier LocalName, Type Ty,
                         bool IsVarArg) {
     CurrentNestingLevel++;

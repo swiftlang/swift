@@ -426,6 +426,7 @@ enum class CompletionKind {
   AssignmentRHS,
   CallArg,
   ReturnStmtExpr,
+  AfterPound,
 };
 
 /// \brief A single code completion result.

@@ -931,6 +931,7 @@ public:
   void completeAssignmentRHS(AssignExpr *E) override;
   void completeCallArg(CallExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
+  void completeAfterPound(CodeCompletionExpr *E) override;
   void addKeywords(CodeCompletionResultSink &Sink);
 
   void doneParsing() override;
@@ -1626,6 +1627,17 @@ public:
       Builder.addAnnotatedRethrows();
     else if (AFT->throws())
       Builder.addAnnotatedThrows();
+  }
+
+  void addPoundAvailable() {
+    CodeCompletionResultBuilder Builder(Sink, CodeCompletionResult::ResultKind::Keyword,
+      SemanticContextKind::ExpressionSpecific, ExpectedTypes);
+    Builder.addTextChunk("available");
+    Builder.addLeftParen();
+    Builder.addSystemParam("Platform", true);
+    Builder.addComma();
+    Builder.addTextChunk("*");
+    Builder.addRightParen();
   }
 
   void addFunctionCallPattern(const AnyFunctionType *AFT,
@@ -3418,6 +3430,12 @@ void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
   Kind = CompletionKind::ReturnStmtExpr;
 }
 
+void CodeCompletionCallbacksImpl::completeAfterPound(CodeCompletionExpr *E) {
+  CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = E;
+  Kind = CompletionKind::AfterPound;
+}
+
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
     SmallVectorImpl<StringRef> &Keywords) {
   assert(!InEnumElementRawValue);
@@ -3494,7 +3512,6 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink) {
   // Same: Swift.BooleanLiteralType.
   AddKeyword("false", "Bool");
   AddKeyword("true", "Bool");
-  AddKeyword("#available", "Bool");
   AddKeyword("__DSO_HANDLE__", "UnsafeMutablePointer<Void>");
 
   CodeCompletionResultBuilder Builder(Sink,
@@ -3516,6 +3533,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::AssignmentRHS:
   case CompletionKind::CallArg:
   case CompletionKind::ReturnStmtExpr:
+  case CompletionKind::AfterPound:
     break;
 
   case CompletionKind::PostfixExprBeginning:
@@ -4000,6 +4018,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       }
     }
     Lookup.getValueCompletionsInDeclContext(Loc);
+    break;
+  }
+
+  case CompletionKind::AfterPound: {
+    Lookup.addPoundAvailable();
+    break;
   }
   }
 
