@@ -496,7 +496,7 @@ bool LoopARCMatchingSetComputationContext::run(
   // worklist.
   llvm::SmallVector<std::pair<SILLoop *, bool>, 32> Worklist;
   for (auto *L : SLI->getTopLevelLoops()) {
-    Worklist.push_back({L, false});
+    Worklist.push_back({L, L->empty()});
   }
 
   bool NestingDetected;
@@ -509,7 +509,7 @@ bool LoopARCMatchingSetComputationContext::run(
     if (!Visited) {
       Worklist.push_back({L, true});
       for (auto *SubLoop : L->getSubLoops()) {
-        Worklist.push_back({SubLoop, false});
+        Worklist.push_back({SubLoop, SubLoop->empty()});
       }
       continue;
     }
