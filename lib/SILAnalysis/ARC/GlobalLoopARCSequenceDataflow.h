@@ -78,26 +78,16 @@ public:
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
   ~LoopARCSequenceDataflowEvaluator();
 
-  /// Run the dataflow evaluator.
-  bool run(bool FreezePostDomReleases);
-
-  /// Clear all of the states we are tracking for the various basic blocks.
-  void clear();
-
   SILFunction *getFunction() const { return &F; }
 
   /// Clear all of the state associated with the given loop.
   void clearLoopState(const LoopRegion *R);
 
+  /// Perform the sequence dataflow, bottom up and top down on the loop region
+  /// \p R.
   bool runOnLoop(const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases);
 
 private:
-  /// Perform the bottom up data flow.
-  bool processBottomUp(bool freezePostDomReleases);
-
-  /// Perform the top down dataflow.
-  bool processTopDown();
-
   /// Merge in the BottomUp state of any successors of DataHandle.getBB() into
   /// DataHandle.getState().
   void mergeSuccessors(const LoopRegion *R, ARCRegionState &State);

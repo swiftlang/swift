@@ -117,39 +117,6 @@ bool LoopARCSequenceDataflowEvaluator::processLoopTopDown(const LoopRegion *R) {
   return NestingDetected;
 }
 
-bool LoopARCSequenceDataflowEvaluator::processTopDown() {
-  bool NestingDetected = false;
-
-  DEBUG(llvm::dbgs() << "<<<< Processing Top Down! >>>>\n");
-
-  // We visit the loop nest inside out via a depth first, post order using this
-  // worklist.
-  llvm::SmallVector<std::pair<SILLoop *, bool>, 32> Worklist;
-  for (auto *L : SLI->getTopLevelLoops()) {
-    Worklist.push_back({L, false});
-  }
-
-  while (Worklist.size()) {
-    SILLoop *L;
-    bool Visited;
-    std::tie(L, Visited) = Worklist.pop_back_val();
-
-    if (!Visited) {
-      Worklist.push_back({L, true});
-      for (auto *SubLoop : L->getSubLoops()) {
-        Worklist.push_back({SubLoop, false});
-      }
-      continue;
-    }
-
-    NestingDetected |= processLoopTopDown(LRFI->getRegion(L));
-  }
-
-  NestingDetected |= processLoopTopDown(LRFI->getTopLevelRegion());
-
-  return NestingDetected;
-}
-
 //===----------------------------------------------------------------------===//
 //                             Bottom Up Dataflow
 //===----------------------------------------------------------------------===//
@@ -275,42 +242,6 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
   return NestingDetected;
 }
 
-bool LoopARCSequenceDataflowEvaluator::processBottomUp(
-    bool FreezeOwnedArgEpilogueReleases) {
-  bool NestingDetected = false;
-
-  DEBUG(llvm::dbgs() << "<<<< Processing Bottom Up! >>>>\n");
-
-  // We visit the loop nest inside out via a depth first, post order using this
-  // worklist.
-  llvm::SmallVector<std::pair<SILLoop *, bool>, 32> Worklist;
-  for (auto *L : SLI->getTopLevelLoops()) {
-    Worklist.push_back({L, false});
-  }
-
-  while (Worklist.size()) {
-    SILLoop *L;
-    bool Visited;
-    std::tie(L, Visited) = Worklist.pop_back_val();
-
-    if (!Visited) {
-      Worklist.push_back({L, true});
-      for (auto *SubLoop : L->getSubLoops()) {
-        Worklist.push_back({SubLoop, false});
-      }
-      continue;
-    }
-
-    NestingDetected |=
-        processLoopBottomUp(LRFI->getRegion(L), FreezeOwnedArgEpilogueReleases);
-  }
-
-  NestingDetected |= processLoopBottomUp(LRFI->getTopLevelRegion(),
-                                         FreezeOwnedArgEpilogueReleases);
-
-  return NestingDetected;
-}
-
 //===----------------------------------------------------------------------===//
 //                 Top Level ARC Sequence Dataflow Evaluator
 //===----------------------------------------------------------------------===//
@@ -328,19 +259,7 @@ LoopARCSequenceDataflowEvaluator::LoopARCSequenceDataflowEvaluator(
   }
 }
 
-bool LoopARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {
-  bool NestingDetected = processBottomUp(FreezeOwnedReleases);
-  NestingDetected |= processTopDown();
-  return NestingDetected;
-}
-
 LoopARCSequenceDataflowEvaluator::~LoopARCSequenceDataflowEvaluator() {}
-
-void LoopARCSequenceDataflowEvaluator::clear() {
-  for (auto P : RegionStateInfo) {
-    P.second->clear();
-  }
-}
 
 bool LoopARCSequenceDataflowEvaluator::runOnLoop(
     const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases) {
