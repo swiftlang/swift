@@ -851,8 +851,8 @@ function(_add_swift_library_single target name)
   llvm_update_compile_flags(${target})
 
   set_output_directory(${target}
-      ${SWIFT_RUNTIME_OUTPUT_INTDIR}
-      ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+      BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
+      LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   if(MODULE)
     set_target_properties("${target}" PROPERTIES
@@ -911,7 +911,8 @@ function(_add_swift_library_single target name)
         ${SWIFT_SOURCE_DIR}/cmake/dummy.c)
 
     set_output_directory(${target_static}
-        ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+        BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
+        LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
       string(TOUPPER ${config} config_upper)
@@ -1682,7 +1683,9 @@ function(_add_swift_executable_single name)
   set_property(TARGET ${name} APPEND_STRING PROPERTY
       LINK_FLAGS " ${link_flags}")
 
-  set_output_directory(${name} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+  set_output_directory(${name}
+      BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
+      LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
   # Add Swift source files to the project.
   source_group("Swift Sources" FILES ${SWIFTEXE_SINGLE_EXTERNAL_SOURCES})
