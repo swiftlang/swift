@@ -1,22 +1,36 @@
 :orphan:
 
-=============================
-Persistable Modules for Swift
-=============================
-
-*or, how to make a forward-compatible serialization format using LLVM bitcode*
+=================================
+Swift Binary Serialization Format
+=================================
 
 The fundamental unit of distribution for Swift code is a *module.* A module
 contains declarations as an interface for clients to write code against. It may
 also contain implementation information for any of these declarations that can
-be used to optimize client code. Conceptually, a serialized module serves much
-the same purpose as the collection of C header files for a particular library.
+be used to optimize client code. Conceptually, the file containing the
+interface for a module serves much the same purpose as the collection of C
+header files for a particular library.
 
-In terms of the compiler, a module must serve as a container of both AST nodes
-and SIL entities. As a unit of distribution, it must also be
+Swift's binary serialization format is currently used for several purposes:
+
+- The public interface for a module ("swiftmodule files").
+
+- A representation of captured compiler state after semantic analysis and SIL
+  generation, but before LLVM IR generation ("SIB", for "Swift Intermediate
+  Binary").
+
+- Debug information about types, for proper high-level introspection without
+  running code.
+
+- Debug information about non-public APIs, for interactive debugging.
+
+The first two uses require a module to serve as a container of both AST nodes
+and SIL entities. As a unit of distribution, it should also be
 forward-compatible: module files installed on a developer's system in 201X
 should be usable without updates for years to come, even as the Swift compiler
-continues to be improved and enhanced.
+continues to be improved and enhanced. However, they are currently too closely
+tied to the compiler internals to be useful for this purpose, and it is likely
+we'll invent a new format instead.
 
 
 Why LLVM bitcode?
@@ -49,6 +63,16 @@ LLVM...might as well use it!
 Versioning
 ==========
 
+.. warning::
+
+  This section is relevant to any forward-compatible format used for a
+  library's public interface. However, as mentioned above this may not be
+  the current binary serialization format.
+
+  Today's Swift uses a "major" version number of 0 and an always-incrementing
+  "minor" version number. Every change is treated as compatibility-breaking;
+  the minor version must match exactly for the compiler to load the module.
+
 Persistent serialized Swift files use the following versioning scheme:
 
 - Serialized modules are given a major and minor version number.
@@ -80,12 +104,6 @@ a simpler implementation would just use the latest version number supported:
 *This versioning scheme was inspired by* `Semantic Versioning
 <http://semver.org>`_. *However, it is not compatible with Semantic Versioning
 because it promises* forward-compatibility *rather than* backward-compatibility.
-
-.. note::
-
-  Today's Swift uses a major version number of 0 and an always-incrementing
-  minor version number. Every change is treated as compatibility-breaking; the
-  minor version must match exactly for the compiler to load the module.
 
 
 A High-Level Tour of the Current Module Format
@@ -140,18 +158,6 @@ organizational purposes.
   their offsets in the AST block or identifier block (as appropriate). It also
   contains various top-level AST information about the module, such as its
   top-level declarations.
-
-
-Adding new information to existing nodes
-========================================
-
-[to be written]
-
-
-Adding new AST nodes
-====================
-
-[to be written]
 
 
 SIL
