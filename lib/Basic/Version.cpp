@@ -150,7 +150,7 @@ Version Version::parseCompilerVersionString(
           Diags->diagnose(Range.Start, diag::unused_compiler_version_component)
           .fixItReplaceChars(Range.Start, Range.End, "*");
         } else {
-          llvm_unreachable("Expected * for second compiler version component");
+          //llvm_unreachable("Expected * for second compiler version component");
         }
       }
 
@@ -167,7 +167,7 @@ Version Version::parseCompilerVersionString(
       Diags->diagnose(Range.Start,
                       diag::compiler_version_component_not_number);
     } else {
-      llvm_unreachable("Invalid character in _compiler_version build configuration");
+      //llvm_unreachable("Invalid character in _compiler_version build configuration");
     }
   }
 

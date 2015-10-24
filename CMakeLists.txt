@@ -145,6 +145,18 @@ set(SWIFT_DARWIN_ICU_INCLUDE_PATH "" CACHE STRING
 set(SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR "@rpath" CACHE STRING
     "The directory of the install_name for standard library dylibs")
 
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.9" CACHE STRING
+    "Minimum deployment target version for OS X")
+
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS "7.0" CACHE STRING
+    "Minimum deployment target version for iOS")
+
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS "9.0" CACHE STRING
+    "Minimum deployment target version for tvOS")
+
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "2.0" CACHE STRING
+    "Minimum deployment target version for watchOS")
+
 #
 # User-configurable debugging options.
 #
@@ -409,7 +421,9 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 
   is_sdk_requested(OSX swift_build_osx)
   if(swift_build_osx)
-    configure_sdk_darwin(OSX "OS X" "10.9" macosx macosx macosx "x86_64")
+    configure_sdk_darwin(
+        OSX "OS X" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}"
+        macosx macosx macosx "x86_64")
     configure_target_variant(OSX-DA "OS X Debug+Asserts"   OSX DA "Debug+Asserts")
     configure_target_variant(OSX-RA "OS X Release+Asserts" OSX RA "Release+Asserts")
     configure_target_variant(OSX-R  "OS X Release"         OSX R  "Release")
@@ -426,7 +440,9 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 
   is_sdk_requested(IOS swift_build_ios)
   if(swift_build_ios AND ${swift_can_crosscompile_stdlib})
-    configure_sdk_darwin(IOS "iOS" "7.0" iphoneos ios ios "armv7;armv7s;arm64")
+    configure_sdk_darwin(
+        IOS "iOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}"
+        iphoneos ios ios "armv7;armv7s;arm64")
     configure_target_variant(IOS-DA "iOS Debug+Asserts"   IOS DA "Debug+Asserts")
     configure_target_variant(IOS-RA "iOS Release+Asserts" IOS RA "Release+Asserts")
     configure_target_variant(IOS-R  "iOS Release"         IOS R "Release")
@@ -434,8 +450,9 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 
   is_sdk_requested(IOS_SIMULATOR swift_build_ios_simulator)
   if(swift_build_ios_simulator AND ${swift_can_crosscompile_stdlib})
-    configure_sdk_darwin(IOS_SIMULATOR "iOS Simulator" "7.0" iphonesimulator
-        ios-simulator ios "i386;x86_64")
+    configure_sdk_darwin(
+        IOS_SIMULATOR "iOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS}"
+        iphonesimulator ios-simulator ios "i386;x86_64")
     configure_target_variant(
         IOS_SIMULATOR-DA "iOS Debug+Asserts"   IOS_SIMULATOR DA "Debug+Asserts")
     configure_target_variant(
@@ -447,7 +464,9 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   if(${SWIFT_ENABLE_TARGET_TVOS})
     is_sdk_requested(TVOS swift_build_tvos)
     if(swift_build_tvos AND ${swift_can_crosscompile_stdlib})
-      configure_sdk_darwin(TVOS "tvOS" "9.0" appletvos tvos tvos "arm64")
+      configure_sdk_darwin(
+          TVOS "tvOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
+          appletvos tvos tvos "arm64")
       configure_target_variant(TVOS-DA "tvOS Debug+Asserts"   TVOS DA "Debug+Asserts")
       configure_target_variant(TVOS-RA "tvOS Release+Asserts" TVOS RA "Release+Asserts")
       configure_target_variant(TVOS-R  "tvOS Release"         TVOS R "Release")
@@ -455,7 +474,9 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 
     is_sdk_requested(TVOS_SIMULATOR swift_build_tvos_simulator)
     if(swift_build_tvos_simulator AND ${swift_can_crosscompile_stdlib})
-      configure_sdk_darwin(TVOS_SIMULATOR "tvOS Simulator" "9.0" appletvsimulator tvos-simulator tvos "x86_64")
+      configure_sdk_darwin(
+          TVOS_SIMULATOR "tvOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS}"
+          appletvsimulator tvos-simulator tvos "x86_64")
       configure_target_variant(
         TVOS_SIMULATOR-DA "tvOS Debug+Asserts"   TVOS_SIMULATOR DA "Debug+Asserts")
       configure_target_variant(
@@ -467,7 +488,9 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 
   is_sdk_requested(WATCHOS swift_build_watchos)
   if(swift_build_watchos AND ${swift_can_crosscompile_stdlib})
-    configure_sdk_darwin(WATCHOS "watchOS" "2.0" watchos watchos watchos "armv7k")
+    configure_sdk_darwin(
+        WATCHOS "watchOS" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+        watchos watchos watchos "armv7k")
     configure_target_variant(WATCHOS-DA "watchOS Debug+Asserts"   WATCHOS DA "Debug+Asserts")
     configure_target_variant(WATCHOS-RA "watchOS Release+Asserts" WATCHOS RA "Release+Asserts")
     configure_target_variant(WATCHOS-R  "watchOS Release"         WATCHOS R "Release")
@@ -475,7 +498,9 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 
   is_sdk_requested(WATCHOS_SIMULATOR swift_build_watchos_simulator)
   if(swift_build_watchos_simulator AND ${swift_can_crosscompile_stdlib})
-    configure_sdk_darwin(WATCHOS_SIMULATOR "watchOS Simulator" "2.0" watchsimulator watchos-simulator watchos "i386")
+    configure_sdk_darwin(
+        WATCHOS_SIMULATOR "watchOS Simulator" "${SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
+        watchsimulator watchos-simulator watchos "i386")
     configure_target_variant(WATCHOS_SIMULATOR-DA "watchOS Debug+Asserts"   WATCHOS_SIMULATOR DA "Debug+Asserts")
     configure_target_variant(WATCHOS_SIMULATOR-RA "watchOS Release+Asserts" WATCHOS_SIMULATOR RA "Release+Asserts")
     configure_target_variant(WATCHOS_SIMULATOR-R  "watchOS Release"         WATCHOS_SIMULATOR R "Release")
