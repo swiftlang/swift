@@ -244,11 +244,13 @@ bool areArraysEqual(RCIdentityFunctionInfo *RCIA, SILValue A, SILValue B,
   if (auto *BLoad = dyn_cast<LoadInst>(B))
     B = BLoad->getOperand();
   // Strip off struct_extract_refs until we hit array address.
-  StructElementAddrInst *SEAI = nullptr;
-  while (A != ArrayAddress && (SEAI = dyn_cast<StructElementAddrInst>(A)))
-    A = SEAI->getOperand();
-  while (B != ArrayAddress && (SEAI = dyn_cast<StructElementAddrInst>(B)))
-    B = SEAI->getOperand();
+  if (ArrayAddress) {
+    StructElementAddrInst *SEAI = nullptr;
+    while (A != ArrayAddress && (SEAI = dyn_cast<StructElementAddrInst>(A)))
+      A = SEAI->getOperand();
+    while (B != ArrayAddress && (SEAI = dyn_cast<StructElementAddrInst>(B)))
+      B = SEAI->getOperand();
+  }
   return A == B;
 }
 
@@ -408,6 +410,9 @@ protected:
   void hoistMakeMutableAndSelfProjection(ArraySemanticsCall MakeMutable,
                                          bool HoistProjection);
   bool hasLoopOnlyDestructorSafeArrayOperations();
+  bool isArrayValueReleasedBeforeMutate(
+      SILValue V, llvm::SmallSet<SILInstruction *, 16> &Releases);
+  bool hoistInLoopWithOnlyNonArrayValueMutatingOperations();
 };
 } // namespace
 
@@ -782,7 +787,7 @@ bool COWArrayOpt::checkSafeElementValueUses(UserOperList &ElementValueUsers) {
   return true;
 }
 static bool isArrayEltStore(StoreInst *SI) {
-  SILValue Dest = SI->getDest();
+  SILValue Dest = SI->getDest().stripAddressProjections();
   if (auto *MD = dyn_cast<MarkDependenceInst>(Dest))
     Dest = MD->getOperand(0);
 
@@ -794,6 +799,490 @@ static bool isArrayEltStore(StoreInst *SI) {
         return true;
     }
   return false;
+}
+
+/// Check whether the array semantic operation could change an array value to
+/// not be uniquely referenced.
+///
+/// Array.append for example can capture another array value.
+static bool mayChangeArrayValueToNonUniqueState(ArraySemanticsCall &Call) {
+  switch (Call.getKind()) {
+  case ArrayCallKind::kArrayPropsIsNative:
+  case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
+  case ArrayCallKind::kCheckSubscript:
+  case ArrayCallKind::kCheckIndex:
+  case ArrayCallKind::kGetCount:
+  case ArrayCallKind::kGetCapacity:
+  case ArrayCallKind::kGetElement:
+  case ArrayCallKind::kGetArrayOwner:
+  case ArrayCallKind::kGetElementAddress:
+  case ArrayCallKind::kMakeMutable:
+    return false;
+
+  case ArrayCallKind::kNone:
+  case ArrayCallKind::kMutateUnknown:
+  case ArrayCallKind::kArrayInit:
+  case ArrayCallKind::kArrayUninitialized:
+    return true;
+  }
+}
+
+/// Check that the array value stored in \p ArrayStruct is released by \Inst.
+bool isReleaseOfArrayValueAt(AllocStackInst *ArrayStruct, SILInstruction *Inst,
+                             RCIdentityFunctionInfo *RCIA) {
+  auto *SRI = dyn_cast<StrongReleaseInst>(Inst);
+  if (!SRI)
+   return false;
+  auto Root = RCIA->getRCIdentityRoot(SRI->getOperand());
+  auto *ArrayLoad = dyn_cast<LoadInst>(Root);
+  if (!ArrayLoad)
+    return false;
+
+  if (ArrayLoad->getOperand().getDef() == ArrayStruct)
+    return true;
+
+  return false;
+}
+
+/// Check that the array value is released before a mutating operation happens.
+bool COWArrayOpt::isArrayValueReleasedBeforeMutate(
+    SILValue V, llvm::SmallSet<SILInstruction *, 16> &Releases) {
+  auto *ASI = dyn_cast<AllocStackInst>(V.getDef());
+  if (!ASI)
+    return false;
+
+  for (auto II = std::next(SILBasicBlock::iterator(ASI)),
+            IE = ASI->getParent()->end();
+       II != IE; ++II) {
+    auto *Inst = &*II;
+    // Ignore matched releases.
+    if (auto SRI = dyn_cast<StrongReleaseInst>(Inst))
+      if (MatchedReleases.count(&SRI->getOperandRef()))
+        continue;
+    if (auto RVI = dyn_cast<ReleaseValueInst>(Inst))
+      if (MatchedReleases.count(&RVI->getOperandRef()))
+        continue;
+
+    if (isReleaseOfArrayValueAt(ASI, II, RCIA)) {
+      Releases.erase(II);
+      return true;
+    }
+
+    if (isa<RetainValueInst>(II) || isa<StrongRetainInst>(II))
+      continue;
+
+    // A side effect free instruction cannot mutate the array.
+    if (!II->mayHaveSideEffects())
+      continue;
+
+    // Non mutating array calls are safe.
+    if (isNonMutatingArraySemanticCall(II))
+      continue;
+
+    return false;
+  }
+  return true;
+}
+
+static SILInstruction *getInstBefore(SILInstruction *I) {
+  auto It = SILBasicBlock::reverse_iterator(I);
+  if (I->getParent()->rend() == It)
+    return nullptr;
+  return &*It;
+}
+
+static SILInstruction *getInstAfter(SILInstruction *I) {
+  auto It = SILBasicBlock::iterator(I);
+  It = std::next(It);
+  if (I->getParent()->end() == It)
+    return nullptr;
+  return &*It;
+}
+
+/// Strips and stores the struct_extract projections leading to the array
+/// storage reference.
+static SILValue
+stripValueProjections(SILValue V,
+                      SmallVectorImpl<SILInstruction *> &ValuePrjs) {
+  while (V->getKind() == ValueKind::StructExtractInst) {
+    ValuePrjs.push_back(cast<SILInstruction>(V.getDef()));
+    V = cast<SILInstruction>(V.getDef())->getOperand(0);
+  }
+  return V;
+}
+
+/// Finds the preceeding check_subscript, make_mutable call or returns nil.
+///
+/// If we found a make_mutable call this means that check_subscript was removed
+/// by the array bounds check elimination pass.
+static SILInstruction *
+findPreceedingCheckSubscriptOrMakeMutable(ApplyInst *GetElementAddr) {
+  for (auto ReverseIt = SILBasicBlock::reverse_iterator(GetElementAddr),
+            End = GetElementAddr->getParent()->rend();
+       ReverseIt != End; ++ReverseIt) {
+    auto Apply = dyn_cast<ApplyInst>(&*ReverseIt);
+    if (!Apply)
+      continue;
+    ArraySemanticsCall CheckSubscript(Apply);
+    if (!CheckSubscript ||
+        (CheckSubscript.getKind() != ArrayCallKind::kCheckSubscript &&
+         CheckSubscript.getKind() != ArrayCallKind::kMakeMutable))
+      return nullptr;
+    return CheckSubscript;
+  }
+  return nullptr;
+}
+
+/// Matches the self parameter arguments, verifies that \p Self is called and
+/// stores the instructions in \p DepInsts in order.
+static bool
+matchSelfParameterSetup(ApplyInst *Call, LoadInst *Self,
+                        SmallVectorImpl<SILInstruction *> &DepInsts) {
+  auto *RetainArray = dyn_cast_or_null<StrongRetainInst>(getInstBefore(Call));
+  if (!RetainArray)
+    return false;
+  auto *ReleaseArray = dyn_cast_or_null<StrongReleaseInst>(getInstAfter(Call));
+  if (!ReleaseArray)
+    return false;
+  if (ReleaseArray->getOperand() != RetainArray->getOperand())
+    return false;
+
+  DepInsts.push_back(ReleaseArray);
+  DepInsts.push_back(Call);
+  DepInsts.push_back(RetainArray);
+
+  auto ArrayLoad = stripValueProjections(RetainArray->getOperand(), DepInsts);
+  if (ArrayLoad != Self)
+    return false;
+
+  DepInsts.push_back(Self);
+  return true;
+}
+
+/// Match a hoistable make_mutable call.
+///
+/// Precondition: The client must make sure that it is valid to actually hoist
+/// the call. It must make sure that no write and no increment to the array
+/// reference has happend such that hoisting is not valid.
+///
+/// This helper only checks that the operands computing the array refererence
+/// are also hoistable.
+struct HoistableMakeMutable {
+  SILLoop *Loop;
+  bool IsHoistable;
+  ApplyInst *MakeMutable;
+  SmallVector<SILInstruction *, 24> DepInsts;
+
+  HoistableMakeMutable(ArraySemanticsCall M, SILLoop *L) {
+    IsHoistable = false;
+    Loop = L;
+    MakeMutable = M;
+
+    // The function_ref needs to be invariant.
+    if (Loop->contains(MakeMutable->getCallee()->getParentBB()))
+      return;
+
+    // The array reference is invariant.
+    if (!L->contains(M.getSelf()->getParentBB())) {
+      IsHoistable = true;
+      return;
+    }
+
+    // Check whether we can hoist the dependent instructions resulting in the
+    // array reference.
+    if (canHoistDependentInstructions(M))
+      IsHoistable = true;
+  }
+
+  /// Is this a hoistable make_mutable call.
+  bool isHoistable() {
+    return IsHoistable;
+  }
+
+  /// Hoist this make_mutable call and depend instructions to the preheader.
+  void hoist() {
+    auto *Term = Loop->getLoopPreheader()->getTerminator();
+    for (auto *It : swift::reversed(DepInsts))
+      It->moveBefore(Term);
+    MakeMutable->moveBefore(Term);
+  }
+
+private:
+
+  /// Check whether we can hoist the dependent instructions resulting in the
+  /// array reference passed to the make_mutable call.
+  /// We pattern match the first dimension's array access here.
+  bool canHoistDependentInstructions(ArraySemanticsCall &M) {
+    // Match get_element_addr call.
+    // %124 = load %3
+    // %125 = struct_extract %124
+    // %126 = struct_extract %125
+    // %127 = struct_extract %126
+    // strong_retain %127
+    // %129 = apply %70(%30, %124)
+    // strong_release %127
+    //
+    // %131 = load %73
+    // %132 = unchecked_ref_cast %131
+    // %133 = enum $Optional<NativeObject>, #Optional.Some!enumelt.1, %132
+    // %134 = struct_extract %129
+    // %135 = pointer_to_address %134 to $*Array<Int>
+    // %136 = mark_dependence %135 on %133
+
+    auto *MarkDependence = dyn_cast<MarkDependenceInst>(M.getSelf());
+    if (!MarkDependence)
+      return false;
+    DepInsts.push_back(MarkDependence);
+
+    auto *PtrToAddrArrayAddr =
+        dyn_cast<PointerToAddressInst>(MarkDependence->getValue());
+    if (!PtrToAddrArrayAddr)
+      return false;
+    DepInsts.push_back(PtrToAddrArrayAddr);
+
+    auto *StructExtractArrayAddr =
+        dyn_cast<StructExtractInst>(PtrToAddrArrayAddr->getOperand());
+    if (!StructExtractArrayAddr)
+      return false;
+    DepInsts.push_back(StructExtractArrayAddr);
+
+    // Check the base the array element address is dependent on.
+    auto *EnumArrayAddr = dyn_cast<EnumInst>(MarkDependence->getBase());
+    if (!EnumArrayAddr)
+      return false;
+    DepInsts.push_back(EnumArrayAddr);
+    auto *UncheckedRefCast =
+        dyn_cast<UncheckedRefCastInst>(EnumArrayAddr->getOperand());
+    if (!UncheckedRefCast)
+      return false;
+    DepInsts.push_back(UncheckedRefCast);
+    auto *BaseLoad = dyn_cast<LoadInst>(UncheckedRefCast->getOperand());
+    if (!BaseLoad ||  Loop->contains(BaseLoad->getOperand()->getParentBB()))
+      return false;
+    DepInsts.push_back(BaseLoad);
+
+    // Check the get_element_addr call.
+    ArraySemanticsCall GetElementAddrCall(
+        StructExtractArrayAddr->getOperand().getDef());
+    if (!GetElementAddrCall ||
+        GetElementAddrCall.getKind() != ArrayCallKind::kGetElementAddress)
+      return false;
+    if (Loop->contains(
+            ((ApplyInst *)GetElementAddrCall)->getCallee()->getParentBB()))
+      return false;
+    if (Loop->contains(GetElementAddrCall.getIndex()->getParentBB()))
+      return false;
+
+    auto *GetElementAddrArrayLoad =
+        dyn_cast<LoadInst>(GetElementAddrCall.getSelf());
+    if (!GetElementAddrArrayLoad ||
+        Loop->contains(GetElementAddrArrayLoad->getOperand()->getParentBB()))
+      return false;
+
+    // Check the retain/release around the get_element_addr call.
+    if (!matchSelfParameterSetup(GetElementAddrCall, GetElementAddrArrayLoad,
+                                 DepInsts))
+      return false;
+
+    // Check check_subscript.
+    // %116 = load %3
+    // %118 = struct_extract %116
+    // %119 = struct_extract %118
+    // %120 = struct_extract %119
+    // strong_retain %120
+    // %122 = apply %23(%30, %69, %116)
+    // strong_release %120
+    //
+    // Find the check_subscript call.
+    auto *Check = findPreceedingCheckSubscriptOrMakeMutable(GetElementAddrCall);
+    if (!Check)
+      return false;
+
+    ArraySemanticsCall CheckSubscript(Check);
+    // The check_subscript call was removed.
+    if (CheckSubscript.getKind() == ArrayCallKind::kMakeMutable)
+      return true;
+
+    if (Loop->contains(CheckSubscript.getIndex()->getParentBB()) ||
+        Loop->contains(CheckSubscript.getArrayPropertyIsNative()->getParentBB()))
+      return false;
+
+    auto *CheckSubscriptArrayLoad =
+        dyn_cast<LoadInst>(CheckSubscript.getSelf());
+    if (!CheckSubscript ||
+        Loop->contains(CheckSubscriptArrayLoad->getOperand()->getParentBB()))
+      return false;
+  if (Loop->contains(
+            ((ApplyInst *)CheckSubscript)->getCallee()->getParentBB()))
+      return false;
+
+    // The array must match get_element_addr's array.
+    if (CheckSubscriptArrayLoad->getOperand() !=
+        GetElementAddrArrayLoad->getOperand())
+      return false;
+
+    // Check the retain/release around the check_subscript call.
+    if (!matchSelfParameterSetup(CheckSubscript, CheckSubscriptArrayLoad,
+                                 DepInsts))
+      return false;
+
+    return true;
+  }
+};
+
+/// Prove that there are not array value mutating or capturing operations in the
+/// loop and hoist make_mutable.
+bool COWArrayOpt::hoistInLoopWithOnlyNonArrayValueMutatingOperations() {
+  // Only handle innermost loops.
+  assert(Loop->getSubLoops().empty() && "Only works in innermost loops");
+
+  DEBUG(llvm::dbgs() << "    Checking whether loop only has only non array "
+                        "value mutating operations ...\n");
+
+  // There is no current array addr value.
+  CurrentArrayAddr = SILValue();
+
+  // We need to cleanup the MatchedRelease on return.
+  auto ReturnWithCleanup = [&] (bool LoopHasSafeOperations) {
+    MatchedReleases.clear();
+    return LoopHasSafeOperations;
+  };
+
+  llvm::SmallSet<SILValue, 16> ArrayValues;
+  llvm::SmallSetVector<SILValue, 16> CreatedNonTrivialValues;
+  llvm::SmallSet<SILInstruction *, 16> Releases;
+  llvm::SmallVector<ArraySemanticsCall, 8> MakeMutableCalls;
+
+
+  /// Make sure that no writes to an array value happens in the loop and that
+  /// no array values are retained without beeing released before hitting a
+  /// make_unique:
+  ///
+  /// * array semantic functions that don't change the uniqueness state to
+  ///   non-unique are safe.
+  /// * retains must be matched by a release before hitting a mutating operation
+  /// * stores must not store an array value (only trivial stores are safe).
+  ///
+  auto &Module = Function->getModule();
+  for (auto *BB : Loop->getBlocks()) {
+    for (auto &InstIt : *BB) {
+      auto *Inst = &InstIt;
+      ArraySemanticsCall Sem(Inst);
+      if (Sem) {
+        // Give up if the array semantic function might change the uniqueness
+        // state of an array value in the loop. An example of such an operation
+        // would be append. We also give up for array initializations.
+        if (mayChangeArrayValueToNonUniqueState(Sem))
+          return ReturnWithCleanup(false);
+
+        // Collect both the value and the pointer.
+        ArrayValues.insert(Sem.getSelf());
+        if (auto *LI = dyn_cast<LoadInst>(Sem.getSelf()))
+          ArrayValues.insert(LI->getOperand());
+
+        // Collect non-trivial generated values. This could be an array value.
+        // We must make sure that any non-trivial generated values (== +1)
+        // are release before we hit a make_unique instruction.
+        ApplyInst *SemCall = Sem;
+        if (Sem.getKind() == ArrayCallKind::kGetElement &&
+            !SemCall->getArgument(0).getType().isTrivial(Module)) {
+          CreatedNonTrivialValues.insert(SemCall->getArgument(0));
+        } else if (Sem.getKind() == ArrayCallKind::kMakeMutable) {
+          MakeMutableCalls.push_back(Sem);
+        }
+
+        continue;
+      }
+
+      // Instructions without side effects are safe.
+      if (!Inst->mayHaveSideEffects())
+        continue;
+      if (isa<CondFailInst>(Inst))
+        continue;
+      if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
+        continue;
+
+      // A retain must be released before make_unique.
+      if (isa<RetainValueInst>(Inst) ||
+          isa<StrongRetainInst>(Inst)) {
+        if (!isRetainReleasedBeforeMutate(Inst, false)) {
+          DEBUG(llvm::dbgs() << "    (NO) retain not released before mutate " << *Inst);
+          return ReturnWithCleanup(false);
+        }
+        continue;
+      }
+      // A store is only safe if it is to an array element and the element type
+      // is trivial.
+      if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
+        if (!isArrayEltStore(SI) ||
+            !SI->getSrc().getType().isTrivial(Module)) {
+          DEBUG(llvm::dbgs()
+                << "     (NO) non trivial store could store an array value "
+                << *Inst);
+          return ReturnWithCleanup(false);
+        }
+        continue;
+      }
+      // Releases must be matched by a retain otherwise a destructor could run.
+      if (auto SRI = dyn_cast<StrongReleaseInst>(Inst)) {
+        if (!MatchedReleases.count(&SRI->getOperandRef()))
+          Releases.insert(Inst);
+        continue;
+      }
+      if (auto RVI = dyn_cast<ReleaseValueInst>(Inst)) {
+        if (!MatchedReleases.count(&RVI->getOperandRef()))
+          Releases.insert(Inst);
+        continue;
+      }
+
+      DEBUG(llvm::dbgs() << "    (NO) instruction prevents make_unique hoisting "
+                         << *Inst);
+      return ReturnWithCleanup(false);
+    }
+  }
+
+  // Nothing to do.
+  if (MakeMutableCalls.empty())
+    return ReturnWithCleanup(false);
+
+  // Verify that all created non trivial values are array values and that they
+  // are released before mutation.
+  for (auto &NonTrivial : CreatedNonTrivialValues) {
+    if (!ArrayValues.count(NonTrivial)) {
+      DEBUG(llvm::dbgs() << "    (NO) non-trivial non-array value: " << NonTrivial);
+      return ReturnWithCleanup(false);
+    }
+
+    if (!isArrayValueReleasedBeforeMutate(NonTrivial, Releases)) {
+      DEBUG(llvm::dbgs() << "    (NO) array value not released before mutation "
+                         << NonTrivial);
+      return ReturnWithCleanup(false);
+    }
+  }
+
+  if (!Releases.empty()) {
+    DEBUG(llvm::dbgs() << "    (NO) remaining releases not matched by retain\n");
+    return ReturnWithCleanup(false);
+  }
+
+  // Collect all recursively hoistable calls.
+  SmallVector<std::unique_ptr<HoistableMakeMutable>, 16> CallsToHoist;
+  for (auto M : MakeMutableCalls) {
+    auto Call = llvm::make_unique<HoistableMakeMutable>(M, Loop);
+    if (!Call->isHoistable()) {
+      DEBUG(llvm::dbgs() << "    (NO) make_mutable not hoistable"
+                         << *Call->MakeMutable);
+      return ReturnWithCleanup(false);
+    }
+    CallsToHoist.push_back(std::move(Call));
+  }
+
+  for (auto &Call: CallsToHoist)
+    Call->hoist();
+
+  DEBUG(llvm::dbgs() << "    Hoisting make_mutable in " << Function->getName()
+                     << "\n");
+  return ReturnWithCleanup(true);
 }
 
 /// Check if a loop has only 'safe' array operations such that we can hoist the
@@ -984,6 +1473,14 @@ bool COWArrayOpt::run() {
     DEBUG(llvm::dbgs() << "    Skipping Loop: No Preheader!\n");
     return false;
   }
+
+  // Hoist make_mutable in two dimensional arrays if there are no array value
+  // mutating operations in the loop.
+  if (Loop->getSubLoops().empty() &&
+      hoistInLoopWithOnlyNonArrayValueMutatingOperations()) {
+    return true;
+  }
+
   for (auto *BB : Loop->getBlocks()) {
     if (ColdBlocks.isCold(BB))
       continue;

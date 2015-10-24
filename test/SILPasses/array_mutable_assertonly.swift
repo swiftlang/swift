@@ -104,3 +104,76 @@ func hoistMutableOfAppend(inout A : [Int]) {
     A.append(i)
   }
 }
+
+@inline(never)
+func use(a: [Int]) {
+}
+
+class ArrayHolder {
+  final var A : [[Int]]
+  init() { A = [] }
+
+// CHECK-LABEL: COW Array Opts in Func {{.*}}hoist2DArrayInClass
+// CHECK: Hoisting make_mutable
+// CHECK: COW Array Opts
+
+  func hoist2DArrayInClass() {
+    for i in 0 ..< 10 {
+      for y in 0 ..< 10 {
+        A[i][y] = A[i][y] * 2
+      }
+    }
+  }
+
+// CHECK-LABEL: COW Array Opts in Func {{.*}}dontHoist2DArray
+// CHECK-NOT: Hoisting make_mutable
+
+  func dontHoist2DArray(){
+    var escape : [Int] = []
+    for i in 0 ..< A.count {
+      for y in 0 ..< A[i].count {
+        escape = A[i]
+        A[i][y] = A[i][y] * 2
+      }
+    }
+    use(escape)
+  }
+
+// CHECK-LABEL: COW Array Opts in Func {{.*}}dontHoist2DArray2
+// CHECK-NOT: Hoisting make_mutable
+
+  func dontHoist2DArray2(){
+    let b = [0]
+    for i in 0 ..< A.count {
+      for y in 0 ..< A[i].count {
+        A[1] = b
+        A[i][y] = A[i][y] * 2
+      }
+    }
+  }
+
+// CHECK-LABEL: COW Array Opts in Func {{.*}}dontHoist2DArray3
+// CHECK-NOT: Hoisting make_mutable
+// CHECK: COW Array Opts
+
+  func dontHoist2DArray3() {
+    for i in 0 ..< A.count {
+      for y in 0 ..< A[i].count {
+        A[i].append(2)
+        A[i][y] = A[i][y] * 2
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: COW Array Opts in Func {{.*}}hoist2DArray
+// CHECK: Hoisting make_mutable
+// CHECK: COW Array Opts
+
+func hoist2DArray(inout a: [[Int]]) {
+  for i in 0 ..< a.count {
+    for y in 0 ..< a[i].count {
+      a[i][y] = a[i][y] * 2
+    }
+  }
+}
