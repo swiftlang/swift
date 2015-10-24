@@ -451,6 +451,9 @@ public:
   bool hasLValueAccessKind() const {
     return ExprBits.LValueAccessKind != 0;
   }
+  void clearLValueAccessKind() {
+    ExprBits.LValueAccessKind = 0;
+  }
 
   /// Set that this l-value expression is used in the given way.
   ///

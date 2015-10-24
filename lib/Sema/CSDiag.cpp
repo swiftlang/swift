@@ -2492,6 +2492,7 @@ static void eraseTypeData(Expr *expr) {
         return { false, expr };
       
       expr->setType(nullptr);
+      expr->clearLValueAccessKind();
       return { true, expr };
     }
     

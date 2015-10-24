@@ -785,3 +785,9 @@ func r22348394() {
   func f(x x: Int = 0) { }
   f(Int(3)) // expected-error{{missing argument label 'x:' in call}}
 }
+
+// <rdar://problem/23185177> Compiler crashes in Assertion failed: ((AllowOverwrite || !E->hasLValueAccessKind()) && "l-value access kind has already been set"), function visit
+protocol P { var y: String? { get } }
+func r23185177(var x: P?) -> [String] { // expected-warning{{parameter 'x' was never mutated}}
+  return x?.y // expected-error{{cannot convert return expression of type 'String?' to return type '[String]'}}
+}
