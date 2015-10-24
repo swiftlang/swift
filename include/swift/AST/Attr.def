@@ -158,6 +158,9 @@ SIMPLE_DECL_ATTR(noescape, NoEscape, OnParam, 29)
 SIMPLE_DECL_ATTR(nonobjc, NonObjC,
                  OnFunc | OnVar | OnSubscript | OnConstructor, 30)
 
+SIMPLE_DECL_ATTR(fixed_layout, FixedLayout,
+                 OnClass | OnStruct | OnEnum, 31)
+
 // Non-serialized attributes.
 
 SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier | NotSerialized,

@@ -283,4 +283,10 @@ def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
    ModeOpt;
 
+def enable_resilience : Flag<["-"], "enable-resilience">,
+   HelpText<"Treat all types as resilient by default">;
+
+def disable_resilience : Flag<["-"], "disable-resilience">,
+   HelpText<"Treat all types as fixed layout by default">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

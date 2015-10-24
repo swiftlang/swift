@@ -1052,7 +1052,7 @@ namespace {
     assert(inst->hasDefault() && "doesn't have a default");
     SILType enumType = enumValue.getType();
 
-    if (enumType.isResilient(inst->getModule()))
+    if (!enumType.hasFixedLayout(inst->getModule()))
       return nullptr;
 
     EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();

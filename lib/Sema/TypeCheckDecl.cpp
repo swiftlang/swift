@@ -225,6 +225,7 @@ static void addImplicitConformances(
 
 /// Check that the declaration attributes are ok.
 static void validateAttributes(TypeChecker &TC, Decl *VD);
+static void validateFixedLayoutAttribute(TypeChecker &TC, NominalTypeDecl *D);
 
 void TypeChecker::resolveSuperclass(ClassDecl *classDecl) {
   IterativeTypeChecker ITC(*this);
@@ -4786,6 +4787,7 @@ public:
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Effects)
+    UNINTERESTING_ATTR(FixedLayout)
     UNINTERESTING_ATTR(Lazy)
     UNINTERESTING_ATTR(LLDBDebuggerFunction)
     UNINTERESTING_ATTR(Mutating)
@@ -5824,6 +5826,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     checkInheritanceClause(D);
     validateAttributes(*this, D);
+    validateFixedLayoutAttribute(*this, nominal);
 
     // Mark a class as @objc. This must happen before checking its members.
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
@@ -6948,6 +6951,24 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Create an empty body for the default constructor. The type-check of the
   // constructor body will introduce default initializations of the members.
   ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
+}
+
+static void validateFixedLayoutAttribute(TypeChecker &TC,
+                                         NominalTypeDecl *D) {
+  DeclAttributes &Attrs = D->getAttrs();
+
+  if (Attrs.hasAttribute<FixedLayoutAttr>())
+    return;
+
+  // Since -enable-resilience should not change how we call into
+  // existing compiled modules, make all value types @fixed_layout
+  // when the frontend is not run with the -enable-resilience flag.
+  if (!TC.Context.LangOpts.EnableResilience &&
+      D->getFormalAccess() == Accessibility::Public)
+    Attrs.add(new (TC.Context) FixedLayoutAttr(/*IsImplicit*/ true));
+  // @objc enums are always @fixed_layout.
+  else if (isa<EnumDecl>(D) && D->isObjC())
+    Attrs.add(new (TC.Context) FixedLayoutAttr(/*IsImplicit*/ true));
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {

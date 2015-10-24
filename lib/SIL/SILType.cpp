@@ -317,13 +317,11 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }
 
-bool SILType::isResilient(SILModule &M) const {
-  NominalTypeDecl *nomType = getNominalOrBoundGenericNominal();
-  if (!nomType) {
-    assert(false && "isResilient on non-nominal types not implemented");
-    return true;
-  }
-  return M.Types.isResilient(nomType);
+bool SILType::hasFixedLayout(SILModule &M) const {
+  if (auto *NTD = getNominalOrBoundGenericNominal())
+    return NTD->hasFixedLayout(M.getSwiftModule());
+
+  llvm_unreachable("hasFixedLayout on non-nominal types not implemented");
 }
 
 /// True if the type, or the referenced type of an address type, is
