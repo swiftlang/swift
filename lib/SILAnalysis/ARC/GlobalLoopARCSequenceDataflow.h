@@ -86,6 +86,11 @@ public:
 
   SILFunction *getFunction() const { return &F; }
 
+  /// Clear all of the state associated with the given loop.
+  void clearLoopState(const LoopRegion *R);
+
+  bool runOnLoop(const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases);
+
 private:
   /// Perform the bottom up data flow.
   bool processBottomUp(bool freezePostDomReleases);

@@ -341,3 +341,15 @@ void LoopARCSequenceDataflowEvaluator::clear() {
     P.second->clear();
   }
 }
+
+bool LoopARCSequenceDataflowEvaluator::runOnLoop(
+    const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases) {
+  bool NestingDetected = processLoopBottomUp(R, FreezeOwnedArgEpilogueReleases);
+  NestingDetected |= processLoopTopDown(R);
+  return NestingDetected;
+}
+
+void LoopARCSequenceDataflowEvaluator::clearLoopState(const LoopRegion *R) {
+  for (unsigned SubregionID : R->getSubregions())
+    getARCState(LRFI->getRegion(SubregionID)).clear();
+}

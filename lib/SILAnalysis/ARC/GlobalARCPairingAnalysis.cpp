@@ -412,10 +412,6 @@ bool ARCMatchingSetComputationContext::performMatching(
   // Then finalize the callback. This is the only place instructions can be
   // deleted.
   Callback.finalize();
-
-  DecToIncStateMap.clear();
-  IncToDecStateMap.clear();
-
   return MatchedPair;
 }
 
@@ -457,26 +453,76 @@ namespace {
 
 struct LoopARCMatchingSetComputationContext : ARCMatchingSetComputationContext {
   LoopARCSequenceDataflowEvaluator Evaluator;
+  LoopRegionFunctionInfo *LRFI;
+  SILLoopInfo *SLI;
 
   LoopARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA,
                                        LoopRegionFunctionInfo *LRFI,
                                        SILLoopInfo *SLI,
                                        RCIdentityFunctionInfo *RCFI)
       : ARCMatchingSetComputationContext(F, RCFI),
-        Evaluator(F, AA, LRFI, SLI, RCIA, DecToIncStateMap, IncToDecStateMap) {}
+        Evaluator(F, AA, LRFI, SLI, RCIA, DecToIncStateMap, IncToDecStateMap),
+        LRFI(LRFI), SLI(SLI) {}
   virtual ~LoopARCMatchingSetComputationContext() override final {}
 
   virtual bool run(bool FreezePostDomReleases,
-                   ARCMatchingSetCallback &Callback) override final {
-    bool NestingDetected = Evaluator.run(FreezePostDomReleases);
-    Evaluator.clear();
-
-    bool MatchedPair = performMatching(Callback);
-    return NestingDetected && MatchedPair;
-  }
+                   ARCMatchingSetCallback &Callback) override final;
+  void processLoop(const LoopRegion *R, bool FreezePostDomReleases,
+                   ARCMatchingSetCallback &Callback);
 };
 
 } // end anonymous namespace
+
+void LoopARCMatchingSetComputationContext::processLoop(
+    const LoopRegion *Region, bool FreezePostDomReleases,
+    ARCMatchingSetCallback &Callback) {
+  bool NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases);
+  bool MatchedPair = performMatching(Callback);
+  DecToIncStateMap.clear();
+  IncToDecStateMap.clear();
+
+  while (NestingDetected && MatchedPair) {
+    Evaluator.clearLoopState(Region);
+    NestingDetected = Evaluator.runOnLoop(Region, FreezePostDomReleases);
+    MatchedPair = performMatching(Callback);
+    DecToIncStateMap.clear();
+    IncToDecStateMap.clear();
+  }
+}
+
+bool LoopARCMatchingSetComputationContext::run(
+    bool FreezePostDomReleases, ARCMatchingSetCallback &Callback) {
+  // We visit the loop nest inside out via a depth first, post order using this
+  // worklist.
+  llvm::SmallVector<std::pair<SILLoop *, bool>, 32> Worklist;
+  for (auto *L : SLI->getTopLevelLoops()) {
+    Worklist.push_back({L, false});
+  }
+
+  bool NestingDetected;
+  bool MatchedPair;
+  while (Worklist.size()) {
+    SILLoop *L;
+    bool Visited;
+    std::tie(L, Visited) = Worklist.pop_back_val();
+
+    if (!Visited) {
+      Worklist.push_back({L, true});
+      for (auto *SubLoop : L->getSubLoops()) {
+        Worklist.push_back({SubLoop, false});
+      }
+      continue;
+    }
+
+    processLoop(LRFI->getRegion(L), FreezePostDomReleases, Callback);
+  }
+
+  processLoop(LRFI->getTopLevelRegion(), FreezePostDomReleases, Callback);
+
+  // We always return false since we are iterating internally rather than
+  // externally.
+  return false;
+}
 
 //===----------------------------------------------------------------------===//
 //                           Top Level EntryPoints
