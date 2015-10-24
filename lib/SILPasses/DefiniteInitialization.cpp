@@ -486,7 +486,7 @@ namespace {
     void handleEscapeUse(const DIMemoryUse &Use);
 
     void handleLoadUseFailure(const DIMemoryUse &InstInfo,
-                              bool IsSuperInitComplete,
+                              bool SuperInitDone,
                               bool FailedSelfUse);
 
     void handleSuperInitUse(const DIMemoryUse &InstInfo);
@@ -515,6 +515,9 @@ namespace {
     void noteUninitializedMembers(const DIMemoryUse &Use);
     void diagnoseInitError(const DIMemoryUse &Use,
                            Diag<StringRef, bool> DiagMessage);
+    void diagnoseRefElementAddr(RefElementAddrInst *REI);
+    bool diagnoseMethodCall(const DIMemoryUse &Use,
+                            bool SuperInitDone);
     
     bool isBlockIsReachableFromEntry(SILBasicBlock *BB);
   };
@@ -1028,9 +1031,9 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
 void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
   // The value must be fully initialized at all escape points.  If not, diagnose
   // the error.
-  bool IsSuperInitDone, FailedSelfUse;
+  bool SuperInitDone, FailedSelfUse;
 
-  if (isInitializedAtUse(Use, &IsSuperInitDone, &FailedSelfUse))
+  if (isInitializedAtUse(Use, &SuperInitDone, &FailedSelfUse))
     return;
 
   auto Inst = Use.Inst;
@@ -1047,25 +1050,28 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
   }
 
   // This is a use of an uninitialized value.  Emit a diagnostic.
-  if (TheMemory.isDelegatingInit()) {
+  if (TheMemory.isDelegatingInit() || TheMemory.isDerivedClassSelfOnly()) {
+    if (diagnoseMethodCall(Use, false))
+      return;
+
+    if (!shouldEmitError(Inst)) return;
+
+    auto diagID = diag::self_before_superselfinit;
+
     // If this is a load with a single user that is a return, then this is
     // a return before self.init.   Emit a specific diagnostic.
     if (auto *LI = dyn_cast<LoadInst>(Inst))
       if (LI->hasOneUse() &&
           isa<ReturnInst>((*LI->use_begin())->getUser())) {
-        if (!shouldEmitError(Inst)) return;
-        diagnose(Module, Inst->getLoc(),
-                 diag::return_from_init_without_self_init);
-        return;
+        diagID = diag::superselfinit_not_called_before_return;
       }
     if (isa<ReturnInst>(Inst)) {
-      if (!shouldEmitError(Inst)) return;
-      diagnose(Module, Inst->getLoc(),
-               diag::return_from_init_without_self_init);
-      return;
+      diagID = diag::superselfinit_not_called_before_return;
     }
 
-    return diagnoseInitError(Use, diag::self_use_before_init_in_delegatinginit);
+    diagnose(Module, Inst->getLoc(), diagID,
+             (unsigned)TheMemory.isDelegatingInit());
+    return;
   }
 
   if (isa<ApplyInst>(Inst) && TheMemory.isAnyInitSelf() &&
@@ -1119,6 +1125,145 @@ static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
   return isa<ReturnInst>(TargetArg->use_begin()->getUser());
 }
 
+enum BadSelfUseKind {
+  BeforeStoredPropertyInit,
+  BeforeSuperInit,
+  BeforeSelfInit
+};
+
+void LifetimeChecker::diagnoseRefElementAddr(RefElementAddrInst *REI) {
+  if (!shouldEmitError(REI)) return;
+  
+  auto Kind = (TheMemory.isAnyDerivedClassSelf()
+               ? BeforeSuperInit
+               : BeforeSelfInit);
+  diagnose(Module, REI->getLoc(),
+           diag::self_use_before_fully_init,
+           REI->getField()->getName(), true, Kind);
+}
+
+bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
+                                         bool SuperInitDone) {
+  SILInstruction *Inst = Use.Inst;
+
+  if (auto *REI = dyn_cast<RefElementAddrInst>(Inst)) {
+    diagnoseRefElementAddr(REI);
+    return true;
+  }
+
+  // Check to see if this is a use of self or super, due to a method call.  If
+  // so, emit a specific diagnostic.
+  FuncDecl *Method = nullptr;
+
+  // Check for an access to the base class through an Upcast.
+  if (auto UCI = dyn_cast<UpcastInst>(Inst)) {
+    // If the upcast is used by a ref_element_addr, then it is an access to a
+    // base ivar before super.init is called.
+    if (UCI->hasOneUse() && !SuperInitDone) {
+      if (auto *REI =
+          dyn_cast<RefElementAddrInst>((*UCI->use_begin())->getUser())) {
+        diagnoseRefElementAddr(REI);
+        return true;
+      }
+    }
+
+    // If the upcast is used by a class_method + apply, then this is a call of a
+    // superclass method or property accessor. If we have a guaranteed method,
+    // we will have a release due to a missing optimization in SILGen that will
+    // be removed.
+    //
+    // TODO: Implement the SILGen fixes so this can be removed.
+    ClassMethodInst *CMI = nullptr;
+    ApplyInst *AI = nullptr;
+    SILInstruction *Release = nullptr;
+    for (auto UI : SILValue(UCI, 0).getUses()) {
+      auto *User = UI->getUser();
+      if (auto *TAI = dyn_cast<ApplyInst>(User)) {
+        if (!AI) {
+          AI = TAI;
+          continue;
+        }
+      }
+      if (auto *TCMI = dyn_cast<ClassMethodInst>(User)) {
+        if (!CMI) {
+          CMI = TCMI;
+          continue;
+        }
+      }
+
+      if (isa<ReleaseValueInst>(User) || isa<StrongReleaseInst>(User)) {
+        if (!Release) {
+          Release = User;
+          continue;
+        }
+      }
+
+      // Not a pattern we recognize, conservatively generate a generic
+      // diagnostic.
+      CMI = nullptr;
+      break;
+    }
+
+    // If we have a release, make sure that AI is guaranteed. If it is not, emit
+    // the generic error that we would emit before.
+    //
+    // That is the only case where we support pattern matching a release.
+    if (Release &&
+        !AI->getSubstCalleeType()->getExtInfo().hasGuaranteedSelfParam())
+      CMI = nullptr;
+
+    if (AI && CMI) {
+      // TODO: Could handle many other members more specifically.
+      auto *Decl = CMI->getMember().getDecl();
+      Method = dyn_cast<FuncDecl>(Decl);
+    }
+  }
+
+  // If this is an apply instruction and we're in an class initializer, we're
+  // calling a method on self.
+  if (isa<ApplyInst>(Inst) && TheMemory.isClassInitSelf()) {
+    // If this is a method application, produce a nice, specific, error.
+    if (auto *CMI = dyn_cast<ClassMethodInst>(Inst->getOperand(0)))
+      Method = dyn_cast<FuncDecl>(CMI->getMember().getDecl());
+
+    // If this is a direct/devirt method application, check the location info.
+    if (auto *FRI = dyn_cast<FunctionRefInst>(Inst->getOperand(0))) {
+      if (FRI->getReferencedFunction()->hasLocation()) {
+        auto SILLoc = FRI->getReferencedFunction()->getLocation();
+        Method = SILLoc.getAsASTNode<FuncDecl>();
+      }
+    }
+  }
+
+  // If we were able to find a method call, emit a diagnostic about the method.
+  if (Method) {
+    if (!shouldEmitError(Inst)) return true;
+
+    Identifier Name;
+    if (Method->isAccessor())
+      Name = Method->getAccessorStorageDecl()->getName();
+    else
+      Name = Method->getName();
+
+    // If this is a use of self before super.init was called, emit a diagnostic
+    // about *that* instead of about individual properties not being
+    // initialized.
+    auto Kind = (SuperInitDone
+                 ? BeforeStoredPropertyInit
+                 : (TheMemory.isAnyDerivedClassSelf()
+                    ? BeforeSuperInit
+                    : BeforeSelfInit));
+    diagnose(Module, Inst->getLoc(), diag::self_use_before_fully_init,
+             Name, Method->isAccessor(), Kind);
+
+    if (SuperInitDone)
+      noteUninitializedMembers(Use);
+    return true;
+  }
+
+  return false;
+}
+
 /// handleLoadUseFailure - Check and diagnose various failures when a load use
 /// is not fully initialized.
 ///
@@ -1126,7 +1271,7 @@ static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
 /// initialization of the type.
 ///
 void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
-                                           bool IsSuperInitComplete,
+                                           bool SuperInitDone,
                                            bool FailedSelfUse) {
   SILInstruction *Inst = Use.Inst;
   
@@ -1223,7 +1368,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   // ivars/super.init are set up.
   if (isa<ReturnInst>(Inst) && TheMemory.isAnyInitSelf()) {
     if (!shouldEmitError(Inst)) return;
-    if (!IsSuperInitComplete) {
+    if (!SuperInitDone) {
       diagnose(Module, Inst->getLoc(),
                diag::superselfinit_not_called_before_return,
                (unsigned)TheMemory.isDelegatingInit());
@@ -1237,114 +1382,12 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
 
   // Check to see if this is a use of self or super, due to a method call.  If
   // so, emit a specific diagnostic.
-  FuncDecl *Method = nullptr;
-
-  // Check for an access to the base class through an Upcast.
-  if (auto UCI = dyn_cast<UpcastInst>(Inst)) {
-    // If the upcast is used by a ref_element_addr, then it is an access to a
-    // base ivar before super.init is called.
-    if (UCI->hasOneUse() && !IsSuperInitComplete) {
-      if (auto *REI =
-          dyn_cast<RefElementAddrInst>((*UCI->use_begin())->getUser())) {
-        if (!shouldEmitError(Inst)) return;
-        diagnose(Module, Inst->getLoc(),
-                 diag::self_use_before_fully_init,
-                 REI->getField()->getName(), true, true);
-        return;
-      }
-    }
-
-    // If the upcast is used by a class_method + apply, then this is a call of a
-    // superclass method or property accessor. If we have a guaranteed method,
-    // we will have a release due to a missing optimization in SILGen that will
-    // be removed.
-    //
-    // TODO: Implement the SILGen fixes so this can be removed.
-    ClassMethodInst *CMI = nullptr;
-    ApplyInst *AI = nullptr;
-    SILInstruction *Release = nullptr;
-    for (auto UI : SILValue(UCI, 0).getUses()) {
-      auto *User = UI->getUser();
-      if (auto *TAI = dyn_cast<ApplyInst>(User)) {
-        if (!AI) {
-          AI = TAI;
-          continue;
-        }
-      }
-      if (auto *TCMI = dyn_cast<ClassMethodInst>(User)) {
-        if (!CMI) {
-          CMI = TCMI;
-          continue;
-        }
-      }
-
-      if (isa<ReleaseValueInst>(User) || isa<StrongReleaseInst>(User)) {
-        if (!Release) {
-          Release = User;
-          continue;
-        }
-      }
-
-      // Not a pattern we recognize, conservatively generate a generic
-      // diagnostic.
-      CMI = nullptr;
-      break;
-    }
-
-    // If we have a release, make sure that AI is guaranteed. If it is not, emit
-    // the generic error that we would emit before.
-    //
-    // That is the only case where we support pattern matching a release.
-    if (Release &&
-        !AI->getSubstCalleeType()->getExtInfo().hasGuaranteedSelfParam())
-      CMI = nullptr;
-
-    if (AI && CMI) {
-      // TODO: Could handle many other members more specifically.
-      auto *Decl = CMI->getMember().getDecl();
-      Method = dyn_cast<FuncDecl>(Decl);
-    }
-  }
-
-  // If this is an apply instruction and we're in an class initializer, we're
-  // calling a method on self.
-  if (isa<ApplyInst>(Inst) && TheMemory.isClassInitSelf()) {
-    // If this is a method application, produce a nice, specific, error.
-    if (auto *CMI = dyn_cast<ClassMethodInst>(Inst->getOperand(0)))
-      Method = dyn_cast<FuncDecl>(CMI->getMember().getDecl());
-
-    // If this is a direct/devirt method application, check the location info.
-    if (auto *FRI = dyn_cast<FunctionRefInst>(Inst->getOperand(0))) {
-      if (FRI->getReferencedFunction()->hasLocation()) {
-        auto SILLoc = FRI->getReferencedFunction()->getLocation();
-        Method = SILLoc.getAsASTNode<FuncDecl>();
-      }
-    }
-  }
-
-  // If we were able to find a method call, emit a diagnostic about the method.
-  if (Method) {
-    Identifier Name;
-    if (Method->isAccessor())
-      Name = Method->getAccessorStorageDecl()->getName();
-    else
-      Name = Method->getName();
-
-    // If this is a use of self before super.init was called, emit a diagnostic
-    // about *that* instead of about individual properties not being
-    // initialized.
-    if (!shouldEmitError(Inst)) return;
-    diagnose(Module, Inst->getLoc(), diag::self_use_before_fully_init,
-             Name, Method->isAccessor(), !IsSuperInitComplete);
-
-    if (IsSuperInitComplete)
-      noteUninitializedMembers(Use);
+  if (diagnoseMethodCall(Use, SuperInitDone))
     return;
-  }
 
   // Otherwise, we couldn't find a specific thing to complain about, so emit a
   // generic error, depending on what kind of failure this is.
-  if (!IsSuperInitComplete) {
+  if (!SuperInitDone) {
     if (!shouldEmitError(Inst)) return;
     diagnose(Module, Inst->getLoc(), diag::self_before_superselfinit,
              (unsigned)TheMemory.isDelegatingInit());

@@ -56,8 +56,6 @@ static unsigned getElementCountRec(CanType T,
 
 DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
   MemoryInst = MI;
-  IsSelfOfNonDelegatingInitializer = false;
-
   // Compute the type of the memory object.
   if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst))
     MemorySILType = ABI->getElementType();
@@ -66,11 +64,6 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
   else {
     auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
     MemorySILType = MUI->getType().getObjectType();
-
-    // If this is a 'self' decl in an init method for a non-enum value, then we
-    // want to process the stored members of the struct/class elementwise.
-    if (isAnyInitSelf() && !isEnumInitSelf() && !isDelegatingInit())
-      IsSelfOfNonDelegatingInitializer = true;
 
     // If this is a let variable we're initializing, remember this so we don't
     // allow reassignment.
@@ -95,7 +88,7 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
   }
 
   // Otherwise, we break down the initializer.
-  NumElements = getElementCountRec(getType(), IsSelfOfNonDelegatingInitializer);
+  NumElements = getElementCountRec(getType(), isNonDelegatingInit());
 
   // If this is a derived class init method, track an extra element to determine
   // whether super.init has been called at each program point.
@@ -146,7 +139,7 @@ static CanType getElementTypeRec(CanType T, unsigned EltNo,
 
 /// getElementTypeRec - Return the swift type of the specified element.
 CanType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
-  return getElementTypeRec(getType(), EltNo, IsSelfOfNonDelegatingInitializer);
+  return getElementTypeRec(getType(), EltNo, isNonDelegatingInit());
 }
 
 /// computeTupleElementAddress - Given a tuple element number (in the flattened
@@ -155,7 +148,7 @@ SILValue DIMemoryObjectInfo::
 emitElementAddress(unsigned EltNo, SILLocation Loc, SILBuilder &B) const {
   SILValue Ptr = getAddress();
   CanType PointeeType = getType();
-  bool IsSelf = IsSelfOfNonDelegatingInitializer;
+  bool IsSelf = isNonDelegatingInit();
 
   while (1) {
     // If we have a tuple, flatten it.
@@ -256,7 +249,7 @@ getPathStringToElement(unsigned Element, std::string &Result) const {
 
 
   // If this is indexing into a field of 'self', look it up.
-  if (IsSelfOfNonDelegatingInitializer) {
+  if (isNonDelegatingInit() && !isDerivedClassSelfOnly()) {
     if (auto *NTD = cast_or_null<NominalTypeDecl>(getType()->getAnyNominal())) {
       for (auto *VD : NTD->getStoredProperties()) {
         auto FieldType = VD->getType()->getCanonicalType();
@@ -289,7 +282,7 @@ getPathStringToElement(unsigned Element, std::string &Result) const {
 bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   // If we aren't representing 'self' in a non-delegating initializer, then we
   // can't have 'let' properties.
-  if (!IsSelfOfNonDelegatingInitializer) return IsLet;
+  if (!isNonDelegatingInit()) return IsLet;
 
   if (auto *NTD = cast_or_null<NominalTypeDecl>(getType()->getAnyNominal())) {
     for (auto *VD : NTD->getStoredProperties()) {
@@ -422,7 +415,7 @@ namespace {
     /// the address and the refcount result of the allocation.
     void collectFrom() {
       IsSelfOfNonDelegatingInitializer =
-        TheMemory.IsSelfOfNonDelegatingInitializer;
+        TheMemory.isNonDelegatingInit();;
 
       // If this is a delegating initializer, collect uses specially.
       if (TheMemory.isDelegatingInit()) {
@@ -432,9 +425,12 @@ namespace {
           collectDelegatingValueTypeInitSelfUses();
       } else if (IsSelfOfNonDelegatingInitializer &&
                 TheMemory.getType()->getClassOrBoundGenericClass() != nullptr) {
-        // If this is a class pointer, we need to look through
-        // ref_element_addrs.
-        collectClassSelfUses();
+        if (TheMemory.isDerivedClassSelfOnly())
+          collectDelegatingClassInitSelfUses();
+        else
+          // If this is a class pointer, we need to look through
+          // ref_element_addrs.
+          collectClassSelfUses();
       } else {
         if (auto container = TheMemory.getContainer())
           collectContainerUses(container, TheMemory.getAddress());
@@ -1262,17 +1258,18 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
       continue;
 
     // Stores *to* the allocation are writes.  If the value being stored is a
-    // call to self.init()... then we have a self.init call. This case only
-    // comes up for struct and enum initializers.
+    // call to self.init()... then we have a self.init call.
     if (auto *AI = dyn_cast<AssignInst>(User)) {
       if (auto *AssignSource = dyn_cast<SILInstruction>(AI->getOperand(0)))
         if (isSelfInitUse(AssignSource)) {
+          assert(isa<ArchetypeType>(TheMemory.getType()));
           Uses.push_back(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
           continue;
         }
       if (auto *AssignSource = dyn_cast<SILArgument>(AI->getOperand(0)))
         if (AssignSource->getParent() == AI->getParent())
           if (isSelfInitUse(AssignSource)) {
+            assert(isa<ArchetypeType>(TheMemory.getType()));
             Uses.push_back(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
             continue;
           }
@@ -1292,7 +1289,12 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
       // the load to find out more information.
       for (auto UI : LI->getUses()) {
         auto *User = UI->getUser();
-        
+
+        // super_method always looks at the metatype for the class, not at any of
+        // its stored properties, so it doesn't have any DI requirements.
+        if (isa<SuperMethodInst>(User))
+          continue;
+
         // We ignore retains of self.
         if (isa<StrongRetainInst>(User))
           continue;
@@ -1329,7 +1331,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         // copyaddr or assigns) will eventually get rewritten as assignments
         // (not initializations), which is the right thing to do.
         DIUseKind Kind = DIUseKind::Escape;
-        
+
         // If this is an ApplyInst, check to see if this is part of a self.init
         // call in a delegating initializer.
         if (isa<FullApplySite>(User) && isSelfInitUse(User)) {

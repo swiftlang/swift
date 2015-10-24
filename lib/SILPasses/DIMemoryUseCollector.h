@@ -54,10 +54,6 @@ public:
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
   
-  /// This is true if the memory being analyzed represents the 'self' value in
-  /// an non-delegating initializer (one that does not call "self.init").
-  bool IsSelfOfNonDelegatingInitializer;
-
   /// True if the memory object being analyzed represents a 'let', which is
   /// initialize-only (reassignments are not allowed).
   bool IsLet = false;
@@ -147,33 +143,46 @@ public:
   /// isDerivedClassSelf - Return true if this memory object is the 'self' of
   /// a derived class init method.
   bool isDerivedClassSelf() const {
-    return IsSelfOfNonDelegatingInitializer &&
-           cast<MarkUninitializedInst>(MemoryInst)->isDerivedClassSelf();
+    if (auto MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
+      return MUI->isDerivedClassSelf();
+    return false;
   }
 
   /// isDerivedClassSelfOnly - Return true if this memory object is the 'self'
   /// of a derived class init method for which we can assume that all ivars
   /// have been initialized.
   bool isDerivedClassSelfOnly() const {
-    return IsSelfOfNonDelegatingInitializer &&
-           cast<MarkUninitializedInst>(MemoryInst)->isDerivedClassSelfOnly();
+    if (auto MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
+      return MUI->isDerivedClassSelfOnly();
+    return false;
   }
 
   /// True if this memory object is the 'self' of a derived class init method,
   /// regardless of whether we're tracking ivar initializations or not.
   bool isAnyDerivedClassSelf() const {
-    if (!IsSelfOfNonDelegatingInitializer)
-      return false;
-
-    auto Inst = cast<MarkUninitializedInst>(MemoryInst);
-    return Inst->isDerivedClassSelf() || Inst->isDerivedClassSelfOnly();
+    if (auto MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
+      return MUI->isDerivedClassSelf() || MUI->isDerivedClassSelfOnly();
+    return false;
   }
 
   /// isDelegatingInit - True if this is a delegating initializer, one that
   /// calls 'self.init'.
   bool isDelegatingInit() const {
-    return isa<MarkUninitializedInst>(MemoryInst) &&
-       cast<MarkUninitializedInst>(MemoryInst)->isDelegatingSelf();
+    if (auto MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
+       return MUI->isDelegatingSelf();
+    return false;
+  }
+
+  /// isNonDelegatingInit - True if this is an initializer that initializes
+  /// stored properties.
+  bool isNonDelegatingInit() const {
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst)) {
+      if (MUI->isDerivedClassSelf() ||
+          MUI->isDerivedClassSelfOnly() ||
+          (MUI->isRootSelf() && !isEnumInitSelf()))
+        return true;
+    }
+    return false;
   }
 
   /// emitElementAddress - Given an element number (in the flattened sense)

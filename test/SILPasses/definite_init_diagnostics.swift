@@ -373,7 +373,7 @@ class SomeDerivedClass : SomeClass {
     y = 11
     if a { super.init() }
     x = 42        // expected-error {{use of 'self' in property access 'x' before super.init initializes self}}
-  }               // expected-error {{super.init isn't called before returning from initializer}}
+  }               // expected-error {{super.init isn't called on all paths before returning from initializer}}
   
   func someMethod() {}
   
@@ -417,7 +417,8 @@ class DelegatingCtorClass {
   }
   
   convenience init(x: EmptyStruct, y: EmptyStruct) {
-    ivar = x       // expected-error {{use of 'self' in delegating initializer before self.init is called}}
+    _ = ivar       // expected-error {{use of 'self' in property access 'ivar' before self.init initializes self}}
+    ivar = x       // expected-error {{use of 'self' in property access 'ivar' before self.init initializes self}}
     self.init()
   }
 
@@ -426,19 +427,26 @@ class DelegatingCtorClass {
     self.init()    // expected-error {{self.init called multiple times in initializer}}
   }
 
+  convenience init(x: (EmptyStruct, EmptyStruct)) {
+    method()       // expected-error {{use of 'self' in method call 'method' before self.init initializes self}}
+    self.init()
+  }
+
   convenience init(c : Bool) {
     if c {
       return
     }
     self.init()
-  }                // expected-error {{self.init isn't called on all paths in delegating initializer}}
+  }                // expected-error {{self.init isn't called on all paths before returning from initializer}}
 
   convenience init(bool: Bool) {
     doesntReturn()
   }
 
   convenience init(double: Double) {
-  } // expected-error{{self.init isn't called on all paths in delegating initializer}}
+  } // expected-error{{self.init isn't called on all paths before returning from initializer}}
+
+  func method() {}
 }
 
 
@@ -454,7 +462,7 @@ struct DelegatingCtorStruct {
   }
   
   init(a : Int) {
-    _ = ivar // expected-error {{use of 'self' in delegating initializer before self.init is called}}
+    _ = ivar // expected-error {{'self' used before self.init call}}
     self.init()
   }
 
@@ -469,7 +477,7 @@ struct DelegatingCtorStruct {
     }
 
     self.init()
-  }                // expected-error {{self.init isn't called on all paths in delegating initializer}}
+  }                // expected-error {{self.init isn't called on all paths before returning from initializer}}
 
 }
 
@@ -486,7 +494,7 @@ enum DelegatingCtorEnum {
   }
   
   init(a : Int) {
-    _ = self // expected-error {{use of 'self' in delegating initializer before self.init is called}}
+    _ = self // expected-error {{'self' used before self.init call}}
     self.init()
   }
 
@@ -501,7 +509,7 @@ enum DelegatingCtorEnum {
     }
 
     self.init()
-  }                // expected-error {{self.init isn't called on all paths in delegating initializer}}
+  }                // expected-error {{self.init isn't called on all paths before returning from initializer}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -520,7 +528,7 @@ extension TriviallyConstructible {
   }
 
   init(down: Int) {
-    go(down) // expected-error {{use of 'self' in delegating initializer before self.init is called}}
+    go(down) // expected-error {{'self' used before self.init call}}
     self.init()
   }
 }
@@ -562,6 +570,8 @@ enum TrivialEnum : TriviallyConstructible {
 @requires_stored_property_inits
 class RequiresInitsDerived : Gizmo {
   var a = 1
+  var b = 2
+  var c = 3
 
   override init() {
     super.init()
@@ -571,11 +581,18 @@ class RequiresInitsDerived : Gizmo {
     if i > 0 {
       super.init()
     }
-  } // expected-error{{super.init isn't called before returning from initializer}}
+  } // expected-error{{super.init isn't called on all paths before returning from initializer}}
 
   init(d: Double) {
     f() // expected-error {{use of 'self' in method call 'f' before super.init initializes self}}
     super.init()
+  }
+
+  init(t: ()) {
+    a = 5 // expected-error {{use of 'self' in property access 'a' before super.init initializes self}}
+    b = 10 // expected-error {{use of 'self' in property access 'b' before super.init initializes self}}
+    super.init()
+    c = 15
   }
 
   func f() { }
@@ -1135,7 +1152,7 @@ extension ProtocolInitTest {
 
   // <rdar://problem/21684596> QoI: Poor DI diagnostic in protocol extension initializer
   init(test1 ii: Int) {
-    i = ii         // expected-error {{use of 'self' in delegating initializer before self.init is called}}
+    i = ii         // expected-error {{'self' used before self.init call}}
     self.init()
   }
 
