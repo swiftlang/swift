@@ -13,13 +13,16 @@ class RequiresOkay { // expected-note{{superclass 'RequiresOkay' requires all st
 
 // Diagnose missing initializers.
 @requires_stored_property_inits
-class RequiresBad { // expected-note 4{{class 'RequiresBad' requires all stored properties to have initial values}}
+class RequiresBad { // expected-note 5{{class 'RequiresBad' requires all stored properties to have initial values}}
   var a: Int // expected-error{{stored property 'a' requires an initial value}}
   var (b, c): (Int, Int) // expected-error{{stored properties 'b' and 'c' require initial values}}
   var (d, e, f): (Int, Int, Int) // expected-error{{stored properties 'd', 'e', and 'f' require initial values}}
   var (g, h, i, j): (Int, Int, Int, Int) // expected-error{{stored properties 'g', 'h', 'i', and others require initial values}}
 
   @NSManaged var managed_property: Int
+
+  var k: RequiresOkay?
+  let l: RequiresOkay? // expected-error{{stored property 'l' requires an initial value}}
 
   init() {
     a = 0

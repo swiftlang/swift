@@ -18,7 +18,8 @@ func testCanDefaultInit() {
 // Cases where we cannot perform default initialization.
 class NotInitializable1 { // expected-error{{class 'NotInitializable1' has no initializers}}
   var (opt1, int1) : (Int?, Int) // expected-note{{stored properties 'opt1' and 'int1' without initial values prevent synthesized initializers}} {{33-33= = (nil, 0)}}
-  let opt2: Int?
+  let opt2: Int? // expected-note{{stored property 'opt2' without initial value prevents synthesized initializers}}
+  var opt3: Int?
 }
 
 func localDefaultInit() -> Int? {

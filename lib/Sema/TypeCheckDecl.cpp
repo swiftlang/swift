@@ -999,23 +999,37 @@ static bool isDefaultInitializable(TypeRepr *typeRepr) {
   return false;
 }
 
+// @NSManaged properties never get default initialized, nor do debugger
+// variables and immutable properties.
+static bool isNeverDefaultInitializable(Pattern *p) {
+  bool result = false;
+
+  p->forEachVariable([&](VarDecl *var) {
+    assert(!var->getAttrs().hasAttribute<NSManagedAttr>());
+    if (var->isDebuggerVar() ||
+        var->isLet())
+      result = true;
+  });
+
+  return result;
+}
+
 /// Determine whether the given pattern binding declaration either has
-/// or will have a default initializer, without performing any type
-/// checking on it.
+/// an initializer expression, or is default initialized, without performing
+/// any type checking on it.
 static bool isDefaultInitializable(PatternBindingDecl *pbd) {
-  // If it is NSManaged or is a lazy variable, it is trivially true.
-  if (auto var = pbd->getSingleVar()) {
-    if (var->getAttrs().hasAttribute<NSManagedAttr>() ||
-        var->getAttrs().hasAttribute<LazyAttr>())
-      return true;
-  }
-  
+  assert(pbd->hasStorage());
+
   for (auto entry : pbd->getPatternList()) {
-    // If it has an initializer, this is trivially true.
+    // If it has an initializer expression, this is trivially true.
     if (entry.getInit())
       continue;
 
-    // If the pattern is typed as optional (or tuples thereof), it is true.
+    if (isNeverDefaultInitializable(entry.getPattern()))
+      return false;
+
+    // If the pattern is typed as optional (or tuples thereof), it is
+    // default initializable.
     if (auto typedPattern = dyn_cast<TypedPattern>(entry.getPattern())) {
       if (auto typeRepr = typedPattern->getTypeLoc().getTypeRepr())
         if (isDefaultInitializable(typeRepr))
@@ -2927,24 +2941,15 @@ public:
             TC.checkTypeModifyingDeclAttributes(var);
 
           // Decide whether we should suppress default initialization.
-          bool suppressDefaultInit = false;
-          PBD->getPattern(i)->forEachVariable([&](VarDecl *var) {
-            // @NSManaged properties never get default initialized, nor do
-            // debugger variables and immutable properties.
-            if (var->getAttrs().hasAttribute<NSManagedAttr>() ||
-                var->isDebuggerVar() ||
-                var->isLet())
-              suppressDefaultInit = true;
-          });
+          if (isNeverDefaultInitializable(PBD->getPattern(i)))
+            continue;
 
-          if (!suppressDefaultInit) {
-            auto type = PBD->getPattern(i)->getType();
-            if (auto defaultInit = buildDefaultInitializer(TC, type)) {
-              // If we got a default initializer, install it and re-type-check it
-              // to make sure it is properly coerced to the pattern type.
-              PBD->setInit(i, defaultInit);
-              TC.typeCheckPatternBinding(PBD, i);
-            }
+          auto type = PBD->getPattern(i)->getType();
+          if (auto defaultInit = buildDefaultInitializer(TC, type)) {
+            // If we got a default initializer, install it and re-type-check it
+            // to make sure it is properly coerced to the pattern type.
+            PBD->setInit(i, defaultInit);
+            TC.typeCheckPatternBinding(PBD, i);
           }
         }
       }
@@ -6702,18 +6707,19 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       if (pbd->hasStorage() && !pbd->isStatic() && !pbd->isImplicit())
         for (auto entry : pbd->getPatternList()) {
           if (entry.getInit()) continue;
-          
-          // If we cannot create a default initializer, we cannot make a default
-          // init.
-          if (!isDefaultInitializable(pbd))
-            SuppressDefaultInitializer = true;
 
-          // If one of the bound variables is a let constant, suppress the default
-          // initializer.  Synthesizing an initializer that initializes the
-          // constant to nil isn't useful.
+          // If one of the bound variables is @NSManaged, go ahead no matter
+          // what.
+          bool CheckDefaultInitializer = true;
           entry.getPattern()->forEachVariable([&](VarDecl *vd) {
-            SuppressDefaultInitializer |= vd->isLet();
+            if (vd->getAttrs().hasAttribute<NSManagedAttr>())
+              CheckDefaultInitializer = false;
           });
+          
+          // If we cannot default initialize the property, we cannot
+          // synthesize a default initializer for the class.
+          if (CheckDefaultInitializer && !isDefaultInitializable(pbd))
+            SuppressDefaultInitializer = true;
         }
       continue;
     }
