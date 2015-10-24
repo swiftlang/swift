@@ -170,13 +170,27 @@ func testOpenExistential(var x: Fooable,
 func couldThrow() throws {}
 
 func testFixitsInStatementsWithPatterns(a : Int?) {
-  if var b = a,    // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{6-9=let}}
-      var b2 = a {   // expected-warning {{variable 'b2' was never mutated; consider changing to 'let' constant}} {{7-10=let}}
+  if var b = a,    // expected-error {{'var' is not allowed in this pattern binding}} {{6-9=let}}
+      var b2 = a {  // expected-error {{'var' is not allowed in this pattern binding}} {{7-10=let}}
+    b = 1
+    b2 = 1
     _ = b
     _ = b2
   }
 
-  for var b in [42] {   // expected-error {{'var' is not allowed in a for-in statement}} {{7-11=}}
+  var g = [1,2,3].generate()
+  while var x = g.next() { // expected-error {{'var' is not allowed in this pattern binding}} {{9-12=let}}
+    x = 0
+    _ = x
+  }
+
+  guard var y = Optional.Some(1) else { // expected-error {{'var' is not allowed in this pattern binding}} {{9-12=let}}
+    return
+  }
+  y = 0
+  _ = y
+
+  for var b in [42] {   // expected-error {{'var' is not allowed in this pattern binding}} {{7-11=}}
     b = 42
     _ = b
   }

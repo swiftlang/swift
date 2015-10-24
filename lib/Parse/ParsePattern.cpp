@@ -818,7 +818,7 @@ ParserResult<Pattern> Parser::parsePattern() {
     } else {
       // In an always immutable context, `var` is not allowed.
       if (alwaysImmutable)
-        diagnose(varLoc, diag::var_not_allowed_in_for_in)
+        diagnose(varLoc, diag::var_not_allowed_in_pattern)
         .fixItRemove(varLoc);
     }
     
@@ -1028,6 +1028,10 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   // 'let' isn't valid inside an implicitly immutable context, but var is.
   if (isLet && InVarOrLetPattern == IVOLP_ImplicitlyImmutable)
     diagnose(varLoc, diag::let_pattern_in_immutable_context);
+
+  if (!isLet && InVarOrLetPattern == IVOLP_AlwaysImmutable)
+    diagnose(varLoc, diag::var_not_allowed_in_pattern)
+      .fixItReplace(varLoc, "let");
 
   // In our recursive parse, remember that we're in a var/let pattern.
   llvm::SaveAndRestore<decltype(InVarOrLetPattern)>

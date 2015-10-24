@@ -71,13 +71,13 @@ print_y()
 // CHECK-LABEL: function_ref toplevel.A.__allocating_init
 // CHECK: switch_enum {{%.+}} : $Optional<A>, case #Optional.Some!enumelt.1: [[SOME_CASE:.+]], default
 // CHECK: [[SOME_CASE]]([[VALUE:%.+]] : $A):
-// CHECK: store [[VALUE]] to [[BOX:%.+]]#1 : $*A
-// CHECK-NOT: release
 // CHECK: [[SINK:%.+]] = function_ref @_TF8toplevel8markUsedurFq_T_
+// CHECK-NOT: release
+// CHECK: store [[VALUE]] to [[BOX:%.+]]#1 : $*A
 // CHECK-NOT: release
 // CHECK: apply [[SINK]]<A>({{%.+}})
 class A {}
-guard var a = Optional(A()) else { trap() }
+guard let a = Optional(A()) else { trap() }
 markUsed(a)
 
 

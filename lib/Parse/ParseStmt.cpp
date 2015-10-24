@@ -1245,9 +1245,14 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         }
       } else {
         // Otherwise, this is an implicit optional binding "if let".
-        ThePattern =
-          parseMatchingPatternAsLetOrVar(BindingKind == BK_Let, VarLoc,
-                                         /*isExprBasic*/ true);
+
+        // In our recursive parse, remember that we're in a var/let pattern.
+        llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+          T(InVarOrLetPattern, IVOLP_AlwaysImmutable);
+
+        ThePattern = parseMatchingPatternAsLetOrVar(BindingKind == BK_Let,
+                                                    VarLoc,
+                                                    /*isExprBasic*/ true);
         // The let/var pattern is part of the statement.
         if (Pattern *P = ThePattern.getPtrOrNull())
           P->setImplicit();

@@ -12,9 +12,10 @@ if let x = foo() {
 
 use(x) // expected-error{{unresolved identifier 'x'}}
 
-if var x = foo() {
+if let x = foo() {
   use(x)
-  modify(&x)
+  var x2 = x
+  modify(&x2)
 }
 
 use(x) // expected-error{{unresolved identifier 'x'}}
@@ -47,7 +48,6 @@ if let x = foo() {
 var opt: Int? = .None
 
 if let x = opt {}
-if var x = opt {}
 
 // <rdar://problem/20800015> Fix error message for invalid if-let
 let someInteger = 1
@@ -56,12 +56,12 @@ if case let y? = someInteger {}  // expected-error {{'?' pattern cannot match va
 
 // Test multiple clauses on "if let".
 if let x = opt, y = opt where x != y,
-   let a = opt, var b = opt {
+   let a = opt, let b = opt {
 }
 
 // Leading boolean conditional.
 if 1 != 2, let x = opt, y = opt where x != y,
-   let a = opt, var b = opt {
+   let a = opt, let b = opt {
 }
 
 // <rdar://problem/20457938> typed pattern is not allowed on if/let condition

@@ -33,6 +33,6 @@ func for_each(r: Range<Int>, iir: IntRange<Int>) {
   for i r { // expected-error 2{{expected ';' in 'for' statement}} expected-error {{use of unresolved identifier 'i'}}
   }
   for i in r sum = sum + i; // expected-error{{expected '{' to start the body of for-each loop}}
-  for var x in 0..<10 {} // expected-error {{'var' is not allowed in a for-in statement}} {{7-11=}}
+  for var x in 0..<10 {} // expected-error {{'var' is not allowed in this pattern binding}} {{7-11=}}
   for let x in 0..<10 {} // expected-error {{'let' pattern is already in an immutable context}} {{7-11=}}
 }

@@ -165,8 +165,8 @@ case x ?? 42: break // match value
 default: break
 }
 
-for (var x) in 0...100 {} // expected-error {{'var' is not allowed in a for-in statement}}
-for var x in 0...100 {}  // expected-error {{'var' is not allowed in a for-in statement}}
+for (var x) in 0...100 {} // expected-error {{'var' is not allowed in this pattern binding}}
+for var x in 0...100 {}  // expected-error {{'var' is not allowed in this pattern binding}}
 for (let x) in 0...100 {} // expected-error {{'let' pattern is already in an immutable context}}
 
 var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
