@@ -74,9 +74,8 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
     @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
-    var g = generate()
     var minResult: ${GElement}? = nil
-    for e in GeneratorSequence(g) {
+    for e in GeneratorSequence(generate()) {
       if let currentMinResult = minResult {
 %   if preds:
         if try isOrderedBefore(e, currentMinResult) { minResult = e }
@@ -100,9 +99,8 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
     @noescape isOrderedBefore: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> ${GElement}? {
-    var g = generate()
     var maxResult: ${GElement}? = nil
-    for e in GeneratorSequence(g) {
+    for e in GeneratorSequence(generate()) {
       if let currentMaxResult = maxResult {
 %   if preds:
         if try isOrderedBefore(currentMaxResult, e) { maxResult = e }
