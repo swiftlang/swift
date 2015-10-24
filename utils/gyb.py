@@ -389,15 +389,13 @@ class ParseContext:
         ... % end
         ... literally
         ... ''')
-        >>> ctx.tokenKind, ctx.tokenText
+        >>> while ctx.tokenKind:
+        ...     print (ctx.tokenKind, ctx.codeText or ctx.tokenText)
+        ...     ignored = ctx.nextToken()
         ('literal', '\n')
-        >>> ctx.nextToken(), ctx.codeText
         ('gybLinesOpen', 'for x in y:\n')
-        >>> ctx.nextToken(), ctx.codeText
         ('gybLines', '    print x\n')
-        >>> ctx.nextToken()
-        'gybLinesClose'
-        >>> ctx.nextToken(), ctx.tokenText
+        ('gybLinesClose', '% end')
         ('literal', 'literally\n')
 
         >>> ctx = ParseContext('dummy',
@@ -409,22 +407,41 @@ class ParseContext:
         ... % else:
         ... THIS SHOULD NOT APPEAR IN THE OUTPUT
         ... ''')
-        >>> ctx.tokenKind, ctx.tokenText
+        >>> while ctx.tokenKind:
+        ...     print (ctx.tokenKind, ctx.codeText or ctx.tokenText)
+        ...     ignored = ctx.nextToken()
         ('literal', 'Nothing\n')
-        >>> ctx.nextToken(), ctx.codeText
         ('gybLinesOpen', 'if x:\n')
-        >>> ctx.nextToken(), ctx.codeText
         ('gybLinesOpen', '   for i in range(3):\n')
-        >>> ctx.nextToken(), ctx.codeText
         ('substitutionOpen', 'i')
-        >>> ctx.nextToken(), ctx.tokenText
         ('literal', '\n')
-        >>> ctx.nextToken()
-        'gybLinesClose'
-        >>> ctx.nextToken(), ctx.codeText
+        ('gybLinesClose', '%    end')
         ('gybLinesOpen', 'else:\n')
-        >>> ctx.nextToken(), ctx.tokenText
         ('literal', 'THIS SHOULD NOT APPEAR IN THE OUTPUT\n')
+
+        >>> ctx = ParseContext('dummy',
+        ... '''% for x in [1, 2, 3]:
+        ... %   if x == 1:
+        ... literal1
+        ... %   elif x > 1:   # add an output line after this line to fix the bug
+        ... %     if x == 2:
+        ... literal2
+        ... %     end
+        ... %   end
+        ... % end
+        ... ''')
+        >>> while ctx.tokenKind:
+        ...     print (ctx.tokenKind, ctx.codeText or ctx.tokenText)
+        ...     ignored = ctx.nextToken()
+        ('gybLinesOpen', 'for x in [1, 2, 3]:\n')
+        ('gybLinesOpen', '  if x == 1:\n')
+        ('literal', 'literal1\n')
+        ('gybLinesOpen', 'elif x > 1:   # add an output line after this line to fix the bug\n')
+        ('gybLinesOpen', '  if x == 2:\n')
+        ('literal', 'literal2\n')
+        ('gybLinesClose', '%     end')
+        ('gybLinesClose', '%   end')
+        ('gybLinesClose', '% end')
         """
         for self.tokenKind, self.tokenText, self.tokenMatch in baseTokens:
             kind = self.tokenKind
@@ -468,10 +485,6 @@ class ParseContext:
                     self.tokenMatch.group('gybLines')+'\n', 
                     flags=re.MULTILINE)[1:]
                 
-                closer = self.tokenMatch.group('gybLinesClose')
-                if closer:
-                    sourceLines.append(closer.replace('end', '#'))
-
                 if codeStartsWithDedentKeyword(sourceLines):
                     self.closeLines = True
 
@@ -482,6 +495,7 @@ class ParseContext:
                     yield self.tokenKind
                     lastSplit = line
                     self.codeStartLine += line - lastSplit
+                    self.closeLines = False
 
                 self.codeText = ''.join(sourceLines[lastSplit:])
                 if self.codeText:
@@ -494,9 +508,6 @@ class ParseContext:
     def nextToken(self):
         """Move to the the next token"""
         for kind in self.tokens:
-            # print '<<%s>>' % kind
-            # print self.codeText or self.tokenText
-            # print '========'
             return self.tokenKind
 
         self.tokenKind = None
@@ -668,6 +679,60 @@ def parseTemplate(filename, text = None):
     
     If text is supplied, it is assumed to be the contents of the file,
     as a string.
+
+    >>> print parseTemplate('dummy.file', text=
+    ... '''% for x in [1, 2, 3]:
+    ... %   if x == 1:
+    ... literal1
+    ... %   elif x > 1:   # add an output line after this line to fix the bug
+    ... %     if x == 2:
+    ... literal2
+    ... %     end
+    ... %   end
+    ... % end
+    ... ''')
+    Block:
+    [
+        Code:
+        {
+            for x in [1, 2, 3]:
+                __children__[0].execute(__context__)
+        }
+        [
+            Block:
+            [
+                Code:
+                {
+                    if x == 1:
+                        __children__[0].execute(__context__)
+                    elif x > 1:   # add an output line after this line to fix the bug
+                        __children__[1].execute(__context__)
+                }
+                [
+                    Block:
+                    [
+                        Literal:
+                        literal1
+                    ]
+                    Block:
+                    [
+                        Code:
+                        {
+                            if x == 2:
+                                __children__[0].execute(__context__)
+                        }
+                        [
+                            Block:
+                            [
+                                Literal:
+                                literal2
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    ]
 
     >>> print parseTemplate('dummy.file', text='%for x in range(10):\n%  print x\n%end\njuicebox')
     Block:
