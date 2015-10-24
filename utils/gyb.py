@@ -37,7 +37,7 @@ def splitLines(s):
     return [ l + '\n' for l in s.split('\n') ]
     
 # text on a line up to the first '$$', '${', or '%%'
-literalText = r'(?: [^$\n@] | \$(?![${]) | @(?!@) )*'
+literalText = r'(?: [^$\n%] | \$(?![${]) | %(?!%) )*'
 
 # The part of an '@end' line that follows the '@' sign
 atEndLine = r'[\ \t]* end [\ \t]* (?: \# .* )? $'
@@ -168,7 +168,7 @@ def tokenizeTemplate(templateText):
     ...   %        print x
     ...     % # different indentation
     ... % twice
-    ... and some lines that literally start with %
+    ... and some lines that literally start with a %% token
     ... %% first line
     ...   %% second line
     ... '''):
@@ -183,7 +183,7 @@ def tokenizeTemplate(templateText):
     ('atLines', '%    for x in zz:')
     ('atLines', '% # different indentation')
     ('atLines', '% twice')
-    ('literal', 'and some lines that literally start with %')
+    ('literal', 'and some lines that literally start with a % token')
     """
     pos = 0
     end = len(templateText)
