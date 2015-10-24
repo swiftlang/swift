@@ -34,6 +34,10 @@
 
 using namespace swift;
 
+//===----------------------------------------------------------------------===//
+//                          ARC Matching Set Builder
+//===----------------------------------------------------------------------===//
+
 namespace {
 
 struct MatchingSetFlags {
@@ -88,6 +92,7 @@ public:
 
   bool matchUpIncDecSetsForPtr();
 
+  // We only allow for get result when this object is invalidated via a move.
   ARCMatchingSet &getResult() {
     return MatchSet;
   }
@@ -366,14 +371,14 @@ struct ARCMatchingSetComputationContext {
       : F(F), DecToIncStateMap(), IncToDecStateMap(), RCIA(RCIA) {}
   virtual ~ARCMatchingSetComputationContext() {}
   virtual bool run(bool FreezePostDomReleases,
-                   std::function<void (ARCMatchingSet &)> Fun) = 0;
-  bool performMatching(std::function<void (ARCMatchingSet &)> Fun);
+                   ARCMatchingSetCallback &Callback) = 0;
+  bool performMatching(ARCMatchingSetCallback &Callback);
 };
 
 } // end swift namespace
 
 bool ARCMatchingSetComputationContext::performMatching(
-    std::function<void(ARCMatchingSet &)> Fun) {
+    ARCMatchingSetCallback &Callback) {
   bool MatchedPair = false;
 
   DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for " << F.getName()
@@ -396,9 +401,17 @@ bool ARCMatchingSetComputationContext::performMatching(
         IncToDecStateMap.blot(I);
       for (auto *I : Set.Decrements)
         DecToIncStateMap.blot(I);
-      Fun(Set);
+
+      // Add the Set to the callback. *NOTE* No instruction destruction can
+      // happen here since we may remove instructions that are insertion points
+      // for other instructions.
+      Callback.processMatchingSet(Set);
     }
   }
+
+  // Then finalize the callback. This is the only place instructions can be
+  // deleted.
+  Callback.finalize();
 
   DecToIncStateMap.clear();
   IncToDecStateMap.clear();
@@ -425,11 +438,11 @@ struct BlockARCMatchingSetComputationContext
   virtual ~BlockARCMatchingSetComputationContext() override final {}
 
   virtual bool run(bool FreezePostDomReleases,
-                   std::function<void(ARCMatchingSet &)> Fun) override final {
+                   ARCMatchingSetCallback &Callback) override final {
     bool NestingDetected = Evaluator.run(FreezePostDomReleases);
     Evaluator.clear();
 
-    bool MatchedPair = performMatching(Fun);
+    bool MatchedPair = performMatching(Callback);
     return NestingDetected && MatchedPair;
   }
 };
@@ -454,11 +467,11 @@ struct LoopARCMatchingSetComputationContext : ARCMatchingSetComputationContext {
   virtual ~LoopARCMatchingSetComputationContext() override final {}
 
   virtual bool run(bool FreezePostDomReleases,
-                   std::function<void(ARCMatchingSet &)> Fun) override final {
+                   ARCMatchingSetCallback &Callback) override final {
     bool NestingDetected = Evaluator.run(FreezePostDomReleases);
     Evaluator.clear();
 
-    bool MatchedPair = performMatching(Fun);
+    bool MatchedPair = performMatching(Callback);
     return NestingDetected && MatchedPair;
   }
 };
@@ -495,10 +508,10 @@ destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx) {
 
 bool swift::computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
                                   bool FreezePostDomReleases,
-                                  std::function<void(ARCMatchingSet &)> Fun) {
+                                  ARCMatchingSetCallback &Callback) {
 
   DEBUG(llvm::dbgs() << "**** Performing ARC Dataflow for " << Ctx->F.getName()
                      << " ****\n");
 
-  return Ctx->run(FreezePostDomReleases, Fun);
+  return Ctx->run(FreezePostDomReleases, Callback);
 }

@@ -80,15 +80,34 @@ static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
   return B.createReleaseValue(Loc, Ptr);
 }
 
-/// This routine takes in the ARCMatchingSet \p MatchSEt and inserts new
-/// increments, decrements at the insertion points and adds the old increment,
-/// decrements to the delete list \p DelList.
-static bool
-optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
-                                  SmallVectorImpl<SILInstruction *> &DelList) {
-  DEBUG(llvm::dbgs() << "**** Optimizing Matching Set ****\n");
+namespace {
 
+class CodeMotionOrDeleteCallback : public ARCMatchingSetCallback {
   bool Changed = false;
+  llvm::SmallVector<SILInstruction *, 16> InstructionsToDelete;
+
+public:
+  virtual void processMatchingSet(ARCMatchingSet &Set) override final;
+
+  // Delete instructions after we have processed all matching sets so that we do
+  // not remove instructions that may be insertion points for other retain,
+  // releases.
+  virtual void finalize() override final {
+    while (!InstructionsToDelete.empty()) {
+      InstructionsToDelete.pop_back_val()->eraseFromParent();
+    }
+  }
+
+  bool madeChange() const { return Changed; }
+};
+}
+
+// This routine takes in the ARCMatchingSet \p MatchSet and inserts new
+// increments, decrements at the insertion points and adds the old increment,
+// decrements to the delete list. Sets changed to true if anything was moved or
+// deleted.
+void CodeMotionOrDeleteCallback::processMatchingSet(ARCMatchingSet &MatchSet) {
+  DEBUG(llvm::dbgs() << "**** Optimizing Matching Set ****\n");
 
   // Insert the new increments.
   for (SILInstruction *InsertPt : MatchSet.IncrementInsertPts) {
@@ -126,7 +145,7 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
   for (SILInstruction *Increment : MatchSet.Increments) {
     Changed = true;
     DEBUG(llvm::dbgs() << "    Deleting increment: " << *Increment);
-    DelList.push_back(Increment);
+    InstructionsToDelete.push_back(Increment);
     ++NumRefCountOpsRemoved;
   }
 
@@ -134,12 +153,9 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
   for (SILInstruction *Decrement : MatchSet.Decrements) {
     Changed = true;
     DEBUG(llvm::dbgs() << "    Deleting decrement: " << *Decrement);
-    DelList.push_back(Decrement);
+    InstructionsToDelete.push_back(Decrement);
     ++NumRefCountOpsRemoved;
   }
-
-  // Return if we made any changes.
-  return Changed;
 }
 
 //===----------------------------------------------------------------------===//
@@ -160,7 +176,6 @@ static bool processFunction(SILFunction &F, bool FreezePostDomRelease,
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
   bool Changed = false;
-  llvm::SmallVector<SILInstruction *, 16> InstructionsToDelete;
 
   // Construct our context once. A context contains the RPOT as well as maps
   // that contain state for each BB in F. This is a major place where the
@@ -176,6 +191,7 @@ static bool processFunction(SILFunction &F, bool FreezePostDomRelease,
     return false;
   }
 
+  CodeMotionOrDeleteCallback Callback;
   // Until we do not remove any instructions or have nested increments,
   // decrements...
   while (true) {
@@ -185,19 +201,10 @@ static bool processFunction(SILFunction &F, bool FreezePostDomRelease,
     // We need to blot pointers we remove after processing an individual pointer
     // so we don't process pairs after we have paired them up. Thus we pass in a
     // lambda that performs the work for us.
-    bool ShouldRunAgain = computeARCMatchingSet(Ctx, FreezePostDomRelease,
-      // Remove the increments, decrements and insert new increments, decrements
-      // at the insertion points associated with a specific pointer.
-      [&Changed, &InstructionsToDelete](ARCMatchingSet &Set) {
-        Changed |= optimizeReferenceCountMatchingSet(Set, InstructionsToDelete);
-      }
-    );
+    bool ShouldRunAgain =
+        computeARCMatchingSet(Ctx, FreezePostDomRelease, Callback);
 
-    // Now that it is safe to do so and avoid iterator invalidation, delete all
-    // instructions from the delete list.
-    while (!InstructionsToDelete.empty()) {
-      InstructionsToDelete.pop_back_val()->eraseFromParent();
-    }
+    Changed |= Callback.madeChange();
 
     // If we did not remove any instructions or have any nested increments, do
     // not perform another iteration.

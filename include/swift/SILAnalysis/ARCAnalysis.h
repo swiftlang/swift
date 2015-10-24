@@ -111,6 +111,13 @@ struct ARCMatchingSet {
   llvm::SetVector<SILInstruction *> Decrements;
   llvm::SetVector<SILInstruction *> DecrementInsertPts;
 
+  // This is a data structure that can not be moved.
+  ARCMatchingSet() = default;
+  ARCMatchingSet(const ARCMatchingSet &) = delete;
+  ARCMatchingSet(ARCMatchingSet &&) = delete;
+  ARCMatchingSet &operator=(const ARCMatchingSet &) = delete;
+  ARCMatchingSet &operator=(ARCMatchingSet &&) = delete;
+
   void clear() {
     Ptr = SILValue();
     Increments.clear();
@@ -135,16 +142,33 @@ ARCMatchingSetComputationContext *createARCMatchingSetComputationContext(
 void
 destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx);
 
+/// A structure that via its virtual calls recieves the results of the analysis.
+///
+/// TODO: We could potentially pass in all of the matching sets as a list and
+/// use less virtual calls at the cost of potentially greater numbers of moves.
+struct ARCMatchingSetCallback {
+  /// This call should process \p Set and modify any internal state of
+  /// ARCMatchingSetCallback given \p Set. This call should not remove any
+  /// instructions since any removed instruction might be used as an insertion
+  /// point for another retain, release pair.
+  virtual void processMatchingSet(ARCMatchingSet &Set) {}
+
+  /// This call should perform any deletion of instructions necessary. It is run
+  /// strictly after all computation has been completed.
+  virtual void finalize() {}
+};
+
 /// Use the opaque context to recompute the matching set for the input function.
 ///
 /// \param Ctx The opaque context for the computation.
 /// \param FreezeOwningPtrEpiloqueReleases Should we not attempt to move, remove
 /// epilogue release pointers and instead use them as post dominating releases
 /// for other pointers.
-/// \param Fun The function to call with the ARC matching
+/// \param Callback The callback used to propagate information to analysis
+/// users.
 bool computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
                            bool FreezeOwningPtrEpiloqueReleases,
-                           std::function<void (ARCMatchingSet&)> Fun);
+                           ARCMatchingSetCallback &Callback);
 
 /// A class that attempts to match owned arguments and corresponding epilogue
 /// releases for a specific function.
