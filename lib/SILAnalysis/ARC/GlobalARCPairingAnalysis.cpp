@@ -351,7 +351,7 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
 }
 
 //===----------------------------------------------------------------------===//
-//                                  Context
+//                    ARC Matching Set Computation Context
 //===----------------------------------------------------------------------===//
 
 namespace swift {
@@ -365,8 +365,52 @@ struct ARCMatchingSetComputationContext {
   ARCMatchingSetComputationContext(SILFunction &F, RCIdentityFunctionInfo *RCIA)
       : F(F), DecToIncStateMap(), IncToDecStateMap(), RCIA(RCIA) {}
   virtual ~ARCMatchingSetComputationContext() {}
-  virtual bool run(bool FreezePostDomReleases) = 0;
+  virtual bool run(bool FreezePostDomReleases,
+                   std::function<void (ARCMatchingSet &)> Fun) = 0;
+  bool performMatching(std::function<void (ARCMatchingSet &)> Fun);
 };
+
+} // end swift namespace
+
+bool ARCMatchingSetComputationContext::performMatching(
+    std::function<void(ARCMatchingSet &)> Fun) {
+  bool MatchedPair = false;
+
+  DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for " << F.getName()
+                     << " ****\n");
+
+  /// For each increment that we matched to a decrement, try to match it to a
+  /// decrement -> increment pair.
+  for (auto Pair : IncToDecStateMap) {
+    SILInstruction *Increment = Pair.first;
+    if (!Increment)
+      continue; // blotted
+
+    DEBUG(llvm::dbgs() << "Constructing Matching Set For: " << *Increment);
+    ARCMatchingSetBuilder Builder(DecToIncStateMap, IncToDecStateMap, RCIA);
+    Builder.init(Increment);
+    if (Builder.matchUpIncDecSetsForPtr()) {
+      MatchedPair |= Builder.matchedPair();
+      auto &Set = Builder.getResult();
+      for (auto *I : Set.Increments)
+        IncToDecStateMap.blot(I);
+      for (auto *I : Set.Decrements)
+        DecToIncStateMap.blot(I);
+      Fun(Set);
+    }
+  }
+
+  DecToIncStateMap.clear();
+  IncToDecStateMap.clear();
+
+  return MatchedPair;
+}
+
+//===----------------------------------------------------------------------===//
+//                                 Block ARC
+//===----------------------------------------------------------------------===//
+
+namespace {
 
 struct BlockARCMatchingSetComputationContext
     : ARCMatchingSetComputationContext {
@@ -378,14 +422,25 @@ struct BlockARCMatchingSetComputationContext
                                         RCIdentityFunctionInfo *RCFI)
       : ARCMatchingSetComputationContext(F, RCFI),
         Evaluator(F, AA, POTA, RCIA, DecToIncStateMap, IncToDecStateMap) {}
-  virtual ~BlockARCMatchingSetComputationContext() override {}
+  virtual ~BlockARCMatchingSetComputationContext() override final {}
 
-  virtual bool run(bool FreezePostDomReleases) override {
+  virtual bool run(bool FreezePostDomReleases,
+                   std::function<void(ARCMatchingSet &)> Fun) override final {
     bool NestingDetected = Evaluator.run(FreezePostDomReleases);
     Evaluator.clear();
-    return NestingDetected;
+
+    bool MatchedPair = performMatching(Fun);
+    return NestingDetected && MatchedPair;
   }
 };
+
+} // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
+//                                  Loop ARC
+//===----------------------------------------------------------------------===//
+
+namespace {
 
 struct LoopARCMatchingSetComputationContext : ARCMatchingSetComputationContext {
   LoopARCSequenceDataflowEvaluator Evaluator;
@@ -396,16 +451,23 @@ struct LoopARCMatchingSetComputationContext : ARCMatchingSetComputationContext {
                                        RCIdentityFunctionInfo *RCFI)
       : ARCMatchingSetComputationContext(F, RCFI),
         Evaluator(F, AA, LRFI, SLI, RCIA, DecToIncStateMap, IncToDecStateMap) {}
-  virtual ~LoopARCMatchingSetComputationContext() override {}
+  virtual ~LoopARCMatchingSetComputationContext() override final {}
 
-  virtual bool run(bool FreezePostDomReleases) override {
+  virtual bool run(bool FreezePostDomReleases,
+                   std::function<void(ARCMatchingSet &)> Fun) override final {
     bool NestingDetected = Evaluator.run(FreezePostDomReleases);
     Evaluator.clear();
-    return NestingDetected;
+
+    bool MatchedPair = performMatching(Fun);
+    return NestingDetected && MatchedPair;
   }
 };
 
-} // end namespace swift
+} // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
+//                           Top Level EntryPoints
+//===----------------------------------------------------------------------===//
 
 ARCMatchingSetComputationContext *swift::createARCMatchingSetComputationContext(
     SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POTA,
@@ -431,50 +493,12 @@ destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx) {
   delete Ctx;
 }
 
-//===----------------------------------------------------------------------===//
-//                           Top Level Entry Point
-//===----------------------------------------------------------------------===//
-
-bool swift::
-computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
-                      bool FreezePostDomReleases,
-                      std::function<void (ARCMatchingSet&)> Fun) {
+bool swift::computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
+                                  bool FreezePostDomReleases,
+                                  std::function<void(ARCMatchingSet &)> Fun) {
 
   DEBUG(llvm::dbgs() << "**** Performing ARC Dataflow for " << Ctx->F.getName()
                      << " ****\n");
 
-  bool NestingDetected = Ctx->run(FreezePostDomReleases);
-  bool MatchedPair = false;
-
-  DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for "
-                     << Ctx->F.getName() << " ****\n");
-
-  /// For each increment that we matched to a decrement...
-  for (auto Pair : Ctx->IncToDecStateMap) {
-    SILInstruction *Increment = Pair.first;
-    if (!Increment)
-      continue; // blotted
-
-    DEBUG(llvm::dbgs() << "Constructing Matching Set For: " << *Increment);
-    ARCMatchingSetBuilder Builder(Ctx->DecToIncStateMap,
-                                  Ctx->IncToDecStateMap,
-                                  Ctx->RCIA);
-    Builder.init(Increment);
-    if (Builder.matchUpIncDecSetsForPtr()) {
-      ARCMatchingSet &M = Builder.getResult();
-      MatchedPair |= Builder.matchedPair();
-      for (auto *I : M.Increments)
-        Ctx->IncToDecStateMap.blot(I);
-      for (auto *I : M.Decrements)
-        Ctx->DecToIncStateMap.blot(I);
-      Fun(M);
-      M.clear();
-    }
-  }
-  Ctx->DecToIncStateMap.clear();
-  Ctx->IncToDecStateMap.clear();
-
-  // If we did not find a matching pair or detected nesting during the dataflow,
-  // there are no more increment, decrements that we can optimize.
-  return MatchedPair && NestingDetected;
+  return Ctx->run(FreezePostDomReleases, Fun);
 }
