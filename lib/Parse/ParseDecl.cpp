@@ -2122,17 +2122,9 @@ void Parser::parseDeclDelayed() {
 ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
-
-  if (Tok.is(tok::code_complete)) {
-    if (CodeCompletion) {
-      CodeCompletion->completeImportDecl();
-    }
-    return makeParserCodeCompletionStatus();
-  }
-
   DebuggerContextChange DCC (*this);
 
-  if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
+  if (!CodeCompletion && !DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
     diagnose(ImportLoc, diag::decl_inner_scope);
     return nullptr;
   }
@@ -2172,6 +2164,13 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 
   SmallVector<std::pair<Identifier, SourceLoc>, 8> ImportPath;
   do {
+    if (Tok.is(tok::code_complete)) {
+      consumeToken();
+      if (CodeCompletion) {
+        CodeCompletion->completeImportDecl(ImportPath);
+      }
+      return makeParserCodeCompletionStatus();
+    }
     ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
     if (parseAnyIdentifier(ImportPath.back().first,
                            diag::expected_identifier_in_decl, "import"))

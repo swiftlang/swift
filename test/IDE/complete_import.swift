@@ -1,5 +1,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT1 | FileCheck %s -check-prefix=CLANG_IMPORT1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT2 | FileCheck %s -check-prefix=CLANG_IMPORT2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -F %S/Inputs/mock-sdk -code-completion-token=CLANG_IMPORT3 | FileCheck %s -check-prefix=CLANG_IMPORT3
 
 import #^CLANG_IMPORT1^#
 
@@ -14,7 +15,12 @@ import Foo
 import #^CLANG_IMPORT2^#
 
 // CLANG_IMPORT2: Begin completions
-// CLANG_IMPORT2-DAG:	Foo[#Module#]; name=Foo
-// CLANG_IMPORT2-DAG:	FooHelper[#Module#]; name=FooHelper
-// CLANG_IMPORT2-DAG:	Decl[Module]/OtherModule[Bar]:                       Bar[#Module#]; name=Bar
+// CLANG_IMPORT2-NOT:	Foo[#Module#]; name=Foo
+// CLANG_IMPORT2-NOT:	FooHelper[#Module#]; name=FooHelper
 // CLANG_IMPORT2-NOT:	SwiftShims
+// CLANG_IMPORT2-DAG:	Decl[Module]/OtherModule[Bar]:                       Bar[#Module#]; name=Bar
+
+import Foo.#^CLANG_IMPORT3^#
+
+// CLANG_IMPORT3: Begin completions
+// CLANG_IMPORT3-NEXT: Decl[Module]/OtherModule[FooSub]:   FooSub[#Module#]; name=FooSub

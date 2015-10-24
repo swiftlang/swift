@@ -858,6 +858,28 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   return result;
 }
 
+void ClangImporter::collectSubModuleNames(ArrayRef<std::pair<Identifier, SourceLoc>> path,
+                                          std::vector<std::string> &names) {
+  auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
+
+  // Look up the top-level module first.
+  clang::Module *clangModule =
+  clangHeaderSearch.lookupModule(path.front().first.str());
+  if (!clangModule)
+    return;
+  clang::Module *submodule = clangModule;
+  for (auto component : path.slice(1)) {
+    submodule = submodule->findSubmodule(component.first.str());
+    if (!submodule)
+      return;
+  }
+  auto submoduleNameLength = submodule->getFullModuleName().length();
+  for (auto sub : submodule->submodules()) {
+    StringRef full = sub->getFullModuleName();
+    names.push_back(full.substr(submoduleNameLength + 1));
+  }
+}
+
 Module *ClangImporter::loadModule(
     SourceLoc importLoc,
     ArrayRef<std::pair<Identifier, SourceLoc>> path) {

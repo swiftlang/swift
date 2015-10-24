@@ -152,7 +152,7 @@ public:
   virtual void completePoundAvailablePlatform() = 0;
 
   /// Complete the import decl with importable modules.
-  virtual void completeImportDecl() = 0;
+  virtual void completeImportDecl(ArrayRef<std::pair<Identifier, SourceLoc>> Path) = 0;
 
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(UnresolvedMemberExpr *E,

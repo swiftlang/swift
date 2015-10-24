@@ -20,6 +20,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
@@ -789,6 +790,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
 
   SmallVector<StringRef, 3> ParsedKeywords;
 
+  std::vector<std::string> SubModuleNames;
+
   void addSuperKeyword(CodeCompletionResultSink &Sink) {
     auto *DC = CurDeclContext->getInnermostTypeContext();
     if (!DC)
@@ -924,7 +927,7 @@ public:
       SmallVectorImpl<StringRef> &Keywords) override;
 
   void completePoundAvailablePlatform() override;
-  void completeImportDecl() override;
+  void completeImportDecl(ArrayRef<std::pair<Identifier, SourceLoc>> Path) override;
   void completeUnresolvedMember(UnresolvedMemberExpr *E,
                                 ArrayRef<StringRef> Identifiers,
                                 bool HasReturn) override;
@@ -1231,6 +1234,20 @@ public:
 
   void addExpressionSpecificDecl(const Decl *D) {
     ExpressionSpecificDecls.insert(D);
+  }
+
+  void addSubModuleNames(std::vector<std::string> &SubModuleNames) {
+    for (auto Name : SubModuleNames) {
+      CodeCompletionResultBuilder Builder(Sink,
+                                          CodeCompletionResult::ResultKind::
+                                          Declaration,
+                                          SemanticContextKind::OtherModule,
+                                          ExpectedTypes);
+      auto MD = ModuleDecl::create(Ctx.getIdentifier(Name), Ctx);
+      Builder.setAssociatedDecl(MD);
+      Builder.addTextChunk(MD->getNameStr());
+      Builder.addTypeAnnotation("Module");
+    }
   }
 
   void addImportModuleNames() {
@@ -3391,9 +3408,16 @@ void CodeCompletionCallbacksImpl::completeCaseStmtDotPrefix() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeImportDecl() {
+void CodeCompletionCallbacksImpl::completeImportDecl(
+    ArrayRef<std::pair<Identifier, SourceLoc>> Path) {
   Kind = CompletionKind::Import;
   CurDeclContext = P.CurDeclContext;
+  DotLoc = Path.empty() ? SourceLoc() : Path.back().second;
+  if (DotLoc.isInvalid())
+    return;
+  auto Importer = static_cast<ClangImporter *>(CurDeclContext->getASTContext().
+                                               getClangModuleLoader());
+  Importer->collectSubModuleNames(Path, SubModuleNames);
 }
 
 void CodeCompletionCallbacksImpl::completeUnresolvedMember(UnresolvedMemberExpr *E,
@@ -3970,7 +3994,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::Import: {
-    Lookup.addImportModuleNames();
+    if (DotLoc.isValid())
+      Lookup.addSubModuleNames(SubModuleNames);
+    else
+      Lookup.addImportModuleNames();
     break;
   }
   case CompletionKind::UnresolvedMember : {

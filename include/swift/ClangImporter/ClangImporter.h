@@ -258,6 +258,11 @@ public:
   
   // Print statistics from the Clang AST reader.
   void printStatistics() const override;
+
+  /// Given the path of a Clang module, collect the names of all its submodules.
+  /// Calling this function does not load the module.
+  void collectSubModuleNames(ArrayRef<std::pair<Identifier, SourceLoc>> path,
+                             std::vector<std::string> &names);
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
