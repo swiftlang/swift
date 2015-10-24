@@ -40,8 +40,8 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
 
   set(dependency_targets)
   set(de_gybbed_sources)
-  set(gyb_sources)
   set(gyb_tool "${SWIFT_SOURCE_DIR}/utils/gyb")
+  set(gyb_tool_source "${gyb_tool}" "${gyb_tool}.py")
   set(gyb_extra_sources
       "${SWIFT_SOURCE_DIR}/utils/GYBUnicodeDataUtils.py"
       "${SWIFT_SOURCE_DIR}/utils/SwiftIntTypes.py"
@@ -71,7 +71,7 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
           COMMAND
             "${CMAKE_COMMAND}" -E remove "${output_file_name}.tmp"
           OUTPUT "${output_file_name}"
-          DEPENDS "${gyb_tool}" "${src}" "${gyb_extra_sources}"
+          DEPENDS "${gyb_tool_source}" "${src}" "${gyb_extra_sources}"
           COMMENT "Generating ${src_sans_gyb} from ${src} with ptr size = ${ptr_size}"
           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
           SOURCES "${src}"
