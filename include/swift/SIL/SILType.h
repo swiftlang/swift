@@ -287,10 +287,11 @@ public:
     return isAddressOnly(type, M);
   }
 
-  /// Returns true if this type is or may be resilient.
+  /// Returns true if this type exposes a fixed layout to the given module's
+  /// resilience domain.
   ///
   /// This is currently only implemented for nominal types.
-  bool isResilient(SILModule &M) const;
+  bool hasFixedLayout(SILModule &M) const;
   
   /// True if the type, or the referenced type of an address type, is loadable.
   /// This is the opposite of isAddressOnly.

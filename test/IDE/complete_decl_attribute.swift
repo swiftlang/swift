@@ -60,12 +60,13 @@ func method(){}
 @#^KEYWORD3^#
 class C {}
 
-// KEYWORD3:                  Begin completions, 7 items
+// KEYWORD3:                  Begin completions, 8 items
 // KEYWORD3-NEXT:             Keyword/None:                       available[#Class Attribute#]; name=available{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       objc[#Class Attribute#]; name=objc{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       IBDesignable[#Class Attribute#]; name=IBDesignable{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       UIApplicationMain[#Class Attribute#]; name=UIApplicationMain{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       requires_stored_property_inits[#Class Attribute#]; name=requires_stored_property_inits{{$}}
+// KEYWORD3-NEXT:             Keyword/None:                       fixed_layout[#Class Attribute#]; name=fixed_layout{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       NSApplicationMain[#Class Attribute#]; name=NSApplicationMain{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       objc_non_lazy_realization[#Class Attribute#]; name=objc_non_lazy_realization{{$}}
 // KEYWORD3-NEXT:             End completions

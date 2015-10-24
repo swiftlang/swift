@@ -1800,6 +1800,24 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   return interfaceType->castTo<MetatypeType>()->getInstanceType();
 }
 
+
+bool NominalTypeDecl::hasFixedLayout() const {
+  // Private and internal types always have a fixed layout.
+  if (getFormalAccess() != Accessibility::Public)
+    return true;
+
+  // Check for an explicit @fixed_layout attribute.
+  if (getAttrs().hasAttribute<FixedLayoutAttr>())
+    return true;
+
+  // Types imported from C always have a fixed layout.
+  if (hasClangNode())
+    return true;
+
+  // Otherwise, access via indirect "resilient" interfaces.
+  return false;
+}
+
 /// Provide the set of parameters to a generic type, or null if
 /// this function is not generic.
 void NominalTypeDecl::setGenericParams(GenericParamList *params) {
