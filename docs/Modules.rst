@@ -9,8 +9,8 @@ A `module` is the primary unit of code sharing in Swift. This document
 describes the experience of using modules in Swift: what they are and what they
 provide for the user.
 
-.. warning:: This document has not been updated since the initial design in
-  Swift 1.0.
+.. warning:: This document was used in planning Swift 1.0; it has not been kept
+  up to date.
 
 .. contents:: :local:
 
@@ -106,12 +106,14 @@ declarations in the module.
 Modules can "re-export" other modules
 -------------------------------------
 
+.. warning:: This feature is likely to be modified in the future.
+
 Like any other body of code, a module may depend on other modules in its
 implementation. The module implementer may also choose to `re-export` these
 modules, meaning that anyone who imports the first module will also have access
 to the declarations in the re-exported modules. ::
 
-  import [exported] AmericanCheckers
+  @exported import AmericanCheckers
 
 As an example, the "Cocoa" `framework` on OS X exists only to re-export three
 other frameworks: AppKit, Foundation, and CoreData.
@@ -119,13 +121,7 @@ other frameworks: AppKit, Foundation, and CoreData.
 Just as certain declarations can be selectively imported from a module, so too
 can they be selectively re-exported, using the same syntax::
 
-  import [exported] class AmericanCheckers.Board
-
-.. admonition:: TODO
-
-  This is currently implemented using a dedicated ``[exported]`` keyword, but is
-  likely to end up using the access control syntax we eventually design for
-  regular declarations.
+  @exported import class AmericanCheckers.Board
 
 
 .. _module-naming:
@@ -218,26 +214,6 @@ loaded with ``import``, but with a few important differences:
   those other modules can't depend on it. Source files within a module may
   have mutual dependencies.
 
-.. note::
-
-  The current plan is to have two possible implementations for this. A serial
-  compilation process would pass all source files to the compiler in a single
-  invocation; parallelism nice-to-have.
-  
-  The more complicated process has the compiler derive a list of all files in
-  a module, either by some structural inference or by explicitly being given a
-  list. These files are parsed but not type-checked; "lazy" type-checking
-  will be used when the compiler needs to refer to declarations in these files.
-  Once compiled, a serialized form of the source file could be used to avoid
-  having to reparse that particular file, but this is just an optimization.
-  
-  A more detailed description of the build system plan will be available in a
-  separate doc.
-
-.. admonition:: TODO
-
-  None of this works yet.
-
 .. admonition:: FIXME
 
   This wouldn't belong in the user model at all except for the implicit 
@@ -266,7 +242,7 @@ the appropriate module.
 These are the rules for resolving name lookup ambiguities:
 
 1. Declarations in the current source file are best.
-2. Declarations from other files in the same module [#]_ are better than
+2. Declarations from other files in the same module are better than
    declarations from imports.
 3. Declarations from selective imports are better than declarations from
    non-selective imports. (This may be used to give priority to a particular
@@ -276,13 +252,12 @@ These are the rules for resolving name lookup ambiguities:
 5. If the name refers to a function, normal overload resolution may resolve
    ambiguities.
 
-.. [#] FIXME: not implemented yet, since the main feature hasn't been
-       implemented either.
-
 .. _submodules:
 
 Submodules
 ----------
+
+.. warning:: This feature was never implemented, or even fully designed.
 
 For large projects, it is usually desirable to break a single application or
 framework into subsystems, which Swift calls "submodules". A submodule is a
@@ -332,11 +307,6 @@ declaration.
   Both cases still use "submodule-only" as the default access control, so this
   only affects the implicit visibility of whole-module and public declarations.
 
-.. admonition:: FIXME
-
-  Cross-reference with access control design doc once we have an access control
-  design doc.
-
 
 Import Search Paths
 -------------------
@@ -378,6 +348,9 @@ to require an explicit import::
 Module Overlays
 ---------------
 
+.. warning:: This feature has mostly been removed from Swift; it's only in use
+  in the "overlay" libraries bundled with Swift itself.
+
 If a source file in module A includes ``import A``, this indicates that the
 source file is providing a replacement or overlay for an external module.
 In most cases, the source file will `re-export` the underlying module, but
@@ -396,20 +369,15 @@ Objective-C header, exposing its declarations to the main source file by
 constructing a sort of "ad hoc" module. These can then be used like any
 other declarations imported from C or Objective-C.
 
-.. admonition:: TODO
-
-  What happens if a user's header file happens to match the name of a real 
-  module? What if the header name is not an identifier? Do we need an
-  ``import [objc]``?
-
-  Or, since it's in the same target, is this something that should happen 
-  implicitly, like with other Swift sources?
-  
-  This doesn't actually work yet.
+.. note:: This is describing the feature that eventually became "bridging
+  headers" for app targets.
 
 
 Accessing Swift declarations from Objective-C
 ---------------------------------------------
+
+.. warning:: This never actually happened; instead, we went with "generated
+  headers" output by the Swift compiler.
 
 Using the new ``@import`` syntax, Objective-C translation units can import
 Swift modules as well. Swift declarations will be mirrored into Objective-C
