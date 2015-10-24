@@ -152,6 +152,30 @@ def tokenizeTemplate(templateText):
     This function provides a base level of tokenization which is
     then refined by ParseContext.tokenGenerator.
 
+    >>> from pprint import *
+    >>> pprint(list((kind, text) for kind,text,_ in tokenizeTemplate(
+    ...   '%for x in range(10):\n%  print x\n%end\njuicebox')))
+    [('gybLines', '%for x in range(10):\n%  print x'),
+     ('gybLinesClose', '%end'),
+     ('literal', 'juicebox')]
+
+    >>> pprint(list((kind, text) for kind,text,_ in tokenizeTemplate(
+    ... '''Nothing
+    ... % if x:
+    ... %    for i in range(3):
+    ... ${i}
+    ... %    end
+    ... % else:
+    ... THIS SHOULD NOT APPEAR IN THE OUTPUT
+    ... ''')))
+    [('literal', 'Nothing\n'),
+     ('gybLines', '% if x:\n%    for i in range(3):'),
+     ('substitutionOpen', '${'),
+     ('literal', '\n'),
+     ('gybLinesClose', '%    end'),
+     ('gybLines', '% else:'),
+     ('literal', 'THIS SHOULD NOT APPEAR IN THE OUTPUT\n')]
+
     >>> for kind, text, _ in tokenizeTemplate('''
     ... This is $some$ literal stuff containing a ${substitution}
     ... followed by a %{...} block:
@@ -257,10 +281,25 @@ def splitGybLines(sourceLines):
     1
     >>> src[s[0]]
     '    if y: print 1\n'
+
+    >>> src = splitLines('''\
+    ... if x:
+    ...     if y:
+    ...         print 1
+    ...         print 2
+    ... ''')
+    >>> s = splitGybLines(src)
+    >>> len(s)
+    2
+    >>> src[s[0]]
+    '    if y:\n'
+    >>> src[s[1]]
+    '        print 1\n'
     """
     lastTokenText,lastTokenKind = None,None
     unmatchedIndents = []
 
+    dedents = 0
     try:
         for tokenKind, tokenText, tokenStart, (tokenEndLine, tokenEndCol), lineText \
             in tokenize.generate_tokens(sourceLines.__iter__().next):
@@ -270,9 +309,17 @@ def splitGybLines(sourceLines):
 
             if tokenText == '\n' and lastTokenText == ':':
                 unmatchedIndents.append(tokenEndLine)
-            elif lastTokenKind == tokenize.DEDENT:
-                unmatchedIndents.pop()
-        
+                
+            # The tokenizer appends dedents at EOF; don't consider
+            # those as matching indentations.  Instead just save them
+            # up...
+            if lastTokenKind == tokenize.DEDENT:
+                dedents += 1
+            # And count them later, when we see something real.
+            if tokenKind != tokenize.DEDENT and dedents > 0:
+                unmatchedIndents = unmatchedIndents[:-dedents]
+                dedents = 0
+                
             lastTokenText,lastTokenKind = tokenText,tokenKind
 
     except tokenize.TokenError, (message, errorPos):
@@ -340,21 +387,44 @@ class ParseContext:
         ... %for x in y:
         ... %    print x
         ... % end
+        ... literally
         ... ''')
-        >>> ctx.tokenKind
-        'literal'
-        >>> ctx.tokenText
-        '\n'
-        >>> ctx.nextToken()
-        'gybLinesOpen'
-        >>> ctx.codeText
-        'for x in y:\n'
-        >>> ctx.nextToken()
-        'gybLines'
-        >>> ctx.codeText
-        '    print x\n'
+        >>> ctx.tokenKind, ctx.tokenText
+        ('literal', '\n')
+        >>> ctx.nextToken(), ctx.codeText
+        ('gybLinesOpen', 'for x in y:\n')
+        >>> ctx.nextToken(), ctx.codeText
+        ('gybLines', '    print x\n')
         >>> ctx.nextToken()
         'gybLinesClose'
+        >>> ctx.nextToken(), ctx.tokenText
+        ('literal', 'literally\n')
+
+        >>> ctx = ParseContext('dummy',
+        ... '''Nothing
+        ... % if x:
+        ... %    for i in range(3):
+        ... ${i}
+        ... %    end
+        ... % else:
+        ... THIS SHOULD NOT APPEAR IN THE OUTPUT
+        ... ''')
+        >>> ctx.tokenKind, ctx.tokenText
+        ('literal', 'Nothing\n')
+        >>> ctx.nextToken(), ctx.codeText
+        ('gybLinesOpen', 'if x:\n')
+        >>> ctx.nextToken(), ctx.codeText
+        ('gybLinesOpen', '   for i in range(3):\n')
+        >>> ctx.nextToken(), ctx.codeText
+        ('substitutionOpen', 'i')
+        >>> ctx.nextToken(), ctx.tokenText
+        ('literal', '\n')
+        >>> ctx.nextToken()
+        'gybLinesClose'
+        >>> ctx.nextToken(), ctx.codeText
+        ('gybLinesOpen', 'else:\n')
+        >>> ctx.nextToken(), ctx.tokenText
+        ('literal', 'THIS SHOULD NOT APPEAR IN THE OUTPUT\n')
         """
         for self.tokenKind, self.tokenText, self.tokenMatch in baseTokens:
             kind = self.tokenKind
@@ -397,6 +467,10 @@ class ParseContext:
                     '^' + re.escape(indentation), 
                     self.tokenMatch.group('gybLines')+'\n', 
                     flags=re.MULTILINE)[1:]
+                
+                closer = self.tokenMatch.group('gybLinesClose')
+                if closer:
+                    sourceLines.append(closer.replace('end', '#'))
 
                 if codeStartsWithDedentKeyword(sourceLines):
                     self.closeLines = True
@@ -538,12 +612,16 @@ class Code(ASTNode):
             source, sourceLineCount = accumulateCode()
             source = '('+source.strip()+')'
 
-        while context.tokenKind == 'gybLinesOpen':
-            source, sourceLineCount = accumulateCode()
-            source += '    __children__[%d].execute(__context__)\n' % len(self.children)
-            sourceLineCount += 1
+        else:
+            while context.tokenKind == 'gybLinesOpen':
+                source, sourceLineCount = accumulateCode()
+                source += '    __children__[%d].execute(__context__)\n' % len(self.children)
+                sourceLineCount += 1
 
-            self.children += (Block(context),)
+                self.children += (Block(context),)
+
+            if context.tokenKind == 'gybLinesClose':
+                context.nextToken()
         
         if context.tokenKind == 'gybLines':
             source, sourceLineCount = accumulateCode()
@@ -559,9 +637,6 @@ class Code(ASTNode):
         self.startLineNumber = context.codeStartLine
         self.code = compile(source, context.filename, evalExec)
         self.source = source
-
-        if context.tokenKind == 'gybLinesClose':
-            context.nextToken()
 
     def execute(self, context):
         # Save __children__ from the local bindings
@@ -593,6 +668,69 @@ def parseTemplate(filename, text = None):
     
     If text is supplied, it is assumed to be the contents of the file,
     as a string.
+
+    >>> print parseTemplate('dummy.file', text='%for x in range(10):\n%  print x\n%end\njuicebox')
+    Block:
+    [
+        Code:
+        {
+            for x in range(10):
+                __children__[0].execute(__context__)
+        }
+        [
+            Block:
+            [
+                Code: {print x} []
+            ]
+        ]
+        Literal:
+        juicebox
+    ]
+
+    >>> print parseTemplate('/dummy.file', text=
+    ... '''Nothing
+    ... % if x:
+    ... %    for i in range(3):
+    ... ${i}
+    ... %    end
+    ... % else:
+    ... THIS SHOULD NOT APPEAR IN THE OUTPUT
+    ... ''')
+    Block:
+    [
+        Literal:
+        Nothing
+        Code:
+        {
+            if x:
+                __children__[0].execute(__context__)
+            else:
+                __children__[1].execute(__context__)
+        }
+        [
+            Block:
+            [
+                Code:
+                {
+                    for i in range(3):
+                        __children__[0].execute(__context__)
+                }
+                [
+                    Block:
+                    [
+                        Code: {(i)} []
+                        Literal:
+    <BLANKLINE>
+                    ]
+                ]
+            ]
+            Block:
+            [
+                Literal:
+                THIS SHOULD NOT APPEAR IN THE OUTPUT
+            ]
+        ]
+    ]
 
     >>> print parseTemplate('dummy.file', text='''%
     ... %for x in y:
@@ -740,6 +878,20 @@ Keyword arguments become local variable bindings in the execution context
     1
     //#line 4 "/dummy.file"
     2
+
+    >>> ast = parseTemplate('/dummy.file', text=
+    ... '''Nothing
+    ... % a = []
+    ... % for x in range(3):
+    ... %    a.append(x)
+    ... % end
+    ... ${a}
+    ... ''')
+    >>> print executeTemplate(ast, lineDirective='//#line', x=1),
+    //#line 1 "/dummy.file"
+    Nothing
+    //#line 6 "/dummy.file"
+    [0, 1, 2]
 """
     executionContext = ExecutionContext(lineDirective=lineDirective, **localBindings)
     ast.execute(executionContext)

@@ -21,6 +21,8 @@
 % for x in ('Decl', 'Conformance', 'Boilerplate'):
 %   locals()['Mirror' + x] = gyb.executeTemplate(
 %     gyb.parseTemplate('../common/Mirror%s.gyb' % x), **common_args)
+%   print '######### x:', x
+% end
 
 ${MirrorDecl} {
   ${MirrorBoilerplate}

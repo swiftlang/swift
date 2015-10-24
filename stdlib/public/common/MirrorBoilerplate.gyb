@@ -28,10 +28,10 @@
 %import inspect,os.path,sys
 %sys.path = [os.path.split(inspect.getframeinfo(inspect.currentframe()).filename)[0] or '.'] + sys.path
 %import MirrorCommon
-%genericArgString = MirrorCommon.getGenericArgString(\
-%                   genericArgs if 'genericArgs' in locals() else None,\
+%genericArgString = MirrorCommon.getGenericArgString(
+%                   genericArgs if 'genericArgs' in locals() else None,
 %                   genericConstraints if 'genericConstraints' in locals() else None)
-%disposition = MirrorCommon.getDisposition(\
+%disposition = MirrorCommon.getDisposition(
 %              disposition if 'disposition' in locals() else None)
 var _value: ${introspecteeType}${genericArgString}
 

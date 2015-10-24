@@ -36,6 +36,7 @@
 %       QLArgFirst = False
 %     QLArgString = QLArgString + 'Double(_value.' + QLArg + ')'
 %     SummaryString = SummaryString + '\(_value.' + QLArg + ')'
+%   end
 
 ${MirrorDecl} {
   ${MirrorBoilerplate}

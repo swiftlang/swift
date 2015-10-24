@@ -89,7 +89,6 @@ tests.test("${Self}/success") {
   %   for n in required_values + range(
   %     minValue + 1, maxValue - 1,
   %     (maxValue - minValue - 2) / (number_of_values - len(required_values))):
-  // This line is a workaround for a gyb parsing bug.
   %     prefix = '+' if n > 0 and n % 2 == 0 else '' # leading '+'
   %     text = inRadix(radix, n)
   expectEqual(${n}, ${Self}("${prefix + text}", radix: ${radix}))

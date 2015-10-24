@@ -149,6 +149,7 @@ public func ${bfunc}(lhs: ${T}, _ rhs: ${T}) -> ${T} {
 % for T, CT, f in AllFloatTypes():
 %   if f == '':
 %     f = 'd'
+%   end
 @transparent
 @warn_unused_result
 public func fpclassify(x: ${T}) -> Int {
