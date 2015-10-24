@@ -39,8 +39,8 @@ def splitLines(s):
 # text on a line up to the first '$$', '${', or '%%'
 literalText = r'(?: [^$\n%] | \$(?![${]) | %(?!%) )*'
 
-# The part of an '@end' line that follows the '@' sign
-atEndLine = r'[\ \t]* end [\ \t]* (?: \# .* )? $'
+# The part of an '%end' line that follows the '%' sign
+linesClose = r'[\ \t]* end [\ \t]* (?: \# .* )? $'
 
 ## Note: Where "# Absorb" appears below, the regexp attempts to eat up
 ## through the end of ${...} and %{...}% constructs.  In reality we
@@ -55,12 +55,12 @@ tokenizeRE = re.compile(
     # \n? # absorb one preceding newline
     ^
     (?: 
-      (?P<atLines>
-        (?P<_indent> [\ \t]* % (?! [{%] ) [\ \t]* ) (?! [\ \t] | '''+atEndLine+r''' ) .*
-        ( \n (?P=_indent) (?! '''+atEndLine+r''' ) .* ) *
+      (?P<gybLines>
+        (?P<_indent> [\ \t]* % (?! [{%] ) [\ \t]* ) (?! [\ \t] | '''+linesClose+r''' ) .*
+        ( \n (?P=_indent) (?! '''+linesClose+r''' ) .* ) *
       )
-      | (?P<atEndLine> [\ \t]* % [ \t]* '''+atEndLine+r''' )
-      | [\ \t]* (?P<atBlockOpen> %\{  )
+      | (?P<gybLinesClose> [\ \t]* % [ \t]* '''+linesClose+r''' )
+      | [\ \t]* (?P<gybBlockOpen> %\{  )
         (?: [^}]| \} (?!%) )* \}%  # Absorb
     )
     \n? # absorb one trailing newline
@@ -84,7 +84,7 @@ tokenizeRE = re.compile(
 '''
 , re.VERBOSE|re.MULTILINE)
 
-atBlockClose = re.compile('\}%[ \t]*\n?')
+gybBlockClose = re.compile('\}%[ \t]*\n?')
 
 def tokenPosToIndex(tokenPos, start, lineStarts):
     """Translate a tokenize (line, column) pair into an absolute
@@ -176,13 +176,13 @@ def tokenizeTemplate(templateText):
     ('literal', 'This is $some$ literal stuff containing a')
     ('substitutionOpen', '${')
     ('literal', 'followed by a %{...} block:')
-    ('atBlockOpen', '%{')
+    ('gybBlockOpen', '%{')
     ('literal', 'and here ${are} some %-lines:')
-    ('atLines', '% x = 1')
-    ('atEndLine', '% end')
-    ('atLines', '%    for x in zz:')
-    ('atLines', '% # different indentation')
-    ('atLines', '% twice')
+    ('gybLines', '% x = 1')
+    ('gybLinesClose', '% end')
+    ('gybLines', '%    for x in zz:')
+    ('gybLines', '% # different indentation')
+    ('gybLines', '% twice')
     ('literal', 'and some lines that literally start with a % token')
     """
     pos = 0
@@ -224,10 +224,10 @@ def tokenizeTemplate(templateText):
     if savedLiteral != []:
         yield 'literal', ''.join(savedLiteral), literalFirstMatch
 
-def splitAtLines(sourceLines):
+def splitGybLines(sourceLines):
     r"""Return a list of lines at which to split the incoming source
 
-    These positions represent the beginnings of python blocks that
+    These positions represent the beginnings of python line groups that
     will require a matching %end construct if they are to be closed.
 
     >>> src = splitLines('''\
@@ -237,7 +237,7 @@ def splitAtLines(sourceLines):
     ...     print z
     ...     if z: # another comment\
     ... ''')
-    >>> s = splitAtLines(src)
+    >>> s = splitGybLines(src)
     >>> len(s)
     2
     >>> src[s[0]]
@@ -252,7 +252,7 @@ def splitAtLines(sourceLines):
     ...         print 2
     ...     pass\
     ... ''')
-    >>> s = splitAtLines(src)
+    >>> s = splitGybLines(src)
     >>> len(s)
     1
     >>> src[s[0]]
@@ -313,7 +313,7 @@ class ParseContext:
     codeStartLine = -1
     codeText = None
     tokens = None       # The rest of the tokens
-    closeBlock = False
+    closeLines = False
 
     def __init__(self, filename, template = None):
         self.filename = os.path.abspath(filename)
@@ -346,22 +346,22 @@ class ParseContext:
         >>> ctx.tokenText
         '\n'
         >>> ctx.nextToken()
-        'atLinesOpen'
+        'gybLinesOpen'
         >>> ctx.codeText
         'for x in y:\n'
         >>> ctx.nextToken()
-        'atLines'
+        'gybLines'
         >>> ctx.codeText
         '    print x\n'
         >>> ctx.nextToken()
-        'atEndLine'
+        'gybLinesClose'
         """
         for self.tokenKind, self.tokenText, self.tokenMatch in baseTokens:
             kind = self.tokenKind
             self.codeText = None
             
-            # Do we need to close the current block?
-            self.closeBlock = kind == 'atEndLine'
+            # Do we need to close the current lines?
+            self.closeLines = kind == 'gybLinesClose'
 
             if kind.endswith('Open'): # %{...}% and ${...} constructs
 
@@ -374,9 +374,9 @@ class ParseContext:
                 self.codeText = self.template[codeStart:closePos]
                 yield kind
 
-                if (kind == 'atBlockOpen'):
+                if (kind == 'gybBlockOpen'):
                     # Absorb any '}% <optional-comment> \n'
-                    m2 = atBlockClose.match(self.template, closePos)
+                    m2 = gybBlockClose.match(self.template, closePos)
                     assert m2, "Invalid block closure" # FIXME: need proper error handling here.
                     nextPos = m2.end(0)
                 else:
@@ -386,24 +386,24 @@ class ParseContext:
                 # Resume tokenizing after the end of the code.
                 baseTokens.send(nextPos)
 
-            elif kind == 'atLines':
+            elif kind == 'gybLines':
                 
-                self.codeStartLine = self.posToLine(self.tokenMatch.start('atLines'))
+                self.codeStartLine = self.posToLine(self.tokenMatch.start('gybLines'))
                 codeStartPos = self.tokenMatch.end('_indent')
                 indentation = self.tokenMatch.group('_indent')
 
                 # Strip off the leading indentation and %-sign
                 sourceLines = re.split(
                     '^' + re.escape(indentation), 
-                    self.tokenMatch.group('atLines')+'\n', 
+                    self.tokenMatch.group('gybLines')+'\n', 
                     flags=re.MULTILINE)[1:]
 
                 if codeStartsWithDedentKeyword(sourceLines):
-                    self.closeBlock = True
+                    self.closeLines = True
 
                 lastSplit = 0
-                for line in splitAtLines(sourceLines):
-                    self.tokenKind = 'atLinesOpen'
+                for line in splitGybLines(sourceLines):
+                    self.tokenKind = 'gybLinesOpen'
                     self.codeText = ''.join(sourceLines[lastSplit:line])
                     yield self.tokenKind
                     lastSplit = line
@@ -411,7 +411,7 @@ class ParseContext:
 
                 self.codeText = ''.join(sourceLines[lastSplit:])
                 if self.codeText:
-                    self.tokenKind = 'atLines'
+                    self.tokenKind = 'gybLines'
                     yield self.tokenKind
             else:
                 yield self.tokenKind
@@ -484,7 +484,7 @@ class Block(ASTNode):
     def __init__(self, context):
         self.children = []
 
-        while context.tokenKind and not context.closeBlock:
+        while context.tokenKind and not context.closeLines:
             if context.tokenKind == 'literal':
                 Node = Literal
             else:
@@ -538,19 +538,19 @@ class Code(ASTNode):
             source, sourceLineCount = accumulateCode()
             source = '('+source.strip()+')'
 
-        while context.tokenKind == 'atLinesOpen':
+        while context.tokenKind == 'gybLinesOpen':
             source, sourceLineCount = accumulateCode()
             source += '    __children__[%d].execute(__context__)\n' % len(self.children)
             sourceLineCount += 1
 
             self.children += (Block(context),)
         
-        if context.tokenKind == 'atLines':
+        if context.tokenKind == 'gybLines':
             source, sourceLineCount = accumulateCode()
             
             # Only handle a substitution as part of this code block if
             # we don't already have some %-lines.
-        elif context.tokenKind == 'atBlockOpen':
+        elif context.tokenKind == 'gybBlockOpen':
 
             # Opening ${...} and %{...}% constructs
             source, sourceLineCount = accumulateCode()
@@ -560,7 +560,7 @@ class Code(ASTNode):
         self.code = compile(source, context.filename, evalExec)
         self.source = source
 
-        if context.tokenKind == 'atEndLine':
+        if context.tokenKind == 'gybLinesClose':
             context.nextToken()
 
     def execute(self, context):
@@ -830,7 +830,7 @@ def main():
         import doctest
         if doctest.testmod(verbose=args.verbose_test).failed:
             exit(1)
-
+        
     bindings = dict( x.split('=', 1) for x in args.defines )
     ast = parseTemplate(args.file.name, args.file.read())
     if args.dump:
