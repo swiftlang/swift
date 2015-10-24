@@ -885,10 +885,15 @@ function(_add_swift_library_single target name)
   endif()
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+    set(install_name_dir "@rpath")
+    if(SWIFTLIB_SINGLE_IS_STDLIB)
+      set(install_name_dir "${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
+    endif()
+
     set_target_properties("${target}"
-        PROPERTIES
-        INSTALL_NAME_DIR "@rpath"
-        BUILD_WITH_INSTALL_RPATH YES)
+      PROPERTIES
+      INSTALL_NAME_DIR "${install_name_dir}"
+      BUILD_WITH_INSTALL_RPATH YES)
   endif()
 
   set_target_properties("${target}" PROPERTIES FOLDER "Swift libraries")
