@@ -10,18 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-internal var _replExitHandlers: [() -> Void] = []
-
-public func _atREPLExit(handler: () -> Void) {
-  _replExitHandlers.append(handler)
-}
-
-internal func _replExit() {
-  for handler in _replExitHandlers.reverse() {
-    handler()
-  }
-}
-
 /// Print a string as is to stdout.
 public // COMPILER_INTRINSIC
 func _replPrintLiteralString(text: String) {

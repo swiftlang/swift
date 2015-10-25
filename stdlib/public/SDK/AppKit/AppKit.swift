@@ -13,26 +13,6 @@
 import Foundation
 @exported import AppKit
 
-class REPLApplication : NSApplication {
-}
-
-/// Initializes and runs a REPLApplication on the main thread asynchronously.
-internal func replApplicationMain() {
-  _precondition(NSApp === nil)
-  // Create a REPLApplication as the NSApp.
-  let app = REPLApplication.sharedApplication() as! REPLApplication
-
-  // Set the activation policy so we get a dock icon and can go foreground.
-  app.setActivationPolicy(.Regular)
-
-  // Run asynchronously.
-  NSOperationQueue.mainQueue().addOperationWithBlock { app.run() }
-
-  // Quit the NSApplication when the REPL quits.
-  _atREPLExit({ app.terminate(nil) })
-
-}
-
 struct _NSCursorMirror : _MirrorType {
   var _value: NSCursor
 

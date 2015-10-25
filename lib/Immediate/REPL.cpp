@@ -60,9 +60,6 @@ public:
   /// The index into the source file's Decls at which to start
   /// irgenning the next REPL input.
   unsigned CurIRGenElem;
-
-  /// \brief Whether we have run replApplicationMain().
-  bool RanREPLApplicationMain;
 };
 
 enum class REPLInputKind : int {
@@ -741,7 +738,6 @@ public:
   SourceFile &REPLInputFile;
 
 private:
-  bool ShouldRunREPLApplicationMain;
   ProcessCmdLine CmdLine;
   llvm::SmallPtrSet<swift::Module *, 8> ImportedModules;
   SmallVector<llvm::Function*, 8> InitFns;
@@ -928,14 +924,12 @@ private:
 
 public:
   REPLEnvironment(CompilerInstance &CI,
-                  bool ShouldRunREPLApplicationMain,
                   const ProcessCmdLine &CmdLine,
                   llvm::LLVMContext &LLVMCtx,
                   bool ParseStdlib)
     : CI(CI),
       REPLInputFile(CI.getMainModule()->
                       getMainSourceFile(SourceFileKind::REPL)),
-      ShouldRunREPLApplicationMain(ShouldRunREPLApplicationMain),
       CmdLine(CmdLine),
       RanGlobalInitializers(false),
       LLVMContext(LLVMCtx),
@@ -947,8 +941,7 @@ public:
       RC{
         /*BufferID*/ 0U,
         /*CurElem*/ 0,
-        /*CurIRGenElem*/ 0,
-        /*RanREPLApplicationMain*/ false
+        /*CurIRGenElem*/ 0
       }
   {
     ASTContext &Ctx = CI.getASTContext();
@@ -1166,33 +1159,8 @@ public:
         
       case REPLInputKind::SourceCode: {
         // Execute this source line.
-        auto result = executeSwiftSource(Line, CmdLine);
-        if (RC.RanREPLApplicationMain || !ShouldRunREPLApplicationMain)
-          return result;
-
-        // We haven't run replApplicationMain() yet. Look for it.
-        ASTContext &ctx = CI.getASTContext();
-        UnqualifiedLookup lookup(ctx.getIdentifier("replApplicationMain"),
-                                 &REPLInputFile, nullptr);
-        if (lookup.isSuccess()) {
-          // Execute replApplicationMain().
-          executeSwiftSource("replApplicationMain()\n", CmdLine);
-          RC.RanREPLApplicationMain = true;
-        }
-
-        return result;
+        return executeSwiftSource(Line, CmdLine);
       }
-    }
-  }
-  
-  /// Tear down the REPL environment, running REPL exit hooks set up by the
-  /// stdlib if available.
-  void exitREPL() {
-    /// Invoke _replExit() if available.
-    UnqualifiedLookup lookup(CI.getASTContext().getIdentifier("_replExit"),
-                             &REPLInputFile, nullptr);
-    if (lookup.isSuccess()) {
-      executeSwiftSource("_replExit()\n", CmdLine);
     }
   }
 };
@@ -1208,9 +1176,7 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
 
 void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                     bool ParseStdlib) {
-  REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/true, CmdLine,
-                      llvm::getGlobalContext(),
-                      ParseStdlib);
+  REPLEnvironment env(CI, CmdLine, llvm::getGlobalContext(), ParseStdlib);
   if (CI.getASTContext().hadError())
     return;
   
@@ -1243,7 +1209,6 @@ void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                         CFDataGetLength(data));
          UInt8 cont = env.handleREPLInput(REPLInputKind(msgid), line);
          if (!cont) {
-           env.exitREPL();
            CFRunLoopStop(CFRunLoopGetCurrent());
          }
          return CFDataCreate(kCFAllocatorDefault, &cont, 1);
@@ -1303,8 +1268,7 @@ void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   // to histedit.h.
   llvm::report_fatal_error("REPL Unimplemented for this platform");
 #if 0
-  REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/false, CmdLine,
-                      llvm::getGlobalContext(), ParseStdlib);
+  REPLEnvironment env(CI, CmdLine, llvm::getGlobalContext(), ParseStdlib);
   if (CI.getASTContext().hadError())
     return;
 
@@ -1313,7 +1277,6 @@ void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   do {
     inputKind = env.getInput().getREPLInput(Line);
   } while (env.handleREPLInput(inputKind, Line));
-  env.exitREPL();
 #endif
 }
 
