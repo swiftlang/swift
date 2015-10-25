@@ -8,8 +8,6 @@
 // RUN: %S/../../utils/line-directive %t/FloatingPointConversionTraps.swift -- %target-run %t/a.out_Release
 // REQUIRES: executable_test
 
-// XFAIL: *
-
 import StdlibUnittest
 
 %{
@@ -68,6 +66,7 @@ var FloatingPointConversion = TestSuite("FloatingPointConversion")
 %     end
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf")
+  .xfail(.Custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
   .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
   if true {
     var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(0.0)))
@@ -85,6 +84,7 @@ FloatingPointConversion.test("${FloatSelf}/${IntSelf}/+inf")
 %     if int_ty.is_signed:
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf")
+  .xfail(.Custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
   .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
   if true {
     var a = get${IntSelf}(${IntSelf}(get${FloatSelf}(-0.0)))
@@ -102,12 +102,14 @@ FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf")
 %     else:
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/negative")
+  .xfail(.Custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
   .crashOutputMatches(getTooSmallMessage()).code {
   expectCrashLater()
   get${IntSelf}(${IntSelf}(get${FloatSelf}(-123.0)))
 }
 
 FloatingPointConversion.test("${FloatSelf}/${IntSelf}/-inf")
+  .xfail(.Custom({ "${FloatSelf}" == "Float80" }, reason: "<rdar://problem/17958458> Int(Float80.quietNaN) is garbage"))
   .crashOutputMatches(getInfiniteOrNaNMessage("${FloatSelf}")).code {
   expectCrashLater()
   get${IntSelf}(${IntSelf}(get${FloatSelf}(-${FloatSelf}.infinity)))
