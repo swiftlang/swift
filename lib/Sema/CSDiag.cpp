@@ -140,7 +140,6 @@ void constraints::simplifyLocator(Expr *&anchor,
         continue;
       }
 
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
       if (auto objectLiteralExpr = dyn_cast<ObjectLiteralExpr>(anchor)) {
         targetAnchor = nullptr;
         targetPath.clear();
@@ -149,7 +148,6 @@ void constraints::simplifyLocator(Expr *&anchor,
         path = path.slice(1);
         continue;
       }
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
       break;
 
     case ConstraintLocator::ApplyFunction:

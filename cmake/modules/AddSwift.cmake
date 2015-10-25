@@ -134,10 +134,6 @@ function(_add_variant_swift_compile_flags
     list(APPEND result "-D" "INTERNAL_CHECKS_ENABLED")
   endif()
 
-  if(SWIFT_ENABLE_OBJECT_LITERALS)
-    list(APPEND result "-D" "SWIFT_ENABLE_OBJECT_LITERALS")
-  endif()
-
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 

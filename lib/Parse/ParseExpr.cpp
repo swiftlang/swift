@@ -949,11 +949,9 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     Result = parseExprCollection();
     break;
 
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   case tok::l_square_lit: // [#Color(...)#], [#Image(...)#]
     Result = parseExprObjectLiteral();
     break;
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
   case tok::pound_available: {
     // For better error recovery, parse but reject #available in an expr
@@ -2077,7 +2075,6 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
                         /*Implicit=*/false));
 }
 
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
 /// \brief Parse an object literal expression.
 ///
 /// expr-literal:
@@ -2113,7 +2110,6 @@ Parser::parseExprObjectLiteral() {
     new (Context) ObjectLiteralExpr(LLitLoc, Name, NameLoc, Arg.get(), RLitLoc,
                                     /*implicit=*/false));
 }
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
 /// \brief Parse an expression call suffix.
 ///

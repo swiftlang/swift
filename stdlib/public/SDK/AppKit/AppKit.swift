@@ -144,7 +144,6 @@ public func NSApplicationMain(
   argc: Int32, _ argv: UnsafeMutablePointer<UnsafeMutablePointer<CChar>>
 ) -> Int32
 
-#if SWIFT_ENABLE_OBJECT_LITERALS
 extension NSColor : _ColorLiteralConvertible {
   public required convenience init(colorLiteralRed red: Float, green: Float,
                                    blue: Float, alpha: Float) {
@@ -166,4 +165,3 @@ extension NSImage : _ImageLiteralConvertible {
 }
 
 public typealias _ImageLiteralType = NSImage
-#endif // SWIFT_ENABLE_OBJECT_LITERALS

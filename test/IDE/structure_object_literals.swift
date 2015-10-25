@@ -1,5 +1,4 @@
 // RUN: %swift-ide-test -structure -source-filename %s | FileCheck %s
-// REQUIRES: object_literals
 
 struct S: _ColorLiteralConvertible {
   init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}

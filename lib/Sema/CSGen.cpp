@@ -1093,7 +1093,6 @@ namespace {
       }
     }
 
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType() && !expr->getType()->hasTypeVariable())
@@ -1136,7 +1135,6 @@ namespace {
 
       return result;
     }
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
       // If this is a ParamDecl for a closure argument that has an Unresolved

@@ -56,9 +56,7 @@ ABSTRACT_EXPR(Literal, Expr)
   EXPR(BooleanLiteral, LiteralExpr)
   EXPR(StringLiteral, LiteralExpr)
   EXPR(InterpolatedStringLiteral, LiteralExpr)
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   EXPR(ObjectLiteral, LiteralExpr)
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
   EXPR(MagicIdentifierLiteral, LiteralExpr)
   EXPR_RANGE(Literal, NilLiteral, MagicIdentifierLiteral)
 EXPR(DiscardAssignment, Expr)

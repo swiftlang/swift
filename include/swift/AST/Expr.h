@@ -833,7 +833,6 @@ public:
   }
 };
 
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
 // ObjectLiteralExpr - An expression of the form
 // '[#Color(red: 1, blue: 0, green: 0, alpha: 1)#]' with a name and a list
 // argument. The components of the list argument are meant to be themselves
@@ -870,7 +869,6 @@ public:
     return E->getKind() == ExprKind::ObjectLiteral;
   }
 };
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
 /// DiscardAssignmentExpr - A '_' in the left-hand side of an assignment, which
 /// discards the corresponding tuple element on the right-hand side.

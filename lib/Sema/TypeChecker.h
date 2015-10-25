@@ -504,11 +504,9 @@ private:
   Type StringLiteralType;
   Type ArrayLiteralType;
   Type DictionaryLiteralType;
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   Type ColorLiteralType;
   Type ImageLiteralType;
   Type FileReferenceLiteralType;
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
   Type StringType;
   Type Int8Type;
   Type UInt8Type;
@@ -1536,9 +1534,7 @@ public:
   /// expression does not have an associated literal protocol.
   ProtocolDecl *getLiteralProtocol(Expr *expr);
 
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   DeclName getObjectLiteralConstructorName(ObjectLiteralExpr *expr);
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
   /// Get the module appropriate for looking up standard library types.
   ///

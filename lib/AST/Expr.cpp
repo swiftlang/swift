@@ -488,10 +488,8 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::MagicIdentifierLiteral:
     return true;
 
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   case ExprKind::ObjectLiteral:
     return true;
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
   case ExprKind::DiscardAssignment:
     // Legal but pointless.
@@ -738,7 +736,6 @@ shallowCloneImpl(const MagicIdentifierLiteralExpr *E, ASTContext &Ctx) {
   return res;
 }
 
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
 static LiteralExpr *
 shallowCloneImpl(const ObjectLiteralExpr *E, ASTContext &Ctx) {
   auto res = new (Ctx) ObjectLiteralExpr(E->getStartLoc(), E->getName(),
@@ -747,7 +744,6 @@ shallowCloneImpl(const ObjectLiteralExpr *E, ASTContext &Ctx) {
   res->setSemanticExpr(E->getSemanticExpr());
   return res;
 }
-#endif
 
 // Make an exact copy of this AST node.
 LiteralExpr *LiteralExpr::shallowClone(ASTContext &Ctx) const {
@@ -765,9 +761,7 @@ LiteralExpr *LiteralExpr::shallowClone(ASTContext &Ctx) const {
   DISPATCH_CLONE(BooleanLiteral)
   DISPATCH_CLONE(StringLiteral)
   DISPATCH_CLONE(InterpolatedStringLiteral)
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   DISPATCH_CLONE(ObjectLiteral)
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
   DISPATCH_CLONE(MagicIdentifierLiteral)
 #undef DISPATCH_CLONE
   }

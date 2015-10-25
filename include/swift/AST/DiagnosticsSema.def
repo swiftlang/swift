@@ -435,10 +435,8 @@ ERROR(pattern_used_in_type,sema_nb,none,
 NOTE(note_module_as_type,sema_nb,none,
      "cannot use module %0 as a type", (Identifier))
 
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
 ERROR(use_unknown_object_literal,sema_nb,none,
      "use of unknown object literal name %0", (Identifier))
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
 ERROR(use_non_type_value,sema_nb,none,
       "%0 is not a type", (Identifier))
@@ -1744,10 +1742,8 @@ ERROR(interpolation_broken_proto,sema_tce,none,
       "protocol 'StringInterpolationConvertible' is broken",
       ())
 
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
 ERROR(object_literal_broken_proto,sema_tce,none,
       "object literal protocol is broken", ())
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
 ERROR(discard_expr_outside_of_assignment,sema_tce,none,
       "'_' can only appear in a pattern or on the left side of an assignment",

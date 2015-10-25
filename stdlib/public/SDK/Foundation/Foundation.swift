@@ -1364,7 +1364,6 @@ extension NSKeyedUnarchiver {
   }
 }
 
-#if SWIFT_ENABLE_OBJECT_LITERALS
 extension NSURL : _FileReferenceLiteralConvertible {
   private convenience init(failableFileReferenceLiteral path: String) {
     let fullPath = NSBundle.mainBundle().pathForResource(path, ofType: nil)!
@@ -1377,4 +1376,3 @@ extension NSURL : _FileReferenceLiteralConvertible {
 }
 
 public typealias _FileReferenceLiteralType = NSURL
-#endif // SWIFT_ENABLE_OBJECT_LITERALS

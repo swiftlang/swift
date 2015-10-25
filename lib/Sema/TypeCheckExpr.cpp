@@ -656,7 +656,6 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     type = &DictionaryLiteralType;
     name = "Dictionary";
   }
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   // _ColorLiteralConvertible -> _ColorLiteralType
   else if (protocol == getProtocol(
                          SourceLoc(),
@@ -678,7 +677,6 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     type = &FileReferenceLiteralType;
     name = "_FileReferenceLiteralType";
   }
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
   if (!type)
     return nullptr;

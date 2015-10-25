@@ -1473,14 +1473,12 @@ public:
     OS << ')';
   }
 
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     printCommon(E, "object_literal")
       << " name=" << E->getName().str();
     OS << '\n';
     printRec(E->getArg());
   }
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
 
   void visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
     printCommon(E, "discard_assignment_expr") << ')';

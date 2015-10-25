@@ -1,7 +1,5 @@
 // RUN: %target-parse-verify-swift
 
-// REQUIRES: object_literals
-
 struct S: _ColorLiteralConvertible {
   init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}
 }

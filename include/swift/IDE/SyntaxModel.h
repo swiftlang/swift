@@ -54,10 +54,8 @@ enum class SyntaxNodeKind : uint8_t {
   AttributeBuiltin,
   /// An editor placeholder string <#like this#>.
   EditorPlaceholder,
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   /// An editor object literal [#like(this)#]
   ObjectLiteral
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
 };
 
 struct SyntaxNode {
@@ -108,9 +106,7 @@ enum class SyntaxStructureKind : uint8_t {
   CallExpression,
   ArrayExpression,
   DictionaryExpression,
-#ifdef SWIFT_ENABLE_OBJECT_LITERALS
   ObjectLiteralExpression,
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
 };
 
 enum class SyntaxStructureElementKind : uint8_t {

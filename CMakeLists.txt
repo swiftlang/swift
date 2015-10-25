@@ -60,10 +60,6 @@ option(SWIFT_ENABLE_TARGET_TVOS
     "Enable compiler support for targeting tvOS"
     TRUE)
 
-option(SWIFT_ENABLE_OBJECT_LITERALS
-    "Enable compiler support for object literals"
-    TRUE)
-
 set(SWIFT_VERSION "2.1" CACHE STRING
     "The user-visible version of the Swift compiler")
 set(SWIFT_VENDOR "" CACHE STRING

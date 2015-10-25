@@ -240,7 +240,6 @@ extension UIView : _Reflectable {
 }
 #endif
 
-#if SWIFT_ENABLE_OBJECT_LITERALS
 extension UIColor : _ColorLiteralConvertible {
   public required convenience init(colorLiteralRed red: Float, green: Float,
                                    blue: Float, alpha: Float) {
@@ -262,4 +261,3 @@ extension UIImage : _ImageLiteralConvertible {
 }
 
 public typealias _ImageLiteralType = UIImage
-#endif // SWIFT_ENABLE_OBJECT_LITERALS
