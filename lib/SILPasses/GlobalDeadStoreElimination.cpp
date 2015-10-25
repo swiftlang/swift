@@ -250,7 +250,7 @@ class DSEContext {
   TypeExpansionMap TypeExpansionVault;
 
   /// Contains a map between location to their index in the MemLocationVault.
-  llvm::DenseMap<MemLocation, unsigned> LocToBitIndex;
+  MemLocationIndexMap LocToBitIndex;
 
   /// Return the BBState for the basic block this basic block belongs to.
   BBState *getBBLocState(SILBasicBlock *B) { return &BBToLocState[B]; }

@@ -40,6 +40,7 @@ class MemLocation;
 /// Type declarations.
 using MemLocationSet = llvm::DenseSet<MemLocation>;
 using MemLocationList = llvm::SmallVector<MemLocation, 8>;
+using MemLocationIndexMap = llvm::DenseMap<MemLocation, unsigned>;
 using TypeExpansionMap = llvm::DenseMap<SILType, ProjectionPathList>;
 
 class MemLocation {
@@ -199,13 +200,13 @@ public:
   /// Enumerate the given Mem MemLocation.
   static void enumerateMemLocation(SILModule *M, SILValue Mem,
                                    std::vector<MemLocation> &MemLocationVault,
-                                   llvm::DenseMap<MemLocation, unsigned> &LocToBit,
+                                   MemLocationIndexMap &LocToBit,
                                    TypeExpansionMap &TypeExpansionVault);
 
   /// Enumerate all the locations in the function.
   static void enumerateMemLocations(SILFunction &F,
                                     std::vector<MemLocation> &MemLocationVault,
-                                    llvm::DenseMap<MemLocation, unsigned> &LocToBit,
+                                    MemLocationIndexMap &LocToBit,
                                     TypeExpansionMap &TypeExpansionVault);
 };
 

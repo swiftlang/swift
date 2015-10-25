@@ -183,7 +183,7 @@ void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
 void
 MemLocation::enumerateMemLocation(SILModule *M, SILValue Mem,
                                   std::vector<MemLocation> &LV,
-                                  llvm::DenseMap<MemLocation, unsigned> &BM,
+                                  MemLocationIndexMap &BM,
                                   TypeExpansionMap &TV) {
   // Construct a Location to represent the memory written by this instruction.
   MemLocation L(Mem);
@@ -206,7 +206,7 @@ MemLocation::enumerateMemLocation(SILModule *M, SILValue Mem,
 void
 MemLocation::enumerateMemLocations(SILFunction &F,
                                    std::vector<MemLocation> &LV,
-                                   llvm::DenseMap<MemLocation, unsigned> &BM,
+                                   MemLocationIndexMap &BM,
                                    TypeExpansionMap &TV) {
   // Enumerate all locations accessed by the loads or stores.
   //
