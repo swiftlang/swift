@@ -1195,15 +1195,43 @@ bb0:
   return %9 : $()                                 // id: %11
 }
 
+/// We are not performing partial dead store for store %3 to %0#1 : $*S7, 
+/// i.e. too many stores generated, but make sure we track the store correctly
+/// so that we can get rid of  store %56 to %57 : $*Int.
+///
+/// CHECK-LABEL : PartialDeadStoreBailOutProperPropagation
+/// CHECK: bb0 
+/// CHECK-NOT: store
+/// CHECK: function_ref
+sil hidden @PartialDeadStoreBailOutProperPropagation : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S7  // var a                  // users: %4, %7, %10
+  %55 = integer_literal $Builtin.Int64, 10         // user: %6
+  %56 = struct $Int (%55 : $Builtin.Int64)          // user: %8
+  %57 = struct_element_addr %0#1 : $*S7, #S7.a     // user: %8
+  store %56 to %57 : $*Int                          // id: %8
+  %1 = function_ref @S7_init : $@convention(thin) (@thin S7.Type) -> S7 // user: %3
+  %2 = metatype $@thin S7.Type                    // user: %3
+  %3 = apply %1(%2) : $@convention(thin) (@thin S7.Type) -> S7 // user: %4
+  store %3 to %0#1 : $*S7                         // id: %4
+  %5 = integer_literal $Builtin.Int64, 10         // user: %6
+  %6 = struct $Int (%5 : $Builtin.Int64)          // user: %8
+  %7 = struct_element_addr %0#1 : $*S7, #S7.y     // user: %8
+  store %6 to %7 : $*Int                          // id: %8
+  %9 = tuple ()                                   // user: %11
+  dealloc_stack %0#0 : $*@local_storage S7        // id: %10
+  return %9 : $()                                 // id: %11
+}
+
 /// Make sure we do perform partial dead store for the first store.
 /// we have a case which partial dead store miscompiles a program,
 /// in that case the bitvector is not tracked correctly and we end
 /// up deleting the entire larger store, store %3 to %0#1 : $*S3 in
 /// this case. 
 ///
-/// CHECK-LABEL : PartialDeadStoreInSimpleSmallStruct
+/// CHECK-LABEL: PartialDeadStoreInSimpleSmallStruct
 /// CHECK: apply 
-/// CHECK-NEXT: struct_extract 
+/// CHECK-NEXT: struct_extract
 sil hidden @PartialDeadStoreInSimpleSmallStruct : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $S3  // var a                  // users: %4, %7, %10

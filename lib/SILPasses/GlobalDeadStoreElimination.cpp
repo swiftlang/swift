@@ -152,6 +152,10 @@ public:
   /// The dead stores in the current basic block.
   llvm::DenseSet<SILInstruction *> DeadStores;
 
+  /// Keeps track of what stores to generate after the data flow stabilizes.
+  /// these stores come from partial dead stores.
+  llvm::DenseMap<SILValue, SILValue> LiveStores;
+
   /// Constructors.
   BBState() : BB(nullptr) {}
   BBState(SILBasicBlock *B, unsigned lcnt) : BB(B) {
@@ -558,10 +562,6 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
         continue;
       // This location is alive.
       Alives.insert(Locs[i]);
-      // We are already tracking all the stores as dead reverse that for these
-      // locations. Otherwise, store contained in Alives will be considered
-      // dead when they are processed.
-      S->stopTrackingMemLocation(getMemLocationBit(Locs[i]));
     }
 
     // Try to create as few aggregated stores as possible out of the locations.
@@ -571,10 +571,12 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
     if (Alives.size() > MaxPartialDeadStoreCountLimit)
       return;
 
+    //
+    // At this point, we are performing a partial dead store elimination.
+    //
     // Locations here have a projection path from their Base, but this
     // particular instruction may not be accessing the base, so we need to
-    // *rebase*
-    // the locations w.r.t. to the current instruction.
+    // *rebase* the locations w.r.t. to the current instruction.
     SILValue B = Locs[0].getBase();
     Optional<ProjectionPath> BP = ProjectionPath::getAddrProjectionPath(B, Mem);
     // Strip off the projection path from base to the accessed field.
@@ -582,12 +584,12 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
       X.subtractPaths(BP);
     }
 
-    // Create the individual stores that are alive.
-    SILBuilderWithScope<16> Builder(I);
+    // We merely setup the remain live stores, but do not materialize in IR yet,
+    // These stores will be materialized when before the algorithm exits.
     for (auto &X : Alives) {
       SILValue Value = createExtract(Val, X.getPath(), I, true);
       SILValue Addr = createExtract(Mem, X.getPath(), I, false);
-      Builder.createStore(Addr.getLoc().getValue(), Value, Addr);
+      S->LiveStores[Addr] = Value;
     }
 
     // Lastly, mark the old store as dead.
@@ -707,8 +709,15 @@ void DSEContext::run() {
     processBasicBlock(BB, true);
   }
 
-  // Finally, delete the dead stores.
+  // Finally, delete the dead stores and create the live stores.
   for (SILBasicBlock *BB : PO->getPostOrder()) {
+    // Create the stores that are alive.
+    for (auto &I : getBBLocState(BB)->LiveStores) {
+      SILInstruction *IT = cast<SILInstruction>(I.first)->getNextNode();
+      SILBuilderWithScope<16> Builder(IT);
+      Builder.createStore(I.first.getLoc().getValue(), I.second, I.first);
+    }
+    // Delete the dead stores.
     for (auto &I : getBBLocState(BB)->DeadStores) {
       DEBUG(llvm::dbgs() << "*** Removing: " << *I << " ***\n");
       I->eraseFromParent();
