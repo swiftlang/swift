@@ -40,6 +40,7 @@ class MemLocation;
 /// Type declarations.
 using MemLocationSet = llvm::DenseSet<MemLocation>;
 using MemLocationList = llvm::SmallVector<MemLocation, 8>;
+using TypeExpansionMap = llvm::DenseMap<SILType, ProjectionPathList>;
 
 class MemLocation {
 public:
@@ -188,7 +189,8 @@ public:
   /// In SIL, we can have a store to an aggregate and loads from its individual
   /// fields. Therefore, we expand all the operations on aggregates onto
   /// individual fields and process them separately.
-  static void expand(MemLocation &Base, SILModule *Mod, MemLocationList &Locs);
+  static void expand(MemLocation &Base, SILModule *Mod, MemLocationList &Locs,
+                     TypeExpansionMap &TypeExpansionVault);
 
   /// Given a set of locations derived from the same base, try to merge/reduce
   /// them into smallest number of MemLocations possible.
@@ -197,12 +199,14 @@ public:
   /// Enumerate the given Mem MemLocation.
   static void enumerateMemLocation(SILModule *M, SILValue Mem,
                                    std::vector<MemLocation> &MemLocationVault,
-                                   llvm::DenseMap<MemLocation, unsigned> &LocToBit);
+                                   llvm::DenseMap<MemLocation, unsigned> &LocToBit,
+                                   TypeExpansionMap &TypeExpansionVault);
 
   /// Enumerate all the locations in the function.
   static void enumerateMemLocations(SILFunction &F,
                                     std::vector<MemLocation> &MemLocationVault,
-                                    llvm::DenseMap<MemLocation, unsigned> &LocToBit);
+                                    llvm::DenseMap<MemLocation, unsigned> &LocToBit,
+                                    TypeExpansionMap &TypeExpansionVault);
 };
 
 static inline llvm::hash_code hash_value(const MemLocation &L) {

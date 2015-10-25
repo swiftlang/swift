@@ -246,6 +246,9 @@ class DSEContext {
   /// has an upward visible store.
   std::vector<MemLocation> MemLocationVault;
 
+  /// Caches a list of projection paths to leaf nodes in the given type.
+  TypeExpansionMap TypeExpansionVault;
+
   /// Contains a map between location to their index in the MemLocationVault.
   llvm::DenseMap<MemLocation, unsigned> LocToBitIndex;
 
@@ -481,7 +484,7 @@ void DSEContext::processRead(SILInstruction *I, BBState *S, SILValue Mem) {
   // Expand the given Mem into individual fields and process them as
   // separate reads.
   MemLocationList Locs;
-  MemLocation::expand(L, &I->getModule(), Locs);
+  MemLocation::expand(L, &I->getModule(), Locs, TypeExpansionVault);
   for (auto &E : Locs) {
     updateWriteSetForRead(I, S, getMemLocationBit(E));
   }
@@ -521,7 +524,7 @@ void DSEContext::processWrite(SILInstruction *I, BBState *S, SILValue Val,
   // writes.
   bool Dead = true;
   MemLocationList Locs;
-  MemLocation::expand(L, Mod, Locs);
+  MemLocation::expand(L, Mod, Locs, TypeExpansionVault);
   llvm::BitVector V(Locs.size());
   unsigned idx = 0;
   for (auto &E : Locs) {
@@ -672,7 +675,8 @@ SILValue DSEContext::createExtract(SILValue Base,
 void DSEContext::run() {
   // Walk over the function and find all the locations accessed by
   // this function.
-  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex);
+  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex,
+                                     TypeExpansionVault);
 
   // For all basic blocks in the function, initialize a BB state. Since we
   // know all the locations accessed in this function, we can resize the bit

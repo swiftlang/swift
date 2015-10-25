@@ -104,7 +104,8 @@ void MemLocation::getFirstLevelMemLocations(MemLocationList &Locs,
 }
 
 void MemLocation::expand(MemLocation &Base, SILModule *Mod,
-                         MemLocationList &Locs) {
+                         MemLocationList &Locs,
+                         TypeExpansionMap &TypeExpansionVault) {
   // To expand a memory location to its indivisible parts, we first get the
   // address projection paths from the accessed type to each indivisible field,
   // i.e. leaf nodes, then we append these projection paths to the Base.
@@ -113,13 +114,20 @@ void MemLocation::expand(MemLocation &Base, SILModule *Mod,
   // initialized with address projection paths. By keeping it consistent makes
   // it easier to implement the getType function for MemLocation.
   //
-  ProjectionPathList Paths;
-  ProjectionPath::BreadthFirstEnumTypeProjection(Base.getType(), Mod, Paths,
-                                                 true);
+  SILType BaseType = Base.getType();
+  if (TypeExpansionVault.find(BaseType) == TypeExpansionVault.end()) {
+    // There is no cached expansion for this type, build and cache it now.
+    ProjectionPathList Paths;
+    ProjectionPath::BreadthFirstEnumTypeProjection(BaseType, Mod, Paths,
+                                                   true);
+    for (auto &X : Paths) {
+      TypeExpansionVault[Base.getType()].push_back(std::move(X.getValue()));
+    }
+  }
 
   // Construct the MemLocation by appending the projection path from the
   // accessed node to the leaf nodes.
-  for (auto &X : Paths) {
+  for (auto &X : TypeExpansionVault[Base.getType()]) {
     Locs.push_back(MemLocation::createMemLocation(Base.getBase(), X.getValue(),
                                                   Base.getPath().getValue()));
   }
@@ -175,7 +183,8 @@ void MemLocation::reduce(MemLocation &Base, SILModule *Mod,
 void
 MemLocation::enumerateMemLocation(SILModule *M, SILValue Mem,
                                   std::vector<MemLocation> &LV,
-                                  llvm::DenseMap<MemLocation, unsigned> &BM) {
+                                  llvm::DenseMap<MemLocation, unsigned> &BM,
+                                  TypeExpansionMap &TV) {
   // Construct a Location to represent the memory written by this instruction.
   MemLocation L(Mem);
 
@@ -187,7 +196,7 @@ MemLocation::enumerateMemLocation(SILModule *M, SILValue Mem,
   // Expand the given Mem into individual fields and add them to the
   // locationvault.
   MemLocationList Locs;
-  MemLocation::expand(L, M, Locs);
+  MemLocation::expand(L, M, Locs, TV);
   for (auto &Loc : Locs) {
     BM[Loc] = LV.size();
     LV.push_back(Loc);
@@ -197,7 +206,8 @@ MemLocation::enumerateMemLocation(SILModule *M, SILValue Mem,
 void
 MemLocation::enumerateMemLocations(SILFunction &F,
                                    std::vector<MemLocation> &LV,
-                                   llvm::DenseMap<MemLocation, unsigned> &BM) {
+                                   llvm::DenseMap<MemLocation, unsigned> &BM,
+                                   TypeExpansionMap &TV) {
   // Enumerate all locations accessed by the loads or stores.
   //
   // TODO: process more instructions as we process more instructions in
@@ -207,9 +217,9 @@ MemLocation::enumerateMemLocations(SILFunction &F,
   for (auto &B : F) {
     for (auto &I : B) {
       if (auto *LI = dyn_cast<LoadInst>(&I)) {
-        enumerateMemLocation(&I.getModule(), LI->getOperand(), LV, BM);
+        enumerateMemLocation(&I.getModule(), LI->getOperand(), LV, BM, TV);
       } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
-        enumerateMemLocation(&I.getModule(), SI->getDest(), LV, BM);
+        enumerateMemLocation(&I.getModule(), SI->getDest(), LV, BM, TV);
       }
     }
   }

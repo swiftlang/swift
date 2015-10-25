@@ -672,6 +672,9 @@ class RLEContext {
   /// has an upward visible store.
   std::vector<MemLocation> MemLocationVault;
 
+  /// Caches a list of projection paths to leaf nodes in the given type.
+  TypeExpansionMap TypeExpansionVault;
+
   /// Contains a map between location to their index in the MemLocationVault.
   llvm::DenseMap<MemLocation, unsigned> LocToBitIndex;
 
@@ -700,6 +703,8 @@ public:
 
   AliasAnalysis *getAA() const { return AA; }
   PostDominanceInfo *getPDI() const { return PDI; }
+
+  TypeExpansionMap &getTypeExpansionVault() { return TypeExpansionVault; }
 
   /// Get the bit representing the location in the MemLocationVault.
   ///
@@ -1341,7 +1346,7 @@ void RLEBBForwarder::processStoreInst(RLEContext &Ctx, StoreInst *SI) {
   // Expand the given Mem into individual fields and process them as
   // separate reads.
   MemLocationList Locs;
-  MemLocation::expand(L, &SI->getModule(), Locs);
+  MemLocation::expand(L, &SI->getModule(), Locs, Ctx.getTypeExpansionVault());
   for (auto &X : Locs) {
     AvailLocs[X] = SILValue();
   } 
@@ -1359,7 +1364,7 @@ void RLEBBForwarder::processLoadInst(RLEContext &Ctx, LoadInst *LI) {
   // Expand the given Mem into individual fields and process them as
   // separate reads.
   MemLocationList Locs;
-  MemLocation::expand(L, &LI->getModule(), Locs);
+  MemLocation::expand(L, &LI->getModule(), Locs, Ctx.getTypeExpansionVault());
   for (auto &X : Locs) {
     AvailLocs[X] = SILValue();
   } 
@@ -1681,7 +1686,8 @@ RLEContext::runIteration() {
   // this function.
   MemLocationVault.clear();
   LocToBitIndex.clear();
-  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex);
+  MemLocation::enumerateMemLocations(*F, MemLocationVault, LocToBitIndex,
+                                     TypeExpansionVault);
 
   bool Changed = false;
   for (SILBasicBlock *BB : ReversePostOrder) {

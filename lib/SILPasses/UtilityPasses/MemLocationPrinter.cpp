@@ -101,6 +101,7 @@ class MemLocationPrinter : public SILFunctionTransform {
   /// properly.
   void printMemExpansion(SILFunction &Fn) {
     MemLocation L;
+    TypeExpansionMap Types;
     MemLocationList Locs;
     unsigned Counter = 0;
     for (auto &BB : Fn) {
@@ -109,12 +110,12 @@ class MemLocationPrinter : public SILFunctionTransform {
           L.initialize(LI->getOperand());
           if (!L.isValid())
             continue;
-          MemLocation::expand(L, &Fn.getModule(), Locs);
+          MemLocation::expand(L, &Fn.getModule(), Locs, Types);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           L.initialize(SI->getDest());
           if (!L.isValid())
             continue;
-          MemLocation::expand(L, &Fn.getModule(), Locs);
+          MemLocation::expand(L, &Fn.getModule(), Locs, Types);
         } else {
           // Not interested in these instructions yet.
           continue;
@@ -139,6 +140,7 @@ class MemLocationPrinter : public SILFunctionTransform {
   void printMemReduction(SILFunction &Fn) {
     MemLocation L;
     MemLocationList Locs;
+    TypeExpansionMap Types;
     llvm::DenseSet<MemLocation> SLocs;
     unsigned Counter = 0;
     for (auto &BB : Fn) {
@@ -150,12 +152,12 @@ class MemLocationPrinter : public SILFunctionTransform {
           L.initialize(LI->getOperand());
           if (!L.isValid())
             continue;
-          MemLocation::expand(L, &Fn.getModule(), Locs);
+          MemLocation::expand(L, &Fn.getModule(), Locs, Types);
         } else if (auto *SI = dyn_cast<StoreInst>(&II)) {
           L.initialize(SI->getDest());
           if (!L.isValid())
             continue;
-          MemLocation::expand(L, &Fn.getModule(), Locs);
+          MemLocation::expand(L, &Fn.getModule(), Locs, Types);
         } else {
           // Not interested in these instructions yet.
           continue;
