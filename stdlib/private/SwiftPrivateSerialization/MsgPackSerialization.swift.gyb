@@ -149,7 +149,8 @@ extension _MsgPackSerializerImpl : FixedDictionarySerializerType {
   internal mutating func _addKeyImpl(key: String, value: MsgPackVariant) {
     if let existingValue = _value {
       switch existingValue {
-      case .Map(var map):
+      case .Map(let map):
+        var map = map
         _value = nil
         map._append(key: .String(key), value: value)
         _value = .Map(map)

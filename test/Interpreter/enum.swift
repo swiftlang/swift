@@ -27,7 +27,7 @@ enum MultiPayloadTrivial {
 
 var s = Singleton.x(1, "a")
 switch s {
-case .x(var int, var char):
+case .x(let int, let char):
   // CHECK: 1
   print(int)
   // CHECK: a
@@ -295,7 +295,7 @@ func optionableSuits() {
 
   for o in optionables {
     switch o {
-    case .Mere(var x):
+    case .Mere(let x):
       print(x)
     case .Nought:
       print("---")

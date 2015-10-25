@@ -600,7 +600,7 @@ func test_union_1(u u: MaybePair) {
     b()
 
   // CHECK: [[IS_RIGHT]]([[STR:%.*]] : $String):
-  case var .Right:
+  case let .Right:
   // CHECK:   release_value [[STR]] : $String
   // CHECK:   function_ref @_TF6switch1cFT_T_
   // CHECK:   br [[CONT]]
@@ -841,9 +841,9 @@ enum Generic<T, U> {
 // Check that switching over a generic instance generates verified SIL.
 func test_union_generic_instance(u u: Generic<Int, String>) {
   switch u {
-  case .Foo(var x):
+  case .Foo(let x):
     a()
-  case .Bar(var y):
+  case .Bar(let y):
     b()
   }
   c()

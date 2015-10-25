@@ -26,7 +26,7 @@ else {
 // CHECK: an empty optional is logically false
 
 switch x {
-case .Some(var y):
+case .Some(let y):
   assert(false, "Something's wrong here!")
 case .None:
   ()
@@ -83,7 +83,7 @@ if optional_return() == nil {
 
 var empty: Bool = true
 switch x {
-case .Some(var y):
+case .Some(let y):
   print("destructuring bind: \(y).")
 case .None:
   ()

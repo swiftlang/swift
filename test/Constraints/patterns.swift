@@ -19,7 +19,7 @@ case (0..<10, _, _),
 }
 
 switch (1, 2) {
-case (var a, a): // expected-error {{use of unresolved identifier 'a'}}
+case (let a, a): // expected-error {{use of unresolved identifier 'a'}}
   ()
 }
 

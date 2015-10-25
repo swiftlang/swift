@@ -149,7 +149,7 @@ func testSwitch() {
   // CHECK: integer_literal $Builtin.Int2048, 200  // {{.*}} line:[[@LINE-2]]:18
     x = z
   // CHECK:  strong_release [[VAR_Z]]{{.*}}        // {{.*}} line:[[@LINE-1]]:9:cleanup
-  case (3, var y):
+  case (3, let y):
     x++
   }
 }
@@ -308,7 +308,7 @@ enum SinglePayloadAddressOnly {
 }
 func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
   switch v {
-  case .x(var runcible):
+  case .x(let runcible):
     runcible.runce()
   case .y:
     runcibleWhy()

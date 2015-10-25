@@ -14,7 +14,7 @@ class B {
 }
 func c(d : A<B>) {
     switch (d) {
-        case .E(var e):
+        case .E(let e):
             print("")
         default:
             print("")

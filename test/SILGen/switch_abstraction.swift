@@ -14,7 +14,7 @@ enum Optionable<T> {
 // CHECK:   [[SUBST:%.*]] = partial_apply [[REABSTRACT]]([[ORIG]])
 func enum_reabstraction(x x: Optionable<A -> A>, a: A) {
   switch x {
-  case .Summn(var f):
+  case .Summn(let f):
     f(a)
   case .Nuttn:
     ()
@@ -37,9 +37,9 @@ func enum_addr_only_to_loadable_with_reabstraction<T>(x x: Wacky<T, A>, a: A)
   -> T
 {
   switch x {
-  case .Foo(var b):
+  case .Foo(let b):
     return b
-  case .Bar(var f):
+  case .Bar(let f):
     return f(a)
   }
 }

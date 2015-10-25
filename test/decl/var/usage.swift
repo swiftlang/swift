@@ -201,11 +201,14 @@ func testFixitsInStatementsWithPatterns(a : Int?) {
 
   do {
     try couldThrow()
-  } catch var err {  // expected-warning {{variable 'err' was never mutated; consider changing to 'let' constant}} {{11-14=let}}
+  } catch var err {  // expected-error {{'var' is not allowed in this pattern binding}} {{11-14=let}}
+    // expected-warning@-1 {{variable 'err' was never mutated; consider changing to 'let' constant}}
     _ = err
   }
 
   switch a {
-    case var b: _ = b  // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{10-13=let}}
+    case var b: // expected-error {{'var' is not allowed in this pattern binding}} {{10-13=let}}
+      // expected-warning@-1 {{variable 'b' was never mutated; consider changing to 'let' constant}}
+      _ = b
   }
 }

@@ -22,7 +22,7 @@ func parseError3(x: Int) {
 
 func parseError4(x: Int) {
   switch x {
-  case var z where // expected-error {{expected expression for 'where' guard of 'case'}} expected-error {{expected ':' after 'case'}}
+  case let z where // expected-error {{expected expression for 'where' guard of 'case'}} expected-error {{expected ':' after 'case'}}
   }
 }
 
@@ -62,7 +62,7 @@ case 10,
 case _ where x % 2 == 0,
      20:
   x = 1
-case var y where y % 2 == 0:
+case let y where y % 2 == 0:
   x = y + 1
 case _ where 0: // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
   x = 0
@@ -197,30 +197,32 @@ default:
 var t = (1, 2)
 
 switch t {
-case (var a, 2), (1, _): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
-  ()
 
-case (_, 2), (var a, _): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
-  ()
-
-case (var a, 2), (1, var b): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
-  ()
-
-case (var a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
+case (let a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
 case (1, _):
   ()
 
 case (_, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{13-13= break}}
-case (1, var a):
+case (1, let a):
   ()
 
-case (var a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
-case (1, var b):
+case (let a, 2): // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{17-17= break}}
+case (1, let b):
   ()
 
 case (1, let b): // let bindings
   ()
 
+// var bindings are not allowed in cases.
+case (1, var b): // expected-error {{'var' is not allowed in this pattern binding}}
+  ()
+case (var a, 2): // expected-error {{'var' is not allowed in this pattern binding}}
+  ()
+
+case (let a, 2), (1, let b): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
+  ()
+case (let a, 2), (1, _): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
+  ()
 case (_, 2), (let a, _): // expected-error {{'case' labels with multiple patterns cannot declare variables}}
   ()
 
@@ -237,7 +239,7 @@ case (1, _):
 switch t {
 case (1, 2):
   fallthrough // expected-error {{'fallthrough' cannot transfer control to a case label that declares variables}}
-case (var a, var b):
+case (let a, let b):
   t = (b, a)
 }
 

@@ -902,7 +902,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   // matching pattern.
   if (patternResult.isNull()) {
     llvm::SaveAndRestore<decltype(P.InVarOrLetPattern)>
-      T(P.InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
+      T(P.InVarOrLetPattern, Parser::IVOLP_AlwaysImmutable);
     patternResult = P.parseMatchingPattern(isExprBasic);
   }
 
