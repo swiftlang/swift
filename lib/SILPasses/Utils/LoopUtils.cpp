@@ -162,15 +162,15 @@ static bool canonicalizeLoopExitBlocks(SILLoop *L, DominanceInfo *DT,
 // This is unfortunate but necessary since splitCriticalEdge may change IDs.
 #ifndef NDEBUG
       llvm::SmallString<5> OldExitingBlockName;
-      {
+      DEBUG({
         llvm::raw_svector_ostream buffer(OldExitingBlockName);
         ExitingBlock->printAsOperand(buffer);
-      }
+      });
       llvm::SmallString<5> OldSuccBBName;
-      {
+      DEBUG({
         llvm::raw_svector_ostream buffer(OldSuccBBName);
         SuccBB->printAsOperand(buffer);
-      }
+      });
 #endif
 
       // Split any critical edges in between exiting block and succ iter.
