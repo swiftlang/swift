@@ -165,7 +165,7 @@ public:
 
   virtual void completeReturnStmt(CodeCompletionExpr *E) = 0;
 
-  virtual void completeAfterPound(CodeCompletionExpr *E) = 0;
+  virtual void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) = 0;
 
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.

@@ -1168,7 +1168,8 @@ public:
   ParserResult<Stmt> parseStmtReturn(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtThrow(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtDefer();
-  ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID);
+  ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID,
+                                  StmtKind ParentKind);
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
   ParserResult<Stmt> parseStmtIf(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtGuard();

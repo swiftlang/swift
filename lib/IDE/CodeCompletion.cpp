@@ -793,6 +793,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   SmallVector<StringRef, 3> ParsedKeywords;
 
   std::vector<std::string> SubModuleNames;
+  StmtKind ParentStmtKind;
 
   void addSuperKeyword(CodeCompletionResultSink &Sink) {
     auto *DC = CurDeclContext->getInnermostTypeContext();
@@ -936,7 +937,7 @@ public:
   void completeAssignmentRHS(AssignExpr *E) override;
   void completeCallArg(CallExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
-  void completeAfterPound(CodeCompletionExpr *E) override;
+  void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) override;
   void addKeywords(CodeCompletionResultSink &Sink);
 
   void doneParsing() override;
@@ -1648,7 +1649,9 @@ public:
       Builder.addAnnotatedThrows();
   }
 
-  void addPoundAvailable() {
+  void addPoundAvailable(StmtKind ParentKind) {
+    if (ParentKind != StmtKind::If && ParentKind != StmtKind::Guard)
+      return;
     CodeCompletionResultBuilder Builder(Sink, CodeCompletionResult::ResultKind::Keyword,
       SemanticContextKind::ExpressionSpecific, ExpectedTypes);
     Builder.addTextChunk("available");
@@ -3575,10 +3578,12 @@ void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
   Kind = CompletionKind::ReturnStmtExpr;
 }
 
-void CodeCompletionCallbacksImpl::completeAfterPound(CodeCompletionExpr *E) {
+void CodeCompletionCallbacksImpl::completeAfterPound(CodeCompletionExpr *E,
+                                                     StmtKind ParentKind) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
   Kind = CompletionKind::AfterPound;
+  ParentStmtKind = ParentKind;
 }
 
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
@@ -4161,7 +4166,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::AfterPound: {
-    Lookup.addPoundAvailable();
+    Lookup.addPoundAvailable(ParentStmtKind);
     break;
   }
   }

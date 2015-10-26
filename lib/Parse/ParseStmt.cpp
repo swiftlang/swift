@@ -1075,7 +1075,7 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
 /// problematic given the curly braces around the if/while body.
 ///
 ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
-                                        Diag<> ID) {
+                                        Diag<> ID, StmtKind ParentKind) {
   ParserStatus Status;
   Condition = StmtCondition();
 
@@ -1087,7 +1087,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     auto Expr = new (Context) CodeCompletionExpr(CharSourceRange(SourceMgr,
       PoundPos, CodeCompletionPos));
     if (CodeCompletion) {
-      CodeCompletion->completeAfterPound(Expr);
+      CodeCompletion->completeAfterPound(Expr, ParentKind);
     }
     result.push_back(Expr);
     Status.setHasCodeCompletion();
@@ -1384,7 +1384,8 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo) {
       ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
       Condition = Context.AllocateCopy(ConditionElems);
     } else {
-      Status |= parseStmtCondition(Condition, diag::expected_condition_if);
+      Status |= parseStmtCondition(Condition, diag::expected_condition_if,
+                                   StmtKind::If);
       if (Status.isError() || Status.hasCodeCompletion()) {
         // FIXME: better recovery
         return makeParserResult<Stmt>(Status, nullptr);
@@ -1434,7 +1435,8 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
     ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
     Condition = Context.AllocateCopy(ConditionElems);
   } else {
-    Status |= parseStmtCondition(Condition, diag::expected_condition_guard);
+    Status |= parseStmtCondition(Condition, diag::expected_condition_guard,
+                                 StmtKind::Guard);
     if (Status.isError() || Status.hasCodeCompletion()) {
       // FIXME: better recovery
       return makeParserResult<Stmt>(Status, nullptr);
@@ -1750,7 +1752,8 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
     ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
     Condition = Context.AllocateCopy(ConditionElems);
   } else {
-    Status |= parseStmtCondition(Condition, diag::expected_condition_while);
+    Status |= parseStmtCondition(Condition, diag::expected_condition_while,
+                                 StmtKind::While);
     if (Status.isError() || Status.hasCodeCompletion()) {
       // FIXME: better recovery
       return makeParserResult<Stmt>(Status, nullptr);
