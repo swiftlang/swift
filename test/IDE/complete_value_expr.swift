@@ -851,11 +851,11 @@ func testInsideFunctionCall10(var x: FooStruct) {
 }
 func testInsideFunctionCall11(var x: FooStruct) {
   x.instanceFunc2(#^INSIDE_FUNCTION_CALL_11^#,
-// INSIDE_FUNCTION_CALL_11-NOT: Pattern/{{.*}}:
+// INSIDE_FUNCTION_CALL_11-NOT: Pattern/{{.*}}:{{.*}}({{.*}}{#Int#}
 }
 func testInsideFunctionCall12(var x: FooStruct) {
   x.instanceFunc2(#^INSIDE_FUNCTION_CALL_12^#<#placeholder#>
-// INSIDE_FUNCTION_CALL_12-NOT: Pattern/{{.*}}:
+// INSIDE_FUNCTION_CALL_12-NOT: Pattern/{{.*}}:{{.*}}({{.*}}{#Int#}
 }
 
 func testInsideVarargFunctionCall1() {

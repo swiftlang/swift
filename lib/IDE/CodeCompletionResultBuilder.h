@@ -249,7 +249,14 @@ public:
                      CallParameterColon, ": ");
   }
 
-  void addSystemParam(StringRef Annotation, bool IsVarArg = false) {
+  void addSimpleNamedParameter(StringRef name) {
+    CurrentNestingLevel++;
+    addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
+    addTextChunk(name);
+    CurrentNestingLevel--;
+  }
+
+  void addSimpleTypedParameter(StringRef Annotation, bool IsVarArg = false) {
     CurrentNestingLevel++;
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,

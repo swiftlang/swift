@@ -1653,7 +1653,7 @@ public:
       SemanticContextKind::ExpressionSpecific, ExpectedTypes);
     Builder.addTextChunk("available");
     Builder.addLeftParen();
-    Builder.addSystemParam("Platform", true);
+    Builder.addSimpleTypedParameter("Platform", /*isVarArg=*/true);
     Builder.addComma();
     Builder.addTextChunk("*");
     Builder.addRightParen();
@@ -2682,6 +2682,13 @@ public:
     using KPK = KnownProtocolKind;
     using Builder = CodeCompletionResultBuilder;
 
+    // Add literal completions that conform to specific protocols.
+    addFromProto(KPK::IntegerLiteralConvertible, "Int", [](Builder &builder) {
+      builder.addTextChunk("0");
+    });
+    addFromProto(KPK::FloatLiteralConvertible, "Double", [](Builder &builder) {
+      builder.addTextChunk("0.0");
+    });
     addFromProto(KPK::BooleanLiteralConvertible, "Bool", [](Builder &builder) {
       builder.addTextChunk("true");
     }, /*isKeyword=*/true);
@@ -2691,6 +2698,43 @@ public:
     addFromProto(KPK::NilLiteralConvertible, "", [](Builder &builder) {
       builder.addTextChunk("nil");
     }, /*isKeyword=*/true);
+    addFromProto(KPK::StringLiteralConvertible, "String", [&](Builder &builder) {
+      builder.addTextChunk("\"");
+      builder.addSimpleNamedParameter("text");
+      builder.addTextChunk("\"");
+    });
+    addFromProto(KPK::ArrayLiteralConvertible, "Array", [&](Builder &builder) {
+      builder.addLeftBracket();
+      builder.addSimpleNamedParameter("item");
+      builder.addRightBracket();
+    });
+    addFromProto(KPK::DictionaryLiteralConvertible, "Dictionary", [&](Builder &builder) {
+      builder.addLeftBracket();
+      builder.addSimpleNamedParameter("key");
+      builder.addTextChunk(": ");
+      builder.addSimpleNamedParameter("value");
+      builder.addRightBracket();
+    });
+
+    // Add tuple completion (item, item).
+    {
+      CodeCompletionResultBuilder builder(Sink, CodeCompletionResult::Pattern,
+                                          SemanticContextKind::None, {});
+      builder.addLeftParen();
+      builder.addSimpleNamedParameter("item");
+      builder.addComma();
+      builder.addSimpleNamedParameter("item");
+      builder.addRightParen();
+      for (auto T : ExpectedTypes) {
+        if (!T)
+          continue;
+        if (T->getAs<TupleType>()) {
+          addTypeAnnotation(builder, T);
+          builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
+          break;
+        }
+      }
+    }
   }
 
   struct FilteredDeclConsumer : public swift::VisibleDeclConsumer {
