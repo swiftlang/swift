@@ -556,7 +556,6 @@ public:
   }
 
   ExpectedTypeRelation getExpectedTypeRelation() const {
-    assert(getKind() == Declaration);
     return static_cast<ExpectedTypeRelation>(TypeDistance);
   }
 
