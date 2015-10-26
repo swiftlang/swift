@@ -75,10 +75,10 @@ class SomeClass {
   // -- Constructors and methods are uncurried in 'self'
   // -- Instance methods use 'method' cc
 
-  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClasscfMS0_FT1xBi64_1yBi64__S0_ : $@convention(method) (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> @owned SomeClass
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClassc{{.*}} : $@convention(method) (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> @owned SomeClass
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $SomeClass):
 
-  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClassCfMS0_FT1xBi64_1yBi64__S0_ : $@convention(thin) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
+  // CHECK-LABEL: sil hidden @_TFC9functions9SomeClassC{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
   init(x:Int, y:Int) {}
 
@@ -212,7 +212,7 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // -- Curry 'self' onto struct method argument lists.
 
   // CHECK: [[ST_ADDR:%.*]] = alloc_box $SomeStruct
-  // CHECK: [[CTOR:%.*]] = function_ref @_TFV9functions10SomeStructCfMS0_FT1xBi64_1yBi64__S0_ : $@convention(thin) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
+  // CHECK: [[CTOR:%.*]] = function_ref @_TFV9functions10SomeStructC{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
   // CHECK: [[METATYPE:%.*]] = metatype $@thin SomeStruct.Type
   // CHECK: [[I:%.*]] = load [[IADDR]]
   // CHECK: [[J:%.*]] = load [[JADDR]]
@@ -233,7 +233,7 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // -- Curry 'self' onto method argument lists dispatched using class_method.
 
   // CHECK: [[CADDR:%[0-9]+]] = alloc_box $SomeClass
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TFC9functions9SomeClassCfMS0_FT1xBi64_1yBi64__S0_ : $@convention(thin) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TFC9functions9SomeClassC{{.*}} : $@convention(thin) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeClass.Type
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
@@ -372,7 +372,7 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // -- Use an apply or partial_apply instruction to bind type parameters of a generic.
 
   // CHECK: [[GADDR:%[0-9]+]] = alloc_box $SomeGeneric<Builtin.Int64>
-  // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGenericCurfMGS0_q__FT_GS0_q__ : $@convention(thin) <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
+  // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGenericC{{.*}} : $@convention(thin) <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeGeneric<Builtin.Int64>.Type
   // CHECK: apply [[CTOR_GEN]]<Builtin.Int64>([[META]])
   var g = SomeGeneric<Builtin.Int64>()
@@ -525,10 +525,10 @@ protocol AlwaysInline {
   func alwaysInlined()
 }
 
-// CHECK-LABEL: sil hidden [always_inline] @_TFV9functions19AlwaysInlinedMember13alwaysInlinedfS0_FT_T_ : $@convention(method) (AlwaysInlinedMember) -> () {
+// CHECK-LABEL: sil hidden [always_inline] @_TFV9functions19AlwaysInlinedMember13alwaysInlined{{.*}} : $@convention(method) (AlwaysInlinedMember) -> () {
 
 // protocol witness for functions.AlwaysInline.alwaysInlined <A : functions.AlwaysInline>(functions.AlwaysInline.Self)() -> () in conformance functions.AlwaysInlinedMember : functions.AlwaysInline in functions
-// CHECK-LABEL: sil hidden [transparent] [thunk] [always_inline] @_TTWV9functions19AlwaysInlinedMemberS_12AlwaysInlineS_FS1_13alwaysInlineduR_S1_rfq_FT_T_ : $@convention(witness_method) (@in_guaranteed AlwaysInlinedMember) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] [always_inline] @_TTWV9functions19AlwaysInlinedMemberS_12AlwaysInlineS_FS1_13alwaysInlined{{.*}} : $@convention(witness_method) (@in_guaranteed AlwaysInlinedMember) -> () {
 struct AlwaysInlinedMember : AlwaysInline {
   @inline(__always)
   func alwaysInlined() {}
@@ -548,10 +548,10 @@ final class r17828355Class {
 }
 
 // The curry thunk for the method should not include a class_method instruction.
-// CHECK-LABEL: sil shared @_TFC9functions14r17828355Class6methodFS0_FBi64_T_
+// CHECK-LABEL: sil shared @_TFC9functions14r17828355Class6methodF
 // CHECK-NEXT: bb0(%0 : $r17828355Class):
-// CHECK-NEXT: // function_ref functions.r17828355Class.method (functions.r17828355Class)(Builtin.Int64) -> ()
-// CHECK-NEXT:  %1 = function_ref @_TFC9functions14r17828355Class6methodfS0_FBi64_T_ : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
+// CHECK-NEXT: // function_ref functions.r17828355Class.method (Builtin.Int64) -> ()
+// CHECK-NEXT:  %1 = function_ref @_TFC9functions14r17828355Class6method{{.*}} : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
 // CHECK-NEXT:  partial_apply %1(%0) : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
 // CHECK-NEXT:  return
 
@@ -620,12 +620,12 @@ func partialApplyEnumCases(x: S, y: C) {
   let right2 = right(C())
 }
 
-// CHECK-LABEL: sil shared [transparent] @_TFO9functions23PartialApplyEnumPayload4Leftu0_rFMGS0_q_q0__Fq_GS0_q_q0__
-// CHECK:         [[UNCURRIED:%.*]] = function_ref @_TFO9functions23PartialApplyEnumPayload4Leftu0_rfMGS0_q_q0__Fq_GS0_q_q0__
+// CHECK-LABEL: sil shared [transparent] @_TFO9functions23PartialApplyEnumPayload4Left{{.*}}
+// CHECK:         [[UNCURRIED:%.*]] = function_ref @_TFO9functions23PartialApplyEnumPayload4Left{{.*}}
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [[UNCURRIED]]<T, U>(%0)
 // CHECK:         return [[CLOSURE]]
 
-// CHECK-LABEL: sil shared [transparent] @_TFO9functions23PartialApplyEnumPayload5Rightu0_rFMGS0_q_q0__Fq0_GS0_q_q0__
-// CHECK:         [[UNCURRIED:%.*]] = function_ref @_TFO9functions23PartialApplyEnumPayload5Rightu0_rfMGS0_q_q0__Fq0_GS0_q_q0__
+// CHECK-LABEL: sil shared [transparent] @_TFO9functions23PartialApplyEnumPayload5Right{{.*}}
+// CHECK:         [[UNCURRIED:%.*]] = function_ref @_TFO9functions23PartialApplyEnumPayload5Right{{.*}}
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [[UNCURRIED]]<T, U>(%0)
 // CHECK:         return [[CLOSURE]]

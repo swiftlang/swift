@@ -13,8 +13,8 @@ hasNoPrototype()
 // CHECK-LABEL: sil @main
 // -- Foreign function is referenced with C calling conv and ownership semantics
 // CHECK:   [[NSANSE:%.*]] = function_ref @NSAnse : $@convention(c) (ImplicitlyUnwrappedOptional<Ansible>) -> @autoreleased ImplicitlyUnwrappedOptional<Ansible>
-// CHECK:   [[ANSIBLE_CTOR:%.*]] = function_ref @_TFCSo7AnsibleCfMS_FT7bellsOnGSQPs9AnyObject___GSQS__
-// CHECK:   [[NSOBJECT_CTOR:%.*]] = function_ref @_TFCSo8NSObjectCfMS_FT_S_ : $@convention(thin) (@thick NSObject.Type) -> @owned NSObject
+// CHECK:   [[ANSIBLE_CTOR:%.*]] = function_ref @_TFCSo7AnsibleC
+// CHECK:   [[NSOBJECT_CTOR:%.*]] = function_ref @_TFCSo8NSObjectC{{.*}} : $@convention(thin) (@thick NSObject.Type) -> @owned NSObject
 // CHECK:   [[ANSIBLE:%.*]] = apply [[ANSIBLE_CTOR]]
 // CHECK:   [[NSANSE_RESULT:%.*]] = apply [[NSANSE]]([[ANSIBLE]])
 // CHECK:   retain_autoreleased [[NSANSE_RESULT]]
@@ -26,11 +26,11 @@ hasNoPrototype()
 // CHECK:   apply [[NOPROTO]]()
 
 // -- Constructors for imported Ansible
-// CHECK-LABEL: sil  shared @_TFCSo7AnsibleCfMS_FT7bellsOnGSQPs9AnyObject___GSQS__ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<AnyObject>, @thick Ansible.Type) -> @owned ImplicitlyUnwrappedOptional<Ansible>
+// CHECK-LABEL: sil  shared @_TFCSo7AnsibleC{{.*}} : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<AnyObject>, @thick Ansible.Type) -> @owned ImplicitlyUnwrappedOptional<Ansible>
 
 
 // -- Constructors for imported NSObject
-// CHECK-LABEL: sil  shared @_TFCSo8NSObjectCfMS_FT_S_ : $@convention(thin) (@thick NSObject.Type) -> @owned NSObject
+// CHECK-LABEL: sil  shared @_TFCSo8NSObjectC{{.*}} : $@convention(thin) (@thick NSObject.Type) -> @owned NSObject
 
 // -- Native Swift thunk for NSAnse
 // CHECK: sil shared @_TTOFSC6NSAnseFGSQCSo7Ansible_GSQS__ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<Ansible>) -> @owned ImplicitlyUnwrappedOptional<Ansible> {
@@ -43,5 +43,5 @@ hasNoPrototype()
 // CHECK: }
 
 // -- Constructor for imported Ansible was unused, should not be emitted.
-// CHECK-NOT: sil  shared @_TFCSo7AnsibleCfMS_FT_S_ : $@convention(thin) (@thick Ansible.Type) -> @owned Ansible
+// CHECK-NOT: sil  shared @_TFCSo7AnsibleC{{.*}} : $@convention(thin) (@thick Ansible.Type) -> @owned Ansible
 

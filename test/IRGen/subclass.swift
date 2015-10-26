@@ -20,8 +20,8 @@
 // CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // CHECK:   [[OPAQUE]]* null,
 // CHECK:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1A to i64), i64 1),
-// CHECK:   i64 ([[A]]*)* @_TFC8subclass1A1ffS0_FT_Si,
-// CHECK:   [[A]]* ([[TYPE]]*)* @_TZFC8subclass1A1gfMS0_FT_S0_
+// CHECK:   i64 ([[A]]*)* @_TFC8subclass1A1ffT_Si,
+// CHECK:   [[A]]* ([[TYPE]]*)* @_TZFC8subclass1A1gfT_S0_
 // CHECK: }
 // CHECK: @_DATA__TtC8subclass1B = private constant {{.*\* } }}{
 // CHECK: @_TMfC8subclass1B = internal global { {{.*}} } {
@@ -32,8 +32,8 @@
 // CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // CHECK:   [[OPAQUE]]* null,
 // CHECK:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1B to i64), i64 1),
-// CHECK:   i64 ([[B]]*)* @_TFC8subclass1B1ffS0_FT_Si,
-// CHECK:   [[A]]* ([[TYPE]]*)* @_TZFC8subclass1A1gfMS0_FT_S0_
+// CHECK:   i64 ([[B]]*)* @_TFC8subclass1B1ffT_Si,
+// CHECK:   [[A]]* ([[TYPE]]*)* @_TZFC8subclass1A1gfT_S0_
 // CHECK: }
 // CHECK: @objc_classes = internal global [2 x i8*] [i8* {{.*}} @_TMC8subclass1A {{.*}}, i8* {{.*}} @_TMC8subclass1B {{.*}}], section "__DATA, __objc_classlist, regular, no_dead_strip", align 8
 

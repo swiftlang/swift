@@ -14,12 +14,12 @@ func main() {
         markUsed("element = \(element)")
     }
     markUsed("Done with the for loop")
-// CHECK: call void @_TF4main8markUsedurFq_T_
+// CHECK: call void @_TF4main8markUsedurFxT_
 // CHECK: br label
 // CHECK: <label>:
 // CHECK: , !dbg ![[LOOPHEADER_LOC:.*]]
 // CHECK: call void {{.*}}elease({{.*}}) {{#[0-9]+}}, !dbg ![[LOOPHEADER_LOC]]
-// CHECK: call void @_TF4main8markUsedurFq_T_
+// CHECK: call void @_TF4main8markUsedurFxT_
 // The cleanups should share the line number with the ret stmt.
 // CHECK:  call void {{.*}}elease({{.*}}) {{#[0-9]+}}, !dbg ![[CLEANUPS:.*]]
 // CHECK-NEXT:  !dbg ![[CLEANUPS]]

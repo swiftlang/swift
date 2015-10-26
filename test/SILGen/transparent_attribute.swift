@@ -38,7 +38,7 @@ func testStructWithTranspConstructor() -> StructWithTranspConstructor {
   return StructWithTranspConstructor()
   
   // transparent_attribute.StructWithTranspConstructor.constructor
-  // CHECK-APPLY: sil hidden @_TFV21transparent_attribute27StructWithTranspConstructorCfMS0_FT_S0_
+  // CHECK-APPLY: sil hidden @_TFV21transparent_attribute27StructWithTranspConstructorC
   
   // testStructWithTranspConstructor
   // CHECK-APPLY: _T21transparent_attribute31testStructWithTranspConstructorFT_VS_27StructWithTranspConstructor
@@ -119,9 +119,9 @@ func testStructExtension() {
   var s : MySt = c.tr2
   var t : MySt = c.tr3
   // CHECK-APPLY: sil hidden @_TF21transparent_attribute13testStructExtensionFT_T_
-  // CHECK: [[INIT:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStructCfMS0_FT5inputVS_4MySt_S0_
+  // CHECK: [[INIT:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStructC
   // CHECK: apply [[INIT]]
-  // CHECK: [[TR1:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStruct3tr1fRS0_FT_T_
+  // CHECK: [[TR1:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStruct3tr1
   // CHECK: apply [[TR1]]
   // CHECK: [[TR2:%[0-9]+]] = function_ref @_TFV21transparent_attribute14MyTranspStructg3tr2VS_4MySt
   // CHECK: apply [[TR2]]
@@ -141,8 +141,8 @@ enum MyEnum {
 func testEnumExtension() {
   MyEnum.onetransp.tr3()
   // CHECK-APPLY: sil hidden @_TF21transparent_attribute17testEnumExtensionFT_T_
-  // CHECK: [[TR3:%[0-9]+]] = function_ref @_TFO21transparent_attribute6MyEnum3tr3fS0_FT_T_
-  // CHECK: [[INIT:%[0-9]+]] = function_ref @_TFO21transparent_attribute6MyEnum9onetranspFMS0_S0_
+  // CHECK: [[TR3:%[0-9]+]] = function_ref @_TFO21transparent_attribute6MyEnum3tr3
+  // CHECK: [[INIT:%[0-9]+]] = function_ref @_TFO21transparent_attribute6MyEnum9onetransp
   // CHECK: apply [[INIT]]
   // CHECK: apply [[TR3]]
 }
@@ -159,7 +159,7 @@ struct testVarDecl {
   }
   func testVarDeclFoo () {
     var z: Int = max
-    // CHECK-APPLY: sil hidden @_TFV21transparent_attribute11testVarDecl14testVarDeclFoofRS0_FT_T_
+    // CHECK-APPLY: sil hidden @_TFV21transparent_attribute11testVarDecl14testVarDeclFoo
     // CHECK: [[TR4:%[0-9]+]] = function_ref @_TFV21transparent_attribute11testVarDeclg3maxSi
     // CHECK: apply [[TR4]]
   }
@@ -169,7 +169,7 @@ struct testVarDeclShortenedSyntax {
   @transparent static var max: Int { return 0xFF };
   func testVarDeclShortenedSyntaxfoo () {
     var z: Int = testVarDeclShortenedSyntax.max
-    // CHECK-APPLY: sil hidden @_TFV21transparent_attribute26testVarDeclShortenedSyntax29testVarDeclShortenedSyntaxfoofRS0_FT_T_
+    // CHECK-APPLY: sil hidden @_TFV21transparent_attribute26testVarDeclShortenedSyntax29testVarDeclShortenedSyntaxfoo
     // CHECK: [[TR5:%[0-9]+]] = function_ref @_TZFV21transparent_attribute26testVarDeclShortenedSyntaxg3maxSi
     // CHECK: apply [[TR5]]
   }

@@ -116,9 +116,9 @@ class C {
 
 // CHECK-LABEL: sil hidden @_TF11expressions7classesFT_T_
 func classes() {
-  // CHECK: function_ref @_TFC11expressions1CCfMS0_FT_S0_ : $@convention(thin) (@thick C.Type) -> @owned C
+  // CHECK: function_ref @_TFC11expressions1CC{{.*}} : $@convention(thin) (@thick C.Type) -> @owned C
   var a = C()
-  // CHECK: function_ref @_TFC11expressions1CCfMS0_FT1xSi_S0_ : $@convention(thin) (Int, @thick C.Type) -> @owned C
+  // CHECK: function_ref @_TFC11expressions1CC{{.*}} : $@convention(thin) (Int, @thick C.Type) -> @owned C
   var b = C(x: 0)
 }
 
@@ -134,9 +134,9 @@ struct S {
 
 // CHECK-LABEL: sil hidden @_TF11expressions7structsFT_T_
 func structs() {
-  // CHECK: function_ref @_TFV11expressions1SCfMS0_FT_S0_ : $@convention(thin) (@thin S.Type) -> S
+  // CHECK: function_ref @_TFV11expressions1SC{{.*}} : $@convention(thin) (@thin S.Type) -> S
   var a = S()
-  // CHECK: function_ref @_TFV11expressions1SCfMS0_FT1xSi_S0_ : $@convention(thin) (Int, @thin S.Type) -> S
+  // CHECK: function_ref @_TFV11expressions1SC{{.*}} : $@convention(thin) (Int, @thin S.Type) -> S
   var b = S(x: 0)
 }
 
@@ -157,7 +157,7 @@ struct SomeStruct {
 }
 
 // CHECK-LABEL: sil hidden @_TF11expressions5callsFT_T_
-// CHECK: [[METHOD:%[0-9]+]] = function_ref @_TFV11expressions10SomeStruct1afRS0_FT_T_ : $@convention(method) (@inout SomeStruct) -> ()
+// CHECK: [[METHOD:%[0-9]+]] = function_ref @_TFV11expressions10SomeStruct1a{{.*}} : $@convention(method) (@inout SomeStruct) -> ()
 // CHECK: apply [[METHOD]]({{.*}})
 func calls() {
   var a : SomeStruct
@@ -211,7 +211,7 @@ struct Generic<T> {
     typevar_member = x.typevar_member
   }
 
-  // CHECK-LABEL: sil hidden @_TZFV11expressions7Generic12class_methodurfMGS0_q__FT_T_
+  // CHECK-LABEL: sil hidden @_TZFV11expressions7Generic12class_method
   static func class_method() {}
 }
 

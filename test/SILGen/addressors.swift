@@ -32,7 +32,7 @@ struct A {
 // CHECK-LABEL: sil hidden @_TF10addressors5test0FT_T_ : $@convention(thin) () -> () {
 func test0() {
 // CHECK: [[A:%.*]] = alloc_stack $A
-// CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1ACfMS0_FT_S0_
+// CHECK: [[T0:%.*]] = function_ref @_TFV10addressors1AC
 // CHECK: [[T1:%.*]] = metatype $@thin A.Type
 // CHECK: [[AVAL:%.*]] = apply [[T0]]([[T1]]) 
 // CHECK: store [[AVAL]] to [[A]]#1
@@ -64,7 +64,7 @@ func test0() {
 
 // CHECK-LABEL: sil hidden @_TF10addressors5test1FT_Vs5Int32 : $@convention(thin) () -> Int32
 func test1() -> Int32 {
-// CHECK: [[CTOR:%.*]] = function_ref @_TFV10addressors1ACfMS0_FT_S0_
+// CHECK: [[CTOR:%.*]] = function_ref @_TFV10addressors1AC
 // CHECK: [[T0:%.*]] = metatype $@thin A.Type
 // CHECK: [[A:%.*]] = apply [[CTOR]]([[T0]]) : $@convention(thin) (@thin A.Type) -> A
 // CHECK: [[ACCESSOR:%.*]] = function_ref @_TFV10addressors1Alu9subscriptFVs5Int32S1_ : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
@@ -145,7 +145,7 @@ func id_int(i: Int32) -> Int32 { return i }
 // CHECK-LABEL: sil hidden @_TF10addressors11test_carrayFRGVS_6CArrayFVs5Int32S1__S1_ : $@convention(thin) (@inout CArray<Int32 -> Int32>) -> Int32 {
 // CHECK: bb0([[ARRAY:%.*]] : $*CArray<Int32 -> Int32>):
 func test_carray(inout array: CArray<Int32 -> Int32>) -> Int32 {
-// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors6CArrayau9subscriptFSiq_ :
+// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors6CArrayau9subscriptFSix :
 // CHECK:   [[T1:%.*]] = apply [[T0]]<Int32 -> Int32>({{%.*}}, [[ARRAY]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32 -> Int32>, #UnsafeMutablePointer._rawValue
 // CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*@callee_owned (@out Int32, @in Int32) -> ()
@@ -153,7 +153,7 @@ func test_carray(inout array: CArray<Int32 -> Int32>) -> Int32 {
   array[0] = id_int
 
 // CHECK:   [[T0:%.*]] = load [[ARRAY]]
-// CHECK:   [[T1:%.*]] = function_ref @_TFV10addressors6CArraylu9subscriptFSiq_ :
+// CHECK:   [[T1:%.*]] = function_ref @_TFV10addressors6CArraylu9subscriptFSix :
 // CHECK:   [[T2:%.*]] = apply [[T1]]<Int32 -> Int32>({{%.*}}, [[T0]])
 // CHECK:   [[T3:%.*]] = struct_extract [[T2]] : $UnsafePointer<Int32 -> Int32>, #UnsafePointer._rawValue
 // CHECK:   [[T4:%.*]] = pointer_to_address [[T3]] : $Builtin.RawPointer to $*@callee_owned (@out Int32, @in Int32) -> ()
@@ -191,7 +191,7 @@ struct D : Subscriptable {
 // SILGEN:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVs5Int32S1_
 // SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[BOX]]#1)
 // SILGEN:   [[ADDR:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
-// SILGEN:   [[INIT:%.*]] = function_ref @_TFSqCurfMGSqq__FT10nilLiteralT__GSqq__
+// SILGEN:   [[INIT:%.*]] = function_ref @_TFSqC
 // SILGEN:   [[META:%.*]] = metatype $@thin Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>.Type
 // SILGEN:   [[T0:%.*]] = alloc_stack $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>
 // SILGEN:   [[OPT:%.*]] = apply [[INIT]]<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>([[T0]]#1, [[META]])

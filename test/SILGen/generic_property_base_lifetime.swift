@@ -33,7 +33,7 @@ func setIntPropExistential(a: ProtocolA) {
   a.intProp = 0
 }
 
-// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGenericuR_S_9ProtocolArFq_Si
+// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGeneric
 // CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>(%0)
 // CHECK:         strong_release %0
@@ -41,7 +41,7 @@ func getIntPropGeneric<T: ProtocolA>(a: T) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17setIntPropGenericuR_S_9ProtocolArFq_T_
+// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17setIntPropGeneric
 // CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>({{%.*}}, %0)
 // CHECK:         strong_release %0
@@ -61,7 +61,7 @@ func getIntPropExistential(a: ProtocolB) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGenericuR_S_9ProtocolBrFq_Si
+// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGeneric
 // CHECK:         [[STACK:%[0-9]+]] = alloc_stack $T
 // CHECK:         copy_addr %0 to [initialization] [[STACK]]#1
 // CHECK:         apply {{%.*}}<T>([[STACK]]#1)
@@ -98,7 +98,7 @@ func setIntPropExistential(a: ProtocolO) {
   a.intProp = 0
 }
 
-// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGenericuR_S_9ProtocolOrFq_Si
+// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGeneric
 // CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>(%0)
 // CHECK:         strong_release %0
@@ -107,7 +107,7 @@ func getIntPropGeneric<T: ProtocolO>(a: T) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17setIntPropGenericuR_S_9ProtocolOrFq_T_
+// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17setIntPropGeneric
 // CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>({{%.*}}, %0)
 // CHECK:         strong_release %0

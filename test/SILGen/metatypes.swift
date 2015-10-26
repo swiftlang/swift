@@ -87,7 +87,7 @@ func existential_metatype_from_thin() -> Any.Type {
 }
 
 // CHECK-LABEL: sil hidden @_TF9metatypes36existential_metatype_from_thin_valueFT_PMPS_3Any_ : $@convention(thin) () -> @thick Any.Type
-// CHECK:      [[T0:%.*]] = function_ref @_TFV9metatypes10SomeStructCfMS0_FT_S0_
+// CHECK:      [[T0:%.*]] = function_ref @_TFV9metatypes10SomeStructC
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: debug_value [[T2]] : $SomeStruct  // let s

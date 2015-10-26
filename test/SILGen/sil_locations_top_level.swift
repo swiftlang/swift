@@ -26,7 +26,7 @@ var topLevelObject2:TopLevelObjectTyWithoutDestructor
 
 // Check allocating initializer
 // CHECK-LABEL: sil_locations_top_level.TopLevelObjectTy.__allocating_init
-// CHECK: sil hidden @_TFC23sil_locations_top_level16TopLevelObjectTyCfMS0_FT_S0_
+// CHECK: sil hidden @_TFC23sil_locations_top_level16TopLevelObjectTyC
 // CHECK: alloc_ref {{.*}}line:5:3:auto_gen
 // CHECK: function_ref
 
@@ -36,7 +36,7 @@ var topLevelObject2:TopLevelObjectTyWithoutDestructor
 
 // Check explicit constructor
 // FIXME: The ConstructorDecl location is wrong here (looks like it's wrong in the AST).
-// CHECK-LABEL: sil hidden @_TFC23sil_locations_top_level33TopLevelObjectTyWithoutDestructorcfMS0_FT_S0_
+// CHECK-LABEL: sil hidden @_TFC23sil_locations_top_level33TopLevelObjectTyWithoutDestructorc
 // CHECK: return {{.*}}// {{.*}} line:14:3:imp_return
 
 

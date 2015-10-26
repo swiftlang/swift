@@ -11,7 +11,7 @@ protocol CP : class {
 class X : P, CP {
   required init(int i: Int) { }
 
-  // CHECK-LABEL: sil hidden @_TFC12dynamic_self1X1ffS0_FT_DS0_ : $@convention(method) (@guaranteed X) -> @owned
+  // CHECK-LABEL: sil hidden @_TFC12dynamic_self1X1f{{.*}} : $@convention(method) (@guaranteed X) -> @owned
   func f() -> Self { return self }
 
   // CHECK-LABEL: sil hidden @_TZFC12dynamic_self1X7factory{{.*}} : $@convention(thin) (Int, @thick X.Type) -> @owned X
@@ -129,7 +129,7 @@ func testObjCInit(meta: ObjCInit.Type) {
 class OptionalResult {
   func foo() -> Self? { return self }
 }
-// CHECK-LABEL: sil hidden @_TFC12dynamic_self14OptionalResult3foofS0_FT_GSqDS0__
+// CHECK-LABEL: sil hidden @_TFC12dynamic_self14OptionalResult3foo
 // CHECK-NEXT: bb0(
 // CHECK-NEXT: debug_value %0 : $OptionalResult
 // CHECK-NEXT: strong_retain [[VALUE:%[0-9]+]]
@@ -152,7 +152,7 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK-NEXT: enum $Optional<OptionalResultInheritor>, #Optional.Some!enumelt.1, [[T4]]
 
 // CHECK-LABEL: sil_witness_table hidden X: P module dynamic_self {
-// CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PS_FS1_1fuR_S1_rfq_FT_q_
+// CHECK: method #P.f!1: @_TTWC12dynamic_self1XS_1PS_FS1_1f
 
 // CHECK-LABEL: sil_witness_table hidden X: CP module dynamic_self {
-// CHECK: method #CP.f!1: @_TTWC12dynamic_self1XS_2CPS_FS1_1fuR_S1_rfq_FT_q_
+// CHECK: method #CP.f!1: @_TTWC12dynamic_self1XS_2CPS_FS1_1f

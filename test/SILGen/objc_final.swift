@@ -6,7 +6,7 @@ import Foundation
 
 final class Foo {
   @objc func foo() {}
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC10objc_final3Foo3foofS0_FT_T_ : $@convention(objc_method) (Foo) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC10objc_final3Foo3foo
 
   @objc var prop: Int = 0
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC10objc_final3Foog4propSi
@@ -17,7 +17,7 @@ final class Foo {
 func callFoo(x: Foo) {
   // Calls to the final @objc method statically reference the native entry
   // point.
-  // CHECK: function_ref @_TFC10objc_final3Foo3foofS0_FT_T_
+  // CHECK: function_ref @_TFC10objc_final3Foo3foo
   x.foo()
 
   // Final @objc properties are still accessed directly.

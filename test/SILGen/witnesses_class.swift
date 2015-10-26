@@ -9,22 +9,22 @@ protocol Fooable: class {
 class Foo: Fooable {
   
   func foo() { }
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC15witnesses_class3FooS_7FooableS_FS1_3foouR_S1_rfq_FT_T_
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC15witnesses_class3FooS_7FooableS_FS1_3foo
   // CHECK-NOT:     function_ref
   // CHECK:         class_method
 
   class func bar() {}
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC15witnesses_class3FooS_7FooableS_ZFS1_3baruR_S1_rfMq_FT_T_
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC15witnesses_class3FooS_7FooableS_ZFS1_3bar
   // CHECK-NOT:     function_ref
   // CHECK:         class_method
 
   required init() {}
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC15witnesses_class3FooS_7FooableS_FS1_CuR_S1_rfMq_FT_q_
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC15witnesses_class3FooS_7FooableS_FS1_C
   // CHECK-NOT:     function_ref
   // CHECK:         class_method
 }
 
-// CHECK-LABEL: sil hidden @_TF15witnesses_class3genuR_S_7FooablerFq_T_
+// CHECK-LABEL: sil hidden @_TF15witnesses_class3gen
 // CHECK:         bb0([[SELF:%.*]] : $T)
 // CHECK:         [[METHOD:%.*]] = witness_method $T
 // CHECK-NOT:     strong_retain [[SELF]]

@@ -18,7 +18,7 @@ class MyCls {
   typealias TA = Int
   // CHECK: [[@LINE+1]]:7 s:vC14swift_ide_test5MyCls3wwwSi{{$}}
   var www : Int = 0
-  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test5MyCls3fooFS0_FSiT_{{$}}
+  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test5MyCls3fooFSiT_{{$}}
   func foo(x : Int) {}
   // CHECK: [[@LINE+1]]:3 s:iC14swift_ide_test5MyCls9subscriptFSiSf{{$}}
   subscript(i: Int) -> Float {
@@ -38,10 +38,10 @@ class GenericClass {
   // CHECK: [[@LINE+1]]:7 s:vC14swift_ide_test12GenericClass11instanceVarSi{{$}}
   var instanceVar: Int = 0
 
-  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test12GenericClass12instanceFuncFS0_FT_T_{{$}}
+  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test12GenericClass12instanceFuncFT_T_{{$}}
   func instanceFunc() {
-    // CHECK: [[@LINE+2]]:18 s:ZFC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_{{$}}
-    // CHECK: [[@LINE+1]]:28 s:vFC14swift_ide_test12GenericClass12instanceFuncFS0_FT_T_L_4selfS0_{{$}}
+    // CHECK: [[@LINE+2]]:18 s:ZFC14swift_ide_test12GenericClass9classFuncFS0_T_{{$}}
+    // CHECK: [[@LINE+1]]:28 s:vFC14swift_ide_test12GenericClass12instanceFuncFT_T_L_4selfS0_{{$}}
     GenericClass.classFunc(self)
   }
 
@@ -56,13 +56,13 @@ class GenericClass {
 
   // CHECK: [[@LINE+1]]:3 s:FC14swift_ide_test12GenericClassd{{$}}
   deinit {
-    // CHECK: [[@LINE+2]]:18 s:ZFC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_{{$}}
+    // CHECK: [[@LINE+2]]:18 s:ZFC14swift_ide_test12GenericClass9classFuncFS0_T_{{$}}
     // CHECK: [[@LINE+1]]:28 ERROR:no-usr{{$}}
     GenericClass.classFunc(self)
   }
 
-  // CHECK: [[@LINE+2]]:14 s:ZFC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_{{$}}
-  // CHECK: [[@LINE+1]]:24 s:vZFC14swift_ide_test12GenericClass9classFuncFMS0_FS0_T_L_1aS0_{{$}}
+  // CHECK: [[@LINE+2]]:14 s:ZFC14swift_ide_test12GenericClass9classFuncFS0_T_{{$}}
+  // CHECK: [[@LINE+1]]:24 s:vZFC14swift_ide_test12GenericClass9classFuncFS0_T_L_1aS0_{{$}}
   class func classFunc(a: GenericClass) {}
 }
 
@@ -70,7 +70,7 @@ class GenericClass {
 protocol Prot {
   // CHECK: [[@LINE+1]]:13 s:P14swift_ide_test4Prot5Blarg{{$}}
   typealias Blarg
-  // CHECK: [[@LINE+1]]:8 s:FP14swift_ide_test4Prot8protMethuR_S0_rFq_Fw_5Blargw_S1_{{$}}
+  // CHECK: [[@LINE+1]]:8 s:FP14swift_ide_test4Prot8protMethFwx5BlargwxS1_{{$}}
   func protMeth(x: Blarg) -> Blarg
   // CHECK: [[@LINE+2]]:7 s:vP14swift_ide_test4Prot17protocolProperty1Si{{$}}
   // CHECK: [[@LINE+1]]:32 s:FP14swift_ide_test4Protg17protocolProperty1Si{{$}}
@@ -81,13 +81,13 @@ protocol Prot2 {}
 class SubCls : MyCls, Prot {
   // CHECK: [[@LINE+1]]:13 s:C14swift_ide_test6SubCls5Blarg{{$}}
   typealias Blarg = Prot2
-  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test6SubCls8protMethFS0_FPS_5Prot2_PS1__{{$}}
+  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test6SubCls8protMethFPS_5Prot2_PS1__{{$}}
   func protMeth(x: Blarg) -> Blarg {}
   // CHECK: [[@LINE+1]]:7 s:vC14swift_ide_test6SubCls17protocolProperty1Si{{$}}
   var protocolProperty1 = 0
 }
 
-// CHECK: [[@LINE+1]]:6 s:F14swift_ide_test5genFnuR_S_4Protw_5BlargS_5Prot2rFq_Si{{$}}
+// CHECK: [[@LINE+1]]:6 s:F14swift_ide_test5genFnuRxS_4Protwx5BlargS_5Prot2rFxSi{{$}}
 func genFn<T : Prot where T.Blarg : Prot2>(p : T) -> Int {}
 
 // CHECK: [[@LINE+1]]:6 s:F14swift_ide_test3barFSiTSiSf_{{$}}
@@ -95,11 +95,11 @@ func bar(x: Int) -> (Int, Float) {}
 
 // CHECK: [[@LINE+1]]:7 s:C14swift_ide_test6GenCls{{$}}
 class GenCls<T> {
-  // CHECK: [[@LINE+1]]:3 s:FC14swift_ide_test6GenClscurFMGS0_q__FT_GS0_q__{{$}}
+  // CHECK: [[@LINE+1]]:3 s:FC14swift_ide_test6GenClscFT_GS0_x_{{$}}
   init() {}
   // CHECK: [[@LINE+1]]:3 s:FC14swift_ide_test6GenClsd{{$}}
   deinit {}
-  // CHECK: [[@LINE+1]]:14 s:ZFC14swift_ide_test6GenCls4cfoourFMGS0_q__FT_T_{{$}}
+  // CHECK: [[@LINE+1]]:14 s:ZFC14swift_ide_test6GenCls4cfooFT_T_{{$}}
   class func cfoo() {}
 
   // CHECK: [[@LINE+1]]:3 s:iC14swift_ide_test6GenCls9subscriptFTSiSi_Si{{$}}
@@ -118,14 +118,14 @@ class GenCls<T> {
 class C4 {
   // CHECK: [[@LINE+1]]:9 s:CC14swift_ide_test2C42In{{$}}
   class In {
-    // CHECK: [[@LINE+1]]:16 s:ZFCC14swift_ide_test2C42In3gooFMS1_FT_T_{{$}}
+    // CHECK: [[@LINE+1]]:16 s:ZFCC14swift_ide_test2C42In3gooFT_T_{{$}}
     class func goo() {}
   }
 }
 
 class C5 {}
 extension C5 {
-  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test2C55extFnFS0_FT_T_{{$}}
+  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test2C55extFnFT_T_{{$}}
   func extFn() {}
 }
 
@@ -152,9 +152,9 @@ class Observers {
 // CHECK: [[@LINE+2]]:7 s:C14swift_ide_test10ObjCClass1{{$}}
 @objc
 class ObjCClass1 {
-  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test10ObjCClass113instanceFunc1FS0_FSiT_{{$}}
+  // CHECK: [[@LINE+1]]:8 s:FC14swift_ide_test10ObjCClass113instanceFunc1FSiT_{{$}}
   func instanceFunc1(a: Int) {}
-  // CHECK: [[@LINE+1]]:14 s:ZFC14swift_ide_test10ObjCClass111staticFunc1FMS0_FSiT_{{$}}
+  // CHECK: [[@LINE+1]]:14 s:ZFC14swift_ide_test10ObjCClass111staticFunc1FSiT_{{$}}
   class func staticFunc1(a: Int) {}
 }
 
@@ -165,7 +165,7 @@ enum Suits {
   // CHECK: [[@LINE+1]]:8 s:FO14swift_ide_test5Suits8DiamondsFMS0_S0_{{$}}
   case Diamonds
 
-  // CHECK: [[@LINE+1]]:8 s:FO14swift_ide_test5Suits5enfooFS0_FT_T_{{$}}
+  // CHECK: [[@LINE+1]]:8 s:FO14swift_ide_test5Suits5enfooFT_T_{{$}}
   func enfoo() {}
 }
 

@@ -11,7 +11,7 @@ func onDestruct() { }
 class SwiftGizmo : Gizmo {
   var x = X()
 
-  // CHECK-LABEL: sil hidden @_TFC12objc_dealloc10SwiftGizmocfMS0_FT_S0_ : $@convention(method) (@owned SwiftGizmo) -> @owned SwiftGizmo
+  // CHECK-LABEL: sil hidden @_TFC12objc_dealloc10SwiftGizmoc
   // CHECK-NEXT: bb0([[SELF_PARAM:%[0-9]+]] : $SwiftGizmo):
   override init() {
     // CHECK:   [[SELF_UNINIT:%[0-9]+]] = mark_uninitialized [derivedselfonly]
@@ -55,7 +55,7 @@ class SwiftGizmo : Gizmo {
   // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : $SwiftGizmo):
   // CHECK-NEXT:   debug_value [[SELF_PARAM]] : $SwiftGizmo  // let self
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $SwiftGizmo
-  // CHECK:        [[XCTOR:%[0-9]+]] = function_ref @_TFC12objc_dealloc1XCfMS0_FT_S0_ : $@convention(thin) (@thick X.Type) -> @owned X
+  // CHECK:        [[XCTOR:%[0-9]+]] = function_ref @_TFC12objc_dealloc1XC
   // CHECK-NEXT:   [[XMETA:%[0-9]+]] = metatype $@thick X.Type
   // CHECK-NEXT:   [[XOBJ:%[0-9]+]] = apply [[XCTOR]]([[XMETA]]) : $@convention(thin) (@thick X.Type) -> @owned X
   // CHECK-NEXT:   [[X:%[0-9]+]] = ref_element_addr [[SELF]] : $SwiftGizmo, #SwiftGizmo.x

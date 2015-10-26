@@ -23,6 +23,6 @@ func closure_generic<T>(var f: T -> T, x: T) -> T {
 
   return bar(x)
 }
-// CHECK-LABEL: sil shared @_TFF19capture_typed_boxes15closure_genericurFTFq_q_1xq__q_L_3barfQ_Q_ : $@convention(thin) <T> (@out T, @in T, @owned @box @callee_owned (@out T, @in T) -> (), @inout @callee_owned (@out T, @in T) -> ()) -> () {
+// CHECK-LABEL: sil shared @_TFF19capture_typed_boxes15closure_generic{{.*}} : $@convention(thin) <T> (@out T, @in T, @owned @box @callee_owned (@out T, @in T) -> (), @inout @callee_owned (@out T, @in T) -> ()) -> () {
 // CHECK-LABEL: bb0(%0 : $*T, %1 : $*T, %2 : $@box @callee_owned (@out T, @in T) -> (), %3 : $*@callee_owned (@out T, @in T) -> ()):
 

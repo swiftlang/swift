@@ -16,14 +16,14 @@ func matchesEither(input input: Hive, a: Hive, b: Hive) -> Bool {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE2:bb[0-9]+]], [[NOT_CASE2:bb[0-9]+]]
   // CHECK: [[YES_CASE2]]:
   case a, b:
-  // CHECK:   function_ref @_TFSbCfMSbFT22_builtinBooleanLiteralBi1__Sb
+  // CHECK:   function_ref @_TFSbC
     return true
 
   // CHECK: [[NOT_CASE2]]:
   // CHECK:   br [[RET_FALSE:bb[0-9]+]]
   default:
   // CHECK: [[RET_FALSE]]:
-  // CHECK:   function_ref @_TFSbCfMSbFT22_builtinBooleanLiteralBi1__Sb
+  // CHECK:   function_ref @_TFSbC
     return false
   }
 }

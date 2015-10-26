@@ -6,9 +6,9 @@ import Foundation
 
 class C : Hive {}
 
-// CHECK-LABEL: sil private @_TTVFC34objc_implicitly_unwrapped_optional1DcfMS0_FT5coderCSo7NSCoder_S0_
+// CHECK-LABEL: sil private @_TTVFC34objc_implicitly_unwrapped_optional1Dc
 // CHECK: bb0(%0 : $ImplicitlyUnwrappedOptional<NSCoder>, %1 : $D):
-// CHECK:   [[THUNK:%.*]] = function_ref @_TFC34objc_implicitly_unwrapped_optional1DcfMS0_FT5coderCSo7NSCoder_S0_
+// CHECK:   [[THUNK:%.*]] = function_ref @_TFC34objc_implicitly_unwrapped_optional1Dc
 // CHECK:   [[REF:%.*]] = apply [[THUNK]]
 // CHECK:   [[RESULT:%.*]] = enum $ImplicitlyUnwrappedOptional<D>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[REF]] : $D
 // CHECK:   return [[RESULT]] : $ImplicitlyUnwrappedOptional<D>

@@ -19,6 +19,6 @@ doSomething2()
 // CHECK: sil [fragile] [noinline] [_semantics "stdlib_binary_only"] @{{.*}}doSomething3{{.*}}
 // CHECK-NOT: return
 
-// CHECK: sil {{.*}} @_TFVs1ACfMS_FT_S_
+// CHECK: sil {{.*}} @_TFVs1AC
 
 callDoSomething3()

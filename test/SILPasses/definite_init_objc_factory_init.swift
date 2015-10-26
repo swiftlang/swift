@@ -4,7 +4,7 @@
 
 import Foundation
 
-// CHECK-LABEL: sil shared @_TTOFCSo4HiveCfMS_FT5queenGSQCSo3Bee__GSQS__ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<Bee>, @thick Hive.Type) -> @owned ImplicitlyUnwrappedOptional<Hive>
+// CHECK-LABEL: sil shared @_TTOFCSo4HiveCfT5queenGSQCSo3Bee__GSQS__ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<Bee>, @thick Hive.Type) -> @owned ImplicitlyUnwrappedOptional<Hive>
 func testInstanceTypeFactoryMethod(queen: Bee) {
   // CHECK-NEXT: bb0([[QUEEN:%[0-9]+]] : $ImplicitlyUnwrappedOptional<Bee>, [[HIVE_META:%[0-9]+]] : $@thick Hive.Type):
   // CHECK-NEXT:   [[HIVE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[HIVE_META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
@@ -21,7 +21,7 @@ extension Hive {
   // initializer, not a convenience initializer, which means it does
   // not have an initializing entry point at all.
 
-  // CHECK-LABEL: sil hidden @_TFE31definite_init_objc_factory_initCSo4HivecfMS0_FT10otherQueenCSo3Bee_S0_ : $@convention(method) (@owned Bee, @owned Hive) -> @owned Hive
+  // CHECK-LABEL: sil hidden @_TFE31definite_init_objc_factory_initCSo4HivecfT10otherQueenCSo3Bee_S0_ : $@convention(method) (@owned Bee, @owned Hive) -> @owned Hive
   convenience init(otherQueen other: Bee) {
     // CHECK: [[SELF_ADDR:%[0-9]+]] = alloc_stack $Hive
     // CHECK: store [[OLD_SELF:%[0-9]+]] to [[SELF_ADDR]]#1

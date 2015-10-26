@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -disable-self-type-mangling %s | FileCheck %s --check-prefix=NO-SELF
 
 struct Foo<T> {
 }
@@ -27,18 +26,18 @@ extension Foo {
 
 extension Foo where T: Runcible {
   // A constrained extension always uses the extension mangling.
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1aSi
+  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1aSi
   var a: Int { return 0 }
 
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsR_S_8RunciblerVS_3Foog1bq_
+  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRxS_8RunciblerVS_3Foog1bx
   var b: T { get { } }
 }
 
 extension Foo where T: Runcible, T.Spoon: Runcible {
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsR_S_8Runciblew_5SpoonS0_rVS_3Foog1aSi
+  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRxS_8Runciblewx5SpoonS0_rVS_3Foog1aSi
   var a: Int { return 0 }
 
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsR_S_8Runciblew_5SpoonS0_rVS_3Foog1bq_
+  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRxS_8Runciblewx5SpoonS0_rVS_3Foog1bx
   var b: T { get { } }
 }
 
@@ -49,13 +48,11 @@ extension Foo where T: Runcible, T.Spoon: Runcible {
 // declaration, so we would no longer want to use the extension mangling
 // in unconstrained cases.
 extension Runcible {
-  // CHECK-LABEL: sil hidden @_TFE27mangling_generic_extensionsPS_8Runcible5runceuR_S0_rfq_FT_T_
-  // NO-SELF-LABEL: sil hidden @_TFE27mangling_generic_extensionsPS_8Runcible5runcefT_T_
+  // CHECK-LABEL: sil hidden @_TFE27mangling_generic_extensionsPS_8Runcible5runcefT_T_
   func runce() {}
 }
 
 extension Runcible where Self.Spoon == Self.Hat {
-  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsR_S_8Runciblew_3Hatzw_5SpoonrS0_5runceuR_S0_w_S1_zw_S2_rfq_FT_T_
-  // NO-SELF-LABEL: sil hidden @_TFe27mangling_generic_extensionsR_S_8Runciblew_3Hatzw_5SpoonrS0_5runcefT_T_
+  // CHECK-LABEL: sil hidden @_TFe27mangling_generic_extensionsRxS_8Runciblewx3Hatzwx5SpoonrS0_5runcefT_T_
   func runce() {}
 }

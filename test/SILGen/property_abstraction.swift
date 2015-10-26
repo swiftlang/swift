@@ -14,7 +14,7 @@ struct Foo<T, U> {
 // CHECK:         bb0([[X_ORIG:%.*]] : $Foo<Int, Int>):
 // CHECK:         [[F_ORIG:%.*]] = struct_extract [[X_ORIG]] : $Foo<Int, Int>, #Foo.f
 // CHECK:         strong_retain [[F_ORIG]]
-// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_iV20property_abstraction3Int_iS0__XFo_dS0__dS0__ : $@convention(thin) (Int, @owned @callee_owned (@out Int, @in Int) -> ()) -> Int
+// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
 // CHECK:         [[F_SUBST:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
 // CHECK:         return [[F_SUBST]]
 func getF(x: Foo<Int, Int>) -> Int -> Int {
@@ -22,7 +22,7 @@ func getF(x: Foo<Int, Int>) -> Int -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF20property_abstraction4setF
-// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_dV20property_abstraction3Int_dS0__XFo_iS0__iS0__ : $@convention(thin) (@out Int, @in Int, @owned @callee_owned (Int) -> Int) -> ()
+// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]({{%.*}})
 // CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
@@ -37,12 +37,12 @@ func inOutFunc(inout f: (Int -> Int)) { }
 // CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
 // CHECK:         [[F_SUBST_MAT:%.*]] = alloc_stack
 // CHECK:         [[F_ORIG:%.*]] = load [[F_ADDR]]
-// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_iV20property_abstraction3Int_iS0__XFo_dS0__dS0__ : $@convention(thin) (Int, @owned @callee_owned (@out Int, @in Int) -> ()) -> Int
+// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
 // CHECK:         [[F_SUBST_IN:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
 // CHECK:         store [[F_SUBST_IN]] to [[F_SUBST_MAT]]
 // CHECK:         apply [[INOUTFUNC]]([[F_SUBST_MAT]]#1)
 // CHECK:         [[F_SUBST_OUT:%.*]] = load [[F_SUBST_MAT]]
-// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_dV20property_abstraction3Int_dS0__XFo_iS0__iS0__ : $@convention(thin) (@out Int, @in Int, @owned @callee_owned (Int) -> Int) -> ()
+// CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTR
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_SUBST_OUT]])
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
 func inOutF(var x: Foo<Int, Int>) {
@@ -65,7 +65,7 @@ struct AddressOnlyLet<T> {
   let makeAddressOnly: P
 }
 
-// CHECK-LABEL: sil hidden @_TF20property_abstraction34getAddressOnlyReabstractedPropertyFGVS_14AddressOnlyLetVS_3Int_FS1_S1_ : $@convention(thin) (@in AddressOnlyLet<Int>) -> @owned @callee_owned (Int) -> Int
+// CHECK-LABEL: sil hidden @_TF20property_abstraction34getAddressOnlyReabstractedProperty{{.*}} : $@convention(thin) (@in AddressOnlyLet<Int>) -> @owned @callee_owned (Int) -> Int
 // CHECK:         [[CLOSURE_ADDR:%.*]] = struct_element_addr {{%.*}} : $*AddressOnlyLet<Int>, #AddressOnlyLet.f
 // CHECK:         [[CLOSURE_ORIG:%.*]] = load [[CLOSURE_ADDR]]
 // CHECK:         [[REABSTRACT:%.*]] = function_ref
@@ -99,7 +99,7 @@ typealias Test20341012 = (title: (), action: () -> ())
 struct T20341012 {
     private var options: ArrayLike<Test20341012> { get {} set {} }
 
-    // CHECK-LABEL: sil hidden @_TFV20property_abstraction9T203410121tfRS0_FT_T_
+    // CHECK-LABEL: sil hidden @_TFV20property_abstraction9T203410121t{{.*}}
     // CHECK:         [[TMP1:%.*]] = alloc_stack $(title: (), action: @callee_owned (@out (), @in ()) -> ())
     // CHECK:         store {{.*}} to [[TMP1]]
     mutating func t() {
@@ -118,12 +118,12 @@ protocol Factory {
 func setBuilder<F: Factory where F.Product == MyClass>(inout factory: F) {
   factory.builder = { return MyClass() }
 }
-// CHECK: sil hidden @_TF20property_abstraction10setBuilderuR_S_7Factoryw_7ProductzCS_7MyClassrFRq_T_ : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
+// CHECK: sil hidden @_TF20property_abstraction10setBuilder{{.*}} : $@convention(thin) <F where F : Factory, F.Product == MyClass> (@inout F) -> ()
 // CHECK: bb0(%0 : $*F):
 // CHECK:   [[FACTORY:%.*]] = alloc_box $F
-// CHECK:   [[F0:%.*]] = function_ref @_TFF20property_abstraction10setBuilderuR_S_7Factoryw_7ProductzCS_7MyClassrFRq_T_U_FT_S2_ : $@convention(thin) () -> @owned MyClass
+// CHECK:   [[F0:%.*]] = function_ref @_TFF20property_abstraction10setBuilder{{.*}} : $@convention(thin) () -> @owned MyClass
 // CHECK:   [[F1:%.*]] = thin_to_thick_function [[F0]]
 // CHECK:   [[SETTER:%.*]] = witness_method $F, #Factory.builder!setter.1
-// CHECK:   [[REABSTRACTOR:%.*]] = function_ref @_TTRGR_20property_abstraction7Factoryw_7ProductzCS_7MyClassrXFo__oS2__XFo__iS2__
+// CHECK:   [[REABSTRACTOR:%.*]] = function_ref @_TTR
 // CHECK:   [[F2:%.*]] = partial_apply [[REABSTRACTOR]]<F>([[F1]])
 // CHECK:   apply [[SETTER]]<F, MyClass>([[F2]], [[FACTORY]]#1)

@@ -47,7 +47,7 @@ func zim(inout x x: Foo)(inout y: Foo) -> (inout z: Foo) -> () {
 
 // Writeback to value type 'self' argument
 x.foo()
-// CHECK: [[FOO:%.*]] = function_ref @_TFV9writeback3Foo3foofRS0_FT_T_ : $@convention(method) (@inout Foo) -> ()
+// CHECK: [[FOO:%.*]] = function_ref @_TFV9writeback3Foo3foo{{.*}} : $@convention(method) (@inout Foo) -> ()
 // CHECK: [[X_TEMP:%.*]] = alloc_stack $Foo
 // CHECK: [[GET_X:%.*]] = function_ref @_TF9writebackg1xVS_3Foo : $@convention(thin) () -> Foo
 // CHECK: [[X:%.*]] = apply [[GET_X]]() : $@convention(thin) () -> Foo
@@ -164,7 +164,7 @@ protocol Frobable {
   var anse: Anse { get set }
 }
 
-// CHECK-LABEL: sil hidden @_TF9writeback12test_genericuR_S_8RunciblerFT5runceRq_4anseW_4Frob4Anse__T_ 
+// CHECK-LABEL: sil hidden @_TF9writeback12test_generic 
 // CHECK:         witness_method $Runce, #Runcible.frob!materializeForSet.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!setter.1
 func test_generic<Runce: Runcible>(inout runce runce: Runce, anse: Runce.Frob.Anse) {
@@ -180,7 +180,7 @@ func loadAddressOnly() -> Fungible {
   return addressOnly
 }
 
-// CHECK-LABEL: sil hidden @_TF9writeback10loadMemberuR_S_8RunciblerFT5runceq__W_4Frob4Anse_
+// CHECK-LABEL: sil hidden @_TF9writeback10loadMember
 // CHECK:         witness_method $Runce, #Runcible.frob!getter.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!getter.1
 // CHECK-NOT:     witness_method $Runce.Frob, #Frobable.anse!setter.1

@@ -4,7 +4,7 @@ class C {
   var member: Int = 0
 
   // Methods have method calling convention.
-  // CHECK-LABEL: sil hidden @_TFC5types1C3foofS0_FT1xSi_T_ : $@convention(method) (Int, @guaranteed C) -> () {
+  // CHECK-LABEL: sil hidden @_TFC5types1C3foo{{.*}} : $@convention(method) (Int, @guaranteed C) -> () {
   func foo(x x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $C):
     member = x
@@ -33,14 +33,14 @@ struct S {
   }
 
   class SC {
-    // CHECK-LABEL: sil hidden  @_TFCV5types1S2SC3barfS1_FT_T_
+    // CHECK-LABEL: sil hidden  @_TFCV5types1S2SC3bar{{.*}}
     func bar() {}
   }
 }
 
 func f() {
   class FC {
-    // CHECK-LABEL: sil shared @_TFCF5types1fFT_T_L_2FC3zimfS0_FT_T_
+    // CHECK-LABEL: sil shared @_TFCF5types1fFT_T_L_2FC3zim{{.*}}
     func zim() {}
   }
 }
@@ -48,12 +48,12 @@ func f() {
 func g(b b : Bool) {
   if (b) {
     class FC {
-      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L_2FC3zimfS0_FT_T_
+      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L_2FC3zim{{.*}}
       func zim() {}
     }
   } else {
     class FC {
-      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L0_2FC3zimfS0_FT_T_
+      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L0_2FC3zim{{.*}}
       func zim() {}
     }
   }

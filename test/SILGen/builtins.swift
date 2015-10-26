@@ -465,13 +465,13 @@ func reinterpretCast(c: C, x: Builtin.Word) -> (Builtin.Word, D, C?, C) {
           Builtin.reinterpretCast(x) as C)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins19reinterpretAddrOnlyu0_rFq_q0_
+// CHECK-LABEL: sil hidden @_TF8builtins19reinterpretAddrOnly
 func reinterpretAddrOnly<T, U>(t: T) -> U {
   // CHECK: unchecked_addr_cast {{%.*}} : $*T to $*U
   return Builtin.reinterpretCast(t)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins28reinterpretAddrOnlyToTrivialurFq_Si
+// CHECK-LABEL: sil hidden @_TF8builtins28reinterpretAddrOnlyToTrivial
 func reinterpretAddrOnlyToTrivial<T>(t: T) -> Int {
   // CHECK: [[ADDR:%.*]] = unchecked_addr_cast [[INPUT:%.*]] : $*T to $*Int
   // CHECK: [[VALUE:%.*]] = load [[ADDR]]
@@ -479,7 +479,7 @@ func reinterpretAddrOnlyToTrivial<T>(t: T) -> Int {
   return Builtin.reinterpretCast(t)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins27reinterpretAddrOnlyLoadableurFTSiq__Tq_Si_
+// CHECK-LABEL: sil hidden @_TF8builtins27reinterpretAddrOnlyLoadable
 func reinterpretAddrOnlyLoadable<T>(a: Int, _ b: T) -> (T, Int) {
   // CHECK: [[BUF:%.*]] = alloc_stack $Int
   // CHECK: store {{%.*}} to [[BUF]]#1
@@ -491,27 +491,27 @@ func reinterpretAddrOnlyLoadable<T>(a: Int, _ b: T) -> (T, Int) {
           Builtin.reinterpretCast(b) as Int)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins18castToBridgeObjectFTCS_1CBw_Bb
+// CHECK-LABEL: sil hidden @_TF8builtins18castToBridgeObject
 // CHECK:         [[BO:%.*]] = ref_to_bridge_object {{%.*}} : $C, {{%.*}} : $Builtin.Word
 // CHECK:         return [[BO]]
 func castToBridgeObject(c: C, _ w: Builtin.Word) -> Builtin.BridgeObject {
   return Builtin.castToBridgeObject(c, w)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins23castRefFromBridgeObjectFBbCS_1C
+// CHECK-LABEL: sil hidden @_TF8builtins23castRefFromBridgeObject
 // CHECK:         bridge_object_to_ref [[BO:%.*]] : $Builtin.BridgeObject to $C
 func castRefFromBridgeObject(bo: Builtin.BridgeObject) -> C {
   return Builtin.castReferenceFromBridgeObject(bo)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins30castBitPatternFromBridgeObjectFBbBw
+// CHECK-LABEL: sil hidden @_TF8builtins30castBitPatternFromBridgeObject
 // CHECK:         bridge_object_to_word [[BO:%.*]] : $Builtin.BridgeObject to $Builtin.Word
 // CHECK:         release [[BO]]
 func castBitPatternFromBridgeObject(bo: Builtin.BridgeObject) -> Builtin.Word {
   return Builtin.castBitPatternFromBridgeObject(bo)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins14markDependenceFTVS_7PointerPS_10ClassProto__S0_ : $@convention(thin) (Pointer, @owned ClassProto) -> Pointer {
+// CHECK-LABEL: sil hidden @_TF8builtins14markDependence
 // CHECK:         [[T0:%.*]] = mark_dependence %0 : $Pointer on %1 : $ClassProto
 // CHECK-NEXT:    strong_release %1 : $ClassProto
 // CHECK-NEXT:    return [[T0]] : $Pointer
@@ -519,7 +519,7 @@ func markDependence(v: Pointer, _ base: ClassProto) -> Pointer {
   return Builtin.markDependence(v, base)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins8pinUnpinFBoT_ :
+// CHECK-LABEL: sil hidden @_TF8builtins8pinUnpin
 // CHECK-NEXT:  bb0(%0 : $Builtin.NativeObject):
 // CHECK-NEXT:    debug_value
 func pinUnpin(object : Builtin.NativeObject) {
@@ -540,7 +540,7 @@ func pinUnpin(object : Builtin.NativeObject) {
 // CHECK-NEXT:    return [[T0]] : $()
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins19allocateValueBufferFRBBBp : $@convention(thin) (@inout Builtin.UnsafeValueBuffer) -> Builtin.RawPointer
+// CHECK-LABEL: sil hidden @_TF8builtins19allocateValueBuffer
 // CHECK-NEXT:  bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    [[T0:%.*]] = alloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
@@ -550,7 +550,7 @@ func allocateValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.Raw
   return Builtin.allocValueBuffer(&buffer, Int.self)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins18projectValueBufferFRBBBp : $@convention(thin) (@inout Builtin.UnsafeValueBuffer) -> Builtin.RawPointer
+// CHECK-LABEL: sil hidden @_TF8builtins18projectValueBuffer
 // CHECK-NEXT:  bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    [[T0:%.*]] = project_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
@@ -560,7 +560,7 @@ func projectValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.RawP
   return Builtin.projectValueBuffer(&buffer, Int.self)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins18deallocValueBufferFRBBT_ : $@convention(thin) (@inout Builtin.UnsafeValueBuffer) -> ()
+// CHECK-LABEL: sil hidden @_TF8builtins18deallocValueBuffer
 // CHECK-NEXT:  bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    dealloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
@@ -576,7 +576,7 @@ func deallocValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> () {
 // ----------------------------------------------------------------------------
 
 // NativeObject
-// CHECK-LABEL: sil hidden @_TF8builtins8isUniqueFRGSqBo_Sb : $@convention(thin) (@inout Optional<Builtin.NativeObject>) -> Bool
+// CHECK-LABEL: sil hidden @_TF8builtins8isUnique
 // CHECK-NEXT: bb0(%0 : $*Optional<Builtin.NativeObject>):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Optional<Builtin.NativeObject>
 // CHECK-NEXT: copy_addr %0 to [initialization] [[BOX]]#1 : $*Optional<Builtin.NativeObject>
@@ -589,7 +589,7 @@ func isUnique(inout ref: Builtin.NativeObject?) -> Bool {
 }
 
 // NativeObject nonNull
-// CHECK-LABEL: sil hidden @_TF8builtins8isUniqueFRBoSb : $@convention(thin) (@inout Builtin.NativeObject) -> Bool
+// CHECK-LABEL: sil hidden @_TF8builtins8isUnique
 // CHECK-NEXT: bb0(%0 : $*Builtin.NativeObject):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.NativeObject
 // CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.NativeObject
@@ -602,7 +602,7 @@ func isUnique(inout ref: Builtin.NativeObject) -> Bool {
 }
 
 // NativeObject pinned
-// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinnedFRGSqBo_Sb : $@convention(thin) (@inout Optional<Builtin.NativeObject>) -> Bool
+// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinned
 // CHECK: bb0(%0 : $*Optional<Builtin.NativeObject>):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Optional<Builtin.NativeObject>
 // CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Optional<Builtin.NativeObject>
@@ -615,7 +615,7 @@ func isUniqueOrPinned(inout ref: Builtin.NativeObject?) -> Bool {
 }
 
 // NativeObject pinned nonNull
-// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinnedFRBoSb : $@convention(thin) (@inout Builtin.NativeObject) -> Bool
+// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinned
 // CHECK: bb0(%0 : $*Builtin.NativeObject):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.NativeObject
 // CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.NativeObject
@@ -628,7 +628,7 @@ func isUniqueOrPinned(inout ref: Builtin.NativeObject) -> Bool {
 }
 
 // UnknownObject (ObjC)
-// CHECK-LABEL: sil hidden @_TF8builtins8isUniqueFRGSqBO_Sb : $@convention(thin) (@inout Optional<Builtin.UnknownObject>) -> Bool
+// CHECK-LABEL: sil hidden @_TF8builtins8isUnique
 // CHECK: bb0(%0 : $*Optional<Builtin.UnknownObject>):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Optional<Builtin.UnknownObject>
 // CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Optional<Builtin.UnknownObject>
@@ -641,7 +641,7 @@ func isUnique(inout ref: Builtin.UnknownObject?) -> Bool {
 }
 
 // UnknownObject (ObjC) nonNull
-// CHECK-LABEL: sil hidden @_TF8builtins8isUniqueFRBOSb : $@convention(thin) (@inout Builtin.UnknownObject) -> Bool
+// CHECK-LABEL: sil hidden @_TF8builtins8isUnique
 // CHECK: bb0(%0 : $*Builtin.UnknownObject):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.UnknownObject
 // CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.UnknownObject
@@ -654,7 +654,7 @@ func isUnique(inout ref: Builtin.UnknownObject) -> Bool {
 }
 
 // UnknownObject (ObjC) pinned nonNull
-// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinnedFRBOSb : $@convention(thin) (@inout Builtin.UnknownObject) -> Bool
+// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinned
 // CHECK: bb0(%0 : $*Builtin.UnknownObject):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.UnknownObject
 // CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.UnknownObject
@@ -667,7 +667,7 @@ func isUniqueOrPinned(inout ref: Builtin.UnknownObject) -> Bool {
 }
 
 // BridgeObject nonNull
-// CHECK-LABEL: sil hidden @_TF8builtins8isUniqueFRBbSb : $@convention(thin) (@inout Builtin.BridgeObject) -> Bool
+// CHECK-LABEL: sil hidden @_TF8builtins8isUnique
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.BridgeObject
 // CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.BridgeObject
@@ -680,7 +680,7 @@ func isUnique(inout ref: Builtin.BridgeObject) -> Bool {
 }
 
 // BridgeObject pinned nonNull
-// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinnedFRBbSb : $@convention(thin) (@inout Builtin.BridgeObject) -> Bool
+// CHECK-LABEL: sil hidden @_TF8builtins16isUniqueOrPinned
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.BridgeObject
 // CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.BridgeObject
@@ -693,7 +693,7 @@ func isUniqueOrPinned(inout ref: Builtin.BridgeObject) -> Bool {
 }
 
 // BridgeObject nonNull native
-// CHECK-LABEL: sil hidden @_TF8builtins15isUnique_nativeFRBbSb : $@convention(thin) (@inout Builtin.BridgeObject) -> Bool
+// CHECK-LABEL: sil hidden @_TF8builtins15isUnique_native
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.BridgeObject
 // CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.BridgeObject
@@ -707,7 +707,7 @@ func isUnique_native(inout ref: Builtin.BridgeObject) -> Bool {
 }
 
 // BridgeObject pinned nonNull native
-// CHECK-LABEL: sil hidden @_TF8builtins23isUniqueOrPinned_nativeFRBbSb : $@convention(thin) (@inout Builtin.BridgeObject) -> Bool
+// CHECK-LABEL: sil hidden @_TF8builtins23isUniqueOrPinned_native
 // CHECK: bb0(%0 : $*Builtin.BridgeObject):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.BridgeObject
 // CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.BridgeObject
@@ -728,33 +728,33 @@ class A {}
 protocol PUnknown {}
 protocol PClass : class {}
 
-// CHECK-LABEL: sil hidden @_TF8builtins19refcast_generic_anyurFq_Ps9AnyObject_
+// CHECK-LABEL: sil hidden @_TF8builtins19refcast_generic_any
 // CHECK: unchecked_ref_cast_addr  T in %{{.*}}#1 : $*T to AnyObject in %{{.*}}#1 : $*AnyObject
 func refcast_generic_any<T>(o: T) -> AnyObject {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins17refcast_class_anyFCS_1APs9AnyObject_
+// CHECK-LABEL: sil hidden @_TF8builtins17refcast_class_any
 // CHECK: unchecked_ref_cast %0 : $A to $AnyObject
 // CHECK-NEXT: return
 func refcast_class_any(o: A) -> AnyObject {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins20refcast_punknown_anyFPS_8PUnknown_Ps9AnyObject_
+// CHECK-LABEL: sil hidden @_TF8builtins20refcast_punknown_any
 // CHECK: unchecked_ref_cast_addr PUnknown in %{{.*}}#1 : $*PUnknown to AnyObject in %{{.*}}#1 : $*AnyObject
 func refcast_punknown_any(o: PUnknown) -> AnyObject {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins18refcast_pclass_anyFPS_6PClass_Ps9AnyObject_
+// CHECK-LABEL: sil hidden @_TF8builtins18refcast_pclass_any
 // CHECK: unchecked_ref_cast %0 : $PClass to $AnyObject
 // CHECK-NEXT: return
 func refcast_pclass_any(o: PClass) -> AnyObject {
   return Builtin.castReference(o)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins20refcast_any_punknownFPs9AnyObject_PS_8PUnknown_
+// CHECK-LABEL: sil hidden @_TF8builtins20refcast_any_punknown
 // CHECK: unchecked_ref_cast_addr AnyObject in %{{.*}}#1 : $*AnyObject to PUnknown in %{{.*}}#1 : $*PUnknown
 func refcast_any_punknown(o: AnyObject) -> PUnknown {
   return Builtin.castReference(o)

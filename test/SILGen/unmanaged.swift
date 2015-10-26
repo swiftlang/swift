@@ -6,7 +6,7 @@ struct Holder {
   unowned(unsafe) var value: C
 }
 _ = Holder(value: C())
-// CHECK-LABEL:sil hidden @_TFV9unmanaged6HolderCfMS0_FT5valueCS_1C_S0_ : $@convention(thin) (@owned C, @thin Holder.Type) -> Holder
+// CHECK-LABEL:sil hidden @_TFV9unmanaged6HolderC{{.*}} : $@convention(thin) (@owned C, @thin Holder.Type) -> Holder
 // CHECK-NEXT: bb0([[T0:%.*]] : $C,
 // CHECK-NEXT:   [[T1:%.*]] = ref_to_unmanaged [[T0]] : $C to $@sil_unmanaged C
 // CHECK-NEXT:   strong_release [[T0]] : $C
@@ -18,7 +18,7 @@ func set(inout holder holder: Holder) {
 }
 // CHECK-LABEL:sil hidden @_TF9unmanaged3setFT6holderRVS_6Holder_T_ : $@convention(thin) (@inout Holder) -> ()
 // CHECK-NEXT: bb0([[ADDR:%.*]] : $*Holder):
-// CHECK:        [[T0:%.*]] = function_ref @_TFC9unmanaged1CCfMS0_FT_S0_
+// CHECK:        [[T0:%.*]] = function_ref @_TFC9unmanaged1CC{{.*}}
 // CHECK:        [[C:%.*]] = apply [[T0]](
 // CHECK-NEXT:   [[T0:%.*]] = struct_element_addr [[ADDR]] : $*Holder, #Holder.value
 // CHECK-NEXT:   [[T1:%.*]] = ref_to_unmanaged [[C]]

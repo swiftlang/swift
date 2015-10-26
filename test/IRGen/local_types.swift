@@ -64,7 +64,7 @@ public struct NominalIfConfig {
   }
   #else
   public func method() {
-    // CHECK-DAG: @_TMmCFV11local_types15NominalIfConfig6methodFS0_FT_T_L_17LocalClassEnabled = hidden global %objc_class
+    // CHECK-DAG: @_TMmCFV11local_types15NominalIfConfig6methodFT_T_L_17LocalClassEnabled = hidden global %objc_class
     class LocalClassEnabled {}
   }
   #endif

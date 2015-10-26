@@ -28,9 +28,9 @@ func foo(var f f: (()->())!) {
 
 func wrap<T>(x x: T) -> T! { return x }
 
-// CHECK-LABEL: sil hidden @_TF29implicitly_unwrapped_optional16wrap_then_unwrapurFT1xq__q_
+// CHECK-LABEL: sil hidden @_TF29implicitly_unwrapped_optional16wrap_then_unwrap
 func wrap_then_unwrap<T>(x x: T) -> T {
-  // CHECK: [[FORCE:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
+  // CHECK: [[FORCE:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
   // CHECK: apply [[FORCE]]<{{.*}}>(%0, {{%.*}})
   return wrap(x: x)!
 }

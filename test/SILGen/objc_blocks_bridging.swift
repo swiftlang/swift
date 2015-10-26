@@ -35,9 +35,9 @@ import Foundation
     return f(x)
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC20objc_blocks_bridging3Foo16cFunctionPointerfS0_FTcSiSi1xSi_Si : $@convention(objc_method) (@convention(c) (Int) -> Int, Int, Foo) -> Int
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC20objc_blocks_bridging3Foo16cFunctionPointer
   // CHECK:       bb0([[F:%.*]] : $@convention(c) (Int) -> Int, [[X:%.*]] : $Int, [[SELF:%.*]] : $Foo):
-  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo16cFunctionPointerfS0_FTcSiSi1xSi_Si
+  // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC20objc_blocks_bridging3Foo16cFunctionPointer
   // CHECK:         apply [[NATIVE]]([[F]], [[X]], [[SELF]])
   dynamic func cFunctionPointer(fp: @convention(c) Int -> Int, x: Int) -> Int {
     fp(x)
@@ -58,7 +58,7 @@ import Foundation
     return f?(x)
   }
 
-  // CHECK-LABEL: sil hidden @_TFC20objc_blocks_bridging3Foo19optCFunctionPointerfS0_FTGSqcSSSS_1xSS_GSqSS_
+  // CHECK-LABEL: sil hidden @_TFC20objc_blocks_bridging3Foo19optCFunctionPointer
   // CHECK:         [[FP_BUF:%.*]] = unchecked_enum_data %0
   dynamic func optCFunctionPointer(fp: (@convention(c) String -> String)?, x: String) -> String? {
     return fp?(x)
@@ -112,7 +112,7 @@ func clearDraggingItemImageComponentsProvider(x: NSDraggingItem) {
   x.imageComponentsProvider = {}
 }
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo__oGSaPs9AnyObject___XFdCb__aGSqCSo7NSArray__
-// CHECK:         [[CONVERT:%.*]] = function_ref @_TF10Foundation22_convertArrayToNSArrayurFGSaq__CSo7NSArray
+// CHECK:         [[CONVERT:%.*]] = function_ref @_TF10Foundation22_convertArrayToNSArray
 // CHECK:         [[CONVERTED:%.*]] = apply [[CONVERT]]
 // CHECK:         [[OPTIONAL:%.*]] = enum $Optional<NSArray>, #Optional.Some!enumelt.1, [[CONVERTED]]
 // CHECK:         autorelease_return [[OPTIONAL]]

@@ -274,14 +274,14 @@ e_nay:
 
 @objc class OA {}
 sil_vtable OA {}
-sil hidden @_TToFC5casts2OAcfMS0_FT_S0_ : $@convention(thin) (OA) -> OA {
+sil hidden @_TToFC5casts2OAcfT_S0_ : $@convention(thin) (OA) -> OA {
 entry(%x : $OA):
   return %x : $OA
 }
 
 @objc class OB {}
 sil_vtable OB {}
-sil hidden_external @_TToFC5casts2OBcfMS0_FT_S0_ : $@convention(thin) (OB) -> OB {
+sil hidden_external @_TToFC5casts2OBcfT_S0_ : $@convention(thin) (OB) -> OB {
 entry(%x : $OB):
   return %x : $OB
 }

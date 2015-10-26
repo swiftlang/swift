@@ -171,19 +171,19 @@ public func testFunctionPointerMethods(x: Test) {
 }
 
 class NewClass : NSObject {
-  // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass12takesClosurefS0_FFSbSbT_ : $@convention(method) (@owned @callee_owned (Bool) -> Bool, @guaranteed NewClass) -> () {
-  // CHECK-OBJCBOOL-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass12takesClosurefS0_FFSbSbT_ : $@convention(objc_method) (@convention(block) (ObjCBool) -> ObjCBool, NewClass) -> () {
+  // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass12takesClosure
+  // CHECK-OBJCBOOL-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass12takesClosure
   func takesClosure(_: (Bool) -> Bool) {}
 
-  // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass15takesCBoolBlockfS0_FbSbSbT_ : $@convention(method) (@owned @convention(block) (Bool) -> Bool, @guaranteed NewClass) -> () {
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass15takesCBoolBlockfS0_FbSbSbT_ : $@convention(objc_method) (@convention(block) (Bool) -> Bool, NewClass) -> () {
+  // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass15takesCBoolBlock
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass15takesCBoolBlock
   func takesCBoolBlock(_: @convention(block) (Bool) -> Bool) {}
 
-  // CHECK-OBJCBOOL-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass18takesObjCBoolBlockfS0_FbV10ObjectiveC8ObjCBoolS2_T_ : $@convention(method) (@owned @convention(block) (ObjCBool) -> ObjCBool, @guaranteed NewClass) -> () {
-  // CHECK-OBJCBOOL-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass18takesObjCBoolBlockfS0_FbV10ObjectiveC8ObjCBoolS2_T_ : $@convention(objc_method) (@convention(block) (ObjCBool) -> ObjCBool, NewClass) -> () {
+  // CHECK-OBJCBOOL-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass18takesObjCBoolBlock
+  // CHECK-OBJCBOOL-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass18takesObjCBoolBlock
   func takesObjCBoolBlock(_: @convention(block) (ObjCBool) -> ObjCBool) {}
 
-  // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass23takesDarwinBooleanBlockfS0_FbV6Darwin13DarwinBooleanS2_T_ : $@convention(method) (@owned @convention(block) (DarwinBoolean) -> DarwinBoolean, @guaranteed NewClass) -> () {
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass23takesDarwinBooleanBlockfS0_FbV6Darwin13DarwinBooleanS2_T_ : $@convention(objc_method) (@convention(block) (DarwinBoolean) -> DarwinBoolean, NewClass) -> () {
+  // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass23takesDarwinBooleanBlock
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC18objc_bool_bridging8NewClass23takesDarwinBooleanBlock
   func takesDarwinBooleanBlock(_: @convention(block) (DarwinBoolean) -> DarwinBoolean) {}
 }

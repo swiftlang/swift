@@ -4,7 +4,7 @@ func markUsed<T>(t: T) {}
 
 class A {
   var a : A?
-  // CHECK: define {{.*}}1AcfMS0_FT_S0_
+  // CHECK: define {{.*}}1AcfT_S0_
   init() {
     // This store that sets up the stack slot should be on line 0 so
     // the debugger may skip ahead.

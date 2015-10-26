@@ -344,11 +344,8 @@ void Mangler::mangleModule(const Module *module) {
 }
 
 /// Bind the generic parameters from the given list and its parents.
-///
-/// \param mangle if true, also emit the mangling for a 'generics'
 void Mangler::bindGenericParameters(CanGenericSignature sig,
-                                    const GenericParamList *genericParams,
-                                    bool mangle = false) {
+                                    const GenericParamList *genericParams) {
   if (sig)
     CurGenericSignature = sig;
   assert(genericParams);
@@ -369,50 +366,9 @@ void Mangler::bindGenericParameters(CanGenericSignature sig,
            (Archetypes[archetype].Depth == info.Depth &&
             Archetypes[archetype].Index == info.Index));
     Archetypes.insert(std::make_pair(archetype, info));
-
-    if (!mangle) continue;
-
-    // Mangle this type parameter.
-    //   <generic-parameter> ::= <protocol-list> _
-    // FIXME: Only mangle the archetypes and protocol requirements
-    // that matter, rather than everything.
-    mangleProtocolList(archetype->getConformsTo());
-    Buffer << '_';
   }
-  
-  if (!mangle)
-    return;
-  
-  auto assocTypes = genericParams->getAssociatedArchetypes();
-  if (!assocTypes.empty()) {
-    // Mangle the associated types.
-    Buffer << 'U';
-    
-    for (auto *assocType : assocTypes) {
-      mangleProtocolList(assocType->getConformsTo());
-      Buffer << '_';
-    }
-  }
-  Buffer << '_';
 }
 
-void Mangler::manglePolymorphicType(const GenericParamList *genericParams,
-                                    Type T, ResilienceExpansion explosion,
-                                    unsigned uncurryLevel,
-                                    bool mangleAsFunction) {
-  assert((DWARFMangling || T->isCanonical()) &&
-         "expecting canonical types when not mangling for the debugger");
-
-  // FIXME: Prefix?
-  bindGenericParameters(nullptr, genericParams, /*mangle*/ true);
-
-  if (mangleAsFunction)
-    mangleFunctionType(dyn_cast<AnyFunctionType>(T.getPointer()), explosion,
-                       uncurryLevel);
-  else
-    mangleType(T, explosion, uncurryLevel);
-}
-        
 static OperatorFixity getDeclFixity(const ValueDecl *decl) {
   if (!decl->getName().isOperator())
     return OperatorFixity::NotOperator;
@@ -487,7 +443,7 @@ static void bindAllGenericParameters(Mangler &mangler,
     return;
   }
   bindAllGenericParameters(mangler, nullptr, generics->getOuterParameters());
-  mangler.bindGenericParameters(sig, generics, /*mangle*/ false);
+  mangler.bindGenericParameters(sig, generics);
 }
 
 void Mangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
@@ -646,7 +602,8 @@ Type Mangler::getDeclTypeForMangling(const ValueDecl *decl,
 
   // Shed the 'self' type and generic requirements from method manglings.
   if (C.LangOpts.DisableSelfTypeMangling
-      && isMethodDecl(decl)) {
+      && isMethodDecl(decl)
+      && type && !type->is<ErrorType>()) {
 
     // Drop the Self argument clause from the type.
     type = type->castTo<AnyFunctionType>()->getResult();
@@ -766,8 +723,8 @@ void Mangler::mangleGenericSignatureParts(
   };
   
   // As a special case, mangle nothing if there's a single generic parameter
-  // at depth 0.
-  if (params.size() == 1 && params[0]->getDepth() == 0)
+  // at the initial depth.
+  if (params.size() == 1 && params[0]->getDepth() == initialParamDepth)
     goto mangle_requirements;
   
   for (auto param : params) {
@@ -857,8 +814,14 @@ void Mangler::mangleGenericParamIndex(GenericTypeParamType *paramTy) {
   if (paramTy->getDepth() > 0) {
     Buffer << 'd';
     Buffer << Index(paramTy->getDepth() - 1);
+    Buffer << Index(paramTy->getIndex());
+    return;
   }
-  Buffer << Index(paramTy->getIndex());
+  if (paramTy->getIndex() == 0) {
+    Buffer << 'x';
+    return;
+  }
+  Buffer << Index(paramTy->getIndex() - 1);
 }
 
 void Mangler::mangleAssociatedTypeName(DependentMemberType *dmt,
@@ -1130,16 +1093,8 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     return;
   }
 
-  case TypeKind::PolymorphicFunction: {
-    // <type> ::= U <generic-parameter>+ _ <type>
-    // 'U' is for "universal qualification".
-    // The nested type is always a function type.
-    auto fn = cast<PolymorphicFunctionType>(tybase);
-    Buffer << 'U';
-    manglePolymorphicType(&fn->getGenericParams(), fn, explosion, uncurryLevel,
-                          /*mangleAsFunction=*/true);
-    return;
-  }
+  case TypeKind::PolymorphicFunction:
+    llvm_unreachable("should not be mangled");
 
   case TypeKind::SILFunction: {
     // <type> ::= 'XF' <impl-function-type>
@@ -1365,9 +1320,18 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
   }
 
   case TypeKind::GenericTypeParam: {
-    Buffer << 'q';
-    // FIXME: Notion of depth is reversed from that for archetypes.
     auto paramTy = cast<GenericTypeParamType>(tybase);
+    // FIXME: Notion of depth is reversed from that for archetypes.
+
+    // A special mangling for the very first generic parameter. This shows up
+    // frequently because it corresponds to 'Self' in protocol requirement
+    // generic signatures.
+    if (paramTy->getDepth() == 0 && paramTy->getIndex() == 0) {
+      Buffer << 'x';
+      return;
+    }
+
+    Buffer << 'q';
     mangleGenericParamIndex(paramTy);
     return;
   }
@@ -1495,8 +1459,7 @@ void Mangler::mangleNominalType(const NominalTypeDecl *decl,
                 : getCanonicalSignatureOrNull(decl->getGenericSignature(),
                                               *decl->getParentModule());
       if (generics)
-        bindGenericParameters(sig,
-                              generics, /*mangle*/ false);
+        bindGenericParameters(sig, generics);
     }
   };
 

@@ -17,14 +17,14 @@ sil_vtable X {}
 sil @_TFC14dynamic_lookup1XD : $@convention(method) (X) -> ()
 
 // [objc] t.X.f (t.X)() -> ()
-sil @_TToFC14dynamic_lookup1X1ffS0_FT_T_ : $@convention(objc_method) (X) -> () {
+sil @_TToFC14dynamic_lookup1X1ffT_T_ : $@convention(objc_method) (X) -> () {
 bb0(%0 : $X):
   %3 = tuple ()
   return %3 : $()
 }
 
 // [objc] X.g (ObjectiveC.X.Type)() -> ()
-sil @_TToZFC14dynamic_lookup1X1gfMS0_FT_T_ : $@convention(thin) (@thick X.Type) -> () {
+sil @_TToZFC14dynamic_lookup1X1gfT_T_ : $@convention(thin) (@thick X.Type) -> () {
 bb0(%0 : $@thick X.Type):
   %14 = tuple ()                                  // user: %15
   return %14 : $()

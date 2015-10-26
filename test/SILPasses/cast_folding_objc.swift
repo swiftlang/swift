@@ -68,7 +68,7 @@ public func testBridgedCastFromObjCtoSwift(ns: NSString) -> String {
 // Check that compiler understands that this cast always succeeds
 // CHECK-LABEL: sil [noinline] @_TF17cast_folding_objc30testBridgedCastFromSwiftToObjCFSSCSo8NSString
 // CHECK-NOT: cast
-// CHECK: function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfSSFT_CSo8NSString
+// CHECK: function_ref @_TFE10FoundationSS19_bridgeToObjectiveC
 // CHECK: apply
 // CHECK: return
 @inline(never)

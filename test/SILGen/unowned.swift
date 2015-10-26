@@ -10,7 +10,7 @@ struct A {
   unowned var x: C
 }
 _ = A(x: C())
-// CHECK-LABEL: sil hidden @_TFV7unowned1ACfMS0_FT1xCS_1C_S0_
+// CHECK-LABEL: sil hidden @_TFV7unowned1AC
 // CHECK: bb0([[X:%.*]] : $C, %1 : $@thin A.Type):
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
 // CHECK:   unowned_retain [[X_UNOWNED]]
@@ -27,7 +27,7 @@ struct AddressOnly {
   var p: P
 }
 _ = AddressOnly(x: C(), p: X())
-// CHECK-LABEL: sil hidden @_TFV7unowned11AddressOnlyCfMS0_FT1xCS_1C1pPS_1P__S0_
+// CHECK-LABEL: sil hidden @_TFV7unowned11AddressOnlyC
 // CHECK: bb0([[RET:%.*]] : $*AddressOnly, [[X:%.*]] : $C, {{.*}}):
 // CHECK:   [[X_ADDR:%.*]] = struct_element_addr [[RET]] : $*AddressOnly, #AddressOnly.x
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
@@ -114,7 +114,7 @@ class TestUnownedMember {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TFC7unowned17TestUnownedMembercfMS0_FT5invalCS_1C_S0_
+// CHECK-LABEL: sil hidden @_TFC7unowned17TestUnownedMemberc
 // CHECK-NEXT:  bb0(%0 : $C, %1 : $TestUnownedMember):
 // CHECK:  [[SELF:%.*]] = mark_uninitialized [rootself] %1 : $TestUnownedMember
 // CHECK:  [[FIELDPTR:%.*]] = ref_element_addr [[SELF]] : $TestUnownedMember, #TestUnownedMember.member

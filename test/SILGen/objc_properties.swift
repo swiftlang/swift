@@ -24,7 +24,7 @@ class A {
 
   // Initializers and destructors always directly access stored properties, even
   // when they are @objc.
-  // CHECK-LABEL: sil hidden @_TFC15objc_properties1AcfMS0_FT_S0_ : $@convention(method) (@owned A) -> @owned A {
+  // CHECK-LABEL: sil hidden @_TFC15objc_properties1Ac
   // CHECK-NOT: class_method {{.*}} #A.prop
   init() {
     prop = 5
@@ -34,7 +34,7 @@ class A {
 
   // rdar://15858869 - However, direct access only applies to (implicit or
   // explicit) 'self' ivar references, not ALL ivar refs.
-  // CHECK-LABEL: sil hidden @_TFC15objc_properties1AcfMS0_FT5otherS0_1xSi_S0_
+  // CHECK-LABEL: sil hidden @_TFC15objc_properties1Ac
   // CHECK-NEXT: bb0(%0 : $A, %1 : $Int, %2 : $A):
   // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized [rootself] %2 : $A
   init(other : A, x : Int) {

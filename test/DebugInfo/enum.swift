@@ -45,7 +45,7 @@ public func foo(empty : Nothing) { }
 // CHECK: !DICompositeType({{.*}}name: "Nothing", {{.*}}elements: ![[EMPTY]]
 
 // CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS:[0-9]+]],
-// CHECK-SAME:             {{.*}}identifier: "_TtGO4enum4Roseq__")
+// CHECK-SAME:             {{.*}}identifier: "_TtGO4enum4Rosex_")
 public enum Rose<A> {
 	case MkRose(() -> A, () -> [Rose<A>])
   // CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS]],
@@ -54,7 +54,7 @@ public enum Rose<A> {
 }
 
 // CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]],
-// CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5Tupleq__")
+// CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5Tuplex_")
 public enum Tuple<P> {
   // CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS]],
   // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5TupleQq_S0__")

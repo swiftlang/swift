@@ -89,16 +89,16 @@ class F: D {
   override func i4(x: Int, y: Int) -> Int {}
 }
 
-// CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuofS0_FTGSqCS_1B_1yS1_1zS1__S1_
+// CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuo
 // CHECK:         [[WRAP_X:%.*]] = enum $Optional<B>
-// CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
+// CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
 // CHECK:         apply [[FORCE_UNWRAP_FN]]<B>([[UNWRAP_Y_ADDR:%.*]]#1,
 // CHECK:         [[UNWRAP_Y:%.*]] = load [[UNWRAP_Y_ADDR]]
 // CHECK:         [[RES:%.*]] = apply {{%.*}}([[WRAP_X]], [[UNWRAP_Y]], %2, %3)
 // CHECK:         [[WRAP_RES:%.*]] = enum $Optional<B>, {{.*}} [[RES]]
 // CHECK:         return [[WRAP_RES]]
 
-// CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D1gfS0_FTGSqPS_8AddrOnly__1yPS1___PS1__
+// CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D1g
 // TODO: extra copies here
 // CHECK:         [[WRAPPED_X_ADDR:%.*]] = init_enum_data_addr [[WRAP_X_ADDR:%.*]] :
 // CHECK:         copy_addr [take] {{%.*}} to [initialization] [[WRAPPED_X_ADDR]]
@@ -166,14 +166,14 @@ class Noot : Aap {
   override func map() -> S? -> () -> Noot {}
 }
 
-// CHECK-LABEL: sil private @_TTVFC13vtable_thunks3Bar3foofS0_FGSqFSiSi_FSiSi : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<Int -> Int>
+// CHECK-LABEL: sil private @_TTVFC13vtable_thunks3Bar3foo{{.*}} : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<Int -> Int>
 // CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
-// CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks3Bar3foofS0_FGSqFSiSi_FSiSi
+// CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks3Bar3foo{{.*}}
 // CHECK:         apply [[IMPL]]
 // CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 
-// CHECK-LABEL: sil private @_TTVFC13vtable_thunks4Noot4flipfS0_FT_FT_VS_1S
-// CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks4Noot4flipfS0_FT_FT_VS_1S
+// CHECK-LABEL: sil private @_TTVFC13vtable_thunks4Noot4flip{{.*}}
+// CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks4Noot4flip{{.*}}
 // CHECK:         [[INNER:%.*]] = apply %1(%0)
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo__dV13vtable_thunks1S_XFo__dGSqS0___
 // CHECK:         [[OUTER:%.*]] = partial_apply [[THUNK]]([[INNER]])
@@ -184,8 +184,8 @@ class Noot : Aap {
 // CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.Some!enumelt.1, %1 : $S
 // CHECK:         return [[OUTER]] : $Optional<S>
 
-// CHECK-LABEL: sil private @_TTVFC13vtable_thunks4Noot3mapfS0_FT_FGSqVS_1S_FT_S0_
-// CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks4Noot3mapfS0_FT_FGSqVS_1S_FT_S0_
+// CHECK-LABEL: sil private @_TTVFC13vtable_thunks4Noot3map{{.*}}
+// CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks4Noot3map{{.*}}
 // CHECK:         [[INNER:%.*]] = apply %1(%0)
 // CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFo_dGSqV13vtable_thunks1S__oXFo__oCS_4Noot__XFo_dS0__oXFo__oGSqCS_3Aap___
 // CHECK:         [[OUTER:%.*]] = partial_apply [[THUNK]]([[INNER]])

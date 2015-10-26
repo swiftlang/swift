@@ -1066,7 +1066,7 @@ sil @_TFC4enum1CD : $@convention(method) (C) -> ()
 
 @objc class OC {}
 sil_vtable OC {}
-sil hidden @_TToFC4enum2OCcfMS0_FT_S0_ : $@convention(thin) (OC) -> OC {
+sil hidden @_TToFC4enum2OCcfT_S0_ : $@convention(thin) (OC) -> OC {
 entry(%x : $OC):
   return %x : $OC
 }

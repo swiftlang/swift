@@ -38,7 +38,7 @@ struct id {
 // Class and methods are [objc] by inheritance.
 class MyBlammo : Blammo {
   func foo() {}
-// CHECK:  define hidden void @_TFC4objc8MyBlammo3foofS0_FT_T_([[MYBLAMMO]]*) {{.*}} {
+// CHECK:  define hidden void @_TFC4objc8MyBlammo3foofT_T_([[MYBLAMMO]]*) {{.*}} {
 // CHECK:    call {{.*}} @swift_release
 // CHECK:    ret void
 }
@@ -46,7 +46,7 @@ class MyBlammo : Blammo {
 // Class and methods are [objc] by inheritance.
 class Test2 : Gizmo {
   func foo() {}
-// CHECK:  define hidden void @_TFC4objc5Test23foofS0_FT_T_([[TEST2]]*) {{.*}} {
+// CHECK:  define hidden void @_TFC4objc5Test23foofT_T_([[TEST2]]*) {{.*}} {
 // CHECK:    call {{.*}} @objc_release
 // CHECK:    ret void
 

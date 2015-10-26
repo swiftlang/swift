@@ -8,20 +8,20 @@ import gizmo
 func test3() -> NSObject {
   // initializer returns at +1
   return Gizmo()
-  // CHECK: [[CTOR:%[0-9]+]] = function_ref @_TFCSo5GizmoCfMS_FT_GSQS__ : $@convention(thin) (@thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
+  // CHECK: [[CTOR:%[0-9]+]] = function_ref @_TFCSo5GizmoC{{.*}} : $@convention(thin) (@thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NEXT: [[GIZMO_META:%[0-9]+]] = metatype $@thick Gizmo.Type
   // CHECK-NEXT: [[GIZMO:%[0-9]+]] = apply [[CTOR]]([[GIZMO_META]]) : $@convention(thin) (@thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK: [[GIZMO_NS:%[0-9]+]] = upcast [[GIZMO:%[0-9]+]] : $Gizmo to $NSObject
   // CHECK: return [[GIZMO_NS]] : $NSObject
 
-  // CHECK-LABEL: sil shared @_TFCSo5GizmoCfMS_FT_GSQS__ : $@convention(thin) (@thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
+  // CHECK-LABEL: sil shared @_TFCSo5GizmoC{{.*}} : $@convention(thin) (@thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // alloc is implicitly ns_returns_retained
   // init is implicitly ns_consumes_self and ns_returns_retained
   // CHECK-NEXT: bb0([[GIZMO_META:%[0-9]+]] : $@thick Gizmo.Type):
   // CHECK-NEXT: [[GIZMO_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[GIZMO_META]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
   // CHECK-NEXT: [[GIZMO:%[0-9]+]] = alloc_ref_dynamic [objc] [[GIZMO_META_OBJC]] : $@objc_metatype Gizmo.Type, $Gizmo
   // CHECK-NEXT: // function_ref
-  // CHECK-NEXT: [[INIT_CTOR:%[0-9]+]] = function_ref @_TTOFCSo5GizmocfMS_FT_GSQS__
+  // CHECK-NEXT: [[INIT_CTOR:%[0-9]+]] = function_ref @_TTOFCSo5Gizmoc{{.*}}
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[INIT_CTOR]]([[GIZMO]]) : $@convention(method) (@owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NEXT: return [[RESULT]] : $ImplicitlyUnwrappedOptional<Gizmo>
 }
@@ -75,7 +75,7 @@ func test8(g: Gizmo) -> Gizmo {
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[G]])
   // CHECK-NEXT: store
   // CHECK-NEXT: function_ref
-  // CHECK-NEXT: function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
+  // CHECK-NEXT: function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
   // CHECK-NEXT: alloc_stack
   // CHECK-NEXT: apply
   // CHECK-NEXT: [[RESULT:%.*]] = load
@@ -97,7 +97,7 @@ func test9(g: Gizmo) -> Gizmo {
   // CHECK-NEXT: retain_autoreleased [[RESULT]]
   // CHECK-NEXT: store [[RESULT]]
   // CHECK-NEXT: function_ref
-  // CHECK-NEXT: function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
+  // CHECK-NEXT: function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
   // CHECK-NEXT: alloc_stack
   // CHECK-NEXT: apply
   // CHECK-NEXT: [[RESULT:%.*]] = load
@@ -119,7 +119,7 @@ func test10(let g: Gizmo) -> AnyClass {
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[THICK]]
-  // CHECK:      [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
+  // CHECK:      [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
   // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%.*]]#1, {{.*}})
   // CHECK-NEXT: [[RES:%.*]] = load [[THICK_BUF]]#1
   // CHECK:      strong_release [[G]] : $Gizmo
@@ -139,7 +139,7 @@ func test11(let g: Gizmo) -> AnyClass {
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[THICK]]
-  // CHECK:      [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
+  // CHECK:      [[T0:%.*]] = function_ref @_TFs36_getImplicitlyUnwrappedOptionalValue
   // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%.*]]#1, {{.*}})
   // CHECK-NEXT: [[RES:%.*]] = load [[THICK_BUF]]#1
   // CHECK:      strong_release [[G]] : $Gizmo

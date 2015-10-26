@@ -25,7 +25,7 @@ func extensionMethodCurrying(x: Foo) {
   _ = x.kay
 }
 
-// CHECK-LABEL: sil shared @_TFC15extensions_objc3Foo3kayFS0_FT_T_
-// CHECK:         function_ref @_TTDFC15extensions_objc3Foo3kayfS0_FT_T_
-// CHECK:       sil shared [transparent] @_TTDFC15extensions_objc3Foo3kayfS0_FT_T_
+// CHECK-LABEL: sil shared @_TFC15extensions_objc3Foo3kayF
+// CHECK:         function_ref @_TTDFC15extensions_objc3Foo3kayf
+// CHECK:       sil shared [transparent] @_TTDFC15extensions_objc3Foo3kayf
 // CHECK:         class_method [volatile] %0 : $Foo, #Foo.kay!1.foreign

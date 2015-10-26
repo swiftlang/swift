@@ -58,27 +58,27 @@ import Foundation
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"\01L_selector_data(strResult)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3Bas9strResultfS0_FT_SS to i8*)
+// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3Bas9strResultfT_SS to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([{{[0-9]*}} x i8], [{{[0-9]*}} x i8]* @"\01L_selector_data(strArgWithS:)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_TToFC11objc_bridge3Bas6strArgfS0_FT1sSS_T_ to i8*)
+// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_TToFC11objc_bridge3Bas6strArgfT1sSS_T_ to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([12 x i8], [12 x i8]* @"\01L_selector_data(nsstrResult)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3Bas11nsstrResultfS0_FT_CSo8NSString to i8*)
+// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3Bas11nsstrResultfT_CSo8NSString to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @"\01L_selector_data(nsstrArgWithS:)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_TToFC11objc_bridge3Bas8nsstrArgfS0_FT1sCSo8NSString_T_ to i8*)
+// CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*)* @_TToFC11objc_bridge3Bas8nsstrArgfT1sCSo8NSString_T_ to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), 
 // CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3BascfMS0_FT_S0_ to i8*)
+// CHECK:       i8* bitcast ([[OPAQUE:.*]]* ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3BascfT_S0_ to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(dealloc)", i64 0, i64 0), 
@@ -88,7 +88,7 @@ import Foundation
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @"\01L_selector_data(acceptSet:)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @{{[0-9]+}}, i64 0, i64 0),
-// CHECK:       i8* bitcast (void (%3*, i8*, %4*)* @_TToFC11objc_bridge3Bas9acceptSetfS0_FGVs3SetS0__T_ to i8*)
+// CHECK:       i8* bitcast (void (%3*, i8*, %4*)* @_TToFC11objc_bridge3Bas9acceptSetfGVs3SetS0__T_ to i8*)
 // CHECK:     }
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0), 
@@ -139,10 +139,10 @@ extension NSString {
     set {}
   }
 
-  // CHECK: define internal [[OPAQUE:.*]]* @_TToFE11objc_bridgeCSo8NSString11nsstrResultfS0_FT_S0_([[OPAQUE:.*]]*, i8*) unnamed_addr
+  // CHECK: define internal [[OPAQUE:.*]]* @_TToFE11objc_bridgeCSo8NSString11nsstrResultfT_S0_([[OPAQUE:.*]]*, i8*) unnamed_addr
   func nsstrResult() -> NSString { return NSS }
 
-  // CHECK: define internal void @_TToFE11objc_bridgeCSo8NSString8nsstrArgfS0_FT1sS0__T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
+  // CHECK: define internal void @_TToFE11objc_bridgeCSo8NSString8nsstrArgfT1sS0__T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
   func nsstrArg(s s: NSString) { }
 }
 
@@ -173,14 +173,14 @@ class Bas : NSObject {
     set {}
   }
 
-  // CHECK: define internal [[OPAQUE:.*]]* @_TToFC11objc_bridge3Bas9strResultfS0_FT_SS([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
+  // CHECK: define internal [[OPAQUE:.*]]* @_TToFC11objc_bridge3Bas9strResultfT_SS([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
   func strResult() -> String { return "" }
-  // CHECK: define internal void @_TToFC11objc_bridge3Bas6strArgfS0_FT1sSS_T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
+  // CHECK: define internal void @_TToFC11objc_bridge3Bas6strArgfT1sSS_T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
   func strArg(s s: String) { }
 
-  // CHECK: define internal [[OPAQUE:.*]]* @_TToFC11objc_bridge3Bas11nsstrResultfS0_FT_CSo8NSString([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
+  // CHECK: define internal [[OPAQUE:.*]]* @_TToFC11objc_bridge3Bas11nsstrResultfT_CSo8NSString([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
   func nsstrResult() -> NSString { return NSS }
-  // CHECK: define internal void @_TToFC11objc_bridge3Bas8nsstrArgfS0_FT1sCSo8NSString_T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
+  // CHECK: define internal void @_TToFC11objc_bridge3Bas8nsstrArgfT1sCSo8NSString_T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
   func nsstrArg(s s: NSString) { }
 
   override init() { 

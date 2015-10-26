@@ -23,7 +23,7 @@ bb0(%0 : $ObjCClass):
   return %0 : $ObjCClass
 }
 
-sil @_TToFC13partial_apply9ObjCClasscfMS0_FT_S0_ : $@convention(objc_method) (ObjCClass) -> ObjCClass {
+sil @_TToFC13partial_apply9ObjCClasscfT_S0_ : $@convention(objc_method) (ObjCClass) -> ObjCClass {
 bb0(%0 : $ObjCClass):
   // function_ref ObjectiveC.ObjCClass.constructor (ObjectiveC.ObjCClass.Type)() -> ObjectiveC.ObjCClass
   %1 = function_ref @_TFC13partial_apply9ObjCClasscfMS_FT_S_ : $@convention(method) (ObjCClass) -> ObjCClass // user: %2
@@ -31,13 +31,13 @@ bb0(%0 : $ObjCClass):
   return %2 : $ObjCClass
 }
 
-sil @_TToFC13partial_apply9ObjCClass6methodfS0_FT1xSi_T_ : $@convention(objc_method) (Int, ObjCClass) -> () {
+sil @_TToFC13partial_apply9ObjCClass6methodfT1xSi_T_ : $@convention(objc_method) (Int, ObjCClass) -> () {
 bb0(%0 : $Int, %1 : $ObjCClass):
   %v = tuple()
   return %v : $()
 }
 
-sil @_TToFC13partial_apply9ObjCClass10initFamilyfS0_FT_S0_ : $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass {
+sil @_TToFC13partial_apply9ObjCClass10initFamilyfT_S0_ : $@convention(objc_method) (@owned ObjCClass) -> @owned ObjCClass {
 bb0(%0 : $ObjCClass):
   return %0 : $ObjCClass
 }

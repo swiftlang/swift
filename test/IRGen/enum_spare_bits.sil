@@ -72,7 +72,7 @@ entry:
   return undef : $()
 }
 
-sil @_TToFC15enum_spare_bits1DcfMS0_FT_S0_ : $(@owned D) -> @owned D {
+sil @_TToFC15enum_spare_bits1DcfT_S0_ : $(@owned D) -> @owned D {
 entry(%x : $D):
   return undef : $D
 }

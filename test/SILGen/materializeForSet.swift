@@ -79,7 +79,7 @@ protocol Abstractable {
 // an abstraction pattern present.
 
 extension Derived : Abstractable {}
-// SILGEN: sil hidden [transparent] [thunk] @_TTWC17materializeForSet7DerivedS_12AbstractableS_FS1_m14storedFunctionFT_w_6Result :
+// SILGEN: sil hidden [transparent] [thunk] @_TTWC17materializeForSet7DerivedS_12AbstractableS_FS1_m14storedFunction
 // SILGEN: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
 // SILGEN-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned (@out Int) -> ()
 // SILGEN-NEXT: [[T0:%.*]] = load %2 : $*Derived
@@ -117,7 +117,7 @@ extension Derived : Abstractable {}
 // SILGEN-NEXT: tuple ()
 // SILGEN-NEXT: return
 
-// SILGEN: sil hidden [transparent] [thunk] @_TTWC17materializeForSet7DerivedS_12AbstractableS_FS1_m19finalStoredFunctionFT_w_6Result :
+// SILGEN: sil hidden [transparent] [thunk] @_TTWC17materializeForSet7DerivedS_12AbstractableS_FS1_m19finalStoredFunction
 // SILGEN: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
 // SILGEN-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to $*@callee_owned (@out Int) -> ()
 // SILGEN-NEXT: [[T0:%.*]] = load %2 : $*Derived
@@ -274,7 +274,7 @@ struct Bill : Totalled {
 // SILGEN:   copy_addr [[SELF]] to [initialization] [[BOX]]#1
 // SILGEN:   [[T0:%.*]] = struct_element_addr [[BOX]]#1 : $*Bill, #Bill.total
 // SILGEN:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
-// SILGEN:   [[INIT:%.*]] = function_ref @_TFSqCurfMGSqq__FT10nilLiteralT__GSqq__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @thin Optional<τ_0_0>.Type) -> ()
+// SILGEN:   [[INIT:%.*]] = function_ref @_TFSqC
 // SILGEN:   [[META:%.*]] = metatype $@thin Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>.Type
 // SILGEN:   [[T2:%.*]] = alloc_stack $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>
 // SILGEN:   [[OPT:%.*]] = apply [[INIT]]<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>([[T2]]#1, [[META]]) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @thin Optional<τ_0_0>.Type) -> ()

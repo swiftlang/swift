@@ -26,8 +26,8 @@ extension C {
 // to materialize local Self metadata.
 //
 // CHECK-LABEL: sil @main : $@convention(c)
-// CHECK: function_ref static inline_self.C.factory (inline_self.C.Type)(Swift.Int) -> Self
-// CHECK: [[F:%[0-9]+]] = function_ref @_TZFC11inline_self1C7factoryfMS0_FSiDS0_ : $@convention(thin) (Int, @thick C.Type) -> @owned C
+// CHECK: function_ref static inline_self.C.factory (Swift.Int) -> Self
+// CHECK: [[F:%[0-9]+]] = function_ref @_TZFC11inline_self1C7factory{{.*}} : $@convention(thin) (Int, @thick C.Type) -> @owned C
 // CHECK: apply [[F]](%{{.+}}, %{{.+}}) : $@convention(thin) (Int, @thick C.Type) -> @owned C
 
 // Call the function so it can be inlined.

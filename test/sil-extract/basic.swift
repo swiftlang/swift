@@ -8,14 +8,14 @@
 // Passing mangled name
 
 // RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TF5basic3fooFT_Si" | FileCheck %s -check-prefix=EXTRACT-FOO
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TFV5basic1X4testfS0_FT_T_" | FileCheck %s -check-prefix=EXTRACT-TEST
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TFC5basic7VehiclecfMS0_FT1nSi_S0_" | FileCheck %s -check-prefix=EXTRACT-INIT
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TFC5basic7Vehicle3nowfS0_FT_Si" | FileCheck %s -check-prefix=EXTRACT-NOW
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TFV5basic1X4testfT_T_" | FileCheck %s -check-prefix=EXTRACT-TEST
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TFC5basic7VehiclecfT1nSi_S0_" | FileCheck %s -check-prefix=EXTRACT-INIT
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-extract -module-name basic -func="_TFC5basic7Vehicle3nowfT_Si" | FileCheck %s -check-prefix=EXTRACT-NOW
 
 
-// EXTRACT-FOO-NOT: sil hidden @_TFV5basic1X4testfS0_FT_T_ : $@convention(method) (X) -> () {
-// EXTRACT-FOO-NOT: sil hidden @_TFC5basic7VehiclecfMS0_FT1nSi_S0_ : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
-// EXTRACT-FOO-NOT: sil hidden @_TFC5basic7Vehicle3nowfS0_FT_Si : $@convention(method) (@guaranteed Vehicle) -> Int {
+// EXTRACT-FOO-NOT: sil hidden @_TFV5basic1X4testfT_T_ : $@convention(method) (X) -> () {
+// EXTRACT-FOO-NOT: sil hidden @_TFC5basic7VehiclecfT1nSi_S0_ : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
+// EXTRACT-FOO-NOT: sil hidden @_TFC5basic7Vehicle3nowfT_Si : $@convention(method) (@guaranteed Vehicle) -> Int {
 
 // EXTRACT-FOO-LABEL: sil hidden @_TF5basic3fooFT_Si : $@convention(thin) () -> Int {
 // EXTRACT-FOO:       bb0:
@@ -25,10 +25,10 @@
 
 
 // EXTRACT-TEST-NOT: sil hidden @_TF5basic3fooFT_Si : $@convention(thin) () -> Int {
-// EXTRACT-TEST-NOT: sil hidden @_TFC5basic7VehiclecfMS0_FT1nSi_S0_ : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
-// EXTRACT-TEST-NOT: sil hidden @_TFC5basic7Vehicle3nowfS0_FT_Si : $@convention(method) (@guaranteed Vehicle) -> Int {
+// EXTRACT-TEST-NOT: sil hidden @_TFC5basic7VehiclecfT1nSi_S0_ : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
+// EXTRACT-TEST-NOT: sil hidden @_TFC5basic7Vehicle3nowfT_Si : $@convention(method) (@guaranteed Vehicle) -> Int {
 
-// EXTRACT-TEST-LABEL:  sil hidden @_TFV5basic1X4testfS0_FT_T_ : $@convention(method) (X) -> () {
+// EXTRACT-TEST-LABEL:  sil hidden @_TFV5basic1X4testfT_T_ : $@convention(method) (X) -> () {
 // EXTRACT-TEST:        bb0(%0 : $X):
 // EXTRACT-TEST-NEXT:     debug_value
 // EXTRACT-TEST-NEXT:     function_ref
@@ -39,10 +39,10 @@
 
 
 // EXTRACT-INIT-NOT: sil hidden @_TF5basic3fooFT_Si : $@convention(thin) () -> Int {
-// EXTRACT-INIT-NOT: sil hidden @_TFV5basic1X4testfS0_FT_T_ : $@convention(method) (X) -> () {
-// EXTRACT-INIT-NOT: sil hidden @_TFC5basic7Vehicle3nowfS0_FT_Si : $@convention(method) (@owned Vehicle) -> Int {
+// EXTRACT-INIT-NOT: sil hidden @_TFV5basic1X4testfT_T_ : $@convention(method) (X) -> () {
+// EXTRACT-INIT-NOT: sil hidden @_TFC5basic7Vehicle3nowfT_Si : $@convention(method) (@owned Vehicle) -> Int {
 
-// EXTRACT-INIT-LABEL:   sil hidden @_TFC5basic7VehiclecfMS0_FT1nSi_S0_ : $@convention(method) (Int, @owned Vehicle) -> @owned Vehicle {
+// EXTRACT-INIT-LABEL:   sil hidden @_TFC5basic7VehiclecfT1nSi_S0_ : $@convention(method) (Int, @owned Vehicle) -> @owned Vehicle {
 // EXTRACT-INIT:         bb0
 // EXTRACT-INIT-NEXT:      debug_value
 // EXTRACT-INIT-NEXT:      debug_value
@@ -52,10 +52,10 @@
 
 
 // EXTRACT-NOW-NOT: sil hidden @_TF5basic3fooFT_Si : $@convention(thin) () -> Int {
-// EXTRACT-NOW-NOT: sil hidden @_TFV5basic1X4testfS0_FT_T_ : $@convention(method) (X) -> () {
-// EXTRACT-NOW-NOT: sil hidden @_TFC5basic7VehiclecfMS0_FT1nSi_S0_ : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
+// EXTRACT-NOW-NOT: sil hidden @_TFV5basic1X4testfT_T_ : $@convention(method) (X) -> () {
+// EXTRACT-NOW-NOT: sil hidden @_TFC5basic7VehiclecfT1nSi_S0_ : $@convention(method) (Int, @guaranteed Vehicle) -> @owned Vehicle {
 
-// EXTRACT-NOW-LABEL:   sil hidden @_TFC5basic7Vehicle3nowfS0_FT_Si : $@convention(method) (@guaranteed Vehicle) -> Int {
+// EXTRACT-NOW-LABEL:   sil hidden @_TFC5basic7Vehicle3nowfT_Si : $@convention(method) (@guaranteed Vehicle) -> Int {
 // EXTRACT-NOW:         bb0
 // EXTRACT-NOW-NEXT:      debug_value
 // EXTRACT-NOW-NEXT:      ref_element_addr

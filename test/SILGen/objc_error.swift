@@ -11,7 +11,7 @@ func NSErrorErrorType_erasure(x: NSError) -> ErrorType {
   return x
 }
 
-// CHECK-LABEL: sil hidden @_TF10objc_error34NSErrorErrorType_archetype_erasureuR_CSo7NSErrorrFq_Ps9ErrorType_
+// CHECK-LABEL: sil hidden @_TF10objc_error34NSErrorErrorType_archetype_erasure
 // CHECK:         [[ERROR_TYPE:%.*]] = init_existential_ref %0 : $T : $T, $ErrorType
 // CHECK:         return [[ERROR_TYPE]]
 func NSErrorErrorType_archetype_erasure<T : NSError>(t: T) -> ErrorType {
@@ -61,7 +61,7 @@ func test_cast_to_nserror() {
 
 // A class-constrained archetype may be NSError, so we can't use scalar casts
 // in that case either.
-// CHECK-LABEL: sil hidden @_TF10objc_error28test_cast_to_class_archetypeuR_s9AnyObjectrFq_T_
+// CHECK-LABEL: sil hidden @_TF10objc_error28test_cast_to_class_archetype
 func test_cast_to_class_archetype<T: AnyObject>(_: T) {
   // CHECK: unconditional_checked_cast_addr {{.*}} ErrorClass in {{%.*}} : $*ErrorClass to T in {{.*}} : $*T
   let e = ErrorClass()

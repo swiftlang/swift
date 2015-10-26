@@ -10,7 +10,7 @@ public class Base1 {
   func middle() { inner() }
 // Check that call to Base1.middle cannot be devirtualized
 //
-// CHECK-LABEL: sil @_TFC19devirt_default_case5Base15outerfS0_FT_T_
+// CHECK-LABEL: sil @_TFC19devirt_default_case5Base15outer
 // CHECK: class_method 
 // CHECK: }
   public func outer() { 
@@ -41,8 +41,8 @@ private class Derived2 : Base2 {
 // Check that call to Base2.middle can be devirtualized
 //
 // CHECK-LABEL: sil @_TF19devirt_default_case9callOuterFSiSi
-// CHECK: function_ref @_TFC19devirt_default_caseP33_77424841540E67CC820F5E5F7940DCB05Base25innerfS0_FT_T_
-// CHECK: function_ref @_TFC19devirt_default_caseP33_77424841540E67CC820F5E5F7940DCB08Derived26middlefS0_FT_T_ 
+// CHECK: function_ref @_TFC19devirt_default_caseP33_77424841540E67CC820F5E5F7940DCB05Base25inner
+// CHECK: function_ref @_TFC19devirt_default_caseP33_77424841540E67CC820F5E5F7940DCB08Derived26middle
 // CHECK-NOT: class_method
 // CHECK: return
 public func callOuter(x: Int) -> Int {
@@ -66,9 +66,9 @@ class Base3 {
 // Check that call to Base3.middle can be devirtualized when not compiling
 // for testing.
 // 
-// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TFC19devirt_default_case5Base35outerfS0_FT_T_
-// CHECK: function_ref @_TFC19devirt_default_case5Base36middlefS0_FT_T_
-// CHECK: function_ref @_TFC19devirt_default_caseP{{.*}}8Derived36middlefS0_FT_T_
+// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TFC19devirt_default_case5Base35outer
+// CHECK: function_ref @_TFC19devirt_default_case5Base36middle
+// CHECK: function_ref @_TFC19devirt_default_caseP{{.*}}8Derived36middle
 // CHECK-NORMAL-NOT: class_method
 // CHECK-TESTABLE: class_method %0 : $Base3, #Base3.middle!1
 // CHECK: }
@@ -96,7 +96,7 @@ func foo(a: A2) -> Int {
 // Check that call to A2.f() can be devirualized.
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A2Si
-// CHECK: function_ref @_TFC19devirt_default_case2A21ffS0_FT_Si
+// CHECK: function_ref @_TFC19devirt_default_case2A21f
 // CHECK-NORMAL-NOT: class_method
 // CHECK-TESTABLE: class_method %0 : $A2, #A2.f!1
 // CHECK: }
@@ -120,8 +120,8 @@ func foo(a: A3) -> Int {
 // Check that call to A3.f() can be devirualized.
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TF19devirt_default_case3fooFCS_2A3Si
-// CHECK: function_ref @_TFC19devirt_default_case2B31ffS0_FT_Si
-// CHECK: function_ref @_TFC19devirt_default_case2A31ffS0_FT_Si
+// CHECK: function_ref @_TFC19devirt_default_case2B31f
+// CHECK: function_ref @_TFC19devirt_default_case2A31f
 // CHECK-NORMAL-NOT: class_method
 // CHECK-TESTABLE: class_method %0 : $A3, #A3.f!1
 // CHECK: }
@@ -137,9 +137,9 @@ class Base4 {
   func test() { 
 // Check that call to foo() can be devirtualized
 //
-// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TFC19devirt_default_case5Base44testfS0_FT_T_
-// CHECK: function_ref @_TFC19devirt_default_case5Base43foofS0_FT_T_
-// CHECK: function_ref @_TFC19devirt_default_case8Derived43foofS0_FT_T_ 
+// CHECK-LABEL: sil{{( hidden)?}} [noinline] @_TFC19devirt_default_case5Base44test
+// CHECK: function_ref @_TFC19devirt_default_case5Base43foo
+// CHECK: function_ref @_TFC19devirt_default_case8Derived43foo
 // CHECK-NORMAL-NOT: class_method
 // CHECK-TESTABLE: class_method %0 : $Base4, #Base4.foo!1
 // CHECK: }
@@ -159,8 +159,8 @@ public class Base5 {
 // Check that call to foo() does not use class_method, because
 // it is a final method.
 //
-// CHECK-LABEL: sil [noinline] @_TFC19devirt_default_case5Base54testfS0_FT_T_ 
-// CHECK: function_ref @_TFC19devirt_default_case5Base53foofS0_FT_T_
+// CHECK-LABEL: sil [noinline] @_TFC19devirt_default_case5Base54test
+// CHECK: function_ref @_TFC19devirt_default_case5Base53foo
 // CHECK-NOT: class_method
 // CHECK: }
     foo() 
@@ -207,10 +207,10 @@ class B7 : A7 { @inline(never) override func foo() -> Bool { return true } }
 // CHECK: checked_cast_br
 // CHECK-NOT: class_method
 // CHECK: unconditional_checked_cast
-// CHECK: function_ref @_TFC19devirt_default_case2B73foofS0_FT_Sb
+// CHECK: function_ref @_TFC19devirt_default_case2B73foo
 // CHECK-NORMAL-NOT: class_method
 // CHECK-TESTABLE: class_method %{{[0-9]+}} : $B7, #B7.foo!1
-// CHECK: function_ref @_TFC19devirt_default_case2A73foofS0_FT_Sb
+// CHECK: function_ref @_TFC19devirt_default_case2A73foo
 // CHECK-NORMAL-NOT: class_method
 // CHECK-TESTABLE: class_method %{{[0-9]+}} : $A7, #A7.foo!1
 // CHECK: return
@@ -294,22 +294,22 @@ internal class M33: M3 {
 
 // CHECK: sil [noinline] @_TF19devirt_default_case54testSpeculativeDevirtualizationWithTooManyAlternativesFCS_2M1Vs5Int32
 // CHECK: checked_cast_br [exact] %0 : $M1 to $M1
-// CHECK: function_ref @_TFC19devirt_default_case2M13foofS0_FT_Vs5Int32 
+// CHECK: function_ref @_TFC19devirt_default_case2M13foo
 // CHECK: br bb1
 // CHECK: checked_cast_br [exact] %0 : $M1 to $M2
-// CHECK: function_ref @_TFC19devirt_default_case2M23foofS0_FT_Vs5Int32 
+// CHECK: function_ref @_TFC19devirt_default_case2M23foo
 // CHECK: br bb1
 // CHECK: checked_cast_br [exact] %0 : $M1 to $M3
-// CHECK: function_ref @_TFC19devirt_default_case2M33foofS0_FT_Vs5Int32 
+// CHECK: function_ref @_TFC19devirt_default_case2M33foo
 // CHECK: br bb1
 // CHECK: checked_cast_br [exact] %0 : $M1 to $M22
-// CHECK: function_ref @_TFC19devirt_default_case3M223foofS0_FT_Vs5Int32 
+// CHECK: function_ref @_TFC19devirt_default_case3M223foo
 // CHECK: br bb1
 // CHECK: checked_cast_br [exact] %0 : $M1 to $M33
-// CHECK: function_ref @_TFC19devirt_default_case3M333foofS0_FT_Vs5Int32 
+// CHECK: function_ref @_TFC19devirt_default_case3M333foo
 // CHECK: br bb1
 // CHECK: checked_cast_br [exact] %0 : $M1 to $M222
-// CHECK: function_ref @_TFC19devirt_default_case4M2223foofS0_FT_Vs5Int32 
+// CHECK: function_ref @_TFC19devirt_default_case4M2223foo
 // CHECK: br bb1
 // CHECK-NOT: checked_cast_br
 // CHECK: class_method

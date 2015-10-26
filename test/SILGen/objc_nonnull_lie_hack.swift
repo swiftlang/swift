@@ -10,7 +10,7 @@ import Foundation
 import gizmo
 
 // SILGEN-LABEL: sil hidden @_TF21objc_nonnull_lie_hack10makeObjectFT_GSqCSo8NSObject_
-// SILGEN:         [[INIT:%.*]] = function_ref @_TFCSo8NSObjectCfMS_FT_S_
+// SILGEN:         [[INIT:%.*]] = function_ref @_TFCSo8NSObjectC
 // SILGEN:         [[NONOPTIONAL:%.*]] = apply [[INIT]]
 // SILGEN:         [[OPTIONAL:%.*]] = unchecked_ref_cast [[NONOPTIONAL]]
 

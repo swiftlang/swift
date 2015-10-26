@@ -87,10 +87,10 @@ class Foo : NSRuncing, NSFunging, Ansible {
   func anse() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo5runcefS0_FT_CSo8NSObject
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo11copyRuncingfS0_FT_CSo8NSObject
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo5fungefS0_FT_T_
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo3foofS0_FT_T_
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo5runce
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo11copyRuncing
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo5funge
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Foo3foo
 // CHECK-NOT: sil hidden @_TToF{{.*}}anse{{.*}}
 
 class Bar { }
@@ -101,9 +101,9 @@ extension Bar : NSRuncing {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar5runcefS0_FT_CSo8NSObject
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar11copyRuncingfS0_FT_CSo8NSObject
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar3foofS0_FT_T_
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar5runce
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar11copyRuncing
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Bar3foo
 
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
@@ -112,8 +112,8 @@ extension Bas : NSRuncing {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas11copyRuncingfS1_FT_CSo8NSObject
-// CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas3foofS1_FT_T_
+// CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas11copyRuncing
+// CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas3Bas3foo
 
 // -- Inherited objc protocols
 
@@ -124,8 +124,8 @@ class Zim : Fungible {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Zim5fungefS0_FT_T_
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Zim3foofS0_FT_T_
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Zim5funge
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols3Zim3foo
 
 // class Zang from objc_protocols_Bas module
 extension Zang : Fungible {
@@ -133,7 +133,7 @@ extension Zang : Fungible {
   @objc func foo() {}
 }
 
-// CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang3foofS1_FT_T_
+// CHECK-LABEL: sil hidden [thunk] @_TToFE14objc_protocolsC18objc_protocols_Bas4Zang3foo
 
 // -- objc protocols with property requirements in extensions
 //    <rdar://problem/16284574>
@@ -197,7 +197,7 @@ func testInitializableExistential(im: Initializable.Type, i: Int) -> Initializab
 class InitializableConformer: Initializable {
   @objc required init(int: Int) {}
 }
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols22InitializableConformercfMS0_FT3intSi_S0_
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols22InitializableConformerc
 
 final class InitializableConformerByExtension {
   init() {}
@@ -208,4 +208,4 @@ extension InitializableConformerByExtension: Initializable {
     self.init()
   }
 }
-// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols33InitializableConformerByExtensioncfMS0_FT3intSi_S0_
+// CHECK-LABEL: sil hidden [thunk] @_TToFC14objc_protocols33InitializableConformerByExtensionc

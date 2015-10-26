@@ -939,12 +939,14 @@ Types
 
 
   type ::= 'u' generic-signature type        // generic type
+  type ::= 'x'                               // generic param, depth=0, idx=0
   type ::= 'q' generic-param-index           // dependent generic parameter
   type ::= 'q' type assoc-type-name          // associated type of non-generic param
   type ::= 'w' generic-param-index assoc-type-name // associated type
   type ::= 'W' generic-param-index assoc-type-name+ '_' // associated type at depth
 
-  generic-param-index ::= index              // depth = 0,   idx = N
+  generic-param-index ::= 'x'                // depth = 0,   idx = 0
+  generic-param-index ::= index              // depth = 0,   idx = N+1
   generic-param-index ::= 'd' index index    // depth = M+1, idx = N
 
 ``<type>`` never begins or ends with a number.

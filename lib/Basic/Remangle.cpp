@@ -1496,12 +1496,25 @@ void Remangler::mangleDependentGenericParamIndex(Node *node) {
   if (depth != 0) {
     Out << 'd';
     mangleIndex(depth - 1);
+    mangleIndex(index);
+    return;
   }
-  mangleIndex(index);
+  if (index != 0) {
+    mangleIndex(index - 1);
+    return;
+  }
 
+  // depth == index == 0
+  Out << 'x';
 }
 
 void Remangler::mangleDependentGenericParamType(Node *node) {
+  if (node->getChild(0)->getIndex() == 0
+      && node->getChild(1)->getIndex() == 0) {
+    Out << 'x';
+    return;
+  }
+
   Out << 'q';
   mangleDependentGenericParamIndex(node);
 }

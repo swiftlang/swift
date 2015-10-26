@@ -318,7 +318,7 @@ func test_if_else_then_break(a : Bool, _ c : C?) {
 func test_if_break(a : Bool) {
   // CHECK: br [[LOOP:bb[0-9]+]]
   // CHECK: [[LOOP]]:
-  // CHECK: function_ref @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_
+  // CHECK: function_ref @_TFSb21_getBuiltinLogicValue
   // CHECK-NEXT: apply
   // CHECK-NEXT: cond_br {{.*}}, [[LOOPTRUE:bb[0-9]+]], [[OUT:bb[0-9]+]]
   while a {
@@ -330,7 +330,7 @@ func test_if_break(a : Bool) {
   }
 
   // CHECK: [[LOOPTRUE]]:
-  // CHECK: function_ref @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_
+  // CHECK: function_ref @_TFSb21_getBuiltinLogicValue
   // CHECK-NEXT: apply
   // CHECK-NEXT: cond_br {{.*}}, [[IFTRUE:bb[0-9]+]], [[IFFALSE:bb[0-9]+]]
 
@@ -354,7 +354,7 @@ func test_do() {
   bar(0)
   // CHECK-NOT: br bb
   do {
-    // CHECK: [[CTOR:%.*]] = function_ref @_TFC10statements7MyClassCfMS0_FT_S0_
+    // CHECK: [[CTOR:%.*]] = function_ref @_TFC10statements7MyClassC
     // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
     let obj = MyClass()
     _ = obj
@@ -384,7 +384,7 @@ func test_do_labeled() {
   // CHECK: br bb1
   // CHECK: bb1:
   lbl: do {
-    // CHECK: [[CTOR:%.*]] = function_ref @_TFC10statements7MyClassCfMS0_FT_S0_
+    // CHECK: [[CTOR:%.*]] = function_ref @_TFC10statements7MyClassC
     // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
     let obj = MyClass()
     _ = obj
@@ -493,13 +493,13 @@ func generic_callee_1<T>(_: T) {}
 func generic_callee_2<T>(_: T) {}
 func generic_callee_3<T>(_: T) {}
 
-// CHECK-LABEL: sil hidden @_TF10statements16defer_in_genericurFq_T_
+// CHECK-LABEL: sil hidden @_TF10statements16defer_in_generic
 func defer_in_generic<T>(x: T) {
-  // CHECK: [[C3:%.*]] = function_ref @_TF10statements16generic_callee_3urFq_T_
+  // CHECK: [[C3:%.*]] = function_ref @_TF10statements16generic_callee_3
   // CHECK: apply [[C3]]<T>
-  // CHECK: [[C2:%.*]] = function_ref @_TFF10statements16defer_in_genericurFq_T_L0_6$deferfT_T_
+  // CHECK: [[C2:%.*]] = function_ref @_TFF10statements16defer_in_generic
   // CHECK: apply [[C2]]<T>
-  // CHECK: [[C1:%.*]] = function_ref @_TFF10statements16defer_in_genericurFq_T_L_6$deferfT_T_
+  // CHECK: [[C1:%.*]] = function_ref @_TFF10statements16defer_in_generic
   // CHECK: apply [[C1]]<T>
   defer { generic_callee_1(x) }
   defer { generic_callee_2(x) }
@@ -601,7 +601,7 @@ enum MyOpt<T> {
   case None, Some(T)
 }
 
-// CHECK-LABEL: sil hidden @_TF10statements28testAddressOnlyEnumInRequireurFGOS_5MyOptq__q_
+// CHECK-LABEL: sil hidden @_TF10statements28testAddressOnlyEnumInRequire
 // CHECK-NEXT: bb0(%0 : $*T, %1 : $*MyOpt<T>):
 // CHECK-NEXT: debug_value_addr %1 : $*MyOpt<T>  // let a
 // CHECK-NEXT: %3 = alloc_stack $T  // let t
@@ -636,7 +636,7 @@ func testAddressOnlyEnumInRequire<T>(a : MyOpt<T>) -> T {
 
 
 
-// CHECK-LABEL: sil hidden @_TF10statements19testCleanupEmissionurFq_T_
+// CHECK-LABEL: sil hidden @_TF10statements19testCleanupEmission
 // <rdar://problem/20563234> let-else problem: cleanups for bound patterns shouldn't be run in the else block
 protocol MyProtocol {}
 func testCleanupEmission<T>(x: T) {

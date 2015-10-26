@@ -33,7 +33,7 @@ import Swift
 // CHECK:   i32 16,
 // CHECK:   %swift.type* null,
 // CHECK:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
-// CHECK:   %C13generic_types1A* (i64, %C13generic_types1A*)* @_TFC13generic_types1AcurfMGS0_q__FT1ySi_GS0_q__
+// CHECK:   %C13generic_types1A* (i64, %C13generic_types1A*)* @_TFC13generic_types1AcfT1ySi_GS0_x_
 // CHECK: }
 // CHECK: @_TMPC13generic_types1B = global [[B_METADATA_T:{.* } }]] {
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[B_METADATA_CREATE:@[a-z0-9_.]+]],
@@ -75,7 +75,7 @@ import Swift
 // CHECK:   %swift.opaque* @_objc_empty_cache,
 // CHECK:   %swift.opaque* null,
 // CHECK:   i64 1,
-// CHECK:   void (%Si*, [[D]]*)* @_TTVFC13generic_types1D3runurfGS0_q__FSiT_
+// CHECK:   void (%Si*, [[D]]*)* @_TTVFC13generic_types1D3runfSiT_
 // CHECK: }
 
 // CHECK: define private %swift.type* [[A_METADATA_CREATE]](%swift.type_pattern*, i8**) {{.*}} {

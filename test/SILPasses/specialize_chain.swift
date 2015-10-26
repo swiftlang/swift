@@ -35,16 +35,16 @@ func exp1() {
   var II = YYY<Int>(t: 5)
   print(II.AAA9(t: 4), terminator: "")
 }
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA9urfRGS0_q__FT1tq__Si
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA8urfRGS0_q__FT1tq__Si
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA7urfRGS0_q__FT1tq__Si
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA6urfRGS0_q__FT1tq__Si
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA5urfRGS0_q__FT1tq__Si
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA4urfRGS0_q__FT1tq__Si
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA3urfRGS0_q__FT1tq__Si
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA2urfRGS0_q__FT1tq__Si
-//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA1urfRGS0_q__FT1tq__Si
+//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA9
+//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA8
+//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA7
+//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA6
+//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA5
+//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA4
+//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA3
+//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA2
+//CHECK: sil shared [noinline] @_TTSg5Si___TFV16specialize_chain3YYY4AAA1
 //CHECK: exp1
-//CHECK: function_ref @_TTSg5Si___TFV16specialize_chain3YYYCurfMGS0_q__FT1tq__GS0_q__
-//CHECK: function_ref @_TTSg5Si___TFV16specialize_chain3YYY4AAA9urfRGS0_q__FT1tq__Si
+//CHECK: function_ref @_TTSg5Si___TFV16specialize_chain3YYYC
+//CHECK: function_ref @_TTSg5Si___TFV16specialize_chain3YYY4AAA9
 //CHECK: return

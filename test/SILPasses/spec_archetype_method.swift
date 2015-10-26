@@ -32,7 +32,7 @@ func useFoo<T>(x x: T) {
 //CHECK: function_ref @_TTSg5C21spec_archetype_method3ABCS0_S_8pingableS____TF21spec_archetype_method12generic_call
 //CHECK-NEXT: retain
 //CHECK-NEXT: apply
-//CHECK:  function_ref @_TTSg5C21spec_archetype_method3ABC___TF21spec_archetype_method6useFoourFT1xq__T_ : $@convention(thin) (@in ABC) -> ()
+//CHECK:  function_ref @_TTSg5C21spec_archetype_method3ABC___TF21spec_archetype_method6useFoo{{.*}} : $@convention(thin) (@in ABC) -> ()
 //CHECK-NEXT: apply
 //CHECK: return
 public

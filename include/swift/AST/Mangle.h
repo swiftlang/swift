@@ -135,8 +135,7 @@ public:
   void mangleProtocolName(const ProtocolDecl *protocol);
   void mangleProtocolConformance(const ProtocolConformance *conformance);
   void bindGenericParameters(CanGenericSignature sig,
-                             const GenericParamList *genericParams,
-                             bool mangleParameters);
+                             const GenericParamList *genericParams);
   void addSubstitution(const void *ptr);
 
   void mangleDeclTypeForDebugger(const ValueDecl *decl);
@@ -174,10 +173,6 @@ private:
                                const DeclContext *parentContext,
                                const DeclContext *localContext);
 
-  void manglePolymorphicType(const GenericParamList *genericParams, Type T,
-                             ResilienceExpansion expansion,
-                             unsigned uncurryLevel,
-                             bool mangleAsFunction);
   bool tryMangleStandardSubstitution(const NominalTypeDecl *type);
   bool tryMangleSubstitution(const void *ptr);
 

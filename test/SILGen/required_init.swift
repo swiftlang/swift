@@ -18,9 +18,9 @@ class Bar: Foo {
 }
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK:         #Foo.init!allocator.1: _TFC13required_init3FooCfMS0_FT12floatLiteralSf_S0_
-// CHECK:         #Foo.init!initializer.1: _TFC13required_init3FoocfMS0_FT12floatLiteralSf_S0_
+// CHECK:         #Foo.init!allocator.1: _TFC13required_init3FooC
+// CHECK:         #Foo.init!initializer.1: _TFC13required_init3Fooc
 
 // CHECK-LABEL: sil_vtable Bar {
-// CHECK:         #Foo.init!allocator.1: _TFC13required_init3BarCfMS0_FT12floatLiteralSf_S0_
-// CHECK:         #Foo.init!initializer.1: _TFC13required_init3BarcfMS0_FT12floatLiteralSf_S0_
+// CHECK:         #Foo.init!allocator.1: _TFC13required_init3BarC
+// CHECK:         #Foo.init!initializer.1: _TFC13required_init3Barc

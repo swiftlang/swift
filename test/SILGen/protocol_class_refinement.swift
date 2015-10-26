@@ -25,7 +25,7 @@ extension ObjectUID {
 
 class Base {}
 
-// CHECK-LABEL: sil hidden @_TF25protocol_class_refinement12getObjectUIDuR_S_9ObjectUIDrFq_TSiSiSiSi_
+// CHECK-LABEL: sil hidden @_TF25protocol_class_refinement12getObjectUID
 func getObjectUID<T: ObjectUID>(var x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[XBOX:%.*]] = alloc_box $T
   // -- call x.uid()
@@ -75,7 +75,7 @@ func getObjectUID<T: ObjectUID>(var x: T) -> (Int, Int, Int, Int) {
   return (x.iid, x.clsid, x.nextCLSID, x.secondNextCLSID)
 }
 
-// CHECK-LABEL: sil hidden @_TF25protocol_class_refinement16getBaseObjectUIDuR_CS_4Base_S_3UIDrFq_TSiSiSi_
+// CHECK-LABEL: sil hidden @_TF25protocol_class_refinement16getBaseObjectUID
 func getBaseObjectUID<T: UID where T: Base>(var x: T) -> (Int, Int, Int) {
   // CHECK: [[XBOX:%.*]] = alloc_box $T
   // -- call x.uid()

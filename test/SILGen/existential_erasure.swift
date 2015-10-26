@@ -100,7 +100,7 @@ func errorHandler(e: ErrorType) throws -> ErrorType {
 // CHECK:  debug_value %0 : $ErrorType
 // CHECK:  [[OPEN:%.*]] = open_existential_box %0 : $ErrorType to $*[[OPEN_TYPE:@opened\(.*\) ErrorType]]
 // CHECK:  [[RESULT:%.*]] = alloc_existential_box $ErrorType, $[[OPEN_TYPE]]
-// CHECK:  [[FUNC:%.*]] = function_ref @_TFE19existential_erasurePs9ErrorType17returnOrThrowSelfuR_S0_rfq_FzT_q_
+// CHECK:  [[FUNC:%.*]] = function_ref @_TFE19existential_erasurePs9ErrorType17returnOrThrowSelf
 // CHECK:  try_apply [[FUNC]]<[[OPEN_TYPE]]>([[RESULT]]#1, [[OPEN]])
 //
 // CHECK: bb1

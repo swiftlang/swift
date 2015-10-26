@@ -112,9 +112,9 @@ func objc_enum_switch(x: ExportedToObjC) -> Int {
 }
 
 @objc class ObjCEnumMethods : NSObject {
-  // CHECK: define internal void @_TToFC12objc_ns_enum15ObjCEnumMethods6enumInfS0_FOS_14ExportedToObjCT_([[OBJC_ENUM_METHODS:.*]]*, i8*, i64)
+  // CHECK: define internal void @_TToFC12objc_ns_enum15ObjCEnumMethods6enumInfOS_14ExportedToObjCT_([[OBJC_ENUM_METHODS:.*]]*, i8*, i64)
   dynamic func enumIn(x: ExportedToObjC) {}
-  // CHECK: define internal i64 @_TToFC12objc_ns_enum15ObjCEnumMethods7enumOutfS0_FT_OS_14ExportedToObjC([[OBJC_ENUM_METHODS]]*, i8*)
+  // CHECK: define internal i64 @_TToFC12objc_ns_enum15ObjCEnumMethods7enumOutfT_OS_14ExportedToObjC([[OBJC_ENUM_METHODS]]*, i8*)
   dynamic func enumOut() -> ExportedToObjC { return .Foo }
 
   // CHECK: define internal i64 @_TToFC12objc_ns_enum15ObjCEnumMethodsg4propOS_14ExportedToObjC([[OBJC_ENUM_METHODS]]*, i8*)

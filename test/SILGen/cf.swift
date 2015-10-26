@@ -58,23 +58,23 @@ protocol ImpedanceType {
 
 extension CCImpedance: ImpedanceType {}
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4realw_9Component
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4realwx9Component
 // CHECK-LABEL: sil shared [transparent] @_TFVSC11CCImpedanceg4realSd
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4imagw_9Component
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4imagwx9Component
 // CHECK-LABEL: sil shared [transparent] @_TFVSC11CCImpedanceg4imagSd
 
 class MyMagnetism : CCMagnetismModel {
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC2cf11MyMagnetism15getRefrigeratorfS0_FT_CSo14CCRefrigerator : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC2cf11MyMagnetism15getRefrigerator{{.*}} : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator
   override func getRefrigerator() -> CCRefrigerator {
     return super.getRefrigerator()
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC2cf11MyMagnetism16takeRefrigeratorfS0_FT_CSo14CCRefrigerator : $@convention(objc_method) (MyMagnetism) -> @owned CCRefrigerator
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC2cf11MyMagnetism16takeRefrigerator{{.*}} : $@convention(objc_method) (MyMagnetism) -> @owned CCRefrigerator
   override func takeRefrigerator() -> CCRefrigerator {
     return super.takeRefrigerator()
   }
 
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC2cf11MyMagnetism18borrowRefrigeratorfS0_FT_CSo14CCRefrigerator : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC2cf11MyMagnetism18borrowRefrigerator{{.*}} : $@convention(objc_method) (MyMagnetism) -> @autoreleased CCRefrigerator
   override func borrowRefrigerator() -> CCRefrigerator {
     return super.borrowRefrigerator()
   }

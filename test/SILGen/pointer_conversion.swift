@@ -16,24 +16,24 @@ func pointerToPointer(mp: UnsafeMutablePointer<Int>,
                       _ cp: UnsafePointer<Int>) {
   // There should be no conversion here
   takesMutablePointer(mp)
-  // CHECK: [[TAKES_MUTABLE_POINTER:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointerFGSpSi_T_
+  // CHECK: [[TAKES_MUTABLE_POINTER:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointer
   // CHECK: apply [[TAKES_MUTABLE_POINTER]]([[MP]])
 
   takesMutableVoidPointer(mp)
-  // CHECK: [[TAKES_MUTABLE_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion23takesMutableVoidPointerFGSpT__T_
-  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs32_convertPointerToPointerArgumentu0_R_s12_PointerType0_S_rFq_q0_
+  // CHECK: [[TAKES_MUTABLE_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion23takesMutableVoidPointer
+  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs32_convertPointerToPointerArgument
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>, UnsafeMutablePointer<()>>
   // CHECK: apply [[TAKES_MUTABLE_VOID_POINTER]]
 
   takesConstPointer(mp)
   // CHECK: [[TAKES_CONST_POINTER:%.*]] = function_ref @_TF18pointer_conversion17takesConstPointerFGSPSi_T_
-  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs32_convertPointerToPointerArgumentu0_R_s12_PointerType0_S_rFq_q0_
+  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs32_convertPointerToPointerArgument
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>, UnsafePointer<Int>>
   // CHECK: apply [[TAKES_CONST_POINTER]]
 
   takesConstVoidPointer(mp)
   // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFGSPT__T_
-  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs32_convertPointerToPointerArgumentu0_R_s12_PointerType0_S_rFq_q0_
+  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs32_convertPointerToPointerArgument
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>, UnsafePointer<()>>
   // CHECK: apply [[TAKES_CONST_VOID_POINTER]]
 }
@@ -43,8 +43,8 @@ func arrayToPointer() {
   var ints = [1,2,3]
 
   takesMutablePointer(&ints)
-  // CHECK: [[TAKES_MUTABLE_POINTER:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointerFGSpSi_T_
-  // CHECK: [[CONVERT_MUTABLE:%.*]] = function_ref @_TFs37_convertMutableArrayToPointerArgumentu0_R0_s12_PointerTyperFRGSaq__TGSqPs9AnyObject__q0__
+  // CHECK: [[TAKES_MUTABLE_POINTER:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointer
+  // CHECK: [[CONVERT_MUTABLE:%.*]] = function_ref @_TFs37_convertMutableArrayToPointerArgument
   // CHECK: apply [[CONVERT_MUTABLE]]<Int, UnsafeMutablePointer<Int>>([[TUPLE_BUF:%.*]]#1,
   // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]#1
   // CHECK: [[OWNER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 0
@@ -54,7 +54,7 @@ func arrayToPointer() {
 
   takesConstPointer(ints)
   // CHECK: [[TAKES_CONST_POINTER:%.*]] = function_ref @_TF18pointer_conversion17takesConstPointerFGSPSi_T_
-  // CHECK: [[CONVERT_CONST:%.*]] = function_ref @_TFs35_convertConstArrayToPointerArgumentu0_R0_s12_PointerTyperFGSaq__TGSqPs9AnyObject__q0__
+  // CHECK: [[CONVERT_CONST:%.*]] = function_ref @_TFs35_convertConstArrayToPointerArgument
   // CHECK: apply [[CONVERT_CONST]]<Int, UnsafePointer<Int>>([[TUPLE_BUF:%.*]]#1,
   // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]#1
   // CHECK: [[OWNER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 0
@@ -67,7 +67,7 @@ func arrayToPointer() {
 func stringToPointer(s: String) {
   takesConstVoidPointer(s)
   // CHECK: [[TAKES_CONST_VOID_POINTER:%.*]] = function_ref @_TF18pointer_conversion21takesConstVoidPointerFGSPT__T_
-  // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_TFs40_convertConstStringToUTF8PointerArgumentuR_s12_PointerTyperFSSTGSqPs9AnyObject__q__
+  // CHECK: [[CONVERT_STRING:%.*]] = function_ref @_TFs40_convertConstStringToUTF8PointerArgument
   // CHECK: apply [[CONVERT_STRING]]<UnsafePointer<()>>([[TUPLE_BUF:%.*]]#1,
   // CHECK: [[TUPLE:%.*]] = load [[TUPLE_BUF]]#1
   // CHECK: [[OWNER:%.*]] = tuple_extract [[TUPLE]] : ${{.*}}, 0
@@ -81,9 +81,9 @@ func inoutToPointer() {
   var int = 0
   // CHECK: [[INT:%.*]] = alloc_box $Int
   takesMutablePointer(&int)
-  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointerFGSpSi_T_
+  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointer
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[INT]]#1
-  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs30_convertInOutToPointerArgumentuR_s12_PointerTyperFBpq_
+  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs30_convertInOutToPointerArgument
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>>({{%.*}}, [[POINTER]])
   // CHECK: apply [[TAKES_MUTABLE]]
 
@@ -92,10 +92,10 @@ func inoutToPointer() {
     set { }
   }
   takesMutablePointer(&logicalInt)
-  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointerFGSpSi_T_
+  // CHECK: [[TAKES_MUTABLE:%.*]] = function_ref @_TF18pointer_conversion19takesMutablePointer
   // CHECK: [[GETTER:%.*]] = function_ref @_TFF18pointer_conversion14inoutToPointerFT_T_gL_10logicalIntSi
   // CHECK: apply [[GETTER]]
-  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs30_convertInOutToPointerArgumentuR_s12_PointerTyperFBpq_
+  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs30_convertInOutToPointerArgument
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<Int>>
   // CHECK: apply [[TAKES_MUTABLE]]
   // CHECK: [[SETTER:%.*]] = function_ref @_TFF18pointer_conversion14inoutToPointerFT_T_sL_10logicalIntSi
@@ -113,9 +113,9 @@ func classInoutToPointer() {
   var c = C()
   // CHECK: [[VAR:%.*]] = alloc_box $C
   takesPlusOnePointer(&c)
-  // CHECK: [[TAKES_PLUS_ONE:%.*]] = function_ref @_TF18pointer_conversion19takesPlusOnePointerFGSpCS_1C_T_
+  // CHECK: [[TAKES_PLUS_ONE:%.*]] = function_ref @_TF18pointer_conversion19takesPlusOnePointer
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[INT]]#1
-  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs30_convertInOutToPointerArgumentuR_s12_PointerTyperFBpq_
+  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs30_convertInOutToPointerArgument
   // CHECK: apply [[CONVERT]]<UnsafeMutablePointer<C>>({{%.*}}, [[POINTER]])
   // CHECK: apply [[TAKES_PLUS_ONE]]
 
@@ -126,7 +126,7 @@ func classInoutToPointer() {
   // CHECK: [[UNOWNED:%.*]] = ref_to_unmanaged [[OWNED]]
   // CHECK: store [[UNOWNED]] to [[WRITEBACK]]
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITEBACK]]
-  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs30_convertInOutToPointerArgumentuR_s12_PointerTyperFBpq_
+  // CHECK: [[CONVERT:%.*]] = function_ref @_TFs30_convertInOutToPointerArgument
   // CHECK: apply [[CONVERT]]<AutoreleasingUnsafeMutablePointer<C>>({{%.*}}, [[POINTER]])
   // CHECK: apply [[TAKES_PLUS_ZERO]]
   // CHECK: [[UNOWNED_OUT:%.*]] = load [[WRITEBACK]]
@@ -140,7 +140,7 @@ func classInoutToPointer() {
 
 // Check that pointer types don't bridge anymore.
 @objc class ObjCMethodBridging : NSObject {
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC18pointer_conversion18ObjCMethodBridging11pointerArgsfS0_FTGSpSi_1yGSPSi_1zGVs33AutoreleasingUnsafeMutablePointerS0___T_ : $@convention(objc_method) (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC18pointer_conversion18ObjCMethodBridging11pointerArgs{{.*}} : $@convention(objc_method) (UnsafeMutablePointer<Int>, UnsafePointer<Int>, AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>, ObjCMethodBridging)
   @objc func pointerArgs(x: UnsafeMutablePointer<Int>,
                          y: UnsafePointer<Int>,
                          z: AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>) {}

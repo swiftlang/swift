@@ -157,12 +157,15 @@ static Node::Kind nominalTypeMarkerToNodeKind(char c) {
   return Node::Kind::Identifier;
 }
 
-static std::string archetypeName(Node::IndexType i) {
+static std::string archetypeName(Node::IndexType index,
+                                 Node::IndexType depth) {
   DemanglerPrinter name;
   do {
-    name << (char)('A' + (i % 26));
-    i /= 26;
-  } while (i);
+    name << (char)('A' + (index % 26));
+    index /= 26;
+  } while (index);
+  if (depth != 0)
+    name << depth;
   return name.str();
 }
 
@@ -303,8 +306,6 @@ static StringRef toString(ValueWitnessKind k) {
 /// The main class for parsing a demangling tree out of a mangled string.
 class Demangler {
   std::vector<NodePointer> Substitutions;
-  std::vector<unsigned> ArchetypeCounts;
-  unsigned ArchetypeCount = 0;
   NameSource Mangled;
 public:  
   Demangler(llvm::StringRef mangled) : Mangled(mangled) {}
@@ -326,11 +327,6 @@ public:
                                            unsigned(*_kind)));     \
   } while (false)
 
-  void resetGenericContext() {
-    ArchetypeCounts.clear();
-    ArchetypeCount = 0;
-  }
-
   /// Attempt to demangle the source string.  The root node will
   /// always be a Global.  Extra characters at the end will be
   /// tolerated (and included as a Suffix node as a child of the
@@ -351,7 +347,6 @@ public:
         // The Substitution header does not share state with the rest
         // of the mangling.
         Substitutions.clear();
-        resetGenericContext();
       } while (Mangled.nextIf("_TTS"));
 
       // Then check that we have a global.
@@ -641,7 +636,6 @@ private:
         NodePointer thunk = NodeFactory::create(Node::Kind::ProtocolWitness);
         DEMANGLE_CHILD_OR_RETURN(thunk, ProtocolConformance);
         // The entity is mangled in its own generic context.
-        resetGenericContext();
         DEMANGLE_CHILD_OR_RETURN(thunk, Entity);
         return thunk;
       }
@@ -1166,7 +1160,6 @@ private:
       // The generic context is currently re-specified by the type mangling.
       // If we ever remove 'self' from manglings, we should stop resetting the
       // context here.
-      resetGenericContext();
       if (!sig) return nullptr;
       NodePointer type = demangleContext();
       if (!type) return nullptr;
@@ -1358,85 +1351,25 @@ private:
     return entity;
   }
 
-  /// A RAII object designed for parsing generic signatures.
-  class GenericContext {
-    Demangler &D;
-  public:
-    GenericContext(Demangler &D) : D(D) {
-      D.ArchetypeCounts.push_back(D.ArchetypeCount);
-    }
-    ~GenericContext() {
-      D.ArchetypeCount = D.ArchetypeCounts.back();
-    }
-  };
-  
-  /// Demangle a generic clause.
-  ///
-  /// \param C - not really required; just a token to prove that the caller
-  ///   has thought to enter a generic context
-  NodePointer demangleGenerics(GenericContext &C) {
-    NodePointer archetypes = NodeFactory::create(Node::Kind::Generics);
-    Node::Kind nodeKind = Node::Kind::Archetype;
-    while (true) {
-      if (nodeKind == Node::Kind::Archetype && Mangled.nextIf('U')) {
-        nodeKind = Node::Kind::AssociatedType;
-        continue;
-      }
-
-      NodePointer protocolList;
-      if (Mangled.nextIf('_')) {
-        if (!Mangled)
-          return nullptr;
-        char c = Mangled.peek();
-        if (c != '_' && c != 'S' && c != 's'
-            && (nodeKind == Node::Kind::AssociatedType || c != 'U')
-            && !isStartOfIdentifier(c))
-          break;
-      } else {
-        protocolList = demangleProtocolList();
-        if (!protocolList)
-          return nullptr;
-      }
-
-      NodePointer archetype;
-      if (nodeKind == Node::Kind::Archetype) {
-        archetype =
-          NodeFactory::create(nodeKind, archetypeName(ArchetypeCount++));
-      } else {
-        archetype = NodeFactory::create(nodeKind);
-      }
-
-      if (protocolList) {
-        archetype->addChild(std::move(protocolList));
-      }
-
-      archetypes->addChild(std::move(archetype));
-    }
-    return archetypes;
+  NodePointer demangleArchetypeRef(Node::IndexType depth, Node::IndexType i) {
+    // FIXME: Name won't match demangled context generic signatures correctly.
+    auto ref = NodeFactory::create(Node::Kind::ArchetypeRef,
+                                   archetypeName(i, depth));
+    ref->addChild(NodeFactory::create(Node::Kind::Index, depth));
+    ref->addChild(NodeFactory::create(Node::Kind::Index, i));
+    return ref;
   }
 
-  NodePointer demangleArchetypeRef(Node::IndexType depth, Node::IndexType i) {
-    auto makeArchetypeRef = [&](Node::IndexType nameIndex) -> NodePointer {
-      auto ref = NodeFactory::create(Node::Kind::ArchetypeRef,
-                                     archetypeName(nameIndex));
-      ref->addChild(NodeFactory::create(Node::Kind::Index, depth));
-      ref->addChild(NodeFactory::create(Node::Kind::Index, i));
-      return ref;
-    };
-  
-    if (depth == 0 && ArchetypeCount == 0) {
-      return makeArchetypeRef(i);
-    }
-    size_t length = ArchetypeCounts.size();
-    if (depth >= length)
-      return nullptr;
-    size_t index = ArchetypeCounts[length - 1 - depth] + i;
-    size_t max =
-        (depth == 0) ? ArchetypeCount : ArchetypeCounts[length - depth];
-    if (index >= max)
-      return nullptr;
-    
-    return makeArchetypeRef(index);
+  NodePointer getDependentGenericParamType(unsigned depth, unsigned index) {
+    DemanglerPrinter Name;
+    Name << archetypeName(index, depth);
+
+    auto paramTy = NodeFactory::create(Node::Kind::DependentGenericParamType,
+                                       std::move(Name.str()));
+    paramTy->addChild(NodeFactory::create(Node::Kind::Index, depth));
+    paramTy->addChild(NodeFactory::create(Node::Kind::Index, index));
+
+    return paramTy;
   }
 
   NodePointer demangleGenericParamIndex() {
@@ -1448,27 +1381,16 @@ private:
       depth += 1;
       if (!demangleIndex(index))
         return nullptr;
-    } else {
+    } else if (Mangled.nextIf('x')) {
       depth = 0;
+      index = 0;
+    } else {
       if (!demangleIndex(index))
         return nullptr;
+      depth = 0;
+      index += 1;
     }
-
-    DemanglerPrinter Name;
-    if (depth == 0) {
-      Name << archetypeName(index);
-    } else {
-      if (depth >= ArchetypeCounts.size())
-        return nullptr;
-      Name << archetypeName(ArchetypeCounts[depth] + index);
-    }
-
-    auto paramTy = NodeFactory::create(Node::Kind::DependentGenericParamType,
-                                       std::move(Name.str()));
-    paramTy->addChild(NodeFactory::create(Node::Kind::Index, depth));
-    paramTy->addChild(NodeFactory::create(Node::Kind::Index, index));
-
-    return paramTy;
+    return getDependentGenericParamType(depth, index);
   }
 
   NodePointer demangleDependentMemberTypeName(NodePointer base) {
@@ -1575,8 +1497,6 @@ private:
   }
 
   NodePointer demangleGenericSignature() {
-    assert(ArchetypeCounts.empty() && "already some generic context?!");
-
     auto sig = NodeFactory::create(Node::Kind::DependentGenericSignature);
     // First read in the parameter counts at each depth.
     Node::IndexType count = ~(Node::IndexType)0;
@@ -1585,8 +1505,6 @@ private:
       auto countNode =
         NodeFactory::create(Node::Kind::DependentGenericParamCount, count);
       sig->addChild(countNode);
-      ArchetypeCounts.push_back(ArchetypeCount);
-      ArchetypeCount += count;
     };
     
     while (Mangled.peek() != 'R' && Mangled.peek() != 'r') {
@@ -2026,6 +1944,10 @@ private:
     if (c == 'q') {
       return demangleDependentType();
     }
+    if (c == 'x') {
+      // Special mangling for the first generic param.
+      return getDependentGenericParamType(0, 0);
+    }
     if (c == 'w') {
       return demangleAssociatedTypeSimple();
     }
@@ -2059,19 +1981,6 @@ private:
       dependentGenericType->addChild(sig);
       dependentGenericType->addChild(sub);
       return dependentGenericType;
-    }
-    if (c == 'U') {
-      GenericContext genericContext(*this);
-      NodePointer generics = demangleGenerics(genericContext);
-      if (!generics)
-        return nullptr;
-      NodePointer base = demangleType();
-      if (!base)
-        return nullptr;
-      NodePointer genericType = NodeFactory::create(Node::Kind::GenericType);
-      genericType->addChild(generics);
-      genericType->addChild(base);
-      return genericType;
     }
     if (c == 'X') {
       if (Mangled.nextIf('f')) {
@@ -2169,10 +2078,8 @@ private:
 
     // Enter a new generic context if this type is generic.
     // FIXME: replace with std::optional, when we have it.
-    std::vector<GenericContext> genericContext;
     if (Mangled.nextIf('G')) {
-      genericContext.emplace_back(*this);
-      NodePointer generics = demangleGenerics(genericContext.front());
+      NodePointer generics = demangleGenericSignature();
       if (!generics)
         return nullptr;
       type->addChild(generics);
@@ -2887,12 +2794,7 @@ void NodePrinter::printSimplifiedEntityType(NodePointer context,
     type = type->getChild(1)->getChild(0);
   }
 
-  if (type->getKind() == Node::Kind::UncurriedFunctionType) {
-    if (generics) print(generics);
-    print(type->getChild(type->getNumChildren() - 1)->getChild(0));
-  } else {
-    print(entityType);
-  }
+  print(entityType);
 }
 
 void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) {
@@ -3027,11 +2929,8 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     printFunctionType(pointer);
     return;
   case Node::Kind::FunctionType:
-    printFunctionType(pointer);
-    return;
   case Node::Kind::UncurriedFunctionType:
-    print(pointer->getChild(0));
-    print(pointer->getChild(1)->getChild(0));
+    printFunctionType(pointer);
     return;
   case Node::Kind::ArgumentTuple: {
     bool need_parens = false;
@@ -3605,7 +3504,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::DependentGenericSignature: {
     Printer << '<';
     
-    unsigned paramNumber = 0;
     unsigned depth = 0;
     unsigned numChildren = pointer->getNumChildren();
     for (;
@@ -3620,7 +3518,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       for (unsigned index = 0; index < count; ++index) {
         if (index != 0)
           Printer << ", ";
-        Printer << archetypeName(paramNumber++);
+        // FIXME: Depth won't match when a generic signature applies to a
+        // method in generic type context.
+        Printer << archetypeName(index, depth);
       }
     }
     

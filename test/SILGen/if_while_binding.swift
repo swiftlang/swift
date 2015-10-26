@@ -219,13 +219,13 @@ func if_multi_else() {
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding14if_multi_whereFT_T_
 func if_multi_where() {
-  // CHECK: [[FOO:%[0-9]+]] = function_ref @_TF16if_while_binding3fooFT_GSqSS_
+  // CHECK: [[FOO:%[0-9]+]] = function_ref @_TF16if_while_binding3foo
   // CHECK: [[AVAL:%[0-9]+]] = apply [[FOO]]()
   // CHECK: switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[YESA:bb.*]], default [[DONE:bb[0-9]+]]
 
   // CHECK: [[YESA]]([[AVAL:%[0-9]+]] : $String):
   // CHECK:   debug_value [[AVAL]]
-  // CHECK:   [[BAR:%[0-9]+]] = function_ref @_TF16if_while_binding3barFT_GSqSS_
+  // CHECK:   [[BAR:%[0-9]+]] = function_ref @_TF16if_while_binding3bar
   // CHECK:   [[BVAL:%[0-9]+]] = apply [[BAR]]()
   // CHECK:   switch_enum [[BVAL]] : $Optional<String>, case #Optional.Some!enumelt.1: [[YESB:bb[0-9]+]], default [[NOB:bb[0-9]+]]
 

@@ -18,7 +18,7 @@ func testDynamicInit(cm: C.Type) {
 // CHECK-LABEL: sil hidden @_TF12dynamic_init14testStaticInit
 func testStaticInit() {
   // CHECK-NOT: class_method
-  // CHECK: function_ref @_TFC12dynamic_init1CCfMS0_FT_S0_ : $@convention(thin) (@thick C.Type) -> @owned C
+  // CHECK: function_ref @_TFC12dynamic_init1CC{{.*}} : $@convention(thin) (@thick C.Type) -> @owned C
   C()
   // CHECK-NOT: class_method
   // CHECK: return

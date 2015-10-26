@@ -17,24 +17,24 @@ import Foundation
 // armv7k-watchos: [[ARMV7K_MYRECT:%.*]] = type { float, float, float, float }
 
 class Foo {
-  // x86_64-macosx: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
-  // x86_64-macosx: define hidden { <2 x float>, <2 x float> } @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {{.*}} {
-  // x86_64-ios: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
-  // x86_64-ios: define hidden { <2 x float>, <2 x float> } @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {{.*}} {
-  // i386-ios: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
-  // i386-ios: define hidden void @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
-  // armv7-ios: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
-  // armv7-ios: define hidden void @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
-  // arm64-ios: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
-  // arm64-ios: define hidden [[ARM64_MYRECT]] @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {{.*}} {
-  // x86_64-tvos: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
-  // x86_64-tvos: define hidden { <2 x float>, <2 x float> } @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {{.*}} {
-  // arm64-tvos: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
-  // arm64-tvos: define hidden [[ARM64_MYRECT]] @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {{.*}} {
-  // i386-watchos: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
-  // i386-watchos: define hidden void @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
-  // armv7k-watchos: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
-  // armv7k-watchos: define hidden [[ARMV7K_MYRECT]] @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {{.*}} {
+  // x86_64-macosx: define hidden void @_TFC8abitypes3Foo3bar{{.*}}(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
+  // x86_64-macosx: define hidden { <2 x float>, <2 x float> } @_TToFC8abitypes3Foo3bar{{.*}}(i8*, i8*) unnamed_addr {{.*}} {
+  // x86_64-ios: define hidden void @_TFC8abitypes3Foo3bar{{.*}}(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
+  // x86_64-ios: define hidden { <2 x float>, <2 x float> } @_TToFC8abitypes3Foo3bar{{.*}}(i8*, i8*) unnamed_addr {{.*}} {
+  // i386-ios: define hidden void @_TFC8abitypes3Foo3bar{{.*}}(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
+  // i386-ios: define hidden void @_TToFC8abitypes3Foo3bar{{.*}}(%VSC6MyRect* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
+  // armv7-ios: define hidden void @_TFC8abitypes3Foo3bar{{.*}}(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
+  // armv7-ios: define hidden void @_TToFC8abitypes3Foo3bar{{.*}}(%VSC6MyRect* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
+  // arm64-ios: define hidden void @_TFC8abitypes3Foo3bar{{.*}}(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
+  // arm64-ios: define hidden [[ARM64_MYRECT]] @_TToFC8abitypes3Foo3bar{{.*}}(i8*, i8*) unnamed_addr {{.*}} {
+  // x86_64-tvos: define hidden void @_TFC8abitypes3Foo3bar{{.*}}(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
+  // x86_64-tvos: define hidden { <2 x float>, <2 x float> } @_TToFC8abitypes3Foo3bar{{.*}}(i8*, i8*) unnamed_addr {{.*}} {
+  // arm64-tvos: define hidden void @_TFC8abitypes3Foo3bar{{.*}}(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
+  // arm64-tvos: define hidden [[ARM64_MYRECT]] @_TToFC8abitypes3Foo3bar{{.*}}(i8*, i8*) unnamed_addr {{.*}} {
+  // i386-watchos: define hidden void @_TFC8abitypes3Foo3bar{{.*}}(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
+  // i386-watchos: define hidden void @_TToFC8abitypes3Foo3bar{{.*}}(%VSC6MyRect* noalias nocapture sret, i8*, i8*) unnamed_addr {{.*}} {
+  // armv7k-watchos: define hidden void @_TFC8abitypes3Foo3bar{{.*}}(%VSC6MyRect* noalias nocapture sret, %C8abitypes3Foo*) {{.*}} {
+  // armv7k-watchos: define hidden [[ARMV7K_MYRECT]] @_TToFC8abitypes3Foo3bar{{.*}}(i8*, i8*) unnamed_addr {{.*}} {
   dynamic func bar() -> MyRect {
     return MyRect(x: 1, y: 2, width: 3, height: 4)
   }
@@ -213,17 +213,17 @@ class Foo {
   // x86_64-macosx:       [[R3:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[R2]]
   // x86_64-macosx:       ret i8 [[R3]]
   //
-  // x86_64-ios-fixme:          define hidden i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1, %C8abitypes3Foo*) {{.*}} {
-  // x86_64-ios-fixme:          define internal zeroext i1 @_TToFC8abitypes3Foo6negatefS0_FT
+  // x86_64-ios-fixme:          define hidden i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*) {{.*}} {
+  // x86_64-ios-fixme:          define internal zeroext i1 @_TToFC8abitypes3Foo6negate{{.*}}
   // x86_64-ios-fixme:          [[R1:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBoolFT1xVS_8ObjCBool_Sb(i1 %2)
-  // x86_64-ios-fixme:          [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1 [[R1]]
+  // x86_64-ios-fixme:          [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate{{.*}}(i1 [[R1]]
   // x86_64-ios-fixme:          [[R3:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBoolFT1xSb_VS_8ObjCBool(i1 [[R2]])
   // x86_64-ios-fixme:          ret i1 [[R3]]
   //
-  // armv7-ios-fixme:     define hidden i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1, %C8abitypes3Foo*) {{.*}} {
-  // armv7-ios-fixme:     define internal signext i8 @_TToFC8abitypes3Foo6negatefS0_FTSb_Sb(i8*, i8*, i8 signext) unnamed_addr {{.*}} {
+  // armv7-ios-fixme:     define hidden i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*) {{.*}} {
+  // armv7-ios-fixme:     define internal signext i8 @_TToFC8abitypes3Foo6negate{{.*}}(i8*, i8*, i8 signext) unnamed_addr {{.*}} {
   // armv7-ios-fixme:     [[R1:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBoolFT1xVS_8ObjCBool_Sb
-  // armv7-ios-fixme:     [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1 [[R1]]
+  // armv7-ios-fixme:     [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate{{.*}}(i1 [[R1]]
   // armv7-ios-fixme:     [[R3:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBoolFT1xSb_VS_8ObjCBool(i1 [[R2]]
   // armv7-ios-fixme:     ret i8 [[R3]]
   //
@@ -239,10 +239,10 @@ class Foo {
   // i386-ios-fixme:     [[R3:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[R2]]
   // i386-ios-fixme:     ret i8 [[R3]]
   //
-  // x86_64-tvos-fixme:          define hidden i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1, %C8abitypes3Foo*) {{.*}} {
-  // x86_64-tvos-fixme:          define internal zeroext i1 @_TToFC8abitypes3Foo6negatefS0_FT
+  // x86_64-tvos-fixme:          define hidden i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*) {{.*}} {
+  // x86_64-tvos-fixme:          define internal zeroext i1 @_TToFC8abitypes3Foo6negate{{.*}}
   // x86_64-tvos-fixme:          [[R1:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBoolFT1xVS_8ObjCBool_Sb(i1 %2)
-  // x86_64-tvos-fixme:          [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1 [[R1]]
+  // x86_64-tvos-fixme:          [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate{{.*}}(i1 [[R1]]
   // x86_64-tvos-fixme:          [[R3:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBoolFT1xSb_VS_8ObjCBool(i1 [[R2]])
   // x86_64-tvos-fixme:          ret i1 [[R3]]
   //
@@ -251,10 +251,10 @@ class Foo {
   // arm64-tvos-fixme:     [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate
   // arm64-tvos-fixme:     ret i1 [[R2]]
 
-  // i386-watchos:  define hidden i1 @_TFC8abitypes3Foo6negatefS0_FSbSb(i1, %C8abitypes3Foo*)
-  // i386-watchos:  define hidden zeroext i1 @_TToFC8abitypes3Foo6negatefS0_FSbSb
+  // i386-watchos:  define hidden i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*)
+  // i386-watchos:  define hidden zeroext i1 @_TToFC8abitypes3Foo6negate{{.*}}
   // i386-watchos:  [[R1:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBoolFVS_8ObjCBoolSb(i1 %2)
-  // i386-watchos:  [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negatefS0_FSbSb(i1 [[R1]]
+  // i386-watchos:  [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate{{.*}}(i1 [[R1]]
   // i386-watchos:  [[R3:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBoolFSbVS_8ObjCBool(i1 [[R2]])
   // i386-watchos:  ret i1 [[R3]]
 
@@ -416,10 +416,10 @@ class Foo {
   }
 
   // arm64-ios: define hidden void @_TFC8abitypes3Foo14callJustReturn{{.*}}(%VSC9BigStruct* noalias nocapture sret, %CSo13StructReturns*, %VSC9BigStruct* noalias nocapture dereferenceable({{.*}}), %C8abitypes3Foo*) {{.*}} {
-  // arm64-ios: define hidden void @_TToFC8abitypes3Foo14callJustReturnfS0_FTCSo13StructReturns4withVSC9BigStruct_S2_(%VSC9BigStruct* noalias nocapture sret, i8*, i8*, [[OPAQUE:.*]]*, %VSC9BigStruct*) unnamed_addr {{.*}} {
+  // arm64-ios: define hidden void @_TToFC8abitypes3Foo14callJustReturn{{.*}}(%VSC9BigStruct* noalias nocapture sret, i8*, i8*, [[OPAQUE:.*]]*, %VSC9BigStruct*) unnamed_addr {{.*}} {
   //
   // arm64-tvos: define hidden void @_TFC8abitypes3Foo14callJustReturn{{.*}}(%VSC9BigStruct* noalias nocapture sret, %CSo13StructReturns*, %VSC9BigStruct* noalias nocapture dereferenceable({{.*}}), %C8abitypes3Foo*) {{.*}} {
-  // arm64-tvos: define hidden void @_TToFC8abitypes3Foo14callJustReturnfS0_FTCSo13StructReturns4withVSC9BigStruct_S2_(%VSC9BigStruct* noalias nocapture sret, i8*, i8*, [[OPAQUE:.*]]*, %VSC9BigStruct*) unnamed_addr {{.*}} {
+  // arm64-tvos: define hidden void @_TToFC8abitypes3Foo14callJustReturn{{.*}}(%VSC9BigStruct* noalias nocapture sret, i8*, i8*, [[OPAQUE:.*]]*, %VSC9BigStruct*) unnamed_addr {{.*}} {
   dynamic func callJustReturn(r: StructReturns, with v: BigStruct) -> BigStruct {
     return r.justReturn(v)
   }

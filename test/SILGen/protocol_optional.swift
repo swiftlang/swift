@@ -21,7 +21,7 @@ func optionalMethodGeneric<T : P1>(var t t : T) {
   var methodRef = t.method
 }
 
-// CHECK-LABEL: sil hidden @_TF17protocol_optional23optionalPropertyGenericuR_S_2P1rFT1tq__T_ : $@convention(thin) <T where T : P1> (@owned T) -> ()
+// CHECK-LABEL: sil hidden @_TF17protocol_optional23optionalPropertyGeneric{{.*}} : $@convention(thin) <T where T : P1> (@owned T) -> ()
 func optionalPropertyGeneric<T : P1>(var t t : T) {
   // CHECK-NEXT: bb0([[T:%[0-9]+]] : $T):
   // CHECK-NEXT: [[TBOX:%[0-9]+]] = alloc_box $T
@@ -34,7 +34,7 @@ func optionalPropertyGeneric<T : P1>(var t t : T) {
   var propertyRef = t.prop
 }
 
-// CHECK-LABEL: sil hidden @_TF17protocol_optional24optionalSubscriptGenericuR_S_2P1rFT1tq__T_ : $@convention(thin) <T where T : P1> (@owned T) -> ()
+// CHECK-LABEL: sil hidden @_TF17protocol_optional24optionalSubscriptGeneric{{.*}} : $@convention(thin) <T where T : P1> (@owned T) -> ()
 func optionalSubscriptGeneric<T : P1>(var t t : T) {
   // CHECK-NEXT: bb0([[T:%[0-9]+]] : $T):
   // CHECK-NEXT: [[TBOX:%[0-9]+]] = alloc_box $T
@@ -42,7 +42,7 @@ func optionalSubscriptGeneric<T : P1>(var t t : T) {
   // CHECK-NEXT: [[OPT_BOX:%[0-9]+]] = alloc_box $Optional<Int>
   // CHECK-NEXT: [[T:%[0-9]+]] = load [[TBOX]]#1 : $*T
   // CHECK-NEXT: strong_retain [[T]] : $T
-  // CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si
+  // CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSiC
   // CHECK-NEXT: [[INT64:%[0-9]+]] = metatype $@thin Int.Type
   // CHECK-NEXT: [[FIVELIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 5
   // CHECK-NEXT: [[FIVE:%[0-9]+]] = apply [[INTCONV]]([[FIVELIT]], [[INT64]]) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int

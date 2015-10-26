@@ -54,13 +54,13 @@ struct S {}
 func callDup(let s: S) { _ = dup(s) }
 // CHECK-LABEL: define hidden void @_TF14generic_tuples7callDupFVS_1ST_()
 // CHECK-NEXT: entry:
-// CHECK-NEXT: call void @_TF14generic_tuples3dupurFq_Tq_q__({{.*}} undef, {{.*}} undef, %swift.type* {{.*}} @_TMfV14generic_tuples1S, {{.*}})
+// CHECK-NEXT: call void @_TF14generic_tuples3dupurFxTxx_({{.*}} undef, {{.*}} undef, %swift.type* {{.*}} @_TMfV14generic_tuples1S, {{.*}})
 // CHECK-NEXT: ret void
 
 class C {}
 
 func dupC<T : C>(let x: T) -> (T, T) { return (x, x) }
-// CHECK-LABEL: define hidden { %C14generic_tuples1C*, %C14generic_tuples1C* } @_TF14generic_tuples4dupCuR_CS_1CrFq_Tq_q__(%C14generic_tuples1C*, %swift.type* %T)
+// CHECK-LABEL: define hidden { %C14generic_tuples1C*, %C14generic_tuples1C* } @_TF14generic_tuples4dupCuRxCS_1CrFxTxx_(%C14generic_tuples1C*, %swift.type* %T)
 // CHECK-NEXT: entry:
 // CHECK:      [[REF:%.*]] = bitcast %C14generic_tuples1C* %0 to %swift.refcounted*
 // CHECK-NEXT: call void @swift_retain(%swift.refcounted* [[REF]])
@@ -74,7 +74,7 @@ func callDupC(let c: C) { _ = dupC(c) }
 // CHECK-NEXT: [[REF:%.*]] = bitcast %C14generic_tuples1C* %0 to %swift.refcounted*
 // CHECK-NEXT: call void @swift_retain(%swift.refcounted* [[REF]])
 // CHECK-NEXT: [[METATYPE:%.*]] = call %swift.type* @_TMaC14generic_tuples1C()
-// CHECK-NEXT: [[TUPLE:%.*]] = call { %C14generic_tuples1C*, %C14generic_tuples1C* } @_TF14generic_tuples4dupCuR_CS_1CrFq_Tq_q__(%C14generic_tuples1C* %0, %swift.type* [[METATYPE]])
+// CHECK-NEXT: [[TUPLE:%.*]] = call { %C14generic_tuples1C*, %C14generic_tuples1C* } @_TF14generic_tuples4dupCuRxCS_1CrFxTxx_(%C14generic_tuples1C* %0, %swift.type* [[METATYPE]])
 // CHECK-NEXT: [[LEFT:%.*]] = extractvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUPLE]], 0
 // CHECK-NEXT: [[RIGHT:%.*]] = extractvalue { %C14generic_tuples1C*, %C14generic_tuples1C* } [[TUPLE]], 1
 // CHECK-NEXT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%C14generic_tuples1C*)*)(%C14generic_tuples1C* [[RIGHT]])

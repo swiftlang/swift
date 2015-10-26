@@ -49,7 +49,7 @@ class NativeClassType: Runcible {
 // -- generic metadata pattern
 // CHECK:           @_TMPV28protocol_conformance_records17NativeGenericType
 // -- witness table
-// CHECK:           @_TWPurGV28protocol_conformance_records17NativeGenericTypeq__S_8RuncibleS_
+// CHECK:           @_TWPurGV28protocol_conformance_records17NativeGenericTypex_S_8RuncibleS_
 // -- flags 0x04: unique direct generic metadata pattern
 // CHECK:           i32 4
 // CHECK:         },

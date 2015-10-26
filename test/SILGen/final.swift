@@ -20,7 +20,7 @@ class TestDerived : TestClass {
 
 // CHECK-LABEL: sil hidden @{{.*}}testDirectDispatch
 // CHECK-NEXT: bb0(%0 : $TestClass):
-// CHECK: [[FINALMETH:%[0-9]+]] = function_ref @_TFC5final9TestClass11finalMethodfS0_FT_Si
+// CHECK: [[FINALMETH:%[0-9]+]] = function_ref @_TFC5final9TestClass11finalMethod
 // CHECK: apply [[FINALMETH]](%0)
 
 // CHECK: [[FINALPROP:%[0-9]+]] = function_ref @_TFC5final9TestClassg13finalPropertySi
@@ -32,14 +32,14 @@ func testDirectDispatch(c : TestClass) -> Int {
 
 // Verify that the non-overriding final methods don't get emitted to the vtable.
 // CHECK-LABEL: sil_vtable TestClass {
-// CHECK-NEXT:  #TestClass.baseMethod!1: _TFC5final9TestClass10baseMethodfS0_FT_T_
+// CHECK-NEXT:  #TestClass.baseMethod!1: _TFC5final9TestClass10baseMethod
 // CHECK-NEXT:  #TestClass.deinit!
-// CHECK-NEXT:  #TestClass.init!initializer.1: _TFC5final9TestClasscfMS0_FT_S0_
+// CHECK-NEXT:  #TestClass.init!initializer.1: _TFC5final9TestClassc
 // CHECK-NEXT: }
 
 // Verify that overriding final methods don't get emitted to the vtable.
 // CHECK-LABEL: sil_vtable TestDerived {
-// CHECK-NEXT:  #TestClass.baseMethod!1: _TFC5final11TestDerived10baseMethodfS0_FT_T_
-// CHECK-NEXT:  #TestClass.init!initializer.1: _TFC5final11TestDerivedcfMS0_FT_S0_
+// CHECK-NEXT:  #TestClass.baseMethod!1: _TFC5final11TestDerived10baseMethod
+// CHECK-NEXT:  #TestClass.init!initializer.1: _TFC5final11TestDerivedc
 // CHECK-NEXT:  #TestDerived.deinit!
 // CHECK-NEXT: }

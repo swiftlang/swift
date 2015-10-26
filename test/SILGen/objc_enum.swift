@@ -7,7 +7,7 @@
 import gizmo
 
 
-// CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsCfMS_FT8rawValueSi_GSqS__
+// CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsC
 // CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsg8rawValueSi
 // CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsg9hashValueSi
 
@@ -45,7 +45,7 @@ _ = NSFungingMask.ToTheMax
 // CHECK-DAG: sil_witness_table shared NSRuncingOptions: Hashable module gizmo
 // CHECK-DAG: sil_witness_table shared NSFungingMask: RawRepresentable module gizmo
 
-// CHECK-DAG: sil shared [transparent] [thunk] @_TTWOSC16NSRuncingOptionss16RawRepresentable5gizmoFS0_CuR_S0_rfMq_FT8rawValuew_8RawValue_GSqq__
+// CHECK-DAG: sil shared [transparent] [thunk] @_TTWOSC16NSRuncingOptionss16RawRepresentable5gizmoFS0_C
 
 // Extension conformances get linkage occording to the protocol's accessibility, as normal.
 // CHECK-DAG: sil_witness_table hidden NSRuncingOptions: Bub module objc_enum

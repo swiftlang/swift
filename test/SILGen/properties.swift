@@ -536,7 +536,7 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK-NEXT: copy_addr [[SELFBOX]]#1 to %1 : $*DidSetWillSetTests
 
 
-  // CHECK-LABEL: sil hidden @_TFV10properties18DidSetWillSetTestsCfMS0_FT1x
+  // CHECK-LABEL: sil hidden @_TFV10properties18DidSetWillSetTestsC
   // CHECK-NEXT: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
   // CHECK:        [[SELF:%.*]] = mark_uninitialized [rootself]
   // CHECK:        [[P1:%.*]] = struct_element_addr [[SELF]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
@@ -630,7 +630,7 @@ class rdar16151899Base {
 }
 
 class rdar16151899Derived : rdar16151899Base {
-    // CHECK-LABEL: sil hidden @_TFC10properties19rdar16151899DerivedcfMS0_FT_S0_
+    // CHECK-LABEL: sil hidden @_TFC10properties19rdar16151899Derivedc
     override init() {
         super.init()
         // CHECK: upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
@@ -692,7 +692,7 @@ class DerivedProperty : BaseProperty {
 
 // rdar://16381392 - Super property references in non-objc classes should be direct.
 
-// CHECK: sil hidden @_TFC10properties15DerivedProperty24super_property_referencefS0_FT_
+// CHECK: sil hidden @_TFC10properties15DerivedProperty24super_property_reference
 // CHECK-NEXT: bb0(%0 : $DerivedProperty):
 // CHECK:  [[BASEPTR:%[0-9]+]] = upcast %0 : $DerivedProperty to $BaseProperty
 // CHECK:  // function_ref properties.BaseProperty.x.getter
@@ -844,7 +844,7 @@ func genericProps(x: GenericClass<String>) {
   let _ = x.z
 }
 
-// CHECK-LABEL: sil hidden @_TF10properties28genericPropsInGenericContexturFGCS_12GenericClassq__T_
+// CHECK-LABEL: sil hidden @_TF10properties28genericPropsInGenericContext
 func genericPropsInGenericContext<U>(x: GenericClass<U>) {
   // CHECK: [[Z:%.*]] = ref_element_addr %0 : $GenericClass<U>, #GenericClass.z
   // CHECK: copy_addr [[Z]] {{.*}} : $*U
@@ -859,7 +859,7 @@ class ClassWithLetProperty {
 
   // We shouldn't have any dynamic dispatch within this method, just load p.
   func ReturnConstant() -> Int { return p }
-// CHECK-LABEL: sil hidden @_TFC10properties20ClassWithLetProperty14ReturnConstantfS0_FT_Si
+// CHECK-LABEL: sil hidden @_TFC10properties20ClassWithLetProperty14ReturnConstant
 // CHECK-NEXT:  bb0(%0 : $ClassWithLetProperty):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr %0 : $ClassWithLetProperty, #ClassWithLetProperty.p
@@ -869,7 +869,7 @@ class ClassWithLetProperty {
 
   // This property is marked dynamic, so go through the getter, always.
   func ReturnDynamicConstant() -> Int { return q }
-// CHECK-LABEL: sil hidden @_TFC10properties20ClassWithLetProperty21ReturnDynamicConstantfS0_FT_Si
+// CHECK-LABEL: sil hidden @_TFC10properties20ClassWithLetProperty21ReturnDynamicConstant
 // CHECK: class_method [volatile] %0 : $ClassWithLetProperty, #ClassWithLetProperty.q!getter.1.foreign
 }
 
@@ -884,7 +884,7 @@ class r19254812Derived: r19254812Base{
   }
   
 // Accessing the "pi" property should not retain/release self.
-// CHECK-LABEL: sil hidden @_TFC10properties16r19254812DerivedcfMS0_FT1xT__S0_
+// CHECK-LABEL: sil hidden @_TFC10properties16r19254812Derivedc
 // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] 
 
 // Initialization of the pi field: no retains/releases.
@@ -914,7 +914,7 @@ class RedundantSelfRetains {
   func testMethod1() {
     f = RedundantSelfRetains()
   }
-  // CHECK-LABEL: sil hidden @_TFC10properties20RedundantSelfRetains11testMethod1fS0_FT_T_
+  // CHECK-LABEL: sil hidden @_TFC10properties20RedundantSelfRetains11testMethod1
   // CHECK-NEXT: bb0(%0 : $RedundantSelfRetains):
 
   // CHECK-NOT: strong_retain
@@ -956,7 +956,7 @@ func addressOnlyNonmutatingProperty<T>(x: AddressOnlyNonmutatingSet<T>)
   x.prop = 0
   return x.prop
 }
-// CHECK-LABEL: sil hidden @_TF10properties30addressOnlyNonmutatingPropertyurFGVS_25AddressOnlyNonmutatingSetq__Si : $@convention(thin) <T> (@in AddressOnlyNonmutatingSet<T>) -> Int {
+// CHECK-LABEL: sil hidden @_TF10properties30addressOnlyNonmutatingProperty
 // CHECK:         [[SET:%.*]] = function_ref @_TFV10properties25AddressOnlyNonmutatingSets4propSi
 // CHECK:         apply [[SET]]<T>({{%.*}}, [[TMP:%.*]]#1)
 // CHECK:         destroy_addr [[TMP]]
@@ -973,10 +973,10 @@ struct AddressOnlyReadOnlySubscript {
   subscript(z: Int) -> Int { return z }
 }
 
-// CHECK-LABEL: sil hidden @_TF10properties43addressOnlyReadOnlySubscriptFromMutableBaseFSiT_
+// CHECK-LABEL: sil hidden @_TF10properties43addressOnlyReadOnlySubscriptFromMutableBase
 // CHECK:         [[BASE:%.*]] = alloc_box $AddressOnlyReadOnlySubscript
 // CHECK:         copy_addr [[BASE:%.*]]#1 to [initialization] [[COPY:%.*]]#1
-// CHECK:         [[GETTER:%.*]] = function_ref @_TFV10properties28AddressOnlyReadOnlySubscriptg9subscriptFSiSi
+// CHECK:         [[GETTER:%.*]] = function_ref @_TFV10properties28AddressOnlyReadOnlySubscriptg9subscript
 // CHECK:         apply [[GETTER]]({{%.*}}, [[COPY]]#1)
 func addressOnlyReadOnlySubscriptFromMutableBase(x: Int) {
   var base = AddressOnlyReadOnlySubscript()
@@ -991,7 +991,7 @@ struct MutatingGetterStruct {
     mutating get {  }
   }
 
-  // CHECK-LABEL: sil hidden @_TZFV10properties20MutatingGetterStruct4testfMS0_FT_T_
+  // CHECK-LABEL: sil hidden @_TZFV10properties20MutatingGetterStruct4test
   // CHECK: [[X:%.*]] = alloc_box $MutatingGetterStruct  // var x
   // CHECK: store {{.*}} to [[X]]#1 : $*MutatingGetterStruct
   // CHECK: apply {{%.*}}([[X]]#1) : $@convention(method) (@inout MutatingGetterStruct) -> Int

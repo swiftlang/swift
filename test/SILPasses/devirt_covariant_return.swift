@@ -177,7 +177,7 @@ public class Bear {
 
   // Check that devirtualizer can handle convenience initializers, which have covariant optional
   // return types.
-  // CHECK-LABEL: sil @_TFC23devirt_covariant_return4BearcfMS0_FT15delegateFailureSb9failAfterSb_GSqS0__
+  // CHECK-LABEL: sil @_TFC23devirt_covariant_return4Bearc
   // CHECK: checked_cast_br [exact] %{{.*}} : $Bear to $PolarBear
   // CHECK: upcast %{{.*}} : $Optional<PolarBear> to $Optional<Bear>
   // CHECK: }

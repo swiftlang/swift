@@ -57,7 +57,7 @@ func testClosureOverWeak() {
 class CC {
   weak var x: CC?
 
-  // CHECK-LABEL: sil hidden @_TFC4weak2CCcfMS0_FT_S0_
+  // CHECK-LABEL: sil hidden @_TFC4weak2CCc
   // CHECK:  [[FOO:%.*]] = alloc_box $Optional<CC>
   // CHECK:  [[X:%.*]] = ref_element_addr %2 : $CC, #CC.x
   // CHECK:  [[VALUE:%.*]] = load_weak [[X]] : $*@sil_weak Optional<CC>

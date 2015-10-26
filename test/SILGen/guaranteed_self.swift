@@ -25,10 +25,10 @@ protocol Barrable: class {
 struct S: Fooable {
   var x: C? // Make the type nontrivial, so +0/+1 is observable.
 
-  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1SCfMS0_FT_S0_ : $@convention(thin) (@thin S.Type) -> @owned S
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1SC{{.*}} : $@convention(thin) (@thin S.Type) -> @owned S
   init() {}
   // TODO: Way too many redundant r/r pairs here. Should use +0 rvalues.
-  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3foofS0_FSiT_ : $@convention(method) (Int, @guaranteed S) -> () {
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3foo{{.*}} : $@convention(method) (Int, @guaranteed S) -> () {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $S):
   // CHECK-NOT:     retain_value [[SELF]]
   // CHECK-NOT:     release_value [[SELF]]
@@ -40,13 +40,13 @@ struct S: Fooable {
     self.foooo(x)
   }
 
-  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3barfRS0_FT_T_ : $@convention(method) (@inout S) -> ()
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3bar{{.*}} : $@convention(method) (@inout S) -> ()
   // CHECK:       bb0([[SELF:%.*]] : $*S):
   // CHECK-NOT:     destroy_addr [[SELF]]
   mutating func bar() {
     self.bar()
   }
-  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3basfS0_FT_T_ : $@convention(method) (@guaranteed S) -> ()
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self1S3bas{{.*}} : $@convention(method) (@guaranteed S) -> ()
   // CHECK:       bb0([[SELF:%.*]] : $S):
   // CHECK-NOT:     retain_value [[SELF]]
   // CHECK-NOT:     release_value [[SELF]]
@@ -99,7 +99,7 @@ struct S: Fooable {
 }
 
 // Witness thunk for nonmutating 'foo'
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3foouR_S1_rfq_FSiT_ : $@convention(witness_method) (Int, @in_guaranteed S) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3foo{{.*}} : $@convention(witness_method) (Int, @in_guaranteed S) -> () {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
@@ -110,14 +110,14 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for mutating 'bar'
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3baruR_S1_rfRq_FT_T_ : $@convention(witness_method) (@inout S) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3bar{{.*}} : $@convention(witness_method) (@inout S) -> () {
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     load [[SELF_ADDR]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for 'bas', which is mutating in the protocol, but nonmutating
 // in the implementation
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3basuR_S1_rfRq_FT_T_ : $@convention(witness_method) (@inout S) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3bas{{.*}} : $@convention(witness_method) (@inout S) -> ()
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
 // CHECK:         retain_value [[SELF]]
@@ -205,7 +205,7 @@ struct AO<T>: Fooable {
   var x: T?
 
   init() {}
-  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3foourfGS0_q__FSiT_ : $@convention(method) <T> (Int, @in_guaranteed AO<T>) -> ()
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3foo{{.*}} : $@convention(method) <T> (Int, @in_guaranteed AO<T>) -> ()
   // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
   // CHECK-NOT:     copy_addr
   // CHECK:         apply {{.*}} [[SELF_ADDR]]
@@ -217,7 +217,7 @@ struct AO<T>: Fooable {
   mutating func bar() {
     self.bar()
   }
-  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3basurfGS0_q__FT_T_ : $@convention(method) <T> (@in_guaranteed AO<T>) -> ()
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3bas{{.*}} : $@convention(method) <T> (@in_guaranteed AO<T>) -> ()
   // CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
   func bas() {
@@ -250,7 +250,7 @@ struct AO<T>: Fooable {
 }
 
 // Witness for nonmutating 'foo'
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOq__S_7FooableS_FS1_3foouR_S1_rfq_FSiT_ : $@convention(witness_method) <T> (Int, @in_guaranteed AO<T>) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOx_S_7FooableS_FS1_3foo{{.*}} : $@convention(witness_method) <T> (Int, @in_guaranteed AO<T>) -> ()
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
 // TODO: This copy isn't necessary.
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]]#1
@@ -259,7 +259,7 @@ struct AO<T>: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness for 'bar', which is mutating in protocol but nonmutating in impl
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOq__S_7FooableS_FS1_3baruR_S1_rfRq_FT_T_ : $@convention(witness_method) <T> (@inout AO<T>) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOx_S_7FooableS_FS1_3bar{{.*}} : $@convention(witness_method) <T> (@inout AO<T>) -> ()
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
 // -- NB: This copy *is* necessary, unless we're willing to assume an inout
 //        parameter is not mutably aliased.
@@ -270,7 +270,7 @@ struct AO<T>: Fooable {
 
 class C: Fooable, Barrable {
   // Allocating initializer
-  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1CCfMS0_FT_S0_ : $@convention(thin) (@thick C.Type) -> @owned C
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1CC{{.*}} : $@convention(thin) (@thick C.Type) -> @owned C
   // CHECK:         [[SELF1:%.*]] = alloc_ref $C
   // CHECK-NOT:     [[SELF1]]
   // CHECK:         [[SELF2:%.*]] = apply {{.*}}([[SELF1]])
@@ -278,7 +278,7 @@ class C: Fooable, Barrable {
   // CHECK:         return [[SELF2]]
 
   // Initializing constructors still have the +1 in, +1 out convention.
-  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1CcfMS0_FT_S0_ : $@convention(method) (@owned C) -> @owned C {
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1Cc{{.*}} : $@convention(method) (@owned C) -> @owned C {
   // CHECK:       bb0([[SELF:%.*]] : $C):
   // CHECK:         [[MARKED_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]]
   // CHECK-NOT:     [[SELF]]
@@ -287,7 +287,7 @@ class C: Fooable, Barrable {
   // CHECK:         return [[MARKED_SELF]]
 
   // @objc thunk for initializing constructor
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC15guaranteed_self1CcfMS0_FT_S0_ : $@convention(objc_method) (@owned C) -> @owned C
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC15guaranteed_self1Cc{{.*}} : $@convention(objc_method) (@owned C) -> @owned C
   // CHECK:       bb0([[SELF:%.*]] : $C):
   // CHECK-NOT:     retain{{.*}} [[SELF]]
   // CHECK:         [[SELF2:%.*]] = apply {{%.*}}([[SELF]])
@@ -297,12 +297,12 @@ class C: Fooable, Barrable {
   @objc required init() {}
 
 
-  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1C3foofS0_FSiT_ : $@convention(method) (Int, @guaranteed C) -> ()
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1C3foo{{.*}} : $@convention(method) (Int, @guaranteed C) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
   // CHECK-NOT:     retain
   // CHECK-NOT:     release
 
-  // CHECK-LABEL: sil hidden [thunk] @_TToFC15guaranteed_self1C3foofS0_FSiT_ : $@convention(objc_method) (Int, C) -> () {
+  // CHECK-LABEL: sil hidden [thunk] @_TToFC15guaranteed_self1C3foo{{.*}} : $@convention(objc_method) (Int, C) -> () {
   // CHECK:       bb0({{.*}} [[SELF:%.*]] : $C):
   // CHECK:         retain{{.*}} [[SELF]]
   // CHECK:         apply {{.*}} [[SELF]]
@@ -345,7 +345,7 @@ class C: Fooable, Barrable {
 }
 
 class D: C {
-  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1DCfMS0_FT_S0_ : $@convention(thin) (@thick D.Type) -> @owned D
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1DC{{.*}} : $@convention(thin) (@thick D.Type) -> @owned D
   // CHECK:         [[SELF1:%.*]] = alloc_ref $D
   // CHECK-NOT:     [[SELF1]]
   // CHECK:         [[SELF2:%.*]] = apply {{.*}}([[SELF1]])
@@ -353,7 +353,7 @@ class D: C {
   // CHECK-NOT:     [[SELF2]]
   // CHECK:         return [[SELF2]]
 
-  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1DcfMS0_FT_S0_ : $@convention(method) (@owned D) -> @owned D
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self1Dc{{.*}} : $@convention(method) (@owned D) -> @owned D
   // CHECK:       bb0([[SELF:%.*]] : $D):
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box $D
   // CHECK-NEXT:    [[SELF_ADDR:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]
@@ -379,7 +379,7 @@ class D: C {
     super.init()
   }
 
-  // CHECK-LABEL: sil shared [transparent] @_TTDFC15guaranteed_self1D3foofS0_FSiT_ : $@convention(method) (Int, @guaranteed D) -> ()
+  // CHECK-LABEL: sil shared [transparent] @_TTDFC15guaranteed_self1D3foo{{.*}} : $@convention(method) (Int, @guaranteed D) -> ()
   // CHECK:       bb0({{.*}} [[SELF:%.*]]):
   // CHECK:         retain{{.*}} [[SELF]]
   // CHECK:         release{{.*}} [[SELF]]
@@ -403,13 +403,13 @@ func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
 // correctly if we are asked to.
 // ----------------------------------------------------------------------------
 
-// CHECK-LABEL: sil [transparent] [thunk] @_TTWV15guaranteed_self9FakeArrayS_12SequenceTypeS_FS1_17_constrainElementuR_S1_rfq_Fw_7ElementT_ : $@convention(witness_method) (@in FakeElement, @in_guaranteed FakeArray) -> () {
+// CHECK-LABEL: sil [transparent] [thunk] @_TTWV15guaranteed_self9FakeArrayS_12SequenceTypeS_FS1_17_constrainElement{{.*}} : $@convention(witness_method) (@in FakeElement, @in_guaranteed FakeArray) -> () {
 // CHECK: bb0([[ARG0_PTR:%.*]] : $*FakeElement, [[ARG1_PTR:%.*]] : $*FakeArray):
 // CHECK: [[GUARANTEED_COPY_STACK_SLOT:%.*]] = alloc_stack $FakeArray
 // CHECK: copy_addr [[ARG1_PTR]] to [initialization] [[GUARANTEED_COPY_STACK_SLOT]]#1
 // CHECK: [[ARG0:%.*]] = load [[ARG0_PTR]]
 // CHECK: [[GUARANTEED_COPY:%.*]] = load [[GUARANTEED_COPY_STACK_SLOT]]#1
-// CHECK: function_ref ext.guaranteed_self.guaranteed_self.SequenceDefaultsType._constrainElement <A where A: guaranteed_self.SequenceDefaultsType> (A)(guaranteed_self.FakeElement) -> ()
+// CHECK: function_ref ext.guaranteed_self.guaranteed_self.SequenceDefaultsType._constrainElement
 // CHECK: [[FUN:%.*]] = function_ref @_{{.*}}
 // CHECK: [[TRANSLATION_STACK_SLOT:%.*]] = alloc_stack $FakeArray
 // CHECK: store [[GUARANTEED_COPY]] to [[TRANSLATION_STACK_SLOT:%.*]]#1
@@ -471,9 +471,9 @@ class CurriedTestBar {
 // Make sure we create a closure and pass it in @owned with a retain before it.
 //
 // CHECK-LABEL: sil hidden @_TF15guaranteed_self13curried_test0FT_T_ : $@convention(thin) () -> () {
-// CHECK: [[FUNC:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarCfMS0_FT_S0_
+// CHECK: [[FUNC:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarC{{.*}}
 // CHECK: [[CTB:%.*]] = apply [[FUNC]](
-// CHECK: [[THUNK_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBar3barFS0_FCS_6KrakenFS1_FS1_S1_ : $@convention(thin) (@owned CurriedTestBar) -> @owned @callee_owned (@owned Kraken) -> @owned @callee_owned (@owned Kraken) -> @owned @callee_owned (@owned Kraken) -> @owned Kraken
+// CHECK: [[THUNK_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBar3barF{{.*}} : $@convention(thin) (@owned CurriedTestBar) -> @owned @callee_owned (@owned Kraken) -> @owned @callee_owned (@owned Kraken) -> @owned @callee_owned (@owned Kraken) -> @owned Kraken
 // CHECK: strong_retain [[CTB]]
 // CHECK: [[CLOSURE:%.*]] = apply [[THUNK_CONSTRUCTOR]]([[CTB]]
 // CHECK-NOT: strong_release [[CTB]]
@@ -487,11 +487,11 @@ func curried_test0() {
 }
 
 // CHECK-LABEL: sil hidden @_TF15guaranteed_self13curried_test1FT_T_ : $@convention(thin) () -> () {
-// CHECK: [[KRAKEN_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self6KrakenCfMS0_FT_S0_ : $@convention(thin) (@thick Kraken.Type) -> @owned Kraken
+// CHECK: [[KRAKEN_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self6KrakenC{{.*}} : $@convention(thin) (@thick Kraken.Type) -> @owned Kraken
 // CHECK: [[KRAKEN:%.*]] = apply [[KRAKEN_CONSTRUCTOR]](
-// CHECK: [[CTB_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarCfMS0_FT_S0_
+// CHECK: [[CTB_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarC{{.*}}
 // CHECK: [[CTB:%.*]] = apply [[CTB_CONSTRUCTOR]](
-// CHECK: [[THUNK_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBar3barfS0_FCS_6KrakenFS1_FS1_S1_ : $@convention(thin) (@owned Kraken, @owned CurriedTestBar) -> @owned @callee_owned (@owned Kraken) -> @owned @callee_owned (@owned Kraken) -> @owned Kraken
+// CHECK: [[THUNK_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBar3bar{{.*}} : $@convention(thin) (@owned Kraken, @owned CurriedTestBar) -> @owned @callee_owned (@owned Kraken) -> @owned @callee_owned (@owned Kraken) -> @owned Kraken
 // CHECK: strong_retain [[CTB]]
 // CHECK-NEXT: strong_retain [[KRAKEN]]
 // CHECK-NEXT: [[CLOSURE:%.*]] = apply [[THUNK_CONSTRUCTOR]]([[KRAKEN]], [[CTB]])
@@ -508,11 +508,11 @@ func curried_test1() {
 }
 
 // CHECK-LABEL: sil hidden @_TF15guaranteed_self13curried_test2FT_T_ : $@convention(thin) () -> () {
-// CHECK: [[KRAKEN_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self6KrakenCfMS0_FT_S0_ : $@convention(thin) (@thick Kraken.Type) -> @owned Kraken
+// CHECK: [[KRAKEN_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self6KrakenC{{.*}} : $@convention(thin) (@thick Kraken.Type) -> @owned Kraken
 // CHECK: [[KRAKEN:%.*]] = apply [[KRAKEN_CONSTRUCTOR]](
-// CHECK: [[CTB_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarCfMS0_FT_S0_
+// CHECK: [[CTB_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarC{{.*}}
 // CHECK: [[CTB:%.*]] = apply [[CTB_CONSTRUCTOR]](
-// CHECK: [[THUNK_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBar3barfS0_fCS_6KrakenFS1_FS1_S1_ : $@convention(thin) (@owned Kraken, @owned Kraken, @owned CurriedTestBar) -> @owned @callee_owned (@owned Kraken) -> @owned Kraken
+// CHECK: [[THUNK_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBar3bar{{.*}} : $@convention(thin) (@owned Kraken, @owned Kraken, @owned CurriedTestBar) -> @owned @callee_owned (@owned Kraken) -> @owned Kraken
 // CHECK: strong_retain [[CTB]]
 // CHECK-NEXT: strong_retain [[KRAKEN]]
 // CHECK-NEXT: strong_retain [[KRAKEN]]
@@ -530,9 +530,9 @@ func curried_test2() {
 }
 
 // CHECK-LABEL: sil hidden @_TF15guaranteed_self13curried_test3FT_T_ : $@convention(thin) () -> () {
-// CHECK: [[KRAKEN_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self6KrakenCfMS0_FT_S0_ : $@convention(thin) (@thick Kraken.Type) -> @owned Kraken
+// CHECK: [[KRAKEN_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self6KrakenC{{.*}} : $@convention(thin) (@thick Kraken.Type) -> @owned Kraken
 // CHECK: [[KRAKEN:%.*]] = apply [[KRAKEN_CONSTRUCTOR]](
-// CHECK: [[CTB_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarCfMS0_FT_S0_
+// CHECK: [[CTB_CONSTRUCTOR:%.*]] = function_ref @_TFC15guaranteed_self14CurriedTestBarC{{.*}}
 // CHECK: [[CTB:%.*]] = apply [[CTB_CONSTRUCTOR]](
 // CHECK: [[CLASS_METHOD:%.*]] = class_method [[CTB]] : $CurriedTestBar, #CurriedTestBar.bar!3 : CurriedTestBar -> (Kraken) -> (Kraken) -> (Kraken) -> Kraken , $@convention(method) (@owned Kraken, @owned Kraken, @owned Kraken, @guaranteed CurriedTestBar) -> @owned Kraken
 // CHECK-NOT: strong_retain [[CTB]]
@@ -563,7 +563,7 @@ class LetFieldClass {
   let letk = Kraken()
   var vark = Kraken()
 
-  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self13LetFieldClass10letkMethodfS0_FT_T_ : $@convention(method) (@guaranteed LetFieldClass) -> () {
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self13LetFieldClass10letkMethod{{.*}} : $@convention(method) (@guaranteed LetFieldClass) -> () {
   // CHECK: bb0([[CLS:%.*]] : $LetFieldClass):
   // CHECK: [[KRAKEN_ADDR:%.*]] = ref_element_addr [[CLS]] : $LetFieldClass, #LetFieldClass.letk
   // CHECK-NEXT: [[KRAKEN:%.*]] = load [[KRAKEN_ADDR]]
@@ -596,7 +596,7 @@ class LetFieldClass {
     destroyShip(lv)
   }
 
-  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self13LetFieldClass10varkMethodfS0_FT_T_ : $@convention(method) (@guaranteed LetFieldClass) -> () {
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self13LetFieldClass10varkMethod{{.*}} : $@convention(method) (@guaranteed LetFieldClass) -> () {
   // CHECK: bb0([[CLS:%.*]] : $LetFieldClass):
   // CHECK: [[KRAKEN_GETTER_FUN:%.*]] = class_method [[CLS]] : $LetFieldClass, #LetFieldClass.vark!getter.1 : LetFieldClass -> () -> Kraken , $@convention(method) (@guaranteed LetFieldClass) -> @owned Kraken
   // CHECK-NEXT: [[KRAKEN:%.*]] = apply [[KRAKEN_GETTER_FUN]]([[CLS]])
@@ -639,7 +639,7 @@ class ClassIntTreeNode {
 
   init() {}
 
-  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self16ClassIntTreeNode4findfS0_FSiS0_ : $@convention(method) (Int, @guaranteed ClassIntTreeNode) -> @owned ClassIntTreeNode {
+  // CHECK-LABEL: sil hidden @_TFC15guaranteed_self16ClassIntTreeNode4find{{.*}} : $@convention(method) (Int, @guaranteed ClassIntTreeNode) -> @owned ClassIntTreeNode {
   // CHECK-NOT: strong_release
   // CHECK: strong_retain
   // CHECK-NOT: strong_retain

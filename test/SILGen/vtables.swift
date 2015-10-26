@@ -23,16 +23,16 @@ class C : B {
   func mopsy() {}
 }
 // CHECK: sil_vtable C {
-// CHECK:   #A.foo!1: _TFC7vtables1B3foofS0_FT_T_
-// CHECK:   #A.bar!1: _TFC7vtables1C3barfS0_FT_T_
-// CHECK:   #A.bas!1: _TFC7vtables1A3basfS0_FT_T_
-// CHECK:   #A.qux!1: _TFC7vtables1C3quxfS0_FT_T_
-// CHECK:   #B.init!allocator.1: _TFC7vtables1CCfMS0_FT3intSi_S0_
-// CHECK:   #B.init!initializer.1: _TFC7vtables1CcfMS0_FT3intSi_S0_
-// CHECK:   #B.zim!1: _TFC7vtables1B3zimfS0_FT_T_
-// CHECK:   #B.zang!1: _TFC7vtables1C4zangfS0_FT_T_
-// CHECK:   #C.flopsy!1: _TFC7vtables1C6flopsyfS0_FT_T_
-// CHECK:   #C.mopsy!1: _TFC7vtables1C5mopsyfS0_FT_T_
+// CHECK:   #A.foo!1: _TFC7vtables1B3foo
+// CHECK:   #A.bar!1: _TFC7vtables1C3bar
+// CHECK:   #A.bas!1: _TFC7vtables1A3bas
+// CHECK:   #A.qux!1: _TFC7vtables1C3qux
+// CHECK:   #B.init!allocator.1: _TFC7vtables1CC
+// CHECK:   #B.init!initializer.1: _TFC7vtables1Cc
+// CHECK:   #B.zim!1: _TFC7vtables1B3zim
+// CHECK:   #B.zang!1: _TFC7vtables1C4zang
+// CHECK:   #C.flopsy!1: _TFC7vtables1C6flopsy
+// CHECK:   #C.mopsy!1: _TFC7vtables1C5mopsy
 // CHECK: }
 
 class A {
@@ -43,11 +43,11 @@ class A {
 }
 
 // CHECK: sil_vtable A {
-// CHECK:   #A.foo!1: _TFC7vtables1A3foofS0_FT_T_
-// CHECK:   #A.bar!1: _TFC7vtables1A3barfS0_FT_T_
-// CHECK:   #A.bas!1: _TFC7vtables1A3basfS0_FT_T_
-// CHECK:   #A.qux!1: _TFC7vtables1A3quxfS0_FT_T_
-// CHECK:   #A.init!initializer.1: _TFC7vtables1AcfMS0_FT_S0_
+// CHECK:   #A.foo!1: _TFC7vtables1A3foo
+// CHECK:   #A.bar!1: _TFC7vtables1A3bar
+// CHECK:   #A.bas!1: _TFC7vtables1A3bas
+// CHECK:   #A.qux!1: _TFC7vtables1A3qux
+// CHECK:   #A.init!initializer.1: _TFC7vtables1Ac
 // CHECK: }
 
 class B : A {
@@ -63,14 +63,14 @@ class B : A {
 }
 
 // CHECK: sil_vtable B {
-// CHECK:   #A.foo!1: _TFC7vtables1B3foofS0_FT_T_
-// CHECK:   #A.bar!1: _TFC7vtables1A3barfS0_FT_T_
-// CHECK:   #A.bas!1: _TFC7vtables1A3basfS0_FT_T_
-// CHECK:   #A.qux!1: _TFC7vtables1B3quxfS0_FT_T_
-// CHECK:   #B.init!allocator.1: _TFC7vtables1BCfMS0_FT3intSi_S0_
-// CHECK:   #B.init!initializer.1: _TFC7vtables1BcfMS0_FT3intSi_S0_
-// CHECK:   #B.zim!1: _TFC7vtables1B3zimfS0_FT_T_
-// CHECK:   #B.zang!1: _TFC7vtables1B4zangfS0_FT_T_
+// CHECK:   #A.foo!1: _TFC7vtables1B3foo
+// CHECK:   #A.bar!1: _TFC7vtables1A3bar
+// CHECK:   #A.bas!1: _TFC7vtables1A3bas
+// CHECK:   #A.qux!1: _TFC7vtables1B3qux
+// CHECK:   #B.init!allocator.1: _TFC7vtables1BC
+// CHECK:   #B.init!initializer.1: _TFC7vtables1Bc
+// CHECK:   #B.zim!1: _TFC7vtables1B3zim
+// CHECK:   #B.zang!1: _TFC7vtables1B4zang
 // CHECK: }
 
 // Test ObjC base class
@@ -88,10 +88,10 @@ class Hoozit : Gizmo {
 // Entries only exist for native Swift methods
 
 // CHECK: sil_vtable Hoozit {
-// CHECK:   #Hoozit.frob!1: _TFC7vtables6Hoozit4frobfS0_FT_T_
-// CHECK:   #Hoozit.funge!1: _TFC7vtables6Hoozit5fungefS0_FT_T_
-// CHECK:   #Hoozit.anse!1: _TFC7vtables6Hoozit4ansefS0_FT_T_
-// CHECK:   #Hoozit.incorrige!1: _TFC7vtables6Hoozit9incorrigefS0_FT_T_
+// CHECK:   #Hoozit.frob!1: _TFC7vtables6Hoozit4frob
+// CHECK:   #Hoozit.funge!1: _TFC7vtables6Hoozit5funge
+// CHECK:   #Hoozit.anse!1: _TFC7vtables6Hoozit4anse
+// CHECK:   #Hoozit.incorrige!1: _TFC7vtables6Hoozit9incorrige
 // CHECK: }
 
 class Wotsit : Hoozit {
@@ -100,18 +100,18 @@ class Wotsit : Hoozit {
 }
 
 // CHECK: sil_vtable Wotsit {
-// CHECK:   #Hoozit.frob!1: _TFC7vtables6Hoozit4frobfS0_FT_T_
-// CHECK:   #Hoozit.funge!1: _TFC7vtables6Wotsit5fungefS0_FT_T_
-// CHECK:   #Hoozit.anse!1: _TFC7vtables6Hoozit4ansefS0_FT_T_
-// CHECK:   #Hoozit.incorrige!1: _TFC7vtables6Wotsit9incorrigefS0_FT_T_
+// CHECK:   #Hoozit.frob!1: _TFC7vtables6Hoozit4frob
+// CHECK:   #Hoozit.funge!1: _TFC7vtables6Wotsit5funge
+// CHECK:   #Hoozit.anse!1: _TFC7vtables6Hoozit4anse
+// CHECK:   #Hoozit.incorrige!1: _TFC7vtables6Wotsit9incorrige
 // CHECK: }
 
 // <rdar://problem/15282548>
 // CHECK: sil_vtable Base {
-// CHECK:   #Base.init!initializer.1: _TFC7vtables4BasecfMS0_FT_S0_
+// CHECK:   #Base.init!initializer.1: _TFC7vtables4Basec
 // CHECK: }
 // CHECK: sil_vtable Derived {
-// CHECK:   #Base.init!initializer.1: _TFC7vtables7DerivedcfMS0_FT_S0_
+// CHECK:   #Base.init!initializer.1: _TFC7vtables7Derivedc
 // CHECK: }
 @objc class Base {}
 
@@ -130,8 +130,8 @@ class Derived : Base {
 
 
 // CHECK: sil_vtable RequiredInitDerived {
-// CHECK-NEXT: #SimpleInitBase.init!initializer.1: _TFC7vtables19RequiredInitDerivedcfMS0_FT_S0_     // vtables.RequiredInitDerived.init (vtables.RequiredInitDerived.Type)() -> vtables.RequiredInitDerived
-// CHECK-NEXT  #RequiredInitDerived.init!allocator.1: _TFC7vtables19RequiredInitDerivedCfMS0_FT_S0_  // vtables.RequiredInitDerived.__allocating_init (vtables.RequiredInitDerived.Type)() -> vtables.RequiredInitDerived
+// CHECK-NEXT: #SimpleInitBase.init!initializer.1: _TFC7vtables19RequiredInitDerivedc
+// CHECK-NEXT  #RequiredInitDerived.init!allocator.1: _TFC7vtables19RequiredInitDerivedC
 // CHECK-NEXT}
 
 class SimpleInitBase { }
@@ -168,4 +168,4 @@ class DerivedWithoutDefaults : BaseWithDefaults {
 // CHECK:         #Observed.x!setter
 
 // CHECK-LABEL: sil_vtable DerivedWithoutDefaults {
-// CHECK:         #BaseWithDefaults.a!1: _TFC7vtables22DerivedWithoutDefaults1afS0_FGSqPs9AnyObject__T_
+// CHECK:         #BaseWithDefaults.a!1: _TFC7vtables22DerivedWithoutDefaults1a

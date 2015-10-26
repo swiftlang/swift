@@ -11,7 +11,7 @@
 
 /// Aaa.  init().
 init() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>init()</Name><USR>s:FC14swift_ide_test21A010_AttachToEntitiescFMS0_FT_S0_</USR><Declaration>init()</Declaration><Abstract><Para>Aaa.  init().</Para></Abstract></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>init()</Name><USR>s:FC14swift_ide_test21A010_AttachToEntitiescFT_S0_</USR><Declaration>init()</Declaration><Abstract><Para>Aaa.  init().</Para></Abstract></Function>]
 
 /// Aaa.  subscript(i: Int).
 subscript(i: Int) -> Int {
@@ -57,7 +57,7 @@ enum A012_AttachToEntities {
   ///
   /// <http://developer.apple.com/swift/>
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test13AutomaticLink2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>And now for a URL.</Para></Abstract><Discussion><Para><Link href="http://developer.apple.com/swift/">http://developer.apple.com/swift/</Link></Para></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test13AutomaticLink2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>And now for a URL.</Para></Abstract><Discussion><Para><Link href="http://developer.apple.com/swift/">http://developer.apple.com/swift/</Link></Para></Discussion></Function>]
 }
 
 @objc class BlockQuote {
@@ -68,7 +68,7 @@ enum A012_AttachToEntities {
   ///
   /// > Ccc.
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test10BlockQuote2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para><Para>Ccc.</Para></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test10BlockQuote2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para><Para>Ccc.</Para></Discussion></Function>]
 }
 
 @objc class ATXHeaders {
@@ -79,32 +79,32 @@ enum A012_AttachToEntities {
   /// LEVEL TWO
   /// ---------
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test10ATXHeaders2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><rawHTML><![CDATA[<h1>]]></rawHTML>LEVEL ONE<rawHTML><![CDATA[</h1>]]></rawHTML><rawHTML><![CDATA[<h2>]]></rawHTML>LEVEL TWO<rawHTML><![CDATA[</h2>]]></rawHTML></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test10ATXHeaders2f0FT_T_</USR><Declaration>func f0()</Declaration><Discussion><rawHTML><![CDATA[<h1>]]></rawHTML>LEVEL ONE<rawHTML><![CDATA[</h1>]]></rawHTML><rawHTML><![CDATA[<h2>]]></rawHTML>LEVEL TWO<rawHTML><![CDATA[</h2>]]></rawHTML></Discussion></Function>]
 }
 
 @objc class Brief {
 // CHECK: {{.*}}DocCommentAsXML=none
   /// Aaa.
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test5Brief2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa.</Para></Abstract></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test5Brief2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa.</Para></Abstract></Function>]
 
   /// Aaa.
   ///
   /// Bbb.
   func f1() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1()</Name><USR>s:FC14swift_ide_test5Brief2f1FS0_FT_T_</USR><Declaration>func f1()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1()</Name><USR>s:FC14swift_ide_test5Brief2f1FT_T_</USR><Declaration>func f1()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para></Discussion></Function>]
 
   ///Aaa.
   ///
   ///> Bbb.
   func f2() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2()</Name><USR>s:FC14swift_ide_test5Brief2f2FS0_FT_T_</USR><Declaration>func f2()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2()</Name><USR>s:FC14swift_ide_test5Brief2f2FT_T_</USR><Declaration>func f2()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para></Discussion></Function>]
 
   ///Aaa.
   ///
   ///Bbb.
   func f3() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f3()</Name><USR>s:FC14swift_ide_test5Brief2f3FS0_FT_T_</USR><Declaration>func f3()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f3()</Name><USR>s:FC14swift_ide_test5Brief2f3FT_T_</USR><Declaration>func f3()</Declaration><Abstract><Para>Aaa.</Para></Abstract><Discussion><Para>Bbb.</Para></Discussion></Function>]
 }
 
 @objc class CodeBlock {
@@ -115,7 +115,7 @@ enum A012_AttachToEntities {
   ///     f0() // WOW!
   ///     f0() // WOW!
   func f0() {}
-// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test9CodeBlock2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>This is how you use this code.</Para></Abstract><Discussion><CodeListing><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test9CodeBlock2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>This is how you use this code.</Para></Abstract><Discussion><CodeListing><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[f0() // WOW!]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
 }
 
 @objc class EmptyComments {
@@ -123,26 +123,26 @@ enum A012_AttachToEntities {
 
   ///
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test13EmptyComments2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test13EmptyComments2f0FT_T_</USR><Declaration>func f0()</Declaration></Function>]
 
   /// Aaa.
   func f1() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1()</Name><USR>s:FC14swift_ide_test13EmptyComments2f1FS0_FT_T_</USR><Declaration>func f1()</Declaration><Abstract><Para>Aaa.</Para></Abstract></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1()</Name><USR>s:FC14swift_ide_test13EmptyComments2f1FT_T_</USR><Declaration>func f1()</Declaration><Abstract><Para>Aaa.</Para></Abstract></Function>]
 
   /** */
   func f2() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2()</Name><USR>s:FC14swift_ide_test13EmptyComments2f2FS0_FT_T_</USR><Declaration>func f2()</Declaration></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2()</Name><USR>s:FC14swift_ide_test13EmptyComments2f2FT_T_</USR><Declaration>func f2()</Declaration></Function>]
 
   /**
    */
   func f3() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f3()</Name><USR>s:FC14swift_ide_test13EmptyComments2f3FS0_FT_T_</USR><Declaration>func f3()</Declaration></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f3()</Name><USR>s:FC14swift_ide_test13EmptyComments2f3FT_T_</USR><Declaration>func f3()</Declaration></Function>]
 
   /**
    * Aaa.
    */
   func f4() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f4()</Name><USR>s:FC14swift_ide_test13EmptyComments2f4FS0_FT_T_</USR><Declaration>func f4()</Declaration><Abstract><Para>Aaa.</Para></Abstract></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f4()</Name><USR>s:FC14swift_ide_test13EmptyComments2f4FT_T_</USR><Declaration>func f4()</Declaration><Abstract><Para>Aaa.</Para></Abstract></Function>]
 }
 
 @objc class Emphasis {
@@ -150,7 +150,7 @@ enum A012_AttachToEntities {
   /// Aaa *bbb* ccc.
   /// Aaa _bbb_ ccc.
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test8Emphasis2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <emphasis>bbb</emphasis> ccc. Aaa <emphasis>bbb</emphasis> ccc.</Para></Abstract></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test8Emphasis2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <emphasis>bbb</emphasis> ccc. Aaa <emphasis>bbb</emphasis> ccc.</Para></Abstract></Function>]
 }
 
 @objc class HasThrowingFunction {
@@ -161,7 +161,7 @@ enum A012_AttachToEntities {
   /// - parameter x: A number
   /// - throws: An error if `x == 0`
   @objc func f1(x: Int) /*throws*/ {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1(_:)</Name><USR>s:FC14swift_ide_test19HasThrowingFunction2f1FS0_FSiT_</USR><Declaration>@objc func f1(x: Int)</Declaration><Abstract><Para>Might throw something.</Para></Abstract><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters><ThrowsDiscussion><Para>An error if <codeVoice>x == 0</codeVoice></Para></ThrowsDiscussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1(_:)</Name><USR>s:FC14swift_ide_test19HasThrowingFunction2f1FSiT_</USR><Declaration>@objc func f1(x: Int)</Declaration><Abstract><Para>Might throw something.</Para></Abstract><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters><ThrowsDiscussion><Para>An error if <codeVoice>x == 0</codeVoice></Para></ThrowsDiscussion></Function>]
 }
 
 @objc class HorizontalRules {
@@ -172,7 +172,7 @@ enum A012_AttachToEntities {
   ///
   /// The end.
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test15HorizontalRules2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Briefly.</Para></Abstract><Discussion><rawHTML><![CDATA[<hr/>]]></rawHTML><Para>The end.</Para></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test15HorizontalRules2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Briefly.</Para></Abstract><Discussion><rawHTML><![CDATA[<hr/>]]></rawHTML><Para>The end.</Para></Discussion></Function>]
 }
 
 @objc class ImplicitNameLink {
@@ -187,14 +187,14 @@ enum A012_AttachToEntities {
 // CHECK: {{.*}}DocCommentAsXML=none
   /// Aaa `bbb` ccc.
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test10InlineCode2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <codeVoice>bbb</codeVoice> ccc.</Para></Abstract></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test10InlineCode2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <codeVoice>bbb</codeVoice> ccc.</Para></Abstract></Function>]
 }
 
 @objc class InlineLink {
 // CHECK: {{.*}}DocCommentAsXML=none
 /// Aaa [bbb](/path/to/something) ccc.
 func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test10InlineLink2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <Link href="/path/to/something">bbb</Link> ccc.</Para></Abstract></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test10InlineLink2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <Link href="/path/to/something">bbb</Link> ccc.</Para></Abstract></Function>]
 }
 
 /// - parameter x: A number
@@ -207,7 +207,7 @@ func f0() {}
 /// - parameter second: Ccc.  Ddd.
 ///   Eee.
 func f0(first: Int, second: Double) {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0(_:second:)</Name><USR>s:FC14swift_ide_test15ParamAndReturns2f0FS0_FTSi6secondSd_T_</USR><Declaration>func f0(first: Int, second: Double)</Declaration><Abstract><Para>Aaa.  f0.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Bbb.</Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Ccc.  Ddd. Eee.</Para></Discussion></Parameter></Parameters></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0(_:second:)</Name><USR>s:FC14swift_ide_test15ParamAndReturns2f0FTSi6secondSd_T_</USR><Declaration>func f0(first: Int, second: Double)</Declaration><Abstract><Para>Aaa.  f0.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Bbb.</Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Ccc.  Ddd. Eee.</Para></Discussion></Parameter></Parameters></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
 
@@ -218,7 +218,7 @@ func f0(first: Int, second: Double) {}
 /// - returns: Ccc.
 ///   Ddd.
 func f1(first: Int) {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1(_:)</Name><USR>s:FC14swift_ide_test15ParamAndReturns2f1FS0_FSiT_</USR><Declaration>func f1(first: Int)</Declaration><Abstract><Para>Aaa.  f1.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Bbb.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>Ccc. Ddd.</Para></ResultDiscussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1(_:)</Name><USR>s:FC14swift_ide_test15ParamAndReturns2f1FSiT_</USR><Declaration>func f1(first: Int)</Declaration><Abstract><Para>Aaa.  f1.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Bbb.</Para></Discussion></Parameter></Parameters><ResultDiscussion><Para>Ccc. Ddd.</Para></ResultDiscussion></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 
 /// Aaa.  f2.
@@ -230,7 +230,7 @@ func f1(first: Int) {}
 /// - parameter third:
 ///   Bbb.
 func f2(first: Int, second: Double, third: Float) {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2(_:second:third:)</Name><USR>s:FC14swift_ide_test15ParamAndReturns2f2FS0_FTSi6secondSd5thirdSf_T_</USR><Declaration>func f2(first: Int, second: Double, third: Float)</Declaration><Abstract><Para>Aaa.  f2.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para></Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Aaa.</Para></Discussion></Parameter><Parameter><Name>third</Name><Direction isExplicit="0">in</Direction><Discussion><Para> Bbb.</Para></Discussion></Parameter></Parameters></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2(_:second:third:)</Name><USR>s:FC14swift_ide_test15ParamAndReturns2f2FTSi6secondSd5thirdSf_T_</USR><Declaration>func f2(first: Int, second: Double, third: Float)</Declaration><Abstract><Para>Aaa.  f2.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para></Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Aaa.</Para></Discussion></Parameter><Parameter><Name>third</Name><Direction isExplicit="0">in</Direction><Discussion><Para> Bbb.</Para></Discussion></Parameter></Parameters></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
@@ -241,7 +241,7 @@ func f2(first: Int, second: Double, third: Float) {}
 /// - parameter second: Ccc.
 /// - parameter third: Ddd.
 func f3(first: Int, second: Double, third: Float) {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f3(_:second:third:)</Name><USR>s:FC14swift_ide_test15ParamAndReturns2f3FS0_FTSi6secondSd5thirdSf_T_</USR><Declaration>func f3(first: Int, second: Double, third: Float)</Declaration><Abstract><Para>Aaa.  f3.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Bbb.</Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Ccc.</Para></Discussion></Parameter><Parameter><Name>third</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Ddd.</Para></Discussion></Parameter></Parameters></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f3(_:second:third:)</Name><USR>s:FC14swift_ide_test15ParamAndReturns2f3FTSi6secondSd5thirdSf_T_</USR><Declaration>func f3(first: Int, second: Double, third: Float)</Declaration><Abstract><Para>Aaa.  f3.</Para></Abstract><Parameters><Parameter><Name>first</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Bbb.</Para></Discussion></Parameter><Parameter><Name>second</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Ccc.</Para></Discussion></Parameter><Parameter><Name>third</Name><Direction isExplicit="0">in</Direction><Discussion><Para>Ddd.</Para></Discussion></Parameter></Parameters></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
@@ -255,7 +255,7 @@ func f3(first: Int, second: Double, third: Float) {}
 /// - returns: Eee.
 ///   Fff.
 func f4() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f4()</Name><USR>s:FC14swift_ide_test15ParamAndReturns2f4FS0_FT_T_</USR><Declaration>func f4()</Declaration><Abstract><Para>Aaa.  f4.</Para></Abstract><ResultDiscussion><Para>Eee. Fff.</Para></ResultDiscussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f4()</Name><USR>s:FC14swift_ide_test15ParamAndReturns2f4FT_T_</USR><Declaration>func f4()</Declaration><Abstract><Para>Aaa.  f4.</Para></Abstract><ResultDiscussion><Para>Eee. Fff.</Para></ResultDiscussion></Function>]
 }
 
 @objc class OrderedList {
@@ -265,7 +265,7 @@ func f4() {}
 /// 2. Bbb.
 ///    Ccc.
 func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test11OrderedList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><List-Number><Item><Para>Aaa.</Para></Item><Item><Para>Bbb. Ccc.</Para></Item></List-Number></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test11OrderedList2f0FT_T_</USR><Declaration>func f0()</Declaration><Discussion><List-Number><Item><Para>Aaa.</Para></Item><Item><Para>Bbb. Ccc.</Para></Item></List-Number></Discussion></Function>]
 }
 
 @objc class ParameterOutline{
@@ -277,7 +277,7 @@ func f0() {}
 /// - PARAMETERS:
 ///   - z: A number
 func f0(x: Int, y: Int, z: Int) {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0(_:y:z:)</Name><USR>s:FC14swift_ide_test16ParameterOutline2f0FS0_FTSi1ySi1zSi_T_</USR><Declaration>func f0(x: Int, y: Int, z: Int)</Declaration><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter><Parameter><Name>y</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter><Parameter><Name>z</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0(_:y:z:)</Name><USR>s:FC14swift_ide_test16ParameterOutline2f0FTSi1ySi1zSi_T_</USR><Declaration>func f0(x: Int, y: Int, z: Int)</Declaration><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter><Parameter><Name>y</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter><Parameter><Name>z</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
@@ -292,7 +292,7 @@ func f0(x: Int, y: Int, z: Int) {}
 /// - This line should also remain.
 /// - parameter z: A number
 func f0(x: Int, y: Int, z: Int) {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0(_:y:z:)</Name><USR>s:FC14swift_ide_test22ParameterOutlineMiddle2f0FS0_FTSi1ySi1zSi_T_</USR><Declaration>func f0(x: Int, y: Int, z: Int)</Declaration><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter><Parameter><Name>y</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter><Parameter><Name>z</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters><Discussion><List-Bullet><Item><Para>This line should remain.</Para></Item><Item><Para>This line should also remain.</Para></Item></List-Bullet></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0(_:y:z:)</Name><USR>s:FC14swift_ide_test22ParameterOutlineMiddle2f0FTSi1ySi1zSi_T_</USR><Declaration>func f0(x: Int, y: Int, z: Int)</Declaration><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter><Parameter><Name>y</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter><Parameter><Name>z</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters><Discussion><List-Bullet><Item><Para>This line should remain.</Para></Item><Item><Para>This line should also remain.</Para></Item></List-Bullet></Discussion></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
@@ -312,14 +312,14 @@ func f0(x: Int, y: Int, z: Int) {}
   func f0() -> Int {
     return 0
   }
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test7Returns2f0FS0_FT_Si</USR><Declaration>func f0() -&gt; Int</Declaration><ResultDiscussion><Para>A number</Para></ResultDiscussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test7Returns2f0FT_Si</USR><Declaration>func f0() -&gt; Int</Declaration><ResultDiscussion><Para>A number</Para></ResultDiscussion></Function>]
 }
 
 @objc class SeparateParameters {
 // CHECK: {{.*}}DocCommentAsXML=none
   /// - Parameter x: A number
   func f0(x: Int, y: Int) {}
-// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0(_:y:)</Name><USR>s:FC14swift_ide_test18SeparateParameters2f0FS0_FTSi1ySi_T_</USR><Declaration>func f0(x: Int, y: Int)</Declaration><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters></Function>]
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0(_:y:)</Name><USR>s:FC14swift_ide_test18SeparateParameters2f0FTSi1ySi_T_</USR><Declaration>func f0(x: Int, y: Int)</Declaration><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
 // CHECK: {{.*}}DocCommentAsXML=none
 }
@@ -338,7 +338,7 @@ func f0(x: Int, y: Int, z: Int) {}
   ///
   /// ##### LEVEL SIX
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test13SetextHeaders2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><rawHTML><![CDATA[<h1>]]></rawHTML>LEVEL ONE<rawHTML><![CDATA[</h1>]]></rawHTML><rawHTML><![CDATA[<h2>]]></rawHTML>LEVEL TWO<rawHTML><![CDATA[</h2>]]></rawHTML><rawHTML><![CDATA[<h3>]]></rawHTML>LEVEL THREE<rawHTML><![CDATA[</h3>]]></rawHTML><rawHTML><![CDATA[<h4>]]></rawHTML>LEVEL FOUR<rawHTML><![CDATA[</h4>]]></rawHTML><rawHTML><![CDATA[<h5>]]></rawHTML>LEVEL FIVE<rawHTML><![CDATA[</h5>]]></rawHTML><rawHTML><![CDATA[<h5>]]></rawHTML>LEVEL SIX<rawHTML><![CDATA[</h5>]]></rawHTML></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test13SetextHeaders2f0FT_T_</USR><Declaration>func f0()</Declaration><Discussion><rawHTML><![CDATA[<h1>]]></rawHTML>LEVEL ONE<rawHTML><![CDATA[</h1>]]></rawHTML><rawHTML><![CDATA[<h2>]]></rawHTML>LEVEL TWO<rawHTML><![CDATA[</h2>]]></rawHTML><rawHTML><![CDATA[<h3>]]></rawHTML>LEVEL THREE<rawHTML><![CDATA[</h3>]]></rawHTML><rawHTML><![CDATA[<h4>]]></rawHTML>LEVEL FOUR<rawHTML><![CDATA[</h4>]]></rawHTML><rawHTML><![CDATA[<h5>]]></rawHTML>LEVEL FIVE<rawHTML><![CDATA[</h5>]]></rawHTML><rawHTML><![CDATA[<h5>]]></rawHTML>LEVEL SIX<rawHTML><![CDATA[</h5>]]></rawHTML></Discussion></Function>]
 }
 
 @objc class StrongEmphasis {
@@ -346,7 +346,7 @@ func f0(x: Int, y: Int, z: Int) {}
   /// Aaa **bbb** ccc.
   /// Aaa __bbb__ ccc.
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test14StrongEmphasis2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <bold>bbb</bold> ccc. Aaa <bold>bbb</bold> ccc.</Para></Abstract></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test14StrongEmphasis2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <bold>bbb</bold> ccc. Aaa <bold>bbb</bold> ccc.</Para></Abstract></Function>]
 }
 
 @objc class UnorderedList {
@@ -360,7 +360,7 @@ func f0(x: Int, y: Int, z: Int) {}
   /// - Eee.
   ///   - Fff.
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test13UnorderedList2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Discussion><List-Bullet><Item><Para>Aaa.</Para></Item><Item><Para>Bbb. Ccc.</Para></Item></List-Bullet><List-Bullet><Item><Para>Ddd.</Para></Item><Item><Para>Eee.</Para><List-Bullet><Item><Para>Fff.</Para></Item></List-Bullet></Item></List-Bullet></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test13UnorderedList2f0FT_T_</USR><Declaration>func f0()</Declaration><Discussion><List-Bullet><Item><Para>Aaa.</Para></Item><Item><Para>Bbb. Ccc.</Para></Item></List-Bullet><List-Bullet><Item><Para>Ddd.</Para></Item><Item><Para>Eee.</Para><List-Bullet><Item><Para>Fff.</Para></Item></List-Bullet></Item></List-Bullet></Discussion></Function>]
 }
 
 @objc class IndentedBlockComment {
@@ -378,7 +378,7 @@ func f0(x: Int, y: Int, z: Int) {}
           var z = 3
   */
   func f1() {}
-// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1()</Name><USR>s:FC14swift_ide_test20IndentedBlockComment2f1FS0_FT_T_</USR><Declaration>func f1()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><Para>First paragraph line. Second paragraph line.</Para><Para>Now for a code sample:</Para><CodeListing><zCodeLineNumbered><![CDATA[var x = 1]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// var y = 2]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var z = 3]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
+// CHECK: DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1()</Name><USR>s:FC14swift_ide_test20IndentedBlockComment2f1FT_T_</USR><Declaration>func f1()</Declaration><Abstract><Para>Brief.</Para></Abstract><Discussion><Para>First paragraph line. Second paragraph line.</Para><Para>Now for a code sample:</Para><CodeListing><zCodeLineNumbered><![CDATA[var x = 1]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// var y = 2]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var z = 3]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
   /**
                         Hugely indented brief.
 
@@ -392,7 +392,7 @@ func f0(x: Int, y: Int, z: Int) {}
                             var z = 3
   */
   func f2() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2()</Name><USR>s:FC14swift_ide_test20IndentedBlockComment2f2FS0_FT_T_</USR><Declaration>func f2()</Declaration><Abstract><Para>Hugely indented brief.</Para></Abstract><Discussion><Para>First paragraph line. Second paragraph line.</Para><Para>Now for a code sample:</Para><CodeListing><zCodeLineNumbered><![CDATA[var x = 1]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// var y = 2]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var z = 3]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f2()</Name><USR>s:FC14swift_ide_test20IndentedBlockComment2f2FT_T_</USR><Declaration>func f2()</Declaration><Abstract><Para>Hugely indented brief.</Para></Abstract><Discussion><Para>First paragraph line. Second paragraph line.</Para><Para>Now for a code sample:</Para><CodeListing><zCodeLineNumbered><![CDATA[var x = 1]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// var y = 2]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[var z = 3]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></Function>]
 }
 
 @objc class MultiLineBrief {
@@ -403,5 +403,5 @@ func f0(x: Int, y: Int, z: Int) {}
   ///
   /// Some paragraph text.
   func f0() {}
-// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test14MultiLineBrief2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Brief first line. Brief after softbreak.</Para></Abstract><Discussion><Para>Some paragraph text.</Para></Discussion></Function>]
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test14MultiLineBrief2f0FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Brief first line. Brief after softbreak.</Para></Abstract><Discussion><Para>Some paragraph text.</Para></Discussion></Function>]
 }
