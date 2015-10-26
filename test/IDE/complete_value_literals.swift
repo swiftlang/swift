@@ -22,6 +22,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=TUPLE_0 | FileCheck %s -check-prefix=TUPLE_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=TUPLE_1 | FileCheck %s -check-prefix=TUPLE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=TUPLE_2 | FileCheck %s -check-prefix=TUPLE_2
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=COLOR_0 | FileCheck %s -check-prefix=COLOR_0
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=COLOR_1 | FileCheck %s -check-prefix=COLOR_1
 
 struct MyNil1: NilLiteralConvertible {
   init(nilLiteral: ()) {}
@@ -175,3 +177,16 @@ func testTuple2() {
 }
 // FIXME: should we extend the tuple to have the right number of elements?
 // TUPLE_2: Pattern/None/TypeRelation[Identical]: ({#item#}, {#item#})[#(MyInt1, MyString1, MyDouble1)#];
+
+struct MyColor1: _ColorLiteralConvertible {
+  init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float) {}
+}
+func testColor0() {
+  let x: Int = #^COLOR_0^#
+}
+// COLOR_0: Pattern/None: [#Color({#colorLiteralRed: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})#];
+
+func testColor1() {
+  let x: MyColor1 = #^COLOR_1^#
+}
+// COLOR_1: Pattern/None/TypeRelation[Identical]: [#Color({#colorLiteralRed: Float#}, {#green: Float#}, {#blue: Float#}, {#alpha: Float#})#][#MyColor1#];

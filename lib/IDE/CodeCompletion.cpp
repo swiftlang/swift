@@ -2716,6 +2716,26 @@ public:
       builder.addRightBracket();
     });
 
+    auto floatType = context.getFloatDecl()->getDeclaredType();
+    addFromProto(KPK::_ColorLiteralConvertible, "", [&](Builder &builder) {
+      builder.addLeftBracket();
+      builder.addTextChunk("#Color");
+      builder.addLeftParen();
+      builder.addCallParameter(context.getIdentifier("colorLiteralRed"),
+                               floatType, false);
+      builder.addComma();
+      builder.addCallParameter(context.getIdentifier("green"), floatType,
+                               false);
+      builder.addComma();
+      builder.addCallParameter(context.getIdentifier("blue"), floatType, false);
+      builder.addComma();
+      builder.addCallParameter(context.getIdentifier("alpha"), floatType,
+                               false);
+      builder.addRightParen();
+      builder.addTextChunk("#");
+      builder.addRightBracket();
+    });
+
     // Add tuple completion (item, item).
     {
       CodeCompletionResultBuilder builder(Sink, CodeCompletionResult::Pattern,
