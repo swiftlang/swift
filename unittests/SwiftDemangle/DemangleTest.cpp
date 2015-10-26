@@ -18,8 +18,8 @@
 TEST(FunctionNameDemangleTests, CorrectlyDemangles) {
   char OutputBuffer[128];
 
-  const char *FunctionName = "_TFC3foo3bar3basfS0_FT3zimCS_3zim_T_";
-  const char *DemangledName = "foo.bar.bas (foo.bar)(zim : foo.zim) -> ()";
+  const char *FunctionName = "_TFC3foo3bar3basfT3zimCS_3zim_T_";
+  const char *DemangledName = "foo.bar.bas (zim : foo.zim) -> ()";
 
   size_t Result = swift_demangle_getDemangledName(FunctionName, OutputBuffer,
                                                   sizeof(OutputBuffer));
@@ -39,8 +39,8 @@ TEST(FunctionNameDemangleTests, CorrectlyDemangles) {
 }
 
 TEST(FunctionNameDemangledTests, WorksWithNULLBuffer) {
-  const char *FunctionName = "_TFC3foo3bar3basfS0_FT3zimCS_3zim_T_";
-  const char *DemangledName = "foo.bar.bas (foo.bar)(zim : foo.zim) -> ()";
+  const char *FunctionName = "_TFC3foo3bar3basfT3zimCS_3zim_T_";
+  const char *DemangledName = "foo.bar.bas (zim : foo.zim) -> ()";
 
   // When given a null buffer, swift_demangle_getDemangledName should still be
   // able to return the size of the demangled string.
