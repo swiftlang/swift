@@ -2638,6 +2638,40 @@ public:
       addPostfixBang(T);
   }
 
+  void addValueLiteralCompletions() {
+    auto addFromProto = [&](
+        KnownProtocolKind kind, StringRef defaultTypeName,
+        llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer,
+        bool isKeyword = false) {
+      auto completionKind = isKeyword ? CodeCompletionResult::Keyword
+                                      : CodeCompletionResult::Pattern;
+
+      CodeCompletionResultBuilder builder(Sink, completionKind,
+                                          SemanticContextKind::None, {});
+      // FIXME: check the protocol against the expected nominal types.
+      consumer(builder);
+      // FIXME: when we match an expected type, we should use that type instead
+      // of the protocol's preferred type.
+      if (!defaultTypeName.empty())
+        builder.addTypeAnnotation(defaultTypeName);
+    };
+
+    // FIXME: the pedantically correct way is to resolve Swift.*LiteralType.
+
+    using KPK = KnownProtocolKind;
+    using Builder = CodeCompletionResultBuilder;
+
+    addFromProto(KPK::BooleanLiteralConvertible, "Bool", [](Builder &builder) {
+      builder.addTextChunk("true");
+    }, /*isKeyword=*/true);
+    addFromProto(KPK::BooleanLiteralConvertible, "Bool", [](Builder &builder) {
+      builder.addTextChunk("false");
+    }, /*isKeyword=*/true);
+    addFromProto(KPK::NilLiteralConvertible, "", [](Builder &builder) {
+      builder.addTextChunk("nil");
+    }, /*isKeyword=*/true);
+  }
+
   struct FilteredDeclConsumer : public swift::VisibleDeclConsumer {
     swift::VisibleDeclConsumer &Consumer;
     DeclFilter Filter;
@@ -2674,6 +2708,8 @@ public:
         }
       }
     }
+
+    addValueLiteralCompletions();
   }
 
   struct LookupByName : public swift::VisibleDeclConsumer {
@@ -3533,16 +3569,7 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink) {
   // Same: Swift.IntegerLiteralType.
   AddKeyword("__LINE__", "Int");
   AddKeyword("__COLUMN__", "Int");
-  // Same: Swift.BooleanLiteralType.
-  AddKeyword("false", "Bool");
-  AddKeyword("true", "Bool");
   AddKeyword("__DSO_HANDLE__", "UnsafeMutablePointer<Void>");
-
-  CodeCompletionResultBuilder Builder(Sink,
-                                      CodeCompletionResult::ResultKind::Keyword,
-                                      SemanticContextKind::CurrentModule, {});
-  Builder.addTextChunk("nil");
-
 }
 
 void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
