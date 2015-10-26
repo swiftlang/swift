@@ -11,7 +11,7 @@
 // Look for generic specialization <Swift.Int with Swift.Int : Swift.ForwardIndexType in Swift, Swift.Int with Swift.Int : Swift._SignedIntegerType in Swift, Swift.Int with Swift.Int : Swift._BuiltinIntegerLiteralConvertible in Swift, Swift.Int> of Swift.RangeGenerator.next <A where A: Swift.ForwardIndexType> (inout Swift.RangeGenerator<A>)() -> Swift.Optional<A>
 // CHECK: function_ref @_TTSg5SiSis16ForwardIndexTypes_SiSis18_SignedIntegerTypes_SiSis33_BuiltinIntegerLiteralConvertibles_Si___TFVs14RangeGenerator4next
 // Look for generic specialization <Swift.Int> of Swift.Array.subscript.getter : (Swift.Int) -> A
-// CHECK: function_ref {{@_TTSg5Si___TFSag9subscriptFSiq_|@_TTSg5Si___TFSaap9subscriptFSiq_}}
+// CHECK: function_ref {{@_TTSg5Si___TFSag9subscriptFSix|@_TTSg5Si___TFSaap9subscriptFSix}}
 // CHECK: return
 @inline(never)
 public func test(inout a: [Int], size: Int) {
@@ -24,7 +24,7 @@ public func test(inout a: [Int], size: Int) {
 
 // CHECK-LABEL: sil [noinline] @_TF13prespecialize3runFT_T_
 // Look for generic specialization <Swift.Int> of Swift.Array.init <A> (Swift.Array<A>.Type)(count : Swift.Int, repeatedValue : A) -> Swift.Array<A>
-// CHECK: function_ref @_TTSg5Si___TFSaCurfMGSaq__FT5countSi13repeatedValueq__GSaq__
+// CHECK: function_ref @_TTSg5Si___TFSaCfT5countSi13repeatedValuex_GSax_
 // CHECK: return
 @inline(never)
 public func run() {
