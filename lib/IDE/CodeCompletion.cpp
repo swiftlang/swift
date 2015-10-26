@@ -2639,6 +2639,9 @@ public:
   }
 
   void addValueLiteralCompletions() {
+    auto &context = CurrDeclContext->getASTContext();
+    auto *module = CurrDeclContext->getParentModule();
+
     auto addFromProto = [&](
         KnownProtocolKind kind, StringRef defaultTypeName,
         llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer,
@@ -2648,11 +2651,27 @@ public:
 
       CodeCompletionResultBuilder builder(Sink, completionKind,
                                           SemanticContextKind::None, {});
-      // FIXME: check the protocol against the expected nominal types.
+
       consumer(builder);
-      // FIXME: when we match an expected type, we should use that type instead
-      // of the protocol's preferred type.
-      if (!defaultTypeName.empty())
+
+      // Check for matching ExpectedTypes.
+      auto *P = context.getProtocol(kind);
+      bool foundConformance = false;
+      for (auto T : ExpectedTypes) {
+        if (!T)
+          continue;
+        if (auto *NTD = T->getAnyNominal()) {
+          SmallVector<ProtocolConformance *, 2> conformances;
+          if (NTD->lookupConformance(module, P, conformances)) {
+            foundConformance = true;
+            addTypeAnnotation(builder, T);
+            // FIXME: add type relation
+          }
+        }
+      }
+
+      // Fallback to showing the default type.
+      if (!foundConformance && !defaultTypeName.empty())
         builder.addTypeAnnotation(defaultTypeName);
     };
 
