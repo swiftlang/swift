@@ -38,7 +38,9 @@ class CodeCompletionResultBuilder {
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
       CurrentModule;
-  ArrayRef<Type> ExpectedTypes;
+  ArrayRef<Type> ExpectedDeclTypes;
+  CodeCompletionResult::ExpectedTypeRelation ExpectedTypeRelation =
+      CodeCompletionResult::Unrelated;
   bool Cancelled = false;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
@@ -67,10 +69,9 @@ public:
   CodeCompletionResultBuilder(CodeCompletionResultSink &Sink,
                               CodeCompletionResult::ResultKind Kind,
                               SemanticContextKind SemanticContext,
-                              ArrayRef<Type> ExpectedTypes)
+                              ArrayRef<Type> ExpectedDeclTypes)
       : Sink(Sink), Kind(Kind), SemanticContext(SemanticContext),
-        ExpectedTypes(ExpectedTypes) {
-  }
+        ExpectedDeclTypes(ExpectedDeclTypes) {}
 
   ~CodeCompletionResultBuilder() {
     finishResult();
@@ -85,6 +86,11 @@ public:
   }
 
   void setAssociatedDecl(const Decl *D);
+
+  void
+  setExpectedTypeRelation(CodeCompletionResult::ExpectedTypeRelation relation) {
+    ExpectedTypeRelation = relation;
+  }
 
   void addAccessControlKeyword(Accessibility Access) {
     switch (Access) {

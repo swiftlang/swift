@@ -486,13 +486,13 @@ public:
   CodeCompletionResult(ResultKind Kind,
                        SemanticContextKind SemanticContext,
                        unsigned NumBytesToErase,
-                       CodeCompletionString *CompletionString)
+                       CodeCompletionString *CompletionString,
+                       ExpectedTypeRelation TypeDistance = Unrelated)
       : Kind(Kind), SemanticContext(unsigned(SemanticContext)),
         NotRecommended(false), NumBytesToErase(NumBytesToErase),
-        CompletionString(CompletionString) {
+        CompletionString(CompletionString), TypeDistance(TypeDistance) {
     assert(Kind != Declaration && "use the other constructor");
     assert(CompletionString);
-    TypeDistance = ExpectedTypeRelation::Unrelated;
   }
 
   /// Constructs a \c Declaration result.

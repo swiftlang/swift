@@ -605,19 +605,21 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       }
     }
 
+    auto typeRelation = ExpectedTypeRelation;
+    if (typeRelation == CodeCompletionResult::Unrelated)
+      typeRelation =
+          calculateMaxTypeRelationForDecl(AssociatedDecl, ExpectedDeclTypes);
+
     return new (*Sink.Allocator) CodeCompletionResult(
         SemanticContext, NumBytesToErase, CCS, AssociatedDecl, ModuleName,
         /*NotRecommended=*/false, copyString(*Sink.Allocator, BriefComment),
-        copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl),
-        ExpectedTypes.empty() ?
-          CodeCompletionResult::ExpectedTypeRelation::Unrelated :
-          calculateMaxTypeRelationForDecl(AssociatedDecl, ExpectedTypes));
+        copyAssociatedUSRs(*Sink.Allocator, AssociatedDecl), typeRelation);
   }
 
   case CodeCompletionResult::ResultKind::Keyword:
   case CodeCompletionResult::ResultKind::Pattern:
-    return new (*Sink.Allocator)
-        CodeCompletionResult(Kind, SemanticContext, NumBytesToErase, CCS);
+    return new (*Sink.Allocator) CodeCompletionResult(
+        Kind, SemanticContext, NumBytesToErase, CCS, ExpectedTypeRelation);
   }
 }
 
@@ -2665,7 +2667,7 @@ public:
           if (NTD->lookupConformance(module, P, conformances)) {
             foundConformance = true;
             addTypeAnnotation(builder, T);
-            // FIXME: add type relation
+            builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
           }
         }
       }
