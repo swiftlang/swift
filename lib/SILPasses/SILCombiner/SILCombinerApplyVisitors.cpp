@@ -185,12 +185,12 @@ public:
 };
 
 void PartialApplyCombiner::allocateTemporaries() {
-  // Copy non-inout alloc_stack arguments of the partial_apply into
+  // Copy the original arguments of the partial_apply into
   // newly created temporaries and use these temporaries instead of
   // the original arguments afterwards.
-  // This is done to "extend" the life-time of original alloc_stack
-  // arguments, as they may be deallocated before the last use by one
-  // of the apply instructions.
+  // This is done to "extend" the life-time of original partial_apply
+  // arguments, as they may be destroyed/deallocated before the last
+  // use by one of the apply instructions.
   // TODO:
   // Copy arguments of the partial_apply into new temporaries
   // only if the lifetime of arguments ends before their uses
@@ -209,7 +209,12 @@ void PartialApplyCombiner::allocateTemporaries() {
     SILParameterInfo Param = Params[AI + Delta];
     if (Param.isIndirectInOut())
       continue;
-    if (isa<AllocStackInst>(Arg)) {
+    // Create a temporary and copy the argument into it, if:
+    // - the argument stems from an alloc_stack
+    // - the argument is consumed by the callee and is indirect
+    //   (e.g. it is an @in argument)
+    if (isa<AllocStackInst>(Arg) ||
+        (Param.isConsumed() && Param.isIndirect())) {
       Builder.setInsertionPoint(PAI->getFunction()->begin()->begin());
       // Create a new temporary at the beginning of a function.
       auto *Tmp = Builder.createAllocStack(PAI->getLoc(), Arg.getType());
@@ -220,6 +225,7 @@ void PartialApplyCombiner::allocateTemporaries() {
                               IsInitialization_t::IsInitialization);
 
       Tmps.push_back(SILValue(Tmp, 0));
+      // If the temporary is non-trivial, we need to release it later.
       if (!Arg.getType().isTrivial(PAI->getModule()))
         needsReleases = true;
       ArgToTmp.insert(std::make_pair(Arg, SILValue(Tmp, 0)));
@@ -312,9 +318,22 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   // pre-incremented. When we combine the partial_apply and this apply into
   // a new apply we need to retain all of the closure non-address type
   // arguments.
-  for (auto Arg : PAI->getArguments())
-    if (!Arg.getType().isAddress())
+  auto ParamInfo = PAI->getSubstCalleeType()->getParameters();
+  auto PartialApplyArgs = PAI->getArguments();
+  // Set of arguments that need to be released after each invocation.
+  SmallVector<SILValue, 8> ToBeReleasedArgs;
+  for (unsigned i = 0, e = PartialApplyArgs.size(); i < e; ++i) {
+    SILValue Arg = PartialApplyArgs[i];
+    if (!Arg.getType().isAddress()) {
+      // Retain the argument as the callee may consume it.
       Builder.emitRetainValueOperation(PAI->getLoc(), Arg);
+      // For non consumed parameters (e.g. guaranteed), we also need to
+      // insert releases after each apply instruction that we create.
+      if (!ParamInfo[ParamInfo.size() - PartialApplyArgs.size() + i].
+            isConsumed())
+        ToBeReleasedArgs.push_back(Arg);
+    }
+  }
 
   auto *F = FRI->getReferencedFunction();
   SILType FnType = F->getLoweredType();
@@ -343,13 +362,24 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   // is consumed by the apply_instruction.
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     Builder.setInsertionPoint(TAI->getNormalBB()->begin());
+    for (auto Arg : ToBeReleasedArgs) {
+      Builder.emitReleaseValueOperation(PAI->getLoc(), Arg);
+    }
     Builder.createStrongRelease(AI.getLoc(), PAI)
       ->setDebugScope(AI.getDebugScope());
     Builder.setInsertionPoint(TAI->getErrorBB()->begin());
+    // Release the non-consumed parameters.
+    for (auto Arg : ToBeReleasedArgs) {
+      Builder.emitReleaseValueOperation(PAI->getLoc(), Arg);
+    }
     Builder.createStrongRelease(AI.getLoc(), PAI)
       ->setDebugScope(AI.getDebugScope());
     Builder.setInsertionPoint(AI.getInstruction());
   } else {
+    // Release the non-consumed parameters.
+    for (auto Arg : ToBeReleasedArgs) {
+      Builder.emitReleaseValueOperation(PAI->getLoc(), Arg);
+    }
     Builder.createStrongRelease(AI.getLoc(), PAI)
       ->setDebugScope(AI.getDebugScope());
   }
