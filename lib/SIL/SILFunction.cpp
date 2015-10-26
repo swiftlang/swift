@@ -469,6 +469,10 @@ bool SILFunction::hasSelfMetadataParam() const {
   return true;
 }
 
+bool SILFunction::hasName(const char *Name) const {
+  return getName() == Name;
+}
+
   /// Helper method which returns true if the linkage of the SILFunction
   /// indicates that the objects definition might be required outside the
   /// current SILModule.

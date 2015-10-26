@@ -131,10 +131,10 @@ breakpoint'.
 
 Let's start with a simple example: sometimes you see a function in the SIL
 output and you want to know where the function was created in the compiler.
-In this case you can set a conditional breakpoint in SILFunction::create and
-check for the function name in the breakpoint condition::
+In this case you can set a conditional breakpoint in SILFunction constructor
+and check for the function name in the breakpoint condition::
 
-    (lldb) br set -c 'name.equals("_TFC3nix1Xd")' -n SILFunction::create 
+    (lldb) br set -c 'hasName("_TFC3nix1Xd")' -f SILFunction.cpp -l 91
 
 Sometimes you want to know which optimization does insert, remove or move a
 certain instruction. To find out, set a breakpoint in
@@ -150,7 +150,7 @@ The condition can be made more precise e.g. by also testing in which function
 this happens::
 
     (lldb) br set -c 'I->getKind() == ValueKind::StrongRetainInst &&
-               I->getFunction()->getName().equals("_TFC3nix1Xd")'
+               I->getFunction()->hasName("_TFC3nix1Xd")'
                -f SILInstruction.cpp -l 63
 
 Let's assume the breakpoint hits somewhere in the middle of compiling a large
