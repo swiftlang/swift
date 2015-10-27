@@ -9,47 +9,49 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-//  Closure Specialization
-//  ----------------------
-//
-//  The purpose of the algorithm in this file is to perform the following
-//  transformation: given a closure passed into a function which the closure is
-//  then invoked in, clone the function and create a copy of the closure inside
-//  the function. This closure will be able to be eliminated easily and the
-//  overhead is gone. We then try to remove the original closure.
-//
-//  There are some complications. They are listed below and how we work around
-//  them:
-//
-//  1. If we support the specialization of closures with multiple user callsites
-//     that can be specialized, we need to ensure that any captured values have
-//     their reference counts adjusted properly. This implies for every
-//     specialized call site, we insert an additional retain for each captured
-//     argument with reference semantics. We will pass them in as extra @owned
-//     to the specialized function. This @owned will be consumed by the "copy"
-//     partial apply that is in the specialized function. Now the partial apply
-//     will own those ref counts. This is unapplicable to thin_to_thick_function
-//     since they do not have any captured args.
-//
-//  2. If the closure was passed in @owned vs if the closure was passed in
-//     @guaranteed. If the original closure was passed in @owned, then we know
-//     that there is a balancing release for the new "copy" partial apply. But
-//     since the original partial apply no longer will have that corresponding
-//     -1, we need to insert a release for the old partial apply. We do this
-//     right after the old call site where the original partial apply was
-//     called. This ensures we do not shrink the lifetime of the old partial
-//     apply. In the case where the old partial_apply was passed in at +0, we
-//     know that the old partial_apply does not need to have any ref count
-//     adjustments. On the other hand, the new "copy" partial apply in the
-//     specialized function now needs to be balanced lest we leak. Thus we
-//     insert a release right before any exit from the function. This ensures
-//     that the release occurs in the epilog after any retains associated with
-//     @owned return values.
-//
-//  3. Handling addresses. We currently do not handle address types. We can in
-//     the future by introducing alloc_stacks.
-//
+///
+/// \file
+///
+/// Closure Specialization
+/// ----------------------
+///
+/// The purpose of the algorithm in this file is to perform the following
+/// transformation: given a closure passed into a function which the closure is
+/// then invoked in, clone the function and create a copy of the closure inside
+/// the function. This closure will be able to be eliminated easily and the
+/// overhead is gone. We then try to remove the original closure.
+///
+/// There are some complications. They are listed below and how we work around
+/// them:
+///
+/// 1. If we support the specialization of closures with multiple user callsites
+///    that can be specialized, we need to ensure that any captured values have
+///    their reference counts adjusted properly. This implies for every
+///    specialized call site, we insert an additional retain for each captured
+///    argument with reference semantics. We will pass them in as extra @owned
+///    to the specialized function. This @owned will be consumed by the "copy"
+///    partial apply that is in the specialized function. Now the partial apply
+///    will own those ref counts. This is unapplicable to thin_to_thick_function
+///    since they do not have any captured args.
+///
+/// 2. If the closure was passed in @owned vs if the closure was passed in
+///    @guaranteed. If the original closure was passed in @owned, then we know
+///    that there is a balancing release for the new "copy" partial apply. But
+///    since the original partial apply no longer will have that corresponding
+///    -1, we need to insert a release for the old partial apply. We do this
+///    right after the old call site where the original partial apply was
+///    called. This ensures we do not shrink the lifetime of the old partial
+///    apply. In the case where the old partial_apply was passed in at +0, we
+///    know that the old partial_apply does not need to have any ref count
+///    adjustments. On the other hand, the new "copy" partial apply in the
+///    specialized function now needs to be balanced lest we leak. Thus we
+///    insert a release right before any exit from the function. This ensures
+///    that the release occurs in the epilog after any retains associated with
+///    @owned return values.
+///
+/// 3. Handling addresses. We currently do not handle address types. We can in
+///    the future by introducing alloc_stacks.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "closure-specialization"
