@@ -879,15 +879,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     break;
   }
-  case ValueKind::AllocRefInst:
+  case ValueKind::AllocRefInst: {
     assert(RecordKind == SIL_ONE_TYPE_VALUES &&
            "Layout should be OneTypeValues.");
     assert(ListOfValues.size() >= 1 && "Not enough values");
+    unsigned Value = ListOfValues[0];
     ResultVal = Builder.createAllocRef(
                   Loc,
                   getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
-                  ListOfValues[0]);
+                  (bool)(Value & 1), (bool)((Value >> 1) & 1));
     break;
+  }
   case ValueKind::AllocRefDynamicInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
@@ -1059,9 +1061,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case ValueKind::DeallocRefInst: {
     auto Ty = MF->getType(TyID);
+    bool OnStack = (bool)Attr;
     ResultVal = Builder.createDeallocRef(Loc,
         getLocalValue(ValID, ValResNum,
-                      getSILType(Ty, (SILValueCategory)TyCategory)));
+                      getSILType(Ty, (SILValueCategory)TyCategory)), OnStack);
     break;
   }
   case ValueKind::DeallocPartialRefInst: {

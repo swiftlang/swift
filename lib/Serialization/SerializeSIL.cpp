@@ -540,7 +540,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::AllocRefInst: {
     const AllocRefInst *ARI = cast<AllocRefInst>(&SI);
     unsigned abbrCode = SILAbbrCodes[SILOneTypeValuesLayout::Code];
-    ValueID Args[1] = { ARI->isObjC() };
+    ValueID Args[1] = { (unsigned)ARI->isObjC() |
+                          ((unsigned)ARI->canAllocOnStack() << 1) };
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        (unsigned)SI.getKind(),
                                        S.addTypeRef(
@@ -903,6 +904,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = LWI->isTake();
     else if (auto *MUI = dyn_cast<MarkUninitializedInst>(&SI))
       Attr = (unsigned)MUI->getKind();
+    else if (auto *DRI = dyn_cast<DeallocRefInst>(&SI))
+      Attr = (unsigned)DRI->canAllocOnStack();
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
     break;
   }

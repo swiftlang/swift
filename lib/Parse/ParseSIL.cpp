@@ -680,14 +680,23 @@ static SILLinkage resolveSILLinkage(Optional<SILLinkage> linkage,
   }
 }
 
-/// Parse an option attribute ('[' Expected ']')?
-static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
+static bool parseSILOptional(StringRef &Result, SILParser &SP) {
   if (SP.P.consumeIf(tok::l_square)) {
     Identifier Id;
     SP.parseSILIdentifier(Id, diag::expected_in_attribute_list);
-    if (Id.str() != Expected)
-      return true;
     SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+    Result = Id.str();
+    return true;
+  }
+  return false;
+}
+
+/// Parse an option attribute ('[' Expected ']')?
+static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
+  StringRef Optional;
+  if (parseSILOptional(Optional, SP)) {
+    if (Optional != Expected)
+      return true;
     Result = true;
   }
   return false;
@@ -2291,9 +2300,17 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::AllocRefInst:
   case ValueKind::MetatypeInst: {
     bool IsObjC = false;
-    if (Opcode == ValueKind::AllocRefInst &&
-        parseSILOptional(IsObjC, *this, "objc"))
-      return true;
+    bool OnStack = false;
+    StringRef Optional;
+    while (parseSILOptional(Optional, *this)) {
+      if (Optional == "objc") {
+        IsObjC = true;
+      } else if (Optional == "stack") {
+        OnStack = true;
+      } else {
+        return true;
+      }
+    }
 
     SILType Ty;
     if (parseSILType(Ty))
@@ -2302,7 +2319,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (Opcode == ValueKind::AllocStackInst)
       ResultVal = B.createAllocStack(InstLoc, Ty);
     else if (Opcode == ValueKind::AllocRefInst)
-      ResultVal = B.createAllocRef(InstLoc, Ty, IsObjC);
+      ResultVal = B.createAllocRef(InstLoc, Ty, IsObjC, OnStack);
     else {
       assert(Opcode == ValueKind::MetatypeInst);
       ResultVal = B.createMetatype(InstLoc, Ty);
@@ -2328,9 +2345,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     ResultVal = B.createDeallocStack(InstLoc, Val);
     break;
   case ValueKind::DeallocRefInst: {
+    bool OnStack = false;
+    if (parseSILOptional(OnStack, *this, "stack"))
+      return true;
+
     if (parseTypedValueRef(Val))
       return true;
-    ResultVal = B.createDeallocRef(InstLoc, Val);
+    ResultVal = B.createDeallocRef(InstLoc, Val, OnStack);
     break;
   }
   case ValueKind::DeallocPartialRefInst: {

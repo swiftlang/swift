@@ -670,6 +670,8 @@ public:
     *this << "alloc_ref ";
     if (ARI->isObjC())
       *this << "[objc] ";
+    if (ARI->canAllocOnStack())
+      *this << "[stack] ";
     *this << ARI->getType();
   }
 
@@ -1241,7 +1243,10 @@ public:
     *this << "dealloc_stack " << getIDAndType(DI->getOperand());
   }
   void visitDeallocRefInst(DeallocRefInst *DI) {
-    *this << "dealloc_ref " << getIDAndType(DI->getOperand());
+    *this << "dealloc_ref ";
+    if (DI->canAllocOnStack())
+      *this << "[stack] ";
+    *this << getIDAndType(DI->getOperand());
   }
   void visitDeallocPartialRefInst(DeallocPartialRefInst *DPI) {
     *this << "dealloc_partial_ref ";

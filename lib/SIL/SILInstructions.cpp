@@ -57,8 +57,9 @@ VarDecl *AllocStackInst::getDecl() const {
 }
 
 AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F,
-                           bool objc)
-  : AllocationInst(ValueKind::AllocRefInst, loc, elementType), ObjC(objc) {
+                           bool objc, bool canBeOnStack)
+  : AllocationInst(ValueKind::AllocRefInst, loc, elementType),
+    StackPromotable(canBeOnStack), ObjC(objc) {
 }
 
 

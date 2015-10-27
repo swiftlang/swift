@@ -1630,9 +1630,9 @@ alloc_ref
 `````````
 ::
 
-  sil-instruction ::= 'alloc_ref' ('[' 'objc' ']')? sil-type
+  sil-instruction ::= 'alloc_ref' ('[' 'objc' ']')? ('[' 'stack' ']')? sil-type
 
-  %1 = alloc_ref $T
+  %1 = alloc_ref [stack] $T
   // $T must be a reference type
   // %1 has type $T
 
@@ -1640,6 +1640,14 @@ Allocates an object of reference type ``T``. The object will be initialized
 with retain count 1; its state will be otherwise uninitialized. The
 optional ``objc`` attribute indicates that the object should be
 allocated using Objective-C's allocation methods (``+allocWithZone:``).
+The optional ``stack`` attribute indicates that the object can be allocated
+on the stack instead on the heap. In this case the instruction must have
+balanced with a ``dealloc_ref [stack]`` instruction to mark the end of the
+object's lifetime.
+Note that the ``stack`` attribute only specifies that stack allocation is
+possible. The final decision on stack allocation is done during llvm IR
+generation. This is because the decision also depends on the object size,
+which is not necessarily known at SIL level.
 
 alloc_ref_dynamic
 `````````````````
@@ -1750,9 +1758,9 @@ dealloc_ref
 ```````````
 ::
 
-  sil-instruction ::= 'dealloc_ref' sil-operand
+  sil-instruction ::= 'dealloc_ref' ('[' 'stack' ']')? sil-operand
 
-  dealloc_ref %0 : $T
+  dealloc_ref [stack] %0 : $T
   // $T must be a class type
 
 Deallocates an uninitialized class type instance, bypassing the reference
@@ -1766,6 +1774,11 @@ The instance must have a retain count of one.
 This does not destroy stored properties of the instance. The contents
 of stored properties must be fully uninitialized at the time
 ``dealloc_ref`` is applied.
+
+The ``stack`` attribute indicates that the instruction is the balanced
+deallocation of its operand which must be a ``alloc_ref [stack]``.
+In this case the instruction marks the end of the object's lifetime but
+has no other effect.
 
 dealloc_partial_ref
 ```````````````````

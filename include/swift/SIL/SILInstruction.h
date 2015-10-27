@@ -220,6 +220,15 @@ public:
     return getMemoryBehavior() != MemoryBehavior::None;
   }
 
+  /// Returns true if the result of this instruction is a pointer to stack
+  /// allocated memory. In this case there must be an adjacent deallocating
+  /// instruction.
+  bool isAllocatingStack() const;
+
+  /// Returns true if this is the deallocation of a stack allocating instruction.
+  /// The first operand must be the allocating instruction.
+  bool isDeallocatingStack() const;
+
   static bool classof(const ValueBase *V) {
     return V->getKind() >= ValueKind::First_SILInstruction &&
            V->getKind() <= ValueKind::Last_SILInstruction;
@@ -318,6 +327,24 @@ public:
   }
 };
 
+/// Base class for allocation/deallocation instructions where the allocation
+/// can be promoted to the stack.
+/// Note that IRGen can still decide to _not_ promote the allocation on the
+/// stack.
+class StackPromotable {
+
+  /// If true, the allocation can be done on the stack (the final decision is
+  /// in IRGen).
+  bool OnStack = false;
+
+public:
+  StackPromotable(bool OnStack) : OnStack(OnStack) { }
+
+  bool canAllocOnStack() const { return OnStack; }
+
+  void setStackAllocatable() { OnStack = true; }
+};
+
 /// AllocStackInst - This represents the allocation of an unboxed (i.e., no
 /// reference count) stack memory.  The memory is provided uninitialized.
 class AllocStackInst : public AllocationInst {
@@ -350,11 +377,12 @@ public:
 /// AllocRefInst - This represents the primitive allocation of an instance
 /// of a reference type. Aside from the reference count, the instance is
 /// returned uninitialized.
-class AllocRefInst : public AllocationInst {
+class AllocRefInst : public AllocationInst, public StackPromotable {
   friend class SILBuilder;
   bool ObjC;
 
-  AllocRefInst(SILLocation loc, SILType type, SILFunction &F, bool objc);
+  AllocRefInst(SILLocation loc, SILType type, SILFunction &F, bool objc,
+               bool canBeOnStack);
 public:
 
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
@@ -3220,12 +3248,13 @@ class DeallocStackInst :
 /// most derived type of the allocated instance.
 class DeallocRefInst :
   public UnaryInstructionBase<ValueKind::DeallocRefInst, DeallocationInst,
-                              /*HAS_RESULT*/ false> {
+                              /*HAS_RESULT*/ false>,
+  public StackPromotable {
   friend class SILBuilder;
 
 private:
-  DeallocRefInst(SILLocation Loc, SILValue Operand)
-    : UnaryInstructionBase(Loc, Operand) {}
+  DeallocRefInst(SILLocation Loc, SILValue Operand, bool canBeOnStack = false)
+    : UnaryInstructionBase(Loc, Operand), StackPromotable(canBeOnStack) {}
 };
 
 /// Deallocate memory for a reference type instance from a failure path of a

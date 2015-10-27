@@ -2819,33 +2819,33 @@ public:
   }
 
   void verifyStackHeight(SILFunction *F) {
-    llvm::DenseMap<SILBasicBlock*, std::vector<AllocStackInst*>> visitedBBs;
+    llvm::DenseMap<SILBasicBlock*, std::vector<SILInstruction*>> visitedBBs;
     SmallVector<SILBasicBlock*, 16> Worklist;
     visitedBBs[F->begin()] = {};
     Worklist.push_back(F->begin());
     while (!Worklist.empty()) {
       SILBasicBlock *BB = Worklist.pop_back_val();
-      std::vector<AllocStackInst*> stack = visitedBBs[BB];
+      std::vector<SILInstruction*> stack = visitedBBs[BB];
       for (SILInstruction &i : *BB) {
         CurInstruction = &i;
 
-        if (auto alloc = dyn_cast<AllocStackInst>(&i)) {
-          stack.push_back(alloc);
+        if (i.isAllocatingStack()) {
+          stack.push_back(&i);
         }
-        if (auto dealloc = dyn_cast<DeallocStackInst>(&i)) {
-          SILValue op = dealloc->getOperand();
+        if (i.isDeallocatingStack()) {
+          SILValue op = i.getOperand(0);
           require(op.getResultNumber() == 0,
-                  "dealloc_stack operand is not local storage of alloc_inst");
+                  "stack dealloc operand is not local storage of stack alloc");
           require(!stack.empty(),
-                  "dealloc_stack with empty stack");
+                  "stack dealloc with empty stack");
           require(op.getDef() == stack.back(),
-                  "dealloc_stack does not match most recent alloc_stack");
+                  "stack dealloc does not match most recent stack alloc");
           stack.pop_back();
         }
         if (isa<ReturnInst>(&i) || isa<AutoreleaseReturnInst>(&i) ||
             isa<ThrowInst>(&i)) {
           require(stack.empty(),
-                  "return with alloc_stacks that haven't been deallocated");
+                  "return with stack allocs that haven't been deallocated");
         }
         if (auto term = dyn_cast<TermInst>(&i)) {
           for (auto &successor : term->getSuccessors()) {

@@ -746,6 +746,29 @@ namespace {
   };
 }
 
+bool SILInstruction::isAllocatingStack() const {
+  if (isa<AllocStackInst>(this))
+    return true;
+
+  if (auto *ARI = dyn_cast<AllocRefInst>(this)) {
+    if (ARI->canAllocOnStack())
+      return true;
+  }
+  return false;
+}
+
+bool SILInstruction::isDeallocatingStack() const {
+  if (isa<DeallocStackInst>(this))
+    return true;
+
+  if (auto *DRI = dyn_cast<DeallocRefInst>(this)) {
+    if (DRI->canAllocOnStack())
+      return true;
+  }
+  return false;
+}
+
+
 /// Create a new copy of this instruction, which retains all of the operands
 /// and other information of this one.  If an insertion point is specified,
 /// then the new instruction is inserted before the specified point, otherwise
