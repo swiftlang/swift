@@ -1836,7 +1836,7 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
       return enumDecl->hasOnlyCasesWithoutAssociatedValues();
     
     // @objc enums can explicitly derive their _BridgedNSError conformance.
-    case KnownProtocolKind::_BridgedNSError:
+    case KnownProtocolKind::BridgedNSError:
       return isObjC() && enumDecl->hasOnlyCasesWithoutAssociatedValues();
 
     default:

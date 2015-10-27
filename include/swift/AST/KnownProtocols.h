@@ -23,7 +23,7 @@ namespace swift {
 
 /// \brief The set of known protocols.
 enum class KnownProtocolKind : uint8_t {
-#define PROTOCOL(Id) Id,
+#define PROTOCOL_WITH_NAME(Id, Name) Id,
 #include "swift/AST/KnownProtocols.def"
 };
 
@@ -31,7 +31,7 @@ enum : uint8_t {
   // This uses a preprocessor trick to count all the protocols. The enum value
   // expression below expands to "+1+1+1...". (Note that the first plus
   // is parsed as a unary operator.)
-#define PROTOCOL(Id) +1
+#define PROTOCOL_WITH_NAME(Id, Name) +1
   /// The number of known protocols.
   NumKnownProtocols =
 #include "swift/AST/KnownProtocols.def"

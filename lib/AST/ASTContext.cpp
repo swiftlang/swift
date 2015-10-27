@@ -46,9 +46,9 @@ void ClangModuleLoader::anchor() {}
 
 llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
   switch (kind) {
-#define PROTOCOL(Id) \
+#define PROTOCOL_WITH_NAME(Id, Name) \
   case KnownProtocolKind::Id: \
-    return #Id;
+    return Name;
 #include "swift/AST/KnownProtocols.def"
   }
   llvm_unreachable("bad KnownProtocolKind");
@@ -815,7 +815,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   SmallVector<ValueDecl *, 1> results;
 
   // _BridgedNSError is in the Foundation module.
-  if (kind == KnownProtocolKind::_BridgedNSError) {
+  if (kind == KnownProtocolKind::BridgedNSError) {
     Module *foundation = const_cast<ASTContext *>(this)->getModule(
                            {{Id_Foundation, SourceLoc()}});
     if (!foundation)
@@ -1303,8 +1303,8 @@ static void recordKnownProtocol(Module *Stdlib, StringRef Name,
 }
 
 void ASTContext::recordKnownProtocols(Module *Stdlib) {
-#define PROTOCOL(Name) \
-  recordKnownProtocol(Stdlib, #Name, KnownProtocolKind::Name);
+#define PROTOCOL_WITH_NAME(Id, Name) \
+  recordKnownProtocol(Stdlib, Name, KnownProtocolKind::Id);
 #include "swift/AST/KnownProtocols.def"
 }
 
@@ -3451,7 +3451,7 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       return type;
 
   // Retrieve the _BridgedToObjectiveC protocol.
-  auto bridgedProto = getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+  auto bridgedProto = getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   if (!bridgedProto)
     return None;
 

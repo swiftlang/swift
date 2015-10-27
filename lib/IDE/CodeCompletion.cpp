@@ -1101,7 +1101,7 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
   case CodeCompletionLiteralKind::BooleanLiteral:
     return KnownProtocolKind::BooleanLiteralConvertible;
   case CodeCompletionLiteralKind::ColorLiteral:
-    return KnownProtocolKind::_ColorLiteralConvertible;
+    return KnownProtocolKind::ColorLiteralConvertible;
   case CodeCompletionLiteralKind::DictionaryLiteral:
     return KnownProtocolKind::DictionaryLiteralConvertible;
   case CodeCompletionLiteralKind::FloatLiteral:

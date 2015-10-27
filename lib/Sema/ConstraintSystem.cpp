@@ -252,9 +252,9 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   unsigned index;
 
   switch (kind) {
-#define PROTOCOL(Protocol) \
-  case KnownProtocolKind::Protocol: llvm_unreachable("Not a literal protocol");
-#define LITERAL_CONVERTIBLE_PROTOCOL(Protocol)
+#define PROTOCOL_WITH_NAME(Id, Name) \
+  case KnownProtocolKind::Id: llvm_unreachable("Not a literal protocol");
+#define LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(Id, Name)
 #include "swift/AST/KnownProtocols.def"
 
   case KnownProtocolKind::ArrayLiteralConvertible:     index = 0; break;
@@ -268,9 +268,9 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::NilLiteralConvertible: index = 7; break;
   case KnownProtocolKind::BooleanLiteralConvertible: index = 8; break;
   case KnownProtocolKind::UnicodeScalarLiteralConvertible: index = 9; break;
-  case KnownProtocolKind::_ColorLiteralConvertible: index = 10; break;
-  case KnownProtocolKind::_ImageLiteralConvertible: index = 11; break;
-  case KnownProtocolKind::_FileReferenceLiteralConvertible: index = 12; break;
+  case KnownProtocolKind::ColorLiteralConvertible: index = 10; break;
+  case KnownProtocolKind::ImageLiteralConvertible: index = 11; break;
+  case KnownProtocolKind::FileReferenceLiteralConvertible: index = 12; break;
   }
 
   // If we already looked for alternative literal types, return those results.
@@ -290,9 +290,9 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
 
   // Some literal kinds are related.
   switch (kind) {
-#define PROTOCOL(Protocol) \
-  case KnownProtocolKind::Protocol: llvm_unreachable("Not a literal protocol");
-#define LITERAL_CONVERTIBLE_PROTOCOL(Protocol)
+#define PROTOCOL_WITH_NAME(Id, Name) \
+  case KnownProtocolKind::Id: llvm_unreachable("Not a literal protocol");
+#define LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(Id, Name)
 #include "swift/AST/KnownProtocols.def"
 
   case KnownProtocolKind::ArrayLiteralConvertible:
@@ -321,9 +321,9 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::NilLiteralConvertible:
   case KnownProtocolKind::BooleanLiteralConvertible:
     break;
-  case KnownProtocolKind::_ColorLiteralConvertible:
-  case KnownProtocolKind::_ImageLiteralConvertible:
-  case KnownProtocolKind::_FileReferenceLiteralConvertible:
+  case KnownProtocolKind::ColorLiteralConvertible:
+  case KnownProtocolKind::ImageLiteralConvertible:
+  case KnownProtocolKind::FileReferenceLiteralConvertible:
     break;
   }
 

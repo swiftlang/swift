@@ -659,21 +659,21 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   // _ColorLiteralConvertible -> _ColorLiteralType
   else if (protocol == getProtocol(
                          SourceLoc(),
-                         KnownProtocolKind::_ColorLiteralConvertible)) {
+                         KnownProtocolKind::ColorLiteralConvertible)) {
     type = &ColorLiteralType;
     name = "_ColorLiteralType";
   }
   // _ImageLiteralConvertible -> _ImageLiteralType
   else if (protocol == getProtocol(
                          SourceLoc(),
-                         KnownProtocolKind::_ImageLiteralConvertible)) {
+                         KnownProtocolKind::ImageLiteralConvertible)) {
     type = &ImageLiteralType;
     name = "_ImageLiteralType";
   }
   // _FileReferenceLiteralConvertible -> _FileReferenceLiteralType
   else if (protocol == getProtocol(
                          SourceLoc(),
-                         KnownProtocolKind::_FileReferenceLiteralConvertible)) {
+                         KnownProtocolKind::FileReferenceLiteralConvertible)) {
     type = &FileReferenceLiteralType;
     name = "_FileReferenceLiteralType";
   }

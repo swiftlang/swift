@@ -1245,7 +1245,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
 
   // Lookup the _ObjectiveCBridgeable protocol.
   auto BridgedProto =
-      M.getASTContext().getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+      M.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   auto Conf =
       M.getSwiftModule()->lookupConformance(Target, BridgedProto, nullptr);
   assert(Conf.getInt() == ConformanceKind::Conforms &&
@@ -1406,7 +1406,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   // Find the _BridgedToObjectiveC protocol.
   auto BridgedProto =
-      M.getASTContext().getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+      M.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
 
   auto Conf =
       M.getSwiftModule()->lookupConformance(Source, BridgedProto, nullptr);

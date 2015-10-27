@@ -157,13 +157,13 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
     Identifier name = E->getName();
     if (name.str().equals("Color")) {
       return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::_ColorLiteralConvertible);
+                         KnownProtocolKind::ColorLiteralConvertible);
     } else if (name.str().equals("Image")) {
       return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::_ImageLiteralConvertible);
+                         KnownProtocolKind::ImageLiteralConvertible);
     } else if (name.str().equals("FileReference")) {
       return getProtocol(expr->getLoc(),
-                         KnownProtocolKind::_FileReferenceLiteralConvertible);
+                         KnownProtocolKind::FileReferenceLiteralConvertible);
     } else {
       return nullptr;
     }

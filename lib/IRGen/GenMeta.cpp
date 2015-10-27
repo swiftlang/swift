@@ -4781,8 +4781,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Equatable:
   case KnownProtocolKind::Hashable:
   case KnownProtocolKind::Comparable:
-  case KnownProtocolKind::_ObjectiveCBridgeable:
-  case KnownProtocolKind::_DestructorSafeContainer:
+  case KnownProtocolKind::ObjectiveCBridgeable:
+  case KnownProtocolKind::DestructorSafeContainer:
   case KnownProtocolKind::ArrayLiteralConvertible:
   case KnownProtocolKind::BooleanLiteralConvertible:
   case KnownProtocolKind::DictionaryLiteralConvertible:
@@ -4793,18 +4793,18 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::StringLiteralConvertible:
   case KnownProtocolKind::NilLiteralConvertible:
   case KnownProtocolKind::UnicodeScalarLiteralConvertible:
-  case KnownProtocolKind::_ColorLiteralConvertible:
-  case KnownProtocolKind::_ImageLiteralConvertible:
-  case KnownProtocolKind::_FileReferenceLiteralConvertible:
-  case KnownProtocolKind::_BuiltinBooleanLiteralConvertible:
-  case KnownProtocolKind::_BuiltinExtendedGraphemeClusterLiteralConvertible:
-  case KnownProtocolKind::_BuiltinFloatLiteralConvertible:
-  case KnownProtocolKind::_BuiltinIntegerLiteralConvertible:
-  case KnownProtocolKind::_BuiltinStringLiteralConvertible:
-  case KnownProtocolKind::_BuiltinUTF16StringLiteralConvertible:
-  case KnownProtocolKind::_BuiltinUnicodeScalarLiteralConvertible:
+  case KnownProtocolKind::ColorLiteralConvertible:
+  case KnownProtocolKind::ImageLiteralConvertible:
+  case KnownProtocolKind::FileReferenceLiteralConvertible:
+  case KnownProtocolKind::BuiltinBooleanLiteralConvertible:
+  case KnownProtocolKind::BuiltinExtendedGraphemeClusterLiteralConvertible:
+  case KnownProtocolKind::BuiltinFloatLiteralConvertible:
+  case KnownProtocolKind::BuiltinIntegerLiteralConvertible:
+  case KnownProtocolKind::BuiltinStringLiteralConvertible:
+  case KnownProtocolKind::BuiltinUTF16StringLiteralConvertible:
+  case KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible:
   case KnownProtocolKind::OptionSetType:
-  case KnownProtocolKind::_BridgedNSError:
+  case KnownProtocolKind::BridgedNSError:
     return SpecialProtocol::None;
   }
 }

@@ -3142,7 +3142,7 @@ isElementRepresentableInObjC(TypeChecker &TC, const DeclContext *DC, Type T) {
     // Don't check this path for collections and other things that are only
     // conditionally bridged to Objective-C.
     ProtocolDecl *bridgingProto =
-        TC.getProtocol({}, KnownProtocolKind::_ObjectiveCBridgeable);
+        TC.getProtocol({}, KnownProtocolKind::ObjectiveCBridgeable);
     if (bridgingProto &&
         TC.conformsToProtocol(T, bridgingProto, const_cast<DeclContext *>(DC),
                               ConformanceCheckOptions())) {

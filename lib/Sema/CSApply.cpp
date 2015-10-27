@@ -1283,7 +1283,7 @@ namespace {
 
       // Find the _BridgedToObjectiveC protocol.
       auto bridgedProto
-        = tc.Context.getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+        = tc.Context.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
 
       // Find the conformance of the value type to _BridgedToObjectiveC.
       Type valueType = value->getType()->getRValueType();
@@ -1321,7 +1321,7 @@ namespace {
 
       // Find the _BridgedToObjectiveC protocol.
       auto bridgedProto
-        = tc.Context.getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+        = tc.Context.getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
 
       // Try to find the conformance of the value type to _BridgedToObjectiveC.
       ProtocolConformance *conformance = nullptr;
@@ -1496,7 +1496,7 @@ namespace {
                          KnownProtocolKind::IntegerLiteralConvertible);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::_BuiltinIntegerLiteralConvertible);
+                         KnownProtocolKind::BuiltinIntegerLiteralConvertible);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1599,7 +1599,7 @@ namespace {
                          KnownProtocolKind::FloatLiteralConvertible);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::_BuiltinFloatLiteralConvertible);
+                         KnownProtocolKind::BuiltinFloatLiteralConvertible);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1659,7 +1659,7 @@ namespace {
                          KnownProtocolKind::BooleanLiteralConvertible);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::_BuiltinBooleanLiteralConvertible);
+                         KnownProtocolKind::BuiltinBooleanLiteralConvertible);
       if (!protocol || !builtinProtocol)
         return nullptr;
 
@@ -1761,7 +1761,7 @@ namespace {
         // UTF-16 string literals, prefer them.
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::_BuiltinUTF16StringLiteralConvertible);
+            KnownProtocolKind::BuiltinUTF16StringLiteralConvertible);
         if (!forceASCII &&
             tc.conformsToProtocol(type, builtinProtocol, cs.DC,
                                   ConformanceCheckFlags::InExpression)) {
@@ -1784,7 +1784,7 @@ namespace {
           // Otherwise, fall back to UTF-8.
           builtinProtocol = tc.getProtocol(
               expr->getLoc(),
-              KnownProtocolKind::_BuiltinStringLiteralConvertible);
+              KnownProtocolKind::BuiltinStringLiteralConvertible);
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
                        { tc.Context.Id_builtinStringLiteral,
@@ -1818,7 +1818,7 @@ namespace {
 
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::_BuiltinExtendedGraphemeClusterLiteralConvertible);
+            KnownProtocolKind::BuiltinExtendedGraphemeClusterLiteralConvertible);
         elements.push_back(
           TupleTypeElt(tc.Context.TheRawPointerType,
                        tc.Context.Id_builtinExtendedGraphemeClusterLiteral));
@@ -1845,10 +1845,10 @@ namespace {
 
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::_BuiltinUnicodeScalarLiteralConvertible);
+            KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible);
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::_BuiltinUnicodeScalarLiteralConvertible);
+            KnownProtocolKind::BuiltinUnicodeScalarLiteralConvertible);
 
         elements.push_back(BuiltinIntegerType::get(32, tc.Context));
 

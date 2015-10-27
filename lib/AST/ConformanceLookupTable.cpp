@@ -511,7 +511,7 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
         cast<EnumDecl>(nominal)->hasOnlyCasesWithoutAssociatedValues()) {
       ASTContext &ctx = nominal->getASTContext();
       if (auto bridgedNSError
-            = ctx.getProtocol(KnownProtocolKind::_BridgedNSError)) {
+            = ctx.getProtocol(KnownProtocolKind::BridgedNSError)) {
         addProtocol(nominal, bridgedNSError, SourceLoc(),
                     ConformanceSource::forImplied(conformanceEntry));
       }

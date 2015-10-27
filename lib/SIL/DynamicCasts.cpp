@@ -157,7 +157,7 @@ classifyDynamicCastToProtocol(CanType source,
 bool swift::isObjectiveCBridgeable(Module *M, CanType Ty) {
   // Retrieve the _BridgedToObjectiveC protocol.
   auto bridgedProto =
-      M->getASTContext().getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+      M->getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
 
   if (bridgedProto) {
     // Find the conformance of the value type to _BridgedToObjectiveC.

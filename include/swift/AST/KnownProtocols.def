@@ -16,25 +16,37 @@
 //===----------------------------------------------------------------------===//
 
 
-/// \def PROTOCOL(Id, Description)
+/// \def PROTOCOL_WITH_NAME(Id, Name)
 ///
 /// The enumerator value is \c KnownProtocolKind::Id. The protocol represented
-/// is simply named \p Id.
-#ifndef PROTOCOL
-#define PROTOCOL(Id)
+/// is simply named \p Name.
+#ifndef PROTOCOL_WITH_NAME
+#define PROTOCOL_WITH_NAME(Id, Name)
 #endif
 
-/// \def LITERAL_CONVERTIBLE_PROTOCOL(Id)
-#ifndef LITERAL_CONVERTIBLE_PROTOCOL
-#define LITERAL_CONVERTIBLE_PROTOCOL(Id) PROTOCOL(Id)
+/// \def LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(Id, Name)
+#ifndef LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME
+#define LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) \
+    PROTOCOL_WITH_NAME(Id, Name)
 #endif
 
-/// \def BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(Id)
+/// \def BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(Id, Name)
 ///
 /// Note that this is not a special form of LITERAL_CONVERTIBLE_PROTOCOL.
-#ifndef BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL
-#define BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(Id) PROTOCOL(Id)
+#ifndef BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME
+#define BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) \
+    PROTOCOL_WITH_NAME(Id, Name)
 #endif
+
+
+#define PROTOCOL(name) PROTOCOL_WITH_NAME(name, #name)
+#define PROTOCOL_(name) PROTOCOL_WITH_NAME(name, "_" #name)
+#define LITERAL_CONVERTIBLE_PROTOCOL(name) \
+    LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(name, #name)
+#define LITERAL_CONVERTIBLE_PROTOCOL_(name) \
+    LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(name, "_" #name)
+#define BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_(name) \
+    BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(name, "_" #name)
 
 PROTOCOL(SequenceType)
 PROTOCOL(GeneratorType)
@@ -46,10 +58,10 @@ PROTOCOL(Hashable)
 PROTOCOL(Comparable)
 PROTOCOL(ErrorType)
 PROTOCOL(OptionSetType)
-PROTOCOL(_BridgedNSError)
+PROTOCOL_(BridgedNSError)
 
-PROTOCOL(_ObjectiveCBridgeable)
-PROTOCOL(_DestructorSafeContainer)
+PROTOCOL_(ObjectiveCBridgeable)
+PROTOCOL_(DestructorSafeContainer)
 
 LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible)
 LITERAL_CONVERTIBLE_PROTOCOL(BooleanLiteralConvertible)
@@ -62,18 +74,23 @@ LITERAL_CONVERTIBLE_PROTOCOL(StringLiteralConvertible)
 LITERAL_CONVERTIBLE_PROTOCOL(NilLiteralConvertible)
 LITERAL_CONVERTIBLE_PROTOCOL(UnicodeScalarLiteralConvertible)
 
-LITERAL_CONVERTIBLE_PROTOCOL(_ColorLiteralConvertible)
-LITERAL_CONVERTIBLE_PROTOCOL(_ImageLiteralConvertible)
-LITERAL_CONVERTIBLE_PROTOCOL(_FileReferenceLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL_(ColorLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL_(ImageLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL_(FileReferenceLiteralConvertible)
 
-BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinBooleanLiteralConvertible)
-BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinExtendedGraphemeClusterLiteralConvertible)
-BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinFloatLiteralConvertible)
-BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinIntegerLiteralConvertible)
-BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinStringLiteralConvertible)
-BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinUTF16StringLiteralConvertible)
-BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinUnicodeScalarLiteralConvertible)
+BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_(BuiltinBooleanLiteralConvertible)
+BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_(BuiltinExtendedGraphemeClusterLiteralConvertible)
+BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_(BuiltinFloatLiteralConvertible)
+BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_(BuiltinIntegerLiteralConvertible)
+BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_(BuiltinStringLiteralConvertible)
+BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_(BuiltinUTF16StringLiteralConvertible)
+BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_(BuiltinUnicodeScalarLiteralConvertible)
 
 #undef LITERAL_CONVERTIBLE_PROTOCOL
-#undef BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL
+#undef LITERAL_CONVERTIBLE_PROTOCOL_
+#undef LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME
+#undef BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_
+#undef BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME
 #undef PROTOCOL
+#undef PROTOCOL_
+#undef PROTOCOL_WITH_NAME
