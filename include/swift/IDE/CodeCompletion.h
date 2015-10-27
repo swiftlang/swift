@@ -404,6 +404,18 @@ enum class CodeCompletionDeclKind {
   GlobalVar,
 };
 
+enum class CodeCompletionLiteralKind {
+  ArrayLiteral,
+  BooleanLiteral,
+  _ColorLiteral,
+  DictionaryLiteral,
+  FloatLiteral,
+  IntegerLiteral,
+  NilLiteral,
+  StringLiteral,
+  Tuple,
+};
+
 enum class CompletionKind {
   None,
   Import,
@@ -437,7 +449,8 @@ public:
   enum ResultKind {
     Declaration,
     Keyword,
-    Pattern
+    Pattern,
+    Literal,
   };
 
   /// Describing the relationship between the type of the completion results and
@@ -460,7 +473,7 @@ public:
 
 private:
   unsigned Kind : 2;
-  unsigned AssociatedDeclKind : 8;
+  unsigned AssociatedDeclOrLiteralKind : 8;
   unsigned SemanticContext : 3;
   unsigned NotRecommended : 1;
 
@@ -495,6 +508,21 @@ public:
     assert(CompletionString);
   }
 
+  /// Constructs a \c Literal result.
+  ///
+  /// \note The caller must ensure \c CodeCompletionString outlives this result.
+  CodeCompletionResult(CodeCompletionLiteralKind LiteralKind,
+                       SemanticContextKind SemanticContext,
+                       unsigned NumBytesToErase,
+                       CodeCompletionString *CompletionString,
+                       ExpectedTypeRelation TypeDistance)
+      : Kind(Literal), SemanticContext(unsigned(SemanticContext)),
+        NotRecommended(false), NumBytesToErase(NumBytesToErase),
+        CompletionString(CompletionString), TypeDistance(TypeDistance) {
+    AssociatedDeclOrLiteralKind = static_cast<unsigned>(LiteralKind);
+    assert(CompletionString);
+  }
+
   /// Constructs a \c Declaration result.
   ///
   /// \note The caller must ensure \c CodeCompletionString and any StringRef
@@ -514,7 +542,8 @@ public:
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
         TypeDistance(TypeDistance) {
     assert(AssociatedDecl && "should have a decl");
-    AssociatedDeclKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
+    AssociatedDeclOrLiteralKind =
+        unsigned(getCodeCompletionDeclKind(AssociatedDecl));
     assert(CompletionString);
   }
 
@@ -530,7 +559,7 @@ public:
         NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs) {
-    AssociatedDeclKind = static_cast<unsigned>(DeclKind);
+    AssociatedDeclOrLiteralKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
     TypeDistance = ExpectedTypeRelation::Unrelated;
   }
@@ -539,7 +568,12 @@ public:
 
   CodeCompletionDeclKind getAssociatedDeclKind() const {
     assert(getKind() == Declaration);
-    return static_cast<CodeCompletionDeclKind>(AssociatedDeclKind);
+    return static_cast<CodeCompletionDeclKind>(AssociatedDeclOrLiteralKind);
+  }
+
+  CodeCompletionLiteralKind getLiteralKind() const {
+    assert(getKind() == Literal);
+    return static_cast<CodeCompletionLiteralKind>(AssociatedDeclOrLiteralKind);
   }
 
   bool isOperator() const {

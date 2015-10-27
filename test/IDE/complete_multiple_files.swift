@@ -19,7 +19,7 @@ func topLevel1() {
 }
 // TOP_LEVEL_1: Begin completions
 // TOP_LEVEL_1-NOT: ERROR
-// TOP_LEVEL_1: Keyword/None: true[#Bool#]{{; name=.+$}}
+// TOP_LEVEL_1: Literal[Boolean]/None: true[#Bool#]{{; name=.+$}}
 // TOP_LEVEL_1-NOT: true
 // TOP_LEVEL_1-NOT: ERROR
 // TOP_LEVEL_1: End completions

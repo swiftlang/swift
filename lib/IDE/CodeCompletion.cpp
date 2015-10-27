@@ -375,6 +375,38 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
   case ResultKind::Pattern:
     Prefix.append("Pattern");
     break;
+  case ResultKind::Literal:
+    Prefix.append("Literal");
+    switch (getLiteralKind()) {
+    case CodeCompletionLiteralKind::ArrayLiteral:
+      Prefix.append("[Array]");
+      break;
+    case CodeCompletionLiteralKind::BooleanLiteral:
+      Prefix.append("[Boolean]");
+      break;
+    case CodeCompletionLiteralKind::_ColorLiteral:
+      Prefix.append("[_Color]");
+      break;
+    case CodeCompletionLiteralKind::DictionaryLiteral:
+      Prefix.append("[Dictionary]");
+      break;
+    case CodeCompletionLiteralKind::FloatLiteral:
+      Prefix.append("[Float]");
+      break;
+    case CodeCompletionLiteralKind::IntegerLiteral:
+      Prefix.append("[Integer]");
+      break;
+    case CodeCompletionLiteralKind::NilLiteral:
+      Prefix.append("[Nil]");
+      break;
+    case CodeCompletionLiteralKind::StringLiteral:
+      Prefix.append("[String]");
+      break;
+    case CodeCompletionLiteralKind::Tuple:
+      Prefix.append("[Tuple]");
+      break;
+    }
+    break;
   }
   Prefix.append("/");
   switch (getSemanticContext()) {
@@ -620,6 +652,12 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResult::ResultKind::Pattern:
     return new (*Sink.Allocator) CodeCompletionResult(
         Kind, SemanticContext, NumBytesToErase, CCS, ExpectedTypeRelation);
+
+  case CodeCompletionResult::ResultKind::Literal:
+    assert(LiteralKind.hasValue());
+    return new (*Sink.Allocator)
+        CodeCompletionResult(*LiteralKind, SemanticContext, NumBytesToErase,
+                             CCS, ExpectedTypeRelation);
   }
 }
 
@@ -1053,6 +1091,30 @@ static Type getReturnTypeFromContext(const DeclContext *DC) {
     return CE->getResultType();
   }
   return Type();
+}
+
+static KnownProtocolKind
+protocolForLiteralKind(CodeCompletionLiteralKind kind) {
+  switch (kind) {
+  case CodeCompletionLiteralKind::ArrayLiteral:
+    return KnownProtocolKind::ArrayLiteralConvertible;
+  case CodeCompletionLiteralKind::BooleanLiteral:
+    return KnownProtocolKind::BooleanLiteralConvertible;
+  case CodeCompletionLiteralKind::_ColorLiteral:
+    return KnownProtocolKind::_ColorLiteralConvertible;
+  case CodeCompletionLiteralKind::DictionaryLiteral:
+    return KnownProtocolKind::DictionaryLiteralConvertible;
+  case CodeCompletionLiteralKind::FloatLiteral:
+    return KnownProtocolKind::FloatLiteralConvertible;
+  case CodeCompletionLiteralKind::IntegerLiteral:
+    return KnownProtocolKind::IntegerLiteralConvertible;
+  case CodeCompletionLiteralKind::NilLiteral:
+    return KnownProtocolKind::NilLiteralConvertible;
+  case CodeCompletionLiteralKind::StringLiteral:
+    return KnownProtocolKind::StringLiteralConvertible;
+  case CodeCompletionLiteralKind::Tuple:
+    llvm_unreachable("no such protocol kind");
+  }
 }
 
 /// Build completions by doing visible decl lookup from a context.
@@ -2648,19 +2710,18 @@ public:
     auto *module = CurrDeclContext->getParentModule();
 
     auto addFromProto = [&](
-        KnownProtocolKind kind, StringRef defaultTypeName,
+        CodeCompletionLiteralKind kind, StringRef defaultTypeName,
         llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer,
         bool isKeyword = false) {
-      auto completionKind = isKeyword ? CodeCompletionResult::Keyword
-                                      : CodeCompletionResult::Pattern;
 
-      CodeCompletionResultBuilder builder(Sink, completionKind,
+      CodeCompletionResultBuilder builder(Sink, CodeCompletionResult::Literal,
                                           SemanticContextKind::None, {});
+      builder.setLiteralKind(kind);
 
       consumer(builder);
 
       // Check for matching ExpectedTypes.
-      auto *P = context.getProtocol(kind);
+      auto *P = context.getProtocol(protocolForLiteralKind(kind));
       bool foundConformance = false;
       for (auto T : ExpectedTypes) {
         if (!T)
@@ -2682,36 +2743,36 @@ public:
 
     // FIXME: the pedantically correct way is to resolve Swift.*LiteralType.
 
-    using KPK = KnownProtocolKind;
+    using LK = CodeCompletionLiteralKind;
     using Builder = CodeCompletionResultBuilder;
 
     // Add literal completions that conform to specific protocols.
-    addFromProto(KPK::IntegerLiteralConvertible, "Int", [](Builder &builder) {
+    addFromProto(LK::IntegerLiteral, "Int", [](Builder &builder) {
       builder.addTextChunk("0");
     });
-    addFromProto(KPK::FloatLiteralConvertible, "Double", [](Builder &builder) {
+    addFromProto(LK::FloatLiteral, "Double", [](Builder &builder) {
       builder.addTextChunk("0.0");
     });
-    addFromProto(KPK::BooleanLiteralConvertible, "Bool", [](Builder &builder) {
+    addFromProto(LK::BooleanLiteral, "Bool", [](Builder &builder) {
       builder.addTextChunk("true");
     }, /*isKeyword=*/true);
-    addFromProto(KPK::BooleanLiteralConvertible, "Bool", [](Builder &builder) {
+    addFromProto(LK::BooleanLiteral, "Bool", [](Builder &builder) {
       builder.addTextChunk("false");
     }, /*isKeyword=*/true);
-    addFromProto(KPK::NilLiteralConvertible, "", [](Builder &builder) {
+    addFromProto(LK::NilLiteral, "", [](Builder &builder) {
       builder.addTextChunk("nil");
     }, /*isKeyword=*/true);
-    addFromProto(KPK::StringLiteralConvertible, "String", [&](Builder &builder) {
+    addFromProto(LK::StringLiteral, "String", [&](Builder &builder) {
       builder.addTextChunk("\"");
       builder.addSimpleNamedParameter("text");
       builder.addTextChunk("\"");
     });
-    addFromProto(KPK::ArrayLiteralConvertible, "Array", [&](Builder &builder) {
+    addFromProto(LK::ArrayLiteral, "Array", [&](Builder &builder) {
       builder.addLeftBracket();
       builder.addSimpleNamedParameter("item");
       builder.addRightBracket();
     });
-    addFromProto(KPK::DictionaryLiteralConvertible, "Dictionary", [&](Builder &builder) {
+    addFromProto(LK::DictionaryLiteral, "Dictionary", [&](Builder &builder) {
       builder.addLeftBracket();
       builder.addSimpleNamedParameter("key");
       builder.addTextChunk(": ");
@@ -2720,7 +2781,7 @@ public:
     });
 
     auto floatType = context.getFloatDecl()->getDeclaredType();
-    addFromProto(KPK::_ColorLiteralConvertible, "", [&](Builder &builder) {
+    addFromProto(LK::_ColorLiteral, "", [&](Builder &builder) {
       builder.addLeftBracket();
       builder.addTextChunk("#Color");
       builder.addLeftParen();
@@ -2741,8 +2802,10 @@ public:
 
     // Add tuple completion (item, item).
     {
-      CodeCompletionResultBuilder builder(Sink, CodeCompletionResult::Pattern,
+      CodeCompletionResultBuilder builder(Sink, CodeCompletionResult::Literal,
                                           SemanticContextKind::None, {});
+      builder.setLiteralKind(LK::Tuple);
+
       builder.addLeftParen();
       builder.addSimpleNamedParameter("item");
       builder.addComma();
@@ -3661,6 +3724,7 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink) {
   AddKeyword("__COLUMN__", "Int");
   AddKeyword("__DSO_HANDLE__", "UnsafeMutablePointer<Void>");
 }
+
 
 void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   switch (Kind) {
