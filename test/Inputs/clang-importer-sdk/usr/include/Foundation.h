@@ -981,3 +981,7 @@ typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
 @property (readonly) BOOL appliesForAJob;
 @property (readonly) BOOL setShouldBeInfinite;
 @end
+
+int variadicFunc1(int A, ...);
+
+int variadicFunc2(int A, ...);

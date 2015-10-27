@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -verify -I %S/Inputs/custom-modules %s
 
-import cfuncs
+// REQUIRES: OS=macosx
+
+import Foundation
 
 func variadicFunc2(A : Int32, _: Any...) -> Int { return 0 }
 
