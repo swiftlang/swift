@@ -239,15 +239,20 @@ takes precedence for files in the Swift project"
         ad-do-it)
     ad-do-it))
 
-(push 'swift-stdlibunittest1 compilation-error-regexp-alist)
-(push `(swift-stdlibunittest1 "^.*\\(?:failed\\(?: at\\|.*file\\)\\|.*: file\\) \\([^,]*\\), line \\([0-9]+\\)$"
-              1 2 ,(not :column) ,(not :just-a-warning))
+(push 'swift-stdlibunittest-possibly-expected-assertion compilation-error-regexp-alist)
+(push `(swift-stdlibunittest-possibly-expected-assertion "^\\(\\(?:out\\|err\\)>>> *\\).*\\(?:failed\\(?: at\\|.*file\\)\\|.*: file\\) \\([^,]*\\), line \\([0-9]+\\)$"
+              2 3 ,(not :column) 0)
       compilation-error-regexp-alist-alist)
 
-(push 'swift-stdlibunittest2 compilation-error-regexp-alist)
-(push `(swift-stdlibunittest2 "^\\(?:\\(?:out\\|err\\)>>> *\\)?#[0-9]+: \\(.+\\):\\([0-9]+\\)\\(?: +.*\\)?$"
+(push 'swift-stdlibunittest-stackframe compilation-error-regexp-alist)
+(push `(swift-stdlibunittest-stackframe "^\\(?:\\(?:out\\|err\\)>>> *\\)#[0-9]+: \\(.+\\):\\([0-9]+\\)\\(?: +.*\\)?$"
               1 2 ,(not :column) ,(not :just-a-warning))
       compilation-error-regexp-alist-alist)
     
+(push 'swift-stdlibunittest-failure compilation-error-regexp-alist)
+(push `(swift-stdlibunittest-failure "^\\(?:out\\|err\\)>>> check failed at \\([^,]*\\), line \\([0-9]+\\)$"
+              1 2 ,(not :column) ,(not :just-a-warning))
+      compilation-error-regexp-alist-alist)
+
 (provide 'swift-project-settings)
 ;; end of swift-project-settings.el
