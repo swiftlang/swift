@@ -34,13 +34,9 @@
 #include "llvm/Support/Process.h"
 
 #if defined(__APPLE__)
-// FIXME: We need a more library-neutral way for frameworks to take ownership of
-// the main loop.
-#include <CoreFoundation/CoreFoundation.h>
-
-#include <thread>
+// FIXME: Support REPL on non-Apple platforms. Ubuntu 14.10's editline does not
+// include the wide character entry points needed by the REPL yet.
 #include <histedit.h>
-#include <system_error>
 #endif // __APPLE__
 
 using namespace swift;
@@ -1180,84 +1176,11 @@ void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   if (CI.getASTContext().hadError())
     return;
   
-  CFMessagePortContext portContext;
-  portContext.version = 0;
-  portContext.info = &env;
-  portContext.retain = nullptr;
-  portContext.release = nullptr;
-  portContext.copyDescription = nullptr;
-  Boolean shouldFreeInfo = false;
-  
-  llvm::SmallString<16> portNameBuf;
-  llvm::raw_svector_ostream portNameS(portNameBuf);
-  portNameS << "REPLInput" << getpid();
-  llvm::StringRef portNameRef = portNameS.str();
-  CFStringRef portName = CFStringCreateWithBytes(kCFAllocatorDefault,
-                             reinterpret_cast<const UInt8*>(portNameRef.data()),
-                             portNameRef.size(),
-                             kCFStringEncodingUTF8,
-                             false);
-
-  CFMessagePortRef replInputPort
-    = CFMessagePortCreateLocal(kCFAllocatorDefault,
-       portName,
-       [](CFMessagePortRef local, SInt32 msgid, CFDataRef data, void *info)
-         -> CFDataRef
-       {
-         REPLEnvironment &env = *static_cast<REPLEnvironment*>(info);
-         StringRef line(reinterpret_cast<char const*>(CFDataGetBytePtr(data)),
-                        CFDataGetLength(data));
-         UInt8 cont = env.handleREPLInput(REPLInputKind(msgid), line);
-         if (!cont) {
-           CFRunLoopStop(CFRunLoopGetCurrent());
-         }
-         return CFDataCreate(kCFAllocatorDefault, &cont, 1);
-       },
-       &portContext, &shouldFreeInfo);
-  assert(replInputPort && "failed to create message port for repl");
-  CFRunLoopSourceRef replSource
-    = CFMessagePortCreateRunLoopSource(kCFAllocatorDefault, replInputPort, 0);
-  CFRunLoopAddSource(CFRunLoopGetCurrent(), replSource, kCFRunLoopDefaultMode);
-
-  REPLInput &e = env.getInput();
-
-  std::thread replInputThread([&] {
-    CFMessagePortRef replInputPortConn
-      = CFMessagePortCreateRemote(kCFAllocatorDefault, portName);
-    
-    llvm::SmallString<80> Line;
-    REPLInputKind inputKind;
-    while (true) {
-      inputKind = e.getREPLInput(Line);
-      CFDataRef lineData = CFDataCreateWithBytesNoCopy(kCFAllocatorDefault,
-                                   reinterpret_cast<const UInt8*>(Line.data()),
-                                   Line.size(),
-                                   kCFAllocatorNull);
-      CFDataRef response;
-      auto res = CFMessagePortSendRequest(replInputPortConn,
-                                          SInt32(inputKind),
-                                          lineData,
-                                          DBL_MAX, DBL_MAX,
-                                          kCFRunLoopDefaultMode,
-                                          &response);
-      assert(res == kCFMessagePortSuccess && "failed to send repl message");
-      (void)res;
-      assert(CFDataGetLength(response) >= 1 && "expected one-byte response");
-      UInt8 cont = CFDataGetBytePtr(response)[0];
-      CFRelease(lineData);
-      CFRelease(response);
-      if (!cont)
-        break;
-    }
-    
-    CFRelease(replInputPortConn);
-  });
-  
-  CFRunLoopRun();
-  replInputThread.join();
-  CFRelease(replSource);
-  CFRelease(replInputPort);
-  CFRelease(portName);
+  llvm::SmallString<80> Line;
+  REPLInputKind inputKind;
+  do {
+    inputKind = env.getInput().getREPLInput(Line);
+  } while (env.handleREPLInput(inputKind, Line));
 }
 
 #else // __APPLE__
@@ -1266,18 +1189,7 @@ void swift::runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                     bool ParseStdlib) {
   // Disable the REPL on other platforms; our current implementation is tied
   // to histedit.h.
-  llvm::report_fatal_error("REPL Unimplemented for this platform");
-#if 0
-  REPLEnvironment env(CI, CmdLine, llvm::getGlobalContext(), ParseStdlib);
-  if (CI.getASTContext().hadError())
-    return;
-
-  llvm::SmallString<80> Line;
-  REPLInputKind inputKind;
-  do {
-    inputKind = env.getInput().getREPLInput(Line);
-  } while (env.handleREPLInput(inputKind, Line));
-#endif
+  llvm::report_fatal_error("Compiler-internal integrated REPL unimplemented "
+                           "for this platform");
 }
-
-#endif // __APPLE__
+#endif
