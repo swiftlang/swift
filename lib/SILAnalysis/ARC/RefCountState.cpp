@@ -182,10 +182,9 @@ bool BottomUpRefCountState::valueCanBeUsedGivenLatticeState() const {
 
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
-bool
-BottomUpRefCountState::handleUser(SILInstruction *PotentialUser,
-                                  SILValue RCIdentity,
-                                  AliasAnalysis *AA) {
+bool BottomUpRefCountState::handleUser(SILInstruction *PotentialUser,
+                                       SILInstruction *InsertPt,
+                                       SILValue RCIdentity, AliasAnalysis *AA) {
   assert(valueCanBeUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
 
@@ -202,7 +201,7 @@ BottomUpRefCountState::handleUser(SILInstruction *PotentialUser,
     LatState = LatticeState::MightBeUsed;
     assert(InsertPts.empty() && "If we are decremented, we should have no "
                                 "insertion points.");
-    InsertPts.insert(std::next(SILBasicBlock::iterator(PotentialUser)));
+    InsertPts.insert(InsertPt);
     return true;
   case LatticeState::MightBeUsed:
   case LatticeState::MightBeDecremented:
@@ -227,11 +226,9 @@ valueCanBeGuaranteedUsedGivenLatticeState() const {
 
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
-bool
-BottomUpRefCountState::
-handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
-                     SILValue RCIdentity,
-                     AliasAnalysis *AA) {
+bool BottomUpRefCountState::handleGuaranteedUser(
+    SILInstruction *PotentialGuaranteedUser, SILInstruction *InsertPt,
+    SILValue RCIdentity, AliasAnalysis *AA) {
   assert(valueCanBeGuaranteedUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
 
@@ -248,8 +245,7 @@ handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
   case LatticeState::Decremented: {
     assert(InsertPts.empty() && "If we are decremented, we should have no "
                                 "insertion points.");
-    auto Iter = SILBasicBlock::iterator(PotentialGuaranteedUser);
-    InsertPts.insert(std::next(Iter));
+    InsertPts.insert(InsertPt);
     LatState = LatticeState::MightBeDecremented;
     return true;
   }
@@ -357,7 +353,8 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
 // the value we are tracking. If so advance the state's sequence appropriately
 // and return true. Otherwise return false.
 bool BottomUpRefCountState::handlePotentialGuaranteedUser(
-    SILInstruction *PotentialGuaranteedUser, AliasAnalysis *AA) {
+    SILInstruction *PotentialGuaranteedUser, SILInstruction *InsertPt,
+    AliasAnalysis *AA) {
   // If we are not tracking a ref count, just return false.
   if (!isTrackingRefCount())
     return false;
@@ -376,7 +373,8 @@ bool BottomUpRefCountState::handlePotentialGuaranteedUser(
     return false;
 
   // Otherwise, update the ref count state given the guaranteed user.
-  return handleGuaranteedUser(PotentialGuaranteedUser, getRCRoot(), AA);
+  return handleGuaranteedUser(PotentialGuaranteedUser, InsertPt, getRCRoot(),
+                              AA);
 }
 
 /// Check if PotentialDecrement can decrement the reference count associated
@@ -410,6 +408,7 @@ bool BottomUpRefCountState::handlePotentialDecrement(
 // requires user to be alive. If so advance the state's sequence
 // appropriately and return true. Otherwise return false.
 bool BottomUpRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
+                                                SILInstruction *InsertPt,
                                                 AliasAnalysis *AA) {
   // If we are not tracking a ref count, just return false.
   if (!isTrackingRefCount())
@@ -426,7 +425,7 @@ bool BottomUpRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
   if (!mayUseValue(PotentialUser, getRCRoot(), AA))
     return false;
 
-  return handleUser(PotentialUser, getRCRoot(), AA);
+  return handleUser(PotentialUser, InsertPt, getRCRoot(), AA);
 }
 
 //===----------------------------------------------------------------------===//

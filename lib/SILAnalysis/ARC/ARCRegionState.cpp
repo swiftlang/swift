@@ -171,7 +171,7 @@ bool ARCRegionState::processBlockBottomUp(
       RCIA, *this, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
       IncToDecStateMap);
 
-  // For each terminator instruction I in BB visited in reverse...
+  // For each non-terminator instruction I in BB visited in reverse...
   for (auto II = std::next(BB.rbegin()), IE = BB.rend(); II != IE;) {
     SILInstruction &I = *II;
     ++II;
@@ -193,6 +193,8 @@ bool ARCRegionState::processBlockBottomUp(
     // that the instruction "visits".
     SILValue Op = Result.RCIdentity;
 
+    auto *InsertPt = &*std::next(SILBasicBlock::iterator(&I));
+
     // For all other (reference counted value, ref count state) we are
     // tracking...
     for (auto &OtherState : getBottomupStates()) {
@@ -213,7 +215,7 @@ bool ARCRegionState::processBlockBottomUp(
       // instruction in a way that requires us to guarantee the lifetime of the
       // pointer up to this point. This has the effect of performing a use and a
       // decrement.
-      if (OtherState.second.handlePotentialGuaranteedUser(&I, AA)) {
+      if (OtherState.second.handlePotentialGuaranteedUser(&I, InsertPt, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
                            << OtherState.second.getRCRoot());
         continue;
@@ -230,7 +232,7 @@ bool ARCRegionState::processBlockBottomUp(
 
       // Otherwise check if the reference counted value we are tracking
       // could be used by the given instruction.
-      if (OtherState.second.handlePotentialUser(&I, AA))
+      if (OtherState.second.handlePotentialUser(&I, InsertPt, AA))
         DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
                            << OtherState.second.getRCRoot());
     }

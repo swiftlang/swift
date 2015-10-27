@@ -200,12 +200,15 @@ public:
   /// Check if PotentialUser could be a use of the reference counted value that
   /// requires user to be alive. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
-  bool handlePotentialUser(SILInstruction *PotentialUser, AliasAnalysis *AA);
+  bool handlePotentialUser(SILInstruction *PotentialUser,
+                           SILInstruction *InsertPt, AliasAnalysis *AA);
 
   /// Check if PotentialGuaranteedUser can use the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
-  bool handlePotentialGuaranteedUser(SILInstruction *User, AliasAnalysis *AA);
+  bool handlePotentialGuaranteedUser(SILInstruction *User,
+                                     SILInstruction *InsertPt,
+                                     AliasAnalysis *AA);
 
   /// Attempt to merge \p Other into this ref count state. Return true if we
   /// succeed and false otherwise.
@@ -241,18 +244,23 @@ private:
   bool valueCanBeUsedGivenLatticeState() const;
 
   /// Given the current lattice state, if we have seen a use, advance the
-  /// lattice state. Return true if we do so and false otherwise.
-  bool handleUser(SILInstruction *PotentialUser, SILValue RCIdentity,
-                  AliasAnalysis *AA);
+  /// lattice state. Return true if we do so and false otherwise. \p InsertPt is
+  /// the location where if \p PotentialUser is a user of this ref count, we
+  /// would insert a release.
+  bool handleUser(SILInstruction *PotentialUser, SILInstruction *InsertPt,
+                  SILValue RCIdentity, AliasAnalysis *AA);
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
   bool valueCanBeGuaranteedUsedGivenLatticeState() const;
 
   /// Given the current lattice state, if we have seen a use, advance the
-  /// lattice state. Return true if we do so and false otherwise.
+  /// lattice state. Return true if we do so and false otherwise. \p InsertPt is
+  /// the location where if \p PotentialUser is a user of this ref count, we
+  /// would insert a release.
   bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
-                            SILValue RCIdentity, AliasAnalysis *AA);
+                            SILInstruction *InsertPt, SILValue RCIdentity,
+                            AliasAnalysis *AA);
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
