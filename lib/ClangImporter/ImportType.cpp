@@ -1336,10 +1336,6 @@ Type ClangImporter::Implementation::importFunctionType(
        SmallVectorImpl<Pattern*> &bodyPatterns,
        DeclName &name) {
 
-  // Cannot import variadic types.
-  if (isVariadic)
-    return Type();
-
   bool allowNSUIntegerAsInt = isFromSystemModule;
   if (allowNSUIntegerAsInt) {
     if (const clang::IdentifierInfo *clangNameID = clangDecl->getIdentifier()) {
@@ -1465,6 +1461,27 @@ Type ClangImporter::Implementation::importFunctionType(
     swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name));
     swiftBodyParams.push_back(TupleTypeElt(swiftParamTy, bodyName));
     ++index;
+  }
+
+  // Append an additional argument to represent varargs.
+  if (isVariadic) {
+      auto paramTy =  BoundGenericType::get(SwiftContext.getArrayDecl(), Type(),
+        {SwiftContext.getAnyDecl()->getDeclaredType()});
+      auto name = SwiftContext.getIdentifier("varargs");
+      auto bodyVar = new (SwiftContext) ParamDecl(true, SourceLoc(), Identifier(),
+                                                  SourceLoc(), name, paramTy,
+                                                  ImportedHeaderUnit);
+      Pattern *bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
+      bodyPattern->setType(paramTy);
+      bodyPattern = new (SwiftContext) TypedPattern(bodyPattern,
+                                                    TypeLoc::withoutLoc(paramTy));
+      bodyPattern->setType(paramTy);
+      bodyPatternElts.push_back(TuplePatternElt(Identifier(), SourceLoc(),
+                                                bodyPattern, true));
+      swiftArgParams.push_back(TupleTypeElt(paramTy, Identifier(),
+                                            DefaultArgumentKind::None, true));
+      swiftBodyParams.push_back(TupleTypeElt(paramTy, name,
+                                             DefaultArgumentKind::None, true));
   }
 
   // Form the parameter tuples.

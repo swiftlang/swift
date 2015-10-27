@@ -2792,6 +2792,10 @@ namespace {
         Impl.markUnavailable(result, knownFnInfo->UnavailableMsg);
       }
 
+      if (decl->isVariadic()) {
+        Impl.markUnavailable(result, "Variadic function is unavailable");
+      }
+
       return result;
     }
 

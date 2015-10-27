@@ -116,6 +116,8 @@ void fooFuncWithComment5(void);
 /// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
 int redeclaredInMultipleModulesFunc1(int a);
 
+int fooFuncUsingVararg(int a, ...);// This comment should not show without decl.
+
 /// Aaa.  FooProtocolBase.  Bbb.
 @protocol FooProtocolBase
 

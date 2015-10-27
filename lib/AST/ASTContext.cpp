@@ -147,6 +147,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Void.
   TypeAliasDecl *VoidDecl = nullptr;
 
+  /// The declaration of Swift.Any.
+  TypeAliasDecl *AnyDecl = nullptr;
+
   /// The declaration of ObjectiveC.ObjCBool.
   StructDecl *ObjCBoolDecl = nullptr;
 
@@ -760,6 +763,26 @@ TypeAliasDecl *ASTContext::getVoidDecl() const {
 
   return Impl.VoidDecl;
 }
+
+
+TypeAliasDecl *ASTContext::getAnyDecl() const {
+  if (Impl.AnyDecl) {
+    return Impl.AnyDecl;
+  }
+
+  // Go find 'Any' in the Swift module.
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule("Any", results);
+  for (auto result : results) {
+    if (auto typeAlias = dyn_cast<TypeAliasDecl>(result)) {
+      Impl.AnyDecl = typeAlias;
+      break;
+    }
+  }
+
+  return Impl.AnyDecl;
+}
+
 
 StructDecl *ASTContext::getObjCBoolDecl() {
   if (!Impl.ObjCBoolDecl) {

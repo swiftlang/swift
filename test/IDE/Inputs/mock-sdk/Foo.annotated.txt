@@ -112,6 +112,8 @@ func <loc>fooFuncWithComment5()</loc></decl>
 
 <decl:Func>/// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
 func <loc>redeclaredInMultipleModulesFunc1(a: <ref:Struct>Int32</ref>)</loc> -> <ref:Struct>Int32</ref></decl>
+<decl:Func>@available(*, unavailable, message="Variadic function is unavailable")
+func <loc>fooFuncUsingVararg(a: <ref:Struct>Int32</ref>, _ varargs: <ref:TypeAlias>Any</ref>...)</loc> -> <ref:Struct>Int32</ref></decl>
 
 <decl:Protocol>/// Aaa.  FooProtocolBase.  Bbb.
 protocol <loc>FooProtocolBase</loc> {
