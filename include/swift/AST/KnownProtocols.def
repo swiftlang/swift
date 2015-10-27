@@ -24,9 +24,9 @@
 #define PROTOCOL(Id)
 #endif
 
-/// \def LITERAL_CONVERTIBLE_PROTOCOL(Id, Description)
+/// \def LITERAL_CONVERTIBLE_PROTOCOL(Id)
 #ifndef LITERAL_CONVERTIBLE_PROTOCOL
-#define LITERAL_CONVERTIBLE_PROTOCOL(Id, Description) PROTOCOL(Id)
+#define LITERAL_CONVERTIBLE_PROTOCOL(Id) PROTOCOL(Id)
 #endif
 
 /// \def BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(Id)
@@ -51,20 +51,20 @@ PROTOCOL(_BridgedNSError)
 PROTOCOL(_ObjectiveCBridgeable)
 PROTOCOL(_DestructorSafeContainer)
 
-LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible, array)
-LITERAL_CONVERTIBLE_PROTOCOL(BooleanLiteralConvertible, boolean)
-LITERAL_CONVERTIBLE_PROTOCOL(DictionaryLiteralConvertible, dictionary)
-LITERAL_CONVERTIBLE_PROTOCOL(ExtendedGraphemeClusterLiteralConvertible, character)
-LITERAL_CONVERTIBLE_PROTOCOL(FloatLiteralConvertible, floating-point)
-LITERAL_CONVERTIBLE_PROTOCOL(IntegerLiteralConvertible, integer)
-LITERAL_CONVERTIBLE_PROTOCOL(StringInterpolationConvertible, string)
-LITERAL_CONVERTIBLE_PROTOCOL(StringLiteralConvertible, string)
-LITERAL_CONVERTIBLE_PROTOCOL(NilLiteralConvertible, nil)
-LITERAL_CONVERTIBLE_PROTOCOL(UnicodeScalarLiteralConvertible, character)
+LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(BooleanLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(DictionaryLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(ExtendedGraphemeClusterLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(FloatLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(IntegerLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(StringInterpolationConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(StringLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(NilLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(UnicodeScalarLiteralConvertible)
 
-LITERAL_CONVERTIBLE_PROTOCOL(_ColorLiteralConvertible, color)
-LITERAL_CONVERTIBLE_PROTOCOL(_ImageLiteralConvertible, image)
-LITERAL_CONVERTIBLE_PROTOCOL(_FileReferenceLiteralConvertible, file-reference)
+LITERAL_CONVERTIBLE_PROTOCOL(_ColorLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(_ImageLiteralConvertible)
+LITERAL_CONVERTIBLE_PROTOCOL(_FileReferenceLiteralConvertible)
 
 BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinBooleanLiteralConvertible)
 BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(_BuiltinExtendedGraphemeClusterLiteralConvertible)
