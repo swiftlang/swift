@@ -53,10 +53,9 @@ public var NSUTF32LittleEndianStringEncoding: UInt { return 0x9c000100 }
 // NSObject
 //===----------------------------------------------------------------------===//
 
-// These conformances should be located in the `ObjectiveC` module, but they can't
+// This conformance should be located in the `ObjectiveC` module, but it can't
 // be placed there because string bridging is not available there.
 extension NSObject : CustomStringConvertible {}
-extension NSObject : CustomDebugStringConvertible {}
 
 //===----------------------------------------------------------------------===//
 // Strings
