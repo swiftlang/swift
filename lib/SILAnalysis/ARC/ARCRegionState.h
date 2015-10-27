@@ -157,6 +157,21 @@ public:
       bool FreezeOwnedArgEpilogueReleases,
       ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
+
+private:
+  bool processBlockBottomUp(
+    SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
+    bool FreezeOwnedArgEpilogueReleases,
+    ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
+    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
+
+  bool processLoopBottomUp();
+
+  bool processBlockTopDown(
+      SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
+      BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap);
+  bool processLoopTopDown();
+
 };
 
 } // end swift namespace

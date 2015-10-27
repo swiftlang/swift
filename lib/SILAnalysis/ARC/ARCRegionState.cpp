@@ -158,20 +158,12 @@ void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
 // Bottom Up Block Visitor
 //
 
-bool ARCRegionState::processBottomUp(
-    AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
+bool ARCRegionState::processBlockBottomUp(
+    SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
     bool FreezeOwnedArgEpilogueReleases,
     ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap) {
-  const LoopRegion *R = getRegion();
-
-  // We only process basic blocks for now. This ensures that we always propagate
-  // the empty set from loops.
-  if (!R->isBlock())
-    return false;
-
   DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
-  SILBasicBlock &BB = *R->getBlock();
 
   bool NestingDetected = false;
 
@@ -247,23 +239,37 @@ bool ARCRegionState::processBottomUp(
   return NestingDetected;
 }
 
-//===---
-// Top Down Block Visitor
-//
+bool ARCRegionState::processLoopBottomUp() {
+  clearBottomUpState();
+  return false;
+}
 
-bool ARCRegionState::processTopDown(
+bool ARCRegionState::processBottomUp(
     AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-    BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap) {
+    bool FreezeOwnedArgEpilogueReleases,
+    ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
+    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap) {
   const LoopRegion *R = getRegion();
 
   // We only process basic blocks for now. This ensures that we always propagate
   // the empty set from loops.
   if (!R->isBlock())
-    return false;
+    return processLoopBottomUp();
 
+  return processBlockBottomUp(*R->getBlock(), AA, RCIA,
+                              FreezeOwnedArgEpilogueReleases,
+                              ConsumedArgToReleaseMap,
+                              IncToDecStateMap);
+}
+
+//===---
+// Top Down Block Visitor
+//
+
+bool ARCRegionState::processBlockTopDown(
+    SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
+    BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap) {
   DEBUG(llvm::dbgs() << ">>>> Top Down!\n");
-
-  SILBasicBlock &BB = *R->getBlock();
 
   bool NestingDetected = false;
 
@@ -349,4 +355,22 @@ bool ARCRegionState::processTopDown(
   }
 
   return NestingDetected;
+}
+
+bool ARCRegionState::processLoopTopDown() {
+  clearTopDownState();
+  return false;
+}
+
+bool ARCRegionState::processTopDown(
+    AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
+    BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap) {
+  const LoopRegion *R = getRegion();
+
+  // We only process basic blocks for now. This ensures that we always propagate
+  // the empty set from loops.
+  if (!R->isBlock())
+    return processLoopTopDown();
+
+  return processBlockTopDown(*R->getBlock(), AA, RCIA, DecToIncStateMap);
 }

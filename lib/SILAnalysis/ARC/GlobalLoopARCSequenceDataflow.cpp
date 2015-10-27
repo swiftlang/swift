@@ -49,11 +49,6 @@ static bool isDefinedMerge(const LoopRegion *Succ, const LoopRegion *Pred) {
   if (Succ->isUnknownControlFlowEdgeHead())
     return false;
 
-  // If either succ or pred is not a block, we can not merge for now. In the
-  // future, we will allow merging of some sort.
-  if (!Succ->isBlock() || !Pred->isBlock())
-    return false;
-
   // Otherwise it is defined to perform the merge.
   return true;
 }
