@@ -664,6 +664,17 @@ bb0:
   return %2 : $()
 }
 
+// CHECK-LABEL: sil public_external [fragile] @test_stack_flag
+sil [fragile] @test_stack_flag : $@convention(thin) () -> () {
+bb0:
+  // CHECK: alloc_ref [stack] $Class1
+  %0 = alloc_ref [stack] $Class1
+  // CHECK: dealloc_ref [stack] %0 : $Class1
+  dealloc_ref [stack] %0 : $Class1
+  %2 = tuple ()
+  return %2 : $()
+}
+
 // CHECK-LABEL: @closure_test
 sil [fragile] @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
 sil [fragile] @closure0 : $@convention(thin) (@box Int, @inout Int) -> ()
@@ -1332,6 +1343,7 @@ bb0:
   %83 = function_ref @test_dealloc_ref : $@convention(thin) () -> ()
   %84 = function_ref @test_dealloc_partial_ref : $@convention(thin) () -> ()
   %85 = function_ref @test_dealloc_box : $@convention(thin) () -> ()
+  %86 = function_ref @test_stack_flag : $@convention(thin) () -> ()
   %87 = function_ref @closure_test : $@convention(thin) () -> ()
   %97 = function_ref @test_switch_union : $@convention(thin) (MaybePair) -> ()
   %99 = function_ref @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
