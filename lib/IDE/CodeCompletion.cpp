@@ -384,7 +384,7 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     case CodeCompletionLiteralKind::BooleanLiteral:
       Prefix.append("[Boolean]");
       break;
-    case CodeCompletionLiteralKind::_ColorLiteral:
+    case CodeCompletionLiteralKind::ColorLiteral:
       Prefix.append("[_Color]");
       break;
     case CodeCompletionLiteralKind::DictionaryLiteral:
@@ -1100,7 +1100,7 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
     return KnownProtocolKind::ArrayLiteralConvertible;
   case CodeCompletionLiteralKind::BooleanLiteral:
     return KnownProtocolKind::BooleanLiteralConvertible;
-  case CodeCompletionLiteralKind::_ColorLiteral:
+  case CodeCompletionLiteralKind::ColorLiteral:
     return KnownProtocolKind::_ColorLiteralConvertible;
   case CodeCompletionLiteralKind::DictionaryLiteral:
     return KnownProtocolKind::DictionaryLiteralConvertible;
@@ -2781,7 +2781,7 @@ public:
     });
 
     auto floatType = context.getFloatDecl()->getDeclaredType();
-    addFromProto(LK::_ColorLiteral, "", [&](Builder &builder) {
+    addFromProto(LK::ColorLiteral, "", [&](Builder &builder) {
       builder.addLeftBracket();
       builder.addTextChunk("#Color");
       builder.addLeftParen();

@@ -407,7 +407,7 @@ enum class CodeCompletionDeclKind {
 enum class CodeCompletionLiteralKind {
   ArrayLiteral,
   BooleanLiteral,
-  _ColorLiteral,
+  ColorLiteral,
   DictionaryLiteral,
   FloatLiteral,
   IntegerLiteral,
