@@ -71,7 +71,7 @@ BottomUpDataflowRCStateVisitor<ARCState>::visitStrongDecrement(ValueBase *V) {
   // If we are running with 'frozen' owned arg releases, check if we have a
   // frozen use in the side table. If so, this release must be known safe.
   if (FreezeOwnedArgEpilogueReleases) {
-    State.KnownSafe |= EpilogueReleaseMatcher.argumentHasRelease(Op);
+    State.updateKnownSafe(EpilogueReleaseMatcher.argumentHasRelease(Op));
   }
 
   DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT! Known Safe: "

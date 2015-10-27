@@ -33,9 +33,11 @@ namespace swift {
 
 /// A struct that abstracts over reference counts manipulated by strong_retain,
 /// retain_value, strong_release,
-struct RefCountState {
+class RefCountState {
+public:
   using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 4>;
 
+protected:
   /// Return the SILValue that represents the RCRoot that we are
   /// tracking.
   SILValue RCRoot;
@@ -60,6 +62,7 @@ struct RefCountState {
   /// control dependency (which avoid for now).
   bool Partial = false;
 
+public:
   RefCountState() {}
   ~RefCountState() {}
 
@@ -137,28 +140,32 @@ struct RefCountState {
     return {InsertPts.begin(), InsertPts.end()};
   }
 
-  /// This retain is known safe if the operand we are tracking was already
-  /// known incremented previously. This occurs when you have nested
-  /// increments.
+  /// This retain is known safe if the operand we are tracking was already known
+  /// incremented previously. This occurs when you have nested increments.
   bool isKnownSafe() const { return KnownSafe; }
 
   /// This reference count state is partial if we found a partial merge of
   /// insertion points. This stymies our ability to move instructions due to
   /// potential control dependency issues.
   bool isPartial() const { return Partial; }
+
+  /// Set KnownSafe to true if \p NewValue is true. If \p NewValue is false,
+  /// this is a no-op.
+  void updateKnownSafe(bool NewValue) {
+    KnownSafe |= NewValue;
+  }
 };
 
 //===----------------------------------------------------------------------===//
 //                         Bottom Up Ref Count State
 //===----------------------------------------------------------------------===//
 
-struct BottomUpRefCountState : RefCountState {
-  using SuperTy = RefCountState;
-
+class BottomUpRefCountState : public RefCountState {
+public:
   /// Sequence of states that a value with reference semantics can go through
   /// when visiting decrements bottom up. The reason why I have this separate
-  /// from TopDownSubstruct is I think it gives more clarity to the algorithm
-  /// by giving it typed form.
+  /// from TopDownSubstruct is I think it gives more clarity to the algorithm by
+  /// giving it typed form.
   enum class LatticeState {
     None,               ///< The pointer has no information associated with it.
     Decremented,        ///< The pointer will be decremented.
@@ -169,6 +176,9 @@ struct BottomUpRefCountState : RefCountState {
                         ///  this decrement.
   };
 
+private:
+  using SuperTy = RefCountState;
+
   /// Current place in the sequence of the value.
   LatticeState LatState = LatticeState::None;
 
@@ -177,18 +187,43 @@ struct BottomUpRefCountState : RefCountState {
   /// know that all releases we see are known safe.
   bool FoundNonARCUser = false;
 
+public:
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
   bool initWithMutatorInst(SILInstruction *I);
 
+  /// Check if PotentialDecrement can decrement the reference count associated
+  /// with the value we are tracking. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialDecrement(SILInstruction *Decrement, AliasAnalysis *AA);
+
+  /// Check if PotentialUser could be a use of the reference counted value that
+  /// requires user to be alive. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialUser(SILInstruction *PotentialUser, AliasAnalysis *AA);
+
+  /// Check if PotentialGuaranteedUser can use the reference count associated
+  /// with the value we are tracking. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialGuaranteedUser(SILInstruction *User, AliasAnalysis *AA);
+
+  /// Attempt to merge \p Other into this ref count state. Return true if we
+  /// succeed and false otherwise.
+  bool merge(const BottomUpRefCountState &Other);
+
+  /// Returns true if the passed in ref count inst matches the ref count inst
+  /// we are tracking. This handles generically retains/release.
+  bool isRefCountInstMatchedToTrackedInstruction(SILInstruction *RefCountInst);
+
+  /// Uninitialize the current state.
+  void clear();
+
+private:
   /// Return true if we *might* remove this instruction.
   ///
   /// This is a conservative query given the information we know, so as we
   /// perform the dataflow it may change value.
   bool mightRemoveMutators();
-
-  /// Uninitialize the current state.
-  void clear();
 
   /// Can we gaurantee that the given reference counted value has been modified?
   bool isRefCountStateModified() const;
@@ -197,11 +232,6 @@ struct BottomUpRefCountState : RefCountState {
   /// we are tracking is decremented.
   bool valueCanBeDecrementedGivenLatticeState() const;
 
-  /// Check if PotentialDecrement can decrement the reference count associated
-  /// with the value we are tracking. If so advance the state's sequence
-  /// appropriately and return true. Otherwise return false.
-  bool handlePotentialDecrement(SILInstruction *Decrement, AliasAnalysis *AA);
-
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
   bool handleDecrement(SILInstruction *PotentialDecrement);
@@ -209,11 +239,6 @@ struct BottomUpRefCountState : RefCountState {
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
   bool valueCanBeUsedGivenLatticeState() const;
-
-  /// Check if PotentialUser could be a use of the reference counted value that
-  /// requires user to be alive. If so advance the state's sequence
-  /// appropriately and return true. Otherwise return false.
-  bool handlePotentialUser(SILInstruction *PotentialUser, AliasAnalysis *AA);
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
@@ -224,36 +249,22 @@ struct BottomUpRefCountState : RefCountState {
   /// we are tracking is used.
   bool valueCanBeGuaranteedUsedGivenLatticeState() const;
 
-  /// Check if PotentialGuaranteedUser can use the reference count associated
-  /// with the value we are tracking. If so advance the state's sequence
-  /// appropriately and return true. Otherwise return false.
-  bool handlePotentialGuaranteedUser(SILInstruction *User, AliasAnalysis *AA);
-
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
   bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
                             SILValue RCIdentity, AliasAnalysis *AA);
 
-  /// Returns true if the passed in ref count inst matches the ref count inst
-  /// we are tracking. This handles generically retains/release.
-  bool isRefCountInstMatchedToTrackedInstruction(SILInstruction *RefCountInst);
-
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
   bool handleRefCountInstMatch(SILInstruction *RefCountInst);
-
-  /// Attempt to merge \p Other into this ref count state. Return true if we
-  /// succeed and false otherwise.
-  bool merge(const BottomUpRefCountState &Other);
 };
 
 //===----------------------------------------------------------------------===//
 //                          Top Down Ref Count State
 //===----------------------------------------------------------------------===//
 
-struct TopDownRefCountState : RefCountState {
-  using SuperTy = RefCountState;
-
+class TopDownRefCountState : public RefCountState {
+public:
   /// Sequence of states that a value with reference semantics can go through
   /// when visiting decrements bottom up. The reason why I have this separate
   /// from BottomUpRefCountState is I think it gives more clarity to the
@@ -266,9 +277,13 @@ struct TopDownRefCountState : RefCountState {
     MightBeUsed,        ///< The pointer has been incremented,
   };
 
+private:
+  using SuperTy = RefCountState;
+
   /// Current place in the sequence of the value.
   LatticeState LatState = LatticeState::None;
 
+public:
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
   bool initWithMutatorInst(SILInstruction *I);
@@ -283,18 +298,38 @@ struct TopDownRefCountState : RefCountState {
   /// Uninitialize the current state.
   void clear();
 
+  /// Check if PotentialDecrement can decrement the reference count associated
+  /// with the value we are tracking. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialDecrement(SILInstruction *PotentialDecrement,
+                                AliasAnalysis *AA);
+
+  /// Check if PotentialUser could be a use of the reference counted value that
+  /// requires user to be alive. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialUser(SILInstruction *PotentialUser, AliasAnalysis *AA);
+
+  /// Check if PotentialGuaranteedUser can use the reference count associated
+  /// with the value we are tracking. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
+                                     AliasAnalysis *AA);
+
+  /// Returns true if the passed in ref count inst matches the ref count inst
+  /// we are tracking. This handles generically retains/release.
+  bool isRefCountInstMatchedToTrackedInstruction(SILInstruction *RefCountInst);
+
+  /// Attempt to merge \p Other into this ref count state. Return true if we
+  /// succeed and false otherwise.
+  bool merge(const TopDownRefCountState &Other);
+
+private:
   /// Can we gaurantee that the given reference counted value has been modified?
   bool isRefCountStateModified() const;
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is decremented.
   bool valueCanBeDecrementedGivenLatticeState() const;
-
-  /// Check if PotentialDecrement can decrement the reference count associated
-  /// with the value we are tracking. If so advance the state's sequence
-  /// appropriately and return true. Otherwise return false.
-  bool handlePotentialDecrement(SILInstruction *PotentialDecrement,
-                                AliasAnalysis *AA);
 
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
@@ -303,11 +338,6 @@ struct TopDownRefCountState : RefCountState {
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
   bool valueCanBeUsedGivenLatticeState() const;
-
-  /// Check if PotentialUser could be a use of the reference counted value that
-  /// requires user to be alive. If so advance the state's sequence
-  /// appropriately and return true. Otherwise return false.
-  bool handlePotentialUser(SILInstruction *PotentialUser, AliasAnalysis *AA);
 
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
@@ -318,28 +348,14 @@ struct TopDownRefCountState : RefCountState {
   /// we are tracking is used.
   bool valueCanBeGuaranteedUsedGivenLatticeState() const;
 
-  /// Check if PotentialGuaranteedUser can use the reference count associated
-  /// with the value we are tracking. If so advance the state's sequence
-  /// appropriately and return true. Otherwise return false.
-  bool handlePotentialGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
-                                     AliasAnalysis *AA);
-
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
   bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
                             SILValue RCIdentity, AliasAnalysis *AA);
 
-  /// Returns true if the passed in ref count inst matches the ref count inst
-  /// we are tracking. This handles generically retains/release.
-  bool isRefCountInstMatchedToTrackedInstruction(SILInstruction *RefCountInst);
-
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
   bool handleRefCountInstMatch(SILInstruction *RefCountInst);
-
-  /// Attempt to merge \p Other into this ref count state. Return true if we
-  /// succeed and false otherwise.
-  bool merge(const TopDownRefCountState &Other);
 };
 
 } // end swift namespace
