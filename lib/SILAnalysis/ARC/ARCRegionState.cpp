@@ -333,7 +333,7 @@ bool ARCRegionState::processBlockTopDown(
       // instruction in a way that requires us to guarantee the lifetime of the
       // pointer up to this point. This has the effect of performing a use and a
       // decrement.
-      if (OtherState.second.handlePotentialGuaranteedUser(&I, AA)) {
+      if (OtherState.second.handlePotentialGuaranteedUser(&I, &I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
                            << OtherState.second.getRCRoot());
         continue;
@@ -342,7 +342,7 @@ bool ARCRegionState::processBlockTopDown(
       // Check if the instruction we are visiting could potentially decrement
       // the reference counted value we are tracking in a manner that could
       // cause us to change states. If we do change states continue...
-      if (OtherState.second.handlePotentialDecrement(&I, AA)) {
+      if (OtherState.second.handlePotentialDecrement(&I, &I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
                            << OtherState.second.getRCRoot());
         continue;

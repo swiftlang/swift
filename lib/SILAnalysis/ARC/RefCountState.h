@@ -310,7 +310,7 @@ public:
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool handlePotentialDecrement(SILInstruction *PotentialDecrement,
-                                AliasAnalysis *AA);
+                                SILInstruction *InsertPt, AliasAnalysis *AA);
 
   /// Check if PotentialUser could be a use of the reference counted value that
   /// requires user to be alive. If so advance the state's sequence
@@ -321,6 +321,7 @@ public:
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool handlePotentialGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
+                                     SILInstruction *InsertPt,
                                      AliasAnalysis *AA);
 
   /// Returns true if the passed in ref count inst matches the ref count inst
@@ -341,7 +342,8 @@ private:
 
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
-  bool handleDecrement(SILInstruction *PotentialDecrement);
+  bool handleDecrement(SILInstruction *PotentialDecrement,
+                       SILInstruction *InsertPt);
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
@@ -359,7 +361,8 @@ private:
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
   bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
-                            SILValue RCIdentity, AliasAnalysis *AA);
+                            SILInstruction *InsertPt, SILValue RCIdentity,
+                            AliasAnalysis *AA);
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.

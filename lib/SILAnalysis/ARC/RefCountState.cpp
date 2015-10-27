@@ -510,11 +510,12 @@ bool TopDownRefCountState::valueCanBeDecrementedGivenLatticeState() const {
 
 /// If advance the state's sequence appropriately for a decrement. If we do
 /// advance return true. Otherwise return false.
-bool TopDownRefCountState::handleDecrement(SILInstruction *PotentialDecrement) {
+bool TopDownRefCountState::handleDecrement(SILInstruction *PotentialDecrement,
+                                           SILInstruction *InsertPt) {
   switch (LatState) {
   case LatticeState::Incremented:
     LatState = LatticeState::MightBeDecremented;
-    InsertPts.insert(PotentialDecrement);
+    InsertPts.insert(InsertPt);
     return true;
   case LatticeState::None:
   case LatticeState::MightBeDecremented:
@@ -573,10 +574,9 @@ valueCanBeGuaranteedUsedGivenLatticeState() const {
 
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
-bool
-TopDownRefCountState::
-handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
-                     SILValue RCIdentity, AliasAnalysis *AA) {
+bool TopDownRefCountState::handleGuaranteedUser(
+    SILInstruction *PotentialGuaranteedUser, SILInstruction *InsertPt,
+    SILValue RCIdentity, AliasAnalysis *AA) {
   assert(valueCanBeGuaranteedUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
   // Advance the sequence...
@@ -586,7 +586,7 @@ handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
     assert(InsertPts.empty() && "If we are decremented, we should have no "
                                 "insertion points.");
     LatState = LatticeState::MightBeUsed;
-    InsertPts.insert(PotentialGuaranteedUser);
+    InsertPts.insert(InsertPt);
     return true;
   }
   case LatticeState::MightBeDecremented:
@@ -691,7 +691,8 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
 // the value we are tracking. If so advance the state's sequence appropriately
 // and return true. Otherwise return false.
 bool TopDownRefCountState::handlePotentialGuaranteedUser(
-    SILInstruction *PotentialGuaranteedUser, AliasAnalysis *AA) {
+    SILInstruction *PotentialGuaranteedUser, SILInstruction *InsertPt,
+    AliasAnalysis *AA) {
   // If we are not tracking a ref count, just return false.
   if (!isTrackingRefCount())
     return false;
@@ -710,14 +711,16 @@ bool TopDownRefCountState::handlePotentialGuaranteedUser(
     return false;
 
   // Otherwise, update our step given that we have a potential decrement.
-  return handleGuaranteedUser(PotentialGuaranteedUser, getRCRoot(), AA);
+  return handleGuaranteedUser(PotentialGuaranteedUser, InsertPt, getRCRoot(),
+                              AA);
 }
 
 // Check if PotentialDecrement can decrement the reference count associated with
 // the value we are tracking. If so advance the state's sequence appropriately
 // and return true. Otherwise return false.
 bool TopDownRefCountState::handlePotentialDecrement(
-    SILInstruction *PotentialDecrement, AliasAnalysis *AA) {
+    SILInstruction *PotentialDecrement, SILInstruction *InsertPt,
+    AliasAnalysis *AA) {
   // If we are not tracking a ref count, just return false.
   if (!isTrackingRefCount())
     return false;
@@ -736,7 +739,7 @@ bool TopDownRefCountState::handlePotentialDecrement(
     return false;
 
   // Otherwise, update our state given the potential decrement.
-  return handleDecrement(PotentialDecrement);
+  return handleDecrement(PotentialDecrement, InsertPt);
 }
 
 // Check if PotentialUser could be a use of the reference counted value that
