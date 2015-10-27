@@ -264,6 +264,23 @@ handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
   }
 }
 
+// Returns true if the passed in ref count inst matches the ref count inst
+// we are tracking. This handles generically retains/release.
+bool BottomUpRefCountState::isRefCountInstMatchedToTrackedInstruction(
+    SILInstruction *RefCountInst) {
+  // If we are not tracking any state transitions bail.
+  if (!Transition.hasValue())
+    return false;
+
+  // Otherwise, ask the transition state if this instruction causes a
+  // transition that can be matched with the transition in order to eliminate
+  // the transition.
+  if (!Transition->matchingInst(RefCountInst))
+    return false;
+
+  return handleRefCountInstMatch(RefCountInst);
+}
+
 /// We have a matching ref count inst. Return true if we advance the sequence
 /// and false otherwise.
 bool
@@ -336,6 +353,81 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
   return true;
 }
 
+// Check if PotentialGuaranteedUser can use the reference count associated with
+// the value we are tracking. If so advance the state's sequence appropriately
+// and return true. Otherwise return false.
+bool BottomUpRefCountState::handlePotentialGuaranteedUser(
+    SILInstruction *PotentialGuaranteedUser, AliasAnalysis *AA) {
+  // If we are not tracking a ref count, just return false.
+  if (!isTrackingRefCount())
+    return false;
+
+  // If at the current lattice state, we don't care if the value we are
+  // tracking can be decremented or used, just return false.
+  //
+  // This causes us to only perform alias queries when we are at a lattice
+  // state where the alias queries will actually be used.
+  if (!valueCanBeGuaranteedUsedGivenLatticeState())
+    return false;
+
+  // If we can prove that Other can not use the pointer we are tracking,
+  // return...
+  if (!mayGuaranteedUseValue(PotentialGuaranteedUser, getRCRoot(), AA))
+    return false;
+
+  // Otherwise, update the ref count state given the guaranteed user.
+  return handleGuaranteedUser(PotentialGuaranteedUser, getRCRoot(), AA);
+}
+
+/// Check if PotentialDecrement can decrement the reference count associated
+/// with the value we are tracking. If so advance the state's sequence
+/// appropriately and return true. Otherwise return false.
+bool BottomUpRefCountState::handlePotentialDecrement(
+    SILInstruction *PotentialDecrement, AliasAnalysis *AA) {
+  // If we are not tracking a ref count, just return false.
+  if (!isTrackingRefCount())
+    return false;
+
+  // If at the current lattice state, we don't care if the value we are
+  // tracking can be decremented, just return false.
+  //
+  // This causes us to only perform alias queries when we are at a lattice
+  // state where the alias queries will actually be used.
+  if (!valueCanBeDecrementedGivenLatticeState())
+    return false;
+
+  // If we can prove that Other can not use the pointer we are tracking,
+  // return...
+  if (!mayDecrementRefCount(PotentialDecrement, getRCRoot(), AA))
+    return false;
+
+  // Otherwise, allow the CRTP substruct to update itself given we have a
+  // potential decrement.
+  return handleDecrement(PotentialDecrement);
+}
+
+// Check if PotentialUser could be a use of the reference counted value that
+// requires user to be alive. If so advance the state's sequence
+// appropriately and return true. Otherwise return false.
+bool BottomUpRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
+                                                AliasAnalysis *AA) {
+  // If we are not tracking a ref count, just return false.
+  if (!isTrackingRefCount())
+    return false;
+
+  // If at the current lattice state, we don't care if the value we are
+  // tracking can be used, just return false.
+  //
+  // This causes us to only perform alias queries when we are at a lattice
+  // state where the alias queries will actually be used.
+  if (!valueCanBeUsedGivenLatticeState())
+    return false;
+
+  if (!mayUseValue(PotentialUser, getRCRoot(), AA))
+    return false;
+
+  return handleUser(PotentialUser, getRCRoot(), AA);
+}
 
 //===----------------------------------------------------------------------===//
 //                          Top Down Ref Count State
@@ -348,6 +440,11 @@ bool TopDownRefCountState::initWithMutatorInst(SILInstruction *I) {
          "strong_retain and retain_value are only supported.");
 
   bool NestingDetected = SuperTy::initWithMutatorInst(I);
+
+  // This retain is known safe if the operand we are tracking was already
+  // known incremented previously. This occurs when you have nested
+  // increments.
+  KnownSafe = isRefCountStateModified();
 
   // Set our lattice state to be incremented.
   LatState = LatticeState::Incremented;
@@ -504,6 +601,23 @@ handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
   }
 }
 
+// Returns true if the passed in ref count inst matches the ref count inst
+// we are tracking. This handles generically retains/release.
+bool TopDownRefCountState::isRefCountInstMatchedToTrackedInstruction(
+    SILInstruction *RefCountInst) {
+  // If we are not tracking any state transitions bail.
+  if (!Transition.hasValue())
+    return false;
+
+  // Otherwise, ask the transition state if this instruction causes a
+  // transition that can be matched with the transition in order to eliminate
+  // the transition.
+  if (!Transition->matchingInst(RefCountInst))
+    return false;
+
+  return handleRefCountInstMatch(RefCountInst);
+}
+
 /// We have a matching ref count inst. Return true if we advance the sequence
 /// and false otherwise.
 bool TopDownRefCountState::
@@ -572,6 +686,81 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
                      << "\n");
 
   return true;
+}
+
+// Check if PotentialGuaranteedUser can use the reference count associated with
+// the value we are tracking. If so advance the state's sequence appropriately
+// and return true. Otherwise return false.
+bool TopDownRefCountState::handlePotentialGuaranteedUser(
+    SILInstruction *PotentialGuaranteedUser, AliasAnalysis *AA) {
+  // If we are not tracking a ref count, just return false.
+  if (!isTrackingRefCount())
+    return false;
+
+  // If at the current lattice state, we don't care if the value we are
+  // tracking can be decremented or used, just return false.
+  //
+  // This causes us to only perform alias queries when we are at a lattice
+  // state where the alias queries will actually be used.
+  if (!valueCanBeGuaranteedUsedGivenLatticeState())
+    return false;
+
+  // If we can prove that Other can not use the pointer we are tracking,
+  // return...
+  if (!mayGuaranteedUseValue(PotentialGuaranteedUser, getRCRoot(), AA))
+    return false;
+
+  // Otherwise, update our step given that we have a potential decrement.
+  return handleGuaranteedUser(PotentialGuaranteedUser, getRCRoot(), AA);
+}
+
+// Check if PotentialDecrement can decrement the reference count associated with
+// the value we are tracking. If so advance the state's sequence appropriately
+// and return true. Otherwise return false.
+bool TopDownRefCountState::handlePotentialDecrement(
+    SILInstruction *PotentialDecrement, AliasAnalysis *AA) {
+  // If we are not tracking a ref count, just return false.
+  if (!isTrackingRefCount())
+    return false;
+
+  // If at the current lattice state, we don't care if the value we are
+  // tracking can be decremented, just return false.
+  //
+  // This causes us to only perform alias queries when we are at a lattice
+  // state where the alias queries will actually be used.
+  if (!valueCanBeDecrementedGivenLatticeState())
+    return false;
+
+  // If we can prove that Other can not use the pointer we are tracking,
+  // return...
+  if (!mayDecrementRefCount(PotentialDecrement, getRCRoot(), AA))
+    return false;
+
+  // Otherwise, update our state given the potential decrement.
+  return handleDecrement(PotentialDecrement);
+}
+
+// Check if PotentialUser could be a use of the reference counted value that
+// requires user to be alive. If so advance the state's sequence appropriately
+// and return true. Otherwise return false.
+bool TopDownRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
+                                               AliasAnalysis *AA) {
+  // If we are not tracking a ref count, just return false.
+  if (!isTrackingRefCount())
+    return false;
+
+  // If at the current lattice state, we don't care if the value we are
+  // tracking can be used, just return false.
+  //
+  // This causes us to only perform alias queries when we are at a lattice
+  // state where the alias queries will actually be used.
+  if (!valueCanBeUsedGivenLatticeState())
+    return false;
+
+  if (!mayUseValue(PotentialUser, getRCRoot(), AA))
+    return false;
+
+  return handleUser(PotentialUser, getRCRoot(), AA);
 }
 
 //===----------------------------------------------------------------------===//
