@@ -42,3 +42,5 @@ struct not_importable;
 
 void opaque_pointer_param(struct not_importable *);
 
+int variadicFunc1(int A, ...);
+int variadicFunc2(int A, ...);
