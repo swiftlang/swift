@@ -36,7 +36,7 @@ namespace {
 
 class SwiftOptTable : public OptTable {
 public:
-  SwiftOptTable() : OptTable(InfoTable, llvm::array_lengthof(InfoTable)) {}
+  SwiftOptTable() : OptTable(InfoTable) {}
 };
 
 }
