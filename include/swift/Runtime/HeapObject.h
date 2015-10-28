@@ -62,7 +62,7 @@ extern "C" HeapObject *swift_initStackObject(HeapMetadata const *metadata,
                                              HeapObject *object);
 
 /// Performs verification that the lifetime of a stack allocated object has
-/// ended. It asserts if the reference counts of the object indicate that the
+/// ended. It aborts if the reference counts of the object indicate that the
 /// object did escape to some other location.
 extern "C" void swift_verifyEndOfLifetime(HeapObject *object);
 
