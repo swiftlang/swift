@@ -454,9 +454,9 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   }
 }
 
-void SILGenModule::emitCurryThunk(SILDeclRef entryPoint,
-                                  SILDeclRef nextEntryPoint,
-                                  ValueDecl *fd) {
+void SILGenModule::emitCurryThunk(ValueDecl *fd,
+                                  SILDeclRef entryPoint,
+                                  SILDeclRef nextEntryPoint) {
   // Thunks are always emitted by need, so don't need delayed emission.
   SILFunction *f = getFunction(entryPoint, ForDefinition);
   preEmitFunction(entryPoint, fd, f, fd);
@@ -1150,37 +1150,37 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 //===--------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *sf,
+SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *SF,
                         Optional<unsigned> startElem, bool makeModuleFragile,
                         bool isWholeModule) {
   const DeclContext *DC;
   if (startElem) {
-    assert(sf && "cannot have a start element without a source file");
+    assert(SF && "cannot have a start element without a source file");
     // Because more decls may be added to the SourceFile, we can't assume
     // anything about the compilation context.
     DC = nullptr;
-  } else if (sf) {
-    DC = sf;
+  } else if (SF) {
+    DC = SF;
   } else {
     DC = mod;
   }
 
-  std::unique_ptr<SILModule> m(new SILModule(mod, options, DC, isWholeModule));
-  SILGenModule sgm(*m, mod, makeModuleFragile);
+  std::unique_ptr<SILModule> M(new SILModule(mod, options, DC, isWholeModule));
+  SILGenModule SGM(*M, mod, makeModuleFragile);
 
-  if (sf) {
-    if (auto *file = dyn_cast<SourceFile>(sf)) {
-      sgm.emitSourceFile(file, startElem.getValueOr(0));
-    } else if (auto *file = dyn_cast<SerializedASTFile>(sf)) {
+  if (SF) {
+    if (auto *file = dyn_cast<SourceFile>(SF)) {
+      SGM.emitSourceFile(file, startElem.getValueOr(0));
+    } else if (auto *file = dyn_cast<SerializedASTFile>(SF)) {
       if (file->isSIB())
-        m->getSILLoader()->getAllForModule(mod->getName(), file);
+        M->getSILLoader()->getAllForModule(mod->getName(), file);
     }
   } else {
     for (auto file : mod->getFiles()) {
       auto nextSF = dyn_cast<SourceFile>(file);
       if (!nextSF || nextSF->ASTStage != SourceFile::TypeChecked)
         continue;
-      sgm.emitSourceFile(nextSF, 0);
+      SGM.emitSourceFile(nextSF, 0);
     }
 
     // Also make sure to process any intermediate files that may contain SIL
@@ -1191,34 +1191,34 @@ SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *sf,
       return SASTF && SASTF->isSIB();
     });
     if (hasSIB)
-      m->getSILLoader()->getAllForModule(mod->getName(), nullptr);
+      M->getSILLoader()->getAllForModule(mod->getName(), nullptr);
   }
 
   // Emit external definitions used by this module.
   for (size_t i = 0, e = mod->getASTContext().LastCheckedExternalDefinition;
        i != e; ++i) {
     auto def = mod->getASTContext().ExternalDefinitions[i];
-    sgm.emitExternalDefinition(def);
+    SGM.emitExternalDefinition(def);
   }
 
   // Emit any delayed definitions that were forced.
   // Emitting these may in turn force more definitions, so we have to take care
   // to keep pumping the queues.
-  while (!sgm.forcedFunctions.empty()
-         || !sgm.forcedConformances.empty()) {
-    while (!sgm.forcedFunctions.empty()) {
-      auto &front = sgm.forcedFunctions.front();
-      front.second.emitter(sgm.getFunction(front.first, ForDefinition));
-      sgm.forcedFunctions.pop_front();
+  while (!SGM.forcedFunctions.empty()
+         || !SGM.forcedConformances.empty()) {
+    while (!SGM.forcedFunctions.empty()) {
+      auto &front = SGM.forcedFunctions.front();
+      front.second.emitter(SGM.getFunction(front.first, ForDefinition));
+      SGM.forcedFunctions.pop_front();
     }
-    while (!sgm.forcedConformances.empty()) {
-      auto &front = sgm.forcedConformances.front();
-      sgm.getWitnessTable(front.first);
-      sgm.forcedConformances.pop_front();
+    while (!SGM.forcedConformances.empty()) {
+      auto &front = SGM.forcedConformances.front();
+      SGM.getWitnessTable(front.first);
+      SGM.forcedConformances.pop_front();
     }
   }
 
-  return m;
+  return M;
 }
 
 std::unique_ptr<SILModule>

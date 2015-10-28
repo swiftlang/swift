@@ -103,7 +103,7 @@ public:
   
   size_t anonymousSymbolCounter = 0;
   
-  /// If true, all functions and global's are made fragile. Currently only used
+  /// If true, all functions and globals are made fragile. Currently only used
   /// for compiling the stdlib.
   bool makeModuleFragile;
   
@@ -250,9 +250,9 @@ public:
                                 ArrayRef<Pattern*> patterns);
 
   /// Emits the curry thunk between two uncurry levels of a function.
-  void emitCurryThunk(SILDeclRef entryPoint,
-                      SILDeclRef nextEntryPoint,
-                      ValueDecl *fd);
+  void emitCurryThunk(ValueDecl *fd,
+                      SILDeclRef entryPoint,
+                      SILDeclRef nextEntryPoint);
   
   /// Emits a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);

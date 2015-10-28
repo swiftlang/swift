@@ -152,7 +152,7 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
       // method implementation.
       next = next.asDirectReference(constant.isDirectReference);
 
-      SGM.emitCurryThunk(constant, next, vd);
+      SGM.emitCurryThunk(vd, constant, next);
     }
     // Otherwise, if this is a calling convention thunk we haven't emitted yet,
     // emit it.
