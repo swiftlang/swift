@@ -366,9 +366,6 @@ macro(swift_common_cxx_warnings)
   # Check for '-fapplication-extension'.  On OSX/iOS we wish to link all
   # dynamic libraries with this flag.
   check_cxx_compiler_flag("-fapplication-extension" CXX_SUPPORTS_FAPPLICATION_EXTENSION)
-
-  check_cxx_compiler_flag("-Werror -Wbool-conversion" CXX_SUPPORTS_BOOL_CONVERSION_WARNING_FLAG)
-  append_if(CXX_SUPPORTS_BOOL_CONVERSION_WARNING_FLAG "-Wbool-conversion" CMAKE_CXX_FLAGS)
 endmacro()
 
 # Like 'llvm_config()', but uses libraries from the selected build
