@@ -74,6 +74,26 @@ _swift_allocObject_(HeapMetadata const *metadata, size_t requiredSize,
 }
 auto swift::_swift_allocObject = _swift_allocObject_;
 
+HeapObject *
+swift::swift_initStackObject(HeapMetadata const *metadata,
+                             HeapObject *object) {
+  object->metadata = metadata;
+  object->refCount.init();
+  object->weakRefCount.initForNotDeallocating();
+
+  return object;
+
+}
+
+void
+swift::swift_verifyEndOfLifetime(HeapObject *object) {
+  if (object->refCount.getCount() != 0)
+    swift::fatalError("fatal error: stack object escaped\n");
+
+  if (object->weakRefCount.getCount() != 1)
+    swift::fatalError("fatal error: weak/unowned reference to stack object\n");
+}
+
 /// \brief Allocate a reference-counted object on the heap that
 /// occupies <size> bytes of maximally-aligned storage.  The object is
 /// uninitialized except for its header.

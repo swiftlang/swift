@@ -52,7 +52,20 @@ struct OpaqueValue;
 extern "C" HeapObject *swift_allocObject(HeapMetadata const *metadata,
                                          size_t requiredSize,
                                          size_t requiredAlignmentMask);
-  
+
+/// Initializes the object header of a stack allocated object.
+///
+/// \param metadata - the object's metadata which is stored in the header
+/// \param object - the pointer to the object's memory on the stack
+/// \returns the passed object pointer.
+extern "C" HeapObject *swift_initStackObject(HeapMetadata const *metadata,
+                                             HeapObject *object);
+
+/// Performs verification that the lifetime of a stack allocated object has
+/// ended. It asserts if the reference counts of the object indicate that the
+/// object did escape to some other location.
+extern "C" void swift_verifyEndOfLifetime(HeapObject *object);
+
 /// The structure returned by swift_allocPOD and swift_allocBox.
 struct BoxPair {
   /// The pointer to the heap object.

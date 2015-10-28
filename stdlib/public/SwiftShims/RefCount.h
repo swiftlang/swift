@@ -307,6 +307,11 @@ class WeakRefCount {
     refCount = RC_ONE;
   }
 
+  /// Initialize for a stack promoted object. This prevents that the final
+  /// release frees the memory of the object.
+  void initForNotDeallocating() {
+    refCount = RC_ONE + RC_ONE;
+  }
 
   // Increment the weak reference count.
   void increment() {
