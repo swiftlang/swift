@@ -69,15 +69,15 @@ public:
     explicit Callees(CalleeSet TheCallees) : TheCallees(TheCallees) {}
 
   public:
-    CalleeFunctionView::iterator begin() {
+    CalleeFunctionView::iterator begin() const {
       return getFunctionView().begin();
     }
 
-    CalleeFunctionView::iterator end() {
+    CalleeFunctionView::iterator end() const {
       return getFunctionView().end();
     }
 
-    bool canCallUnknownFunction() {
+    bool canCallUnknownFunction() const {
       if (TheCallees.is<CalleeSet>())
         return TheCallees.get<CalleeSet>().getInt();
 
@@ -90,7 +90,7 @@ public:
     }
 
   private:
-    CalleeFunctionView getFunctionView() {
+    CalleeFunctionView getFunctionView() const {
       // Make a view over the entire callee set.
       if (TheCallees.is<CalleeSet>()) {
         auto *Set = TheCallees.get<CalleeSet>().getPointer();
@@ -147,9 +147,7 @@ public:
   ~CallGraphEdge() {
   }
 
-  const FullApplySite getApply() const { return TheApply; }
-
-  FullApplySite getApply() { return TheApply; }
+  FullApplySite getApply() const { return TheApply; }
 
   /// Return the callee set.
   CallGraphNodeSet getCalleeSet() const {
@@ -203,9 +201,9 @@ public:
     return Ordinal;
   }
 
-  void print(llvm::raw_ostream &OS, int Indent);
-  void dump(int Indent);
-  void dump();
+  void print(llvm::raw_ostream &OS, int Indent) const;
+  void dump(int Indent) const;
+  void dump() const;
 };
 
 class CallGraphNode {
@@ -283,8 +281,8 @@ public:
     return Ordinal;
   }
 
-  void print(llvm::raw_ostream &OS);
-  void dump();
+  void print(llvm::raw_ostream &OS) const;
+  void dump() const;
 
 private:
   /// Mark a set of callers as known to not be complete.
@@ -400,7 +398,7 @@ public:
 
   // Call graph queries on call sites.
 
-  bool canCallUnknownFunction(FullApplySite FAS) {
+  bool canCallUnknownFunction(FullApplySite FAS) const {
     return getCallGraphEdge(FAS)->canCallUnknownFunction();
   }
 
@@ -452,7 +450,7 @@ private:
 
   // Query funtions for getting nodes and edges from the call graph.
 
-  CallGraphNode *getCallGraphNode(SILFunction *F) const {
+  const CallGraphNode *getCallGraphNode(SILFunction *F) const {
     return const_cast<CallGraph *>(this)->getCallGraphNode(F);
   }
 

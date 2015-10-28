@@ -464,7 +464,7 @@ static void printFlag(llvm::raw_ostream &OS,
     (Value ? "yes\n" : "no\n");
 }
 
-void CallGraphEdge::print(llvm::raw_ostream &OS, int Indent) {
+void CallGraphEdge::print(llvm::raw_ostream &OS, int Indent) const {
   indent(OS, Indent);
   OS << CallGraphFileCheckPrefix << "Call site #" << Ordinal << ": ";
   OS << *getApply().getInstruction();
@@ -490,20 +490,20 @@ void CallGraphEdge::print(llvm::raw_ostream &OS, int Indent) {
   }
 }
 
-void CallGraphEdge::dump(int Indent) {
+void CallGraphEdge::dump(int Indent) const {
 #ifndef NDEBUG
   print(llvm::errs(), Indent);
 #endif
 }
 
-void CallGraphEdge::dump() {
+void CallGraphEdge::dump() const {
 #ifndef NDEBUG
   dump(0);
 #endif
 }
 
 
-void CallGraphNode::print(llvm::raw_ostream &OS) {
+void CallGraphNode::print(llvm::raw_ostream &OS) const {
   OS << CallGraphFileCheckPrefix << "Function #" << Ordinal << ": " <<
     getFunction()->getName() << "\n";
   OS << CallGraphFileCheckPrefix << "Demangled: " <<
@@ -555,7 +555,7 @@ void CallGraphNode::print(llvm::raw_ostream &OS) {
     getFunction()->print(OS);
 }
 
-void CallGraphNode::dump() {
+void CallGraphNode::dump() const {
 #ifndef NDEBUG
   print(llvm::errs());
 #endif
@@ -884,7 +884,7 @@ void CallGraph::verify(SILFunction *F) const {
 #ifndef NDEBUG
   // Collect all full apply sites of the function.
 
-  CallGraphNode *Node = getCallGraphNode(F);
+  auto *Node = getCallGraphNode(F);
   unsigned numEdges = 0;
 
   for (auto &BB : *F) {
