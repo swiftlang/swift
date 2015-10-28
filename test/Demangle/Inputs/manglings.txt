@@ -65,6 +65,7 @@ _TF3foog3barSi ---> foo.bar.getter : Swift.Int
 _TF3foos3barSi ---> foo.bar.setter : Swift.Int
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas (zim : foo.zim) -> ()
 _TToFC3foo3bar3basfT3zimCS_3zim_T_ ---> @objc foo.bar.bas (zim : foo.zim) -> ()
+_TTOFSC3fooFTSdSd_Sd ---> @nonobjc __C.foo (Swift.Double, Swift.Double) -> Swift.Double
 _TTDFC3foo3bar3basfT3zimCS_3zim_T_ ---> dynamic foo.bar.bas (zim : foo.zim) -> ()
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas (zim : foo.zim) -> ()
 _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix (foo.bar, foo.bas) -> foo.zim
