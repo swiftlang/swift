@@ -101,7 +101,7 @@ private:
   void *TypeListUniquing;
 
   /// The swift Module associated with this SILModule.
-  Module *TheSwiftModule;
+  ModuleDecl *TheSwiftModule;
 
   /// A specific context for AST-level declarations associated with this SIL
   /// module.
@@ -180,7 +180,7 @@ private:
 
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
-  SILModule(Module *M, SILOptions &Options, const DeclContext *associatedDC,
+  SILModule(ModuleDecl *M, SILOptions &Options, const DeclContext *associatedDC,
             bool wholeModule);
 
   SILModule(const SILModule&) = delete;
@@ -224,21 +224,21 @@ public:
   /// If \p makeModuleFragile is true, all functions and global variables of
   /// the module are marked as fragile. This is used for compiling the stdlib.
   static std::unique_ptr<SILModule>
-  constructSIL(Module *M, SILOptions &Options, FileUnit *sf = nullptr,
+  constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr,
                Optional<unsigned> startElem = None,
                bool makeModuleFragile = false,
                bool isWholeModule = false);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
-  static std::unique_ptr<SILModule> createEmptyModule(Module *M,
+  static std::unique_ptr<SILModule> createEmptyModule(ModuleDecl *M,
                                                       SILOptions &Options,
                                                       bool WholeModule = false) {
     return std::unique_ptr<SILModule>(new SILModule(M, Options, M, WholeModule));
   }
 
   /// Get the Swift module associated with this SIL module.
-  Module *getSwiftModule() const { return TheSwiftModule; }
+  ModuleDecl *getSwiftModule() const { return TheSwiftModule; }
   /// Get the AST context used for type uniquing etc. by this SIL module.
   ASTContext &getASTContext() const { return TheSwiftModule->getASTContext(); }
   SourceManager &getSourceManager() const { return getASTContext().SourceMgr; }
@@ -495,7 +495,7 @@ public:
   ///        variables, and witness tables by name to ease diffing.
   /// \param PrintASTDecls If set to true print AST decls.
   void print(raw_ostream &OS, bool Verbose = false,
-             Module *M = nullptr, bool ShouldSort = false,
+             ModuleDecl *M = nullptr, bool ShouldSort = false,
              bool PrintASTDecls = true) const;
 
   /// Allocate memory using the module's internal allocator.
