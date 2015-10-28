@@ -158,10 +158,17 @@ func _swift_stdlib_atomicLoadInt${bits}(
 
 %   for operation in [ 'Add', 'And', 'Or', 'Xor' ]:
 // Warning: no overflow checking.
-@asmname("swift_stdlib_atomicFetch${operation}UInt${bits}")
+@transparent
+public // @testable
 func _swift_stdlib_atomicFetch${operation}UInt${bits}(
   object target: UnsafeMutablePointer<UInt${bits}>,
-  operand: UInt${bits}) -> UInt${bits}
+  operand: UInt${bits}) -> UInt${bits} {
+
+  let value = Builtin.atomicrmw_${operation.lower()}_seqcst_Int${bits}(
+    target._rawValue, operand._value)
+
+  return UInt${bits}(value)
+}
 
 // Warning: no overflow checking.
 @warn_unused_result
