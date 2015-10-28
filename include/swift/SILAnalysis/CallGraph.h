@@ -402,7 +402,13 @@ public:
   // Call graph queries on call sites.
 
   bool canCallUnknownFunction(FullApplySite FAS) const {
-    return getCallGraphEdge(FAS)->canCallUnknownFunction();
+    auto *Edge = tryGetCallGraphEdge(FAS);
+
+    // Passes that do not maintain the call graph may have applies
+    // without edges. In this case, return a conservative result.
+    if (!Edge) return true;
+
+    return Edge->canCallUnknownFunction();
   }
 
   /// Return the callee set for the given call site.
@@ -463,17 +469,28 @@ private:
     return CGN;
   }
 
+  CallGraphEdge *getCallGraphEdge(FullApplySite AI) const {
+    return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
+  }
+
   CallGraphEdge *getCallGraphEdge(FullApplySite AI) {
+    auto *Edge = tryGetCallGraphEdge(AI);
+    assert(Edge && "Expected call graph edge for apply!");
+
+    return Edge;
+  }
+
+  CallGraphEdge *tryGetCallGraphEdge(FullApplySite AI) const {
+    return const_cast<CallGraph *>(this)->tryGetCallGraphEdge(AI);
+  }
+
+  CallGraphEdge *tryGetCallGraphEdge(FullApplySite AI) {
     auto Found = ApplyToEdgeMap.find(AI);
     if (Found == ApplyToEdgeMap.end())
       return nullptr;
 
     assert(Found->second && "Unexpected null call graph edge in map!");
     return Found->second;
-  }
-
-  CallGraphEdge *getCallGraphEdge(FullApplySite AI) const {
-    return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
   }
 
   CallGraphEdge::CalleeSet &getOrCreateCalleeSetForMethod(SILDeclRef Decl);
