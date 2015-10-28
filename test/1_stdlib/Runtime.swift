@@ -2237,6 +2237,16 @@ Reflection.test("Name of metatype of artificial subclass") {
   expectEqual("\(obj.dynamicType)", "TestArtificialSubclass")
 }
 
+@objc class StringConvertibleInDebugAndOtherwise : NSObject {
+  override var description: String { return "description" }
+  override var debugDescription: String { return "debugDescription" }
+}
+
+Reflection.test("NSObject is properly CustomDebugStringConvertible") {
+  let object = StringConvertibleInDebugAndOtherwise()
+  expectEqual(String(reflecting: object), object.debugDescription)
+}
+
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
 func computeCountLeadingZeroes(var x: Int64) -> Int64 {
