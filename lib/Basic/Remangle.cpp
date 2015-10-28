@@ -569,10 +569,6 @@ void Remangler::mangleObjCAttribute(Node *node) {
   Out << "To";
 }
 
-void Remangler::mangleNonObjCAttribute(Node *node) {
-  Out << "TO";
-}
-
 void Remangler::mangleDirectMethodReferenceAttribute(Node *node) {
   Out << "Td";
 }

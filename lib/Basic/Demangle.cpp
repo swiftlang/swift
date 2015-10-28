@@ -355,8 +355,6 @@ public:
 
     } else if (Mangled.nextIf("To")) {
       topLevel->addChild(NodeFactory::create(Node::Kind::ObjCAttribute));
-    } else if (Mangled.nextIf("TO")) {
-      topLevel->addChild(NodeFactory::create(Node::Kind::NonObjCAttribute));
     } else if (Mangled.nextIf("TD")) {
       topLevel->addChild(NodeFactory::create(Node::Kind::DynamicAttribute));
     } else if (Mangled.nextIf("Td")) {
@@ -2401,7 +2399,6 @@ private:
     case Node::Kind::NativePinningAddressor:
     case Node::Kind::NativePinningMutableAddressor:
     case Node::Kind::NominalTypeDescriptor:
-    case Node::Kind::NonObjCAttribute:
     case Node::Kind::Number:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::ObjCBlock:
@@ -2999,9 +2996,6 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::InOut:
     Printer << "inout ";
     print(pointer->getChild(0));
-    return;
-  case Node::Kind::NonObjCAttribute:
-    Printer << "@nonobjc ";
     return;
   case Node::Kind::ObjCAttribute:
     Printer << "@objc ";
