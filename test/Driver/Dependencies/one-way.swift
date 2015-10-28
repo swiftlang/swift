@@ -26,6 +26,16 @@
 // CHECK-FOURTH: Handled main.swift
 // CHECK-FOURTH-NOT: Handled other.swift
 
+// RUN: rm %t/main.o
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-FOURTH %s
+
+// RUN: rm %t/other.o
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-FIFTH %s
+
+// CHECK-FIFTH-NOT: Handled main.swift
+// CHECK-FIFTH: Handled other.swift
+// CHECK-FIFTH-NOT: Handled main.swift
+
 
 // RUN: rm -rf %t && cp -r %S/Inputs/one-way/ %t
 // RUN: touch -t 201401240005 %t/*

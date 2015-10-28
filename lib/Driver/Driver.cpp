@@ -1592,7 +1592,10 @@ handleCompileJobCondition(Job *J, CompileJobAction::InputInfo inputInfo,
   Job::Condition condition;
   switch (inputInfo.status) {
   case CompileJobAction::InputInfo::UpToDate:
-    condition = Job::Condition::CheckDependencies;
+    if (!llvm::sys::fs::exists(J->getOutput().getPrimaryOutputFilename()))
+      condition = Job::Condition::RunWithoutCascading;
+    else
+      condition = Job::Condition::CheckDependencies;
     break;
   case CompileJobAction::InputInfo::NeedsCascadingBuild:
     condition = Job::Condition::Always;
