@@ -20,12 +20,19 @@ import SwiftShims
 // Atomics
 //===----------------------------------------------------------------------===//
 
+@transparent
 @warn_unused_result
-@asmname("swift_stdlib_atomicCompareExchangeStrongPtr")
+public // @testable
 func _stdlib_atomicCompareExchangeStrongPtrImpl(
   object target: UnsafeMutablePointer<COpaquePointer>,
   expected: UnsafeMutablePointer<COpaquePointer>,
-  desired: COpaquePointer) -> Bool
+  desired: COpaquePointer) -> Bool {
+
+  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_RawPointer(
+    target._rawValue, expected.memory._rawValue, desired._rawValue)
+  expected.memory._rawValue = oldValue
+  return Bool(won)
+}
 
 /// Atomic compare and exchange of `UnsafeMutablePointer<T>` with sequentially
 /// consistent memory ordering.  Precise semantics are defined in C++11 or C11.
@@ -89,13 +96,22 @@ func _stdlib_atomicInitializeARCRef(
 % for bits in [ 32, 64 ]:
 
 @warn_unused_result
-@asmname("swift_stdlib_atomicCompareExchangeStrongUInt${bits}")
+@transparent
+public // @testable
 func _stdlib_atomicCompareExchangeStrongUInt${bits}(
   object target: UnsafeMutablePointer<UInt${bits}>,
   expected: UnsafeMutablePointer<UInt${bits}>,
-  desired: UInt${bits}) -> Bool
+  desired: UInt${bits}) -> Bool {
+
+  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int${bits}(
+    target._rawValue, expected.memory._value, desired._value)
+  expected.memory._value = oldValue
+  return Bool(won)
+}
 
 @warn_unused_result
+@transparent
+public // @testable
 func _stdlib_atomicCompareExchangeStrongInt${bits}(
   object target: UnsafeMutablePointer<Int${bits}>,
   expected: UnsafeMutablePointer<Int${bits}>,
