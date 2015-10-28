@@ -1,0 +1,70 @@
+// RUN: %target-swift-frontend -emit-stack-promotion-checks -stack-promotion-limit 48 -Onone -emit-ir %s | FileCheck %s
+
+import Builtin
+import Swift
+
+class TestClass {
+  @sil_stored var a : Int64
+  init()
+}
+
+struct TestStruct {
+  @sil_stored var a : Int64
+  @sil_stored var b : Int64
+  @sil_stored var c : Int64
+}
+
+sil_vtable TestClass {}
+
+// CHECK-LABEL: define void @simple_promote
+// CHECK: %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
+// CHECK: [[M:%[0-9]+]] = call %swift.type* @_TMa[[C]]()
+// CHECK: [[O:%[0-9]+]] = bitcast %[[C]]* %reference.raw to %swift.refcounted*
+// CHECK: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
+// CHECK: [[R:%[0-9]+]] = bitcast %swift.refcounted* %reference.new to %[[C]]*
+// CHECK: call {{.*}} @swift_release {{.*}} [[R]])
+// CHECK: [[O2:%[0-9]+]] = bitcast %[[C]]* [[R]] to %swift.refcounted*
+// CHECK: call void @swift_verifyEndOfLifetime(%swift.refcounted* [[O2]])
+// CHECK: ret void
+sil @simple_promote : $@convention(thin) () -> () {
+bb0:
+  %o1 = alloc_ref [stack] $TestClass
+  strong_release %o1 : $TestClass
+  dealloc_ref [stack] %o1 : $TestClass
+
+  %r = tuple()
+  return %r : $()
+}
+
+// A stack promotion limit of 48 bytes allows that one of the two alloc_refs
+// can be allocated on the stack.
+
+// CHECK-LABEL: define void @exceed_limit
+// CHECK: alloca {{.*}}TestClass
+// CHECK: alloca {{.*}}TestStruct
+// CHECK-NOT: alloca
+// CHECK: call %swift.refcounted* @swift_initStackObject
+// CHECK: call noalias %swift.refcounted* @swift_allocObject
+// CHECK: ret void
+sil @exceed_limit : $@convention(thin) () -> () {
+bb0:
+  %o1 = alloc_ref [stack] $TestClass
+  %o2 = alloc_ref [stack] $TestClass
+
+  %s1 = alloc_stack $TestStruct
+
+  %f = function_ref @unknown_func :  $@convention(thin) (@inout TestStruct) -> ()
+  %a = apply %f(%s1#1) : $@convention(thin) (@inout TestStruct) -> ()
+
+  dealloc_stack %s1#0 : $*@local_storage TestStruct
+
+  strong_release %o1 : $TestClass
+  strong_release %o2 : $TestClass
+  dealloc_ref [stack] %o2 : $TestClass
+  dealloc_ref [stack] %o1 : $TestClass
+
+  %r = tuple()
+  return %r : $()
+}
+
+sil @unknown_func :  $@convention(thin) (@inout TestStruct) -> ()

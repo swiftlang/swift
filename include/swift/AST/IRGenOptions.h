@@ -104,7 +104,15 @@ public:
   
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
-  
+
+  /// Emit runtime calls to check the end of the lifetime of stack promoted
+  /// objects.
+  unsigned EmitStackPromotionChecks : 1;
+
+  /// The maximum number of bytes used on a stack frame for stack promotion
+  /// (includes alloc_stack allocations).
+  unsigned StackPromotionSizeLimit = 1024;
+
   /// Emit code to verify that static and runtime type layout are consistent for
   /// the given type names.
   SmallVector<StringRef, 1> VerifyTypeLayoutNames;
@@ -126,7 +134,7 @@ public:
                    UseJIT(false), DisableLLVMOptzns(false),
                    DisableLLVMARCOpts(false), DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), Playground(false),
-                   GenerateProfile(false),
+                   EmitStackPromotionChecks(false), GenerateProfile(false),
                    EmbedMode(IRGenEmbedMode::None) {}
   
   /// Gets the name of the specified output filename.

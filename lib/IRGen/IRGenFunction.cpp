@@ -111,6 +111,25 @@ llvm::Value *IRGenFunction::emitAllocObjectCall(llvm::Value *metadata,
                             { metadata, size, alignMask }, name);
 }
 
+llvm::Value *IRGenFunction::emitInitStackObjectCall(llvm::Value *metadata,
+                                                    llvm::Value *object,
+                                                    const llvm::Twine &name) {
+  llvm::CallInst *call =
+    Builder.CreateCall(IGM.getInitStackObjectFn(), { metadata, object }, name);
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.RuntimeCC);
+  return call;
+}
+
+llvm::Value *IRGenFunction::emitVerifyEndOfLifetimeCall(llvm::Value *object,
+                                                      const llvm::Twine &name) {
+  llvm::CallInst *call =
+    Builder.CreateCall(IGM.getVerifyEndOfLifetimeFn(), { object }, name);
+  call->setDoesNotThrow();
+  call->setCallingConv(IGM.RuntimeCC);
+  return call;
+}
+
 void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
                                       llvm::Value *&box,
                                       llvm::Value *&valueAddress) {

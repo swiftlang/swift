@@ -183,6 +183,11 @@ public:
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
                                    llvm::Value *alignMask,
                                    const llvm::Twine &name = "");
+  llvm::Value *emitInitStackObjectCall(llvm::Value *metadata,
+                                       llvm::Value *object,
+                                       const llvm::Twine &name = "");
+  llvm::Value *emitVerifyEndOfLifetimeCall(llvm::Value *object,
+                                           const llvm::Twine &name = "");
   llvm::Value *emitAllocRawCall(llvm::Value *size, llvm::Value *alignMask,
                                 const llvm::Twine &name ="");
   void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size,

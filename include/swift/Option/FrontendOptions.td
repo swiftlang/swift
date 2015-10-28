@@ -171,6 +171,13 @@ def disable_llvm_slp_vectorizer : Flag<["-"], "disable-llvm-slp-vectorizer">,
 def disable_llvm_verify : Flag<["-"], "disable-llvm-verify">,
   HelpText<"Don't run the LLVM IR verifier.">;
 
+def stack_promotion_checks : Flag<["-"], "emit-stack-promotion-checks">,
+  HelpText<"Emit runtime checks for correct stack promotion of objects.">;
+
+def stack_promotion_limit : Separate<["-"], "stack-promotion-limit">,
+  HelpText<"Limit the size of stack promoted objects to the provided number "
+           "of bytes.">;
+
 def disable_sil_linking : Flag<["-"], "disable-sil-linking">,
   HelpText<"Don't link SIL functions">;
 

@@ -68,8 +68,13 @@ namespace irgen {
   llvm::Constant *emitObjCProtocolData(IRGenModule &IGM, ProtocolDecl *ext);
 
   /// Emit an allocation of a class.
+  /// The \p StackAllocSize is an in- and out-parameter. The passed value
+  /// specifies the maximum object size for stack allocation. A negative value
+  /// means that no stack allocation is possible.
+  /// The returned \p StackAllocSize value is the actual size if the object is
+  /// allocated on the stack or -1, if the object is allocated on the heap.
   llvm::Value *emitClassAllocation(IRGenFunction &IGF, SILType selfType,
-                                   bool objc);
+                                   bool objc, int &StackAllocSize);
 
   /// Emit an allocation of a class using a metadata value.
   llvm::Value *emitClassAllocationDynamic(IRGenFunction &IGF, 

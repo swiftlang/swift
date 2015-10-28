@@ -1074,6 +1074,17 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_llvm_verify))
     Opts.Verify = false;
 
+  Opts.EmitStackPromotionChecks |= Args.hasArg(OPT_stack_promotion_checks);
+  if (const Arg *A = Args.getLastArg(OPT_stack_promotion_limit)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+    Opts.StackPromotionSizeLimit = limit;
+  }
+
   if (Args.hasArg(OPT_autolink_force_load))
     Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
 

@@ -59,6 +59,19 @@ FUNCTION(AllocObject,    swift_allocObject,   RuntimeCC,
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind))
 
+// HeapObject *swift_initStackObject(HeapMetadata const *metadata,
+//                                   HeapObject *object);
+FUNCTION(InitStackObject, swift_initStackObject, RuntimeCC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(TypeMetadataPtrTy, RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_verifyEndOfLifetime(HeapObject *object);
+FUNCTION(VerifyEndOfLifetime, swift_verifyEndOfLifetime, RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_deallocObject(HeapObject *obj, size_t size, size_t alignMask);
 FUNCTION(DeallocObject,  swift_deallocObject, RuntimeCC,
          RETURNS(VoidTy),

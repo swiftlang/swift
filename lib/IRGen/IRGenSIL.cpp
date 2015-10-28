@@ -289,6 +289,16 @@ class IRGenSILFunction :
 public:
   llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
   llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
+
+  /// All alloc_ref instructions which allocate the object on the stack.
+  llvm::SmallPtrSet<SILInstruction *, 8> StackAllocs;
+
+  /// Accumulative amount of allocated bytes on the stack. Used to limit the
+  /// size for stack promoted objects.
+  /// We calculate it on demand, so that we don't have to do it if the
+  /// function does not have any stack promoted allocations.
+  int EstimatedStackSize = -1;
+
   llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
   // These could also be cached for the entire module which could pay
   // off in optimized code with lots of inlining of the same functions.
@@ -308,6 +318,9 @@ public:
   
   /// Generate IR for the SIL Function.
   void emitSILFunction();
+
+  /// Calculates EstimatedStackSize.
+  void estimateStackSize();
 
   void setLoweredValue(SILValue v, LoweredValue &&lv) {
     auto inserted = LoweredValues.insert({v, std::move(lv)});
@@ -1381,6 +1394,26 @@ void IRGenSILFunction::emitSILFunction() {
   for (SILBasicBlock &bb : *CurSILFn)
     if (!visitedBlocks.count(&bb))
       LoweredBBs[&bb].bb->eraseFromParent();
+}
+
+void IRGenSILFunction::estimateStackSize() {
+  if (EstimatedStackSize >= 0)
+    return;
+
+  // TODO: as soon as we generate alloca instructions with accurate lifetimes
+  // we should also do a better stack size calculation here. Currently we
+  // add all stack sizes even if life ranges do not overlap.
+  for (SILBasicBlock &BB : *CurSILFn) {
+    for (SILInstruction &I : BB) {
+      if (auto *ASI = dyn_cast<AllocStackInst>(&I)) {
+        const TypeInfo &type = getTypeInfo(ASI->getElementType());
+        if (llvm::Constant *SizeConst = type.getStaticSize(IGM)) {
+          auto *SizeInt = cast<llvm::ConstantInt>(SizeConst);
+          EstimatedStackSize += (int)SizeInt->getSExtValue();
+        }
+      }
+    }
+  }
 }
 
 /// Store the lowered IR representation of Arg in the array
@@ -3371,7 +3404,20 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
 }
 
 void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
-  llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC());
+  int StackAllocSize = -1;
+  if (i->canAllocOnStack()) {
+    estimateStackSize();
+    // Is there enough space for stack allocation?
+    StackAllocSize = IGM.Opts.StackPromotionSizeLimit - EstimatedStackSize;
+  }
+  llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC(),
+                                             StackAllocSize);
+  if (StackAllocSize >= 0) {
+    // Remember that this alloc_ref allocates the object on the stack.
+
+    StackAllocs.insert(i);
+    EstimatedStackSize += StackAllocSize;
+  }
   Explosion e;
   e.add(alloced);
   setLoweredExplosion(SILValue(i, 0), e);
@@ -3398,8 +3444,20 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
   // Lower the operand.
   Explosion self = getLoweredExplosion(i->getOperand());
   auto selfValue = self.claimNext();
-  auto classType = i->getOperand()->getType(0);
-  emitClassDeallocation(*this, classType, selfValue);
+  if (!i->canAllocOnStack()) {
+    auto classType = i->getOperand()->getType(0);
+    emitClassDeallocation(*this, classType, selfValue);
+    return;
+  }
+  // It's a dealloc_ref [stack]. Even if the alloc_ref did not allocate the
+  // object on the stack, we don't have to deallocate it, because it is
+  // deallocated in the final release.
+  auto *ARI = cast<AllocRefInst>(i->getOperand());
+  assert(ARI->canAllocOnStack());
+  if (IGM.Opts.EmitStackPromotionChecks && StackAllocs.count(ARI)) {
+    selfValue = Builder.CreateBitCast(selfValue, IGM.RefCountedPtrTy);
+    emitVerifyEndOfLifetimeCall(selfValue);
+  }
 }
 
 void IRGenSILFunction::visitDeallocPartialRefInst(swift::DeallocPartialRefInst *i) {

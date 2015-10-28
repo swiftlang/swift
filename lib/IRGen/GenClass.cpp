@@ -547,7 +547,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
 
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
-                                        bool objc) {
+                                        bool objc, int &StackAllocSize) {
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
   auto classType = selfType.getSwiftRValueType();
 
@@ -558,6 +558,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     llvm::Value *metadata =
       emitClassHeapMetadataRef(IGF, classType, MetadataValueType::ObjCClass,
                                /*allow uninitialized*/ true);
+    StackAllocSize = -1;
     return emitObjCAllocObjectCall(IGF, metadata, selfType.getSwiftRValueType());
   }
 
@@ -570,11 +571,26 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     = emitClassFragileInstanceSizeAndAlignMask(IGF,
                                    selfType.getClassOrBoundGenericClass(),
                                    metadata);
-  
-  llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
-                                             "reference.new");
+
   auto &layout = classTI.getLayout(IGF.IGM);
   llvm::Type *destType = layout.getType()->getPointerTo();
+  llvm::Value *val = nullptr;
+  if (layout.isFixedLayout() &&
+      (int)layout.getSize().getValue() < StackAllocSize) {
+    // Allocate the object on the stack.
+    auto *Ty = layout.getType();
+    auto Alloca = IGF.createAlloca(Ty, layout.getAlignment(),
+                                   "reference.raw");
+    val = Alloca.getAddress();
+    assert(val->getType() == destType);
+    val = IGF.Builder.CreateBitCast(val, IGF.IGM.RefCountedPtrTy);
+    val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
+    StackAllocSize = layout.getSize().getValue();
+  } else {
+    // Allocate the object on the heap.
+    val = IGF.emitAllocObjectCall(metadata, size, alignMask, "reference.new");
+    StackAllocSize = -1;
+  }
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
