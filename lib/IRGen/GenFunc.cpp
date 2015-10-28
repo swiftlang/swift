@@ -2016,6 +2016,71 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::AtomicLoad
+      || Builtin.ID == BuiltinValueKind::AtomicStore) {
+    using namespace llvm;
+
+    SmallVector<Type, 4> Types;
+    StringRef BuiltinName = getBuiltinBaseName(IGF.IGM.Context,
+                                               FnId.str(), Types);
+    auto underscore = BuiltinName.find('_');
+    BuiltinName = BuiltinName.substr(underscore+1);
+
+    underscore = BuiltinName.find('_');
+    auto ordering = decodeLLVMAtomicOrdering(BuiltinName.substr(0, underscore));
+    BuiltinName = BuiltinName.substr(underscore);
+
+    // Accept volatile and singlethread if present.
+    bool isVolatile = BuiltinName.startswith("_volatile");
+    if (isVolatile) BuiltinName = BuiltinName.drop_front(strlen("_volatile"));
+
+    bool isSingleThread = BuiltinName.startswith("_singlethread");
+    if (isSingleThread)
+      BuiltinName = BuiltinName.drop_front(strlen("_singlethread"));
+    assert(BuiltinName.empty() && "Mismatch with sema");
+
+    auto pointer = args.claimNext();
+    auto &valueTI = IGF.getTypeInfoForUnlowered(Types[0]);
+    auto schema = valueTI.getSchema();
+    assert(schema.size() == 1 && "not a scalar type?!");
+    auto origValueTy = schema[0].getScalarType();
+
+    // If the type is floating-point, then we need to bitcast to integer.
+    auto valueTy = origValueTy;
+    if (valueTy->isFloatingPointTy()) {
+      valueTy = llvm::IntegerType::get(IGF.IGM.LLVMContext,
+                                       valueTy->getPrimitiveSizeInBits());
+    }
+
+    pointer = IGF.Builder.CreateBitCast(pointer, valueTy->getPointerTo());
+
+    if (Builtin.ID == BuiltinValueKind::AtomicLoad) {
+      auto load = IGF.Builder.CreateLoad(pointer,
+                                         valueTI.getBestKnownAlignment());
+      load->setAtomic(ordering,
+                      isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+      load->setVolatile(isVolatile);
+
+      llvm::Value *value = load;
+      if (valueTy != origValueTy)
+        value = IGF.Builder.CreateBitCast(value, origValueTy);
+      out.add(value);
+      return;
+    } else if (Builtin.ID == BuiltinValueKind::AtomicStore) {
+      llvm::Value *value = args.claimNext();
+      if (valueTy != origValueTy)
+        value = IGF.Builder.CreateBitCast(value, valueTy);
+      auto store = IGF.Builder.CreateStore(value, pointer,
+                                           valueTI.getBestKnownAlignment());
+      store->setAtomic(ordering,
+                       isSingleThread ? llvm::SingleThread : llvm::CrossThread);
+      store->setVolatile(isVolatile);
+      return;
+    } else {
+      llvm_unreachable("out of sync with outer conditional");
+    }
+  }
+
   if (Builtin.ID == BuiltinValueKind::ExtractElement) {
     using namespace llvm;
 

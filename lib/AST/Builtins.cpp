@@ -730,6 +730,20 @@ static ValueDecl *getAtomicRMWOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
+static ValueDecl *getAtomicLoadOperation(ASTContext &Context, Identifier Id,
+                                         Type T) {
+  TupleTypeElt ArgElts[] = { Context.TheRawPointerType };
+  Type ResultTy = T;
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
+}
+
+static ValueDecl *getAtomicStoreOperation(ASTContext &Context, Identifier Id,
+                                          Type T) {
+  TupleTypeElt ArgElts[] = { Context.TheRawPointerType, T };
+  Type ResultTy = Context.TheEmptyTupleType;
+  return getBuiltinFunction(Id, ArgElts, ResultTy);
+}
+
 static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
                                       BuiltinValueKind BV) {
   Type BuiltinTy;
@@ -1256,6 +1270,18 @@ static bool isValidRMWOrdering(StringRef Ordering) {
          Ordering == "acqrel" || Ordering == "seqcst";
 }
 
+static bool isValidLoadOrdering(StringRef Ordering) {
+  return Ordering == "unordered" || Ordering == "monotonic" ||
+         Ordering == "acquire" ||
+         Ordering == "seqcst";
+}
+
+static bool isValidStoreOrdering(StringRef Ordering) {
+  return Ordering == "unordered" || Ordering == "monotonic" ||
+         Ordering == "release" ||
+         Ordering == "seqcst";
+}
+
 /// decodeLLVMAtomicOrdering - turn a string like "release" into the LLVM enum.
 static llvm::AtomicOrdering decodeLLVMAtomicOrdering(StringRef O) {
   using namespace llvm;
@@ -1362,7 +1388,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   if (OperationName.startswith("atomicrmw_")) {
     OperationName = OperationName.drop_front(strlen("atomicrmw_"));
     
-    // Verify we have a single integer, floating point, or pointer type.
+    // Verify we have a single integer or pointer type.
     if (Types.size() != 1) return nullptr;
     Type Ty = Types[0];
     if (!Ty->is<BuiltinIntegerType>() && !Ty->is<BuiltinRawPointerType>())
@@ -1394,7 +1420,62 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       return nullptr;
     return getAtomicRMWOperation(Context, Id, Ty);
   }
-  
+
+  // If this starts with atomicload or atomicstore, we have special suffixes to
+  // handle.
+  if (OperationName.startswith("atomicload_")) {
+    OperationName = OperationName.drop_front(strlen("atomicload_"));
+
+    // Verify we have a single integer, floating point, or pointer type.
+    if (Types.size() != 1) return nullptr;
+    Type T = Types[0];
+    if (!T->is<BuiltinIntegerType>() && !T->is<BuiltinRawPointerType>() &&
+        !T->is<BuiltinFloatType>())
+      return nullptr;
+
+    // Get and validate the ordering argument, which is required.
+    auto Underscore = OperationName.find('_');
+    if (!isValidLoadOrdering(OperationName.substr(0, Underscore)))
+      return nullptr;
+    OperationName = OperationName.substr(Underscore);
+
+    // Accept volatile and singlethread if present.
+    if (OperationName.startswith("_volatile"))
+      OperationName = OperationName.drop_front(strlen("_volatile"));
+    if (OperationName.startswith("_singlethread"))
+      OperationName = OperationName.drop_front(strlen("_singlethread"));
+    // Nothing else is allowed in the name.
+    if (!OperationName.empty())
+      return nullptr;
+    return getAtomicLoadOperation(Context, Id, T);
+  }
+  if (OperationName.startswith("atomicstore_")) {
+    OperationName = OperationName.drop_front(strlen("atomicstore_"));
+
+    // Verify we have a single integer, floating point, or pointer type.
+    if (Types.size() != 1) return nullptr;
+    Type T = Types[0];
+    if (!T->is<BuiltinIntegerType>() && !T->is<BuiltinRawPointerType>() &&
+        !T->is<BuiltinFloatType>())
+      return nullptr;
+
+    // Get and validate the ordering argument, which is required.
+    auto Underscore = OperationName.find('_');
+    if (!isValidStoreOrdering(OperationName.substr(0, Underscore)))
+      return nullptr;
+    OperationName = OperationName.substr(Underscore);
+
+    // Accept volatile and singlethread if present.
+    if (OperationName.startswith("_volatile"))
+      OperationName = OperationName.drop_front(strlen("_volatile"));
+    if (OperationName.startswith("_singlethread"))
+      OperationName = OperationName.drop_front(strlen("_singlethread"));
+    // Nothing else is allowed in the name.
+    if (!OperationName.empty())
+      return nullptr;
+    return getAtomicStoreOperation(Context, Id, T);
+  }
+
   BuiltinValueKind BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name, Attrs) \
        .Case(name, BuiltinValueKind::id)
@@ -1413,6 +1494,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::Fence:
   case BuiltinValueKind::CmpXChg:
   case BuiltinValueKind::AtomicRMW:
+  case BuiltinValueKind::AtomicLoad:
+  case BuiltinValueKind::AtomicStore:
     llvm_unreachable("Handled above");
   case BuiltinValueKind::None: return nullptr;
 

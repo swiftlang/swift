@@ -702,4 +702,29 @@ func ispod_test() {
   var f = Builtin.ispod(Builtin.NativeObject)
 }
 
+// CHECK-LABEL: define {{.*}} @{{.*}}atomicload
+func atomicload(p: Builtin.RawPointer) {
+  // CHECK: [[A:%.*]] = load atomic i8*, i8** {{%.*}} unordered, align 8
+  let a: Builtin.RawPointer = Builtin.atomicload_unordered_RawPointer(p)
+  // CHECK: [[B:%.*]] = load atomic i32, i32* {{%.*}} singlethread monotonic, align 4
+  let b: Builtin.Int32 = Builtin.atomicload_monotonic_singlethread_Int32(p)
+  // CHECK: [[C:%.*]] = load atomic volatile i64, i64* {{%.*}} singlethread acquire, align 8
+  let c: Builtin.Int64 =
+    Builtin.atomicload_acquire_volatile_singlethread_Int64(p)
+  // CHECK: [[D0:%.*]] = load atomic volatile i32, i32* {{%.*}} seq_cst, align 4
+  // CHECK: [[D:%.*]] = bitcast i32 [[D0]] to float
+  let d: Builtin.FPIEEE32 = Builtin.atomicload_seqcst_volatile_FPIEEE32(p)
+
+  // CHECK: store atomic i8* [[A]], i8** {{%.*}} unordered, align 8
+  Builtin.atomicstore_unordered_RawPointer(p, a)
+  // CHECK: store atomic i32 [[B]], i32* {{%.*}} singlethread monotonic, align 4
+  Builtin.atomicstore_monotonic_singlethread_Int32(p, b)
+  // CHECK: store atomic volatile i64 [[C]], i64* {{%.*}} singlethread release, align 8
+  Builtin.atomicstore_release_volatile_singlethread_Int64(p, c)
+  // CHECK: [[D1:%.*]] = bitcast float [[D]] to i32
+  // CHECK: store atomic volatile i32 [[D1]], i32* {{.*}} seq_cst, align 4
+  Builtin.atomicstore_seqcst_volatile_FPIEEE32(p, d)
+}
+
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}
+

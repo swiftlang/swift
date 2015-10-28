@@ -476,6 +476,10 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
     Info.ID = BuiltinValueKind::CmpXChg;
   else if (OperationName.startswith("atomicrmw_"))
     Info.ID = BuiltinValueKind::AtomicRMW;
+  else if (OperationName.startswith("atomicload_"))
+    Info.ID = BuiltinValueKind::AtomicLoad;
+  else if (OperationName.startswith("atomicstore_"))
+    Info.ID = BuiltinValueKind::AtomicStore;
   else {
     // Switch through the rest of builtins.
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)

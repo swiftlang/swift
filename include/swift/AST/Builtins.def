@@ -391,6 +391,12 @@ BUILTIN_MISC_OPERATION(Fence, "fence", "", None)
 /// CmpXChg has type (Builtin.RawPointer, T, T) -> (T, Bool).
 BUILTIN_MISC_OPERATION(CmpXChg, "cmpxchg", "", Special)
 
+/// AtomicLoad has type (Builtin.RawPointer) -> T.
+BUILTIN_MISC_OPERATION(AtomicLoad, "atomicload", "", Special)
+
+/// AtomicStore has type (Builtin.RawPointer, T) -> ().
+BUILTIN_MISC_OPERATION(AtomicStore, "atomicstore", "", Special)
+
 /// AtomicRMW has type (Builtin.RawPointer, T) -> T.
 BUILTIN_MISC_OPERATION(AtomicRMW, "atomicrmw", "", IntegerOrRawPointer)
 
