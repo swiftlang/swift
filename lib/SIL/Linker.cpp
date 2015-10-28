@@ -58,18 +58,23 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
     return false;
 
   // If F is a declaration, first deserialize it.
-  auto *NewFn = F->isExternalDeclaration() ? Loader->lookupSILFunction(F) : F;
-  if (!NewFn || NewFn->isExternalDeclaration())
-    return false;
+  if (F->isExternalDeclaration()) {
+    auto *NewFn = Loader->lookupSILFunction(F);
 
-  // Notify client of new deserialized function.
-  if (Callback)
-    Callback(NewFn);
+    if (!NewFn || NewFn->isExternalDeclaration())
+      return false;
+
+    if (Callback)
+      Callback(NewFn);
+
+    F = NewFn;
+  }
 
   ++NumFuncLinked;
 
-  // Try to transitively deserialize everything referenced by NewFn.
-  Worklist.push_back(NewFn);
+  // Try to transitively deserialize everything referenced by this
+  // function.
+  Worklist.push_back(F);
   process();
 
   // Since we successfully processed at least one function, return true.
