@@ -110,6 +110,15 @@ template<typename KeyT, typename ValueT,
       Vector.clear();
     }
   };
+
+template <typename KeyT, typename ValueT, unsigned N,
+          typename MapT=llvm::SmallDenseMap<KeyT, size_t, N>,
+          typename VectorT=llvm::SmallVector<std::pair<KeyT, ValueT>, N>>
+class SmallBlotMapVector : public BlotMapVector<KeyT, ValueT, MapT, VectorT> {
+public:
+  SmallBlotMapVector() {}
+};
+
 } // end namespace swift
 
 #endif

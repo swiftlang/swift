@@ -27,8 +27,8 @@ class RCIdentityFunctionInfo;
 class ARCRegionState {
 public:
   // TODO: These are relatively expensive, find something else to use here.
-  using TopDownMapTy = BlotMapVector<SILValue, TopDownRefCountState>;
-  using BottomUpMapTy = BlotMapVector<SILValue, BottomUpRefCountState>;
+  using TopDownMapTy = SmallBlotMapVector<SILValue, TopDownRefCountState, 4>;
+  using BottomUpMapTy = SmallBlotMapVector<SILValue, BottomUpRefCountState, 4>;
 
 private:
   /// The region that this ARCRegionState summarizes information for.

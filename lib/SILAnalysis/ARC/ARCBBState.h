@@ -20,8 +20,8 @@ namespace swift {
 /// \brief Per-BasicBlock state.
 class ARCSequenceDataflowEvaluator::ARCBBState {
 public:
-  using TopDownMapTy = BlotMapVector<SILValue, TopDownRefCountState>;
-  using BottomUpMapTy = BlotMapVector<SILValue, BottomUpRefCountState>;
+  using TopDownMapTy = SmallBlotMapVector<SILValue, TopDownRefCountState, 4>;
+  using BottomUpMapTy = SmallBlotMapVector<SILValue, BottomUpRefCountState, 4>;
 
 private:
   /// The basic block that this bbstate corresponds to.
