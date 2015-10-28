@@ -66,12 +66,8 @@ static SILFunction *getDestructor(AllocRefInst *ARI) {
   // Find the destructor name via SILDeclRef.
   // FIXME: When destructors get moved into vtables, update this to use the
   // vtable for the class.
-  SmallVector<char, 128> buffer;
-  StringRef Name = SILDeclRef(Destructor).mangle(buffer);
-  DEBUG(llvm::dbgs() << "    Looking up destructor: " << Name << "\n");
-
-  // Then try to lookup the destructor from the module.
-  SILFunction *Fn = ARI->getModule().lookUpFunction(Name);
+  SILDeclRef Ref(Destructor);
+  SILFunction *Fn = ARI->getModule().lookUpFunction(Ref);
   if (!Fn || Fn->empty()) {
     DEBUG(llvm::dbgs() << "    Could not find destructor.\n");
     return nullptr;

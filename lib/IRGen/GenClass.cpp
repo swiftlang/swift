@@ -646,13 +646,9 @@ static bool getInstanceSizeByMethod(IRGenFunction &IGF,
                    ResilienceExpansion::Minimal,
                    /*uncurryLevel*/ 1,
                    /*foreign*/ false);
-  SILFunction *silFn; {
-    llvm::SmallString<32> name;
-    fnRef.mangle(name);
-    silFn = IGF.IGM.SILMod->lookUpFunction(name);
-    if (!silFn)
-      return false;
-  }
+  SILFunction *silFn = IGF.IGM.SILMod->lookUpFunction(fnRef);
+  if (!silFn)
+    return false;
 
   // Check that it returns two size_t's and takes no other arguments.
   auto fnType = silFn->getLoweredFunctionType();
@@ -1251,9 +1247,7 @@ namespace {
                          ResilienceExpansion::Minimal,
                          SILDeclRef::ConstructAtNaturalUncurryLevel,
                          /*isForeign=*/true);
-      llvm::SmallString<64> dtorNameBuffer;
-      auto dtorName = dtorRef.mangle(dtorNameBuffer);
-      if (auto silFn = IGM.SILMod->lookUpFunction(dtorName))
+      if (auto silFn = IGM.SILMod->lookUpFunction(dtorRef))
         return silFn->isDefinition();
 
       // The Objective-C thunk was never even declared, so it is not defined.

@@ -2290,10 +2290,8 @@ Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
                     SILDeclRef::ConstructAtNaturalUncurryLevel, 
                     isForeign);
 
-  llvm::SmallString<64> ivarInitDestroyNameBuffer;
-  auto name = silRef.mangle(ivarInitDestroyNameBuffer);
   // Find the SILFunction for the ivar initializer or destroyer.
-  if (auto silFn = SILMod->lookUpFunction(name)) {
+  if (auto silFn = SILMod->lookUpFunction(silRef)) {
     return getAddrOfSILFunction(silFn, forDefinition);
   }
 
