@@ -393,6 +393,7 @@ void SideEffectAnalysis::recompute() {
     return;
 
   Function2Effects.clear();
+  Allocator.DestroyAll();
   shouldRecompute = false;
 
   WorkListType WorkList;
