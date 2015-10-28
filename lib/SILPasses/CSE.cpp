@@ -606,7 +606,11 @@ bool CSE::canHandle(SILInstruction *Inst) {
     // have any other side effects.
     SideEffectAnalysis::FunctionEffects Effects;
     SEA->getEffects(Effects, AI);
-    if (Effects.getMemBehavior(true) == SILInstruction::MemoryBehavior::None)
+
+    // Note that the function also may not contain any retains. And there are
+    // functions which are read-none and have a retain, e.g. functions which
+    // _convert_ a global_addr to a reference and retain it.
+    if (Effects.getMemBehavior(false) == SILInstruction::MemoryBehavior::None)
       return true;
     
     return false;

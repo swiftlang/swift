@@ -61,6 +61,28 @@ bb0(%0 : $Int64, %1 : $Int64):
   return %l : $Int64
 }
 
+struct Storage {
+	var a: Int64
+	var b: Int64
+	var c: Int64
+}
+
+class XX {
+}
+
+sil_global @ggs : $Storage
+
+sil @retain_only : $@convention(thin) () -> XX {
+bb0:
+  %g = global_addr @ggs : $*Storage
+  %a = address_to_pointer %g : $*Storage to $Builtin.RawPointer
+  %r = raw_pointer_to_ref %a : $Builtin.RawPointer to $XX
+  strong_retain %r : $XX
+  return %r : $XX
+}
+
+
+
 //CHECK-LABEL: sil @cse_readnone_apply
 //CHECK: [[A:%[0-9]+]] = apply
 //CHECK: [[S:%[0-9]+]] = struct_extract [[A]]
@@ -100,5 +122,20 @@ bb0(%0 : $Int64):
   %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 0
   %14 = struct $Int64 (%11 : $Builtin.Int64)
   return %14 : $Int64
+}
+
+//CHECK-LABEL: sil @dont_cse_retain_only_apply
+//CHECK: %{{[0-9]+}} = apply
+//CHECK: %{{[0-9]+}} = apply
+//CHECK: return
+sil @dont_cse_retain_only_apply : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @retain_only : $@convention(thin) () -> XX
+  %a1 = apply %f() : $@convention(thin) () -> XX
+  %a2 = apply %f() : $@convention(thin) () -> XX
+  strong_release %a1 : $XX
+  strong_release %a2 : $XX
+  %r = tuple()
+  return %r : $()
 }
 
