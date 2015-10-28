@@ -122,10 +122,14 @@ func _stdlib_atomicCompareExchangeStrongInt${bits}(
     desired: UInt${bits}(bitPattern: desired))
 }
 
-@asmname("swift_stdlib_atomicStoreUInt${bits}")
+@transparent
+public // @testable
 func _swift_stdlib_atomicStoreUInt${bits}(
   object target: UnsafeMutablePointer<UInt${bits}>,
-  desired: UInt${bits})
+  desired: UInt${bits}) {
+
+  Builtin.atomicstore_seqcst_Int${bits}(target._rawValue, desired._value)
+}
 
 func _swift_stdlib_atomicStoreInt${bits}(
   object target: UnsafeMutablePointer<Int${bits}>,
@@ -136,9 +140,13 @@ func _swift_stdlib_atomicStoreInt${bits}(
 }
 
 @warn_unused_result
-@asmname("swift_stdlib_atomicLoadUInt${bits}")
+public // @testable
 func _swift_stdlib_atomicLoadUInt${bits}(
-  object target: UnsafeMutablePointer<UInt${bits}>) -> UInt${bits}
+  object target: UnsafeMutablePointer<UInt${bits}>) -> UInt${bits} {
+
+  let value = Builtin.atomicload_seqcst_Int${bits}(target._rawValue)
+  return UInt${bits}(value)
+}
 
 @warn_unused_result
 func _swift_stdlib_atomicLoadInt${bits}(
@@ -217,10 +225,14 @@ public func _swift_stdlib_atomicLoadInt(
 }
 
 @warn_unused_result
-@asmname("swift_stdlib_atomicLoadPtr")
+@transparent
+public // @testable
 func _swift_stdlib_atomicLoadPtrImpl(
   object target: UnsafeMutablePointer<COpaquePointer>
-) -> COpaquePointer
+) -> COpaquePointer {
+  let value = Builtin.atomicload_seqcst_RawPointer(target._rawValue)
+  return COpaquePointer(value)
+}
 
 @transparent
 @warn_unused_result

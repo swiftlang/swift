@@ -265,31 +265,6 @@ typedef enum {
   memory_order_seq_cst = 5
 } memory_order;
 
-extern "C" void swift_stdlib_atomicStoreUInt32(
-    _Atomic(uint32_t) * object, uint32_t desired) {
-  return __c11_atomic_store(object, desired, memory_order_seq_cst);
-}
-
-extern "C" void swift_stdlib_atomicStoreUInt64(
-    _Atomic(uint64_t) * object, uint64_t desired) {
-  return __c11_atomic_store(object, desired, memory_order_seq_cst);
-}
-
-extern "C" uint32_t swift_stdlib_atomicLoadUInt32(
-    _Atomic(uint32_t) * object) {
-  return __c11_atomic_load(object, memory_order_seq_cst);
-}
-
-extern "C" uint64_t swift_stdlib_atomicLoadUInt64(
-    _Atomic(uint64_t) * object) {
-  return __c11_atomic_load(object, memory_order_seq_cst);
-}
-
-extern "C" uintptr_t swift_stdlib_atomicLoadPtr(
-    _Atomic(uintptr_t) * object) {
-  return __c11_atomic_load(object, memory_order_seq_cst);
-}
-
 // fetch_add
 
 extern "C" uint32_t swift_stdlib_atomicFetchAddUInt32(
