@@ -163,7 +163,9 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
     }
   }
 
-  return B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition));
+  auto f = SGM.getFunction(constant, NotForDefinition);
+  assert(f->getLoweredFunctionType() == constantInfo.SILFnType);
+  return B.createFunctionRef(loc, f);
 }
 
 std::tuple<ManagedValue, SILType, ArrayRef<Substitution>>
