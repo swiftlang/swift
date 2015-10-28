@@ -368,6 +368,9 @@ public:
     return BottomUpSCCOrder;
   }
 
+  /// Forces recomputation of the bottom-up function list.
+  void invalidateBottomUpFunctionOrder() { BottomUpFunctionOrder.clear(); }
+
   ArrayRef<SILFunction *> getBottomUpFunctionOrder() {
     if (BottomUpFunctionOrder.empty())
       computeBottomUpFunctionOrder();

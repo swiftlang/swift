@@ -1050,6 +1050,11 @@ void EscapeAnalysis::recompute() {
   shouldRecompute = false;
 
   CallGraph &CG = CGA->getOrBuildCallGraph();
+
+  // TODO: Remove this workaround when the bottom-up function order is
+  // updated automatically.
+  CG.invalidateBottomUpFunctionOrder();
+
   auto BottomUpFunctions = CG.getBottomUpFunctionOrder();
   std::vector<ConnectionGraph *> Graphs;
   Graphs.reserve(BottomUpFunctions.size());
@@ -1120,11 +1125,10 @@ bool EscapeAnalysis::mergeAllCallees(ConnectionGraph *ConGraph, CallGraph &CG) {
     for (SILFunction *Callee : Callees) {
       DEBUG(llvm::dbgs() << "    callee " << Callee->getName() << '\n');
       ConnectionGraph *CalleeCG = Function2ConGraph[Callee];
-      // TODO: just assert CalleeCG != nullptr when rdar://problem/23157111 is
-      // fixed.
+      assert(CalleeCG);
       // TODO: Handle self-cycles in the call graph. We can't merge a graph to
       // itself. All we have to do is to copy the graph before we merge it.
-      if (CalleeCG && CalleeCG != ConGraph) {
+      if (CalleeCG != ConGraph) {
         Changed |= ConGraph->mergeCalleeGraph(FAS, CalleeCG);
       } else {
         Changed |= setAllEscaping(FAS.getInstruction(), ConGraph);
