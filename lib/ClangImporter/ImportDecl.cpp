@@ -584,6 +584,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   paramPattern->setImplicit();
   
   auto patternElt = TuplePatternElt(paramPattern);
+  patternElt.setLabel(C.Id_rawValue, SourceLoc());
   paramPattern = TuplePattern::create(C, SourceLoc(), patternElt, SourceLoc());
   paramPattern->setImplicit();
   auto typeElt = TupleTypeElt(enumDecl->getRawType(), C.Id_rawValue);
@@ -1767,6 +1768,7 @@ namespace {
         Pattern *pattern = createTypedNamedPattern(param);
         paramPatterns.push_back(pattern);
         patternElts.push_back(TuplePatternElt(pattern));
+        patternElts.back().setLabel(argName, SourceLoc());
         tupleElts.push_back(TupleTypeElt(var->getType(), var->getName()));
       }
       auto paramPattern = TuplePattern::create(context, SourceLoc(), patternElts,

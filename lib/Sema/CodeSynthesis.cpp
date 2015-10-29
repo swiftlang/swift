@@ -155,9 +155,10 @@ static Pattern *buildIndexForwardingPattern(AbstractStorageDecl *storage,
   // Clone index patterns in a manner that allows them to be
   // perfectly forwarded.
   DeclContext *DC = storage->getDeclContext();
-  auto addVarPatternFor = [&](Pattern *P) {
+  auto addVarPatternFor = [&](Pattern *P, Identifier label = Identifier()) {
     Pattern *vp = P->cloneForwardable(TC.Context, DC, Pattern::Implicit);
     elements.push_back(TuplePatternElt(vp));
+    elements.back().setLabel(label, SourceLoc());
   };
 
   // This is the same breakdown the parser does.
@@ -167,7 +168,7 @@ static Pattern *buildIndexForwardingPattern(AbstractStorageDecl *storage,
   } else {
     auto tp = cast<TuplePattern>(indices);
     for (auto &element : tp->getElements()) {
-      addVarPatternFor(element.getPattern());
+      addVarPatternFor(element.getPattern(), element.getLabel());
     }
   }
 

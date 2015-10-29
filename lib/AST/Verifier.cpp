@@ -2117,6 +2117,87 @@ struct ASTNodeBase {};
     void verifyChecked(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
 
+      // All of the parameter names should match.
+      if (!isa<DestructorDecl>(AFD)) {
+        auto paramNames = AFD->getFullName().getArgumentNames();
+        bool checkParamNames = (bool)AFD->getFullName();
+        bool hasSelf = AFD->getDeclContext()->isTypeContext();
+        const Pattern *firstParams =
+            AFD->getBodyParamPatterns()[hasSelf ? 1 : 0];
+
+        if (auto *paramTuple = dyn_cast<TuplePattern>(firstParams)) {
+          if (checkParamNames &&
+              paramNames.size() != paramTuple->getNumElements()) {
+            Out << "Function name does not match its argument pattern ("
+                << paramNames.size() << " elements instead of "
+                << paramTuple->getNumElements() << ")\n";
+            AFD->dump(Out);
+            abort();
+          }
+
+          // This doesn't use for_each because paramNames shouldn't be checked
+          // when the function is anonymous.
+          for (size_t i = 0, e = paramTuple->getNumElements(); i < e; ++i) {
+            TuplePatternElt elt = paramTuple->getElement(i);
+            Pattern *param = elt.getPattern()->getSemanticsProvidingPattern();
+            if (auto *namedParam = dyn_cast<NamedPattern>(param)) {
+              if (namedParam->getBoundName() != elt.getLabel()) {
+                Out << "Function body param tuple label "
+                       "doesn't match variable's public name\n";
+                AFD->dump(Out);
+                abort();
+              }
+
+              if (checkParamNames &&
+                  namedParam->getBoundName() != paramNames[i]) {
+                Out << "Function full name doesn't match variable name\n";
+                AFD->dump(Out);
+                abort();
+              }
+            } else {
+              assert(isa<AnyPattern>(param));
+              if (!elt.getLabel().empty()) {
+                Out << "Function body param tuple has a label, "
+                       "but there's no variable\n";
+                AFD->dump(Out);
+                abort();
+              }
+
+              if (checkParamNames && !paramNames[i].empty()) {
+                Out << "Function full name doesn't match variable name\n";
+                AFD->dump(Out);
+                abort();
+              }
+            }
+          }
+        } else {
+          if (checkParamNames && paramNames.size() != 1) {
+            Out << "Function name does not match its non-tuple argument pattern ("
+                << paramNames.size() << " elements instead of 1)\n";
+            AFD->dump(Out);
+            abort();
+          }
+
+          firstParams = firstParams->getSemanticsProvidingPattern();
+          if (auto *namedParam = dyn_cast<NamedPattern>(firstParams)) {
+            if (checkParamNames &&
+                namedParam->getBoundName() != paramNames.front()) {
+              Out << "Function full name doesn't match variable name\n";
+              AFD->dump(Out);
+              abort();
+            }
+          } else {
+            assert(isa<AnyPattern>(firstParams));
+            if (checkParamNames && !paramNames.front().empty()) {
+              Out << "Function full name has an argument name, "
+                     "but there's no variable\n";
+              AFD->dump(Out);
+              abort();
+            }
+          }
+        }
+      }
+
       // If this function is generic or is within a generic type, it should
       // have an interface type.
       if ((AFD->getGenericParams() ||

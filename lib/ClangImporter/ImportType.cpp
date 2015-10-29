@@ -1456,7 +1456,8 @@ Type ClangImporter::Implementation::importFunctionType(
                                         TypeLoc::withoutLoc(swiftParamTy));
     bodyPattern->setType(swiftParamTy);
     bodyPatternElts.push_back(TuplePatternElt(bodyPattern));
-    
+    bodyPatternElts.back().setLabel(name, SourceLoc());
+
     // Add the tuple elements for the function types.
     swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name));
     swiftBodyParams.push_back(TupleTypeElt(swiftParamTy, bodyName));
@@ -2316,6 +2317,7 @@ Type ClangImporter::Implementation::importMethodType(
     pattern->setType(type);
 
     bodyPatternElts.push_back(TuplePatternElt(pattern));
+    bodyPatternElts.back().setLabel(argName, SourceLoc());
     swiftArgParams.push_back(TupleTypeElt(type, argName));
     swiftBodyParams.push_back(TupleTypeElt(type, argName));
   };
@@ -2463,6 +2465,7 @@ Type ClangImporter::Implementation::importMethodType(
     bodyPattern->setType(swiftParamTy);
     TuplePatternElt patternElt(bodyPattern);
     patternElt.setDefaultArgKind(defaultArg);
+    patternElt.setLabel(name, SourceLoc());
     bodyPatternElts.push_back(patternElt);
 
     // Add the tuple elements for the function types.
