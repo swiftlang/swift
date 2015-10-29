@@ -14,16 +14,23 @@
 #define SWIFT_BASIC_BLOTMAPVECTOR_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include <vector>
 
 namespace swift {
-  /// \brief An associative container with fast insertion-order (deterministic)
-  /// iteration over its elements. Plus the special blot operation.
-template<typename KeyT, typename ValueT,
-         typename MapTy=llvm::DenseMap<KeyT, size_t>,
-         typename VectorTy=std::vector<std::pair<KeyT, ValueT>>>
-  class BlotMapVector {
+
+template <typename KeyT, typename ValueT>
+bool compareKeyAgainstDefaultKey(const std::pair<KeyT, ValueT> &Pair) {
+  return Pair.first == KeyT();
+}
+
+/// \brief An associative container with fast insertion-order (deterministic)
+/// iteration over its elements. Plus the special blot operation.
+template <typename KeyT, typename ValueT,
+          typename MapTy = llvm::DenseMap<KeyT, size_t>,
+          typename VectorTy = std::vector<Optional<std::pair<KeyT, ValueT>>>>
+class BlotMapVector {
     /// Map keys to indices in Vector.
     MapTy Map;
 
@@ -31,8 +38,11 @@ template<typename KeyT, typename ValueT,
     VectorTy Vector;
 
   public:
-    typedef typename VectorTy::iterator iterator;
-    typedef typename VectorTy::const_iterator const_iterator;
+    using iterator = typename VectorTy::iterator;
+    using const_iterator = typename VectorTy::const_iterator;
+    using key_type = KeyT;
+    using mapped_type = ValueT;
+
     iterator begin() { return Vector.begin(); }
     iterator end() { return Vector.end(); }
     const_iterator begin() const { return Vector.begin(); }
@@ -42,38 +52,20 @@ template<typename KeyT, typename ValueT,
       return swift::make_range(begin(), end());
     }
 
-#ifdef XDEBUG
-    ~BlotMapVector() {
-      assert(Vector.size() >= Map.size()); // May differ due to blotting.
-      for (typename MapTy::const_iterator I = Map.begin(), E = Map.end();
-           I != E; ++I) {
-        assert(I->second < Vector.size());
-        assert(Vector[I->second].first == I->first);
-      }
-      for (typename VectorTy::const_iterator I = Vector.begin(),
-           E = Vector.end(); I != E; ++I)
-        assert(!I->first ||
-               (Map.count(I->first) &&
-                Map[I->first] == size_t(I - Vector.begin())));
-    }
-#endif
-
     ValueT &operator[](const KeyT &Arg) {
-      std::pair<typename MapTy::iterator, bool> Pair =
-        Map.insert(std::make_pair(Arg, size_t(0)));
+      auto Pair = Map.insert(std::make_pair(Arg, size_t(0)));
       if (Pair.second) {
         size_t Num = Vector.size();
         Pair.first->second = Num;
-        Vector.push_back(std::make_pair(Arg, ValueT()));
-        return Vector[Num].second;
+        Vector.push_back({std::make_pair(Arg, ValueT())});
+        return (*Vector[Num]).second;
       }
-      return Vector[Pair.first->second].second;
+      return Vector[Pair.first->second].getValue().second;
     }
 
     std::pair<iterator, bool>
     insert(const std::pair<KeyT, ValueT> &InsertPair) {
-      std::pair<typename MapTy::iterator, bool> Pair =
-        Map.insert(std::make_pair(InsertPair.first, size_t(0)));
+      auto Pair = Map.insert(std::make_pair(InsertPair.first, size_t(0)));
       if (Pair.second) {
         size_t Num = Vector.size();
         Pair.first->second = Num;
@@ -86,14 +78,25 @@ template<typename KeyT, typename ValueT,
     iterator find(const KeyT &Key) {
       typename MapTy::iterator It = Map.find(Key);
       if (It == Map.end()) return Vector.end();
-      return Vector.begin() + It->second;
+      auto Iter = Vector.begin() + It->second;
+      if (!Iter->hasValue())
+        return Vector.end();
+      return Iter;
     }
 
     const_iterator find(const KeyT &Key) const {
-      typename MapTy::const_iterator It = Map.find(Key);
-      if (It == Map.end()) return Vector.end();
-      return Vector.begin() + It->second;
+      return const_cast<BlotMapVector &>(*this)->find(Key);
     }
+
+    /// This is similar to erase, but instead of removing the element from the
+    /// vector, it just zeros out the key in the vector. This leaves iterators
+    /// intact, but clients must be prepared for zeroed-out keys when iterating.
+    void erase(const KeyT &Key) { blot(Key); }
+
+    /// This is similar to erase, but instead of removing the element from the
+    /// vector, it just zeros out the key in the vector. This leaves iterators
+    /// intact, but clients must be prepared for zeroed-out keys when iterating.
+    void erase(iterator I) { erase((*I)->first); }
 
     /// This is similar to erase, but instead of removing the element from the
     /// vector, it just zeros out the key in the vector. This leaves iterators
@@ -101,7 +104,7 @@ template<typename KeyT, typename ValueT,
     void blot(const KeyT &Key) {
       typename MapTy::iterator It = Map.find(Key);
       if (It == Map.end()) return;
-      Vector[It->second].first = KeyT();
+      Vector[It->second] = None;
       Map.erase(It);
     }
 
@@ -109,12 +112,29 @@ template<typename KeyT, typename ValueT,
       Map.clear();
       Vector.clear();
     }
+
+    unsigned size() const { return Map.size(); }
+
+    ValueT lookup(const KeyT &Val) const {
+      auto Iter = Map.find(Val);
+      if (Iter == Map.end())
+        return ValueT();
+      auto &P = Vector[Iter->second];
+      if (!P.hasValue())
+        return ValueT();
+      return P->second;
+    }
+
+    size_t count(const KeyT &Val) const { return Map.count(Val); }
+
+    bool empty() const { return Map.empty(); }
   };
 
-template <typename KeyT, typename ValueT, unsigned N,
-          typename MapT=llvm::SmallDenseMap<KeyT, size_t, N>,
-          typename VectorT=llvm::SmallVector<std::pair<KeyT, ValueT>, N>>
-class SmallBlotMapVector : public BlotMapVector<KeyT, ValueT, MapT, VectorT> {
+  template <typename KeyT, typename ValueT, unsigned N,
+            typename MapT = llvm::SmallDenseMap<KeyT, size_t, N>,
+            typename VectorT =
+                llvm::SmallVector<Optional<std::pair<KeyT, ValueT>>, N>>
+  class SmallBlotMapVector : public BlotMapVector<KeyT, ValueT, MapT, VectorT> {
 public:
   SmallBlotMapVector() {}
 };

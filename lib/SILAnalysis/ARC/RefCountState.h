@@ -35,7 +35,7 @@ namespace swift {
 /// retain_value, strong_release,
 class RefCountState {
 public:
-  using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 4>;
+  using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 1>;
 
 protected:
   /// Return the SILValue that represents the RCRoot that we are
@@ -65,6 +65,10 @@ protected:
 public:
   RefCountState() {}
   ~RefCountState() {}
+  RefCountState(const RefCountState &) = default;
+  RefCountState &operator=(const RefCountState &) = default;
+  RefCountState(RefCountState &&) = default;
+  RefCountState &operator=(RefCountState &&) = default;
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
@@ -188,6 +192,12 @@ private:
   bool FoundNonARCUser = false;
 
 public:
+  BottomUpRefCountState() {}
+  BottomUpRefCountState(const BottomUpRefCountState &) = default;
+  BottomUpRefCountState &operator=(const BottomUpRefCountState &) = default;
+  BottomUpRefCountState(BottomUpRefCountState &&) = default;
+  BottomUpRefCountState &operator=(BottomUpRefCountState &&) = default;
+
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
   bool initWithMutatorInst(SILInstruction *I);
@@ -292,6 +302,12 @@ private:
   LatticeState LatState = LatticeState::None;
 
 public:
+  TopDownRefCountState() {}
+  TopDownRefCountState(const TopDownRefCountState &) = default;
+  TopDownRefCountState &operator=(const TopDownRefCountState &) = default;
+  TopDownRefCountState(TopDownRefCountState &&) = default;
+  TopDownRefCountState &operator=(TopDownRefCountState &&) = default;
+
   /// Initializes/reinitialized the state for I. If we reinitialize we return
   /// true.
   bool initWithMutatorInst(SILInstruction *I);

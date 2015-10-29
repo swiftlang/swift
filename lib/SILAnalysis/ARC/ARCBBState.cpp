@@ -30,8 +30,11 @@ using ARCBBState = ARCSequenceDataflowEvaluator::ARCBBState;
 /// operation.
 void ARCBBState::mergeSuccBottomUp(ARCBBState &SuccBBState) {
   // For each [(SILValue, BottomUpState)] that we are tracking...
-  for (std::pair<SILValue, BottomUpRefCountState> &Pair : getBottomupStates()) {
-    SILValue RefCountedValue = Pair.first;
+  for (auto &Pair : getBottomupStates()) {
+    if (!Pair.hasValue())
+      continue;
+
+    SILValue RefCountedValue = Pair->first;
 
     // If our SILValue was blotted, skip it. This will be ignored for the rest
     // of the ARC optimization.
@@ -49,7 +52,7 @@ void ARCBBState::mergeSuccBottomUp(ARCBBState &SuccBBState) {
       continue;
     }
 
-    SILValue OtherRefCountedValue = Other->first;
+    SILValue OtherRefCountedValue = (*Other)->first;
 
     // If the other ref count value was blotted, blot our value and continue.
     // This has the effect of an intersection since we already checked earlier
@@ -59,8 +62,8 @@ void ARCBBState::mergeSuccBottomUp(ARCBBState &SuccBBState) {
       continue;
     }
 
-    BottomUpRefCountState &RefCountState = Pair.second;
-    BottomUpRefCountState &OtherRefCountState = Other->second;
+    BottomUpRefCountState &RefCountState = Pair->second;
+    BottomUpRefCountState &OtherRefCountState = (*Other)->second;
 
     // Ok, now we know that the merged set can safely represent a set of
     // of instructions which together semantically act as one ref count
@@ -81,8 +84,11 @@ void ARCBBState::initSuccBottomUp(ARCBBState &SuccBBState) {
 /// Merge in the state of the predecessor basic block.
 void ARCBBState::mergePredTopDown(ARCBBState &PredBBState) {
   // For each [(SILValue, TopDownState)] that we are tracking...
-  for (std::pair<SILValue, TopDownRefCountState> &Pair : getTopDownStates()) {
-    SILValue RefCountedValue = Pair.first;
+  for (auto &Pair : getTopDownStates()) {
+    if (!Pair.hasValue())
+      continue;
+
+    SILValue RefCountedValue = Pair->first;
 
     // If our SILValue was blotted, skip it. This will be ignored in the rest of
     // the optimizer.
@@ -100,7 +106,7 @@ void ARCBBState::mergePredTopDown(ARCBBState &PredBBState) {
       continue;
     }
 
-    SILValue OtherRefCountedValue = Other->first;
+    SILValue OtherRefCountedValue = (*Other)->first;
 
     // If the other ref count value was blotted, blot our value and continue.
     // This has the effect of an intersection.
@@ -111,8 +117,8 @@ void ARCBBState::mergePredTopDown(ARCBBState &PredBBState) {
 
     // Ok, so now we know that the ref counted value we are tracking was not
     // blotted on either side. Grab the states.
-    TopDownRefCountState &RefCountState = Pair.second;
-    TopDownRefCountState &OtherRefCountState = Other->second;
+    TopDownRefCountState &RefCountState = Pair->second;
+    TopDownRefCountState &OtherRefCountState = (*Other)->second;
 
     // Attempt to merge Other into this ref count state. If we fail, blot this
     // ref counted value and continue.

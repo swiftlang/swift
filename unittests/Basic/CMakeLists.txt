@@ -18,6 +18,7 @@ add_swift_unittest(SwiftBasicTests
   StringExtrasTest.cpp
   SuccessorMapTest.cpp
   Unicode.cpp
+  BlotMapVectorTest.cpp
 
   ${generated_tests}
   )

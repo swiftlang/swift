@@ -53,8 +53,11 @@ void ARCRegionState::initSuccBottomUp(ARCRegionState &SuccRegionState) {
 /// This is an intersection operation.
 void ARCRegionState::mergeSuccBottomUp(ARCRegionState &SuccRegionState) {
   // Otherwise for each [(SILValue, BottomUpState)] that we are tracking...
-  for (std::pair<SILValue, BottomUpRefCountState> &Pair : getBottomupStates()) {
-    SILValue RefCountedValue = Pair.first;
+  for (auto &Pair : getBottomupStates()) {
+    if (!Pair.hasValue())
+      continue;
+
+    SILValue RefCountedValue = Pair->first;
 
     // If our SILValue was blotted, skip it. This will be ignored for the rest
     // of the ARC optimization.
@@ -72,7 +75,7 @@ void ARCRegionState::mergeSuccBottomUp(ARCRegionState &SuccRegionState) {
       continue;
     }
 
-    SILValue OtherRefCountedValue = Other->first;
+    SILValue OtherRefCountedValue = (*Other)->first;
 
     // If the other ref count value was blotted, blot our value and continue.
     // This has the effect of an intersection since we already checked earlier
@@ -82,8 +85,8 @@ void ARCRegionState::mergeSuccBottomUp(ARCRegionState &SuccRegionState) {
       continue;
     }
 
-    BottomUpRefCountState &RefCountState = Pair.second;
-    BottomUpRefCountState &OtherRefCountState = Other->second;
+    BottomUpRefCountState &RefCountState = Pair->second;
+    BottomUpRefCountState &OtherRefCountState = (*Other)->second;
 
     // Ok, now we know that the merged set can safely represent a set of
     // of instructions which together semantically act as one ref count
@@ -108,8 +111,10 @@ void ARCRegionState::initPredTopDown(ARCRegionState &PredRegionState) {
 /// Merge in the state of the predecessor basic block.
 void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
   // For each [(SILValue, TopDownState)] that we are tracking...
-  for (std::pair<SILValue, TopDownRefCountState> &Pair : getTopDownStates()) {
-    SILValue RefCountedValue = Pair.first;
+  for (auto &Pair : getTopDownStates()) {
+    if (!Pair.hasValue())
+      continue;
+    SILValue RefCountedValue = Pair->first;
 
     // If our SILValue was blotted, skip it. This will be ignored in the rest of
     // the optimizer.
@@ -127,7 +132,7 @@ void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
       continue;
     }
 
-    SILValue OtherRefCountedValue = Other->first;
+    SILValue OtherRefCountedValue = (*Other)->first;
 
     // If the other ref count value was blotted, blot our value and continue.
     // This has the effect of an intersection.
@@ -138,8 +143,8 @@ void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
 
     // Ok, so now we know that the ref counted value we are tracking was not
     // blotted on either side. Grab the states.
-    TopDownRefCountState &RefCountState = Pair.second;
-    TopDownRefCountState &OtherRefCountState = Other->second;
+    TopDownRefCountState &RefCountState = Pair->second;
+    TopDownRefCountState &OtherRefCountState = (*Other)->second;
 
     // Attempt to merge Other into this ref count state. If we fail, blot this
     // ref counted value and continue.
@@ -198,43 +203,43 @@ bool ARCRegionState::processBlockBottomUp(
     // For all other (reference counted value, ref count state) we are
     // tracking...
     for (auto &OtherState : getBottomupStates()) {
-      // If this is the state associated with the instruction that we are
-      // currently visiting, bail.
-      if (Op && OtherState.first == Op)
+      // If the other state's value is blotted, skip it.
+      if (!OtherState.hasValue())
         continue;
 
-      // If the other state's value is blotted, skip it.
-      if (!OtherState.first)
+      // If this is the state associated with the instruction that we are
+      // currently visiting, bail.
+      if (Op && OtherState->first == Op)
         continue;
 
       // If this state is not tracking anything, skip it.
-      if (!OtherState.second.isTrackingRefCount())
+      if (!OtherState->second.isTrackingRefCount())
         continue;
 
       // Check if the instruction we are visiting could potentially use our
       // instruction in a way that requires us to guarantee the lifetime of the
       // pointer up to this point. This has the effect of performing a use and a
       // decrement.
-      if (OtherState.second.handlePotentialGuaranteedUser(&I, InsertPt, AA)) {
+      if (OtherState->second.handlePotentialGuaranteedUser(&I, InsertPt, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
-                           << OtherState.second.getRCRoot());
+                           << OtherState->second.getRCRoot());
         continue;
       }
 
       // Check if the instruction we are visiting could potentially decrement
       // the reference counted value we are tracking... in a manner that could
       // cause us to change states. If we do change states continue...
-      if (OtherState.second.handlePotentialDecrement(&I, AA)) {
+      if (OtherState->second.handlePotentialDecrement(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-                           << OtherState.second.getRCRoot());
+                           << OtherState->second.getRCRoot());
         continue;
       }
 
       // Otherwise check if the reference counted value we are tracking
       // could be used by the given instruction.
-      if (OtherState.second.handlePotentialUser(&I, InsertPt, AA))
+      if (OtherState->second.handlePotentialUser(&I, InsertPt, AA))
         DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
-                           << OtherState.second.getRCRoot());
+                           << OtherState->second.getRCRoot());
     }
   }
 
@@ -315,44 +320,44 @@ bool ARCRegionState::processBlockTopDown(
 
     // For all other [(SILValue, TopDownState)] we are tracking...
     for (auto &OtherState : getTopDownStates()) {
+      // If the other state's value is blotted, skip it.
+      if (!OtherState.hasValue())
+        continue;
+
       // If we visited an increment or decrement successfully (and thus Op is
       // set), if this is the state for this operand, skip it. We already
       // processed it.
-      if (Op && OtherState.first == Op)
-        continue;
-
-      // If the other state's value is blotted, skip it.
-      if (!OtherState.first)
+      if (Op && OtherState->first == Op)
         continue;
 
       // If the other state is not tracking anything, bail.
-      if (!OtherState.second.isTrackingRefCount())
+      if (!OtherState->second.isTrackingRefCount())
         continue;
 
       // Check if the instruction we are visiting could potentially use our
       // instruction in a way that requires us to guarantee the lifetime of the
       // pointer up to this point. This has the effect of performing a use and a
       // decrement.
-      if (OtherState.second.handlePotentialGuaranteedUser(&I, &I, AA)) {
+      if (OtherState->second.handlePotentialGuaranteedUser(&I, &I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
-                           << OtherState.second.getRCRoot());
+                           << OtherState->second.getRCRoot());
         continue;
       }
 
       // Check if the instruction we are visiting could potentially decrement
       // the reference counted value we are tracking in a manner that could
       // cause us to change states. If we do change states continue...
-      if (OtherState.second.handlePotentialDecrement(&I, &I, AA)) {
+      if (OtherState->second.handlePotentialDecrement(&I, &I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-                           << OtherState.second.getRCRoot());
+                           << OtherState->second.getRCRoot());
         continue;
       }
 
       // Otherwise check if the reference counted value we are tracking
       // could be used by the given instruction.
-      if (OtherState.second.handlePotentialUser(&I, AA))
+      if (OtherState->second.handlePotentialUser(&I, AA))
         DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
-                           << OtherState.second.getRCRoot());
+                           << OtherState->second.getRCRoot());
     }
   }
 

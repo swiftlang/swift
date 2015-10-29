@@ -1038,16 +1038,11 @@ class BBEnumTagDataflowState
   NullablePtr<SILBasicBlock> BB;
 
   using ValueToCaseSmallBlotMapVectorTy =
-    BlotMapVector<SILValue, EnumElementDecl *,
-                  llvm::SmallDenseMap<SILValue, unsigned>,
-                  llvm::SmallVector<std::pair<SILValue,
-                                              EnumElementDecl *>, 4>>;
+    SmallBlotMapVector<SILValue, EnumElementDecl *, 4>;
   ValueToCaseSmallBlotMapVectorTy ValueToCaseMap;
 
   using EnumToEnumBBCaseListMapTy =
-    BlotMapVector<SILValue, EnumBBCaseList,
-                  llvm::SmallDenseMap<SILValue, unsigned>,
-                  llvm::SmallVector<std::pair<SILValue, EnumBBCaseList>, 4>>;
+    SmallBlotMapVector<SILValue, EnumBBCaseList, 4>;
 
   EnumToEnumBBCaseListMapTy EnumToEnumBBCaseListMap;
 
@@ -1247,9 +1242,13 @@ initWithFirstPred(BBToDataflowStateMap &BBToStateMap,
   // are tracking with it.
   //
   // TODO: I am writing this too fast. Clean this up later.
-  if (FirstPredBB->getSingleSuccessor())
-    for (auto P : ValueToCaseMap.getItems())
-      EnumToEnumBBCaseListMap[P.first].push_back({FirstPredBB, P.second});
+  if (FirstPredBB->getSingleSuccessor()) {
+    for (auto P : ValueToCaseMap.getItems()) {
+      if (!P.hasValue())
+        continue;
+      EnumToEnumBBCaseListMap[P->first].push_back({FirstPredBB, P->second});
+    }
+  }
 
   return true;
 }
@@ -1345,23 +1344,23 @@ mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
     for (auto P : ValueToCaseMap.getItems()) {
       // If this SILValue was blotted, there is nothing left to do, we found
       // some sort of conflicting definition and are being conservative.
-      if (!P.first)
+      if (!P.hasValue())
         continue;
 
       // Then attempt to look up the enum state associated in our SILValue in
       // the predecessor we are processing.
-      auto PredValue = PredBBState->ValueToCaseMap.find(P.first);
+      auto PredValue = PredBBState->ValueToCaseMap.find(P->first);
 
       // If we can not find the state associated with this SILValue in this
       // predecessor or the value in the corresponding predecessor was blotted,
       // we can not find a covering switch for this BB or forward any enum tag
       // information for this enum value.
-      if (PredValue == PredBBState->ValueToCaseMap.end() || !PredValue->first) {
+      if (PredValue == PredBBState->ValueToCaseMap.end() || !(*PredValue)->first) {
         // Otherwise, we are conservative and do not forward the EnumTag that we
         // are tracking. Blot it!
-        DEBUG(llvm::dbgs() << "                Blotting: " << P.first);
-        CurBBValuesToBlot.push_back(P.first);
-        PredBBValuesToBlot.push_back(P.first);
+        DEBUG(llvm::dbgs() << "                Blotting: " << P->first);
+        CurBBValuesToBlot.push_back(P->first);
+        PredBBValuesToBlot.push_back(P->first);
         continue;
       }
 
@@ -1374,18 +1373,18 @@ mergePredecessorStates(BBToDataflowStateMap &BBToStateMap) {
       } else {
         // Otherwise, add this case to our predecessor case list. We will unique
         // this after we have finished processing all predecessors.
-        auto Case = std::make_pair(PredBB, PredValue->second);
-        EnumToEnumBBCaseListMap[PredValue->first].push_back(Case);
+        auto Case = std::make_pair(PredBB, (*PredValue)->second);
+        EnumToEnumBBCaseListMap[(*PredValue)->first].push_back(Case);
       }
 
       // And the states match, the enum state propagates to this BB.
-      if (PredValue->second == P.second)
+      if ((*PredValue)->second == P->second)
         continue;
 
       // Otherwise, we are conservative and do not forward the EnumTag that we
       // are tracking. Blot it!
-      DEBUG(llvm::dbgs() << "                Blotting: " << P.first);
-      CurBBValuesToBlot.push_back(P.first);
+      DEBUG(llvm::dbgs() << "                Blotting: " << P->first);
+      CurBBValuesToBlot.push_back(P->first);
     }
   } while (PI != PE);
 
@@ -1403,16 +1402,16 @@ bool BBEnumTagDataflowState::visitRetainValueInst(RetainValueInst *RVI) {
     return false;
 
   // If we do not have any argument, kill the retain_value.
-  if (!FindResult->second->hasArgumentType()) {
+  if (!(*FindResult)->second->hasArgumentType()) {
     RVI->eraseFromParent();
     return true;
   }
 
   DEBUG(llvm::dbgs() << "    Found RetainValue: " << *RVI);
-  DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: " << FindResult->first);
+  DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: " << (*FindResult)->first);
 
   SILBuilderWithScope<> Builder(RVI, RVI->getDebugScope());
-  createRefCountOpForPayload(Builder, RVI, FindResult->second);
+  createRefCountOpForPayload(Builder, RVI, (*FindResult)->second);
   RVI->eraseFromParent();
   return true;
 }
@@ -1423,16 +1422,16 @@ bool BBEnumTagDataflowState::visitReleaseValueInst(ReleaseValueInst *RVI) {
     return false;
 
   // If we do not have any argument, just delete the release value.
-  if (!FindResult->second->hasArgumentType()) {
+  if (!(*FindResult)->second->hasArgumentType()) {
     RVI->eraseFromParent();
     return true;
   }
 
   DEBUG(llvm::dbgs() << "    Found ReleaseValue: " << *RVI);
-  DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: " << FindResult->first);
+  DEBUG(llvm::dbgs() << "        Paired to Enum Oracle: " << (*FindResult)->first);
 
   SILBuilderWithScope<> Builder(RVI , RVI->getDebugScope());
-  createRefCountOpForPayload(Builder, RVI, FindResult->second);
+  createRefCountOpForPayload(Builder, RVI, (*FindResult)->second);
   RVI->eraseFromParent();
   return true;
 }
@@ -1477,7 +1476,7 @@ BBEnumTagDataflowState::hoistDecrementsIntoSwitchRegions(AliasAnalysis *AA) {
       continue;
     }
 
-    auto &EnumBBCaseList = R->second;
+    auto &EnumBBCaseList = (*R)->second;
     // If we don't have an enum tag for each predecessor of this BB, bail since
     // we do not know how to handle that BB.
     if (EnumBBCaseList.size() != NumPreds) {
@@ -1618,10 +1617,10 @@ sinkIncrementsOutOfSwitchRegions(AliasAnalysis *AA,
 
     // If EnumValue is null, we deleted this entry. There is nothing to do for
     // this value... Skip it.
-    if (!P.first)
+    if (!P.hasValue())
       continue;
-    SILValue EnumValue = RCIA->getRCIdentityRoot(P.first);
-    EnumBBCaseList &Map = P.second;
+    SILValue EnumValue = RCIA->getRCIdentityRoot(P->first);
+    EnumBBCaseList &Map = P->second;
 
     // If we do not have a tag associated with this enum value for each
     // predecessor, we are not a switch region exit for this enum value. Skip
