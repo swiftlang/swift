@@ -63,6 +63,16 @@ SILGenFunction::getMethodDispatch(AbstractFunctionDecl *method) {
   return MethodDispatch::Static;
 }
 
+static SILDeclRef::Loc getLocForFunctionRef(AnyFunctionRef fn) {
+  if (auto afd = fn.getAbstractFunctionDecl()) {
+    return afd;
+  } else {
+    auto closure = fn.getAbstractClosureExpr();
+    assert(closure);
+    return closure;
+  }
+}
+
 /// Collect the captures necessary to invoke a local function into an
 /// ArgumentSource.
 static std::pair<ArgumentSource, CanFunctionType>
@@ -74,7 +84,7 @@ emitCapturesAsArgumentSource(SILGenFunction &gen,
   
   // The capture array should match the explosion schema of the closure's
   // first formal argument type.
-  auto info = gen.SGM.Types.getConstantInfo(SILDeclRef::forAnyFunctionRef(fn));
+  auto info = gen.SGM.Types.getConstantInfo(SILDeclRef(getLocForFunctionRef(fn)));
   auto subs = info.getForwardingSubstitutions(gen.getASTContext());
   auto origFormalTy = info.FormalInterfaceType;
   CanFunctionType formalTy;
@@ -1156,8 +1166,9 @@ public:
 
         // If there are substitutions, add them.
         if (e->getDeclRef().isSpecialized()) {
-          ApplyCallee->setSubstitutions(SGF, e, e->getDeclRef().getSubstitutions(),
-                                   CallDepth);
+          ApplyCallee->setSubstitutions(SGF, e,
+                                        e->getDeclRef().getSubstitutions(),
+                                        CallDepth);
         }
 
         return;

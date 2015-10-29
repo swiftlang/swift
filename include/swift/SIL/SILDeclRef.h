@@ -173,8 +173,6 @@ struct SILDeclRef {
                         = ResilienceExpansion::Minimal,
                       unsigned uncurryLevel = ConstructAtNaturalUncurryLevel,
                       bool isForeign = false);
-  
-  static SILDeclRef forAnyFunctionRef(AnyFunctionRef fn);
 
   /// Produce a SIL constant for a default argument generator.
   static SILDeclRef getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);
@@ -366,13 +364,13 @@ private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;
   /// Produces a SILDeclRef from an opaque value.
   explicit SILDeclRef(void *opaqueLoc,
-                       Kind kind,
-                       unsigned rawExpansion,
-                       unsigned uncurryLevel,
-                       bool isCurried,
-                       bool isDirectReference,
-                       bool isForeign,
-                       unsigned defaultArgIndex)
+                      Kind kind,
+                      unsigned rawExpansion,
+                      unsigned uncurryLevel,
+                      bool isCurried,
+                      bool isDirectReference,
+                      bool isForeign,
+                      unsigned defaultArgIndex)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)),
       kind(kind), uncurryLevel(uncurryLevel), Expansion(rawExpansion),
       isCurried(isCurried),

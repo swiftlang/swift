@@ -136,7 +136,6 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 /// \param I The instruction to be deleted.
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
-/// \return Returns true if any instructions were deleted.
 void swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
                                                        bool Force,
                                                        CallbackTy Callback) {
