@@ -261,8 +261,8 @@ func rdar21784170() {
 }
 
 // <rdar://problem/21829141> BOGUS: unexpected trailing closure
-func expect<T, U>(_: T)(_: U.Type) {} // expected-note {{found this candidate}}
-func expect<T, U>(_: T, _: Int = 1)(_: U.Type) {} // expected-note {{found this candidate}}
+func expect<T, U>(_: T)(_: U.Type) {} // expected-note {{found this candidate}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+func expect<T, U>(_: T, _: Int = 1)(_: U.Type) {} // expected-note {{found this candidate}} expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 expect(Optional(3))(Optional<Int>.self)  // expected-error {{ambiguous use of 'expect'}}
 
 // <rdar://problem/19804707> Swift Enum Scoping Oddity
@@ -301,7 +301,7 @@ func r20789423() {
 
 
 
-func f7(a: Int)(b : Int) -> Int {
+func f7(a: Int)(b : Int) -> Int { // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
   return a+b
 }
 
@@ -317,7 +317,7 @@ f8(1.0)         // expected-error {{cannot convert value of type 'Double' to exp
 
 class CurriedClass {
   func method1() {}
-  func method2(a: Int)(b : Int) {}
+  func method2(a: Int)(b : Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
   func method3(a: Int, b : Int) {}
 }
 

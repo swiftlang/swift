@@ -689,6 +689,9 @@ ERROR(parameter_operator_keyword_argument,decl_parsing,none,
 ERROR(parameter_unnamed,decl_parsing,none,
       "unnamed parameters must be written with the empty name '_'", ())
 
+WARNING(parameter_curry_syntax_removed,decl_parsing,none,
+        "curried function declaration syntax will be removed in a future version of Swift; use a single parameter list", ())
+
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
 //------------------------------------------------------------------------------

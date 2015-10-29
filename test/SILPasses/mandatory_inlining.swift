@@ -80,7 +80,7 @@ func test_auto_closure_without_capture() -> Bool {
   // CHECK: [[FALSE:%.*]] = struct $Bool ([[FV:%.*]] : $Builtin.Int1)
   // CHECK: return [[FALSE]]
 
-@transparent func test_curried(x: Int)(y: Int) -> Int {
+@transparent func test_curried(x: Int)(y: Int) -> Int { // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
   return y
 }
 

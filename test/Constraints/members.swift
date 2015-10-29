@@ -41,7 +41,7 @@ struct Z {
   func getI() -> Int { return i }
   mutating func incI() {}
 
-  func curried(x: Int)(y: Int) -> Int { return x + y }
+  func curried(x: Int)(y: Int) -> Int { return x + y } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 
   subscript (k : Int) -> Int {
     get {
@@ -110,7 +110,7 @@ enum W {
   case Omega
 
   func foo(x: Int) {}
-  func curried(x: Int)(y: Int) {}
+  func curried(x: Int)(y: Int) {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 }
 
 var w = W.Omega
@@ -326,7 +326,7 @@ protocol Functional {
   func apply(v: Vector) -> Scalar
 }
 protocol Coalgebra {
-  func coproduct(f: Functional)(v1: Vector, v2: Vector) -> Scalar
+  func coproduct(f: Functional)(v1: Vector, v2: Vector) -> Scalar // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 }
 
 // Make sure existential is closed early when we partially apply

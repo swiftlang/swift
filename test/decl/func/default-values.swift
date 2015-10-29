@@ -29,7 +29,7 @@ func returnWithDefault() -> (a: Int, b: Int = 42) { // expected-error{{default a
 
 // Only the first parameter list of a curried function can have a
 // default argument.
-func curried(i: Int = 1)
+func curried(i: Int = 1) // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
      (f : Float = 2) { // expected-error{{default argument is only permitted for a non-curried function parameter}}{{17-20=}}
 }
 

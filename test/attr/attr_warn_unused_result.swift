@@ -29,7 +29,7 @@ class C1 {
   static func f2() { }
 
   @warn_unused_result
-  func curried1()()() { }
+  func curried1()()() { } // expected-warning {{curried function declaration syntax will be removed in a future version of Swift}}
 }
 
 func testMethodsNegative(c1: C1) {

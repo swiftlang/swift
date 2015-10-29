@@ -8,7 +8,7 @@ func foo(inout x: Int) {
 }
 
 // But not partially applied.
-func curriedFoo(inout x: Int)(y: Int) -> Int {
+func curriedFoo(inout x: Int)(y: Int) -> Int { // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
   return x + y
 }
 

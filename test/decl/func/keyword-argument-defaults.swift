@@ -67,8 +67,8 @@ struct Subscripts2 {
 }
 
 
-func f4(a: Int)(_ b: Int) { }
-func f5(a: Int)(b: Int) { }
+func f4(a: Int)(_ b: Int) { } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+func f5(a: Int)(b: Int) { } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 
 func testFunctions(i: Int, x: X) {
   f4(i)(i)
@@ -78,11 +78,11 @@ func testFunctions(i: Int, x: X) {
 }
 
 struct Y {
-  func m0(a: Int)(_ b: Int) { }
-  func m1(a: Int)(b: Int) { }
+  func m0(a: Int)(_ b: Int) { } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+  func m1(a: Int)(b: Int) { } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 
-  func m2(a: Int)(_ b: Int, _ c: Int) { }
-  func m3(a: Int)(b: Int, c2 c: Int) { }
+  func m2(a: Int)(_ b: Int, _ c: Int) { } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
+  func m3(a: Int)(b: Int, c2 c: Int) { } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 
   subscript (x: Int) -> Int {
     get { return x }
@@ -115,7 +115,7 @@ func testSubscripts(i: Int, s: String, x: Y) {
 func +(_ a: String,  // expected-warning{{extraneous '_' in parameter: 'a' has no keyword argument name}}{{8-10=}}
        b b: Double) { } // expected-error{{operator cannot have keyword arguments}} {{8-10=}}
 
-func +(a: Double, b: String)(_ c: Int)(d e: Int) { } // okay
+func +(a: Double, b: String)(_ c: Int)(d e: Int) { } // okay; expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 
 // # is being removed
 func pound(#a: Int, // expected-error{{'#' has been removed from Swift; double up 'a a' to make the argument label the same as the parameter name}}{{12-13=a }}

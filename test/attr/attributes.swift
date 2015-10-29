@@ -49,7 +49,7 @@ func foo(x: @convention(block) (Int) -> Int) {}
 @transparent
 func zim() {}
 @transparent
-func zang()() {}
+func zang()() {} // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 @transparent
 func zung<T>(_: T) {}
 @transparent // expected-error{{@transparent cannot be applied to stored properties}} {{1-14=}}

@@ -53,7 +53,7 @@ protocol P10 {
 
 // Never inheritable: method with 'Self' in curried position.
 protocol P11 {
-  func f11()(x: Self) -> Int
+  func f11()(x: Self) -> Int // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 }
 
 
@@ -98,7 +98,7 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   func f10(arr: [A]) { } // expected-error{{protocol 'P10' requirement 'f10' cannot be satisfied by a non-final class ('A') because it uses 'Self' in a non-parameter, non-result type position}}
 
   // P11
-  func f11()(x: A) -> Int { return 5 }
+  func f11()(x: A) -> Int { return 5 } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 }
 
 // P9
@@ -185,7 +185,7 @@ final class A9 : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   func f10(arr: [A9]) { }
 
   // P11
-  func f11()(x: A9) -> Int { return 5 }
+  func f11()(x: A9) -> Int { return 5 } // expected-warning{{curried function declaration syntax will be removed in a future version of Swift}}
 }
 
 // P9

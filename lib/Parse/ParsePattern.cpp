@@ -563,6 +563,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
   // Parse parameter-clauses.
   ParserStatus status;
   bool isFirstParameterClause = true;
+  unsigned FirstBodyPatternIndex = BodyPatterns.size();
   while (Tok.is(tok::l_paren)) {
     SmallVector<ParsedParameter, 4> params;
     SourceLoc leftParenLoc, rightParenLoc;
@@ -581,6 +582,38 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
     BodyPatterns.push_back(pattern);
     isFirstParameterClause = false;
     paramContext = ParameterContextKind::Curried;
+  }
+
+  // If the decl uses currying syntax, warn that that syntax is going away.
+  if (BodyPatterns.size() - FirstBodyPatternIndex > 1) {
+    SourceRange allPatternsRange(
+      BodyPatterns[FirstBodyPatternIndex]->getStartLoc(),
+      BodyPatterns.back()->getEndLoc());
+    auto diag = diagnose(allPatternsRange.Start,
+                         diag::parameter_curry_syntax_removed);
+    diag.highlight(allPatternsRange);
+    bool seenArg = false;
+    auto isEmptyPattern = [](Pattern *pattern) -> bool {
+      auto *tuplePattern = dyn_cast<TuplePattern>(pattern);
+      return tuplePattern && tuplePattern->getNumElements() == 0;
+    };
+    for (unsigned i = FirstBodyPatternIndex; i < BodyPatterns.size() - 1; i++) {
+      // Replace ")(" with ", ", so "(x: Int)(y: Int)" becomes
+      // "(x: Int, y: Int)". But just delete them if they're not actually
+      // separating any arguments, e.g. in "()(y: Int)".
+      StringRef replacement(", ");
+      Pattern *leftPattern = BodyPatterns[i];
+      Pattern *rightPattern = BodyPatterns[i + 1];
+      if (!isEmptyPattern(leftPattern)) {
+        seenArg = true;
+      }
+      if (!seenArg || isEmptyPattern(rightPattern)) {
+        replacement = "";
+      }
+      diag.fixItReplace(SourceRange(leftPattern->getEndLoc(),
+                                    rightPattern->getStartLoc()),
+                        replacement);
+    }
   }
 
   return status;
