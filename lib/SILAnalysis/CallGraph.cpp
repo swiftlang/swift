@@ -776,7 +776,7 @@ void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
   if (!CG)
     return;
 
-  if (auto *Edge = CG->getCallGraphEdge(Old))
+  if (auto *Edge = CG->tryGetCallGraphEdge(Old))
     CG->removeEdge(Edge);
 
   CG->addEdgesForApply(New);
@@ -787,7 +787,7 @@ void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
   if (!CG)
     return;
 
-  if (auto *Edge = CG->getCallGraphEdge(Old))
+  if (auto *Edge = CG->tryGetCallGraphEdge(Old))
     CG->removeEdge(Edge);
 
   for (auto NewApply : NewApplies)
@@ -894,7 +894,6 @@ void CallGraph::verify(SILFunction *F) const {
         continue;
 
       auto *Edge = getCallGraphEdge(FAS);
-      assert(Edge && "no edge for full apply site");
 
       numEdges++;
 

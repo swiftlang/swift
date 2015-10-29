@@ -585,7 +585,7 @@ public:
   void removeEdgeIfPresent(SILInstruction *I) {
     if (CG) {
       if (auto AI = FullApplySite::isa(I))
-        if (auto *Edge = CG->getCallGraphEdge(AI))
+        if (auto *Edge = CG->tryGetCallGraphEdge(AI))
           CG->removeEdge(Edge);
     }
   }
