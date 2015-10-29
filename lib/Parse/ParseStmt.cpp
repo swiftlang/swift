@@ -97,6 +97,13 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (CodeCompletion)
     CodeCompletion->setExprBeginning(getParserPosition());
 
+  if (Tok.is(tok::code_complete)) {
+    if (CodeCompletion)
+      CodeCompletion->completeStmtOrExpr();
+    consumeToken(tok::code_complete);
+    return makeParserCodeCompletionStatus();
+  }
+
   ParserResult<Expr> ResultExpr = parseExpr(diag::expected_expr);
   if (ResultExpr.isNonNull()) {
     Result = ResultExpr.get();

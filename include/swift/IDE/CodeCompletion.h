@@ -421,6 +421,7 @@ enum class CompletionKind {
   Import,
   UnresolvedMember,
   DotExpr,
+  StmtOrExpr,
   PostfixExprBeginning,
   PostfixExpr,
   PostfixExprParen,

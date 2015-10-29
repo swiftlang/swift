@@ -102,6 +102,9 @@ public:
   /// \brief Complete expr-dot after we have consumed the dot.
   virtual void completeDotExpr(Expr *E, SourceLoc DotLoc) = 0;
 
+  /// \brief Complete the beginning of a statement or expression.
+  virtual void completeStmtOrExpr() = 0;
+
   /// \brief Complete the beginning of expr-postfix -- no tokens provided
   /// by user.
   virtual void completePostfixExprBeginning(CodeCompletionExpr *E) = 0;

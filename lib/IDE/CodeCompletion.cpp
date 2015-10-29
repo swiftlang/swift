@@ -808,7 +808,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CodeCompletionContext &CompletionContext;
   std::vector<RequestedCachedModule> RequestedModules;
   CodeCompletionConsumer &Consumer;
-  CodeCompletionExpr *CodeCompleteTokenExpr;
+  CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
   AssignExpr *AssignmentExpr;
   CallExpr *FuncCallExpr;
   UnresolvedMemberExpr *UnresolvedExpr;
@@ -950,6 +950,7 @@ public:
 
   void completeExpr() override;
   void completeDotExpr(Expr *E, SourceLoc DotLoc) override;
+  void completeStmtOrExpr() override;
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completePostfixExpr(Expr *E, bool hasSpace) override;
   void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
@@ -3456,6 +3457,14 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeStmtOrExpr() {
+  assert(P.Tok.is(tok::code_complete));
+  Kind = CompletionKind::StmtOrExpr;
+  CurDeclContext = P.CurDeclContext;
+  CStyleForLoopIterationVariable =
+      CodeCompletionCallbacks::CStyleForLoopIterationVariable;
+}
+
 void CodeCompletionCallbacksImpl::completePostfixExprBeginning(CodeCompletionExpr *E) {
   assert(P.Tok.is(tok::code_complete));
 
@@ -3741,6 +3750,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::AfterPound:
     break;
 
+  case CompletionKind::StmtOrExpr:
   case CompletionKind::PostfixExprBeginning:
     addSuperKeyword(Sink);
     addDeclKeywords(Sink);
@@ -4059,6 +4069,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.getValueExprCompletions(ExprType);
     break;
   }
+
+  case CompletionKind::StmtOrExpr:
+    DoPostfixExprBeginning();
+    break;
 
   case CompletionKind::PostfixExprBeginning: {
     CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
