@@ -22,6 +22,22 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD2 | FileCheck %s -check-prefix=SUPER_KEYWORD2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD3 | FileCheck %s -check-prefix=SUPER_KEYWORD3
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_1 > %t.expr1
+// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr1
+// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_2 > %t.expr2
+// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr2
+// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_3 > %t.expr3
+// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr3
+// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_4 > %t.expr4
+// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr4
+// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_5 > %t.expr5
+// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr5
+// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr5
+
 // KW_DECL: Begin completions
 // KW_DECL-DAG: Keyword/None: class{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: convenience{{; name=.+$}}
@@ -130,6 +146,49 @@
 // KW_DECL_STMT-DAG: Literal[Nil]/None: nil{{; name=.+$}}
 // KW_DECL_STMT: End completions
 
+
+// KW_EXPR: Begin completions
+//
+// Expressions
+//
+// KW_EXPR-DAG: Keyword/None: throw{{; name=.+$}}
+// KW_EXPR-DAG: Keyword/None: try{{; name=.+$}}
+// KW_EXPR-DAG: Keyword/None: try!{{; name=.+$}}
+// KW_EXPR-DAG: Keyword/None: try?{{; name=.+$}}
+// KW_EXPR-DAG: Keyword/None: __FUNCTION__[#String#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword/None: __FILE__[#String#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword/None: __LINE__[#Int#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword/None: __COLUMN__[#Int#]{{; name=.+$}}
+//
+// let and var
+//
+// KW_EXPR-DAG: Keyword/None: let{{; name=.+$}}
+// KW_EXPR-DAG: Keyword/None: var{{; name=.+$}}
+//
+// Literals
+//
+// KW_EXPR-DAG: Literal[Boolean]/None: false[#Bool#]{{; name=.+$}}
+// KW_EXPR-DAG: Literal[Boolean]/None: true[#Bool#]{{; name=.+$}}
+// KW_EXPR-DAG: Literal[Nil]/None: nil{{; name=.+$}}
+// KW_EXPR: End completions
+
+// KW_EXPR_NEG: Begin completions
+//
+// Declaration keywords
+//
+// KW_EXPR_NEG-NOT: class
+// KW_EXPR_NEG-NOT: convenience
+// KW_EXPR_NEG-NOT: mutating
+// KW_EXPR_NEG-NOT: weak
+//
+// Statement keywords
+//
+// KW_EXPR_NEG-NOT: while
+// KW_EXPR_NEG-NOT: switch
+// KW_EXPR_NEG-NOT: catch
+// KW_EXPR_NEG-NOT: break
+// KW_EXPR_NEG: End completions
+
 #^TOP_LEVEL_1^#
 
 func testInFuncBody1() {
@@ -229,4 +288,22 @@ extension SubClass {
     #^SUPER_KEYWORD3^#
   }
 // SUPER_KEYWORD3: Keyword/CurrNominal:                       super[#SuperClass#]; name=super{{$}}
+}
+
+func inExpr1() {
+  (#^EXPR_1^#)
+}
+func inExpr2() {
+  let x = #^EXPR_2^#
+}
+func inExpr3() {
+  if #^EXPR_3^# {}
+}
+func inExpr4() {
+  let x = 1
+  x + #^EXPR_4^#
+}
+func inExpr5() {
+  let x = 1
+  x + #^EXPR_5^#
 }

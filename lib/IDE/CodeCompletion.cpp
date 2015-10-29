@@ -3681,6 +3681,10 @@ static bool isClangSubModule(Module *TheModule) {
 
 static void addDeclKeywords(CodeCompletionResultSink &Sink) {
   auto AddKeyword = [&](StringRef Name) {
+    if (Name == "let" || Name == "var") {
+      // Treat keywords that could be the start of a pattern specially.
+      return;
+    }
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None, {});
@@ -3707,6 +3711,29 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink) {
 }
 
 static void addStmtKeywords(CodeCompletionResultSink &Sink) {
+  auto AddKeyword = [&](StringRef Name) {
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::None, {});
+    Builder.addTextChunk(Name);
+  };
+#define STMT_KEYWORD(kw) AddKeyword(#kw);
+#include "swift/Parse/Tokens.def"
+}
+
+static void addLetVarKeywords(CodeCompletionResultSink &Sink) {
+  auto AddKeyword = [&](StringRef Name) {
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::None, {});
+    Builder.addTextChunk(Name);
+  };
+
+  AddKeyword("let");
+  AddKeyword("var");
+}
+
+static void addExprKeywords(CodeCompletionResultSink &Sink) {
   auto AddKeyword = [&](StringRef Name, StringRef TypeAnnotation) {
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Keyword,
@@ -3715,9 +3742,6 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink) {
     if (!TypeAnnotation.empty())
       Builder.addTypeAnnotation(TypeAnnotation);
   };
-
-#define STMT_KEYWORD(kw) AddKeyword(#kw, StringRef());
-#include "swift/Parse/Tokens.def"
 
   // Expr keywords.
   AddKeyword("throw", StringRef());
@@ -3751,10 +3775,13 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
     break;
 
   case CompletionKind::StmtOrExpr:
-  case CompletionKind::PostfixExprBeginning:
-    addSuperKeyword(Sink);
     addDeclKeywords(Sink);
     addStmtKeywords(Sink);
+    SWIFT_FALLTHROUGH;
+  case CompletionKind::PostfixExprBeginning:
+    addSuperKeyword(Sink);
+    addLetVarKeywords(Sink);
+    addExprKeywords(Sink);
     break;
 
   case CompletionKind::PostfixExpr:
@@ -3770,6 +3797,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
 
   case CompletionKind::NominalMemberBeginning:
     addDeclKeywords(Sink);
+    addLetVarKeywords(Sink);
     break;
   }
 }
