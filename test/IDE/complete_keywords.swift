@@ -37,39 +37,42 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_5 > %t.expr5
 // RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr5
 // RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_6 > %t.expr6
+// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr6
+// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr6
 
 // KW_DECL: Begin completions
-// KW_DECL-DAG: Keyword/None: class{{; name=.+$}}
+// KW_DECL-DAG: Keyword[class]/None: class{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: convenience{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: deinit{{; name=.+$}}
+// KW_DECL-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: dynamic{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: enum{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: extension{{; name=.+$}}
+// KW_DECL-DAG: Keyword[enum]/None: enum{{; name=.+$}}
+// KW_DECL-DAG: Keyword[extension]/None: extension{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: final{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: func{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: import{{; name=.+$}}
+// KW_DECL-DAG: Keyword[func]/None: func{{; name=.+$}}
+// KW_DECL-DAG: Keyword[import]/None: import{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: infix{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: init{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: internal{{; name=.+$}}
+// KW_DECL-DAG: Keyword[init]/None: init{{; name=.+$}}
+// KW_DECL-DAG: Keyword[internal]/None: internal{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: lazy{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: let{{; name=.+$}}
+// KW_DECL-DAG: Keyword[let]/None: let{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: mutating{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: nonmutating{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: operator{{; name=.+$}}
+// KW_DECL-DAG: Keyword[operator]/None: operator{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: optional{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: override{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: postfix{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: prefix{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: private{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: protocol{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: public{{; name=.+$}}
+// KW_DECL-DAG: Keyword[private]/None: private{{; name=.+$}}
+// KW_DECL-DAG: Keyword[protocol]/None: protocol{{; name=.+$}}
+// KW_DECL-DAG: Keyword[public]/None: public{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: required{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: static{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: struct{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: subscript{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: typealias{{; name=.+$}}
+// KW_DECL-DAG: Keyword[static]/None: static{{; name=.+$}}
+// KW_DECL-DAG: Keyword[struct]/None: struct{{; name=.+$}}
+// KW_DECL-DAG: Keyword[subscript]/None: subscript{{; name=.+$}}
+// KW_DECL-DAG: Keyword[typealias]/None: typealias{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: unowned{{; name=.+$}}
-// KW_DECL-DAG: Keyword/None: var{{; name=.+$}}
+// KW_DECL-DAG: Keyword[var]/None: var{{; name=.+$}}
 // KW_DECL-DAG: Keyword/None: weak{{; name=.+$}}
 // KW_DECL: End completions
 
@@ -77,67 +80,67 @@
 //
 // Declaration keywords.
 //
-// KW_DECL_STMT-DAG: Keyword/None: class{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[class]/None: class{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: convenience{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: deinit{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[deinit]/None: deinit{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: dynamic{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: enum{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: extension{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[enum]/None: enum{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[extension]/None: extension{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: final{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: func{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: import{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[func]/None: func{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[import]/None: import{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: infix{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: init{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: internal{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[init]/None: init{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[internal]/None: internal{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: lazy{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: let{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[let]/None: let{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: mutating{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: nonmutating{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: operator{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[operator]/None: operator{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: optional{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: override{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: postfix{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: prefix{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: private{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: protocol{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: public{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[private]/None: private{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[protocol]/None: protocol{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[public]/None: public{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: required{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: static{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: struct{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: subscript{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: typealias{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[static]/None: static{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[struct]/None: struct{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[subscript]/None: subscript{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[typealias]/None: typealias{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: unowned{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: var{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[var]/None: var{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword/None: weak{{; name=.+$}}
 //
 // Statement keywords.
 //
-// KW_DECL_STMT-DAG: Keyword/None: if{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: do{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: else{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: for{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: in{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: while{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: return{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: break{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: continue{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: fallthrough{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: switch{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: case{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: default{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: where{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: catch{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[if]/None: if{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[do]/None: do{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[else]/None: else{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[for]/None: for{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[in]/None: in{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[while]/None: while{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[return]/None: return{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[break]/None: break{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[continue]/None: continue{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[fallthrough]/None: fallthrough{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[switch]/None: switch{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[case]/None: case{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[default]/None: default{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[where]/None: where{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[catch]/None: catch{{; name=.+$}}
 //
 // Misc.
 //
-// KW_DECL_STMT-DAG: Keyword/None: throw{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: try{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: try!{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: try?{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: __FUNCTION__[#String#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: __FILE__[#String#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: __LINE__[#Int#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword/None: __COLUMN__[#Int#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[throw]/None: throw{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[try]/None: try{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[try]/None: try!{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[try]/None: try?{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[__FUNCTION__]/None: __FUNCTION__[#String#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[__FILE__]/None: __FILE__[#String#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[__LINE__]/None: __LINE__[#Int#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[__COLUMN__]/None: __COLUMN__[#Int#]{{; name=.+$}}
 //
 // Literals
 //
@@ -151,19 +154,18 @@
 //
 // Expressions
 //
-// KW_EXPR-DAG: Keyword/None: throw{{; name=.+$}}
-// KW_EXPR-DAG: Keyword/None: try{{; name=.+$}}
-// KW_EXPR-DAG: Keyword/None: try!{{; name=.+$}}
-// KW_EXPR-DAG: Keyword/None: try?{{; name=.+$}}
-// KW_EXPR-DAG: Keyword/None: __FUNCTION__[#String#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword/None: __FILE__[#String#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword/None: __LINE__[#Int#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword/None: __COLUMN__[#Int#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[try]/None: try{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[try]/None: try!{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[try]/None: try?{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[__FUNCTION__]/None: __FUNCTION__[#String#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[__FILE__]/None: __FILE__[#String#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[__LINE__]/None: __LINE__[#Int#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[__COLUMN__]/None: __COLUMN__[#Int#]{{; name=.+$}}
 //
 // let and var
 //
-// KW_EXPR-DAG: Keyword/None: let{{; name=.+$}}
-// KW_EXPR-DAG: Keyword/None: var{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[let]/None: let{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[var]/None: var{{; name=.+$}}
 //
 // Literals
 //
@@ -183,6 +185,7 @@
 //
 // Statement keywords
 //
+// KW_EXPR_NEG-NOT: Keyword{{.*}}throw
 // KW_EXPR_NEG-NOT: while
 // KW_EXPR_NEG-NOT: switch
 // KW_EXPR_NEG-NOT: catch
@@ -265,7 +268,7 @@ extension InProtocol {
 class SuperSuperClass {
    func f1() {
     #^SUPER_KEYWORD0^#
-// SUPER_KEYWORD0-NOT: Keyword/CurrNominal:                       super
+// SUPER_KEYWORD0-NOT: Keyword{{.*}}super
   }
 }
 
@@ -273,21 +276,21 @@ class SuperClass : SuperSuperClass {
    func f2() {
     #^SUPER_KEYWORD1^#
   }
-// SUPER_KEYWORD1: Keyword/CurrNominal:                       super[#SuperSuperClass#]; name=super{{$}}
+// SUPER_KEYWORD1: Keyword[super]/CurrNominal:                       super[#SuperSuperClass#]; name=super{{$}}
 }
 
 class SubClass : SuperClass {
   func f3() {
     #^SUPER_KEYWORD2^#
   }
-// SUPER_KEYWORD2: Keyword/CurrNominal:                       super[#SuperClass#]; name=super{{$}}
+// SUPER_KEYWORD2: Keyword[super]/CurrNominal:                       super[#SuperClass#]; name=super{{$}}
 }
 
 extension SubClass {
   func f4() {
     #^SUPER_KEYWORD3^#
   }
-// SUPER_KEYWORD3: Keyword/CurrNominal:                       super[#SuperClass#]; name=super{{$}}
+// SUPER_KEYWORD3: Keyword[super]/CurrNominal:                       super[#SuperClass#]; name=super{{$}}
 }
 
 func inExpr1() {
@@ -304,6 +307,9 @@ func inExpr4() {
   x + #^EXPR_4^#
 }
 func inExpr5() {
-  let x = 1
-  x + #^EXPR_5^#
+  var x: Int
+  x = #^EXPR_5^#
+}
+func inExpr6() -> Int {
+  return #^EXPR_6^#
 }

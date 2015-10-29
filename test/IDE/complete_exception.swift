@@ -75,7 +75,7 @@ func test001() {
 // CATCH1-DAG:  Decl[Class]/CurrModule:             Error3[#Error3#]; name=Error3{{$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2{{$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1{{$}}
-// CATCH1-DAG:  Keyword/None:                       let{{; name=.+$}}
+// CATCH1-DAG:  Keyword[let]/None:                  let{{; name=.+$}}
 // CATCH1-DAG:  Decl[Class]/CurrModule:             NoneError1[#NoneError1#]; name=NoneError1{{$}}
 // CATCH1-DAG:  Decl[Class]/OtherModule[Foundation]: NSError[#NSError#]{{; name=.+$}}
 }
@@ -137,7 +137,7 @@ throw Error4.#^TOP_LEVEL_THROW2^#
 
 // Statement-level code completions. This isn't exhaustive.
 // STMT: Begin completions
-// STMT-DAG: Keyword/None:                       if; name=if
+// STMT-DAG: Keyword[if]/None:                       if; name=if
 // STMT-DAG: Decl[Class]/CurrModule:             Error1[#Error1#]; name=Error1
 // STMT-DAG: Decl[Class]/CurrModule:             Error2[#Error2#]; name=Error2
 // STMT-DAG: Decl[FreeFunction]/CurrModule:      getError1()[#Error1#]; name=getError1()

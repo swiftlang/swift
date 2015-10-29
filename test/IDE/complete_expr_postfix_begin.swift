@@ -88,7 +88,7 @@ typealias FooTypealias = Int
 // COMMON-DAG: Decl[Protocol]/CurrModule:   FooProtocol[#FooProtocol#]{{; name=.+$}}
 // COMMON-DAG: Decl[TypeAlias]/CurrModule:  FooTypealias[#Int#]{{; name=.+$}}
 // COMMON-DAG: Decl[GlobalVar]/CurrModule:  fooObject[#FooStruct#]{{; name=.+$}}
-// COMMON-DAG: Keyword/None: try{{; name=.+$}}
+// COMMON-DAG: Keyword[try]/None: try{{; name=.+$}}
 // COMMON-DAG: Literal[Boolean]/None: true[#Bool#]{{; name=.+$}}
 // COMMON-DAG: Literal[Boolean]/None: false[#Bool#]{{; name=.+$}}
 // COMMON-DAG: Literal[Nil]/None: nil{{; name=.+$}}
@@ -97,10 +97,10 @@ typealias FooTypealias = Int
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]:    Int32[#Int32#]{{; name=.+$}}
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]:    Int64[#Int64#]{{; name=.+$}}
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]:      Bool[#Bool#]{{; name=.+$}}
-// COMMON-DAG: Keyword/None: __FUNCTION__[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword/None: __FILE__[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword/None: __LINE__[#Int#]{{; name=.+$}}
-// COMMON-DAG: Keyword/None: __COLUMN__[#Int#]{{; name=.+$}}
+// COMMON-DAG: Keyword[__FUNCTION__]/None: __FUNCTION__[#String#]{{; name=.+$}}
+// COMMON-DAG: Keyword[__FILE__]/None: __FILE__[#String#]{{; name=.+$}}
+// COMMON-DAG: Keyword[__LINE__]/None: __LINE__[#Int#]{{; name=.+$}}
+// COMMON-DAG: Keyword[__COLUMN__]/None: __COLUMN__[#Int#]{{; name=.+$}}
 // COMMON: End completions
 
 // NO_SELF-NOT: Self

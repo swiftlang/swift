@@ -4,7 +4,7 @@
 // rdar://14585108
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=A | FileCheck %s -check-prefix=A
 // A: Begin completions
-// A-DAG: Keyword/None: func{{; name=.+$}}
+// A-DAG: Keyword[func]/None: func{{; name=.+$}}
 // A-DAG: Literal[Boolean]/None: true[#Bool#]{{; name=.+$}}
 // A-DAG: Literal[Boolean]/None: false[#Bool#]{{; name=.+$}}
 // A-DAG: Literal[Nil]/None: nil{{; name=.+$}}

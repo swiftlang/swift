@@ -371,6 +371,14 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     break;
   case ResultKind::Keyword:
     Prefix.append("Keyword");
+    switch (getKeywordKind()) {
+    case CodeCompletionKeywordKind::None:
+      break;
+#define KEYWORD(X) case CodeCompletionKeywordKind::kw_##X: \
+      Prefix.append("[" #X "]"); \
+      break;
+#include "swift/Parse/Tokens.def"
+    }
     break;
   case ResultKind::Pattern:
     Prefix.append("Pattern");
@@ -649,6 +657,10 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   }
 
   case CodeCompletionResult::ResultKind::Keyword:
+    return new (*Sink.Allocator)
+        CodeCompletionResult(KeywordKind, SemanticContext, NumBytesToErase,
+                             CCS, ExpectedTypeRelation);
+
   case CodeCompletionResult::ResultKind::Pattern:
     return new (*Sink.Allocator) CodeCompletionResult(
         Kind, SemanticContext, NumBytesToErase, CCS, ExpectedTypeRelation);
@@ -849,6 +861,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
                                           CodeCompletionResult::ResultKind::Keyword,
                                           SemanticContextKind::CurrentNominal,
                                           {});
+      Builder.setKeywordKind(CodeCompletionKeywordKind::kw_super);
       Builder.addTextChunk("super");
       ST = ST->getReferenceStorageReferent();
       assert(!ST->isVoid() && "Cannot get type name.");
@@ -3680,7 +3693,7 @@ static bool isClangSubModule(Module *TheModule) {
 }
 
 static void addDeclKeywords(CodeCompletionResultSink &Sink) {
-  auto AddKeyword = [&](StringRef Name) {
+  auto AddKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind) {
     if (Name == "let" || Name == "var") {
       // Treat keywords that could be the start of a pattern specially.
       return;
@@ -3688,74 +3701,84 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink) {
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None, {});
+    Builder.setKeywordKind(Kind);
     Builder.addTextChunk(Name);
   };
 
-#define DECL_KEYWORD(kw) AddKeyword(#kw);
+#define DECL_KEYWORD(kw) AddKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
 #include "swift/Parse/Tokens.def"
+
   // Context-sensitive keywords.
-  AddKeyword("weak");
-  AddKeyword("unowned");
-  AddKeyword("optional");
-  AddKeyword("required");
-  AddKeyword("lazy");
-  AddKeyword("final");
-  AddKeyword("dynamic");
-  AddKeyword("prefix");
-  AddKeyword("postfix");
-  AddKeyword("infix");
-  AddKeyword("override");
-  AddKeyword("mutating");
-  AddKeyword("nonmutating");
-  AddKeyword("convenience");
+  auto AddCSKeyword = [&](StringRef Name) {
+    AddKeyword(Name, CodeCompletionKeywordKind::None);
+  };
+  AddCSKeyword("weak");
+  AddCSKeyword("unowned");
+  AddCSKeyword("optional");
+  AddCSKeyword("required");
+  AddCSKeyword("lazy");
+  AddCSKeyword("final");
+  AddCSKeyword("dynamic");
+  AddCSKeyword("prefix");
+  AddCSKeyword("postfix");
+  AddCSKeyword("infix");
+  AddCSKeyword("override");
+  AddCSKeyword("mutating");
+  AddCSKeyword("nonmutating");
+  AddCSKeyword("convenience");
 }
 
 static void addStmtKeywords(CodeCompletionResultSink &Sink) {
-  auto AddKeyword = [&](StringRef Name) {
+  auto AddKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind) {
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None, {});
+    Builder.setKeywordKind(Kind);
     Builder.addTextChunk(Name);
   };
-#define STMT_KEYWORD(kw) AddKeyword(#kw);
+#define STMT_KEYWORD(kw) AddKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
 #include "swift/Parse/Tokens.def"
+
+  // Throw is not marked as a STMT_KEYWORD.
+  AddKeyword("throw", CodeCompletionKeywordKind::kw_throw);
 }
 
 static void addLetVarKeywords(CodeCompletionResultSink &Sink) {
-  auto AddKeyword = [&](StringRef Name) {
+  auto AddKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind) {
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None, {});
+    Builder.setKeywordKind(Kind);
     Builder.addTextChunk(Name);
   };
 
-  AddKeyword("let");
-  AddKeyword("var");
+  AddKeyword("let", CodeCompletionKeywordKind::kw_let);
+  AddKeyword("var", CodeCompletionKeywordKind::kw_var);
 }
 
 static void addExprKeywords(CodeCompletionResultSink &Sink) {
-  auto AddKeyword = [&](StringRef Name, StringRef TypeAnnotation) {
+  auto AddKeyword = [&](StringRef Name, StringRef TypeAnnotation, CodeCompletionKeywordKind Kind) {
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None, {});
+    Builder.setKeywordKind(Kind);
     Builder.addTextChunk(Name);
     if (!TypeAnnotation.empty())
       Builder.addTypeAnnotation(TypeAnnotation);
   };
 
   // Expr keywords.
-  AddKeyword("throw", StringRef());
-  AddKeyword("try", StringRef());
-  AddKeyword("try!", StringRef());
-  AddKeyword("try?", StringRef());
+  AddKeyword("try", StringRef(), CodeCompletionKeywordKind::kw_try);
+  AddKeyword("try!", StringRef(), CodeCompletionKeywordKind::kw_try);
+  AddKeyword("try?", StringRef(), CodeCompletionKeywordKind::kw_try);
   // FIXME: The pedantically correct way to find the type is to resolve the
   // Swift.StringLiteralType type.
-  AddKeyword("__FUNCTION__", "String");
-  AddKeyword("__FILE__", "String");
+  AddKeyword("__FUNCTION__", "String", CodeCompletionKeywordKind::kw___FUNCTION__);
+  AddKeyword("__FILE__", "String", CodeCompletionKeywordKind::kw___FILE__);
   // Same: Swift.IntegerLiteralType.
-  AddKeyword("__LINE__", "Int");
-  AddKeyword("__COLUMN__", "Int");
-  AddKeyword("__DSO_HANDLE__", "UnsafeMutablePointer<Void>");
+  AddKeyword("__LINE__", "Int", CodeCompletionKeywordKind::kw___LINE__);
+  AddKeyword("__COLUMN__", "Int", CodeCompletionKeywordKind::kw___COLUMN__);
+  AddKeyword("__DSO_HANDLE__", "UnsafeMutablePointer<Void>", CodeCompletionKeywordKind::kw___DSO_HANDLE__);
 }
 
 
@@ -3768,9 +3791,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::PoundAvailablePlatform:
   case CompletionKind::Import:
   case CompletionKind::UnresolvedMember:
-  case CompletionKind::AssignmentRHS:
   case CompletionKind::CallArg:
-  case CompletionKind::ReturnStmtExpr:
   case CompletionKind::AfterPound:
     break;
 
@@ -3778,6 +3799,8 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
     addDeclKeywords(Sink);
     addStmtKeywords(Sink);
     SWIFT_FALLTHROUGH;
+  case CompletionKind::AssignmentRHS:
+  case CompletionKind::ReturnStmtExpr:
   case CompletionKind::PostfixExprBeginning:
     addSuperKeyword(Sink);
     addLetVarKeywords(Sink);

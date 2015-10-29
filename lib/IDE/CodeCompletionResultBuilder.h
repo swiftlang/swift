@@ -35,6 +35,7 @@ class CodeCompletionResultBuilder {
   unsigned NumBytesToErase = 0;
   const Decl *AssociatedDecl = nullptr;
   Optional<CodeCompletionLiteralKind> LiteralKind;
+  CodeCompletionKeywordKind KeywordKind = CodeCompletionKeywordKind::None;
   unsigned CurrentNestingLevel = 0;
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
   llvm::PointerUnion<const ModuleDecl *, const clang::Module *>
@@ -89,6 +90,7 @@ public:
   void setAssociatedDecl(const Decl *D);
 
   void setLiteralKind(CodeCompletionLiteralKind kind) { LiteralKind = kind; }
+  void setKeywordKind(CodeCompletionKeywordKind kind) { KeywordKind = kind; }
 
   void
   setExpectedTypeRelation(CodeCompletionResult::ExpectedTypeRelation relation) {
