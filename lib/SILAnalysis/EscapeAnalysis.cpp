@@ -879,10 +879,10 @@ void EscapeAnalysis::buildConnectionGraph(SILFunction *F,
 /// Returns true if all called functions from an apply site are known and not
 /// external.
 static bool allCalleeFunctionsVisible(FullApplySite FAS, CallGraph &CG) {
-  auto Callees = CG.getCallees(FAS);
-  if (Callees.canCallUnknownFunction())
+  if (CG.canCallUnknownFunction(FAS))
     return false;
 
+  auto Callees = CG.getCallees(FAS);
   for (SILFunction *Callee : Callees) {
     if (Callee->isExternalDeclaration())
       return false;
