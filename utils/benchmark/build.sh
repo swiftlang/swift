@@ -12,7 +12,7 @@ fi
 SWIFT="$BUILD_DIR/bin/swift"
 CLANG="$BUILD_DIR/bin/clang"
 CLANGPP="$BUILD_DIR/bin/clang++"
-SDKROOT=$(xcrun --show-sdk-path -sdk macosx.internal) || exit 1
+SDKROOT=$(xcrun --show-sdk-path -sdk macosx) || exit 1
 
 benchmark() {
     local NAME=$1

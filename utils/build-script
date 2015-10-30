@@ -1,0 +1,771 @@
+#!/usr/bin/python
+#===--- build-script - The ultimate tool for building Swift ----------------===#
+#
+## This source file is part of the Swift.org open source project
+##
+## Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+## Licensed under Apache License v2.0 with Runtime Library Exception
+##
+## See http://swift.org/LICENSE.txt for license information
+## See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+#===------------------------------------------------------------------------===#
+
+from __future__ import print_function
+
+import argparse
+import os
+import shutil
+import sys
+import textwrap
+
+sys.path.append(os.path.dirname(__file__))
+
+from SwiftBuildSupport import *
+
+
+# Main entry point for the preset mode.
+def main_preset():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""Builds Swift using a preset.""")
+    parser.add_argument("--preset-file",
+        help="load presets from the specified file",
+        metavar="PATH",
+        action="append",
+        dest="preset_file_names",
+        default=[])
+    parser.add_argument("--preset",
+        help="use the specified option preset",
+        metavar="NAME")
+    parser.add_argument("--show-presets",
+        help="list all presets and exit",
+        action="store_true")
+    parser.add_argument("--distcc",
+        help="use distcc",
+        action="store_true")
+    parser.add_argument("preset_substitutions_raw",
+        help="'name=value' pairs that are substituted in the preset",
+        nargs="*",
+        metavar="SUBSTITUTION")
+    args = parser.parse_args()
+
+    if len(args.preset_file_names) == 0:
+        args.preset_file_names = [
+            os.path.join(HOME, ".swift-build-presets"),
+            os.path.join(
+                SWIFT_SOURCE_ROOT, "swift", "utils", "build-presets.ini")
+        ]
+
+    if args.show_presets:
+        for name in sorted(get_all_preset_names(args.preset_file_names),
+                           key=str.lower):
+            print(name)
+        return 0
+
+    if not args.preset:
+        print_with_argv0("Missing --preset option")
+        return 1
+
+    args.preset_substitutions = {}
+
+    for arg in args.preset_substitutions_raw:
+        name, value = arg.split("=", 1)
+        args.preset_substitutions[name] = value
+
+    preset_args = get_preset_options(
+        args.preset_substitutions, args.preset_file_names, args.preset)
+
+    build_script_args = [ sys.argv[0] ]
+    build_script_args += preset_args
+    if args.distcc:
+        build_script_args += [ "--distcc" ]
+
+    print_with_argv0(
+        "using preset '" + args.preset + "', which expands to " +
+        quote_shell_command(build_script_args))
+    check_call(build_script_args)
+
+    return 0
+
+
+# Main entry point for the normal mode.
+def main_normal():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""
+Use this tool to build, test, and prepare binary distribution archives of Swift
+and related tools.
+
+Builds Swift (and, optionally, SourceKit and LLDB), incrementally, optionally
+testing it thereafter.  Different build configurations are maintained in
+parallel.""",
+        epilog="""
+Using option presets:
+
+  --preset-file=PATH    load presets from the specified file
+
+  --preset=NAME         use the specified option preset
+
+  The preset mode is mutually exclusive with other options.  It is not
+  possible to add ad-hoc customizations to a preset.  This is a deliberate
+  design decision.  (Rationale: a preset is a certain important set of
+  options that we want to keep in a centralized location.  If you need to
+  customize it, you should create another preset in a centralized location,
+  rather than scattering the knowledge about the build across the system.)
+
+  Presets support substitutions for controlled customizations.  Substitutions
+  are defined in the preset file.  Values for substitutions are supplied
+  using the name=value syntax on the command line.
+
+
+Any arguments passed after "--" are forwarded directly to Swift's
+'build-script-impl'.  See that script's help for details.
+
+Environment variables
+---------------------
+
+This script respects a few environment variables, should you
+choose to set them:
+
+SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift,
+                   and SourceKit.  If this script is located in a Swift
+                   source directory, the location of SWIFT_SOURCE_ROOT will be
+                   inferred if the variable is not set.
+
+'build-script' expects the sources to be laid out in the following way:
+
+   $SWIFT_SOURCE_ROOT/llvm
+                     /clang
+                     /swift
+                     /SourceKit  (optional)
+                     /lldb       (optional)
+                     /llbuild    (optional)
+                     /swiftpm    (optional, requires llbuild)
+
+SWIFT_BUILD_ROOT: a directory in which to create out-of-tree builds.
+                  Defaults to "$SWIFT_SOURCE_ROOT/build/".
+
+Preparing to run this script
+----------------------------
+
+  See README.md for instructions on cloning Swift subprojects.
+
+If you intend to use the -s or --sourcekit options.
+
+If you intend to use the -l, -L, --lldb, or --lldb-debug options.
+
+That's it; you're ready to go!
+
+Examples
+--------
+
+Given the above layout of sources, the simplest invocation of 'build-script' is
+just:
+
+  [~/src/s]$ ./swift/utils/build-script
+
+This builds LLVM, Clang, Swift and Swift standard library in debug mode.
+
+All builds are incremental.  To incrementally build changed files, repeat the
+same 'build-script' command.
+
+Typical uses of 'build-script'
+------------------------------
+
+To build everything with optimization without debug information:
+
+  [~/src/s]$ ./swift/utils/build-script -R
+
+To run tests, add '-t':
+
+  [~/src/s]$ ./swift/utils/build-script -R -t
+
+To run normal tests and validation tests, add '-T':
+
+  [~/src/s]$ ./swift/utils/build-script -R -T
+
+To build LLVM+Clang with optimization without debug information, and a
+debuggable Swift compiler:
+
+  [~/src/s]$ ./swift/utils/build-script -R --debug-swift
+
+To build a debuggable Swift standard library:
+
+  [~/src/s]$ ./swift/utils/build-script -R --debug-swift-stdlib
+
+iOS build targets are always configured and present, but are not build by
+default.  To build the standard library for OS X, iOS simulator and iOS device:
+
+  [~/src/s]$ ./swift/utils/build-script -R -i
+
+To run OS X and iOS tests that don't require a device:
+
+  [~/src/s]$ ./swift/utils/build-script -R -i -t
+
+To use 'make' instead of 'ninja', use '-m':
+
+  [~/src/s]$ ./swift/utils/build-script -m -R
+
+To create Xcode projects that can build Swift, use '-x':
+
+  [~/src/s]$ ./swift/utils/build-script -x -R
+
+The Xcode IDE may have performance issues with this configuration. To create
+slimmer Xcode projects that can edit Swift compiler source, but cannot build,
+use '-X' instead:
+
+  [~/src/s]$ ./swift/utils/build-script -X -R
+
+Preset mode in build-script
+---------------------------
+
+All buildbots and automated environments use 'build-script' in *preset mode*.
+In preset mode, the command line only specifies the preset name and allows
+limited customization (extra output paths).  The actual options come from
+the selected preset in 'utils/build-presets.ini'.  For example, to build like
+the incremental buildbot, run:
+
+  [~/src/s]$ ./swift/utils/build-script --preset=buildbot_incremental
+
+To build with AddressSanitizer:
+
+  [~/src/s]$ ./swift/utils/build-script --preset=asan
+
+To build a root for Xcode XYZ, '/tmp/xcode-xyz-root.tar.gz':
+
+  [~/src/s]$ ./swift/utils/build-script --preset=buildbot_BNI_internal_XYZ \\
+      install_destdir="/tmp/install"
+      install_symroot="/tmp/symroot"
+      installable_package="/tmp/xcode-xyz-root.tar.gz"
+
+If you have your own favorite set of options, you can create your own, local,
+preset.  For example, let's create a preset called 'ds' (which stands for
+Debug Swift):
+
+  $ cat > ~/.swift-build-presets
+  [preset: ds]
+  release
+  debug-swift
+  debug-swift-stdlib
+  test
+  build-subdir=ds
+
+To use it, specify the '--preset=' argument:
+
+  [~/src/s]$ ./swift/utils/build-script --preset=ds
+  ./swift/utils/build-script: using preset 'ds', which expands to
+  ./swift/utils/build-script --release --debug-swift --debug-swift-stdlib --test
+  --build-subdir=ds --
+  ...
+
+Philosophy
+----------
+
+While you can invoke CMake directly to build Swift, this tool will save you
+time by taking away the mechanical parts of the process, providing you controls
+for the important options.
+
+For all automated build environments, this tool is regarded as *the* *only* way
+to build Swift.  This is not a technical limitation of the Swift build system.
+It is a policy decision aimed at making the builds uniform across all
+environments and easily reproducible by engineers who are not familiar with the
+details of the setups of other systems or automated environments.""")
+
+    projects_group = parser.add_argument_group(
+        title="Options to select projects")
+    projects_group.add_argument("-s", "--sourcekit",
+        help="build SourceKit",
+        action="store_true",
+        dest="build_sourcekit")
+    projects_group.add_argument("-l", "--lldb",
+        help="build LLDB",
+        action="store_true",
+        dest="build_lldb")
+    projects_group.add_argument("-b", "--llbuild",
+        help="build llbuild",
+        action="store_true",
+        dest="build_llbuild")
+    projects_group.add_argument("-p", "--swiftpm",
+        help="build swiftpm",
+        action="store_true",
+        dest="build_swiftpm")
+
+    extra_actions_group = parser.add_argument_group(
+        title="Extra actions to perform before building")
+    extra_actions_group.add_argument("-c", "--clean",
+        help="do a clean build",
+        action="store_true")
+
+    build_variant_group = parser.add_mutually_exclusive_group(required=False)
+    build_variant_group.add_argument("-d", "--debug",
+        help="""
+build the Debug variant of everything (LLVM, Clang, Swift host tools, target
+Swift standard libraries, SourceKit (if enabled), LLDB (if enabled)
+(default)""",
+        action="store_const",
+        const="Debug",
+        dest="build_variant")
+    build_variant_group.add_argument("-r", "--release-debuginfo",
+        help="""
+build the RelWithDebInfo variant of everything (default is Debug)""",
+        action="store_const",
+        const="RelWithDebInfo",
+        dest="build_variant")
+    build_variant_group.add_argument("-R", "--release",
+        help="build the Release variant of everything (default is Debug)",
+        action="store_const",
+        const="Release",
+        dest="build_variant")
+
+    build_variant_override_group = parser.add_argument_group(
+        title="Override build variant for a specific project")
+    build_variant_override_group.add_argument("--debug-llvm",
+        help="build the Debug variant of LLVM",
+        action="store_const",
+        const="Debug",
+        dest="llvm_build_variant")
+    build_variant_override_group.add_argument("--debug-swift",
+        help="build the Debug variant of Swift host tools",
+        action="store_const",
+        const="Debug",
+        dest="swift_build_variant")
+    build_variant_override_group.add_argument("--debug-swift-stdlib",
+        help="""
+build the Debug variant of the Swift standard library and SDK overlay""",
+        action="store_const",
+        const="Debug",
+        dest="swift_stdlib_build_variant")
+    build_variant_override_group.add_argument("--debug-sourcekit",
+        help="build the Debug variant of SourceKit",
+        action="store_const",
+        const="Debug",
+        dest="sourcekit_build_variant")
+    build_variant_override_group.add_argument("--debug-lldb",
+        help="build the Debug variant of LLDB",
+        action="store_const",
+        const="Debug",
+        dest="lldb_build_variant")
+    build_variant_override_group.add_argument("--debug-cmark",
+        help="build the Debug variant of CommonMark",
+        action="store_const",
+        const="Debug",
+        dest="cmark_build_variant")
+
+    assertions_group = parser.add_mutually_exclusive_group(required=False)
+    assertions_group.add_argument("--assertions",
+        help="enable assertions in all projects",
+        action="store_const",
+        const=True,
+        dest="assertions")
+    assertions_group.add_argument("--no-assertions",
+        help="disable assertions in all projects",
+        action="store_const",
+        const=False,
+        dest="assertions")
+
+    assertions_override_group = parser.add_argument_group(
+        title="Control assertions in a specific project")
+    assertions_override_group.add_argument("--cmark-assertions",
+        help="enable assertions in CommonMark",
+        action="store_const",
+        const=True,
+        dest="cmark_assertions")
+    assertions_override_group.add_argument("--llvm-assertions",
+        help="enable assertions in LLVM",
+        action="store_const",
+        const=True,
+        dest="llvm_assertions")
+    assertions_override_group.add_argument("--no-llvm-assertions",
+        help="disable assertions in LLVM",
+        action="store_const",
+        const=False,
+        dest="llvm_assertions")
+    assertions_override_group.add_argument("--swift-assertions",
+        help="enable assertions in Swift",
+        action="store_const",
+        const=True,
+        dest="swift_assertions")
+    assertions_override_group.add_argument("--no-swift-assertions",
+        help="disable assertions in Swift",
+        action="store_const",
+        const=False,
+        dest="swift_assertions")
+    assertions_override_group.add_argument("--swift-stdlib-assertions",
+        help="enable assertions in the Swift standard library",
+        action="store_const",
+        const=True,
+        dest="swift_stdlib_assertions")
+    assertions_override_group.add_argument("--no-swift-stdlib-assertions",
+        help="disable assertions in the Swift standard library",
+        action="store_const",
+        const=False,
+        dest="swift_stdlib_assertions")
+    assertions_override_group.add_argument("--sourcekit-assertions",
+        help="enable assertions in SourceKit",
+        action="store_const",
+        const=True,
+        dest="sourcekit_assertions")
+    assertions_override_group.add_argument("--no-sourcekit-assertions",
+        help="disable assertions in SourceKit",
+        action="store_const",
+        const=False,
+        dest="sourcekit_assertions")
+    assertions_override_group.add_argument("--lldb-assertions",
+        help="enable assertions in LLDB",
+        action="store_const",
+        const=True,
+        dest="lldb_assertions")
+    assertions_override_group.add_argument("--no-lldb-assertions",
+        help="disable assertions in LLDB",
+        action="store_const",
+        const=False,
+        dest="lldb_assertions")
+
+    cmake_generator_group = parser.add_argument_group(
+        title="Select the CMake generator")
+    cmake_generator_group.add_argument("-x", "--xcode",
+        help="use CMake's Xcode generator (default is Ninja)",
+        action="store_const",
+        const="Xcode",
+        dest="cmake_generator")
+    cmake_generator_group.add_argument("-X", "--xcode-ide-only",
+        help="use CMake's Xcode generator, with only IDE support (no build)",
+        action="store_const",
+        const="XcodeIDEOnly",
+        dest="cmake_generator")
+    cmake_generator_group.add_argument("-m", "--make",
+        help="use CMake's Makefile generator (default is Ninja)",
+        action="store_const",
+        const="Unix Makefiles",
+        dest="cmake_generator")
+    cmake_generator_group.add_argument("-e", "--eclipse",
+        help="use CMake's Eclipse generator (default is Ninja)",
+        action="store_const",
+        const="Eclipse CDT4 - Ninja",
+        dest="cmake_generator")
+
+    run_tests_group = parser.add_argument_group(
+        title="Run tests")
+    run_tests_group.add_argument("-t", "--test",
+        help="test Swift after building",
+        action="store_true")
+    run_tests_group.add_argument("-T", "--validation-test",
+        help="run the validation test suite (implies --test)",
+        action="store_true")
+
+    parser.add_argument("-o", "--test-optimized",
+        help="run the test suite in optimized mode too (implies --test)",
+        action="store_true")
+
+    run_build_group = parser.add_argument_group(
+        title="Run build")
+    run_build_group.add_argument("-S", "--skip-build",
+        help="generate build directory only without building",
+        action="store_true")
+
+    parser.add_argument("-i", "--ios",
+        help="""
+also build for iOS, but disallow tests that require an iOS device""",
+        action="store_true")
+
+    parser.add_argument("--tvos",
+        help="""
+also build for tvOS, but disallow tests that require an tvos device""",
+        action="store_true")
+
+    parser.add_argument("--watchos",
+        help="""
+also build for Apple watchos, but disallow tests that require an watchOS device""",
+        action="store_true")
+
+    parser.add_argument("--build-subdir",
+        help="""
+name of the directory under $SWIFT_BUILD_ROOT where the build products will be
+placed""",
+        metavar="PATH")
+    parser.add_argument("--extra-swift-args", help=textwrap.dedent("""
+    Pass through extra flags to swift in the form of a cmake list 'module_regexp;flag'. Can
+    be called multiple times to add multiple such module_regexp flag pairs. All semicolons
+    in flags must be scaped with a '\'"""),
+                        action="append", dest="extra_swift_args", default=[])
+
+    parser.add_argument("build_script_impl_args",
+        help="",
+        nargs="*")
+
+    args = parser.parse_args()
+
+    # Build cmark if any cmark-related options were specified.
+    if (args.cmark_build_variant is not None):
+        args.build_cmark = True
+
+    # Build SourceKit if any SourceKit-related options were specified.
+    if (args.sourcekit_build_variant is not None or
+        args.sourcekit_assertions is not None):
+       args.build_sourcekit = True
+
+    # Build LLDB if any LLDB-related options were specified.
+    if (args.lldb_build_variant is not None or
+        args.lldb_assertions is not None):
+       args.build_lldb = True
+
+    # Set the default build variant.
+    if args.build_variant is None:
+        args.build_variant = "Debug"
+
+    if args.cmark_build_variant is None:
+        args.cmark_build_variant = args.build_variant
+
+    # Propagate the default build variant.
+    if args.llvm_build_variant is None:
+        args.llvm_build_variant = args.build_variant
+
+    if args.swift_build_variant is None:
+        args.swift_build_variant = args.build_variant
+
+    if args.swift_stdlib_build_variant is None:
+        args.swift_stdlib_build_variant = args.build_variant
+
+    if args.sourcekit_build_variant is None:
+        args.sourcekit_build_variant = args.build_variant
+
+    if args.lldb_build_variant is None:
+        args.lldb_build_variant = args.build_variant
+
+    # Assertions are enabled by default.
+    if args.assertions is None:
+        args.assertions = True
+
+    # Propagate the default assertions setting.
+    if args.cmark_assertions is None:
+        args.cmark_assertions = args.assertions
+
+    if args.llvm_assertions is None:
+        args.llvm_assertions = args.assertions
+
+    if args.swift_assertions is None:
+        args.swift_assertions = args.assertions
+
+    if args.swift_stdlib_assertions is None:
+        args.swift_stdlib_assertions = args.assertions
+
+    if args.sourcekit_assertions is None:
+        args.sourcekit_assertions = args.assertions
+
+    # Set the default CMake generator.
+    if args.cmake_generator is None:
+        args.cmake_generator = "Ninja"
+
+    # --validation-test implies --test.
+    if args.validation_test:
+        args.test = True
+
+    # --test-optimized implies --test.
+    if args.test_optimized:
+        args.test = True
+
+    build_script_impl_inferred_args = []
+
+    if args.cmake_generator == "XcodeIDEOnly":
+        args.cmake_generator = "Xcode"
+        build_script_impl_inferred_args += [
+            "--xcode-ide-only"
+        ]
+
+    if not args.test:
+        build_script_impl_inferred_args += [
+            "--skip-test-cmark",
+            "--skip-test-lldb",
+            "--skip-test-swift",
+            "--skip-test-sourcekit",
+            "--skip-test-llbuild",
+            "--skip-test-swiftpm",
+            "--skip-test-ios",
+            "--skip-test-tvos",
+            "--skip-test-watchos",
+        ]
+
+    if not args.validation_test:
+        build_script_impl_inferred_args += [
+            "--skip-test-validation"
+        ]
+
+    if not args.test_optimized:
+        build_script_impl_inferred_args += [
+            "--skip-test-optimized"
+        ]
+
+    if not args.ios:
+        build_script_impl_inferred_args += [
+            "--skip-build-ios",
+            "--skip-test-ios"
+        ]
+
+    if not args.tvos:
+        build_script_impl_inferred_args += [
+            "--skip-build-tvos",
+            "--skip-test-tvos",
+        ]
+
+    if not args.watchos:
+        build_script_impl_inferred_args += [
+            "--skip-build-watchos",
+            "--skip-test-watchos",
+        ]
+
+    if not args.build_sourcekit:
+        build_script_impl_inferred_args += [
+            "--skip-build-sourcekit",
+            "--skip-test-sourcekit"
+        ]
+
+    if not args.build_lldb:
+        build_script_impl_inferred_args += [
+            "--skip-build-lldb"
+        ]
+
+    if not args.build_llbuild:
+        build_script_impl_inferred_args += [
+            "--skip-build-llbuild"
+        ]
+
+    if not args.build_swiftpm:
+        build_script_impl_inferred_args += [
+            "--skip-build-swiftpm"
+        ]
+
+    if args.skip_build:
+        build_script_impl_inferred_args += [
+            "--skip-build"
+        ]
+
+    if args.build_subdir is None:
+        # Create a name for the build directory.
+        args.build_subdir = args.cmake_generator.replace(" ", "_")
+        cmark_build_dir_label = args.cmark_build_variant
+        if args.cmark_assertions:
+            cmark_build_dir_label += "Assert"
+
+        llvm_build_dir_label = args.llvm_build_variant
+        if args.llvm_assertions:
+            llvm_build_dir_label += "Assert"
+
+        swift_build_dir_label = args.swift_build_variant
+        if args.swift_assertions:
+            swift_build_dir_label += "Assert"
+
+        swift_stdlib_build_dir_label = args.swift_stdlib_build_variant
+        if args.swift_stdlib_assertions:
+            swift_stdlib_build_dir_label += "Assert"
+
+        sourcekit_build_dir_label = args.sourcekit_build_variant
+        if args.sourcekit_assertions:
+            sourcekit_build_dir_label += "Assert"
+
+        # FIXME: mangle LLDB build configuration into the directory name.
+        if (llvm_build_dir_label == swift_build_dir_label and
+            llvm_build_dir_label == swift_stdlib_build_dir_label and
+            llvm_build_dir_label == cmark_build_dir_label and
+            llvm_build_dir_label == sourcekit_build_dir_label):
+            # Use a simple directory name if all projects use the same build type.
+            args.build_subdir += "-" + llvm_build_dir_label
+        elif (llvm_build_dir_label != swift_build_dir_label and
+            llvm_build_dir_label == swift_stdlib_build_dir_label and
+            llvm_build_dir_label == cmark_build_dir_label and
+            llvm_build_dir_label == sourcekit_build_dir_label):
+            # Swift build type differs.
+            args.build_subdir += "-" + llvm_build_dir_label
+            args.build_subdir += "+swift-" + swift_build_dir_label
+        elif (llvm_build_dir_label == swift_build_dir_label and
+            llvm_build_dir_label != swift_stdlib_build_dir_label and
+            llvm_build_dir_label == cmark_build_dir_label and
+            llvm_build_dir_label == sourcekit_build_dir_label):
+            # Swift stdlib build type differs.
+            args.build_subdir += "-" + llvm_build_dir_label
+            args.build_subdir += "+stdlib-" + swift_stdlib_build_dir_label
+        elif (llvm_build_dir_label == swift_build_dir_label and
+            llvm_build_dir_label == swift_stdlib_build_dir_label and
+            llvm_build_dir_label == cmark_build_dir_label and
+            llvm_build_dir_label != sourcekit_build_dir_label):
+            # SourceKit build type differs.
+            args.build_subdir += "-" + llvm_build_dir_label
+            args.build_subdir += "+SourceKit-" + swift_stdlib_build_dir_label
+        elif (llvm_build_dir_label == swift_build_dir_label and
+            llvm_build_dir_label == swift_stdlib_build_dir_label and
+            llvm_build_dir_label != cmark_build_dir_label and
+            llvm_build_dir_label == sourcekit_build_dir_label):
+            # cmark build type differs.
+            args.build_subdir += "-" + llvm_build_dir_label
+            args.build_subdir += "+cmark-" + cmark_build_dir_label
+        else:
+            # We don't know how to create a short name, so just mangle in all
+            # the information.
+            args.build_subdir += "+cmark-" + cmark_build_dir_label
+            args.build_subdir += "+llvm-" + llvm_build_dir_label
+            args.build_subdir += "+swift-" + swift_build_dir_label
+            args.build_subdir += "+stdlib-" + swift_stdlib_build_dir_label
+            args.build_subdir += "+SourceKit-" + sourcekit_build_dir_label
+
+    build_dir = os.path.join(SWIFT_BUILD_ROOT, args.build_subdir)
+
+    if args.clean:
+        shutil.rmtree(build_dir)
+
+    build_script_impl_args = [
+        os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl"),
+        "--build-dir", build_dir,
+        "--cmark-build-type", args.cmark_build_variant,
+        "--llvm-build-type", args.llvm_build_variant,
+        "--swift-build-type", args.swift_build_variant,
+        "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
+        "--sourcekit-build-type", args.sourcekit_build_variant,
+        "--lldb-build-type", args.lldb_build_variant,
+        "--llvm-enable-assertions", str(args.llvm_assertions).lower(),
+        "--swift-enable-assertions", str(args.swift_assertions).lower(),
+        "--swift-stdlib-enable-assertions", str(args.swift_stdlib_assertions).lower(),
+        "--sourcekit-enable-assertions", str(args.sourcekit_assertions).lower(),
+        "--cmake-generator", args.cmake_generator,
+        "--workspace", SWIFT_SOURCE_ROOT
+    ]
+    build_script_impl_args += build_script_impl_inferred_args
+
+    # If we have extra_swift_args, combine all of them together and then add
+    # them as one command.
+    if args.extra_swift_args:
+        build_script_impl_args += ["--extra-swift-args", ";".join(args.extra_swift_args)]
+
+    build_script_impl_args += args.build_script_impl_args
+
+    # Unset environment variables that might affect how tools behave.
+    for v in [ 'MAKEFLAGS', 'SDKROOT', 'MACOSX_DEPLOYMENT_TARGET', 'IPHONEOS_DEPLOYMENT_TARGET' ]:
+        os.environ.pop(v, None)
+
+    check_call(build_script_impl_args)
+
+    return 0
+
+
+def main():
+    if not SWIFT_SOURCE_ROOT:
+        print_with_argv0("Could not infer source root directory.  " +
+            "Forgot to set $SWIFT_SOURCE_ROOT environment variable?")
+        return 1
+
+    if not os.path.isdir(SWIFT_SOURCE_ROOT):
+        print_with_argv0("Source root directory \'" + SWIFT_SOURCE_ROOT +
+            "\' does not exist.  " +
+            "Forgot to set $SWIFT_SOURCE_ROOT environment variable?")
+        return 1
+
+    # Determine if we are invoked in the preset mode and dispatch accordingly.
+    if any([ (opt.startswith("--preset") or opt == "--show-presets")
+             for opt in sys.argv[1:] ]):
+        return main_preset()
+    else:
+        return main_normal()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+

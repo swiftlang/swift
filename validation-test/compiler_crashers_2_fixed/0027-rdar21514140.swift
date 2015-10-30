@@ -199,15 +199,6 @@ public func _prext_lazy<Base: CollectionType>(s: Base) -> _prext_LazyCollection<
 }
 
 
-//===--- Map.swift --------------------------------------------------------===//
-//
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
-//
-//===----------------------------------------------------------------------===//
-
 //===--- New stuff --------------------------------------------------------===//
 /// The `GeneratorType` used by `_prext_MapSequence` and `_prext_MapCollection`.
 /// Produces each element by passing the output of the `Base`

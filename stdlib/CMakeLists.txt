@@ -1,0 +1,23 @@
+# Create convenience targets for the Swift standard library.
+add_custom_target(swift-stdlib-all)
+foreach(SDK ${SWIFT_SDKS})
+  add_custom_target("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+  foreach(ARCH ${SWIFT_SDK_${SDK}_ARCHITECTURES})
+    set(VARIANT_SUFFIX "-${SWIFT_SDK_${SDK}_LIB_SUBDIR}-${ARCH}")
+    add_custom_target("swift-stdlib${VARIANT_SUFFIX}")
+    add_dependencies(swift-stdlib-all "swift-stdlib${VARIANT_SUFFIX}")
+    add_dependencies("swift-stdlib-${SWIFT_SDK_${SDK}_LIB_SUBDIR}"
+        "swift-stdlib${VARIANT_SUFFIX}")
+  endforeach()
+endforeach()
+add_custom_target(swift-stdlib ALL
+    DEPENDS "swift-stdlib${SWIFT_PRIMARY_VARIANT_SUFFIX}")
+
+if(SWIFT_HOST_VARIANT STREQUAL "linux")
+  find_package(BSD REQUIRED)
+endif()
+
+add_subdirectory(public)
+add_subdirectory(internal)
+add_subdirectory(private)
+

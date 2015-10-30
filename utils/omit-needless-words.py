@@ -97,17 +97,17 @@ if module == '':
     sys.exit(2)
 
 if target == '':
-    if sdk in ('macosx', 'macosx.internal'):
+    if sdk == 'macosx':
         target = 'x86_64-apple-macosx10.10'
-    if sdk in ('iphoneos', 'iphoneos.internal'):
+    if sdk == 'iphoneos':
         target = 'arm64-apple-ios8.0'
     if sdk == 'iphonesimulator':
         target = 'x86_64-apple-ios8.0'
-    if sdk in ('watchos', 'watchos.internal'):
+    if sdk == 'watchos':
         target = 'armv7k-apple-watchos2.0'
     if sdk == 'watchos.simulator':
         target = 'i386-apple-watchos2.0'
-    if sdk in ('appletvos', 'appletvos.internal'):
+    if sdk == 'appletvos':
         target = 'arm64-apple-tvos9'
     if sdk == 'appletvos.simulator':
         target = 'x86_64-apple-tvos9'
