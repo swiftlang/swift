@@ -454,7 +454,7 @@ private:
   /// caller or callee edges.
   void removeNode(CallGraphNode *Node);
 
-  void removeEdge(CallGraphEdge *Edge);
+  void removeEdgeFromFunction(CallGraphEdge *Edge, SILFunction *F);
   void removeEdgesForApply(FullApplySite AI);
 
   // Query funtions for getting nodes and edges from the call graph.
@@ -586,7 +586,7 @@ public:
     if (CG) {
       if (auto AI = FullApplySite::isa(I))
         if (auto *Edge = CG->tryGetCallGraphEdge(AI))
-          CG->removeEdge(Edge);
+          CG->removeEdgeFromFunction(Edge, I->getFunction());
     }
   }
 

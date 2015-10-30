@@ -355,18 +355,18 @@ void CallGraph::addEdgesForApply(FullApplySite Apply,
   ++NumAppliesWithEdges;
 }
 
-void CallGraph::removeEdge(CallGraphEdge *Edge) {
+void CallGraph::removeEdgeFromFunction(CallGraphEdge *Edge, SILFunction *F) {
   // Remove the edge from all the potential callee call graph nodes.
   auto CalleeSet = Edge->getCalleeSet();
   for (auto *CalleeNode : CalleeSet)
     CalleeNode->removeCallerEdge(Edge);
 
   // Remove the edge from the caller's call graph node.
-  auto Apply = Edge->getApply();
-  auto *CallerNode = getCallGraphNode(Apply.getFunction());
+  auto *CallerNode = getCallGraphNode(F);
   CallerNode->removeCalleeEdge(Edge);
 
   // Remove the mapping from the apply to this edge.
+  auto Apply = Edge->getApply();
   ApplyToEdgeMap.erase(Apply);
 
   // Call the destructor for the edge. The memory will be reclaimed
@@ -398,7 +398,7 @@ void CallGraph::removeNode(CallGraphNode *Node) {
 // apply is known to the call graph.
 void CallGraph::removeEdgesForApply(FullApplySite AI) {
   assert(ApplyToEdgeMap.count(AI) && "Expected apply to be in edge map!");
-  removeEdge(ApplyToEdgeMap[AI]);
+  removeEdgeFromFunction(ApplyToEdgeMap[AI], AI.getFunction());
 }
 
 void CallGraph::addEdges(SILFunction *F) {
@@ -777,7 +777,7 @@ void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
     return;
 
   if (auto *Edge = CG->tryGetCallGraphEdge(Old))
-    CG->removeEdge(Edge);
+    CG->removeEdgeFromFunction(Edge, Old.getFunction());
 
   CG->addEdgesForApply(New);
 }
@@ -788,7 +788,7 @@ void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
     return;
 
   if (auto *Edge = CG->tryGetCallGraphEdge(Old))
-    CG->removeEdge(Edge);
+    CG->removeEdgeFromFunction(Edge, Old.getFunction());
 
   for (auto NewApply : NewApplies)
     CG->addEdgesForApply(NewApply);
@@ -813,7 +813,7 @@ void CallGraphEditor::removeAllCalleeEdgesFrom(SILFunction *F) {
   auto &CalleeEdges = CG->getCallGraphNode(F)->getCalleeEdges();
   while (!CalleeEdges.empty()) {
     auto *Edge = *CalleeEdges.begin();
-    CG->removeEdge(Edge);
+    CG->removeEdgeFromFunction(Edge, F);
   }
 }
 
