@@ -1877,14 +1877,17 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       nominal == nullptr)
     return;
 
-  // Non-NSManaged class instance variables get accessors, because it affects
-  // vtable layout.
+  // Public and internal class instance variables get accessors, because it
+  // affects vtable layout. Private @objc stored properties also need accessors.
+  // @NSManaged stored properties are handled differently.
   if (isa<ClassDecl>(nominal)) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
       var->setIsBeingTypeChecked();
       convertNSManagedStoredVarToComputed(var, TC);
       var->setIsBeingTypeChecked(false);
-    } else if (!isInSILMode) {
+    } else if ((var->isObjC() ||
+                var->getFormalAccess() != Accessibility::Private) &&
+               !isInSILMode) {
       var->setIsBeingTypeChecked();
       addTrivialAccessorsToStorage(var, TC);
       var->setIsBeingTypeChecked(false);
