@@ -1184,18 +1184,35 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC) const {
     // TODO: What about static properties?
     switch (var->getStorageKind()) {
     case AbstractStorageDecl::Stored:
-    case AbstractStorageDecl::StoredWithTrivialAccessors:
     case AbstractStorageDecl::Addressed:
-    case AbstractStorageDecl::AddressedWithTrivialAccessors:
-      if (!isPolymorphic(var))
-        return AccessSemantics::DirectToStorage;
-      break;
+      // The storage is completely trivial. Always do direct access.
+      return AccessSemantics::DirectToStorage;
+
+    case AbstractStorageDecl::StoredWithTrivialAccessors:
+    case AbstractStorageDecl::AddressedWithTrivialAccessors: {
+      // If the property is defined in a non-final class or a protocol, the
+      // accessors are dynamically dispatched, and we cannot do direct access.
+      if (isPolymorphic(var))
+        return AccessSemantics::Ordinary;
+
+      // If the property is defined in a nominal type which must be accessed
+      // resiliently from the current module, we cannot do direct access.
+      auto VarDC = var->getDeclContext();
+      if (auto *nominal = VarDC->isNominalTypeOrNominalTypeExtensionContext())
+        if (!nominal->hasFixedLayout(UseDC->getParentModule()))
+          return AccessSemantics::Ordinary;
+
+      // We know enough about the property to perform direct access.
+      return AccessSemantics::DirectToStorage;
+    }
 
     case AbstractStorageDecl::StoredWithObservers:
     case AbstractStorageDecl::InheritedWithObservers:
     case AbstractStorageDecl::Computed:
     case AbstractStorageDecl::ComputedWithMutableAddress:
     case AbstractStorageDecl::AddressedWithObservers:
+      // Property is not trivially backed by storage, do not perform
+      // direct access.
       break;
     }
   }
@@ -1256,13 +1273,27 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       SWIFT_FALLTHROUGH;
 
     case StoredWithTrivialAccessors:
-    case AddressedWithTrivialAccessors:
-      // If the storage is polymorphic, either the getter or the
-      // setter could be overridden by something more interesting.
+    case AddressedWithTrivialAccessors: {
+        // If the property is defined in a non-final class or a protocol, the
+        // accessors are dynamically dispatched, and we cannot do direct access.
       if (isPolymorphic(this))
         return AccessStrategy::DispatchToAccessor;
 
-      // Otherwise, just access the storage directly.
+      // If we end up here with a stored property of a type that's resilient
+      // from some resilience domain, we cannot do direct access.
+      //
+      // As an optimization, we do want to perform direct accesses of stored
+      // properties of resilient types in the same resilience domain as the
+      // access.
+      //
+      // This is done by using DirectToStorage semantics above, with the
+      // understanding that the access semantics are with respect to the
+      // resilience domain of the accessor's caller.
+      auto DC = getDeclContext();
+      if (auto *nominal = DC->isNominalTypeOrNominalTypeExtensionContext())
+        if (!nominal->hasFixedLayout())
+          return AccessStrategy::DirectToAccessor;
+
       if (storageKind == StoredWithObservers ||
           storageKind == StoredWithTrivialAccessors) {
         return AccessStrategy::Storage;
@@ -1271,6 +1302,7 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
                storageKind == AddressedWithTrivialAccessors);
         return AccessStrategy::Addressor;
       }
+    }
 
     case ComputedWithMutableAddress:
       if (isPolymorphic(this))

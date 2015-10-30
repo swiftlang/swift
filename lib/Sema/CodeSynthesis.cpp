@@ -746,6 +746,22 @@ static void createPropertyStoreOrCallSuperclassSetter(FuncDecl *accessor,
                                              IsImplicit));
 }
 
+/// Mark the accessor as transparent if we can.
+///
+/// If the storage is inside a fixed-layout nominal type, we can mark the
+/// accessor as transparent, since in this case we just want it for abstraction
+/// purposes (i.e., to make access to the variable uniform and to be able to
+/// put the getter in a vtable).
+static void maybeMarkTransparent(FuncDecl *accessor,
+                                 AbstractStorageDecl *storage,
+                                 TypeChecker &TC) {
+  auto *NTD = storage->getDeclContext()
+      ->isNominalTypeOrNominalTypeExtensionContext();
+
+  // FIXME: resilient global variables
+  if (!NTD || NTD->hasFixedLayout())
+    accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
+}
 
 /// Synthesize the body of a trivial getter.  For a non-member vardecl or one
 /// which is not an override of a base class property, it performs a a direct
@@ -762,11 +778,8 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
   SourceLoc loc = storage->getLoc();
   getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc, true));
 
-  // Mark it transparent, there is no user benefit to this actually existing, we
-  // just want it for abstraction purposes (i.e., to make access to the variable
-  // uniform and to be able to put the getter in a vtable).
-  getter->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
-  
+  maybeMarkTransparent(getter, storage, TC);
+ 
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
     TC.Context.addedExternalDecl(getter);
@@ -788,8 +801,7 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
                                             setterBody, TC);
   setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc, true));
 
-  // Mark it transparent, there is no user benefit to this actually existing.
-  setter->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
+  maybeMarkTransparent(setter, storage, TC);
 
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
@@ -842,8 +854,7 @@ static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
   SourceLoc loc = storage->getLoc();
   materializeForSet->setBody(BraceStmt::create(ctx, loc, returnStmt, loc,true));
 
-  // Mark it transparent, there is no user benefit to this actually existing.
-  materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
+  maybeMarkTransparent(materializeForSet, storage, TC);
 
   TC.typeCheckDecl(materializeForSet, true);
   
@@ -1831,7 +1842,7 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
   if (var->getGetter() || var->isBeingTypeChecked() || isa<ParamDecl>(var))
     return;
 
-  // Lazy variables need accessors.
+  // Lazy properties get accessors.
   if (var->getAttrs().hasAttribute<LazyAttr>()) {
     var->setIsBeingTypeChecked();
 
@@ -1855,28 +1866,38 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     return;
 
   }
+  // Stored properties in SIL mode don't get auto-synthesized accessors.
+  bool isInSILMode = false;
+  if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
+    isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
 
-  // Class instance variables also need accessors, because it affects
+  auto nominal = var->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+  if (var->hasAccessorFunctions() ||
+      var->isImplicit() ||
+      nominal == nullptr)
+    return;
+
+  // Non-NSManaged class instance variables get accessors, because it affects
   // vtable layout.
-  if (!var->hasAccessorFunctions() && !var->isImplicit() &&
-      var->getDeclContext()->isClassOrClassExtensionContext()) {
+  if (isa<ClassDecl>(nominal)) {
     if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
       var->setIsBeingTypeChecked();
       convertNSManagedStoredVarToComputed(var, TC);
       var->setIsBeingTypeChecked(false);
-    } else {
-      // Variables in SIL mode don't get auto-synthesized getters.
-      bool isInSILMode = false;
-      if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
-        isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
-
-      if (!isInSILMode) {
-        var->setIsBeingTypeChecked();
-        addTrivialAccessorsToStorage(var, TC);
-        var->setIsBeingTypeChecked(false);
-      }
+    } else if (!isInSILMode) {
+      var->setIsBeingTypeChecked();
+      addTrivialAccessorsToStorage(var, TC);
+      var->setIsBeingTypeChecked(false);
     }
-    return;
+  }
+
+  // Public instance variables of resilient structs get accessors.
+  if (auto structDecl = dyn_cast<StructDecl>(nominal)) {
+    if (!structDecl->hasFixedLayout() && !isInSILMode) {
+      var->setIsBeingTypeChecked();
+      addTrivialAccessorsToStorage(var, TC);
+      var->setIsBeingTypeChecked(false);
+    }
   }
 }
 
