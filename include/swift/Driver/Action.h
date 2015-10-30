@@ -148,8 +148,7 @@ private:
 
 public:
   CompileJobAction(types::ID OutputType)
-      : JobAction(Action::CompileJob, llvm::None, OutputType),
-        inputInfo(InputInfo()) {}
+      : JobAction(Action::CompileJob, None, OutputType), inputInfo() {}
 
   CompileJobAction(Action *Input, types::ID OutputType,
                    InputInfo info)

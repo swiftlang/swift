@@ -24,6 +24,7 @@
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Option/Arg.h"
@@ -101,13 +102,11 @@ static const Job *findUnfinishedJob(ArrayRef<const Job *> JL,
   return nullptr;
 }
 
-static void writeCompilationRecord(StringRef path, StringRef argsHash,
-                                   llvm::sys::TimeValue buildTime,
-                                   const PerformJobsState &endState) {
+using InputInfoMap =
+  llvm::SmallMapVector<const llvm::opt::Arg *, CompileJobAction::InputInfo, 16>;
 
-  llvm::SmallDenseMap<const llvm::opt::Arg *, CompileJobAction::InputInfo, 16>
-      inputs;
-
+static void populateInputInfoMap(InputInfoMap &inputs,
+                                 const PerformJobsState &endState) {
   for (auto &entry : endState.UnfinishedCommands) {
     for (auto *action : entry.first->getSource().getInputs()) {
       auto inputFile = cast<InputAction>(action);
@@ -136,6 +135,45 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
     }
   }
 
+  // Sort the entries by input order.
+  static_assert(std::is_trivially_copyable<CompileJobAction::InputInfo>::value,
+                "llvm::array_pod_sort relies on trivially-copyable data");
+  using InputInfoEntry = std::decay<decltype(inputs.front())>::type;
+  llvm::array_pod_sort(inputs.begin(), inputs.end(),
+                       [](const InputInfoEntry *lhs,
+                          const InputInfoEntry *rhs) -> int {
+    auto lhsIndex = lhs->first->getIndex();
+    auto rhsIndex = rhs->first->getIndex();
+    return (lhsIndex < rhsIndex) ? -1 : (lhsIndex > rhsIndex) ? 1 : 0;
+  });
+}
+
+static void checkForOutOfDateInputs(DiagnosticEngine &diags,
+                                    const InputInfoMap &inputs) {
+  for (const auto &inputPair : inputs) {
+    auto recordedModTime = inputPair.second.previousModTime;
+    if (recordedModTime == llvm::sys::TimeValue::MaxTime())
+      continue;
+
+    const char *input = inputPair.first->getValue();
+
+    llvm::sys::fs::file_status inputStatus;
+    if (auto statError = llvm::sys::fs::status(input, inputStatus)) {
+      diags.diagnose(SourceLoc(), diag::warn_cannot_stat_input,
+                     llvm::sys::path::filename(input), statError.message());
+      continue;
+    }
+
+    if (recordedModTime != inputStatus.getLastModificationTime()) {
+      diags.diagnose(SourceLoc(), diag::error_input_changed_during_build,
+                     llvm::sys::path::filename(input));
+    }
+  }
+}
+
+static void writeCompilationRecord(StringRef path, StringRef argsHash,
+                                   llvm::sys::TimeValue buildTime,
+                                   const InputInfoMap &inputs) {
   std::error_code error;
   llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
   if (out.has_error()) {
@@ -509,10 +547,15 @@ int Compilation::performJobsImpl() {
   }
 
   if (!CompilationRecordPath.empty() && !SkipTaskExecution) {
+    InputInfoMap InputInfo;
+    populateInputInfoMap(InputInfo, State);
+    checkForOutOfDateInputs(Diags, InputInfo);
     writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
-                           State);
+                           InputInfo);
   }
 
+  if (Result == 0)
+    Result = Diags.hadAnyError();
   return Result;
 }
 

@@ -101,10 +101,19 @@ ERROR(error_sdk_too_old,driver,none,
       "Swift does not support the SDK '%0'", (StringRef))
 
 ERROR(error_two_files_same_name,driver,none,
-      "filename \"%0\" used twice: '%1' and '%2'", (StringRef, StringRef, StringRef))
+      "filename \"%0\" used twice: '%1' and '%2'",
+      (StringRef, StringRef, StringRef))
 NOTE(note_explain_two_files_same_name,driver,none,
      "filenames are used to distinguish private declarations with the same "
      "name", ())
+
+WARNING(warn_cannot_stat_input,driver,none,
+        "unable to determine when '%0' was last modified: %1",
+        (StringRef, StringRef))
+
+ERROR(error_input_changed_during_build,driver,none,
+      "input file '%0' was modified during the build",
+      (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
