@@ -23,6 +23,16 @@ using namespace swift;
 //                                 LoopRegion
 //===----------------------------------------------------------------------===//
 
+LoopRegion::~LoopRegion() {
+  // Blocks do not have subregion data, so everything should just clean up via
+  // RAII.
+  if (isBlock())
+    return;
+
+  // Otherwise, we need to cleanup subregion data.
+  getSubregionData().~SubregionData();
+}
+
 LoopRegion::BlockTy *LoopRegion::getBlock() const {
   return Ptr.get<BlockTy *>();
 }
@@ -137,6 +147,13 @@ LoopRegionFunctionInfo::LoopRegionFunctionInfo(FunctionTy *F,
 #ifndef NDEBUG
   verify();
 #endif
+}
+
+LoopRegionFunctionInfo::~LoopRegionFunctionInfo() {
+  for (auto *R : IDToRegionMap) {
+    R->~RegionTy();
+  }
+  IDToRegionMap.clear();
 }
 
 void LoopRegionFunctionInfo::verify() {

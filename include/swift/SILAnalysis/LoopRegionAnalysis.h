@@ -162,6 +162,7 @@ class LoopRegion {
                 "Expected trivially copyable type");
 
   struct SubregionData;
+  friend class LoopRegionFunctionInfo;
 
 public:
   /// We operate in terms of FunctionTy, LoopTy, and BlockTy so that this can
@@ -437,20 +438,9 @@ private:
     void sortSubregions() { std::sort(Subregions.begin(), Subregions.end()); }
   };
 
-  SubregionData &getSubregionData() {
-    assert(!isBlock() && "BBs do not have subregion data");
-    return reinterpret_cast<SubregionData &>(*(this + 1));
-  }
-
-  const SubregionData &getSubregionData() const {
-    assert(!isBlock() && "BBs do not have subregion data");
-    return reinterpret_cast<const SubregionData &>(*(this + 1));
-  }
-
-  friend class LoopRegionFunctionInfo;
-  using InnerSuccRange = IteratorRange<decltype(Succs)::const_iterator>;
-
 public:
+  ~LoopRegion();
+
   /// These will assert if this is not a loop region. If this is a loop region,
   /// the forward iterators will give the IDs of the subregions in RPO order.
   /// The backward iterators will give the IDs of the subregions in PO order.
@@ -523,6 +513,10 @@ public:
   bool succ_empty() const { return Succs.empty(); }
   unsigned succ_size() const { return Succs.size(); }
 
+private:
+  using InnerSuccRange = IteratorRange<decltype(Succs)::const_iterator>;
+
+public:
   using SuccRange =
       OptionalTransformRange<InnerSuccRange, SuccessorID::ToLiveSucc>;
   using LocalSuccRange =
@@ -652,6 +646,16 @@ private:
     getSubregionData().addLoopSubregion(L, Header);
   }
 
+
+  SubregionData &getSubregionData() {
+    assert(!isBlock() && "BBs do not have subregion data");
+    return reinterpret_cast<SubregionData &>(*(this + 1));
+  }
+
+  const SubregionData &getSubregionData() const {
+    assert(!isBlock() && "BBs do not have subregion data");
+    return reinterpret_cast<const SubregionData &>(*(this + 1));
+  }
 };
 
 } // end swift namespace
@@ -759,7 +763,7 @@ class LoopRegionFunctionInfo {
 public:
   LoopRegionFunctionInfo(FunctionTy *F, PostOrderFunctionInfo *POI,
                          LoopInfoTy *LI);
-
+  ~LoopRegionFunctionInfo();
 
   RegionTy *getRegion(unsigned RegionID) const {
     return IDToRegionMap[RegionID];
