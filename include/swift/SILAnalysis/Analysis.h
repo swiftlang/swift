@@ -185,10 +185,14 @@ namespace swift {
       }
     }
 
+    FunctionAnalysisBase() {}
+    virtual ~FunctionAnalysisBase() {
+      for (auto D : Storage)
+        delete D.second;
+    }
     FunctionAnalysisBase(AnalysisKind K) : SILAnalysis(K), Storage() {}
     FunctionAnalysisBase(const FunctionAnalysisBase &) = delete;
     FunctionAnalysisBase &operator=(const FunctionAnalysisBase &) = delete;
-    FunctionAnalysisBase() {}
 
     /// Verify all of the AnalysisTy for all functions.
     ///
