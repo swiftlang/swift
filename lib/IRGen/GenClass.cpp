@@ -63,10 +63,15 @@ static ClassDecl *getRootClass(ClassDecl *theClass) {
 /// What reference counting mechanism does a class have?
 ReferenceCounting irgen::getReferenceCountingForClass(IRGenModule &IGM,
                                                       ClassDecl *theClass) {
+  // If ObjC interop is disabled, we have a Swift refcount.
+  if (!IGM.ObjCInterop)
+    return ReferenceCounting::Native;
+
   // If the root class is implemented in swift, then we have a swift
   // refcount; otherwise, we have an ObjC refcount.
   if (hasKnownSwiftImplementation(IGM, getRootClass(theClass)))
     return ReferenceCounting::Native;
+
   return ReferenceCounting::ObjC;
 }
 

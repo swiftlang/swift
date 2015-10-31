@@ -283,9 +283,7 @@ public:
   void emitObjCRelease(llvm::Value *value);
   llvm::Value *emitBlockCopyCall(llvm::Value *value);
   void emitBlockRelease(llvm::Value *value);
-  
-  /// Emit a retain of a class instance with unknown retain semantics.
-  void emitUnknownRetain(llvm::Value *value, Explosion &explosion);
+
   /// Emit a retain of a class instance with unknown retain semantics, and
   /// return the retained value.
   llvm::Value *emitUnknownRetainCall(llvm::Value *value);
@@ -294,8 +292,6 @@ public:
   void emitUnknownUnownedRetain(llvm::Value *value);
   void emitUnknownUnownedRelease(llvm::Value *value);
   void emitUnknownRetainUnowned(llvm::Value *value);
-  /// Emit a retain of a class instance with bridge retain semantics.
-  void emitBridgeRetain(llvm::Value *value, Explosion &explosion);
   /// Emit a retain of a class instance with bridge retain semantics, and
   /// return the retained value.
   llvm::Value *emitBridgeRetainCall(llvm::Value *value);

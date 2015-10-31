@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -57,30 +57,4 @@ func call_existential_methods(x: P, var y: S) {
   // CHECK: [[GENERIC_METHOD:%.*]] = bitcast i8* [[GENERIC_METHOD_PTR]] to void (%swift.opaque*, %swift.type*, %swift.opaque*, %swift.type*)*
   // CHECK: call void [[GENERIC_METHOD]](%swift.opaque* noalias nocapture {{.*}}, %swift.type* {{.*}} @_TMfV27sil_generic_witness_methods1S, {{.*}} %swift.opaque* noalias nocapture {{%.*}}, %swift.type* [[METADATA]])
   x.generic_method(y)
-}
-
-@objc protocol ObjC {
-  func method()
-}
-
-// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods16call_objc_method{{.*}}(%objc_object*, %swift.type* %T) {{.*}} {
-// CHECK:         [[SEL:%.*]] = load i8*, i8** @"\01L_selector(method)", align 8
-// CHECK:         [[CAST:%.*]] = bitcast %objc_object* %0 to [[SELFTYPE:%?.*]]*
-// CHECK:         call void bitcast (void ()* @objc_msgSend to void ([[SELFTYPE]]*, i8*)*)([[SELFTYPE]]* [[CAST]], i8* [[SEL]])
-func call_objc_method<T: ObjC>(x: T) {
-  x.method()
-}
-
-// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods21call_call_objc_method{{.*}}(%objc_object*, %swift.type* %T) {{.*}} {
-// CHECK:         call void @_TF27sil_generic_witness_methods16call_objc_method{{.*}}(%objc_object* %0, %swift.type* %T)
-func call_call_objc_method<T: ObjC>(x: T) {
-  call_objc_method(x)
-}
-
-// CHECK-LABEL: define hidden void @_TF27sil_generic_witness_methods28call_objc_existential_method{{.*}}(%objc_object*) {{.*}} {
-// CHECK:         [[SEL:%.*]] = load i8*, i8** @"\01L_selector(method)", align 8
-// CHECK:         [[CAST:%.*]] = bitcast %objc_object* %0 to [[SELFTYPE:%?.*]]*
-// CHECK:         call void bitcast (void ()* @objc_msgSend to void ([[SELFTYPE]]*, i8*)*)([[SELFTYPE]]* [[CAST]], i8* [[SEL]])
-func call_objc_existential_method(x: ObjC) {
-  x.method()
 }

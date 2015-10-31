@@ -368,11 +368,18 @@ class WeakClassExistentialTypeInfo :
   using super =
            ExistentialTypeInfoBase<WeakClassExistentialTypeInfo,
              IndirectTypeInfo<WeakClassExistentialTypeInfo, WeakTypeInfo>>;
+
+  ReferenceCounting Refcounting;
+
 public:
   WeakClassExistentialTypeInfo(ArrayRef<ProtocolEntry> protocols,
                                llvm::Type *ty, Size size, Alignment align,
-                               SpareBitVector &&spareBits)
-    : super(protocols, ty, size, align, std::move(spareBits)) {
+                               SpareBitVector &&spareBits,
+                               ReferenceCounting refcounting)
+    : super(protocols, ty, size, align, std::move(spareBits)),
+      Refcounting(refcounting) {
+    assert(refcounting == ReferenceCounting::Native ||
+           refcounting == ReferenceCounting::Unknown);
   }
 
   Address projectWitnessTable(IRGenFunction &IGF, Address container,
@@ -391,7 +398,10 @@ public:
                       SILType T) const override {
     Address destValue = projectValue(IGF, dest);
     Address srcValue = projectValue(IGF, src);
-    IGF.emitUnknownWeakCopyAssign(destValue, srcValue);
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitWeakCopyAssign(destValue, srcValue);
+    else
+      IGF.emitUnknownWeakCopyAssign(destValue, srcValue);
     emitCopyOfTables(IGF, dest, src);
   }
 
@@ -400,7 +410,10 @@ public:
                           SILType T) const override {
     Address destValue = projectValue(IGF, dest);
     Address srcValue = projectValue(IGF, src);
-    IGF.emitUnknownWeakCopyInit(destValue, srcValue);
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitWeakCopyInit(destValue, srcValue);
+    else
+      IGF.emitUnknownWeakCopyInit(destValue, srcValue);
     emitCopyOfTables(IGF, dest, src);
   }
 
@@ -409,7 +422,10 @@ public:
                       SILType T) const override {
     Address destValue = projectValue(IGF, dest);
     Address srcValue = projectValue(IGF, src);
-    IGF.emitUnknownWeakTakeAssign(destValue, srcValue);
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitWeakTakeAssign(destValue, srcValue);
+    else
+      IGF.emitUnknownWeakTakeAssign(destValue, srcValue);
     emitCopyOfTables(IGF, dest, src);
   }
 
@@ -418,14 +434,20 @@ public:
                           SILType T) const override {
     Address destValue = projectValue(IGF, dest);
     Address srcValue = projectValue(IGF, src);
-    IGF.emitUnknownWeakTakeInit(destValue, srcValue);
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitWeakTakeInit(destValue, srcValue);
+    else
+      IGF.emitUnknownWeakTakeInit(destValue, srcValue);
     emitCopyOfTables(IGF, dest, src);
   }
 
   void destroy(IRGenFunction &IGF, Address existential,
                SILType T) const override {
     Address valueAddr = projectValue(IGF, existential);
-    IGF.emitUnknownWeakDestroy(valueAddr);
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitWeakDestroy(valueAddr);
+    else
+      IGF.emitUnknownWeakDestroy(valueAddr);
   }
 
   /// Given an explosion with multiple pointer elements in them, pack them
@@ -452,8 +474,12 @@ public:
                           IRGenFunction &IGF) const {
     // The first entry is always the weak*.
     llvm::Value *weak = InE.claimNext();
-    OutE.add(IGF.Builder.CreateBitOrPointerCast(weak,
-                                        IGF.IGM.UnknownRefCountedPtrTy));
+    if (Refcounting == ReferenceCounting::Native)
+      OutE.add(IGF.Builder.CreateBitOrPointerCast(weak,
+                                          IGF.IGM.RefCountedPtrTy));
+    else
+      OutE.add(IGF.Builder.CreateBitOrPointerCast(weak,
+                                          IGF.IGM.UnknownRefCountedPtrTy));
 
     // Collect the witness tables.
     for (unsigned i = 0, e = getNumStoredProtocols(); i != e; ++i) {
@@ -470,8 +496,12 @@ public:
                       Explosion &out) const override {
     Explosion temp;
     Address valueAddr = projectValue(IGF, existential);
-    temp.add(IGF.emitUnknownWeakLoadStrong(valueAddr,
-                                          IGF.IGM.UnknownRefCountedPtrTy));
+    if (Refcounting == ReferenceCounting::Native)
+      temp.add(IGF.emitWeakLoadStrong(valueAddr,
+                                      IGF.IGM.RefCountedPtrTy));
+    else
+      temp.add(IGF.emitUnknownWeakLoadStrong(valueAddr,
+                                            IGF.IGM.UnknownRefCountedPtrTy));
     emitLoadOfTables(IGF, existential, temp);
     mergeExplosion(temp, out, IGF);
   }
@@ -480,8 +510,12 @@ public:
                       Explosion &out) const override {
     Explosion temp;
     Address valueAddr = projectValue(IGF, existential);
-    temp.add(IGF.emitUnknownWeakTakeStrong(valueAddr,
-                                          IGF.IGM.UnknownRefCountedPtrTy));
+    if (Refcounting == ReferenceCounting::Native)
+      temp.add(IGF.emitWeakTakeStrong(valueAddr,
+                                      IGF.IGM.RefCountedPtrTy));
+    else
+      temp.add(IGF.emitUnknownWeakTakeStrong(valueAddr,
+                                            IGF.IGM.UnknownRefCountedPtrTy));
     emitLoadOfTables(IGF, existential, temp);
     mergeExplosion(temp, out, IGF);
   }
@@ -492,10 +526,16 @@ public:
     decomposeExplosion(in, temp, IGF);
 
     llvm::Value *value = temp.claimNext();
-    assert(value->getType() == IGF.IGM.UnknownRefCountedPtrTy);
+    if (Refcounting == ReferenceCounting::Native)
+      assert(value->getType() == IGF.IGM.RefCountedPtrTy);
+    else
+      assert(value->getType() == IGF.IGM.UnknownRefCountedPtrTy);
     emitStoreOfTables(IGF, temp, existential);
     Address valueAddr = projectValue(IGF, existential);
-    IGF.emitUnknownWeakInit(value, valueAddr);
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitWeakInit(value, valueAddr);
+    else
+      IGF.emitUnknownWeakInit(value, valueAddr);
   }
 
   void weakAssign(IRGenFunction &IGF, Explosion &in,
@@ -504,10 +544,16 @@ public:
     decomposeExplosion(in, temp, IGF);
 
     llvm::Value *value = temp.claimNext();
-    assert(value->getType() == IGF.IGM.UnknownRefCountedPtrTy);
+    if (Refcounting == ReferenceCounting::Native)
+      assert(value->getType() == IGF.IGM.RefCountedPtrTy);
+    else
+      assert(value->getType() == IGF.IGM.UnknownRefCountedPtrTy);
     emitStoreOfTables(IGF, temp, existential);
     Address valueAddr = projectValue(IGF, existential);
-    IGF.emitUnknownWeakAssign(value, valueAddr);
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitWeakAssign(value, valueAddr);
+    else
+      IGF.emitUnknownWeakAssign(value, valueAddr);
   }
 };
 
@@ -767,25 +813,41 @@ public:
 class UnownedClassExistentialTypeInfo
   : public ScalarExistentialTypeInfoBase<UnownedClassExistentialTypeInfo,
                                          UnownedTypeInfo> {
+  ReferenceCounting Refcounting;
+
 public:
   UnownedClassExistentialTypeInfo(ArrayRef<ProtocolEntry> storedProtocols,
                                   llvm::Type *ty,
                                   const SpareBitVector &spareBits,
-                                  Size size, Alignment align)
+                                  Size size, Alignment align,
+                                  ReferenceCounting refcounting)
     : ScalarExistentialTypeInfoBase(storedProtocols, ty, size,
-                                    spareBits, align) {}
+                                    spareBits, align),
+      Refcounting(refcounting) {
+    assert(refcounting == ReferenceCounting::Native ||
+           refcounting == ReferenceCounting::Unknown);
+  }
 
   const LoadableTypeInfo &
   getPayloadTypeInfoForExtraInhabitants(IRGenModule &IGM) const {
-    return IGM.getUnknownObjectTypeInfo();
+    if (Refcounting == ReferenceCounting::Native)
+      return IGM.getNativeObjectTypeInfo();
+    else
+      return IGM.getUnknownObjectTypeInfo();
   }
 
   void emitPayloadRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitUnknownUnownedRetain(value);
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitUnownedRetain(value);
+    else
+      IGF.emitUnknownUnownedRetain(value);
   }
 
   void emitPayloadRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitUnknownUnownedRelease(value);
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitUnownedRelease(value);
+    else
+      IGF.emitUnknownUnownedRelease(value);
   }
 
   void emitPayloadFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
@@ -807,7 +869,10 @@ public:
 
   const LoadableTypeInfo &
   getPayloadTypeInfoForExtraInhabitants(IRGenModule &IGM) const {
-    return IGM.getUnknownObjectTypeInfo();
+    if (!IGM.ObjCInterop)
+      return IGM.getNativeObjectTypeInfo();
+    else
+      return IGM.getUnknownObjectTypeInfo();
   }
 
   void emitPayloadRetain(IRGenFunction &IGF, llvm::Value *value) const {
@@ -832,22 +897,26 @@ class ClassExistentialTypeInfo
   : public ScalarExistentialTypeInfoBase<ClassExistentialTypeInfo,
                                          ReferenceTypeInfo>
 {
+  ReferenceCounting Refcounting;
+ 
   friend ExistentialTypeInfoBase;
   ClassExistentialTypeInfo(ArrayRef<ProtocolEntry> protocols,
                            llvm::Type *ty,
                            Size size,
                            SpareBitVector &&spareBits,
-                           Alignment align)
+                           Alignment align,
+                           ReferenceCounting refcounting)
     : ScalarExistentialTypeInfoBase(protocols, ty, size,
-                                    std::move(spareBits), align)
-  {}
+                                    std::move(spareBits), align),
+      Refcounting(refcounting) {
+    assert(refcounting == ReferenceCounting::Native ||
+           refcounting == ReferenceCounting::Unknown);
+  }
+
 public:
 
-  /// Class existentials are single refcounted pointers if they have no
-  /// witness tables. Right now we have no way of constraining an existential
-  /// to Swift-refcounted types.
   bool isSingleSwiftRetainablePointer(ResilienceScope scope) const override {
-    return false;
+    return (Refcounting == ReferenceCounting::Native);
   }
   bool isSingleUnknownRetainablePointer(ResilienceScope scope) const override{
     return getNumStoredProtocols() == 0;
@@ -855,45 +924,69 @@ public:
 
   const LoadableTypeInfo &
   getPayloadTypeInfoForExtraInhabitants(IRGenModule &IGM) const {
-    return IGM.getUnknownObjectTypeInfo();
+    if (Refcounting == ReferenceCounting::Native)
+      return IGM.getNativeObjectTypeInfo();
+    else
+      return IGM.getUnknownObjectTypeInfo();
   }
 
   void retain(IRGenFunction &IGF, Explosion &e) const override {
     // The instance is treated as unknown-refcounted.
-    IGF.emitUnknownRetainCall(e.claimNext());
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitRetainCall(e.claimNext());
+    else
+      IGF.emitUnknownRetainCall(e.claimNext());
     e.claim(getNumStoredProtocols());
   }
 
   void release(IRGenFunction &IGF, Explosion &e) const override {
     // The instance is treated as unknown-refcounted.
-    IGF.emitUnknownRelease(e.claimNext());
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitRelease(e.claimNext());
+    else
+      IGF.emitUnknownRelease(e.claimNext());
     e.claim(getNumStoredProtocols());
   }
 
   void retainUnowned(IRGenFunction &IGF, Explosion &e) const override {
     // The instance is treated as unknown-refcounted.
-    IGF.emitUnknownRetainUnowned(e.claimNext());
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitRetainUnowned(e.claimNext());
+    else
+      IGF.emitUnknownRetainUnowned(e.claimNext());
     e.claim(getNumStoredProtocols());
   }
 
   void unownedRetain(IRGenFunction &IGF, Explosion &e) const override {
     // The instance is treated as unknown-refcounted.
-    IGF.emitUnknownUnownedRetain(e.claimNext());
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitUnownedRetain(e.claimNext());
+    else
+      IGF.emitUnknownUnownedRetain(e.claimNext());
     e.claim(getNumStoredProtocols());
   }
 
   void unownedRelease(IRGenFunction &IGF, Explosion &e) const override {
     // The instance is treated as unknown-refcounted.
-    IGF.emitUnknownUnownedRelease(e.claimNext());
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitUnownedRelease(e.claimNext());
+    else
+      IGF.emitUnknownUnownedRelease(e.claimNext());
     e.claim(getNumStoredProtocols());
   }
 
   void emitPayloadRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitUnknownRetainCall(value);
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitRetainCall(value);
+    else
+      IGF.emitUnknownRetainCall(value);
   }
 
   void emitPayloadRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    IGF.emitUnknownRelease(value);
+    if (Refcounting == ReferenceCounting::Native)
+      IGF.emitRelease(value);
+    else
+      IGF.emitUnknownRelease(value);
   }
 
   void emitPayloadFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
@@ -902,7 +995,10 @@ public:
 
   LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                               Address addr) const override {
-    return LoadedRef(IGF.emitLoadUnknownRefcountedPtr(addr), true);
+    if (Refcounting == ReferenceCounting::Native)
+      return LoadedRef(IGF.emitLoadNativeRefcountedPtr(addr), true);
+    else
+      return LoadedRef(IGF.emitLoadUnknownRefcountedPtr(addr), true);
   }
 
   const UnownedTypeInfo *
@@ -912,7 +1008,8 @@ public:
                                                    getStorageType(),
                                                    getSpareBits(),
                                                    getFixedSize(),
-                                                   getFixedAlignment());
+                                                   getFixedAlignment(),
+                                                   Refcounting);
   }
 
   const TypeInfo *
@@ -948,7 +1045,8 @@ public:
 
     return WeakClassExistentialTypeInfo::create(getStoredProtocols(),
                                                 storageTy, size, align,
-                                                std::move(spareBits));
+                                                std::move(spareBits),
+                                                Refcounting);
   }
 };
 
@@ -992,17 +1090,22 @@ public:
 class ErrorExistentialTypeInfo : public HeapTypeInfo<ErrorExistentialTypeInfo>
 {
   ProtocolEntry ErrorProtocolEntry;
+  ReferenceCounting Refcounting;
+
 public:
   ErrorExistentialTypeInfo(llvm::PointerType *storage,
                            Size size, SpareBitVector spareBits,
                            Alignment align,
-                           const ProtocolEntry &errorProtocolEntry)
+                           const ProtocolEntry &errorProtocolEntry,
+                           ReferenceCounting refcounting)
     : HeapTypeInfo(storage, size, spareBits, align),
-      ErrorProtocolEntry(errorProtocolEntry) {}
+      ErrorProtocolEntry(errorProtocolEntry),
+      Refcounting(refcounting) {}
 
   ReferenceCounting getReferenceCounting() const {
-    // ErrorType uses its own rc entry points.
-    return ReferenceCounting::Error;
+    // ErrorType uses its own rc entry points when the Objective-C runtime
+    // is in use.
+    return Refcounting;
   }
   
   ArrayRef<ProtocolEntry> getStoredProtocols() const {
@@ -1018,14 +1121,18 @@ static const TypeInfo *createErrorExistentialTypeInfo(IRGenModule &IGM,
   // only for witnesses to the ErrorType protocol.
   assert(protocols.size() == 1
      && *protocols[0]->getKnownProtocolKind() == KnownProtocolKind::ErrorType);
-  
+
   const ProtocolInfo &impl = IGM.getProtocolInfo(protocols[0]);
-  
+  auto refcounting = (!IGM.ObjCInterop
+                      ? ReferenceCounting::Native
+                      : ReferenceCounting::Error);
+
   return new ErrorExistentialTypeInfo(IGM.ErrorPtrTy,
                                       IGM.getPointerSize(),
                                       IGM.getHeapObjectSpareBits(),
                                       IGM.getPointerAlignment(),
-                                      ProtocolEntry(protocols[0], impl));
+                                      ProtocolEntry(protocols[0], impl),
+                                      refcounting);
 }
 
 static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
@@ -1093,8 +1200,19 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   // If the existential is class, lower it to a class
   // existential representation.
   if (requiresClass) {
+    // If we're not using the Objective-C runtime, we can use the
+    // native reference counting entry points.
+    ReferenceCounting refcounting;
+
     // Replace the type metadata pointer with the class instance.
-    fields[1] = IGM.UnknownRefCountedPtrTy;
+    if (!IGM.ObjCInterop) {
+      refcounting = ReferenceCounting::Native;
+      fields[1] = IGM.RefCountedPtrTy;
+    } else {
+      refcounting = ReferenceCounting::Unknown;
+      fields[1] = IGM.UnknownRefCountedPtrTy;
+    }
+
     auto classFields = llvm::makeArrayRef(fields).slice(1);
     type->setBody(classFields);
 
@@ -1117,7 +1235,8 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
     }
 
     return ClassExistentialTypeInfo::create(entries, type,
-                                            size, std::move(spareBits), align);
+                                            size, std::move(spareBits), align,
+                                            refcounting);
   }
 
   // Set up the first two fields.
@@ -1479,8 +1598,13 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
   auto &destTI = IGF.getTypeInfo(outType).as<ClassExistentialTypeInfo>();
 
   // Cast the instance pointer to an opaque refcounted pointer.
-  llvm::Value *opaqueInstance
-    = IGF.Builder.CreateBitCast(instance, IGF.IGM.UnknownRefCountedPtrTy);
+  llvm::Value *opaqueInstance;
+  if (!IGF.IGM.ObjCInterop)
+    opaqueInstance = IGF.Builder.CreateBitCast(instance,
+                                               IGF.IGM.RefCountedPtrTy);
+  else
+    opaqueInstance = IGF.Builder.CreateBitCast(instance,
+                                               IGF.IGM.UnknownRefCountedPtrTy);
   out.add(opaqueInstance);
 
   // Emit the witness table pointers.

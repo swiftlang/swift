@@ -153,11 +153,11 @@ bb0(%0 : $Optional<A>):
 }
 
 // CHECK-i386-LABEL: define i32 @unchecked_ref_cast_proto_optional
-// CHECK-i386: ptrtoint %objc_object* %0 to i32
+// CHECK-i386: ptrtoint {{%objc_object|%swift.refcounted}}* %0 to i32
 // CHECK-i386-NEXT: ret i32
 
 // CHECK-x86_64-LABEL: define i64 @unchecked_ref_cast_proto_optional
-// CHECK-x86_64: ptrtoint %objc_object* %0 to i64
+// CHECK-x86_64: ptrtoint {{%objc_object|%swift.refcounted}}* %0 to i64
 // CHECK-x86_64-NEXT: ret i64
 sil @unchecked_ref_cast_proto_optional : $@convention(thin) (@owned CP) -> @owned Optional<AnyObject> {
 bb0(%0 : $CP):

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -gnone -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %s -gnone -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime-%target-ptrsize
 
 // REQUIRES: CPU=i386_or_x86_64
 
@@ -1135,7 +1135,8 @@ enum SinglePayloadObjCProtocol {
 // CHECK-64:     i64 4, label {{%.*}}
 // CHECK-64:   ]
 
-// CHECK-64:   inttoptr i64 %0 to %objc_object*
+// CHECK-objc-64:     inttoptr i64 %0 to %objc_object*
+// CHECK-native-64:   inttoptr i64 %0 to %swift.refcounted*
 // CHECK-64:   inttoptr i64 %1 to i8**
 
 // CHECK-32: define void @single_payload_class_protocol_switch(i32, i32) {{.*}} {
@@ -1145,7 +1146,8 @@ enum SinglePayloadObjCProtocol {
 // CHECK-32:     i32 2, label {{%.*}}
 // CHECK-32:   ]
 
-// CHECK-32:   inttoptr i32 %0 to %objc_object*
+// CHECK-objc-32:     inttoptr i32 %0 to %objc_object*
+// CHECK-native-32:   inttoptr i32 %0 to %swift.refcounted*
 // CHECK-32:   inttoptr i32 %1 to i8**
 
 sil @single_payload_class_protocol_switch : $(SinglePayloadClassProtocol) -> () {
@@ -1171,7 +1173,8 @@ end:
 // CHECK-64:     i64 2, label {{%.*}}
 // CHECK-64:     i64 4, label {{%.*}}
 // CHECK-64:   ]
-// CHECK-64:   inttoptr i64 %0 to %objc_object*
+// CHECK-objc-64:     inttoptr i64 %0 to %objc_object*
+// CHECK-native-64:   inttoptr i64 %0 to %swift.refcounted*
 
 // CHECK-32: define void @single_payload_objc_protocol_switch(i32) {{.*}} {
 // CHECK-32:   switch i32 %0, label {{%.*}}
@@ -1179,7 +1182,8 @@ end:
 // CHECK-32:     i32 1, label {{%.*}}
 // CHECK-32:     i32 2, label {{%.*}}
 // CHECK-32:   ]
-// CHECK-32:   inttoptr i32 %0 to %objc_object*
+// CHECK-objc-32:     inttoptr i32 %0 to %objc_object*
+// CHECK-native-32:   inttoptr i32 %0 to %swift.refcounted*
 
 sil @single_payload_objc_protocol_switch : $(SinglePayloadObjCProtocol) -> () {
 entry(%c : $SinglePayloadObjCProtocol):

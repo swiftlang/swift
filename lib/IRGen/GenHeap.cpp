@@ -919,53 +919,21 @@ void IRGenFunction::emitFixLifetime(llvm::Value *value) {
   emitUnaryRefCountCall(*this, IGM.getFixLifetimeFn(), value);
 }
 
-void IRGenFunction::emitUnknownRetain(llvm::Value *value, Explosion &e) {
-  if (!IGM.ObjCInterop) {
-    emitRetain(value, e);
-    return;
-  }
-  emitUnaryRefCountCall(*this, IGM.getUnknownRetainFn(), value);
-}
-
 llvm::Value *IRGenFunction::emitUnknownRetainCall(llvm::Value *value) {
-  if (!IGM.ObjCInterop) {
-    emitRetainCall(value);
-    return value;
-  }
   emitUnaryRefCountCall(*this, IGM.getUnknownRetainFn(), value);
   return value;
 }
 
 void IRGenFunction::emitUnknownRelease(llvm::Value *value) {
-  if (!IGM.ObjCInterop) {
-    emitRelease(value);
-    return;
-  }
   emitUnaryRefCountCall(*this, IGM.getUnknownReleaseFn(), value);
 }
 
-void IRGenFunction::emitBridgeRetain(llvm::Value *value, Explosion &e) {
-  if (!IGM.ObjCInterop) {
-    emitRetain(value, e);
-    return;
-  }
-  emitUnaryRefCountCall(*this, IGM.getBridgeObjectRetainFn(), value);
-}
-
 llvm::Value *IRGenFunction::emitBridgeRetainCall(llvm::Value *value) {
-  if (!IGM.ObjCInterop) {
-    emitRetainCall(value);
-    return value;
-  }
   emitUnaryRefCountCall(*this, IGM.getBridgeObjectRetainFn(), value);
   return value;
 }
 
 void IRGenFunction::emitBridgeRelease(llvm::Value *value) {
-  if (!IGM.ObjCInterop) {
-    emitRelease(value);
-    return;
-  }
   emitUnaryRefCountCall(*this, IGM.getBridgeObjectReleaseFn(), value);
 }
 

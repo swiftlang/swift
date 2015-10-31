@@ -237,8 +237,8 @@ public:
 /// A type implementation for a class archetype, that is, an archetype
 /// bounded by a class protocol constraint. These archetypes can be
 /// represented by a refcounted pointer instead of an opaque value buffer.
-/// We use an unknown-refcounted pointer in order to allow ObjC or Swift
-/// classes to conform to the type variable.
+/// If ObjC interop is disabled, we can use Swift refcounting entry
+/// points, otherwise we have to use the unknown ones.
 class ClassArchetypeTypeInfo
   : public HeapTypeInfo<ClassArchetypeTypeInfo>,
     public ArchetypeTypeInfoBase
@@ -314,10 +314,16 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // If the archetype is class-constrained, use a class pointer
   // representation.
   if (archetype->requiresClass()) {
-    // Fully general archetypes can't be assumed to have any particular
-    // refcounting scheme.
-    ReferenceCounting refcount = ReferenceCounting::Unknown;
-    llvm::PointerType *reprTy = IGM.UnknownRefCountedPtrTy;
+    ReferenceCounting refcount;
+    llvm::PointerType *reprTy;
+
+    if (!IGM.ObjCInterop) {
+      refcount = ReferenceCounting::Native;
+      reprTy = IGM.RefCountedPtrTy;
+    } else {
+      refcount = ReferenceCounting::Unknown;
+      reprTy = IGM.UnknownRefCountedPtrTy;
+    }
 
     // If the archetype has a superclass constraint, it has at least the
     // retain semantics of its superclass, and it can be represented with

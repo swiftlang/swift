@@ -1541,10 +1541,14 @@ namespace {
 
       auto getReferenceCountingForReferent
         = [&](CanType referent) -> ReferenceCounting {
-          // For generic types, use unknown reference counting.
-          if (isa<ArchetypeType>(referent)
-              || referent->isExistentialType())
-            return ReferenceCounting::Unknown;
+          // If Objective-C interop is enabled, generic types might contain
+          // Objective-C references, so we have to use unknown reference
+          // counting.
+          if (isa<ArchetypeType>(referent) ||
+              referent->isExistentialType())
+            return (IGF.IGM.ObjCInterop ?
+                    ReferenceCounting::Unknown :
+                    ReferenceCounting::Native);
 
           if (auto classDecl = referent->getClassOrBoundGenericClass())
             return getReferenceCountingForClass(IGF.IGM, classDecl);

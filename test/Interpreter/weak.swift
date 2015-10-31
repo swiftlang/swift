@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
 protocol Protocol : class {
   func noop()
 }

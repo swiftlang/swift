@@ -1,13 +1,15 @@
-// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime
 
 import Swift
 
 // CHECK-LABEL: define void @retain_release_boxed_existential(%swift.error*)
 sil @retain_release_boxed_existential : $@convention(thin) (ErrorType) -> () {
 entry(%e : $ErrorType):
-  // CHECK: @swift_errorRetain
+  // CHECK-objc: @swift_errorRetain
+  // CHECK-native: @swift_retain
   strong_retain %e : $ErrorType
-  // CHECK: @swift_errorRelease
+  // CHECK-objc: @swift_errorRelease
+  // CHECK-native: @swift_release
   strong_release %e : $ErrorType
   return undef : $()
 }
@@ -84,7 +86,8 @@ entry(%b : $ErrorType):
   // CHECK: [[WITNESS:%.*]] = load {{.*}} [[OUT_WITNESS]]
   %m = existential_metatype $@thick ErrorType.Type, %b : $ErrorType
 
-  // CHECK: call void @swift_errorRelease(%swift.error* %0)
+  // CHECK-objc:   call void @swift_errorRelease(%swift.error* %0)
+  // CHECK-native: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%swift.error*)*)(%swift.error* %0)
   strong_release %b : $ErrorType
 
   // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* [[DYNAMIC_TYPE]], 0
