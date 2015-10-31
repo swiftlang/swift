@@ -729,11 +729,7 @@ static void doWeakInit(WeakReference *addr, void *value, bool valueIsNative) {
   if (valueIsNative) {
     swift_weakInit(addr, (HeapObject*) value);
   } else {
-#if SWIFT_OBJC_INTEROP
     objc_initWeak((id*) &addr->Value, (id) value);
-#else
-    assert(valueIsNative);
-#endif
   }
 }
 
@@ -741,11 +737,7 @@ static void doWeakDestroy(WeakReference *addr, bool valueIsNative) {
   if (valueIsNative) {
     swift_weakDestroy(addr);
   } else {
-#if SWIFT_OBJC_INTEROP
     objc_destroyWeak((id*) &addr->Value);
-#else
-    assert(valueIsNative);
-#endif
   }
 }
 
