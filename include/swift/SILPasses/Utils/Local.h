@@ -310,7 +310,10 @@ class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     DestBB->push_back(Cloned);
     SILClonerWithScopes<BaseThreadingCloner>::postProcess(Orig, Cloned);
-    AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
+    // A terminator defines no values. Keeping terminators in the AvailVals list
+    // is problematic because terminators get replaced during SSA update.
+    if (!isa<TermInst>(Orig))
+      AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
   }
 };
 
