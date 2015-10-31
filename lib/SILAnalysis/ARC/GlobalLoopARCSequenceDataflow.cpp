@@ -254,7 +254,11 @@ LoopARCSequenceDataflowEvaluator::LoopARCSequenceDataflowEvaluator(
   }
 }
 
-LoopARCSequenceDataflowEvaluator::~LoopARCSequenceDataflowEvaluator() {}
+LoopARCSequenceDataflowEvaluator::~LoopARCSequenceDataflowEvaluator() {
+  for (auto P : RegionStateInfo) {
+    P.second->~ARCRegionState();
+  }
+}
 
 bool LoopARCSequenceDataflowEvaluator::runOnLoop(
     const LoopRegion *R, bool FreezeOwnedArgEpilogueReleases) {
