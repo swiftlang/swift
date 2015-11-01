@@ -110,34 +110,7 @@ static bool processBBTopDown(
       if (Op && OtherState->first == Op)
         continue;
 
-      // If the other state is not tracking anything, bail.
-      if (!OtherState->second.isTrackingRefCount())
-        continue;
-
-      // Check if the instruction we are visiting could potentially use our
-      // instruction in a way that requires us to guarantee the lifetime of the
-      // pointer up to this point. This has the effect of performing a use and a
-      // decrement.
-      if (OtherState->second.handlePotentialGuaranteedUser(&I, &I, AA)) {
-        DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
-                           << OtherState->second.getRCRoot());
-        continue;
-      }
-
-      // Check if the instruction we are visiting could potentially decrement
-      // the reference counted value we are tracking in a manner that could
-      // cause us to change states. If we do change states continue...
-      if (OtherState->second.handlePotentialDecrement(&I, &I, AA)) {
-        DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-                           << OtherState->second.getRCRoot());
-        continue;
-      }
-
-      // Otherwise check if the reference counted value we are tracking
-      // could be used by the given instruction.
-      if (OtherState->second.handlePotentialUser(&I, AA))
-        DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
-                           << OtherState->second.getRCRoot());
+      OtherState->second.updateForSameLoopInst(&I, &I, AA);
     }
   }
 
@@ -289,34 +262,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
       if (Op && OtherState->first == Op)
         continue;
 
-      // If this state is not tracking anything, skip it.
-      if (!OtherState->second.isTrackingRefCount())
-        continue;
-
-      // Check if the instruction we are visiting could potentially use our
-      // instruction in a way that requires us to guarantee the lifetime of the
-      // pointer up to this point. This has the effect of performing a use and a
-      // decrement.
-      if (OtherState->second.handlePotentialGuaranteedUser(&I, InsertPt, AA)) {
-        DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
-                           << OtherState->second.getRCRoot());
-        continue;
-      }
-
-      // Check if the instruction we are visiting could potentially decrement
-      // the reference counted value we are tracking... in a manner that could
-      // cause us to change states. If we do change states continue...
-      if (OtherState->second.handlePotentialDecrement(&I, AA)) {
-        DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-                           << OtherState->second.getRCRoot());
-        continue;
-      }
-
-      // Otherwise check if the reference counted value we are tracking
-      // could be used by the given instruction.
-      if (OtherState->second.handlePotentialUser(&I, InsertPt, AA))
-        DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
-                           << OtherState->second.getRCRoot());
+      OtherState->second.updateForSameLoopInst(&I, InsertPt, AA);
     }
   }
 

@@ -428,6 +428,39 @@ bool BottomUpRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
   return handleUser(PotentialUser, InsertPt, getRCRoot(), AA);
 }
 
+void BottomUpRefCountState::updateForSameLoopInst(SILInstruction *I,
+                                                  SILInstruction *InsertPt,
+                                                  AliasAnalysis *AA) {
+  // If this state is not tracking anything, there is nothing to update.
+  if (!isTrackingRefCount())
+    return;
+
+  // Check if the instruction we are visiting could potentially use our
+  // instruction in a way that requires us to guarantee the lifetime of the
+  // pointer up to this point. This has the effect of performing a use and a
+  // decrement.
+  if (handlePotentialGuaranteedUser(I, InsertPt, AA)) {
+    DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
+                       << getRCRoot());
+    return;
+  }
+
+  // Check if the instruction we are visiting could potentially decrement
+  // the reference counted value we are tracking... in a manner that could
+  // cause us to change states. If we do change states continue...
+  if (handlePotentialDecrement(I, AA)) {
+    DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
+                       << getRCRoot());
+    return;
+  }
+
+  // Otherwise check if the reference counted value we are tracking
+  // could be used by the given instruction.
+  if (!handlePotentialUser(I, InsertPt, AA))
+    return;
+  DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << getRCRoot());
+}
+
 //===----------------------------------------------------------------------===//
 //                          Top Down Ref Count State
 //===----------------------------------------------------------------------===//
@@ -763,6 +796,39 @@ bool TopDownRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
     return false;
 
   return handleUser(PotentialUser, getRCRoot(), AA);
+}
+
+void TopDownRefCountState::updateForSameLoopInst(SILInstruction *I,
+                                                 SILInstruction *InsertPt,
+                                                 AliasAnalysis *AA) {
+  // If the other state is not tracking anything, bail.
+  if (!isTrackingRefCount())
+    return;
+
+  // Check if the instruction we are visiting could potentially use our
+  // instruction in a way that requires us to guarantee the lifetime of the
+  // pointer up to this point. This has the effect of performing a use and a
+  // decrement.
+  if (handlePotentialGuaranteedUser(I, InsertPt, AA)) {
+    DEBUG(llvm::dbgs() << "    Found Potential Guaranteed Use:\n        "
+                       << getRCRoot());
+    return;
+  }
+
+  // Check if the instruction we are visiting could potentially decrement
+  // the reference counted value we are tracking in a manner that could
+  // cause us to change states. If we do change states continue...
+  if (handlePotentialDecrement(I, InsertPt, AA)) {
+    DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
+                       << getRCRoot());
+    return;
+  }
+
+  // Otherwise check if the reference counted value we are tracking
+  // could be used by the given instruction.
+  if (!handlePotentialUser(I, AA))
+    return;
+  DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << getRCRoot());
 }
 
 //===----------------------------------------------------------------------===//

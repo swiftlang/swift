@@ -202,23 +202,11 @@ public:
   /// true.
   bool initWithMutatorInst(SILInstruction *I);
 
-  /// Check if PotentialDecrement can decrement the reference count associated
-  /// with the value we are tracking. If so advance the state's sequence
-  /// appropriately and return true. Otherwise return false.
-  bool handlePotentialDecrement(SILInstruction *Decrement, AliasAnalysis *AA);
-
-  /// Check if PotentialUser could be a use of the reference counted value that
-  /// requires user to be alive. If so advance the state's sequence
-  /// appropriately and return true. Otherwise return false.
-  bool handlePotentialUser(SILInstruction *PotentialUser,
-                           SILInstruction *InsertPt, AliasAnalysis *AA);
-
-  /// Check if PotentialGuaranteedUser can use the reference count associated
-  /// with the value we are tracking. If so advance the state's sequence
-  /// appropriately and return true. Otherwise return false.
-  bool handlePotentialGuaranteedUser(SILInstruction *User,
-                                     SILInstruction *InsertPt,
-                                     AliasAnalysis *AA);
+  /// Update this reference count's state given the instruction \p I. \p
+  /// InsertPt is the point furthest up the CFG where we can move the currently
+  /// tracked reference count.
+  void updateForSameLoopInst(SILInstruction *I, SILInstruction *InsertPt,
+                             AliasAnalysis *AA);
 
   /// Attempt to merge \p Other into this ref count state. Return true if we
   /// succeed and false otherwise.
@@ -249,6 +237,11 @@ private:
   /// advance return true. Otherwise return false.
   bool handleDecrement(SILInstruction *PotentialDecrement);
 
+  /// Check if PotentialDecrement can decrement the reference count associated
+  /// with the value we are tracking. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialDecrement(SILInstruction *Decrement, AliasAnalysis *AA);
+
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
   bool valueCanBeUsedGivenLatticeState() const;
@@ -259,6 +252,12 @@ private:
   /// would insert a release.
   bool handleUser(SILInstruction *PotentialUser, SILInstruction *InsertPt,
                   SILValue RCIdentity, AliasAnalysis *AA);
+
+  /// Check if PotentialUser could be a use of the reference counted value that
+  /// requires user to be alive. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialUser(SILInstruction *PotentialUser,
+                           SILInstruction *InsertPt, AliasAnalysis *AA);
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
@@ -271,6 +270,13 @@ private:
   bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
                             SILInstruction *InsertPt, SILValue RCIdentity,
                             AliasAnalysis *AA);
+
+  /// Check if PotentialGuaranteedUser can use the reference count associated
+  /// with the value we are tracking. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialGuaranteedUser(SILInstruction *User,
+                                     SILInstruction *InsertPt,
+                                     AliasAnalysis *AA);
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
@@ -322,23 +328,11 @@ public:
   /// Uninitialize the current state.
   void clear();
 
-  /// Check if PotentialDecrement can decrement the reference count associated
-  /// with the value we are tracking. If so advance the state's sequence
-  /// appropriately and return true. Otherwise return false.
-  bool handlePotentialDecrement(SILInstruction *PotentialDecrement,
-                                SILInstruction *InsertPt, AliasAnalysis *AA);
-
-  /// Check if PotentialUser could be a use of the reference counted value that
-  /// requires user to be alive. If so advance the state's sequence
-  /// appropriately and return true. Otherwise return false.
-  bool handlePotentialUser(SILInstruction *PotentialUser, AliasAnalysis *AA);
-
-  /// Check if PotentialGuaranteedUser can use the reference count associated
-  /// with the value we are tracking. If so advance the state's sequence
-  /// appropriately and return true. Otherwise return false.
-  bool handlePotentialGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
-                                     SILInstruction *InsertPt,
-                                     AliasAnalysis *AA);
+  /// Update this reference count's state given the instruction \p I. \p
+  /// InsertPt is the point furthest up the CFG where we can move the currently
+  /// tracked reference count.
+  void updateForSameLoopInst(SILInstruction *I, SILInstruction *InsertPt,
+                             AliasAnalysis *AA);
 
   /// Returns true if the passed in ref count inst matches the ref count inst
   /// we are tracking. This handles generically retains/release.
@@ -361,6 +355,12 @@ private:
   bool handleDecrement(SILInstruction *PotentialDecrement,
                        SILInstruction *InsertPt);
 
+  /// Check if PotentialDecrement can decrement the reference count associated
+  /// with the value we are tracking. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialDecrement(SILInstruction *PotentialDecrement,
+                                SILInstruction *InsertPt, AliasAnalysis *AA);
+
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
   bool valueCanBeUsedGivenLatticeState() const;
@@ -369,6 +369,11 @@ private:
   /// lattice state. Return true if we do so and false otherwise.
   bool handleUser(SILInstruction *PotentialUser,
                   SILValue RCIdentity, AliasAnalysis *AA);
+
+  /// Check if PotentialUser could be a use of the reference counted value that
+  /// requires user to be alive. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialUser(SILInstruction *PotentialUser, AliasAnalysis *AA);
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
@@ -379,6 +384,13 @@ private:
   bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
                             SILInstruction *InsertPt, SILValue RCIdentity,
                             AliasAnalysis *AA);
+
+  /// Check if PotentialGuaranteedUser can use the reference count associated
+  /// with the value we are tracking. If so advance the state's sequence
+  /// appropriately and return true. Otherwise return false.
+  bool handlePotentialGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
+                                     SILInstruction *InsertPt,
+                                     AliasAnalysis *AA);
 
   /// We have a matching ref count inst. Return true if we advance the sequence
   /// and false otherwise.
