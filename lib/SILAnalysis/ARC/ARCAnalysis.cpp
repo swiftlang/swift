@@ -87,12 +87,11 @@ static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
                                    Ptr, AA);
 }
 
-static bool canApplyDecrementRefCount(BuiltinInst *BI, SILValue Ptr,
-                                      AliasAnalysis *AA) {
+static bool canBuiltinNeverDecrementRefCounts(BuiltinInst *BI) {
   // If we have a builtin that is side effect free, we can commute the
   // builtin and the retain.
   if (!BI->mayHaveSideEffects())
-    return false;
+    return true;
 
   // If this is an instruction which might have side effect, but its side
   // effects do not cause reference counts to be decremented, return false.
@@ -101,7 +100,7 @@ static bool canApplyDecrementRefCount(BuiltinInst *BI, SILValue Ptr,
   if (auto Kind = BI->getBuiltinKind()) {
     switch (Kind.getValue()) {
     case BuiltinValueKind::CopyArray:
-      return false;
+      return true;
     default:
       break;
     }
@@ -112,11 +111,19 @@ static bool canApplyDecrementRefCount(BuiltinInst *BI, SILValue Ptr,
     case llvm::Intrinsic::memcpy:
     case llvm::Intrinsic::memmove:
     case llvm::Intrinsic::memset:
-      return false;
+      return true;
     default:
       break;
     }
   }
+
+  return false;
+}
+
+static bool canApplyDecrementRefCount(BuiltinInst *BI, SILValue Ptr,
+                                      AliasAnalysis *AA) {
+  if (canBuiltinNeverDecrementRefCounts(BI))
+    return false;
 
   return canApplyDecrementRefCount(BI->getArguments(), Ptr, AA);
 }
@@ -193,6 +200,24 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
 
 bool swift::mayCheckRefCount(SILInstruction *User) {
   return isa<IsUniqueInst>(User) || isa<IsUniqueOrPinnedInst>(User);
+}
+
+// Attempt to prove conservatively that Inst can never decrement reference
+// counts
+bool swift::canNeverDecrementRefCounts(SILInstruction *Inst) {
+  if (Inst->getMemoryBehavior() !=
+      SILInstruction::MemoryBehavior::MayHaveSideEffects)
+    return true;
+
+  if (!canDecrementRefCountsByValueKind(Inst))
+    return true;
+
+  if (auto *BI = dyn_cast<BuiltinInst>(Inst))
+    return canBuiltinNeverDecrementRefCounts(BI);
+
+  // We can not prove that Inst can never decrement or use ref counts. Be
+  // conservative.
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

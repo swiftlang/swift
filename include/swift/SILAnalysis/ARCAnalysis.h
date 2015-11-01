@@ -59,6 +59,9 @@ bool mustUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
 bool mustGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
                             AliasAnalysis *AA);
 
+/// Returns true if \p Inst can never conservatively decrement reference counts.
+bool canNeverDecrementRefCounts(SILInstruction *Inst);
+
 /// \returns True if \p User can never use a value in a way that requires the
 /// value to be alive.
 ///
