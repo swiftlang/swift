@@ -54,6 +54,16 @@ private:
   /// advantage of this to ignore control flow.
   bool AllowsLeaks;
 
+  /// A list of instructions contained in this region that can either use or
+  /// decrement reference counts.
+  ///
+  /// This is flow insensitive since we just add all of the potential
+  /// users/decrements in subregions without caring if there is only one along a
+  /// path. This is for simplicity in the first iteration.
+  ///
+  /// TODO: This needs a better name.
+  llvm::SmallVector<SILInstruction *, 4> SummarizedInterestingInsts;
+
 public:
   ARCRegionState(LoopRegion *R);
 
@@ -119,6 +129,22 @@ public:
     clearBottomUpState();
   }
 
+  using const_summarizedinterestinginsts_iterator =
+      decltype(SummarizedInterestingInsts)::const_iterator;
+  const_summarizedinterestinginsts_iterator
+  summarizedinterestinginsts_begin() const {
+    return SummarizedInterestingInsts.begin();
+  }
+  const_summarizedinterestinginsts_iterator
+  summarizedinterestinginsts_end() const {
+    return SummarizedInterestingInsts.end();
+  }
+  iterator_range<const_summarizedinterestinginsts_iterator>
+  getSummarizedDecrements() const {
+    return {summarizedinterestinginsts_begin(),
+            summarizedinterestinginsts_end()};
+  }
+
   /// Returns a reference to the basic block that we are tracking.
   const LoopRegion *getRegion() const { return Region.get(); }
 
@@ -158,6 +184,10 @@ public:
       ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
 
+  void summarize(
+      LoopRegionFunctionInfo *LRFI,
+      llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo);
+
 private:
   bool processBlockBottomUp(
     SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
@@ -172,6 +202,10 @@ private:
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap);
   bool processLoopTopDown();
 
+  void summarizeBlock(SILBasicBlock *BB);
+  void summarizeLoop(
+      const LoopRegion *R, LoopRegionFunctionInfo *LRFI,
+      llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo);
 };
 
 } // end swift namespace

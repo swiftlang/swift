@@ -31,10 +31,6 @@ ARCRegionState::ARCRegionState(LoopRegion *R)
 }
 
 //===---
-// Utility
-//
-
-//===---
 // Bottom Up Merge
 //
 
@@ -160,7 +156,7 @@ void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
 }
 
 //===---
-// Bottom Up Block Visitor
+// Bottom Up Dataflow
 //
 
 bool ARCRegionState::processBlockBottomUp(
@@ -243,7 +239,7 @@ bool ARCRegionState::processBottomUp(
 }
 
 //===---
-// Top Down Block Visitor
+// Top Down Dataflow
 //
 
 bool ARCRegionState::processBlockTopDown(
@@ -326,4 +322,52 @@ bool ARCRegionState::processTopDown(
     return processLoopTopDown();
 
   return processBlockTopDown(*R->getBlock(), AA, RCIA, DecToIncStateMap);
+}
+
+//===---
+// Summary
+//
+
+void ARCRegionState::summarizeBlock(SILBasicBlock *BB) {
+  SummarizedInterestingInsts.clear();
+
+  for (auto &I : *BB)
+    if (!canNeverUseValues(&I) || !canNeverDecrementRefCounts(&I))
+      SummarizedInterestingInsts.push_back(&I);
+}
+
+void ARCRegionState::summarizeLoop(
+    const LoopRegion *R, LoopRegionFunctionInfo *LRFI,
+    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo) {
+  SummarizedInterestingInsts.clear();
+  for (unsigned SubregionID : R->getSubregions()) {
+    LoopRegion *Subregion = LRFI->getRegion(SubregionID);
+    ARCRegionState *SubregionState = RegionStateInfo[Subregion];
+    std::copy(SubregionState->summarizedinterestinginsts_begin(),
+              SubregionState->summarizedinterestinginsts_end(),
+              std::back_inserter(SummarizedInterestingInsts));
+  }
+}
+
+void ARCRegionState::summarize(
+    LoopRegionFunctionInfo *LRFI,
+    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo) {
+  const LoopRegion *R = getRegion();
+
+  // We do not need to summarize a function since it is the outermost loop.
+  if (R->isFunction())
+    return;
+
+  assert(R->isLoop() && "Expected to be called on a loop");
+  // Make sure that all subregions that are blocked are summarized. We know that
+  // all subloops have already been summarized.
+  for (unsigned SubregionID : R->getSubregions()) {
+    auto *Subregion = LRFI->getRegion(SubregionID);
+    if (!Subregion->isBlock())
+      continue;
+    auto *SubregionState = RegionStateInfo[Subregion];
+    SubregionState->summarizeBlock(Subregion->getBlock());
+  }
+
+  summarizeLoop(R, LRFI, RegionStateInfo);
 }
