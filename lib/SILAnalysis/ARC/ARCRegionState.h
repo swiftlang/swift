@@ -140,7 +140,7 @@ public:
     return SummarizedInterestingInsts.end();
   }
   iterator_range<const_summarizedinterestinginsts_iterator>
-  getSummarizedDecrements() const {
+  getSummarizedInterestingInsts() const {
     return {summarizedinterestinginsts_begin(),
             summarizedinterestinginsts_end()};
   }
@@ -172,7 +172,9 @@ public:
   /// instructions. Returns false otherwise.
   bool processTopDown(
       AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-      BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap);
+      LoopRegionFunctionInfo *LRFI,
+      BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
+      llvm::DenseMap<const LoopRegion *, ARCRegionState *> &LoopRegionState);
 
   /// If this region is a block, process all instructions bottom up. Otherwise,
   /// apply the summarized bottom up information to the merged bottom up
@@ -180,9 +182,10 @@ public:
   /// instructions. Returns false otherwise.
   bool processBottomUp(
       AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-      bool FreezeOwnedArgEpilogueReleases,
+      LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
       ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
-      BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
+      BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
+      llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo);
 
   void summarize(
       LoopRegionFunctionInfo *LRFI,
@@ -194,13 +197,15 @@ private:
     bool FreezeOwnedArgEpilogueReleases,
     ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
-
-  bool processLoopBottomUp();
+  bool processLoopBottomUp(
+      const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
+      llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo);
 
   bool processBlockTopDown(
       SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap);
-  bool processLoopTopDown();
+  bool processLoopTopDown(const LoopRegion *R, ARCRegionState *State,
+                          AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI);
 
   void summarizeBlock(SILBasicBlock *BB);
   void summarizeLoop(

@@ -99,14 +99,17 @@ bool LoopARCSequenceDataflowEvaluator::processLoopTopDown(const LoopRegion *R) {
     DEBUG(llvm::dbgs() << "Processing Subregion#: " << SubregionIndex << "\n");
 
     // Ignore blocks that allow leaks.
-    if (SubregionData.allowsLeaks())
+    if (SubregionData.allowsLeaks()) {
+      DEBUG(llvm::dbgs() << "Skipping leaking BB.\n");
       continue;
+    }
 
-    DEBUG(llvm::dbgs() << "Merging Predecessors!\n");
+    DEBUG(llvm::dbgs() << "Merging Predecessors for subregion!\n");
     mergePredecessors(Subregion, SubregionData);
 
     // Then perform the dataflow.
-    NestingDetected |= SubregionData.processTopDown(AA, RCFI, DecToIncStateMap);
+    NestingDetected |= SubregionData.processTopDown(
+        AA, RCFI, LRFI, DecToIncStateMap, RegionStateInfo);
   }
 
   return NestingDetected;
@@ -125,7 +128,7 @@ void LoopARCSequenceDataflowEvaluator::mergeSuccessors(const LoopRegion *Region,
     auto *SuccRegion = LRFI->getRegion(SuccID);
     auto &SuccState = getARCState(SuccRegion);
 
-    DEBUG(llvm::dbgs() << "    Merging Succ: " << SuccID << "\n");
+    DEBUG(llvm::dbgs() << "    Merging Local Succ: " << SuccID << "\n");
 
     // If this merge is undefined due to unknown control flow, assume that the
     // empty set is flowing into this block so clear all state and exit early.
@@ -156,16 +159,19 @@ void LoopARCSequenceDataflowEvaluator::mergeSuccessors(const LoopRegion *Region,
     auto *SuccRegion = LRFI->getRegionForNonLocalSuccessor(Region, SuccID);
     auto &SuccState = getARCState(SuccRegion);
 
-    DEBUG(llvm::dbgs() << "    Merging Pred: " << SuccID << "\n");
+    DEBUG(llvm::dbgs() << "    Merging Non Local Succs: " << SuccID << "\n");
 
     // Check if this block is post dominated by ARC unreachable
     // blocks. Otherwise we clear all state.
     //
     // TODO: We just check the block itself for now.
-    if (SuccState.allowsLeaks())
+    if (SuccState.allowsLeaks()) {
+      DEBUG(llvm::dbgs() << "        Allows leaks skipping\n");
       continue;
+    }
 
     // Otherwise, we treat it as unknown control flow.
+    DEBUG(llvm::dbgs() << "        Cleaing state b/c of early exit\n");
     State.clear();
     break;
   }
@@ -211,8 +217,8 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
 
     // Then perform the region optimization.
     NestingDetected |= SubregionData.processBottomUp(
-        AA, RCFI, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
-        IncToDecStateMap);
+        AA, RCFI, LRFI, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
+        IncToDecStateMap, RegionStateInfo);
     --End;
   }
 
@@ -230,8 +236,8 @@ bool LoopARCSequenceDataflowEvaluator::processLoopBottomUp(
 
     // Then perform the region optimization.
     NestingDetected |= SubregionData.processBottomUp(
-        AA, RCFI, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
-        IncToDecStateMap);
+        AA, RCFI, LRFI, FreezeOwnedArgEpilogueReleases, ConsumedArgToReleaseMap,
+        IncToDecStateMap, RegionStateInfo);
   }
 
   return NestingDetected;

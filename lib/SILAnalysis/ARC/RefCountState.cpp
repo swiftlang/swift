@@ -183,7 +183,7 @@ bool BottomUpRefCountState::valueCanBeUsedGivenLatticeState() const {
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
 bool BottomUpRefCountState::handleUser(SILInstruction *PotentialUser,
-                                       SILInstruction *InsertPt,
+                                       ArrayRef<SILInstruction *> NewInsertPts,
                                        SILValue RCIdentity, AliasAnalysis *AA) {
   assert(valueCanBeUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
@@ -201,7 +201,7 @@ bool BottomUpRefCountState::handleUser(SILInstruction *PotentialUser,
     LatState = LatticeState::MightBeUsed;
     assert(InsertPts.empty() && "If we are decremented, we should have no "
                                 "insertion points.");
-    InsertPts.insert(InsertPt);
+    InsertPts.insert(NewInsertPts.begin(), NewInsertPts.end());
     return true;
   case LatticeState::MightBeUsed:
   case LatticeState::MightBeDecremented:
@@ -227,8 +227,9 @@ valueCanBeGuaranteedUsedGivenLatticeState() const {
 /// Given the current lattice state, if we have seen a use, advance the
 /// lattice state. Return true if we do so and false otherwise.
 bool BottomUpRefCountState::handleGuaranteedUser(
-    SILInstruction *PotentialGuaranteedUser, SILInstruction *InsertPt,
-    SILValue RCIdentity, AliasAnalysis *AA) {
+    SILInstruction *PotentialGuaranteedUser,
+    ArrayRef<SILInstruction *> NewInsertPts, SILValue RCIdentity,
+    AliasAnalysis *AA) {
   assert(valueCanBeGuaranteedUsedGivenLatticeState() &&
          "Must be able to be used at this point of the lattice.");
 
@@ -245,7 +246,7 @@ bool BottomUpRefCountState::handleGuaranteedUser(
   case LatticeState::Decremented: {
     assert(InsertPts.empty() && "If we are decremented, we should have no "
                                 "insertion points.");
-    InsertPts.insert(InsertPt);
+    InsertPts.insert(NewInsertPts.begin(), NewInsertPts.end());
     LatState = LatticeState::MightBeDecremented;
     return true;
   }
@@ -407,9 +408,10 @@ bool BottomUpRefCountState::handlePotentialDecrement(
 // Check if PotentialUser could be a use of the reference counted value that
 // requires user to be alive. If so advance the state's sequence
 // appropriately and return true. Otherwise return false.
-bool BottomUpRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
-                                                SILInstruction *InsertPt,
-                                                AliasAnalysis *AA) {
+bool BottomUpRefCountState::handlePotentialUser(
+    SILInstruction *PotentialUser, ArrayRef<SILInstruction *> InsertPts,
+    AliasAnalysis *AA) {
+
   // If we are not tracking a ref count, just return false.
   if (!isTrackingRefCount())
     return false;
@@ -425,7 +427,7 @@ bool BottomUpRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
   if (!mayUseValue(PotentialUser, getRCRoot(), AA))
     return false;
 
-  return handleUser(PotentialUser, InsertPt, getRCRoot(), AA);
+  return handleUser(PotentialUser, InsertPts, getRCRoot(), AA);
 }
 
 void BottomUpRefCountState::updateForSameLoopInst(SILInstruction *I,
@@ -457,6 +459,31 @@ void BottomUpRefCountState::updateForSameLoopInst(SILInstruction *I,
   // Otherwise check if the reference counted value we are tracking
   // could be used by the given instruction.
   if (!handlePotentialUser(I, InsertPt, AA))
+    return;
+  DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << getRCRoot());
+}
+
+void BottomUpRefCountState::updateForDifferentLoopInst(
+    SILInstruction *I, ArrayRef<SILInstruction *> InsertPts,
+    AliasAnalysis *AA) {
+  // If we are not tracking anything, bail.
+  if (!isTrackingRefCount())
+    return;
+
+  if (valueCanBeGuaranteedUsedGivenLatticeState()) {
+    if (mayGuaranteedUseValue(I, getRCRoot(), AA) ||
+        mayDecrementRefCount(I, getRCRoot(), AA)) {
+      DEBUG(llvm::dbgs() << "    Found potential guaranteed use:\n        "
+                         << getRCRoot());
+      handleGuaranteedUser(I, InsertPts, getRCRoot(), AA);
+      return;
+    }
+  }
+
+  // We can just handle potential users normally, since if we handle the user we
+  // already saw a decrement implying that we will treat this like a guaranteed
+  // use.
+  if (!handlePotentialUser(I, InsertPts, AA))
     return;
   DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << getRCRoot());
 }
@@ -801,7 +828,7 @@ bool TopDownRefCountState::handlePotentialUser(SILInstruction *PotentialUser,
 void TopDownRefCountState::updateForSameLoopInst(SILInstruction *I,
                                                  SILInstruction *InsertPt,
                                                  AliasAnalysis *AA) {
-  // If the other state is not tracking anything, bail.
+  // If we are not tracking anything, bail.
   if (!isTrackingRefCount())
     return;
 
@@ -826,6 +853,27 @@ void TopDownRefCountState::updateForSameLoopInst(SILInstruction *I,
 
   // Otherwise check if the reference counted value we are tracking
   // could be used by the given instruction.
+  if (!handlePotentialUser(I, AA))
+    return;
+  DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << getRCRoot());
+}
+
+void TopDownRefCountState::updateForDifferentLoopInst(SILInstruction *I,
+                                                      SILInstruction *InsertPt,
+                                                      AliasAnalysis *AA) {
+  // If we are not tracking anything, bail.
+  if (!isTrackingRefCount())
+    return;
+
+  if (valueCanBeGuaranteedUsedGivenLatticeState()) {
+    if (mayGuaranteedUseValue(I, getRCRoot(), AA) ||
+        mayDecrementRefCount(I, getRCRoot(), AA)) {
+      DEBUG(llvm::dbgs() << "    Found potential guaranteed use!\n");
+      handleGuaranteedUser(I, InsertPt, getRCRoot(), AA);
+      return;
+    }
+  }
+
   if (!handlePotentialUser(I, AA))
     return;
   DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << getRCRoot());

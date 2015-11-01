@@ -208,6 +208,17 @@ public:
   void updateForSameLoopInst(SILInstruction *I, SILInstruction *InsertPt,
                              AliasAnalysis *AA);
 
+  /// Update this reference count's state given the instruction \p I. \p
+  /// InsertPts are the points furthest up the CFG where we can move the
+  /// currently tracked reference count.
+  //
+  /// The main difference in between this routine and update for same loop inst
+  /// is that if we see any decrements on a value, we treat it as being
+  /// guaranteed used. We treat any uses as regular uses.
+  void updateForDifferentLoopInst(SILInstruction *I,
+                                  ArrayRef<SILInstruction *> InsertPts,
+                                  AliasAnalysis *AA);
+
   /// Attempt to merge \p Other into this ref count state. Return true if we
   /// succeed and false otherwise.
   bool merge(const BottomUpRefCountState &Other);
@@ -250,14 +261,16 @@ private:
   /// lattice state. Return true if we do so and false otherwise. \p InsertPt is
   /// the location where if \p PotentialUser is a user of this ref count, we
   /// would insert a release.
-  bool handleUser(SILInstruction *PotentialUser, SILInstruction *InsertPt,
-                  SILValue RCIdentity, AliasAnalysis *AA);
+  bool handleUser(SILInstruction *PotentialUser,
+                  ArrayRef<SILInstruction *> InsertPt, SILValue RCIdentity,
+                  AliasAnalysis *AA);
 
   /// Check if PotentialUser could be a use of the reference counted value that
   /// requires user to be alive. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.
   bool handlePotentialUser(SILInstruction *PotentialUser,
-                           SILInstruction *InsertPt, AliasAnalysis *AA);
+                           ArrayRef<SILInstruction *> InsertPts,
+                           AliasAnalysis *AA);
 
   /// Returns true if given the current lattice state, do we care if the value
   /// we are tracking is used.
@@ -268,8 +281,8 @@ private:
   /// the location where if \p PotentialUser is a user of this ref count, we
   /// would insert a release.
   bool handleGuaranteedUser(SILInstruction *PotentialGuaranteedUser,
-                            SILInstruction *InsertPt, SILValue RCIdentity,
-                            AliasAnalysis *AA);
+                            ArrayRef<SILInstruction *> InsertPts,
+                            SILValue RCIdentity, AliasAnalysis *AA);
 
   /// Check if PotentialGuaranteedUser can use the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
@@ -333,6 +346,16 @@ public:
   /// tracked reference count.
   void updateForSameLoopInst(SILInstruction *I, SILInstruction *InsertPt,
                              AliasAnalysis *AA);
+
+  /// Update this reference count's state given the instruction \p I. \p
+  /// InsertPts are the points furthest up the CFG where we can move the
+  /// currently tracked reference count.
+  ///
+  /// The main difference in between this routine and update for same loop inst
+  /// is that if we see any decrements on a value, we treat it as being
+  /// guaranteed used. We treat any uses as regular uses.
+  void updateForDifferentLoopInst(SILInstruction *I, SILInstruction *InsertPt,
+                                  AliasAnalysis *AA);
 
   /// Returns true if the passed in ref count inst matches the ref count inst
   /// we are tracking. This handles generically retains/release.

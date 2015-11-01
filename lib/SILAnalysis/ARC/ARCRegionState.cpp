@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-global-arc-opts"
 #include "ARCRegionState.h"
 #include "RCStateTransitionVisitors.h"
+#include "swift/Basic/Range.h"
 #include "swift/SILAnalysis/LoopRegionAnalysis.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"
@@ -215,22 +216,76 @@ bool ARCRegionState::processBlockBottomUp(
   return NestingDetected;
 }
 
-bool ARCRegionState::processLoopBottomUp() {
-  clearBottomUpState();
+// Find the relevant insertion points for the loop region R in its
+// successors. Returns true if we succeeded. Returns false if any of the
+// non-local successors of the region are not leaking blocks. We currently do
+// not handle early exits, but do handle trapping blocks.
+static bool getInsertionPtsForLoopRegionExits(
+    const LoopRegion *R, LoopRegionFunctionInfo *LRFI,
+    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
+    llvm::SmallVectorImpl<SILInstruction *> &InsertPts) {
+  assert(R->isLoop() && "Expected a loop region that is representing a loop");
+
+  // Go through all of our non local successors. If any of them can not be
+  // ignored, we bail for simplicity. This means that for now we do not handle
+  // early exits.
+  if (any_of(R->getNonLocalSuccs(), [&](unsigned SuccID) -> bool {
+        return !RegionStateInfo[LRFI->getRegion(SuccID)]->allowsLeaks();
+      })) {
+    return false;
+  }
+
+  // We assume that all of our loops have been canonicalized so that /all/ loop
+  // exit blocks only have exiting blocks as predecessors. This means that all
+  // successor regions of any region /cannot/ be a region representing a loop.
+  for (unsigned SuccID : R->getLocalSuccs()) {
+    auto *SuccRegion = LRFI->getRegion(SuccID);
+    assert(SuccRegion->isBlock() && "Loop canonicalization failed?!");
+    InsertPts.push_back(&*SuccRegion->getBlock()->begin());
+  }
+
+  return true;
+}
+
+bool ARCRegionState::processLoopBottomUp(
+    const LoopRegion *R, AliasAnalysis *AA, LoopRegionFunctionInfo *LRFI,
+    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo) {
+  ARCRegionState *State = RegionStateInfo[R];
+
+  llvm::SmallVector<SILInstruction *, 2> InsertPts;
+  // Try to lookup insertion points for this region. If when checking for
+  // insertion points, we find that we have non-leaking early exits, clear state
+  // and bail. We do not handle these for now.
+  if (!getInsertionPtsForLoopRegionExits(R, LRFI, RegionStateInfo, InsertPts)) {
+    clearBottomUpState();
+    return false;
+  }
+
+  // For each state that we are currently tracking, apply our summarized
+  // instructions to it.
+  for (auto &OtherState : getBottomupStates()) {
+    if (!OtherState.hasValue())
+      continue;
+
+    for (auto *I : State->getSummarizedInterestingInsts())
+      OtherState->second.updateForDifferentLoopInst(I, InsertPts, AA);
+  }
+
   return false;
 }
 
 bool ARCRegionState::processBottomUp(
     AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-    bool FreezeOwnedArgEpilogueReleases,
+    LoopRegionFunctionInfo *LRFI, bool FreezeOwnedArgEpilogueReleases,
     ConsumedArgToEpilogueReleaseMatcher &ConsumedArgToReleaseMap,
-    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap) {
+    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
+    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo) {
   const LoopRegion *R = getRegion();
 
   // We only process basic blocks for now. This ensures that we always propagate
   // the empty set from loops.
   if (!R->isBlock())
-    return processLoopBottomUp();
+    return processLoopBottomUp(R, AA, LRFI, RegionStateInfo);
 
   return processBlockBottomUp(*R->getBlock(), AA, RCIA,
                               FreezeOwnedArgEpilogueReleases,
@@ -306,20 +361,51 @@ bool ARCRegionState::processBlockTopDown(
   return NestingDetected;
 }
 
-bool ARCRegionState::processLoopTopDown() {
-  clearTopDownState();
+bool ARCRegionState::processLoopTopDown(const LoopRegion *R,
+                                        ARCRegionState *State,
+                                        AliasAnalysis *AA,
+                                        LoopRegionFunctionInfo *LRFI) {
+
+  assert(R->isLoop() && "We assume we are processing a loop");
+
+  // If we have more than 2 predecessors, we do not have a pre-header. We do not
+  // support this case since canonicalization failed.
+  if (R->pred_size() != 1) {
+    clearTopDownState();
+    return false;
+  }
+
+  auto *PredRegion = LRFI->getRegion(*R->pred_begin());
+  assert(PredRegion->isBlock() && "Expected the predecessor region to be a "
+                                  "block");
+
+  // Our insert point is going to be the terminator inst.
+  SILInstruction *InsertPt = PredRegion->getBlock()->getTerminator();
+
+  // For each state that we are currently tracking, apply our summarized
+  // instructions to it.
+  for (auto &OtherState : getTopDownStates()) {
+    if (!OtherState.hasValue())
+      continue;
+
+    for (auto *I : State->getSummarizedInterestingInsts())
+      OtherState->second.updateForDifferentLoopInst(I, InsertPt, AA);
+  }
+
   return false;
 }
 
 bool ARCRegionState::processTopDown(
     AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
-    BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap) {
+    LoopRegionFunctionInfo *LRFI,
+    BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
+    llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo) {
   const LoopRegion *R = getRegion();
 
   // We only process basic blocks for now. This ensures that we always propagate
   // the empty set from loops.
   if (!R->isBlock())
-    return processLoopTopDown();
+    return processLoopTopDown(R, RegionStateInfo[R], AA, LRFI);
 
   return processBlockTopDown(*R->getBlock(), AA, RCIA, DecToIncStateMap);
 }
