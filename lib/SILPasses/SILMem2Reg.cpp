@@ -448,7 +448,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
   SILBasicBlock *BB = ASI->getParent();
 
   // The default value of the AllocStack is NULL because we don't have
-  // unilitialized variables in Swift.
+  // uninitialized variables in Swift.
   SILValue RunningVal = SILValue();
 
   // For all instructions in the block.
