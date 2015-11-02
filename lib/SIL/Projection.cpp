@@ -904,6 +904,11 @@ ProjectionTree::ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &BPA,
   }
 }
 
+ProjectionTree::~ProjectionTree() {
+  for (auto *N : ProjectionTreeNodes)
+    N->~ProjectionTreeNode();
+}
+
 void
 ProjectionTree::computeUsesAndLiveness(SILValue Base) {
   // Propagate liveness and users through the tree.

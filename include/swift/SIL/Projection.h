@@ -685,13 +685,20 @@ class ProjectionTree {
   SILModule &Mod;
 
   llvm::BumpPtrAllocator &Allocator;
-  llvm::SmallVector<ProjectionTreeNode *, 32> ProjectionTreeNodes;
-  llvm::SmallVector<unsigned, 16> LeafIndices;
+
+  // A common pattern is a 3 field struct.
+  llvm::SmallVector<ProjectionTreeNode *, 4> ProjectionTreeNodes;
+  llvm::SmallVector<unsigned, 3> LeafIndices;
 
 public:
   /// Construct a projection tree from BaseTy.
   ProjectionTree(SILModule &Mod, llvm::BumpPtrAllocator &Allocator,
                  SILType BaseTy);
+  ~ProjectionTree();
+  ProjectionTree(const ProjectionTree &) = delete;
+  ProjectionTree(ProjectionTree &&) = default;
+  ProjectionTree &operator=(const ProjectionTree &) = delete;
+  ProjectionTree &operator=(ProjectionTree &&) = default;
 
   /// Compute liveness and use information in this projection tree using Base.
   /// All debug instructions (debug_value, debug_value_addr) are ignored.

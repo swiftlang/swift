@@ -160,6 +160,11 @@ struct ArgumentDescriptor {
     ProjTree.computeUsesAndLiveness(A);
   }
 
+  ArgumentDescriptor(const ArgumentDescriptor &) = delete;
+  ArgumentDescriptor(ArgumentDescriptor &&) = default;
+  ArgumentDescriptor &operator=(const ArgumentDescriptor &) = delete;
+  ArgumentDescriptor &operator=(ArgumentDescriptor &&) = default;
+
   /// \returns true if this argument's ParameterConvention is P.
   bool hasConvention(ParameterConvention P) const {
     return Arg->hasConvention(P);
@@ -553,7 +558,7 @@ FunctionAnalyzer::analyze() {
     }
 
     // Add the argument to our list.
-    ArgDescList.push_back(A);
+    ArgDescList.push_back(std::move(A));
   }
 
   return ShouldOptimize;
