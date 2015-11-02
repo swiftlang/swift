@@ -82,7 +82,7 @@ public struct EnumerateGenerator<
   Base : GeneratorType
 > : GeneratorType, SequenceType {
   /// The type of element returned by `next()`.
-  public typealias Element = (index: Int, element: Base.Element)
+  public typealias Element = (offset: Int, element: Base.Element)
   var base: Base
   var count: Int
 
@@ -98,7 +98,7 @@ public struct EnumerateGenerator<
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
     guard let b = base.next() else { return .None }
-    return .Some((index: count++, element: b))
+    return .Some((offset: count++, element: b))
   }
 }
 
