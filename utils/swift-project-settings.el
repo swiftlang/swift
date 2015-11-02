@@ -117,13 +117,13 @@
 (set-auto-mode)
 
 
-(define-skeleton llvm-header
-  "Insert the LLVM header at the top of a file
+(define-skeleton swift-header
+  "Insert the Swift header at the top of a file
 
 Note: this skeleton presently assumes that comment-start creates
 a comment until end-of-line.  Handling paired comment syntax is
 possible, but more work, and someone needs to decide what such an
-LLVM header should look like.
+Swift header should look like.
 "
   ;; prompt
   "Short description (RET for none): "
@@ -132,7 +132,7 @@ LLVM header should look like.
   ;; nobody is crazy enough to define a language where whitespace
   ;; determines whether something is a comment, but c++ mode and
   ;; friends have a space at the end of comment-start, which messes up
-  ;; the LLVM header format.
+  ;; the Swift header format.
   ;;
   ;; When there's no comment syntax defined, we use "//"; precedent is
   ;; in the project's README file.
@@ -154,10 +154,13 @@ LLVM header should look like.
   ;; Use whatever comment character is usual for the current mode in place of "//"
   (replace-regexp-in-string "//" v1 
 "//
-//                     The LLVM Compiler Infrastructure
+// This source file is part of the Swift.org open source project
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 ")
@@ -175,8 +178,8 @@ LLVM header should look like.
 ")
     ))
 
-(define-skeleton llvm-divider
-  "Insert an llvm //===--- ... ---===// divider
+(define-skeleton swift-divider
+  "Insert a Swift //===--- ... ---===// divider
 "
   ;; prompt
   "Text (RET for none): "
@@ -185,7 +188,7 @@ LLVM header should look like.
   ;; nobody is crazy enough to define a language where whitespace
   ;; determines whether something is a comment, but c++ mode and
   ;; friends have a space at the end of comment-start, which messes up
-  ;; the LLVM header format.
+  ;; the Swift header format.
   ;;
   ;; When there's no comment syntax defined, we use "//"; precedent is
   ;; in the project's README file.
@@ -211,10 +214,10 @@ LLVM header should look like.
   )
 
 (defvar swift-project-auto-insert-alist
-  ;; Currently we match any file and insert the LLVM header.  We can
+  ;; Currently we match any file and insert the Swift header.  We can
   ;; make the regexp more specific or filter based on mode if this
   ;; doesn't work out.
-  '((("" . "LLVM header") . llvm-header))
+  '((("" . "Swift header") . swift-header))
   "auto-insert-alist entries that are just for the Swift project"
   )
 
@@ -229,7 +232,7 @@ takes precedence for files in the Swift project"
       (let ((auto-insert-alist
              (append swift-project-auto-insert-alist auto-insert-alist))
             ;; The default is to ask when creating a new file.  Inside
-            ;; this project, we always want the LLVM header, so only
+            ;; this project, we always want the Swift header, so only
             ;; prompt if the user has set auto-insert to /always/
             ;; prompt.
             (auto-insert-query (if (eq auto-insert-query 'function) nil auto-insert-query)))
