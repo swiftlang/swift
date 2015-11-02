@@ -14,13 +14,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/InstrumentsSupport.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/ABI/System.h"
 #include "llvm/Support/MathExtras.h"
-#include "Lazy.h"
 #include "MetadataCache.h"
 #include "Private.h"
 #include "Debug.h"

@@ -24,6 +24,7 @@
 #endif
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/Demangle.h"
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -31,7 +32,6 @@
 #include "swift/Strings.h"
 #include "../SwiftShims/RuntimeShims.h"
 #include "Private.h"
-#include "Lazy.h"
 #include "Debug.h"
 #include <dlfcn.h>
 #include <stdio.h>

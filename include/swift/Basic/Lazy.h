@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_RUNTIME_LAZY_H
-#define SWIFT_RUNTIME_LAZY_H
+#ifndef SWIFT_BASIC_LAZY_H
+#define SWIFT_BASIC_LAZY_H
 
 #ifdef __APPLE__
 #include <dispatch/dispatch.h>
@@ -26,7 +26,7 @@ namespace swift {
 /// global objects.
 template <class T> class Lazy {
   typename std::aligned_storage<sizeof(T), alignof(T)>::type Value;
-  
+
 #ifdef __APPLE__
   dispatch_once_t OnceToken;
 #else
@@ -35,13 +35,11 @@ template <class T> class Lazy {
 
 public:
   T &get();
-  
+
   /// Get the value, assuming it must have already been initialized by this
   /// point.
-  T &unsafeGetAlreadyInitialized() {
-    return *reinterpret_cast<T*>(&Value);
-  }
-  
+  T &unsafeGetAlreadyInitialized() { return *reinterpret_cast<T *>(&Value); }
+
   constexpr Lazy() = default;
 
   T *operator->() { return &get(); }
@@ -52,13 +50,12 @@ private:
     auto self = reinterpret_cast<Lazy *>(Argument);
     ::new (&self->unsafeGetAlreadyInitialized()) T();
   }
-  
+
   Lazy(const Lazy &) = delete;
   Lazy &operator=(const Lazy &) = delete;
 };
 
-template<typename T>
-inline T& Lazy<T>::get() {
+template <typename T> inline T &Lazy<T>::get() {
   static_assert(std::is_literal_type<Lazy<T>>::value,
                 "Lazy<T> must be a literal type");
 
@@ -72,5 +69,4 @@ inline T& Lazy<T>::get() {
 
 } // namespace swift
 
-#endif // SWIFT_RUNTIME_LAZY_H
-
+#endif // SWIFT_BASIC_LAZY_H

@@ -17,6 +17,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Strings.h"
@@ -32,7 +33,6 @@
 #include "llvm/ADT/Hashing.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
-#include "Lazy.h"
 #include "Debug.h"
 #include "Private.h"
 

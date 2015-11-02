@@ -17,7 +17,7 @@
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
 #include "Leaks.h"
-#include "Lazy.h"
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #import <objc/objc.h>
