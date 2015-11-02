@@ -256,15 +256,6 @@ __muloti4(ti_int a, ti_int b, int* overflow)
 
 #endif
 
-typedef enum {
-  memory_order_relaxed = 0,
-  memory_order_consume = 1,
-  memory_order_acquire = 2,
-  memory_order_release = 3,
-  memory_order_acq_rel = 4,
-  memory_order_seq_cst = 5
-} memory_order;
-
 // We can't return Float80, but we can receive a pointer to one, so
 // switch the return type and the out parameter on strtold.
 template <typename T>
