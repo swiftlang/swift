@@ -83,13 +83,13 @@ public struct EnumerateGenerator<
 > : GeneratorType, SequenceType {
   /// The type of element returned by `next()`.
   public typealias Element = (offset: Int, element: Base.Element)
-  var base: Base
-  var count: Int
+  var _base: Base
+  var _count: Int
 
   /// Construct from a `Base` generator.
   public init(_ base: Base) {
-    self.base = base
-    count = 0
+    self._base = base
+    self._count = 0
   }
 
   /// Advance to the next element and return it, or `nil` if no next
@@ -97,8 +97,8 @@ public struct EnumerateGenerator<
   ///
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
-    guard let b = base.next() else { return .None }
-    return .Some((offset: count++, element: b))
+    guard let b = _base.next() else { return .None }
+    return .Some((offset: _count++, element: b))
   }
 }
 
@@ -113,18 +113,18 @@ public struct EnumerateGenerator<
 /// - Note: Idiomatic usage is to call `enumerate` instead of
 ///   constructing an `EnumerateSequence` directly.
 public struct EnumerateSequence<Base : SequenceType> : SequenceType {
-  var base: Base
+  internal var _base: Base
 
   /// Construct from a `Base` sequence.
   public init(_ base: Base) {
-    self.base = base
+    self._base = base
   }
 
   /// Returns a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   public func generate() -> EnumerateGenerator<Base.Generator> {
-    return EnumerateGenerator(base.generate())
+    return EnumerateGenerator(_base.generate())
   }
 }
 
