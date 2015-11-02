@@ -4,7 +4,7 @@ We have a pretty good user model for C pointer interop now, but the language
 model still needs improvement. Building the user model on top of implicit
 conversions has a number of undesirable side effects. We end up with a mess of
 pointer types—the intended user-facing, one-word pointer types
-``UnsafeMutablePointer`` and ``COpaquePointer``, which expose a full pointer-ish API
+``UnsafeMutablePointer`` and ``OpaquePointer``, which expose a full pointer-ish API
 and are naturally ABI-compatible with C pointers; and the bridging pointer
 types, ``ObjCMutablePointer``, ``CMutablePointer``, ``CConstPointer``,
 ``CMutableVoidPointer``, and ``CConstVoidPointer``, which have no real API yet

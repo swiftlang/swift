@@ -155,7 +155,7 @@ func writeImageToDisk(context : CGContextRef, outPath : NSString) -> Bool {
   assert(url != CFURLRef())
   var destination = CGImageDestinationCreateWithURL(url, kUTTypePNG, 1, CFDictionaryRef())
   assert(destination != CGImageDestinationRef())
-  CGImageDestinationAddImage(destination, image, COpaquePointer())
+  CGImageDestinationAddImage(destination, image, OpaquePointer())
   if !CGImageDestinationFinalize(destination) {
     print("Failed to write image")
     return (false)

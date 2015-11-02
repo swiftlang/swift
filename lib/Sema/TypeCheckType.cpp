@@ -3350,7 +3350,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
 
   SmallVector<Identifier, 32> StdlibTypeNames;
 
-  StdlibTypeNames.push_back(Context.getIdentifier("COpaquePointer"));
+  StdlibTypeNames.push_back(Context.getIdentifier("OpaquePointer"));
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
   StdlibTypeNames.push_back(Context.getIdentifier(#SWIFT_TYPE_NAME));
 #include "swift/ClangImporter/BuiltinMappedTypes.def"

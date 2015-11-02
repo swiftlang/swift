@@ -213,7 +213,7 @@ extension UInt8 : CVarArgType {
   }
 }
 
-extension COpaquePointer : CVarArgType {
+extension OpaquePointer : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Int] {

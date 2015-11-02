@@ -375,12 +375,12 @@ public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
       typealias OptionalAnyObject = AnyObject?
       Builtin.retain(unsafeBitCast(newValue, OptionalAnyObject.self))
       Builtin.autorelease(unsafeBitCast(newValue, OptionalAnyObject.self))
-      // Trivially assign it as a COpaquePointer; the pointer references an
+      // Trivially assign it as an OpaquePointer; the pointer references an
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.
-      let p = UnsafeMutablePointer<COpaquePointer>(
+      let p = UnsafeMutablePointer<OpaquePointer>(
         UnsafeMutablePointer<Memory>(self))
-        p.memory = unsafeBitCast(newValue, COpaquePointer.self)
+        p.memory = unsafeBitCast(newValue, OpaquePointer.self)
     }
   }
 

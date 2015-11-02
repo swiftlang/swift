@@ -683,8 +683,8 @@ final public class NSFastGenerator : GeneratorType {
 
   /// Must have enough space for STACK_BUF_SIZE object references.
   struct ObjectsBuffer {
-    var buf = (COpaquePointer(), COpaquePointer(),
-               COpaquePointer(), COpaquePointer())
+    var buf = (OpaquePointer(), OpaquePointer(),
+               OpaquePointer(), OpaquePointer())
   }
   var objects: [ObjectsBuffer]
 

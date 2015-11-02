@@ -44,7 +44,7 @@ extension ObjCBool : BooleanLiteralConvertible {
 }
 
 public struct Selector : StringLiteralConvertible {
-  private var ptr : COpaquePointer
+  private var ptr : OpaquePointer
 
   public init(unicodeScalarLiteral value: String) {
     self.init(stringLiteral: value)
@@ -60,11 +60,11 @@ public struct Selector : StringLiteralConvertible {
 }
 
 public struct NSZone: NilLiteralConvertible {
-  public var pointer : COpaquePointer
+  public var pointer : OpaquePointer
 
   @_transparent public
   init(nilLiteral: ()) {
-    pointer = COpaquePointer()
+    pointer = OpaquePointer()
   }
 }
 

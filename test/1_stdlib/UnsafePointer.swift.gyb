@@ -49,12 +49,12 @@ extension UnsafeMutableBufferPointer where Element : TestProtocol1 {
 
 var UnsafePointerTestSuite = TestSuite("UnsafePointer")
 var UnsafeMutablePointerTestSuite = TestSuite("UnsafeMutablePointer")
-var COpaquePointerTestSuite = TestSuite("COpaquePointer")
+var OpaquePointerTestSuite = TestSuite("OpaquePointer")
 
 % for (SelfName, SelfType) in [
 %     ( 'UnsafePointer', 'UnsafePointer<Float>' ),
 %     ( 'UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),
-%     ( 'COpaquePointer', 'COpaquePointer' ) ]:
+%     ( 'OpaquePointer', 'OpaquePointer' ) ]:
 
 ${SelfName}TestSuite.test("convertFromNil") {
   let ptr: ${SelfType} = nil
@@ -66,8 +66,8 @@ ${SelfName}TestSuite.test("initNoArgs") {
   expectEqual(0, unsafeBitCast(ptr, Int.self))
 }
 
-${SelfName}TestSuite.test("initFromCOpaquePointer") {
-  let other = COpaquePointer(bitPattern: 0x12345678)
+${SelfName}TestSuite.test("initFromOpaquePointer") {
+  let other = OpaquePointer(bitPattern: 0x12345678)
   let ptr = UnsafePointer<Float>(other)
   expectEqual(0x12345678, unsafeBitCast(ptr, Int.self))
 }

@@ -161,7 +161,7 @@ class NotObjC {}
   class func test2() {}
 
   func testPrimitives(b: Bool, i: Int, f: Float, d: Double, u: UInt)
-    -> COpaquePointer { return COpaquePointer() }
+    -> OpaquePointer { return OpaquePointer() }
   func testString(s: String) {}
   func testSelector(sel: Selector, boolean b: ObjCBool) {}
 

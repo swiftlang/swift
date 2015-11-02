@@ -61,7 +61,7 @@ public struct ${Self}<Memory>
   ///
   /// This is a fundamentally unsafe conversion.
   @_transparent
-  public init(_ other : COpaquePointer) {
+  public init(_ other : OpaquePointer) {
     _rawValue = other._rawValue
   }
 

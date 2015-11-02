@@ -27,13 +27,13 @@
 public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Internals
-  public var _baseAddress: COpaquePointer
+  public var _baseAddress: OpaquePointer
   var _countAndFlags: UInt
   public var _owner: AnyObject?
 
   /// (private) create the implementation of a string from its component parts.
   init(
-    baseAddress: COpaquePointer,
+    baseAddress: OpaquePointer,
     _countAndFlags: UInt,
     owner: AnyObject?
   ) {
@@ -96,15 +96,15 @@ public struct _StringCore {
   /// element may be 1 or 2 bytes wide, depending on elementWidth; the
   /// result may be null if the string is empty.
   @warn_unused_result
-  func _pointerToNth(n: Int) -> COpaquePointer {
+  func _pointerToNth(n: Int) -> OpaquePointer {
     _sanityCheck(hasContiguousStorage && n >= 0 && n <= count)
-    return COpaquePointer(
+    return OpaquePointer(
       UnsafeMutablePointer<RawByte>(_baseAddress) + (n << elementShift))
   }
 
   static func _copyElements(
-    srcStart: COpaquePointer, srcElementWidth: Int,
-    dstStart: COpaquePointer, dstElementWidth: Int,
+    srcStart: OpaquePointer, srcElementWidth: Int,
+    dstStart: OpaquePointer, dstElementWidth: Int,
     count: Int
   ) {
     // Copy the old stuff into the new storage
@@ -138,7 +138,7 @@ public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Initialization
   public init(
-    baseAddress: COpaquePointer,
+    baseAddress: OpaquePointer,
     count: Int,
     elementShift: Int,
     hasCocoaBuffer: Bool,
@@ -160,7 +160,7 @@ public struct _StringCore {
   /// Create a _StringCore that covers the entire length of the _StringBuffer.
   init(_ buffer: _StringBuffer) {
     self = _StringCore(
-      baseAddress: COpaquePointer(buffer.start),
+      baseAddress: OpaquePointer(buffer.start),
       count: buffer.usedCount,
       elementShift: buffer.elementShift,
       hasCocoaBuffer: false,
@@ -370,7 +370,7 @@ public struct _StringCore {
   ///   the existing buffer's storage.
   @warn_unused_result
   mutating func _claimCapacity(
-    newSize: Int, minElementWidth: Int) -> (Int, COpaquePointer) {
+    newSize: Int, minElementWidth: Int) -> (Int, OpaquePointer) {
     if _fastPath((nativeBuffer != nil) && elementWidth >= minElementWidth) {
       var buffer = nativeBuffer!
 
@@ -405,7 +405,7 @@ public struct _StringCore {
   @warn_unused_result
   mutating func _growBuffer(
     newSize: Int, minElementWidth: Int
-  ) -> COpaquePointer {
+  ) -> OpaquePointer {
     let (newCapacity, existingStorage)
       = _claimCapacity(newSize, minElementWidth: minElementWidth)
 
@@ -445,7 +445,7 @@ public struct _StringCore {
     if hasContiguousStorage {
       _StringCore._copyElements(
         _baseAddress, srcElementWidth: elementWidth,
-        dstStart: COpaquePointer(newStorage.start),
+        dstStart: OpaquePointer(newStorage.start),
         dstElementWidth: newElementWidth, count: oldCount)
     }
     else {
@@ -494,7 +494,7 @@ public struct _StringCore {
     if _fastPath(elementWidth == 1) {
       _sanityCheck(
         _pointerToNth(count)
-        == COpaquePointer(UnsafeMutablePointer<RawByte>(destination) + 1))
+        == OpaquePointer(UnsafeMutablePointer<RawByte>(destination) + 1))
 
       UnsafeMutablePointer<UTF8.CodeUnit>(destination)[0] = UTF8.CodeUnit(u0)
     }
@@ -708,7 +708,7 @@ extension _StringCore : RangeReplaceableCollectionType {
 // storage have a non-NULL base address.
 var _emptyStringStorage: UInt32 = 0
 
-var _emptyStringBase: COpaquePointer {
-  return COpaquePointer(
+var _emptyStringBase: OpaquePointer {
+  return OpaquePointer(
     UnsafeMutablePointer<UInt16>(Builtin.addressof(&_emptyStringStorage)))
 }

@@ -24,9 +24,9 @@ import SwiftShims
 @warn_unused_result
 public // @testable
 func _stdlib_atomicCompareExchangeStrongPtrImpl(
-  object target: UnsafeMutablePointer<COpaquePointer>,
-  expected: UnsafeMutablePointer<COpaquePointer>,
-  desired: COpaquePointer) -> Bool {
+  object target: UnsafeMutablePointer<OpaquePointer>,
+  expected: UnsafeMutablePointer<OpaquePointer>,
+  desired: OpaquePointer) -> Bool {
 
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_RawPointer(
     target._rawValue, expected.memory._rawValue, desired._rawValue)
@@ -71,7 +71,7 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
   return _stdlib_atomicCompareExchangeStrongPtrImpl(
     object: UnsafeMutablePointer(target),
     expected: UnsafeMutablePointer(expected),
-    desired: COpaquePointer(desired))
+    desired: OpaquePointer(desired))
 }
 
 @_transparent
@@ -79,7 +79,7 @@ public // @testable
 func _stdlib_atomicInitializeARCRef(
   object target: UnsafeMutablePointer<AnyObject?>,
   desired: AnyObject) -> Bool {
-  var expected = COpaquePointer()
+  var expected = OpaquePointer()
   let desiredPtr = Unmanaged.passRetained(desired).toOpaque()
   let wonRace = _stdlib_atomicCompareExchangeStrongPtrImpl(
     object: UnsafeMutablePointer(target),
@@ -235,10 +235,10 @@ public func _swift_stdlib_atomicLoadInt(
 @_transparent
 public // @testable
 func _swift_stdlib_atomicLoadPtrImpl(
-  object target: UnsafeMutablePointer<COpaquePointer>
-) -> COpaquePointer {
+  object target: UnsafeMutablePointer<OpaquePointer>
+) -> OpaquePointer {
   let value = Builtin.atomicload_seqcst_RawPointer(target._rawValue)
-  return COpaquePointer(value)
+  return OpaquePointer(value)
 }
 
 @_transparent

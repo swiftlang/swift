@@ -44,8 +44,8 @@ func test_varArgs3() {
   var args = [CVarArgType]()
 
   let format = "pointers: '%p' '%p' '%p' '%p' '%p'\n"
-  args.append(COpaquePointer(bitPattern: 0x1234_5670))
-  args.append(COpaquePointer(bitPattern: 0x1234_5671))
+  args.append(OpaquePointer(bitPattern: 0x1234_5670))
+  args.append(OpaquePointer(bitPattern: 0x1234_5671))
   args.append(UnsafePointer<Int>(bitPattern: 0x1234_5672))
   args.append(UnsafeMutablePointer<Float>(bitPattern: 0x1234_5673))
   args.append(AutoreleasingUnsafeMutablePointer<AnyObject>(

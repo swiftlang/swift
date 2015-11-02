@@ -76,7 +76,7 @@ public typealias CBool = Bool
 ///
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
-public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
+public struct OpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   var _rawValue: Builtin.RawPointer
 
   /// Construct a `nil` instance.
@@ -90,7 +90,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
     _rawValue = v
   }
 
-  /// Construct a `COpaquePointer` from a given address in memory.
+  /// Construct an `OpaquePointer` from a given address in memory.
   ///
   /// This is a fundamentally unsafe conversion.
   @_transparent
@@ -98,7 +98,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
     _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Construct a `COpaquePointer` from a given address in memory.
+  /// Construct an `OpaquePointer` from a given address in memory.
   ///
   /// This is a fundamentally unsafe conversion.
   @_transparent
@@ -142,7 +142,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   }
 }
 
-extension COpaquePointer : CustomDebugStringConvertible {
+extension OpaquePointer : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
@@ -150,7 +150,7 @@ extension COpaquePointer : CustomDebugStringConvertible {
 }
 
 @warn_unused_result
-public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
+public func ==(lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 

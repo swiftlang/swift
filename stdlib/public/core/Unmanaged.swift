@@ -28,7 +28,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @_transparent
   @warn_unused_result
-  public static func fromOpaque(value: COpaquePointer) -> Unmanaged {
+  public static func fromOpaque(value: OpaquePointer) -> Unmanaged {
     // Null pointer check is a debug check, because it guards only against one
     // specific bad pointer value.
     _debugPrecondition(
@@ -46,8 +46,8 @@ public struct Unmanaged<Instance : AnyObject> {
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @_transparent
   @warn_unused_result
-  public func toOpaque() -> COpaquePointer {
-    return unsafeBitCast(_value, COpaquePointer.self)
+  public func toOpaque() -> OpaquePointer {
+    return unsafeBitCast(_value, OpaquePointer.self)
   }
 
   /// Create an unmanaged reference with an unbalanced retain.

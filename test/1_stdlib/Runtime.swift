@@ -2188,9 +2188,9 @@ Reflection.test("MirrorMirror") {
   expectEqual(0, mirrorMirror.children.count)
 }
 
-Reflection.test("COpaquePointer/null") {
+Reflection.test("OpaquePointer/null") {
   // Don't crash on null pointers. rdar://problem/19708338
-  var sequence = COpaquePointer()
+  var sequence = OpaquePointer()
   var mirror = _reflect(sequence)
   var child = mirror[0]
   expectEqual("(Opaque Value)", child.1.summary)

@@ -54,7 +54,7 @@ func _cocoaStringToSwiftString_NonASCII(
   let start = _stdlib_binary_CFStringGetCharactersPtr(cfImmutableValue)
 
   return String(_StringCore(
-    baseAddress: COpaquePointer(start),
+    baseAddress: OpaquePointer(start),
     count: length,
     elementShift: 1,
     hasCocoaBuffer: true,
@@ -169,7 +169,7 @@ extension String {
     }
 
     self._core = _StringCore(
-      baseAddress: COpaquePointer(start),
+      baseAddress: OpaquePointer(start),
       count: length,
       elementShift: isUTF16 ? 1 : 0,
       hasCocoaBuffer: true,

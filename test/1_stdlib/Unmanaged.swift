@@ -21,7 +21,7 @@ UnmanagedTests.test("fromOpaque()/trap")
     { !_isDebugAssertConfiguration() },
     reason: "fromOpaque() does a _debugPrecondition() for null pointers"))
   .code {
-  let null = getPointer(COpaquePointer())
+  let null = getPointer(OpaquePointer())
   expectCrashLater()
   let unmanaged = Unmanaged<AnyObject>.fromOpaque(null)
   _blackHole(unmanaged)

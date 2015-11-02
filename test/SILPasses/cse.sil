@@ -842,15 +842,15 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK: return
 sil @cse_unchecked_addr_cast : $@convention(thin) () -> (Builtin.RawPointer, Builtin.RawPointer) {
 bb0:
-   %1 = alloc_stack $COpaquePointer
-   %2 = unchecked_addr_cast %1#1: $*COpaquePointer to $*UnsafeMutablePointer<AnyObject>
-   %3 = unchecked_addr_cast %1#1: $*COpaquePointer to $*UnsafeMutablePointer<AnyObject>
+   %1 = alloc_stack $OpaquePointer
+   %2 = unchecked_addr_cast %1#1: $*OpaquePointer to $*UnsafeMutablePointer<AnyObject>
+   %3 = unchecked_addr_cast %1#1: $*OpaquePointer to $*UnsafeMutablePointer<AnyObject>
    %4 = struct_element_addr %2 : $*UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
    %5 = load %4 : $*Builtin.RawPointer
    %6 = struct_element_addr %3 : $*UnsafeMutablePointer<AnyObject>, #UnsafeMutablePointer._rawValue
    %7 = load %6 : $*Builtin.RawPointer
    %8 = tuple (%5: $Builtin.RawPointer, %7: $Builtin.RawPointer)
-   dealloc_stack %1#0 : $*@local_storage COpaquePointer
+   dealloc_stack %1#0 : $*@local_storage OpaquePointer
    return %8: $(Builtin.RawPointer, Builtin.RawPointer)
 }
 

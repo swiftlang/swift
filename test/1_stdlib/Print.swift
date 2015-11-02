@@ -481,7 +481,7 @@ func test_PointerPrinting() {
   printedIs(UnsafeMutableBufferPointer(start: nullUP, count: 0),
       "UnsafeMutableBufferPointer(start: \(expectedNull), length: 0)")
 
-  printedIs(COpaquePointer(), expectedNull)
+  printedIs(OpaquePointer(), expectedNull)
   printedIs(CVaListPointer(_fromUnsafeMutablePointer: nullUP), expectedNull)
   printedIs(AutoreleasingUnsafeMutablePointer<Int>(), expectedNull)
 

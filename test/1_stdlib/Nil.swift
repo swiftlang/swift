@@ -6,7 +6,7 @@
 
 import Foundation
 
-let opaqueNil: COpaquePointer = nil
+let opaqueNil: OpaquePointer = nil
 if opaqueNil == nil {
   print("ok opaqueNil == nil")
   // CHECK: ok opaqueNil == nil

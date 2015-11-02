@@ -34,7 +34,7 @@ public struct ObjCBool : CustomStringConvertible {
 }
 
 public struct Selector {
-  private var ptr : COpaquePointer
+  private var ptr : OpaquePointer
 }
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.

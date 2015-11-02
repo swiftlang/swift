@@ -96,7 +96,7 @@ func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
 ///
 /// The compiler has special knowledge of this type.
 public struct Selector : StringLiteralConvertible, NilLiteralConvertible {
-  var ptr : COpaquePointer
+  var ptr : OpaquePointer
 
   /// Create a selector from a string.
   public init(_ str : String) {
@@ -179,7 +179,7 @@ extension Selector : _Reflectable {
 //===----------------------------------------------------------------------===//
 
 public struct NSZone : NilLiteralConvertible {
-  var pointer : COpaquePointer
+  var pointer : OpaquePointer
 
   public init() { pointer = nil }
 
@@ -196,10 +196,10 @@ public struct NSZone : NilLiteralConvertible {
 
 @warn_unused_result
 @_silgen_name("objc_autoreleasePoolPush")
-func __pushAutoreleasePool() -> COpaquePointer
+func __pushAutoreleasePool() -> OpaquePointer
 
 @_silgen_name("objc_autoreleasePoolPop")
-func __popAutoreleasePool(pool: COpaquePointer)
+func __popAutoreleasePool(pool: OpaquePointer)
 
 public func autoreleasepool(@noescape code: () -> Void) {
   let pool = __pushAutoreleasePool()

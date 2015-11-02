@@ -52,7 +52,7 @@ internal func invokeBlockContext(
   contextAsVoidPointer: UnsafeMutablePointer<Void>
 ) -> UnsafeMutablePointer<Void> {
   // The context is passed in +1; we're responsible for releasing it.
-  let contextAsOpaque = COpaquePointer(contextAsVoidPointer)
+  let contextAsOpaque = OpaquePointer(contextAsVoidPointer)
   let context = Unmanaged<PthreadBlockContext>.fromOpaque(contextAsOpaque)
     .takeRetainedValue()
 

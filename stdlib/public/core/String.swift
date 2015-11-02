@@ -211,7 +211,7 @@ extension String : _BuiltinUTF16StringLiteralConvertible {
   )  {
     self = String(
       _StringCore(
-        baseAddress: COpaquePointer(start),
+        baseAddress: OpaquePointer(start),
         count: Int(numberOfCodeUnits),
         elementShift: 1,
         hasCocoaBuffer: false,
@@ -229,7 +229,7 @@ extension String : _BuiltinStringLiteralConvertible {
     if Bool(isASCII) {
       self = String(
         _StringCore(
-          baseAddress: COpaquePointer(start),
+          baseAddress: OpaquePointer(start),
           count: Int(byteSize),
           elementShift: 0,
           hasCocoaBuffer: false,

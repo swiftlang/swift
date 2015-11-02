@@ -158,7 +158,7 @@ public struct StaticString
     unicodeScalar: Builtin.Int32
   ) {
     self._startPtrOrData =
-      unsafeBitCast(UInt(UInt32(unicodeScalar)), COpaquePointer.self)._rawValue
+      unsafeBitCast(UInt(UInt32(unicodeScalar)), OpaquePointer.self)._rawValue
     self._byteSize = 0._builtinWordValue
     self._flags = UnicodeScalar(_builtinUnicodeScalarLiteral: unicodeScalar).isASCII()
       ? (0x3 as UInt8)._value

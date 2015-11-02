@@ -481,7 +481,7 @@ internal func _makeBridgeObject(
 public // @testable
 func _getSuperclass(t: AnyClass) -> AnyClass? {
   return unsafeBitCast(
-    _swift_getSuperclass_nonNull(unsafeBitCast(t, COpaquePointer.self)),
+    _swift_getSuperclass_nonNull(unsafeBitCast(t, OpaquePointer.self)),
     AnyClass.self)
 }
 

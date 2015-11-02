@@ -103,7 +103,7 @@ func test_pointer() {
   param_const_void_pointer(fa)
   // FIXME: param_const_void_pointer([1.0, 2.0, 3.0])
 
-  let op = COpaquePointer()
+  let op = OpaquePointer()
   opaque_pointer_param(op)
 }
 

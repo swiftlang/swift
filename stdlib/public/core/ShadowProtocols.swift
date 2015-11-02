@@ -43,7 +43,7 @@ public protocol _NSEnumeratorType : _ShadowProtocol {
 }
 
 /// A token that can be used for `NSZone*`.
-public typealias _SwiftNSZone = COpaquePointer
+public typealias _SwiftNSZone = OpaquePointer
 
 /// A shadow for the `NSCopying` protocol.
 @objc

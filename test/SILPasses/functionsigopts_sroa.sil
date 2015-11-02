@@ -76,7 +76,7 @@ struct FakeStaticString {
 sil @fakestaticstring_user : $@convention(thin) (FakeStaticString) -> ()
 
 @objc protocol FakeAnyObject {}
-struct FakeCOpaquePointer {
+struct FakeOpaquePointer {
   var rawValue : Builtin.RawPointer
 }
 enum FakeOptional<T> {
@@ -88,7 +88,7 @@ struct FakeUWord {
 }
 
 struct FakeStringCore {
-  var baseAddress : FakeCOpaquePointer
+  var baseAddress : FakeOpaquePointer
   var countAndFlags : FakeUWord
   var owner : FakeOptional<FakeAnyObject>
 }
@@ -423,7 +423,7 @@ bb0(%0 : $*S1, %1 : $S1, %2 : $S1):
 // CHECK: [[EXT5:%.*]] = struct_extract [[EXT4]] : $FakeStringCore, #FakeStringCore.owner
 // CHECK: [[EXT6:%.*]] = struct_extract [[EXT4]] : $FakeStringCore, #FakeStringCore.countAndFlags
 // CHECK: [[EXT7:%.*]] = struct_extract [[EXT4]] : $FakeStringCore, #FakeStringCore.baseAddress
-// CHECK: [[EXT8:%.*]] = struct_extract [[EXT7]] : $FakeCOpaquePointer, #FakeCOpaquePointer.rawValue
+// CHECK: [[EXT8:%.*]] = struct_extract [[EXT7]] : $FakeOpaquePointer, #FakeOpaquePointer.rawValue
 // CHECK: [[EXT9:%.*]] = struct_extract [[EXT6]] : $FakeUWord, #FakeUWord.value
 // CHECK: [[EXT10:%.*]] = struct_extract [[IN3]] : $FakeStaticString, #FakeStaticString.f3
 // CHECK: [[EXT11:%.*]] = struct_extract [[IN3]] : $FakeStaticString, #FakeStaticString.f2
@@ -450,7 +450,7 @@ bb0(%0 : $FakeStaticString, %1 : $FakeString, %2 : $FakeStaticString):
 // CHECK: [[EXT5:%.*]] = struct_extract [[EXT4]] : $FakeStringCore, #FakeStringCore.owner
 // CHECK: [[EXT6:%.*]] = struct_extract [[EXT4]] : $FakeStringCore, #FakeStringCore.countAndFlags
 // CHECK: [[EXT7:%.*]] = struct_extract [[EXT4]] : $FakeStringCore, #FakeStringCore.baseAddress
-// CHECK: [[EXT8:%.*]] = struct_extract [[EXT7]] : $FakeCOpaquePointer, #FakeCOpaquePointer.rawValue
+// CHECK: [[EXT8:%.*]] = struct_extract [[EXT7]] : $FakeOpaquePointer, #FakeOpaquePointer.rawValue
 // CHECK: [[EXT9:%.*]] = struct_extract [[EXT6]] : $FakeUWord, #FakeUWord.value
 // CHECK: [[EXT10:%.*]] = struct_extract [[IN3]] : $FakeStaticString, #FakeStaticString.f3
 // CHECK: [[EXT11:%.*]] = struct_extract [[IN3]] : $FakeStaticString, #FakeStaticString.f2
@@ -678,8 +678,8 @@ bb0(%0 : $SingleFieldLvl1):
 // CHECK: bb0([[IN1:%.*]] : $Builtin.RawPointer, [[IN2:%.*]] : $Builtin.Word, [[IN3:%.*]] : $Builtin.Word, [[IN4:%.*]] : $Builtin.RawPointer, [[IN5:%.*]] : $Builtin.Word, [[IN6:%.*]] : $FakeOptional<FakeAnyObject>, [[IN7:%.*]] : $Builtin.RawPointer, [[IN8:%.*]] : $Builtin.Word, [[IN9:%.*]] : $Builtin.Word):
 // CHECK-NEXT: [[STRUCT6:%.*]] = struct $FakeStaticString ([[IN7]] : $Builtin.RawPointer, [[IN8]] : $Builtin.Word, [[IN9]] : $Builtin.Word)
 // CHECK-NEXT: [[STRUCT2:%.*]] = struct $FakeUWord ([[IN5]] : $Builtin.Word)
-// CHECK: [[STRUCT3:%.*]] = struct $FakeCOpaquePointer ([[IN4]] : $Builtin.RawPointer)
-// CHECK: [[STRUCT4:%.*]] = struct $FakeStringCore ([[STRUCT3]] : $FakeCOpaquePointer, [[STRUCT2]] : $FakeUWord, [[IN6]] : $FakeOptional<FakeAnyObject>)
+// CHECK: [[STRUCT3:%.*]] = struct $FakeOpaquePointer ([[IN4]] : $Builtin.RawPointer)
+// CHECK: [[STRUCT4:%.*]] = struct $FakeStringCore ([[STRUCT3]] : $FakeOpaquePointer, [[STRUCT2]] : $FakeUWord, [[IN6]] : $FakeOptional<FakeAnyObject>)
 // CHECK: [[STRUCT5:%.*]] = struct $FakeString ([[STRUCT4]] : $FakeStringCore)
 // CHECK-NEXT: [[STRUCT1:%.*]] = struct $FakeStaticString ([[IN1]] : $Builtin.RawPointer, [[IN2]] : $Builtin.Word, [[IN3]] : $Builtin.Word)
 // CHECK: [[FN1:%.*]] = function_ref @fakestaticstring_user : $@convention(thin) (FakeStaticString) -> ()
