@@ -618,7 +618,7 @@ swift_install_in_component(clang-libclang
 if(XCODE)
   add_custom_target(Documentation
       SOURCES
-        README.txt
+        README.md
         docs/LangRef.html
         docs/toc.js)
 
