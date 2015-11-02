@@ -20,7 +20,7 @@
 /// 2. The store to pointer is overwritten by another store before any
 /// potential use of the pointer.
 ///
-/// DeadStoreElimination (DSE) eliminates such stores by:
+/// Dead store elimination (DSE) eliminates such stores by:
 ///
 /// 1. Introducing a notion of a MemLocation that is used to model objects
 /// fields. (See below for more details).
