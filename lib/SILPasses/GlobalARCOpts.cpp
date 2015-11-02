@@ -48,10 +48,8 @@ llvm::cl::opt<bool> EnableLoopARC("enable-loop-arc", llvm::cl::init(true));
 /// \p Ptr is a non-trivial value without reference-semantics.
 static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
   // Set up the builder we use to insert at our insertion point.
-  SILBuilderWithScope<1> B(InsertPt);
-  // To avoid a jumpy line table at -Onone, inherit the location and
-  // scope from InsertPt.
-  auto Loc = InsertPt->getLoc();
+  SILBuilder B(InsertPt);
+  auto Loc = SILFileLocation(SourceLoc());
 
   // If Ptr is refcounted itself, create the strong_retain and
   // return.
@@ -67,10 +65,8 @@ static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
 /// if \p Ptr is a non-trivial value without reference-semantics.
 static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
   // Setup the builder we will use to insert at our insertion point.
-  SILBuilderWithScope<1> B(InsertPt);
-  // To avoid a jumpy line table at -Onone, inherit the location and
-  // scope from InsertPt.
-  auto Loc = InsertPt->getLoc();
+  SILBuilder B(InsertPt);
+  auto Loc = SILFileLocation(SourceLoc());
 
   // If Ptr has reference semantics itself, create a strong_release.
   if (Ptr.getType().isReferenceCounted(B.getModule()))
