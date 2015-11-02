@@ -10,4 +10,4 @@ extension AnyObject {
     func x() { #^B^# }
 }
 // Sanity check results.
-// CHECK:  Keyword/None:                       let
+// CHECK:  Keyword[let]/None:                  let
