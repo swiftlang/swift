@@ -405,9 +405,6 @@ public:
         CGA->unlockInvalidation();
       }
     }
-    if (NeedUpdate) {
-      CallGraphEditor(CG).updateCalleeSets();
-    }
   }
 };
 
@@ -477,8 +474,7 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
     DEBUG(llvm::dbgs() << "  removed external function " << F->getName()
           << "\n");
     CallGraph *CG = CGA->getCallGraphOrNull();
-    CallGraphEditor(CG).removeAllCalleeEdgesFrom(F);
-    F->dropAllReferences();
+    CallGraphEditor(CG).dropAllReferences(F);
     auto &Blocks = F->getBlocks();
     Blocks.clear();
     assert(F->isExternalDeclaration() &&
@@ -515,9 +511,6 @@ public:
           CGA->unlockInvalidation();
         }
       }
-    }
-    if (NeedUpdate) {
-      CallGraphEditor(CGA->getCallGraphOrNull()).updateCalleeSets();
     }
   }
 };

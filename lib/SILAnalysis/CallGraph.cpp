@@ -156,6 +156,21 @@ CallGraph::computeWitnessMethodCalleesForWitnessTable(SILWitnessTable &WTable) {
   }
 }
 
+/// Remove a function from all the callee sets. This should be called
+/// on any function that we'll eventually remove.
+// FIXME: Consider adding a reverse mapping from call graph node to
+//        the sets it appears in.
+void CallGraph::removeFunctionFromCalleeSets(SILFunction *F) {
+  auto *Node = getCallGraphNode(F);
+
+  for (auto I = CalleeSetCache.begin(), E = CalleeSetCache.end();
+       I != E; ++I) {
+    auto *Callees = I->second.getPointer();
+
+    Callees->remove(Node);
+  }
+}
+
 /// Compute the callees for each method that appears in a VTable or
 /// Witness Table.
 void CallGraph::computeMethodCallees() {
@@ -814,6 +829,18 @@ void CallGraphEditor::removeAllCalleeEdgesFrom(SILFunction *F) {
   while (!CalleeEdges.empty()) {
     auto *Edge = *CalleeEdges.begin();
     CG->removeEdgeFromFunction(Edge, F);
+  }
+}
+
+void CallGraphEditor::removeAllCallerEdgesFrom(SILFunction *F) {
+  if (!CG)
+    return;
+
+  auto &CallerEdges = CG->getCallGraphNode(F)->getCallerEdges();
+  while (!CallerEdges.empty()) {
+    auto *Edge = *CallerEdges.begin();
+    auto Apply = Edge->getApply();
+    CG->removeEdgeFromFunction(Edge, Apply.getFunction());
   }
 }
 

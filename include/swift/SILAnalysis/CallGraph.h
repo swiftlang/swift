@@ -514,6 +514,7 @@ private:
     return addCallGraphNode(F);
   }
 
+  void removeFunctionFromCalleeSets(SILFunction *F);
   void computeMethodCallees();
   void computeClassMethodCalleesForClass(ClassDecl *CD);
   void computeWitnessMethodCalleesForWitnessTable(SILWitnessTable &WTable);
@@ -541,8 +542,11 @@ public:
   /// function \a New.
   void moveNodeToNewFunction(SILFunction *Old, SILFunction *New);
 
-  /// Removes all callee edges from function
+  /// Removes all callee edges from function.
   void removeAllCalleeEdgesFrom(SILFunction *F);
+
+  /// Removes all caller edges from function.
+  void removeAllCallerEdgesFrom(SILFunction *F);
 
   /// Creates a new node for function \p F and adds callee edges for all
   /// full apply sites in the function.
@@ -590,20 +594,16 @@ public:
     }
   }
 
-  /// Recomputes the callee sets. This should be done whenever a method is
-  /// deleted.
-  void updateCalleeSets() {
-    if (CG)
-      CG->computeMethodCallees();
-  }
-
   /// Drops all references in function and removes the references to
   /// instructions in the function from the call graph.
   void dropAllReferences(SILFunction *F) {
     F->dropAllReferences();
 
-    if (CG)
-      CallGraphEditor(CG).removeAllCalleeEdgesFrom(F);
+    if (CG) {
+      removeAllCalleeEdgesFrom(F);
+      removeAllCallerEdgesFrom(F);
+      CG->removeFunctionFromCalleeSets(F);
+    }
   }
 
   /// Erase the function from the module and any references to it from
