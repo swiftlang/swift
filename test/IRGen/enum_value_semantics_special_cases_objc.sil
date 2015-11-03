@@ -1,0 +1,104 @@
+// RUN: %target-swift-frontend %s -emit-ir | FileCheck %s
+
+// REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
+
+import Builtin
+
+// ObjC payloads can be nullable too.
+enum NullableObjCRefcounted {
+  case Ref(Builtin.UnknownObject)
+  case None
+}
+// CHECK-LABEL: define linkonce_odr hidden void @_TwxxO36enum_value_semantics_special_cases_objc22NullableObjCRefcounted(%swift.opaque* %object, %swift.type* %Self) {{.*}} {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %object to %O36enum_value_semantics_special_cases_objc22NullableObjCRefcounted*
+// CHECK:   %1 = bitcast %O36enum_value_semantics_special_cases_objc22NullableObjCRefcounted* %0 to %objc_object**
+// CHECK:   %2 = load %objc_object*, %objc_object** %1, align 8
+// CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_unknownRelease to void (%objc_object*)*)(%objc_object* %2) {{#[0-9]+}}
+// CHECK:   ret void
+// CHECK: }
+
+// Enums consisting of all retainable pointers and at most one empty case
+// use tagged pointer value semantics—we mask off the tag bits and pass the
+// pointer to the r/r functions.
+
+class C {}
+sil_vtable C {}
+class D {}
+sil_vtable D {}
+
+sil @_TFC36enum_value_semantics_special_cases_objc1CD : $@convention(method) (C) -> ()
+sil @_TFC36enum_value_semantics_special_cases_objc1DD : $@convention(method) (D) -> ()
+
+enum AllRefcounted {
+  case Ref(Builtin.NativeObject)
+  case CRef(C)
+  case DRef(D)
+  case None
+}
+
+// CHECK-LABEL: define linkonce_odr hidden void @_TwxxO36enum_value_semantics_special_cases_objc13AllRefcounted(%swift.opaque* %object, %swift.type* %Self) {{.*}} {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %object to %O36enum_value_semantics_special_cases_objc13AllRefcounted*
+// CHECK:   %1 = bitcast %O36enum_value_semantics_special_cases_objc13AllRefcounted* %0 to i64*
+// CHECK:   %2 = load i64, i64* %1, align 8
+// --                        0x3fffffffffffffff
+// CHECK:   %3 = and i64 %2, 4611686018427387903
+// CHECK:   %4 = inttoptr i64 %3 to %swift.refcounted*
+// CHECK:   call void @swift_release(%swift.refcounted* %4) {{#[0-9]+}}
+// CHECK:   ret void
+// CHECK: }
+
+// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @_TwcpO36enum_value_semantics_special_cases_objc13AllRefcounted(%swift.opaque* %dest, %swift.opaque* %src, %swift.type* %Self) {{.*}} {
+// CHECK:         %3 = load i64, i64* %2, align 8
+// --                              0x3fffffffffffffff
+// CHECK:         %4 = and i64 %3, 4611686018427387903
+// CHECK:         %5 = inttoptr i64 %4 to %swift.refcounted*
+// CHECK:         call void @swift_retain(%swift.refcounted* %5) #1
+// CHECK:         %6 = bitcast %O36enum_value_semantics_special_cases_objc13AllRefcounted* %0 to i64*
+// -- NB: The original loaded value is stored, not the masked one.
+// CHECK:         store i64 %3, i64* %6, align 8
+// CHECK: }
+
+enum AllRefcountedTwoSimple {
+  case Ref(Builtin.NativeObject)
+  case CRef(C)
+  case DRef(D)
+  case None
+  case Nothing
+}
+
+// CHECK-LABEL: define linkonce_odr hidden void @_TwxxO36enum_value_semantics_special_cases_objc22AllRefcountedTwoSimple
+// CHECK:   switch
+
+enum AllMixedRefcounted {
+  case Ref(Builtin.NativeObject)
+  case CRef(C)
+  case ORef(Builtin.UnknownObject)
+  case None
+}
+
+// CHECK-LABEL: define linkonce_odr hidden void @_TwxxO36enum_value_semantics_special_cases_objc18AllMixedRefcounted(%swift.opaque* %object, %swift.type* %Self) {{.*}} {
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %object to %O36enum_value_semantics_special_cases_objc18AllMixedRefcounted*
+// CHECK:   %1 = bitcast %O36enum_value_semantics_special_cases_objc18AllMixedRefcounted* %0 to i64*
+// CHECK:   %2 = load i64, i64* %1, align 8
+// --                         0x3fffffffffffffff
+// CHECK:   %3 = and i64 %2, 4611686018427387903
+// CHECK:   %4 = inttoptr i64 %3 to %objc_object*
+// CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_unknownRelease to void (%objc_object*)*)(%objc_object* %4) {{#[0-9]+}}
+// CHECK:   ret void
+// CHECK: }
+
+enum AllMixedRefcountedTwoSimple {
+  case Ref(Builtin.NativeObject)
+  case CRef(C)
+  case ORef(Builtin.UnknownObject)
+  case None
+  case Nothing
+}
+
+// CHECK-LABEL: define linkonce_odr hidden void @_TwxxO36enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimple
+// CHECK:   switch
+
