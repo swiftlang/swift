@@ -1684,6 +1684,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
             llbuild)
                 cmake_options=(
                     "${cmake_options[@]}"
+                    -DCMAKE_INSTALL_PREFIX:PATH="${INSTALL_PREFIX}"
                     -DLIT_EXECUTABLE:PATH="${LLVM_SOURCE_DIR}/utils/lit/lit.py"
                     -DFILECHECK_EXECUTABLE:PATH="$(build_directory_bin $deployment_target llvm)/FileCheck"
                     -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
@@ -1974,7 +1975,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 set -x
                 "$SWIFTPM_SOURCE_DIR"/utils/bootstrap -v "${swiftpm_bootstrap_options[@]}" \
                                      --swiftc="${SWIFTC_BIN}" --sbt="${LLBUILD_BIN}" \
-                                     --build="${build_dir}" --prefix="${INSTALL_DESTDIR}" install
+                                     --build="${build_dir}" --prefix="${INSTALL_DESTDIR}"/"${INSTALL_PREFIX}" install
                 { set +x; } 2>/dev/null
                 # As swiftpm bootstraps the installation itself, we break early here.
                 continue
