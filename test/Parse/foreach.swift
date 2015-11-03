@@ -5,7 +5,7 @@ struct IntRange<Int> : SequenceType, IteratorProtocol {
   func next() -> (Int, Int)? {}
 
   typealias Iterator = IntRange<Int>
-  func generate() -> IntRange<Int> { return self }
+  func iterator() -> IntRange<Int> { return self }
 }
 
 func for_each(r: Range<Int>, iir: IntRange<Int>) {

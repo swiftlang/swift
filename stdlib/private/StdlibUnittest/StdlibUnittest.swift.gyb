@@ -1918,7 +1918,7 @@ public func checkSequence<
 ) {
   let expectedCount: Int = numericCast(expected.count)
   checkIterator(
-    expected, sequence.generate(), ${trace},
+    expected, sequence.iterator(), ${trace},
     resiliencyChecks: resiliencyChecks,
     sameValue: sameValue)
 
@@ -2476,7 +2476,7 @@ func compose<A, B, C>(f: A -> B, _ g: B -> C) -> A -> C {
 }
 
 /// State that is created every time a fresh iterator is created with
-/// `MinimalSequence.generate()`.
+/// `MinimalSequence.iterator()`.
 internal class _MinimalIteratorPrivateState<T> {
   internal init() {}
 
@@ -2583,8 +2583,8 @@ extension StrictSequenceType {
 }
 
 extension StrictSequenceType where Iterator : _MinimalIteratorProtocol {
-  public func generate() -> MinimalIterator<Element> {
-    return base.generate()
+  public func iterator() -> MinimalIterator<Element> {
+    return base.iterator()
   }
 }
 
@@ -2615,7 +2615,7 @@ public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
     }
   }
 
-  public func generate() -> MinimalIterator<T> {
+  public func iterator() -> MinimalIterator<T> {
     return MinimalIterator(_sharedState)
   }
 
@@ -3332,8 +3332,8 @@ extension ${Protocol} {
 }
 
 extension ${Protocol} where Iterator : _MinimalIteratorProtocol {
-  public func generate() -> MinimalIterator<Element> {
-    return base.generate()
+  public func iterator() -> MinimalIterator<Element> {
+    return base.iterator()
   }
 }
 
@@ -3386,7 +3386,7 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
     }
   }
 
-  public func generate() -> MinimalIterator<T> {
+  public func iterator() -> MinimalIterator<T> {
     return MinimalIterator(_elements)
   }
 
@@ -3461,8 +3461,8 @@ extension ${Protocol} {
 }
 
 extension ${Protocol} where Iterator : _MinimalIteratorProtocol {
-  public func generate() -> MinimalIterator<Element> {
-    return base.generate()
+  public func iterator() -> MinimalIterator<Element> {
+    return base.iterator()
   }
 }
 
@@ -3531,7 +3531,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
       _CollectionState(newRootStateForElementCount: self.elements.count)
   }
 
-  public func generate() -> MinimalIterator<T> {
+  public func iterator() -> MinimalIterator<T> {
     return MinimalIterator(elements)
   }
 
@@ -3917,7 +3917,7 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
       base: Base(elements: elements))
   }
 
-  public func generate() -> MinimalIterator<Element> {
+  public func iterator() -> MinimalIterator<Element> {
     return MinimalIterator(Array(self))
   }
 

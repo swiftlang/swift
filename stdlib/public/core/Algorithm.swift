@@ -71,10 +71,10 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 /// starting at zero, along with the elements of the underlying
 /// `Base`:
 ///
-///     var g = EnumeratedIterator(["foo", "bar"].generate())
-///     g.next() // (0, "foo")
-///     g.next() // (1, "bar")
-///     g.next() // nil
+///     var iterator = ["foo", "bar"].enumerate()
+///     iterator.next() // (0, "foo")
+///     iterator.next() // (1, "bar")
+///     iterator.next() // nil
 ///
 /// - Note: Idiomatic usage is to call `enumerate` instead of
 ///   constructing an `EnumeratedIterator` directly.
@@ -123,8 +123,8 @@ public struct EnumeratedSequence<Base : SequenceType> : SequenceType {
   /// Returns an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> EnumeratedIterator<Base.Iterator> {
-    return EnumeratedIterator(_base: _base.generate())
+  public func iterator() -> EnumeratedIterator<Base.Iterator> {
+    return EnumeratedIterator(_base: _base.iterator())
   }
 }
 

@@ -13,7 +13,7 @@ protocol CollectionType : Indexable, SequenceType {}
 public struct IndexingGenerator<Elements : Indexable>
   : IteratorProtocol, SequenceType {
   
-  public func generate() -> IndexingGenerator {
+  public func iterator() -> IndexingGenerator {
     return self
   }
   
@@ -23,7 +23,7 @@ public struct IndexingGenerator<Elements : Indexable>
 }
 
 extension SequenceType where Self : CollectionType {
-  func generate() -> IndexingGenerator<Self> {
+  func iterator() -> IndexingGenerator<Self> {
     return IndexingGenerator(self)
   }
 }

@@ -24,7 +24,7 @@ struct OtherFileSecretTypeWrapper {
 
 struct OtherFileIntArray : SequenceType {
   var array: [Int] = []
-  func generate() -> Array<Int>.Iterator { return array.generate() }
+  func iterator() -> Array<Int>.Iterator { return array.iterator() }
 }
 func getOtherFileIntArray() -> OtherFileIntArray { return OtherFileIntArray() }
 

@@ -7,7 +7,7 @@ var tests = TestSuite("Iterator")
 // Check to make sure we are actually getting Optionals out of this
 // IteratorProtocol
 tests.test("Range") {
-  var w = (1..<2).generate()
+  var w = (1..<2).iterator()
   var maybe_one = w.next()
   expectType(Optional<Int>.self, &maybe_one)
   expectEqual(1, maybe_one)
@@ -15,7 +15,7 @@ tests.test("Range") {
 }
 
 tests.test("RangeIteratorConformsToSequence") {
-  for x in (1..<2).generate() { 
+  for x in (1..<2).iterator() {
     expectEqual(1, x)
   }
 }

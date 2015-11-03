@@ -43,7 +43,7 @@ public struct JoinIterator<
       switch _state {
       case .Start:
         if let nextSubSequence = _base.next() {
-          _inner = nextSubSequence.generate()
+          _inner = nextSubSequence.iterator()
           _state = .GeneratingElements
         } else {
           _state = .End
@@ -56,18 +56,18 @@ public struct JoinIterator<
           return result
         }
         if _separatorData.isEmpty {
-          _inner = _base.next()?.generate()
+          _inner = _base.next()?.iterator()
           if _inner == nil {
             _state = .End
             return nil
           }
         } else {
-          _inner = _base.next()?.generate()
+          _inner = _base.next()?.iterator()
           if _inner == nil {
             _state = .End
             return nil
           }
-          _separator = _separatorData.generate()
+          _separator = _separatorData.iterator()
           _state = .GeneratingSeparator
         }
 
@@ -116,9 +116,9 @@ public struct JoinSequence<
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> JoinIterator<Base.Iterator> {
+  public func iterator() -> JoinIterator<Base.Iterator> {
     return JoinIterator(
-      base: _base.generate(),
+      base: _base.iterator(),
       separator: _separator)
   }
 
@@ -141,7 +141,7 @@ public struct JoinSequence<
     }
 
     if separatorSize != 0 {
-      var gen = _base.generate()
+      var gen = _base.iterator()
       if let first = gen.next() {
         result.appendContentsOf(first)
         while let next = gen.next() {

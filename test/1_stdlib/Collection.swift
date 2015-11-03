@@ -15,7 +15,7 @@ struct X : CollectionType {
   }
   subscript(i: Index) -> Element { return msg[i] }
 
-  func generate() -> IndexingGenerator<X> {
+  func iterator() -> IndexingGenerator<X> {
     return IndexingGenerator(self)
   }
 }
@@ -50,7 +50,7 @@ func isPalindrome0<
   var a = seq.indices
   var i = seq.indices
   var ir = i.lazy.reverse()
-  var b = ir.generate()
+  var b = ir.iterator()
   for i in a {
     if seq[i] != seq[b.next()!] {
       return false
@@ -72,7 +72,7 @@ func isPalindrome1<
 >(seq: S) -> Bool {
 
   var a = PermutationGenerator(elements: seq, indices: seq.indices)
-  var b = seq.lazy.reverse().generate()
+  var b = seq.lazy.reverse().iterator()
   for nextChar in a {
     if nextChar != b.next()! {
       return false
@@ -89,7 +89,7 @@ func isPalindrome1_5<
   S.Iterator.Element: Equatable
 >(seq: S) -> Bool {
 
-  var b = seq.lazy.reverse().generate()
+  var b = seq.lazy.reverse().iterator()
   for nextChar in seq {
     if nextChar != b.next()! {
       return false
@@ -181,7 +181,7 @@ testCount()
 
 struct SequenceOnly<T : SequenceType> : SequenceType {
   var base: T
-  func generate() -> T.Iterator { return base.generate() }
+  func iterator() -> T.Iterator { return base.iterator() }
 }
 
 func testUnderestimateCount() {

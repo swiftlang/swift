@@ -414,8 +414,8 @@ public struct Set<Element : Hashable> :
   /// Return a *iterator* over the members.
   ///
   /// - Complexity: O(1).
-  public func generate() -> SetIterator<Element> {
-    return _variantStorage.generate()
+  public func iterator() -> SetIterator<Element> {
+    return _variantStorage.iterator()
   }
 
   //
@@ -650,7 +650,7 @@ public struct Set<Element : Hashable> :
   }
 
   /// The first element obtained when iterating, or `nil` if `self` is
-  /// empty.  Equivalent to `self.generate().next()`.
+  /// empty.  Equivalent to `self.iterator().next()`.
   public var first: Element? {
     return count > 0 ? self[startIndex] : .None
   }
@@ -1122,8 +1122,8 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Return a *iterator* over the (key, value) pairs.
   ///
   /// - Complexity: O(1).
-  public func generate() -> DictionaryIterator<Key, Value> {
-    return _variantStorage.generate()
+  public func iterator() -> DictionaryIterator<Key, Value> {
+    return _variantStorage.iterator()
   }
 
   //
@@ -3454,7 +3454,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
   /// Return a *iterator* over the (Key, Value) pairs.
   ///
   /// - Complexity: O(1).
-  internal func generate() -> ${Self}Iterator<${TypeParameters}> {
+  internal func iterator() -> ${Self}Iterator<${TypeParameters}> {
     switch self {
     case .Native(let owner):
       return

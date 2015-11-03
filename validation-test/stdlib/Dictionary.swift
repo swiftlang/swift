@@ -882,7 +882,7 @@ DictionaryTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
   var d = getCOWFastDictionary()
   var identity1 = unsafeBitCast(d, Int.self)
 
-  var gen = d.generate()
+  var gen = d.iterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
     pairs += [(key, value)]
@@ -895,7 +895,7 @@ DictionaryTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
   var d = getCOWSlowDictionary()
   var identity1 = unsafeBitCast(d, Int.self)
 
-  var gen = d.generate()
+  var gen = d.iterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
     // FIXME: This doesn't work (<rdar://problem/17751308> Can't +=
@@ -2158,7 +2158,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isCocoaDictionary(d))
 
-  var gen = d.generate()
+  var gen = d.iterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
@@ -2178,7 +2178,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isNativeDictionary(d))
 
-  var gen = d.generate()
+  var gen = d.iterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
     let kv = (key.value, value.value)
@@ -2198,7 +2198,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isCocoaDictionary(d))
 
-  var gen = d.generate()
+  var gen = d.iterator()
   // Can not write code below because of
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
   // assert(gen.next() == .None)
@@ -2216,7 +2216,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isNativeDictionary(d))
 
-  var gen = d.generate()
+  var gen = d.iterator()
   // Can not write code below because of
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
   // assert(gen.next() == .None)
@@ -2235,7 +2235,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isCocoaDictionary(d))
 
-  var gen = d.generate()
+  var gen = d.iterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
@@ -2259,7 +2259,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isNativeDictionary(d))
 
-  var gen = d.generate()
+  var gen = d.iterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
     let kv = (key.value, value.value)
@@ -2288,7 +2288,7 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isCocoaDictionary(d))
 
-  var gen = d.generate()
+  var gen = d.iterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
@@ -2314,7 +2314,7 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
   var identity1 = unsafeBitCast(d, Int.self)
   assert(isNativeDictionary(d))
 
-  var gen = d.generate()
+  var gen = d.iterator()
   var pairs = Array<(Int, Int)>()
   while let (key, value) = gen.next() {
     let kv = (key.value, value.value)
@@ -2481,7 +2481,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfDictionaries") {
   var a = nsa as [AnyObject] as! [Dictionary<NSObject, AnyObject>]
   for i in 0..<3 {
     var d = a[i]
-    var gen = d.generate()
+    var gen = d.iterator()
     var pairs = Array<(Int, Int)>()
     while let (key, value) = gen.next() {
       let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
@@ -2502,7 +2502,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfDictionaries") {
   var a = nsa as [AnyObject] as! [Dictionary<TestBridgedKeyTy, TestBridgedValueTy>]
   for i in 0..<3 {
     var d = a[i]
-    var gen = d.generate()
+    var gen = d.iterator()
     var pairs = Array<(Int, Int)>()
     while let (key, value) = gen.next() {
       let kv = (key.value, value.value)
@@ -3680,7 +3680,7 @@ ObjCThunks.test("Dictionary/Return") {
 
 DictionaryTestSuite.test("mutationDoesNotAffectIterator/subscript/store") {
   var dict = getDerivedAPIsDictionary()
-  var g = dict.generate()
+  var g = dict.iterator()
   dict[10] = 1011
 
   expectEqualsUnordered(
@@ -3690,7 +3690,7 @@ DictionaryTestSuite.test("mutationDoesNotAffectIterator/subscript/store") {
 
 DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,1") {
   var dict = getDerivedAPIsDictionary()
-  var g = dict.generate()
+  var g = dict.iterator()
   expectOptionalEqual(1010, dict.removeValueForKey(10))
 
   expectEqualsUnordered(
@@ -3700,7 +3700,7 @@ DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,1") {
 
 DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,all") {
   var dict = getDerivedAPIsDictionary()
-  var g = dict.generate()
+  var g = dict.iterator()
   expectOptionalEqual(1010, dict.removeValueForKey(10))
   expectOptionalEqual(1020, dict.removeValueForKey(20))
   expectOptionalEqual(1030, dict.removeValueForKey(30))
@@ -3713,7 +3713,7 @@ DictionaryTestSuite.test("mutationDoesNotAffectIterator/removeValueForKey,all") 
 DictionaryTestSuite.test(
   "mutationDoesNotAffectIterator/removeAll,keepCapacity=false") {
   var dict = getDerivedAPIsDictionary()
-  var g = dict.generate()
+  var g = dict.iterator()
   dict.removeAll(keepCapacity: false)
 
   expectEqualsUnordered(
@@ -3724,7 +3724,7 @@ DictionaryTestSuite.test(
 DictionaryTestSuite.test(
   "mutationDoesNotAffectIterator/removeAll,keepCapacity=true") {
   var dict = getDerivedAPIsDictionary()
-  var g = dict.generate()
+  var g = dict.iterator()
   dict.removeAll(keepCapacity: true)
 
   expectEqualsUnordered(

@@ -111,7 +111,7 @@ struct zip<A : IteratorProtocol, B : IteratorProtocol>
   func next() -> (A.Element, B.Element)? { }
 
   typealias Generator = zip
-  func generate() -> zip { }
+  func iterator() -> zip { }
 }
 
 protocol P8 { }

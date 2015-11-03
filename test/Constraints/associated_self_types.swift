@@ -32,7 +32,7 @@ class X<XT> : Q {
   func f<SX : SequenceType where SX.Iterator.Element == X.Iterator.Element>(x: SX) {
   }
   
-  func generate() -> No<XT> {
+  func iterator() -> No<XT> {
     return No<XT>()
   }
 }

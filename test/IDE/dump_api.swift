@@ -72,7 +72,7 @@ public class AnyIterator<T> : _AnyIteratorBase, GeneratorType {
 /// traversing the sequence consumes the generator.
 extension AnyIterator : SequenceType {
   /// Returns `self`.
-  public func generate() -> AnyIterator { return self }
+  public func iterator() -> AnyIterator { return self }
 }
 
 /// Return a `GeneratorType` instance that wraps `base` but whose type
@@ -86,7 +86,7 @@ extension AnyIterator : SequenceType {
 ///       // This is a really complicated type of no interest to our
 ///       // clients.
 ///       let g: MapSequenceGenerator<RangeGenerator<Int>, String>
-///         = lazyStrings.generate()
+///         = lazyStrings.iterator()
 ///       return anyIterator(g)
 ///     }
 public func anyIterator<G: GeneratorType>(base: G) -> AnyIterator<G.Element> {
@@ -131,7 +131,7 @@ internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
 internal class _AnySequenceBox {
   // FIXME: can't make _AnySequenceBox generic and return
   // _AnyIterator<T> here due to <rdar://20211022>
-  func generate() -> _AnyIteratorBase {_abstract()}
+  func iterator() -> _AnyIteratorBase {_abstract()}
 
   func _underestimateCount() -> Int  {_abstract()}
   // FIXME: can't traffic in UnsafeMutablePointer<T> and
@@ -154,8 +154,8 @@ internal class _SequenceBox<S: SequenceType>
   : _AnySequenceBox {
   typealias Element = S.Generator.Element
 
-  override func generate() -> _AnyIteratorBase {
-    return _GeneratorBox(_base.generate())
+  override func iterator() -> _AnyIteratorBase {
+    return _GeneratorBox(_base.iterator())
   }
   override func _underestimateCount() -> Int {
     return Swift.underestimateCount(_base)
@@ -176,7 +176,7 @@ internal class _CollectionBox<S: CollectionType>
   : _AnyCollectionBox<S.Generator.Element> {
   typealias Element = S.Generator.Element
 
-  override func generate() -> _AnyIteratorBase {
+  override func iterator() -> _AnyIteratorBase {
     fatalError("")
   }
   override func _underestimateCount() -> Int {
@@ -226,8 +226,8 @@ public struct AnySequence<T> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyIterator<Element> {
-    return unsafeDowncast(_box.generate())
+  public func iterator() -> AnyIterator<Element> {
+    return unsafeDowncast(_box.iterator())
   }
 
   internal let _box: _AnySequenceBox
@@ -757,8 +757,8 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyIterator<Element> {
-    return unsafeDowncast(_box.generate())
+  public func iterator() -> AnyIterator<Element> {
+    return unsafeDowncast(_box.iterator())
   }
 
   /// The position of the first element in a non-empty collection.
@@ -867,8 +867,8 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyIterator<Element> {
-    return unsafeDowncast(_box.generate())
+  public func iterator() -> AnyIterator<Element> {
+    return unsafeDowncast(_box.iterator())
   }
 
   /// The position of the first element in a non-empty collection.
@@ -967,8 +967,8 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyIterator<Element> {
-    return unsafeDowncast(_box.generate())
+  public func iterator() -> AnyIterator<Element> {
+    return unsafeDowncast(_box.iterator())
   }
 
   /// The position of the first element in a non-empty collection.

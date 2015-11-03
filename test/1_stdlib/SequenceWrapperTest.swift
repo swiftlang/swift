@@ -49,7 +49,7 @@ func expectWrapperDispatch<R1, R2>(
 
 sequenceWrapperTests.test("Dispatch/generate") {
   expectWrapperDispatch(
-    direct.generate(), indirect.generate(), dispatchLog.generate)
+    direct.iterator(), indirect.iterator(), dispatchLog.generate)
 }
 
 sequenceWrapperTests.test("Dispatch/underestimateCount") {

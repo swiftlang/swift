@@ -68,7 +68,7 @@ class OffsetCollection : MutableCollectionType {
     get { return data[i - startIndex] }
     set { data[i - startIndex] = newValue }
   }
-  func generate() -> IndexingGenerator<[Int]> {
+  func iterator() -> IndexingGenerator<[Int]> {
     return IndexingGenerator<[Int]>(data)
   }
   func toArray() -> [Int] {

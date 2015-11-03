@@ -33,8 +33,8 @@ extension SequenceType
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> Base.Iterator {
-    return self._base.generate()
+  public func iterator() -> Base.Iterator {
+    return self._base.iterator()
   }
 
   public func underestimateCount() -> Int {

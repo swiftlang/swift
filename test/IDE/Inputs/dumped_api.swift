@@ -57,7 +57,7 @@ public class AnyIterator<T> : _AnyIteratorBase, GeneratorType {
 /// traversing the sequence consumes the generator.
 extension AnyIterator : SequenceType {
   /// Returns `self`.
-  public func generate() -> AnyIterator 
+  public func iterator() -> AnyIterator 
 }
 
 /// Return a `GeneratorType` instance that wraps `base` but whose type
@@ -71,7 +71,7 @@ extension AnyIterator : SequenceType {
 ///       // This is a really complicated type of no interest to our
 ///       // clients.
 ///       let g: MapSequenceGenerator<RangeGenerator<Int>, String>
-///         = lazyStrings.generate()
+///         = lazyStrings.iterator()
 ///       return anyIterator(g)
 ///     }
 public func anyIterator<G: GeneratorType>(base: G) -> AnyIterator<G.Element> 
@@ -112,7 +112,7 @@ public struct AnySequence<T> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyIterator<Element> 
+  public func iterator() -> AnyIterator<Element> 
 
 }
 
@@ -414,7 +414,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyIterator<Element> 
+  public func iterator() -> AnyIterator<Element> 
 
   /// The position of the first element in a non-empty collection.
   ///
@@ -492,7 +492,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyIterator<Element> 
+  public func iterator() -> AnyIterator<Element> 
 
   /// The position of the first element in a non-empty collection.
   ///
@@ -561,7 +561,7 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyIterator<Element> 
+  public func iterator() -> AnyIterator<Element> 
 
   /// The position of the first element in a non-empty collection.
   ///

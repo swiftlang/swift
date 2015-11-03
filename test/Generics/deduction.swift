@@ -215,8 +215,8 @@ func rangeOfIsBefore<
 
 
 func callRangeOfIsBefore(ia: [Int], da: [Double]) {
-  rangeOfIsBefore(ia.generate())
-  rangeOfIsBefore(da.generate()) // expected-error{{cannot invoke 'rangeOfIsBefore' with an argument list of type '(IndexingGenerator<[Double]>)'}} expected-note{{expected an argument list of type '(R)'}}
+  rangeOfIsBefore(ia.iterator())
+  rangeOfIsBefore(da.iterator()) // expected-error{{cannot invoke 'rangeOfIsBefore' with an argument list of type '(IndexingGenerator<[Double]>)'}} expected-note{{expected an argument list of type '(R)'}}
 }
 
 //===----------------------------------------------------------------------===//

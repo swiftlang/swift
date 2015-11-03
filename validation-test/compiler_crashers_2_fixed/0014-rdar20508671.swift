@@ -7,12 +7,12 @@ protocol MyIteratorProtocol {
 
 protocol MySequenceType {
   typealias Iterator : MyIteratorProtocol
-  func generate() -> Iterator
+  func iterator() -> Iterator
 }
 
 protocol MyCollectionDefaultsType : MySequenceType {}
 extension MyCollectionDefaultsType {
-  final func generate() -> DefaultIterator<Self> {
+  final func iterator() -> DefaultIterator<Self> {
     return DefaultIterator()
   }
 }
@@ -31,5 +31,5 @@ struct FooIteratorWrapper<Base : MyIteratorProtocol> {
 }
 
 func f<C : MyCollectionType>(c: C) {
-  FooIteratorWrapper(c.generate())
+  FooIteratorWrapper(c.iterator())
 }

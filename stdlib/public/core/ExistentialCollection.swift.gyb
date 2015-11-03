@@ -42,7 +42,7 @@ public struct AnyIterator<Element> : IteratorProtocol {
   ///       // This is a really complicated type of no interest to our
   ///       // clients.
   ///       let g: MapSequenceIterator<RangeIterator<Int>, String>
-  ///         = lazyStrings.generate()
+  ///         = lazyStrings.iterator()
   ///       return AnyIterator(g)
   ///     }
   public init<I : IteratorProtocol where I.Element == Element>(_ base: I) {
@@ -115,7 +115,7 @@ internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
 //===----------------------------------------------------------------------===//
 
 internal class _AnySequenceBox<Element> {
-  internal func generate() -> AnyIterator<Element> { _abstract() }
+  internal func iterator() -> AnyIterator<Element> { _abstract() }
 
   internal func _underestimateCount() -> Int { _abstract() }
 
@@ -145,8 +145,8 @@ internal class _${Kind}Box<S : ${Kind}Type>
   : _Any${Kind}Box<S.Iterator.Element> {
   typealias Element = S.Iterator.Element
 
-  override func generate() -> AnyIterator<Element> {
-    return AnyIterator(_base.generate())
+  override func iterator() -> AnyIterator<Element> {
+    return AnyIterator(_base.iterator())
   }
   override func _underestimateCount() -> Int {
     return _base.underestimateCount()
@@ -192,7 +192,7 @@ internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
     self._makeUnderlyingIterator = makeUnderlyingIterator
   }
 
-  internal func generate() -> Iterator {
+  internal func iterator() -> Iterator {
     return _makeUnderlyingIterator()
   }
 
@@ -212,7 +212,7 @@ public struct AnySequence<Element> : SequenceType {
     _box = _SequenceBox(base)
   }
 
-  /// Create a sequence whose `generate()` method forwards to
+  /// Create a sequence whose `iterator()` method forwards to
   /// `makeUnderlyingIterator`.
   public init<I : IteratorProtocol where I.Element == Element>(
     _ makeUnderlyingIterator: () -> I
@@ -223,8 +223,8 @@ public struct AnySequence<Element> : SequenceType {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> AnyIterator<Element> {
-    return _box.generate()
+  public func iterator() -> AnyIterator<Element> {
+    return _box.iterator()
   }
 
   internal let _box: _AnySequenceBox<Element>
@@ -581,8 +581,8 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   /// Returns an *iterator* over the elements of this *collection*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> AnyIterator<Element> {
-    return _box.generate()
+  public func iterator() -> AnyIterator<Element> {
+    return _box.iterator()
   }
 
   /// The position of the first element in a non-empty collection.

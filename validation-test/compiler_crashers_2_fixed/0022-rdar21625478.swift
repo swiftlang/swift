@@ -111,9 +111,9 @@ public protocol LoggingSequenceType  : SequenceType, LoggingType {
 
 extension LoggingSequenceType
   where Log == SequenceLog, Iterator == LoggingIterator<Base.Iterator> {
-  public func generate() -> LoggingIterator<Base.Iterator> {
+  public func iterator() -> LoggingIterator<Base.Iterator> {
     ++Log.generate[selfType]
-    return LoggingIterator(base.generate())
+    return LoggingIterator(base.iterator())
   }
 
   public func underestimateCount() -> Int {
@@ -250,8 +250,8 @@ public struct LoggingCollection<Base_: CollectionType> : LoggingCollectionType {
   public typealias Base = Base_
   public typealias SubSequence = Base.SubSequence
 
-  public func generate() -> Iterator {
-    return Iterator(base.generate())
+  public func iterator() -> Iterator {
+    return Iterator(base.iterator())
   }
   public init(_ base: Base_) {
     self.base = base

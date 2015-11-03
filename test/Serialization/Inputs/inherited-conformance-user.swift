@@ -17,7 +17,7 @@ public struct OneToAThousand : CollectionType {
     return i.value
   }
 
-  public func generate() -> IndexingGenerator<OneToAThousand> {
+  public func iterator() -> IndexingGenerator<OneToAThousand> {
     return IndexingGenerator(self)
   }
 

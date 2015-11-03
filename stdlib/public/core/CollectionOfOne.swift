@@ -61,7 +61,7 @@ public struct CollectionOfOne<Element> : CollectionType {
   /// Return a *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> IteratorOfOne<Element> {
+  public func iterator() -> IteratorOfOne<Element> {
     return IteratorOfOne(element)
   }
 

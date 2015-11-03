@@ -17,7 +17,7 @@ public struct mmEnumerateGenerator<
   public init(_ base: Base)
   public mutating func next() -> Element?
   public typealias Generator = mmEnumerateGenerator<Base>
-  public func generate() -> Generator
+  public func iterator() -> Generator
 }
 
 public struct mmEnumerateSequence<
@@ -25,7 +25,7 @@ public struct mmEnumerateSequence<
 > : SequenceType {
   var base: Base
   public init(_ base: Base)
-  public func generate() -> mmEnumerateGenerator<Base.Generator>
+  public func iterator() -> mmEnumerateGenerator<Base.Generator>
 }
 
 // CHECK: sil_witness_table <Base where Base : SequenceType, Base.Generator : GeneratorType> mmEnumerateSequence<Base>: _Sequence_Type module WitnessTableWithGP {
@@ -43,7 +43,7 @@ public struct _mmArrayBuffer<T> : CollectionType {
   public var startIndex: Int { get }
   public var endIndex: Int { get }
   public subscript(i: Int) -> T { get }
-  public func generate() -> IndexingGenerator<_mmArrayBuffer>
+  public func iterator() -> IndexingGenerator<_mmArrayBuffer>
 }
 
 sil_witness_table <T> _mmArrayBuffer<T>: _Sequence_Type module WitnessTableWithGP {

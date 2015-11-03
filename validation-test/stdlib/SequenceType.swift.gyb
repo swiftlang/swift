@@ -161,7 +161,7 @@ SequenceTypeTests.test("IteratorSequence/IteratorProtocol/empty") {
   }
   if true {
     let data: [OpaqueValue<Int>] = []
-    let base = data.generate()
+    let base = data.iterator()
     var g = IteratorSequence(base)
     expectType(
       IteratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
@@ -182,7 +182,7 @@ SequenceTypeTests.test("IteratorSequence/IteratorProtocol") {
   }
   if true {
     let data: [OpaqueValue<Int>] = []
-    let base = data.generate()
+    let base = data.iterator()
     var g = IteratorSequence(base)
     expectType(
       IteratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
@@ -203,7 +203,7 @@ SequenceTypeTests.test("IteratorSequence/SequenceType/empty") {
   }
   if true {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
-    let base = data.generate()
+    let base = data.iterator()
     var g = IteratorSequence(base)
     expectType(
       IteratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
@@ -224,7 +224,7 @@ SequenceTypeTests.test("IteratorSequence/SequenceType") {
   }
   if true {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
-    let base = data.generate()
+    let base = data.iterator()
     var g = IteratorSequence(base)
     expectType(
       IteratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
@@ -754,8 +754,8 @@ struct MinimalSequenceWith${Implementation}Map<Element> : SequenceType {
       elements: data, underestimatedCount: underestimatedCount)
   }
 
-  func generate() -> MinimalIterator<Element> {
-    return _data.generate()
+  func iterator() -> MinimalIterator<Element> {
+    return _data.iterator()
   }
 
   var _data: MinimalSequence<Element>
@@ -1057,11 +1057,11 @@ SequenceTypeTests.test("zip") {
 struct SequenceWithDefaultUnderestimateCount : SequenceType {
   init() {}
 
-  func generate() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
+  func iterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
     expectUnreachable()
     return MinimalSequence(
       elements: [ 1, 2, 3 ].map(OpaqueValue.init)
-    ).generate()
+    ).iterator()
   }
 }
 
@@ -1075,11 +1075,11 @@ struct SequenceWithCustomUnderestimateCount : SequenceType {
     self._underestimatedCount = underestimatedCount
   }
 
-  func generate() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
+  func iterator() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
     expectUnreachable()
     return MinimalSequence(
       elements: [ 0xffff, 0xffff, 0xffff ].map(OpaqueValue.init)
-    ).generate()
+    ).iterator()
   }
 
   func underestimateCount() -> Int {

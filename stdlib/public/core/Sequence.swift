@@ -21,7 +21,7 @@
 /// specific *sequence* is multi-pass, either because its concrete
 /// type is known or because it is constrained to `CollectionType`.
 /// Also, the iterators must be obtained by distinct calls to the
-/// *sequence's* `generate()` method, rather than by copying.
+/// *sequence's* `iterator()` method, rather than by copying.
 public protocol IteratorProtocol {
   /// The type of element traversed by `self`.
   typealias Element
@@ -78,7 +78,7 @@ public protocol SequenceType {
   ///
   /// - Complexity: O(1).
   @warn_unused_result
-  func generate() -> Iterator
+  func iterator() -> Iterator
 
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
@@ -201,11 +201,11 @@ public protocol SequenceType {
     -> UnsafeMutablePointer<Iterator.Element>
 }
 
-/// A default generate() function for `IteratorProtocol` instances that
+/// A default iterator() function for `IteratorProtocol` instances that
 /// are declared to conform to `SequenceType`
 extension SequenceType
   where Self.Iterator == Self, Self : IteratorProtocol {
-  public func generate() -> Self {
+  public func iterator() -> Self {
     return self
   }
 }
@@ -220,29 +220,29 @@ extension SequenceType
 internal class _DropFirstSequence<Base : IteratorProtocol>
     : SequenceType, IteratorProtocol {
 
-  internal var iterator: Base
-  internal let limit: Int
-  internal var dropped: Int
+  internal var _iterator: Base
+  internal let _limit: Int
+  internal var _dropped: Int
 
   internal init(_ iterator: Base, limit: Int, dropped: Int = 0) {
-    self.iterator = iterator
-    self.limit = limit
-    self.dropped = dropped
+    self._iterator = iterator
+    self._limit = limit
+    self._dropped = dropped
   }
 
-  internal func generate() -> _DropFirstSequence<Base> {
+  internal func iterator() -> _DropFirstSequence<Base> {
     return self
   }
 
   internal func next() -> Base.Element? {
-    while dropped < limit {
-      if iterator.next() == nil {
-        dropped = limit
+    while _dropped < _limit {
+      if _iterator.next() == nil {
+        _dropped = _limit
         return nil
       }
-      ++dropped
+      ++_dropped
     }
-    return iterator.next()
+    return _iterator.next()
   }
 }
 
@@ -256,29 +256,29 @@ internal class _DropFirstSequence<Base : IteratorProtocol>
 internal class _PrefixSequence<Base : IteratorProtocol>
   : SequenceType, IteratorProtocol {
 
-  internal let maxLength: Int
-  internal var iterator: Base
-  internal var taken: Int
+  internal let _maxLength: Int
+  internal var _iterator: Base
+  internal var _taken: Int
 
   internal init(_ iterator: Base, maxLength: Int, taken: Int = 0) {
-    self.iterator = iterator
-    self.maxLength = maxLength
-    self.taken = taken
+    self._iterator = iterator
+    self._maxLength = maxLength
+    self._taken = taken
   }
 
-  internal func generate() -> _PrefixSequence<Base> {
+  internal func iterator() -> _PrefixSequence<Base> {
     return self
   }
 
   internal func next() -> Base.Element? {
-    if taken >= maxLength { return nil }
-    ++taken
+    if _taken >= _maxLength { return nil }
+    ++_taken
 
-    if let next = iterator.next() {
+    if let next = _iterator.next() {
       return next
     }
 
-    taken = maxLength
+    _taken = _maxLength
     return nil
   }
 }
@@ -300,7 +300,7 @@ extension SequenceType {
     var result = ContiguousArray<T>()
     result.reserveCapacity(initialCapacity)
 
-    var iterator = generate()
+    var iterator = self.iterator()
 
     // Add elements up to the initial capacity without checking for regrowth.
     for _ in 0..<initialCapacity {
@@ -322,7 +322,7 @@ extension SequenceType {
 
     var result = ContiguousArray<Iterator.Element>()
 
-    var iterator = generate()
+    var iterator = self.iterator()
 
     while let element = iterator.next() {
       if try includeElement(element) {
@@ -351,12 +351,12 @@ extension SequenceType {
     if let any = self as? AnySequence<Iterator.Element>,
        let box = any._box as? _SequenceBox<_DropFirstSequence<Iterator>> {
       let base = box._base
-      let folded = _DropFirstSequence(base.iterator, limit: base.limit + n,
-          dropped: base.dropped)
+      let folded = _DropFirstSequence(
+        base._iterator, limit: base._limit + n, dropped: base._dropped)
       return AnySequence(folded)
     }
 
-    return AnySequence(_DropFirstSequence(generate(), limit: n))
+    return AnySequence(_DropFirstSequence(iterator(), limit: n))
   }
 
   /// Returns a subsequence containing all but the last `n` elements.
@@ -402,12 +402,12 @@ extension SequenceType {
        let box = any._box as? _SequenceBox<_PrefixSequence<Iterator>> {
       let base = box._base
       let folded = _PrefixSequence(
-        base.iterator,
-        maxLength: min(base.maxLength, maxLength),
-        taken: base.taken)
+        base._iterator,
+        maxLength: min(base._maxLength, maxLength),
+        taken: base._taken)
       return AnySequence(folded)
     }
-    return AnySequence(_PrefixSequence(generate(), maxLength: maxLength))
+    return AnySequence(_PrefixSequence(iterator(), maxLength: maxLength))
   }
 
   @warn_unused_result
@@ -483,7 +483,7 @@ extension SequenceType {
     }
 
     var hitEnd = false
-    var iterator = self.generate()
+    var iterator = self.iterator()
     while true {
       guard let element = iterator.next() else {
         hitEnd = true
@@ -606,7 +606,7 @@ extension SequenceType {
   public func _initializeTo(ptr: UnsafeMutablePointer<Iterator.Element>)
     -> UnsafeMutablePointer<Iterator.Element> {
     var p = UnsafeMutablePointer<Iterator.Element>(ptr)
-    for x in IteratorSequence(self.generate()) {
+    for x in IteratorSequence(self.iterator()) {
       p++.initialize(x)
     }
     return p

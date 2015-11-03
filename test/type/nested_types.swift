@@ -13,7 +13,7 @@ extension X {
 protocol MyIteratorProtocol {}
 protocol MySequence {
   typealias Iterator : MyIteratorProtocol
-  func generate() -> Iterator
+  func iterator() -> Iterator
 }
 
 struct IteratorWrapper<I : MyIteratorProtocol> {
@@ -25,7 +25,7 @@ struct SequenceWrapper<T : MySequence> {
   var input : T
 
   typealias Iterator = IteratorWrapper<T.Iterator>
-  func generate() -> Iterator {
-    return Iterator(index: 0, elements: input.generate())
+  func iterator() -> Iterator {
+    return Iterator(index: 0, elements: input.iterator())
   }
 }

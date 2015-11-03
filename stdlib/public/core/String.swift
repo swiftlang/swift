@@ -634,7 +634,7 @@ extension SequenceType where Iterator.Element == String {
     }
 
     if separatorSize != 0 {
-      var gen = generate()
+      var gen = iterator()
       if let first = gen.next() {
         result.appendContentsOf(first)
         while let next = gen.next() {

@@ -226,8 +226,8 @@ public struct LoggingRangeReplaceableCollection<
     return try base.filter(includeElement)
   }
 
-  public func generate() -> Base.Iterator {
-    return base.generate()
+  public func iterator() -> Base.Iterator {
+    return base.iterator()
   }
 }
 
@@ -447,9 +447,9 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   }
 %   end
 
-  public func generate() -> LoggingIterator<Base.Iterator> {
+  public func iterator() -> LoggingIterator<Base.Iterator> {
     ++Log.generate[selfType]
-    return LoggingIterator(base.generate())
+    return LoggingIterator(base.iterator())
   }
 
   public func underestimateCount() -> Int {

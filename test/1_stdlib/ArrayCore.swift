@@ -64,7 +64,7 @@ struct MrMcRange : CollectionType {
     self.base = base
   }
 
-  func generate() -> IndexingGenerator<MrMcRange> {
+  func iterator() -> IndexingGenerator<MrMcRange> {
     return IndexingGenerator(self)
   }
   
@@ -103,7 +103,7 @@ print("testing...")
 func test() {
   //===--- Sequences can be converted -------------------------------------===//
 
-  let n0 = ((Tracked(10)..<Tracked(27)).generate())._copyToNativeArrayBuffer()
+  let n0 = ((Tracked(10)..<Tracked(27)).iterator())._copyToNativeArrayBuffer()
   // CHECK-NEXT: <10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26>
   printSequence(n0)
 

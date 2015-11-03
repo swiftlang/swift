@@ -233,7 +233,7 @@ struct Y7<T> : P7 {
 
 struct MyAnySequence<Element> : MySequenceType {
   typealias SubSequence = MyAnySequence<Element>
-  func generate() -> MyAnyIterator<Element> {
+  func iterator() -> MyAnyIterator<Element> {
     return MyAnyIterator<Element>()
   }
 }
@@ -251,7 +251,7 @@ protocol MySequenceType {
   typealias SubSequence
 
   func foo() -> SubSequence
-  func generate() -> Iterator
+  func iterator() -> Iterator
 }
 
 extension MySequenceType {
@@ -266,7 +266,7 @@ struct SomeStruct<Element> : MySequenceType {
     self.element = element
   }
 
-  func generate() -> MyAnyIterator<Element> {
+  func iterator() -> MyAnyIterator<Element> {
     return MyAnyIterator<Element>()
   }
 }

@@ -73,12 +73,12 @@ public protocol MutableIndexable {
 /// An *iterator* for an arbitrary *collection*.  Provided `C`
 /// conforms to the other requirements of `Indexable`,
 /// `IndexingGenerator<C>` can be used as the result of `C`'s
-/// `generate()` method.  For example:
+/// `iterator()` method.  For example:
 ///
 ///      struct MyCollection : CollectionType {
 ///        struct Index : ForwardIndexType { /* implementation hidden */ }
 ///        subscript(i: Index) -> MyElement { /* implementation hidden */ }
-///        func generate() -> IndexingGenerator<MyCollection> { // <===
+///        func iterator() -> IndexingGenerator<MyCollection> { // <===
 ///          return IndexingGenerator(self)
 ///        }
 ///      }
@@ -128,9 +128,9 @@ public protocol CollectionType : Indexable, SequenceType {
   typealias Iterator : IteratorProtocol = IndexingGenerator<Self>
 
   // FIXME: Needed here so that the Iterator is properly deduced from
-  // a custom generate() function.  Otherwise we get an
+  // a custom iterator() function.  Otherwise we get an
   // IndexingGenerator. <rdar://problem/21539115>
-  func generate() -> Iterator
+  func iterator() -> Iterator
   
   // FIXME: should be constrained to CollectionType
   // (<rdar://problem/20715009> Implement recursive protocol
@@ -195,11 +195,11 @@ public protocol CollectionType : Indexable, SequenceType {
   var first: Iterator.Element? { get }
 }
 
-/// Supply the default `generate()` method for `CollectionType` models
+/// Supply the default `iterator()` method for `CollectionType` models
 /// that accept the default associated `Iterator`,
 /// `IndexingGenerator<Self>`.
 extension CollectionType where Iterator == IndexingGenerator<Self> {
-  public func generate() -> IndexingGenerator<Self> {
+  public func iterator() -> IndexingGenerator<Self> {
     return IndexingGenerator(self)
   }
 }
@@ -739,7 +739,7 @@ public struct PermutationGenerator<
   /// - Requires: `elements[i]` is valid for every `i` in `indices`.
   public init(elements: C, indices: Indices) {
     self.seq = elements
-    self.indices = indices.generate()
+    self.indices = indices.iterator()
   }
 }
 

@@ -37,7 +37,7 @@ represented by the `SequenceType` protocol::
 
   protocol SequenceType { 
     typealias Iterator : IteratorProtocol
-    func generate() -> Iterator
+    func iterator() -> Iterator
   }
 
 .. sidebar:: Hiding Iterator Type Details
@@ -68,8 +68,8 @@ the two kinds of sequences.
   …\ `in`, and thus require *separate traversal state*.
 
 To get an initial traversal state for an arbitrary sequence `x`, Swift
-calls `x.generate()`.  The sequence delivers that state, along with
-traversal logic, in the form of a **iterator**.
+calls `x.iterator()`.  The sequence delivers that state, along with
+traversal logic, in the form of an **iterator**.
 
 Iterators
 ==========
@@ -160,10 +160,10 @@ end.  For example::
     withSeparator separator: S.Iterator.Element
   ) -> [S.Iterator.Element] {
     var result: [S.Iterator.Element] = []
-    var g = source.generate()
-    if let start = g.next() {
+    var iterator = source.iterator()
+    if let start = iterator.next() {
       result.append(start)
-      while let next = g.next() {
+      while let next = iterator.next() {
         result.append(separator)
         result.append(next)
       }
@@ -192,7 +192,7 @@ depend on stability that an arbitrary sequence can't provide:
   the elements it has yet to return from `next()`.  Therefore, every
   iterator *could* satisfy the requirements of `SequenceType` by
   simply declaring conformance, and returning `self` from its
-  `generate()` method.  In fact, if it weren't for `current language
+  `iterator()` method.  In fact, if it weren't for `current language
   limitations <rdar://17986597>`_, `IteratorProtocol` would refine
   `SequenceType`, as follows:
 

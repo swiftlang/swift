@@ -3,7 +3,7 @@
 public protocol Q_SequenceDefaultsType {
   typealias Element
   typealias Iterator : IteratorProtocol
-  func generate() -> Iterator
+  func iterator() -> Iterator
 }
 
 extension Q_SequenceDefaultsType {
@@ -20,7 +20,7 @@ extension Q_SequenceDefaultsType {
     var result = _ContiguousArrayBuffer<Iterator.Element>(
       count: initialCapacity, minimumCapacity: 0)
 
-    var g = self.generate()
+    var g = self.iterator()
     while let x = g.next() {
       result += CollectionOfOne(x)
     }
@@ -33,7 +33,7 @@ extension Q_SequenceDefaultsType {
     baseAddress: UnsafeMutablePointer<Iterator.Element>
   ) {
     var p = baseAddress
-    var g = self.generate()
+    var g = self.iterator()
     while let element = g.next() {
       p.initialize(element)
       ++p
@@ -54,7 +54,7 @@ public protocol Q_SequenceType : Q_SequenceDefaultsType {
   /// encapsulates its iteration state.
   typealias Iterator : IteratorProtocol
 
-  func generate() -> Iterator
+  func iterator() -> Iterator
 
   /// Return a value less than or equal to the number of elements in
   /// self, **nondestructively**.
@@ -82,7 +82,7 @@ public protocol Q_SequenceType : Q_SequenceDefaultsType {
 public extension IteratorProtocol {
   typealias Iterator = Self
   
-  public final func generate() -> Iterator {
+  public final func iterator() -> Iterator {
     return self
   }
 }
@@ -110,7 +110,7 @@ extension Q_CollectionDefaultsType {
 
   /*
   typealias Iterator = Q_IndexingIterator<Self>
-  public final func generate() -> Q_IndexingIterator<Self> {
+  public final func iterator() -> Q_IndexingIterator<Self> {
     return Q_IndexingIterator(pos: self.startIndex, elements: self)
   }
   */
@@ -146,7 +146,7 @@ struct Boo : Q_CollectionType {
   let startIndex: Int = 0
   let endIndex: Int = 10
 
-  func generate() -> Q_IndexingIterator<Boo> {
+  func iterator() -> Q_IndexingIterator<Boo> {
     return Q_IndexingIterator(pos: self.startIndex, elements: self)
   }
   

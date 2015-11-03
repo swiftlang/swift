@@ -599,7 +599,7 @@ public:
       S->setSequence(sequence);
     }
 
-    // Invoke generate() to get a generator from the sequence.
+    // Invoke iterator() to get an iterator from the sequence.
     Type generatorTy;
     VarDecl *generator;
     {
@@ -620,7 +620,7 @@ public:
       
       Expr *getIterator
         = TC.callWitness(sequence, DC, sequenceProto, conformance,
-                         TC.Context.Id_generate,
+                         TC.Context.Id_iterator,
                          {}, diag::sequence_protocol_broken);
       if (!getIterator) return nullptr;
       

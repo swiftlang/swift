@@ -2,7 +2,7 @@
 
 public protocol Q_SequenceDefaultsType {
   typealias Iterator : IteratorProtocol
-  func generate() -> Iterator
+  func iterator() -> Iterator
 }
 
 extension Q_SequenceDefaultsType {
@@ -21,7 +21,7 @@ extension Q_SequenceDefaultsType {
     var result = _ContiguousArrayBuffer<Iterator.Element>(
       count: initialCapacity, minimumCapacity: 0)
 
-    var g = self.generate()
+    var g = self.iterator()
     while let x? = g.next() {
       result += CollectionOfOne(x)
     }
@@ -34,7 +34,7 @@ extension Q_SequenceDefaultsType {
     baseAddress: UnsafeMutablePointer<Iterator.Element>
   ) {
     var p = baseAddress
-    var g = self.generate()
+    var g = self.iterator()
     while let element? = g.next() {
       p.initialize(element)
       ++p
@@ -55,7 +55,7 @@ public protocol Q_SequenceType : Q_SequenceDefaultsType {
   /// encapsulates its iteration state.
   typealias Iterator : IteratorProtocol
 
-  func generate() -> Iterator
+  func iterator() -> Iterator
 
   /// Return a value less than or equal to the number of elements in
   /// self, **nondestructively**.
@@ -81,7 +81,7 @@ public protocol Q_SequenceType : Q_SequenceDefaultsType {
 }
 
 public extension IteratorProtocol {
-  public final func generate() -> Self {
+  public final func iterator() -> Self {
     return self
   }
 }
@@ -97,7 +97,7 @@ public protocol Q_IndexableType {
 }
 
 extension Q_IndexableType {
-  public final func generate() -> Q_IndexingIterator<Self> {
+  public final func iterator() -> Q_IndexingIterator<Self> {
     return Q_IndexingIterator(pos: self.startIndex, elements: self)
   }
 }

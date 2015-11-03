@@ -87,10 +87,10 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType>
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> Iterator {
+  public func iterator() -> Iterator {
     return Iterator(
-      _sequences.0.generate(),
-      _sequences.1.generate())
+      _sequences.0.iterator(),
+      _sequences.1.iterator())
   }
 
   internal let _sequences: (Sequence1, Sequence2)

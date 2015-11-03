@@ -151,7 +151,7 @@ struct StreamTypeWithInferredAssociatedTypes : StreamWithAssoc {
 
 protocol SequenceViaStream {
   typealias SequenceStreamTypeType : IteratorProtocol // expected-note{{protocol requires nested type 'SequenceStreamTypeType'}}
-  func generate() -> SequenceStreamTypeType
+  func iterator() -> SequenceStreamTypeType
 }
 
 struct IntIterator : IteratorProtocol /*, SequenceType, ReplPrintable*/ {
@@ -168,7 +168,7 @@ struct IntIterator : IteratorProtocol /*, SequenceType, ReplPrintable*/ {
   }
 
   typealias Generator = IntIterator
-  func generate() -> IntIterator {
+  func iterator() -> IntIterator {
     return self
   }
 }
@@ -179,7 +179,7 @@ extension IntIterator : SequenceViaStream {
 
 struct NotSequence : SequenceViaStream { // expected-error{{type 'NotSequence' does not conform to protocol 'SequenceViaStream'}}
   typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
-  func generate() -> Int {}
+  func iterator() -> Int {}
 }
 
 protocol GetATuple {
@@ -243,7 +243,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(e: SequenceType) { // expected-error{{has Self or associated type requirements}}
-  var x = e.generate() // expected-error{{type 'SequenceType' does not conform to protocol 'IteratorProtocol'}}
+  var x = e.iterator() // expected-error{{type 'SequenceType' does not conform to protocol 'IteratorProtocol'}}
   x.next()
   x.nonexistent()
 }
@@ -256,7 +256,7 @@ protocol HasSequenceAndStream {
 func existentialSequenceAndStreamType(h: HasSequenceAndStream) { // expected-error{{has Self or associated type requirements}}
   // FIXME: Crummy diagnostics.
   var x = h.getR() // expected-error{{member 'getR' cannot be used on value of protocol type 'HasSequenceAndStream'; use a generic constraint instead}}
-  x.generate()
+  x.iterator()
   x.next()
 
   x.nonexistent()

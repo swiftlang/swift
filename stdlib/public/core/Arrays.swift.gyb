@@ -1216,7 +1216,7 @@ internal func _arrayAppendSequence<
 >(
   inout buffer: Buffer, _ newItems: S
 ) {
-  var stream = newItems.generate()
+  var stream = newItems.iterator()
   var nextItem = stream.next()
 
   if nextItem == nil {
@@ -1262,8 +1262,8 @@ public func == <Element : Equatable>(
     return true
   }
 
-  var streamLHS = lhs.generate()
-  var streamRHS = rhs.generate()
+  var streamLHS = lhs.iterator()
+  var streamRHS = rhs.iterator()
 
   var nextLHS = streamLHS.next()
   while nextLHS != nil {

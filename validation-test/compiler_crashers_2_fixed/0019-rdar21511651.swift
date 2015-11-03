@@ -9,8 +9,8 @@ internal protocol _SequenceWrapperType {
 
 extension SequenceType
   where Self : _SequenceWrapperType, Self.Iterator == Self.Base.Iterator {
-  public func generate() -> Base.Iterator {
-    return self._base.generate()
+  public func iterator() -> Base.Iterator {
+    return self._base.iterator()
   }
 
   public func underestimateCount() -> Int {
@@ -134,7 +134,7 @@ public func _prext_lazy<S : SequenceType>(s: S) -> _prext_LazySequence<S> {
 
 public extension SequenceType
   where Self.Iterator == Self, Self : IteratorProtocol {
-  public func generate() -> Self {
+  public func iterator() -> Self {
     return self
   }
 }
@@ -230,9 +230,9 @@ public struct _prext_MapSequence<Base : SequenceType, T>
 
   typealias Elements = _prext_MapSequence
 
-  public func generate() -> _prext_MapIterator<Base.Iterator,T> {
+  public func iterator() -> _prext_MapIterator<Base.Iterator,T> {
     return _prext_MapIterator(
-      _base: _base.generate(), _transform: _transform)
+      _base: _base.iterator(), _transform: _transform)
   }
 
   var _base: Base
@@ -259,8 +259,8 @@ public struct _prext_MapCollection<Base : CollectionType, T>
     return _transform(_base[position])
   }
 
-  public func generate() -> _prext_MapIterator<Base.Iterator, T> {
-    return _prext_MapIterator(_base: _base.generate(), _transform: _transform)
+  public func iterator() -> _prext_MapIterator<Base.Iterator, T> {
+    return _prext_MapIterator(_base: _base.iterator(), _transform: _transform)
   }
 
   public func underestimateCount() -> Int {

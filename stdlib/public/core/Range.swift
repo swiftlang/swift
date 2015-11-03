@@ -114,7 +114,7 @@ public struct Range<
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> RangeIterator<Element> {
+  public func iterator() -> RangeIterator<Element> {
     return RangeIterator(self)
   }
 

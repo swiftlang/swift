@@ -183,7 +183,7 @@ func testFixitsInStatementsWithPatterns(a : Int?) {
     _ = b2
   }
 
-  var g = [1,2,3].generate()
+  var g = [1,2,3].iterator()
   // FIXME: rdar://problem/23378003
   // This will eventually be an error.
   while var x = g.next() { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{9-12=let}}

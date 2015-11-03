@@ -38,7 +38,7 @@ struct StructWithInheritedConformances: SequenceType {
     }
   }
 
-  func generate() -> EmptyIterator {
+  func iterator() -> EmptyIterator {
     return EmptyIterator()
   }
 }

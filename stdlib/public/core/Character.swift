@@ -188,7 +188,7 @@ public struct Character :
       internal var _data: UInt64
     }
 
-    internal func generate() -> Iterator {
+    internal func iterator() -> Iterator {
       return Iterator(data)
     }
 
@@ -199,7 +199,7 @@ public struct Character :
   struct _SmallUTF16 : CollectionType {
     init(_ u8: UInt64) {
       let count = UTF16.measure(
-        UTF8.self, input: _SmallUTF8(u8).generate(),
+        UTF8.self, input: _SmallUTF8(u8).iterator(),
         repairIllFormedSequences: true)!.0
       _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
       self.count = UInt16(count)
@@ -209,7 +209,7 @@ public struct Character :
         u16 = u16 | UInt64($0)
       }
       transcode(
-        UTF8.self, UTF16.self, _SmallUTF8(u8).generate(), output,
+        UTF8.self, UTF16.self, _SmallUTF8(u8).iterator(), output,
         stopOnError: false)
       self.data = u16
     }

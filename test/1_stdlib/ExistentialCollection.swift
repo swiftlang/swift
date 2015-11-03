@@ -56,7 +56,7 @@ tests.test("AnyIterator") {
     // This is a really complicated type of no interest to our
     // clients.
     let iterator: LazyMapIterator<RangeIterator<Int>, String> =
-      lazyStrings.generate()
+      lazyStrings.iterator()
     return AnyIterator(iterator)
   }
   expectEqual(["0", "1", "2", "3", "4"], Array(countStrings()))

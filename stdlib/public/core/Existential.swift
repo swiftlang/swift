@@ -31,7 +31,7 @@ internal struct _CollectionOf<
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  func generate() -> AnyIterator<T> {
+  func iterator() -> AnyIterator<T> {
     var index = startIndex
     return AnyIterator {
       () -> T? in

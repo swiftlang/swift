@@ -333,10 +333,10 @@ extension TestSuite {
     testNamePrefix += String(Collection.Type)
 
 //===----------------------------------------------------------------------===//
-// generate()
+// iterator()
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).generate()/semantics") {
+self.test("\(testNamePrefix).iterator()/semantics") {
   for test in subscriptRangeTests {
     let c = makeWrappedCollection(test.collection)
     for _ in 0..<3 {

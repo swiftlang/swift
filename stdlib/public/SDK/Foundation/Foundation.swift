@@ -725,7 +725,7 @@ extension NSArray : SequenceType {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  final public func generate() -> NSFastEnumerationIterator {
+  final public func iterator() -> NSFastEnumerationIterator {
     return NSFastEnumerationIterator(self)
   }
 }
@@ -769,7 +769,7 @@ extension NSSet : SequenceType {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> NSFastEnumerationIterator {
+  public func iterator() -> NSFastEnumerationIterator {
     return NSFastEnumerationIterator(self)
   }
 }
@@ -778,7 +778,7 @@ extension NSOrderedSet : SequenceType {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> NSFastEnumerationIterator {
+  public func iterator() -> NSFastEnumerationIterator {
     return NSFastEnumerationIterator(self)
   }
 }
@@ -816,7 +816,7 @@ extension NSIndexSet : SequenceType {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> NSIndexSetIterator {
+  public func iterator() -> NSIndexSetIterator {
     return NSIndexSetIterator(set: self)
   }
 }
@@ -942,7 +942,7 @@ extension NSDictionary : SequenceType {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> Iterator {
+  public func iterator() -> Iterator {
     return Iterator(self)
   }
 }
@@ -951,7 +951,7 @@ extension NSEnumerator : SequenceType {
   /// Return an *iterator* over the *enumerator*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> NSFastEnumerationIterator {
+  public func iterator() -> NSFastEnumerationIterator {
     return NSFastEnumerationIterator(self)
   }
 }

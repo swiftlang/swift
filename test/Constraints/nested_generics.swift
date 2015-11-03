@@ -44,7 +44,7 @@ struct AnyStream<T : SequenceType> {
   // Conform to the enumerable protocol.
   typealias Elements = StreamRange<T.Iterator>
   func getElements() -> Elements {
-    return Elements(index: 0, elements: input.generate())
+    return Elements(index: 0, elements: input.iterator())
   }
 }
 

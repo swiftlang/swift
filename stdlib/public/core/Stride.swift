@@ -145,7 +145,7 @@ public struct StrideTo<Element : Strideable> : SequenceType {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> StrideToIterator<Element> {
+  public func iterator() -> StrideToIterator<Element> {
     return StrideToIterator(current: start, end: end, stride: stride)
   }
 
@@ -206,7 +206,7 @@ public struct StrideThrough<Element : Strideable> : SequenceType {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> StrideThroughIterator<Element> {
+  public func iterator() -> StrideThroughIterator<Element> {
     return StrideThroughIterator(
       current: start, end: end, stride: stride, done: false)
   }
