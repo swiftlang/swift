@@ -78,7 +78,6 @@
 #define DEBUG_TYPE "sil-redundant-load-elim"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SIL/MemLocation.h"
-#include "swift/SIL/MemValue.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
