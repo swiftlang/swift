@@ -102,7 +102,9 @@ static Class getSwiftNativeNSErrorClass() {
 /// Allocate a catchable error object.
 static BoxPair::Return
 _swift_allocError_(const Metadata *type,
-                   const WitnessTable *errorConformance) {
+                   const WitnessTable *errorConformance,
+                   OpaqueValue *initialValue,
+                   bool isTake) {
   auto TheSwiftNativeNSError = getSwiftNativeNSErrorClass();
   assert(class_getInstanceSize(TheSwiftNativeNSError) == sizeof(SwiftErrorHeader)
          && "NSError layout changed!");
@@ -132,19 +134,29 @@ _swift_allocError_(const Metadata *type,
   instance->type = type;
   instance->errorConformance = errorConformance;
   
+  auto valueBytePtr = reinterpret_cast<char*>(instance) + valueOffset;
+  auto valuePtr = reinterpret_cast<OpaqueValue*>(valueBytePtr);
+  
+  // If an initial value was given, copy or take it in.
+  if (initialValue) {
+    if (isTake)
+      type->vw_initializeWithTake(valuePtr, initialValue);
+    else
+      type->vw_initializeWithCopy(valuePtr, initialValue);
+  }
+  
   // Return the SwiftError reference and a pointer to the uninitialized value
   // inside.
-  auto valuePtr = reinterpret_cast<char*>(instance) + valueOffset;
-  return BoxPair{reinterpret_cast<HeapObject*>(instance),
-                 reinterpret_cast<OpaqueValue*>(valuePtr)};
+  return BoxPair{reinterpret_cast<HeapObject*>(instance), valuePtr};
 }
 
 extern "C" auto *_swift_allocError = _swift_allocError_;
 
 BoxPair::Return
 swift::swift_allocError(const Metadata *type,
-                        const WitnessTable *errorConformance) {
-  return _swift_allocError(type, errorConformance);
+                        const WitnessTable *errorConformance,
+                        OpaqueValue *value, bool isTake) {
+  return _swift_allocError(type, errorConformance, value, isTake);
 }
 
 /// Deallocate an error object whose contained object has already been

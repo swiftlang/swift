@@ -137,8 +137,14 @@ struct SwiftError : SwiftErrorHeader {
 };
   
 /// Allocate a catchable error object.
+///
+/// If value is nonnull, it should point to a value of \c type, which will be
+/// copied (or taken if \c isTake is true) into the newly-allocated error box.
+/// If value is null, the box's contents will be left uninitialized, and
+/// \c isTake should be false.
 extern "C" BoxPair::Return swift_allocError(const Metadata *type,
-                                         const WitnessTable *errorConformance);
+                                          const WitnessTable *errorConformance,
+                                          OpaqueValue *value, bool isTake);
   
 /// Deallocate an error object whose contained object has already been
 /// destroyed.

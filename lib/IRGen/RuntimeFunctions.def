@@ -919,7 +919,7 @@ FUNCTION(DeadMethodError, swift_reportMissingMethod, C_CC,
 
 FUNCTION(AllocError, swift_allocError, C_CC,
          RETURNS(ErrorPtrTy, OpaquePtrTy),
-         ARGS(TypeMetadataPtrTy, WitnessTablePtrTy),
+         ARGS(TypeMetadataPtrTy, WitnessTablePtrTy, OpaquePtrTy, Int1Ty),
          ATTRS(NoUnwind))
 FUNCTION(DeallocError, swift_deallocError, C_CC,
          RETURNS(VoidTy),

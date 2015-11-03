@@ -1398,8 +1398,12 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                          entry, conformances[0]);
   
   // Call the runtime to allocate the box.
+  // TODO: When there's a store or copy_addr immediately into the box, peephole
+  // it into the initializer parameter to allocError.
   auto result = IGF.Builder.CreateCall(IGF.IGM.getAllocErrorFn(),
-                                       {srcMetadata, witness});
+                         {srcMetadata, witness,
+                           llvm::ConstantPointerNull::get(IGF.IGM.OpaquePtrTy),
+                           llvm::ConstantInt::get(IGF.IGM.Int1Ty, 0)});
   
   // Extract the box and value address from the result.
   auto box = IGF.Builder.CreateExtractValue(result, 0);

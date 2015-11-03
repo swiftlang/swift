@@ -980,13 +980,10 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
                               &errorWitness))
       return _fail(src, srcType, targetType, flags);
     
-    BoxPair destBox = swift_allocError(srcDynamicType, errorWitness);
+    BoxPair destBox = swift_allocError(srcDynamicType, errorWitness,
+                                       srcDynamicValue,
+               /*isTake*/ canTake && (flags & DynamicCastFlags::TakeOnSuccess));
     *destBoxAddr = reinterpret_cast<SwiftError*>(destBox.heapObject);
-    if (canTake && (flags & DynamicCastFlags::TakeOnSuccess)) {
-      srcDynamicType->vw_initializeWithTake(destBox.value, srcDynamicValue);
-    } else {
-      srcDynamicType->vw_initializeWithCopy(destBox.value, srcDynamicValue);
-    }
     maybeDeallocateSourceAfterSuccess();
     return true;
   }
@@ -1924,13 +1921,8 @@ static id dynamicCastValueToNSError(OpaqueValue *src,
                                     const Metadata *srcType,
                                     const WitnessTable *srcErrorTypeWitness,
                                     DynamicCastFlags flags) {
-  BoxPair errorBox = swift_allocError(srcType, srcErrorTypeWitness);
-  
-  if (flags & DynamicCastFlags::TakeOnSuccess)
-    srcType->vw_initializeWithTake(errorBox.value, src);
-  else
-    srcType->vw_initializeWithCopy(errorBox.value, src);
-  
+  BoxPair errorBox = swift_allocError(srcType, srcErrorTypeWitness, src,
+                            /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
   return swift_bridgeErrorTypeToNSError((SwiftError*)errorBox.heapObject);
 }
 #endif

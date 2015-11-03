@@ -64,7 +64,9 @@ static const FullMetadata<HeapMetadata> ErrorTypeMetadata{
 
 BoxPair::Return
 swift::swift_allocError(const swift::Metadata *type,
-                        const swift::WitnessTable *errorConformance) {
+                        const swift::WitnessTable *errorConformance,
+                        OpaqueValue *initialValue,
+                        bool isTake) {
   auto sizeAndAlign = _getErrorAllocatedSizeAndAlignmentMask(type);
   
   auto allocated = swift_allocObject(&ErrorTypeMetadata,
@@ -75,7 +77,16 @@ swift::swift_allocError(const swift::Metadata *type,
   error->type = type;
   error->errorConformance = errorConformance;
   
-  return BoxPair{allocated, error->getValue()};
+  // If an initial value was given, copy or take it in.
+  auto valuePtr = error->getValue();
+  if (initialValue) {
+    if (isTake)
+      type->vw_initializeWithTake(valuePtr, initialValue);
+    else
+      type->vw_initializeWithCopy(valuePtr, initialValue);
+  }
+  
+  return BoxPair{allocated, valuePtr};
 }
 
 void
