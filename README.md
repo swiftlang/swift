@@ -69,7 +69,7 @@ with version 2 shipped with Ubuntu.
       git clone git@github.com:/apple/swift-lldb.git lldb
       git clone git@github.com:/apple/swift-cmark.git cmark
       git clone git@github.com:/apple/swift-llbuild.git llbuild
-      git clone git@github.com:/apple/swift-source-package-manager.git swiftpm
+      git clone git@github.com:/apple/swift-package-manager.git swiftpm
 
 
 ### Building Swift
