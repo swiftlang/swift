@@ -6,7 +6,7 @@
 
 protocol C {
 func a: Hashable> {
-typealias g, x in return ".Generator.B : 1])
+typealias g, x in return ".Iterator.B : 1])
 }
 struct D : NSObject {
 protocol c : b {

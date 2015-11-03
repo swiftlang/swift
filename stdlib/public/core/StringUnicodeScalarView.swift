@@ -35,7 +35,7 @@ extension String {
       self._core = _core
     }
 
-    struct _ScratchGenerator : IteratorProtocol {
+    struct _ScratchIterator : IteratorProtocol {
       var core: _StringCore
       var idx: Int
       init(_ core: _StringCore, _ pos: Int) {
@@ -62,7 +62,7 @@ extension String {
       /// - Requires: The next value is representable.
       @warn_unused_result
       public func successor() -> Index {
-        var scratch = _ScratchGenerator(_core, _position)
+        var scratch = _ScratchIterator(_core, _position)
         var decoder = UTF16()
         let (_, length) = decoder._decodeOne(&scratch)
         return Index(_position + length, _core)
@@ -117,7 +117,7 @@ extension String {
     /// - Requires: `position` is a valid position in `self` and
     ///   `position != endIndex`.
     public subscript(position: Index) -> UnicodeScalar {
-      var scratch = _ScratchGenerator(_core, position._position)
+      var scratch = _ScratchIterator(_core, position._position)
       var decoder = UTF16()
       switch decoder.decode(&scratch) {
       case .Result(let us):
@@ -141,7 +141,7 @@ extension String {
 
     /// A type whose instances can produce the elements of this
     /// sequence, in order.
-    public struct Generator : IteratorProtocol {
+    public struct Iterator : IteratorProtocol {
       init(_ _base: _StringCore) {
         if _base.hasContiguousStorage {
             self._baseSet = true
@@ -196,8 +196,8 @@ extension String {
       var _decoder: UTF16 = UTF16()
       let _baseSet: Bool
       let _ascii: Bool
-      var _asciiBase: UnsafeBufferPointerGenerator<UInt8>!
-      var _base: UnsafeBufferPointerGenerator<UInt16>!
+      var _asciiBase: UnsafeBufferPointerIterator<UInt8>!
+      var _base: UnsafeBufferPointerIterator<UInt16>!
       var _iterator: IndexingGenerator<_StringCore>!
     }
 
@@ -206,8 +206,8 @@ extension String {
     ///
     /// - Complexity: O(1).
     @warn_unused_result
-    public func generate() -> Generator {
-      return Generator(_core)
+    public func generate() -> Iterator {
+      return Iterator(_core)
     }
 
     /// Returns a mirror that reflects `self`.
@@ -271,7 +271,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// - Complexity: O(*length of result*).
   public mutating func appendContentsOf<
-    S : SequenceType where S.Generator.Element == UnicodeScalar
+    S : SequenceType where S.Iterator.Element == UnicodeScalar
   >(newElements: S) {
     _core.appendContentsOf(newElements.lazy.flatMap { $0.utf16 })
   }
@@ -282,7 +282,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
-    C: CollectionType where C.Generator.Element == UnicodeScalar
+    C: CollectionType where C.Iterator.Element == UnicodeScalar
   >(
     subRange: Range<Index>, with newElements: C
   ) {

@@ -6,7 +6,7 @@
 
 var d = [T {
 struct c == 1)-> {
-print((object1, range.Generator.R
+print((object1, range.Iterator.R
 }
 let c> T : d where h: l) ->(array: T : a: P> Any {
 return "[1)

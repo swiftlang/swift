@@ -312,7 +312,7 @@ k()
 h
 protocol k : h { func h
 k
-func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
+func d<b: SequenceType, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
     }
 }

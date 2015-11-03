@@ -15,7 +15,7 @@ extension String {
 func x: NSManagedObject {
 }
 extension NSSet {
-func i(A, Any)(")!(c) -> Any) -> U.Generator.c == [c> () {
+func i(A, Any)(")!(c) -> Any) -> U.Iterator.c == [c> () {
 }
 }
 }

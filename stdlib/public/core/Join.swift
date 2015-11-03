@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-internal enum _JoinGeneratorState {
+internal enum _JoinIteratorState {
   case Start
   case GeneratingElements
   case GeneratingSeparator
@@ -19,7 +19,7 @@ internal enum _JoinGeneratorState {
 
 /// An iterator that presents the elements of the sequences traversed
 /// by `Base`, concatenated using a given separator.
-public struct JoinGenerator<
+public struct JoinIterator<
   Base : IteratorProtocol where Base.Element : SequenceType
 > : IteratorProtocol {
 
@@ -30,7 +30,7 @@ public struct JoinGenerator<
   public init<
     Separator : SequenceType
     where
-    Separator.Generator.Element == Base.Element.Generator.Element
+    Separator.Iterator.Element == Base.Element.Iterator.Element
   >(base: Base, separator: Separator) {
     self._base = base
     self._separatorData = ContiguousArray(separator)
@@ -38,7 +38,7 @@ public struct JoinGenerator<
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
-  public mutating func next() -> Base.Element.Generator.Element? {
+  public mutating func next() -> Base.Element.Iterator.Element? {
     repeat {
       switch _state {
       case .Start:
@@ -87,16 +87,17 @@ public struct JoinGenerator<
   }
 
   internal var _base: Base
-  internal var _inner: Base.Element.Generator? = nil
-  internal var _separatorData: ContiguousArray<Base.Element.Generator.Element>
-  internal var _separator: ContiguousArray<Base.Element.Generator.Element>.Generator?
-  internal var _state: _JoinGeneratorState = .Start
+  internal var _inner: Base.Element.Iterator? = nil
+  internal var _separatorData: ContiguousArray<Base.Element.Iterator.Element>
+  internal var _separator:
+    ContiguousArray<Base.Element.Iterator.Element>.Iterator?
+  internal var _state: _JoinIteratorState = .Start
 }
 
 /// A sequence that presents the elements of the `Base` sequences
 /// concatenated using a given separator.
 public struct JoinSequence<
-  Base : SequenceType where Base.Generator.Element : SequenceType
+  Base : SequenceType where Base.Iterator.Element : SequenceType
 > : SequenceType {
 
   /// Creates a sequence that presents the elements of `base` sequences
@@ -106,8 +107,7 @@ public struct JoinSequence<
   public init<
     Separator : SequenceType
     where
-    Separator.Generator.Element ==
-      Base.Generator.Element.Generator.Element
+    Separator.Iterator.Element == Base.Iterator.Element.Iterator.Element
   >(base: Base, separator: Separator) {
     self._base = base
     self._separator = ContiguousArray(separator)
@@ -116,15 +116,15 @@ public struct JoinSequence<
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> JoinGenerator<Base.Generator> {
-    return JoinGenerator(
+  public func generate() -> JoinIterator<Base.Iterator> {
+    return JoinIterator(
       base: _base.generate(),
       separator: _separator)
   }
 
   public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element.Generator.Element> {
-    var result = ContiguousArray<Generator.Element>()
+    -> _ContiguousArrayBuffer<Base.Iterator.Element.Iterator.Element> {
+    var result = ContiguousArray<Iterator.Element>()
     let separatorSize: Int = numericCast(_separator.count)
 
     let reservation = _base._preprocessingPass {
@@ -160,10 +160,10 @@ public struct JoinSequence<
 
   internal var _base: Base
   internal var _separator:
-    ContiguousArray<Base.Generator.Element.Generator.Element>
+    ContiguousArray<Base.Iterator.Element.Iterator.Element>
 }
 
-extension SequenceType where Generator.Element : SequenceType {
+extension SequenceType where Iterator.Element : SequenceType {
   /// Returns a view, whose elements are the result of interposing a given
   /// `separator` between the elements of the sequence `self`.
   ///
@@ -174,7 +174,7 @@ extension SequenceType where Generator.Element : SequenceType {
   public func joinWithSeparator<
     Separator : SequenceType
     where
-    Separator.Generator.Element == Generator.Element.Generator.Element
+    Separator.Iterator.Element == Iterator.Element.Iterator.Element
   >(separator: Separator) -> JoinSequence<Self> {
     return JoinSequence(base: self, separator: separator)
   }

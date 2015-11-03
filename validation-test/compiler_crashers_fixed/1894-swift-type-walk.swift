@@ -16,7 +16,7 @@ protocol a {
 }
 typealias e : Any, f: () -> {
 }
-super.Generator.A, B, c(A) -> {
+super.Iterator.A, B, c(A) -> {
 }
 struct e {
 protocol A {

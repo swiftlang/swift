@@ -47,7 +47,7 @@
 ///       /// - Complexity: O(N)
 ///       func scan<ResultElement>(
 ///         initial: ResultElement,
-///         @noescape combine: (ResultElement, Generator.Element)->ResultElement
+///         @noescape combine: (ResultElement, Iterator.Element)->ResultElement
 ///       ) -> [ResultElement] {
 ///         var result = [initial]
 ///         for x in self {
@@ -76,14 +76,14 @@
 ///     struct LazyScanSequence<Base: SequenceType, ResultElement>
 ///       : LazySequenceType // Chained operations on self are lazy, too
 ///     {
-///       func generate() -> LazyScanIterator<Base.Generator, ResultElement> {
+///       func generate() -> LazyScanIterator<Base.Iterator, ResultElement> {
 ///         return LazyScanIterator(
 ///           nextElement: initial, base: base.generate(), combine: combine)
 ///       }
 ///       private let initial: ResultElement
 ///       private let base: Base
 ///       private let combine:
-///         (ResultElement, Base.Generator.Element)->ResultElement
+///         (ResultElement, Base.Iterator.Element)->ResultElement
 ///     }
 ///
 /// and finally, we can give all lazy sequences a lazy `scan` method:
@@ -101,7 +101,7 @@
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
 ///         initial: ResultElement,
-///         combine: (ResultElement, Generator.Element)->ResultElement
+///         combine: (ResultElement, Iterator.Element)->ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(
 ///           initial: initial, base: self, combine: combine)
@@ -116,7 +116,7 @@
 ///   as the accumulation of `result` below are never unexpectedly
 ///   dropped or deferred:
 ///
-///       extension SequenceType where Generator.Element == Int {
+///       extension SequenceType where Iterator.Element == Int {
 ///         func sum() -> Int {
 ///           var result = 0
 ///           _ = self.map { result += $0 }

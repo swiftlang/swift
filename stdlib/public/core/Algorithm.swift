@@ -123,7 +123,7 @@ public struct EnumeratedSequence<Base : SequenceType> : SequenceType {
   /// Returns an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> EnumeratedIterator<Base.Generator> {
+  public func generate() -> EnumeratedIterator<Base.Iterator> {
     return EnumeratedIterator(_base: _base.generate())
   }
 }

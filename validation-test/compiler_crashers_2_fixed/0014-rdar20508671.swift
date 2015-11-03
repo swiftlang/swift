@@ -6,8 +6,8 @@ protocol MyIteratorProtocol {
 }
 
 protocol MySequenceType {
-  typealias Generator : MyIteratorProtocol
-  func generate() -> Generator
+  typealias Iterator : MyIteratorProtocol
+  func generate() -> Iterator
 }
 
 protocol MyCollectionDefaultsType : MySequenceType {}
@@ -21,7 +21,7 @@ protocol MyCollectionType
   : MySequenceType, MyCollectionDefaultsType {}
 
 struct DefaultIterator<C : MyCollectionDefaultsType> : MyIteratorProtocol {
-  mutating func next() -> C.Generator.Element {
+  mutating func next() -> C.Iterator.Element {
     fatalError("")
   }
 }

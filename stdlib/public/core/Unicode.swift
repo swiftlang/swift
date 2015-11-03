@@ -732,7 +732,8 @@ public func transcode<
 @warn_unused_result
 internal func _transcodeSomeUTF16AsUTF8<
   Input : CollectionType
-  where Input.Generator.Element == UInt16>(
+  where
+  Input.Iterator.Element == UInt16>(
   input: Input, _ startIndex: Input.Index
 ) -> (Input.Index, _StringCore.UTF8Chunk) {
   typealias UTF8Chunk = _StringCore.UTF8Chunk

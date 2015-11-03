@@ -152,9 +152,9 @@ class q<k>: c a(b: Int = 0) {
 }
 let c = a
 c()
-func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
+func d<b: SequenceType, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
 enum S<T> {
     case C(T, () -> ())
 }

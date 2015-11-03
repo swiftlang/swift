@@ -115,7 +115,7 @@ extension _ReverseCollectionType
 {
   public var startIndex : Index { return Self.Index(_base.endIndex) }
   public var endIndex : Index { return Self.Index(_base.startIndex) }
-  public subscript(position: Index) -> Self.Base.Generator.Element {
+  public subscript(position: Index) -> Self.Base.Iterator.Element {
     return _base[position.base.predecessor()]
   }
 }
@@ -155,7 +155,7 @@ public struct ReverseCollection<
 
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
-  public typealias Generator = IndexingGenerator<ReverseCollection>
+  public typealias Iterator = IndexingGenerator<ReverseCollection>
   
   public let _base: Base
 }
@@ -185,7 +185,7 @@ public struct ReverseRandomAccessCollection<
   
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
-  public typealias Generator = IndexingGenerator<
+  public typealias Iterator = IndexingGenerator<
     ReverseRandomAccessCollection
   >
 

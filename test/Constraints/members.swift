@@ -521,9 +521,9 @@ let _ : [UnavailMember] = [.XYZ] // expected-error {{'XYZ' is unavailable}}
 let _ : [UnavailMember] = [.ABC] // expected-error {{type 'UnavailMember' has no member 'ABC'}}
 
 
-// <rdar://problem/22490787> QoI: Poor error message iterating over property with non-sequence type that defines a Generator type alias
+// <rdar://problem/22490787> QoI: Poor error message iterating over property with non-sequence type that defines an Iterator type alias
 struct S22490787 {
-  typealias Generator = AnyIterator<Int>
+  typealias Iterator = AnyIterator<Int>
 }
 
 func f22490787() {

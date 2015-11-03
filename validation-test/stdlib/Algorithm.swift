@@ -56,7 +56,7 @@ struct A<T> : MutableSliceable {
     return impl.count
   }
 
-  func generate() -> Array<T>.Generator {
+  func generate() -> Array<T>.Iterator {
     return impl.generate()
   }
 

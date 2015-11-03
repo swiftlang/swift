@@ -54,7 +54,7 @@ public struct GeneratorOf<T> : IteratorProtocol, SequenceType {
   
   /// Construct an instance whose `next()` method pulls its results
   /// from `base`.
-  public init<G: IteratorProtocol where G.Element == T>(_ base: G) {
+  public init<I : IteratorProtocol where I.Element == T>(_ base: I) {
     var base = base
     self._next = { base.next() }
   }
@@ -78,7 +78,7 @@ public struct GeneratorOf<T> : IteratorProtocol, SequenceType {
 }
 
 // rdar://problem/19009056
-public struct LazySequenceOf<S : SequenceType, A where S.Generator.Element == A> : SequenceType {
+public struct LazySequenceOf<S : SequenceType, A where S.Iterator.Element == A> : SequenceType {
   public func generate() -> GeneratorOf<A> { 
     return GeneratorOf<A>({ return nil })
   }
@@ -142,7 +142,7 @@ protocol Seq {
 
 // rdar://problem/18435371
 extension Dictionary {
-    func multiSubscript<S: SequenceType where S.Generator.Element == Key>(seq: S) -> [Value?] {
+    func multiSubscript<S : SequenceType where S.Iterator.Element == Key>(seq: S) -> [Value?] {
         var result = [Value?]()
         for seqElt in seq {
             result.append(self[seqElt])
@@ -190,7 +190,7 @@ struct Something<T> {
 }
 
 extension Something {
-    init<S: SequenceType where S.Generator.Element == T>(_ s: S) {
+    init<S : SequenceType where S.Iterator.Element == T>(_ s: S) {
         for item in s {
             items.append(item)
         }

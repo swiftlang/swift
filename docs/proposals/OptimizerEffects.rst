@@ -186,7 +186,7 @@ state.
 
       @preserve_unique
       mutating func replaceRange<
-        C: CollectionType where C.Generator.Element == T
+        C : CollectionType where C.Iterator.Element == T
       >(
         subRange: Range<Int>, with newElements: C
       ) { ... }

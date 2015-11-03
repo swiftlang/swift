@@ -167,7 +167,7 @@ public struct Mirror {
   }
   
   @warn_unused_result
-  internal static func _superclassGenerator<T: Any>(
+  internal static func _superclassIterator<T: Any>(
     subject: T, _ ancestorRepresentation: AncestorRepresentation
   ) -> ()->Mirror? {
 
@@ -212,7 +212,7 @@ public struct Mirror {
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
   public init<
-    T, C: CollectionType where C.Generator.Element == Child
+    T, C: CollectionType where C.Iterator.Element == Child
   >(
     _ subject: T,
     children: C,
@@ -220,7 +220,7 @@ public struct Mirror {
     ancestorRepresentation: AncestorRepresentation = .Generated
   ) {
     self.subjectType = T.self
-    self._makeSuperclassMirror = Mirror._superclassGenerator(
+    self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
       
     self.children = Children(children)
@@ -268,7 +268,7 @@ public struct Mirror {
     ancestorRepresentation: AncestorRepresentation = .Generated
   ) {
     self.subjectType = T.self
-    self._makeSuperclassMirror = Mirror._superclassGenerator(
+    self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
       
     self.children = Children(
@@ -309,7 +309,7 @@ public struct Mirror {
     ancestorRepresentation: AncestorRepresentation = .Generated
   ) {
     self.subjectType = T.self
-    self._makeSuperclassMirror = Mirror._superclassGenerator(
+    self._makeSuperclassMirror = Mirror._superclassIterator(
       subject, ancestorRepresentation)
       
     let lazyChildren = children.lazy.map { Child(label: $0.0, value: $0.1) }

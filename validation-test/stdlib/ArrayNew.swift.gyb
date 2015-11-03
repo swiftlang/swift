@@ -92,8 +92,8 @@ extension ${array_type} where Element : TestProtocol1 {
 
 /// Returns an ${array_type} that does not share its buffer with other arrays.
 func getFresh${array_type}<S : SequenceType>(sequence: S)
-  -> ${array_type}<S.Generator.Element> {
-  var result: ${array_type}<S.Generator.Element> = []
+  -> ${array_type}<S.Iterator.Element> {
+  var result: ${array_type}<S.Iterator.Element> = []
   result.reserveCapacity(sequence.underestimateCount())
   for element in sequence {
     result.append(element)
@@ -122,7 +122,7 @@ struct SequenceWithCustomUnderestimateCount : SequenceType {
     self._data = MinimalSequence(elements: data.map(OpaqueValue.init))
   }
 
-  func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
+  func generate() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
     return _data.generate()
   }
 

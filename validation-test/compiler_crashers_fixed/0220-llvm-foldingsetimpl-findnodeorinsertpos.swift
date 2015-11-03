@@ -63,7 +63,7 @@ struct c<d : SequenceType> {
 func a<d>() -> [c<d>] {
     return []
 }
-func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
+func d<b: SequenceType, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
     }
 }

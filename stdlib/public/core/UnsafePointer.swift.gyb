@@ -273,7 +273,7 @@ ${comment}
   ///
   /// - Precondition: The memory is not initialized.
   public func initializeFrom<
-    C : CollectionType where C.Generator.Element == Memory
+    C : CollectionType where C.Iterator.Element == Memory
   >(source: C) {
     source._initializeTo(self)
   }

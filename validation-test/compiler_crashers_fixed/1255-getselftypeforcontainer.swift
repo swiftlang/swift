@@ -136,7 +136,7 @@ j q
 j o
 }
 struct n<r : l>
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
 }
 class p {
 u _ = q() {

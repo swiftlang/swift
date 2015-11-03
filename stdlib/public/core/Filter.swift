@@ -65,7 +65,7 @@ public struct LazyFilterSequence<Base : SequenceType>
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> LazyFilterIterator<Base.Generator> {
+  public func generate() -> LazyFilterIterator<Base.Iterator> {
     return LazyFilterIterator(
       base.generate(), whereElementsSatisfy: _include)
   }
@@ -74,7 +74,7 @@ public struct LazyFilterSequence<Base : SequenceType>
   /// which `predicate(x) == true`.
   public init(
     _ base: Base,
-    whereElementsSatisfy predicate: (Base.Generator.Element)->Bool
+    whereElementsSatisfy predicate: (Base.Iterator.Element)->Bool
   ) {
     self.base = base
     self._include = predicate
@@ -85,7 +85,7 @@ public struct LazyFilterSequence<Base : SequenceType>
 
   /// The predicate used to determine which elements of `base` are
   /// also elements of `self`.
-  internal let _include: (Base.Generator.Element)->Bool
+  internal let _include: (Base.Iterator.Element)->Bool
 }
 
 /// The `Index` used for subscripting a `LazyFilterCollection`.
@@ -131,7 +131,7 @@ public struct LazyFilterIndex<
 
   /// The predicate used to determine which elements of `base` are
   /// also elements of `self`.
-  internal let _include: (BaseElements.Generator.Element)->Bool
+  internal let _include: (BaseElements.Iterator.Element)->Bool
 }
 
 /// Returns `true` iff `lhs` is identical to `rhs`.
@@ -166,7 +166,7 @@ public struct LazyFilterCollection<
   /// satisfy `predicate`.
   public init(
     _ base: Base,
-    whereElementsSatisfy predicate: (Base.Generator.Element)->Bool
+    whereElementsSatisfy predicate: (Base.Iterator.Element)->Bool
   ) {
     self._base = base
     self._predicate = predicate
@@ -206,20 +206,20 @@ public struct LazyFilterCollection<
   ///
   /// - Requires: `position` is a valid position in `self` and
   /// `position != endIndex`.
-  public subscript(position: Index) -> Base.Generator.Element {
+  public subscript(position: Index) -> Base.Iterator.Element {
     return _base[position.base]
   }
 
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> LazyFilterIterator<Base.Generator> {
+  public func generate() -> LazyFilterIterator<Base.Iterator> {
     return LazyFilterIterator(
       _base.generate(), whereElementsSatisfy: _predicate)
   }
 
   var _base: Base
-  var _predicate: (Base.Generator.Element)->Bool
+  var _predicate: (Base.Iterator.Element)->Bool
 }
 
 extension LazySequenceType {
@@ -231,7 +231,7 @@ extension LazySequenceType {
   ///   elements.
   @warn_unused_result
   public func filter(
-    predicate: (Elements.Generator.Element)->Bool
+    predicate: (Elements.Iterator.Element)->Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(
       self.elements, whereElementsSatisfy: predicate)
@@ -247,7 +247,7 @@ extension LazyCollectionType {
   ///   elements.
   @warn_unused_result
   public func filter(
-    predicate: (Elements.Generator.Element)->Bool
+    predicate: (Elements.Iterator.Element)->Bool
   ) -> LazyFilterCollection<Self.Elements> {
     return LazyFilterCollection(
       self.elements, whereElementsSatisfy: predicate)

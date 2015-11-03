@@ -12,7 +12,7 @@
 
 /// A iterator for the elements in the buffer referenced by
 /// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer`.
-public struct UnsafeBufferPointerGenerator<Element>
+public struct UnsafeBufferPointerIterator<Element>
   : IteratorProtocol, SequenceType {
 
   /// Advance to the next element and return it, or `nil` if no next
@@ -76,8 +76,8 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// Return a *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> UnsafeBufferPointerGenerator<Element> {
-    return UnsafeBufferPointerGenerator(position: _position, end: _end)
+  public func generate() -> UnsafeBufferPointerIterator<Element> {
+    return UnsafeBufferPointerIterator(position: _position, end: _end)
   }
 
   /// A pointer to the first element of the buffer.

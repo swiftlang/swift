@@ -20,11 +20,11 @@ protocol _CollectionType  {
 }
 
 protocol CollectionType : _CollectionType, SequenceType {
-  subscript(i: Index) -> Generator.Element {get}
+  subscript(i: Index) -> Iterator.Element {get}
 }
 
 protocol MutableCollectionType : CollectionType {
-  subscript(i: Index) -> Generator.Element {get set}
+  subscript(i: Index) -> Iterator.Element {get set}
 }
 
 func insertionSort<
@@ -33,7 +33,7 @@ C: MutableCollectionType
   inout elements: C,
   i: C.Index
 ) {
-  var _: C.Generator.Element = elements[i] // should not error
+  var _: C.Iterator.Element = elements[i] // should not error
 }
 
 // rdar://problem/21322215
@@ -47,13 +47,13 @@ struct TestClass<
   Factory: FactoryType,
   NodeCollection: MyCollectionType
   where
-  NodeCollection.Generator.Element == Factory.Item
+  NodeCollection.Iterator.Element == Factory.Item
 > {
   var flattenedNodes: NodeCollection
 
   func test() {
     let node1 = self.flattenedNodes[self.flattenedNodes.startIndex]
-    let typecheck1: NodeCollection.Generator.Element = node1
+    let typecheck1: NodeCollection.Iterator.Element = node1
     _ = typecheck1
   }
 }

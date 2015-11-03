@@ -158,15 +158,15 @@ and MutableCollection
 extension MutableSlice {
   func _checkBaseSubSequenceElementIsElement() {
       Element.self,
-      Generator.Element.self)
+      Iterator.Element.self)
     expectEqualType(
       Element.self,
-      Generator.Element.self,
-      Base.Generator.Element.self)
+      Iterator.Element.self,
+      Base.Iterator.Element.self)
     expectEqualType(
       Element.self,
-      Generator.Element.self,
-      Base.SubSequence.Generator.Element.self)
+      Iterator.Element.self,
+      Base.SubSequence.Iterator.Element.self)
   }
 }
 */

@@ -6,7 +6,7 @@
 
 extension Array {
 typealias R = a<T.Element>(Any) {
-return self.Generator..E == "](((b(bytes: S<T : C> a {
+return self.Iterator..E == "](((b(bytes: S<T : C> a {
 extension NSData {
 struct e {
 }

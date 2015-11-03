@@ -97,10 +97,10 @@ func checkReallocation<T : _ArrayType>(
 }
 
 func checkEqual<
-    S1 : SequenceType, S2 : SequenceType
-  where 
-    S1.Generator.Element == S2.Generator.Element,
-    S1.Generator.Element : Equatable
+  S1 : SequenceType, S2 : SequenceType
+  where
+  S1.Iterator.Element == S2.Iterator.Element,
+  S1.Iterator.Element : Equatable
 >(a1: S1, _ a2: S2, _ expected: Bool) {
   if a1.elementsEqual(a2) != expected {
     let un = expected ? "un" : ""
@@ -110,10 +110,11 @@ func checkEqual<
 
 func test<
   T : _ArrayType
-where T.Generator.Element == T._Buffer.Element,
-          T._Buffer.Element == T.Element,
-          T.Element == X,
-          T.Index == Int
+  where
+  T.Iterator.Element == T._Buffer.Element,
+  T._Buffer.Element == T.Element,
+  T.Element == X,
+  T.Index == Int
 >(_: T.Type, _ label: String) {
   print("test: \(label)...", terminator: "")
 

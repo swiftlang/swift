@@ -18,7 +18,7 @@ protocol _ArrayType
 {
   //===--- public interface -----------------------------------------------===//
   /// Construct an array of `count` elements, each initialized to `repeatedValue`.
-  init(count: Int, repeatedValue: Generator.Element)
+  init(count: Int, repeatedValue: Iterator.Element)
 
   /// The number of elements the Array stores.
   var count: Int {get}
@@ -36,7 +36,7 @@ protocol _ArrayType
   /// element. Otherwise, `nil`.
   var _baseAddressIfContiguous: UnsafeMutablePointer<Element> {get}
 
-  subscript(index: Int) -> Generator.Element {get set}
+  subscript(index: Int) -> Iterator.Element {get set}
 
   //===--- basic mutations ------------------------------------------------===//
 
@@ -50,7 +50,7 @@ protocol _ArrayType
 
   /// Operator form of `appendContentsOf`.
   func += <
-    S: SequenceType where S.Generator.Element == Generator.Element
+    S: SequenceType where S.Iterator.Element == Iterator.Element
   >(inout lhs: Self, rhs: S)
 
   /// Insert `newElement` at index `i`.
@@ -60,7 +60,7 @@ protocol _ArrayType
   /// - Complexity: O(`self.count`).
   ///
   /// - Requires: `atIndex <= count`.
-  mutating func insert(newElement: Generator.Element, atIndex i: Int)
+  mutating func insert(newElement: Iterator.Element, atIndex i: Int)
 
   /// Remove and return the element at the given index.
   ///
@@ -69,7 +69,7 @@ protocol _ArrayType
   /// - Complexity: Worst case O(N).
   ///
   /// - Requires: `count > index`.
-  mutating func removeAtIndex(index: Int) -> Generator.Element
+  mutating func removeAtIndex(index: Int) -> Iterator.Element
 
   //===--- implementation detail  -----------------------------------------===//
 

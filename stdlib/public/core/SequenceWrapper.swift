@@ -20,17 +20,20 @@
 public // @testable
 protocol _SequenceWrapperType {
   typealias Base : SequenceType
-  typealias Generator : IteratorProtocol = Base.Generator
+  typealias Iterator : IteratorProtocol = Base.Iterator
   
   var _base: Base {get}
 }
 
 extension SequenceType
-  where Self : _SequenceWrapperType, Self.Generator == Self.Base.Generator {
+  where
+  Self : _SequenceWrapperType,
+  Self.Iterator == Self.Base.Iterator {
+
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> Base.Generator {
+  public func generate() -> Base.Iterator {
     return self._base.generate()
   }
 
@@ -40,20 +43,20 @@ extension SequenceType
 
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) throws -> T
+    @noescape transform: (Base.Iterator.Element) throws -> T
   ) rethrows -> [T] {
     return try _base.map(transform)
   }
 
   @warn_unused_result
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) throws -> Bool
-  ) rethrows -> [Base.Generator.Element] {
+    @noescape includeElement: (Base.Iterator.Element) throws -> Bool
+  ) rethrows -> [Base.Iterator.Element] {
     return try _base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
@@ -68,14 +71,14 @@ extension SequenceType
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
   public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
+    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
     return _base._copyToNativeArrayBuffer()
   }
 
   /// Copy a Sequence into an array, returning one past the last
   /// element initialized.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
-    -> UnsafeMutablePointer<Base.Generator.Element> {
+  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Iterator.Element>)
+    -> UnsafeMutablePointer<Base.Iterator.Element> {
     return _base._initializeTo(ptr)
   }
 }
@@ -109,27 +112,27 @@ extension CollectionType
   ///
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
-  public subscript(position: Base.Index) -> Base.Generator.Element {
+  public subscript(position: Base.Index) -> Base.Iterator.Element {
     return _base[position]
   }
 
   //===--- Restatements From SequenceWrapperType break ambiguity ----------===//
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) -> T
+    @noescape transform: (Base.Iterator.Element) -> T
   ) -> [T] {
     return _base.map(transform)
   }
 
   @warn_unused_result
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) -> Bool
-  ) -> [Base.Generator.Element] {
+    @noescape includeElement: (Base.Iterator.Element) -> Bool
+  ) -> [Base.Iterator.Element] {
     return _base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
@@ -144,13 +147,13 @@ extension CollectionType
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
   public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
+    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
     return _base._copyToNativeArrayBuffer()
   }
 
   /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
-    -> UnsafeMutablePointer<Base.Generator.Element> {
+  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Iterator.Element>)
+    -> UnsafeMutablePointer<Base.Iterator.Element> {
     return _base._initializeTo(ptr)
   }
 }

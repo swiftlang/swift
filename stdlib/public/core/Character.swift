@@ -171,7 +171,7 @@ public struct Character :
         truncatingBitPattern: data >> (UInt64(position) &* 8))
     }
 
-    internal struct Generator : IteratorProtocol {
+    internal struct Iterator : IteratorProtocol {
       init(_ data: UInt64) {
         self._data = data
       }
@@ -188,8 +188,8 @@ public struct Character :
       internal var _data: UInt64
     }
 
-    internal func generate() -> Generator {
-      return Generator(data)
+    internal func generate() -> Iterator {
+      return Iterator(data)
     }
 
     var count: UInt16

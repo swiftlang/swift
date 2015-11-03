@@ -916,7 +916,7 @@ extension Set : _ObjectiveCBridgeable {
 extension NSDictionary : SequenceType {
   // FIXME: A class because we can't pass a struct with class fields through an
   // [objc] interface without prematurely destroying the references.
-  final public class Generator : IteratorProtocol {
+  final public class Iterator : IteratorProtocol {
     var _fastIterator: NSFastEnumerationIterator
     var _dictionary: NSDictionary {
       return _fastIterator.enumerable as! NSDictionary
@@ -942,8 +942,8 @@ extension NSDictionary : SequenceType {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> Generator {
-    return Generator(self)
+  public func generate() -> Iterator {
+    return Iterator(self)
   }
 }
 

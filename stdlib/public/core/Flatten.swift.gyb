@@ -33,7 +33,7 @@ public struct FlattenIterator<
   /// - Requires: `next()` has not been applied to a copy of `self`
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
-  public mutating func next() -> Base.Element.Generator.Element? {
+  public mutating func next() -> Base.Element.Iterator.Element? {
     repeat {
       if _fastPath(_inner != nil) {
         let ret = _inner!.next()
@@ -51,7 +51,7 @@ public struct FlattenIterator<
   }
 
   internal var _base: Base
-  internal var _inner: Base.Element.Generator? = nil
+  internal var _inner: Base.Element.Iterator? = nil
 }
 
 /// A sequence consisting of all the elements contained in each segment
@@ -70,7 +70,7 @@ public struct FlattenIterator<
 ///
 /// - See also: `FlattenCollection`
 public struct FlattenSequence<
-  Base : SequenceType where Base.Generator.Element : SequenceType
+  Base : SequenceType where Base.Iterator.Element : SequenceType
 > : SequenceType {
 
   /// Creates a concatenation of the elements of the elements of `base`.
@@ -83,14 +83,14 @@ public struct FlattenSequence<
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> FlattenIterator<Base.Generator> {
+  public func generate() -> FlattenIterator<Base.Iterator> {
     return FlattenIterator(_base.generate())
   }
   
   internal var _base: Base
 }
 
-extension SequenceType where Generator.Element : SequenceType {
+extension SequenceType where Iterator.Element : SequenceType {
   /// A concatenation of the elements of `self`.
   @warn_unused_result
   public func flatten() -> FlattenSequence<Self> {
@@ -99,8 +99,10 @@ extension SequenceType where Generator.Element : SequenceType {
 }
 
 extension LazySequenceType
-  where Elements.Generator.Element == Generator.Element, 
-    Generator.Element : SequenceType {
+  where
+  Elements.Iterator.Element == Iterator.Element,
+  Iterator.Element : SequenceType {
+
   /// A concatenation of the elements of `self`.
   @warn_unused_result
   public func flatten() -> LazySequence<
@@ -113,11 +115,11 @@ extension LazySequenceType
 % for traversal in ('Forward', 'Bidirectional'):
 %   t = '' if traversal == 'Forward' else traversal
 %   Collection = 'Flatten%sCollection' % t
-%   constraints = '%(Base)sGenerator.Element : CollectionType'
+%   constraints = '%(Base)sIterator.Element : CollectionType'
 %   if traversal == 'Bidirectional':
 %     constraints += ''',
 %   %(Base)sIndex : BidirectionalIndexType, 
-%   %(Base)sGenerator.Element.Index : BidirectionalIndexType'''
+%   %(Base)sIterator.Element.Index : BidirectionalIndexType'''
 %   Index = Collection + 'Index'
 public struct ${Index}<
   BaseElements: CollectionType where ${constraints % {'Base': 'BaseElements.'}}
@@ -185,8 +187,8 @@ public struct ${Index}<
   internal init(
     _ _base: BaseElements,
     _ outer: BaseElements.Index,
-    _ inner: BaseElements.Generator.Element.Index?,
-    _ innerCollection: BaseElements.Generator.Element?) {
+    _ inner: BaseElements.Iterator.Element.Index?,
+    _ innerCollection: BaseElements.Iterator.Element?) {
     self._base = _base
     self._outer = outer
     self._inner = inner
@@ -195,8 +197,8 @@ public struct ${Index}<
   
   internal let _base: BaseElements
   internal let _outer: BaseElements.Index
-  internal let _inner: BaseElements.Generator.Element.Index?
-  internal let _innerCollection: BaseElements.Generator.Element?
+  internal let _inner: BaseElements.Iterator.Element.Index?
+  internal let _innerCollection: BaseElements.Iterator.Element?
 }
 
 @warn_unused_result
@@ -238,7 +240,7 @@ public struct ${Collection}<
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> FlattenIterator<Base.Generator> {
+  public func generate() -> FlattenIterator<Base.Iterator> {
     return FlattenIterator(_base.generate())
   }
 
@@ -264,7 +266,7 @@ public struct ${Collection}<
   ///   `position != endIndex`.
   public subscript(
     position: Index
-  ) -> Base.Generator.Element.Generator.Element {
+  ) -> Base.Iterator.Element.Iterator.Element {
     return position._innerCollection![position._inner!]
   }
 
@@ -276,7 +278,7 @@ public struct ${Collection}<
   }
 
   public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element.Generator.Element> {
+    -> _ContiguousArrayBuffer<Base.Iterator.Element.Iterator.Element> {
 
     // The default implementation of `_copyToNativeArrayBuffer` queries the
     // `count` property, which materializes every inner collection.  This is a
@@ -299,7 +301,7 @@ extension CollectionType where ${constraints % {'Base': ''}} {
 extension LazyCollectionType
   where ${constraints % {'Base': ''}}, 
   ${constraints % {'Base': 'Elements.'}},
-  Generator.Element == Elements.Generator.Element {
+  Iterator.Element == Elements.Iterator.Element {
   /// A concatenation of the elements of `self`.
   @warn_unused_result
   public func flatten() -> LazyCollection<${Collection}<Elements>> {

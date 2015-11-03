@@ -11,7 +11,7 @@ print()) -> Any {
 }
 }
 }
-struct e = F>(.Generator.advance({
+struct e = F>(.Iterator.advance({
 }
 protocol A : l) -> T : T) -> {
 class A = Swift.advance() {

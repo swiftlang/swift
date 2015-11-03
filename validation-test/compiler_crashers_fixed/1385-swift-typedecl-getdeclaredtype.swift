@@ -79,7 +79,7 @@ class a<Q<T) -> V {
 }
 class a {
 case s()
-class A.Generator.count]
+class A.Iterator.count]
 }
 enum A : String {
 func d<h : [unowned self.E == compose<T] = [c()

@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func i<Y> {
-t..Generator.f = Swift.init([0.E == {
+t..Iterator.f = Swift.init([0.E == {
 class a {
 }
 print() -> {

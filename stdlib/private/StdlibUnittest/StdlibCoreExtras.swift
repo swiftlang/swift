@@ -168,7 +168,7 @@ public func forAllPermutations(size: Int, body: ([Int]) -> Void) {
 
 /// Generate all permutations.
 public func forAllPermutations<S : SequenceType>(
-  sequence: S, body: ([S.Generator.Element]) -> Void
+  sequence: S, body: ([S.Iterator.Element]) -> Void
 ) {
   let data = Array(sequence)
   forAllPermutations(data.count) {

@@ -2,8 +2,8 @@
 
 public protocol Q_SequenceDefaultsType {
   typealias Element
-  typealias Generator : IteratorProtocol
-  func generate() -> Generator
+  typealias Iterator : IteratorProtocol
+  func generate() -> Iterator
 }
 
 extension Q_SequenceDefaultsType {
@@ -14,10 +14,10 @@ extension Q_SequenceDefaultsType {
 
   /// Create a ContiguousArray containing the elements of `self`,
   /// in the same order.
-  public final func copyToContiguousArray() -> ContiguousArray<Generator.Element> {
+  public final func copyToContiguousArray() -> ContiguousArray<Iterator.Element> {
     let initialCapacity = underestimateCount()
 
-    var result = _ContiguousArrayBuffer<Generator.Element>(
+    var result = _ContiguousArrayBuffer<Iterator.Element>(
       count: initialCapacity, minimumCapacity: 0)
 
     var g = self.generate()
@@ -30,7 +30,7 @@ extension Q_SequenceDefaultsType {
   /// Initialize the storage at baseAddress with the contents of this
   /// sequence.
   public final func initializeRawMemory(
-    baseAddress: UnsafeMutablePointer<Generator.Element>
+    baseAddress: UnsafeMutablePointer<Iterator.Element>
   ) {
     var p = baseAddress
     var g = self.generate()
@@ -40,7 +40,7 @@ extension Q_SequenceDefaultsType {
     }
   }
 
-  public final static func _constrainElement(Generator.Element) {}
+  public final static func _constrainElement(Iterator.Element) {}
 }
 
 /// A type that can be iterated with a `for`\ ...\ `in` loop.
@@ -52,9 +52,9 @@ extension Q_SequenceDefaultsType {
 public protocol Q_SequenceType : Q_SequenceDefaultsType {
   /// A type that provides the *sequence*\ 's iteration interface and
   /// encapsulates its iteration state.
-  typealias Generator : IteratorProtocol
+  typealias Iterator : IteratorProtocol
 
-  func generate() -> Generator
+  func generate() -> Iterator
 
   /// Return a value less than or equal to the number of elements in
   /// self, **nondestructively**.
@@ -80,9 +80,9 @@ public protocol Q_SequenceType : Q_SequenceDefaultsType {
 }
 
 public extension IteratorProtocol {
-  typealias Generator = Self
+  typealias Iterator = Self
   
-  public final func generate() -> Generator {
+  public final func generate() -> Iterator {
     return self
   }
 }
@@ -104,9 +104,9 @@ public protocol Q_Indexable {
 }
 
 extension Q_Indexable {
-  typealias Generator = Q_IndexingGenerator<Self>
-  public final func generate() -> Q_IndexingGenerator<Self> {
-    return Q_IndexingGenerator(pos: self.startIndex, elements: self)
+  typealias Iterator = Q_IndexingIterator<Self>
+  public final func generate() -> Q_IndexingIterator<Self> {
+    return Q_IndexingIterator(pos: self.startIndex, elements: self)
   }
 }
 
@@ -125,7 +125,7 @@ extension Q_CollectionDefaultsType {
   }
 }
 
-public struct Q_IndexingGenerator<C: Q_Indexable> : IteratorProtocol {
+public struct Q_IndexingIterator<C: Q_Indexable> : IteratorProtocol {
   public typealias Element = C.Element
   var pos: C.Index
   let elements: C
@@ -155,8 +155,8 @@ struct Boo : Q_CollectionType {
   let startIndex: Int = 0
   let endIndex: Int = 10
 
-  func generate() -> Q_IndexingGenerator<Boo> {
-    return Q_IndexingGenerator(pos: self.startIndex, elements: self)
+  func generate() -> Q_IndexingIterator<Boo> {
+    return Q_IndexingIterator(pos: self.startIndex, elements: self)
   }
 
   typealias Element = String

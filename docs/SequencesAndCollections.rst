@@ -36,11 +36,11 @@ In Swift, all of the above are called **sequences**, an abstraction
 represented by the `SequenceType` protocol::
 
   protocol SequenceType { 
-    typealias Generator : IteratorProtocol
-    func generate() -> Generator
+    typealias Iterator : IteratorProtocol
+    func generate() -> Iterator
   }
 
-.. sidebar:: Hiding Generator Type Details
+.. sidebar:: Hiding Iterator Type Details
 
   A sequence's iterator is an associated type—rather than something
   like |AnyIterator|__ that depends only on the element type—for
@@ -71,7 +71,7 @@ To get an initial traversal state for an arbitrary sequence `x`, Swift
 calls `x.generate()`.  The sequence delivers that state, along with
 traversal logic, in the form of a **iterator**.
 
-Generators
+Iterators
 ==========
 
 `for`\ …\ `in` needs three operations from the iterator:
@@ -157,9 +157,9 @@ end.  For example::
   // `separator` interposed between each consecutive pair.
   func array<S: SequenceType>(
     source: S, 
-    withSeparator separator: S.Generator.Element
-  ) -> [S.Generator.Element] {
-    var result: [S.Generator.Element] = []
+    withSeparator separator: S.Iterator.Element
+  ) -> [S.Iterator.Element] {
+    var result: [S.Iterator.Element] = []
     var g = source.generate()
     if let start = g.next() {
       result.append(start)
@@ -186,7 +186,7 @@ depend on stability that an arbitrary sequence can't provide:
 * Meaningful in-place element mutation (including sorting,
   partitioning, rotations, etc.)
 
-.. sidebar:: Generators Should Be Sequences
+.. sidebar:: Iterators Should Be Sequences
 
   In principle, every iterator is a volatile sequence containing
   the elements it has yet to return from `next()`.  Therefore, every
@@ -218,7 +218,7 @@ represented by an associated `Index` type::
  
   protocol CollectionType : SequenceType {
     typealias Index : ForwardIndexType             // a position
-    subscript(i: Index) -> Generator.Element {get}
+    subscript(i: Index) -> Iterator.Element {get}
 
     var startIndex: Index {get}
     var endIndex: Index {get}
@@ -275,7 +275,7 @@ subscript setter:
 .. parsed-literal::
 
   protocol MutableCollectionType : CollectionType {
-    subscript(i: Index) -> Generator.Element { get **set** }
+    subscript(i: Index) -> Iterator.Element { get **set** }
   }
 
 The `CollectionType` protocol does not require collection to support mutation,
@@ -307,7 +307,7 @@ range of elements, denoted by two indices, by elements from a collection with a
 
   public protocol RangeReplaceableCollectionType : MutableCollectionType {
     mutating func replaceRange<
-      C: CollectionType where C.Generator.Element == Self.Generator.Element
+      C: CollectionType where C.Iterator.Element == Self.Iterator.Element
     >(
       subRange: Range<Index>, with newElements: C
     )

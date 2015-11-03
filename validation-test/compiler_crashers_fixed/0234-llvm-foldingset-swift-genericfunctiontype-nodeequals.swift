@@ -166,7 +166,7 @@ class b<i : b> i: g{ func c {}
 e g {
  : g {
 h func i() ->  }
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
 }
 class p {
     u _ = q() {
@@ -229,7 +229,7 @@ protocol k {
    class func j()
 }
 class e: k{  class func j
-func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
+func d<b: SequenceType, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
     }
 }

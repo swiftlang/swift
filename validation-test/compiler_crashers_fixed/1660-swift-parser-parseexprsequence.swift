@@ -28,7 +28,7 @@ protocol A {
 for () -> : Hashable> Void>(Any) -> Any] {
 let a(T> S) {
 }
-func f: AnyObject) -> (A, self.Generator.Element == g<U)) {
+func f: AnyObject) -> (A, self.Iterator.Element == g<U)) {
 }
 }() -> T>()
 return x {

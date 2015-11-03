@@ -273,7 +273,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
-    C: CollectionType where C.Generator.Element == Character
+    C: CollectionType where C.Iterator.Element == Character
   >(
     subRange: Range<Index>, with newElements: C
   ) {
@@ -305,8 +305,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
 
   /// Append the elements of `newElements` to `self`.
   public mutating func appendContentsOf<
-      S : SequenceType
-      where S.Generator.Element == Character
+    S : SequenceType where S.Iterator.Element == Character
   >(newElements: S) {
     reserveCapacity(_core.count + newElements.underestimateCount())
     for c in newElements {
@@ -316,8 +315,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
 
   /// Create an instance containing `characters`.
   public init<
-      S : SequenceType
-      where S.Generator.Element == Character
+    S : SequenceType where S.Iterator.Element == Character
   >(_ characters: S) {
     self = String.CharacterView()
     self.appendContentsOf(characters)

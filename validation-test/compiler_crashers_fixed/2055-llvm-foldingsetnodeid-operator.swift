@@ -11,7 +11,7 @@ protocol b {
 var b = 1, g<T, let x }
 func f(a<C(())
 return self.C<T : U) {
-init(#object1, A<T, x in return self.endIndex - range: b.Generator..B
+init(#object1, A<T, x in return self.endIndex - range: b.Iterator..B
 protocol b {
 protocol b = A> {
 }

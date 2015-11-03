@@ -65,7 +65,7 @@ public protocol IteratorProtocol {
 public protocol SequenceType {
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
-  typealias Generator : IteratorProtocol
+  typealias Iterator : IteratorProtocol
 
   // FIXME: should be constrained to SequenceType
   // (<rdar://problem/20715009> Implement recursive protocol
@@ -78,7 +78,7 @@ public protocol SequenceType {
   ///
   /// - Complexity: O(1).
   @warn_unused_result
-  func generate() -> Generator
+  func generate() -> Iterator
 
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
@@ -93,15 +93,15 @@ public protocol SequenceType {
   /// - Complexity: O(N).
   @warn_unused_result
   func map<T>(
-    @noescape transform: (Generator.Element) throws -> T
+    @noescape transform: (Iterator.Element) throws -> T
   ) rethrows -> [T]
 
   /// Return an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   @warn_unused_result
   func filter(
-    @noescape includeElement: (Generator.Element) throws -> Bool
-  ) rethrows -> [Generator.Element]
+    @noescape includeElement: (Iterator.Element) throws -> Bool
+  ) rethrows -> [Iterator.Element]
 
   /// Call `body` on each element in `self` in the same order as a
   /// *for-in loop.*
@@ -123,7 +123,7 @@ public protocol SequenceType {
   ///   skip subsequent calls.
   ///
   /// - Complexity: O(`self.count`)
-  func forEach(@noescape body: (Generator.Element) throws -> Void) rethrows
+  func forEach(@noescape body: (Iterator.Element) throws -> Void) rethrows
 
   /// Returns a subsequence containing all but the first `n` elements.
   ///
@@ -178,12 +178,12 @@ public protocol SequenceType {
   /// - Requires: `maxSplit >= 0`
   @warn_unused_result
   func split(maxSplit: Int, allowEmptySlices: Bool,
-    @noescape isSeparator: (Generator.Element) throws -> Bool
+    @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence]
 
   @warn_unused_result
   func _customContainsEquatableElement(
-    element: Generator.Element
+    element: Iterator.Element
   ) -> Bool?
 
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
@@ -193,18 +193,18 @@ public protocol SequenceType {
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
-  func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Generator.Element>
+  func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Iterator.Element>
 
   /// Copy a Sequence into an array, returning one past the last
   /// element initialized.
-  func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>)
-    -> UnsafeMutablePointer<Generator.Element>
+  func _initializeTo(ptr: UnsafeMutablePointer<Iterator.Element>)
+    -> UnsafeMutablePointer<Iterator.Element>
 }
 
 /// A default generate() function for `IteratorProtocol` instances that
 /// are declared to conform to `SequenceType`
 extension SequenceType
-  where Self.Generator == Self, Self : IteratorProtocol {
+  where Self.Iterator == Self, Self : IteratorProtocol {
   public func generate() -> Self {
     return self
   }
@@ -294,7 +294,7 @@ extension SequenceType {
   /// - Complexity: O(N).
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Generator.Element) throws -> T
+    @noescape transform: (Iterator.Element) throws -> T
   ) rethrows -> [T] {
     let initialCapacity = underestimateCount()
     var result = ContiguousArray<T>()
@@ -317,10 +317,10 @@ extension SequenceType {
   /// in order, that satisfy the predicate `includeElement`.
   @warn_unused_result
   public func filter(
-    @noescape includeElement: (Generator.Element) throws -> Bool
-  ) rethrows -> [Generator.Element] {
+    @noescape includeElement: (Iterator.Element) throws -> Bool
+  ) rethrows -> [Iterator.Element] {
 
-    var result = ContiguousArray<Generator.Element>()
+    var result = ContiguousArray<Iterator.Element>()
 
     var iterator = generate()
 
@@ -338,7 +338,7 @@ extension SequenceType {
   /// - Requires: `n >= 0`
   /// - Complexity: O(`n`)
   @warn_unused_result
-  public func dropFirst(n: Int) -> AnySequence<Generator.Element> {
+  public func dropFirst(n: Int) -> AnySequence<Iterator.Element> {
     _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
     // If this is already a _DropFirstSequence, we need to fold in
@@ -348,8 +348,8 @@ extension SequenceType {
     // [1,2,3,4].dropFirst(2).
     // FIXME: <rdar://problem/21885675> Use method dispatch to fold
     // _PrefixSequence and _DropFirstSequence counts
-    if let any = self as? AnySequence<Generator.Element>,
-       let box = any._box as? _SequenceBox<_DropFirstSequence<Generator>> {
+    if let any = self as? AnySequence<Iterator.Element>,
+       let box = any._box as? _SequenceBox<_DropFirstSequence<Iterator>> {
       let base = box._base
       let folded = _DropFirstSequence(base.iterator, limit: base.limit + n,
           dropped: base.dropped)
@@ -365,17 +365,17 @@ extension SequenceType {
   /// - Requires: `n >= 0`
   /// - Complexity: O(`self.count`)
   @warn_unused_result
-  public func dropLast(n: Int) -> AnySequence<Generator.Element> {
+  public func dropLast(n: Int) -> AnySequence<Iterator.Element> {
     _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
     if n == 0 { return AnySequence(self) }
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
     // Put incoming elements from this sequence in a holding tank, a ring buffer
     // of size <= n. If more elements keep coming in, pull them out of the
     // holding tank into the result, an `Array`. This saves
-    // `n` * sizeof(Generator.Element) of memory, because slices keep the entire
+    // `n` * sizeof(Iterator.Element) of memory, because slices keep the entire
     // memory of an `Array` alive.
-    var result: [Generator.Element] = []
-    var ringBuffer: [Generator.Element] = []
+    var result: [Iterator.Element] = []
+    var ringBuffer: [Iterator.Element] = []
     var i = ringBuffer.startIndex
 
     for element in self {
@@ -391,15 +391,15 @@ extension SequenceType {
   }
 
   @warn_unused_result
-  public func prefix(maxLength: Int) -> AnySequence<Generator.Element> {
+  public func prefix(maxLength: Int) -> AnySequence<Iterator.Element> {
     _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
     if maxLength == 0 {
-      return AnySequence(EmptyCollection<Generator.Element>())
+      return AnySequence(EmptyCollection<Iterator.Element>())
     }
     // FIXME: <rdar://problem/21885675> Use method dispatch to fold
     // _PrefixSequence and _DropFirstSequence counts
-    if let any = self as? AnySequence<Generator.Element>,
-       let box = any._box as? _SequenceBox<_PrefixSequence<Generator>> {
+    if let any = self as? AnySequence<Iterator.Element>,
+       let box = any._box as? _SequenceBox<_PrefixSequence<Iterator>> {
       let base = box._base
       let folded = _PrefixSequence(
         base.iterator,
@@ -411,7 +411,7 @@ extension SequenceType {
   }
 
   @warn_unused_result
-  public func suffix(maxLength: Int) -> AnySequence<Generator.Element> {
+  public func suffix(maxLength: Int) -> AnySequence<Iterator.Element> {
     _precondition(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
     if maxLength == 0 { return AnySequence([]) }
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
@@ -419,7 +419,7 @@ extension SequenceType {
     // elements are consumed, reorder the ring buffer into an `Array`
     // and return it. This saves memory for sequences particularly longer
     // than `maxLength`.
-    var ringBuffer: [Generator.Element] = []
+    var ringBuffer: [Iterator.Element] = []
     ringBuffer.reserveCapacity(min(maxLength, underestimateCount()))
 
     var i = ringBuffer.startIndex
@@ -459,11 +459,11 @@ extension SequenceType {
   public func split(
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
-    @noescape isSeparator: (Generator.Element) throws -> Bool
-  ) rethrows -> [AnySequence<Generator.Element>] {
+    @noescape isSeparator: (Iterator.Element) throws -> Bool
+  ) rethrows -> [AnySequence<Iterator.Element>] {
     _precondition(maxSplit >= 0, "Must take zero or more splits")
-    var result: [AnySequence<Generator.Element>] = []
-    var subSequence: [Generator.Element] = []
+    var result: [AnySequence<Iterator.Element>] = []
+    var subSequence: [Iterator.Element] = []
 
     func appendSubsequence() -> Bool {
       if subSequence.isEmpty && !allowEmptySlices {
@@ -524,7 +524,7 @@ extension SequenceType {
 
   @warn_unused_result
   public func _customContainsEquatableElement(
-    element: Generator.Element
+    element: Iterator.Element
   ) -> Bool? {
     return nil
   }
@@ -552,7 +552,7 @@ extension SequenceType {
   ///
   /// - Complexity: O(`self.count`)
   public func forEach(
-    @noescape body: (Generator.Element) throws -> Void
+    @noescape body: (Iterator.Element) throws -> Void
   ) rethrows {
     for element in self {
       try body(element)
@@ -560,7 +560,7 @@ extension SequenceType {
   }
 }
 
-extension SequenceType where Generator.Element : Equatable {
+extension SequenceType where Iterator.Element : Equatable {
   /// Returns the maximal `SubSequence`s of `self`, in order, around elements
   /// equatable to `separator`.
   ///
@@ -578,10 +578,10 @@ extension SequenceType where Generator.Element : Equatable {
   /// - Requires: `maxSplit >= 0`
   @warn_unused_result
   public func split(
-    separator: Generator.Element,
+    separator: Iterator.Element,
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false
-  ) -> [AnySequence<Generator.Element>] {
+  ) -> [AnySequence<Iterator.Element>] {
     return split(maxSplit, allowEmptySlices: allowEmptySlices,
       isSeparator: { $0 == separator })
   }
@@ -603,9 +603,9 @@ extension SequenceType {
 }
 
 extension SequenceType {
-  public func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>)
-    -> UnsafeMutablePointer<Generator.Element> {
-    var p = UnsafeMutablePointer<Generator.Element>(ptr)
+  public func _initializeTo(ptr: UnsafeMutablePointer<Iterator.Element>)
+    -> UnsafeMutablePointer<Iterator.Element> {
+    var p = UnsafeMutablePointer<Iterator.Element>(ptr)
     for x in IteratorSequence(self.generate()) {
       p++.initialize(x)
     }

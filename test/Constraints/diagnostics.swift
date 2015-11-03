@@ -112,7 +112,7 @@ i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argum
 
 @available(*, unavailable, message="call the 'map()' method on the sequence")
 public func myMap<C : CollectionType, T>(
-  source: C, _ transform: (C.Generator.Element) -> T
+  source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
 }
@@ -127,7 +127,7 @@ public func myMap<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
 // make sure that it doesn't crash.
 func rdar20142523() {
   myMap(0..<10, { x in // expected-error{{cannot invoke 'myMap' with an argument list of type '(Range<Int>, (_) -> _)'}}
-    // expected-note @-1 {{overloads for 'myMap' exist with these partially matching parameter lists: (C, (C.Generator.Element) -> T), (T?, @noescape (T) -> U)}}
+    // expected-note @-1 {{overloads for 'myMap' exist with these partially matching parameter lists: (C, (C.Iterator.Element) -> T), (T?, @noescape (T) -> U)}}
     ()
     return x  // expected-error {{type of expression is ambiguous without more context}}
   })
@@ -593,7 +593,7 @@ func r22470302(c: r22470302Class) {
 // <rdar://problem/21928143> QoI: Pointfree reference to generic initializer in generic context does not compile
 extension String {
   @available(*, unavailable, message="calling this is unwise")
-  func unavail<T : SequenceType where T.Generator.Element == String> // expected-note {{'unavail' has been explicitly marked unavailable here}}
+  func unavail<T : SequenceType where T.Iterator.Element == String> // expected-note {{'unavail' has been explicitly marked unavailable here}}
     (a : T) -> String {}
 }
 extension Array {

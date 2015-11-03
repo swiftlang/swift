@@ -272,7 +272,7 @@ public func expectSequenceType<
   X : SequenceType
   where
   X.SubSequence : SequenceType,
-  X.SubSequence.Generator.Element == X.Generator.Element,
+  X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.SubSequence == X.SubSequence
 >(x: X) -> X { return x }
 
@@ -281,7 +281,7 @@ public func expectCollectionType<
   X : CollectionType
   where
   X.SubSequence : CollectionType,
-  X.SubSequence.Generator.Element == X.Generator.Element,
+  X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.SubSequence == X.SubSequence
 >(x: X) -> X { return x }
 
@@ -1420,7 +1420,7 @@ public enum TestRunPredicate : CustomStringConvertible {
 /// - Note: `oracle` is also checked for conformance to the
 ///   laws.
 public func checkEquatable<
-  Instances: CollectionType where Instances.Generator.Element : Equatable
+  Instances: CollectionType where Instances.Iterator.Element : Equatable
 >(
   instances: Instances,
   oracle: (Instances.Index, Instances.Index) -> Bool,
@@ -1474,7 +1474,7 @@ public func checkEquatable<T : Equatable>(
 /// requirements of `Hashable`, using `equalityOracle` to generate
 /// equality expectations from pairs of positions in `instances`.
 public func checkHashable<
-  Instances: CollectionType where Instances.Generator.Element : Hashable
+  Instances: CollectionType where Instances.Iterator.Element : Hashable
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index)->Bool,
@@ -1513,11 +1513,11 @@ public func checkHashable<T : Hashable>(
 ///   elements of `instances` are reachable from `startIndex`.'''}
 public func check${inc.capitalize()}rementable<
   Instances: CollectionType
-  where Instances.Generator.Element : ${protocol}
+  where Instances.Iterator.Element : ${protocol}
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index)->Bool,
-  ${end}Index: Instances.Generator.Element, ${TRACE}
+  ${end}Index: Instances.Iterator.Element, ${TRACE}
 ) {
   checkEquatable(instances, oracle: equalityOracle, ${trace})
   for i in instances {
@@ -1604,7 +1604,7 @@ extension ExpectedComparisonResult : CustomStringConvertible {
 /// - Note: `oracle` is also checked for conformance to the
 ///   laws.
 public func checkComparable<
-  Instances: CollectionType where Instances.Generator.Element : Comparable
+  Instances: CollectionType where Instances.Iterator.Element : Comparable
 >(
   instances: Instances,
   oracle: (Instances.Index, Instances.Index) -> ExpectedComparisonResult,
@@ -1672,14 +1672,15 @@ public func checkComparable<T : Comparable>(
 ///   laws.
 public func checkStrideable<
   Instances: CollectionType, Strides: CollectionType
-  where Instances.Generator.Element : Strideable,
-    Strides.Generator.Element == Instances.Generator.Element.Stride
+  where
+  Instances.Iterator.Element : Strideable,
+  Strides.Iterator.Element == Instances.Iterator.Element.Stride
 >(
   instances: Instances, strides: Strides,
   distanceOracle:
-    (Instances.Index, Instances.Index) -> Strides.Generator.Element,
+    (Instances.Index, Instances.Index) -> Strides.Iterator.Element,
   advanceOracle:
-    (Instances.Index, Strides.Index) -> Instances.Generator.Element,
+    (Instances.Index, Strides.Index) -> Instances.Iterator.Element,
   ${TRACE}
 ) {
   checkComparable(
@@ -1732,19 +1733,21 @@ public struct CollectionMisuseResiliencyChecks {
 }
 
 internal func _checkIncrementalAdvance<
-  Instances: CollectionType where Instances.Generator.Element : ForwardIndexType
+  Instances : CollectionType
+  where
+  Instances.Iterator.Element : ForwardIndexType
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index)->Bool,
-  limit: Instances.Generator.Element,
-  sign: Instances.Generator.Element.Distance, // 1 or -1
-  next: (Instances.Generator.Element)->Instances.Generator.Element,
+  limit: Instances.Iterator.Element,
+  sign: Instances.Iterator.Element.Distance, // 1 or -1
+  next: (Instances.Iterator.Element) -> Instances.Iterator.Element,
   ${TRACE}
 ) {
   for i in instances {
     let d = sign > 0 ? i.distanceTo(limit) : -limit.distanceTo(i)
 
-    var offset: Instances.Generator.Element.Distance = 0
+    var offset: Instances.Iterator.Element.Distance = 0
     for _ in 0...(d * sign).toIntMax() {
       let j = i.advancedBy(offset)
       let k = i.advancedBy(offset + sign, limit: limit)
@@ -1766,13 +1769,15 @@ internal func _checkIncrementalAdvance<
 /// - Precondition: `endIndex` is reachable from all elements of
 ///   `instances`
 public func checkForwardIndex<
-  Instances: CollectionType where Instances.Generator.Element : ForwardIndexType
+  Instances : CollectionType
+  where
+  Instances.Iterator.Element : ForwardIndexType
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index)->Bool,
-  endIndex: Instances.Generator.Element, ${TRACE}
+  endIndex: Instances.Iterator.Element, ${TRACE}
 ) {
-  typealias Index = Instances.Generator.Element
+  typealias Index = Instances.Iterator.Element
   
   checkIncrementable(
     instances, equalityOracle: equalityOracle, endIndex: endIndex, ${trace})
@@ -1792,15 +1797,16 @@ public func checkForwardIndex<
 ///   - `endIndex` is reachable from all elements of `instances`.
 public func checkBidirectionalIndex<
   Instances: CollectionType
-  where Instances.Generator.Element : BidirectionalIndexType
+  where
+  Instances.Iterator.Element : BidirectionalIndexType
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index)->Bool,
-  startIndex: Instances.Generator.Element, 
-  endIndex: Instances.Generator.Element,
+  startIndex: Instances.Iterator.Element,
+  endIndex: Instances.Iterator.Element,
   ${TRACE}
 ) {
-  typealias Index = Instances.Generator.Element
+  typealias Index = Instances.Iterator.Element
 
   checkForwardIndex(
     instances, equalityOracle: equalityOracle, endIndex: endIndex)
@@ -1823,18 +1829,19 @@ public func checkBidirectionalIndex<
 ///   - all elements of `instances` are reachable from `startIndex`.
 ///   - `endIndex` is reachable from all elements of `instances`.
 public func checkRandomAccessIndex<
-  Instances: CollectionType, Distances: CollectionType
-  where Instances.Generator.Element : RandomAccessIndexType,
-    Distances.Generator.Element == Instances.Generator.Element.Distance,
-    Instances.Generator.Element.Distance == Instances.Generator.Element.Stride
+  Instances : CollectionType, Distances : CollectionType
+  where
+  Instances.Iterator.Element : RandomAccessIndexType,
+  Distances.Iterator.Element == Instances.Iterator.Element.Distance,
+  Instances.Iterator.Element.Distance == Instances.Iterator.Element.Stride
 >(
   instances: Instances, distances: Distances,
   distanceOracle:
-    (Instances.Index, Instances.Index) -> Distances.Generator.Element,
+    (Instances.Index, Instances.Index) -> Distances.Iterator.Element,
   advanceOracle:
-    (Instances.Index, Distances.Index) -> Instances.Generator.Element,
-  startIndex: Instances.Generator.Element, 
-  endIndex: Instances.Generator.Element,
+    (Instances.Index, Distances.Index) -> Instances.Iterator.Element,
+  startIndex: Instances.Iterator.Element,
+  endIndex: Instances.Iterator.Element,
   ${TRACE}
 ) {
   checkBidirectionalIndex(
@@ -1852,7 +1859,7 @@ public func checkRandomAccessIndex<
 // accepts any appropriate Collection type.
 % for genericParam, Element, Expected in zip(
 %   ('Expected: CollectionType', 'Element'),
-%   ('Expected.Generator.Element', 'Element'),
+%   ('Expected.Iterator.Element', 'Element'),
 %   ('Expected', 'Array<Element>')):
 
 public func checkIterator<
@@ -1900,7 +1907,8 @@ public func checkIterator<
 
 public func checkSequence<
   ${genericParam}, S : SequenceType
-  where S.Generator.Element == ${Element}
+  where
+  S.Iterator.Element == ${Element}
 >(
   expected: ${Expected},
   _ sequence: S,
@@ -1922,7 +1930,7 @@ public func checkSequence<
   sequence._preprocessingPass { (sequence)->Void in 
     var count = 0
     for _ in sequence { ++count }
-    let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
+    let buf = UnsafeMutablePointer<S.Iterator.Element>.alloc(count)
     let end = sequence._initializeTo(buf)
     expectTrue(end == buf + count, "_initializeTo returned the wrong value")
     var j = expected.startIndex
@@ -1936,7 +1944,9 @@ public func checkSequence<
 
 public func checkSequence<
   ${genericParam}, S : SequenceType
-  where S.Generator.Element == ${Element}, S.Generator.Element : Equatable
+  where
+  S.Iterator.Element == ${Element},
+  S.Iterator.Element : Equatable
 >(
   expected: ${Expected},
   _ sequence: S,
@@ -1954,7 +1964,7 @@ public func checkSequence<
 public func check${traversal}Collection<
   ${genericParam}, C : CollectionType
   where
-  C.Generator.Element == ${Element},
+  C.Iterator.Element == ${Element},
   C.Index : ${traversal}IndexType
 %  if traversal == 'RandomAccess':
   , C.Index.Stride == C.Index.Distance
@@ -2121,7 +2131,7 @@ public func check${traversal}Collection<
 public func check${traversal}Collection<
   ${genericParam}, C : CollectionType
   where
-  C.Generator.Element == ${Element},
+  C.Iterator.Element == ${Element},
   C.Index : ${traversal}IndexType,
   ${Element} : Equatable
 %  if traversal == 'RandomAccess':
@@ -2142,8 +2152,8 @@ public func check${traversal}Collection<
 public func checkSliceableWithBidirectionalIndex<
   ${genericParam}, S : CollectionType
   where
-  S.Generator.Element == ${Element},
-  S.SubSequence.Generator.Element == ${Element},
+  S.Iterator.Element == ${Element},
+  S.SubSequence.Iterator.Element == ${Element},
   S.Index : BidirectionalIndexType,
   S.SubSequence : CollectionType,
   S.SubSequence.Index : BidirectionalIndexType,
@@ -2192,15 +2202,16 @@ public func nthIndex<C: CollectionType>(x: C, _ n: Int) -> C.Index {
   return x.startIndex.advancedBy(numericCast(n))
 }
 
-public func nth<C: CollectionType>(x: C, _ n: Int) -> C.Generator.Element {
+public func nth<C: CollectionType>(x: C, _ n: Int) -> C.Iterator.Element {
   return x[nthIndex(x, n)]
 }
 
 public func checkRangeReplaceable<
   C: RangeReplaceableCollectionType,
   N: CollectionType
-where
-  C.Generator.Element : Equatable, C.Generator.Element == N.Generator.Element
+  where
+  C.Iterator.Element : Equatable,
+  C.Iterator.Element == N.Iterator.Element
 >(
   makeCollection: ()->C,
   _ makeNewValues: (Int)->N
@@ -2209,7 +2220,7 @@ where
 
   // First make an independent copy of the array that we can use for
   // comparison later.
-  let source = Array<A.Generator.Element>(makeCollection())
+  let source = Array<A.Iterator.Element>(makeCollection())
 
   for (ix, i) in source.indices.enumerate() {
     for (jx_, j) in (i..<source.endIndex).enumerate() {
@@ -2260,8 +2271,9 @@ where
 public func expectEqualSequence<
   Expected: SequenceType,
   Actual: SequenceType
-  where Expected.Generator.Element == Actual.Generator.Element,
-     Expected.Generator.Element : Equatable
+  where
+  Expected.Iterator.Element == Actual.Iterator.Element,
+  Expected.Iterator.Element : Equatable
 >(expected: Expected, _ actual: Actual, ${TRACE}) {
   expectEqualSequence(expected, actual, ${trace}) { $0 == $1 }
 }
@@ -2271,8 +2283,9 @@ public func expectEqualSequence<
   Actual : SequenceType,
   T : Equatable,
   U : Equatable
-  where Expected.Generator.Element == Actual.Generator.Element,
-     Expected.Generator.Element == (T, U)
+  where
+  Expected.Iterator.Element == Actual.Iterator.Element,
+  Expected.Iterator.Element == (T, U)
 >(expected: Expected, _ actual: Actual, ${TRACE}) {
   expectEqualSequence(
     expected, actual, ${trace}) {
@@ -2284,10 +2297,11 @@ public func expectEqualSequence<
 public func expectEqualSequence<
   Expected: SequenceType,
   Actual: SequenceType
-  where Expected.Generator.Element == Actual.Generator.Element
+  where
+  Expected.Iterator.Element == Actual.Iterator.Element
 >(expected: Expected, _ actual: Actual, ${TRACE},
-  sameValue: (Expected.Generator.Element, Expected.Generator.Element)->Bool) {
-  
+  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element)->Bool) {
+
   if !expected.elementsEqual(actual, isEquivalent: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
       + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
@@ -2296,17 +2310,18 @@ public func expectEqualSequence<
 }
 
 public func expectEqualsUnordered<
-    Expected : SequenceType,
-    Actual : SequenceType
-    where Expected.Generator.Element == Actual.Generator.Element
+  Expected : SequenceType,
+  Actual : SequenceType
+  where
+  Expected.Iterator.Element == Actual.Iterator.Element
 >(
   expected: Expected, _ actual: Actual, ${TRACE},
-  compare: (Expected.Generator.Element, Expected.Generator.Element)
+  compare: (Expected.Iterator.Element, Expected.Iterator.Element)
     -> ExpectedComparisonResult
 ) {
-  let x: [Expected.Generator.Element] =
+  let x: [Expected.Iterator.Element] =
     expected.sort(compose(compare, { $0.isLT() }))
-  let y: [Actual.Generator.Element] =
+  let y: [Actual.Iterator.Element] =
     actual.sort(compose(compare, { $0.isLT() }))
   expectEqualSequence(
     x, y, ${trace}, sameValue: compose(compare, { $0.isEQ() }))
@@ -2316,8 +2331,8 @@ public func expectEqualsUnordered<
   Expected : SequenceType,
   Actual : SequenceType
   where
-  Expected.Generator.Element == Actual.Generator.Element,
-  Expected.Generator.Element : Comparable
+  Expected.Iterator.Element == Actual.Iterator.Element,
+  Expected.Iterator.Element : Comparable
 >(
   expected: Expected, _ actual: Actual, ${TRACE}
 ) {
@@ -2362,8 +2377,8 @@ public func expectEqualsUnordered<
     Actual : SequenceType,
     T : Comparable
     where
-      Expected.Generator.Element == Actual.Generator.Element,
-      Expected.Generator.Element == (T, T)
+    Expected.Iterator.Element == Actual.Iterator.Element,
+    Expected.Iterator.Element == (T, T)
 >(
     expected: Expected, _ actual: Actual, ${TRACE}
 ) {
@@ -2488,7 +2503,7 @@ internal class _MinimalIteratorSharedState<T> {
 ///
 /// This iterator will return `nil` only once.
 public struct MinimalIterator<T> : IteratorProtocol {
-  public init<S : SequenceType where S.Generator.Element == T>(_ s: S) {
+  public init<S : SequenceType where S.Iterator.Element == T>(_ s: S) {
     self._sharedState = _MinimalIteratorSharedState(Array(s))
   }
 
@@ -2554,7 +2569,7 @@ public protocol StrictSequenceType : SequenceType {
 }
 
 extension StrictSequenceType {
-  public init<S : SequenceType where S.Generator.Element == Element>(
+  public init<S : SequenceType where S.Iterator.Element == Element>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
@@ -2567,7 +2582,7 @@ extension StrictSequenceType {
   }
 }
 
-extension StrictSequenceType where Generator : _MinimalIteratorProtocol {
+extension StrictSequenceType where Iterator : _MinimalIteratorProtocol {
   public func generate() -> MinimalIterator<Element> {
     return base.generate()
   }
@@ -2578,7 +2593,7 @@ extension StrictSequenceType where Generator : _MinimalIteratorProtocol {
 ///
 /// This sequence is consumed when its iterator is advanced.
 public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
-  public init<S : SequenceType where S.Generator.Element == T>(
+  public init<S : SequenceType where S.Iterator.Element == T>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
@@ -3303,7 +3318,7 @@ public protocol ${Protocol} : ${'MutableCollectionType' if mutable else 'Collect
 }
 
 extension ${Protocol} {
-  public init<S : SequenceType where S.Generator.Element == Element>(
+  public init<S : SequenceType where S.Iterator.Element == Element>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
@@ -3316,7 +3331,7 @@ extension ${Protocol} {
   }
 }
 
-extension ${Protocol} where Generator : _MinimalIteratorProtocol {
+extension ${Protocol} where Iterator : _MinimalIteratorProtocol {
   public func generate() -> MinimalIterator<Element> {
     return base.generate()
   }
@@ -3347,7 +3362,7 @@ extension ${Protocol} where Index : _MinimalIndexType {
 
 /// A minimal implementation of `CollectionType` with extra checks.
 public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'CollectionType'} {
-  public init<S : SequenceType where S.Generator.Element == T>(
+  public init<S : SequenceType where S.Iterator.Element == T>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
@@ -3434,7 +3449,7 @@ public protocol ${Protocol} : RangeReplaceableCollectionType {
 
 extension ${Protocol} {
   public mutating func replaceRange<
-    C: CollectionType where C.Generator.Element == Element
+    C : CollectionType where C.Iterator.Element == Element
   >(subRange: Range<${Self}<Element>.Index>,
     with newElements: C) {
     base.replaceRange(subRange, with: newElements)
@@ -3445,7 +3460,7 @@ extension ${Protocol} {
   }
 }
 
-extension ${Protocol} where Generator : _MinimalIteratorProtocol {
+extension ${Protocol} where Iterator : _MinimalIteratorProtocol {
   public func generate() -> MinimalIterator<Element> {
     return base.generate()
   }
@@ -3477,7 +3492,7 @@ extension ${Protocol} where Index : _MinimalIndexType {
 public struct ${Self}<T> : RangeReplaceableCollectionType {
   /// Creates a collection with given contents, but a unique modification
   /// history.  No other instance has the same modification history.
-  public init<S : SequenceType where S.Generator.Element == T>(
+  public init<S : SequenceType where S.Iterator.Element == T>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
@@ -3508,7 +3523,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
   }
 
   public init<
-    S : SequenceType where S.Generator.Element == T
+    S : SequenceType where S.Iterator.Element == T
   >(_ elements: S) {
     self.underestimatedCount = 0
     self.elements = Array(elements)
@@ -3563,7 +3578,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
   }
 
   public mutating func appendContentsOf<
-    S : SequenceType where S.Generator.Element == T
+    S : SequenceType where S.Iterator.Element == T
   >(newElements: S) {
     let oldCount = count
     elements.appendContentsOf(newElements)
@@ -3572,7 +3587,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
   }
 
   public mutating func replaceRange<
-    C : CollectionType where C.Generator.Element == T
+    C : CollectionType where C.Iterator.Element == T
   >(
     subRange: Range<${Index}>, with newElements: C
   ) {
@@ -3592,7 +3607,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
   }
 
   public mutating func insertContentsOf<
-    S : CollectionType where S.Generator.Element == T
+    S : CollectionType where S.Iterator.Element == T
   >(newElements: S, at i: ${Index}) {
     let oldCount = count
     elements.insertContentsOf(newElements, at: i.position)
@@ -3794,7 +3809,7 @@ public struct Defaulted${traversal}Collection<Element>
   : Strict${traversal}CollectionType {
 
   public typealias Base = Minimal${traversal}Collection<Element>
-  public typealias Generator = MinimalIterator<Element>
+  public typealias Iterator = MinimalIterator<Element>
   public typealias Index = Minimal${traversal}Index
 
   public let base: Base
@@ -3816,7 +3831,7 @@ public struct Defaulted${traversal}MutableCollection<Element>
   : Strict${traversal}MutableCollectionType {
 
   public typealias Base = Minimal${traversal}MutableCollection<Element>
-  public typealias Generator = MinimalIterator<Element>
+  public typealias Iterator = MinimalIterator<Element>
   public typealias Index = Minimal${traversal}Index
 
   public var base: Base
@@ -3838,7 +3853,7 @@ public struct Defaulted${traversal}RangeReplaceableCollection<Element>
   : Strict${traversal}RangeReplaceableCollectionType {
 
   public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>
-  public typealias Generator = MinimalIterator<Element>
+  public typealias Iterator = MinimalIterator<Element>
   public typealias Index = Minimal${traversal}Index
 
   public var base: Base
@@ -3865,7 +3880,7 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
 
   public typealias Self_ = Defaulted${traversal}RangeReplaceableSlice<Element>
   public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>
-  public typealias Generator = MinimalIterator<Element>
+  public typealias Iterator = MinimalIterator<Element>
   public typealias Index = Minimal${traversal}Index
 
   public var base: Base
@@ -3920,7 +3935,7 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
   }
 
   public mutating func replaceRange<
-    C : CollectionType where C.Generator.Element == Element
+    C : CollectionType where C.Iterator.Element == Element
   >(
     subRange: Range<Index>,
     with newElements: C

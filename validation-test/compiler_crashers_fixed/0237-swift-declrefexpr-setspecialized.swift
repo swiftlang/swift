@@ -60,7 +60,7 @@ var e: Int -> Int = {
 }
 let d: Int =  { c, b in
 }(f, e)
-func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
+func d<b: SequenceType, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
     }
 }

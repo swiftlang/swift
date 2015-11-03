@@ -14,7 +14,7 @@
 
 # We know we will eventually get a SequenceType.Element type.  Define
 # a shorthand that we can use today.
-GElement = "Generator.Element"
+GElement = "Iterator.Element"
 
 }%
 
@@ -61,7 +61,7 @@ else:
   rethrows_ = ""
 }%
 
-extension SequenceType ${"" if preds else "where Generator.Element : Comparable"} {
+extension SequenceType ${"" if preds else "where Iterator.Element : Comparable"} {
 
   /// Returns the minimum element in `self` or `nil` if the sequence is empty.
   ///
@@ -125,7 +125,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
 % # an Equatable requirement.
 % for preds in [ True, False ]:
 
-extension SequenceType ${"" if preds else "where Generator.Element : Equatable"} {
+extension SequenceType ${"" if preds else "where Iterator.Element : Equatable"} {
 
 %{
 if preds:
@@ -154,9 +154,9 @@ else:
     @noescape isEquivalent: (${GElement}, ${GElement}) throws -> Bool
 %   end
   ) ${rethrows_}-> Bool {
-    var otherGenerator = other.generate()
+    var otherIterator = other.generate()
     for e0 in self {
-      if let e1 = otherGenerator.next() {
+      if let e1 = otherIterator.next() {
         if ${"try !isEquivalent(e0, e1)" if preds else "e0 != e1"} {
           return false
         }
@@ -165,7 +165,7 @@ else:
         return true
       }
     }
-    return otherGenerator.next() == nil
+    return otherIterator.next() == nil
   }
 }
 
@@ -179,7 +179,7 @@ else:
 % # an Equatable requirement.
 % for preds in [ True, False ]:
 
-extension SequenceType ${"" if preds else "where Generator.Element : Equatable"} {
+extension SequenceType ${"" if preds else "where Iterator.Element : Equatable"} {
 
 %{
 if preds:
@@ -235,7 +235,7 @@ else:
 % # Comparable requirement.
 % for preds in [ True, False ]:
 
-extension SequenceType ${"" if preds else "where Generator.Element : Comparable"} {
+extension SequenceType ${"" if preds else "where Iterator.Element : Comparable"} {
 
 %{
 if preds:
@@ -301,7 +301,7 @@ else:
 // contains()
 //===----------------------------------------------------------------------===//
 
-extension SequenceType where Generator.Element : Equatable {
+extension SequenceType where Iterator.Element : Equatable {
   /// Return `true` iff `element` is in `self`.
   @warn_unused_result
   public func contains(element: ${GElement}) -> Bool {

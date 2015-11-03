@@ -48,7 +48,7 @@ ji(s x gf)
 func ji() {
     ({})
 }
-func u<qp: SequenceType, t where Optional<t> == qp.Generator.Element>(r : qp) -> t? {
+func u<qp: SequenceType, t where Optional<t> == qp.Iterator.Element>(r : qp) -> t? {
     ih (y : t?) lk r {
         hg let fe = y {
             p fe

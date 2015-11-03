@@ -30,7 +30,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   ///   `subRange.endIndex == self.endIndex` and `newElements.isEmpty`,
   ///   O(`self.count` + `newElements.count`) otherwise.
   mutating func replaceRange<
-    C : CollectionType where C.Generator.Element == Generator.Element
+    C : CollectionType where C.Iterator.Element == Iterator.Element
   >(
     subRange: Range<Index>, with newElements: C
   )
@@ -44,22 +44,22 @@ public protocol RangeReplaceableCollectionType : CollectionType {
 
   func +<
     S : SequenceType
-    where S.Generator.Element == Generator.Element
+    where S.Iterator.Element == Iterator.Element
   >(_: Self, _: S) -> Self
 
   func +<
     S : SequenceType
-    where S.Generator.Element == Generator.Element
+    where S.Iterator.Element == Iterator.Element
   >(_: S, _: Self) -> Self
 
   func +<
     S : CollectionType
-    where S.Generator.Element == Generator.Element
+    where S.Iterator.Element == Iterator.Element
   >(_: Self, _: S) -> Self
 
   func +<
     RC : RangeReplaceableCollectionType
-    where RC.Generator.Element == Generator.Element
+    where RC.Iterator.Element == Iterator.Element
   >(_: Self, _: S) -> Self
 */
 
@@ -75,7 +75,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
 
   /// Creates a collection instance that contains `elements`.
   init<
-    S : SequenceType where S.Generator.Element == Generator.Element
+    S : SequenceType where S.Iterator.Element == Iterator.Element
   >(_ elements: S)
 
   /// Append `x` to `self`.
@@ -84,7 +84,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// `self.endIndex`.
   ///
   /// - Complexity: Amortized O(1).
-  mutating func append(x: Generator.Element)
+  mutating func append(x: Iterator.Element)
 
   /*
   The 'appendContentsOf' requirement should be an operator, but the compiler crashes:
@@ -94,7 +94,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
 
   func +=<
     S : SequenceType
-    where S.Generator.Element == Generator.Element
+    where S.Iterator.Element == Iterator.Element
   >(inout _: Self, _: S)
   */
 
@@ -103,7 +103,8 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// - Complexity: O(*length of result*).
   mutating func appendContentsOf<
     S : SequenceType
-    where S.Generator.Element == Generator.Element
+    where
+    S.Iterator.Element == Iterator.Element
   >(newElements: S)
 
   /// Insert `newElement` at index `i`.
@@ -111,7 +112,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  mutating func insert(newElement: Generator.Element, atIndex i: Index)
+  mutating func insert(newElement: Iterator.Element, atIndex i: Index)
 
   /// Insert `newElements` at index `i`.
   ///
@@ -119,7 +120,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   ///
   /// - Complexity: O(`self.count + newElements.count`).
   mutating func insertContentsOf<
-    S : CollectionType where S.Generator.Element == Generator.Element
+    S : CollectionType where S.Iterator.Element == Iterator.Element
   >(newElements: S, at i: Index)
 
   /// Remove the element at index `i`.
@@ -127,14 +128,14 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  mutating func removeAtIndex(i: Index) -> Generator.Element
+  mutating func removeAtIndex(i: Index) -> Iterator.Element
 
   /// Customization point for `removeLast()`.  Implement this function if you
   /// want to replace the default implementation.
   ///
   /// - Returns: A non-nil value if the operation was performed.
   @warn_unused_result
-  mutating func _customRemoveLast() -> Generator.Element?
+  mutating func _customRemoveLast() -> Iterator.Element?
 
   /// Customization point for `removeLast(_:)`.  Implement this function if you
   /// want to replace the default implementation.
@@ -147,7 +148,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   ///
   /// - Complexity: O(`self.count`)
   /// - Requires: `!self.isEmpty`.
-  mutating func removeFirst() -> Generator.Element
+  mutating func removeFirst() -> Iterator.Element
 
   /// Remove the first `n` elements.
   ///
@@ -181,18 +182,18 @@ public protocol RangeReplaceableCollectionType : CollectionType {
 
 extension RangeReplaceableCollectionType {
   public init<
-    S : SequenceType where S.Generator.Element == Generator.Element
+    S : SequenceType where S.Iterator.Element == Iterator.Element
   >(_ elements: S) {
     self.init()
     appendContentsOf(elements)
   }
 
-  public mutating func append(newElement: Generator.Element) {
+  public mutating func append(newElement: Iterator.Element) {
     insert(newElement, atIndex: endIndex)
   }
 
   public mutating func appendContentsOf<
-    S : SequenceType where S.Generator.Element == Generator.Element
+    S : SequenceType where S.Iterator.Element == Iterator.Element
   >(newElements: S) {
     for element in newElements {
       append(element)
@@ -200,20 +201,20 @@ extension RangeReplaceableCollectionType {
   }
 
   public mutating func insert(
-    newElement: Generator.Element, atIndex i: Index
+    newElement: Iterator.Element, atIndex i: Index
   ) {
     replaceRange(i..<i, with: CollectionOfOne(newElement))
   }
 
   public mutating func insertContentsOf<
-    C : CollectionType where C.Generator.Element == Generator.Element
+    C : CollectionType where C.Iterator.Element == Iterator.Element
   >(newElements: C, at i: Index) {
     replaceRange(i..<i, with: newElements)
   }
 
-  public mutating func removeAtIndex(index: Index) -> Generator.Element {
+  public mutating func removeAtIndex(index: Index) -> Iterator.Element {
     _precondition(!isEmpty, "can't remove from an empty collection")
-    let result: Generator.Element = self[index]
+    let result: Iterator.Element = self[index]
     replaceRange(index...index, with: EmptyCollection())
     return result
   }
@@ -231,7 +232,7 @@ extension RangeReplaceableCollectionType {
     removeRange(startIndex..<end)
   }
 
-  public mutating func removeFirst() -> Generator.Element {
+  public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty,
       "can't remove first element from an empty collection")
     let firstElement = first!
@@ -256,7 +257,7 @@ extension RangeReplaceableCollectionType where SubSequence == Self {
   ///
   /// - Complexity: O(1)
   /// - Requires: `!self.isEmpty`.
-  public mutating func removeFirst() -> Generator.Element {
+  public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
     self = self[startIndex.successor()..<endIndex]
@@ -278,7 +279,7 @@ extension RangeReplaceableCollectionType where SubSequence == Self {
 
 extension RangeReplaceableCollectionType {
   @warn_unused_result
-  public mutating func _customRemoveLast() -> Generator.Element? {
+  public mutating func _customRemoveLast() -> Iterator.Element? {
     return nil
   }
 
@@ -294,7 +295,7 @@ extension RangeReplaceableCollectionType
   SubSequence == Self {
 
   @warn_unused_result
-  public mutating func _customRemoveLast() -> Generator.Element? {
+  public mutating func _customRemoveLast() -> Iterator.Element? {
     let element = last!
     self = self[startIndex..<endIndex.predecessor()]
     return element
@@ -312,7 +313,7 @@ extension RangeReplaceableCollectionType where Index : BidirectionalIndexType {
   ///
   /// - Complexity: O(1)
   /// - Requires: `!self.isEmpty`
-  public mutating func removeLast() -> Generator.Element {
+  public mutating func removeLast() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove last element from an empty collection")
     if let result = _customRemoveLast() {
       return result
@@ -341,7 +342,7 @@ extension RangeReplaceableCollectionType where Index : BidirectionalIndexType {
 public func +<
     C : RangeReplaceableCollectionType,
     S : SequenceType
-    where S.Generator.Element == C.Generator.Element
+    where S.Iterator.Element == C.Iterator.Element
 >(lhs: C, rhs: S) -> C {
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
@@ -351,9 +352,9 @@ public func +<
 
 @warn_unused_result
 public func +<
-    C : RangeReplaceableCollectionType,
-    S : SequenceType
-    where S.Generator.Element == C.Generator.Element
+  C : RangeReplaceableCollectionType,
+  S : SequenceType
+  where S.Iterator.Element == C.Iterator.Element
 >(lhs: S, rhs: C) -> C {
   var result = C()
   result.reserveCapacity(rhs.count + numericCast(rhs.underestimateCount()))
@@ -364,9 +365,9 @@ public func +<
 
 @warn_unused_result
 public func +<
-    C : RangeReplaceableCollectionType,
-    S : CollectionType
-    where S.Generator.Element == C.Generator.Element
+  C : RangeReplaceableCollectionType,
+  S : CollectionType
+  where S.Iterator.Element == C.Iterator.Element
 >(lhs: C, rhs: S) -> C {
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.
@@ -377,9 +378,9 @@ public func +<
 
 @warn_unused_result
 public func +<
-    RRC1 : RangeReplaceableCollectionType,
-    RRC2 : RangeReplaceableCollectionType 
-    where RRC1.Generator.Element == RRC2.Generator.Element
+  RRC1 : RangeReplaceableCollectionType,
+  RRC2 : RangeReplaceableCollectionType
+  where RRC1.Iterator.Element == RRC2.Iterator.Element
 >(lhs: RRC1, rhs: RRC2) -> RRC1 {
   var lhs = lhs
   // FIXME: what if lhs is a reference type?  This will mutate it.

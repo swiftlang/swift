@@ -1600,7 +1600,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         lookupOptions |= NameLookupFlags::KnownPrivate;
       auto member = cs.TC.lookupMemberType(cs.DC,
                                            expr->getType()->getRValueType(),
-                                           tc.Context.Id_Generator,
+                                           tc.Context.Id_Iterator,
                                            lookupOptions);
       
       if (member) {
@@ -1622,7 +1622,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         cs.addConstraint(
           Constraint::create(cs, ConstraintKind::TypeMember,
                              expr->getType(), generatorType,
-                             tc.Context.Id_Generator,
+                             tc.Context.Id_Iterator,
                              cs.getConstraintLocator(
                                Locator,
                                ConstraintLocator::SequenceIteratorProtocol)));

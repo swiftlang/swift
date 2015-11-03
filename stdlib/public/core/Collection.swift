@@ -18,7 +18,7 @@
 //
 // This protocol is almost an implementation detail of the standard
 // library; it is used to deduce things like the `SubSequence` and
-// `Generator` type from a minimal collection, but it is also used in
+// `Iterator` type from a minimal collection, but it is also used in
 // exposed places like as a constraint on IndexingGenerator.
 public protocol Indexable {
   /// A type that represents a valid position in the collection.
@@ -45,11 +45,11 @@ public protocol Indexable {
 
   // The declaration of _Element and subscript here is a trick used to
   // break a cyclic conformance/deduction that Swift can't handle.  We
-  // need something other than a CollectionType.Generator.Element that can
+  // need something other than a CollectionType.Iterator.Element that can
   // be used as IndexingGenerator<T>'s Element.  Here we arrange for the
   // CollectionType itself to have an Element type that's deducible from
   // its subscript.  Ideally we'd like to constrain this
-  // Element to be the same as CollectionType.Generator.Element (see
+  // Element to be the same as CollectionType.Iterator.Element (see
   // below), but we have no way of expressing it today.
   typealias _Element
 
@@ -123,14 +123,14 @@ public protocol CollectionType : Indexable, SequenceType {
   /// encapsulates its iteration state.
   ///
   /// By default, a `CollectionType` satisfies `SequenceType` by
-  /// supplying an `IndexingGenerator` as its associated `Generator`
+  /// supplying an `IndexingGenerator` as its associated `Iterator`
   /// type.
-  typealias Generator : IteratorProtocol = IndexingGenerator<Self>
+  typealias Iterator : IteratorProtocol = IndexingGenerator<Self>
 
-  // FIXME: Needed here so that the Generator is properly deduced from
+  // FIXME: Needed here so that the Iterator is properly deduced from
   // a custom generate() function.  Otherwise we get an
   // IndexingGenerator. <rdar://problem/21539115>
-  func generate() -> Generator
+  func generate() -> Iterator
   
   // FIXME: should be constrained to CollectionType
   // (<rdar://problem/20715009> Implement recursive protocol
@@ -146,7 +146,7 @@ public protocol CollectionType : Indexable, SequenceType {
   typealias SubSequence: Indexable, SequenceType = Slice<Self>
 
   /// Returns the element at the given `position`.
-  subscript(position: Index) -> Generator.Element {get}
+  subscript(position: Index) -> Iterator.Element {get}
 
   /// Returns a collection representing a contiguous sub-range of
   /// `self`'s elements.
@@ -189,16 +189,16 @@ public protocol CollectionType : Indexable, SequenceType {
   ///
   /// - Complexity: O(N).
   @warn_unused_result
-  func _customIndexOfEquatableElement(element: Generator.Element) -> Index??
+  func _customIndexOfEquatableElement(element: Iterator.Element) -> Index??
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.
-  var first: Generator.Element? { get }
+  var first: Iterator.Element? { get }
 }
 
 /// Supply the default `generate()` method for `CollectionType` models
-/// that accept the default associated `Generator`,
+/// that accept the default associated `Iterator`,
 /// `IndexingGenerator<Self>`.
-extension CollectionType where Generator == IndexingGenerator<Self> {
+extension CollectionType where Iterator == IndexingGenerator<Self> {
   public func generate() -> IndexingGenerator<Self> {
     return IndexingGenerator(self)
   }
@@ -221,7 +221,7 @@ extension CollectionType where SubSequence == Self {
   ///
   /// - Complexity: O(`self.count`)
   @warn_unused_result
-  public mutating func popFirst() -> Generator.Element? {
+  public mutating func popFirst() -> Iterator.Element? {
     guard !isEmpty else { return nil }
     let element = first!
     self = self[startIndex.successor()..<endIndex]
@@ -233,7 +233,7 @@ extension CollectionType where SubSequence == Self {
   ///
   /// - Complexity: O(`self.count`)
   @warn_unused_result
-  public mutating func popLast() -> Generator.Element? {
+  public mutating func popLast() -> Iterator.Element? {
     guard !isEmpty else { return nil }
     let lastElementIndex = startIndex.advancedBy(numericCast(count) - 1)
     let element = self[lastElementIndex]
@@ -254,7 +254,7 @@ extension CollectionType {
   /// Returns the first element of `self`, or `nil` if `self` is empty.
   ///
   /// - Complexity: O(1)
-  public var first: Generator.Element? {
+  public var first: Iterator.Element? {
     return isEmpty ? nil : self[startIndex]
   }
 
@@ -286,7 +286,7 @@ extension CollectionType {
   /// - Complexity: O(N).
   @warn_unused_result
   public // dispatching
-  func _customIndexOfEquatableElement(_: Generator.Element) -> Index?? {
+  func _customIndexOfEquatableElement(_: Iterator.Element) -> Index?? {
     return nil
   }
 }
@@ -302,7 +302,7 @@ extension CollectionType {
   /// - Complexity: O(N).
   @warn_unused_result
   public func map<T>(
-    @noescape transform: (Generator.Element) throws -> T
+    @noescape transform: (Iterator.Element) throws -> T
   ) rethrows -> [T] {
     let count: Int = numericCast(self.count)
     if count == 0 {
@@ -419,7 +419,7 @@ extension CollectionType {
   public func split(
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false,
-    @noescape isSeparator: (Generator.Element) throws -> Bool
+    @noescape isSeparator: (Iterator.Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     _precondition(maxSplit >= 0, "Must take zero or more splits")
 
@@ -462,7 +462,7 @@ extension CollectionType {
   }
 }
 
-extension CollectionType where Generator.Element : Equatable {
+extension CollectionType where Iterator.Element : Equatable {
   /// Returns the maximal `SubSequence`s of `self`, in order, around a
   /// `separator` element.
   ///
@@ -480,7 +480,7 @@ extension CollectionType where Generator.Element : Equatable {
   /// - Requires: `maxSplit >= 0`
   @warn_unused_result
   public func split(
-    separator: Generator.Element,
+    separator: Iterator.Element,
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false
   ) -> [SubSequence] {
@@ -522,7 +522,7 @@ extension CollectionType where SubSequence == Self {
   ///
   /// - Complexity: O(1)
   /// - Requires: `!self.isEmpty`.
-  public mutating func removeFirst() -> Generator.Element {
+  public mutating func removeFirst() -> Iterator.Element {
     _precondition(!isEmpty, "can't remove items from an empty collection")
     let element = first!
     self = self[startIndex.successor()..<endIndex]
@@ -553,7 +553,7 @@ extension CollectionType
   ///
   /// - Complexity: O(1)
   /// - Requires: `!self.isEmpty`
-  public mutating func removeLast() -> Generator.Element {
+  public mutating func removeLast() -> Iterator.Element {
     let element = last!
     self = self[startIndex..<endIndex.predecessor()]
     return element
@@ -575,10 +575,10 @@ extension CollectionType
 }
 
 extension SequenceType
-  where Self : _ArrayType, Self.Element == Self.Generator.Element {
+  where Self : _ArrayType, Self.Element == Self.Iterator.Element {
   // A fast implementation for when you are backed by a contiguous array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>)
-    -> UnsafeMutablePointer<Generator.Element> {
+  public func _initializeTo(ptr: UnsafeMutablePointer<Iterator.Element>)
+    -> UnsafeMutablePointer<Iterator.Element> {
     let s = self._baseAddressIfContiguous
     if s != nil {
       let count = self.count
@@ -627,7 +627,7 @@ public protocol MutableCollectionType : MutableIndexable, CollectionType {
   ///   `position != endIndex`.
   ///
   /// - Complexity: O(1)
-  subscript(position: Index) -> Generator.Element {get set}
+  subscript(position: Index) -> Iterator.Element {get set}
 
   /// Returns a collection representing a contiguous sub-range of
   /// `self`'s elements.
@@ -646,7 +646,7 @@ public protocol MutableCollectionType : MutableIndexable, CollectionType {
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (UnsafeMutablePointer<Generator.Element>, Int) throws -> R
+    @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R?
   // FIXME: the signature should use UnsafeMutableBufferPointer, but the
   // compiler can't handle that.
@@ -658,7 +658,7 @@ public protocol MutableCollectionType : MutableIndexable, CollectionType {
 
 extension MutableCollectionType {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (UnsafeMutablePointer<Generator.Element>, Int) throws -> R
+    @noescape body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
     return nil
   }
@@ -680,7 +680,7 @@ internal func _writeBackMutableSlice<
   Collection : MutableCollectionType,
   Slice_ : CollectionType
   where
-  Collection._Element == Slice_.Generator.Element,
+  Collection._Element == Slice_.Iterator.Element,
   Collection.Index == Slice_.Index
 >(inout self_: Collection, bounds: Range<Collection.Index>, slice: Slice_) {
   Collection.Index._failEarlyRangeCheck2(
@@ -716,13 +716,14 @@ internal func _writeBackMutableSlice<
 /// permuted order.
 public struct PermutationGenerator<
   C: CollectionType, Indices: SequenceType
-  where C.Index == Indices.Generator.Element
+  where
+  C.Index == Indices.Iterator.Element
 > : IteratorProtocol, SequenceType {
   var seq : C
-  var indices : Indices.Generator
+  var indices : Indices.Iterator
 
   /// The type of element returned by `next()`.
-  public typealias Element = C.Generator.Element
+  public typealias Element = C.Iterator.Element
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.

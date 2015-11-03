@@ -74,7 +74,7 @@ init(T, x }
 init <S : BooleanType)
 func g<U : Bool) {
 enum a: NSObject {
-func d: A where f, Any, y: [B, (A.Generator.C(seq: AnyObject)
+func d: A where f, Any, y: [B, (A.Iterator.C(seq: AnyObject)
 }
 0] = ")
 func i: A"].init()

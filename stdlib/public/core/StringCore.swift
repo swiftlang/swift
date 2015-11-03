@@ -575,7 +575,7 @@ extension _StringCore : RangeReplaceableCollectionType {
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
-    C: CollectionType where C.Generator.Element == UTF16.CodeUnit
+    C: CollectionType where C.Iterator.Element == UTF16.CodeUnit
   >(
     subRange: Range<Int>, with newElements: C
   ) {
@@ -666,8 +666,7 @@ extension _StringCore : RangeReplaceableCollectionType {
   }
 
   public mutating func appendContentsOf<
-    S : SequenceType
-      where S.Generator.Element == UTF16.CodeUnit
+    S : SequenceType where S.Iterator.Element == UTF16.CodeUnit
   >(s: S) {
     var width = elementWidth
     if width == 1 {

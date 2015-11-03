@@ -22,7 +22,7 @@ public func asHex<T : IntegerType>(x: T) -> String {
 public func asHex<
   S: SequenceType
 where
-  S.Generator.Element : IntegerType
+  S.Iterator.Element : IntegerType
 >(x: S) -> String {
   return "[ " + x.lazy.map { asHex($0) }.joinWithSeparator(", ") + " ]"
 }
@@ -30,7 +30,7 @@ where
 /// Compute the prefix sum of `seq`.
 public func scan<
   S : SequenceType, U
->(seq: S, _ initial: U, _ combine: (U, S.Generator.Element) -> U) -> [U] {
+>(seq: S, _ initial: U, _ combine: (U, S.Iterator.Element) -> U) -> [U] {
   var result: [U] = []
   result.reserveCapacity(seq.underestimateCount())
   var runningResult = initial
@@ -57,10 +57,10 @@ public func gather<
   C : CollectionType,
   IndicesSequence : SequenceType
   where
-  IndicesSequence.Generator.Element == C.Index
+  IndicesSequence.Iterator.Element == C.Index
 >(
   collection: C, _ indices: IndicesSequence
-) -> [C.Generator.Element] {
+) -> [C.Iterator.Element] {
   return Array(indices.map { collection[$0] })
 }
 

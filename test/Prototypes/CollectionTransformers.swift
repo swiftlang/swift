@@ -71,7 +71,7 @@ internal func _splitRandomAccessIndexRange<Index : RandomAccessIndexType>(
 /// instance and adding elements one by one.
 public protocol CollectionBuilderType {
   typealias Collection : CollectionType
-  typealias Element = Collection.Generator.Element
+  typealias Element = Collection.Iterator.Element
 
   init()
 
@@ -85,7 +85,7 @@ public protocol CollectionBuilderType {
   /// added at the end.
   ///
   /// Complexity: amortized O(1).
-  mutating func append(element: Collection.Generator.Element)
+  mutating func append(element: Collection.Iterator.Element)
 
   /// Append `elements` to `self`.
   ///
@@ -96,7 +96,7 @@ public protocol CollectionBuilderType {
   mutating func appendContentsOf<
     C : CollectionType
     where
-    C.Generator.Element == Element
+    C.Iterator.Element == Element
   >(elements: C)
 
   /// Append elements from `otherBuilder` to `self`, emptying `otherBuilder`.
@@ -152,7 +152,7 @@ public struct ArrayBuilder<T> : CollectionBuilderType {
   public mutating func appendContentsOf<
     C : CollectionType
     where
-    C.Generator.Element == T
+    C.Iterator.Element == T
   >(elements: C) {
     _resultTail.appendContentsOf(elements)
   }
@@ -757,7 +757,7 @@ final public class ForkJoinPool {
   internal func _submitTasksToRandomWorkers<
     C : CollectionType
     where
-    C.Generator.Element == ForkJoinTaskBase
+    C.Iterator.Element == ForkJoinTaskBase
   >(tasks: C) {
     if tasks.isEmpty {
       return
@@ -837,7 +837,7 @@ internal protocol _CollectionTransformerStepType /*: class*/ {
     InputCollection : CollectionType,
     Collector : _ElementCollectorType
     where
-    InputCollection.Generator.Element == PipelineInputElement,
+    InputCollection.Iterator.Element == PipelineInputElement,
     Collector.Element == OutputElement
   >(
     c: InputCollection,
@@ -874,8 +874,8 @@ internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
     C : BuildableCollectionType
     where
     C.Builder.Collection == C,
-    C.Builder.Element == C.Generator.Element,
-    C.Generator.Element == OutputElement
+    C.Builder.Element == C.Iterator.Element,
+    C.Iterator.Element == OutputElement
   >(_: C.Type) -> _CollectionTransformerFinalizer<PipelineInputElement, C> {
 
     fatalError("abstract method")
@@ -885,7 +885,7 @@ internal class _CollectionTransformerStep<PipelineInputElement_, OutputElement_>
     InputCollection : CollectionType,
     Collector : _ElementCollectorType
     where
-    InputCollection.Generator.Element == PipelineInputElement,
+    InputCollection.Iterator.Element == PipelineInputElement,
     Collector.Element == OutputElement
   >(
     c: InputCollection,
@@ -928,8 +928,8 @@ final internal class _CollectionTransformerStepCollectionSource<
     C : BuildableCollectionType
     where
     C.Builder.Collection == C,
-    C.Builder.Element == C.Generator.Element,
-    C.Generator.Element == OutputElement
+    C.Builder.Element == C.Iterator.Element,
+    C.Iterator.Element == OutputElement
   >(c: C.Type) -> _CollectionTransformerFinalizer<PipelineInputElement, C> {
 
     return _CollectionTransformerFinalizerCollectTo(self, c)
@@ -939,7 +939,7 @@ final internal class _CollectionTransformerStepCollectionSource<
     InputCollection : CollectionType,
     Collector : _ElementCollectorType
     where
-    InputCollection.Generator.Element == PipelineInputElement,
+    InputCollection.Iterator.Element == PipelineInputElement,
     Collector.Element == OutputElement
   >(
     c: InputCollection,
@@ -1011,8 +1011,8 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
     C : BuildableCollectionType
     where
     C.Builder.Collection == C,
-    C.Builder.Element == C.Generator.Element,
-    C.Generator.Element == OutputElement
+    C.Builder.Element == C.Iterator.Element,
+    C.Iterator.Element == OutputElement
   >(c: C.Type) -> _CollectionTransformerFinalizer<PipelineInputElement, C> {
 
     return _CollectionTransformerFinalizerCollectTo(self, c)
@@ -1022,7 +1022,7 @@ final internal class _CollectionTransformerStepOneToMaybeOne<
     InputCollection : CollectionType,
     Collector : _ElementCollectorType
     where
-    InputCollection.Generator.Element == PipelineInputElement,
+    InputCollection.Iterator.Element == PipelineInputElement,
     Collector.Element == OutputElement
   >(
     c: InputCollection,
@@ -1064,7 +1064,7 @@ struct _ElementCollectorOneToMaybeOne<
   mutating func appendContentsOf<
     C : CollectionType
     where
-    C.Generator.Element == Element
+    C.Iterator.Element == Element
   >(elements: C) {
     for e in elements {
       append(e)
@@ -1082,7 +1082,7 @@ protocol _ElementCollectorType {
   mutating func appendContentsOf<
     C : CollectionType
     where
-    C.Generator.Element == Element
+    C.Iterator.Element == Element
   >(elements: C)
 }
 
@@ -1090,7 +1090,7 @@ class _CollectionTransformerFinalizer<PipelineInputElement, Result> {
   func transform<
     InputCollection : CollectionType
     where
-    InputCollection.Generator.Element == PipelineInputElement
+    InputCollection.Iterator.Element == PipelineInputElement
   >(c: InputCollection) -> Result {
     fatalError("implement")
   }
@@ -1119,7 +1119,7 @@ final class _CollectionTransformerFinalizerReduce<
   override func transform<
     InputCollection : CollectionType
     where
-    InputCollection.Generator.Element == PipelineInputElement
+    InputCollection.Iterator.Element == PipelineInputElement
   >(c: InputCollection) -> U {
     var collector = _ElementCollectorReduce(_initial, _combine)
     _input.transform(c, c.indices, &collector)
@@ -1147,7 +1147,7 @@ struct _ElementCollectorReduce<Element_, Result> : _ElementCollectorType {
   mutating func appendContentsOf<
     C : CollectionType
     where
-    C.Generator.Element == Element
+    C.Iterator.Element == Element
   >(elements: C) {
     for e in elements {
       append(e)
@@ -1168,8 +1168,8 @@ final class _CollectionTransformerFinalizerCollectTo<
   InputStep.OutputElement == InputElementTy,
   InputStep.PipelineInputElement == PipelineInputElement,
   U.Builder.Collection == U,
-  U.Builder.Element == U.Generator.Element,
-  U.Generator.Element == InputStep.OutputElement
+  U.Builder.Element == U.Iterator.Element,
+  U.Iterator.Element == InputStep.OutputElement
 > : _CollectionTransformerFinalizer<PipelineInputElement, U> {
 
   var _input: InputStep
@@ -1181,7 +1181,7 @@ final class _CollectionTransformerFinalizerCollectTo<
   override func transform<
     InputCollection : CollectionType
     where
-    InputCollection.Generator.Element == PipelineInputElement
+    InputCollection.Iterator.Element == PipelineInputElement
   >(c: InputCollection) -> U {
     var collector = _ElementCollectorCollectTo<U>()
     _input.transform(c, c.indices, &collector)
@@ -1193,10 +1193,10 @@ struct _ElementCollectorCollectTo<
   Collection : BuildableCollectionType
   where
   Collection.Builder.Collection == Collection,
-  Collection.Builder.Element == Collection.Generator.Element
+  Collection.Builder.Element == Collection.Iterator.Element
 > : _ElementCollectorType {
 
-  typealias Element = Collection.Generator.Element
+  typealias Element = Collection.Iterator.Element
 
   var _builder: Collection.Builder
 
@@ -1215,7 +1215,7 @@ struct _ElementCollectorCollectTo<
   mutating func appendContentsOf<
     C : CollectionType
     where
-    C.Generator.Element == Element
+    C.Iterator.Element == Element
   >(elements: C) {
     _builder.appendContentsOf(elements)
   }
@@ -1235,7 +1235,7 @@ internal func _runCollectionTransformer<
   InputCollection : CollectionType, Result
 >(
   c: InputCollection,
-  _ transformer: _CollectionTransformerFinalizer<InputCollection.Generator.Element, Result>
+  _ transformer: _CollectionTransformerFinalizer<InputCollection.Iterator.Element, Result>
 ) -> Result {
   dump(transformer)
   let optimized = _optimizeCollectionTransformer(transformer)
@@ -1251,7 +1251,7 @@ public struct CollectionTransformerPipeline<
   InputCollection : CollectionType, T
 > {
   internal var _input: InputCollection
-  internal var _step: _CollectionTransformerStep<InputCollection.Generator.Element, T>
+  internal var _step: _CollectionTransformerStep<InputCollection.Iterator.Element, T>
 
   public func map<U>(transform: (T) -> U)
     -> CollectionTransformerPipeline<InputCollection, U> {
@@ -1279,7 +1279,7 @@ public struct CollectionTransformerPipeline<
     C : BuildableCollectionType
     where
     C.Builder.Collection == C,
-    C.Generator.Element == T,
+    C.Iterator.Element == T,
     C.Builder.Element == T
   >(c: C.Type) -> C {
     return _runCollectionTransformer(_input, _step.collectTo(c))
@@ -1291,11 +1291,11 @@ public struct CollectionTransformerPipeline<
 }
 
 public func transform<C : CollectionType>(c: C)
-  -> CollectionTransformerPipeline<C, C.Generator.Element> {
+  -> CollectionTransformerPipeline<C, C.Iterator.Element> {
 
-  return CollectionTransformerPipeline<C, C.Generator.Element>(
+  return CollectionTransformerPipeline<C, C.Iterator.Element>(
     _input: c,
-    _step: _CollectionTransformerStepCollectionSource<C.Generator.Element>())
+    _step: _CollectionTransformerStepCollectionSource<C.Iterator.Element>())
 }
 
 //===----------------------------------------------------------------------===//

@@ -559,8 +559,8 @@ func callStaticContains(
 }
 
 func callGenericContains<
-  S : SequenceType where S.Generator.Element : Equatable
->(sequence: S, _ element: S.Generator.Element) -> Bool {
+  S : SequenceType where S.Iterator.Element : Equatable
+>(sequence: S, _ element: S.Iterator.Element) -> Bool {
   return sequence.contains(element)
 }
 
@@ -804,7 +804,7 @@ func callStaticSequenceMap<T>(
 
 func callGenericSequenceMap<S : SequenceType, T>(
   sequence: S,
-  @noescape transform: (S.Generator.Element) -> T
+  @noescape transform: (S.Iterator.Element) -> T
 ) -> [T] {
   var result = sequence.map(transform)
   expectType([T].self, &result)
@@ -1057,7 +1057,7 @@ SequenceTypeTests.test("zip") {
 struct SequenceWithDefaultUnderestimateCount : SequenceType {
   init() {}
 
-  func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
+  func generate() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
     expectUnreachable()
     return MinimalSequence(
       elements: [ 1, 2, 3 ].map(OpaqueValue.init)
@@ -1075,7 +1075,7 @@ struct SequenceWithCustomUnderestimateCount : SequenceType {
     self._underestimatedCount = underestimatedCount
   }
 
-  func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
+  func generate() -> MinimalSequence<OpaqueValue<Int>>.Iterator {
     expectUnreachable()
     return MinimalSequence(
       elements: [ 0xffff, 0xffff, 0xffff ].map(OpaqueValue.init)

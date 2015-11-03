@@ -35,14 +35,14 @@ func useCollectionTypeSubSequenceIndex<
 func useCollectionTypeSubSequenceGeneratorElement<
   C : CollectionType
   where
-  C.SubSequence.Generator.Element == C.Generator.Element
+  C.SubSequence.Iterator.Element == C.Iterator.Element
 >(c: C) {}
 
 func sortResultIgnored<
   S : SequenceType, MC : MutableCollectionType
   where
-  S.Generator.Element : Comparable,
-  MC.Generator.Element : Comparable
+  S.Iterator.Element : Comparable,
+  MC.Iterator.Element : Comparable
 >(
   sequence: S,
   mutableCollection: MC,

@@ -18,8 +18,8 @@ struct Foo: Fooable {
 }
 
 // rdar://problem/19049566
-// CHECK-LABEL: sil [transparent] [thunk] @_TTWu0_Rxs12SequenceType_zWx9Generator7Element_rGV17witness_same_type14LazySequenceOfxq__S_S2_FS_8generate
-public struct LazySequenceOf<SS : SequenceType, A where SS.Generator.Element == A> : SequenceType {
+// CHECK-LABEL: sil [transparent] [thunk] @_TTWu0_Rxs12SequenceType_zWx8Iterator7Element_rGV17witness_same_type14LazySequenceOfxq__S_S2_FS_8generate
+public struct LazySequenceOf<SS : SequenceType, A where SS.Iterator.Element == A> : SequenceType {
   public func generate() -> AnyIterator<A> { 
     var opt: AnyIterator<A>?
     return opt!

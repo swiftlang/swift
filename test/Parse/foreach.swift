@@ -4,7 +4,7 @@ struct IntRange<Int> : SequenceType, IteratorProtocol {
   typealias Element = (Int, Int)
   func next() -> (Int, Int)? {}
 
-  typealias Generator = IntRange<Int>
+  typealias Iterator = IntRange<Int>
   func generate() -> IntRange<Int> { return self }
 }
 

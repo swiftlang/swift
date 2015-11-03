@@ -283,18 +283,18 @@ extension TestSuite {
     CollectionWithEquatableElement : CollectionType
     where
     Collection.SubSequence : CollectionType,
-    Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.Iterator.Element == Collection.Iterator.Element,
     Collection.SubSequence.SubSequence == Collection.SubSequence,
-    CollectionWithEquatableElement.Generator.Element : Equatable
+    CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
     testNamePrefix: String = "",
-    makeCollection: ([Collection.Generator.Element]) -> Collection,
-    wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
-    extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([Collection.Iterator.Element]) -> Collection,
+    wrapValue: (OpaqueValue<Int>) -> Collection.Iterator.Element,
+    extractValue: (Collection.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Generator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Generator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
@@ -782,20 +782,20 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/slice/removeTooMany/semantics")
     where
     Collection.Index : BidirectionalIndexType,
     Collection.SubSequence : CollectionType,
-    Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.Iterator.Element == Collection.Iterator.Element,
     Collection.SubSequence.Index : BidirectionalIndexType,
     Collection.SubSequence.SubSequence == Collection.SubSequence,
     CollectionWithEquatableElement.Index : BidirectionalIndexType,
-    CollectionWithEquatableElement.Generator.Element : Equatable
+    CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
     testNamePrefix: String = "",
-    makeCollection: ([Collection.Generator.Element]) -> Collection,
-    wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
-    extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([Collection.Iterator.Element]) -> Collection,
+    wrapValue: (OpaqueValue<Int>) -> Collection.Iterator.Element,
+    extractValue: (Collection.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Generator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Generator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
@@ -1087,20 +1087,20 @@ self.test("\(testNamePrefix).suffix/semantics") {
     where
     Collection.Index : RandomAccessIndexType,
     Collection.SubSequence : CollectionType,
-    Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.Iterator.Element == Collection.Iterator.Element,
     Collection.SubSequence.Index : RandomAccessIndexType,
     Collection.SubSequence.SubSequence == Collection.SubSequence,
     CollectionWithEquatableElement.Index : RandomAccessIndexType,
-    CollectionWithEquatableElement.Generator.Element : Equatable
+    CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
     testNamePrefix: String = "",
-    makeCollection: ([Collection.Generator.Element]) -> Collection,
-    wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
-    extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([Collection.Iterator.Element]) -> Collection,
+    wrapValue: (OpaqueValue<Int>) -> Collection.Iterator.Element,
+    extractValue: (Collection.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Generator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Generator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,

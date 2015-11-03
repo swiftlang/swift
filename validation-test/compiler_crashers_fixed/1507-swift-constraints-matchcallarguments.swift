@@ -29,7 +29,7 @@ class a: P> Any, x }
 import CoreData
 protocol b = e: d where Optional<T> == a(c(2, Any)
 var e> Any) -> [Byte]()
-let foo as [c] = i((self.<h : d = b() -> ("[1, object2)(c<T>>(m: 1, U.Generator.A: T>, a() -> U) -> {
+let foo as [c] = i((self.<h : d = b() -> ("[1, object2)(c<T>>(m: 1, U.Iterator.A: T>, a() -> U) -> {
 enum A {
 class a<T {
 protocol a : a {

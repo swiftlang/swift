@@ -135,7 +135,7 @@ protocol c {
 }
 class k: c{  class func i {
 a=1 as a=1
-func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
+func d<b: SequenceType, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
     for (mx : e?) in c {
 func a<T>() -> (T, T -> T) -> T {
     var b: ({ (x: Int, f: Int -> Int) -> Int in
@@ -179,7 +179,7 @@ f l: k -> k = {
 }(j, l)
 f
 protocol k : f { func f
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
 protocol A {
     typealias E
 }
@@ -273,7 +273,7 @@ class b: a {
 (b() as a).dynamicType.c()
 b
 protocol c : b { func b
-func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
+func some<S: SequenceType, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
     for (mx :       if let x = mx {
      d: f{  ceanTy b {
     clasi() {

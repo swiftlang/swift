@@ -1434,19 +1434,19 @@ extension TestSuite {
     Sequence : SequenceType,
     SequenceWithEquatableElement : SequenceType
     where
-    SequenceWithEquatableElement.Generator.Element : Equatable,
+    SequenceWithEquatableElement.Iterator.Element : Equatable,
     Sequence.SubSequence : SequenceType,
-    Sequence.SubSequence.Generator.Element == Sequence.Generator.Element,
+    Sequence.SubSequence.Iterator.Element == Sequence.Iterator.Element,
     Sequence.SubSequence.SubSequence == Sequence.SubSequence
   >(
     testNamePrefix: String = "",
-    makeSequence: ([Sequence.Generator.Element]) -> Sequence,
-    wrapValue: (OpaqueValue<Int>) -> Sequence.Generator.Element,
-    extractValue: (Sequence.Generator.Element) -> OpaqueValue<Int>,
+    makeSequence: ([Sequence.Iterator.Element]) -> Sequence,
+    wrapValue: (OpaqueValue<Int>) -> Sequence.Iterator.Element,
+    extractValue: (Sequence.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeSequenceOfEquatable: ([SequenceWithEquatableElement.Generator.Element]) -> SequenceWithEquatableElement,
-    wrapValueIntoEquatable: (MinimalEquatableValue) -> SequenceWithEquatableElement.Generator.Element,
-    extractValueFromEquatable: ((SequenceWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
+    makeSequenceOfEquatable: ([SequenceWithEquatableElement.Iterator.Element]) -> SequenceWithEquatableElement,
+    wrapValueIntoEquatable: (MinimalEquatableValue) -> SequenceWithEquatableElement.Iterator.Element,
+    extractValueFromEquatable: ((SequenceWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all

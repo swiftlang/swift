@@ -11,7 +11,7 @@ func b: P {
 protocol b : d {
 func a)
 var b {
-class A : b> k -> T where T where H) -> Any, Bool][self] = T.Generator.A.c {
+class A : b> k -> T where T where H) -> Any, Bool][self] = T.Iterator.A.c {
 }
 }
 typealias A : A

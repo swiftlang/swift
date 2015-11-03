@@ -615,7 +615,7 @@ public:
 
       generatorTy = TC.getWitnessType(sequenceType, sequenceProto,
                                       conformance,
-                                      TC.Context.Id_Generator,
+                                      TC.Context.Id_Iterator,
                                       diag::sequence_protocol_broken);
       
       Expr *getIterator

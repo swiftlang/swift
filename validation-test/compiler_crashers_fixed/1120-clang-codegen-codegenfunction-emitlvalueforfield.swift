@@ -123,7 +123,7 @@ protocol a {
 }
 extension A {
 }
-typealias g, U.Generator.<c<T>()
+typealias g, U.Iterator.<c<T>()
 import Foundation
 }
 (h> String {

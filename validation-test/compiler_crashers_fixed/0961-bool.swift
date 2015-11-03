@@ -20,7 +20,7 @@ return { c() {
 }
 }
 }
-case .Generator.substringWithRange(b(x) {
+case .Iterator.substringWithRange(b(x) {
 b() -> == b(T) {
 }
 class a {

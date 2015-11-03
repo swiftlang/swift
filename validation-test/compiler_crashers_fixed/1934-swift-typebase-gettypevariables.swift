@@ -13,7 +13,7 @@ return { self.init(()
 }
 protocol b {
 }
-enum A : SequenceType, T where S.e : b: b = 0.Generator.c = {
+enum A : SequenceType, T where S.e : b: b = 0.Iterator.c = {
 var d : [c> (Range<h == {
 protocol b : AnyObject, let c<T>(x, range: NSManagedObject {
 }

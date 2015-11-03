@@ -19,7 +19,7 @@ internal func _abstract(file: StaticString = __FILE__, line: UInt = __LINE__) {
   fatalError("Method must be overridden", file: file, line: line)
 }
 
-//===--- Generator --------------------------------------------------------===//
+//===--- Iterator ---------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
 /// A type-erased iterator of `Element`.
@@ -41,12 +41,12 @@ public struct AnyIterator<Element> : IteratorProtocol {
   ///
   ///       // This is a really complicated type of no interest to our
   ///       // clients.
-  ///       let g: MapSequenceGenerator<RangeGenerator<Int>, String>
+  ///       let g: MapSequenceIterator<RangeIterator<Int>, String>
   ///         = lazyStrings.generate()
   ///       return AnyIterator(g)
   ///     }
   public init<I : IteratorProtocol where I.Element == Element>(_ base: I) {
-    self._box = _GeneratorBox(base)
+    self._box = _IteratorBox(base)
   }
 
   /// Create a `IteratorProtocol` instance whose `next` method invokes
@@ -58,7 +58,7 @@ public struct AnyIterator<Element> : IteratorProtocol {
   ///     let g = AnyIterator { x < 15 ? x++ : nil }
   ///     let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
   public init(body: () -> Element?) {
-    self._box = _GeneratorBox(_ClosureBasedGenerator(body))
+    self._box = _IteratorBox(_ClosureBasedIterator(body))
   }
 
   internal init(_box: _AnyIteratorBoxBase<Element>) {
@@ -78,7 +78,7 @@ public struct AnyIterator<Element> : IteratorProtocol {
 /// traversing the sequence consumes the iterator.
 extension AnyIterator : SequenceType {}
 
-internal struct _ClosureBasedGenerator<Element> : IteratorProtocol {
+internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
   internal init(_ body: () -> Element?) {
     self._body = body
   }
@@ -98,7 +98,7 @@ internal class _AnyIteratorBoxBase<Element>
   internal func next() -> Element? {_abstract()}
 }
 
-internal final class _GeneratorBox<
+internal final class _IteratorBox<
   Base : IteratorProtocol
 > : _AnyIteratorBoxBase<Base.Element> {
   internal init(_ base: Base) { self._base = base }
@@ -142,8 +142,8 @@ internal class _AnyCollectionBoxBase<Element> : _AnySequenceBox<Element> {
 % for Kind in ['Sequence', 'Collection']:
 // FIXME: can't make this a protocol due to <rdar://20209031>
 internal class _${Kind}Box<S : ${Kind}Type>
-  : _Any${Kind}Box<S.Generator.Element> {
-  typealias Element = S.Generator.Element
+  : _Any${Kind}Box<S.Iterator.Element> {
+  typealias Element = S.Iterator.Element
 
   override func generate() -> AnyIterator<Element> {
     return AnyIterator(_base.generate())
@@ -185,18 +185,18 @@ internal class _${Kind}Box<S : ${Kind}Type>
 }
 % end
 
-internal struct _ClosureBasedSequence<Generator : IteratorProtocol>
+internal struct _ClosureBasedSequence<Iterator : IteratorProtocol>
   : SequenceType {
 
-  internal init(_ makeUnderlyingGenerator: () -> Generator) {
-    self._makeUnderlyingGenerator = makeUnderlyingGenerator
+  internal init(_ makeUnderlyingIterator: () -> Iterator) {
+    self._makeUnderlyingIterator = makeUnderlyingIterator
   }
 
-  internal func generate() -> Generator {
-    return _makeUnderlyingGenerator()
+  internal func generate() -> Iterator {
+    return _makeUnderlyingIterator()
   }
 
-  internal var _makeUnderlyingGenerator: () -> Generator
+  internal var _makeUnderlyingIterator: () -> Iterator
 }
 
 /// A type-erased sequence.
@@ -208,16 +208,16 @@ internal struct _ClosureBasedSequence<Generator : IteratorProtocol>
 /// - SeeAlso: `AnyIterator<Element>`.
 public struct AnySequence<Element> : SequenceType {
   /// Wrap and forward operations to to `base`.
-  public init<S: SequenceType where S.Generator.Element == Element>(_ base: S) {
+  public init<S: SequenceType where S.Iterator.Element == Element>(_ base: S) {
     _box = _SequenceBox(base)
   }
 
   /// Create a sequence whose `generate()` method forwards to
-  /// `makeUnderlyingGenerator`.
+  /// `makeUnderlyingIterator`.
   public init<I : IteratorProtocol where I.Element == Element>(
-    _ makeUnderlyingGenerator: () -> I
+    _ makeUnderlyingIterator: () -> I
   ) {
-    self.init(_ClosureBasedSequence(makeUnderlyingGenerator))
+    self.init(_ClosureBasedSequence(makeUnderlyingIterator))
   }
 
   /// Return an *iterator* over the elements of this *sequence*.
@@ -541,8 +541,9 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   ///
   /// - Complexity: O(1).
   public init<
-    C: CollectionType
-      where C.Index: ${SubTraversal}IndexType, C.Generator.Element == Element
+    C : CollectionType
+    where
+    C.Index: ${SubTraversal}IndexType, C.Iterator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
       base,

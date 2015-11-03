@@ -137,8 +137,11 @@ var d2 : Dictionary<String, Int>
 d1["hello"] = d2["world"]
 i = d2["blarg"]
 
-struct RangeOfPrintables<R : SequenceType
-         where R.Generator.Element : MyFormattedPrintable> {
+struct RangeOfPrintables<
+  R : SequenceType
+  where
+  R.Iterator.Element : MyFormattedPrintable
+> {
   var r : R
 
   func format() -> String {
@@ -152,11 +155,11 @@ struct RangeOfPrintables<R : SequenceType
 
 struct Y {}
 struct SequenceY : SequenceType, IteratorProtocol {
-  typealias Generator = SequenceY
+  typealias Iterator = SequenceY
   typealias Element = Y
 
   func next() -> Element? { return Y() }
-  func generate() -> Generator { return self }
+  func generate() -> Iterator { return self }
 }
 
 func useRangeOfPrintables(roi : RangeOfPrintables<[Int]>) {

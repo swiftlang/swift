@@ -30,7 +30,7 @@ extension CollectionType {
 print(["a", "b", "c", "d"].clone().myCount)
 
 extension CollectionType {
-  final func indexMatching(fn: Generator.Element -> Bool) -> Index? {
+  final func indexMatching(fn: Iterator.Element -> Bool) -> Index? {
     for i in myIndices {
       if fn(self[i]) { return i }
     }
@@ -43,8 +43,8 @@ print(["a", "b", "c", "d"].indexMatching({$0 == "c"})!)
 
 // Extend certain instances of a collection (those that have equatable
 // element types) with another algorithm.
-extension CollectionType where Self.Generator.Element : Equatable {
-  final func myIndexOf(element: Generator.Element) -> Index? {
+extension CollectionType where Self.Iterator.Element : Equatable {
+  final func myIndexOf(element: Iterator.Element) -> Index? {
     for i in self.indices {
       if self[i] == element { return i }
     }
@@ -71,7 +71,7 @@ for (index, element) in ["a", "b", "c"].myEnumerate() {
 
 extension SequenceType {
   final public func myReduce<T>(
-    initial: T, @noescape combine: (T, Self.Generator.Element) -> T
+    initial: T, @noescape combine: (T, Self.Iterator.Element) -> T
   ) -> T { 
     var result = initial
     for value in self {
@@ -100,7 +100,7 @@ for (a, b) in [1, 2, 3].myZip(["a", "b", "c"]) {
 
 // Mutating algorithms.
 extension MutableCollectionType
-  where Self.Index: RandomAccessIndexType, Self.Generator.Element : Comparable {
+  where Self.Index: RandomAccessIndexType, Self.Iterator.Element : Comparable {
 
   public final mutating func myPartition(range: Range<Index>) -> Index {
     return self.partition(range)
@@ -118,7 +118,7 @@ for i in evenOdd.myIndices {
 print("")
 
 extension RangeReplaceableCollectionType {
-  public final func myJoin<S : SequenceType where S.Generator.Element == Self>(
+  public final func myJoin<S : SequenceType where S.Iterator.Element == Self>(
     elements: S
   ) -> Self {
     var result = Self()
@@ -142,7 +142,7 @@ print(
 )
 
 // Constrained extensions for specific types.
-extension CollectionType where Self.Generator.Element == String {
+extension CollectionType where Self.Iterator.Element == String {
   final var myCommaSeparatedList: String {
     if startIndex == endIndex { return "" }
 

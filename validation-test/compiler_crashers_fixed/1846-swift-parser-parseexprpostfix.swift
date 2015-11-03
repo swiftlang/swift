@@ -6,6 +6,6 @@
 
 class A<U -> String {
 var b {
-struct c where H.Generator.B = g<h : a {
+struct c where H.Iterator.B = g<h : a {
 typealias d where f(T>) -> {
 print(c() -> T

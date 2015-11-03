@@ -98,7 +98,7 @@ extension LoggingSequenceType {
     self.base = base
   }
   
-  public func generate() -> LoggingIterator<Base.Generator> {
+  public func generate() -> LoggingIterator<Base.Iterator> {
     ++SequenceLog.generate[selfType]
     return LoggingIterator(base.generate())
   }
@@ -109,21 +109,21 @@ extension LoggingSequenceType {
   }
 
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) -> T
+    @noescape transform: (Base.Iterator.Element) -> T
   ) -> [T] {
     ++SequenceLog.map[selfType]
     return base.map(transform)
   }
 
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) -> Bool
-  ) -> [Base.Generator.Element] {
+    @noescape includeElement: (Base.Iterator.Element) -> Bool
+  ) -> [Base.Iterator.Element] {
     ++SequenceLog.filter[selfType]
     return base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Bool? {
     ++SequenceLog._customContainsEquatableElement[selfType]
     return base._customContainsEquatableElement(element)
@@ -142,13 +142,13 @@ extension LoggingSequenceType {
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
   public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
+    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
     ++SequenceLog._copyToNativeArrayBuffer[selfType]
     return base._copyToNativeArrayBuffer()
   }
 
   /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>) {
+  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Iterator.Element>) {
     ++SequenceLog._initializeTo[selfType]
     return base._initializeTo(ptr)
   }
@@ -184,7 +184,7 @@ public protocol LoggingCollectionType : CollectionType, LoggingSequenceType {
 }
 
 extension LoggingCollectionType {
-  subscript(position: Base.Index) -> Base.Generator.Element {
+  subscript(position: Base.Index) -> Base.Iterator.Element {
     ++CollectionLog.subscriptIndex[selfType]
     return base[position]
   }
@@ -204,12 +204,12 @@ extension LoggingCollectionType {
     return base.count
   }
   
-  func _customIndexOfEquatableElement(element: Generator.Element) -> Base.Index?? {
+  func _customIndexOfEquatableElement(element: Iterator.Element) -> Base.Index?? {
     ++CollectionLog._customIndexOfEquatableElement[selfType]
     return base._customIndexOfEquatableElement(element)
   }
 
-  var first: Generator.Element? {
+  var first: Iterator.Element? {
     ++CollectionLog.first[selfType]
     return base.first
   }

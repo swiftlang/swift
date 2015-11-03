@@ -124,7 +124,7 @@ extension String {
   public // @testable
   static func _fromWellFormedCodeUnitSequence<
     Encoding: UnicodeCodecType, Input: CollectionType
-    where Input.Generator.Element == Encoding.CodeUnit
+    where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
   ) -> String {
@@ -135,7 +135,7 @@ extension String {
   public // @testable
   static func _fromCodeUnitSequence<
     Encoding: UnicodeCodecType, Input: CollectionType
-    where Input.Generator.Element == Encoding.CodeUnit
+    where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
   ) -> String? {
@@ -153,7 +153,7 @@ extension String {
   public // @testable
   static func _fromCodeUnitSequenceWithRepair<
     Encoding: UnicodeCodecType, Input: CollectionType
-    where Input.Generator.Element == Encoding.CodeUnit
+    where Input.Iterator.Element == Encoding.CodeUnit
   >(
     encoding: Encoding.Type, input: Input
   ) -> (String, hadError: Bool) {
@@ -589,8 +589,7 @@ extension String {
   }
   
   public mutating func appendContentsOf<
-      S : SequenceType
-  where S.Generator.Element == Character
+    S : SequenceType where S.Iterator.Element == Character
   >(newElements: S) {
     withMutableCharacters {
       (inout v: CharacterView) in v.appendContentsOf(newElements)
@@ -599,14 +598,13 @@ extension String {
   
   /// Create an instance containing `characters`.
   public init<
-      S : SequenceType
-      where S.Generator.Element == Character
+    S : SequenceType where S.Iterator.Element == Character
   >(_ characters: S) {
     self._core = CharacterView(characters)._core
   }
 }
 
-extension SequenceType where Generator.Element == String {
+extension SequenceType where Iterator.Element == String {
 
   /// Interpose the `separator` between elements of `self`, then concatenate
   /// the result.  For example:
@@ -663,7 +661,7 @@ extension String {
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
-    C: CollectionType where C.Generator.Element == Character
+    C: CollectionType where C.Iterator.Element == Character
   >(
     subRange: Range<Index>, with newElements: C
   ) {
@@ -701,7 +699,7 @@ extension String {
   ///
   /// - Complexity: O(`self.count + newElements.count`).
   public mutating func insertContentsOf<
-    S : CollectionType where S.Generator.Element == Character
+    S : CollectionType where S.Iterator.Element == Character
   >(newElements: S, at i: Index) {
     withMutableCharacters {
       (inout v: CharacterView) in v.insertContentsOf(newElements, at: i)

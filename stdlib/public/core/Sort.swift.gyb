@@ -41,11 +41,11 @@ else:
 
 func _insertionSort<
   C: MutableCollectionType where C.Index: BidirectionalIndexType
-  ${"" if p else ", C.Generator.Element : Comparable"}
+  ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
 ) {
   if !range.isEmpty {
     let start = range.startIndex
@@ -58,13 +58,13 @@ func _insertionSort<
     // Continue until the sorted elements cover the whole sequence
     while (++sortedEnd != range.endIndex) {
       // get the first unsorted element
-      let x: C.Generator.Element = elements[sortedEnd]
+      let x: C.Iterator.Element = elements[sortedEnd]
 
       // Look backwards for x's position in the sorted sequence,
       // moving elements forward to make room.
       var i = sortedEnd
       repeat {
-        let predecessor: C.Generator.Element = elements[i.predecessor()]
+        let predecessor: C.Iterator.Element = elements[i.predecessor()]
 
         // if x doesn't belong before y, we've found its position
         if !${cmp("x", "predecessor", p)} {
@@ -86,11 +86,11 @@ func _insertionSort<
 
 func _partition<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
-  ${"" if p else ", C.Generator.Element : Comparable"}
+  ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
 ) -> C.Index {
   var lo = range.startIndex
   var hi = range.endIndex
@@ -137,11 +137,11 @@ Loop: while true {
 public // @testable
 func _introSort<
   C : MutableCollectionType where C.Index : RandomAccessIndexType
-  ${"" if p else ", C.Generator.Element : Comparable"}
+  ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"_ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
 ) {
 %   if p:
   var comp = isOrderedBefore
@@ -158,11 +158,11 @@ func _introSort<
 
 func _introSortImpl<
   C : MutableCollectionType where C.Index : RandomAccessIndexType
-  ${"" if p else ", C.Generator.Element : Comparable"}
+  ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""},
+  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""},
   _ depthLimit: Int
 ) {
 
@@ -189,12 +189,12 @@ func _introSortImpl<
 
 func _siftDown<
   C : MutableCollectionType where C.Index : RandomAccessIndexType
-  ${"" if p else ", C.Generator.Element : Comparable"}
+  ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
   _ index: C.Index,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
 ) {
   let countToIndex = (range.startIndex..<index).count
   let countFromIndex = (index..<range.endIndex).count
@@ -224,11 +224,11 @@ func _siftDown<
 }
 func _heapify<
   C : MutableCollectionType where C.Index : RandomAccessIndexType
-  ${"" if p else ", C.Generator.Element : Comparable"}
+  ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
 ) {
   // Here we build a heap starting from the lowest nodes and moving to the root.
   // On every step we sift down the current node to obey the max-heap property:
@@ -244,11 +244,11 @@ func _heapify<
 }
 func _heapSort<
   C : MutableCollectionType where C.Index : RandomAccessIndexType
-  ${"" if p else ", C.Generator.Element : Comparable"}
+  ${"" if p else ", C.Iterator.Element : Comparable"}
 >(
   inout elements: C,
   _ range: Range<C.Index> ${"," if p else ""}
-  ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
+  ${"inout _ isOrderedBefore: (C.Iterator.Element, C.Iterator.Element)->Bool" if p else ""}
 ) {
   var hi = range.endIndex
   let lo = range.startIndex

@@ -57,7 +57,7 @@ public func randArray(count: Int) -> [Int] {
 
 public func pickRandom<
   C : CollectionType where C.Index : RandomAccessIndexType
->(c: C) -> C.Generator.Element {
+>(c: C) -> C.Iterator.Element {
   let i = Int(rand32(exclusiveUpperBound: numericCast(c.count)))
   return c[c.startIndex.advancedBy(numericCast(i))]
 }

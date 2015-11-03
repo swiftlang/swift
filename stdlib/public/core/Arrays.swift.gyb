@@ -497,7 +497,7 @@ extension ${Self} : _ArrayType {
 
   /// Construct from an arbitrary sequence with elements of type `Element`.
   public init<
-    S: SequenceType where S.Generator.Element == _Buffer.Element
+    S: SequenceType where S.Iterator.Element == _Buffer.Element
   >(_ s: S) {
     self = ${Self}(_Buffer(s._copyToNativeArrayBuffer(),
       shiftedToStartIndex: 0))
@@ -685,8 +685,9 @@ extension ${Self} : _ArrayType {
   ///
   /// - Complexity: O(*length of result*).
   public mutating func appendContentsOf<
-      S : SequenceType
-      where S.Generator.Element == Element
+    S : SequenceType
+    where
+    S.Iterator.Element == Element
   >(newElements: S) {
     self += newElements
   }
@@ -697,8 +698,9 @@ extension ${Self} : _ArrayType {
   ///
   /// - Complexity: O(*length of result*).
   public mutating func appendContentsOf<
-      C : CollectionType
-      where C.Generator.Element == Element
+    C : CollectionType
+    where
+    C.Iterator.Element == Element
   >(newElements: C) {
     self += newElements
   }
@@ -890,7 +892,7 @@ extension ${Self} {
 internal struct _InitializeMemoryFromCollection<
   C: CollectionType
 > : _PointerFunctionType {
-  func call(rawMemory: UnsafeMutablePointer<C.Generator.Element>, count: Int) {
+  func call(rawMemory: UnsafeMutablePointer<C.Iterator.Element>, count: Int) {
     var p = rawMemory
     var q = newValues.startIndex
     for _ in 0..<count {
@@ -909,8 +911,9 @@ internal struct _InitializeMemoryFromCollection<
 @inline(never)
 internal func _arrayOutOfPlaceReplace<
   B : _ArrayBufferType, C : CollectionType
-    where C.Generator.Element == B.Element,
-    B.Index == Int
+  where
+  C.Iterator.Element == B.Element,
+  B.Index == Int
 >(
   inout source: B, _ subRange: Range<Int>, _ newValues: C, _ insertCount: Int
 ) {
@@ -950,7 +953,7 @@ extension ${Self} {
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   @_semantics("array.mutate_unknown")
   public mutating func replaceRange<
-    C: CollectionType where C.Generator.Element == _Buffer.Element
+    C: CollectionType where C.Iterator.Element == _Buffer.Element
   >(
     subRange: Range<Int>, with newElements: C
   ) {
@@ -976,7 +979,8 @@ extension ${Self} {
 /// Extend `lhs` with the elements of `rhs`.
 public func += <
   Element, S : SequenceType
-  where S.Generator.Element == Element
+  where
+  S.Iterator.Element == Element
 >(inout lhs: ${Self}<Element>, rhs: S) {
   let oldCount = lhs.count
   let capacity = lhs.capacity
@@ -992,7 +996,8 @@ public func += <
 /// Extend `lhs` with the elements of `rhs`.
 public func += <
   Element, C : CollectionType
-  where C.Generator.Element == Element
+  where
+  C.Iterator.Element == Element
 >(inout lhs: ${Self}<Element>, rhs: C) {
   let rhsCount = numericCast(rhs.count) as Int
 
@@ -1191,9 +1196,9 @@ public // SPI(Foundation)
 func _extractOrCopyToNativeArrayBuffer<
   Buffer : _ArrayBufferType
   where
-  Buffer.Generator.Element == Buffer.Element
+  Buffer.Iterator.Element == Buffer.Element
 >(source: Buffer)
-  -> _ContiguousArrayBuffer<Buffer.Generator.Element>
+  -> _ContiguousArrayBuffer<Buffer.Iterator.Element>
 {
   if let n = source.requestNativeBuffer() {
     return n
@@ -1204,7 +1209,9 @@ func _extractOrCopyToNativeArrayBuffer<
 /// Append items from `newItems` to `buffer`.
 internal func _arrayAppendSequence<
   Buffer : _ArrayBufferType,
-  S : SequenceType where S.Generator.Element == Buffer.Element,
+  S : SequenceType
+  where
+  S.Iterator.Element == Buffer.Element,
   Buffer.Index == Int
 >(
   inout buffer: Buffer, _ newItems: S

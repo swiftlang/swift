@@ -74,7 +74,7 @@ extension LazyCollection : SequenceType {
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> Base.Generator { return _base.generate() }
+  public func generate() -> Base.Iterator { return _base.generate() }
   
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
@@ -83,18 +83,18 @@ extension LazyCollection : SequenceType {
   public func underestimateCount() -> Int { return _base.underestimateCount() }
 
   public func _copyToNativeArrayBuffer() 
-     -> _ContiguousArrayBuffer<Base.Generator.Element> {
+     -> _ContiguousArrayBuffer<Base.Iterator.Element> {
     return _base._copyToNativeArrayBuffer()
   }
   
   public func _initializeTo(
-    ptr: UnsafeMutablePointer<Base.Generator.Element>
-  ) -> UnsafeMutablePointer<Base.Generator.Element> {
+    ptr: UnsafeMutablePointer<Base.Iterator.Element>
+  ) -> UnsafeMutablePointer<Base.Iterator.Element> {
     return _base._initializeTo(ptr)
   }
 
   public func _customContainsEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
@@ -121,7 +121,7 @@ extension LazyCollection : CollectionType {
   ///
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
-  public subscript(position: Base.Index) -> Base.Generator.Element {
+  public subscript(position: Base.Index) -> Base.Iterator.Element {
     return _base[position]
   }
 
@@ -154,13 +154,13 @@ extension LazyCollection : CollectionType {
   ///
   /// - Complexity: O(N).
   public func _customIndexOfEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Index?? {
     return _base._customIndexOfEquatableElement(element)
   }
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.
-  public var first: Base.Generator.Element? {
+  public var first: Base.Iterator.Element? {
     return _base.first
   }
 }

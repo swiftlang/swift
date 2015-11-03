@@ -119,10 +119,10 @@ func callStaticCollectionFilter(
 
 func callGenericCollectionFilter<S : CollectionType>(
   sequence: S,
-  @noescape includeElement: (S.Generator.Element) -> Bool
-) -> [S.Generator.Element] {
+  @noescape includeElement: (S.Iterator.Element) -> Bool
+) -> [S.Iterator.Element] {
   var result = sequence.filter(includeElement)
-  expectType(Array<S.Generator.Element>.self, &result)
+  expectType(Array<S.Iterator.Element>.self, &result)
   return result
 }
 
@@ -251,7 +251,7 @@ func callStaticCollectionMap<T>(
 
 func callGenericCollectionMap<C : CollectionType, T>(
   collection: C,
-  @noescape transform: (C.Generator.Element) -> T
+  @noescape transform: (C.Iterator.Element) -> T
 ) -> [T] {
   var result = collection.map(transform)
   expectType([T].self, &result)
@@ -379,10 +379,10 @@ CollectionTypeTests.test("underestimateCount/CollectionType/CustomImplementation
 }
 
 //===----------------------------------------------------------------------===//
-// CollectionType.generate(), CollectionType.Generator
+// CollectionType.generate(), CollectionType.Iterator
 //===----------------------------------------------------------------------===//
 
-struct MinimalForwardCollectionWithDefaultGenerator : CollectionType {
+struct MinimalForwardCollectionWithDefaultIterator : CollectionType {
   init(count: Int) {
     self._count = count
   }
@@ -403,19 +403,19 @@ struct MinimalForwardCollectionWithDefaultGenerator : CollectionType {
   var _count: Int
 }
 
-func callGenericGenerate<S : SequenceType>(sequence: S) -> S.Generator {
+func callGenericGenerate<S : SequenceType>(sequence: S) -> S.Iterator {
   return sequence.generate()
 }
 
 CollectionTypeTests.test("CollectionType.generate()/DefaultImplementation") {
   for count in [ 0, 5 ] {
-    let collection = MinimalForwardCollectionWithDefaultGenerator(count: count)
+    let collection = MinimalForwardCollectionWithDefaultIterator(count: count)
 
     if true {
       // Check the return type of the function when called statically.
       var generator = collection.generate()
       expectType(
-        IndexingGenerator<MinimalForwardCollectionWithDefaultGenerator>.self,
+        IndexingGenerator<MinimalForwardCollectionWithDefaultIterator>.self,
         &generator)
     }
 
@@ -423,7 +423,7 @@ CollectionTypeTests.test("CollectionType.generate()/DefaultImplementation") {
       // Check the return type of the function when called generically.
       var generator = callGenericGenerate(collection)
       expectType(
-        IndexingGenerator<MinimalForwardCollectionWithDefaultGenerator>.self,
+        IndexingGenerator<MinimalForwardCollectionWithDefaultIterator>.self,
         &generator)
     }
 
@@ -434,7 +434,7 @@ CollectionTypeTests.test("CollectionType.generate()/DefaultImplementation") {
   }
 }
 
-struct MinimalForwardCollectionWithCustomGenerator : CollectionType {
+struct MinimalForwardCollectionWithCustomIterator : CollectionType {
   init(count: Int) {
     self._count = count
   }
@@ -442,7 +442,7 @@ struct MinimalForwardCollectionWithCustomGenerator : CollectionType {
   static var timesGenerateWasCalled: Int = 0
 
   func generate() -> MinimalIterator<OpaqueValue<Int>> {
-    ++MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled
+    ++MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled
     return MinimalIterator<OpaqueValue<Int>>(
       Array(1..<_count+1).map(OpaqueValue.init) as [OpaqueValue<Int>]
     )
@@ -466,26 +466,26 @@ struct MinimalForwardCollectionWithCustomGenerator : CollectionType {
 
 CollectionTypeTests.test("CollectionType.generate()/CustomImplementation") {
   for count in [ 0, 5 ] {
-    let collection = MinimalForwardCollectionWithCustomGenerator(count: count)
+    let collection = MinimalForwardCollectionWithCustomIterator(count: count)
 
     if true {
       // Check the return type of the function when called statically.
-      MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled = 0
+      MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled = 0
       var generator = collection.generate()
       expectType(
         MinimalIterator<OpaqueValue<Int>>.self,
         &generator)
-      expectEqual(1, MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled)
+      expectEqual(1, MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled)
     }
 
     if true {
-      MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled = 0
+      MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled = 0
       // Check the return type of the function when called generically.
       var generator = callGenericGenerate(collection)
       expectType(
         MinimalIterator<OpaqueValue<Int>>.self,
         &generator)
-      expectEqual(1, MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled)
+      expectEqual(1, MinimalForwardCollectionWithCustomIterator.timesGenerateWasCalled)
     }
 
     checkForwardCollection(
@@ -563,8 +563,8 @@ CollectionTypeTests.test("indexOf/WhereElementIsEquatable/dispatch") {
 // <rdar://problem/20582358> Commenting out one line determines whether a
 // completely different line type-checks
 func callGenericFind_<
-  C : CollectionType where C.Generator.Element : Equatable
->(collection: C, _ element: C.Generator.Element) -> C.Index? {
+  C : CollectionType where C.Iterator.Element : Equatable
+>(collection: C, _ element: C.Iterator.Element) -> C.Index? {
   return collection.indexOf(element)
 }
 
@@ -614,17 +614,17 @@ CollectionTypeTests.test("Set<T>.find/CustomImplementation/${dispatch}") {
 % end
 
 extension CollectionType where
-  Generator.Element : Equatable,
+  Iterator.Element : Equatable,
 
   // FIXME: the following constraints should go away after
   // <rdar://problem/20715697> CollectionType.SubSlice should constrain its
   // Element type
   SubSequence : CollectionType,
   SubSequence.SubSequence == SubSequence,
-  SubSequence.Generator.Element == Generator.Element,
+  SubSequence.Iterator.Element == Iterator.Element,
   SubSequence.Index == Index {
 
-  func _test_indicesOf(element: Generator.Element) -> [Index] {
+  func _test_indicesOf(element: Iterator.Element) -> [Index] {
     var result: [Index] = []
     var tail = self[indices]
     while let foundIndex = tail.indexOf(element) {

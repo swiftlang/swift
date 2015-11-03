@@ -7,7 +7,7 @@
 ([1)
 class A {
 class B : String {
-func d.Generator.init(T> T>
+func d.Iterator.init(T> T>
 print() {
 }
 func d<T : d

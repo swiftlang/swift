@@ -60,7 +60,7 @@ public func withInvalidOrderings(body: ((Int,Int) -> Bool) -> Void) {
 
 internal func _mapInPlace<C : MutableCollectionType>(
   inout elements: C,
-  @noescape transform: (C.Generator.Element) -> C.Generator.Element
+  @noescape transform: (C.Iterator.Element) -> C.Iterator.Element
 ) {
   for i in elements.indices {
     elements[i] = transform(elements[i])
@@ -74,23 +74,23 @@ extension TestSuite {
     CollectionWithComparableElement : MutableCollectionType
     where
     Collection.SubSequence : MutableCollectionType,
-    Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.Iterator.Element == Collection.Iterator.Element,
     Collection.SubSequence.SubSequence == Collection.SubSequence,
-    CollectionWithEquatableElement.Generator.Element : Equatable,
-    CollectionWithComparableElement.Generator.Element : Comparable
+    CollectionWithEquatableElement.Iterator.Element : Equatable,
+    CollectionWithComparableElement.Iterator.Element : Comparable
   >(
     testNamePrefix: String = "",
-    makeCollection: ([Collection.Generator.Element]) -> Collection,
-    wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
-    extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([Collection.Iterator.Element]) -> Collection,
+    wrapValue: (OpaqueValue<Int>) -> Collection.Iterator.Element,
+    extractValue: (Collection.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Generator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Generator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
-    makeCollectionOfComparable: ([CollectionWithComparableElement.Generator.Element]) -> CollectionWithComparableElement,
-    wrapValueIntoComparable: (MinimalComparableValue) -> CollectionWithComparableElement.Generator.Element,
-    extractValueFromComparable: ((CollectionWithComparableElement.Generator.Element) -> MinimalComparableValue),
+    makeCollectionOfComparable: ([CollectionWithComparableElement.Iterator.Element]) -> CollectionWithComparableElement,
+    wrapValueIntoComparable: (MinimalComparableValue) -> CollectionWithComparableElement.Iterator.Element,
+    extractValueFromComparable: ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
@@ -377,26 +377,26 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
     where
     Collection.Index : BidirectionalIndexType,
     Collection.SubSequence : MutableCollectionType,
-    Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.Iterator.Element == Collection.Iterator.Element,
     Collection.SubSequence.Index : BidirectionalIndexType,
     Collection.SubSequence.SubSequence == Collection.SubSequence,
     CollectionWithEquatableElement.Index : BidirectionalIndexType,
-    CollectionWithEquatableElement.Generator.Element : Equatable,
+    CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithComparableElement.Index : BidirectionalIndexType,
-    CollectionWithComparableElement.Generator.Element : Comparable
+    CollectionWithComparableElement.Iterator.Element : Comparable
   >(
     testNamePrefix: String = "",
-    makeCollection: ([Collection.Generator.Element]) -> Collection,
-    wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
-    extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([Collection.Iterator.Element]) -> Collection,
+    wrapValue: (OpaqueValue<Int>) -> Collection.Iterator.Element,
+    extractValue: (Collection.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Generator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Generator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
-    makeCollectionOfComparable: ([CollectionWithComparableElement.Generator.Element]) -> CollectionWithComparableElement,
-    wrapValueIntoComparable: (MinimalComparableValue) -> CollectionWithComparableElement.Generator.Element,
-    extractValueFromComparable: ((CollectionWithComparableElement.Generator.Element) -> MinimalComparableValue),
+    makeCollectionOfComparable: ([CollectionWithComparableElement.Iterator.Element]) -> CollectionWithComparableElement,
+    wrapValueIntoComparable: (MinimalComparableValue) -> CollectionWithComparableElement.Iterator.Element,
+    extractValueFromComparable: ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
@@ -496,26 +496,26 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     where
     Collection.Index : RandomAccessIndexType,
     Collection.SubSequence : MutableCollectionType,
-    Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.Iterator.Element == Collection.Iterator.Element,
     Collection.SubSequence.Index : RandomAccessIndexType,
     Collection.SubSequence.SubSequence == Collection.SubSequence,
     CollectionWithEquatableElement.Index : RandomAccessIndexType,
-    CollectionWithEquatableElement.Generator.Element : Equatable,
+    CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithComparableElement.Index : RandomAccessIndexType,
-    CollectionWithComparableElement.Generator.Element : Comparable
+    CollectionWithComparableElement.Iterator.Element : Comparable
   >(
     testNamePrefix: String = "",
-    makeCollection: ([Collection.Generator.Element]) -> Collection,
-    wrapValue: (OpaqueValue<Int>) -> Collection.Generator.Element,
-    extractValue: (Collection.Generator.Element) -> OpaqueValue<Int>,
+    makeCollection: ([Collection.Iterator.Element]) -> Collection,
+    wrapValue: (OpaqueValue<Int>) -> Collection.Iterator.Element,
+    extractValue: (Collection.Iterator.Element) -> OpaqueValue<Int>,
 
-    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Generator.Element]) -> CollectionWithEquatableElement,
-    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Generator.Element,
-    extractValueFromEquatable: ((CollectionWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
+    makeCollectionOfEquatable: ([CollectionWithEquatableElement.Iterator.Element]) -> CollectionWithEquatableElement,
+    wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Iterator.Element,
+    extractValueFromEquatable: ((CollectionWithEquatableElement.Iterator.Element) -> MinimalEquatableValue),
 
-    makeCollectionOfComparable: ([CollectionWithComparableElement.Generator.Element]) -> CollectionWithComparableElement,
-    wrapValueIntoComparable: (MinimalComparableValue) -> CollectionWithComparableElement.Generator.Element,
-    extractValueFromComparable: ((CollectionWithComparableElement.Generator.Element) -> MinimalComparableValue),
+    makeCollectionOfComparable: ([CollectionWithComparableElement.Iterator.Element]) -> CollectionWithComparableElement,
+    wrapValueIntoComparable: (MinimalComparableValue) -> CollectionWithComparableElement.Iterator.Element,
+    extractValueFromComparable: ((CollectionWithComparableElement.Iterator.Element) -> MinimalComparableValue),
 
     checksAdded: Box<Set<String>> = Box([]),
     resiliencyChecks: CollectionMisuseResiliencyChecks = .all,

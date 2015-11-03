@@ -45,13 +45,13 @@ struct PiecewiseTransformedSequenceOf<
         TransformerSequence: SequenceType,
         Transformable: SourceTargetTransformable
     where
-        SourceSequence.Generator.Element == Transformable.Source,
-        TransformerSequence.Generator.Element == Transformable.Transformer
+        SourceSequence.Iterator.Element == Transformable.Source,
+        TransformerSequence.Iterator.Element == Transformable.Transformer
         >: SequenceType {
     
-    typealias Source = SourceSequence.Generator.Element
+    typealias Source = SourceSequence.Iterator.Element
     typealias Target = Transformable.Target
-    typealias Generator = PiecewiseTransformedIteratorOf<Source, Target, SourceSequence.Generator, TransformerSequence.Generator, Transformable>
+    typealias Iterator = PiecewiseTransformedIteratorOf<Source, Target, SourceSequence.Iterator, TransformerSequence.Iterator, Transformable>
     
  
     let inputs: SourceSequence
@@ -62,7 +62,7 @@ struct PiecewiseTransformedSequenceOf<
         self.transformers = transformers
     }
     
-    func generate() -> Generator {
+    func generate() -> Iterator {
         return PiecewiseTransformedIteratorOf(sourceIterator: inputs.generate(), transformerIterator: transformers.generate())
     }
 }

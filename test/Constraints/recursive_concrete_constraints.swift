@@ -1,7 +1,7 @@
 // RUN: %target-parse-verify-swift
 
 struct S<A: CollectionType where A.Index == Int> : CollectionType {
-  typealias Element = A.Generator.Element
+  typealias Element = A.Iterator.Element
   typealias Index = A.Index
   
   init(base: A, baseRange: Range<Index>) {

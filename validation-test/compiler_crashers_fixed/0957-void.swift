@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 import Foundation
-return x = [0.Generator.count](#object1: A? = {
+return x = [0.Iterator.count](#object1: A? = {
 protocol c = "foo"ab"
 func d(b: T) {
 ())() {

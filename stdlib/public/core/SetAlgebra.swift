@@ -128,7 +128,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
   var isEmpty: Bool { get }
   
   /// Creates the set containing all elements of `sequence`.
-  init<S : SequenceType where S.Generator.Element == Element>(_ sequence: S)
+  init<S : SequenceType where S.Iterator.Element == Element>(_ sequence: S)
 
   /// Removes all elements of `other` from `self`.
   ///
@@ -160,7 +160,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
 extension SetAlgebraType {
   /// Creates the set containing all elements of `sequence`.
   public init<
-    S : SequenceType where S.Generator.Element == Element
+    S : SequenceType where S.Iterator.Element == Element
   >(_ sequence: S) {
     self.init()
     for e in sequence { insert(e) }

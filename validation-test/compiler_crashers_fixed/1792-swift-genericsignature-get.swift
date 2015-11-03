@@ -9,7 +9,7 @@ class func b(f: NSObject {
 return [0x31] as BooleanType, ")
 case .init() {
 class c {
-var d.Generator..dynamicType.C() -> T : () {
+var d.Iterator..dynamicType.C() -> T : () {
 }
 protocol A : a {
 init <I : String {

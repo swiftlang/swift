@@ -98,8 +98,9 @@ protocol HasherType {
   // collections.
   mutating func combineSequence<
     S : SequenceType
-  where
-    S.Generator.Element : NewHashable>(s: S)
+    where
+    S.Iterator.Element : NewHashable
+  >(s: S)
 
   mutating func combine<H : NewHashable>(value: H)
 }
@@ -126,8 +127,9 @@ struct InProcessHashtableHasher : HasherType {
 
   mutating func combineSequence<
     S : SequenceType
-  where
-    S.Generator.Element : NewHashable>(s: S) {
+    where
+    S.Iterator.Element : NewHashable
+  >(s: S) {
     for v in s {
       v.combineIntoHash(&self)
     }

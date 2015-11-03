@@ -14,7 +14,7 @@
 
 # We know we will eventually get a SequenceType.Element type.  Define
 # a shorthand that we can use today.
-GElement = "Generator.Element"
+GElement = "Iterator.Element"
 
 }%
 
@@ -23,7 +23,7 @@ GElement = "Generator.Element"
 //===----------------------------------------------------------------------===//
 
 extension CollectionType where Index : BidirectionalIndexType {
-  public var last: Generator.Element? {
+  public var last: Iterator.Element? {
     return isEmpty ? nil : self[endIndex.predecessor()]
   }
 }
@@ -211,14 +211,14 @@ sortIsUnstableForComparable = """\
 
 % for Self in [ 'SequenceType', 'MutableCollectionType' ]:
 
-extension ${Self} where Self.Generator.Element : Comparable {
+extension ${Self} where Self.Iterator.Element : Comparable {
 ${sortDocCommentForComparable}
   ///
 ${sortIsUnstableForComparable}
   ///
 ${orderingRequirementForComparable}
   @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
-  public func sort() -> [Generator.Element] {
+  public func sort() -> [Iterator.Element] {
     var result = ContiguousArray(self)
     result.sortInPlace()
     return Array(result)
@@ -233,10 +233,10 @@ ${sortIsUnstableForPredicate}
 ${orderingRequirementForPredicate}
   @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
   public func sort(
-    @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
-  ) -> [Generator.Element] {
+    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
+  ) -> [Iterator.Element] {
     typealias EscapingBinaryPredicate =
-       (Generator.Element, Generator.Element) -> Bool
+       (Iterator.Element, Iterator.Element) -> Bool
     let escapableIsOrderedBefore =
       unsafeBitCast(isOrderedBefore, EscapingBinaryPredicate.self)
 
@@ -251,7 +251,7 @@ ${orderingRequirementForPredicate}
 extension MutableCollectionType
   where
   Self.Index : RandomAccessIndexType,
-  Self.Generator.Element : Comparable {
+  Self.Iterator.Element : Comparable {
 
 ${sortInPlaceDocCommentForComparable}
   ///
@@ -280,10 +280,10 @@ ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
   public mutating func sortInPlace(
-    @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
+    @noescape isOrderedBefore: (Iterator.Element, Iterator.Element) -> Bool
   ) {
     typealias EscapingBinaryPredicate =
-      (Generator.Element, Generator.Element) -> Bool
+      (Iterator.Element, Iterator.Element) -> Bool
     let escapableIsOrderedBefore =
       unsafeBitCast(isOrderedBefore, EscapingBinaryPredicate.self)
 

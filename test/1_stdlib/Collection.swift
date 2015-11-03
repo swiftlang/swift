@@ -2,7 +2,7 @@
 // REQUIRES: executable_test
 
 struct X : CollectionType {
-  typealias Element = String.CharacterView.Generator.Element
+  typealias Element = String.CharacterView.Iterator.Element
   typealias Index = String.Index
   var msg: String
 
@@ -40,8 +40,10 @@ for a in PermutationGenerator(elements: foobar, indices: r) {
 print("")
 
 func isPalindrome0<
-  S: CollectionType 
-    where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
+  S : CollectionType
+  where
+  S.Index : BidirectionalIndexType,
+  S.Iterator.Element : Equatable
 >(seq: S) -> Bool {
   typealias Index = S.Index
 
@@ -63,8 +65,10 @@ print(isPalindrome0(X("GoHangaSalamiImaLasagneHoG")))
 print(isPalindrome0(X("GoHangaSalamiimalaSagnaHoG")))
 
 func isPalindrome1<
-  S: CollectionType 
-  where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
+  S : CollectionType
+  where
+  S.Index : BidirectionalIndexType,
+  S.Iterator.Element : Equatable
 >(seq: S) -> Bool {
 
   var a = PermutationGenerator(elements: seq, indices: seq.indices)
@@ -78,8 +82,11 @@ func isPalindrome1<
 }
 
 func isPalindrome1_5<
-  S: CollectionType 
-  where S.Index: BidirectionalIndexType, S.Generator.Element == S.Generator.Element, S.Generator.Element: Equatable
+  S: CollectionType
+  where
+  S.Index: BidirectionalIndexType,
+  S.Iterator.Element == S.Iterator.Element,
+  S.Iterator.Element: Equatable
 >(seq: S) -> Bool {
 
   var b = seq.lazy.reverse().generate()
@@ -104,8 +111,10 @@ print(isPalindrome1_5(X("FleetoMeReMoteelF")))
 // Finally, one that actually uses indexing to do half as much work.
 // BidirectionalIndexType traversal finally pays off!
 func isPalindrome2<
-  S: CollectionType 
-    where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
+  S: CollectionType
+  where
+  S.Index : BidirectionalIndexType,
+  S.Iterator.Element: Equatable
 >(seq: S) -> Bool {
 
   var b = seq.startIndex, e = seq.endIndex
@@ -134,8 +143,10 @@ print(isPalindrome2(X("ZerimarORamireZ")))
 print(isPalindrome2(X("Zerimar-O-ramireZ")))
 
 func isPalindrome4<
-  S: CollectionType 
-  where S.Index: BidirectionalIndexType, S.Generator.Element: Equatable
+  S: CollectionType
+  where
+  S.Index : BidirectionalIndexType,
+  S.Iterator.Element : Equatable
 >(seq: S) -> Bool {
   typealias Index = S.Index
 
@@ -168,9 +179,9 @@ func testCount() {
 }
 testCount()
 
-struct SequenceOnly<T: SequenceType> : SequenceType {
+struct SequenceOnly<T : SequenceType> : SequenceType {
   var base: T
-  func generate() -> T.Generator { return base.generate() }
+  func generate() -> T.Iterator { return base.generate() }
 }
 
 func testUnderestimateCount() {

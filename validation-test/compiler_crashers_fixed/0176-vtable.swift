@@ -498,7 +498,7 @@ class e: n, p {
 func s<o : m, o : p o o.m == o> (m: o) {
 }
 func s<v : p o v.m == m> (u: String) -> <t>(() -> t) -
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
 func f<m>() -> (m, m -> m) -> m {
    e c e.i = {
 }

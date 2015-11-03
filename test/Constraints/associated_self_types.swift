@@ -5,20 +5,19 @@ protocol P : CollectionType {
 }
 postfix operator ~>> {}
 
-postfix func ~>> <_Self: SequenceType, A: P where _Self.Generator.Element == A.Generator.Element>(_:_Self) -> A {
+postfix func ~>> <_Self : SequenceType, A : P where _Self.Iterator.Element == A.Iterator.Element>(_:_Self) -> A {
   return A()
 }
 
 protocol _ExtendedSequence : SequenceType {
-  //typealias Generator = RangeGenerator<T>
-  postfix func ~>> <A: P where Self.Generator.Element == A.Generator.Element>(s: Self) -> A
+  postfix func ~>> <A : P where Self.Iterator.Element == A.Iterator.Element>(s: Self) -> A
 }
 
 extension Range : _ExtendedSequence {
 }
 
 protocol Q : SequenceType {
-  func f<QS: SequenceType where QS.Generator.Element == Self.Generator.Element>(x: QS)
+  func f<QS : SequenceType where QS.Iterator.Element == Self.Iterator.Element>(x: QS)
 }
 
 struct No<NT> : IteratorProtocol {
@@ -28,9 +27,9 @@ struct No<NT> : IteratorProtocol {
 }
 
 class X<XT> : Q {
-  typealias Generator = No<XT>
+  typealias Iterator = No<XT>
   
-  func f<SX: SequenceType where SX.Generator.Element == X.Generator.Element>(x: SX) {
+  func f<SX : SequenceType where SX.Iterator.Element == X.Iterator.Element>(x: SX) {
   }
   
   func generate() -> No<XT> {

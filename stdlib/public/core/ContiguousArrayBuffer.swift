@@ -500,7 +500,7 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
 
 /// Append the elements of `rhs` to `lhs`.
 public func += <
-  Element, C : CollectionType where C.Generator.Element == Element
+  Element, C : CollectionType where C.Iterator.Element == Element
 > (inout lhs: _ContiguousArrayBuffer<Element>, rhs: C) {
   let oldCount = lhs.count
   let newCount = oldCount + numericCast(rhs.count)
@@ -541,7 +541,7 @@ extension _ContiguousArrayBuffer : CollectionType {
 
 extension SequenceType {
   public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Generator.Element> {
+    -> _ContiguousArrayBuffer<Iterator.Element> {
     return _copySequenceToNativeArrayBuffer(self)
   }
 }
@@ -549,10 +549,10 @@ extension SequenceType {
 @warn_unused_result
 internal func _copySequenceToNativeArrayBuffer<
   S : SequenceType
->(source: S) -> _ContiguousArrayBuffer<S.Generator.Element> {
+>(source: S) -> _ContiguousArrayBuffer<S.Iterator.Element> {
   let initialCapacity = source.underestimateCount()
   var builder =
-    _UnsafePartiallyInitializedContiguousArrayBuffer<S.Generator.Element>(
+    _UnsafePartiallyInitializedContiguousArrayBuffer<S.Iterator.Element>(
       initialCapacity: initialCapacity)
 
   var iterator = source.generate()
@@ -574,7 +574,7 @@ internal func _copySequenceToNativeArrayBuffer<
 
 extension CollectionType {
   public func _copyToNativeArrayBuffer(
-  ) -> _ContiguousArrayBuffer<Generator.Element> {
+  ) -> _ContiguousArrayBuffer<Iterator.Element> {
     return _copyCollectionToNativeArrayBuffer(self)
   }
 }
@@ -596,14 +596,14 @@ extension _ContiguousArrayBuffer {
 @warn_unused_result
 internal func _copyCollectionToNativeArrayBuffer<
   C : CollectionType
->(source: C) -> _ContiguousArrayBuffer<C.Generator.Element>
+>(source: C) -> _ContiguousArrayBuffer<C.Iterator.Element>
 {
   let count: Int = numericCast(source.count)
   if count == 0 {
     return _ContiguousArrayBuffer()
   }
 
-  let result = _ContiguousArrayBuffer<C.Generator.Element>(
+  let result = _ContiguousArrayBuffer<C.Iterator.Element>(
     count: numericCast(count),
     minimumCapacity: 0
   )

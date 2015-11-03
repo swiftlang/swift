@@ -17,7 +17,7 @@ class d: f{  class func i {}
 func a(b: Int = 0) {
 }
 let c = a
-func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -> T? {
+func some<S: SequenceType, T where Optional<T> == S.Iterator.Element>(xs : S) -> T? {
 for (mx : T?) in xs {
 if let x = mx {
 }

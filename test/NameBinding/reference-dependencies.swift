@@ -351,7 +351,7 @@ struct Sentinel2 {}
 // CHECK-DAG: - ["Sb", "InnerToBool"]
 // CHECK-DAG: - !private ["Vs10Dictionary", "Key"]
 // CHECK-DAG: - !private ["Vs10Dictionary", "Value"]
-// CHECK-DAG: - !private ["V4main17OtherFileIntArray", "Generator"]
+// CHECK-DAG: - !private ["V4main17OtherFileIntArray", "Iterator"]
 // CHECK-DAG: - !private ["V4main17OtherFileIntArray", "deinit"]
 // CHECK-DAG: - !private ["V4main18OtherFileOuterType", "InnerType"]
 // CHECK-DAG: - !private ["VV4main18OtherFileOuterType9InnerType", "init"]

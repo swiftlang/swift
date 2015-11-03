@@ -10,4 +10,4 @@ func b<C {
 }
 struct Q<T {
 func a { c
-protocol b { func b(x: [T.Generator.c
+protocol b { func b(x: [T.Iterator.c

@@ -44,7 +44,7 @@ public struct LazyMapSequence<Base : SequenceType, Element>
   /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> LazyMapIterator<Base.Generator, Element> {
+  public func generate() -> LazyMapIterator<Base.Iterator, Element> {
     return LazyMapIterator(_base: _base.generate(), _transform: _transform)
   }
 
@@ -58,13 +58,13 @@ public struct LazyMapSequence<Base : SequenceType, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  public init(_ base: Base, transform: (Base.Generator.Element)->Element) {
+  public init(_ base: Base, transform: (Base.Iterator.Element)->Element) {
     self._base = base
     self._transform = transform
   }
   
   public var _base: Base
-  internal var _transform: (Base.Generator.Element)->Element
+  internal var _transform: (Base.Iterator.Element)->Element
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -99,7 +99,7 @@ public struct LazyMapCollection<Base : CollectionType, Element>
   /// Returns an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> LazyMapIterator<Base.Generator, Element> {
+  public func generate() -> LazyMapIterator<Base.Iterator, Element> {
     return LazyMapIterator(_base: _base.generate(), _transform: _transform)
   }
 
@@ -117,13 +117,13 @@ public struct LazyMapCollection<Base : CollectionType, Element>
 
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
-  public init(_ base: Base, transform: (Base.Generator.Element)->Element) {
+  public init(_ base: Base, transform: (Base.Iterator.Element)->Element) {
     self._base = base
     self._transform = transform
   }
   
   public var _base: Base
-  var _transform: (Base.Generator.Element)->Element
+  var _transform: (Base.Iterator.Element)->Element
 }
 
 //===--- Support for s.lazy ----------------------------------------------===//
@@ -134,7 +134,7 @@ extension LazySequenceType {
   /// calling `transform` function on a base element.
   @warn_unused_result
   public func map<U>(
-    transform: (Elements.Generator.Element) -> U
+    transform: (Elements.Iterator.Element) -> U
   ) -> LazyMapSequence<Self.Elements, U> {
     return LazyMapSequence(self.elements, transform: transform)
   }
@@ -146,7 +146,7 @@ extension LazyCollectionType {
   /// calling `transform` function on a base element.
   @warn_unused_result
   public func map<U>(
-    transform: (Elements.Generator.Element) -> U
+    transform: (Elements.Iterator.Element) -> U
   ) -> LazyMapCollection<Self.Elements, U> {
     return LazyMapCollection(self.elements, transform: transform)
   }

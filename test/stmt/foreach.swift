@@ -27,7 +27,7 @@ func bad_containers_3(bc: BadContainer3) {
 struct BadIterator1 {}
 
 struct BadContainer4 : SequenceType { // expected-error{{type 'BadContainer4' does not conform to protocol 'SequenceType'}}
-  typealias Generator = BadIterator1 // expected-note{{possibly intended match 'Generator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
+  typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
   func generate() -> BadIterator1 { }
 }
 
@@ -41,7 +41,7 @@ struct GoodRange<Int> : SequenceType, IteratorProtocol {
   typealias Element = Int
   func next() -> Int? {}
 
-  typealias Generator = GoodRange<Int>
+  typealias Iterator = GoodRange<Int>
   func generate() -> GoodRange<Int> { return self }
 }
 
@@ -49,7 +49,7 @@ struct GoodTupleIterator: SequenceType, IteratorProtocol {
   typealias Element = (Int, Float)
   func next() -> (Int, Float)? {}
 
-  typealias Generator = GoodTupleIterator
+  typealias Iterator = GoodTupleIterator
   func generate() -> GoodTupleIterator {}
 }
 

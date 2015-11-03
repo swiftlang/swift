@@ -282,7 +282,7 @@ func p<p>() -> (p, p -> p) -> p {
 }
 j(k(m, k(2, 3)))
 func l(p: j) -> <n>(() -> n
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
 d = i
 }
 class d<j : i, f : i where j.i == f> : e {

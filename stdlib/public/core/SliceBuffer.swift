@@ -77,7 +77,7 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
   ///   `_ContiguousArrayBuffer` and
   ///   `insertCount <= numericCast(newValues.count)`.
   public mutating func replace<
-    C : CollectionType where C.Generator.Element == Element
+    C : CollectionType where C.Iterator.Element == Element
   >(
     subRange subRange: Range<Int>,
     with insertCount: Int,

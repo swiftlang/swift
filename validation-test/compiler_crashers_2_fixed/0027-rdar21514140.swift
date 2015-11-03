@@ -3,15 +3,15 @@
 /// A type that is just a wrapper over some base Sequence
 internal protocol _SequenceWrapperType {
   typealias Base : SequenceType
-  typealias Generator : IteratorProtocol = Base.Generator
+  typealias Iterator : IteratorProtocol = Base.Iterator
   
   var _base: Base {get}
 }
 
 extension SequenceType
-  where Self : _SequenceWrapperType, Self.Generator == Self.Base.Generator {
+  where Self : _SequenceWrapperType, Self.Iterator == Self.Base.Iterator {
 
-  public func generate() -> Base.Generator {
+  public func generate() -> Base.Iterator {
     return self._base.generate()
   }
 
@@ -20,7 +20,7 @@ extension SequenceType
   }
 
   public func _customContainsEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
@@ -35,12 +35,12 @@ extension SequenceType
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
   public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
+    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
     return _base._copyToNativeArrayBuffer()
   }
 
   /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>) {
+  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Iterator.Element>) {
     return _base._initializeTo(ptr)
   }
 }
@@ -73,7 +73,7 @@ extension CollectionType
   ///
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
-  public subscript(position: Base.Index) -> Base.Generator.Element {
+  public subscript(position: Base.Index) -> Base.Iterator.Element {
     return _base[position]
   }
 }
@@ -104,13 +104,13 @@ public protocol _prext_LazySequenceType : SequenceType {
   ///
   /// Note: this property need not be implemented by conforming types, it has a
   /// default implementation in a protocol extension.
-  var array: [Generator.Element] {get}
+  var array: [Iterator.Element] {get}
 }
 
 extension _prext_LazySequenceType {
   /// an Array, created on-demand, containing the elements of this
   /// lazy SequenceType.
-  public var array: [Generator.Element] {
+  public var array: [Iterator.Element] {
     return Array(self)
   }
 }
@@ -135,7 +135,7 @@ public func _prext_lazy<S : SequenceType>(s: S) -> _prext_LazySequence<S> {
 }
 
 public extension SequenceType
-  where Self.Generator == Self, Self : IteratorProtocol {
+  where Self.Iterator == Self, Self : IteratorProtocol {
   public func generate() -> Self {
     return self
   }
@@ -201,7 +201,7 @@ public func _prext_lazy<Base: CollectionType>(s: Base) -> _prext_LazyCollection<
 /// The `IteratorProtocol` used by `_prext_MapSequence` and `_prext_MapCollection`.
 /// Produces each element by passing the output of the `Base`
 /// `IteratorProtocol` through a transform function returning `T`.
-public struct _prext_MapGenerator<
+public struct _prext_MapIterator<
   Base: IteratorProtocol, T
 > : IteratorProtocol, SequenceType {
   /// Advance to the next element and return it, or `nil` if no next
@@ -233,13 +233,13 @@ public struct _prext_MapSequence<Base : SequenceType, T>
 
   typealias Elements = _prext_MapSequence
 
-  public func generate() -> _prext_MapGenerator<Base.Generator,T> {
-    return _prext_MapGenerator(
+  public func generate() -> _prext_MapIterator<Base.Iterator,T> {
+    return _prext_MapIterator(
       _base: _base.generate(), _transform: _transform)
   }
 
   var _base: Base
-  var _transform: (Base.Generator.Element)->T
+  var _transform: (Base.Iterator.Element)->T
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -262,8 +262,8 @@ public struct _prext_MapCollection<Base : CollectionType, T>
     return _transform(_base[position])
   }
 
-  public func generate() -> _prext_MapGenerator<Base.Generator, T> {
-    return _prext_MapGenerator(_base: _base.generate(), _transform: _transform)
+  public func generate() -> _prext_MapIterator<Base.Iterator, T> {
+    return _prext_MapIterator(_base: _base.generate(), _transform: _transform)
   }
 
   public func underestimateCount() -> Int {
@@ -271,7 +271,7 @@ public struct _prext_MapCollection<Base : CollectionType, T>
   }
 
   var _base: Base
-  var _transform: (Base.Generator.Element)->T
+  var _transform: (Base.Iterator.Element)->T
 }
 
 //===--- Support for lazy(s) ----------------------------------------------===//
@@ -281,7 +281,7 @@ extension _prext_LazySequenceType {
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   public func map<U>(
-    transform: (Elements.Generator.Element) -> U
+    transform: (Elements.Iterator.Element) -> U
   ) -> _prext_MapSequence<Self.Elements, U> {
     return _prext_MapSequence(_base: self.elements, _transform: transform)
   }
@@ -292,7 +292,7 @@ extension _prext_LazyCollectionType {
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   public func map<U>(
-    transform: (Elements.Generator.Element) -> U
+    transform: (Elements.Iterator.Element) -> U
   ) -> _prext_MapCollection<Self.Elements, U> {
     return _prext_MapCollection(_base: self.elements, _transform: transform)
   }
@@ -383,11 +383,11 @@ extension CollectionType
   where Self : __prext_ReverseCollectionType,
   Self.Index : _prext_ReverseIndexType,
   Self.Index.Base == Self.Base.Index,
-  Generator.Element == Self.Base.Generator.Element
+  Iterator.Element == Self.Base.Iterator.Element
 {
   public var startIndex : Index { return Index(_base.endIndex) }
   public var endIndex : Index { return Index(_base.startIndex) }
-  public subscript(position: Index) -> Self.Base.Generator.Element {
+  public subscript(position: Index) -> Self.Base.Iterator.Element {
     return _base[position._base.predecessor()]
   }
 }

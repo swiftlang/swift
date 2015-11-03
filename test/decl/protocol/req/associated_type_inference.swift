@@ -247,15 +247,15 @@ protocol MyIteratorType {
 }
 
 protocol MySequenceType {
-  typealias Generator : MyIteratorType
+  typealias Iterator : MyIteratorType
   typealias SubSequence
 
   func foo() -> SubSequence
-  func generate() -> Generator
+  func generate() -> Iterator
 }
 
 extension MySequenceType {
-  func foo() -> MyAnySequence<Generator.Element> {
+  func foo() -> MyAnySequence<Iterator.Element> {
     return MyAnySequence()
   }
 }

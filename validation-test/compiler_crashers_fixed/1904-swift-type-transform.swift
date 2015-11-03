@@ -13,7 +13,7 @@ func g<f = i(A, Any) -> Any] as BooleanType>(n: d<T>(Range<h>) -> U) -> Any) -> 
 }
 }
 class c : a {
-class A where T : SequenceType where S<d.Generator.startIndex, V, f<(false)) -> T -> {
+class A where T : SequenceType where S<d.Iterator.startIndex, V, f<(false)) -> T -> {
 }
 protocol a {
 protocol a {

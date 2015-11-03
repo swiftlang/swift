@@ -106,12 +106,12 @@ public class SequenceLog {
 public protocol LoggingSequenceType  : SequenceType, LoggingType {
   typealias Base : SequenceType
   typealias Log : AnyObject = SequenceLog
-  typealias Generator : IteratorProtocol = LoggingIterator<Base.Generator>
+  typealias Iterator : IteratorProtocol = LoggingIterator<Base.Iterator>
 }
 
 extension LoggingSequenceType
-  where Log == SequenceLog, Generator == LoggingIterator<Base.Generator> {
-  public func generate() -> LoggingIterator<Base.Generator> {
+  where Log == SequenceLog, Iterator == LoggingIterator<Base.Iterator> {
+  public func generate() -> LoggingIterator<Base.Iterator> {
     ++Log.generate[selfType]
     return LoggingIterator(base.generate())
   }
@@ -122,21 +122,21 @@ extension LoggingSequenceType
   }
 
   public func map<T>(
-    @noescape transform: (Base.Generator.Element) -> T
+    @noescape transform: (Base.Iterator.Element) -> T
   ) -> [T] {
     ++Log.map[selfType]
     return base.map(transform)
   }
 
   public func filter(
-    @noescape includeElement: (Base.Generator.Element) -> Bool
-  ) -> [Base.Generator.Element] {
+    @noescape includeElement: (Base.Iterator.Element) -> Bool
+  ) -> [Base.Iterator.Element] {
     ++Log.filter[selfType]
     return base.filter(includeElement)
   }
   
   public func _customContainsEquatableElement(
-    element: Base.Generator.Element
+    element: Base.Iterator.Element
   ) -> Bool? {
     ++Log._customContainsEquatableElement[selfType]
     return base._customContainsEquatableElement(element)
@@ -155,14 +155,14 @@ extension LoggingSequenceType
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
   public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
+    -> _ContiguousArrayBuffer<Base.Iterator.Element> {
     ++Log._copyToNativeArrayBuffer[selfType]
     return base._copyToNativeArrayBuffer()
   }
 
   /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
-    -> UnsafeMutablePointer<Base.Generator.Element> {
+  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Iterator.Element>)
+    -> UnsafeMutablePointer<Base.Iterator.Element> {
     ++Log._initializeTo[selfType]
     return base._initializeTo(ptr)
   }
@@ -213,7 +213,7 @@ where Index == Base.Index {
     ++CollectionLog.endIndex[selfType]
     return base.endIndex
   }
-  public subscript(position: Base.Index) -> Base.Generator.Element {
+  public subscript(position: Base.Index) -> Base.Iterator.Element {
     ++CollectionLog.subscriptIndex[selfType]
     return base[position]
   }
@@ -233,25 +233,25 @@ where Index == Base.Index {
     return base.count
   }
   
-  public func _customIndexOfEquatableElement(element: Base.Generator.Element) -> Base.Index?? {
+  public func _customIndexOfEquatableElement(element: Base.Iterator.Element) -> Base.Index?? {
     ++CollectionLog._customIndexOfEquatableElement[selfType]
     return base._customIndexOfEquatableElement(element)
   }
 
-  public var first: Base.Generator.Element? {
+  public var first: Base.Iterator.Element? {
     ++CollectionLog.first[selfType]
     return base.first
   }
 }
 
 public struct LoggingCollection<Base_: CollectionType> : LoggingCollectionType {
-  public typealias Generator = LoggingIterator<Base.Generator>
+  public typealias Iterator = LoggingIterator<Base.Iterator>
   public typealias Log = CollectionLog
   public typealias Base = Base_
   public typealias SubSequence = Base.SubSequence
 
-  public func generate() -> Generator {
-    return Generator(base.generate())
+  public func generate() -> Iterator {
+    return Iterator(base.generate())
   }
   public init(_ base: Base_) {
     self.base = base

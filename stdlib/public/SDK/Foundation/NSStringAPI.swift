@@ -741,7 +741,7 @@ extension String {
   /// Produces an initialized `NSString` object equivalent to the given
   /// `bytes` interpreted in the given `encoding`.
   public init? <
-    S: SequenceType where S.Generator.Element == UInt8
+    S: SequenceType where S.Iterator.Element == UInt8
   >(
     bytes: S, encoding: NSStringEncoding
   ) {

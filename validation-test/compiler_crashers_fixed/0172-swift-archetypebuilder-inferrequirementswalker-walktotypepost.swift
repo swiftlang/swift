@@ -127,7 +127,7 @@ class C: B, A {
 func e<T where T: A, T: B>(t: T) {
     t.c()
 }
-struct c<d: SequenceType, b where Optional<b> == d.Generator.Element>
+struct c<d: SequenceType, b where Optional<b> == d.Iterator.Element>
 func f<e>() -> (e, e -> e) -> e {
     e b e.c = {}
     {

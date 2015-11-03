@@ -1,12 +1,12 @@
 // RUN: not %target-swift-frontend %s -parse
 
 public protocol Q_SequenceDefaultsType {
-  typealias Generator : IteratorProtocol
-  func generate() -> Generator
+  typealias Iterator : IteratorProtocol
+  func generate() -> Iterator
 }
 
 extension Q_SequenceDefaultsType {
-  typealias Element = Generator.Element
+  typealias Element = Iterator.Element
   
   public final func underestimateCount() -> Int { return 0 }
   public final func preprocessingPass<R>(body: (Self)->R) -> R? {
@@ -15,10 +15,10 @@ extension Q_SequenceDefaultsType {
 
   /// Create a ContiguousArray containing the elements of `self`,
   /// in the same order.
-  public final func copyToContiguousArray() -> ContiguousArray<Generator.Element> {
+  public final func copyToContiguousArray() -> ContiguousArray<Iterator.Element> {
     let initialCapacity = underestimateCount()
 
-    var result = _ContiguousArrayBuffer<Generator.Element>(
+    var result = _ContiguousArrayBuffer<Iterator.Element>(
       count: initialCapacity, minimumCapacity: 0)
 
     var g = self.generate()
@@ -31,7 +31,7 @@ extension Q_SequenceDefaultsType {
   /// Initialize the storage at baseAddress with the contents of this
   /// sequence.
   public final func initializeRawMemory(
-    baseAddress: UnsafeMutablePointer<Generator.Element>
+    baseAddress: UnsafeMutablePointer<Iterator.Element>
   ) {
     var p = baseAddress
     var g = self.generate()
@@ -41,7 +41,7 @@ extension Q_SequenceDefaultsType {
     }
   }
 
-//  public final static func _constrainElement(Generator.Element) {}
+//  public final static func _constrainElement(Iterator.Element) {}
 }
 
 /// A type that can be iterated with a `for`\ ...\ `in` loop.
@@ -53,9 +53,9 @@ extension Q_SequenceDefaultsType {
 public protocol Q_SequenceType : Q_SequenceDefaultsType {
   /// A type that provides the *sequence*\ 's iteration interface and
   /// encapsulates its iteration state.
-  typealias Generator : IteratorProtocol
+  typealias Iterator : IteratorProtocol
 
-  func generate() -> Generator
+  func generate() -> Iterator
 
   /// Return a value less than or equal to the number of elements in
   /// self, **nondestructively**.
@@ -69,12 +69,12 @@ public protocol Q_SequenceType : Q_SequenceDefaultsType {
 
   /// Create a ContiguousArray containing the elements of `self`,
   /// in the same order.
-  func copyToContiguousArray() -> ContiguousArray<Generator.Element>
+  func copyToContiguousArray() -> ContiguousArray<Iterator.Element>
 
   /// Initialize the storage at baseAddress with the contents of this
   /// sequence.
   func initializeRawMemory(
-    baseAddress: UnsafeMutablePointer<Generator.Element>
+    baseAddress: UnsafeMutablePointer<Iterator.Element>
   )
   
 //  static func _constrainElement(Element)
@@ -97,13 +97,13 @@ public protocol Q_IndexableType {
 }
 
 extension Q_IndexableType {
-  public final func generate() -> Q_IndexingGenerator<Self> {
-    return Q_IndexingGenerator(pos: self.startIndex, elements: self)
+  public final func generate() -> Q_IndexingIterator<Self> {
+    return Q_IndexingIterator(pos: self.startIndex, elements: self)
   }
 }
 
 public protocol Q_CollectionDefaultsType : Q_IndexableType, Q_SequenceType {
-  typealias Element = Generator.Element
+  typealias Element = Iterator.Element
 }
 
 extension Q_CollectionDefaultsType {
@@ -121,7 +121,7 @@ extension Q_CollectionDefaultsType {
   }
 }
 
-public struct Q_IndexingGenerator<C: Q_IndexableType> : Q_ConcreteIteratorProtocol {
+public struct Q_IndexingIterator<C: Q_IndexableType> : Q_ConcreteIteratorProtocol {
   public typealias Element = C.Element
   var pos: C.Index
   let elements: C
