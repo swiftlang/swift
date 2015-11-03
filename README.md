@@ -102,11 +102,16 @@ to build for other SDKs but still use Xcode, once you've built Swift using Ninja
 or one of the other supported CMake generators, you can set up an IDE-only Xcode
 environment using the build-script's `-X` flag:
 
-    swift/utils/build-script -X --skip-build -- --llvm-config=$HOME/build/swift/Ninja-DebugAssert/llvm-macosx-x86_64/bin/llvm-config
+    swift/utils/build-script -X --skip-build -- --reconfigure
 
-The `--skip-build` parameter tells build-script to only generate the project,
-not build it, and the `--llvm-config` parameter allows the Xcode project to
-share the LLVM build products and environment with Ninja.
+The `--skip-build` flag tells build-script to only generate the project,
+not build it in its entirety. A bare minimum of LLVM tools will build in order
+to configure the Xcode projects.
+
+The `--reconfigure` flag tells build-script-impl to run the CMake configuration
+step even if there is a cached configuration. As you develop in Xcode, you may
+need to rerun this from time to time to refresh your generated Xcode project,
+picking up new targets, file removals, or file additions.
 
 ## Testing Swift
 
