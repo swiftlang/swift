@@ -3285,7 +3285,6 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   A->replaceAllUsesWith(SILUndef::get(A->getType(), BB->getModule()));
   auto *NewArg = BB->replaceBBArg(i, User->getType(0));
   User->replaceAllUsesWith(NewArg);
-  User->eraseFromParent();
 
   // Rewrite the branch operand for each incoming branch.
   for (auto *Pred : BB->getPreds()) {
@@ -3296,6 +3295,8 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
       addToWorklist(Pred);
     }
   }
+
+  User->eraseFromParent();
 
   return true;
 }
