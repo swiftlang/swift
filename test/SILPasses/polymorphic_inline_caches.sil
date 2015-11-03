@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -specdevirt -dce | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -specdevirt -dce -early-codemotion | FileCheck %s
 
 sil_stage canonical
 
@@ -46,7 +46,6 @@ bb0(%0 : $A, %1 : $Builtin.Int32):
   // CHECK: bb2
   // CHECK: [[APING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1A4pingfS0_FBi32_Bi32_
   // CHECK: apply [[APING]]
-  // CHECK: strong_release %{{[0-9]+}} : $A
   // CHECK: bb3
   // CHECK: checked_cast_br [exact] %0 : $A to $B, bb5, bb6
   // CHECK: bb4
@@ -54,7 +53,6 @@ bb0(%0 : $A, %1 : $Builtin.Int32):
   // CHECK: bb5
   // CHECK: [[BPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1B4pingfS0_FBi32_Bi32_
   // CHECK: apply [[BPING]]
-  // CHECK: strong_release %{{[0-9]+}} : $B
   // CHECK: bb6
   // CHECK: checked_cast_br [exact] %0 : $A to $C, bb8, bb9
   // CHECK: bb7
@@ -62,7 +60,6 @@ bb0(%0 : $A, %1 : $Builtin.Int32):
   // CHECK: bb8
   // CHECK: [[CPING:%.*]] = function_ref @_TFC25polymorphic_inline_caches1C4pingfS0_FBi32_Bi32_
   // CHECK: apply [[CPING]]
-  // CHECK: strong_release %{{[0-9]+}} : $C
   // CHECK: bb9
   // CHECK: [[PING:%.*]] = class_method %0 : $A, #A.ping!1
   // CHECK: apply [[PING]]
@@ -156,7 +153,6 @@ sil [noinline] @_TFC5casts1G3foofS0_FT_T_ : $@convention(method) (@guaranteed G)
 sil [noinline] @_TF5casts18unchecked_ref_castFBoT_ : $@convention(thin) (@owned Builtin.NativeObject) -> () {
   // CHECK: bb0
 bb0(%0 : $Builtin.NativeObject):
-  // CHECK: strong_retain %0
   strong_retain %0 : $Builtin.NativeObject
   // CHECK: [[CAST:%.*]] = unchecked_ref_cast %0 : $Builtin.NativeObject to $E
   %3 = unchecked_ref_cast %0 : $Builtin.NativeObject to $E
@@ -168,9 +164,11 @@ bb0(%0 : $Builtin.NativeObject):
   return %7 : $()
   // CHECK: checked_cast_br [exact] [[CAST]] : $E to $E, bb2, bb3
   // CHECK: bb1
+  // CHECK: strong_release %0  
   // CHECK: return
   // CHECK: bb2
   // CHECK: [[EFOO:%.*]] = function_ref @_TFC5casts1E3foofS0_FT_T_
+  // CHECK: strong_retain %0
   // CHECK: apply [[EFOO]]
   // CHECK: bb3
   // CHECK: checked_cast_br [exact] [[CAST]] : $E to $F, bb5, bb6
@@ -178,15 +176,18 @@ bb0(%0 : $Builtin.NativeObject):
   // CHECK: br bb1
   // CHECK: bb5
   // CHECK: [[FFOO:%.*]] = function_ref @_TFC5casts1F3foofS0_FT_T_
+  // CHECK: strong_retain %0
   // CHECK: apply [[FFOO]]
   // CHECK: bb6
   // CHECK: checked_cast_br [exact] [[CAST]] : $E to $G, bb8, bb9
   // CHECK: bb7
   // CHECK: bb8
   // CHECK: [[GFOO:%.*]] = function_ref @_TFC5casts1G3foofS0_FT_T_
+  // CHECK: strong_retain %0
   // CHECK: apply [[GFOO]]
   // CHECK: bb9
   // CHECK: [[DYNAMIC:%.*]] = class_method [[CAST]] : $E, #E.foo!1
+  // CHECK: strong_retain %0
   // CHECK: apply [[DYNAMIC]]
 }
 
@@ -194,7 +195,6 @@ bb0(%0 : $Builtin.NativeObject):
 sil [noinline] @_TF5casts22unchecked_ref_castFCS_1ET_ : $@convention(thin) (@owned E) -> () {
 // CHECK: bb0
 bb0(%0 : $E):
-  // CHECK: strong_retain %0
   strong_retain %0 : $E
   // CHECK: [[CAST:%.*]] = unchecked_ref_cast %0 : $E to $F
   %3 = unchecked_ref_cast %0 : $E to $F
@@ -206,12 +206,15 @@ bb0(%0 : $E):
   return %7 : $()
   // CHECK: checked_cast_br [exact] [[CAST]] : $F to $F, bb2, bb3
   // CHECK: bb1
+  // CHECK: strong_release %0
   // CHECK: return
   // CHECK: bb2
   // CHECK: [[FFOO:%.*]] = function_ref @_TFC5casts1F3foofS0_FT_T_
+  // CHECK: strong_retain %0
   // CHECK: apply [[FFOO]]
   // CHECK: bb3
   // CHECK: [[DYNAMIC:%.*]] = class_method [[CAST]] : $F, #F.foo!1
+  // CHECK: strong_retain %0
   // CHECK: apply [[DYNAMIC]]
 }
 

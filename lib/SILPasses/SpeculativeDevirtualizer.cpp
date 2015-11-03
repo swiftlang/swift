@@ -92,50 +92,6 @@ static bool isOperandOf(SILValue V, SILInstruction *I) {
   return false;
 }
 
-/// Find a retain of the class instance, which happens before a given
-/// instruction. Return this retain instruction, if it is possible to
-/// sink it, or nullptr otherwise.
-static StrongRetainInst *findClassInstanceRetainForSinking(SILBasicBlock *BB,
-                                                  SILBasicBlock::iterator It,
-                                                      SILValue ClassInstance) {
-  // Scan the basic block backwards starting at the provided iterator.
-  // Look for a retain of the class instance, which could be sinked.
-  while (It != BB->begin()) {
-    // Check if this is a strong_retain.
-    if (auto *SRI = dyn_cast<StrongRetainInst>(--It)) {
-      // Be conservative and don't reorder retain instructions:
-      // Bail if it is not a retain of the class instance.
-      if (SRI->getOperand() != ClassInstance)
-        return nullptr;
-
-      // This is a retain of the class instance and it can be sinked.
-      return SRI;
-    }
-
-    // Be conservative and don't try to reorder RC instructions.
-    if (isa<RefCountingInst>(It))
-      return nullptr;
-
-    // It is OK if the class instance is used by the class_method,
-    // as we are going to remove this instruction during devirtualization
-    // anyways. So, there is no conflict.
-    if (isa<ClassMethodInst>(It))
-      continue;
-
-    // OK, it is not an RC instruction:
-    // check if this instruction uses the class instance as its operand.
-    // If this is the case, then we won't be able to sink a retain of
-    // the class instance even if we find this retain later, because the current
-    // instruction may depend on the class instance being retained before
-    // the current instruction is executed.
-    if (isOperandOf(ClassInstance, It))
-      return nullptr;
-  }
-
-  // Nothing was found.
-  return nullptr;
-}
-
 /// Insert monomorphic inline caches for a specific class or metatype
 /// type \p SubClassTy.
 static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
@@ -177,17 +133,6 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILBuilder IdenBuilder(Iden);
   // This is the class reference downcasted into subclass SubType.
   SILValue DownCastedClassInstance = Iden->getBBArg(0);
-
-  // Try sinking the retain of the class instance into the diamond. This may
-  // allow additional ARC optimizations on the fast path.
-  auto *SRI = findClassInstanceRetainForSinking(Entry, It, CMI->getOperand());
-  if (SRI) {
-    VirtBuilder.createStrongRetain(SRI->getLoc(), CMI->getOperand())
-            ->setDebugScope(SRI->getDebugScope());
-    IdenBuilder.createStrongRetain(SRI->getLoc(), DownCastedClassInstance)
-            ->setDebugScope(SRI->getDebugScope());
-    SRI->eraseFromParent();
-  }
 
   // Copy the two apply instructions into the two blocks.
   FullApplySite IdenAI = CloneApply(AI, IdenBuilder);
