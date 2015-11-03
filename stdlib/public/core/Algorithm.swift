@@ -87,8 +87,8 @@ public struct EnumerateGenerator<
   var _count: Int
 
   /// Construct from a `Base` generator.
-  public init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
     self._count = 0
   }
 
@@ -116,15 +116,15 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
   internal var _base: Base
 
   /// Construct from a `Base` sequence.
-  public init(_ base: Base) {
-    self._base = base
+  internal init(_base: Base) {
+    self._base = _base
   }
 
   /// Returns a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   public func generate() -> EnumerateGenerator<Base.Generator> {
-    return EnumerateGenerator(_base.generate())
+    return EnumerateGenerator(_base: _base.generate())
   }
 }
 

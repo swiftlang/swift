@@ -37,7 +37,7 @@ extension SequenceType {
   ///     4: 't'
   @warn_unused_result
   public func enumerate() -> EnumerateSequence<Self> {
-    return EnumerateSequence(self)
+    return EnumerateSequence(_base: self)
   }
 }
 
