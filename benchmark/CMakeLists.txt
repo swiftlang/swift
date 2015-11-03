@@ -1,4 +1,4 @@
-option(SWIFT_INCLUDE_PERF_TESTSUITE "Create targets for swift performance benchmarks." YES)
+option(SWIFT_INCLUDE_PERF_TESTSUITE "Create targets for swift performance benchmarks." NO)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   # Performance test harness only builds on Darwin.
   if (SWIFT_INCLUDE_PERF_TESTSUITE)
