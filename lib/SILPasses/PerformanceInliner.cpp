@@ -611,6 +611,12 @@ getEligibleFunction(FullApplySite AI, CallGraph &CG) {
     return nullptr;
   }
   
+  if (!Callee->shouldOptimize()) {
+    DEBUG(llvm::dbgs() << "        FAIL: optimizations disabled on " <<
+          Callee->getName() << ".\n");
+    return nullptr;
+  }
+
   // We don't support this yet.
   if (AI.hasSubstitutions()) {
     DEBUG(llvm::dbgs() << "        FAIL: Generic substitutions on " <<
@@ -1117,6 +1123,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
     DEBUG(llvm::dbgs() << "    Inline:" <<  *AI.getInstruction());
+
+    if (!Callee->shouldOptimize()) {
+      DEBUG(llvm::dbgs() << "    Cannot inline function " << Callee->getName()
+                         << " marked to be excluded from optimizations.\n");
+      continue;
+    }
     
     SmallVector<SILValue, 8> Args;
     for (const auto &Arg : AI.getArguments())

@@ -242,6 +242,12 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
   auto *F = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
   assert(F->isDefinition() && "Expected definition to specialize!");
 
+  if (!F->shouldOptimize()) {
+    DEBUG(llvm::dbgs() << "    Cannot specialize function " << F->getName()
+                       << " marked to be excluded from optimizations.\n");
+    return ApplySite();
+  }
+
   DEBUG(llvm::dbgs() << "  ApplyInst: " << *Apply.getInstruction());
 
   // Create the substitution maps.
