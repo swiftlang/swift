@@ -214,9 +214,11 @@ case (1, let b): // let bindings
   ()
 
 // var bindings are not allowed in cases.
-case (1, var b): // expected-error {{'var' is not allowed in this pattern binding}}
+// FIXME: rdar://problem/23378003
+// This will eventually be an error.
+case (1, var b): // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{10-13=let}}
   ()
-case (var a, 2): // expected-error {{'var' is not allowed in this pattern binding}}
+case (var a, 2): // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{7-10=let}}
   ()
 
 case (let a, 2), (1, let b): // expected-error {{'case' labels with multiple patterns cannot declare variables}}

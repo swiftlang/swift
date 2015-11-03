@@ -1234,7 +1234,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       if (BindingKind == BK_Case) {
         // In our recursive parse, remember that we're in a matching pattern.
         llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-          T(InVarOrLetPattern, IVOLP_InMatchingPattern);
+          T(InVarOrLetPattern, IVOLP_AlwaysImmutable);
+
         ThePattern = parseMatchingPattern(/*isExprBasic*/ true);
       } else if (BindingKind == BK_LetCase || BindingKind == BK_VarCase) {
         // Recover from the 'if let case' typo gracefully.
@@ -2268,6 +2269,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
     // if desired by using a 'var' pattern.
     assert(InVarOrLetPattern == IVOLP_NotInVarOrLet &&
            "for-each loops cannot exist inside other patterns");
+
     InVarOrLetPattern = IVOLP_AlwaysImmutable;
     pattern = parseTypedPattern();
     assert(InVarOrLetPattern == IVOLP_AlwaysImmutable);

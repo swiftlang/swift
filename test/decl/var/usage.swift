@@ -170,8 +170,10 @@ func testOpenExistential(var x: Fooable,
 func couldThrow() throws {}
 
 func testFixitsInStatementsWithPatterns(a : Int?) {
-  if var b = a,    // expected-error {{'var' is not allowed in this pattern binding}} {{6-9=let}}
-      var b2 = a {  // expected-error {{'var' is not allowed in this pattern binding}} {{7-10=let}}
+  // FIXME: rdar://problem/23378003
+  // This will eventually be an error.
+  if var b = a,    // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{6-9=let}}
+      var b2 = a {  // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{7-10=let}}
     b = 1
     b2 = 1
     _ = b
@@ -179,18 +181,24 @@ func testFixitsInStatementsWithPatterns(a : Int?) {
   }
 
   var g = [1,2,3].generate()
-  while var x = g.next() { // expected-error {{'var' is not allowed in this pattern binding}} {{9-12=let}}
+  // FIXME: rdar://problem/23378003
+  // This will eventually be an error.
+  while var x = g.next() { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{9-12=let}}
     x = 0
     _ = x
   }
 
-  guard var y = Optional.Some(1) else { // expected-error {{'var' is not allowed in this pattern binding}} {{9-12=let}}
+  // FIXME: rdar://problem/23378003
+  // This will eventually be an error.
+  guard var y = Optional.Some(1) else { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{9-12=let}}
     return
   }
   y = 0
   _ = y
 
-  for var b in [42] {   // expected-error {{'var' is not allowed in this pattern binding}} {{7-11=}}
+  // FIXME: rdar://problem/23378003
+  // This will eventually be an error.
+  for var b in [42] {   // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{7-11=}}
     b = 42
     _ = b
   }
@@ -201,13 +209,17 @@ func testFixitsInStatementsWithPatterns(a : Int?) {
 
   do {
     try couldThrow()
-  } catch var err {  // expected-error {{'var' is not allowed in this pattern binding}} {{11-14=let}}
+  // FIXME: rdar://problem/23378003
+  // This will eventually be an error.
+  } catch var err {  // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{11-14=let}}
     // expected-warning@-1 {{variable 'err' was never mutated; consider changing to 'let' constant}}
     _ = err
   }
 
   switch a {
-    case var b: // expected-error {{'var' is not allowed in this pattern binding}} {{10-13=let}}
+    // FIXME: rdar://problem/23378003
+    // This will eventually be an error.
+    case var b: // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{10-13=let}}
       // expected-warning@-1 {{variable 'b' was never mutated; consider changing to 'let' constant}}
       _ = b
   }

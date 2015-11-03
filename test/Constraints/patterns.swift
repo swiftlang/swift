@@ -165,8 +165,11 @@ case x ?? 42: break // match value
 default: break
 }
 
-for (var x) in 0...100 {} // expected-error {{'var' is not allowed in this pattern binding}}
-for var x in 0...100 {}  // expected-error {{'var' is not allowed in this pattern binding}}
+// FIXME: rdar://problem/23378003
+// These will eventually become errors.
+for (var x) in 0...100 {} // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{6-9=}}
+for var x in 0...100 {}  // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{5-9=}}
+
 for (let x) in 0...100 {} // expected-error {{'let' pattern is already in an immutable context}}
 
 var (let y) = 42  // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
