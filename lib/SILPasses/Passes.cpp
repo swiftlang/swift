@@ -189,7 +189,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addGlobalRedundantLoadElimination();
   PM.addGlobalDeadStoreElimination();
   PM.addEarlyCodeMotion();
-  PM.addGlobalARCOpts();
+  PM.addARCSequenceOpts();
 
   PM.addSILLinker();
 
@@ -214,7 +214,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
     PM.addLateCodeMotion();
   else
     PM.addEarlyCodeMotion();
-  PM.addGlobalARCOpts();
+  PM.addARCSequenceOpts();
   PM.addRemovePins();
   PM.addUpdateSideEffects();
 }
@@ -317,7 +317,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addGlobalRedundantLoadElimination();
   PM.addGlobalDeadStoreElimination();
   PM.addLateCodeMotion();
-  PM.addGlobalARCOpts();
+  PM.addARCSequenceOpts();
 
   PM.runOneIteration();
   PM.resetAndRemoveTransformations();

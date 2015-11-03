@@ -1,4 +1,4 @@
-//===-------- GlobalARCOpts.cpp - Global SIL ARC Optimizations ------------===//
+//===--- ARCSequenceOpts.cpp ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-global-arc-opts"
+#define DEBUG_TYPE "arc-sequence-opts"
 #include "swift/SILPasses/Passes.h"
 #include "GlobalARCPairingAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
@@ -223,7 +223,7 @@ static bool processFunction(SILFunction &F, bool FreezePostDomRelease,
 }
 
 namespace {
-class GlobalARCOpts : public SILFunctionTransform {
+class ARCSequenceOpts : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     // If ARC optimizations are disabled, don't optimize anything and bail.
@@ -263,11 +263,11 @@ class GlobalARCOpts : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "Global ARC Optimization"; }
+  StringRef getName() override { return "ARC Sequence Opts"; }
 };
 } // end anonymous namespace
 
 
-SILTransform *swift::createGlobalARCOpts() {
-  return new GlobalARCOpts();
+SILTransform *swift::createARCSequenceOpts() {
+  return new ARCSequenceOpts();
 }

@@ -1,5 +1,5 @@
 set(ARC_SOURCES
-  ARC/GlobalARCOpts.cpp
+  ARC/ARCSequenceOpts.cpp
   ARC/ARCBBState.cpp
   ARC/GlobalARCPairingAnalysis.cpp
   ARC/GlobalARCSequenceDataflow.cpp

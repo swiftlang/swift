@@ -80,8 +80,9 @@ PASS(ExternalFunctionDefinitionsElimination, "external-func-definition-elim",
      "Eliminate external function definitions")
 PASS(FunctionSignatureOpts, "function-signature-opts",
      "Optimize Function Signatures")
-PASS(GlobalARCOpts, "global-arc-opts",
-     "Perform multiple basic block arc optimizations")
+PASS(ARCSequenceOpts, "arc-sequence-opts",
+     "Optimize sequences of retain/release opts by removing redundant inner "
+     "retain/release sequenes")
 PASS(GlobalRedundantLoadElimination, "global-redundant-load-elim",
      "Multiple basic block redundant load elimination")
 PASS(GlobalDeadStoreElimination, "global-dead-store-elim",

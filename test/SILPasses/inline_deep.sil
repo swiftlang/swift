@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -dce -mem2reg -copy-forwarding -global-arc-opts -mem2reg -enable-loop-arc=0 | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -dce -mem2reg -copy-forwarding -arc-sequence-opts -mem2reg -enable-loop-arc=0 | FileCheck %s
 
 sil_stage canonical
 

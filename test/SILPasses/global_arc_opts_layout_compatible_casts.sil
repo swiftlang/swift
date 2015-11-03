@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -global-arc-opts -enable-loop-arc=0 %s | FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -global-arc-opts -enable-loop-arc=1 %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -arc-sequence-opts -enable-loop-arc=0 %s | FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -arc-sequence-opts -enable-loop-arc=1 %s | FileCheck %s
 
 // This file is separate from the normal ARC optimizer tests to make
 // it easy to remove when layout compatible types are removed.
