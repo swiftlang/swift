@@ -337,7 +337,7 @@ struct SConforms2b : PConforms2 {
 protocol _MySeq { }
 
 protocol MySeq : _MySeq {
-  typealias Generator : GeneratorType
+  typealias Generator : IteratorProtocol
   func myGenerate() -> Generator
 }
 
@@ -354,7 +354,7 @@ protocol _MyCollection : _MySeq {
 protocol MyCollection : _MyCollection {
 }
 
-struct MyIndexedGenerator<C : _MyCollection> : GeneratorType {
+struct MyIndexedIterator<C : _MyCollection> : IteratorProtocol {
   var container: C
   var index: C.Index
 
@@ -366,7 +366,7 @@ struct MyIndexedGenerator<C : _MyCollection> : GeneratorType {
   }
 }
 
-struct OtherIndexedGenerator<C : _MyCollection> : GeneratorType {
+struct OtherIndexedIterator<C : _MyCollection> : IteratorProtocol {
   var container: C
   var index: C.Index
 
@@ -379,8 +379,8 @@ struct OtherIndexedGenerator<C : _MyCollection> : GeneratorType {
 }
 
 extension _MyCollection {
-  final func myGenerate() -> MyIndexedGenerator<Self> {
-    return MyIndexedGenerator(container: self, index: self.myEndIndex)
+  final func myGenerate() -> MyIndexedIterator<Self> {
+    return MyIndexedIterator(container: self, index: self.myEndIndex)
   }
 }
 
@@ -401,18 +401,18 @@ struct SomeCollection2 : MyCollection {
     return "blah"
   }
 
-  func myGenerate() -> OtherIndexedGenerator<SomeCollection2> {
-    return OtherIndexedGenerator(container: self, index: self.myEndIndex)
+  func myGenerate() -> OtherIndexedIterator<SomeCollection2> {
+    return OtherIndexedIterator(container: self, index: self.myEndIndex)
   }
 }
 
 func testSomeCollections(sc1: SomeCollection1, sc2: SomeCollection2) {
   var mig = sc1.myGenerate()
-  mig = MyIndexedGenerator(container: sc1, index: sc1.myStartIndex)
+  mig = MyIndexedIterator(container: sc1, index: sc1.myStartIndex)
   _ = mig
 
   var ig = sc2.myGenerate()
-  ig = MyIndexedGenerator(container: sc2, index: sc2.myStartIndex) // expected-error{{cannot invoke initializer for type 'MyIndexedGenerator<_>' with an argument list of type '(container: SomeCollection2, index: Int)'}}
+  ig = MyIndexedIterator(container: sc2, index: sc2.myStartIndex) // expected-error{{cannot invoke initializer for type 'MyIndexedIterator<_>' with an argument list of type '(container: SomeCollection2, index: Int)'}}
   // expected-note @-1 {{expected an argument list of type '(container: C, index: C.Index)'}}
   _ = ig
 }

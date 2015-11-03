@@ -6,7 +6,7 @@
 
 func f0<T>(x: Int, y: Int, t: T) { }
 func f1<T : Any>(x: Int, y: Int, t: T) { }
-func f2<T : protocol<GeneratorType,Any>>(x: Int, y: Int, t: T) { }
+func f2<T : protocol<IteratorProtocol,Any>>(x: Int, y: Int, t: T) { }
 func f3<T : () -> ()>(x: Int, y: Int, t: T) { } // expected-error{{expected a type name or protocol composition restricting 'T'}}
 func f4<T>(x: T, y: T) { }
 

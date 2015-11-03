@@ -150,11 +150,11 @@ struct StreamTypeWithInferredAssociatedTypes : StreamWithAssoc {
 }
 
 protocol SequenceViaStream {
-  typealias SequenceStreamTypeType : GeneratorType // expected-note{{protocol requires nested type 'SequenceStreamTypeType'}}
+  typealias SequenceStreamTypeType : IteratorProtocol // expected-note{{protocol requires nested type 'SequenceStreamTypeType'}}
   func generate() -> SequenceStreamTypeType
 }
 
-struct IntGeneratorType : GeneratorType /*, SequenceType, ReplPrintable*/ {
+struct IntIterator : IteratorProtocol /*, SequenceType, ReplPrintable*/ {
   typealias Element = Int
   var min : Int
   var max : Int
@@ -167,18 +167,18 @@ struct IntGeneratorType : GeneratorType /*, SequenceType, ReplPrintable*/ {
     return prev
   }
 
-  typealias Generator = IntGeneratorType
-  func generate() -> IntGeneratorType {
+  typealias Generator = IntIterator
+  func generate() -> IntIterator {
     return self
   }
 }
 
-extension IntGeneratorType : SequenceViaStream {
-  typealias SequenceStreamTypeType = IntGeneratorType
+extension IntIterator : SequenceViaStream {
+  typealias SequenceStreamTypeType = IntIterator
 }
 
 struct NotSequence : SequenceViaStream { // expected-error{{type 'NotSequence' does not conform to protocol 'SequenceViaStream'}}
-  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'GeneratorType'}}
+  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
   func generate() -> Int {}
 }
 
@@ -243,13 +243,13 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(e: SequenceType) { // expected-error{{has Self or associated type requirements}}
-  var x = e.generate() // expected-error{{type 'SequenceType' does not conform to protocol 'GeneratorType'}}
+  var x = e.generate() // expected-error{{type 'SequenceType' does not conform to protocol 'IteratorProtocol'}}
   x.next()
   x.nonexistent()
 }
 
 protocol HasSequenceAndStream {
-  typealias R : GeneratorType, SequenceType
+  typealias R : IteratorProtocol, SequenceType
   func getR() -> R
 }
 

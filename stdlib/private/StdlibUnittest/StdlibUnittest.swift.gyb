@@ -304,14 +304,14 @@ public func expectMutableSliceType<
 /// Check all associated types of a `CollectionType`.
 public func expectCollectionAssociatedTypes<
   X : CollectionType,
-  Generator : GeneratorType,
+  Iterator : IteratorProtocol,
   SubSequence : SequenceType,
   Index : ForwardIndexType
   where
   X.Index == Index
 >(
   collectionType collectionType: X.Type,
-  generatorType: Generator.Type,
+  iteratorType: Iterator.Type,
   subSequenceType: SubSequence.Type,
   indexType: Index.Type
 ) {}
@@ -1855,18 +1855,18 @@ public func checkRandomAccessIndex<
 %   ('Expected.Generator.Element', 'Element'),
 %   ('Expected', 'Array<Element>')):
 
-public func checkGenerator<
-  ${genericParam}, G : GeneratorType
-  where G.Element == ${Element}
+public func checkIterator<
+  ${genericParam}, I : IteratorProtocol
+  where I.Element == ${Element}
 >(
   expected: ${Expected},
-  _ generator: G,
+  _ iterator: I,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
 ) {
-  // Copying a `GeneratorType` is allowed.
-  var mutableGen = generator
+  // Copying a `IteratorProtocol` is allowed.
+  var mutableGen = iterator
   var actual: [${Element}] = []
   while let e = mutableGen.next() {
     actual.append(e)
@@ -1875,7 +1875,7 @@ public func checkGenerator<
     expected, actual, ${trace}, sameValue: sameValue)
 
   if resiliencyChecks.callNextOnExhaustedGenerator {
-    // Having returned `.None` once, a `GeneratorType` should not generate more
+    // Having returned `.None` once, a `IteratorProtocol` should not generate more
     // elements.
     for _ in 0..<10 {
       expectEmpty(mutableGen.next(), ${trace})
@@ -1883,17 +1883,17 @@ public func checkGenerator<
   }
 }
 
-public func checkGenerator<
-  ${genericParam}, G : GeneratorType
-  where G.Element == ${Element}, ${Element} : Equatable
+public func checkIterator<
+  ${genericParam}, I : IteratorProtocol
+  where I.Element == ${Element}, ${Element} : Equatable
 >(
   expected: ${Expected},
-  _ generator: G,
+  _ iterator: I,
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) {
-  checkGenerator(
-    expected, generator, ${trace},
+  checkIterator(
+    expected, iterator, ${trace},
     resiliencyChecks: resiliencyChecks, showFrame: false
   ) { $0 == $1 }
 }
@@ -1909,7 +1909,7 @@ public func checkSequence<
   sameValue: (${Element}, ${Element}) -> Bool
 ) {
   let expectedCount: Int = numericCast(expected.count)
-  checkGenerator(
+  checkIterator(
     expected, sequence.generate(), ${trace},
     resiliencyChecks: resiliencyChecks,
     sameValue: sameValue)
@@ -2460,16 +2460,16 @@ func compose<A, B, C>(f: A -> B, _ g: B -> C) -> A -> C {
   }
 }
 
-/// State that is created every time a fresh generator is created with
+/// State that is created every time a fresh iterator is created with
 /// `MinimalSequence.generate()`.
-internal class _MinimalGeneratorPrivateState<T> {
+internal class _MinimalIteratorPrivateState<T> {
   internal init() {}
 
   internal var returnedNilCounter: Int = 0
 }
 
-/// State shared by all generators of a MinimalSequence.
-internal class _MinimalGeneratorSharedState<T> {
+/// State shared by all iterators of a MinimalSequence.
+internal class _MinimalIteratorSharedState<T> {
   internal init(_ data: [T]) {
     self.data = data
   }
@@ -2480,30 +2480,30 @@ internal class _MinimalGeneratorSharedState<T> {
 }
 
 //===----------------------------------------------------------------------===//
-// MinimalGenerator
+// MinimalIterator
 //===----------------------------------------------------------------------===//
 
-/// A GeneratorType that implements the protocol contract in the most
+/// An iterator that implements the protocol contract in the most
 /// narrow way possible.
 ///
-/// This generator will return `nil` only once.
-public struct MinimalGenerator<T> : GeneratorType {
+/// This iterator will return `nil` only once.
+public struct MinimalIterator<T> : IteratorProtocol {
   public init<S : SequenceType where S.Generator.Element == T>(_ s: S) {
-    self._sharedState = _MinimalGeneratorSharedState(Array(s))
+    self._sharedState = _MinimalIteratorSharedState(Array(s))
   }
 
   public init(_ data: [T]) {
-    self._sharedState = _MinimalGeneratorSharedState(data)
+    self._sharedState = _MinimalIteratorSharedState(data)
   }
 
-  internal init(_ _sharedState: _MinimalGeneratorSharedState<T>) {
+  internal init(_ _sharedState: _MinimalIteratorSharedState<T>) {
     self._sharedState = _sharedState
   }
 
   public func next() -> T? {
     if _sharedState.i == _sharedState.data.count {
       if isConsumed {
-        expectUnreachable("next() was called on a consumed generator")
+        expectUnreachable("next() was called on a consumed iterator")
       }
       ++_privateState.returnedNilCounter
       return nil
@@ -2519,14 +2519,14 @@ public struct MinimalGenerator<T> : GeneratorType {
     return _privateState.returnedNilCounter
   }
 
-  internal let _privateState: _MinimalGeneratorPrivateState<T> =
-    _MinimalGeneratorPrivateState()
-  internal let _sharedState: _MinimalGeneratorSharedState<T>
+  internal let _privateState: _MinimalIteratorPrivateState<T> =
+    _MinimalIteratorPrivateState()
+  internal let _sharedState: _MinimalIteratorSharedState<T>
 }
 
-// A protocol to identify MinimalGenerator.
-public protocol _MinimalGeneratorType {}
-extension MinimalGenerator : _MinimalGeneratorType {}
+// A protocol to identify MinimalIterator.
+public protocol _MinimalIteratorProtocol {}
+extension MinimalIterator : _MinimalIteratorProtocol {}
 
 //===----------------------------------------------------------------------===//
 // MinimalSequence
@@ -2567,8 +2567,8 @@ extension StrictSequenceType {
   }
 }
 
-extension StrictSequenceType where Generator : _MinimalGeneratorType {
-  public func generate() -> MinimalGenerator<Element> {
+extension StrictSequenceType where Generator : _MinimalIteratorProtocol {
+  public func generate() -> MinimalIterator<Element> {
     return base.generate()
   }
 }
@@ -2576,14 +2576,14 @@ extension StrictSequenceType where Generator : _MinimalGeneratorType {
 /// A SequenceType that implements the protocol contract in the most
 /// narrow way possible.
 ///
-/// This sequence is consumed when its generator is advanced.
+/// This sequence is consumed when its iterator is advanced.
 public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
   public init<S : SequenceType where S.Generator.Element == T>(
     elements: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
   ) {
     let data = Array(elements)
-    self._sharedState = _MinimalGeneratorSharedState(data)
+    self._sharedState = _MinimalIteratorSharedState(data)
 
     switch underestimatedCount {
     case .Precise:
@@ -2600,8 +2600,8 @@ public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
     }
   }
 
-  public func generate() -> MinimalGenerator<T> {
-    return MinimalGenerator(_sharedState)
+  public func generate() -> MinimalIterator<T> {
+    return MinimalIterator(_sharedState)
   }
 
   public func underestimateCount() -> Int {
@@ -2612,7 +2612,7 @@ public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
     return "MinimalSequence(\(_sharedState.data[_sharedState.i..<_sharedState.data.count]))"
   }
 
-  internal let _sharedState: _MinimalGeneratorSharedState<T>
+  internal let _sharedState: _MinimalIteratorSharedState<T>
 }
 
 //===----------------------------------------------------------------------===//
@@ -3316,8 +3316,8 @@ extension ${Protocol} {
   }
 }
 
-extension ${Protocol} where Generator : _MinimalGeneratorType {
-  public func generate() -> MinimalGenerator<Element> {
+extension ${Protocol} where Generator : _MinimalIteratorProtocol {
+  public func generate() -> MinimalIterator<Element> {
     return base.generate()
   }
 }
@@ -3371,8 +3371,8 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
     }
   }
 
-  public func generate() -> MinimalGenerator<T> {
-    return MinimalGenerator(_elements)
+  public func generate() -> MinimalIterator<T> {
+    return MinimalIterator(_elements)
   }
 
   public var startIndex: ${Index} {
@@ -3445,8 +3445,8 @@ extension ${Protocol} {
   }
 }
 
-extension ${Protocol} where Generator : _MinimalGeneratorType {
-  public func generate() -> MinimalGenerator<Element> {
+extension ${Protocol} where Generator : _MinimalIteratorProtocol {
+  public func generate() -> MinimalIterator<Element> {
     return base.generate()
   }
 }
@@ -3516,8 +3516,8 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
       _CollectionState(newRootStateForElementCount: self.elements.count)
   }
 
-  public func generate() -> MinimalGenerator<T> {
-    return MinimalGenerator(elements)
+  public func generate() -> MinimalIterator<T> {
+    return MinimalIterator(elements)
   }
 
   public func underestimateCount() -> Int {
@@ -3794,7 +3794,7 @@ public struct Defaulted${traversal}Collection<Element>
   : Strict${traversal}CollectionType {
 
   public typealias Base = Minimal${traversal}Collection<Element>
-  public typealias Generator = MinimalGenerator<Element>
+  public typealias Generator = MinimalIterator<Element>
   public typealias Index = Minimal${traversal}Index
 
   public let base: Base
@@ -3816,7 +3816,7 @@ public struct Defaulted${traversal}MutableCollection<Element>
   : Strict${traversal}MutableCollectionType {
 
   public typealias Base = Minimal${traversal}MutableCollection<Element>
-  public typealias Generator = MinimalGenerator<Element>
+  public typealias Generator = MinimalIterator<Element>
   public typealias Index = Minimal${traversal}Index
 
   public var base: Base
@@ -3838,7 +3838,7 @@ public struct Defaulted${traversal}RangeReplaceableCollection<Element>
   : Strict${traversal}RangeReplaceableCollectionType {
 
   public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>
-  public typealias Generator = MinimalGenerator<Element>
+  public typealias Generator = MinimalIterator<Element>
   public typealias Index = Minimal${traversal}Index
 
   public var base: Base
@@ -3865,7 +3865,7 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
 
   public typealias Self_ = Defaulted${traversal}RangeReplaceableSlice<Element>
   public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>
-  public typealias Generator = MinimalGenerator<Element>
+  public typealias Generator = MinimalIterator<Element>
   public typealias Index = Minimal${traversal}Index
 
   public var base: Base
@@ -3902,8 +3902,8 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
       base: Base(elements: elements))
   }
 
-  public func generate() -> MinimalGenerator<Element> {
-    return MinimalGenerator(Array(self))
+  public func generate() -> MinimalIterator<Element> {
+    return MinimalIterator(Array(self))
   }
 
   public subscript(index: Index) -> Element {

@@ -24,11 +24,11 @@ GInt.static_bar(0)
 
 // <rdar://problem/12895793>
 struct AnyStream<T : SequenceType> {
-  struct StreamRange<S : GeneratorType> { // expected-error{{generic type 'StreamRange' nested in type 'AnyStream' is not allowed}}
+  struct StreamRange<S : IteratorProtocol> { // expected-error{{generic type 'StreamRange' nested in type 'AnyStream' is not allowed}}
     var index : Int
     var elements : S
 
-    // Conform to the GeneratorType protocol.
+    // Conform to the IteratorProtocol protocol.
     typealias Element = (Int, S.Element)
     mutating
     func next() -> Element? {

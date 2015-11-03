@@ -26,22 +26,22 @@ extension _ContiguousArrayBuffer {
 //===--- Generator --------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public class _AnyGeneratorBase {}
+public class _AnyIteratorBase {}
 
 /// An abstract `GeneratorType` base class over `T` elements.
 ///
 /// Use this as a `Sequence`'s associated `Generator` type when you
 /// don't want to expose details of the concrete generator, a subclass.
 ///
-/// It is an error to create instances of `AnyGenerator` that are not
-/// also instances of an `AnyGenerator` subclass.
+/// It is an error to create instances of `AnyIterator` that are not
+/// also instances of an `AnyIterator` subclass.
 ///
 /// See also:
 ///
 ///     struct AnySequence<S: SequenceType>
-///     func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element>
-///     func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T>
-public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
+///     func anyIterator<G: GeneratorType>(base: G) -> AnyIterator<G.Element>
+///     func anyIterator<T>(nextImplementation: ()->T?) -> AnyIterator<T>
+public class AnyIterator<T> : _AnyIteratorBase, GeneratorType {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
   override public init() 
@@ -55,9 +55,9 @@ public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
 
 /// Every `GeneratorType` can also be a `SequenceType`.  Note that
 /// traversing the sequence consumes the generator.
-extension AnyGenerator : SequenceType {
+extension AnyIterator : SequenceType {
   /// Returns `self`.
-  public func generate() -> AnyGenerator 
+  public func generate() -> AnyIterator 
 }
 
 /// Return a `GeneratorType` instance that wraps `base` but whose type
@@ -65,16 +65,16 @@ extension AnyGenerator : SequenceType {
 ///
 /// Example:
 ///
-///     func countStrings() -> AnyGenerator<String> {
+///     func countStrings() -> AnyIterator<String> {
 ///       let lazyStrings = lazy(0..<10).map { String($0) }
 ///
 ///       // This is a really complicated type of no interest to our
 ///       // clients.
 ///       let g: MapSequenceGenerator<RangeGenerator<Int>, String>
 ///         = lazyStrings.generate()
-///       return anyGenerator(g)
+///       return anyIterator(g)
 ///     }
-public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> 
+public func anyIterator<G: GeneratorType>(base: G) -> AnyIterator<G.Element> 
 
 
 /// Return a `GeneratorType` instance whose `next` method invokes
@@ -83,9 +83,9 @@ public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element>
 /// Example:
 ///
 ///     var x = 7
-///     let g = anyGenerator { x < 15 ? x++ : nil }
+///     let g = anyIterator { x < 15 ? x++ : nil }
 ///     let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
-public func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T> 
+public func anyIterator<T>(nextImplementation: ()->T?) -> AnyIterator<T> 
 
 
 
@@ -103,7 +103,7 @@ public func anyGenerator<T>(nextImplementation: ()->T?) -> AnyGenerator<T>
 /// same `Element` type, hiding the specifics of the underlying
 /// `SequenceType`.
 ///
-/// See also: `AnyGenerator<T>`.
+/// See also: `AnyIterator<T>`.
 public struct AnySequence<T> : SequenceType {
 
   /// Wrap and forward operations to to `base`
@@ -112,7 +112,7 @@ public struct AnySequence<T> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyGenerator<Element> 
+  public func generate() -> AnyIterator<Element> 
 
 }
 
@@ -414,7 +414,7 @@ public struct AnyForwardCollection<Element> : AnyCollectionType {
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyGenerator<Element> 
+  public func generate() -> AnyIterator<Element> 
 
   /// The position of the first element in a non-empty collection.
   ///
@@ -492,7 +492,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollectionType {
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyGenerator<Element> 
+  public func generate() -> AnyIterator<Element> 
 
   /// The position of the first element in a non-empty collection.
   ///
@@ -561,7 +561,7 @@ public struct AnyRandomAccessCollection<Element> : AnyCollectionType {
   /// Return a *generator* over the elements of this *collection*.
   ///
   /// Complexity: O(1)
-  public func generate() -> AnyGenerator<Element> 
+  public func generate() -> AnyIterator<Element> 
 
   /// The position of the first element in a non-empty collection.
   ///

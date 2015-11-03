@@ -15,7 +15,7 @@
 // Check that the generic parameters are called 'Base' and 'Element'.
 protocol TestProtocol1 {}
 
-extension LazyMapGenerator where Base : TestProtocol1, Element : TestProtocol1 {
+extension LazyMapIterator where Base : TestProtocol1, Element : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -55,15 +55,15 @@ print(">")
 //===--- Avoid creating gratuitously self-destructive sequences ----------===//
 
 // In a naive implementation, mapping over a non-self-destructive
-// SequenceType having a reference-semantics GeneratorType produces a
+// SequenceType having a reference-semantics IteratorProtocol produces a
 // self-destructive mapped view.  This is technically correct because
 // Sequences are allowed to be self-destructive, and theoretically
 // every multi-pass SequenceType would be a CollectionType, but Sequences are
 // much easier to build than Collections and it would be extremely
 // surprising for users if their mappings were not stable.
 
-// A GeneratorType with reference semantics
-class Counter : GeneratorType {
+// An IteratorProtocol with reference semantics
+class Counter : IteratorProtocol {
   func next() -> Int? {
     return n < end ? n++ : nil
   }

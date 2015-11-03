@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// The `GeneratorType` used by `MapSequence` and `MapCollection`.
+/// The `IteratorProtocol` used by `MapSequence` and `MapCollection`.
 /// Produces each element by passing the output of the `Base`
-/// `GeneratorType` through a transform function returning `Element`.
-public struct LazyMapGenerator<
-  Base : GeneratorType, Element
-> : GeneratorType, SequenceType {
+/// `IteratorProtocol` through a transform function returning `Element`.
+public struct LazyMapIterator<
+  Base : IteratorProtocol, Element
+> : IteratorProtocol, SequenceType {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
@@ -41,11 +41,11 @@ public struct LazyMapSequence<Base : SequenceType, Element>
   
   public typealias Elements = LazyMapSequence
   
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> LazyMapGenerator<Base.Generator, Element> {
-    return LazyMapGenerator(_base: _base.generate(), _transform: _transform)
+  public func generate() -> LazyMapIterator<Base.Generator, Element> {
+    return LazyMapIterator(_base: _base.generate(), _transform: _transform)
   }
 
   /// Return a value less than or equal to the number of elements in
@@ -96,11 +96,11 @@ public struct LazyMapCollection<Base : CollectionType, Element>
   public var first: Element? { return _base.first.map(_transform) }
   
 
-  /// Returns a *generator* over the elements of this *sequence*.
+  /// Returns an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> LazyMapGenerator<Base.Generator, Element> {
-    return LazyMapGenerator(_base: _base.generate(), _transform: _transform)
+  public func generate() -> LazyMapIterator<Base.Generator, Element> {
+    return LazyMapIterator(_base: _base.generate(), _transform: _transform)
   }
 
   public func underestimateCount() -> Int {

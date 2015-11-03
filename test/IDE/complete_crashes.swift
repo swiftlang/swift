@@ -107,7 +107,7 @@ class C<T> {
 
 // rdar://problem/22036358
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22036358
-public extension AnyGenerator {
+public extension AnyIterator {
   public extension AnySequence {
     public func take(n: Int) -> AnySequence<Element> {
       var xs: [Element] = []

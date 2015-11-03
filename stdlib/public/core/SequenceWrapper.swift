@@ -20,14 +20,14 @@
 public // @testable
 protocol _SequenceWrapperType {
   typealias Base : SequenceType
-  typealias Generator : GeneratorType = Base.Generator
+  typealias Generator : IteratorProtocol = Base.Generator
   
   var _base: Base {get}
 }
 
 extension SequenceType
   where Self : _SequenceWrapperType, Self.Generator == Self.Base.Generator {
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   public func generate() -> Base.Generator {

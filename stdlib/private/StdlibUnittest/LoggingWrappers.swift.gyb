@@ -30,19 +30,19 @@ extension LoggingType {
   }
 }
 
-public class GeneratorLog {
-  public static func dispatchTester<G: GeneratorType>(
-    g: G
-  ) -> LoggingGenerator<LoggingGenerator<G>> {
-    return LoggingGenerator(LoggingGenerator(g))
+public class IteratorLog {
+  public static func dispatchTester<I : IteratorProtocol>(
+    iterator: I
+  ) -> LoggingIterator<LoggingIterator<I>> {
+    return LoggingIterator(LoggingIterator(iterator))
   }
   public static var next = TypeIndexed(0)
 }
 
-public struct LoggingGenerator<Base: GeneratorType>
-  : GeneratorType, LoggingType {
+public struct LoggingIterator<Base : IteratorProtocol>
+  : IteratorProtocol, LoggingType {
 
-  public typealias Log = GeneratorLog
+  public typealias Log = IteratorLog
   
   public init(_ base: Base) {
     self.base = base
@@ -447,9 +447,9 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
   }
 %   end
 
-  public func generate() -> LoggingGenerator<Base.Generator> {
+  public func generate() -> LoggingIterator<Base.Generator> {
     ++Log.generate[selfType]
-    return LoggingGenerator(base.generate())
+    return LoggingIterator(base.generate())
   }
 
   public func underestimateCount() -> Int {

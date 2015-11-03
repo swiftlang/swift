@@ -120,8 +120,8 @@ public func -= <T : UnsignedIntegerType> (
 
 //===----------------------------------------------------------------------===//
 
-/// A GeneratorType for `StrideTo<Element>`.
-public struct StrideToGenerator<Element : Strideable> : GeneratorType {
+/// A IteratorProtocol for `StrideTo<Element>`.
+public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
   var current: Element
   let end: Element
   let stride: Element.Stride
@@ -142,11 +142,11 @@ public struct StrideToGenerator<Element : Strideable> : GeneratorType {
 public struct StrideTo<Element : Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> StrideToGenerator<Element> {
-    return StrideToGenerator(current: start, end: end, stride: stride)
+  public func generate() -> StrideToIterator<Element> {
+    return StrideToIterator(current: start, end: end, stride: stride)
   }
 
   init(start: Element, end: Element, stride: Element.Stride) {
@@ -173,8 +173,8 @@ extension Strideable {
   }
 }
 
-/// A GeneratorType for `StrideThrough<Element>`.
-public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
+/// A IteratorProtocol for `StrideThrough<Element>`.
+public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
   var current: Element
   let end: Element
   let stride: Element.Stride
@@ -203,11 +203,11 @@ public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
 public struct StrideThrough<Element : Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> StrideThroughGenerator<Element> {
-    return StrideThroughGenerator(
+  public func generate() -> StrideThroughIterator<Element> {
+    return StrideThroughIterator(
       current: start, end: end, stride: stride, done: false)
   }
 

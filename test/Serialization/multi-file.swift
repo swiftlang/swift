@@ -32,13 +32,13 @@ func bar() {
 
 // <rdar://problem/17251682>
 struct StructWithInheritedConformances: SequenceType {
-  struct EmptyGenerator: GeneratorType {
+  struct EmptyIterator : IteratorProtocol {
     mutating func next() -> Int? {
       return nil
     }
   }
 
-  func generate() -> EmptyGenerator {
-    return EmptyGenerator()
+  func generate() -> EmptyIterator {
+    return EmptyIterator()
   }
 }

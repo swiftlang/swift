@@ -7,28 +7,28 @@ protocol SourceTargetTransformable {
 }
 
 
-struct PiecewiseTransformedGeneratorOf<
+struct PiecewiseTransformedIteratorOf<
                                         Source,
                                         Target,
-                                        SourceGenerator: GeneratorType,
-                                        TransformerGenerator: GeneratorType,
+                                        SourceIterator: IteratorProtocol,
+                                        TransformerIterator: IteratorProtocol,
                                         Transformable: SourceTargetTransformable
                                       where
                                         Transformable.Source == Source,
                                         Transformable.Target == Target,
-                                        SourceGenerator.Element == Source,
-                                        TransformerGenerator.Element == Transformable.Transformer
+                                        SourceIterator.Element == Source,
+                                        TransformerIterator.Element == Transformable.Transformer
                                       >
-       : GeneratorType {
+       : IteratorProtocol {
     typealias Element = Target
     
-    var sourceGenerator: SourceGenerator
-    var transformerGenerator: TransformerGenerator
+    var sourceIterator: SourceIterator
+    var transformerIterator: TransformerIterator
     
     mutating func next() -> Element? {
-        let source: Transformable.Source? = sourceGenerator.next()
+        let source: Transformable.Source? = sourceIterator.next()
         if let source: Transformable.Source = source {
-            let transformer: Transformable.Transformer? = transformerGenerator.next()
+            let transformer: Transformable.Transformer? = transformerIterator.next()
             if let transformer: Transformable.Transformer = transformer {
                 let tfunc: (Source -> Target)? = transformer as? (Source -> Target)
                 if let tfunc = tfunc {
@@ -51,7 +51,7 @@ struct PiecewiseTransformedSequenceOf<
     
     typealias Source = SourceSequence.Generator.Element
     typealias Target = Transformable.Target
-    typealias Generator = PiecewiseTransformedGeneratorOf<Source, Target, SourceSequence.Generator, TransformerSequence.Generator, Transformable>
+    typealias Generator = PiecewiseTransformedIteratorOf<Source, Target, SourceSequence.Generator, TransformerSequence.Generator, Transformable>
     
  
     let inputs: SourceSequence
@@ -63,6 +63,6 @@ struct PiecewiseTransformedSequenceOf<
     }
     
     func generate() -> Generator {
-        return PiecewiseTransformedGeneratorOf(sourceGenerator: inputs.generate(), transformerGenerator: transformers.generate())
+        return PiecewiseTransformedIteratorOf(sourceIterator: inputs.generate(), transformerIterator: transformers.generate())
     }
 }

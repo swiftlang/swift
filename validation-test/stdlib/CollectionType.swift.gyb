@@ -17,9 +17,9 @@ struct CollectionWithDefaultUnderestimateCount : CollectionType {
     self._count = count
   }
 
-  func generate() -> MinimalGenerator<OpaqueValue<Int>> {
+  func generate() -> MinimalIterator<OpaqueValue<Int>> {
     expectUnreachable()
-    return MinimalGenerator([])
+    return MinimalIterator([])
   }
 
   var startIndex: MinimalForwardIndex {
@@ -56,7 +56,7 @@ struct MinimalForwardCollectionWith${Implementation}Filter<Element>
       elements: data, underestimatedCount: underestimatedCount)
   }
 
-  func generate() -> MinimalGenerator<Element> {
+  func generate() -> MinimalIterator<Element> {
     return _data.generate()
   }
 
@@ -188,7 +188,7 @@ struct MinimalForwardCollectionWith${Implementation}Map<Element>
       elements: data, underestimatedCount: underestimatedCount)
   }
 
-  func generate() -> MinimalGenerator<Element> {
+  func generate() -> MinimalIterator<Element> {
     return _data.generate()
   }
 
@@ -339,9 +339,9 @@ struct CollectionWithCustomUnderestimateCount : CollectionType {
     self._underestimatedCount = underestimatedCount
   }
 
-  func generate() -> MinimalGenerator<OpaqueValue<Int>> {
+  func generate() -> MinimalIterator<OpaqueValue<Int>> {
     expectUnreachable()
-    return MinimalGenerator([])
+    return MinimalIterator([])
   }
 
   var startIndex: MinimalForwardIndex {
@@ -441,9 +441,9 @@ struct MinimalForwardCollectionWithCustomGenerator : CollectionType {
 
   static var timesGenerateWasCalled: Int = 0
 
-  func generate() -> MinimalGenerator<OpaqueValue<Int>> {
+  func generate() -> MinimalIterator<OpaqueValue<Int>> {
     ++MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled
-    return MinimalGenerator<OpaqueValue<Int>>(
+    return MinimalIterator<OpaqueValue<Int>>(
       Array(1..<_count+1).map(OpaqueValue.init) as [OpaqueValue<Int>]
     )
   }
@@ -473,7 +473,7 @@ CollectionTypeTests.test("CollectionType.generate()/CustomImplementation") {
       MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled = 0
       var generator = collection.generate()
       expectType(
-        MinimalGenerator<OpaqueValue<Int>>.self,
+        MinimalIterator<OpaqueValue<Int>>.self,
         &generator)
       expectEqual(1, MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled)
     }
@@ -483,7 +483,7 @@ CollectionTypeTests.test("CollectionType.generate()/CustomImplementation") {
       // Check the return type of the function when called generically.
       var generator = callGenericGenerate(collection)
       expectType(
-        MinimalGenerator<OpaqueValue<Int>>.self,
+        MinimalIterator<OpaqueValue<Int>>.self,
         &generator)
       expectEqual(1, MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled)
     }

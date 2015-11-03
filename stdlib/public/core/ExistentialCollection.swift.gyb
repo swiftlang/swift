@@ -22,46 +22,46 @@ internal func _abstract(file: StaticString = __FILE__, line: UInt = __LINE__) {
 //===--- Generator --------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-/// A type-erased generator of `Element`.
+/// A type-erased iterator of `Element`.
 ///
-/// This generator forwards its `next()` method to an arbitrary underlying
-/// generator having the same `Element` type, hiding the specifics of the
-/// underlying `GeneratorType`.
+/// This iterator forwards its `next()` method to an arbitrary underlying
+/// iterator having the same `Element` type, hiding the specifics of the
+/// underlying `IteratorProtocol`.
 ///
 /// - seealso:
 ///   - `struct AnySequence<S : SequenceType>`
-public struct AnyGenerator<Element> : GeneratorType {
-  /// Create a `GeneratorType` instance that wraps `base` but whose type
-  /// depends only on the type of `G.Element`.
+public struct AnyIterator<Element> : IteratorProtocol {
+  /// Create a `IteratorProtocol` instance that wraps `base` but whose type
+  /// depends only on the type of `I.Element`.
   ///
   /// Example:
   ///
-  ///     func countStrings() -> AnyGenerator<String> {
+  ///     func countStrings() -> AnyIterator<String> {
   ///       let lazyStrings = (0..<10).lazy.map { String($0) }
   ///
   ///       // This is a really complicated type of no interest to our
   ///       // clients.
   ///       let g: MapSequenceGenerator<RangeGenerator<Int>, String>
   ///         = lazyStrings.generate()
-  ///       return AnyGenerator(g)
+  ///       return AnyIterator(g)
   ///     }
-  public init<G : GeneratorType where G.Element == Element>(_ base: G) {
+  public init<I : IteratorProtocol where I.Element == Element>(_ base: I) {
     self._box = _GeneratorBox(base)
   }
 
-  /// Create a `GeneratorType` instance whose `next` method invokes
+  /// Create a `IteratorProtocol` instance whose `next` method invokes
   /// `body` and returns the result.
   ///
   /// Example:
   ///
   ///     var x = 7
-  ///     let g = AnyGenerator { x < 15 ? x++ : nil }
+  ///     let g = AnyIterator { x < 15 ? x++ : nil }
   ///     let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
   public init(body: () -> Element?) {
     self._box = _GeneratorBox(_ClosureBasedGenerator(body))
   }
 
-  internal init(_box: _AnyGeneratorBoxBase<Element>) {
+  internal init(_box: _AnyIteratorBoxBase<Element>) {
     self._box = _box
   }
 
@@ -71,14 +71,14 @@ public struct AnyGenerator<Element> : GeneratorType {
     return _box.next()
   }
 
-  internal let _box: _AnyGeneratorBoxBase<Element>
+  internal let _box: _AnyIteratorBoxBase<Element>
 }
 
-/// Every `GeneratorType` can also be a `SequenceType`.  Note that
-/// traversing the sequence consumes the generator.
-extension AnyGenerator : SequenceType {}
+/// Every `IteratorProtocol` can also be a `SequenceType`.  Note that
+/// traversing the sequence consumes the iterator.
+extension AnyIterator : SequenceType {}
 
-internal struct _ClosureBasedGenerator<Element> : GeneratorType {
+internal struct _ClosureBasedGenerator<Element> : IteratorProtocol {
   internal init(_ body: () -> Element?) {
     self._body = body
   }
@@ -86,10 +86,10 @@ internal struct _ClosureBasedGenerator<Element> : GeneratorType {
   internal let _body: () -> Element?
 }
 
-internal class _AnyGeneratorBase {}
+internal class _AnyIteratorBase {}
 
-internal class _AnyGeneratorBoxBase<Element>
-  : _AnyGeneratorBase, GeneratorType {
+internal class _AnyIteratorBoxBase<Element>
+  : _AnyIteratorBase, IteratorProtocol {
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
@@ -99,8 +99,8 @@ internal class _AnyGeneratorBoxBase<Element>
 }
 
 internal final class _GeneratorBox<
-  Base : GeneratorType
-> : _AnyGeneratorBoxBase<Base.Element> {
+  Base : IteratorProtocol
+> : _AnyIteratorBoxBase<Base.Element> {
   internal init(_ base: Base) { self._base = base }
   internal override func next() -> Base.Element? { return _base.next() }
   internal var _base: Base
@@ -115,7 +115,7 @@ internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
 //===----------------------------------------------------------------------===//
 
 internal class _AnySequenceBox<Element> {
-  internal func generate() -> AnyGenerator<Element> { _abstract() }
+  internal func generate() -> AnyIterator<Element> { _abstract() }
 
   internal func _underestimateCount() -> Int { _abstract() }
 
@@ -145,8 +145,8 @@ internal class _${Kind}Box<S : ${Kind}Type>
   : _Any${Kind}Box<S.Generator.Element> {
   typealias Element = S.Generator.Element
 
-  override func generate() -> AnyGenerator<Element> {
-    return AnyGenerator(_base.generate())
+  override func generate() -> AnyIterator<Element> {
+    return AnyIterator(_base.generate())
   }
   override func _underestimateCount() -> Int {
     return _base.underestimateCount()
@@ -185,7 +185,7 @@ internal class _${Kind}Box<S : ${Kind}Type>
 }
 % end
 
-internal struct _ClosureBasedSequence<Generator : GeneratorType>
+internal struct _ClosureBasedSequence<Generator : IteratorProtocol>
   : SequenceType {
 
   internal init(_ makeUnderlyingGenerator: () -> Generator) {
@@ -205,7 +205,7 @@ internal struct _ClosureBasedSequence<Generator : GeneratorType>
 /// same `Element` type, hiding the specifics of the underlying
 /// `SequenceType`.
 ///
-/// - SeeAlso: `AnyGenerator<Element>`.
+/// - SeeAlso: `AnyIterator<Element>`.
 public struct AnySequence<Element> : SequenceType {
   /// Wrap and forward operations to to `base`.
   public init<S: SequenceType where S.Generator.Element == Element>(_ base: S) {
@@ -214,16 +214,16 @@ public struct AnySequence<Element> : SequenceType {
 
   /// Create a sequence whose `generate()` method forwards to
   /// `makeUnderlyingGenerator`.
-  public init<G : GeneratorType where G.Element == Element>(
-    _ makeUnderlyingGenerator: () -> G
+  public init<I : IteratorProtocol where I.Element == Element>(
+    _ makeUnderlyingGenerator: () -> I
   ) {
     self.init(_ClosureBasedSequence(makeUnderlyingGenerator))
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> AnyGenerator<Element> {
+  public func generate() -> AnyIterator<Element> {
     return _box.generate()
   }
 
@@ -577,10 +577,10 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   }
 %   end
 
-  /// Returns a *generator* over the elements of this *collection*.
+  /// Returns an *iterator* over the elements of this *collection*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> AnyGenerator<Element> {
+  public func generate() -> AnyIterator<Element> {
     return _box.generate()
   }
 

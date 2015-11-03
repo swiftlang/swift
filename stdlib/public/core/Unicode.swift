@@ -52,17 +52,17 @@ public protocol UnicodeCodecType {
   ///
   /// In order to decode a code unit sequence completely, this function should
   /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
-  /// Checking that the generator was exhausted is not sufficient.  The decoder
+  /// Checking that the iterator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
-  /// generator.
+  /// iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
-  /// in the generator for a given returned `UnicodeScalar` or an error.
+  /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A *generator* of code units to be decoded.
+  /// - parameter next: An *iterator* of code units to be decoded.
   mutating func decode<
-    G : GeneratorType where G.Element == CodeUnit
-  >(inout next: G) -> UnicodeDecodingResult
+    I : IteratorProtocol where I.Element == CodeUnit
+  >(inout next: I) -> UnicodeDecodingResult
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
   /// calling `output` on each `CodeUnit`.
@@ -126,7 +126,7 @@ public struct UTF8 : UnicodeCodecType {
 
   /// Flags with layout: `0bxxxx_yyyy`.
   ///
-  /// `xxxx` is the EOF flag.  It means that the input generator has signaled
+  /// `xxxx` is the EOF flag.  It means that the input iterator has signaled
   /// end of sequence.  Out of the four bits, only one bit can be set.  The bit
   /// position specifies how many bytes have been consumed from the lookahead
   /// buffer already.  A value of `1000` means that there are `yyyy` bytes in
@@ -325,19 +325,19 @@ public struct UTF8 : UnicodeCodecType {
   ///
   /// In order to decode a code unit sequence completely, this function should
   /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
-  /// Checking that the generator was exhausted is not sufficient.  The decoder
+  /// Checking that the iterator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
-  /// generator.
+  /// iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
-  /// in the generator for a given returned `UnicodeScalar` or an error.
+  /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A *generator* of code units to be decoded.
+  /// - parameter next: A *iterator* over the code units to be decoded.
   public mutating func decode<
-    G : GeneratorType where G.Element == CodeUnit
-  >(inout next: G) -> UnicodeDecodingResult {
+    I : IteratorProtocol where I.Element == CodeUnit
+  >(inout next: I) -> UnicodeDecodingResult {
     // If the EOF flag is not set, fill the lookahead buffer from the input
-    // generator.
+    // iterator.
     if _lookaheadFlags & 0b1111_0000 == 0 {
       // Add more bytes into the buffer until we have 4.
       while _lookaheadFlags != 0b0000_1111 {
@@ -511,17 +511,17 @@ public struct UTF16 : UnicodeCodecType {
   ///
   /// In order to decode a code unit sequence completely, this function should
   /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
-  /// Checking that the generator was exhausted is not sufficient.  The decoder
+  /// Checking that the iterator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
-  /// generator.
+  /// iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
-  /// in the generator for a given returned `UnicodeScalar` or an error.
+  /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A *generator* of code units to be decoded.
+  /// - parameter next: An *iterator* of code units to be decoded.
   public mutating func decode<
-    G : GeneratorType where G.Element == CodeUnit
-  >(inout input: G) -> UnicodeDecodingResult {
+    I : IteratorProtocol where I.Element == CodeUnit
+  >(inout input: I) -> UnicodeDecodingResult {
     if _lookaheadFlags & 0b01 != 0 {
       return .EmptyInput
     }
@@ -598,8 +598,8 @@ public struct UTF16 : UnicodeCodecType {
   /// units it spanned in the input.  This function may consume more code
   /// units than required for this scalar.
   mutating func _decodeOne<
-    G : GeneratorType where G.Element == CodeUnit
-  >(inout input: G) -> (UnicodeDecodingResult, Int) {
+    I : IteratorProtocol where I.Element == CodeUnit
+  >(inout input: I) -> (UnicodeDecodingResult, Int) {
     let result = decode(&input)
     switch result {
     case .Result(let us):
@@ -646,23 +646,23 @@ public struct UTF32 : UnicodeCodecType {
   ///
   /// In order to decode a code unit sequence completely, this function should
   /// be called repeatedly until it returns `UnicodeDecodingResult.EmptyInput`.
-  /// Checking that the generator was exhausted is not sufficient.  The decoder
+  /// Checking that the iterator was exhausted is not sufficient.  The decoder
   /// can have an internal buffer that is pre-filled with data from the input
-  /// generator.
+  /// iterator.
   ///
   /// Because of buffering, it is impossible to find the corresponding position
-  /// in the generator for a given returned `UnicodeScalar` or an error.
+  /// in the iterator for a given returned `UnicodeScalar` or an error.
   ///
-  /// - parameter next: A *generator* of code units to be decoded.
+  /// - parameter next: An *iterator* over the code units to be decoded.
   public mutating func decode<
-    G : GeneratorType where G.Element == CodeUnit
-  >(inout input: G) -> UnicodeDecodingResult {
+    I : IteratorProtocol where I.Element == CodeUnit
+  >(inout input: I) -> UnicodeDecodingResult {
     return UTF32._decode(&input)
   }
 
   static func _decode<
-    G : GeneratorType where G.Element == CodeUnit
-  >(inout input: G) -> UnicodeDecodingResult {
+    I : IteratorProtocol where I.Element == CodeUnit
+  >(inout input: I) -> UnicodeDecodingResult {
     guard let x = input.next() else { return .EmptyInput }
     if _fastPath((x >> 11) != 0b1101_1 && x <= 0x10ffff) {
       return .Result(UnicodeScalar(x))
@@ -688,7 +688,7 @@ public struct UTF32 : UnicodeCodecType {
 ///   error is detected in `input`, if `true`.  Otherwise, U+FFFD
 ///   replacement characters are inserted for each detected error.
 public func transcode<
-  Input : GeneratorType,
+  Input : IteratorProtocol,
   InputEncoding : UnicodeCodecType,
   OutputEncoding : UnicodeCodecType
   where InputEncoding.CodeUnit == Input.Element>(
@@ -925,7 +925,7 @@ extension UTF16 {
   /// found in `input`.
   @warn_unused_result
   public static func measure<
-      Encoding : UnicodeCodecType, Input : GeneratorType
+      Encoding : UnicodeCodecType, Input : IteratorProtocol
       where Encoding.CodeUnit == Input.Element
   >(
     _: Encoding.Type, input: Input, repairIllFormedSequences: Bool

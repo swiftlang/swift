@@ -63,10 +63,10 @@ struct formattedTestS<T : MyFormattedPrintable> {
 }
 
 struct GenericReq<
-  T : GeneratorType, U : GeneratorType where T.Element == U.Element
+  T : IteratorProtocol, U : IteratorProtocol where T.Element == U.Element
 > {}
 
-func getFirst<R : GeneratorType>(r: R) -> R.Element {
+func getFirst<R : IteratorProtocol>(r: R) -> R.Element {
   var r = r
   return r.next()!
 }
@@ -151,7 +151,7 @@ struct RangeOfPrintables<R : SequenceType
 }
 
 struct Y {}
-struct SequenceY : SequenceType, GeneratorType {
+struct SequenceY : SequenceType, IteratorProtocol {
   typealias Generator = SequenceY
   typealias Element = Y
 

@@ -36,8 +36,8 @@ extension SequenceType {
   ///     3: 'f'
   ///     4: 't'
   @warn_unused_result
-  public func enumerate() -> EnumerateSequence<Self> {
-    return EnumerateSequence(_base: self)
+  public func enumerate() -> EnumeratedSequence<Self> {
+    return EnumeratedSequence(_base: self)
   }
 }
 
@@ -75,7 +75,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
 %   end
   ) ${rethrows_}-> ${GElement}? {
     var minResult: ${GElement}? = nil
-    for e in GeneratorSequence(generate()) {
+    for e in IteratorSequence(generate()) {
       if let currentMinResult = minResult {
 %   if preds:
         if try isOrderedBefore(e, currentMinResult) { minResult = e }
@@ -100,7 +100,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
 %   end
   ) ${rethrows_}-> ${GElement}? {
     var maxResult: ${GElement}? = nil
-    for e in GeneratorSequence(generate()) {
+    for e in IteratorSequence(generate()) {
       if let currentMaxResult = maxResult {
 %   if preds:
         if try isOrderedBefore(currentMaxResult, e) { maxResult = e }

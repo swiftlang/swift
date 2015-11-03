@@ -15,7 +15,7 @@
 // Check that the generic parameter is called 'Base'.
 protocol TestProtocol1 {}
 
-extension LazyFilterGenerator where Base : TestProtocol1 {
+extension LazyFilterIterator where Base : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }

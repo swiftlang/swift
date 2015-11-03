@@ -1993,8 +1993,8 @@ NOTE(change_to_mutating,sema_tcs,none,
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,
       "SequenceType protocol definition is broken", ())
-ERROR(generator_protocol_broken,sema_tcs,none,
-      "GeneratorType protocol definition is broken", ())
+ERROR(iterator_protocol_broken,sema_tcs,none,
+      "IteratorProtocol protocol definition is broken", ())
 
 ERROR(label_shadowed,sema_tcs, none,
       "label %0 cannot be reused on an inner statement", (Identifier))

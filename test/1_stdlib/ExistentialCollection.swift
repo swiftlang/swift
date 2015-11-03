@@ -17,7 +17,7 @@ import StdlibUnittest
 // Check that the generic parameter is called 'Element'.
 protocol TestProtocol1 {}
 
-extension AnyGenerator where Element : TestProtocol1 {
+extension AnyIterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -49,21 +49,21 @@ extension AnyRandomAccessCollection where Element : TestProtocol1 {
 
 var tests = TestSuite("ExistentialCollection")
 
-tests.test("AnyGenerator") {
-  func countStrings() -> AnyGenerator<String> {
+tests.test("AnyIterator") {
+  func countStrings() -> AnyIterator<String> {
     let lazyStrings = (0..<5).lazy.map { String($0) }
     
     // This is a really complicated type of no interest to our
     // clients.
-    let g: LazyMapGenerator<
-      RangeGenerator<Int>, String> = lazyStrings.generate()
-    return AnyGenerator(g)
+    let iterator: LazyMapIterator<RangeIterator<Int>, String> =
+      lazyStrings.generate()
+    return AnyIterator(iterator)
   }
   expectEqual(["0", "1", "2", "3", "4"], Array(countStrings()))
 
   var x = 7
-  let g = AnyGenerator { x < 15 ? x++ : nil }
-  expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(g))
+  let iterator = AnyIterator { x < 15 ? x++ : nil }
+  expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(iterator))
 }
 
 let initialCallCounts = [
@@ -138,7 +138,7 @@ tests.test("AnySequence.init(SequenceType)") {
 tests.test("AnySequence.init(() -> Generator)") {
   if true {
     var s = AnySequence {
-      return MinimalGenerator<OpaqueValue<Int>>([])
+      return MinimalIterator<OpaqueValue<Int>>([])
     }
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
     checkSequence([], s, resiliencyChecks: .none) { $0.value == $1.value }
@@ -147,7 +147,7 @@ tests.test("AnySequence.init(() -> Generator)") {
     let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
     let data = intData.map(OpaqueValue.init)
     var s = AnySequence {
-      return MinimalGenerator(data)
+      return MinimalIterator(data)
     }
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
     checkSequence(data, s, resiliencyChecks: .none) { $0.value == $1.value }

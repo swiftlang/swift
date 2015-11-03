@@ -45,7 +45,7 @@ struct SatisfySameTypeAssocTypeRequirementDependent<T>
 
 // Pulled in from old standard library to keep the following test
 // (LazySequenceOf) valid.
-public struct GeneratorOf<T> : GeneratorType, SequenceType {
+public struct GeneratorOf<T> : IteratorProtocol, SequenceType {
 
   /// Construct an instance whose `next()` method calls `nextElement`.
   public init(_ nextElement: ()->T?) {
@@ -54,7 +54,7 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
   
   /// Construct an instance whose `next()` method pulls its results
   /// from `base`.
-  public init<G: GeneratorType where G.Element == T>(_ base: G) {
+  public init<G: IteratorProtocol where G.Element == T>(_ base: G) {
     var base = base
     self._next = { base.next() }
   }
@@ -90,13 +90,13 @@ public func iterate<A>(f : A -> A)(x : A) -> LazySequenceOf<Iterate<A>, A>? { //
 }
 
 public final class Iterate<A> : SequenceType {
-  typealias GeneratorType = IterateGenerator<A>
+  typealias IteratorProtocol = IterateGenerator<A>
   public func generate() -> IterateGenerator<A> {
     return IterateGenerator<A>()
   }
 }
 
-public final class IterateGenerator<A> : GeneratorType {
+public final class IterateGenerator<A> : IteratorProtocol {
   public func next() -> A? {
     return nil
   }
@@ -198,24 +198,24 @@ extension Something {
 }
 
 // rdar://problem/18120419
-func TTGenWrap<T, G: GeneratorType where G.Element == (T,T)>(gen: G)
+func TTGenWrap<T, I : IteratorProtocol where I.Element == (T,T)>(iterator: I)
 {
-  var gen = gen
-  _ = gen.next()
+  var iterator = iterator
+  _ = iterator.next()
 }
 
-func IntIntGenWrap<G: GeneratorType where G.Element == (Int,Int)>(gen: G)
+func IntIntGenWrap<I : IteratorProtocol where I.Element == (Int,Int)>(iterator: I)
 {
-  var gen = gen
-  _ = gen.next()
+  var iterator = iterator
+  _ = iterator.next()
 }
 
-func GGWrap<G1: GeneratorType, G2: GeneratorType where G1.Element == G2.Element>(g1: G1, _ g2: G2)
+func GGWrap<I1 : IteratorProtocol, I2 : IteratorProtocol where I1.Element == I2.Element>(i1: I1, _ i2: I2)
 {
-  var g1 = g1
-  var g2 = g2
-  _ = g1.next()
-  _ = g2.next()
+  var i1 = i1
+  var i2 = i2
+  _ = i1.next()
+  _ = i2.next()
 }
 
 func testSameTypeTuple(a: Array<(Int,Int)>, s: ArraySlice<(Int,Int)>) {

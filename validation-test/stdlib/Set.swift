@@ -31,7 +31,7 @@ extension SetIndex where Element : TestProtocol1 {
   }
 }
 
-extension SetGenerator where Element : TestProtocol1 {
+extension SetIterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -1899,7 +1899,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
     members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   expectEmpty(gen.next())
   expectEmpty(gen.next())
@@ -1918,7 +1918,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
     members.append(member.value)
   }
   expectTrue(equalsUnordered(members, [1010, 2020, 3030]))
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   expectEmpty(gen.next())
   expectEmpty(gen.next())
@@ -1933,7 +1933,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
 
   var gen = s.generate()
   expectEmpty(gen.next())
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   expectEmpty(gen.next())
   expectEmpty(gen.next())
@@ -1948,7 +1948,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
 
   var gen = s.generate()
   expectEmpty(gen.next())
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   expectEmpty(gen.next())
   expectEmpty(gen.next())
@@ -1967,7 +1967,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
     members.append((member as! TestObjCKeyTy).value)
   }
   expectTrue(equalsUnordered(members, hugeNumberArray))
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   expectEmpty(gen.next())
   expectEmpty(gen.next())
@@ -1986,7 +1986,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
     members.append((member as! TestBridgedKeyTy).value)
   }
   expectTrue(equalsUnordered(members, hugeNumberArray))
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   expectEmpty(gen.next())
   expectEmpty(gen.next())
@@ -3672,7 +3672,7 @@ SetTestSuite.test("mutationDoesNotAffectGenerator/remove,1") {
   var g = set.generate()
   expectOptionalEqual(1010, set.remove(1010))
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(GeneratorSequence(g)))
+  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(g)))
 }
 
 SetTestSuite.test("mutationDoesNotAffectGenerator/remove,all") {
@@ -3682,7 +3682,7 @@ SetTestSuite.test("mutationDoesNotAffectGenerator/remove,all") {
   expectOptionalEqual(1020, set.remove(1020))
   expectOptionalEqual(1030, set.remove(1030))
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(GeneratorSequence(g)))
+  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(g)))
 }
 
 SetTestSuite.test("mutationDoesNotAffectGenerator/removeAll,keepCapacity=false") {
@@ -3690,7 +3690,7 @@ SetTestSuite.test("mutationDoesNotAffectGenerator/removeAll,keepCapacity=false")
   var g = set.generate()
   set.removeAll(keepCapacity: false)
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(GeneratorSequence(g)))
+  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(g)))
 }
 
 SetTestSuite.test("mutationDoesNotAffectGenerator/removeAll,keepCapacity=true") {
@@ -3698,7 +3698,7 @@ SetTestSuite.test("mutationDoesNotAffectGenerator/removeAll,keepCapacity=true") 
   var g = set.generate()
   set.removeAll(keepCapacity: true)
 
-  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(GeneratorSequence(g)))
+  expectEqualsUnordered([ 1010, 1020, 1030 ], Array(IteratorSequence(g)))
 }
 
 runAllTests()

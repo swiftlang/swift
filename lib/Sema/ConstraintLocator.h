@@ -105,7 +105,7 @@ public:
     /// \brief The instance of a metatype type.
     InstanceType,
     /// \brief The generic type of a sequence.
-    SequenceGeneratorType,
+    SequenceIteratorProtocol,
     /// \brief The element type of a generator.
     GeneratorElementType,
     /// \brief The element of an array type.
@@ -142,7 +142,7 @@ public:
     case ClosureResult:
     case ParentType:
     case InstanceType:
-    case SequenceGeneratorType:
+    case SequenceIteratorProtocol:
     case GeneratorElementType:
     case ArrayElementType:
     case ScalarToTuple:
@@ -182,7 +182,7 @@ public:
     case ApplyArgument:
     case ApplyFunction:
     case ApplyArgToParam:
-    case SequenceGeneratorType:
+    case SequenceIteratorProtocol:
     case GeneratorElementType:
     case ArrayElementType:
     case ClosureResult:

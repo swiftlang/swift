@@ -60,8 +60,8 @@
 /// we can build a sequence that lazily computes the elements in the
 /// result of `scan`:
 ///
-///     struct LazyScanGenerator<Base: GeneratorType, ResultElement>
-///       : GeneratorType {
+///     struct LazyScanIterator<Base : IteratorProtocol, ResultElement>
+///       : IteratorProtocol {
 ///       mutating func next() -> ResultElement? {
 ///         return nextElement.map { result in
 ///           nextElement = base.next().map { combine(result, $0) }
@@ -69,15 +69,15 @@
 ///         }
 ///       }
 ///       private var nextElement: ResultElement? // The next result of next().
-///       private var base: Base                  // The underlying generator.
+///       private var base: Base                  // The underlying iterator.
 ///       private let combine: (ResultElement, Base.Element)->ResultElement
 ///     }
 ///     
 ///     struct LazyScanSequence<Base: SequenceType, ResultElement>
 ///       : LazySequenceType // Chained operations on self are lazy, too
 ///     {
-///       func generate() -> LazyScanGenerator<Base.Generator, ResultElement> {
-///         return LazyScanGenerator(
+///       func generate() -> LazyScanIterator<Base.Generator, ResultElement> {
+///         return LazyScanIterator(
 ///           nextElement: initial, base: base.generate(), combine: combine)
 ///       }
 ///       private let initial: ResultElement

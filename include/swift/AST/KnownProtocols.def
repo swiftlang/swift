@@ -49,7 +49,7 @@
     BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL_WITH_NAME(name, "_" #name)
 
 PROTOCOL(SequenceType)
-PROTOCOL(GeneratorType)
+PROTOCOL(IteratorProtocol)
 PROTOCOL(BooleanType)
 PROTOCOL(AnyObject)
 PROTOCOL(RawRepresentable)

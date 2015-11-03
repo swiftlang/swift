@@ -411,10 +411,10 @@ public struct Set<Element : Hashable> :
     return _variantStorage.assertingGet(position)
   }
 
-  /// Return a *generator* over the members.
+  /// Return a *iterator* over the members.
   ///
   /// - Complexity: O(1).
-  public func generate() -> SetGenerator<Element> {
+  public func generate() -> SetIterator<Element> {
     return _variantStorage.generate()
   }
 
@@ -441,7 +441,9 @@ public struct Set<Element : Hashable> :
   }
 
   /// Create a `Set` from a finite sequence of items.
-  public init<S : SequenceType where S.Generator.Element == Element>(_ sequence: S) {
+  public init<
+    S : SequenceType where S.Generator.Element == Element
+  >(_ sequence: S) {
     self.init()
     if let s = sequence as? Set<Element> {
       // If this sequence is actually a native `Set`, then we can quickly
@@ -1117,10 +1119,10 @@ public struct Dictionary<Key : Hashable, Value> :
   // `SequenceType` conformance
   //
 
-  /// Return a *generator* over the (key, value) pairs.
+  /// Return a *iterator* over the (key, value) pairs.
   ///
   /// - Complexity: O(1).
-  public func generate() -> DictionaryGenerator<Key, Value> {
+  public func generate() -> DictionaryIterator<Key, Value> {
     return _variantStorage.generate()
   }
 
@@ -2998,16 +3000,16 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       let cocoa${Self} = cocoaStorage.cocoa${Self}
       let newNativeOwner = NativeStorageOwner(minimumCapacity: minimumCapacity)
       var newNativeStorage = newNativeOwner.nativeStorage
-      let oldCocoaGenerator = _Cocoa${Self}Generator(cocoa${Self})
+      let oldCocoaIterator = _Cocoa${Self}Iterator(cocoa${Self})
 %if Self == 'Set':
-      while let key = oldCocoaGenerator.next() {
+      while let key = oldCocoaIterator.next() {
         newNativeStorage.unsafeAddNew(
             key: _forceBridgeFromObjectiveC(key, Value.self))
       }
 
 %elif Self == 'Dictionary':
 
-      while let (key, value) = oldCocoaGenerator.next() {
+      while let (key, value) = oldCocoaIterator.next() {
         newNativeStorage.unsafeAddNew(
           key: _forceBridgeFromObjectiveC(key, Key.self),
           value: _forceBridgeFromObjectiveC(value, Value.self))
@@ -3449,17 +3451,17 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     }
   }
 
-  /// Return a *generator* over the (Key, Value) pairs.
+  /// Return a *iterator* over the (Key, Value) pairs.
   ///
   /// - Complexity: O(1).
-  internal func generate() -> ${Self}Generator<${TypeParameters}> {
+  internal func generate() -> ${Self}Iterator<${TypeParameters}> {
     switch self {
     case .Native(let owner):
       return
         ._Native(start: native.startIndex, end: native.endIndex, owner: owner)
     case .Cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
-      return ._Cocoa(_Cocoa${Self}Generator(cocoaStorage.cocoa${Self}))
+      return ._Cocoa(_Cocoa${Self}Iterator(cocoaStorage.cocoa${Self}))
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
@@ -3757,10 +3759,10 @@ public func < <${TypeParametersDecl}> (
 }
 
 #if _runtime(_ObjC)
-final internal class _Cocoa${Self}Generator : GeneratorType {
+final internal class _Cocoa${Self}Iterator : IteratorProtocol {
   internal typealias Element = ${AnySequenceType}
 
-  // Cocoa ${Self} generator has to be a class, otherwise we can not
+  // Cocoa ${Self} iterator has to be a class, otherwise we can not
   // guarantee that the fast enumeration struct is pinned to a certain memory
   // location.
 
@@ -3831,30 +3833,30 @@ final internal class _Cocoa${Self}Generator : GeneratorType {
   }
 }
 #else
-final internal class _Cocoa${Self}Generator {}
+final internal class _Cocoa${Self}Iterator {}
 #endif
 
-internal enum ${Self}GeneratorRepresentation<${TypeParametersDecl}> {
-  internal typealias _Generator = ${Self}Generator<${TypeParameters}>
+internal enum ${Self}IteratorRepresentation<${TypeParametersDecl}> {
+  internal typealias _Iterator = ${Self}Iterator<${TypeParameters}>
   internal typealias _NativeStorageOwner =
     _Native${Self}StorageOwner<${TypeParameters}>
-  internal typealias _NativeIndex = _Generator._NativeIndex
+  internal typealias _NativeIndex = _Iterator._NativeIndex
 
   // For native storage, we keep two indices to keep track of the iteration
   // progress and the storage owner to make the storage non-uniquely
   // referenced.
   //
   // While indices keep the storage alive, they don't affect reference count of
-  // the storage.  Generator is iterating over a frozen view of the collection
+  // the storage.  Iterator is iterating over a frozen view of the collection
   // state, so it should keep its own reference to the storage owner.
   case _Native(
     start: _NativeIndex, end: _NativeIndex, owner: _NativeStorageOwner)
-  case _Cocoa(_Cocoa${Self}Generator)
+  case _Cocoa(_Cocoa${Self}Iterator)
 }
 
-/// A generator over the members of a `${Self}<${TypeParameters}>`.
-public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
-  // ${Self} has a separate GeneratorType and Index because of efficiency
+/// A iterator over the members of a `${Self}<${TypeParameters}>`.
+public struct ${Self}Iterator<${TypeParametersDecl}> : IteratorProtocol {
+  // ${Self} has a separate IteratorProtocol and Index because of efficiency
   // and implementability reasons.
   //
   // Index for native storage is efficient.  Index for bridged NS${Self} is
@@ -3862,25 +3864,25 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
   //
   // Even though fast enumeration is not suitable for implementing
   // Index, which is multi-pass, it is suitable for implementing a
-  // GeneratorType, which is being consumed as iteration proceeds.
+  // IteratorProtocol, which is being consumed as iteration proceeds.
 
   internal typealias _NativeStorageOwner =
     _Native${Self}StorageOwner<${TypeParameters}>
   internal typealias _NativeIndex = _Native${Self}Index<${TypeParameters}>
 
-  internal var _state: ${Self}GeneratorRepresentation<${TypeParameters}>
+  internal var _state: ${Self}IteratorRepresentation<${TypeParameters}>
 
   internal static func _Native(
     start start: _NativeIndex, end: _NativeIndex, owner: _NativeStorageOwner
-  ) -> ${Self}Generator {
-    return ${Self}Generator(
+  ) -> ${Self}Iterator {
+    return ${Self}Iterator(
       _state: ._Native(start: start, end: end, owner: owner))
   }
 #if _runtime(_ObjC)
   internal static func _Cocoa(
-    generator: _Cocoa${Self}Generator
-  ) -> ${Self}Generator{
-    return ${Self}Generator(_state: ._Cocoa(generator))
+    iterator: _Cocoa${Self}Iterator
+  ) -> ${Self}Iterator{
+    return ${Self}Iterator(_state: ._Cocoa(iterator))
   }
 #endif
 
@@ -3920,14 +3922,14 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
     switch _state {
     case ._Native:
       return _nativeNext()
-    case ._Cocoa(let cocoaGenerator):
+    case ._Cocoa(let cocoaIterator):
 #if _runtime(_ObjC)
 %if Self == 'Set':
-      if let anyObjectElement = cocoaGenerator.next() {
+      if let anyObjectElement = cocoaIterator.next() {
         return _forceBridgeFromObjectiveC(anyObjectElement, Element.self)
       }
 %elif Self == 'Dictionary':
-      if let (anyObjectKey, anyObjectValue) = cocoaGenerator.next() {
+      if let (anyObjectKey, anyObjectValue) = cocoaIterator.next() {
         let nativeKey = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
         let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
         return (nativeKey, nativeValue)

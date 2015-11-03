@@ -22,9 +22,9 @@ import var Swift.Int // expected-error {{'Int' was imported as 'var', but is a s
 // CHECK-NEXT: FIXIT: ([[FILE:.*import-specific-fixits.swift]]:[[@LINE-6]]:8 - [[FILE]]:[[@LINE-6]]:13): "struct"
 // CHECK-NEXT: note: 'Int' declared here
 
-import typealias Swift.GeneratorType // expected-error {{'GeneratorType' was imported as 'typealias', but is a protocol}} {{8-17=protocol}}
-import struct Swift.GeneratorType // expected-error {{'GeneratorType' was imported as 'struct', but is a protocol}} {{8-14=protocol}}
-import func Swift.GeneratorType // expected-error {{'GeneratorType' was imported as 'func', but is a protocol}} {{8-12=protocol}}
+import typealias Swift.IteratorProtocol // expected-error {{'IteratorProtocol' was imported as 'typealias', but is a protocol}} {{8-17=protocol}}
+import struct Swift.IteratorProtocol // expected-error {{'IteratorProtocol' was imported as 'struct', but is a protocol}} {{8-14=protocol}}
+import func Swift.IteratorProtocol // expected-error {{'IteratorProtocol' was imported as 'func', but is a protocol}} {{8-12=protocol}}
 
 import class Swift.Int64 // expected-error {{'Int64' was imported as 'class', but is a struct}} {{8-13=struct}}
 

@@ -210,7 +210,7 @@ func callMin(x: Int, y: Int, a: Float, b: Float) {
 }
 
 func rangeOfIsBefore<
-  R : GeneratorType where R.Element : IsBefore
+  R : IteratorProtocol where R.Element : IsBefore
 >(range : R) { }
 
 

@@ -57,7 +57,7 @@ extension CollectionType where Self.Generator.Element : Equatable {
 print(["a", "b", "c", "d", "e"].myIndexOf("d")!)
 
 extension SequenceType {
-  final public func myEnumerate() -> EnumerateSequence<Self> { 
+  final public func myEnumerate() -> EnumeratedSequence<Self> {
     return self.enumerate()
   }
 }

@@ -1,35 +1,35 @@
 // RUN: not %target-swift-frontend %s -parse
 
-protocol MyGeneratorType {
+protocol MyIteratorProtocol {
   typealias Element
   mutating func next() -> Element?
 }
 
 protocol MySequenceType {
-  typealias Generator : MyGeneratorType
+  typealias Generator : MyIteratorProtocol
   func generate() -> Generator
 }
 
 protocol MyCollectionDefaultsType : MySequenceType {}
 extension MyCollectionDefaultsType {
-  final func generate() -> DefaultGenerator<Self> {
-    return DefaultGenerator()
+  final func generate() -> DefaultIterator<Self> {
+    return DefaultIterator()
   }
 }
 
 protocol MyCollectionType
   : MySequenceType, MyCollectionDefaultsType {}
 
-struct DefaultGenerator<C : MyCollectionDefaultsType> : MyGeneratorType {
+struct DefaultIterator<C : MyCollectionDefaultsType> : MyIteratorProtocol {
   mutating func next() -> C.Generator.Element {
     fatalError("")
   }
 }
 
-struct FooGeneratorWrapper<Base : MyGeneratorType> {
+struct FooIteratorWrapper<Base : MyIteratorProtocol> {
   init(_ base: Base) {}
 }
 
 func f<C : MyCollectionType>(c: C) {
-  FooGeneratorWrapper(c.generate())
+  FooIteratorWrapper(c.generate())
 }

@@ -70,7 +70,7 @@ public protocol MutableIndexable {
   subscript(position: Index) -> _Element {get set}
 }
 
-/// A *generator* for an arbitrary *collection*.  Provided `C`
+/// An *iterator* for an arbitrary *collection*.  Provided `C`
 /// conforms to the other requirements of `Indexable`,
 /// `IndexingGenerator<C>` can be used as the result of `C`'s
 /// `generate()` method.  For example:
@@ -83,9 +83,9 @@ public protocol MutableIndexable {
 ///        }
 ///      }
 public struct IndexingGenerator<Elements : Indexable>
- : GeneratorType, SequenceType {
-  
-  /// Create a *generator* over the given collection.
+ : IteratorProtocol, SequenceType {
+
+  /// Create a *iterator* over the given collection.
   public init(_ elements: Elements) {
     self._elements = elements
     self._position = elements.startIndex
@@ -125,7 +125,7 @@ public protocol CollectionType : Indexable, SequenceType {
   /// By default, a `CollectionType` satisfies `SequenceType` by
   /// supplying an `IndexingGenerator` as its associated `Generator`
   /// type.
-  typealias Generator: GeneratorType = IndexingGenerator<Self>
+  typealias Generator : IteratorProtocol = IndexingGenerator<Self>
 
   // FIXME: Needed here so that the Generator is properly deduced from
   // a custom generate() function.  Otherwise we get an
@@ -711,13 +711,13 @@ internal func _writeBackMutableSlice<
     "Can not replace a slice of a MutableCollectionType with a slice of a smaller size")
 }
 
-/// A *generator* that adapts a *collection* `C` and any *sequence* of
+/// An *iterator* that adapts a *collection* `C` and any *sequence* of
 /// its `Index` type to present the collection's elements in a
 /// permuted order.
 public struct PermutationGenerator<
   C: CollectionType, Indices: SequenceType
   where C.Index == Indices.Generator.Element
-> : GeneratorType, SequenceType {
+> : IteratorProtocol, SequenceType {
   var seq : C
   var indices : Indices.Generator
 
@@ -732,7 +732,7 @@ public struct PermutationGenerator<
     return indices.next().map { seq[$0] }
   }
 
-  /// Construct a *generator* over a permutation of `elements` given
+  /// Construct an *iterator* over a permutation of `elements` given
   /// by `indices`.
   ///
   /// - Requires: `elements[i]` is valid for every `i` in `indices`.

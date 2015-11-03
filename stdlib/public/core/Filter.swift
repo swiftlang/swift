@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A generator that produces the elements produced by some base
-/// generator that also satisfy a given predicate.
+/// An iterator over the elements traversed by some base iterator that also
+/// satisfy a given predicate.
 ///
-/// - Note: This is the associated `Generator` of `LazyFilterSequence`
+/// - Note: This is the associated `Iterator` of `LazyFilterSequence`
 /// and `LazyFilterCollection`.
-public struct LazyFilterGenerator<
-  Base : GeneratorType
-> : GeneratorType, SequenceType {
+public struct LazyFilterIterator<
+  Base : IteratorProtocol
+> : IteratorProtocol, SequenceType {
   /// Advances to the next element and returns it, or `nil` if no next
   /// element exists.
   ///
@@ -44,7 +44,7 @@ public struct LazyFilterGenerator<
     self._predicate = predicate
   }
 
-  /// The underlying generator whose elements are being filtered
+  /// The underlying iterator whose elements are being filtered.
   public var base: Base { return _base }
 
   internal var _base: Base
@@ -62,11 +62,11 @@ public struct LazyFilterGenerator<
 public struct LazyFilterSequence<Base : SequenceType>
   : LazySequenceType {
   
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> LazyFilterGenerator<Base.Generator> {
-    return LazyFilterGenerator(
+  public func generate() -> LazyFilterIterator<Base.Generator> {
+    return LazyFilterIterator(
       base.generate(), whereElementsSatisfy: _include)
   }
 
@@ -210,11 +210,11 @@ public struct LazyFilterCollection<
     return _base[position.base]
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> LazyFilterGenerator<Base.Generator> {
-    return LazyFilterGenerator(
+  public func generate() -> LazyFilterIterator<Base.Generator> {
+    return LazyFilterIterator(
       _base.generate(), whereElementsSatisfy: _predicate)
   }
 

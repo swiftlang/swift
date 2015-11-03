@@ -2,10 +2,10 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-var tests = TestSuite("Generator")
+var tests = TestSuite("Iterator")
 
 // Check to make sure we are actually getting Optionals out of this
-// GeneratorType
+// IteratorProtocol
 tests.test("Range") {
   var w = (1..<2).generate()
   var maybe_one = w.next()
@@ -14,34 +14,34 @@ tests.test("Range") {
   expectEmpty(w.next())
 }
 
-tests.test("RangeGeneratorConformsToSequence") {
+tests.test("RangeIteratorConformsToSequence") {
   for x in (1..<2).generate() { 
     expectEqual(1, x)
   }
 }
 
-// Test round-trip GeneratorType/GeneratorType adaptation
-tests.test("GeneratorSequence") {
+// Test round-trip IteratorProtocol/IteratorProtocol adaptation
+tests.test("IteratorSequence") {
   var r = 1..<7
-  var x = MinimalGenerator(Array(r))
-  for a in GeneratorSequence(x) {
+  var x = MinimalIterator(Array(r))
+  for a in IteratorSequence(x) {
     expectEqual(r.startIndex, a)
     ++r.startIndex
   }
   expectEqual(r.startIndex, r.endIndex)
 }
 
-struct G : GeneratorType {
+struct MyIterator : IteratorProtocol {
   var i = 0
   mutating func next() -> Int? {
     return i < 10 ? i++ : nil
   }
 }
 
-extension G : SequenceType {}
-tests.test("GeneratorsModelSequenceTypeByDeclaration") {
+extension MyIterator : SequenceType {}
+tests.test("IteratorsModelSequenceTypeByDeclaration") {
   var n = 0
-  for i in G() {
+  for i in MyIterator() {
     expectEqual(n++, i)
   }
 }

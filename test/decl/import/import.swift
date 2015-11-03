@@ -36,7 +36,7 @@ import typealias Swift.ManagedBuffer
 import class Swift.ManagedBuffer
 import typealias Swift.Bool
 import struct Swift.Bool
-import protocol Swift.GeneratorType
+import protocol Swift.IteratorProtocol
 import var import_builtin.x
 import func Swift.min
 

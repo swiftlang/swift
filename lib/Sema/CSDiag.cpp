@@ -1882,7 +1882,7 @@ static bool isConversionConstraint(const Constraint *C) {
 /// nothing else interesting we can scrape out of the constraint system.
 static bool isLowPriorityConstraint(Constraint *C) {
   // If the member constraint is a ".Element" lookup to find the element type of
-  // a generator in a foreach loop, then it is very low priority: We will get a
+  // an iterator in a foreach loop, then it is very low priority: We will get a
   // better and more useful diagnostic from the failed conversion to
   // SequenceType that will fail as well.
   if (C->getKind() == ConstraintKind::TypeMember) {

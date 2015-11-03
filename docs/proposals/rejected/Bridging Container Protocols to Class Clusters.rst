@@ -15,7 +15,7 @@ Here's what I propose instead:
   ``ContiguousArray``.
 - Redefine ``Array`` as a refinement of the ``Collection`` protocol
   that has integer indices.
-- Implement an ``ArrayOf<T>`` generic container, like ``AnyGenerator`` and
+- Implement an ``ArrayOf<T>`` generic container, like ``AnyIterator`` and
   ``AnySequence``, that can hold an arbitrary type conforming to ``Array``.
 - Bridge ``NSArray`` from ObjC to Swift ``ArrayOf<AnyObject>`` with value
   semantics.
@@ -78,7 +78,7 @@ The ArrayOf<T> Type
 
 Although the language as implemented does not yet support protocol types for
 protocols with associated types, DaveA devised a technique for implementing
-types that provide the same effect in the library, such as his ``AnyGenerator<T>``
+types that provide the same effect in the library, such as his ``AnyIterator<T>``
 and ``AnySequence<T>`` containers for arbitrary ``Stream`` and ``Sequence``
 types. This technique can be extended to the ``Array`` protocol, using class
 inheritance to hide the concrete implementing type behind an abstract base::

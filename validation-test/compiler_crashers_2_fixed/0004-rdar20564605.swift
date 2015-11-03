@@ -2,7 +2,7 @@
 
 public protocol Q_SequenceDefaultsType {
   typealias Element
-  typealias Generator : GeneratorType
+  typealias Generator : IteratorProtocol
   func generate() -> Generator
 }
 
@@ -52,11 +52,8 @@ extension Q_SequenceDefaultsType {
 public protocol Q_SequenceType : Q_SequenceDefaultsType {
   /// A type that provides the *sequence*\ 's iteration interface and
   /// encapsulates its iteration state.
-  typealias Generator : GeneratorType
+  typealias Generator : IteratorProtocol
 
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// Complexity: O(1)
   func generate() -> Generator
 
   /// Return a value less than or equal to the number of elements in
@@ -82,7 +79,7 @@ public protocol Q_SequenceType : Q_SequenceDefaultsType {
   static func _constrainElement(Element)
 }
 
-public extension GeneratorType {
+public extension IteratorProtocol {
   typealias Generator = Self
   
   public final func generate() -> Generator {
@@ -128,7 +125,7 @@ extension Q_CollectionDefaultsType {
   }
 }
 
-public struct Q_IndexingGenerator<C: Q_Indexable> : GeneratorType {
+public struct Q_IndexingGenerator<C: Q_Indexable> : IteratorProtocol {
   public typealias Element = C.Element
   var pos: C.Index
   let elements: C

@@ -21,7 +21,7 @@ protocol Q : SequenceType {
   func f<QS: SequenceType where QS.Generator.Element == Self.Generator.Element>(x: QS)
 }
 
-struct No<NT> : GeneratorType {
+struct No<NT> : IteratorProtocol {
   func next() -> NT? {
     return .None
   }

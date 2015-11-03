@@ -200,7 +200,7 @@ func lookUpManyTopLevelNames() {
     break
   }
   
-  for _: OtherFileEnumWrapper.Enum in EmptyGenerator<X>() {}
+  for _: OtherFileEnumWrapper.Enum in EmptyIterator<X>() {}
   
   // CHECK-DAG: !private "otherFileGetNonImpl"
   overloadedOnProto(otherFileGetNonImpl())
@@ -360,8 +360,8 @@ struct Sentinel2 {}
 // CHECK-DAG: - !private ["V4main25OtherFileProtoImplementor", "deinit"]
 // CHECK-DAG: - !private ["V4main26OtherFileProtoImplementor2", "deinit"]
 // CHECK-DAG: - !private ["V4main28OtherFileProtoNonImplementor", "deinit"]
-// CHECK-DAG: - !private ["Vs14EmptyGenerator", "Element"]
-// CHECK-DAG: - !private ["Vs14EmptyGenerator", "init"]
+// CHECK-DAG: - !private ["Vs13EmptyIterator", "Element"]
+// CHECK-DAG: - !private ["Vs13EmptyIterator", "init"]
 // CHECK-DAG: - !private ["Vs17IndexingGenerator", "Element"]
 // CHECK-DAG: - ["O4main13OtherFileEnum", "Value"]
 // CHECK-DAG: - !private ["V4main20OtherFileEnumWrapper", "Enum"]
@@ -400,7 +400,7 @@ struct Sentinel2 {}
 // CHECK-DAG: !private "V4main25OtherFileProtoImplementor"
 // CHECK-DAG: !private "V4main26OtherFileProtoImplementor2"
 // CHECK-DAG: !private "V4main28OtherFileProtoNonImplementor"
-// CHECK-DAG: !private "Vs14EmptyGenerator"
+// CHECK-DAG: !private "Vs13EmptyIterator"
 // CHECK-DAG: !private "Vs17IndexingGenerator"
 // CHECK-DAG: - "O4main13OtherFileEnum"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"

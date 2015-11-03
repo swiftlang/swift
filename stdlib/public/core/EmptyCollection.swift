@@ -17,10 +17,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A generator that never produces an element.
+/// A iterator that never produces an element.
 ///
 /// - SeeAlso: `EmptyCollection<Element>`.
-public struct EmptyGenerator<Element> : GeneratorType, SequenceType {
+public struct EmptyIterator<Element> : IteratorProtocol, SequenceType {
   /// Construct an instance.
   public init() {}
 
@@ -51,11 +51,11 @@ public struct EmptyCollection<Element> : CollectionType {
     return 0
   }
 
-  /// Returns an empty *generator*.
+  /// Returns an empty *iterator*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> EmptyGenerator<Element> {
-    return EmptyGenerator()
+  public func generate() -> EmptyIterator<Element> {
+    return EmptyIterator()
   }
 
   /// Access the element at `position`.

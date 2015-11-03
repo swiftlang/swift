@@ -61,19 +61,19 @@ extension LoggingType {
   }
 }
 
-public class GeneratorLog {
-  public static func dispatchTester<G: GeneratorType>(
+public class IteratorLog {
+  public static func dispatchTester<G: IteratorProtocol>(
     g: G
-  ) -> LoggingGenerator<LoggingGenerator<G>> {
-    return LoggingGenerator(LoggingGenerator(g))
+  ) -> LoggingIterator<LoggingIterator<G>> {
+    return LoggingIterator(LoggingIterator(g))
   }
   public static var next = TypeIndexed(0)
 }
 
-public struct LoggingGenerator<Base: GeneratorType>
-  : GeneratorType, LoggingType {
+public struct LoggingIterator<Base: IteratorProtocol>
+  : IteratorProtocol, LoggingType {
 
-  public typealias Log = GeneratorLog
+  public typealias Log = IteratorLog
   
   public init(_ base: Base) {
     self.base = base
@@ -106,14 +106,14 @@ public class SequenceLog {
 public protocol LoggingSequenceType  : SequenceType, LoggingType {
   typealias Base : SequenceType
   typealias Log : AnyObject = SequenceLog
-  typealias Generator : GeneratorType = LoggingGenerator<Base.Generator>
+  typealias Generator : IteratorProtocol = LoggingIterator<Base.Generator>
 }
 
 extension LoggingSequenceType
-  where Log == SequenceLog, Generator == LoggingGenerator<Base.Generator> {
-  public func generate() -> LoggingGenerator<Base.Generator> {
+  where Log == SequenceLog, Generator == LoggingIterator<Base.Generator> {
+  public func generate() -> LoggingIterator<Base.Generator> {
     ++Log.generate[selfType]
-    return LoggingGenerator(base.generate())
+    return LoggingIterator(base.generate())
   }
 
   public func underestimateCount() -> Int {
@@ -245,7 +245,7 @@ where Index == Base.Index {
 }
 
 public struct LoggingCollection<Base_: CollectionType> : LoggingCollectionType {
-  public typealias Generator = LoggingGenerator<Base.Generator>
+  public typealias Generator = LoggingIterator<Base.Generator>
   public typealias Log = CollectionLog
   public typealias Base = Base_
   public typealias SubSequence = Base.SubSequence

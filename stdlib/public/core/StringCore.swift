@@ -698,7 +698,7 @@ extension _StringCore : RangeReplaceableCollectionType {
       }
     }
     // Append any remaining elements
-    for u in GeneratorSequence(g) {
+    for u in IteratorSequence(g) {
       self.append(u)
     }
   }

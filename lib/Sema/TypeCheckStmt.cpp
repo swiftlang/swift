@@ -583,7 +583,7 @@ public:
 
     // Retrieve the 'Generator' protocol.
     ProtocolDecl *generatorProto
-      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::GeneratorType);
+      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::IteratorProtocol);
     if (!generatorProto) {
       return nullptr;
     }
@@ -618,11 +618,11 @@ public:
                                       TC.Context.Id_Generator,
                                       diag::sequence_protocol_broken);
       
-      Expr *getGenerator
+      Expr *getIterator
         = TC.callWitness(sequence, DC, sequenceProto, conformance,
                          TC.Context.Id_generate,
                          {}, diag::sequence_protocol_broken);
-      if (!getGenerator) return nullptr;
+      if (!getIterator) return nullptr;
       
       // Create a local variable to capture the generator.
       std::string name;
@@ -640,9 +640,9 @@ public:
       auto genBinding =
           PatternBindingDecl::create(TC.Context, SourceLoc(),
                                      StaticSpellingKind::None,
-                                     S->getForLoc(), genPat, getGenerator, DC);
+                                     S->getForLoc(), genPat, getIterator, DC);
       genBinding->setImplicit();
-      S->setGenerator(genBinding);
+      S->setIterator(genBinding);
     }
     
     // Working with generators requires Optional.
@@ -661,32 +661,32 @@ public:
     
     Type elementTy = TC.getWitnessType(generatorTy, generatorProto,
                                        genConformance, TC.Context.Id_Element,
-                                       diag::generator_protocol_broken);
+                                       diag::iterator_protocol_broken);
     if (!elementTy)
       return nullptr;
     
     // Compute the expression that advances the generator.
-    Expr *genNext
+    Expr *iteratorNext
       = TC.callWitness(TC.buildCheckedRefExpr(generator, DC, S->getInLoc(),
                                               /*implicit*/true),
                        DC, generatorProto, genConformance,
-                       TC.Context.Id_next, {}, diag::generator_protocol_broken);
-    if (!genNext) return nullptr;
+                       TC.Context.Id_next, {}, diag::iterator_protocol_broken);
+    if (!iteratorNext) return nullptr;
     // Check that next() produces an Optional<T> value.
-    if (genNext->getType()->getCanonicalType()->getAnyNominal()
+    if (iteratorNext->getType()->getCanonicalType()->getAnyNominal()
           != TC.Context.getOptionalDecl()) {
-      TC.diagnose(S->getForLoc(), diag::generator_protocol_broken);
+      TC.diagnose(S->getForLoc(), diag::iterator_protocol_broken);
       return nullptr;
     }
 
     // Convert that Optional<T> value to Optional<Element>.
     auto optPatternType = OptionalType::get(S->getPattern()->getType());
-    if (!optPatternType->isEqual(genNext->getType()) &&
-        TC.convertToType(genNext, optPatternType, DC)) {
+    if (!optPatternType->isEqual(iteratorNext->getType()) &&
+        TC.convertToType(iteratorNext, optPatternType, DC)) {
       return nullptr;
     }
 
-    S->setGeneratorNext(genNext);
+    S->setIteratorNext(iteratorNext);
     
     // Type-check the body of the loop.
     AddLabeledStmt loopNest(*this, S);

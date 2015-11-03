@@ -30,7 +30,7 @@ extension DictionaryIndex where Key : TestProtocol1, Value : TestProtocol1 {
   }
 }
 
-extension DictionaryGenerator
+extension DictionaryIterator
   where Key : TestProtocol1, Value : TestProtocol1 {
 
   var _keyValueAreTestProtocol1: Bool {
@@ -2165,7 +2165,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   assert(gen.next() == nil)
   assert(gen.next() == nil)
@@ -2185,7 +2185,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
     pairs.append(kv)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   assert(gen.next() == nil)
   assert(gen.next() == nil)
@@ -2203,7 +2203,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
   // assert(gen.next() == .None)
   assert(gen.next() == nil)
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   assert(gen.next() == nil)
   assert(gen.next() == nil)
@@ -2221,7 +2221,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
   // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
   // assert(gen.next() == .None)
   assert(gen.next() == nil)
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   assert(gen.next() == nil)
   assert(gen.next() == nil)
@@ -2246,7 +2246,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
     expectedPairs += [(i, 1000 + i)]
   }
   assert(equalsUnordered(pairs, expectedPairs))
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   assert(gen.next() == nil)
   assert(gen.next() == nil)
@@ -2270,7 +2270,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
     expectedPairs += [(i, 1000 + i)]
   }
   assert(equalsUnordered(pairs, expectedPairs))
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   assert(gen.next() == nil)
   assert(gen.next() == nil)
@@ -2296,7 +2296,7 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
   }
   var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
   assert(equalsUnordered(pairs, expectedPairs))
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   assert(gen.next() == nil)
   assert(gen.next() == nil)
@@ -2322,7 +2322,7 @@ autoreleasepoolIfUnoptimizedReturnAutoreleased {
   }
   var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
   assert(equalsUnordered(pairs, expectedPairs))
-  // The following is not required by the GeneratorType protocol, but
+  // The following is not required by the IteratorProtocol protocol, but
   // it is a nice QoI.
   assert(gen.next() == nil)
   assert(gen.next() == nil)
@@ -3685,7 +3685,7 @@ DictionaryTestSuite.test("mutationDoesNotAffectGenerator/subscript/store") {
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
-    Array(GeneratorSequence(g)))
+    Array(IteratorSequence(g)))
 }
 
 DictionaryTestSuite.test("mutationDoesNotAffectGenerator/removeValueForKey,1") {
@@ -3695,7 +3695,7 @@ DictionaryTestSuite.test("mutationDoesNotAffectGenerator/removeValueForKey,1") {
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
-    Array(GeneratorSequence(g)))
+    Array(IteratorSequence(g)))
 }
 
 DictionaryTestSuite.test("mutationDoesNotAffectGenerator/removeValueForKey,all") {
@@ -3707,7 +3707,7 @@ DictionaryTestSuite.test("mutationDoesNotAffectGenerator/removeValueForKey,all")
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
-    Array(GeneratorSequence(g)))
+    Array(IteratorSequence(g)))
 }
 
 DictionaryTestSuite.test(
@@ -3718,7 +3718,7 @@ DictionaryTestSuite.test(
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
-    Array(GeneratorSequence(g)))
+    Array(IteratorSequence(g)))
 }
 
 DictionaryTestSuite.test(
@@ -3729,7 +3729,7 @@ DictionaryTestSuite.test(
 
   expectEqualsUnordered(
     [ (10, 1010), (20, 1020), (30, 1030) ],
-    Array(GeneratorSequence(g)))
+    Array(IteratorSequence(g)))
 }
 
 //===---

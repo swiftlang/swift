@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A generator that produces one or fewer instances of `Element`.
-public struct GeneratorOfOne<Element> : GeneratorType, SequenceType {
+/// A iterator that produces one or fewer instances of `Element`.
+public struct IteratorOfOne<Element> : IteratorProtocol, SequenceType {
   /// Construct an instance that generates `element!`, or an empty
   /// sequence if `element == nil`.
   public init(_ element: Element?) {
@@ -58,11 +58,11 @@ public struct CollectionOfOne<Element> : CollectionType {
     return .One
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return a *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> GeneratorOfOne<Element> {
-    return GeneratorOfOne(element)
+  public func generate() -> IteratorOfOne<Element> {
+    return IteratorOfOne(element)
   }
 
   /// Access the element at `position`.

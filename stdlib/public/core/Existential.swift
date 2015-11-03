@@ -28,12 +28,12 @@ internal struct _CollectionOf<
     _subscriptImpl = subscriptImpl
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  func generate() -> AnyGenerator<T> {
+  func generate() -> AnyIterator<T> {
     var index = startIndex
-    return AnyGenerator {
+    return AnyIterator {
       () -> T? in
       if _fastPath(index != self.endIndex) {
         ++index

@@ -66,27 +66,27 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   return r
 }
 
-/// The `GeneratorType` for `EnumerateSequence`.  `EnumerateGenerator`
-/// wraps a `Base` `GeneratorType` and yields successive `Int` values,
+/// The `IteratorProtocol` for `EnumeratedSequence`.  `EnumeratedIterator`
+/// wraps a `Base` `IteratorProtocol` and yields successive `Int` values,
 /// starting at zero, along with the elements of the underlying
 /// `Base`:
 ///
-///     var g = EnumerateGenerator(["foo", "bar"].generate())
+///     var g = EnumeratedIterator(["foo", "bar"].generate())
 ///     g.next() // (0, "foo")
 ///     g.next() // (1, "bar")
 ///     g.next() // nil
 ///
 /// - Note: Idiomatic usage is to call `enumerate` instead of
-///   constructing an `EnumerateGenerator` directly.
-public struct EnumerateGenerator<
-  Base : GeneratorType
-> : GeneratorType, SequenceType {
+///   constructing an `EnumeratedIterator` directly.
+public struct EnumeratedIterator<
+  Base : IteratorProtocol
+> : IteratorProtocol, SequenceType {
   /// The type of element returned by `next()`.
   public typealias Element = (offset: Int, element: Base.Element)
   var _base: Base
   var _count: Int
 
-  /// Construct from a `Base` generator.
+  /// Construct from a `Base` iterator.
   internal init(_base: Base) {
     self._base = _base
     self._count = 0
@@ -102,17 +102,17 @@ public struct EnumerateGenerator<
   }
 }
 
-/// The `SequenceType` returned by `enumerate()`.  `EnumerateSequence`
+/// The `SequenceType` returned by `enumerate()`.  `EnumeratedSequence`
 /// is a sequence of pairs (*n*, *x*), where *n*s are consecutive
 /// `Int`s starting at zero, and *x*s are the elements of a `Base`
 /// `SequenceType`:
 ///
-///     var s = EnumerateSequence(["foo", "bar"])
+///     var s = EnumeratedSequence(["foo", "bar"])
 ///     Array(s) // [(0, "foo"), (1, "bar")]
 ///
 /// - Note: Idiomatic usage is to call `enumerate` instead of
-///   constructing an `EnumerateSequence` directly.
-public struct EnumerateSequence<Base : SequenceType> : SequenceType {
+///   constructing an `EnumeratedSequence` directly.
+public struct EnumeratedSequence<Base : SequenceType> : SequenceType {
   internal var _base: Base
 
   /// Construct from a `Base` sequence.
@@ -120,11 +120,11 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
     self._base = _base
   }
 
-  /// Returns a *generator* over the elements of this *sequence*.
+  /// Returns an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> EnumerateGenerator<Base.Generator> {
-    return EnumerateGenerator(_base: _base.generate())
+  public func generate() -> EnumeratedIterator<Base.Generator> {
+    return EnumeratedIterator(_base: _base.generate())
   }
 }
 

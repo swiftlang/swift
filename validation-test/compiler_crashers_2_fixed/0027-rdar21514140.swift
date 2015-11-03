@@ -3,16 +3,14 @@
 /// A type that is just a wrapper over some base Sequence
 internal protocol _SequenceWrapperType {
   typealias Base : SequenceType
-  typealias Generator : GeneratorType = Base.Generator
+  typealias Generator : IteratorProtocol = Base.Generator
   
   var _base: Base {get}
 }
 
 extension SequenceType
   where Self : _SequenceWrapperType, Self.Generator == Self.Base.Generator {
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
+
   public func generate() -> Base.Generator {
     return self._base.generate()
   }
@@ -137,7 +135,7 @@ public func _prext_lazy<S : SequenceType>(s: S) -> _prext_LazySequence<S> {
 }
 
 public extension SequenceType
-  where Self.Generator == Self, Self : GeneratorType {
+  where Self.Generator == Self, Self : IteratorProtocol {
   public func generate() -> Self {
     return self
   }
@@ -200,12 +198,12 @@ public func _prext_lazy<Base: CollectionType>(s: Base) -> _prext_LazyCollection<
 
 
 //===--- New stuff --------------------------------------------------------===//
-/// The `GeneratorType` used by `_prext_MapSequence` and `_prext_MapCollection`.
+/// The `IteratorProtocol` used by `_prext_MapSequence` and `_prext_MapCollection`.
 /// Produces each element by passing the output of the `Base`
-/// `GeneratorType` through a transform function returning `T`.
+/// `IteratorProtocol` through a transform function returning `T`.
 public struct _prext_MapGenerator<
-  Base: GeneratorType, T
-> : GeneratorType, SequenceType {
+  Base: IteratorProtocol, T
+> : IteratorProtocol, SequenceType {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
@@ -234,10 +232,7 @@ public struct _prext_MapSequence<Base : SequenceType, T>
   : _prext_LazySequenceType, _SequenceWrapperType {
 
   typealias Elements = _prext_MapSequence
-  
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
+
   public func generate() -> _prext_MapGenerator<Base.Generator,T> {
     return _prext_MapGenerator(
       _base: _base.generate(), _transform: _transform)
@@ -267,9 +262,6 @@ public struct _prext_MapCollection<Base : CollectionType, T>
     return _transform(_base[position])
   }
 
-  /// Returns a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
   public func generate() -> _prext_MapGenerator<Base.Generator, T> {
     return _prext_MapGenerator(_base: _base.generate(), _transform: _transform)
   }

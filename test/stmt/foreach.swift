@@ -17,20 +17,18 @@ func bad_containers_2(bc: BadContainer2) {
 }
 
 struct BadContainer3 : SequenceType { // expected-error{{type 'BadContainer3' does not conform to protocol 'SequenceType'}}
-  func generate() { } // expected-note{{inferred type '()' (by matching requirement 'generate()') is invalid: does not conform to 'GeneratorType'}}
+  func generate() { } // expected-note{{inferred type '()' (by matching requirement 'generate()') is invalid: does not conform to 'IteratorProtocol'}}
 }
 
 func bad_containers_3(bc: BadContainer3) {
   for e in bc { }
 }
 
-struct BadGeneratorType1 {
-  
-}
+struct BadIterator1 {}
 
 struct BadContainer4 : SequenceType { // expected-error{{type 'BadContainer4' does not conform to protocol 'SequenceType'}}
-  typealias Generator = BadGeneratorType1 // expected-note{{possibly intended match 'Generator' (aka 'BadGeneratorType1') does not conform to 'GeneratorType'}}
-  func generate() -> BadGeneratorType1 { }
+  typealias Generator = BadIterator1 // expected-note{{possibly intended match 'Generator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
+  func generate() -> BadIterator1 { }
 }
 
 func bad_containers_4(bc: BadContainer4) {
@@ -39,7 +37,7 @@ func bad_containers_4(bc: BadContainer4) {
 
 // Pattern type-checking
 
-struct GoodRange<Int> : SequenceType, GeneratorType {
+struct GoodRange<Int> : SequenceType, IteratorProtocol {
   typealias Element = Int
   func next() -> Int? {}
 
@@ -47,15 +45,15 @@ struct GoodRange<Int> : SequenceType, GeneratorType {
   func generate() -> GoodRange<Int> { return self }
 }
 
-struct GoodTupleGeneratorType : SequenceType, GeneratorType {
+struct GoodTupleIterator: SequenceType, IteratorProtocol {
   typealias Element = (Int, Float)
   func next() -> (Int, Float)? {}
 
-  typealias Generator = GoodTupleGeneratorType
-  func generate() -> GoodTupleGeneratorType {}
+  typealias Generator = GoodTupleIterator
+  func generate() -> GoodTupleIterator {}
 }
 
-func patterns(gir: GoodRange<Int>, gtr: GoodTupleGeneratorType) {
+func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
   var sum : Int
   var sumf : Float
   for i : Int in gir { sum = sum + i }
@@ -96,7 +94,7 @@ struct X<T> {
   var value: T
 }
 
-struct Gen<T> : GeneratorType {
+struct Gen<T> : IteratorProtocol {
   func next() -> T? { return nil }
 }
 

@@ -11,7 +11,7 @@ public protocol Indexable {
 protocol CollectionType : Indexable, SequenceType {}
 
 public struct IndexingGenerator<Elements : Indexable>
-  : GeneratorType, SequenceType {
+  : IteratorProtocol, SequenceType {
   
   public func generate() -> IndexingGenerator {
     return self

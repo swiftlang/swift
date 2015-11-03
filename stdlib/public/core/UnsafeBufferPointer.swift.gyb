@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A generator for the elements in the buffer referenced by
+/// A iterator for the elements in the buffer referenced by
 /// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer`.
 public struct UnsafeBufferPointerGenerator<Element>
-  : GeneratorType, SequenceType {
+  : IteratorProtocol, SequenceType {
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
@@ -73,7 +73,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     _end = start + count
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return a *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   public func generate() -> UnsafeBufferPointerGenerator<Element> {

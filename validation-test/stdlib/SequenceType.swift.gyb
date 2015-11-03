@@ -126,13 +126,13 @@ SequenceTypeTests.test("${algorithmKind}Element/Predicate") {
 
 
 //===----------------------------------------------------------------------===//
-// GeneratorSequence
+// IteratorSequence
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Base'.
 protocol TestProtocol1 {}
 
-extension GeneratorSequence where Base : TestProtocol1 {
+extension IteratorSequence where Base : TestProtocol1 {
   var _baseIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -149,85 +149,85 @@ SequenceTypeTests.test("Demonstration/NotCustomizable") {
   expectNotCustomizable(tester, tester.log.nonCustomizableOperation)
 }
 
-SequenceTypeTests.test("GeneratorSequence/GeneratorType/empty") {
+SequenceTypeTests.test("IteratorSequence/IteratorProtocol/empty") {
   if true {
     let data: [OpaqueValue<Int>] = []
-    let base = MinimalGenerator(data)
-    var g = GeneratorSequence(base)
+    let base = MinimalIterator(data)
+    var g = IteratorSequence(base)
     expectType(
-      GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
+      IteratorSequence<MinimalIterator<OpaqueValue<Int>>>.self,
       &g)
-    checkGenerator(data, g, resiliencyChecks: .none) { $0.value == $1.value }
+    checkIterator(data, g, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let data: [OpaqueValue<Int>] = []
     let base = data.generate()
-    var g = GeneratorSequence(base)
+    var g = IteratorSequence(base)
     expectType(
-      GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
+      IteratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
       &g)
-    checkGenerator(data, g) { $0.value == $1.value }
+    checkIterator(data, g) { $0.value == $1.value }
   }
 }
 
-SequenceTypeTests.test("GeneratorSequence/GeneratorType") {
+SequenceTypeTests.test("IteratorSequence/IteratorProtocol") {
   if true {
     let data: [OpaqueValue<Int>] = []
-    let base = MinimalGenerator(data)
-    var g = GeneratorSequence(base)
+    let base = MinimalIterator(data)
+    var g = IteratorSequence(base)
     expectType(
-      GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
+      IteratorSequence<MinimalIterator<OpaqueValue<Int>>>.self,
       &g)
-    checkGenerator(data, g, resiliencyChecks: .none) { $0.value == $1.value }
+    checkIterator(data, g, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let data: [OpaqueValue<Int>] = []
     let base = data.generate()
-    var g = GeneratorSequence(base)
+    var g = IteratorSequence(base)
     expectType(
-      GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
+      IteratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
       &g)
-    checkGenerator(data, g) { $0.value == $1.value }
+    checkIterator(data, g) { $0.value == $1.value }
   }
 }
 
-SequenceTypeTests.test("GeneratorSequence/SequenceType/empty") {
+SequenceTypeTests.test("IteratorSequence/SequenceType/empty") {
   if true {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
-    let base = MinimalGenerator(data)
-    var g = GeneratorSequence(base)
+    let base = MinimalIterator(data)
+    var g = IteratorSequence(base)
     expectType(
-      GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
+      IteratorSequence<MinimalIterator<OpaqueValue<Int>>>.self,
       &g)
     checkSequence(data, g, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
     let base = data.generate()
-    var g = GeneratorSequence(base)
+    var g = IteratorSequence(base)
     expectType(
-      GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
+      IteratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
       &g)
     checkSequence(data, g) { $0.value == $1.value }
   }
 }
 
-SequenceTypeTests.test("GeneratorSequence/SequenceType") {
+SequenceTypeTests.test("IteratorSequence/SequenceType") {
   if true {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
-    let base = MinimalGenerator(data)
-    var g = GeneratorSequence(base)
+    let base = MinimalIterator(data)
+    var g = IteratorSequence(base)
     expectType(
-      GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
+      IteratorSequence<MinimalIterator<OpaqueValue<Int>>>.self,
       &g)
     checkSequence(data, g, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let data = [ 10, 20, 30 ].map(OpaqueValue.init)
     let base = data.generate()
-    var g = GeneratorSequence(base)
+    var g = IteratorSequence(base)
     expectType(
-      GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
+      IteratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
       &g)
     checkSequence(data, g) { $0.value == $1.value }
   }
@@ -238,13 +238,13 @@ SequenceTypeTests.test("GeneratorSequence/SequenceType") {
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Base'.
-extension EnumerateGenerator where Base : TestProtocol1 {
+extension EnumeratedIterator where Base : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
-extension EnumerateSequence where Base : TestProtocol1 {
+extension EnumeratedSequence where Base : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }
@@ -261,7 +261,7 @@ SequenceTypeTests.test("enumerate") {
       elements: test.sequence.map(OpaqueValue.init))
     var result = s.enumerate()
     expectType(
-      EnumerateSequence<MinimalSequence<OpaqueValue<Int>>>.self,
+      EnumeratedSequence<MinimalSequence<OpaqueValue<Int>>>.self,
       &result)
     
     checkSequence(
@@ -754,7 +754,7 @@ struct MinimalSequenceWith${Implementation}Map<Element> : SequenceType {
       elements: data, underestimatedCount: underestimatedCount)
   }
 
-  func generate() -> MinimalGenerator<Element> {
+  func generate() -> MinimalIterator<Element> {
     return _data.generate()
   }
 
@@ -998,15 +998,16 @@ SequenceTypeTests.test("SequenceType/split/dispatch") {
 // zip()
 //===----------------------------------------------------------------------===//
 
-// Check that the generic parameters are called 'Generator1' and 'Generator2'.
-extension Zip2Generator
-  where Generator1 : TestProtocol1, Generator2 : TestProtocol1 {
+// Check generic parameter names.
+extension Zip2Iterator
+  where Iterator1 : TestProtocol1, Iterator2 : TestProtocol1 {
 
   var _generator1IsTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
+// Check generic parameter names.
 extension Zip2Sequence
   where Sequence1 : TestProtocol1, Sequence2 : TestProtocol1 {
 

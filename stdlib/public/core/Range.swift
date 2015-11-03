@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A generator over the elements of `Range<Element>`.
-public struct RangeGenerator<
+/// An iterator over the elements of `Range<Element>`.
+public struct RangeIterator<
   Element : ForwardIndexType
-> : GeneratorType, SequenceType {
+> : IteratorProtocol, SequenceType {
 
   /// Construct an instance that traverses the elements of `bounds`.
   @_transparent
@@ -111,11 +111,11 @@ public struct Range<
 
   //===--------------------------------------------------------------------===//
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> RangeGenerator<Element> {
-    return Generator(self)
+  public func generate() -> RangeIterator<Element> {
+    return RangeIterator(self)
   }
 
   /// The range's lower bound.

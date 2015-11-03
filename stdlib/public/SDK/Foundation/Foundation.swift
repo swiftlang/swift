@@ -672,7 +672,7 @@ extension Dictionary : _ObjectiveCBridgeable {
 // to the enumeration state, so the state cannot be moved in memory. We will
 // probably need to implement fast enumeration in the compiler as a primitive
 // to implement it both correctly and efficiently.
-final public class NSFastGenerator : GeneratorType {
+final public class NSFastEnumerationIterator : IteratorProtocol {
   var enumerable: NSFastEnumeration
   var state: [NSFastEnumerationState]
   var n: Int
@@ -722,11 +722,11 @@ final public class NSFastGenerator : GeneratorType {
 }
 
 extension NSArray : SequenceType {
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  final public func generate() -> NSFastGenerator {
-    return NSFastGenerator(self)
+  final public func generate() -> NSFastEnumerationIterator {
+    return NSFastEnumerationIterator(self)
   }
 }
 
@@ -766,25 +766,25 @@ extension Set {
 }
 
 extension NSSet : SequenceType {
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> NSFastGenerator {
-    return NSFastGenerator(self)
+  public func generate() -> NSFastEnumerationIterator {
+    return NSFastEnumerationIterator(self)
   }
 }
 
 extension NSOrderedSet : SequenceType {
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> NSFastGenerator {
-    return NSFastGenerator(self)
+  public func generate() -> NSFastEnumerationIterator {
+    return NSFastEnumerationIterator(self)
   }
 }
 
 // FIXME: move inside NSIndexSet when the compiler supports this.
-public struct NSIndexSetGenerator : GeneratorType {
+public struct NSIndexSetIterator : IteratorProtocol {
   public typealias Element = Int
 
   internal let _set: NSIndexSet
@@ -813,11 +813,11 @@ public struct NSIndexSetGenerator : GeneratorType {
 }
 
 extension NSIndexSet : SequenceType {
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> NSIndexSetGenerator {
-    return NSIndexSetGenerator(set: self)
+  public func generate() -> NSIndexSetIterator {
+    return NSIndexSetIterator(set: self)
   }
 }
 
@@ -916,14 +916,14 @@ extension Set : _ObjectiveCBridgeable {
 extension NSDictionary : SequenceType {
   // FIXME: A class because we can't pass a struct with class fields through an
   // [objc] interface without prematurely destroying the references.
-  final public class Generator : GeneratorType {
-    var _fastGenerator: NSFastGenerator
+  final public class Generator : IteratorProtocol {
+    var _fastIterator: NSFastEnumerationIterator
     var _dictionary: NSDictionary {
-      return _fastGenerator.enumerable as! NSDictionary
+      return _fastIterator.enumerable as! NSDictionary
     }
 
     public func next() -> (key: AnyObject, value: AnyObject)? {
-      switch _fastGenerator.next() {
+      switch _fastIterator.next() {
       case .None:
         return .None
       case .Some(let key):
@@ -934,12 +934,12 @@ extension NSDictionary : SequenceType {
       }
     }
 
-    init(_ _dict: NSDictionary) {
-      _fastGenerator = NSFastGenerator(_dict)
+    internal init(_ _dict: NSDictionary) {
+      _fastIterator = NSFastEnumerationIterator(_dict)
     }
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Return an *iterator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   public func generate() -> Generator {
@@ -948,11 +948,11 @@ extension NSDictionary : SequenceType {
 }
 
 extension NSEnumerator : SequenceType {
-  /// Return a *generator* over the *enumerator*.
+  /// Return an *iterator* over the *enumerator*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> NSFastGenerator {
-    return NSFastGenerator(self)
+  public func generate() -> NSFastEnumerationIterator {
+    return NSFastEnumerationIterator(self)
   }
 }
 
@@ -1298,7 +1298,7 @@ extension NSCoder {
     var classesAsNSObjects: Set<NSObject>? = nil
     if let theClasses = classes {
       classesAsNSObjects =
-        Set(GeneratorSequence(NSFastGenerator(theClasses)).map {
+        Set(IteratorSequence(NSFastEnumerationIterator(theClasses)).map {
           unsafeBitCast($0, NSObject.self)
         })
     }

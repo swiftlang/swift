@@ -35,7 +35,7 @@ extension String {
       self._core = _core
     }
 
-    struct _ScratchGenerator : GeneratorType {
+    struct _ScratchGenerator : IteratorProtocol {
       var core: _StringCore
       var idx: Int
       init(_ core: _StringCore, _ pos: Int) {
@@ -141,7 +141,7 @@ extension String {
 
     /// A type whose instances can produce the elements of this
     /// sequence, in order.
-    public struct Generator : GeneratorType {
+    public struct Generator : IteratorProtocol {
       init(_ _base: _StringCore) {
         if _base.hasContiguousStorage {
             self._baseSet = true
@@ -159,7 +159,7 @@ extension String {
         } else {
           self._ascii = false
           self._baseSet = false
-          self._generator = _base.generate()
+          self._iterator = _base.generate()
         }
       }
 
@@ -182,7 +182,7 @@ extension String {
             result = _decoder.decode(&(self._base!))
           }
         } else {
-          result = _decoder.decode(&(self._generator!))
+          result = _decoder.decode(&(self._iterator!))
         }
         switch result {
         case .Result(let us):
@@ -198,10 +198,10 @@ extension String {
       let _ascii: Bool
       var _asciiBase: UnsafeBufferPointerGenerator<UInt8>!
       var _base: UnsafeBufferPointerGenerator<UInt16>!
-      var _generator: IndexingGenerator<_StringCore>!
+      var _iterator: IndexingGenerator<_StringCore>!
     }
 
-    /// Return a *generator* over the `UnicodeScalar`s that comprise
+    /// Return an *iterator* over the `UnicodeScalar`s that comprise
     /// this *sequence*.
     ///
     /// - Complexity: O(1).

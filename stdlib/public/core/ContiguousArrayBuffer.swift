@@ -555,17 +555,17 @@ internal func _copySequenceToNativeArrayBuffer<
     _UnsafePartiallyInitializedContiguousArrayBuffer<S.Generator.Element>(
       initialCapacity: initialCapacity)
 
-  var generator = source.generate()
+  var iterator = source.generate()
 
   // FIXME(performance): use _initializeTo().
 
   // Add elements up to the initial capacity without checking for regrowth.
   for _ in 0..<initialCapacity {
-    builder.addWithExistingCapacity(generator.next()!)
+    builder.addWithExistingCapacity(iterator.next()!)
   }
 
   // Add remaining elements, if any.
-  while let element = generator.next() {
+  while let element = iterator.next() {
     builder.add(element)
   }
 

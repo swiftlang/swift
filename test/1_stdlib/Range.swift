@@ -14,7 +14,7 @@ extension Range where Element : TestProtocol1 {
   }
 }
 
-extension RangeGenerator where Element : TestProtocol1 {
+extension RangeIterator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
   }

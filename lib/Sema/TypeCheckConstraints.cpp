@@ -1625,7 +1625,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
                              tc.Context.Id_Generator,
                              cs.getConstraintLocator(
                                Locator,
-                               ConstraintLocator::SequenceGeneratorType)));
+                               ConstraintLocator::SequenceIteratorProtocol)));
 
         // Determine the element type of the generator.
         // FIXME: Should look up the type witness.
