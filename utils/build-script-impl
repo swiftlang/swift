@@ -1656,6 +1656,7 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                             LLDB_PATH_TO_CLANG_BUILD="${llvm_build_dir}"
                             LLDB_PATH_TO_SWIFT_BUILD="${swift_build_dir}"
                             LLDB_PATH_TO_CMARK_BUILD="${cmark_build_dir}"
+                            LLDB_PATH_TO_SWIG="${swig_build_dir}/Install/bin/swig"
                             SYMROOT="${lldb_build_dir}"
                             OBJROOT="${lldb_build_dir}"
                         )
