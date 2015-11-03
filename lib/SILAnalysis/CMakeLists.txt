@@ -1,6 +1,5 @@
-add_subdirectory(ARC)
 add_swift_library(swiftSILAnalysis
-  ${ARC_SOURCES}
+  ARCAnalysis.cpp
   AliasAnalysis.cpp
   Analysis.cpp
   ColdBlockInfo.cpp

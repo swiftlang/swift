@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILANALYSIS_ARCBBSTATE_H
-#define SWIFT_SILANALYSIS_ARCBBSTATE_H
+#ifndef SWIFT_SILPASSES_ARC_ARCBBSTATE_H
+#define SWIFT_SILPASSES_ARC_ARCBBSTATE_H
 
 #include "GlobalARCSequenceDataflow.h"
 

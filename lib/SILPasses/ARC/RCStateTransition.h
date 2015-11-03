@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILANALYSIS_RCSTATETRANSITION_H
-#define SWIFT_SILANALYSIS_RCSTATETRANSITION_H
+#ifndef SWIFT_SILPASSES_ARC_RCSTATETRANSITION_H
+#define SWIFT_SILPASSES_ARC_RCSTATETRANSITION_H
 
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"

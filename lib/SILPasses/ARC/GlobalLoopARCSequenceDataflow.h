@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILANALYSIS_GLOBALLOOPARCSEQUENCEDATAFLOW_H
-#define SWIFT_SILANALYSIS_GLOBALLOOPARCSEQUENCEDATAFLOW_H
+#ifndef SWIFT_SILPASSES_ARC_GLOBALLOOPARCSEQUENCEDATAFLOW_H
+#define SWIFT_SILPASSES_ARC_GLOBALLOOPARCSEQUENCEDATAFLOW_H
 
 #include "RefCountState.h"
 #include "swift/SILAnalysis/LoopRegionAnalysis.h"

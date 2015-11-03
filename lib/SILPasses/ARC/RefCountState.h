@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILANALYSIS_REFCOUNTSTATE_H
-#define SWIFT_SILANALYSIS_REFCOUNTSTATE_H
+#ifndef SWIFT_SILPASSES_ARC_REFCOUNTSTATE_H
+#define SWIFT_SILPASSES_ARC_REFCOUNTSTATE_H
 
 #include "RCStateTransition.h"
 #include "swift/Basic/Fallthrough.h"

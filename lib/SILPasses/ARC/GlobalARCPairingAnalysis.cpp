@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-global-arc-opts"
-#include "swift/SILAnalysis/ARCAnalysis.h"
+#include "GlobalARCPairingAnalysis.h"
 #include "RefCountState.h"
 #include "GlobalARCSequenceDataflow.h"
 #include "GlobalLoopARCSequenceDataflow.h"
@@ -21,6 +21,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
+#include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/RCIdentityAnalysis.h"

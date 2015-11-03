@@ -16,8 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILANALYSIS_RCSTATETRANSITIONVISITORS_H
-#define SWIFT_SILANALYSIS_RCSTATETRANSITIONVISITORS_H
+#ifndef SWIFT_SILPASSES_ARC_RCSTATETRANSITIONVISITORS_H
+#define SWIFT_SILPASSES_ARC_RCSTATETRANSITIONVISITORS_H
 
 #include "ARCBBState.h"
 #include "ARCRegionState.h"

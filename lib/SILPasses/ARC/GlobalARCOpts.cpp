@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-global-arc-opts"
 #include "swift/SILPasses/Passes.h"
+#include "GlobalARCPairingAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"

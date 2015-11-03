@@ -1,9 +1,11 @@
 add_subdirectory(Utils)
 add_subdirectory(SILCombiner)
 add_subdirectory(UtilityPasses)
+add_subdirectory(ARC)
 add_swift_library(swiftSILPasses
   ${SILCOMBINER_SOURCES}
   ${UTILITYPASSES_SOURCES}
+  ${ARC_SOURCES}
   AllocBoxToStack.cpp
   ArrayBoundsCheckOpts.cpp
   COWArrayOpt.cpp
@@ -23,7 +25,6 @@ add_swift_library(swiftSILPasses
   DiagnoseUnreachable.cpp
   ExternalDefsToDecls.cpp
   FunctionSignatureOpts.cpp
-  GlobalARCOpts.cpp
   GlobalDeadStoreElimination.cpp
   GlobalRedundantLoadElimination.cpp
   GlobalOpt.cpp
