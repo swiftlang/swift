@@ -581,7 +581,7 @@ public:
       return nullptr;
     }
 
-    // Retrieve the 'Generator' protocol.
+    // Retrieve the 'Iterator' protocol.
     ProtocolDecl *generatorProto
       = TC.getProtocol(S->getForLoc(), KnownProtocolKind::IteratorProtocol);
     if (!generatorProto) {
@@ -649,7 +649,7 @@ public:
     if (TC.requireOptionalIntrinsics(S->getForLoc()))
       return nullptr;
     
-    // Gather the witnesses from the Generator protocol conformance, which
+    // Gather the witnesses from the Iterator protocol conformance, which
     // we'll use to drive the loop.
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
