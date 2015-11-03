@@ -20,6 +20,7 @@
 #define SWIFT_MEM_LOCATION_H
 
 #include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILAnalysis/ValueTracking.h"
@@ -39,6 +40,7 @@ class MemLocation;
 class LoadStoreValue;
 using LoadStoreValueList = llvm::SmallVector<LoadStoreValue, 8>;
 using MemLocationValueMap = llvm::DenseMap<MemLocation, LoadStoreValue>; 
+using ValueTableMap = llvm::SmallMapVector<unsigned, LoadStoreValue, 8>;
 
 /// This class represents either a single SILValue or a covering of values that
 /// we can forward from via the introdution of a SILArgument. This enables us
@@ -105,6 +107,8 @@ class LoadStoreValue {
   /// materialize the value.
   bool IsCoveringValue;
 
+  llvm::SmallVector<SILBasicBlock *, 8> BasicBlocks;
+
   /// Create a path of ValueProjection with the given VA and Path.
   SILValue createExtract(SILValue VA, Optional<ProjectionPath> &Path,
                          SILInstruction *Inst);
@@ -123,6 +127,7 @@ public:
     Base = RHS.Base;
     IsCoveringValue = RHS.IsCoveringValue;
     Path.reset();
+    BasicBlocks = RHS.BasicBlocks;
     if (!RHS.Path.hasValue())
       return;
     ProjectionPath X;
@@ -133,6 +138,7 @@ public:
   LoadStoreValue &operator=(const LoadStoreValue &RHS) {
     Base = RHS.Base;
     IsCoveringValue = RHS.IsCoveringValue;
+    BasicBlocks = RHS.BasicBlocks;
     Path.reset();
     if (!RHS.Path.hasValue())
       return *this;
@@ -158,6 +164,10 @@ public:
   bool isCoveringValue() const { return IsCoveringValue; }
   /// Mark this LoadStoreValue as a covering value.
   void setCoveringValue(); 
+
+  void addCoveringValue(SILBasicBlock *BB) {
+     BasicBlocks.push_back(BB);
+  }
  
   /// Print the base and the path of the LoadStoreValue.
   void print();
@@ -171,11 +181,7 @@ public:
   /// and when we insert the PHI node, this is set to the SILArgument which
   /// represents the PHI node.
   SILValue materialize(SILInstruction *Inst) {
-    //
-    // TODO: handle covering value.
-    //
-    if (IsCoveringValue)
-      return SILValue();
+    assert(!IsCoveringValue && "Trying to materialize a covering value");
     return createExtract(Base, Path, Inst);
   }
 
