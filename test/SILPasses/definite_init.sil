@@ -730,7 +730,7 @@ class DerivedClassWithNontrivialStoredProperties : RootClassWithNontrivialStored
 }
 
 // CHECK-LABEL: sil @test_root_release
-// CHECK-NEXT: bb0(%0 : $RootClassWithNontrivialStoredProperties):
+// CHECK: bb0(%0 : $RootClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thick RootClassWithNontrivialStoredProperties.Type
 // CHECK-NEXT: dealloc_partial_ref %0 : $RootClassWithNontrivialStoredProperties, [[METATYPE]] : $@thick RootClassWithNontrivialStoredProperties.Type
 sil @test_root_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
@@ -743,7 +743,7 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 }
 
 // CHECK-LABEL: sil @test_root_partial_release
-// CHECK-NEXT: bb0(%0 : $RootClassWithNontrivialStoredProperties):
+// CHECK: bb0(%0 : $RootClassWithNontrivialStoredProperties):
 // CHECK-NEXT: alloc_ref
 // CHECK-NEXT: ref_element_addr
 // CHECK-NEXT: store
@@ -766,7 +766,7 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 }
 
 // CHECK-LABEL: sil @test_derived_release
-// CHECK-NEXT: bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
+// CHECK: bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_stack
 // CHECK-NEXT: store
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
@@ -789,7 +789,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 
 
 // CHECK-LABEL: sil @test_derived_partial_release
-// CHECK-NEXT: bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
+// CHECK: bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_stack
 // CHECK-NEXT: store
 // CHECK-NEXT: alloc_ref
@@ -823,7 +823,7 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 }
 
 // CHECK-LABEL: sil @test_delegating_box_release
-// CHECK-NEXT: bb0(%0 : $RootClassWithNontrivialStoredProperties):
+// CHECK: bb0(%0 : $RootClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_box $RootClassWithNontrivialStoredProperties
 // CHECK-NEXT: store %0 to [[SELFBOX]]#1
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
@@ -842,7 +842,7 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 }
 
 // CHECK-LABEL: sil @test_delegating_rvalue_release
-// CHECK-NEXT: bb0(%0 : $RootClassWithNontrivialStoredProperties):
+// CHECK: bb0(%0 : $RootClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_box $RootClassWithNontrivialStoredProperties
 // CHECK-NEXT: store %0 to [[SELFBOX]]#1
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
@@ -866,7 +866,7 @@ bb0(%0 : $RootClassWithNontrivialStoredProperties):
 }
 
 // CHECK-LABEL: sil @test_delegating_derived_release
-// CHECK-NEXT: bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
+// CHECK: bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 // CHECK-NEXT: [[SELFBOX:%[0-9]+]] = alloc_stack $DerivedClassWithNontrivialStoredProperties
 // CHECK-NEXT: store %0 to [[SELFBOX]]#1
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1

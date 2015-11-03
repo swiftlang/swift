@@ -230,7 +230,7 @@ struct Aleph {
 
   // -- loadable value constructor:
   // CHECK-LABEL: sil hidden @_TFV8lifetime5AlephC{{.*}} : $@convention(thin) (@owned Ref, Val, @thin Aleph.Type) -> @owned Aleph
-  // CHECK-NEXT: bb0([[A:%.*]] : $Ref, [[B:%.*]] : $Val, {{%.*}} : $@thin Aleph.Type):
+  // CHECK: bb0([[A:%.*]] : $Ref, [[B:%.*]] : $Val, {{%.*}} : $@thin Aleph.Type):
   // CHECK-NEXT:   [[RET:%.*]] = struct $Aleph ([[A]] : {{.*}}, [[B]] : {{.*}})
   // CHECK-NEXT:   return [[RET]]
 }
@@ -274,7 +274,7 @@ class He {
 
   // -- default allocator:
   // CHECK-LABEL: sil hidden @_TFC8lifetime2HeC{{.*}} : $@convention(thin) (@thick He.Type) -> @owned He {
-  // CHECK-NEXT: bb0({{%.*}} : $@thick He.Type):
+  // CHECK: bb0({{%.*}} : $@thick He.Type):
   // CHECK-NEXT:   [[THIS:%.*]] = alloc_ref $He
   // CHECK-NEXT:   // function_ref lifetime.He.init
   // CHECK-NEXT:   [[INIT:%.*]] = function_ref @_TFC8lifetime2Hec{{.*}} : $@convention(method) (@owned He) -> @owned He
@@ -290,7 +290,7 @@ struct Waw {
 
   // -- loadable value initializer with tuple destructuring:
   // CHECK-LABEL: sil hidden @_TFV8lifetime3WawC{{.*}} : $@convention(thin) (@owned Ref, Val, Val, @thin Waw.Type) -> @owned Waw 
-  // CHECK-NEXT: bb0([[A0:%.*]] : $Ref, [[A1:%.*]] : $Val, [[B:%.*]] : $Val, {{%.*}} : $@thin Waw.Type):
+  // CHECK: bb0([[A0:%.*]] : $Ref, [[A1:%.*]] : $Val, [[B:%.*]] : $Val, {{%.*}} : $@thin Waw.Type):
   // CHECK-NEXT:   [[A:%.*]] = tuple ([[A0]] : {{.*}}, [[A1]] : {{.*}})
   // CHECK-NEXT:   [[RET:%.*]] = struct $Waw ([[A]] : {{.*}}, [[B]] : {{.*}})
   // CHECK-NEXT:   return [[RET]]
@@ -302,7 +302,7 @@ struct Zayin {
 
   // -- address-only value initializer with tuple destructuring:
   // CHECK-LABEL: sil hidden @_TFV8lifetime5ZayinC{{.*}} : $@convention(thin) (@out Zayin, @in Unloadable, Val, @in Unloadable, @thin Zayin.Type) -> ()
-  // CHECK-NEXT: bb0([[THIS:%.*]] : $*Zayin, [[A0:%.*]] : $*Unloadable, [[A1:%.*]] : $Val, [[B:%.*]] : $*Unloadable, {{%.*}} : $@thin Zayin.Type):
+  // CHECK: bb0([[THIS:%.*]] : $*Zayin, [[A0:%.*]] : $*Unloadable, [[A1:%.*]] : $Val, [[B:%.*]] : $*Unloadable, {{%.*}} : $@thin Zayin.Type):
   // CHECK-NEXT:   [[THIS_A_ADDR:%.*]] = struct_element_addr [[THIS]] : $*Zayin, #Zayin.a
   // CHECK-NEXT:   [[THIS_A0_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 0
   // CHECK-NEXT:   [[THIS_A1_ADDR:%.*]] = tuple_element_addr [[THIS_A_ADDR]] : {{.*}}, 1
@@ -459,7 +459,7 @@ class Foo<T> {
 
   // Deallocating destructor for Foo.
   // CHECK-LABEL: sil hidden @_TFC8lifetime3FooD : $@convention(method) <T> (@owned Foo<T>) -> ()
-  // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $Foo<T>):
+  // CHECK: bb0([[SELF:%[0-9]+]] : $Foo<T>):
   // CHECK:   [[DESTROYING_REF:%[0-9]+]] = function_ref @_TFC8lifetime3Food : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
   // CHECK-NEXT:   [[RESULT_SELF:%[0-9]+]] = apply [[DESTROYING_REF]]<T>([[SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = unchecked_ref_cast [[RESULT_SELF]] : $Builtin.NativeObject to $Foo<T>

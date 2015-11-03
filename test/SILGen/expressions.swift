@@ -524,7 +524,7 @@ func dontEmitIgnoredLoadExpr(a : NonTrivialStruct) -> NonTrivialStruct.Type {
 
 // <rdar://problem/18851497> Swiftc fails to compile nested destructuring tuple binding
 // CHECK-LABEL: sil hidden @_TF11expressions21implodeRecursiveTupleFGSqTTSiSi_Si__T_
-// CHECK-NEXT: bb0(%0 : $Optional<((Int, Int), Int)>):
+// CHECK: bb0(%0 : $Optional<((Int, Int), Int)>):
 func implodeRecursiveTuple(expr: ((Int, Int), Int)?) {
 
   // CHECK:      [[WHOLE:%[0-9]+]] = load {{.*}} : $*((Int, Int), Int)

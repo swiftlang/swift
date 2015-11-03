@@ -284,7 +284,7 @@ bb0:
 
 
 // CHECK-LABEL: sil @fold_condfail_instructions
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: integer_literal{{.*}}3
 // CHECK-NEXT: struct
 // CHECK-NEXT: return

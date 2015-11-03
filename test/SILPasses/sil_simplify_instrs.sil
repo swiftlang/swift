@@ -210,7 +210,7 @@ bb3(%11 : $Ternary):
 
 // xor(xor (a, b), b) -> a
 // CHECK-LABEL: sil @simplify_xor1
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: return %0 : $Builtin.Int32
 sil @simplify_xor1 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
@@ -221,7 +221,7 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 
 // xor(xor (a, b), a) -> b
 // CHECK-LABEL: sil @simplify_xor2
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: return %1 : $Builtin.Int32
 sil @simplify_xor2 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
@@ -232,7 +232,7 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 
 
 // CHECK-LABEL: sil @simplify_xor3
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // xor(b, xor (a, b)) -> a
 // CHECK-NEXT: return %0 : $Builtin.Int32
 sil @simplify_xor3 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
@@ -252,7 +252,7 @@ struct BitwiseStruct2 {
 }
 
 // CHECK-LABEL: sil @simplify_unchecked_bitwise_cast
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil @simplify_unchecked_bitwise_cast : $@convention(thin) (BitwiseStruct1) -> (BitwiseStruct1, BitwiseStruct1) {

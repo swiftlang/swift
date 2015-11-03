@@ -15,9 +15,9 @@ class Generic<T>: NSObject {
   var x: Int = 10
 
   // CHECK-LABEL: sil hidden @_TFC18objc_generic_class7GenericD : $@convention(method) <T> (@owned Generic<T>) -> () {
-  // CHECK-NEXT:  bb0({{%.*}} : $Generic<T>):
+  // CHECK:       bb0({{%.*}} : $Generic<T>):
   // CHECK-LABEL: sil hidden [thunk] @_TToFC18objc_generic_class7GenericD : $@convention(objc_method) <T> (Generic<T>) -> () {
-  // CHECK-NEXT:  bb0([[SELF:%.*]] : $Generic<T>):
+  // CHECK:       bb0([[SELF:%.*]] : $Generic<T>):
   // CHECK:         [[NATIVE:%.*]] = function_ref @_TFC18objc_generic_class7GenericD
   // CHECK:         apply [[NATIVE]]<T>([[SELF]])
   deinit {
@@ -31,7 +31,7 @@ class Generic<T>: NSObject {
 // CHECK-NOT: sil hidden @_TFCSo8NSObjectd
 
 // CHECK-LABEL: sil hidden @_TFC18objc_generic_class11SubGeneric1D : $@convention(method) <U, V> (@owned SubGeneric1<U, V>) -> () {
-// CHECK-NEXT:  bb0([[SELF:%.*]] : $SubGeneric1<U, V>):
+// CHECK:       bb0([[SELF:%.*]] : $SubGeneric1<U, V>):
 // CHECK:         [[SUPER_DEALLOC:%.*]] = super_method [[SELF]] : $SubGeneric1<U, V>, #Generic.deinit!deallocator.foreign : <T> Generic<T> -> () , $@convention(objc_method) <τ_0_0> (Generic<τ_0_0>) -> ()
 // CHECK:         [[SUPER:%.*]] = upcast [[SELF:%.*]] : $SubGeneric1<U, V> to $Generic<Int>
 // CHECK:         apply [[SUPER_DEALLOC]]<Int>([[SUPER]])

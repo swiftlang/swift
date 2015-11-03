@@ -294,7 +294,7 @@ class DerivedClass : BaseClass {}
 
 // CHECK-LABEL: sil hidden @_TF16if_while_binding20testAsPatternInIfLetFGSqCS_9BaseClass_T_
 func testAsPatternInIfLet(a : BaseClass?) {
-  // CHECK-NEXT: bb0(%0 : $Optional<BaseClass>):
+  // CHECK: bb0(%0 : $Optional<BaseClass>):
   // CHECK-NEXT:   debug_value %0 : $Optional<BaseClass>  // let a
   // CHECK-NEXT:   retain_value %0 : $Optional<BaseClass>
   // CHECK-NEXT:   switch_enum %0 : $Optional<BaseClass>, case #Optional.Some!enumelt.1: [[OPTPRESENTBB:bb[0-9]+]], default [[NILBB:bb[0-9]+]]
@@ -332,7 +332,7 @@ func testAsPatternInIfLet(a : BaseClass?) {
 // <rdar://problem/22312114> if case crashes swift - bools not supported in let/else yet
 // CHECK-LABEL: sil hidden @_TF16if_while_binding12testCaseBoolFGSqSb_T_
 func testCaseBool(value : Bool?) {
-  // CHECK-NEXT: bb0(%0 : $Optional<Bool>):
+  // CHECK: bb0(%0 : $Optional<Bool>):
   // CHECK: switch_enum %0 : $Optional<Bool>, case #Optional.Some!enumelt.1: bb1, default bb3
   // CHECK: bb1(%3 : $Bool):
   // CHECK: [[ISTRUE:%[0-9]+]] = struct_extract %3 : $Bool, #Bool._value

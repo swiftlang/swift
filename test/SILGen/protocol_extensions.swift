@@ -11,7 +11,7 @@ struct Box {
 
 extension P1 {
   // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P16extP1a{{.*}} : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
-  // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $*Self):
+  // CHECK: bb0([[SELF:%[0-9]+]] : $*Self):
   final func extP1a() {
     // CHECK: [[WITNESS:%[0-9]+]] = witness_method $Self, #P1.reqP1a!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     // CHECK-NEXT: apply [[WITNESS]]<Self>([[SELF]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
@@ -20,7 +20,7 @@ extension P1 {
   }
 
   // CHECK-LABEL: sil @_TFE19protocol_extensionsPS_2P16extP1b{{.*}} : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
-  // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $*Self):
+  // CHECK: bb0([[SELF:%[0-9]+]] : $*Self):
   public final func extP1b() {
     // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P16extP1a{{.*}} : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     // CHECK-NEXT: apply [[FN]]<Self>([[SELF]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
@@ -40,7 +40,7 @@ extension P1 {
     // But here we have to do a witness method call:
 
     // CHECK-LABEL: sil hidden @_TFE19protocol_extensionsPS_2P113callSubscript{{.*}}
-    // CHECK-NEXT: bb0(%0 : $*Self):
+    // CHECK: bb0(%0 : $*Self):
     // CHECK: witness_method $Self, #P1.subscript!getter.1
     // CHECK: return
     return self[0]
@@ -70,7 +70,7 @@ class C : P1 {
 
 //   (materializeForSet test from above)
 // CHECK-LABEL: sil [transparent] [thunk] @_TTWC19protocol_extensions1CS_2P1S_FS1_m9subscriptFSiSi
-// CHECK-NEXT: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*C):
+// CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*C):
 // CHECK: function_ref @_TFE19protocol_extensionsPS_2P1g9subscriptFSiSi
 // CHECK: return
 
@@ -96,7 +96,7 @@ struct GenericMetaHolder<T> {
 func inout_func(inout n: Int) {}
 
 // CHECK-LABEL: sil hidden @_TF19protocol_extensions5testDFTVS_10MetaHolder2ddMCS_1D1dS1__T_ : $@convention(thin) (MetaHolder, @thick D.Type, @owned D) -> ()
-// CHECK-NEXT: bb0([[M:%[0-9]+]] : $MetaHolder, [[DD:%[0-9]+]] : $@thick D.Type, [[D:%[0-9]+]] : $D):
+// CHECK: bb0([[M:%[0-9]+]] : $MetaHolder, [[DD:%[0-9]+]] : $@thick D.Type, [[D:%[0-9]+]] : $D):
 func testD(m: MetaHolder, dd: D.Type, d: D) {
   // CHECK: [[D2:%[0-9]+]] = alloc_box $D
   // CHECK: [[FN:%[0-9]+]] = function_ref @_TFE19protocol_extensionsPS_2P111returnsSelf{{.*}}

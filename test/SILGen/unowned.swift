@@ -95,7 +95,7 @@ func test_unowned_let_capture(aC : C) {
 }
 
 // CHECK-LABEL: sil shared @_TFF7unowned24test_unowned_let_captureFCS_1CT_U_FT_Si : $@convention(thin) (@owned @sil_unowned C) -> Int {
-// CHECK-NEXT: bb0([[ARG:%.*]] : $@sil_unowned C):
+// CHECK: bb0([[ARG:%.*]] : $@sil_unowned C):
 // CHECK-NEXT:   strong_retain_unowned [[ARG]] : $@sil_unowned C
 // CHECK-NEXT:   [[UNOWNED_ARG:%.*]] = unowned_to_ref [[ARG]] : $@sil_unowned C to $C
 // CHECK-NEXT:   [[FUN:%.*]] = class_method [[UNOWNED_ARG]] : $C, #C.f!1 : C -> () -> Int , $@convention(method) (@guaranteed C) -> Int
@@ -115,7 +115,7 @@ class TestUnownedMember {
 }
 
 // CHECK-LABEL: sil hidden @_TFC7unowned17TestUnownedMemberc
-// CHECK-NEXT:  bb0(%0 : $C, %1 : $TestUnownedMember):
+// CHECK:       bb0(%0 : $C, %1 : $TestUnownedMember):
 // CHECK:  [[SELF:%.*]] = mark_uninitialized [rootself] %1 : $TestUnownedMember
 // CHECK:  [[FIELDPTR:%.*]] = ref_element_addr [[SELF]] : $TestUnownedMember, #TestUnownedMember.member
 // CHECK:  [[INVAL:%.*]] = ref_to_unowned %0 : $C to $@sil_unowned C

@@ -259,7 +259,7 @@ func test_weird_property(var v : WeirdPropertyTest, let i : Int) -> Int {
 
 
 // CHECK-LABEL: sil hidden @{{.*}}generic_identity
-// CHECK-NEXT: bb0(%0 : $*T, %1 : $*T):
+// CHECK: bb0(%0 : $*T, %1 : $*T):
 // CHECK-NEXT: debug_value_addr %1 : $*T
 // CHECK-NEXT: copy_addr [take] %1 to [initialization] %0 : $*T
 // CHECK-NEXT: %4 = tuple ()
@@ -290,7 +290,7 @@ protocol SimpleProtocol {
 // methods on protocol and archetypes calls.
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetProtocolBases
-// CHECK-NEXT: bb0(%0 : $*SimpleProtocol):
+// CHECK: bb0(%0 : $*SimpleProtocol):
 func testLetProtocolBases(let p : SimpleProtocol) {
   // CHECK-NEXT: debug_value_addr
   // CHECK-NEXT: open_existential_addr
@@ -309,7 +309,7 @@ func testLetProtocolBases(let p : SimpleProtocol) {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}testLetArchetypeBases
-// CHECK-NEXT: bb0(%0 : $*T):
+// CHECK: bb0(%0 : $*T):
 func testLetArchetypeBases<T : SimpleProtocol>(let p : T) {
   // CHECK-NEXT: debug_value_addr
   // CHECK-NEXT: witness_method $T
@@ -325,7 +325,7 @@ func testLetArchetypeBases<T : SimpleProtocol>(let p : T) {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}testDebugValue
-// CHECK-NEXT: bb0(%0 : $Int, %1 : $*SimpleProtocol):
+// CHECK: bb0(%0 : $Int, %1 : $*SimpleProtocol):
 // CHECK-NEXT: debug_value %0 : $Int  // let a
 // CHECK-NEXT: debug_value_addr %1 : $*SimpleProtocol  // let b
 func testDebugValue(let a : Int, let b : SimpleProtocol) -> Int {
@@ -345,7 +345,7 @@ func testDebugValue(let a : Int, let b : SimpleProtocol) -> Int {
 
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyTupleArgument
 func testAddressOnlyTupleArgument(let bounds: (start: SimpleProtocol, pastEnd: Int)) {
-// CHECK-NEXT:  bb0(%0 : $*SimpleProtocol, %1 : $Int):
+// CHECK:       bb0(%0 : $*SimpleProtocol, %1 : $Int):
 // CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int)  // let bounds
 // CHECK-NEXT:    %3 = tuple_element_addr %2#1 : $*(start: SimpleProtocol, pastEnd: Int), 0
 // CHECK-NEXT:    copy_addr [take] %0 to [initialization] %3 : $*SimpleProtocol
@@ -439,7 +439,7 @@ struct GenericStruct<T> {
     return a
   }
   // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getA{{.*}} : $@convention(method) <T> (@out T, @in_guaranteed GenericStruct<T>)
-  // CHECK-NEXT: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
+  // CHECK: bb0(%0 : $*T, %1 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %1 : $*GenericStruct<T>  // let self
   // CHECK-NEXT: %3 = struct_element_addr %1 : $*GenericStruct<T>, #GenericStruct.a
   // CHECK-NEXT: copy_addr %3 to [initialization] %0 : $*T
@@ -451,7 +451,7 @@ struct GenericStruct<T> {
   }
   
   // CHECK-LABEL: sil hidden @{{.*}}GenericStruct4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
-  // CHECK-NEXT: bb0(%0 : $*GenericStruct<T>):
+  // CHECK: bb0(%0 : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value_addr %0 : $*GenericStruct<T>  // let self
   // CHECK-NEXT: %2 = struct_element_addr %0 : $*GenericStruct<T>, #GenericStruct.b
   // CHECK-NEXT: %3 = load %2 : $*Int
@@ -481,7 +481,7 @@ func testLetPropertyAccessOnLValueBase(var a : LetPropertyStruct) -> Int {
 var addressOnlyGetOnlyGlobalProperty : SimpleProtocol { get {} }
 
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyGetOnlyGlobalProperty
-// CHECK-NEXT: bb0(%0 : $*SimpleProtocol):
+// CHECK: bb0(%0 : $*SimpleProtocol):
 // CHECK-NEXT:   // function_ref
 // CHECK-NEXT:  %1 = function_ref @{{.*}}addressOnlyGetOnlyGlobalProperty
 // CHECK-NEXT:  %2 = apply %1(%0) : $@convention(thin) (@out SimpleProtocol) -> ()

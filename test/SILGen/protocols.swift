@@ -20,7 +20,7 @@ func use_subscript_rvalue_get(i : Int) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_rvalue_get
-// CHECK-NEXT: bb0(%0 : $Int):
+// CHECK: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols16subscriptableGetPS_16SubscriptableGet_ : $*SubscriptableGet
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*SubscriptableGet to $*[[OPENED:@opened(.*) SubscriptableGet]]
 // CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $[[OPENED]]
@@ -36,7 +36,7 @@ func use_subscript_lvalue_get(i : Int) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_get
-// CHECK-NEXT: bb0(%0 : $Int):
+// CHECK: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols19subscriptableGetSetPS_19SubscriptableGetSet_ : $*SubscriptableGetSet
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*SubscriptableGetSet to $*[[OPENED:@opened(.*) SubscriptableGetSet]]
 // CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $[[OPENED]]
@@ -52,7 +52,7 @@ func use_subscript_lvalue_set(i : Int) {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_lvalue_set
-// CHECK-NEXT: bb0(%0 : $Int):
+// CHECK: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols19subscriptableGetSetPS_19SubscriptableGetSet_ : $*SubscriptableGetSet
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*SubscriptableGetSet to $*[[OPENED:@opened(.*) SubscriptableGetSet]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGetSet.subscript!setter.1
@@ -67,7 +67,7 @@ func use_subscript_archetype_rvalue_get<T : SubscriptableGet>(generic : T, idx :
   return generic[idx]
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_rvalue_get
-// CHECK-NEXT: bb0(%0 : $*T, %1 : $Int):
+// CHECK: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[STACK:%[0-9]+]] = alloc_stack $T
 // CHECK: copy_addr %0 to [initialization] [[STACK]]#1
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #SubscriptableGet.subscript!getter.1
@@ -81,7 +81,7 @@ func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(inout generic :
   return generic[idx]
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_get
-// CHECK-NEXT: bb0(%0 : $*T, %1 : $Int):
+// CHECK: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T  // var generic
 // CHECK: [[GUARANTEEDSTACK:%[0-9]+]] = alloc_stack $T
 // CHECK: copy_addr [[INOUTBOX]]#1 to [initialization]
@@ -98,7 +98,7 @@ func use_subscript_archetype_lvalue_set<T : SubscriptableGetSet>(inout generic :
   generic[idx] = idx
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_subscript_archetype_lvalue_set
-// CHECK-NEXT: bb0(%0 : $*T, %1 : $Int):
+// CHECK: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #SubscriptableGetSet.subscript!setter.1
 // CHECK-NEXT: apply [[METH]]<T>(%1, %1, [[INOUTBOX]]#1)
@@ -148,7 +148,7 @@ func use_property_lvalue_set(x : Int) {
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}use_property_lvalue_set
-// CHECK-NEXT: bb0(%0 : $Int):
+// CHECK: bb0(%0 : $Int):
 // CHECK: [[GLOB:%[0-9]+]] = global_addr @_Tv9protocols14propertyGetSetPS_24PropertyWithGetterSetter_ : $*PropertyWithGetterSetter
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr [[GLOB]] : $*PropertyWithGetterSetter to $*[[OPENED:@opened(.*) PropertyWithGetterSetter]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetterSetter.b!setter.1
@@ -163,7 +163,7 @@ func use_property_archetype_rvalue_get<T : PropertyWithGetter>(generic : T) -> I
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_rvalue_get
-// CHECK-NEXT: bb0(%0 : $*T):
+// CHECK: bb0(%0 : $*T):
 // CHECK: [[STACK:%[0-9]+]] = alloc_stack $T
 // CHECK: copy_addr %0 to [initialization] [[STACK]]#1
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #PropertyWithGetter.a!getter.1
@@ -178,7 +178,7 @@ func use_property_archetype_lvalue_get<T : PropertyWithGetterSetter>(generic : T
 }
 
 // CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_get
-// CHECK-NEXT: bb0(%0 : $*T):
+// CHECK: bb0(%0 : $*T):
 // CHECK: [[STACK:%[0-9]+]] = alloc_stack $T
 // CHECK: copy_addr %0 to [initialization] [[STACK]]#1 : $*T
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #PropertyWithGetterSetter.b!getter.1
@@ -192,7 +192,7 @@ func use_property_archetype_lvalue_set<T : PropertyWithGetterSetter>(inout gener
   generic.b = v
 }
 // CHECK-LABEL: sil hidden @{{.*}}use_property_archetype_lvalue_set
-// CHECK-NEXT: bb0(%0 : $*T, %1 : $Int):
+// CHECK: bb0(%0 : $*T, %1 : $Int):
 // CHECK: [[INOUTBOX:%[0-9]+]] = alloc_box $T
 // CHECK: [[METH:%[0-9]+]] = witness_method $T, #PropertyWithGetterSetter.b!setter.1
 // CHECK-NEXT: apply [[METH]]<T>(%1, [[INOUTBOX]]#1)
@@ -295,7 +295,7 @@ class ClassWithStoredProperty : PropertyWithGetter {
     return a
   }
   // CHECK-LABEL: sil hidden @{{.*}}ClassWithStoredProperty{{.*}}methodUsingProperty
-  // CHECK-NEXT: bb0([[ARG:%.*]] : $ClassWithStoredProperty):
+  // CHECK: bb0([[ARG:%.*]] : $ClassWithStoredProperty):
   // CHECK-NEXT: debug_value [[ARG]]
   // CHECK-NOT: strong_retain
   // CHECK-NEXT: [[FUN:%.*]] = class_method [[ARG]] : $ClassWithStoredProperty, #ClassWithStoredProperty.a!getter.1 : ClassWithStoredProperty -> () -> Int , $@convention(method) (@guaranteed ClassWithStoredProperty) -> Int
@@ -312,7 +312,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
     return a
   }
   // CHECK-LABEL: sil hidden @{{.*}}StructWithStoredProperty{{.*}}methodUsingProperty
-  // CHECK-NEXT: bb0(%0 : $StructWithStoredProperty):
+  // CHECK: bb0(%0 : $StructWithStoredProperty):
   // CHECK-NEXT: debug_value %0
   // CHECK-NEXT: %2 = struct_extract %0 : $StructWithStoredProperty, #StructWithStoredProperty.a
   // CHECK-NEXT: return %2 : $Int
@@ -352,7 +352,7 @@ struct StructWithStoredClassProperty : PropertyWithGetter {
     return a
   }
   // CHECK-LABEL: sil hidden @{{.*}}StructWithStoredClassProperty{{.*}}methodUsingProperty
-  // CHECK-NEXT: bb0(%0 : $StructWithStoredClassProperty):
+  // CHECK: bb0(%0 : $StructWithStoredClassProperty):
   // CHECK-NEXT: debug_value %0
   // CHECK-NEXT: %2 = struct_extract %0 : $StructWithStoredClassProperty, #StructWithStoredClassProperty.a
   // CHECK-NEXT: return %2 : $Int

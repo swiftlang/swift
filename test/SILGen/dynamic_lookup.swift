@@ -116,7 +116,7 @@ func opt_to_static_method(var obj: AnyObject) {
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup15opt_to_property
 func opt_to_property(var obj: AnyObject) {
-  // CHECK-NEXT: bb0([[OBJ:%[0-9]+]] : $AnyObject):
+  // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject):
   // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
   // CHECK-NEXT: store [[OBJ]] to [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: [[INT_BOX:%[0-9]+]] = alloc_box $Int
@@ -139,7 +139,7 @@ func opt_to_property(var obj: AnyObject) {
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup19direct_to_subscript
 func direct_to_subscript(var obj: AnyObject, var i: Int) {
-  // CHECK-NEXT: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
+  // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
   // CHECK-NEXT: store [[OBJ]] to [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $Int
@@ -166,7 +166,7 @@ func direct_to_subscript(var obj: AnyObject, var i: Int) {
 
 // CHECK-LABEL: sil hidden @_TF14dynamic_lookup16opt_to_subscript
 func opt_to_subscript(var obj: AnyObject, var i: Int) {
-  // CHECK-NEXT: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
+  // CHECK: bb0([[OBJ:%[0-9]+]] : $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK-NEXT: [[OBJ_BOX:%[0-9]+]] = alloc_box $AnyObject
   // CHECK-NEXT: store [[OBJ]] to [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: [[I_BOX:%[0-9]+]] = alloc_box $Int

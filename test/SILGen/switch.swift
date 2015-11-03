@@ -1001,7 +1001,7 @@ class ClassPatternTest {
 }
 
 // CHECK-LABEL: sil hidden @_TF6switch18test_class_patternFT1kCS_16ClassPatternTest_T_
-// CHECK-NEXT: bb0([[C:%.*]] : $ClassPatternTest):
+// CHECK: bb0([[C:%.*]] : $ClassPatternTest):
 func test_class_pattern(k k: ClassPatternTest) {
   switch k {
   // CHECK: [[XM:%.*]] = class_method [[C]] : $ClassPatternTest, #ClassPatternTest.x!getter.1
@@ -1046,7 +1046,7 @@ class SubclassTestA : ClassPatternTest {}
 class SubclassTestB : ClassPatternTest {}
 
 // CHECK-LABEL: sil hidden @{{.*}}test_class_pattern_with_isa_1
-// CHECK-NEXT: bb0([[C:%.*]] : $ClassPatternTest):
+// CHECK: bb0([[C:%.*]] : $ClassPatternTest):
 
 func test_class_pattern_with_isa_1(k k: ClassPatternTest) {
   switch k {

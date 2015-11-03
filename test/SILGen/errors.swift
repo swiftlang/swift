@@ -731,7 +731,7 @@ func testOptionalTryVar() {
 }
 
 // CHECK-LABEL: sil hidden @_TF6errors26testOptionalTryAddressOnly
-// CHECK-NEXT: bb0(%0 : $*T):
+// CHECK: bb0(%0 : $*T):
 // CHECK: [[BOX:%.+]] = alloc_stack $Optional<T>
 // CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]]#1 : $*Optional<T>, #Optional.Some!enumelt.1
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors11dont_return
@@ -760,7 +760,7 @@ func testOptionalTryAddressOnly<T>(obj: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF6errors29testOptionalTryAddressOnlyVar
-// CHECK-NEXT: bb0(%0 : $*T):
+// CHECK: bb0(%0 : $*T):
 // CHECK: [[BOX:%.+]] = alloc_box $Optional<T>
 // CHECK-NEXT: [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]]#1 : $*Optional<T>, #Optional.Some!enumelt.1
 // CHECK: [[FN:%.+]] = function_ref @_TF6errors11dont_return
@@ -788,7 +788,7 @@ func testOptionalTryAddressOnlyVar<T>(obj: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF6errors23testOptionalTryMultipleFT_T_
-// CHECK-NEXT: bb0:
+// CHECK: bb0:
 // CHECK: [[FN_1:%.+]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat
 // CHECK-NEXT: try_apply [[FN_1]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal [[SUCCESS_1:[^ ]+]], error [[CLEANUPS_1:[^ ]+]]
 // CHECK: [[SUCCESS_1]]([[VALUE_1:%.+]] : $Cat)
@@ -816,7 +816,7 @@ func testOptionalTryMultiple() {
 }
 
 // CHECK-LABEL: sil hidden @_TF6errors25testOptionalTryNeverFailsFT_T_
-// CHECK-NEXT: bb0:
+// CHECK: bb0:
 // CHECK-NEXT:   [[VALUE:%.+]] = tuple ()
 // CHECK-NEXT:   = enum $Optional<()>, #Optional.Some!enumelt.1, [[VALUE]]
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
@@ -827,7 +827,7 @@ func testOptionalTryNeverFails() {
 }
 
 // CHECK-LABEL: sil hidden @_TF6errors28testOptionalTryNeverFailsVarFT_T_
-// CHECK-NEXT: bb0:
+// CHECK: bb0:
 // CHECK-NEXT:   [[BOX:%.+]] = alloc_box $Optional<()>
 // CHECK-NEXT:   = init_enum_data_addr [[BOX]]#1 : $*Optional<()>, #Optional.Some!enumelt.1
 // CHECK-NEXT:   inject_enum_addr [[BOX]]#1 : $*Optional<()>, #Optional.Some!enumelt.1
@@ -840,7 +840,7 @@ func testOptionalTryNeverFailsVar() {
 }
 
 // CHECK-LABEL: sil hidden @_TF6errors36testOptionalTryNeverFailsAddressOnly
-// CHECK-NEXT: bb0(%0 : $*T):
+// CHECK: bb0(%0 : $*T):
 // CHECK:   [[BOX:%.+]] = alloc_stack $Optional<T>
 // CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]]#1 : $*Optional<T>, #Optional.Some!enumelt.1
 // CHECK-NEXT:   copy_addr %0 to [initialization] [[BOX_DATA]] : $*T
@@ -856,7 +856,7 @@ func testOptionalTryNeverFailsAddressOnly<T>(obj: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF6errors39testOptionalTryNeverFailsAddressOnlyVar
-// CHECK-NEXT: bb0(%0 : $*T):
+// CHECK: bb0(%0 : $*T):
 // CHECK:   [[BOX:%.+]] = alloc_box $Optional<T>
 // CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]]#1 : $*Optional<T>, #Optional.Some!enumelt.1
 // CHECK-NEXT:   copy_addr %0 to [initialization] [[BOX_DATA]] : $*T

@@ -12,7 +12,7 @@ class SwiftGizmo : Gizmo {
   var x = X()
 
   // CHECK-LABEL: sil hidden @_TFC12objc_dealloc10SwiftGizmoc
-  // CHECK-NEXT: bb0([[SELF_PARAM:%[0-9]+]] : $SwiftGizmo):
+  // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : $SwiftGizmo):
   override init() {
     // CHECK:   [[SELF_UNINIT:%[0-9]+]] = mark_uninitialized [derivedselfonly]
     // CHECK-NOT: ref_element_addr

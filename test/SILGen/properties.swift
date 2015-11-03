@@ -7,7 +7,7 @@ func use(_: Double) {}
 func getInt() -> Int { return zero }
 
 // CHECK-LABEL: sil hidden  @{{.*}}physical_tuple_lvalue
-// CHECK-NEXT: bb0(%0 : $Int):
+// CHECK: bb0(%0 : $Int):
 func physical_tuple_lvalue(c: Int) {
   var x : (Int, Int)
   // CHECK: [[XADDR1:%[0-9]+]] = alloc_box $(Int, Int)
@@ -328,7 +328,7 @@ func physical_inout(var x: Int) {
  * reuses temporaries */
 
 // CHECK-LABEL: sil hidden  @_TF10properties17val_subscript_get
-// CHECK-NEXT: bb0([[VVAL:%[0-9]+]] : $Val, [[I:%[0-9]+]] : $Int):
+// CHECK: bb0([[VVAL:%[0-9]+]] : $Val, [[I:%[0-9]+]] : $Int):
 func val_subscript_get(v: Val, i: Int) -> Float {
   return v[i]
   // CHECK: [[SUBSCRIPT_GET_METHOD:%[0-9]+]] = function_ref @_TFV10properties3Valg9subscript
@@ -448,7 +448,7 @@ struct DidSetWillSetTests: ForceAccessors {
     willSet(newA) {
       // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.willset
       // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestsw1a
-      // CHECK-NEXT: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
+      // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug_value %0
       // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
       // CHECK-NEXT: copy_addr %1 to [initialization] [[SELFBOX]]#1 : $*DidSetWillSetTests
@@ -472,7 +472,7 @@ struct DidSetWillSetTests: ForceAccessors {
     didSet {
       // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.didset
       // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestsW1a
-      // CHECK-NEXT: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
+      // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug
       // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
       // CHECK-NEXT: copy_addr %1 to [initialization] [[SELFBOX:%.*]]#1 : $*DidSetWillSetTests
@@ -508,14 +508,14 @@ struct DidSetWillSetTests: ForceAccessors {
 
   // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.getter
   // CHECK-NEXT: sil hidden [transparent] @_TFV10properties18DidSetWillSetTestsg1a
-  // CHECK-NEXT: bb0(%0 : $DidSetWillSetTests):
+  // CHECK: bb0(%0 : $DidSetWillSetTests):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   %2 = struct_extract %0 : $DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT:   return %2 : $Int                      // id: %3
   
   // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.setter
   // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestss1a
-  // CHECK-NEXT: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
+  // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
   // CHECK-NEXT: copy_addr %1 to [initialization] [[SELFBOX]]#1 : $*DidSetWillSetTests
@@ -537,7 +537,7 @@ struct DidSetWillSetTests: ForceAccessors {
 
 
   // CHECK-LABEL: sil hidden @_TFV10properties18DidSetWillSetTestsC
-  // CHECK-NEXT: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
+  // CHECK: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
   // CHECK:        [[SELF:%.*]] = mark_uninitialized [rootself]
   // CHECK:        [[P1:%.*]] = struct_element_addr [[SELF]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT:   assign %0 to [[P1]]
@@ -561,7 +561,7 @@ func force_global_observing_property_setter() {
 
 // The property is initialized with "zero".
 // CHECK-LABEL: sil private @globalinit_{{.*}}_func1 : $@convention(thin) () -> () {
-// CHECK-NEXT: bb0:
+// CHECK: bb0:
 // CHECK-NEXT: %0 = global_addr @_Tv10properties25global_observing_propertySi : $*Int
 // CHECK: properties.zero.unsafeMutableAddressor
 // CHECK: return
@@ -598,7 +598,7 @@ func local_observing_property(arg: Int) {
 // initialize the property to the argument value.
 
 // CHECK-LABEL: sil hidden @{{.*}}local_observing_property
-// CHECK-NEXT: bb0([[ARG:%[0-9]+]] : $Int)
+// CHECK: bb0([[ARG:%[0-9]+]] : $Int)
 // CHECK: [[BOX:%[0-9]+]] = alloc_box $Int
 // CHECK: store [[ARG]] to [[BOX]]#1
 
@@ -663,7 +663,7 @@ func propertyWithDidSetTakingOldValue() {
 
 // CHECK: // properties.(propertyWithDidSetTakingOldValue () -> ()).(p #1).setter : Swift.Int
 // CHECK-NEXT: sil {{.*}} @_TFF10properties32propertyWithDidSetTakingOldValue
-// CHECK-NEXT: bb0(%0 : $Int, %1 : $@box Int, %2 : $*Int):
+// CHECK: bb0(%0 : $Int, %1 : $@box Int, %2 : $*Int):
 // CHECK-NEXT:  debug_value %0 : $Int
 // CHECK-NEXT:  %4 = load %2 : $*Int
 // CHECK-NEXT:  debug_value %4 : $Int
@@ -693,7 +693,7 @@ class DerivedProperty : BaseProperty {
 // rdar://16381392 - Super property references in non-objc classes should be direct.
 
 // CHECK: sil hidden @_TFC10properties15DerivedProperty24super_property_reference
-// CHECK-NEXT: bb0(%0 : $DerivedProperty):
+// CHECK: bb0(%0 : $DerivedProperty):
 // CHECK:  [[BASEPTR:%[0-9]+]] = upcast %0 : $DerivedProperty to $BaseProperty
 // CHECK:  // function_ref properties.BaseProperty.x.getter
 // CHECK:  [[FN:%[0-9]+]] = function_ref @_TFC10properties12BasePropertyg1x
@@ -708,7 +708,7 @@ struct ReferenceStorageTypeRValues {
     return p1
   }
 // CHECK: sil hidden @{{.*}}testRValueUnowned
-// CHECK-NEXT: bb0(%0 : $ReferenceStorageTypeRValues):
+// CHECK: bb0(%0 : $ReferenceStorageTypeRValues):
 // CHECK-NEXT:   debug_value %0 : $ReferenceStorageTypeRValues
 // CHECK-NEXT:   %2 = struct_extract %0 : $ReferenceStorageTypeRValues, #ReferenceStorageTypeRValues.p1
 // CHECK-NEXT:   strong_retain_unowned %2 : $@sil_unowned Ref
@@ -860,7 +860,7 @@ class ClassWithLetProperty {
   // We shouldn't have any dynamic dispatch within this method, just load p.
   func ReturnConstant() -> Int { return p }
 // CHECK-LABEL: sil hidden @_TFC10properties20ClassWithLetProperty14ReturnConstant
-// CHECK-NEXT:  bb0(%0 : $ClassWithLetProperty):
+// CHECK:       bb0(%0 : $ClassWithLetProperty):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    [[PTR:%[0-9]+]] = ref_element_addr %0 : $ClassWithLetProperty, #ClassWithLetProperty.p
 // CHECK-NEXT:    [[VAL:%[0-9]+]] = load [[PTR]] : $*Int
@@ -915,7 +915,7 @@ class RedundantSelfRetains {
     f = RedundantSelfRetains()
   }
   // CHECK-LABEL: sil hidden @_TFC10properties20RedundantSelfRetains11testMethod1
-  // CHECK-NEXT: bb0(%0 : $RedundantSelfRetains):
+  // CHECK: bb0(%0 : $RedundantSelfRetains):
 
   // CHECK-NOT: strong_retain
   

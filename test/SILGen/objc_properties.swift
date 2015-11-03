@@ -35,7 +35,7 @@ class A {
   // rdar://15858869 - However, direct access only applies to (implicit or
   // explicit) 'self' ivar references, not ALL ivar refs.
   // CHECK-LABEL: sil hidden @_TFC15objc_properties1Ac
-  // CHECK-NEXT: bb0(%0 : $A, %1 : $Int, %2 : $A):
+  // CHECK: bb0(%0 : $A, %1 : $Int, %2 : $A):
   // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized [rootself] %2 : $A
   init(other : A, x : Int) {
     // CHECK: [[SELF_A:%[0-9]+]] = ref_element_addr [[SELF]] : $A, #A.prop
@@ -101,7 +101,7 @@ class B : A {
 // Test the @NSCopying attribute.
 class TestNSCopying {
   // CHECK-LABEL: sil hidden [transparent] @_TFC15objc_properties13TestNSCopyings8propertyCSo8NSString : $@convention(method) (@owned NSString, @guaranteed TestNSCopying) -> ()
-  // CHECK-NEXT: bb0(%0 : $NSString, %1 : $TestNSCopying):
+  // CHECK: bb0(%0 : $NSString, %1 : $TestNSCopying):
   // CHECK:  class_method [volatile] %0 : $NSString, #NSString.copyWithZone!1.foreign
   @NSCopying var property : NSString
 

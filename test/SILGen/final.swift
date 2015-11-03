@@ -19,7 +19,7 @@ class TestDerived : TestClass {
 
 
 // CHECK-LABEL: sil hidden @{{.*}}testDirectDispatch
-// CHECK-NEXT: bb0(%0 : $TestClass):
+// CHECK: bb0(%0 : $TestClass):
 // CHECK: [[FINALMETH:%[0-9]+]] = function_ref @_TFC5final9TestClass11finalMethod
 // CHECK: apply [[FINALMETH]](%0)
 

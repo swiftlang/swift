@@ -40,7 +40,7 @@ func PQtoP() {
 
 // CHECK-LABEL: sil hidden @_TF19existential_erasure19openExistentialToP1FzPS_1P_T_
 func openExistentialToP1(p: P) throws {
-// CHECK-NEXT: bb0(%0 : $*P):
+// CHECK: bb0(%0 : $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
 // CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]]#1 : $*P, $[[OPEN_TYPE]]
@@ -65,7 +65,7 @@ func openExistentialToP1(p: P) throws {
 
 // CHECK-LABEL: sil hidden @_TF19existential_erasure19openExistentialToP2FzPS_1P_T_
 func openExistentialToP2(p: P) throws {
-// CHECK-NEXT: bb0(%0 : $*P):
+// CHECK: bb0(%0 : $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
 // CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]]#1 : $*P, $[[OPEN_TYPE]]
@@ -96,7 +96,7 @@ extension ErrorType {
 
 // CHECK-LABEL: sil hidden @_TF19existential_erasure12errorHandlerFzPs9ErrorType_PS0__
 func errorHandler(e: ErrorType) throws -> ErrorType {
-// CHECK-NEXT: bb0(%0 : $ErrorType):
+// CHECK: bb0(%0 : $ErrorType):
 // CHECK:  debug_value %0 : $ErrorType
 // CHECK:  [[OPEN:%.*]] = open_existential_box %0 : $ErrorType to $*[[OPEN_TYPE:@opened\(.*\) ErrorType]]
 // CHECK:  [[RESULT:%.*]] = alloc_existential_box $ErrorType, $[[OPEN_TYPE]]

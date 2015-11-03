@@ -1175,7 +1175,7 @@ entry(%0 : $*@block_storage Int):
 }
 
 // CHECK-LABEL: sil @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int) {
-// CHECK-NEXT:  bb0(%0 : $Class1):
+// CHECK:  bb0(%0 : $Class1):
 // CHECK-NEXT:    %1 = unchecked_ref_cast %0 : $Class1 to $Class2
 // CHECK-NEXT:    %2 = unchecked_trivial_bit_cast %0 : $Class1 to $Int
 // CHECK-NEXT:    %3 = tuple (%1 : $Class2, %2 : $Int)
@@ -1189,7 +1189,7 @@ entry(%0 : $Class1):
 }
 
 // CHECK-LABEL: sil @bridge_object : $@convention(thin) (@owned Class1, Builtin.Word) -> () {
-// CHECK-NEXT:  bb0([[X:%.*]] : $Class1, [[W:%.*]] : $Builtin.Word):
+// CHECK:  bb0([[X:%.*]] : $Class1, [[W:%.*]] : $Builtin.Word):
 // CHECK-NEXT:    [[A:%.*]] = ref_to_bridge_object [[X]] : $Class1, [[W]] : $Builtin.Word
 // CHECK-NEXT:    [[B:%.*]] = bridge_object_to_ref [[A]] : $Builtin.BridgeObject to $Class1
 // CHECK-NEXT:    [[C:%.*]] = bridge_object_to_word [[A]] : $Builtin.BridgeObject to $Builtin.Word
@@ -1382,7 +1382,7 @@ bb0(%0 : $*Builtin.NativeObject):
 
 // CHECK-LABEL: sil @box_type : $@convention(thin) (@box Int, Int) -> () {
 sil @box_type : $@convention(thin) (@box Int, Int) -> () {
-// CHECK-NEXT: bb0(%0 : $@box Int, %1 : $Int):
+// CHECK: bb0(%0 : $@box Int, %1 : $Int):
 bb0(%0 : $@box Int, %1 : $Int):
   // CHECK-NEXT: strong_retain %0 : $@box Int
   strong_retain %0 : $@box Int
@@ -1397,7 +1397,7 @@ bb0(%0 : $@box Int, %1 : $Int):
 
 // CHECK-LABEL: sil @value_names : $@convention(thin) (Builtin.Int1) -> () {
 sil @value_names : $@convention(thin) (Builtin.Int1) -> () {
-// CHECK-NEXT: bb0(%0 : $Builtin.Int1):
+// CHECK: bb0(%0 : $Builtin.Int1):
 entry(%param : $Builtin.Int1):
 // CHECK-NEXT: %1 = tuple ()
   %v_o_i_d = tuple ()

@@ -51,7 +51,7 @@ func class_metatypes(c: SomeClass, s: SomeSubclass)
 }
 
 // CHECK-LABEL: sil hidden @_TF9metatypes19archetype_metatypes
-// CHECK-NEXT: bb0(%0 : $*T):
+// CHECK: bb0(%0 : $*T):
 func archetype_metatypes<T>(t: T) -> (T.Type, T.Type) {
   // CHECK: [[STATIC_T:%[0-9]+]] = metatype $@thick T.Type
   // CHECK: [[DYN_T:%[0-9]+]] = value_metatype $@thick T.Type, %0

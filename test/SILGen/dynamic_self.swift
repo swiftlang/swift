@@ -130,7 +130,7 @@ class OptionalResult {
   func foo() -> Self? { return self }
 }
 // CHECK-LABEL: sil hidden @_TFC12dynamic_self14OptionalResult3foo
-// CHECK-NEXT: bb0(
+// CHECK: bb0(
 // CHECK-NEXT: debug_value %0 : $OptionalResult
 // CHECK-NEXT: strong_retain [[VALUE:%[0-9]+]]
 // CHECK-NEXT: [[T0:%.*]] = enum $Optional<OptionalResult>, #Optional.Some!enumelt.1, %0 : $OptionalResult

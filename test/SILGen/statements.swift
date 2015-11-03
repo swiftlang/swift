@@ -558,7 +558,7 @@ func testRequireExprPattern(a : Int) {
 
 
 // CHECK-LABEL: sil hidden @_TF10statements20testRequireOptional1FGSqSi_Si
-// CHECK-NEXT: bb0(%0 : $Optional<Int>):
+// CHECK: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT:   debug_value %0 : $Optional<Int>  // let a
 // CHECK-NEXT:   switch_enum %0 : $Optional<Int>, case #Optional.Some!enumelt.1: bb1, default bb2
 func testRequireOptional1(a : Int?) -> Int {
@@ -577,7 +577,7 @@ func testRequireOptional1(a : Int?) -> Int {
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements20testRequireOptional2FGSqSS_SS
-// CHECK-NEXT: bb0(%0 : $Optional<String>):
+// CHECK: bb0(%0 : $Optional<String>):
 // CHECK-NEXT:   debug_value %0 : $Optional<String>  // let a
 // CHECK-NEXT:   retain_value %0 : $Optional<String>
 // CHECK-NEXT:   switch_enum %0 : $Optional<String>, case #Optional.Some!enumelt.1: bb1, default bb2
@@ -602,7 +602,7 @@ enum MyOpt<T> {
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements28testAddressOnlyEnumInRequire
-// CHECK-NEXT: bb0(%0 : $*T, %1 : $*MyOpt<T>):
+// CHECK: bb0(%0 : $*T, %1 : $*MyOpt<T>):
 // CHECK-NEXT: debug_value_addr %1 : $*MyOpt<T>  // let a
 // CHECK-NEXT: %3 = alloc_stack $T  // let t
 // CHECK-NEXT: %4 = alloc_stack $MyOpt<T>
@@ -670,7 +670,7 @@ func test_as_pattern(y : BaseClass) -> DerivedClass {
 // CHECK-LABEL: sil hidden @_TF10statements22let_else_tuple_bindingFGSqTSiSi__Si
 func let_else_tuple_binding(a : (Int, Int)?) -> Int {
 
-  // CHECK-NEXT: bb0(%0 : $Optional<(Int, Int)>):
+  // CHECK: bb0(%0 : $Optional<(Int, Int)>):
   // CHECK-NEXT:   debug_value %0 : $Optional<(Int, Int)>  // let a
   // CHECK-NEXT:   switch_enum %0 : $Optional<(Int, Int)>, case #Optional.Some!enumelt.1: bb1, default bb2
 

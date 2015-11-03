@@ -19,7 +19,7 @@ func MakeItNotAGlobal() -> Y {
 
 // Make sure all abstractions have been removed and everything inlined into top_level_method.
 // CHECK-LABEL: sil @main
-// CHECK-NEXT: bb0({{.*}}):
+// CHECK: bb0({{.*}}):
 // CHECK: [[UNKNOWN:%.*]] = function_ref @unknown
 // CHECK: apply [[UNKNOWN]]
 // CHECK: integer_literal

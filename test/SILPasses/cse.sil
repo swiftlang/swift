@@ -1032,7 +1032,7 @@ sil  @_TFC4main4PingD : $@convention(method) (@owned Ping) -> ()
 sil  @_TFC4main4PingcfMS0_FT_S0_ : $@convention(method) (@owned Ping) -> @owned Ping
 
 // CHECK-LABEL: _TF4main4ringFCS_4PingT_
-// CHECK-NEXT:      bb0(%0 : $Ping):
+// CHECK:           bb0(%0 : $Ping):
 // CHECK-NEXT:      class_method
 // CHECK-NEXT:      apply
 // CHECK-NEXT:      apply
@@ -1116,7 +1116,7 @@ bb0(%0 : $*T):
 }
 
 // CHECK-LABEL: sil hidden @_TF1p3foouRq_S_9Reachable_FTq_1aSi_T_
-// CHECK-NEXT:      bb0(%0 : $*T, %1 : $Int):
+// CHECK:           bb0(%0 : $*T, %1 : $Int):
 // CHECK-NEXT:      witness_method
 // CHECK-NEXT:      apply
 // CHECK-NEXT:      apply
@@ -1190,7 +1190,7 @@ bb0(%0 : $*Airplane):
 }
 
 // CHECK-LABEL: _TF2p28trytoflyFPS_7Flyable_T_
-// CHECK-NEXT:      bb0(%0 : $*Flyable):
+// CHECK:           bb0(%0 : $*Flyable):
 // CHECK-NEXT:      open_existential_addr
 // CHECK-NEXT:      witness_method
 // CHECK-NEXT:      apply
@@ -1303,7 +1303,7 @@ bb0(%0 : $Bar):
 }
 
 // CHECK-LABEL: _TF4test9trytowalkFPS_8Walkable_T_
-// CHECK-NEXT:      bb0(%0 : $Walkable):
+// CHECK:           bb0(%0 : $Walkable):
 // CHECK-NEXT:      open_existential_ref
 // CHECK-NEXT:      witness_method
 // CHECK-NEXT:      apply

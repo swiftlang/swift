@@ -260,7 +260,7 @@ bb7(%19 : $Int64):                                // Preds: bb6 bb5
 
 
 /// CHECK-LABEL: sil @testCondBrFold
-/// CHECK-NEXT: bb0(
+/// CHECK: bb0(
 /// CHECK-NEXT: return %1 : $Int64
 sil @testCondBrFold : $@convention(thin) (Int64, Int64) -> Int64 {
 bb0(%0 : $Int64, %1 : $Int64):
@@ -273,7 +273,7 @@ bb2:
 }
 
 /// CHECK-LABEL: sil @testSwitchEnumFold
-/// CHECK-NEXT: bb0(
+/// CHECK: bb0(
 /// CHECK-NEXT: return %0 : $Int64
 sil @testSwitchEnumFold : $@convention(thin) (Int64) -> Int64 {
 bb0(%0 : $Int64):

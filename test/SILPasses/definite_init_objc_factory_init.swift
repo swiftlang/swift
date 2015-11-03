@@ -6,7 +6,7 @@ import Foundation
 
 // CHECK-LABEL: sil shared @_TTOFCSo4HiveCfT5queenGSQCSo3Bee__GSQS__ : $@convention(thin) (@owned ImplicitlyUnwrappedOptional<Bee>, @thick Hive.Type) -> @owned ImplicitlyUnwrappedOptional<Hive>
 func testInstanceTypeFactoryMethod(queen: Bee) {
-  // CHECK-NEXT: bb0([[QUEEN:%[0-9]+]] : $ImplicitlyUnwrappedOptional<Bee>, [[HIVE_META:%[0-9]+]] : $@thick Hive.Type):
+  // CHECK: bb0([[QUEEN:%[0-9]+]] : $ImplicitlyUnwrappedOptional<Bee>, [[HIVE_META:%[0-9]+]] : $@thick Hive.Type):
   // CHECK-NEXT:   [[HIVE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[HIVE_META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
   // CHECK-NEXT:   [[FACTORY:%[0-9]+]] = class_method [volatile] [[HIVE_META_OBJC]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : Hive.Type -> (queen: Bee!) -> Hive! , $@convention(objc_method) (ImplicitlyUnwrappedOptional<Bee>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>
   // CHECK-NEXT:   [[HIVE:%[0-9]+]] = apply [[FACTORY]]([[QUEEN]], [[HIVE_META_OBJC]]) : $@convention(objc_method) (ImplicitlyUnwrappedOptional<Bee>, @objc_metatype Hive.Type) -> @autoreleased ImplicitlyUnwrappedOptional<Hive>

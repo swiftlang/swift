@@ -96,7 +96,7 @@ struct ConformingStruct : X {
   mutating
   func selfTypes(x x: ConformingStruct) -> ConformingStruct { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_9selfTypes{{.*}} : $@convention(witness_method) (@out ConformingStruct, @in ConformingStruct, @inout ConformingStruct) -> () {
-  // CHECK-NEXT:  bb0(%0 : $*ConformingStruct, %1 : $*ConformingStruct, %2 : $*ConformingStruct):
+  // CHECK:       bb0(%0 : $*ConformingStruct, %1 : $*ConformingStruct, %2 : $*ConformingStruct):
   // CHECK-NEXT:    %3 = load %1 : $*ConformingStruct
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %4 = function_ref @_TFV9witnesses16ConformingStruct9selfTypes{{.*}} : $@convention(method) (ConformingStruct, @inout ConformingStruct) -> ConformingStruct
@@ -109,7 +109,7 @@ struct ConformingStruct : X {
   mutating
   func loadable(x x: Loadable) -> Loadable { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_8loadable{{.*}} : $@convention(witness_method) (Loadable, @inout ConformingStruct) -> Loadable {
-  // CHECK-NEXT:  bb0(%0 : $Loadable, %1 : $*ConformingStruct):
+  // CHECK:       bb0(%0 : $Loadable, %1 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %2 = function_ref @_TFV9witnesses16ConformingStruct8loadable{{.*}} : $@convention(method) (Loadable, @inout ConformingStruct) -> Loadable
   // CHECK-NEXT:    %3 = apply %2(%0, %1) : $@convention(method) (Loadable, @inout ConformingStruct) -> Loadable
@@ -119,7 +119,7 @@ struct ConformingStruct : X {
   mutating
   func addrOnly(x x: AddrOnly) -> AddrOnly { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_8addrOnly{{.*}} : $@convention(witness_method) (@out AddrOnly, @in AddrOnly, @inout ConformingStruct) -> () {
-  // CHECK-NEXT:  bb0(%0 : $*AddrOnly, %1 : $*AddrOnly, %2 : $*ConformingStruct):
+  // CHECK:       bb0(%0 : $*AddrOnly, %1 : $*AddrOnly, %2 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @_TFV9witnesses16ConformingStruct8addrOnly{{.*}} : $@convention(method) (@out AddrOnly, @in AddrOnly, @inout ConformingStruct) -> ()
   // CHECK-NEXT:    %4 = apply %3(%0, %1, %2) : $@convention(method) (@out AddrOnly, @in AddrOnly, @inout ConformingStruct) -> ()
@@ -129,7 +129,7 @@ struct ConformingStruct : X {
   mutating
   func generic<C>(x x: C) -> C { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_7generic{{.*}} : $@convention(witness_method) <A> (@out A, @in A, @inout ConformingStruct) -> () {
-  // CHECK-NEXT:  bb0(%0 : $*A, %1 : $*A, %2 : $*ConformingStruct):
+  // CHECK:       bb0(%0 : $*A, %1 : $*A, %2 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @_TFV9witnesses16ConformingStruct7generic{{.*}} : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformingStruct) -> ()
   // CHECK-NEXT:    %4 = apply %3<A>(%0, %1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformingStruct) -> ()
@@ -138,7 +138,7 @@ struct ConformingStruct : X {
   mutating
   func classes<C2: Classes>(x x: C2) -> C2 { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_FS1_7classes{{.*}} : $@convention(witness_method) <A2 where A2 : Classes> (@owned A2, @inout ConformingStruct) -> @owned A2 {
-  // CHECK-NEXT:  bb0(%0 : $A2, %1 : $*ConformingStruct):
+  // CHECK:       bb0(%0 : $A2, %1 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %2 = function_ref @_TFV9witnesses16ConformingStruct7classes{{.*}} : $@convention(method) <τ_0_0 where τ_0_0 : Classes> (@owned τ_0_0, @inout ConformingStruct) -> @owned τ_0_0
   // CHECK-NEXT:    %3 = apply %2<A2>(%0, %1) : $@convention(method) <τ_0_0 where τ_0_0 : Classes> (@owned τ_0_0, @inout ConformingStruct) -> @owned τ_0_0
@@ -147,7 +147,7 @@ struct ConformingStruct : X {
 }
 func <~>(x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { return x }
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses16ConformingStructS_1XS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@out ConformingStruct, @in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> () {
-// CHECK-NEXT:  bb0(%0 : $*ConformingStruct, %1 : $*ConformingStruct, %2 : $*ConformingStruct, %3 : $@thick ConformingStruct.Type):
+// CHECK:       bb0(%0 : $*ConformingStruct, %1 : $*ConformingStruct, %2 : $*ConformingStruct, %3 : $@thick ConformingStruct.Type):
 // CHECK-NEXT:    %4 = load %1 : $*ConformingStruct
 // CHECK-NEXT:    %5 = load %2 : $*ConformingStruct
 // CHECK-NEXT:    // function_ref
@@ -161,7 +161,7 @@ func <~>(x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { return 
 final class ConformingClass : X {
   func selfTypes(x x: ConformingClass) -> ConformingClass { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses15ConformingClassS_1XS_FS1_9selfTypes{{.*}} : $@convention(witness_method) (@out ConformingClass, @in ConformingClass, @inout ConformingClass) -> () {
-  // CHECK-NEXT:  bb0(%0 : $*ConformingClass, %1 : $*ConformingClass, %2 : $*ConformingClass):
+  // CHECK:       bb0(%0 : $*ConformingClass, %1 : $*ConformingClass, %2 : $*ConformingClass):
   // -- load and retain 'self' from inout witness 'self' parameter
   // CHECK-NEXT:    %3 = load %2 : $*ConformingClass
   // CHECK-NEXT:    strong_retain %3 : $ConformingClass
@@ -197,7 +197,7 @@ struct ConformingAOStruct : X {
   mutating
   func selfTypes(x x: ConformingAOStruct) -> ConformingAOStruct { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses18ConformingAOStructS_1XS_FS1_9selfTypes{{.*}} : $@convention(witness_method) (@out ConformingAOStruct, @in ConformingAOStruct, @inout ConformingAOStruct) -> () {
-  // CHECK-NEXT:  bb0(%0 : $*ConformingAOStruct, %1 : $*ConformingAOStruct, %2 : $*ConformingAOStruct):
+  // CHECK:       bb0(%0 : $*ConformingAOStruct, %1 : $*ConformingAOStruct, %2 : $*ConformingAOStruct):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @_TFV9witnesses18ConformingAOStruct9selfTypes{{.*}} : $@convention(method) (@out ConformingAOStruct, @in ConformingAOStruct, @inout ConformingAOStruct) -> ()
   // CHECK-NEXT:    %4 = apply %3(%0, %1, %2) : $@convention(method) (@out ConformingAOStruct, @in ConformingAOStruct, @inout ConformingAOStruct) -> ()
@@ -218,7 +218,7 @@ struct ConformsWithMoreGeneric : X, Y {
   mutating
   func selfTypes<E>(x x: E) -> E { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_9selfTypes{{.*}} : $@convention(witness_method) (@out ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @inout ConformsWithMoreGeneric) -> () {
-  // CHECK-NEXT:  bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric):
+  // CHECK:       bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    %3 = load %1 : $*ConformsWithMoreGeneric
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %4 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric9selfTypes{{.*}} : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
@@ -237,7 +237,7 @@ struct ConformsWithMoreGeneric : X, Y {
   mutating
   func addrOnly<G>(x x: G) -> G { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_8addrOnly{{.*}} : $@convention(witness_method) (@out AddrOnly, @in AddrOnly, @inout ConformsWithMoreGeneric) -> () {
-  // CHECK-NEXT:  bb0(%0 : $*AddrOnly, %1 : $*AddrOnly, %2 : $*ConformsWithMoreGeneric):
+  // CHECK:       bb0(%0 : $*AddrOnly, %1 : $*AddrOnly, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric8addrOnly{{.*}} : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
   // CHECK-NEXT:    %4 = apply %3<AddrOnly>(%0, %1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
@@ -247,7 +247,7 @@ struct ConformsWithMoreGeneric : X, Y {
   mutating
   func generic<H>(x x: H) -> H { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7generic{{.*}} : $@convention(witness_method) <A> (@out A, @in A, @inout ConformsWithMoreGeneric) -> () {
-  // CHECK-NEXT:  bb0(%0 : $*A, %1 : $*A, %2 : $*ConformsWithMoreGeneric):
+  // CHECK:       bb0(%0 : $*A, %1 : $*A, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7generic{{.*}} : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
   // CHECK-NEXT:    %4 = apply %3<A>(%0, %1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
@@ -257,7 +257,7 @@ struct ConformsWithMoreGeneric : X, Y {
   mutating
   func classes<I>(x x: I) -> I { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7classes{{.*}} : $@convention(witness_method) <A2 where A2 : Classes> (@owned A2, @inout ConformsWithMoreGeneric) -> @owned A2 {
-  // CHECK-NEXT:  bb0(%0 : $A2, %1 : $*ConformsWithMoreGeneric):
+  // CHECK:       bb0(%0 : $A2, %1 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    // function_ref witnesses.ConformsWithMoreGeneric.classes
   // CHECK-NEXT:    %2 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7classes{{.*}} : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
   // CHECK-NEXT:    %3 = alloc_stack $A2
@@ -272,7 +272,7 @@ struct ConformsWithMoreGeneric : X, Y {
 }
 func <~> <J: Y, K: Y>(x: J, y: K) -> K { return y }
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@out ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @thick ConformsWithMoreGeneric.Type) -> () {
-// CHECK-NEXT:  bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric, %3 : $@thick ConformsWithMoreGeneric.Type):
+// CHECK:       bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric, %3 : $@thick ConformsWithMoreGeneric.Type):
 // CHECK-NEXT:    %4 = load %1 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    %5 = load %2 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    // function_ref

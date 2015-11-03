@@ -290,7 +290,7 @@ func closeOverLetLValue() {
 // The let property needs to be captured into a temporary stack slot so that it
 // is loadable even though we capture the value.
 // CHECK-LABEL: sil shared @_TFF8closures18closeOverLetLValueFT_T_U_FT_Si
-// CHECK-NEXT: bb0(%0 : $ClassWithIntProperty):
+// CHECK: bb0(%0 : $ClassWithIntProperty):
 // CHECK-NEXT: [[TMP:%.*]] = alloc_stack $ClassWithIntProperty  // let a
 // CHECK-NEXT: store %0 to [[TMP]]#1 : $*ClassWithIntProperty
 // CHECK-NEXT: {{.*}} = load [[TMP]]#1 : $*ClassWithIntProperty
@@ -318,7 +318,7 @@ struct StructWithMutatingMethod {
 // Check that the address of self is passed in, but not the refcount pointer.
 
 // CHECK-LABEL: sil hidden @_TFV8closures24StructWithMutatingMethod14mutatingMethod
-// CHECK-NEXT: bb0(%0 : $*StructWithMutatingMethod):
+// CHECK: bb0(%0 : $*StructWithMutatingMethod):
 // CHECK-NEXT: %1 = alloc_box $StructWithMutatingMethod  // var self // users: %2, %5, %7, %8
 // CHECK-NEXT: copy_addr %0 to [initialization] %1#1 : $*StructWithMutatingMethod // id: %2
 // CHECK: [[CLOSURE:%[0-9]+]] = function_ref @_TFFV8closures24StructWithMutatingMethod14mutatingMethod{{.*}} : $@convention(thin) (@inout StructWithMutatingMethod) -> Int
@@ -326,7 +326,7 @@ struct StructWithMutatingMethod {
 
 // Check that the closure body only takes the pointer.
 // CHECK-LABEL: sil shared @_TFFV8closures24StructWithMutatingMethod14mutatingMethod{{.*}} : $@convention(thin) (@inout StructWithMutatingMethod) -> Int {
-// CHECK-NEXT:  bb0(%0 : $*StructWithMutatingMethod):
+// CHECK:       bb0(%0 : $*StructWithMutatingMethod):
 
 class SuperBase {
   func boom() {}

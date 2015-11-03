@@ -455,6 +455,33 @@ public:
   }
 
   void print(const SILBasicBlock *BB) {
+    // Output uses for BB arguments.
+    if (!BB->bbarg_empty()) {
+      for (auto I = BB->bbarg_begin(), E = BB->bbarg_end(); I != E; ++I) {
+        SILValue V = *I;
+        if (V.use_empty())
+          continue;
+        *this << "// " << getID(V);
+        PrintState.OS.PadToColumn(50);
+        *this << "// user";
+        if (std::next(V->use_begin()) != V->use_end())
+          *this << 's';
+        *this << ": ";
+
+        // Display the user ids sorted to give a stable use order in the printer's
+        // output. This makes diffing large sections of SIL significantly easier.
+        llvm::SmallVector<ID, 32> UserIDs;
+        for (auto *Op : V->getUses())
+          UserIDs.push_back(getID(Op->getUser()));
+        std::sort(UserIDs.begin(), UserIDs.end());
+
+        interleave(UserIDs.begin(), UserIDs.end(),
+            [&] (ID id) { *this << id; },
+            [&] { *this << ", "; });
+        *this << '\n';
+      }
+    }
+
     *this << getID(BB);
 
     if (!BB->bbarg_empty()) {

@@ -440,7 +440,7 @@ bb0(%0 : $@callee_owned (@out U) -> ()):
 
 // CHECK-LABEL: sil @callWithAutoclosure
 sil @callWithAutoclosure : $@convention(thin) <T where T : P> (@in T) -> () {
-// CHECK-NEXT: bb0
+// CHECK: bb0
 bb0(%0 : $*T):
   // CHECK: [[STACK:%[0-9a-zA-Z_]+]] = alloc_stack $T
   // CHECK: debug_value_addr

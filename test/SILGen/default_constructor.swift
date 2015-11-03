@@ -34,7 +34,7 @@ class E {
 }
 
 // CHECK-LABEL: sil hidden @_TFC19default_constructor1Ec{{.*}} : $@convention(method) (@owned E) -> @owned E
-// CHECK-NEXT: bb0([[SELFIN:%[0-9]+]] : $E)
+// CHECK: bb0([[SELFIN:%[0-9]+]] : $E)
 // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized
 // CHECK: [[INT64_CTOR:%[0-9]+]] = function_ref @_TFVs5Int64C{{.*}} : $@convention(thin) (@thin Int64.Type) -> Int64
 // CHECK-NEXT: [[INT64:%[0-9]+]] = metatype $@thin Int64.Type
@@ -46,7 +46,7 @@ class E {
 class F : E { }
 
 // CHECK-LABEL: sil hidden @_TFC19default_constructor1Fc{{.*}} : $@convention(method) (@owned F) -> @owned F
-// CHECK-NEXT: bb0([[ORIGSELF:%[0-9]+]] : $F)
+// CHECK: bb0([[ORIGSELF:%[0-9]+]] : $F)
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $F
 // CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself]
 // CHECK-NEXT: store [[ORIGSELF]] to [[SELF]] : $*F

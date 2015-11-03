@@ -445,7 +445,7 @@ func autorelease(o: O) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins15reinterpretCastFTCS_1C1xBw_TBwCS_1DGSqS0__S0__ : $@convention(thin) (@owned C, Builtin.Word) -> @owned (Builtin.Word, D, Optional<C>, C)
-// CHECK-NEXT:  bb0(%0 : $C, %1 : $Builtin.Word):
+// CHECK:       bb0(%0 : $C, %1 : $Builtin.Word):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    strong_retain %0 : $C
@@ -520,7 +520,7 @@ func markDependence(v: Pointer, _ base: ClassProto) -> Pointer {
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins8pinUnpin
-// CHECK-NEXT:  bb0(%0 : $Builtin.NativeObject):
+// CHECK:       bb0(%0 : $Builtin.NativeObject):
 // CHECK-NEXT:    debug_value
 func pinUnpin(object : Builtin.NativeObject) {
 // CHECK-NEXT:    strong_retain %0 : $Builtin.NativeObject
@@ -541,7 +541,7 @@ func pinUnpin(object : Builtin.NativeObject) {
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins19allocateValueBuffer
-// CHECK-NEXT:  bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
+// CHECK:       bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    [[T0:%.*]] = alloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:    [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
@@ -551,7 +551,7 @@ func allocateValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.Raw
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins18projectValueBuffer
-// CHECK-NEXT:  bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
+// CHECK:       bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    [[T0:%.*]] = project_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:    [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
@@ -561,7 +561,7 @@ func projectValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> Builtin.RawP
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins18deallocValueBuffer
-// CHECK-NEXT:  bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
+// CHECK:       bb0([[BUFFER:%.*]] : $*Builtin.UnsafeValueBuffer):
 // CHECK-NEXT:    metatype $@thin Int.Type
 // CHECK-NEXT:    dealloc_value_buffer $Int in [[BUFFER]] : $*Builtin.UnsafeValueBuffer
 // CHECK-NEXT:    tuple ()
@@ -577,7 +577,7 @@ func deallocValueBuffer(inout buffer: Builtin.UnsafeValueBuffer) -> () {
 
 // NativeObject
 // CHECK-LABEL: sil hidden @_TF8builtins8isUnique
-// CHECK-NEXT: bb0(%0 : $*Optional<Builtin.NativeObject>):
+// CHECK: bb0(%0 : $*Optional<Builtin.NativeObject>):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Optional<Builtin.NativeObject>
 // CHECK-NEXT: copy_addr %0 to [initialization] [[BOX]]#1 : $*Optional<Builtin.NativeObject>
 // CHECK: [[BUILTIN:%.*]] = is_unique [[BOX]]#1 : $*Optional<Builtin.NativeObject>
@@ -590,7 +590,7 @@ func isUnique(inout ref: Builtin.NativeObject?) -> Bool {
 
 // NativeObject nonNull
 // CHECK-LABEL: sil hidden @_TF8builtins8isUnique
-// CHECK-NEXT: bb0(%0 : $*Builtin.NativeObject):
+// CHECK: bb0(%0 : $*Builtin.NativeObject):
 // CHECK-NEXT: [[BOX:%.*]] = alloc_box $Builtin.NativeObject
 // CHECK: copy_addr %0 to [initialization] [[BOX]]#1 : $*Builtin.NativeObject
 // CHECK: [[BUILTIN:%.*]] = is_unique [[BOX]]#1 : $*Builtin.NativeObject

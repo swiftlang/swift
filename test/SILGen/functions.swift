@@ -549,7 +549,7 @@ final class r17828355Class {
 
 // The curry thunk for the method should not include a class_method instruction.
 // CHECK-LABEL: sil shared @_TFC9functions14r17828355Class6methodF
-// CHECK-NEXT: bb0(%0 : $r17828355Class):
+// CHECK: bb0(%0 : $r17828355Class):
 // CHECK-NEXT: // function_ref functions.r17828355Class.method (Builtin.Int64) -> ()
 // CHECK-NEXT:  %1 = function_ref @_TFC9functions14r17828355Class6method{{.*}} : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
 // CHECK-NEXT:  partial_apply %1(%0) : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()

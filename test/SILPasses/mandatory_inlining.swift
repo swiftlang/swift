@@ -9,7 +9,7 @@ func foo(x: Float) -> Float {
 }
 
 // CHECK-LABEL: sil hidden @_TF18mandatory_inlining3foo
-// CHECK-NEXT: bb0(%0 : $Float):
+// CHECK: bb0(%0 : $Float):
 // CHECK-NEXT: debug_value %0 : $Float  // let x
 // CHECK-NEXT: return %0
 
@@ -163,7 +163,7 @@ func call_let_auto_closure(@autoclosure let x: () -> Bool) -> Bool {
 }
 
 // CHECK: sil hidden @{{.*}}test_let_auto_closure_with_value_capture
-// CHECK-NEXT: bb0(%0 : $Bool):
+// CHECK: bb0(%0 : $Bool):
 // CHECK-NEXT: debug_value %0 : $Bool
 // CHECK-NEXT: return %0 : $Bool
 

@@ -6,7 +6,7 @@
 struct DoesNotBridgeToObjC {}
 
 // CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation23testAnyObjectToArrayIntFPs9AnyObject_Sb
-// CHECK-NEXT: bb0(%0 : $AnyObject):
+// CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Array<Int>
 // CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]]#1 : $*AnyObject to Array<Int> in [[TARGET]]#1 : $*Array<Int>, bb1, bb2
@@ -16,7 +16,7 @@ func testAnyObjectToArrayInt(a: AnyObject) -> Bool {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation26testAnyObjectToArrayStringFPs9AnyObject_Sb
-// CHECK-NEXT: bb0(%0 : $AnyObject):
+// CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Array<String>
 // CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]]#1 : $*AnyObject to Array<String> in [[TARGET]]#1 : $*Array<String>, bb1, bb2
@@ -36,7 +36,7 @@ func testAnyObjectToArrayNotBridged(a: AnyObject) -> Bool {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation25testAnyObjectToDictionaryFPs9AnyObject_Sb
-// CHECK-NEXT: bb0(%0 : $AnyObject):
+// CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $Dictionary<Int, String>
 // CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]]#1 : $*AnyObject to Dictionary<Int, String> in [[TARGET]]#1 : $*Dictionary<Int, String>, bb1, bb2
@@ -46,7 +46,7 @@ func testAnyObjectToDictionary(a: AnyObject) -> Bool {
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TTSf4g___TF31cast_folding_objc_no_foundation21testAnyObjectToStringFPs9AnyObject_Sb
-// CHECK-NEXT: bb0(%0 : $AnyObject):
+// CHECK: bb0(%0 : $AnyObject):
 // CHECK: [[SOURCE:%.*]] = alloc_stack $AnyObject
 // CHECK: [[TARGET:%.*]] = alloc_stack $String
 // CHECK: checked_cast_addr_br take_always AnyObject in [[SOURCE]]#1 : $*AnyObject to String in [[TARGET]]#1 : $*String, bb1, bb2

@@ -17,7 +17,7 @@ func test3() -> NSObject {
   // CHECK-LABEL: sil shared @_TFCSo5GizmoC{{.*}} : $@convention(thin) (@thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // alloc is implicitly ns_returns_retained
   // init is implicitly ns_consumes_self and ns_returns_retained
-  // CHECK-NEXT: bb0([[GIZMO_META:%[0-9]+]] : $@thick Gizmo.Type):
+  // CHECK: bb0([[GIZMO_META:%[0-9]+]] : $@thick Gizmo.Type):
   // CHECK-NEXT: [[GIZMO_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[GIZMO_META]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
   // CHECK-NEXT: [[GIZMO:%[0-9]+]] = alloc_ref_dynamic [objc] [[GIZMO_META_OBJC]] : $@objc_metatype Gizmo.Type, $Gizmo
   // CHECK-NEXT: // function_ref

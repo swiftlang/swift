@@ -26,7 +26,7 @@ class DerivedClassWithNonTrivialProperties : RootClassWithoutProperties {
 }
 
 // CHECK-LABEL: sil hidden @_TFC14ivar_destroyer36DerivedClassWithNonTrivialPropertiesE
-// CHECK-NEXT:  bb0(%0 : $DerivedClassWithNonTrivialProperties):
+// CHECK:       bb0(%0 : $DerivedClassWithNonTrivialProperties):
 // CHECK-NEXT:    debug_value %0
 // CHECK-NEXT:    [[Z_ADDR:%.*]] = ref_element_addr %0
 // CHECK-NEXT:    destroy_addr [[Z_ADDR]]

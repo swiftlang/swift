@@ -8,7 +8,7 @@ import ansible
 class Hoozit : Gizmo {
   func typical(x: Int, y: Gizmo) -> Gizmo { return y }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozit7typical{{.*}} : $@convention(objc_method) (Int, Gizmo, Hoozit) -> @autoreleased Gizmo {
-  // CHECK-NEXT: bb0([[X:%.*]] : $Int, [[Y:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[X:%.*]] : $Int, [[Y:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[Y]]
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
@@ -21,7 +21,7 @@ class Hoozit : Gizmo {
   // NS_CONSUMES_SELF by inheritance
   override func fork() { }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozit4fork{{.*}} : $@convention(objc_method) (@owned Hoozit) -> () {
-  // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit4fork{{.*}} : $@convention(method) (@guaranteed Hoozit) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[THIS]])
@@ -32,7 +32,7 @@ class Hoozit : Gizmo {
   // NS_CONSUMED 'gizmo' argument by inheritance
   override class func consume(gizmo: Gizmo?) { }
    // CHECK-LABEL: sil hidden [thunk] @_TToZFC11objc_thunks6Hoozit7consume{{.*}} : $@convention(objc_method) (@owned Optional<Gizmo>, @objc_metatype Hoozit.Type) -> () {
-  // CHECK-NEXT: bb0([[GIZMO:%.*]] : $Optional<Gizmo>, [[THIS:%.*]] : $@objc_metatype Hoozit.Type):
+  // CHECK: bb0([[GIZMO:%.*]] : $Optional<Gizmo>, [[THIS:%.*]] : $@objc_metatype Hoozit.Type):
   // CHECK-NEXT: [[THICK_THIS:%[0-9]+]] = objc_to_thick_metatype [[THIS]] : $@objc_metatype Hoozit.Type to $@thick Hoozit.Type
   // CHECK:   [[NATIVE:%.*]] = function_ref @_TZFC11objc_thunks6Hoozit7consume{{.*}} : $@convention(thin) (@owned Optional<Gizmo>, @thick Hoozit.Type) -> ()
   // CHECK-NEXT:   apply [[NATIVE]]([[GIZMO]], [[THICK_THIS]])
@@ -42,7 +42,7 @@ class Hoozit : Gizmo {
   // NS_RETURNS_RETAINED by family (-copy)
   func copyFoo() -> Gizmo { return self }
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozit7copyFoo{{.*}} : $@convention(objc_method) (Hoozit) -> @owned Gizmo
-  // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozit7copyFoo{{.*}} : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
@@ -55,7 +55,7 @@ class Hoozit : Gizmo {
   var typicalProperty: Gizmo
   // -- getter
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
-  // CHECK-NEXT: bb0(%0 : $Hoozit):
+  // CHECK: bb0(%0 : $Hoozit):
   // CHECK-NEXT:   strong_retain %0
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.typicalProperty.getter
   // CHECK-NEXT:   [[GETIMPL:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo
@@ -65,7 +65,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
   
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozitg15typicalPropertyCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
-  // CHECK-NEXT: bb0(%0 : $Hoozit):
+  // CHECK: bb0(%0 : $Hoozit):
   // CHECK-NEXT:   debug_value %0
   // CHECK-NEXT:   [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.typicalProperty {{.*}}
   // CHECK-NEXT:   [[RES:%.*]] = load [[ADDR]] {{.*}}
@@ -74,7 +74,7 @@ class Hoozit : Gizmo {
 
   // -- setter
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
-  // CHECK-NEXT: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[VALUE]] : $Gizmo
   // CHECK-NEXT:   retain [[THIS]] : $Hoozit
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.typicalProperty.setter
@@ -83,7 +83,7 @@ class Hoozit : Gizmo {
   // CHECK_NEXT:   return [[RES]] line:[[@LINE-19]]:7:auto_gen
 
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozits15typicalPropertyCSo5Gizmo
-  // CHECK-NEXT: bb0(%0 : $Gizmo, %1 : $Hoozit):
+  // CHECK: bb0(%0 : $Gizmo, %1 : $Hoozit):
   // CHECK:        [[ADDR:%.*]] = ref_element_addr %1 : {{.*}}, #Hoozit.typicalProperty
   // CHECK-NEXT:   assign %0 to [[ADDR]] : $*Gizmo
 
@@ -91,7 +91,7 @@ class Hoozit : Gizmo {
   var copyProperty: Gizmo
   // -- getter
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC11objc_thunks6Hoozitg12copyPropertyCSo5Gizmo : $@convention(objc_method) (Hoozit) -> @owned Gizmo {
-  // CHECK-NEXT: bb0(%0 : $Hoozit):
+  // CHECK: bb0(%0 : $Hoozit):
   // CHECK-NEXT:   strong_retain %0
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.copyProperty.getter
   // CHECK-NEXT:   [[FR:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg12copyPropertyCSo5Gizmo
@@ -101,7 +101,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: }
 
   // CHECK-LABEL: sil hidden [transparent] @_TFC11objc_thunks6Hoozitg12copyPropertyCSo5Gizmo
-  // CHECK-NEXT: bb0(%0 : $Hoozit):
+  // CHECK: bb0(%0 : $Hoozit):
   // CHECK:        [[ADDR:%.*]] = ref_element_addr %0 : {{.*}}, #Hoozit.copyProperty
   // CHECK-NEXT:   [[RES:%.*]] = load [[ADDR]]
   // CHECK-NEXT:   retain [[RES]] 
@@ -109,7 +109,7 @@ class Hoozit : Gizmo {
 
   // -- setter is normal
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TToFC11objc_thunks6Hoozits12copyPropertyCSo5Gizmo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
-  // CHECK-NEXT: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[VALUE]]
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref objc_thunks.Hoozit.copyProperty.setter
@@ -126,7 +126,7 @@ class Hoozit : Gizmo {
   var roProperty: Gizmo { return self }
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozitg10roPropertyCSo5Gizmo : $@convention(objc_method) (Hoozit) -> @autoreleased Gizmo {
-  // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg10roPropertyCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
@@ -149,7 +149,7 @@ class Hoozit : Gizmo {
 
   // -- setter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozits10rwPropertyCSo5Gizmo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
-  // CHECK-NEXT: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[VALUE]]
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
@@ -167,7 +167,7 @@ class Hoozit : Gizmo {
   }
   // -- getter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozitg14copyRWPropertyCSo5Gizmo : $@convention(objc_method) (Hoozit) -> @owned Gizmo {
-  // CHECK-NEXT: bb0([[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Hoozitg14copyRWPropertyCSo5Gizmo : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
@@ -179,7 +179,7 @@ class Hoozit : Gizmo {
 
   // -- setter is normal
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozits14copyRWPropertyCSo5Gizmo : $@convention(objc_method) (Gizmo, Hoozit) -> () {
-  // CHECK-NEXT: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
+  // CHECK: bb0([[VALUE:%.*]] : $Gizmo, [[THIS:%.*]] : $Hoozit):
   // CHECK-NEXT:   retain [[VALUE]]
   // CHECK-NEXT:   retain [[THIS]]
   // CHECK-NEXT:   // function_ref
@@ -213,7 +213,7 @@ class Hoozit : Gizmo {
   subscript (i: Int) -> Hoozit {
   // Getter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozitg9subscript{{.*}} : $@convention(objc_method) (Int, Hoozit) -> @autoreleased Hoozit
-  // CHECK-NEXT: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $Hoozit):
+  // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $Hoozit):
   // CHECK-NEXT:   strong_retain [[SELF]] : $Hoozit
   // CHECK: [[NATIVE:%[0-9]+]] = function_ref @_TFC11objc_thunks6Hoozitg9subscript{{.*}} : $@convention(method) (Int, @guaranteed Hoozit) -> @owned Hoozit
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[NATIVE]]([[I]], [[SELF]]) : $@convention(method) (Int, @guaranteed Hoozit) -> @owned Hoozit
@@ -225,7 +225,7 @@ class Hoozit : Gizmo {
 
   // Setter
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Hoozits9subscript{{.*}} : $@convention(objc_method) (Hoozit, Int, Hoozit) -> ()
-  // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $Hoozit, [[I:%[0-9]+]] : $Int, [[VALUE:%[0-9]+]] : $Hoozit):
+  // CHECK: bb0([[SELF:%[0-9]+]] : $Hoozit, [[I:%[0-9]+]] : $Int, [[VALUE:%[0-9]+]] : $Hoozit):
   // CHECK-NEXT: strong_retain [[SELF]] : $Hoozit
   // CHECK_NEXT: strong_retain [[VALUE]] : $Hoozit
   // CHECK: [[NATIVE:%[0-9]+]] = function_ref @_TFC11objc_thunks6Hoozits9subscript{{.*}} : $@convention(method) (@owned Hoozit, Int, @guaranteed Hoozit) -> ()
@@ -238,7 +238,7 @@ class Hoozit : Gizmo {
 
 class Wotsit<T> : Gizmo {
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Wotsit5plain{{.*}} : $@convention(objc_method) <T> (Wotsit<T>) -> () {
-  // CHECK-NEXT: bb0([[SELF:%.*]] : $Wotsit<T>):
+  // CHECK: bb0([[SELF:%.*]] : $Wotsit<T>):
   // CHECK-NEXT: strong_retain [[SELF]] : $Wotsit<T>
   // CHECK-NEXT: // function_ref
   // CHECK-NEXT: [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Wotsit5plain{{.*}} : $@convention(method) <τ_0_0> (@guaranteed Wotsit<τ_0_0>) -> ()
@@ -258,7 +258,7 @@ class Wotsit<T> : Gizmo {
   }
 
   // CHECK-LABEL: sil hidden [thunk] @_TToFC11objc_thunks6Wotsitg11descriptionSS : $@convention(objc_method) <T> (Wotsit<T>) -> @autoreleased NSString {
-  // CHECK-NEXT: bb0([[SELF:%.*]] : $Wotsit<T>):
+  // CHECK: bb0([[SELF:%.*]] : $Wotsit<T>):
   // CHECK-NEXT:   strong_retain [[SELF]] : $Wotsit<T>
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Wotsitg11descriptionSS : $@convention(method) <τ_0_0> (@guaranteed Wotsit<τ_0_0>) -> @owned String

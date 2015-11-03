@@ -756,7 +756,7 @@ class C2 : C1 {}
 class C3 : C2 {}
 
 // CHECK-LABEL: sil @upcast_upcast_merge
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: upcast
 // CHECK-NEXT: return
 sil @upcast_upcast_merge : $@convention(thin)(C3) -> C1 {
@@ -1124,7 +1124,7 @@ bb0(%0 : $*E):
 }
 
 // CHECK-LABEL: sil @unchecked_enum_data_of_enum : $@convention(thin) () -> Builtin.Int1 {
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: return
 sil @unchecked_enum_data_of_enum : $@convention(thin) () -> Builtin.Int1 {
@@ -1469,7 +1469,7 @@ bb0:
 /// Global initializers might have side-effects. We cannot delete such unused
 /// calls.
 // CHECK-LABEL: sil @not_dead_global_init_call : $@convention(thin) () -> () {
-// CHECK-NEXT: bb0:
+// CHECK: bb0:
 // CHECK: [[FUN:%.*]] = function_ref
 // CHECK-NEXT: apply [[FUN]]()
 // CHECK-NEXT: tuple
@@ -1483,7 +1483,7 @@ bb0:
 }
 
 // CHECK-LABEL: sil @sub_pointers : $@convention(thin) (Builtin.RawPointer) -> Builtin.Word
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: return
 sil @sub_pointers : $@convention(thin) (Builtin.RawPointer) -> Builtin.Word {
@@ -1497,7 +1497,7 @@ bb0(%0 : $Builtin.RawPointer):
 }
 
 // CHECK-LABEL: sil @sub_same_value : $@convention(thin) (Builtin.RawPointer) -> Builtin.Word
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: integer_literal
 // CHECK-NEXT: return
 sil @sub_same_value : $@convention(thin) (Builtin.RawPointer) -> Builtin.Word {
@@ -1564,7 +1564,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.RawPointer):
 }
 
 // CHECK-LABEL: sil @bitwise_combines : $@convention(thin) (Builtin.NativeObject, Builtin.RawPointer) -> (Optional<Builtin.NativeObject>, Builtin.RawPointer, Optional<Builtin.NativeObject>) {
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: unchecked_bitwise_cast
 // CHECK-NEXT: unchecked_trivial_bit_cast
 // CHECK-NEXT: unchecked_ref_cast
@@ -2446,7 +2446,7 @@ bb3 (%10: $Builtin.Int32):
 }
 
 // CHECK-LABEL: sil @delete_dead_alloc_stack
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil @delete_dead_alloc_stack : $(@inout B) -> () {
@@ -2460,7 +2460,7 @@ bb0(%0 : $*B):
 }
 
 // CHECK-LABEL: sil @delete_dead_alloc_stack2
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: destroy_addr %0
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
@@ -2477,7 +2477,7 @@ bb0(%0 : $*B):
 sil @use_b : $@convention(thin) (@inout B) -> ()
 
 // CHECK-LABEL: sil @dont_delete_dead_alloc_stack
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: copy_addr
 // CHECK: return
@@ -2498,7 +2498,7 @@ protocol someProtocol {
 }
 
 // CHECK-LABEL: sil @witness_archetype
-// CHECK-NEXT: bb0
+// CHECK: bb0
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: init_existential_addr
 // CHECK-NEXT: copy_addr

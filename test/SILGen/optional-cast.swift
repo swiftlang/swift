@@ -117,7 +117,7 @@ func baz(y : AnyObject?) {
 // <rdar://problem/17013042> T! <-> T? conversions should not produce a diamond
 
 // CHECK-LABEL: sil hidden @_TF4main18opt_to_opt_trivialFGSqSi_GSQSi_
-// CHECK-NEXT:  bb0(%0 : $Optional<Int>):
+// CHECK:       bb0(%0 : $Optional<Int>):
 // CHECK-NEXT:  debug_value %0 : $Optional<Int>  // let x
 // CHECK-NEXT:  %2 = unchecked_trivial_bit_cast %0 : $Optional<Int> to $ImplicitlyUnwrappedOptional<Int>
 // CHECK-NEXT:  return %2 : $ImplicitlyUnwrappedOptional<Int>
@@ -127,7 +127,7 @@ func opt_to_opt_trivial(x: Int?) -> Int! {
 }
 
 // CHECK-LABEL: sil hidden @_TF4main20opt_to_opt_referenceFGSQCS_1C_GSqS0__
-// CHECK-NEXT:  bb0(%0 : $ImplicitlyUnwrappedOptional<C>):
+// CHECK:       bb0(%0 : $ImplicitlyUnwrappedOptional<C>):
 // CHECK-NEXT:  debug_value %0 : $ImplicitlyUnwrappedOptional<C>  // let x
 // CHECK-NEXT:  %2 = unchecked_ref_cast %0 : $ImplicitlyUnwrappedOptional<C> to $Optional<C>
 // CHECK-NEXT:  return %2 : $Optional<C>
@@ -135,7 +135,7 @@ func opt_to_opt_trivial(x: Int?) -> Int! {
 func opt_to_opt_reference(x : C!) -> C? { return x }
 
 // CHECK-LABEL: sil hidden @_TF4main22opt_to_opt_addressOnly
-// CHECK-NEXT:  bb0(%0 : $*Optional<T>, %1 : $*ImplicitlyUnwrappedOptional<T>):
+// CHECK:       bb0(%0 : $*Optional<T>, %1 : $*ImplicitlyUnwrappedOptional<T>):
 // CHECK-NEXT:  debug_value_addr %1 : $*ImplicitlyUnwrappedOptional<T>  // let x
 // CHECK-NEXT:  %3 = unchecked_addr_cast %0 : $*Optional<T> to $*ImplicitlyUnwrappedOptional<T>
 // CHECK-NEXT:  copy_addr [take] %1 to [initialization] %3
@@ -147,7 +147,7 @@ public struct TestAddressOnlyStruct<T>  {
   func f(a : T?) {}
   
   // CHECK-LABEL: sil hidden @_TFV4main21TestAddressOnlyStruct8testCall
-  // CHECK-NEXT: bb0(%0 : $*ImplicitlyUnwrappedOptional<T>, %1 : $TestAddressOnlyStruct<T>):
+  // CHECK: bb0(%0 : $*ImplicitlyUnwrappedOptional<T>, %1 : $TestAddressOnlyStruct<T>):
   // CHECK: [[TMPBUF:%.*]] = alloc_stack $Optional<T>
   // CHECK: [[TMPCAST:%.*]] = unchecked_addr_cast [[TMPBUF]]#1
   // CHECK-NEXT: copy_addr %0 to [initialization] [[TMPCAST]]
@@ -158,7 +158,7 @@ public struct TestAddressOnlyStruct<T>  {
 }
 
 // CHECK-LABEL: sil hidden @_TF4main35testContextualInitOfNonAddrOnlyTypeFGSqSi_T_
-// CHECK-NEXT: bb0(%0 : $Optional<Int>):
+// CHECK: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT: debug_value %0 : $Optional<Int>  // let a
 // CHECK-NEXT: %2 = alloc_box $ImplicitlyUnwrappedOptional<Int>  // var x
 // CHECK-NEXT: %3 = unchecked_addr_cast %2#1 : $*ImplicitlyUnwrappedOptional<Int> to $*Optional<Int>
