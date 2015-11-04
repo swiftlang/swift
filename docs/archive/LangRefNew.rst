@@ -1,3 +1,5 @@
+:orphan:
+
 .. @raise litre.TestsAreMissing
 
 ===============================
@@ -8,6 +10,8 @@ Swift Language Reference Manual
 
 Introduction
 ============
+
+.. warning:: This document has not been kept up to date.
 
 .. admonition:: Commentary
 

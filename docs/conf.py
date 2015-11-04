@@ -143,7 +143,7 @@ html_last_updated_fmt = '%Y-%m-%d'
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
-html_additional_pages = {'LangRef': 'LangRef.html'}
+html_additional_pages = {'LangRef': 'archive/LangRef.html'}
 
 # If false, no module index is generated.
 #html_domain_indices = True
