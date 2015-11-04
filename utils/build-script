@@ -97,7 +97,7 @@ def main_normal():
 Use this tool to build, test, and prepare binary distribution archives of Swift
 and related tools.
 
-Builds Swift (and, optionally, SourceKit and LLDB), incrementally, optionally
+Builds Swift (and, optionally, LLDB), incrementally, optionally
 testing it thereafter.  Different build configurations are maintained in
 parallel.""",
         epilog="""
@@ -128,8 +128,8 @@ Environment variables
 This script respects a few environment variables, should you
 choose to set them:
 
-SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift,
-                   and SourceKit.  If this script is located in a Swift
+SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
+                   If this script is located in a Swift
                    source directory, the location of SWIFT_SOURCE_ROOT will be
                    inferred if the variable is not set.
 
@@ -138,7 +138,6 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift,
    $SWIFT_SOURCE_ROOT/llvm
                      /clang
                      /swift
-                     /SourceKit  (optional)
                      /lldb       (optional)
                      /llbuild    (optional)
                      /swiftpm    (optional, requires llbuild)
@@ -150,8 +149,6 @@ Preparing to run this script
 ----------------------------
 
   See README.md for instructions on cloning Swift subprojects.
-
-If you intend to use the -s or --sourcekit options.
 
 If you intend to use the -l, -L, --lldb, or --lldb-debug options.
 
@@ -274,10 +271,6 @@ details of the setups of other systems or automated environments.""")
 
     projects_group = parser.add_argument_group(
         title="Options to select projects")
-    projects_group.add_argument("-s", "--sourcekit",
-        help="build SourceKit",
-        action="store_true",
-        dest="build_sourcekit")
     projects_group.add_argument("-l", "--lldb",
         help="build LLDB",
         action="store_true",
@@ -301,7 +294,7 @@ details of the setups of other systems or automated environments.""")
     build_variant_group.add_argument("-d", "--debug",
         help="""
 build the Debug variant of everything (LLVM, Clang, Swift host tools, target
-Swift standard libraries, SourceKit (if enabled), LLDB (if enabled)
+Swift standard libraries, LLDB (if enabled)
 (default)""",
         action="store_const",
         const="Debug",
@@ -336,11 +329,6 @@ build the Debug variant of the Swift standard library and SDK overlay""",
         action="store_const",
         const="Debug",
         dest="swift_stdlib_build_variant")
-    build_variant_override_group.add_argument("--debug-sourcekit",
-        help="build the Debug variant of SourceKit",
-        action="store_const",
-        const="Debug",
-        dest="sourcekit_build_variant")
     build_variant_override_group.add_argument("--debug-lldb",
         help="build the Debug variant of LLDB",
         action="store_const",
@@ -401,16 +389,6 @@ build the Debug variant of the Swift standard library and SDK overlay""",
         action="store_const",
         const=False,
         dest="swift_stdlib_assertions")
-    assertions_override_group.add_argument("--sourcekit-assertions",
-        help="enable assertions in SourceKit",
-        action="store_const",
-        const=True,
-        dest="sourcekit_assertions")
-    assertions_override_group.add_argument("--no-sourcekit-assertions",
-        help="disable assertions in SourceKit",
-        action="store_const",
-        const=False,
-        dest="sourcekit_assertions")
     assertions_override_group.add_argument("--lldb-assertions",
         help="enable assertions in LLDB",
         action="store_const",
@@ -500,11 +478,6 @@ placed""",
     if (args.cmark_build_variant is not None):
         args.build_cmark = True
 
-    # Build SourceKit if any SourceKit-related options were specified.
-    if (args.sourcekit_build_variant is not None or
-        args.sourcekit_assertions is not None):
-       args.build_sourcekit = True
-
     # Build LLDB if any LLDB-related options were specified.
     if (args.lldb_build_variant is not None or
         args.lldb_assertions is not None):
@@ -527,9 +500,6 @@ placed""",
     if args.swift_stdlib_build_variant is None:
         args.swift_stdlib_build_variant = args.build_variant
 
-    if args.sourcekit_build_variant is None:
-        args.sourcekit_build_variant = args.build_variant
-
     if args.lldb_build_variant is None:
         args.lldb_build_variant = args.build_variant
 
@@ -549,9 +519,6 @@ placed""",
 
     if args.swift_stdlib_assertions is None:
         args.swift_stdlib_assertions = args.assertions
-
-    if args.sourcekit_assertions is None:
-        args.sourcekit_assertions = args.assertions
 
     # Set the default CMake generator.
     if args.cmake_generator is None:
@@ -578,7 +545,6 @@ placed""",
             "--skip-test-cmark",
             "--skip-test-lldb",
             "--skip-test-swift",
-            "--skip-test-sourcekit",
             "--skip-test-llbuild",
             "--skip-test-swiftpm",
             "--skip-test-ios",
@@ -612,12 +578,6 @@ placed""",
         build_script_impl_inferred_args += [
             "--skip-build-watchos",
             "--skip-test-watchos",
-        ]
-
-    if not args.build_sourcekit:
-        build_script_impl_inferred_args += [
-            "--skip-build-sourcekit",
-            "--skip-test-sourcekit"
         ]
 
     if not args.build_lldb:
@@ -659,42 +619,27 @@ placed""",
         if args.swift_stdlib_assertions:
             swift_stdlib_build_dir_label += "Assert"
 
-        sourcekit_build_dir_label = args.sourcekit_build_variant
-        if args.sourcekit_assertions:
-            sourcekit_build_dir_label += "Assert"
-
         # FIXME: mangle LLDB build configuration into the directory name.
         if (llvm_build_dir_label == swift_build_dir_label and
             llvm_build_dir_label == swift_stdlib_build_dir_label and
-            llvm_build_dir_label == cmark_build_dir_label and
-            llvm_build_dir_label == sourcekit_build_dir_label):
+            llvm_build_dir_label == cmark_build_dir_label):
             # Use a simple directory name if all projects use the same build type.
             args.build_subdir += "-" + llvm_build_dir_label
         elif (llvm_build_dir_label != swift_build_dir_label and
             llvm_build_dir_label == swift_stdlib_build_dir_label and
-            llvm_build_dir_label == cmark_build_dir_label and
-            llvm_build_dir_label == sourcekit_build_dir_label):
+            llvm_build_dir_label == cmark_build_dir_label):
             # Swift build type differs.
             args.build_subdir += "-" + llvm_build_dir_label
             args.build_subdir += "+swift-" + swift_build_dir_label
         elif (llvm_build_dir_label == swift_build_dir_label and
             llvm_build_dir_label != swift_stdlib_build_dir_label and
-            llvm_build_dir_label == cmark_build_dir_label and
-            llvm_build_dir_label == sourcekit_build_dir_label):
+            llvm_build_dir_label == cmark_build_dir_label):
             # Swift stdlib build type differs.
             args.build_subdir += "-" + llvm_build_dir_label
             args.build_subdir += "+stdlib-" + swift_stdlib_build_dir_label
         elif (llvm_build_dir_label == swift_build_dir_label and
             llvm_build_dir_label == swift_stdlib_build_dir_label and
-            llvm_build_dir_label == cmark_build_dir_label and
-            llvm_build_dir_label != sourcekit_build_dir_label):
-            # SourceKit build type differs.
-            args.build_subdir += "-" + llvm_build_dir_label
-            args.build_subdir += "+SourceKit-" + swift_stdlib_build_dir_label
-        elif (llvm_build_dir_label == swift_build_dir_label and
-            llvm_build_dir_label == swift_stdlib_build_dir_label and
-            llvm_build_dir_label != cmark_build_dir_label and
-            llvm_build_dir_label == sourcekit_build_dir_label):
+            llvm_build_dir_label != cmark_build_dir_label):
             # cmark build type differs.
             args.build_subdir += "-" + llvm_build_dir_label
             args.build_subdir += "+cmark-" + cmark_build_dir_label
@@ -705,7 +650,6 @@ placed""",
             args.build_subdir += "+llvm-" + llvm_build_dir_label
             args.build_subdir += "+swift-" + swift_build_dir_label
             args.build_subdir += "+stdlib-" + swift_stdlib_build_dir_label
-            args.build_subdir += "+SourceKit-" + sourcekit_build_dir_label
 
     build_dir = os.path.join(SWIFT_BUILD_ROOT, args.build_subdir)
 
@@ -719,12 +663,10 @@ placed""",
         "--llvm-build-type", args.llvm_build_variant,
         "--swift-build-type", args.swift_build_variant,
         "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
-        "--sourcekit-build-type", args.sourcekit_build_variant,
         "--lldb-build-type", args.lldb_build_variant,
         "--llvm-enable-assertions", str(args.llvm_assertions).lower(),
         "--swift-enable-assertions", str(args.swift_assertions).lower(),
         "--swift-stdlib-enable-assertions", str(args.swift_stdlib_assertions).lower(),
-        "--sourcekit-enable-assertions", str(args.sourcekit_assertions).lower(),
         "--cmake-generator", args.cmake_generator,
         "--workspace", SWIFT_SOURCE_ROOT
     ]

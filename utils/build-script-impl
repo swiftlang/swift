@@ -71,8 +71,6 @@ KNOWN_SETTINGS=(
     swift-enable-assertions     "1"              "enable assertions in Swift"
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
-    sourcekit-build-type        "Debug"          "the CMake build variant for SourceKit"
-    sourcekit-enable-assertions "1"              "enable assertions in SourceKit"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     llbuild-enable-assertions   "1"              "enable assertions in llbuild"
@@ -86,7 +84,6 @@ KNOWN_SETTINGS=(
     install-destdir             ""               "the path to use as the filesystem root for the installation"
     install-symroot             ""               "the path to install debug symbols into"
     swift-install-components    ""               "a semicolon-separated list of Swift components to install"
-    sourcekit-install-components ""              "a semicolon-separated list of SourceKit components to install"
     installable-package         ""               "the path to the archive of the installation directory"
     symbols-package             ""               "the path to the archive of the symbols directory"
     show-sdks                   ""               "print installed Xcode and SDK versions"
@@ -111,7 +108,6 @@ KNOWN_SETTINGS=(
     skip-build-watchos          ""               "set to skip building Swift stdlibs for Apple watchOS"
     skip-build-watchos-device   ""               "set to skip building Swift stdlibs for Apple watchOS devices (i.e. build simulators only)"
     skip-build-watchos-simulator ""              "set to skip building Swift stdlibs for Apple watchOS simulators (i.e. build devices only)"
-    skip-build-sourcekit        ""               "set to skip building SourceKit"
     skip-build-lldb             ""               "set to skip building LLDB"
     skip-build-llbuild          ""               "set to skip buildling llbuild"
     skip-build-swiftpm          ""               "set to skip buildling swiftpm"
@@ -127,12 +123,11 @@ KNOWN_SETTINGS=(
     skip-test-tvos-simulator    ""               "set to skip testing Swift stdlibs for tvOS simulators (i.e. test devices only)"
     skip-test-watchos           ""               "set to skip testing Swift stdlibs for Apple watchOS"
     skip-test-watchos-simulator  ""              "set to skip testing Swift stdlibs for Apple watchOS simulators (i.e. test devices only)"
-    skip-test-sourcekit         ""               "set to skip testing SourceKit"
     skip-test-validation        ""               "set to skip validation test suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
     xcode-ide-only              ""               "set to configure Xcode project for IDE use only, not building"
-    workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift, and SourceKit"
+    workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift"
     enable-llvm-assertions      "1"              "set to enable llvm assertions"
     build-llvm                  "1"              "set to 1 to build LLVM and Clang"
     build-swift-tools           "1"              "set to 1 to build Swift host tools"
@@ -152,7 +147,6 @@ KNOWN_SETTINGS=(
     darwin-stdlib-install-name-dir ""            "the directory of the install_name for standard library dylibs"
     install-cmark               ""               "whether to install cmark"
     install-swift               ""               "whether to install Swift"
-    install-sourcekit           ""               "whether to install SourceKit"
     install-lldb                ""               "whether to install LLDB"
     install-llbuild             ""               "whether to install llbuild"
     install-swiftpm             ""               "whether to install swiftpm"
@@ -201,7 +195,6 @@ function set_lldb_build_mode() {
 function set_deployment_target_based_options() {
     llvm_cmake_options=()
     swift_cmake_options=()
-    SourceKit_cmake_options=()
     cmark_cmake_options=()
     swiftpm_bootstrap_options=()
 
@@ -224,10 +217,6 @@ function set_deployment_target_based_options() {
                         -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
                         -DCMAKE_OSX_DEPLOYMENT_TARGET="${cmake_osx_deployment_target}"
                     )
-                    SourceKit_cmake_options=(
-                        -DSOURCEKIT_DEPLOYMENT_OS="macosx"
-                        -DSOURCEKIT_DEPLOYMENT_TARGET="${DARWIN_DEPLOYMENT_VERSION_OSX}"
-                    )
                     swiftpm_bootstrap_options=(
                         --sysroot="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
                     )
@@ -247,10 +236,6 @@ function set_deployment_target_based_options() {
                         -DSWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                         -DSWIFT_HOST_VARIANT_ARCH="i386"
                     )
-                    SourceKit_cmake_options=(
-                        -DSOURCEKIT_DEPLOYMENT_OS="iphonesimulator"
-                        -DSOURCEKIT_DEPLOYMENT_TARGET="${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    )
                     ;;
                 iphonesimulator-x86_64)
                     xcrun_sdk_name="iphonesimulator"
@@ -266,10 +251,6 @@ function set_deployment_target_based_options() {
                         -DSWIFT_HOST_VARIANT="iphonesimulator"
                         -DSWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                         -DSWIFT_HOST_VARIANT_ARCH="x86_64"
-                    )
-                    SourceKit_cmake_options=(
-                        -DSOURCEKIT_DEPLOYMENT_OS="iphonesimulator"
-                        -DSOURCEKIT_DEPLOYMENT_TARGET="${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     )
                     ;;
                 iphoneos-armv7)
@@ -287,10 +268,6 @@ function set_deployment_target_based_options() {
                         -DSWIFT_HOST_VARIANT_SDK="IOS"
                         -DSWIFT_HOST_VARIANT_ARCH="armv7"
                     )
-                    SourceKit_cmake_options=(
-                        -DSOURCEKIT_DEPLOYMENT_OS="iphoneos"
-                        -DSOURCEKIT_DEPLOYMENT_TARGET="${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    )
                     ;;
                 iphoneos-arm64)
                     xcrun_sdk_name="iphoneos"
@@ -306,10 +283,6 @@ function set_deployment_target_based_options() {
                         -DSWIFT_HOST_VARIANT="iphoneos"
                         -DSWIFT_HOST_VARIANT_SDK="IOS"
                         -DSWIFT_HOST_VARIANT_ARCH="arm64"
-                    )
-                    SourceKit_cmake_options=(
-                        -DSOURCEKIT_DEPLOYMENT_OS="iphoneos"
-                        -DSOURCEKIT_DEPLOYMENT_TARGET="${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     )
                     ;;
                 appletvsimulator-x86_64)
@@ -327,10 +300,6 @@ function set_deployment_target_based_options() {
                         -DSWIFT_HOST_VARIANT_SDK="TVOS_SIMULATOR"
                         -DSWIFT_HOST_VARIANT_ARCH="x86_64"
                     )
-                    SourceKit_cmake_options=(
-                        -DSOURCEKIT_DEPLOYMENT_OS="appletvsimulator"
-                        -DSOURCEKIT_DEPLOYMENT_TARGET="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
-                    )
                     ;;
                 appletvos-arm64)
                     xcrun_sdk_name="appletvos"
@@ -346,10 +315,6 @@ function set_deployment_target_based_options() {
                         -DSWIFT_HOST_VARIANT="appletvos"
                         -DSWIFT_HOST_VARIANT_SDK="TVOS"
                         -DSWIFT_HOST_VARIANT_ARCH="arm64"
-                    )
-                    SourceKit_cmake_options=(
-                        -DSOURCEKIT_DEPLOYMENT_OS="appletvos"
-                        -DSOURCEKIT_DEPLOYMENT_TARGET="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                     )
                     ;;
                 watchsimulator-i386)
@@ -367,10 +332,6 @@ function set_deployment_target_based_options() {
                         -DSWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
                         -DSWIFT_HOST_VARIANT_ARCH="i386"
                     )
-                    SourceKit_cmake_options=(
-                        -DSOURCEKIT_DEPLOYMENT_OS="watchsimulator"
-                        -DSOURCEKIT_DEPLOYMENT_TARGET="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-                    )
                     ;;
                 watchos-armv7k)
                     xcrun_sdk_name="watchos"
@@ -386,10 +347,6 @@ function set_deployment_target_based_options() {
                         -DSWIFT_HOST_VARIANT="watchos"
                         -DSWIFT_HOST_VARIANT_SDK="WATCHOS"
                         -DSWIFT_HOST_VARIANT_ARCH="armv7k"
-                    )
-                    SourceKit_cmake_options=(
-                        -DSOURCEKIT_DEPLOYMENT_OS="watchos"
-                        -DSOURCEKIT_DEPLOYMENT_TARGET="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
                     )
                     ;;
                 *)
@@ -410,10 +367,6 @@ function set_deployment_target_based_options() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_IOS="${DARWIN_DEPLOYMENT_VERSION_IOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-            )
-            SourceKit_cmake_options=(
-                "${SourceKit_cmake_options[@]}"
-                -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk $xcrun_sdk_name --show-sdk-path)"
             )
 
             if [[ "${llvm_target_arch}" ]] ; then
@@ -559,7 +512,6 @@ if [[ "$SKIP_BUILD" ]]; then
     SKIP_BUILD_WATCHOS=1
     SKIP_BUILD_WATCHOS_DEVICE=1
     SKIP_BUILD_WATCHOS_SIMULATOR=1
-    SKIP_BUILD_SOURCEKIT=1
     SKIP_BUILD_LLDB=1
     SKIP_BUILD_LLBUILD=1
     SKIP_BUILD_SWIFTPM=1
@@ -851,7 +803,6 @@ NINJA_SOURCE_DIR="$WORKSPACE/ninja"
 SWIG_SOURCE_DIR="$WORKSPACE/swig"
 SWIFT_SOURCE_DIR="$WORKSPACE/swift"
 LLVM_SOURCE_DIR="$WORKSPACE/llvm"
-SOURCEKIT_SOURCE_DIR="$WORKSPACE/SourceKit"
 CMARK_SOURCE_DIR="$WORKSPACE/cmark"
 LLDB_SOURCE_DIR="$WORKSPACE/lldb"
 LLBUILD_SOURCE_DIR="$WORKSPACE/llbuild"
@@ -899,9 +850,6 @@ if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
 fi
 
 PRODUCTS=(cmark llvm swift)
-if [[ ! "${SKIP_BUILD_SOURCEKIT}" ]] ; then
-     PRODUCTS=("${PRODUCTS[@]}" SourceKit)
-fi
 if [[ ! "${SKIP_BUILD_SWIG}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" swig)
 fi
@@ -1114,9 +1062,6 @@ function build_directory_bin() {
             swift)
                 echo "${root}/${SWIFT_BUILD_TYPE}/bin"
                 ;;
-            SourceKit)
-                echo "${root}/${SOURCEKIT_BUILD_TYPE}/bin"
-                ;;
             swig)
                 echo "${root}"
                 ;;
@@ -1199,13 +1144,6 @@ function swift_c_flags() {
     fi
 }
 
-function SourceKit_c_flags() {
-    echo -n " $(common_cross_c_flags $1)"
-    if [[ $(is_cmake_release_build_type "${SOURCEKIT_BUILD_TYPE}") ]] ; then
-        echo -n " -fno-stack-protector"
-    fi
-}
-
 function cmake_config_opt() {
     product=$1
     if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
@@ -1220,9 +1158,6 @@ function cmake_config_opt() {
                 ;;
             swift)
                 echo "--config ${SWIFT_BUILD_TYPE}"
-                ;;
-            SourceKit)
-                echo "--config ${SOURCEKIT_BUILD_TYPE}"
                 ;;
             swig)
                 ;;
@@ -1320,9 +1255,9 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
     fi
 
     if [[ "${ENABLE_ASAN}" ]] ; then
-        SourceKit_cmake_options=(
-            "${SourceKit_cmake_options[@]}"
-            -DSOURCEKIT_USE_INPROC_LIBRARY:BOOL=TRUE
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
+            -DSWIFT_SOURCEKIT_USE_INPROC_LIBRARY:BOOL=TRUE
         )
     fi
 
@@ -1381,7 +1316,8 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
         PRODUCT=$(toupper $product)
         llvm_build_dir=$(build_directory $deployment_target llvm)
         module_cache="${build_dir}/module-cache"
-        swift_and_sourcekit_cmake_options=(
+        swift_cmake_options=(
+            "${swift_cmake_options[@]}"
             -DCMAKE_INSTALL_PREFIX:PATH="${INSTALL_PREFIX}"
             -DLLVM_CONFIG:PATH="$(build_directory_bin $deployment_target llvm)/llvm-config"
             -D${PRODUCT}_PATH_TO_CLANG_SOURCE:PATH="${CLANG_SOURCE_DIR}"
@@ -1394,13 +1330,13 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
         )
 
         if [[ "${CMAKE_GENERATOR}" != "Ninja" ]] ; then
-            swift_and_sourcekit_cmake_options=(
-                "${swift_and_sourcekit_cmake_options[@]-}"
+            swift_cmake_options=(
+                "${swift_cmake_options[@]-}"
                 -D${PRODUCT}_CMARK_LIBRARY_DIR:PATH=$(build_directory $deployment_target cmark)/src/$CMARK_BUILD_TYPE
             )
         else
-            swift_and_sourcekit_cmake_options=(
-                "${swift_and_sourcekit_cmake_options[@]-}"
+            swift_cmake_options=(
+                "${swift_cmake_options[@]-}"
                 -D${PRODUCT}_CMARK_LIBRARY_DIR:PATH=$(build_directory $deployment_target cmark)/src
             )
         fi
@@ -1424,13 +1360,13 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 fi
                 if [ "${SKIP_BUILD_LLVM}" ] ; then
                     # We can't skip the build completely because the standalone
-                    # build of Swift and SourceKit depend on these.
+                    # build of Swift depend on these.
                     build_targets=(llvm-config llvm-tblgen clang-headers)
                 fi
 
-                # Note: we set the two variables:
+                # Note: we set the variable:
                 #
-                # LLVM_TOOL_{SWIFT,SOURCEKIT}_BUILD
+                # LLVM_TOOL_SWIFT_BUILD
                 #
                 # below because this script builds swift separately, and people
                 # often have reasons to symlink the swift directory into
@@ -1442,7 +1378,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLVM_ENABLE_ASSERTIONS}")
                     -DLLVM_TOOL_SWIFT_BUILD:BOOL=NO
-                    -DLLVM_TOOL_SOURCEKIT_BUILD:BOOL=NO
                     -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}"
                     -DLLVM_INCLUDE_TESTS:BOOL=$(true_false "${SOURCE_TREE_INCLUDES_TESTS}")
                     -LLVM_INCLUDE_DOCS:BOOL=TRUE
@@ -1538,7 +1473,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                     -DSWIFT_INCLUDE_TESTS:BOOL=$(true_false "${build_tests_this_time}")
                     -DSWIFT_INSTALL_COMPONENTS:STRING="${SWIFT_INSTALL_COMPONENTS}"
                     -DSWIFT_EMBED_BITCODE_SECTION:BOOL=$(true_false "${EMBED_BITCODE_SECTION}")
-                    "${swift_and_sourcekit_cmake_options[@]}"
                     "${swift_cmake_options[@]}"
                     "${SWIFT_SOURCE_DIR}"
                 )
@@ -1558,39 +1492,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
 
                 build_targets=(all "${SWIFT_STDLIB_TARGETS[@]}")
                 skip_build=$SKIP_BUILD_SWIFT
-                ;;
-
-            SourceKit)
-                swift_build_dir=$(build_directory $deployment_target swift)
-                cmake_options=(
-                    "${COMMON_CMAKE_OPTIONS[@]}"
-                    "${swift_and_sourcekit_cmake_options[@]}"
-                    -DCMAKE_C_FLAGS="$(SourceKit_c_flags $deployment_target)"
-                    -DCMAKE_CXX_FLAGS="$(SourceKit_c_flags $deployment_target)"
-                    -DCMAKE_BUILD_TYPE:STRING="${SOURCEKIT_BUILD_TYPE}"
-                    -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SOURCEKIT_ENABLE_ASSERTIONS}")
-                    -DSOURCEKIT_INCLUDE_TESTS:BOOL=$(true_false "${SOURCE_TREE_INCLUDES_TESTS}")
-                    -DSOURCEKIT_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                    -DSOURCEKIT_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                    -DSOURCEKIT_INSTALL_COMPONENTS:STRING="${SOURCEKIT_INSTALL_COMPONENTS}"
-                    "${SourceKit_cmake_options[@]}"
-                    "${SOURCEKIT_SOURCE_DIR}"
-                )
-
-                if [[ $(is_cross_tools_deployment_target $deployment_target) ]] ; then
-                    # FIXME: don't hardcode macosx-x86_64.
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        -DSOURCEKIT_NATIVE_LLVM_TOOLS_PATH=$(build_directory macosx-x86_64 llvm)/bin
-                        -DLLVM_TOOLS_BINARY_DIR=$(build_directory $deployment_target llvm)/bin
-                        -DLLVM_LIBRARY_DIR=$(build_directory $deployment_target llvm)/lib
-                        -DLLVM_MAIN_INCLUDE_DIR=$(build_directory $deployment_target llvm)/include
-                        -DLLVM_BINARY_DIR=$(build_directory $deployment_target llvm)
-                        -DLLVM_MAIN_SRC_DIR="${LLVM_SOURCE_DIR}"
-                    )
-                fi
-
-                skip_build=$SKIP_BUILD_SOURCEKIT
                 ;;
 
             swig)
@@ -1805,13 +1706,6 @@ for deployment_target in "${STDLIB_DEPLOYMENT_TARGETS[@]}"; do
                 fi
                 executable_target=SwiftUnitTests
                 results_targets=("${SWIFT_TEST_TARGETS[@]}")
-                ;;
-            SourceKit)
-                if [[ "$SKIP_TEST_SOURCEKIT" ]]; then
-                    continue
-                fi
-                executable_target="SourceKitUnitTests"
-                results_targets=(check-SourceKit)
                 if [[ "$STRESS_TEST_SOURCEKIT" ]]; then
                     results_targets=(
                         "${results_targets[@]}"
@@ -1933,11 +1827,6 @@ for deployment_target in "${NATIVE_TOOLS_DEPLOYMENT_TARGETS[@]}" "${CROSS_TOOLS_
                 ;;
             swift)
                 if [[ -z "${INSTALL_SWIFT}" ]] ; then
-                    continue
-                fi
-                ;;
-            SourceKit)
-                if [[ -z "${INSTALL_SOURCEKIT}" ]] ; then
                     continue
                 fi
                 ;;
