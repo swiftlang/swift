@@ -2207,7 +2207,7 @@ public func nth<C: Collection>(x: C, _ n: Int) -> C.Iterator.Element {
 }
 
 public func checkRangeReplaceable<
-  C: RangeReplaceableCollectionType,
+  C: RangeReplaceableCollection,
   N: Collection
   where
   C.Iterator.Element : Equatable,
@@ -3433,15 +3433,15 @@ public struct ${Self}<T> : ${'MutableCollection' if mutable else 'Collection'} {
 % end
 
 //===----------------------------------------------------------------------===//
-// Minimal***RangeReplaceableCollectionType
+// Minimal***RangeReplaceableCollection
 //===----------------------------------------------------------------------===//
 
 % for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-%   Protocol = 'Strict%sRangeReplaceableCollectionType' % traversal
+%   Protocol = 'Strict%sRangeReplaceableCollection' % traversal
 %   Self = 'Minimal%sRangeReplaceableCollection' % traversal
 %   Index = 'Minimal%sIndex' % traversal
 
-public protocol ${Protocol} : RangeReplaceableCollectionType {
+public protocol ${Protocol} : RangeReplaceableCollection {
   typealias Element
   init(base: ${Self}<Element>)
   var base: ${Self}<Element> { get set }
@@ -3487,9 +3487,9 @@ extension ${Protocol} where Index : _MinimalIndexType {
   }
 }
 
-/// A minimal implementation of `RangeReplaceableCollectionType` with extra
+/// A minimal implementation of `RangeReplaceableCollection` with extra
 /// checks.
-public struct ${Self}<T> : RangeReplaceableCollectionType {
+public struct ${Self}<T> : RangeReplaceableCollection {
   /// Creates a collection with given contents, but a unique modification
   /// history.  No other instance has the same modification history.
   public init<S : SequenceType where S.Iterator.Element == T>(
@@ -3850,7 +3850,7 @@ public struct Defaulted${traversal}MutableCollection<Element>
 }
 
 public struct Defaulted${traversal}RangeReplaceableCollection<Element>
-  : Strict${traversal}RangeReplaceableCollectionType {
+  : Strict${traversal}RangeReplaceableCollection {
 
   public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>
   public typealias Iterator = MinimalIterator<Element>
@@ -3876,7 +3876,7 @@ public struct Defaulted${traversal}RangeReplaceableCollection<Element>
 }
 
 public struct Defaulted${traversal}RangeReplaceableSlice<Element>
-  : RangeReplaceableCollectionType {
+  : RangeReplaceableCollection {
 
   public typealias Self_ = Defaulted${traversal}RangeReplaceableSlice<Element>
   public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>

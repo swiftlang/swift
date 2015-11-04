@@ -331,7 +331,7 @@ let appendContentsOfTests: [AppendContentsOfTest] = [
 ]
 
 extension TestSuite {
-  /// Adds a set of tests for `RangeReplaceableCollectionType`.
+  /// Adds a set of tests for `RangeReplaceableCollection`.
   ///
   /// - parameter makeCollection: a factory function that creates a collection
   ///   instance with provided elements.
@@ -340,8 +340,8 @@ extension TestSuite {
   ///   constructed using APIs in the protocol (for example, `Array`s that wrap
   ///   `NSArray`s).
   public func addForwardRangeReplaceableCollectionTests<
-    C : RangeReplaceableCollectionType,
-    CollectionWithEquatableElement : RangeReplaceableCollectionType
+    C : RangeReplaceableCollection,
+    CollectionWithEquatableElement : RangeReplaceableCollection
     where
     C.SubSequence : Collection,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
@@ -973,7 +973,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
       expected: [ 1010, 2020, 3030, 4040, 5050, 6060, 7070 ]),
   ]
 
-  // RangeReplaceableCollectionType + SequenceType
+  // RangeReplaceableCollection + SequenceType
   for test in tests {
     let lhs = makeWrappedCollection(test.lhs)
     let rhs = MinimalSequence(elements: test.rhs.map(wrapValue))
@@ -990,7 +990,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
       stackTrace: SourceLocStack().with(test.loc))
   }
 
-  // SequenceType + RangeReplaceableCollectionType
+  // SequenceType + RangeReplaceableCollection
   for test in tests {
     let lhs = MinimalSequence(elements: test.lhs.map(wrapValue))
     let rhs = makeWrappedCollection(test.rhs)
@@ -1007,7 +1007,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
       stackTrace: SourceLocStack().with(test.loc))
   }
 
-  // RangeReplaceableCollectionType + Collection
+  // RangeReplaceableCollection + Collection
   for test in tests {
     let lhs = makeWrappedCollection(test.lhs)
     let rhs = MinimalForwardCollection(elements: test.rhs.map(wrapValue))
@@ -1028,7 +1028,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
       stackTrace: SourceLocStack().with(test.loc))
   }
 
-  // RangeReplaceableCollectionType + same RangeReplaceableCollectionType
+  // RangeReplaceableCollection + same RangeReplaceableCollection
   for test in tests {
     let lhs = makeWrappedCollection(test.lhs)
     let rhs = makeWrappedCollection(test.rhs)
@@ -1049,7 +1049,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
       stackTrace: SourceLocStack().with(test.loc))
   }
 
-  // RangeReplaceableCollectionType + MinimalForwardRangeReplaceableCollection
+  // RangeReplaceableCollection + MinimalForwardRangeReplaceableCollection
   for test in tests {
     let lhs = makeWrappedCollection(test.lhs)
     let rhs = MinimalForwardRangeReplaceableCollection(
@@ -1071,7 +1071,7 @@ self.test("\(testNamePrefix).OperatorPlus") {
       stackTrace: SourceLocStack().with(test.loc))
   }
 
-  // MinimalForwardRangeReplaceableCollection + RangeReplaceableCollectionType
+  // MinimalForwardRangeReplaceableCollection + RangeReplaceableCollection
   for test in tests {
     let lhs = MinimalForwardRangeReplaceableCollection(
       elements: test.lhs.map(wrapValue))
@@ -1099,8 +1099,8 @@ self.test("\(testNamePrefix).OperatorPlus") {
   } // addForwardRangeReplaceableCollectionTests
 
   public func addBidirectionalRangeReplaceableCollectionTests<
-    C : RangeReplaceableCollectionType,
-    CollectionWithEquatableElement : RangeReplaceableCollectionType
+    C : RangeReplaceableCollection,
+    CollectionWithEquatableElement : RangeReplaceableCollection
     where
     C.Index : BidirectionalIndexType,
     C.SubSequence : Collection,
@@ -1226,8 +1226,8 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
   } // addBidirectionalRangeReplaceableCollectionTests
 
   public func addRandomAccessRangeReplaceableCollectionTests<
-    C : RangeReplaceableCollectionType,
-    CollectionWithEquatableElement : RangeReplaceableCollectionType
+    C : RangeReplaceableCollection,
+    CollectionWithEquatableElement : RangeReplaceableCollection
     where
     C.Index : RandomAccessIndexType,
     C.SubSequence : Collection,

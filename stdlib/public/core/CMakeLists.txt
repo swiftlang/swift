@@ -77,7 +77,7 @@ set(SWIFTLIB_ESSENTIAL
   REPL.swift
   Range.swift
   RangeMirrors.swift.gyb
-  RangeReplaceableCollectionType.swift
+  RangeReplaceableCollection.swift
   Reflection.swift
   Repeat.swift
   Reverse.swift

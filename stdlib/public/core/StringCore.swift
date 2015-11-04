@@ -568,7 +568,7 @@ extension _StringCore : Collection {
   }
 }
 
-extension _StringCore : RangeReplaceableCollectionType {
+extension _StringCore : RangeReplaceableCollection {
 
   /// Replace the given `subRange` of elements with `newElements`.
   ///

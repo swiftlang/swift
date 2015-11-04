@@ -12,7 +12,7 @@
 
 public // @testable
 protocol _ArrayType
-  : RangeReplaceableCollectionType,
+  : RangeReplaceableCollection,
     MutableSliceable,
     ArrayLiteralConvertible
 {

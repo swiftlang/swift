@@ -260,7 +260,7 @@ extension String.CharacterView : Collection {
   }
 }
 
-extension String.CharacterView : RangeReplaceableCollectionType {
+extension String.CharacterView : RangeReplaceableCollection {
   /// Create an empty instance.
   public init() {
     self.init("")

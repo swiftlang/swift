@@ -1,4 +1,4 @@
-//===--- RangeReplaceableCollectionType.swift -----------------*- swift -*-===//
+//===--- RangeReplaceableCollection.swift ---------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,7 +16,7 @@
 
 /// A *collection* that supports replacement of an arbitrary subRange
 /// of elements with the elements of another collection.
-public protocol RangeReplaceableCollectionType : Collection {
+public protocol RangeReplaceableCollection : Collection {
   //===--- Fundamental Requirements ---------------------------------------===//
 
   /// Create an empty instance.
@@ -58,7 +58,7 @@ public protocol RangeReplaceableCollectionType : Collection {
   >(_: Self, _: S) -> Self
 
   func +<
-    RC : RangeReplaceableCollectionType
+    RC : RangeReplaceableCollection
     where RC.Iterator.Element == Iterator.Element
   >(_: Self, _: S) -> Self
 */
@@ -177,10 +177,10 @@ public protocol RangeReplaceableCollectionType : Collection {
 }
 
 //===----------------------------------------------------------------------===//
-// Default implementations for RangeReplaceableCollectionType
+// Default implementations for RangeReplaceableCollection
 //===----------------------------------------------------------------------===//
 
-extension RangeReplaceableCollectionType {
+extension RangeReplaceableCollection {
   public init<
     S : SequenceType where S.Iterator.Element == Iterator.Element
   >(_ elements: S) {
@@ -252,7 +252,7 @@ extension RangeReplaceableCollectionType {
   public mutating func reserveCapacity(n: Index.Distance) {}
 }
 
-extension RangeReplaceableCollectionType where SubSequence == Self {
+extension RangeReplaceableCollection where SubSequence == Self {
   /// Remove the element at `startIndex` and return it.
   ///
   /// - Complexity: O(1)
@@ -277,7 +277,7 @@ extension RangeReplaceableCollectionType where SubSequence == Self {
   }
 }
 
-extension RangeReplaceableCollectionType {
+extension RangeReplaceableCollection {
   @warn_unused_result
   public mutating func _customRemoveLast() -> Iterator.Element? {
     return nil
@@ -289,7 +289,7 @@ extension RangeReplaceableCollectionType {
   }
 }
 
-extension RangeReplaceableCollectionType
+extension RangeReplaceableCollection
   where
   Index : BidirectionalIndexType,
   SubSequence == Self {
@@ -308,7 +308,7 @@ extension RangeReplaceableCollectionType
   }
 }
 
-extension RangeReplaceableCollectionType where Index : BidirectionalIndexType {
+extension RangeReplaceableCollection where Index : BidirectionalIndexType {
   /// Remove an element from the end.
   ///
   /// - Complexity: O(1)
@@ -340,7 +340,7 @@ extension RangeReplaceableCollectionType where Index : BidirectionalIndexType {
 
 @warn_unused_result
 public func +<
-    C : RangeReplaceableCollectionType,
+    C : RangeReplaceableCollection,
     S : SequenceType
     where S.Iterator.Element == C.Iterator.Element
 >(lhs: C, rhs: S) -> C {
@@ -352,7 +352,7 @@ public func +<
 
 @warn_unused_result
 public func +<
-  C : RangeReplaceableCollectionType,
+  C : RangeReplaceableCollection,
   S : SequenceType
   where S.Iterator.Element == C.Iterator.Element
 >(lhs: S, rhs: C) -> C {
@@ -365,7 +365,7 @@ public func +<
 
 @warn_unused_result
 public func +<
-  C : RangeReplaceableCollectionType,
+  C : RangeReplaceableCollection,
   S : Collection
   where S.Iterator.Element == C.Iterator.Element
 >(lhs: C, rhs: S) -> C {
@@ -378,8 +378,8 @@ public func +<
 
 @warn_unused_result
 public func +<
-  RRC1 : RangeReplaceableCollectionType,
-  RRC2 : RangeReplaceableCollectionType
+  RRC1 : RangeReplaceableCollection,
+  RRC2 : RangeReplaceableCollection
   where RRC1.Iterator.Element == RRC2.Iterator.Element
 >(lhs: RRC1, rhs: RRC2) -> RRC1 {
   var lhs = lhs

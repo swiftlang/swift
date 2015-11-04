@@ -250,7 +250,7 @@ extension String {
   }
 }
 
-extension String.UnicodeScalarView : RangeReplaceableCollectionType {
+extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// Construct an empty instance.
   public init() {
     self = String.UnicodeScalarView(_StringCore())

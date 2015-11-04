@@ -11,11 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 extension TestSuite {
-  /// Adds a set of tests for `RangeReplaceableCollectionType` that is also a
+  /// Adds a set of tests for `RangeReplaceableCollection` that is also a
   /// slice type.
   public func addForwardRangeReplaceableSliceTests<
-    C : RangeReplaceableCollectionType,
-    CollectionWithEquatableElement : RangeReplaceableCollectionType
+    C : RangeReplaceableCollection,
+    CollectionWithEquatableElement : RangeReplaceableCollection
     where
     C.SubSequence == C,
     CollectionWithEquatableElement.Iterator.Element : Equatable
@@ -143,8 +143,8 @@ extension TestSuite {
   } // addForwardRangeReplaceableSliceTests
 
   public func addBidirectionalRangeReplaceableSliceTests<
-    C : RangeReplaceableCollectionType,
-    CollectionWithEquatableElement : RangeReplaceableCollectionType
+    C : RangeReplaceableCollection,
+    CollectionWithEquatableElement : RangeReplaceableCollection
     where
     C.Index : BidirectionalIndexType,
     C.SubSequence == C,
@@ -284,13 +284,13 @@ extension TestSuite {
       c.removeLast(3) // Should trap.
     }
 
-    //===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
   } // addBidirectionalRangeReplaceableSliceTests
 
   public func addRandomAccessRangeReplaceableSliceTests<
-    C : RangeReplaceableCollectionType,
-    CollectionWithEquatableElement : RangeReplaceableCollectionType
+    C : RangeReplaceableCollection,
+    CollectionWithEquatableElement : RangeReplaceableCollection
     where
     C.Index : RandomAccessIndexType,
     C.SubSequence == C,
