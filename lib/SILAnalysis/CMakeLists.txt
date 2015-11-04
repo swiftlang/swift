@@ -16,4 +16,5 @@ add_swift_library(swiftSILAnalysis
   EscapeAnalysis.cpp
   LoopRegionAnalysis.cpp
   MemoryBehavior.cpp
+  RCIdentityAnalysis.cpp
   LINK_LIBRARIES swiftSILPassesUtils)
