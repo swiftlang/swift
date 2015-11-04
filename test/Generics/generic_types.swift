@@ -66,7 +66,8 @@ struct GenericReq<
   T : GeneratorType, U : GeneratorType where T.Element == U.Element
 > {}
 
-func getFirst<R : GeneratorType>(var r: R) -> R.Element {
+func getFirst<R : GeneratorType>(r: R) -> R.Element {
+  var r = r
   return r.next()!
 }
 

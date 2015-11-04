@@ -141,8 +141,10 @@ struct SubscriptC1 : SubscriptP1 {
   func writeAt(i: Int, string: String) { }
 }
 
-func testSubscriptP1(var ss1: SubscriptS1, var sc1: SubscriptC1,
+func testSubscriptP1(ss1: SubscriptS1, sc1: SubscriptC1,
                      i: Int, s: String) {
+  var ss1 = ss1
+  var sc1 = sc1
   _ = ss1[i]
   ss1[i] = s
 

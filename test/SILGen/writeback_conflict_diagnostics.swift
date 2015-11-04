@@ -67,7 +67,8 @@ func testComputedStructWithProperty() {
 
 var global_array : [[Int]]
 
-func testMultiArray(i : Int, j : Int, var array : [[Int]]) {
+func testMultiArray(i : Int, j : Int, array : [[Int]]) {
+  var array = array
   swap(&array[i][j],
        &array[i][i])
   swap(&array[0][j],
@@ -93,8 +94,9 @@ struct ArrayWithoutAddressors<T> {
 var global_array_without_addressors: ArrayWithoutAddressors<ArrayWithoutAddressors<Int>>
 
 func testMultiArrayWithoutAddressors(
-  i: Int, j: Int, var array: ArrayWithoutAddressors<ArrayWithoutAddressors<Int>>
+  i: Int, j: Int, array: ArrayWithoutAddressors<ArrayWithoutAddressors<Int>>
 ) {
+  var array = array
   swap(&array[i][j],  // expected-note  {{concurrent writeback occurred here}}
        &array[i][i])  // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
   swap(&array[0][j],  // expected-note  {{concurrent writeback occurred here}}

@@ -61,8 +61,10 @@ func countIf<
 
 func equal<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
                                            R1.Element == R2.Element>
-       (var range1 : R1, var range2 : R2) -> Bool {
+       (range1 : R1, range2 : R2) -> Bool {
 
+  var range1 = range1
+  var range2 = range2
   var e1 = range1.next()
   var e2 = range2.next()
     
@@ -77,8 +79,10 @@ func equal<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
 }
 
 func equalIf<R1 : GeneratorType, R2 : GeneratorType>
-       (var range1 : R1, var range2 : R2,
+       (range1 : R1, range2 : R2,
         predicate : (R1.Element, R2.Element)-> Bool) -> Bool {
+  var range1 = range1
+  var range2 = range2
   var e1 = range1.next()
   var e2 = range2.next()
     
@@ -94,7 +98,9 @@ func equalIf<R1 : GeneratorType, R2 : GeneratorType>
 
 func mismatch<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
                                               R1.Element == R2.Element>
-       (var range1 : R1, var range2 : R2) -> (R1, R2) {
+       (range1 : R1, range2 : R2) -> (R1, R2) {
+  var range1 = range1
+  var range2 = range2
   var prev1 = range1, prev2 = range2
 
   while true {
@@ -109,8 +115,10 @@ func mismatch<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
 }
 
 func mismatchIf<R1 : GeneratorType, R2 : GeneratorType>
-       (var range1 : R1, var range2 : R2,
+       (range1 : R1, range2 : R2,
         predicate : (R1.Element, R2.Element) -> Bool) -> (R1, R2) {
+  var range1 = range1
+  var range2 = range2
   var prev1 = range1, prev2 = range2
 
   while true {
@@ -124,8 +132,9 @@ func mismatchIf<R1 : GeneratorType, R2 : GeneratorType>
   return (prev1, prev2)
 }
 
-func minElement<R : GeneratorType where R.Element : Comparable>(var range: R)
+func minElement<R : GeneratorType where R.Element : Comparable>(range: R)
        -> R.Element {
+  var range = range
   var result = range.next()!
   for next in GeneratorSequence(range) {
     if next < result {
@@ -135,8 +144,9 @@ func minElement<R : GeneratorType where R.Element : Comparable>(var range: R)
   return result
 }
 
-func maxElement<R : GeneratorType where R.Element : Comparable>(var range: R)
+func maxElement<R : GeneratorType where R.Element : Comparable>(range: R)
        -> R.Element {
+  var range = range
   var result = range.next()!
   for next in GeneratorSequence(range) {
     if next > result {
@@ -146,8 +156,9 @@ func maxElement<R : GeneratorType where R.Element : Comparable>(var range: R)
   return result
 }
 
-func minMaxElement<R : GeneratorType where R.Element : Comparable>(var range: R)
+func minMaxElement<R : GeneratorType where R.Element : Comparable>(range: R)
        -> (R.Element, R.Element) {
+  var range = range
   var min = range.next()!, max = min
   for next in GeneratorSequence(range) {
     if next < min { min = next }

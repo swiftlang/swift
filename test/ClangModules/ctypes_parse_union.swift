@@ -2,7 +2,8 @@
 
 import ctypes
 
-func useStructWithUnion(var vec: GLKVector4) -> GLKVector4 {
+func useStructWithUnion(vec: GLKVector4) -> GLKVector4 {
+  var vec = vec
   _ = vec.v.0
   _ = vec.v.1
   _ = vec.v.2
@@ -57,7 +58,8 @@ func useStructWithAnonymousUnion(u: AnonUnion) -> AnonUnion {
   return u
 }
 
-func useStructWithUnnamedUnion(var u: UnnamedUnion) -> UnnamedUnion {
+func useStructWithUnnamedUnion(u: UnnamedUnion) -> UnnamedUnion {
+  var u = u
   u.u.i = 100
   u.u.f = 1.0
 }

@@ -95,8 +95,8 @@ class SuperUnnamed {
   init(int _: Int) { }
   init(_ : Double) { }
 
-  init(var string _: String) { }
-  init(var _ : Float) { }
+  init(string _: String) { }
+  init(_ : Float) { }
 }
 
 class SubUnnamed : SuperUnnamed { }

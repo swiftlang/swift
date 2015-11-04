@@ -36,7 +36,8 @@ struct B {
   var x : Int
 }
 
-func test2(var b : B!) {
+func test2(b : B!) {
+  var b = b
   let x = b.x
   b.x = x
   b = nil
@@ -85,7 +86,8 @@ func test10(x : Int?) -> Int! { return test10_helper(x) }
 protocol P11 { }
 extension Int : P11 { }
 func test11_helper<T : P11>(t: T) { }
-func test11(i: Int!, var j: Int!) {
+func test11(i: Int!, j: Int!) {
+  var j = j
   test11_helper(i)
   test11_helper(j)
   j = nil

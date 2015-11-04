@@ -788,6 +788,6 @@ func r22348394() {
 
 // <rdar://problem/23185177> Compiler crashes in Assertion failed: ((AllowOverwrite || !E->hasLValueAccessKind()) && "l-value access kind has already been set"), function visit
 protocol P { var y: String? { get } }
-func r23185177(var x: P?) -> [String] { // expected-warning{{parameter 'x' was never mutated}}
+func r23185177(x: P?) -> [String] {
   return x?.y // expected-error{{cannot convert return expression of type 'String?' to return type '[String]'}}
 }

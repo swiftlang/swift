@@ -72,11 +72,12 @@ let _ = 1["1"]  // expected-error {{ambiguous use of 'subscript'}}
 
 
 // rdar://17687826 - QoI: error message when reducing to an untyped dictionary isn't helpful
-let squares = [ 1, 2, 3 ].reduce([:]) { (var dict, n) in // expected-error {{cannot invoke 'reduce' with an argument list of type '([_ : _], @noescape (_, Int) throws -> _)'}}
+let squares = [ 1, 2, 3 ].reduce([:]) { (dict, n) in // expected-error {{cannot invoke 'reduce' with an argument list of type '([_ : _], @noescape (_, Int) throws -> _)'}}
   // expected-note @-1 {{expected an argument list of type '(T, combine: @noescape (T, Self.Generator.Element) throws -> T)'}}
+  var dict = dict // expected-error {{type of expression is ambiguous without more context}}
 
-  dict[n] = n * n // expected-error {{type of expression is ambiguous without more context}}
-  return dict // expected-error {{type of expression is ambiguous without more context}}
+  dict[n] = n * n
+  return dict
 }
 
 

@@ -54,7 +54,8 @@ public struct GeneratorOf<T> : GeneratorType, SequenceType {
   
   /// Construct an instance whose `next()` method pulls its results
   /// from `base`.
-  public init<G: GeneratorType where G.Element == T>(var _ base: G) {
+  public init<G: GeneratorType where G.Element == T>(_ base: G) {
+    var base = base
     self._next = { base.next() }
   }
   
@@ -197,18 +198,22 @@ extension Something {
 }
 
 // rdar://problem/18120419
-func TTGenWrap<T, G: GeneratorType where G.Element == (T,T)>(var gen: G)
+func TTGenWrap<T, G: GeneratorType where G.Element == (T,T)>(gen: G)
 {
+  var gen = gen
   _ = gen.next()
 }
 
-func IntIntGenWrap<G: GeneratorType where G.Element == (Int,Int)>(var gen: G)
+func IntIntGenWrap<G: GeneratorType where G.Element == (Int,Int)>(gen: G)
 {
+  var gen = gen
   _ = gen.next()
 }
 
-func GGWrap<G1: GeneratorType, G2: GeneratorType where G1.Element == G2.Element>(var g1: G1, var _ g2: G2)
+func GGWrap<G1: GeneratorType, G2: GeneratorType where G1.Element == G2.Element>(g1: G1, _ g2: G2)
 {
+  var g1 = g1
+  var g2 = g2
   _ = g1.next()
   _ = g2.next()
 }

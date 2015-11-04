@@ -121,7 +121,7 @@ func testObjCMethodCurry(a : ClassWithObjCMethod) -> (Int) -> () {
 }
 
 // We used to crash on this.
-func rdar16786220(var let c: Int) -> () { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{23-27=}}
+func rdar16786220(var let c: Int) -> () { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{19-22=}} expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
   c = 42
 }
 
@@ -135,8 +135,11 @@ func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false
 
 
 // <rdar://problem/16786168> Functions currently permit 'var inout' parameters
-func var_inout_error(inout var x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{28-32=}}
-func var_inout_error(var inout x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-32=}} expected-warning {{parameter 'x' was never mutated}} {{22-25=}}
+func inout_inout_error(inout inout x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{30-36=}}
+// expected-warning@+1 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{22-25=}}
+func var_inout_error(var inout x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} {{26-32=}}
+  x = 2
+}
 
 // Unnamed parameters require the name "_":
 func unnamed(Int) { } // expected-error{{unnamed parameters must be written with the empty name '_'}}{{14-14=_: }}

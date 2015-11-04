@@ -642,7 +642,7 @@ ERROR(untyped_pattern_ellipsis,pattern_parsing,none,
 ERROR(non_func_decl_pattern_init,pattern_parsing,none,
       "default argument is only permitted for a non-curried function parameter",())
 WARNING(var_not_allowed_in_pattern,pattern_parsing, none,
-      "Use of 'var' binding here is deprecated and will be removed in a future version of Swift", ())
+      "Use of '%select{var|let}0' binding here is deprecated and will be removed in a future version of Swift", (unsigned))
 ERROR(var_pattern_in_var,pattern_parsing,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))

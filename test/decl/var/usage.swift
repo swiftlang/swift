@@ -12,8 +12,11 @@ func basicTests() -> Int {
   return y
 }
 
-func mutableParameter(a : Int, h : Int, var i : Int, var j: Int,
-       var g : Int) -> Int { // expected-warning {{parameter 'g' was never mutated; consider changing to 'let' constant}} {{8-12=}}
+// expected-warning@+2 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{41-45=}}
+// expected-warning@+1 {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{54-58=}}
+func mutableParameter(a : Int, h : Int, var i : Int, var j: Int, 
+       var g : Int) -> Int { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{8-12=}}
+  g += 1
   swap(&i, &j)
   return i+g
 }
@@ -97,7 +100,7 @@ func testSubscript() -> [Int] {
 }
 
 
-func testTuple(var x : Int) -> Int {
+func testTuple(var x : Int) -> Int { // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{16-19=}}
   var y : Int  // Ok, stored by a tuple
   
   (x, y) = (1,2)
@@ -160,8 +163,8 @@ protocol Fooable {
   mutating func mutFoo()
   func immutFoo()
 }
-func testOpenExistential(var x: Fooable,
-                         var y: Fooable) {  // expected-warning {{parameter 'y' was never mutated; consider changing to 'let' constant}} {{26-30=}}
+func testOpenExistential(var x: Fooable, // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{26-29=}}
+                         y: Fooable) {
   x.mutFoo()
   y.immutFoo()
 }

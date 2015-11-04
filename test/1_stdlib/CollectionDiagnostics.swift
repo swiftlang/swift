@@ -44,10 +44,13 @@ func sortResultIgnored<
   S.Generator.Element : Comparable,
   MC.Generator.Element : Comparable
 >(
-  var sequence: S, // expected-warning {{parameter 'sequence' was never mutated; consider changing to 'let' constant}} {{3-7=}}
-  var mutableCollection: MC, // expected-warning {{parameter 'mutableCollection' was never mutated; consider changing to 'let' constant}} {{3-7=}}
-  var array: [Int] // expected-warning {{parameter 'array' was never mutated; consider changing to 'let' constant}} {{3-7=}}
+  sequence: S,
+  mutableCollection: MC,
+  array: [Int]
 ) {
+  var sequence = sequence // expected-warning {{was never mutated; consider changing to 'let' constant}}
+  var mutableCollection = mutableCollection // expected-warning {{was never mutated; consider changing to 'let' constant}}
+  var array = array // expected-warning {{was never mutated; consider changing to 'let' constant}}
 
   sequence.sort() // expected-warning {{result of call to 'sort()' is unused}}
   sequence.sort { $0 < $1 } // expected-warning {{result of call to 'sort' is unused}}
@@ -359,7 +362,8 @@ struct MyCollection : Sliceable {} // expected-error {{'Sliceable' has been rena
 protocol MyProtocol : Sliceable {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}} {{23-32=CollectionType}}
 func processCollection<E : Sliceable>(e: E) {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}} {{28-37=CollectionType}}
 
-func renamedRangeReplaceableCollectionTypeMethods(var c: DefaultedForwardRangeReplaceableCollection<Int>) {
+func renamedRangeReplaceableCollectionTypeMethods(c: DefaultedForwardRangeReplaceableCollection<Int>) {
+  var c = c
   c.extend([ 10 ]) // expected-error {{'extend' has been renamed to 'appendContentsOf'}} {{5-11=appendContentsOf}}
   c.splice([ 10 ], atIndex: c.startIndex) // expected-error {{'splice(_:atIndex:)' has been renamed to 'insertContentsOf'}} {{5-11=insertContentsOf}}
 }

@@ -241,7 +241,8 @@ func rdar19831698() {
 }
 
 // <rdar://problem/19836341> Incorrect fixit for NSString? to String? conversions
-func rdar19836341(ns: NSString?, var vns: NSString?) {
+func rdar19836341(ns: NSString?, vns: NSString?) {
+  var vns = vns
   let _: String? = ns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}
   var _: String? = ns // expected-error{{cannot convert value of type 'NSString?' to specified type 'String?'}}
   // FIXME: there should be a fixit appending "as String?" to the line; for now

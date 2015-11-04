@@ -69,7 +69,8 @@ struct Mutating1 {
   mutating func barInPlace(x: Int, y: Int) { }
 }
 
-func testMutating1(m1: Mutating1, var m2: Mutating1) {
+func testMutating1(m1: Mutating1, m2: Mutating1) {
+  var m2 = m2
   m1.foo() // expected-warning{{result of call to 'foo()' is unused}}
   m2.foo() // expected-warning{{result of call to non-mutating function 'foo()' is unused; use 'fooInPlace()' to mutate in-place}}{{6-9=fooInPlace}}
 

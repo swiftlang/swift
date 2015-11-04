@@ -158,7 +158,7 @@ func testInlineUnionElement() -> X {
 
 
 @transparent
-func call_let_auto_closure(@autoclosure let x: () -> Bool) -> Bool {
+func call_let_auto_closure(@autoclosure x: () -> Bool) -> Bool {
   return x()
 }
 
@@ -167,7 +167,7 @@ func call_let_auto_closure(@autoclosure let x: () -> Bool) -> Bool {
 // CHECK-NEXT: debug_value %0 : $Bool
 // CHECK-NEXT: return %0 : $Bool
 
-func test_let_auto_closure_with_value_capture(let x: Bool) -> Bool {
+func test_let_auto_closure_with_value_capture(x: Bool) -> Bool {
   return call_let_auto_closure(x)
 }
 

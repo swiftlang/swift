@@ -187,7 +187,8 @@ protocol ClassP : class {
   func bas(x: Int)
 }
 
-func generic<T: P>(var t: T) {
+func generic<T: P>(t: T) {
+  var t = t
   // Instance member of archetype
   let _: Int -> () = id(t.bar)
   let _: () = id(t.bar(0))
@@ -250,7 +251,8 @@ func genericClassP<T: ClassP>(t: T) {
 // Members of existentials
 ////
 
-func existential(var p: P) {
+func existential(p: P) {
+  var p = p
   // Fully applied mutating method
   p.mut(1)
   _ = p.mut // expected-error{{partial application of 'mutating' method is not allowed}}

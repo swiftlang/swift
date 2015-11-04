@@ -211,7 +211,8 @@ protocol P {
   func f() -> Self
 }
 
-func testGenericCall<T: P>(var t: T) {
+func testGenericCall<T: P>(t: T) {
+  var t = t
   var t2 = t.f()
   t2 = t
   t = t2
@@ -229,7 +230,8 @@ func testExistentialCall(p: P) {
   @objc func method() -> Self { return self }
 }
 
-func testAnyObject(var ao: AnyObject) {
+func testAnyObject(ao: AnyObject) {
+  var ao = ao
   var result : AnyObject = ao.method!()
   result = ao
   ao = result

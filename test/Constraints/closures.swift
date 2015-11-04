@@ -48,8 +48,10 @@ struct X3<T> {
   init(_: (T)->()) {}
 }
 
-func testX3(var x: Int) {
+func testX3(x: Int) {
+  var x = x
   _ = X3({ x = $0 })
+  _ = x
 }
 
 // <rdar://problem/13811882>

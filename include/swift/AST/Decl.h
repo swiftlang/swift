@@ -4151,6 +4151,9 @@ public:
   /// that it can be rewritten to a 'var'.  This is used in situations where the
   /// compiler detects obvious attempts to mutate a constant.
   void emitLetToVarNoteIfSimple(DeclContext *UseDC) const;
+
+  /// Returns true if the name is the self identifier and is implicit.
+  bool isImplicitSelf() const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 

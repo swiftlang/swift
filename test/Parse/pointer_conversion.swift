@@ -143,7 +143,8 @@ takesConstVoidPointer([0.0, 1.0, 2.0])  // expected-error {{cannot convert value
   _ = x
 }
 
-func stringArguments(var s: String) {
+func stringArguments(s: String) {
+  var s = s
   takesConstVoidPointer(s)
   takesConstInt8Pointer(s)
   takesConstUInt8Pointer(s)
@@ -201,13 +202,15 @@ func pointerInClosure(f: UnsafeMutablePointer<Int> -> Int) -> Int {
 
 struct NotEquatable {}
 
-func arrayComparison(var x: [NotEquatable], y: [NotEquatable], p: UnsafeMutablePointer<NotEquatable>) {
+func arrayComparison(x: [NotEquatable], y: [NotEquatable], p: UnsafeMutablePointer<NotEquatable>) {
+  var x = x
   // Don't allow implicit array-to-pointer conversions in operators.
   let a: Bool = x == y // expected-error{{binary operator '==' cannot be applied to two '[NotEquatable]' operands}}
 
   let _: Bool = p == &x  // Allowed!
 }
 
-func addressConversion(p: UnsafeMutablePointer<Int>, var x: Int) {
+func addressConversion(p: UnsafeMutablePointer<Int>, x: Int) {
+  var x = x
   let _: Bool = p == &x
 }

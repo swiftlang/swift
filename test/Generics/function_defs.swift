@@ -145,7 +145,6 @@ protocol IntSubscriptable {
   subscript (index : Int) -> ElementType { get  }
 }
 
-// expected-note @+1 {{mark parameter with 'var' to make it mutable}} {{66-66=var }}
 func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
   var index = t.getIndex()
   var value = t.getValue()

@@ -66,7 +66,8 @@ protocol P {
   init()
 }
 
-func constructArchetypeValue<T: P>(var t: T, tm: T.Type) {
+func constructArchetypeValue<T: P>(t: T, tm: T.Type) {
+  var t = t
   var t1 = T()
   t = t1
   t1 = t

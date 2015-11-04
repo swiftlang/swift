@@ -23,10 +23,13 @@ func abort() { abort() }
 
 
 
-func assignment(var x: Int, var y: Int) {
+func assignment(x: Int, y: Int) {
+  var x = x
+  var y = y
   x = 42
   y = 57
-  
+  _ = x
+  _ = y
   (x, y) = (1,2)
 }
 
@@ -152,7 +155,8 @@ func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
 
 
 // CHECK-LABEL: sil hidden  @{{.*}}for_loops1
-func for_loops1(var x: Int, c: Bool) {
+func for_loops1(x: Int, c: Bool) {
+  var x = x
   for i in 1..<100 {
     markUsed(i)
   }
@@ -507,7 +511,8 @@ func defer_in_generic<T>(x: T) {
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements13defer_mutableFSiT_
-func defer_mutable(var x: Int) {
+func defer_mutable(x: Int) {
+  var x = x
   // CHECK: [[BOX:%.*]] = alloc_box $Int
   // CHECK-NOT: [[BOX]]#0
   // CHECK: function_ref @_TFF10statements13defer_mutableFSiT_L_6$deferfT_T_ : $@convention(thin) (@inout Int) -> ()

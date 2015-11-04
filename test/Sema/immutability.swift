@@ -36,7 +36,7 @@ func passClosure() {
     return 42
   }
   
-  takeClosure { (a : Int) -> Int in // expected-note {{mark parameter with 'var' to make it mutable}} {{18-18=var }}
+  takeClosure { (a : Int) -> Int in
     a = 42     // expected-error{{cannot assign to value: 'a' is a 'let' constant}}
     return 42
   }
@@ -220,9 +220,9 @@ func test_mutability() {
 }
 
 
-func test_arguments(a : Int,       // expected-note {{mark parameter with 'var' to make it mutable}} {{21-21=var }}
-                    var b : Int,
-                    let c : Int) {   // expected-note {{change 'let' parameter to 'var' to make it mutable}}  {{21-24=var}}
+func test_arguments(a : Int,
+                    var b : Int, // expected-warning {{Use of 'var' binding here is deprecated and will be removed in a future version of Swift}} {{21-25=}}
+                    let c : Int) {   // expected-warning {{Use of 'let' binding here is deprecated and will be removed in a future version of Swift}} {{21-25=}}
   a = 1  // expected-error {{cannot assign to value: 'a' is a 'let' constant}}
   b = 2  // ok.
   c = 3  // expected-error {{cannot assign to value: 'c' is a 'let' constant}}
@@ -310,16 +310,18 @@ protocol SubscriptNoGetter {
   subscript (i: Int) -> Int { get }
 }
 
-func testSubscriptNoGetter(let iis: SubscriptNoGetter) {
+func testSubscriptNoGetter(iis: SubscriptNoGetter) {
   var _: Int = iis[17]
 }
 
-func testSelectorStyleArguments1(var x: Int, var bar y: Int) {
+func testSelectorStyleArguments1(x: Int, bar y: Int) {
+  var x = x
+  var y = y
   ++x; ++y
 }
 
-func testSelectorStyleArguments2(let x: Int,  // expected-note {{change 'let' parameter to 'var' to make it mutable}} {{34-37=var}}
-                                 let bar y: Int) { // expected-note {{change 'let' parameter to 'var' to make it}} {{34-37=var}}
+func testSelectorStyleArguments2(x: Int,
+                                 bar y: Int) {
   ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
   ++y  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 }
@@ -427,9 +429,9 @@ struct StructWithDelegatingInit {
 
 
 
-func test_recovery_missing_name_1(var: Int) {} // expected-error 2{{expected ',' separator}} {{38-38=,}} {{38-38=,}} expected-error 2{{expected parameter type following ':'}}
+func test_recovery_missing_name_1(: Int) {} // expected-error {{expected ',' separator}} {{35-35=,}} expected-error {{expected parameter type following ':'}}
 
-func test_recovery_missing_name_2(let: Int) {} // expected-error 2{{expected ',' separator}} {{38-38=,}} {{38-38=,}} expected-error 2{{expected parameter type following ':'}}
+func test_recovery_missing_name_2(: Int) {} // expected-error {{expected ',' separator}} {{35-35=,}} expected-error {{expected parameter type following ':'}}
 
 
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function
@@ -485,7 +487,7 @@ struct TestSubscriptMutability {
   }
 }
 
-func f(a : TestSubscriptMutability) { // expected-note {{mark parameter with 'var' to make it mutable}} {{8-8=var }}
+func f(a : TestSubscriptMutability) {
   a.var_arr = []  // expected-error {{cannot assign to property: 'a' is a 'let' constant}}
 }
 
