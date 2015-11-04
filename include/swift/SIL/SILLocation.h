@@ -24,6 +24,7 @@
 namespace swift {
 
 class SourceLoc;
+class SILDebugScope;
 
 /// This is a pointer to the AST node that a SIL instruction was
 /// derived from. This may be null if AST information is unavailable or
@@ -142,28 +143,27 @@ protected:
     return cast<T>(Node.get<typename base_type<T>::type*>());
   }
 
-  // SILLocation constructors.
-  SILLocation(LocationKind K) : KindData(K) {}
-  SILLocation(Stmt *S, LocationKind K) : ASTNode(S), KindData(K) {}
-  SILLocation(Expr *E, LocationKind K) : ASTNode(E), KindData(K) {}
-  SILLocation(Decl *D, LocationKind K) : ASTNode(D), KindData(K) {}
-  SILLocation(Pattern *P, LocationKind K) : ASTNode(P), KindData(K) {}
+  /// \defgroup SILLocation constructors.
+  /// @{
 
-  // This constructor is used to support getAs operation.
+  /// This constructor is used to support getAs operation.
   SILLocation() {}
 
-  // Constructors for specifying the kind and the special flags for a
-  // specific SILLocation. Meant to be used in conjunction with
-  // getSpecialFlags.
-  SILLocation(LocationKind K, unsigned Flags) : KindData(unsigned(K) | Flags) {}
-  SILLocation(Stmt *S, LocationKind K,
-              unsigned Flags) : ASTNode(S), KindData(unsigned(K) | Flags) {}
-  SILLocation(Expr *E, LocationKind K,
-              unsigned Flags) : ASTNode(E), KindData(unsigned(K) | Flags) {}
-  SILLocation(Decl *D, LocationKind K,
-              unsigned Flags) : ASTNode(D), KindData(unsigned(K) | Flags) {}
-  SILLocation(Pattern *P, LocationKind K,
-              unsigned Flags) : ASTNode(P), KindData(unsigned(K) | Flags) {}
+  SILLocation(LocationKind K, unsigned Flags = 0)
+      : KindData(unsigned(K) | Flags) {}
+
+  SILLocation(Stmt *S, LocationKind K, unsigned Flags = 0)
+      : ASTNode(S), KindData(unsigned(K) | Flags) {}
+
+  SILLocation(Expr *E, LocationKind K, unsigned Flags = 0)
+      : ASTNode(E), KindData(unsigned(K) | Flags) {}
+
+  SILLocation(Decl *D, LocationKind K, unsigned Flags = 0)
+      : ASTNode(D), KindData(unsigned(K) | Flags) {}
+
+  SILLocation(Pattern *P, LocationKind K, unsigned Flags = 0)
+      : ASTNode(P), KindData(unsigned(K) | Flags) {}
+  /// @}
 
 private:
   friend class ImplicitReturnLocation;
