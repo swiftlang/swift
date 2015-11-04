@@ -4827,13 +4827,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto fromEI = fromFunc->getExtInfo(), toEI = toFunc->getExtInfo();
       if ((toEI.isNoEscape() && !fromEI.isNoEscape()) ||
           (toEI.isNoReturn() && !fromEI.isNoReturn())) {
-        auto newToEI =
-          toEI.withIsNoReturn(toEI.isNoReturn()|fromEI.isNoReturn())
-              .withNoEscape(toEI.isNoEscape()|fromEI.isNoEscape())
-              .withThrows(toEI.throws()&fromEI.throws())
-              .withRepresentation(fromEI.getRepresentation());
+        swift::AnyFunctionType::ExtInfo newEI(fromEI.getRepresentation(),
+                                        toEI.isNoReturn() | fromEI.isNoReturn(),
+                                        toEI.isAutoClosure(),
+                                        toEI.isNoEscape() | fromEI.isNoEscape(),
+                                        toEI.throws() & fromEI.throws());
         auto newToType = FunctionType::get(fromFunc->getInput(),
-                                           fromFunc->getResult(), newToEI);
+                                           fromFunc->getResult(), newEI);
         if (applyTypeToClosureExpr(expr, newToType)) {
           fromFunc = newToType;
           // Propagating the bits in might have satisfied the entire
