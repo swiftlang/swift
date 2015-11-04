@@ -433,6 +433,10 @@ func malformedBlockComment(f : ()throws->()) rethrows {}
 // CHECK: <doc-comment-block>/**/</doc-comment-block>
 // CHECK: <kw>func</kw> malformedBlockComment(f : ()<kw>throws</kw>->()) <attr-builtin>rethrows</attr-builtin> {}
 
+
+"--\"\(x) --"
+// CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>
+
 // Keep this as the last test
 /**
   Trailing off ...

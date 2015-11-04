@@ -134,7 +134,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         if (PrevTok.getKind() != tok::string_literal)
           continue;
         StringRef StrText = PrevTok.getText();
-        if (StrText.size() > 1 && StrText.back() == '\"')
+        if (StrText.size() > 1 && StrText.back() == '\"' &&
+            !StrText.endswith("\\\""))
           continue;
         Kind = SyntaxNodeKind::StringInterpolationAnchor;
         break;
