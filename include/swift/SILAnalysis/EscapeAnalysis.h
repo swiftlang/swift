@@ -78,25 +78,33 @@ class EscapeAnalysis : public SILAnalysis {
 
     /// The function return value, which is also just a special case of Value
     /// type.
-    Return
-   };
+    Return,
 
-  /// Bits in the CGNode's escape set.
-  enum {
+    /// A ref_element_addr, which is also just a special case of Value type.
+    /// There is only a single RefElement node for all ref_element_addrs of a
+    /// reference. The purpose of having such a node is to model the fact that
+    /// a reference cannot escape even if a ref_element_addr escapes.
+    RefElement
+  };
+
+  /// Indicates to what a value escapes. Note: the order of values is important.
+  enum class EscapeState : char {
+
+    /// The node's value does not escape.
+    None,
+
+    /// The node's value escapes through a function argument or return value.
+    Arguments,
+
     /// The node's value escapes to any global or unidentified memory.
-    GlobalEscape,
-    
-    /// The node's value escapes through the function's return value.
-    ReturnEscape,
-    
-    /// The first of the consecutive function argument bits: The node's value
-    /// escapes through a function argument.
-    FirstArg
+    Global
   };
 
   class CGNode;
   class CGNodeMap;
+public:
   class ConnectionGraph;
+private:
 
   /// The int-part is an EdgeType and specifies which kind of predecessor it is.
   typedef llvm::PointerIntPair<CGNode *, 1> Predecessor;
@@ -127,7 +135,16 @@ class EscapeAnalysis : public SILAnalysis {
     /// If this Content node is merged with another Content node, mergeTo is
     /// the merge destination.
     CGNode *mergeTo = nullptr;
-    
+
+    /// Information where the node's value is used in its function.
+    /// Each bit corresponds to an argument/instruction where the value is used.
+    /// The UsePoints on demand when calling ConnectionGraph::getUsePoints().
+    llvm::SmallBitVector UsePoints;
+
+    /// The actual result of the escape analysis. It tells if and how (global or
+    /// through arguments) the value escapes.
+    EscapeState State = EscapeState::None;
+
     /// If true, the pointsTo is a real edge in the graph. Otherwise it is not
     /// and edge (e.g. this does not appear in the pointsTo Preds list), but
     /// still must point to the same Content node as all successor nodes.
@@ -144,20 +161,25 @@ class EscapeAnalysis : public SILAnalysis {
     /// nodes).
     NodeType Type;
     
-    /// The actual result of the escape analysis. It tells if and how (global or
-    /// through arguments) the pointer escapes.
-    llvm::SmallBitVector EscapeSet;
+    /// The constructor.
+    CGNode(ValueBase *V, NodeType Type) :
+        V(V), UsePoints(0), Type(Type) { }
 
-    /// The constructor. \p numArgs is the number of function arguments.
-    CGNode(ValueBase *V, NodeType Type, int numArgs) :
-       V(V), Type(Type), EscapeSet(numArgs + FirstArg) { }
-    
-    /// Merges the escape set from another node and returns true if any new bits
-    /// were set.
-    bool mergeEscapeSet(const CGNode *From) {
-      bool changed = From->EscapeSet.test(EscapeSet);
-      EscapeSet |= From->EscapeSet;
-      return changed;
+    /// Merges the state from another state and returns true if it changed.
+    bool mergeEscapeState(EscapeState OtherState) {
+      if (OtherState > State) {
+        State = OtherState;
+        return true;
+      }
+      return false;
+    }
+
+    /// Merges the use points from another node and returns true if there are
+    /// any changes.
+    bool mergeUsePoints(CGNode *RHS) {
+      bool Changed = RHS->UsePoints.test(UsePoints);
+      UsePoints |= RHS->UsePoints;
+      return Changed;
     }
 
     /// Returns the Content node if this node has an outgoing points-to edge.
@@ -191,9 +213,29 @@ class EscapeAnalysis : public SILAnalysis {
         if (Def == To)
           return false;
       }
-      defersTo.push_back(To);
       To->Preds.push_back(Predecessor(this, EdgeType::Defer));
+      if (To->Type == NodeType::RefElement && !defersTo.empty()) {
+        /// We keep the RefElement nodes at the head of defersTo to speed up
+        /// the lookup for such a successor.
+        defersTo.insert(defersTo.begin(), To);
+      } else {
+        defersTo.push_back(To);
+      }
       return true;
+    }
+
+    /// Returns a defer-successor of type RefElement for the node or null if
+    /// the node doesn't have one.
+    CGNode *getRefElementNode() const {
+      if (defersTo.empty())
+        return nullptr;
+
+      // RefElement successors are always at the head of the list.
+      CGNode *First = defersTo[0];
+      if (First->Type != NodeType::RefElement)
+        return nullptr;
+
+      return First;
     }
 
     /// Sets the outgoing points-to edge. The \p To node must be a Content node.
@@ -215,6 +257,11 @@ class EscapeAnalysis : public SILAnalysis {
         assert(Target->Type == NodeType::Content);
       }
       return Target;
+    }
+
+    void setUsePointBit(int Idx) {
+      UsePoints.resize(Idx + 1, false);
+      UsePoints.set(Idx);
     }
 
     /// For debug dumping.
@@ -246,16 +293,14 @@ class EscapeAnalysis : public SILAnalysis {
     /// Specifies that the node's value escapes to global or unidentified
     /// memory. Returns true if this changed the state.
     bool setEscapesGlobal() {
-      bool isAlreadyEscaping = escapesGlobal();
-      EscapeSet.set(GlobalEscape);
-      return !isAlreadyEscaping;
+      return mergeEscapeState(EscapeState::Global);
     }
 
-    /// Returns true if the node's value escapes to global or unidentified
-    /// memory.
-    bool escapesGlobal() const {
-      return EscapeSet.test(GlobalEscape);
-    }
+    /// Returns the escape state.
+    EscapeState getEscapeState() const { return State; }
+
+    /// Returns true if the node's value escapes from its function.
+    bool escapes() const { return getEscapeState() != EscapeState::None; }
   };
 
   /// Mapping from nodes in a calleee-graph to nodes in a caller-graph.
@@ -274,6 +319,8 @@ class EscapeAnalysis : public SILAnalysis {
       return Iter->second->getMergeTarget();
     }
   };
+
+public:
 
   /// The connection graph for a function. See also: EdgeType, NodeType and
   /// CGNode.
@@ -309,7 +356,10 @@ class EscapeAnalysis : public SILAnalysis {
     /// The pseudo node which represents the return value. It's type is
     /// NodeType::Return.
     CGNode *ReturnNode = nullptr;
-    
+
+    /// Use points for CGNode::UsePoints.
+    llvm::SmallVector<ValueBase *, 32> UsePoints;
+
     /// The callsites from which we have to merge the callee graphs.
     llvm::SmallVector<FullApplySite, 8> KnownCallees;
     
@@ -317,16 +367,18 @@ class EscapeAnalysis : public SILAnalysis {
     /// them again.
     bool NeedMergeCallees = false;
 
-    /// True if the graph is computed.
-    bool Valid = false;
+    /// Set to false when the analysis for the function is invalidated.
+    bool Valid = true;
+
+    /// True if the CGNode::UsePoints are computed.
+    bool UsePointsComputed = false;
 
     /// The allocator for nodes.
     llvm::SpecificBumpPtrAllocator<CGNode> NodeAllocator;
 
     /// Allocates a node of a given type.
     CGNode *allocNode(ValueBase *V, NodeType Type) {
-      CGNode *Node = new (NodeAllocator.Allocate()) CGNode(V, Type,
-                                                   F->getArguments().size());
+      CGNode *Node = new (NodeAllocator.Allocate()) CGNode(V, Type);
       Nodes.push_back(Node);
       return Node;
     }
@@ -368,18 +420,10 @@ class EscapeAnalysis : public SILAnalysis {
     ConnectionGraph(SILFunction *F, EscapeAnalysis *EA) : F(F), EA(EA) {
     }
 
-    void setValid() { Valid = true; }
+    bool isValid() const { return Valid; }
 
     /// Removes all nodes from the graph and sets it to invalid.
-    void invalidate() {
-      Values2Nodes.clear();
-      Nodes.clear();
-      ReturnNode = nullptr;
-      Valid = false;
-      NodeAllocator.DestroyAll();
-      assert(ToMerge.empty());
-      assert(!NeedMergeCallees);
-    }
+    void invalidate();
 
     SILFunction *getFunction() const { return F; }
     
@@ -413,11 +457,15 @@ class EscapeAnalysis : public SILAnalysis {
     /// Gets or creates a content node to which \a AddrNode points to.
     CGNode *getContentNode(CGNode *AddrNode);
 
+    /// Gets or creates the unique RefElement node for the \p RefNode which
+    /// represents an object reference.
+    CGNode *getRefElementNode(CGNode *RefNode);
+
     /// Get or creates a pseudo node for the function return value.
     CGNode *getReturnNode(ReturnInst *RI) {
       if (!ReturnNode) {
         ReturnNode = allocNode(RI, NodeType::Return);
-        ReturnNode->EscapeSet.set(ReturnEscape);
+        ReturnNode->mergeEscapeState(EscapeState::Arguments);
       }
       return ReturnNode;
     }
@@ -425,7 +473,10 @@ class EscapeAnalysis : public SILAnalysis {
     /// Returns the node of the "exact" value \p V (no projections are skipped)
     /// if one exists.
     CGNode *getNodeOrNull(ValueBase *V) {
-      return Values2Nodes.lookup(V);
+      CGNode *Node = Values2Nodes.lookup(V);
+      if (Node)
+        return Node->getMergeTarget();
+      return nullptr;
     }
     
     /// Re-uses a node for another SIL value.
@@ -434,16 +485,19 @@ class EscapeAnalysis : public SILAnalysis {
       Values2Nodes[V] = Node;
     }
 
-    /// If V is a pointer, set it to global escaping.
-    bool setEscapesGlobal(SILValue V) {
-      if (CGNode *Node = getNode(V))
-        return Node->setEscapesGlobal();
-      return false;
+    /// Adds an argument/instruction in which the node's value is used.
+    int addUsePoint(CGNode *Node, ValueBase *V) {
+      if (Node->getEscapeState() >= EscapeState::Global)
+        return -1;
+
+      int Idx = (int)UsePoints.size();
+      UsePoints.push_back(V);
+      Node->setUsePointBit(Idx);
+      return Idx;
     }
 
-    /// Returns true if the node's value escapes to global or unidentified
-    /// memory.
-    bool escapesGlobal(SILValue V) {
+    /// If V is a pointer, set it to global escaping.
+    bool setEscapesGlobal(SILValue V) {
       if (CGNode *Node = getNode(V))
         return Node->setEscapesGlobal();
       return false;
@@ -458,11 +512,19 @@ class EscapeAnalysis : public SILAnalysis {
       return EdgeAdded;
     }
 
+    /// Computes the use point information.
+    void computeUsePoints();
+
+    /// Gets the arguments/instructions where the node's value is used.
+    /// It only includes values which are relevant for lifeness computation,
+    /// e.g. release or apply instructions.
+    void getUsePoints(llvm::SmallPtrSetImpl<ValueBase *> &Values, CGNode *Node);
+
     /// Merges the graph of a callee function (called by \p FAS) into this graph.
     bool mergeCalleeGraph(FullApplySite FAS, ConnectionGraph *CalleeGraph);
 
-    /// Propagates the escape bits through the graph.
-    void propagateEscapes();
+    /// Propagates the escape states through the graph.
+    void propagateEscapeStates();
 
     /// Debug print the graph.
     void print(llvm::raw_ostream &OS) const;
@@ -509,6 +571,9 @@ private:
 
   SILModule *M;
 
+  /// The Array<Element> type of the stdlib.
+  NominalTypeDecl *ArrayType;
+
   /// This analysis depends on the call graph.
   CallGraphAnalysis *CGA;
   
@@ -526,6 +591,9 @@ private:
   /// Updates the graph by analysing instruction \p I.
   void analyzeInstruction(SILInstruction *I, ConnectionGraph *ConGraph);
 
+  /// Returns true if \p V is an Array or the storage reference of an array.
+  bool isArrayOrArrayStorage(SILValue V);
+
   /// Sets all operands and results of \p I as global escaping.
   bool setAllEscaping(SILInstruction *I, ConnectionGraph *ConGraph);
 
@@ -538,9 +606,7 @@ private:
   friend struct ::CGForDotView;
 
 public:
-  EscapeAnalysis(SILModule *M) :
-    SILAnalysis(AnalysisKind::Escape), M(M), CGA(nullptr), shouldRecompute(true) {
-  }
+  EscapeAnalysis(SILModule *M);
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::Escape;
@@ -549,12 +615,11 @@ public:
   virtual void initialize(SILPassManager *PM);
 
   /// Gets or creates a connection graph for \a F.
-  ConnectionGraph *getConnectionGraph(SILFunction *F) {
-    ConnectionGraph *&CG = Function2ConGraph[F];
-    if (!CG) {
-      CG = new (Allocator.Allocate()) ConnectionGraph(F, this);
-    }
-    return CG;
+  ConnectionGraph *getConnectionGraph(SILFunction *F) const {
+    ConnectionGraph *CG = Function2ConGraph.lookup(F);
+    if (CG && CG->isValid())
+      return CG;
+    return nullptr;
   }
   
   /// Recomputes the connection graphs for all functions the module.
@@ -567,8 +632,10 @@ public:
   }
   
   virtual void invalidate(SILFunction *F, PreserveKind K) {
-    getConnectionGraph(F)->invalidate();
-    shouldRecompute = true;
+    if (auto *ConGraph = getConnectionGraph(F)) {
+      ConGraph->invalidate();
+      shouldRecompute = true;
+    }
   }
 
   virtual void verify() const {
