@@ -18,6 +18,7 @@
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/type_traits.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/DependencyGraph.h"
 #include "swift/Driver/Driver.h"
@@ -136,7 +137,7 @@ static void populateInputInfoMap(InputInfoMap &inputs,
   }
 
   // Sort the entries by input order.
-  static_assert(std::is_trivially_copyable<CompileJobAction::InputInfo>::value,
+  static_assert(IsTriviallyCopyable<CompileJobAction::InputInfo>::value,
                 "llvm::array_pod_sort relies on trivially-copyable data");
   using InputInfoEntry = std::decay<decltype(inputs.front())>::type;
   llvm::array_pod_sort(inputs.begin(), inputs.end(),
