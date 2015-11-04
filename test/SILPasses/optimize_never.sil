@@ -192,13 +192,13 @@ sil [transparent] [fragile] @_TZFsoi1pFTVs5Int32S__S_ : $@convention(thin) (Int3
 sil @_TF14optimize_never4boo1FCS_1CVs5Int32 : $@convention(thin) (@owned C) -> Int32 {
 bb0(%0 : $C):
   %2 = function_ref @_TF14optimize_never4foo1urFTxCS_1C_Vs5Int32 : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
-  %3 = integer_literal $Builtin.Int64, 1
-  %4 = struct $Int (%3 : $Builtin.Int64)
-  %5 = alloc_stack $Int
-  store %4 to %5#1 : $*Int
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %5 = alloc_stack $Int32
+  store %4 to %5#1 : $*Int32
   strong_retain %0 : $C
-  %8 = apply %2<Int>(%5#1, %0) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
-  dealloc_stack %5#0 : $*@local_storage Int
+  %8 = apply %2<Int32>(%5#1, %0) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
+  dealloc_stack %5#0 : $*@local_storage Int32
   strong_release %0 : $C
   return %8 : $Int32
 }
@@ -261,7 +261,7 @@ bb0(%0 : $C):
 // Check that no generic specialization was produced for foo1 because it is excluded from optimizations.
 // CHECK-NOT: generic specialization <Swift.Int> of {{.*}}.foo1
 // But foo3 was specialized, because it is not annotated with @_semantics("optimize.sil.never")
-// CHECK: generic specialization <Swift.Int> of {{.*}}.foo3
+// CHECK: generic specialization <Swift.Int32> of {{.*}}.foo3
 
 
 sil @_TF14optimize_never10transform3urFxVs5Int32 : $@convention(thin) <T> (@in T) -> Int32 {
@@ -309,13 +309,13 @@ bb0(%0 : $*T, %1 : $C):
 sil @_TF14optimize_never4boo3FCS_1CVs5Int32 : $@convention(thin) (@owned C) -> Int32 {
 bb0(%0 : $C):
   %2 = function_ref @_TF14optimize_never4foo3urFTxCS_1C_Vs5Int32 : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
-  %3 = integer_literal $Builtin.Int64, 1
-  %4 = struct $Int (%3 : $Builtin.Int64)
-  %5 = alloc_stack $Int
-  store %4 to %5#1 : $*Int
+  %3 = integer_literal $Builtin.Int32, 1
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %5 = alloc_stack $Int32
+  store %4 to %5#1 : $*Int32
   strong_retain %0 : $C
-  %8 = apply %2<Int>(%5#1, %0) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
-  dealloc_stack %5#0 : $*@local_storage Int
+  %8 = apply %2<Int32>(%5#1, %0) : $@convention(thin) <τ_0_0> (@in τ_0_0, @owned C) -> Int32
+  dealloc_stack %5#0 : $*@local_storage Int32
   strong_release %0 : $C
   return %8 : $Int32
 }
