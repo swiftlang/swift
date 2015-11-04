@@ -52,7 +52,7 @@ public class TypeIndexed<Value> : Resettable {
   internal var defaultValue: Value
 }
 
-extension TypeIndexed where Value : ForwardIndexType {
+extension TypeIndexed where Value : ForwardIndex {
   public func expectIncrement<R>(
     t: Any.Type,
     @autoclosure _ message: ()->String = "",

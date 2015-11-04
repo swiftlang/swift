@@ -45,7 +45,7 @@ extension StrideThrough where Element : TestProtocol1 {
 
 var StrideTestSuite = TestSuite("Strideable")
 
-struct R : RandomAccessIndexType {
+struct R : RandomAccessIndex {
   typealias Distance = Int
   var x: Int
 
@@ -76,7 +76,7 @@ struct R : RandomAccessIndexType {
 
 StrideTestSuite.test("Double") {
   // Doubles are not yet ready for testing, since they still conform
-  // to RandomAccessIndexType
+  // to RandomAccessIndex
 }
 
 StrideTestSuite.test("HalfOpen") {
@@ -86,7 +86,7 @@ StrideTestSuite.test("HalfOpen") {
       sum,
       start.stride(to: end, by: stepSize).reduce(0, combine: +))
 
-    // Work on an arbitrary RandomAccessIndexType
+    // Work on an arbitrary RandomAccessIndex
     expectEqual(
       sum,
       R(start).stride(to: R(end), by: stepSize).reduce(0) { $0 + $1.x })
@@ -111,7 +111,7 @@ StrideTestSuite.test("Closed") {
       sum,
       start.stride(through: end, by: stepSize).reduce(0, combine: +))
 
-    // Work on an arbitrary RandomAccessIndexType
+    // Work on an arbitrary RandomAccessIndex
     expectEqual(
       sum,
       R(start).stride(through: R(end), by: stepSize).reduce(0) { $0 + $1.x })

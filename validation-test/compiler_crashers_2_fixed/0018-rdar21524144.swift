@@ -1,7 +1,7 @@
 // RUN: not %target-swift-frontend %s -parse
 
 public protocol Indexable {
-  typealias Index : ForwardIndexType
+  typealias Index : ForwardIndex
   var startIndex: Index {get}
   var endIndex: Index {get}
   typealias _Element

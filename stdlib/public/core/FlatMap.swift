@@ -44,7 +44,7 @@ extension LazyCollectionProtocol {
   }
 }
 
-extension LazyCollectionProtocol where Elements.Index : BidirectionalIndexType
+extension LazyCollectionProtocol where Elements.Index : BidirectionalIndex
 {
   /// Returns the concatenated results of mapping `transform` over
   /// `self`.  Equivalent to 
@@ -55,7 +55,7 @@ extension LazyCollectionProtocol where Elements.Index : BidirectionalIndexType
   @warn_unused_result
   public func flatMap<
     Intermediate: Collection
-    where Intermediate.Index : BidirectionalIndexType
+    where Intermediate.Index : BidirectionalIndex
   >(
     transform: (Elements.Iterator.Element)->Intermediate
   ) -> LazyCollection<

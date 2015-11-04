@@ -206,8 +206,8 @@ public struct Mirror {
   ///     ancestorRepresentation: .Customized(super.customMirror)
   ///
   /// - Note: The traversal protocol modeled by `children`'s indices
-  ///   (`ForwardIndexType`, `BidirectionalIndexType`, or
-  ///   `RandomAccessIndexType`) is captured so that the resulting
+  ///   (`ForwardIndex`, `BidirectionalIndex`, or
+  ///   `RandomAccessIndex`) is captured so that the resulting
   /// `Mirror`'s `children` may be upgraded later.  See the failable
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.
@@ -254,8 +254,8 @@ public struct Mirror {
   ///     ancestorRepresentation: .Customized(super.customMirror)
   ///
   /// - Note: The traversal protocol modeled by `children`'s indices
-  ///   (`ForwardIndexType`, `BidirectionalIndexType`, or
-  ///   `RandomAccessIndexType`) is captured so that the resulting
+  ///   (`ForwardIndex`, `BidirectionalIndex`, or
+  ///   `RandomAccessIndex`) is captured so that the resulting
   /// `Mirror`'s `children` may be upgraded later.  See the failable
   /// initializers of `AnyBidirectionalCollection` and
   /// `AnyRandomAccessCollection` for details.

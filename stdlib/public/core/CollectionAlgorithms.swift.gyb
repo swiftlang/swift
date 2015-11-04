@@ -22,7 +22,7 @@ GElement = "Iterator.Element"
 // last
 //===----------------------------------------------------------------------===//
 
-extension Collection where Index : BidirectionalIndexType {
+extension Collection where Index : BidirectionalIndex {
   public var last: Iterator.Element? {
     return isEmpty ? nil : self[endIndex.predecessor()]
   }
@@ -122,7 +122,7 @@ orderingRequirementForComparable = """\
 % for preds in [ True, False ]:
 
 %   if preds:
-extension MutableCollection where Index : RandomAccessIndexType {
+extension MutableCollection where Index : RandomAccessIndex {
 
 ${partitionDocComment}
   ///
@@ -136,7 +136,7 @@ ${orderingRequirementForPredicate}
 %   else:
 
 extension MutableCollection
-  where Index : RandomAccessIndexType, ${GElement} : Comparable {
+  where Index : RandomAccessIndex, ${GElement} : Comparable {
 
 ${partitionDocComment}
   ///
@@ -250,7 +250,7 @@ ${orderingRequirementForPredicate}
 
 extension MutableCollection
   where
-  Self.Index : RandomAccessIndexType,
+  Self.Index : RandomAccessIndex,
   Self.Iterator.Element : Comparable {
 
 ${sortInPlaceDocCommentForComparable}
@@ -273,7 +273,7 @@ ${orderingRequirementForComparable}
   }
 }
 
-extension MutableCollection where Self.Index : RandomAccessIndexType {
+extension MutableCollection where Self.Index : RandomAccessIndex {
 ${sortInPlaceDocCommentForPredicate}
   ///
 ${sortIsUnstableForPredicate}

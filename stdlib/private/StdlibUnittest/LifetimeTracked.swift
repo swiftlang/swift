@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
+public final class LifetimeTracked : ForwardIndex, CustomStringConvertible {
   public init(_ value: Int, identity: Int = 0) {
     ++LifetimeTracked.instances
     serialNumber = ++LifetimeTracked._nextSerialNumber

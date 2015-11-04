@@ -51,7 +51,7 @@ extension String {
     }
 
     /// A position in a `String.UnicodeScalarView`.
-    public struct Index : BidirectionalIndexType, Comparable {
+    public struct Index : BidirectionalIndex, Comparable {
       public init(_ _position: Int, _ _core: _StringCore) {
         self._position = _position
         self._core = _core

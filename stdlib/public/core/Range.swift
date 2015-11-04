@@ -12,7 +12,7 @@
 
 /// An iterator over the elements of `Range<Element>`.
 public struct RangeIterator<
-  Element : ForwardIndexType
+  Element : ForwardIndex
 > : IteratorProtocol, SequenceType {
 
   /// Construct an instance that traverses the elements of `bounds`.
@@ -63,12 +63,12 @@ public struct RangeIterator<
 ///
 /// However, subscripting that range still works in a generic context:
 ///
-///     func brackets<Element : ForwardIndexType>(x: Range<Element>, i: Element) -> Element {
+///     func brackets<Element : ForwardIndex>(x: Range<Element>, i: Element) -> Element {
 ///       return x[i] // Just forward to subscript
 ///     }
 ///     print(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
 public struct Range<
-  Element : ForwardIndexType
+  Element : ForwardIndex
 > : Equatable, Collection,
     CustomStringConvertible, CustomDebugStringConvertible {
 
@@ -151,7 +151,7 @@ public func == <Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
 /// `maximum`.
 @_transparent
 @warn_unused_result
-public func ..< <Pos : ForwardIndexType> (minimum: Pos, maximum: Pos)
+public func ..< <Pos : ForwardIndex> (minimum: Pos, maximum: Pos)
   -> Range<Pos> {
   return Range(start: minimum, end: maximum)
 }
@@ -159,7 +159,7 @@ public func ..< <Pos : ForwardIndexType> (minimum: Pos, maximum: Pos)
 /// Forms a closed range that contains both `minimum` and `maximum`.
 @_transparent
 @warn_unused_result
-public func ... <Pos : ForwardIndexType> (
+public func ... <Pos : ForwardIndex> (
   minimum: Pos, maximum: Pos
 ) -> Range<Pos> {
   return Range(start: minimum, end: maximum.successor())
@@ -172,7 +172,7 @@ public func ... <Pos : ForwardIndexType> (
 /// - Requires: `start <= end`.
 @_transparent
 @warn_unused_result
-public func ..< <Pos : ForwardIndexType where Pos : Comparable> (
+public func ..< <Pos : ForwardIndex where Pos : Comparable> (
   start: Pos, end: Pos
 ) -> Range<Pos> {
   _precondition(start <= end, "Can't form Range with end < start")
@@ -183,7 +183,7 @@ public func ..< <Pos : ForwardIndexType where Pos : Comparable> (
 /// - Requires: `start <= end`.
 @_transparent
 @warn_unused_result
-public func ... <Pos : ForwardIndexType where Pos : Comparable> (
+public func ... <Pos : ForwardIndex where Pos : Comparable> (
   start: Pos, end: Pos
 ) -> Range<Pos> {
   _precondition(start <= end, "Can't form Range with end < start")
@@ -192,7 +192,7 @@ public func ... <Pos : ForwardIndexType where Pos : Comparable> (
 }
 
 @warn_unused_result
-public func ~= <I : ForwardIndexType where I : Comparable> (
+public func ~= <I : ForwardIndex where I : Comparable> (
   pattern: Range<I>, value: I
 ) -> Bool {
   // Intervals can check for containment in O(1).

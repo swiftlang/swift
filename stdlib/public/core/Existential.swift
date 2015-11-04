@@ -19,7 +19,7 @@
 // their respective protocols.
 
 internal struct _CollectionOf<
-  IndexType_ : ForwardIndexType, T
+  IndexType_ : ForwardIndex, T
 > : Collection {
   init(startIndex: IndexType_, endIndex: IndexType_,
       _ subscriptImpl: (IndexType_)->T) {

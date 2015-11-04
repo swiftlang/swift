@@ -33,7 +33,7 @@ import ObjectiveC
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
-final class Tracked : ForwardIndexType, CustomStringConvertible {
+final class Tracked : ForwardIndex, CustomStringConvertible {
   required init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber

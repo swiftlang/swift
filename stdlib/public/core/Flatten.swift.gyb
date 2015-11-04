@@ -118,12 +118,12 @@ extension LazySequenceType
 %   constraints = '%(Base)sIterator.Element : Collection'
 %   if traversal == 'Bidirectional':
 %     constraints += ''',
-%   %(Base)sIndex : BidirectionalIndexType, 
-%   %(Base)sIterator.Element.Index : BidirectionalIndexType'''
+%   %(Base)sIndex : BidirectionalIndex, 
+%   %(Base)sIterator.Element.Index : BidirectionalIndex'''
 %   Index = Collection + 'Index'
 public struct ${Index}<
   BaseElements: Collection where ${constraints % {'Base': 'BaseElements.'}}
-> : ${traversal}IndexType {
+> : ${traversal}Index {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Requires: The next value is representable.

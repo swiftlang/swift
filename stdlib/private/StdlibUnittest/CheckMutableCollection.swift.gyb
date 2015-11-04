@@ -375,14 +375,14 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
     CollectionWithEquatableElement : MutableCollection,
     CollectionWithComparableElement : MutableCollection
     where
-    C.Index : BidirectionalIndexType,
+    C.Index : BidirectionalIndex,
     C.SubSequence : MutableCollection,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
-    C.SubSequence.Index : BidirectionalIndexType,
+    C.SubSequence.Index : BidirectionalIndex,
     C.SubSequence.SubSequence == C.SubSequence,
-    CollectionWithEquatableElement.Index : BidirectionalIndexType,
+    CollectionWithEquatableElement.Index : BidirectionalIndex,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithComparableElement.Index : BidirectionalIndexType,
+    CollectionWithComparableElement.Index : BidirectionalIndex,
     CollectionWithComparableElement.Iterator.Element : Comparable
   >(
     testNamePrefix: String = "",
@@ -494,14 +494,14 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     CollectionWithEquatableElement : MutableCollection,
     CollectionWithComparableElement : MutableCollection
     where
-    C.Index : RandomAccessIndexType,
+    C.Index : RandomAccessIndex,
     C.SubSequence : MutableCollection,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
-    C.SubSequence.Index : RandomAccessIndexType,
+    C.SubSequence.Index : RandomAccessIndex,
     C.SubSequence.SubSequence == C.SubSequence,
-    CollectionWithEquatableElement.Index : RandomAccessIndexType,
+    CollectionWithEquatableElement.Index : RandomAccessIndex,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithComparableElement.Index : RandomAccessIndexType,
+    CollectionWithComparableElement.Index : RandomAccessIndex,
     CollectionWithComparableElement.Iterator.Element : Comparable
   >(
     testNamePrefix: String = "",

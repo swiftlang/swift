@@ -25,7 +25,7 @@ public protocol Indexable {
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  typealias Index : ForwardIndexType
+  typealias Index : ForwardIndex
 
   /// The position of the first element in a non-empty collection.
   ///
@@ -60,7 +60,7 @@ public protocol Indexable {
 }
 
 public protocol MutableIndexable {
-  typealias Index : ForwardIndexType
+  typealias Index : ForwardIndex
 
   var startIndex: Index {get}
   var endIndex: Index {get}
@@ -166,7 +166,7 @@ public protocol Collection : Indexable, SequenceType {
 
   /// Returns the number of elements.
   ///
-  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
   var count: Index.Distance { get }
   
@@ -257,7 +257,7 @@ extension Collection {
 
   /// Returns the number of elements.
   ///
-  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
   public var count: Index.Distance {
     return startIndex.distanceTo(endIndex)
@@ -478,7 +478,7 @@ extension Collection where Iterator.Element : Equatable {
   }
 }
 
-extension Collection where Index : BidirectionalIndexType {
+extension Collection where Index : BidirectionalIndex {
   /// Returns a subsequence containing all but the last `n` elements.
   ///
   /// - Requires: `n >= 0`
@@ -521,7 +521,7 @@ extension Collection where SubSequence == Self {
   /// Remove the first `n` elements.
   ///
   /// - Complexity:
-  ///   - O(1) if `Index` conforms to `RandomAccessIndexType`
+  ///   - O(1) if `Index` conforms to `RandomAccessIndex`
   ///   - O(n) otherwise
   /// - Requires: `n >= 0 && self.count >= n`.
   public mutating func removeFirst(n: Int) {
@@ -536,7 +536,7 @@ extension Collection where SubSequence == Self {
 extension Collection
   where
   SubSequence == Self,
-  Index : BidirectionalIndexType {
+  Index : BidirectionalIndex {
 
   /// Remove an element from the end.
   ///
@@ -551,7 +551,7 @@ extension Collection
   /// Remove the last `n` elements.
   ///
   /// - Complexity:
-  ///   - O(1) if `Index` conforms to `RandomAccessIndexType`
+  ///   - O(1) if `Index` conforms to `RandomAccessIndex`
   ///   - O(n) otherwise
   /// - Requires: `n >= 0 && self.count >= n`.
   public mutating func removeLast(n: Int) {

@@ -100,7 +100,7 @@ for (a, b) in [1, 2, 3].myZip(["a", "b", "c"]) {
 
 // Mutating algorithms.
 extension MutableCollection
-  where Self.Index: RandomAccessIndexType, Self.Iterator.Element : Comparable {
+  where Self.Index: RandomAccessIndex, Self.Iterator.Element : Comparable {
 
   public final mutating func myPartition(range: Range<Index>) -> Index {
     return self.partition(range)

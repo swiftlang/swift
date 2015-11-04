@@ -15,8 +15,8 @@
 //===--- Verify that Foundation isn't loaded ------------------------------===//
 struct No {}
 struct Yes {}
-func isRandomAccessIndex<T : ForwardIndexType>(_: T) -> No { return No() }
-func isRandomAccessIndex<T : RandomAccessIndexType>(_: T) -> Yes { return Yes() }
+func isRandomAccessIndex<T : ForwardIndex>(_: T) -> No { return No() }
+func isRandomAccessIndex<T : RandomAccessIndex>(_: T) -> Yes { return Yes() }
 let no = isRandomAccessIndex("".utf16.startIndex)
 let _: No = no
 

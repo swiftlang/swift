@@ -291,7 +291,7 @@ extension RangeReplaceableCollection {
 
 extension RangeReplaceableCollection
   where
-  Index : BidirectionalIndexType,
+  Index : BidirectionalIndex,
   SubSequence == Self {
 
   @warn_unused_result
@@ -308,7 +308,7 @@ extension RangeReplaceableCollection
   }
 }
 
-extension RangeReplaceableCollection where Index : BidirectionalIndexType {
+extension RangeReplaceableCollection where Index : BidirectionalIndex {
   /// Remove an element from the end.
   ///
   /// - Complexity: O(1)

@@ -199,7 +199,7 @@ public class CollectionLog : SequenceLog {
 
 public protocol LoggingCollectionType : LoggingSequenceType, Collection {
   typealias Base : Collection
-  typealias Index : ForwardIndexType = Base.Index
+  typealias Index : ForwardIndex = Base.Index
 }
 
 extension LoggingCollectionType

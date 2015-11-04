@@ -49,7 +49,7 @@ public protocol SplittableCollection : Collection {
   func split(range: Range<Index>) -> [Range<Index>]
 }
 
-internal func _splitRandomAccessIndexRange<Index : RandomAccessIndexType>(
+internal func _splitRandomAccessIndexRange<Index : RandomAccessIndex>(
   range: Range<Index>
 ) -> [Range<Index>] {
   let startIndex = range.startIndex

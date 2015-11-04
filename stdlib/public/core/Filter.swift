@@ -98,10 +98,10 @@ public struct LazyFilterSequence<Base : SequenceType>
 /// - Note: The performance of advancing a `LazyFilterIndex`
 ///   depends on how sparsely the filtering predicate is satisfied,
 ///   and may not offer the usual performance given by models of
-///   `ForwardIndexType`.
+///   `ForwardIndex`.
 public struct LazyFilterIndex<
   BaseElements: Collection
-> : ForwardIndexType {
+> : ForwardIndex {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Requires: The next value is representable.
@@ -111,7 +111,7 @@ public struct LazyFilterIndex<
   ///   predicate.
   ///
   /// - Note: This operation may not satisfy the expected complexity
-  ///   for models of `ForwardIndexType`.
+  ///   for models of `ForwardIndex`.
   public func successor() -> LazyFilterIndex {
     for p in base.successor()..<_baseElements.endIndex {
       if _include(_baseElements[p]) {
@@ -149,7 +149,7 @@ public func == <Base : Collection>(
 /// - Note: The performance of advancing a `LazyFilterIndex`
 ///   depends on how sparsely the filtering predicate is satisfied,
 ///   and may not offer the usual performance given by models of
-///   `ForwardIndexType`.  Be aware, therefore, that general operations
+///   `ForwardIndex`.  Be aware, therefore, that general operations
 ///   on `LazyFilterCollection` instances may not have the
 ///   documented complexity.
 public struct LazyFilterCollection<

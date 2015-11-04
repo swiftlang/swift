@@ -10,17 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  ForwardIndexType, BidirectionalIndexType, and RandomAccessIndexType
+//  ForwardIndex, BidirectionalIndex, and RandomAccessIndex
 //
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
-//===--- ForwardIndexType -------------------------------------------------===//
+//===--- ForwardIndex -------------------------------------------------===//
 
-/// This protocol is an implementation detail of `ForwardIndexType`; do
+/// This protocol is an implementation detail of `ForwardIndex`; do
 /// not use it directly.
 ///
-/// Its requirements are inherited by `ForwardIndexType` and thus must
+/// Its requirements are inherited by `ForwardIndex` and thus must
 /// be satisfied by types conforming to that protocol.
 public protocol _Incrementable : Equatable {
   /// Return the next consecutive value in a discrete sequence of
@@ -70,7 +70,7 @@ public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
 /// Represents a discrete value in a series, where a value's
 /// successor, if any, is reachable by applying the value's
 /// `successor()` method.
-public protocol ForwardIndexType : _Incrementable {
+public protocol ForwardIndex : _Incrementable {
   /// A type that can represent the number of steps between pairs of
   /// `Self` values where one value is reachable from the other.
   ///
@@ -135,9 +135,9 @@ public protocol ForwardIndexType : _Incrementable {
   ///   - If `n < 0`, the result of applying `predecessor` to `self` `-n` times.
   ///   - Otherwise, `self`.
   ///
-  /// - Requires: `n >= 0` if only conforming to `ForwardIndexType`
+  /// - Requires: `n >= 0` if only conforming to `ForwardIndex`
   /// - Complexity:
-  ///   - O(1) if conforming to `RandomAccessIndexType`
+  ///   - O(1) if conforming to `RandomAccessIndex`
   ///   - O(`abs(n)`) otherwise
   @warn_unused_result
   func advancedBy(n: Distance) -> Self
@@ -152,10 +152,10 @@ public protocol ForwardIndexType : _Incrementable {
   ///     but not past `limit`.
   ///   - Otherwise, `self`.
   ///
-  /// - Requires: `n >= 0` if only conforming to `ForwardIndexType`.
+  /// - Requires: `n >= 0` if only conforming to `ForwardIndex`.
   ///
   /// - Complexity:
-  ///   - O(1) if conforming to `RandomAccessIndexType`
+  ///   - O(1) if conforming to `RandomAccessIndex`
   ///   - O(`abs(n)`) otherwise
   @warn_unused_result
   func advancedBy(n: Distance, limit: Self) -> Self
@@ -168,7 +168,7 @@ public protocol ForwardIndexType : _Incrementable {
   ///   - `end` is reachable from `self` by incrementation otherwise.
   ///
   /// - Complexity:
-  ///   - O(1) if conforming to `RandomAccessIndexType`
+  ///   - O(1) if conforming to `RandomAccessIndex`
   ///   - O(`n`) otherwise, where `n` is the function's result.
   @warn_unused_result
   func distanceTo(end: Self) -> Distance
@@ -176,7 +176,7 @@ public protocol ForwardIndexType : _Incrementable {
 
 // advance and distance implementations
 
-extension ForwardIndexType {
+extension ForwardIndex {
   public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) {
     // Can't perform range checks in O(1) on forward indices.
   }
@@ -192,7 +192,7 @@ extension ForwardIndexType {
   @warn_unused_result
   internal func _advanceForward(n: Distance) -> Self {
     _precondition(n >= 0,
-        "Only BidirectionalIndexType can be advanced by a negative amount")
+        "Only BidirectionalIndex can be advanced by a negative amount")
     var p = self
     for var i: Distance = 0; i != n; ++i {
       ++p
@@ -205,7 +205,7 @@ extension ForwardIndexType {
   @warn_unused_result
   internal func _advanceForward(n: Distance, _ limit: Self) -> Self {
     _precondition(n >= 0,
-        "Only BidirectionalIndexType can be advanced by a negative amount")
+        "Only BidirectionalIndex can be advanced by a negative amount")
     var p = self
     for var i: Distance = 0; i != n && p != limit; ++i {
       ++p
@@ -236,12 +236,12 @@ extension ForwardIndexType {
 }
 
 //===----------------------------------------------------------------------===//
-//===--- BidirectionalIndexType -------------------------------------------===//
+//===--- BidirectionalIndex -------------------------------------------===//
 
 
 /// An *index* that can step backwards via application of its
 /// `predecessor()` method.
-public protocol BidirectionalIndexType : ForwardIndexType {
+public protocol BidirectionalIndex : ForwardIndex {
   /// Return the previous consecutive value in a discrete sequence.
   ///
   /// If `self` has a well-defined successor,
@@ -256,7 +256,7 @@ public protocol BidirectionalIndexType : ForwardIndexType {
   mutating func _predecessorInPlace()
 }
 
-extension BidirectionalIndexType {
+extension BidirectionalIndex {
   @inline(__always)
   public mutating func _predecessorInPlace() {
     self = self.predecessor()
@@ -290,7 +290,7 @@ extension BidirectionalIndexType {
 /// Replace `i` with its `predecessor()` and return the updated value
 /// of `i`.
 @_transparent
-public prefix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
+public prefix func -- <T : BidirectionalIndex> (inout i: T) -> T {
   i._predecessorInPlace()
   return i
 }
@@ -299,16 +299,16 @@ public prefix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
 /// Replace `i` with its `predecessor()` and return the original
 /// value of `i`.
 @_transparent
-public postfix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
+public postfix func -- <T : BidirectionalIndex> (inout i: T) -> T {
   let ret = i
   i._predecessorInPlace()
   return ret
 }
 
 //===----------------------------------------------------------------------===//
-//===--- RandomAccessIndexType --------------------------------------------===//
+//===--- RandomAccessIndex ------------------------------------------------===//
 
-/// Used to force conformers of RandomAccessIndexType to implement
+/// Used to force conformers of RandomAccessIndex to implement
 /// `advancedBy` methods and `distanceTo`.
 public protocol _RandomAccessAmbiguity {
   typealias Distance : _SignedIntegerType = Int
@@ -323,7 +323,7 @@ extension _RandomAccessAmbiguity {
 
 /// An *index* that can be offset by an arbitrary number of positions,
 /// and can measure the distance to any reachable value, in O(1).
-public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable,
+public protocol RandomAccessIndex : BidirectionalIndex, Strideable,
   _RandomAccessAmbiguity {
 
   @warn_unused_result
@@ -336,7 +336,7 @@ public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable,
   func advancedBy(n: Distance, limit: Self) -> Self
 }
 
-extension RandomAccessIndexType {
+extension RandomAccessIndex {
   public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) {
     _precondition(
       bounds.startIndex <= index,

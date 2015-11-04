@@ -60,7 +60,7 @@ public protocol _IntegerType
 }
 
 /// A set of common requirements for Swift's integer types.
-public protocol IntegerType : _IntegerType, RandomAccessIndexType {
+public protocol IntegerType : _IntegerType, RandomAccessIndex {
 }
 
 /// This protocol is an implementation detail of `SignedIntegerType`;
@@ -355,10 +355,10 @@ extension ${Self} : CustomStringConvertible {
 // precondition violations in this context.  Therefore, we use masked
 // arithmetic in this conformance, and we need to be be sure that
 // generic implementations of the arithmetic operators for
-// RandomAccessIndexType's are all shadowed by more-specific
+// RandomAccessIndex's are all shadowed by more-specific
 // implementations that *do* check for overflows.
 @_transparent
-extension ${Self} : RandomAccessIndexType {
+extension ${Self} : RandomAccessIndex {
   // HACK: Disable indexing and slicing Ranges of IntegerType types
   // outside of a generic context.  See the implementation of Range
   // for details of how this works.

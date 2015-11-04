@@ -109,7 +109,7 @@ public struct LazyMapCollection<Base : Collection, Element>
 
   /// Returns the number of elements.
   ///
-  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndex`;
   ///   O(N) otherwise.
   public var count: Base.Index.Distance {
     return _base.count

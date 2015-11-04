@@ -306,7 +306,7 @@ public func expectCollectionAssociatedTypes<
   X : Collection,
   Iterator : IteratorProtocol,
   SubSequence : SequenceType,
-  Index : ForwardIndexType
+  Index : ForwardIndex
   where
   X.Index == Index
 >(
@@ -316,7 +316,7 @@ public func expectCollectionAssociatedTypes<
   indexType: Index.Type
 ) {}
 
-public func expectForwardIndexType<X : ForwardIndexType>(x: X) -> X { return x }
+public func expectForwardIndexType<X : ForwardIndex>(x: X) -> X { return x }
 public func expectIsBooleanType<X : BooleanType>(inout x: X) -> X { return x }
 
 public struct AssertionResult : CustomStringConvertible, BooleanType {
@@ -1500,7 +1500,7 @@ public func checkHashable<T : Hashable>(
 
 % for inc, protocol, op, successor, end in (
 %  ('inc', '_Incrementable', '++', 'successor', 'end'),
-%  ('dec', 'BidirectionalIndexType', '--', 'predecessor', 'start')):
+%  ('dec', 'BidirectionalIndex', '--', 'predecessor', 'start')):
 
 /// Test that the elements of `instances` satisfy
 /// ${'some of ' if inc == 'dec' else ''}the semantic
@@ -1735,7 +1735,7 @@ public struct CollectionMisuseResiliencyChecks {
 internal func _checkIncrementalAdvance<
   Instances : Collection
   where
-  Instances.Iterator.Element : ForwardIndexType
+  Instances.Iterator.Element : ForwardIndex
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index)->Bool,
@@ -1762,7 +1762,7 @@ internal func _checkIncrementalAdvance<
 }
 
 /// Test that the elements of `instances` satisfy the semantic
-/// requirements of `ForwardIndexType`, using `equalityOracle` to
+/// requirements of `ForwardIndex`, using `equalityOracle` to
 /// generate equality expectations from pairs of positions in
 /// `instances`.
 ///
@@ -1771,7 +1771,7 @@ internal func _checkIncrementalAdvance<
 public func checkForwardIndex<
   Instances : Collection
   where
-  Instances.Iterator.Element : ForwardIndexType
+  Instances.Iterator.Element : ForwardIndex
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index)->Bool,
@@ -1788,7 +1788,7 @@ public func checkForwardIndex<
 }
 
 /// Test that the elements of `instances` satisfy the semantic
-/// requirements of `BidirectionalIndexType`, using `equalityOracle`
+/// requirements of `BidirectionalIndex`, using `equalityOracle`
 /// to generate equality expectations from pairs of positions in
 /// `instances`.
 ///
@@ -1798,7 +1798,7 @@ public func checkForwardIndex<
 public func checkBidirectionalIndex<
   Instances: Collection
   where
-  Instances.Iterator.Element : BidirectionalIndexType
+  Instances.Iterator.Element : BidirectionalIndex
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index)->Bool,
@@ -1820,7 +1820,7 @@ public func checkBidirectionalIndex<
 }
 
 /// Test that the elements of `instances` satisfy the semantic
-/// requirements of `RandomAccessIndexType`, using 
+/// requirements of `RandomAccessIndex`, using 
 /// `advanceOracle` and 'distanceOracle' to generate expectations
 /// about the results of `advancedBy` and `distanceTo` from pairs of
 /// positions in `instances` and `distances`.
@@ -1831,7 +1831,7 @@ public func checkBidirectionalIndex<
 public func checkRandomAccessIndex<
   Instances : Collection, Distances : Collection
   where
-  Instances.Iterator.Element : RandomAccessIndexType,
+  Instances.Iterator.Element : RandomAccessIndex,
   Distances.Iterator.Element == Instances.Iterator.Element.Distance,
   Instances.Iterator.Element.Distance == Instances.Iterator.Element.Stride
 >(
@@ -1965,7 +1965,7 @@ public func check${traversal}Collection<
   ${genericParam}, C : Collection
   where
   C.Iterator.Element == ${Element},
-  C.Index : ${traversal}IndexType
+  C.Index : ${traversal}Index
 %  if traversal == 'RandomAccess':
   , C.Index.Stride == C.Index.Distance
 % end
@@ -2132,7 +2132,7 @@ public func check${traversal}Collection<
   ${genericParam}, C : Collection
   where
   C.Iterator.Element == ${Element},
-  C.Index : ${traversal}IndexType,
+  C.Index : ${traversal}Index,
   ${Element} : Equatable
 %  if traversal == 'RandomAccess':
   , C.Index.Stride == C.Index.Distance
@@ -2154,9 +2154,9 @@ public func checkSliceableWithBidirectionalIndex<
   where
   S.Iterator.Element == ${Element},
   S.SubSequence.Iterator.Element == ${Element},
-  S.Index : BidirectionalIndexType,
+  S.Index : BidirectionalIndex,
   S.SubSequence : Collection,
-  S.SubSequence.Index : BidirectionalIndexType,
+  S.SubSequence.Index : BidirectionalIndex,
   ${Element} : Equatable
 >(
   expected: ${Expected}, _ sliceable: S, ${TRACE}
@@ -2905,7 +2905,7 @@ public protocol _MinimalIndexType {
 % for Distance in [ '', 'Int32' ]:
 %   Index = 'MinimalForward%sIndex' % Distance
 
-public struct ${Index} : ForwardIndexType {
+public struct ${Index} : ForwardIndex {
 % if Distance != '':
   public typealias Distance = ${Distance}
 % end
@@ -2998,7 +2998,7 @@ extension ${Index} : _MinimalIndexType {
 // MinimalBidirectionalIndex
 //===----------------------------------------------------------------------===//
 
-public struct MinimalBidirectionalIndex : BidirectionalIndexType {
+public struct MinimalBidirectionalIndex : BidirectionalIndex {
   public init(position: Int, startIndex: Int, endIndex: Int) {
     self = MinimalBidirectionalIndex(
       collectionState: nil,
@@ -3099,10 +3099,10 @@ extension MinimalBidirectionalIndex : _MinimalIndexType {
 //===----------------------------------------------------------------------===//
 
 % for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
-%   StrictIndexType = 'Strict{}IndexType'.format(Traversal)
+%   StrictIndexType = 'Strict{}Index'.format(Traversal)
 
-public protocol ${StrictIndexType} : ${Traversal}IndexType {
-  typealias Base : ${Traversal}IndexType
+public protocol ${StrictIndexType} : ${Traversal}Index {
+  typealias Base : ${Traversal}Index
   init(_ base: Base)
   var base: Base { get set }
 
@@ -3129,7 +3129,7 @@ extension ${StrictIndexType} {
 // Defaulted Index Types
 //===----------------------------------------------------------------------===//
 % for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
-%   StrictIndexType = 'Strict{}IndexType'.format(Traversal)
+%   StrictIndexType = 'Strict{}Index'.format(Traversal)
 %   DefaultedIndex = 'Defaulted{}Index'.format(Traversal)
 
 public struct ${DefaultedIndex}: ${StrictIndexType} {
@@ -3180,7 +3180,7 @@ public func == (lhs: ${DefaultedIndex}, rhs: ${DefaultedIndex}) -> Bool {
 // MinimalRandomAccessIndex
 //===----------------------------------------------------------------------===//
 
-public struct MinimalRandomAccessIndex : RandomAccessIndexType {
+public struct MinimalRandomAccessIndex : RandomAccessIndex {
   public typealias Distance = Int
   public init(position: Int, startIndex: Int, endIndex: Int) {
     self = MinimalRandomAccessIndex(

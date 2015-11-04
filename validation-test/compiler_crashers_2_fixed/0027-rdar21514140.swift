@@ -47,7 +47,7 @@ extension SequenceType
 
 internal protocol _CollectionWrapperType : _SequenceWrapperType {
   typealias Base : Collection
-  typealias Index : ForwardIndexType = Base.Index
+  typealias Index : ForwardIndex = Base.Index
   var _base: Base {get}
 }
 
@@ -304,8 +304,8 @@ extension _prext_LazyCollectionType {
  
 //===--- New stuff --------------------------------------------------------===//
 
-internal protocol _prext_ReverseIndexType : BidirectionalIndexType {
-  typealias Base : BidirectionalIndexType
+internal protocol _prext_ReverseIndexType : BidirectionalIndex {
+  typealias Base : BidirectionalIndex
   
   /// A type that can represent the number of steps between pairs of
   /// `_prext_ReverseIndex` values where one value is reachable from the other.
@@ -315,9 +315,9 @@ internal protocol _prext_ReverseIndexType : BidirectionalIndexType {
   init(_ base: Base)
 }
 
-/// A wrapper for a `BidirectionalIndexType` that reverses its
+/// A wrapper for a `BidirectionalIndex` that reverses its
 /// direction of traversal.
-extension BidirectionalIndexType where Self : _prext_ReverseIndexType {
+extension BidirectionalIndex where Self : _prext_ReverseIndexType {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Requires: The next value is representable.
@@ -333,8 +333,8 @@ extension BidirectionalIndexType where Self : _prext_ReverseIndexType {
   }
 }
 
-public struct _prext_ReverseIndex<Base: BidirectionalIndexType>
-: BidirectionalIndexType, _prext_ReverseIndexType {
+public struct _prext_ReverseIndex<Base: BidirectionalIndex>
+: BidirectionalIndex, _prext_ReverseIndexType {
   internal init(_ base: Base) { self._base = base }
   internal let _base: Base
 }
@@ -343,8 +343,8 @@ public func == <I> (lhs: _prext_ReverseIndex<I>, rhs: _prext_ReverseIndex<I>) ->
   return lhs._base == rhs._base
 }
 
-public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndexType>
-  : RandomAccessIndexType, _prext_ReverseIndexType {
+public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndex>
+  : RandomAccessIndex, _prext_ReverseIndexType {
 
   typealias Distance = Base.Distance
   

@@ -88,7 +88,7 @@ public extension IteratorProtocol {
 }
 
 public protocol Q_IndexableType {
-  typealias Index : ForwardIndexType
+  typealias Index : ForwardIndex
   typealias Element
   subscript(position: Index) -> Element {get}
   var startIndex: Index {get}

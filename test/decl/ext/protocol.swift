@@ -342,7 +342,7 @@ protocol MySeq : _MySeq {
 }
 
 protocol _MyCollection : _MySeq {
-  typealias Index : ForwardIndexType
+  typealias Index : ForwardIndex
 
   var myStartIndex : Index { get }
   var myEndIndex : Index { get }

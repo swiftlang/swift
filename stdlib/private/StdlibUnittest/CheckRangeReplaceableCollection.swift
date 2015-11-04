@@ -1102,12 +1102,12 @@ self.test("\(testNamePrefix).OperatorPlus") {
     C : RangeReplaceableCollection,
     CollectionWithEquatableElement : RangeReplaceableCollection
     where
-    C.Index : BidirectionalIndexType,
+    C.Index : BidirectionalIndex,
     C.SubSequence : Collection,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
-    C.SubSequence.Index : BidirectionalIndexType,
+    C.SubSequence.Index : BidirectionalIndex,
     C.SubSequence.SubSequence == C.SubSequence,
-    CollectionWithEquatableElement.Index : BidirectionalIndexType,
+    CollectionWithEquatableElement.Index : BidirectionalIndex,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
     testNamePrefix: String = "",
@@ -1229,12 +1229,12 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     C : RangeReplaceableCollection,
     CollectionWithEquatableElement : RangeReplaceableCollection
     where
-    C.Index : RandomAccessIndexType,
+    C.Index : RandomAccessIndex,
     C.SubSequence : Collection,
     C.SubSequence.Iterator.Element == C.Iterator.Element,
-    C.SubSequence.Index : RandomAccessIndexType,
+    C.SubSequence.Index : RandomAccessIndex,
     C.SubSequence.SubSequence == C.SubSequence,
-    CollectionWithEquatableElement.Index : RandomAccessIndexType,
+    CollectionWithEquatableElement.Index : RandomAccessIndex,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
     testNamePrefix: String = "",

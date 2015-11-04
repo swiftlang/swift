@@ -171,15 +171,15 @@ extension AnyRandomAccessCollection {
 //===----------------------------------------------------------------------===//
 
 
-/// A wrapper over an underlying `ForwardIndexType` that hides
+/// A wrapper over an underlying `ForwardIndex` that hides
 /// the specific underlying type.
 ///
 /// See also: `AnyForwardCollection`
-public struct AnyForwardIndex : ForwardIndexType {
+public struct AnyForwardIndex : ForwardIndex {
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex: ForwardIndexType>(_ base: BaseIndex) 
+  public init<BaseIndex: ForwardIndex>(_ base: BaseIndex) 
 
   /// Return the next consecutive value in a discrete sequence of
   /// `AnyForwardIndex` values.
@@ -215,15 +215,15 @@ public func ~> (
 /// identical.
 public func == (lhs: AnyForwardIndex, rhs: AnyForwardIndex) -> Bool 
 
-/// A wrapper over an underlying `BidirectionalIndexType` that hides
+/// A wrapper over an underlying `BidirectionalIndex` that hides
 /// the specific underlying type.
 ///
 /// See also: `AnyBidirectionalCollection`
-public struct AnyBidirectionalIndex : BidirectionalIndexType {
+public struct AnyBidirectionalIndex : BidirectionalIndex {
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex: BidirectionalIndexType>(_ base: BaseIndex) 
+  public init<BaseIndex: BidirectionalIndex>(_ base: BaseIndex) 
 
   /// Return the next consecutive value in a discrete sequence of
   /// `AnyBidirectionalIndex` values.
@@ -264,15 +264,15 @@ public func ~> (
 /// identical.
 public func == (lhs: AnyBidirectionalIndex, rhs: AnyBidirectionalIndex) -> Bool 
 
-/// A wrapper over an underlying `RandomAccessIndexType` that hides
+/// A wrapper over an underlying `RandomAccessIndex` that hides
 /// the specific underlying type.
 ///
 /// See also: `AnyRandomAccessCollection`
-public struct AnyRandomAccessIndex : RandomAccessIndexType {
+public struct AnyRandomAccessIndex : RandomAccessIndex {
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex: RandomAccessIndexType>(_ base: BaseIndex) 
+  public init<BaseIndex: RandomAccessIndex>(_ base: BaseIndex) 
 
   /// Return the next consecutive value in a discrete sequence of
   /// `AnyRandomAccessIndex` values.
@@ -367,7 +367,7 @@ public struct AnyForwardCollection<Element> : AnyCollection {
   /// Complexity: O(1)
   public init<
     C: Collection
-      where C.Index: ForwardIndexType, C.Generator.Element == Element
+      where C.Index: ForwardIndex, C.Generator.Element == Element
   >(_ base: C) 
 
   /// Create an `AnyForwardCollection` having the same underlying
@@ -383,7 +383,7 @@ public struct AnyForwardCollection<Element> : AnyCollection {
   /// Complexity: O(1)
   public init<
     C: Collection
-      where C.Index: BidirectionalIndexType, C.Generator.Element == Element
+      where C.Index: BidirectionalIndex, C.Generator.Element == Element
   >(_ base: C) 
 
   /// Create an `AnyForwardCollection` having the same underlying
@@ -399,7 +399,7 @@ public struct AnyForwardCollection<Element> : AnyCollection {
   /// Complexity: O(1)
   public init<
     C: Collection
-      where C.Index: RandomAccessIndexType, C.Generator.Element == Element
+      where C.Index: RandomAccessIndex, C.Generator.Element == Element
   >(_ base: C) 
 
   /// Create an `AnyForwardCollection` having the same underlying
@@ -454,7 +454,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollection {
   /// Complexity: O(1)
   public init<
     C: Collection
-      where C.Index: BidirectionalIndexType, C.Generator.Element == Element
+      where C.Index: BidirectionalIndex, C.Generator.Element == Element
   >(_ base: C) 
 
   /// Create an `AnyBidirectionalCollection` having the same underlying
@@ -470,7 +470,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollection {
   /// Complexity: O(1)
   public init<
     C: Collection
-      where C.Index: RandomAccessIndexType, C.Generator.Element == Element
+      where C.Index: RandomAccessIndex, C.Generator.Element == Element
   >(_ base: C) 
 
   /// Create an `AnyBidirectionalCollection` having the same underlying
@@ -482,7 +482,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollection {
   public init(_ other: AnyRandomAccessCollection<Element>) 
 
   /// If the indices of the underlying collection stored by `other`
-  /// satisfy `BidirectionalIndexType`, create an
+  /// satisfy `BidirectionalIndex`, create an
   /// `AnyBidirectionalCollection` having the same underlying
   /// collection as `other`.  Otherwise, the result is `nil`.
   ///
@@ -532,7 +532,7 @@ public struct AnyRandomAccessCollection<Element> : AnyCollection {
   /// Complexity: O(1)
   public init<
     C: Collection
-      where C.Index: RandomAccessIndexType, C.Generator.Element == Element
+      where C.Index: RandomAccessIndex, C.Generator.Element == Element
   >(_ base: C) 
 
   /// Create an `AnyRandomAccessCollection` having the same underlying
@@ -544,14 +544,14 @@ public struct AnyRandomAccessCollection<Element> : AnyCollection {
   public init(_ other: AnyRandomAccessCollection<Element>) 
 
   /// If the indices of the underlying collection stored by `other`
-  /// satisfy `RandomAccessIndexType`, create an
+  /// satisfy `RandomAccessIndex`, create an
   /// `AnyRandomAccessCollection` having the same underlying
   /// collection as `other`.  Otherwise, the result is `nil`.
   ///
   /// Complexity: O(1)
   public init?(_ other: AnyForwardCollection<Element>) 
   /// If the indices of the underlying collection stored by `other`
-  /// satisfy `RandomAccessIndexType`, create an
+  /// satisfy `RandomAccessIndex`, create an
   /// `AnyRandomAccessCollection` having the same underlying
   /// collection as `other`.  Otherwise, the result is `nil`.
   ///

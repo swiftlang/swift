@@ -263,7 +263,7 @@ internal protocol _ForwardIndexBoxType : class {
   func equals(other: _ForwardIndexBoxType) -> Bool
 
   @warn_unused_result
-  func _unbox<T : ForwardIndexType>() -> T?
+  func _unbox<T : ForwardIndex>() -> T?
 
   @warn_unused_result
   func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance
@@ -280,7 +280,7 @@ internal protocol _ForwardIndexBoxType : class {
 }
 
 internal class _ForwardIndexBox<
-  BaseIndex: ForwardIndexType
+  BaseIndex: ForwardIndex
 > : _ForwardIndexBoxType {
   required init(_ base: BaseIndex) {
     self.base = base
@@ -318,7 +318,7 @@ internal class _ForwardIndexBox<
       base.advancedBy(numericCast(n), limit: unsafeUnbox(limit)))
   }
 
-  func _unbox<T : ForwardIndexType>() -> T? {
+  func _unbox<T : ForwardIndex>() -> T? {
     if T.self is BaseIndex.Type {
       _sanityCheck(BaseIndex.self is T.Type)
       // This bit cast is really nothing as we have proven they are
@@ -343,7 +343,7 @@ internal protocol _BidirectionalIndexBoxType : _ForwardIndexBoxType {
 }
 
 internal class _BidirectionalIndexBox<
-  BaseIndex: BidirectionalIndexType
+  BaseIndex: BidirectionalIndex
 > : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxType {
   required init(_ base: BaseIndex) {
     super.init(base)
@@ -362,13 +362,13 @@ internal class _BidirectionalIndexBox<
   }
 }
 
-//===--- RandomAccessIndex -----------------------------------------------===//
+//===--- RandomAccessIndex ------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
 internal protocol _RandomAccessIndexBoxType : _BidirectionalIndexBoxType {}
 
 internal final class _RandomAccessIndexBox<
-  BaseIndex: RandomAccessIndexType
+  BaseIndex: RandomAccessIndex
 > : _BidirectionalIndexBox<BaseIndex>, _RandomAccessIndexBoxType {
   required init(_ base: BaseIndex) {
     super.init(base)
@@ -381,15 +381,15 @@ internal final class _RandomAccessIndexBox<
 % for Traversal in traversals:
 
 %   Self = 'Any%sIndex' % Traversal
-/// A wrapper over an underlying `${Traversal}IndexType` that hides
+/// A wrapper over an underlying `${Traversal}Index` that hides
 /// the specific underlying type.
 ///
 /// - SeeAlso: `Any${Traversal}Collection`
-public struct ${Self} : ${Traversal}IndexType {
+public struct ${Self} : ${Traversal}Index {
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex: ${Traversal}IndexType>(_ base: BaseIndex) {
+  public init<BaseIndex: ${Traversal}Index>(_ base: BaseIndex) {
     _box = _${Traversal}IndexBox(base)
   }
 
@@ -543,7 +543,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollection {
   public init<
     C : Collection
     where
-    C.Index: ${SubTraversal}IndexType, C.Iterator.Element == Element
+    C.Index: ${SubTraversal}Index, C.Iterator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
       base,
@@ -564,7 +564,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollection {
 
 %   for SuperTraversal in traversals[:ti]:
   /// If the indices of the underlying collection stored by `other`
-  /// satisfy `${Traversal}IndexType`, create an
+  /// satisfy `${Traversal}Index`, create an
   /// `Any${Traversal}Collection` having the same underlying
   /// collection as `other`.  Otherwise, the result is `nil`.
   ///

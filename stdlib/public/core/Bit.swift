@@ -14,9 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A `RandomAccessIndexType` that has two possible values.  Used as
+/// A `RandomAccessIndex` that has two possible values.  Used as
 /// the `Index` type for `CollectionOfOne<T>`.
-public enum Bit : Int, Comparable, RandomAccessIndexType, _Reflectable {
+public enum Bit : Int, Comparable, RandomAccessIndex, _Reflectable {
 
   public typealias Distance = Int
 

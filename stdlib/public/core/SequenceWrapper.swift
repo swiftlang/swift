@@ -86,7 +86,7 @@ extension SequenceType
 public // @testable
 protocol _CollectionWrapperType : _SequenceWrapperType {
   typealias Base : Collection
-  typealias Index : ForwardIndexType = Base.Index
+  typealias Index : ForwardIndex = Base.Index
   var _base: Base {get}
 }
 

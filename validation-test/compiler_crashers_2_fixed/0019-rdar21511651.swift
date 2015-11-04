@@ -45,7 +45,7 @@ extension SequenceType
 
 internal protocol _CollectionWrapperType : _SequenceWrapperType {
   typealias Base : Collection
-  typealias Index : ForwardIndexType = Base.Index
+  typealias Index : ForwardIndex = Base.Index
   var _base: Base {get}
 }
 
@@ -306,9 +306,9 @@ internal protocol __prext_ReverseCollectionType : _prext_LazyCollectionType {
 }
 
 
-/// A wrapper for a `BidirectionalIndexType` that reverses its
+/// A wrapper for a `BidirectionalIndex` that reverses its
 /// direction of traversal.
-public struct _prext_ReverseIndex<I : BidirectionalIndexType> : BidirectionalIndexType {
+public struct _prext_ReverseIndex<I : BidirectionalIndex> : BidirectionalIndex {
   var _base: I
 
   init(_ _base: I) { self._base = _base }
@@ -334,7 +334,7 @@ public struct _prext_ReverseIndex<I : BidirectionalIndexType> : BidirectionalInd
 
 /// A wrapper for a `${IndexProtocol}` that reverses its
 /// direction of traversal.
-public struct _prext_ReverseRandomAccessIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
+public struct _prext_ReverseRandomAccessIndex<I : RandomAccessIndex> : RandomAccessIndex {
   var _base: I
 
   init(_ _base: I) { self._base = _base }
@@ -386,7 +386,7 @@ public func == <I> (lhs: _prext_ReverseRandomAccessIndex<I>, rhs: _prext_Reverse
 }
 
 extension Collection
-  where Self : __prext_ReverseCollectionType, Self.Base.Index : BidirectionalIndexType {
+  where Self : __prext_ReverseCollectionType, Self.Base.Index : BidirectionalIndex {
   public var startIndex : _prext_ReverseIndex<Base.Index> {
     return _prext_ReverseIndex<Base.Index>(_base.endIndex)
   }
@@ -400,7 +400,7 @@ extension Collection
 
 
 extension Collection
-  where Self : __prext_ReverseCollectionType, Self.Base.Index : RandomAccessIndexType {
+  where Self : __prext_ReverseCollectionType, Self.Base.Index : RandomAccessIndex {
   public var startIndex : _prext_ReverseRandomAccessIndex<Base.Index> {
     return _prext_ReverseRandomAccessIndex<Base.Index>(_base.endIndex)
   }

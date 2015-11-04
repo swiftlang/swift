@@ -88,7 +88,7 @@ public extension IteratorProtocol {
 }
 
 public protocol Q_CollectionDefaultsType : Q_SequenceType {
-  typealias Index : ForwardIndexType
+  typealias Index : ForwardIndex
   subscript(position: Index) -> Element {get}
   var startIndex: Index {get}
   var endIndex: Index {get}

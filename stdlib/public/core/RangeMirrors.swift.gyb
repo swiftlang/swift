@@ -15,7 +15,7 @@
 % common_args = dict(
 %   introspecteeType='Range',
 %   genericArgs=['T'],
-%   genericConstraints={'T':'ForwardIndexType'},
+%   genericConstraints={'T':'ForwardIndex'},
 %   disposition='Struct')
 %
 % for x in ('Decl', 'Conformance', 'Boilerplate'):

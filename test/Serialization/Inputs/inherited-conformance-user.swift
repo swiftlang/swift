@@ -1,6 +1,6 @@
 import Base
 
-// Instantiate Counter<Int>, relying on Counter's adoption of ForwardIndexType.
+// Instantiate Counter<Int>, relying on Counter's adoption of ForwardIndex.
 public struct OneToAThousand : Collection {
   public typealias Element = Int
   public typealias Index = Counter<Int>

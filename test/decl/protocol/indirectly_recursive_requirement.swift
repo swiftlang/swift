@@ -8,24 +8,24 @@ protocol _ForwardIndexType  {
   typealias Distance  = MyInt
 }
 
-protocol ForwardIndexType : _ForwardIndexType {
+protocol ForwardIndex : _ForwardIndexType {
 }
 
 protocol _BidirectionalIndexType : _ForwardIndexType {
   func predecessor() -> Self
 }
 
-protocol BidirectionalIndexType : ForwardIndexType, _BidirectionalIndexType {
+protocol BidirectionalIndex : ForwardIndex, _BidirectionalIndexType {
 }
 
 protocol _RandomAccessIndexType : _BidirectionalIndexType {
   typealias Distance
 }
 
-protocol RandomAccessIndexType 
-  : BidirectionalIndexType, _RandomAccessIndexType {}
+protocol RandomAccessIndex 
+  : BidirectionalIndex, _RandomAccessIndexType {}
 
-struct MyInt : RandomAccessIndexType
+struct MyInt : RandomAccessIndex
 {
   typealias Distance = MyInt
 

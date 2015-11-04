@@ -237,7 +237,7 @@ public class ForwardIndexLog {
   public static var advancedByWithLimit = TypeIndexed(0)
   public static var distanceTo = TypeIndexed(0)
 
-  public class func dispatchTester<I : ForwardIndexType>(
+  public class func dispatchTester<I : ForwardIndex>(
     i: I
   ) -> LoggingForwardIndex<LoggingForwardIndex<I>> {
     return LoggingForwardIndex(LoggingForwardIndex(i))
@@ -247,7 +247,7 @@ public class ForwardIndexLog {
 public class BidirectionalIndexLog : ForwardIndexLog {
   public static var predecessor = TypeIndexed(0)
 
-  public class func dispatchTester<I : BidirectionalIndexType>(
+  public class func dispatchTester<I : BidirectionalIndex>(
     i: I
   ) -> LoggingBidirectionalIndex<LoggingBidirectionalIndex<I>> {
     return LoggingBidirectionalIndex(LoggingBidirectionalIndex(i))
@@ -255,7 +255,7 @@ public class BidirectionalIndexLog : ForwardIndexLog {
 }
 
 public class RandomAccessIndexLog : BidirectionalIndexLog {
-  public class func dispatchTester<I : RandomAccessIndexType>(
+  public class func dispatchTester<I : RandomAccessIndex>(
     i: I
   ) -> LoggingRandomAccessIndex<LoggingRandomAccessIndex<I>> {
     return LoggingRandomAccessIndex(LoggingRandomAccessIndex(i))
@@ -318,8 +318,8 @@ public class MutableCollectionLog : CollectionLog {
 
 % for Kind in ['ForwardIndex', 'BidirectionalIndex', 'RandomAccessIndex']:
 public struct Logging${Kind}<
-  Base: ${Kind}Type
-> : ${Kind}Type, LoggingType {
+  Base: ${Kind}
+> : ${Kind}, LoggingType {
 
   public typealias Log = ${Kind}Log
   public typealias Distance = Base.Distance

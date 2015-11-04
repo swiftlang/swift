@@ -72,7 +72,7 @@ extension String.CharacterView : Collection {
   }
   
   /// A character position.
-  public struct Index : BidirectionalIndexType, Comparable, _Reflectable {
+  public struct Index : BidirectionalIndex, Comparable, _Reflectable {
     public // SPI(Foundation)    
     init(_base: String.UnicodeScalarView.Index) {
       self._base = _base

@@ -42,7 +42,7 @@ print("")
 func isPalindrome0<
   S : Collection
   where
-  S.Index : BidirectionalIndexType,
+  S.Index : BidirectionalIndex,
   S.Iterator.Element : Equatable
 >(seq: S) -> Bool {
   typealias Index = S.Index
@@ -67,7 +67,7 @@ print(isPalindrome0(X("GoHangaSalamiimalaSagnaHoG")))
 func isPalindrome1<
   S : Collection
   where
-  S.Index : BidirectionalIndexType,
+  S.Index : BidirectionalIndex,
   S.Iterator.Element : Equatable
 >(seq: S) -> Bool {
 
@@ -84,7 +84,7 @@ func isPalindrome1<
 func isPalindrome1_5<
   S: Collection
   where
-  S.Index: BidirectionalIndexType,
+  S.Index: BidirectionalIndex,
   S.Iterator.Element == S.Iterator.Element,
   S.Iterator.Element: Equatable
 >(seq: S) -> Bool {
@@ -109,11 +109,11 @@ print(isPalindrome1_5(X("FleetoMeRemoteelF")))
 print(isPalindrome1_5(X("FleetoMeReMoteelF")))
 
 // Finally, one that actually uses indexing to do half as much work.
-// BidirectionalIndexType traversal finally pays off!
+// BidirectionalIndex traversal finally pays off!
 func isPalindrome2<
   S: Collection
   where
-  S.Index : BidirectionalIndexType,
+  S.Index : BidirectionalIndex,
   S.Iterator.Element: Equatable
 >(seq: S) -> Bool {
 
@@ -145,7 +145,7 @@ print(isPalindrome2(X("Zerimar-O-ramireZ")))
 func isPalindrome4<
   S: Collection
   where
-  S.Index : BidirectionalIndexType,
+  S.Index : BidirectionalIndex,
   S.Iterator.Element : Equatable
 >(seq: S) -> Bool {
   typealias Index = S.Index

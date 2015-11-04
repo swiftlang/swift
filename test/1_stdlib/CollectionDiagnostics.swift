@@ -29,7 +29,7 @@ struct CollectionWithBadSubSequence : Collection {
 func useCollectionTypeSubSequenceIndex<
   C : Collection
   where
-  C.SubSequence.Index : BidirectionalIndexType
+  C.SubSequence.Index : BidirectionalIndex
 >(c: C) {}
 
 func useCollectionTypeSubSequenceGeneratorElement<
@@ -62,7 +62,7 @@ func sortResultIgnored<
   array.sort { $0 < $1 } // expected-warning {{result of call to non-mutating function 'sort' is unused; use 'sortInPlace' to mutate in-place}} {{9-13=sortInPlace}}
 }
 
-struct GoodForwardIndex1 : ForwardIndexType {
+struct GoodForwardIndex1 : ForwardIndex {
   func successor() -> GoodForwardIndex1 {
     fatalError("not implemented")
   }
@@ -71,7 +71,7 @@ func == (lhs: GoodForwardIndex1, rhs: GoodForwardIndex1) -> Bool {
   fatalError("not implemented")
 }
 
-struct GoodForwardIndex2 : ForwardIndexType {
+struct GoodForwardIndex2 : ForwardIndex {
   func successor() -> GoodForwardIndex2 {
     fatalError("not implemented")
   }
@@ -82,7 +82,7 @@ func == (lhs: GoodForwardIndex2, rhs: GoodForwardIndex2) -> Bool {
 }
 
 
-struct GoodBidirectionalIndex1 : BidirectionalIndexType {
+struct GoodBidirectionalIndex1 : BidirectionalIndex {
   func successor() -> GoodBidirectionalIndex1 {
     fatalError("not implemented")
   }
@@ -94,7 +94,7 @@ func == (lhs: GoodBidirectionalIndex1, rhs: GoodBidirectionalIndex1) -> Bool {
   fatalError("not implemented")
 }
 
-struct GoodBidirectionalIndex2 : BidirectionalIndexType {
+struct GoodBidirectionalIndex2 : BidirectionalIndex {
   func successor() -> GoodBidirectionalIndex2 {
     fatalError("not implemented")
   }
@@ -107,8 +107,8 @@ func == (lhs: GoodBidirectionalIndex2, rhs: GoodBidirectionalIndex2) -> Bool {
   fatalError("not implemented")
 }
 
-// expected-error@+1 {{type 'BadBidirectionalIndex1' does not conform to protocol 'BidirectionalIndexType'}}
-struct BadBidirectionalIndex1 : BidirectionalIndexType {
+// expected-error@+1 {{type 'BadBidirectionalIndex1' does not conform to protocol 'BidirectionalIndex'}}
+struct BadBidirectionalIndex1 : BidirectionalIndex {
   func successor() -> BadBidirectionalIndex1 {
     fatalError("not implemented")
   }
@@ -118,7 +118,7 @@ func == (lhs: BadBidirectionalIndex1, rhs: BadBidirectionalIndex1) -> Bool {
   fatalError("not implemented")
 }
 
-struct GoodRandomAccessIndex1 : RandomAccessIndexType {
+struct GoodRandomAccessIndex1 : RandomAccessIndex {
   func successor() -> GoodRandomAccessIndex1 {
     fatalError("not implemented")
   }
@@ -136,7 +136,7 @@ func == (lhs: GoodRandomAccessIndex1, rhs: GoodRandomAccessIndex1) -> Bool {
   fatalError("not implemented")
 }
 
-struct GoodRandomAccessIndex2 : RandomAccessIndexType {
+struct GoodRandomAccessIndex2 : RandomAccessIndex {
   func successor() -> GoodRandomAccessIndex2 {
     fatalError("not implemented")
   }
@@ -155,9 +155,9 @@ func == (lhs: GoodRandomAccessIndex2, rhs: GoodRandomAccessIndex2) -> Bool {
   fatalError("not implemented")
 }
 
-// expected-error@+2 {{type 'BadRandomAccessIndex1' does not conform to protocol 'RandomAccessIndexType'}}
+// expected-error@+2 {{type 'BadRandomAccessIndex1' does not conform to protocol 'RandomAccessIndex'}}
 // expected-error@+1 * {{}} // There are a lot of other errors we don't care about.
-struct BadRandomAccessIndex1 : RandomAccessIndexType {
+struct BadRandomAccessIndex1 : RandomAccessIndex {
   func successor() -> BadRandomAccessIndex1 {
     fatalError("not implemented")
   }
@@ -169,9 +169,9 @@ func == (lhs: BadRandomAccessIndex1, rhs: BadRandomAccessIndex1) -> Bool {
   fatalError("not implemented")
 }
 
-// expected-error@+2 {{type 'BadRandomAccessIndex2' does not conform to protocol 'RandomAccessIndexType'}}
+// expected-error@+2 {{type 'BadRandomAccessIndex2' does not conform to protocol 'RandomAccessIndex'}}
 // expected-error@+1 * {{}} // There are a lot of other errors we don't care about.
-struct BadRandomAccessIndex2 : RandomAccessIndexType {
+struct BadRandomAccessIndex2 : RandomAccessIndex {
   func successor() -> BadRandomAccessIndex2 {
     fatalError("not implemented")
   }
@@ -186,9 +186,9 @@ func == (lhs: BadRandomAccessIndex2, rhs: BadRandomAccessIndex2) -> Bool {
   fatalError("not implemented")
 }
 
-// expected-error@+2 {{type 'BadRandomAccessIndex3' does not conform to protocol 'RandomAccessIndexType'}}
+// expected-error@+2 {{type 'BadRandomAccessIndex3' does not conform to protocol 'RandomAccessIndex'}}
 // expected-error@+1 * {{}} // There are a lot of other errors we don't care about.
-struct BadRandomAccessIndex3 : RandomAccessIndexType {
+struct BadRandomAccessIndex3 : RandomAccessIndex {
   func successor() -> BadRandomAccessIndex3 {
     fatalError("not implemented")
   }

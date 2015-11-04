@@ -110,7 +110,7 @@ extension String {
     }
 
     /// A position in a `String.UTF8View`.
-    public struct Index : ForwardIndexType {
+    public struct Index : ForwardIndex {
       internal typealias Buffer = _StringCore.UTF8Chunk
 
       init(_ _core: _StringCore, _ _coreIndex: Int,

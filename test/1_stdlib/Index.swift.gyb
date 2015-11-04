@@ -139,20 +139,20 @@ var Index = TestSuite("Index")
 
 % for Traversal in ['Forward', 'Bidirectional', 'RandomAccess']:
 
-Index.test("${Traversal}IndexType/distanceTo/dispatch") {
+Index.test("${Traversal}Index/distanceTo/dispatch") {
   var start = ${Traversal}IndexLog.dispatchTester(0)
   var end = ${Traversal}IndexLog.dispatchTester(10)
   _ = start.distanceTo(end)
   expectCustomizable(start, start.log.distanceTo)
 }
 
-Index.test("${Traversal}IndexType/advancedBy(n)/dispatch") {
+Index.test("${Traversal}Index/advancedBy(n)/dispatch") {
   var start = ${Traversal}IndexLog.dispatchTester(0)
   _ = start.advancedBy(10)
   expectCustomizable(start, start.log.advancedBy)
 }
 
-Index.test("${Traversal}IndexType/advancedBy(n, limit:)/dispatch") {
+Index.test("${Traversal}Index/advancedBy(n, limit:)/dispatch") {
   let start = ${Traversal}IndexLog.dispatchTester(0)
   let limit = ${Traversal}IndexLog.dispatchTester(5)
   _ = start.advancedBy(10, limit: limit)
@@ -162,7 +162,7 @@ Index.test("${Traversal}IndexType/advancedBy(n, limit:)/dispatch") {
 %   for Base in ['Minimal', 'Defaulted']:
 %     Kind = '{}{}'.format(Base, Traversal)
 
-Index.test("${Kind}IndexType/distanceTo/semantics") {
+Index.test("${Kind}Index/distanceTo/semantics") {
   for test in distanceToTests {
     let start = ${Kind}Index(
       position: test.startIndex,
@@ -178,7 +178,7 @@ Index.test("${Kind}IndexType/distanceTo/semantics") {
   }
 }
 
-Index.test("${Kind}IndexType/advancedBy(n)/semantics") {
+Index.test("${Kind}Index/advancedBy(n)/semantics") {
   for test in advancedByTests.filter({$0.limit == nil}) {
     let start = ${Kind}Index(
       position: test.startIndex,
@@ -206,7 +206,7 @@ Index.test("${Kind}IndexType/advancedBy(n)/semantics") {
 }
 
 %     if Traversal == 'Forward':
-Index.test("${Kind}IndexType/advancedBy(-n)/semantics") {
+Index.test("${Kind}Index/advancedBy(-n)/semantics") {
   for test in advancedByTests.filter({$0.limit == nil && $0.distance < 0}) {
     let start = ${Kind}Index(
       position: test.startIndex,
@@ -223,7 +223,7 @@ Index.test("${Kind}IndexType/advancedBy(-n)/semantics") {
 %     end
 
 %     if Traversal == 'Forward':
-Index.test("${Kind}IndexType/advancedBy(-n, limit:)/semantics") {
+Index.test("${Kind}Index/advancedBy(-n, limit:)/semantics") {
   for test in advancedByTests.filter({$0.limit != nil && $0.distance < 0}) {
     let start = ${Kind}Index(
       position: test.startIndex,
@@ -239,7 +239,7 @@ Index.test("${Kind}IndexType/advancedBy(-n, limit:)/semantics") {
 }
 %     end
 
-Index.test("${Kind}IndexType/advancedBy(n, limit:)/semantics") {
+Index.test("${Kind}Index/advancedBy(n, limit:)/semantics") {
   for test in advancedByTests.filter({$0.limit != nil}) {
     let startIndex = test.startIndex
     let endIndex = test.startIndex + test.distance
@@ -275,7 +275,7 @@ Index.test("${Kind}IndexType/advancedBy(n, limit:)/semantics") {
 
 %     if Traversal == 'RandomAccess' and Base == 'Defaulted':
 Index.test(
-  "${Kind}IndexType/advancedBy(n)/avoidsSuccessorAndPredecessor/dispatch"
+  "${Kind}Index/advancedBy(n)/avoidsSuccessorAndPredecessor/dispatch"
 ) {
   for test in advancedByTests.filter({$0.limit == nil}) {
     let i = ${Kind}Index(test.startIndex)
@@ -287,7 +287,7 @@ Index.test(
 }
 
 Index.test(
-  "${Kind}IndexType/advancedBy(n, limit:)/avoidsSuccessorAndPredecessor/dispatch"
+  "${Kind}Index/advancedBy(n, limit:)/avoidsSuccessorAndPredecessor/dispatch"
 ) {
   for test in advancedByTests.filter({$0.limit != nil}) {
     let i = ${Kind}Index(test.startIndex)

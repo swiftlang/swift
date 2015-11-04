@@ -41,7 +41,7 @@ RangeTestSuite.test("Range/Equatable") {
 }
 
 // Something to test with that distinguishes debugDescription from description
-struct X<T : ForwardIndexType> : ForwardIndexType, CustomStringConvertible, CustomDebugStringConvertible {
+struct X<T : ForwardIndex> : ForwardIndex, CustomStringConvertible, CustomDebugStringConvertible {
   init(_ a: T) {
     self.a = a
   }
@@ -61,7 +61,7 @@ struct X<T : ForwardIndexType> : ForwardIndexType, CustomStringConvertible, Cust
   var a: T
 }
 
-func == <T : ForwardIndexType>(lhs: X<T>, rhs: X<T>) -> Bool {
+func == <T : ForwardIndex>(lhs: X<T>, rhs: X<T>) -> Bool {
   return lhs.a == rhs.a
 }
 

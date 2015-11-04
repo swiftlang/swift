@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol ReverseIndexType : BidirectionalIndexType {
-  typealias Base : BidirectionalIndexType
+public protocol ReverseIndexType : BidirectionalIndex {
+  typealias Base : BidirectionalIndex
   
   /// A type that can represent the number of steps between pairs of
   /// `ReverseIndex` values where one value is reachable from the other.
@@ -29,7 +29,7 @@ public protocol ReverseIndexType : BidirectionalIndexType {
   init(_ base: Base)
 }
 
-extension BidirectionalIndexType where Self : ReverseIndexType {
+extension BidirectionalIndex where Self : ReverseIndexType {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Requires: The next value is representable.
@@ -45,10 +45,10 @@ extension BidirectionalIndexType where Self : ReverseIndexType {
   }
 }
 
-/// A wrapper for a `BidirectionalIndexType` that reverses its
+/// A wrapper for a `BidirectionalIndex` that reverses its
 /// direction of traversal.
-public struct ReverseIndex<Base: BidirectionalIndexType>
-: BidirectionalIndexType, ReverseIndexType {
+public struct ReverseIndex<Base: BidirectionalIndex>
+: BidirectionalIndex, ReverseIndexType {
   public typealias Distance = Base.Distance
   
   public init(_ base: Base) { self.base = base }
@@ -70,10 +70,10 @@ public func == <Base> (
   return lhs.base == rhs.base
 }
 
-/// A wrapper for a `RandomAccessIndexType` that reverses its
+/// A wrapper for a `RandomAccessIndex` that reverses its
 /// direction of traversal.
-public struct ReverseRandomAccessIndex<Base: RandomAccessIndexType>
-  : RandomAccessIndexType, ReverseIndexType {
+public struct ReverseRandomAccessIndex<Base: RandomAccessIndex>
+  : RandomAccessIndex, ReverseIndexType {
 
   public typealias Distance = Base.Distance
   
@@ -104,7 +104,7 @@ public protocol _ReverseCollection : Collection {
 }
 
 extension Collection
-  where Self : _ReverseCollection, Self.Base.Index : RandomAccessIndexType {
+  where Self : _ReverseCollection, Self.Base.Index : RandomAccessIndex {
   public var startIndex : ReverseRandomAccessIndex<Self.Base.Index> {
     return ReverseRandomAccessIndex(_base.endIndex)
   }
@@ -137,7 +137,7 @@ extension _ReverseCollection
 ///
 /// - See also: `ReverseRandomAccessCollection`
 public struct ReverseCollection<
-  Base : Collection where Base.Index : BidirectionalIndexType
+  Base : Collection where Base.Index : BidirectionalIndex
 > : Collection, _ReverseCollection {
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
@@ -167,7 +167,7 @@ public struct ReverseCollection<
 ///   collection having random access indices.
 /// - See also: `ReverseCollection`
 public struct ReverseRandomAccessCollection<
-  Base : Collection where Base.Index : RandomAccessIndexType
+  Base : Collection where Base.Index : RandomAccessIndex
 > : _ReverseCollection {
   /// Creates an instance that presents the elements of `base` in
   /// reverse order.
@@ -192,7 +192,7 @@ public struct ReverseRandomAccessCollection<
   public let _base: Base
 }
 
-extension Collection where Index : BidirectionalIndexType {
+extension Collection where Index : BidirectionalIndex {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
@@ -202,7 +202,7 @@ extension Collection where Index : BidirectionalIndexType {
   }
 }
 
-extension Collection where Index : RandomAccessIndexType {
+extension Collection where Index : RandomAccessIndex {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
@@ -213,7 +213,7 @@ extension Collection where Index : RandomAccessIndexType {
 }
 
 extension LazyCollectionProtocol
-where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
+where Index : BidirectionalIndex, Elements.Index : BidirectionalIndex {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)
@@ -226,7 +226,7 @@ where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
 }
 
 extension LazyCollectionProtocol
-where Index : RandomAccessIndexType, Elements.Index : RandomAccessIndexType {
+where Index : RandomAccessIndex, Elements.Index : RandomAccessIndex {
   /// Return the elements of `self` in reverse order.
   ///
   /// - Complexity: O(1)

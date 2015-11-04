@@ -292,7 +292,7 @@ internal protocol _ForwardIndexBoxType : class {
   var typeID: ObjectIdentifier {get}
   func successor() -> _ForwardIndexBoxType
   func equals(other: _ForwardIndexBoxType) -> Bool
-  func _unbox<T: ForwardIndexType>() -> T?
+  func _unbox<T: ForwardIndex>() -> T?
   func _distanceTo(other: _ForwardIndexBoxType) -> AnyForwardIndex.Distance
   // FIXME: Can't return Self from _advancedBy pending <rdar://20181253>
   func _advancedBy(distance: AnyForwardIndex.Distance) -> _ForwardIndexBoxType
@@ -303,7 +303,7 @@ internal protocol _ForwardIndexBoxType : class {
 }
 
 internal class _ForwardIndexBox<
-  BaseIndex: ForwardIndexType
+  BaseIndex: ForwardIndex
 > : _ForwardIndexBoxType {
   required init(_ base: BaseIndex) {
     self.base = base
@@ -336,7 +336,7 @@ internal class _ForwardIndexBox<
     return self.dynamicType(advance(base, numericCast(n), unsafeUnbox(limit)))
   }
 
-  func _unbox<T: ForwardIndexType>() -> T? {
+  func _unbox<T: ForwardIndex>() -> T? {
     if T.self is BaseIndex.Type {
       _sanityCheck(BaseIndex.self is T.Type)
       // This bit cast is really nothing as we have proven they are
@@ -360,7 +360,7 @@ internal protocol _BidirectionalIndexBoxType : _ForwardIndexBoxType {
 }
 
 internal class _BidirectionalIndexBox<
-  BaseIndex: BidirectionalIndexType
+  BaseIndex: BidirectionalIndex
 > : _ForwardIndexBox<BaseIndex>, _BidirectionalIndexBoxType {
   required init(_ base: BaseIndex) {
     super.init(base)
@@ -381,7 +381,7 @@ internal class _BidirectionalIndexBox<
 internal protocol _RandomAccessIndexBoxType : _BidirectionalIndexBoxType {}
 
 internal final class _RandomAccessIndexBox<
-  BaseIndex: RandomAccessIndexType
+  BaseIndex: RandomAccessIndex
 > : _BidirectionalIndexBox<BaseIndex>, _RandomAccessIndexBoxType {
   required init(_ base: BaseIndex) {
     super.init(base)
@@ -392,15 +392,15 @@ internal final class _RandomAccessIndexBox<
 //===----------------------------------------------------------------------===//
 
 
-/// A wrapper over an underlying `ForwardIndexType` that hides
+/// A wrapper over an underlying `ForwardIndex` that hides
 /// the specific underlying type.
 ///
 /// See also: `AnyForwardCollection`
-public struct AnyForwardIndex : ForwardIndexType {
+public struct AnyForwardIndex : ForwardIndex {
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex: ForwardIndexType>(_ base: BaseIndex) {
+  public init<BaseIndex: ForwardIndex>(_ base: BaseIndex) {
     _box = _ForwardIndexBox(base)
   }
 
@@ -461,15 +461,15 @@ public func == (lhs: AnyForwardIndex, rhs: AnyForwardIndex) -> Bool {
   return lhs._box.equals(rhs._box)
 }
 
-/// A wrapper over an underlying `BidirectionalIndexType` that hides
+/// A wrapper over an underlying `BidirectionalIndex` that hides
 /// the specific underlying type.
 ///
 /// See also: `AnyBidirectionalCollection`
-public struct AnyBidirectionalIndex : BidirectionalIndexType {
+public struct AnyBidirectionalIndex : BidirectionalIndex {
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex: BidirectionalIndexType>(_ base: BaseIndex) {
+  public init<BaseIndex: BidirectionalIndex>(_ base: BaseIndex) {
     _box = _BidirectionalIndexBox(base)
   }
 
@@ -537,15 +537,15 @@ public func == (lhs: AnyBidirectionalIndex, rhs: AnyBidirectionalIndex) -> Bool 
   return lhs._box.equals(rhs._box)
 }
 
-/// A wrapper over an underlying `RandomAccessIndexType` that hides
+/// A wrapper over an underlying `RandomAccessIndex` that hides
 /// the specific underlying type.
 ///
 /// See also: `AnyRandomAccessCollection`
-public struct AnyRandomAccessIndex : RandomAccessIndexType {
+public struct AnyRandomAccessIndex : RandomAccessIndex {
   public typealias Distance = IntMax
 
   /// Wrap and forward operations to `base`.
-  public init<BaseIndex: RandomAccessIndexType>(_ base: BaseIndex) {
+  public init<BaseIndex: RandomAccessIndex>(_ base: BaseIndex) {
     _box = _RandomAccessIndexBox(base)
   }
 
@@ -689,7 +689,7 @@ public struct AnyForwardCollection<Element> : AnyCollection {
   /// Complexity: O(1)
   public init<
     C: Collection
-      where C.Index: ForwardIndexType, C.Generator.Element == Element
+      where C.Index: ForwardIndex, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
       base,
@@ -712,7 +712,7 @@ public struct AnyForwardCollection<Element> : AnyCollection {
   /// Complexity: O(1)
   public init<
     C: Collection
-      where C.Index: BidirectionalIndexType, C.Generator.Element == Element
+      where C.Index: BidirectionalIndex, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
       base,
@@ -735,7 +735,7 @@ public struct AnyForwardCollection<Element> : AnyCollection {
   /// Complexity: O(1)
   public init<
     C: Collection
-      where C.Index: RandomAccessIndexType, C.Generator.Element == Element
+      where C.Index: RandomAccessIndex, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
       base,
@@ -809,7 +809,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollection {
   /// Complexity: O(1)
   public init<
     C: Collection
-      where C.Index: BidirectionalIndexType, C.Generator.Element == Element
+      where C.Index: BidirectionalIndex, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
       base,
@@ -832,7 +832,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollection {
   /// Complexity: O(1)
   public init<
     C: Collection
-      where C.Index: RandomAccessIndexType, C.Generator.Element == Element
+      where C.Index: RandomAccessIndex, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
       base,
@@ -851,7 +851,7 @@ public struct AnyBidirectionalCollection<Element> : AnyCollection {
   }
 
   /// If the indices of the underlying collection stored by `other`
-  /// satisfy `BidirectionalIndexType`, create an
+  /// satisfy `BidirectionalIndex`, create an
   /// `AnyBidirectionalCollection` having the same underlying
   /// collection as `other`.  Otherwise, the result is `nil`.
   ///
@@ -919,7 +919,7 @@ public struct AnyRandomAccessCollection<Element> : AnyCollection {
   /// Complexity: O(1)
   public init<
     C: Collection
-      where C.Index: RandomAccessIndexType, C.Generator.Element == Element
+      where C.Index: RandomAccessIndex, C.Generator.Element == Element
   >(_ base: C) {
     self._box = _CollectionBox<C>(
       base,
@@ -938,7 +938,7 @@ public struct AnyRandomAccessCollection<Element> : AnyCollection {
   }
 
   /// If the indices of the underlying collection stored by `other`
-  /// satisfy `RandomAccessIndexType`, create an
+  /// satisfy `RandomAccessIndex`, create an
   /// `AnyRandomAccessCollection` having the same underlying
   /// collection as `other`.  Otherwise, the result is `nil`.
   ///
@@ -951,7 +951,7 @@ public struct AnyRandomAccessCollection<Element> : AnyCollection {
     self._box = other._box
   }
   /// If the indices of the underlying collection stored by `other`
-  /// satisfy `RandomAccessIndexType`, create an
+  /// satisfy `RandomAccessIndex`, create an
   /// `AnyRandomAccessCollection` having the same underlying
   /// collection as `other`.  Otherwise, the result is `nil`.
   ///

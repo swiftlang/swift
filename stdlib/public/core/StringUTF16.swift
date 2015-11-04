@@ -171,9 +171,9 @@ extension String {
   public typealias UTF16Index = UTF16View.Index
 }
 
-// Conformance to RandomAccessIndexType intentionally only appears
+// Conformance to RandomAccessIndex intentionally only appears
 // when Foundation is loaded
-extension String.UTF16View.Index : BidirectionalIndexType {
+extension String.UTF16View.Index : BidirectionalIndex {
   public typealias Distance = Int
 
   @warn_unused_result
@@ -204,7 +204,7 @@ public func < (
 }
 
 // We can do some things more efficiently, even if we don't promise to
-// by conforming to RandomAccessIndexType.
+// by conforming to RandomAccessIndex.
 
 /// Do not use this operator directly; call distance(start, end) instead.
 extension String.UTF16View.Index {

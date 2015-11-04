@@ -28,7 +28,7 @@ func test1a() -> unionSearchFlags {
   b = .Anchored
   _ = b
 
-  // ForwardIndexType use of MaybeInt.
+  // ForwardIndex use of MaybeInt.
   _ = MaybeInt.None
 
   return .Backwards

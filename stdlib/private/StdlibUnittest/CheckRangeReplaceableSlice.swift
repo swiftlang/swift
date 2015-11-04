@@ -146,9 +146,9 @@ extension TestSuite {
     C : RangeReplaceableCollection,
     CollectionWithEquatableElement : RangeReplaceableCollection
     where
-    C.Index : BidirectionalIndexType,
+    C.Index : BidirectionalIndex,
     C.SubSequence == C,
-    CollectionWithEquatableElement.Index : BidirectionalIndexType,
+    CollectionWithEquatableElement.Index : BidirectionalIndex,
     CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(
@@ -292,9 +292,9 @@ extension TestSuite {
     C : RangeReplaceableCollection,
     CollectionWithEquatableElement : RangeReplaceableCollection
     where
-    C.Index : RandomAccessIndexType,
+    C.Index : RandomAccessIndex,
     C.SubSequence == C,
-    CollectionWithEquatableElement.Index : RandomAccessIndexType,
+    CollectionWithEquatableElement.Index : RandomAccessIndex,
     CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
     CollectionWithEquatableElement.Iterator.Element : Equatable
   >(

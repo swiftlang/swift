@@ -177,7 +177,7 @@ func == <Element>(lhs: DictionaryIndex<Element>, rhs: DictionaryIndex<Element>) 
   return lhs.offset == rhs.offset
 }
 
-struct DictionaryIndex<Element> : BidirectionalIndexType {
+struct DictionaryIndex<Element> : BidirectionalIndex {
   typealias Index = DictionaryIndex<Element>
 
   func predecessor() -> Index {
