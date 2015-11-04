@@ -177,7 +177,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
               "Expected new instruction inserted before existing instruction!");
 
         if (auto FAS = FullApplySite::isa(Result)) {
-          CallGraphEditor(CG).addEdgesForApply(FAS);
+          CallGraphEditor(CG).addEdgesForInstruction(FAS.getInstruction());
         }
 
         DEBUG(llvm::dbgs() << "SC: Old = " << *I << '\n'

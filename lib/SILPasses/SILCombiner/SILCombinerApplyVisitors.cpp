@@ -356,7 +356,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite AI) {
 
   NAI.getInstruction()->setDebugScope(AI.getDebugScope());
 
-  CallGraphEditor(CG).addEdgesForApply(NAI);
+  CallGraphEditor(CG).addEdgesForInstruction(NAI.getInstruction());
 
   // We also need to release the partial_apply instruction itself because it
   // is consumed by the apply_instruction.
@@ -763,7 +763,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
     replaceInstUsesWith(*AI.getInstruction(), NewAI.getInstruction(), 0);
   eraseInstFromFunction(*AI.getInstruction());
 
-  CallGraphEditor(CG).addEdgesForApply(NewAI);
+  CallGraphEditor(CG).addEdgesForInstruction(NewAI.getInstruction());
 
   return NewAI.getInstruction();
 }
@@ -1260,7 +1260,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
                 Builder, AI, OrigThinFun, CastedThinFun)) {
           replaceInstUsesWith(*AI, NewAI, 0);
           eraseInstFromFunction(*AI);
-          CallGraphEditor(CG).addEdgesForApply(NewAI);
+          CallGraphEditor(CG).addEdgesForInstruction(NewAI);
           return nullptr;
         }
 

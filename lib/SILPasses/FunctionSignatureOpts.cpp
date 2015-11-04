@@ -685,9 +685,12 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
   // edges in a temporary vector in the first loop.
   llvm::SmallVector<FullApplySite, 8> CallSites;
   for (const CallGraphEdge *Edge : CallEdges) {
-    const FullApplySite FAS = Edge->getApply();
+    const FullApplySite FAS = FullApplySite::isa(Edge->getInstruction());
 
-    if (!CG.hasSingleCallee(FAS))
+    if (!FAS)
+      continue;
+
+    if (!CG.hasSingleCallee(FAS.getInstruction()))
       continue;
 
     // Don't optimize functions that are marked with the opt.never attribute.
@@ -906,7 +909,7 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   ++NumFunctionSignaturesOptimized;
 
   DEBUG(for (auto *Edge : CallSites) {
-      auto *AI = Edge->getApply().getInstruction();
+      auto *AI = Edge->getInstruction();
       llvm::dbgs() << "        CALLSITE: " << *AI;
       llvm::dbgs() << "            CALLER: "
                    << AI->getFunction()->getName() << "\n";

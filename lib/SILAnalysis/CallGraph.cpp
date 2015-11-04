@@ -83,7 +83,7 @@ CallGraph::~CallGraph() {
   }
 
   // Clean up all call graph edges.
-  for (auto &P : ApplyToEdgeMap) {
+  for (auto &P : InstToEdgeMap) {
     P.second->~CallGraphEdge();
   }
 
@@ -245,7 +245,8 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
                      CallGraphLinkerEditor(this).getCallback());
 
     auto *CalleeNode = getOrAddCallGraphNode(CalleeFn);
-    return new (Allocator) CallGraphEdge(Apply, CalleeNode, EdgeOrdinal++);
+    return new (Allocator) CallGraphEdge(Apply.getInstruction(), CalleeNode,
+                                         EdgeOrdinal++);
   }
 
   case ValueKind::PartialApplyInst: {
@@ -257,31 +258,31 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
     // TODO: Decide how to handle these in graph construction and
     //       analysis passes. We might just leave them out of the
     //       graph.
-    return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
+    return new (Allocator) CallGraphEdge(Apply.getInstruction(), EdgeOrdinal++);
 
   case ValueKind::SILArgument:
     // First-pass call-graph construction will not do anything with
     // these, but a second pass can potentially statically determine
     // the called function in some cases.
-    return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
+    return new (Allocator) CallGraphEdge(Apply.getInstruction(), EdgeOrdinal++);
 
   case ValueKind::ApplyInst:
   case ValueKind::TryApplyInst:
     // TODO: Probably not worth iterating invocation- then
     //       reverse-invocation order to catch this.
-    return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
+    return new (Allocator) CallGraphEdge(Apply.getInstruction(), EdgeOrdinal++);
 
   case ValueKind::TupleExtractInst:
     // TODO: It would be good to tunnel through extracts so that we
     //       can build a more accurate call graph prior to any
     //       optimizations.
-    return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
+    return new (Allocator) CallGraphEdge(Apply.getInstruction(), EdgeOrdinal++);
 
   case ValueKind::StructExtractInst:
     // TODO: It would be good to tunnel through extracts so that we
     //       can build a more accurate call graph prior to any
     //       optimizations.
-    return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
+    return new (Allocator) CallGraphEdge(Apply.getInstruction(), EdgeOrdinal++);
 
   case ValueKind::WitnessMethodInst: {
     auto *WMI = cast<WitnessMethodInst>(Callee);
@@ -300,7 +301,8 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
                        CallGraphLinkerEditor(this).getCallback());
 
       auto *CalleeNode = getOrAddCallGraphNode(CalleeFn);
-      return new (Allocator) CallGraphEdge(Apply, CalleeNode, EdgeOrdinal++);
+      return new (Allocator) CallGraphEdge(Apply.getInstruction(), CalleeNode,
+                                           EdgeOrdinal++);
     }
 
     // Lookup the previously computed callee set if we didn't find a
@@ -309,10 +311,11 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
 
     auto Found = CalleeSetCache.find(AFD);
     if (Found != CalleeSetCache.end())
-      return new (Allocator) CallGraphEdge(Apply, Found->second, EdgeOrdinal++);
+      return new (Allocator) CallGraphEdge(Apply.getInstruction(),
+                                           Found->second, EdgeOrdinal++);
 
     // Otherwise default to an edge with unknown callees.
-    return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
+    return new (Allocator) CallGraphEdge(Apply.getInstruction(), EdgeOrdinal++);
   }
 
   case ValueKind::ClassMethodInst: {
@@ -321,21 +324,22 @@ CallGraphEdge *CallGraph::makeCallGraphEdgeForCallee(FullApplySite Apply,
 
     auto Found = CalleeSetCache.find(AFD);
     if (Found != CalleeSetCache.end())
-      return new (Allocator) CallGraphEdge(Apply, Found->second, EdgeOrdinal++);
+      return new (Allocator) CallGraphEdge(Apply.getInstruction(),
+                                           Found->second, EdgeOrdinal++);
 
     // We don't know the callees in cases where the method isn't
     // present in a vtable, so create a call graph edge with no known
     // callees, assumed to be able to call unknown functions.
-    return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
+    return new (Allocator) CallGraphEdge(Apply.getInstruction(), EdgeOrdinal++);
   }
 
   case ValueKind::SuperMethodInst:
-    return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
+    return new (Allocator) CallGraphEdge(Apply.getInstruction(), EdgeOrdinal++);
 
   default:
     assert(!isa<MethodInst>(Callee) &&
            "Unhandled method instruction in call graph construction!");
-    return new (Allocator) CallGraphEdge(Apply, EdgeOrdinal++);
+    return new (Allocator) CallGraphEdge(Apply.getInstruction(), EdgeOrdinal++);
   }
 }
 
@@ -350,16 +354,20 @@ static void orderEdges(const llvm::SmallPtrSetImpl<CallGraphEdge *> &Edges,
             });
 }
 
-void CallGraph::addEdgesForApply(FullApplySite Apply,
-                                 CallGraphNode *CallerNode) {
+void CallGraph::addEdgesForInstruction(SILInstruction *I,
+                                       CallGraphNode *CallerNode) {
+  auto Apply = FullApplySite::isa(I);
+  // TODO: Build this out for non-apply instructions.
+  assert(Apply && "Expected apply for instruction!");
+
   CallerNode->MayBindDynamicSelf |=
     hasDynamicSelfTypes(Apply.getSubstitutions());
 
   auto *Edge = makeCallGraphEdgeForCallee(Apply, Apply.getCallee());
   assert(Edge && "Expected to be able to make call graph edge for callee!");
-  assert(!ApplyToEdgeMap.count(Apply) &&
+  assert(!InstToEdgeMap.count(Apply.getInstruction()) &&
          "Added apply that already has an edge node!\n");
-  ApplyToEdgeMap[Apply] = Edge;
+  InstToEdgeMap[Apply.getInstruction()] = Edge;
   CallerNode->addCalleeEdge(Edge);
 
   for (auto *CalleeNode : Edge->getCalleeSet())
@@ -381,8 +389,8 @@ void CallGraph::removeEdgeFromFunction(CallGraphEdge *Edge, SILFunction *F) {
   CallerNode->removeCalleeEdge(Edge);
 
   // Remove the mapping from the apply to this edge.
-  auto Apply = Edge->getApply();
-  ApplyToEdgeMap.erase(Apply);
+  auto Apply = Edge->getInstruction();
+  InstToEdgeMap.erase(Apply);
 
   // Call the destructor for the edge. The memory will be reclaimed
   // when the call graph is deleted by virtue of the bump pointer
@@ -411,9 +419,9 @@ void CallGraph::removeNode(CallGraphNode *Node) {
 
 // Remove the call graph edges associated with an apply, where the
 // apply is known to the call graph.
-void CallGraph::removeEdgesForApply(FullApplySite AI) {
-  assert(ApplyToEdgeMap.count(AI) && "Expected apply to be in edge map!");
-  removeEdgeFromFunction(ApplyToEdgeMap[AI], AI.getFunction());
+void CallGraph::removeEdgesForInstruction(SILInstruction *I) {
+  assert(InstToEdgeMap.count(I) && "Expected apply to be in edge map!");
+  removeEdgeFromFunction(InstToEdgeMap[I], I->getFunction());
 }
 
 void CallGraph::addEdges(SILFunction *F) {
@@ -421,8 +429,8 @@ void CallGraph::addEdges(SILFunction *F) {
 
   for (auto &BB : *F) {
     for (auto &I : BB) {
-      if (auto AI = FullApplySite::isa(&I))
-        addEdgesForApply(AI, CallerNode);
+      if (auto FAS = FullApplySite::isa(&I))
+        addEdgesForInstruction(&I, CallerNode);
 
       auto *FRI = dyn_cast<FunctionRefInst>(&I);
       if (!FRI)
@@ -482,7 +490,7 @@ static void printFlag(llvm::raw_ostream &OS,
 void CallGraphEdge::print(llvm::raw_ostream &OS, int Indent) const {
   indent(OS, Indent);
   OS << CallGraphFileCheckPrefix << "Call site #" << Ordinal << ": ";
-  OS << *getApply().getInstruction();
+  OS << *getInstruction();
 
   printFlag(OS, "Unknown callees", canCallUnknownFunction(), Indent);
 
@@ -553,7 +561,7 @@ void CallGraphNode::print(llvm::raw_ostream &OS) const {
     llvm::SetVector<SILFunction *> Callers;
 
     for (auto *Edge : OrderedCallerEdges)
-      Callers.insert(Edge->getApply().getFunction());
+      Callers.insert(Edge->getInstruction()->getFunction());
 
     for (auto *Caller : Callers) {
       OS << "\n";
@@ -791,10 +799,10 @@ void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
   if (!CG)
     return;
 
-  if (auto *Edge = CG->tryGetCallGraphEdge(Old))
-    CG->removeEdgeFromFunction(Edge, Old.getFunction());
+  if (auto *Edge = CG->tryGetCallGraphEdge(Old.getInstruction()))
+    CG->removeEdgeFromFunction(Edge, Old.getInstruction()->getFunction());
 
-  CG->addEdgesForApply(New);
+  CG->addEdgesForInstruction(New.getInstruction());
 }
 
 void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
@@ -802,11 +810,11 @@ void CallGraphEditor::replaceApplyWithNew(FullApplySite Old,
   if (!CG)
     return;
 
-  if (auto *Edge = CG->tryGetCallGraphEdge(Old))
-    CG->removeEdgeFromFunction(Edge, Old.getFunction());
+  if (auto *Edge = CG->tryGetCallGraphEdge(Old.getInstruction()))
+    CG->removeEdgeFromFunction(Edge, Old.getInstruction()->getFunction());
 
   for (auto NewApply : NewApplies)
-    CG->addEdgesForApply(NewApply);
+    CG->addEdgesForInstruction(NewApply.getInstruction());
 }
 
 void CallGraphEditor::moveNodeToNewFunction(SILFunction *Old,
@@ -839,8 +847,8 @@ void CallGraphEditor::removeAllCallerEdgesFrom(SILFunction *F) {
   auto &CallerEdges = CG->getCallGraphNode(F)->getCallerEdges();
   while (!CallerEdges.empty()) {
     auto *Edge = *CallerEdges.begin();
-    auto Apply = Edge->getApply();
-    CG->removeEdgeFromFunction(Edge, Apply.getFunction());
+    auto Apply = Edge->getInstruction();
+    CG->removeEdgeFromFunction(Edge, Apply->getFunction());
   }
 }
 
@@ -892,8 +900,8 @@ void CallGraph::verify() const {
     numEdges += Node->getCalleeEdges().size();
   }
 
-  assert(ApplyToEdgeMap.size() == numEdges &&
-         "Some edges in ApplyToEdgeMap are not contained in any node");
+  assert(InstToEdgeMap.size() == numEdges &&
+         "Some edges in InstToEdgeMap are not contained in any node");
 
   // Verify the callee sets.
   for (auto Iter : CalleeSetCache) {
@@ -920,15 +928,15 @@ void CallGraph::verify(SILFunction *F) const {
       if (!FAS)
         continue;
 
-      auto *Edge = getCallGraphEdge(FAS);
+      auto *Edge = getCallGraphEdge(FAS.getInstruction());
 
       numEdges++;
 
-      assert(Edge->getApply().getInstruction() == &I &&
+      assert(Edge->getInstruction() == &I &&
              "Edge is not linked to the correct apply site");
 
-      assert(ApplyToEdgeMap.lookup(FAS) == Edge &&
-             "Edge is not in ApplyToEdgeMap");
+      assert(InstToEdgeMap.lookup(FAS.getInstruction()) == Edge &&
+             "Edge is not in InstToEdgeMap");
 
       if (!Edge->canCallUnknownFunction()) {
         // In the trivial case that we call a known function, check if we have
@@ -954,7 +962,7 @@ void CallGraph::verify(SILFunction *F) const {
   // Make structural graph checks:
   // 1.) Check that the callee edges are part of the callee node's caller set.
   for (auto *Edge : CalleeEdges) {
-    assert(Edge->getApply().getFunction() == F &&
+    assert(Edge->getInstruction()->getFunction() == F &&
            "Apply in callee set that is not in the callee function?!");
 
     for (auto *CalleeNode : Edge->getCalleeSet()) {
@@ -1145,7 +1153,7 @@ namespace llvm {
                                           OrderedCallGraph::child_iterator I) {
       std::string Label;
       raw_string_ostream O(Label);
-      SILInstruction *Inst = I.baseIter->CGEdge->getApply().getInstruction();
+      SILInstruction *Inst = I.baseIter->CGEdge->getInstruction();
       O << '%' << Node->OCG->InstToIDMap[Inst];
       return Label;
     }

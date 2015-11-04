@@ -879,10 +879,10 @@ void EscapeAnalysis::buildConnectionGraph(SILFunction *F,
 /// Returns true if all called functions from an apply site are known and not
 /// external.
 static bool allCalleeFunctionsVisible(FullApplySite FAS, CallGraph &CG) {
-  if (CG.canCallUnknownFunction(FAS))
+  if (CG.canCallUnknownFunction(FAS.getInstruction()))
     return false;
 
-  auto Callees = CG.getCallees(FAS);
+  auto Callees = CG.getCallees(FAS.getInstruction());
   for (SILFunction *Callee : Callees) {
     if (Callee->isExternalDeclaration())
       return false;
@@ -1096,7 +1096,7 @@ void EscapeAnalysis::recompute() {
           auto &CallerSet = CG.getCallerEdges(ConGraph->getFunction());
           for (CallGraphEdge *CallerEdge : CallerSet) {
             if (!CallerEdge->canCallUnknownFunction()) {
-              SILFunction *Caller = CallerEdge->getApply().getFunction();
+              SILFunction *Caller = CallerEdge->getInstruction()->getFunction();
               ConnectionGraph *CallerCG = Function2ConGraph[Caller];
               CallerCG->setNeedMergeCallees();
             }
@@ -1119,7 +1119,7 @@ void EscapeAnalysis::recompute() {
 bool EscapeAnalysis::mergeAllCallees(ConnectionGraph *ConGraph, CallGraph &CG) {
   bool Changed = false;
   for (FullApplySite FAS : ConGraph->getKnownCallees()) {
-    auto Callees = CG.getCallees(FAS);
+    auto Callees = CG.getCallees(FAS.getInstruction());
     assert(!Callees.canCallUnknownFunction() &&
            "knownCallees should not contain an unknown function");
     for (SILFunction *Callee : Callees) {

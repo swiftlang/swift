@@ -109,10 +109,11 @@ public:
   };
 
 
-  // The call site represented by this call graph edge.
-  FullApplySite TheApply;
+  // The instruction that can result in a function call, which this
+  // edge represents.
+  SILInstruction *Inst;
 
-  // The set of things we know this apply can call into.
+  // The set of things we know this instruction can call into.
   Callees CallsiteCallees;
 
   // A unique identifier for this edge based on the order in which it
@@ -122,24 +123,24 @@ public:
 public:
   /// Create a call graph edge for a call site with a single known
   /// callee.
-  CallGraphEdge(FullApplySite TheApply, CallGraphNode *Node, unsigned Ordinal)
-    : TheApply(TheApply), CallsiteCallees(Node), Ordinal(Ordinal) {
+  CallGraphEdge(SILInstruction *Inst, CallGraphNode *Node, unsigned Ordinal)
+    : Inst(Inst), CallsiteCallees(Node), Ordinal(Ordinal) {
     assert(Node != nullptr && "Expected non-null callee node!");
   }
 
   /// Create a call graph edge for a call site for which we are not
   /// currently able to determine the callees.
-  CallGraphEdge(FullApplySite TheApply, unsigned Ordinal)
-    : TheApply(TheApply),
+  CallGraphEdge(SILInstruction *Inst, unsigned Ordinal)
+    : Inst(Inst),
       CallsiteCallees((CallGraphNode *) nullptr),
       Ordinal(Ordinal) {
   }
 
   /// Create a call graph edge for a call site where we will fill in
   /// the set of potentially called functions later.
-  CallGraphEdge(FullApplySite TheApply, CalleeSet KnownCallees,
+  CallGraphEdge(SILInstruction *Inst, CalleeSet KnownCallees,
                 unsigned Ordinal)
-    : TheApply(TheApply),
+    : Inst(Inst),
       CallsiteCallees(KnownCallees),
       Ordinal(Ordinal) {
   }
@@ -147,7 +148,7 @@ public:
   ~CallGraphEdge() {
   }
 
-  FullApplySite getApply() const { return TheApply; }
+  SILInstruction *getInstruction() const { return Inst; }
 
   /// Return the callee set.
   CallGraphNodeSet getCalleeSet() const {
@@ -324,8 +325,8 @@ class CallGraph {
   /// A map from a function to the function's node in the call graph.
   llvm::DenseMap<SILFunction *, CallGraphNode *> FunctionToNodeMap;
 
-  /// A map from an apply inst to its call edge in the call graph.
-  llvm::DenseMap<FullApplySite , CallGraphEdge *> ApplyToEdgeMap;
+  /// A map from an instruction to its call edge in the call graph.
+  llvm::DenseMap<SILInstruction *, CallGraphEdge *> InstToEdgeMap;
 
   /// A vector of SCCs in bottom up SCC order.
   llvm::SmallVector<CallGraphSCC *, 16> BottomUpSCCOrder;
@@ -401,8 +402,8 @@ public:
 
   // Call graph queries on call sites.
 
-  bool canCallUnknownFunction(FullApplySite FAS) const {
-    auto *Edge = tryGetCallGraphEdge(FAS);
+  bool canCallUnknownFunction(SILInstruction *I) const {
+    auto *Edge = tryGetCallGraphEdge(I);
 
     // Passes that do not maintain the call graph may have applies
     // without edges. In this case, return a conservative result.
@@ -413,18 +414,18 @@ public:
 
   /// Return the callee set for the given call site.
   CallGraphEdge::CallGraphNodeSet
-  getCalleeSet(FullApplySite FAS) const {
-    return getCallGraphEdge(FAS)->getCalleeSet();
+  getCalleeSet(SILInstruction *I) const {
+    return getCallGraphEdge(I)->getCalleeSet();
   }
 
   /// Return the callees for the given call site.
-  CallGraphEdge::Callees getCallees(FullApplySite FAS) const {
-    return getCallGraphEdge(FAS)->getCallees();
+  CallGraphEdge::Callees getCallees(SILInstruction *I) const {
+    return getCallGraphEdge(I)->getCallees();
   }
 
   /// Is this call site known to call exactly one single function?
-  bool hasSingleCallee(FullApplySite FAS) const {
-    return getCallGraphEdge(FAS)->hasSingleCallee();
+  bool hasSingleCallee(SILInstruction *I) const {
+    return getCallGraphEdge(I)->hasSingleCallee();
   }
 
   // Printing/dumping functionality.
@@ -446,8 +447,8 @@ public:
 private:
   // Functions for editing an existing call graph.
 
-  void addEdgesForApply(FullApplySite AI) {
-    addEdgesForApply(AI, getCallGraphNode(AI.getFunction()));
+  void addEdgesForInstruction(SILInstruction *I) {
+    addEdgesForInstruction(I, getCallGraphNode(I->getFunction()));
   }
 
   /// Removes a node from the graph. The node must not have any
@@ -455,7 +456,7 @@ private:
   void removeNode(CallGraphNode *Node);
 
   void removeEdgeFromFunction(CallGraphEdge *Edge, SILFunction *F);
-  void removeEdgesForApply(FullApplySite AI);
+  void removeEdgesForInstruction(SILInstruction *I);
 
   // Query funtions for getting nodes and edges from the call graph.
 
@@ -469,24 +470,24 @@ private:
     return CGN;
   }
 
-  CallGraphEdge *getCallGraphEdge(FullApplySite AI) const {
-    return const_cast<CallGraph *>(this)->getCallGraphEdge(AI);
+  CallGraphEdge *getCallGraphEdge(SILInstruction *I) const {
+    return const_cast<CallGraph *>(this)->getCallGraphEdge(I);
   }
 
-  CallGraphEdge *getCallGraphEdge(FullApplySite AI) {
-    auto *Edge = tryGetCallGraphEdge(AI);
-    assert(Edge && "Expected call graph edge for apply!");
+  CallGraphEdge *getCallGraphEdge(SILInstruction *I) {
+    auto *Edge = tryGetCallGraphEdge(I);
+    assert(Edge && "Expected call graph edge for instruction!");
 
     return Edge;
   }
 
-  CallGraphEdge *tryGetCallGraphEdge(FullApplySite AI) const {
-    return const_cast<CallGraph *>(this)->tryGetCallGraphEdge(AI);
+  CallGraphEdge *tryGetCallGraphEdge(SILInstruction *I) const {
+    return const_cast<CallGraph *>(this)->tryGetCallGraphEdge(I);
   }
 
-  CallGraphEdge *tryGetCallGraphEdge(FullApplySite AI) {
-    auto Found = ApplyToEdgeMap.find(AI);
-    if (Found == ApplyToEdgeMap.end())
+  CallGraphEdge *tryGetCallGraphEdge(SILInstruction *I) {
+    auto Found = InstToEdgeMap.find(I);
+    if (Found == InstToEdgeMap.end())
       return nullptr;
 
     assert(Found->second && "Unexpected null call graph edge in map!");
@@ -521,9 +522,9 @@ private:
 
   CallGraphNode *addCallGraphNode(SILFunction *F);
   void addEdges(SILFunction *F);
-  CallGraphEdge *makeCallGraphEdgeForCallee(FullApplySite Apply,
+  CallGraphEdge *makeCallGraphEdgeForCallee(FullApplySite FAS,
                                             SILValue Callee);
-  void addEdgesForApply(FullApplySite AI, CallGraphNode *CallerNode);
+  void addEdgesForInstruction(SILInstruction *I, CallGraphNode *CallerNode);
   void clearBottomUpSCCOrder();
   void computeBottomUpSCCOrder();
   void computeBottomUpFunctionOrder();
@@ -549,7 +550,7 @@ public:
   void removeAllCallerEdgesFrom(SILFunction *F);
 
   /// Creates a new node for function \p F and adds callee edges for all
-  /// full apply sites in the function.
+  /// call sites in the function.
   void addNewFunction(SILFunction *F) {
     if (CG && !CG->tryGetCallGraphNode(F)) {
       CG->addCallGraphNode(F);
@@ -564,21 +565,22 @@ public:
       CG->removeNode(CG->getCallGraphNode(F));
   }
 
-  /// Removes edges from the apply site \p AI.
-  void removeEdgesForApply(FullApplySite AI) {
+  /// Removes edges for the instruction \p I.
+  void removeEdgesForInstruction(SILInstruction *I) {
     if (CG)
-      CG->removeEdgesForApply(AI);
+      CG->removeEdgesForInstruction(I);
   }
 
-  /// Checks which function(s) are called by apply site \p AI and adds
-  /// edges to \a AI.
-  void addEdgesForApply(FullApplySite AI) {
+  /// Checks which function(s) are called by instruction \p I and adds
+  /// edges to the call graph for it.
+  void addEdgesForInstruction(SILInstruction *I) {
     if (CG)
-      CG->addEdgesForApply(AI);
+      CG->addEdgesForInstruction(I);
   }
 
-  /// Update uses of a changed apply site which is not a full apply site.
-  /// If a use is a full apply site, its call graph edge is updated.
+  /// Update uses of a changed apply site which is not a full apply
+  /// site.  If a use is a full apply site, its call graph edge is
+  /// updated.
   void updatePartialApplyUses(ApplySite AI);
 
   void addEdgesForFunction(SILFunction *F) {
@@ -587,11 +589,9 @@ public:
   }
 
   void removeEdgeIfPresent(SILInstruction *I) {
-    if (CG) {
-      if (auto AI = FullApplySite::isa(I))
-        if (auto *Edge = CG->tryGetCallGraphEdge(AI))
-          CG->removeEdgeFromFunction(Edge, I->getFunction());
-    }
+    if (CG)
+      if (auto *Edge = CG->tryGetCallGraphEdge(I))
+        CG->removeEdgeFromFunction(Edge, I->getFunction());
   }
 
   /// Drops all references in function and removes the references to

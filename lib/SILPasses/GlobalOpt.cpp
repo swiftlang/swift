@@ -424,7 +424,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
           HoistAI = CommonAI;
         }
         AI->replaceAllUsesWith(CommonAI);
-        CallGraphEditor(CG).removeEdgesForApply(AI);
+        CallGraphEditor(CG).removeEdgesForInstruction(AI);
         AI->eraseFromParent();
         HasChanged = true;
       }
@@ -861,7 +861,7 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
     SILBuilderWithScope<1> B(Load);
     auto *GetterRef = B.createFunctionRef(Load->getLoc(), GetterF);
     auto *Value = B.createApply(Load->getLoc(), GetterRef, {}, false);
-    CallGraphEditor(CG).addEdgesForApply(Value);
+    CallGraphEditor(CG).addEdgesForInstruction(Value);
 
     convertLoadSequence(Load, Value, B);
     HasChanged = true;

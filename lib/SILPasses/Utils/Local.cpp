@@ -1311,7 +1311,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
 
   auto *AI = Builder.createApply(Loc, FuncRef, SubstFnTy, ResultTy, Subs, Args,
                                  false);
-  CallGraphEditor(CG).addEdgesForApply(AI);
+  CallGraphEditor(CG).addEdgesForInstruction(AI);
 
   // If the source of a cast should be destroyed, emit a release.
   if (auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(Inst)) {
@@ -1485,7 +1485,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   // Generate a code to invoke the bridging function.
   auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src,
                                     false);
-  CallGraphEditor(CG).addEdgesForApply(NewAI);
+  CallGraphEditor(CG).addEdgesForInstruction(NewAI);
 
   if(ParamTypes[0].getConvention() == ParameterConvention::Direct_Guaranteed)
     Builder.createReleaseValue(Loc, Src);

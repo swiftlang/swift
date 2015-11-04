@@ -265,7 +265,7 @@ void SideEffectAnalysis::analyzeFunction(SILFunction *F,
     // The effects have changed. We also have to recompute the effects of all
     // callers.
     for (auto *CallerEdge : CG.getCallerEdges(F)) {
-      SILFunction *Caller = CallerEdge->getApply().getFunction();
+      SILFunction *Caller = CallerEdge->getInstruction()->getFunction();
       WorkList.insert(Caller);
     }
   }
@@ -369,14 +369,14 @@ void SideEffectAnalysis::getEffectsOfApply(FunctionEffects &ApplyEffects,
   if (getSemanticEffects(ApplyEffects, FAS))
     return;
 
-  if (CG.canCallUnknownFunction(FAS)) {
+  if (CG.canCallUnknownFunction(FAS.getInstruction())) {
     ApplyEffects.setWorstEffects();
     return;
   }
 
   // We can see all the callees. So we just merge the effects from all of
   // them.
-  for (auto *F : CG.getCallees(FAS)) {
+  for (auto *F : CG.getCallees(FAS.getInstruction())) {
     auto *E = getFunctionEffects(F, isRecomputing);
     ApplyEffects.mergeFrom(*E);
   }
