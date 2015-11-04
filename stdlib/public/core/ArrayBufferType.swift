@@ -22,11 +22,11 @@ public protocol _ArrayBufferType : MutableCollection {
   /// Adopt the entire buffer, presenting it at the provided `startIndex`.
   init(_ buffer: _ContiguousArrayBuffer<Element>, shiftedToStartIndex: Int)
 
-  /// Copy the given subRange of this buffer into uninitialized memory
-  /// starting at target.  Return a pointer past-the-end of the
+  /// Copy the elements in `bounds` from this buffer into uninitialized
+  /// memory starting at `target`.  Return a pointer past-the-end of the
   /// just-initialized memory.
   func _uninitializedCopy(
-    subRange: Range<Int>, target: UnsafeMutablePointer<Element>
+    bounds: Range<Int>, target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element>
 
   /// Get or set the index'th element.
@@ -71,9 +71,8 @@ public protocol _ArrayBufferType : MutableCollection {
     subRange subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   )
 
-  /// Returns a `_SliceBuffer` containing the given `subRange` of values
-  /// from this buffer.
-  subscript(subRange: Range<Int>) -> _SliceBuffer<Element> {get}
+  /// Returns a `_SliceBuffer` containing the elements in `bounds`.
+  subscript(bounds: Range<Int>) -> _SliceBuffer<Element> {get}
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is

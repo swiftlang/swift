@@ -140,10 +140,10 @@ public struct LoggingRangeReplaceableCollection<
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == Base.Iterator.Element
   >(
-    subRange: Range<Base.Index>, with newElements: C
+    bounds: Range<Base.Index>, with newElements: C
   ) {
     ++Log.replaceRange[selfType]
-    base.replaceRange(subRange, with: newElements)
+    base.replaceRange(bounds, with: newElements)
   }
 
   public mutating func append(newElement: Base.Iterator.Element) {
@@ -190,9 +190,9 @@ public struct LoggingRangeReplaceableCollection<
     base.removeFirst(n)
   }
 
-  public mutating func removeRange(subRange: Range<Base.Index>) {
+  public mutating func removeRange(bounds: Range<Base.Index>) {
     ++Log.removeRange[selfType]
-    base.removeRange(subRange)
+    base.removeRange(bounds)
   }
 
   public mutating func removeAll(keepCapacity keepCapacity: Bool) {

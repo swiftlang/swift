@@ -99,7 +99,7 @@ internal func _cocoaStringReadAll(
 
 @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
 internal func _cocoaStringSlice(
-  target: _StringCore, _ subRange: Range<Int>
+  target: _StringCore, _ bounds: Range<Int>
 ) -> _StringCore {
   _sanityCheck(target.hasCocoaBuffer)
   
@@ -111,7 +111,7 @@ internal func _cocoaStringSlice(
 
   let cfResult: AnyObject = _swift_stdlib_CFStringCreateWithSubstring(
     nil, cfSelf, _swift_shims_CFRange(
-      location: subRange.startIndex, length: subRange.count))
+      location: bounds.startIndex, length: bounds.count))
 
   return String(_cocoaString: cfResult)._core
 }

@@ -181,16 +181,15 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
     return nil
   }
 
-  public
-  func _uninitializedCopy(
-    subRange: Range<Int>, target: UnsafeMutablePointer<Element>
+  public func _uninitializedCopy(
+    bounds: Range<Int>, target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
     _invariantCheck()
-    _sanityCheck(subRange.startIndex >= startIndex)
-    _sanityCheck(subRange.endIndex >= subRange.startIndex)
-    _sanityCheck(subRange.endIndex <= endIndex)
-    let c = subRange.count
-    target.initializeFrom(subscriptBaseAddress + subRange.startIndex, count: c)
+    _sanityCheck(bounds.startIndex >= startIndex)
+    _sanityCheck(bounds.endIndex >= bounds.startIndex)
+    _sanityCheck(bounds.endIndex <= endIndex)
+    let c = bounds.count
+    target.initializeFrom(subscriptBaseAddress + bounds.startIndex, count: c)
     return target + c
   }
 
@@ -270,15 +269,15 @@ struct _SliceBuffer<Element> : _ArrayBufferType {
     }
   }
 
-  public subscript(subRange: Range<Int>) -> _SliceBuffer {
+  public subscript(bounds: Range<Int>) -> _SliceBuffer {
     get {
-      _sanityCheck(subRange.startIndex >= startIndex)
-      _sanityCheck(subRange.endIndex >= subRange.startIndex)
-      _sanityCheck(subRange.endIndex <= endIndex)
+      _sanityCheck(bounds.startIndex >= startIndex)
+      _sanityCheck(bounds.endIndex >= bounds.startIndex)
+      _sanityCheck(bounds.endIndex <= endIndex)
       return _SliceBuffer(
         owner: owner,
         subscriptBaseAddress: subscriptBaseAddress,
-        indices: subRange,
+        indices: bounds,
         hasNativeBuffer: _hasNativeBuffer)
     }
     set {

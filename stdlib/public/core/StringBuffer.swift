@@ -187,17 +187,17 @@ public struct _StringBuffer {
   /// - the buffer is uniquely-refereced, or
   /// - `oldUsedEnd` points to the end of the currently used capacity.
   ///
-  /// - parameter subRange: Range of the substring that the caller tries
+  /// - parameter bounds: Range of the substring that the caller tries
   ///   to extend.
   /// - parameter newUsedCount: The desired size of the substring.
   mutating func grow(
-    subRange: Range<UnsafePointer<RawByte>>, newUsedCount: Int
+    bounds: Range<UnsafePointer<RawByte>>, newUsedCount: Int
   ) -> Bool {
     var newUsedCount = newUsedCount
     // The substring to be grown could be pointing in the middle of this
     // _StringBuffer.  Adjust the size so that it covers the imaginary
     // substring from the start of the buffer to `oldUsedEnd`.
-    newUsedCount += (subRange.startIndex - UnsafePointer(start)) >> elementShift
+    newUsedCount += (bounds.startIndex - UnsafePointer(start)) >> elementShift
 
     if _slowPath(newUsedCount > capacity) {
       return false
@@ -215,13 +215,13 @@ public struct _StringBuffer {
     // place.  The operation should be implemented in a thread-safe way,
     // though.
     //
-    // if usedEnd == subRange.endIndex {
+    // if usedEnd == bounds.endIndex {
     //  usedEnd = newUsedEnd
     //  return true
     // }
     let usedEndPhysicalPtr =
       UnsafeMutablePointer<UnsafeMutablePointer<RawByte>>(_storage._value)
-    var expected = UnsafeMutablePointer<RawByte>(subRange.endIndex)
+    var expected = UnsafeMutablePointer<RawByte>(bounds.endIndex)
     if _stdlib_atomicCompareExchangeStrongPtr(
       object: usedEndPhysicalPtr, expected: &expected, desired: newUsedEnd) {
       return true

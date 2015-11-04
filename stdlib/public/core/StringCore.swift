@@ -263,26 +263,26 @@ public struct _StringCore {
   // slicing
 
   /// Returns the given sub-`_StringCore`.
-  public subscript(subRange: Range<Int>) -> _StringCore {
+  public subscript(bounds: Range<Int>) -> _StringCore {
     _precondition(
-      subRange.startIndex >= 0,
-      "subscript: subRange start precedes String start")
+      bounds.startIndex >= 0,
+      "subscript: subrange start precedes String start")
 
     _precondition(
-      subRange.endIndex <= count,
-      "subscript: subRange extends past String end")
+      bounds.endIndex <= count,
+      "subscript: subrange extends past String end")
 
-    let newCount = subRange.endIndex - subRange.startIndex
+    let newCount = bounds.endIndex - bounds.startIndex
     _sanityCheck(UInt(newCount) & _flagMask == 0)
 
     if hasContiguousStorage {
       return _StringCore(
-        baseAddress: _pointerToNth(subRange.startIndex),
+        baseAddress: _pointerToNth(bounds.startIndex),
         _countAndFlags: (_countAndFlags & _flagMask) | UInt(newCount),
         owner: _owner)
     }
 #if _runtime(_ObjC)
-    return _cocoaStringSlice(self, subRange)
+    return _cocoaStringSlice(self, bounds)
 #else
     _sanityCheckFailure("subscript: non-native string without objc runtime")
 #endif
@@ -570,27 +570,27 @@ extension _StringCore : Collection {
 
 extension _StringCore : RangeReplaceableCollection {
 
-  /// Replace the given `subRange` of elements with `newElements`.
+  /// Replace the elements within `bounds` with `newElements`.
   ///
-  /// - Complexity: O(`subRange.count`) if `subRange.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
     C: Collection where C.Iterator.Element == UTF16.CodeUnit
   >(
-    subRange: Range<Int>, with newElements: C
+    bounds: Range<Int>, with newElements: C
   ) {
     _precondition(
-      subRange.startIndex >= 0,
-      "replaceRange: subRange start precedes String start")
+      bounds.startIndex >= 0,
+      "replaceRange: subrange start precedes String start")
 
     _precondition(
-      subRange.endIndex <= count,
-      "replaceRange: subRange extends past String end")
+      bounds.endIndex <= count,
+      "replaceRange: subrange extends past String end")
 
     let width = elementWidth == 2 || newElements.contains { $0 > 0x7f } ? 2 : 1
     let replacementCount = numericCast(newElements.count) as Int
-    let replacedCount = subRange.count
-    let tailCount = count - subRange.endIndex
+    let replacedCount = bounds.count
+    let tailCount = count - bounds.endIndex
     let growth = replacementCount - replacedCount
     let newCount = count + growth
 
@@ -599,7 +599,7 @@ extension _StringCore : RangeReplaceableCollection {
     // strings, i.e., when we're appending.  Already-used characters
     // can only be mutated when we have a unique reference to the
     // buffer.
-    let appending = subRange.startIndex == endIndex
+    let appending = bounds.startIndex == endIndex
 
     let existingStorage = !hasCocoaBuffer && (
       appending || isUniquelyReferencedNonObjC(&_owner)
@@ -607,7 +607,7 @@ extension _StringCore : RangeReplaceableCollection {
 
     if _fastPath(existingStorage != nil) {
       let rangeStart = UnsafeMutablePointer<UInt8>(
-        _pointerToNth(subRange.startIndex))
+        _pointerToNth(bounds.startIndex))
       let tailStart = rangeStart + (replacedCount << elementShift)
 
       if growth > 0 {
@@ -643,9 +643,9 @@ extension _StringCore : RangeReplaceableCollection {
             : representableAsASCII() && !newElements.contains { $0 > 0x7f } ? 1
             : 2
         ))
-      r.appendContentsOf(self[0..<subRange.startIndex])
+      r.appendContentsOf(self[0..<bounds.startIndex])
       r.appendContentsOf(newElements)
-      r.appendContentsOf(self[subRange.endIndex..<count])
+      r.appendContentsOf(self[bounds.endIndex..<count])
       self = r
     }
   }
@@ -654,10 +654,10 @@ extension _StringCore : RangeReplaceableCollection {
     if _fastPath(!hasCocoaBuffer) {
       if _fastPath(isUniquelyReferencedNonObjC(&_owner)) {
 
-        let subRange: Range<UnsafePointer<RawByte>>
+        let bounds: Range<UnsafePointer<RawByte>>
           = UnsafePointer(_pointerToNth(0))..<UnsafePointer(_pointerToNth(count))
 
-        if _fastPath(nativeBuffer!.hasCapacity(n, forSubRange: subRange)) {
+        if _fastPath(nativeBuffer!.hasCapacity(n, forSubRange: bounds)) {
           return
         }
       }

@@ -374,30 +374,30 @@ public struct _ContiguousArrayBuffer<Element> : _ArrayBufferType {
     return __bufferPointer.value.capacity
   }
 
-  /// Copy the given subRange of this buffer into uninitialized memory
-  /// starting at target.  Return a pointer past-the-end of the
+  /// Copy the elements in `bounds` from this buffer into uninitialized
+  /// memory starting at `target`.  Return a pointer past-the-end of the
   /// just-initialized memory.
   public func _uninitializedCopy(
-    subRange: Range<Int>, target: UnsafeMutablePointer<Element>
+    bounds: Range<Int>, target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
-    _sanityCheck(subRange.startIndex >= 0)
-    _sanityCheck(subRange.endIndex >= subRange.startIndex)
-    _sanityCheck(subRange.endIndex <= count)
+    _sanityCheck(bounds.startIndex >= 0)
+    _sanityCheck(bounds.endIndex >= bounds.startIndex)
+    _sanityCheck(bounds.endIndex <= count)
 
-    let c = subRange.endIndex - subRange.startIndex
-    target.initializeFrom(firstElementAddress + subRange.startIndex, count: c)
+    let c = bounds.endIndex - bounds.startIndex
+    target.initializeFrom(firstElementAddress + bounds.startIndex, count: c)
     _fixLifetime(owner)
     return target + c
   }
 
-  /// Returns a `_SliceBuffer` containing the given `subRange` of values
+  /// Returns a `_SliceBuffer` containing the given `bounds` of values
   /// from this buffer.
-  public subscript(subRange: Range<Int>) -> _SliceBuffer<Element> {
+  public subscript(bounds: Range<Int>) -> _SliceBuffer<Element> {
     get {
       return _SliceBuffer(
         owner: __bufferPointer.buffer,
         subscriptBaseAddress: subscriptBaseAddress,
-        indices: subRange,
+        indices: bounds,
         hasNativeBuffer: true)
     }
     set {

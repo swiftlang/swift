@@ -94,7 +94,7 @@ extension String {
     @available(
       *, unavailable,
       message="Slicing a String's UTF16View requires a Range<String.UTF16View.Index>, String.UTF16View.Index can be constructed from Int when Foundation is imported")
-    public subscript(subRange: Range<Int>) -> UTF16View {
+    public subscript(bounds: Range<Int>) -> UTF16View {
       fatalError("unavailable function can't be called")
     }
 #endif
@@ -104,10 +104,11 @@ extension String {
     ///
     /// - Complexity: O(1) unless bridging from Objective-C requires an
     ///   O(N) conversion.
-    public subscript(subRange: Range<Index>) -> UTF16View {
+    public subscript(bounds: Range<Index>) -> UTF16View {
       return UTF16View(
-        _core, offset: _toInternalIndex(subRange.startIndex._offset),
-          length: subRange.endIndex._offset - subRange.startIndex._offset)
+        _core,
+        offset: _toInternalIndex(bounds.startIndex._offset),
+        length: bounds.endIndex._offset - bounds.startIndex._offset)
     }
 
     internal init(_ _core: _StringCore) {

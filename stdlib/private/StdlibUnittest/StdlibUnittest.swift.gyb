@@ -2638,12 +2638,12 @@ internal enum _CollectionOperation : Equatable {
   case ReserveCapacity(capacity: Int)
   case Append
   case AppendContentsOf(count: Int)
-  case ReplaceRange(subRange: Range<Int>, replacementCount: Int)
+  case ReplaceRange(bounds: Range<Int>, replacementCount: Int)
   case Insert(atIndex: Int)
   case InsertContentsOf(atIndex: Int, count: Int)
   case RemoveAt(index: Int)
   case RemoveLast
-  case RemoveRange(subRange: Range<Int>)
+  case RemoveRange(bounds: Range<Int>)
   case RemoveAll(keepCapacity: Bool)
 
   internal func _applyTo(
@@ -2663,12 +2663,12 @@ internal enum _CollectionOperation : Equatable {
       result.appendContentsOf(
         Repeat(repeating: nextStateId, count: count))
 
-    case ReplaceRange(let subRange, let replacementCount):
+    case ReplaceRange(let bounds, let replacementCount):
       result.replaceRange(
-        subRange,
+        bounds,
         with: Repeat(repeating: nextStateId, count: replacementCount))
 
-      let invalidIndices = subRange.startIndex..<result.endIndex
+      let invalidIndices = bounds.startIndex..<result.endIndex
       result.replaceRange(
         invalidIndices,
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
@@ -2702,10 +2702,10 @@ internal enum _CollectionOperation : Equatable {
     case RemoveLast:
       result.removeLast()
 
-    case RemoveRange(let subRange):
-      result.removeRange(subRange)
+    case RemoveRange(let bounds):
+      result.removeRange(bounds)
 
-      let invalidIndices = subRange.startIndex..<result.endIndex
+      let invalidIndices = bounds.startIndex..<result.endIndex
       result.replaceRange(
         invalidIndices,
         with: Repeat(repeating: nextStateId, count: invalidIndices.count))
@@ -3450,9 +3450,9 @@ public protocol ${Protocol} : RangeReplaceableCollection {
 extension ${Protocol} {
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == Element
-  >(subRange: Range<${Self}<Element>.Index>,
+  >(bounds: Range<${Self}<Element>.Index>,
     with newElements: C) {
-    base.replaceRange(subRange, with: newElements)
+    base.replaceRange(bounds, with: newElements)
   }
 
   public mutating func removeLast() -> Element {
@@ -3589,16 +3589,16 @@ public struct ${Self}<T> : RangeReplaceableCollection {
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == T
   >(
-    subRange: Range<${Index}>, with newElements: C
+    bounds: Range<${Index}>, with newElements: C
   ) {
     let oldCount = count
     elements.replaceRange(
-      subRange.startIndex.position..<subRange.endIndex.position,
+      bounds.startIndex.position..<bounds.endIndex.position,
       with: newElements)
     let newCount = count
     _willMutate(.ReplaceRange(
-      subRange: subRange.startIndex._offset..<subRange.endIndex._offset,
-      replacementCount: subRange.count + newCount - oldCount))
+      bounds: bounds.startIndex._offset..<bounds.endIndex._offset,
+      replacementCount: bounds.count + newCount - oldCount))
   }
 
   public mutating func insert(newElement: T, atIndex i: ${Index}) {
@@ -3630,13 +3630,13 @@ public struct ${Self}<T> : RangeReplaceableCollection {
     return elements.removeLast()
   }
 
-  public mutating func removeRange(subRange: Range<${Index}>) {
-    if !subRange.isEmpty {
+  public mutating func removeRange(bounds: Range<${Index}>) {
+    if !bounds.isEmpty {
       _willMutate(.RemoveRange(
-        subRange: subRange.startIndex._offset..<subRange.endIndex._offset))
+        bounds: bounds.startIndex._offset..<bounds.endIndex._offset))
     }
     elements.removeRange(
-      subRange.startIndex.position..<subRange.endIndex.position
+      bounds.startIndex.position..<bounds.endIndex.position
     )
   }
 
@@ -3937,18 +3937,18 @@ public struct Defaulted${traversal}RangeReplaceableSlice<Element>
   public mutating func replaceRange<
     C : Collection where C.Iterator.Element == Element
   >(
-    subRange: Range<Index>,
+    bounds: Range<Index>,
     with newElements: C
   ) {
     let startOffset = startIndex.position
     let endOffset =
       endIndex.position
-      - subRange.count
+      - bounds.count
       + numericCast(newElements.count) as Int
     Index._failEarlyRangeCheck2(
-      subRange.startIndex, rangeEnd: subRange.endIndex,
+      bounds.startIndex, rangeEnd: bounds.endIndex,
       boundsStart: startIndex, boundsEnd: endIndex)
-    base.replaceRange(subRange, with: newElements)
+    base.replaceRange(bounds, with: newElements)
     startIndex = base.startIndex.advancedBy(startOffset)
     endIndex = base.startIndex.advancedBy(endOffset)
   }

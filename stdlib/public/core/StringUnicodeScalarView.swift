@@ -275,19 +275,19 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   >(newElements: S) {
     _core.appendContentsOf(newElements.lazy.flatMap { $0.utf16 })
   }
-  /// Replace the given `subRange` of elements with `newElements`.
+  /// Replace the elements within `bounds` with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`subRange.count`) if `subRange.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
     C: Collection where C.Iterator.Element == UnicodeScalar
   >(
-    subRange: Range<Index>, with newElements: C
+    bounds: Range<Index>, with newElements: C
   ) {
-    let rawSubRange = subRange.startIndex._position
-      ..< subRange.endIndex._position
+    let rawSubRange = bounds.startIndex._position
+      ..< bounds.endIndex._position
     let lazyUTF16 = newElements.lazy.flatMap { $0.utf16 }
     _core.replaceRange(rawSubRange, with: lazyUTF16)
   }

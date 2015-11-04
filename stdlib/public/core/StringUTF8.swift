@@ -226,8 +226,8 @@ extension String {
     ///
     /// - Complexity: O(1) unless bridging from Objective-C requires an
     ///   O(N) conversion.
-    public subscript(subRange: Range<Index>) -> UTF8View {
-      return UTF8View(_core, subRange.startIndex, subRange.endIndex)
+    public subscript(bounds: Range<Index>) -> UTF8View {
+      return UTF8View(_core, bounds.startIndex, bounds.endIndex)
     }
 
     /// Returns a mirror that reflects `self`.

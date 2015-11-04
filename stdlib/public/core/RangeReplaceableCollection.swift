@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A *collection* that supports replacement of an arbitrary subRange
+/// A *collection* that supports replacement of an arbitrary subrange
 /// of elements with the elements of another collection.
 public protocol RangeReplaceableCollection : Collection {
   //===--- Fundamental Requirements ---------------------------------------===//
@@ -22,17 +22,17 @@ public protocol RangeReplaceableCollection : Collection {
   /// Create an empty instance.
   init()
 
-  /// Replace the given `subRange` of elements with `newElements`.
+  /// Replace the elements within `bounds` with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`subRange.count`) if
-  ///   `subRange.endIndex == self.endIndex` and `newElements.isEmpty`,
+  /// - Complexity: O(`bounds.count`) if
+  ///   `bounds.endIndex == self.endIndex` and `newElements.isEmpty`,
   ///   O(`self.count` + `newElements.count`) otherwise.
   mutating func replaceRange<
     C : Collection where C.Iterator.Element == Iterator.Element
   >(
-    subRange: Range<Index>, with newElements: C
+    bounds: Range<Index>, with newElements: C
   )
 
   /*
@@ -156,12 +156,12 @@ public protocol RangeReplaceableCollection : Collection {
   /// - Requires: `n >= 0 && self.count >= n`.
   mutating func removeFirst(n: Int)
 
-  /// Remove the indicated `subRange` of elements.
+  /// Remove the elements in `bounds`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  mutating func removeRange(subRange: Range<Index>)
+  mutating func removeRange(bounds: Range<Index>)
 
   /// Remove all elements.
   ///
@@ -219,8 +219,8 @@ extension RangeReplaceableCollection {
     return result
   }
 
-  public mutating func removeRange(subRange: Range<Index>) {
-    replaceRange(subRange, with: EmptyCollection())
+  public mutating func removeRange(bounds: Range<Index>) {
+    replaceRange(bounds, with: EmptyCollection())
   }
 
   public mutating func removeFirst(n: Int) {

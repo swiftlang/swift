@@ -567,12 +567,12 @@ public func < (lhs: String.Index, rhs: String.Index) -> Bool {
 }
 
 extension String {
-  /// Access the characters in the given `subRange`.
+  /// Access the characters in `bounds`.
   ///
   /// - Complexity: O(1) unless bridging from Objective-C requires an
   ///   O(N) conversion.
-  public subscript(subRange: Range<Index>) -> String {
-    return String(characters[subRange])
+  public subscript(bounds: Range<Index>) -> String {
+    return String(characters[bounds])
   }
 }
 
@@ -654,32 +654,32 @@ extension Sequence where Iterator.Element == String {
 }
 
 extension String {
-  /// Replace the given `subRange` of elements with `newElements`.
+  /// Replace the elements in `bounds` with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`subRange.count`) if `subRange.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange<
     C: Collection where C.Iterator.Element == Character
   >(
-    subRange: Range<Index>, with newElements: C
+    bounds: Range<Index>, with newElements: C
   ) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.replaceRange(subRange, with: newElements)
+      (inout v: CharacterView) in v.replaceRange(bounds, with: newElements)
     }
   }
 
-  /// Replace the given `subRange` of elements with `newElements`.
+  /// Replace the elements in `bounds` with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`subRange.count`) if `subRange.endIndex
+  /// - Complexity: O(`bounds.count`) if `bounds.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
   public mutating func replaceRange(
-    subRange: Range<Index>, with newElements: String
+    bounds: Range<Index>, with newElements: String
   ) {
-    replaceRange(subRange, with: newElements.characters)
+    replaceRange(bounds, with: newElements.characters)
   }
 
   /// Insert `newElement` at index `i`.
@@ -717,14 +717,14 @@ extension String {
     }
   }
 
-  /// Remove the indicated `subRange` of characters.
+  /// Remove the characters in `bounds`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  public mutating func removeRange(subRange: Range<Index>) {
+  public mutating func removeRange(bounds: Range<Index>) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.removeRange(subRange)
+      (inout v: CharacterView) in v.removeRange(bounds)
     }
   }
 

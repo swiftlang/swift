@@ -201,24 +201,24 @@ extension _ArrayBuffer {
       }
     }
   }
-  
-  /// Copy the given subRange of this buffer into uninitialized memory
-  /// starting at target.  Return a pointer past-the-end of the
+
+  /// Copy the elements in `bounds` from this buffer into uninitialized
+  /// memory starting at `target`.  Return a pointer past-the-end of the
   /// just-initialized memory.
   @inline(never) // The copy loop blocks retain release matching.
   public func _uninitializedCopy(
-    subRange: Range<Int>, target: UnsafeMutablePointer<Element>
+    bounds: Range<Int>, target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
-    _typeCheck(subRange)
+    _typeCheck(bounds)
     if _fastPath(_isNative) {
-      return _native._uninitializedCopy(subRange, target: target)
+      return _native._uninitializedCopy(bounds, target: target)
     }
 
     let nonNative = _nonNative
 
     let nsSubRange = SwiftShims._SwiftNSRange(
-      location:subRange.startIndex,
-      length: subRange.endIndex - subRange.startIndex)
+      location:bounds.startIndex,
+      length: bounds.endIndex - bounds.startIndex)
 
     let buffer = UnsafeMutablePointer<AnyObject>(target)
     
@@ -227,21 +227,20 @@ extension _ArrayBuffer {
     
     // Make another pass to retain the copied objects
     var result = target
-    for _ in subRange {
+    for _ in bounds {
       result.initialize(result.memory)
       ++result
     }
     return result
   }
 
-  /// Return a `_SliceBuffer` containing the given `subRange` of values
-  /// from this buffer.
-  public subscript(subRange: Range<Int>) -> _SliceBuffer<Element> {
+  /// Returns a `_SliceBuffer` containing the elements in `bounds`.
+  public subscript(bounds: Range<Int>) -> _SliceBuffer<Element> {
     get {
-      _typeCheck(subRange)
+      _typeCheck(bounds)
 
       if _fastPath(_isNative) {
-        return _native[subRange]
+        return _native[bounds]
       }
 
       // Look for contiguous storage in the NSArray
@@ -253,23 +252,23 @@ extension _ArrayBuffer {
         return _SliceBuffer(
           owner: nonNative,
           subscriptBaseAddress: UnsafeMutablePointer(cocoaStorageBaseAddress),
-          indices: subRange,
+          indices: bounds,
           hasNativeBuffer: false)
       }
 
       // No contiguous storage found; we must allocate
-      let subRangeCount = subRange.count
+      let boundsCount = bounds.count
       let result = _ContiguousArrayBuffer<Element>(
-        count: subRangeCount, minimumCapacity: 0)
+        count: boundsCount, minimumCapacity: 0)
 
       // Tell Cocoa to copy the objects into our storage
       cocoa.buffer.getObjects(
         UnsafeMutablePointer(result.firstElementAddress),
         range: _SwiftNSRange(
-          location: subRange.startIndex,
-          length: subRangeCount))
+          location: bounds.startIndex,
+          length: boundsCount))
 
-      return _SliceBuffer(result, shiftedToStartIndex: subRange.startIndex)
+      return _SliceBuffer(result, shiftedToStartIndex: bounds.startIndex)
     }
     set {
       fatalError("not implemented")

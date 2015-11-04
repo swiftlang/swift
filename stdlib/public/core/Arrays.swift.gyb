@@ -260,20 +260,20 @@ public struct ${Self}<Element>
   }
 #endif
 
-  /// Access the elements indicated by the given half-open `subRange`.
+  /// Access the contiguous subrange of elements enclosed by `bounds`.
   ///
   /// - Complexity: O(1).
-  public subscript(subRange: Range<Int>) -> ArraySlice<Element> {
+  public subscript(bounds: Range<Int>) -> ArraySlice<Element> {
     get {
-      _checkIndex(subRange.startIndex)
-      _checkIndex(subRange.endIndex)
-      return ArraySlice(_buffer[subRange])
+      _checkIndex(bounds.startIndex)
+      _checkIndex(bounds.endIndex)
+      return ArraySlice(_buffer[bounds])
     }
     set(rhs) {
-      _checkIndex(subRange.startIndex)
-      _checkIndex(subRange.endIndex)
-      if self[subRange]._buffer.identity != rhs._buffer.identity {
-        self.replaceRange(subRange, with: rhs)
+      _checkIndex(bounds.startIndex)
+      _checkIndex(bounds.endIndex)
+      if self[bounds]._buffer.identity != rhs._buffer.identity {
+        self.replaceRange(bounds, with: rhs)
       }
     }
   }
@@ -915,9 +915,9 @@ internal func _arrayOutOfPlaceReplace<
   C.Iterator.Element == B.Element,
   B.Index == Int
 >(
-  inout source: B, _ subRange: Range<Int>, _ newValues: C, _ insertCount: Int
+  inout source: B, _ bounds: Range<Int>, _ newValues: C, _ insertCount: Int
 ) {
-  let growth = insertCount - subRange.count
+  let growth = insertCount - bounds.count
   let newCount = source.count + growth
   var newBuffer = Optional(
     _forceCreateUniqueMutableBuffer(
@@ -925,7 +925,7 @@ internal func _arrayOutOfPlaceReplace<
 
   _arrayOutOfPlaceUpdate(
     &source, &newBuffer,
-    subRange.startIndex - source.startIndex, insertCount,
+    bounds.startIndex - source.startIndex, insertCount,
     _InitializeMemoryFromCollection(newValues)
   )
 }
@@ -947,7 +947,7 @@ internal func _growArrayCapacity(capacity: Int) -> Int {
 
 % for (Self, a_Self) in arrayTypes:
 extension ${Self} {
-  /// Replace the given `subRange` of elements with `newElements`.
+  /// Replace the elements within `bounds` with `newElements`.
   ///
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `newElements.isEmpty`, O(N) otherwise.
